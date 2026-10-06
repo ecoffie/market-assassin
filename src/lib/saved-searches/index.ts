@@ -39,11 +39,28 @@ export type {
   SavedSearchAlertFailureClass,
 } from './alert-drain';
 export { getSavedSearchDeliveryReadiness } from './delivery-readiness';
+export { classifyRunFailures, SAVED_SEARCH_ALERTS_JOB } from './delivery-readiness';
 export type {
   DeliveryExecutionHealth,
   DeliveryState,
   SavedSearchDeliveryReadiness,
+  SavedSearchJobStatus,
 } from './delivery-readiness';
+export {
+  composeSearchAlertStatus,
+  probeFilterReach,
+  readRecipientEvidence,
+} from './search-delivery-status';
+export type {
+  AlertHeadline,
+  FilterReach,
+  FilterReachResult,
+  FilterSupport,
+  RecipientEvidence,
+  SavedSearchAlertStatus,
+  SearchBaseline,
+  SearchDeliveryStatus,
+} from './search-delivery-status';
 export { buildSavedSearchMapUrl } from './map-url';
 export {
   canonicalizeSavedSearchFilters,

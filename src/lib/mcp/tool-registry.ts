@@ -1157,7 +1157,8 @@ const LIST_MARKET_SCHEDULES_TOOL_DEF = {
     description:
       "List the authenticated user's market watches / scheduled searches (same rows as the Map Watchlist). " +
       'Use after schedule_market_search or when the user asks what is being monitored. ' +
-      'Free read — returns schedule_id, cadence, filters, and map_url per row.',
+      'Free read — returns schedule_id, cadence, filters, map_url, and alert_status per row ' +
+      '(this search\'s own delivery vs system status — relay alert_status.summary).',
     parameters: { type: 'object', properties: {} },
   },
 };

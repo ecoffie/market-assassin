@@ -9,13 +9,20 @@ import { mcpFlags } from '@/lib/mcp/flags';
 import {
   buildSavedSearchMapUrl,
   canonicalizeSavedSearchFilters,
+  composeSearchAlertStatus,
   createSavedSearch,
   deleteSavedSearch,
   getSavedSearchDeliveryReadiness,
   listSavedSearches,
+  probeFilterReach,
+  readRecipientEvidence,
   updateSavedSearch,
   type DeliveryExecutionHealth,
   type DeliveryState,
+  type FilterReachResult,
+  type SavedSearchAlertStatus,
+  type SavedSearchDeliveryReadiness,
+  type SavedSearchJobStatus,
   type SavedSearchAlertFrequency,
   type SavedSearchMode,
   type SavedSearchRow,
@@ -39,7 +46,18 @@ export type ScheduleDeliveryMeta = {
   delivery_state: DeliveryState;
   delivery_ready: boolean;
   delivery_execution_health?: DeliveryExecutionHealth;
-  delivery_last_success_at?: string | null;
+  /** The saved-search alerts JOB (all customers' searches). Never this search's own status. */
+  saved_search_alerts_job_status?: SavedSearchJobStatus;
+  saved_search_alerts_job_reason?: string;
+  /** Last alert-job run with zero failures. A job-run time — NOT "last successful email send". */
+  delivery_last_clean_run_at?: string | null;
+  /** Last saved-search alert the email PROVIDER accepted, any account. Not inbox delivery. */
+  delivery_last_alert_provider_accepted_at?: string | null;
+  inbox_delivery?: 'not_observable';
+  /** Raw failure summary of the latest run (other searches), e.g. "email_send_rejected=3". */
+  delivery_latest_run_failures?: string | null;
+  /** Confirmed recipient suppressions in the latest run: an action item, not an outage. */
+  delivery_suppression_action_items?: Record<string, number>;
   idempotent: boolean;
   bbox_omitted?: boolean;
   bbox_restored?: boolean;
@@ -56,6 +74,8 @@ export type ScheduleMarketSearchResult = {
   map_url: string;
   idempotent: boolean;
   alert_destination: 'account_email';
+  /** What THIS search can do: saved/validated, filter reach, its own delivery, and system status. */
+  alert_status?: SavedSearchAlertStatus;
   message: string;
   _meta: ScheduleDeliveryMeta;
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string };
@@ -63,50 +83,64 @@ export type ScheduleMarketSearchResult = {
 
 function scheduleMessage(opts: {
   idempotent: boolean;
-  alertsEnabled: boolean;
-  deliveryReady: boolean;
-  deliveryState: DeliveryState;
   bboxOmitted: boolean;
+  status: SavedSearchAlertStatus;
 }): string {
-  if (opts.idempotent) {
-    return 'An identical schedule already exists for this account; returning the existing saved search.';
-  }
-
-  const parts: string[] = ['Schedule saved.'];
-
+  const parts: string[] = [
+    opts.idempotent
+      ? 'An identical schedule already exists for this account; returning the existing saved search.'
+      : '',
+    opts.status.summary,
+  ];
   if (opts.bboxOmitted) {
     parts.push('Map viewport (bbox) was not stored — only the filter set is restored via map_url.');
   }
+  return parts.filter(Boolean).join(' ');
+}
 
-  if (!opts.alertsEnabled) {
-    parts.push('Alerts are paused; no emails will be sent until alerts are re-enabled.');
-    return parts.join(' ');
-  }
+/** Delivery fields shared by every schedule tool's _meta — named for what they measure. */
+function deliveryMeta(delivery: SavedSearchDeliveryReadiness) {
+  return {
+    delivery_state: delivery.delivery_state,
+    delivery_ready: delivery.delivery_ready,
+    delivery_execution_health: delivery.execution_health,
+    saved_search_alerts_job_status: delivery.job_status,
+    saved_search_alerts_job_reason: delivery.job_status_reason,
+    delivery_last_clean_run_at: delivery.last_clean_run_at,
+    delivery_last_alert_provider_accepted_at: delivery.last_alert_provider_accepted_at,
+    inbox_delivery: delivery.inbox_delivery,
+    delivery_latest_run_failures: delivery.latest_run_failures,
+    delivery_suppression_action_items: delivery.suppression_action_items,
+  };
+}
 
-  if (opts.deliveryReady) {
-    parts.push('When new matches appear, Mindy will email your account on the selected cadence.');
-    return parts.join(' ');
-  }
+/**
+ * `_meta.degraded` for a schedule: true only when THIS search's alerts are affected — the search is
+ * blocked or failing, its filter cannot run, or the saved-search alerts job failed / is unknown.
+ * A partial failure of the job (other customers' searches) is not this search's degradation.
+ */
+function scheduleDegraded(status: SavedSearchAlertStatus): boolean {
+  if (status.search_delivery === 'paused') return false;
+  if (['search_blocked_invalid_filters', 'search_blocked_recipient', 'search_failing', 'search_filter_unsupported', 'job_failure', 'unknown'].includes(status.headline)) return true;
+  return status.job_status === 'unknown';
+}
 
-  if (opts.deliveryState === 'scheduler_unavailable') {
-    parts.push('Alert delivery infrastructure is unavailable — do not promise emails.');
-  } else if (opts.deliveryState === 'delivery_configured') {
-    parts.push(
-      'Alert delivery is configured, but no recent successful execution has been observed — do not promise emails yet.',
-    );
-  } else {
-    parts.push(
-      'Alert delivery is degraded and not currently guaranteed — the cron is missing, disabled, stale, or recently failed.',
-    );
-  }
-
-  return parts.join(' ');
+async function statusFor(
+  search: SavedSearchRow,
+  delivery: SavedSearchDeliveryReadiness,
+  reach?: FilterReachResult,
+): Promise<SavedSearchAlertStatus> {
+  const [recipient, filterReach] = await Promise.all([
+    readRecipientEvidence(search.user_email),
+    reach ? Promise.resolve(reach) : probeFilterReach(search.filters),
+  ]);
+  return composeSearchAlertStatus(search, delivery, recipient, filterReach);
 }
 
 function publicScheduleView(
   search: SavedSearchRow,
   idempotent: boolean,
-  delivery: Awaited<ReturnType<typeof getSavedSearchDeliveryReadiness>>,
+  status: SavedSearchAlertStatus,
   bboxOmitted: boolean,
 ): Omit<ScheduleMarketSearchResult, '_meta' | '_ai_hint'> {
   return {
@@ -119,13 +153,8 @@ function publicScheduleView(
     map_url: buildSavedSearchMapUrl(search.id, { src: 'mcp_schedule' }),
     idempotent,
     alert_destination: 'account_email',
-    message: scheduleMessage({
-      idempotent,
-      alertsEnabled: search.alerts_enabled,
-      deliveryReady: delivery.delivery_ready,
-      deliveryState: delivery.delivery_state,
-      bboxOmitted,
-    }),
+    alert_status: status,
+    message: scheduleMessage({ idempotent, bboxOmitted, status }),
   };
 }
 
@@ -183,18 +212,15 @@ export async function scheduleMarketSearch(input: ScheduleMarketSearchInput): Pr
   }
 
   const bboxOmitted = res.data.bbox_omitted;
-  const body = publicScheduleView(res.data.search, res.data.idempotent, delivery, bboxOmitted);
-  const alertsActive = res.data.search.alerts_enabled;
+  const status = await statusFor(res.data.search, delivery);
+  const body = publicScheduleView(res.data.search, res.data.idempotent, status, bboxOmitted);
   const result: ScheduleMarketSearchResult = {
     ...body,
     _meta: {
       grounded: true,
-      degraded: delivery.delivery_state === 'delivery_degraded' && alertsActive,
+      degraded: scheduleDegraded(status),
       schedule_saved: true,
-      delivery_state: delivery.delivery_state,
-      delivery_ready: delivery.delivery_ready,
-      delivery_execution_health: delivery.execution_health,
-      delivery_last_success_at: delivery.last_success_at,
+      ...deliveryMeta(delivery),
       idempotent: res.data.idempotent,
       bbox_omitted: bboxOmitted,
       bbox_restored: !bboxOmitted,
@@ -206,6 +232,8 @@ export async function scheduleMarketSearch(input: ScheduleMarketSearchInput): Pr
 
 export type ListMarketSchedulesInput = { userEmail: string };
 
+const LIST_REACH_PROBE_CAP = 25;
+
 export type ListMarketSchedulesResult = {
   schedules: Array<{
     schedule_id: string;
@@ -215,6 +243,7 @@ export type ListMarketSchedulesResult = {
     mode: SavedSearchMode;
     filters: Record<string, unknown>;
     map_url: string;
+    alert_status?: SavedSearchAlertStatus;
   }>;
   count: number;
   _meta: {
@@ -223,7 +252,13 @@ export type ListMarketSchedulesResult = {
     delivery_state: DeliveryState;
     delivery_ready: boolean;
     delivery_execution_health: DeliveryExecutionHealth;
-    delivery_last_success_at: string | null;
+    saved_search_alerts_job_status: SavedSearchJobStatus;
+    saved_search_alerts_job_reason: string;
+    delivery_last_clean_run_at: string | null;
+    delivery_last_alert_provider_accepted_at: string | null;
+    inbox_delivery: 'not_observable';
+    delivery_latest_run_failures: string | null;
+    delivery_suppression_action_items: Record<string, number>;
     count: number;
   };
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string };
@@ -239,16 +274,26 @@ export async function listMarketSchedules(input: ListMarketSchedulesInput): Prom
       _meta: {
         grounded: false,
         degraded: res.code === 'scheduler_unavailable',
+        ...deliveryMeta(delivery),
         delivery_state: res.code === 'scheduler_unavailable' ? 'scheduler_unavailable' : delivery.delivery_state,
         delivery_ready: false,
-        delivery_execution_health: delivery.execution_health,
-        delivery_last_success_at: delivery.last_success_at,
         count: 0,
       },
     };
   }
 
-  const schedules = res.data.searches.map((s) => ({
+  // Every schedule belongs to the caller, so recipient evidence is read once. Filter reach is
+  // probed per search (bounded); beyond the cap it is reported as unknown, never guessed.
+  const searches = res.data.searches;
+  const recipient = searches.length ? await readRecipientEvidence(input.userEmail) : null;
+  const reaches = await Promise.all(
+    searches.map((s, i) => (i < LIST_REACH_PROBE_CAP
+      ? probeFilterReach(s.filters)
+      : Promise.resolve<FilterReachResult>({ reach: 'unknown', detail: 'not probed (list cap)' }))),
+  );
+  const statuses = searches.map((s, i) => composeSearchAlertStatus(s, delivery, recipient!, reaches[i]));
+
+  const schedules = searches.map((s, i) => ({
     schedule_id: s.id,
     name: s.name,
     cadence: s.alert_frequency,
@@ -256,6 +301,7 @@ export async function listMarketSchedules(input: ListMarketSchedulesInput): Prom
     mode: s.mode,
     filters: canonicalizeSavedSearchFilters(s.filters),
     map_url: buildSavedSearchMapUrl(s.id, { src: 'mcp_schedule' }),
+    alert_status: statuses[i],
   }));
 
   return {
@@ -263,11 +309,8 @@ export async function listMarketSchedules(input: ListMarketSchedulesInput): Prom
     count: schedules.length,
     _meta: {
       grounded: true,
-      degraded: delivery.delivery_state === 'delivery_degraded',
-      delivery_state: delivery.delivery_state,
-      delivery_ready: delivery.delivery_ready,
-      delivery_execution_health: delivery.execution_health,
-      delivery_last_success_at: delivery.last_success_at,
+      degraded: statuses.some(scheduleDegraded),
+      ...deliveryMeta(delivery),
       count: schedules.length,
     },
   };
@@ -287,6 +330,7 @@ export type UpdateMarketScheduleResult = {
   alerts_enabled: boolean;
   name: string;
   map_url: string;
+  alert_status?: SavedSearchAlertStatus;
   message: string;
   _meta: {
     grounded: boolean;
@@ -295,7 +339,13 @@ export type UpdateMarketScheduleResult = {
     delivery_state: DeliveryState;
     delivery_ready: boolean;
     delivery_execution_health: DeliveryExecutionHealth;
-    delivery_last_success_at: string | null;
+    saved_search_alerts_job_status: SavedSearchJobStatus;
+    saved_search_alerts_job_reason: string;
+    delivery_last_clean_run_at: string | null;
+    delivery_last_alert_provider_accepted_at: string | null;
+    inbox_delivery: 'not_observable';
+    delivery_latest_run_failures: string | null;
+    delivery_suppression_action_items: Record<string, number>;
     noop?: boolean;
   };
 };
@@ -322,21 +372,19 @@ export async function updateMarketSchedule(input: UpdateMarketScheduleInput): Pr
         grounded: false,
         degraded: res.code === 'scheduler_unavailable',
         schedule_saved: false,
+        ...deliveryMeta(delivery),
         delivery_state: res.code === 'scheduler_unavailable' ? 'scheduler_unavailable' : delivery.delivery_state,
         delivery_ready: false,
-        delivery_execution_health: delivery.execution_health,
-        delivery_last_success_at: delivery.last_success_at,
       },
     };
   }
 
   const s = res.data.search;
+  const status = await statusFor(s, delivery);
   const message = res.data.noop
-    ? 'No changes — schedule already matches the requested update.'
+    ? `No changes — schedule already matches the requested update. ${status.summary}`
     : s.alerts_enabled
-      ? delivery.delivery_ready
-        ? 'Schedule updated. Alert emails will continue on the selected cadence when delivery infrastructure is healthy.'
-        : 'Schedule updated, but alert delivery is not currently guaranteed.'
+      ? `Schedule updated. ${status.summary}`
       : 'Schedule updated. Alerts are paused — prefer this over delete when stopping emails.';
 
   return {
@@ -345,15 +393,13 @@ export async function updateMarketSchedule(input: UpdateMarketScheduleInput): Pr
     alerts_enabled: s.alerts_enabled,
     name: s.name,
     map_url: buildSavedSearchMapUrl(s.id, { src: 'mcp_schedule' }),
+    alert_status: status,
     message,
     _meta: {
       grounded: true,
-      degraded: delivery.delivery_state === 'delivery_degraded' && s.alerts_enabled,
+      degraded: scheduleDegraded(status),
       schedule_saved: true,
-      delivery_state: delivery.delivery_state,
-      delivery_ready: delivery.delivery_ready,
-      delivery_execution_health: delivery.execution_health,
-      delivery_last_success_at: delivery.last_success_at,
+      ...deliveryMeta(delivery),
       noop: res.data.noop,
     },
   };
@@ -418,16 +464,21 @@ function buildScheduleHint(r: ScheduleMarketSearchResult): NonNullable<ScheduleM
       key_caveats: 'No row was created.',
     };
   }
-  const deliveryNote = r._meta.delivery_ready
-    ? 'Delivery is enabled and a recent successful saved-search-alerts run was observed.'
-    : `Delivery state is ${r._meta.delivery_state} — do not promise email until delivery_ready is true.`;
+  const st = r.alert_status;
+  const deliveryNote = st
+    ? `${st.summary} (headline=${st.headline}, search_delivery=${st.search_delivery}, saved_search_alerts_job=${st.job_status}).`
+    : `Delivery state is ${r._meta.delivery_state}.`;
   return {
     summary: r.idempotent
-      ? `Existing schedule "${r.name}" (${r.cadence}) is already saved for this filter set.`
+      ? `Existing schedule "${r.name}" (${r.cadence}) is already saved for this filter set. ${deliveryNote}`
       : `Saved schedule "${r.name}" (${r.cadence}). ${deliveryNote}`,
     how_to_use: `Share map_url for the saved Map view. Email links from Mindy will use the same ?ss= id with optional ?opp= per opportunity.`,
     key_caveats:
       'Do not quote or invent the user email address. alert_destination=account_email only. ' +
+      'Relay alert_status.summary; do not restate system status as this search failing. ' +
+      'Describe THIS search first (alert_status.summary). Job-level fields are about the "saved-search alerts" job only — never generalize them to all Mindy email. ' +
+      'delivery_last_clean_run_at is the last job run with no processing failure — never call it "last successful send"; ' +
+      'delivery_last_alert_provider_accepted_at is the last alert accepted by the email provider (inbox delivery is not observable). ' +
       (r._meta.bbox_omitted ? 'bbox was omitted — viewport is NOT restored.' : ''),
   };
 }

@@ -45,6 +45,13 @@ export const SCHEDULE_MARKET_SEARCH_DESCRIPTION =
   'time, explain those three options and get confirmation BEFORE saving. Emails go to the ' +
   'authenticated Mindy account only; do NOT pass a recipient email. Returns schedule_id, ' +
   'cadence, canonical filters, map_url (?ss=), and alert_destination=account_email. ' +
+  'Report delivery from alert_status: describe THIS search first (summary/headline: blocked, ' +
+  'skipped, not yet checked, checked with no alert sent yet, delivered), then — only if relevant — the ' +
+  '"saved-search alerts" job (partial failure vs confirmed job failure), labelled as that job and never ' +
+  'as Mindy email in general. Never call delivery_last_clean_run_at a "last successful send"; provider ' +
+  'acceptance is not inbox delivery; never tell the user their emails will not arrive because other ' +
+  'searches failed. Do not promise a future alert: one is sent only if a scheduled check finds a new ' +
+  'matching notice and the send succeeds. ' +
   'Idempotent: identical filter+cadence returns the existing schedule. Before telling the ' +
   'user that scheduling is unavailable, list/inspect available tools — this tool is ' +
   'schedule_market_search.';

@@ -1,20 +1,55 @@
 import { getAppSupabase } from '@/lib/app/workspace';
+import { classifyObservation } from '@/lib/cron/watchdog-incidents';
+
+/**
+ * Status of the SAVED-SEARCH ALERTS job (cron `saved-search-alerts`) — one named job, never "Mindy
+ * email" in general. Deliberately separate from any one search's status (search-delivery-status.ts).
+ *
+ * Failure classes come from the job's own self-report (`cron_job_runs.error`, e.g.
+ * "unexpected_schedule_error=1,recipient_suppressed=3") and are split by the SAME classifier the
+ * watchdog uses (`classifyObservation` in src/lib/cron/watchdog-incidents.ts) so the two can never
+ * drift: `recipient_suppressed` is the only non-outage class; `suppression_lookup_failed`,
+ * `invalid_recipient_address`, legacy `email_send_rejected` etc. are processing failures.
+ *
+ * Reporting rules:
+ *   healthy          the run in today's window finished with no processing failure. Confirmed
+ *                    suppressions are listed as action items, not failures.
+ *   partial_failure  some searches failed (per-search classes, or a capacity backlog) and the job
+ *                    otherwise ran: it evaluated searches or the provider accepted alerts.
+ *   job_failure      CONFIRMED: storage missing, job missing/disabled/unschedulable, no run in today's
+ *                    window, a run-level failure (timeout, saved_search_query_failed, non-2xx,
+ *                    unclassifiable error), or a failed run that evaluated nothing and sent nothing.
+ *   not_observed     configured, never seen to run.
+ *   unknown          evidence unreadable or today's run not yet reported — never turned into 0 or healthy.
+ * Zero alerts sent never implies a failure on its own: a clean run that checked every due search and
+ * found no new match (or only took first-check baselines) is `healthy` with no email required. A
+ * failure needs a recorded failure class or run-level evidence; zero sends only matters alongside one.
+ */
+export type SavedSearchJobStatus = 'healthy' | 'partial_failure' | 'job_failure' | 'not_observed' | 'unknown';
 
 export type DeliveryState =
   | 'delivery_ready'
+  | 'delivery_partial'
   | 'delivery_configured'
   | 'delivery_degraded'
+  | 'delivery_unknown'
   | 'scheduler_unavailable';
 
 export type DeliveryExecutionHealth =
   | 'recent_success'
-  | 'not_observed'
-  | 'stale_success'
+  | 'partial_failure'
   | 'latest_failed'
+  | 'unreported'
+  | 'stale_success'
+  | 'not_observed'
   | 'invalid_daily_schedule'
   | 'service_unavailable';
 
+export const SAVED_SEARCH_ALERTS_JOB = 'saved-search-alerts' as const;
+
 export type SavedSearchDeliveryReadiness = {
+  /** Always 'saved-search-alerts': every job-level field below is about this one named job. */
+  job: typeof SAVED_SEARCH_ALERTS_JOB;
   storage_ready: boolean;
   cron_registered: boolean;
   cron_enabled: boolean;
@@ -24,10 +59,35 @@ export type SavedSearchDeliveryReadiness = {
   cron_expr: string | null;
   last_run_at: string | null;
   last_run_status: string | null;
-  last_success_at: string | null;
+  /**
+   * Last run with NO processing failure (confirmed suppression is not one). A JOB-RUN time, NOT the
+   * last alert email: one failing search marks a whole run `error`. Never present it as "last
+   * successful send" (it once read Sept 29 while alerts were going out daily).
+   */
+  last_clean_run_at: string | null;
+  /** Last saved-search alert ACCEPTED BY THE EMAIL PROVIDER. Not inbox delivery. null = none or unreadable. */
+  last_alert_provider_accepted_at: string | null;
+  /** Inbox placement is never observed by Mindy; acceptance by the provider is the furthest evidence. */
+  inbox_delivery: 'not_observable';
+  /** The run this status judges (latest terminal run in today's window), if any. */
+  latest_run_started_at: string | null;
+  latest_run_in_window: boolean;
+  /** Raw self-reported failure summary of that run. */
+  latest_run_failures: string | null;
+  /** Processing-failure classes (outage-relevant), split by the watchdog's classifier. */
+  latest_run_processing_failures: Record<string, number>;
+  /** Confirmed recipient suppressions: an ACTION ITEM for those recipients, never an outage. */
+  suppression_action_items: Record<string, number>;
+  /** Alerts the provider accepted during that run. null = unreadable / not measured (never 0). */
+  latest_run_alerts_provider_accepted: number | null;
+  /** Searches the run evaluated (stamped). null = unreadable / not measured (never 0). */
+  latest_run_searches_evaluated: number | null;
+  /** Why the job status is what it is, in plain words, prefixed with the job name. */
+  job_status_reason: string;
   execution_health: DeliveryExecutionHealth;
   delivery_state: DeliveryState;
-  /** True only when config is enabled and a recent successful daily run is observed. */
+  job_status: SavedSearchJobStatus;
+  /** True when the run in today's window delivered (healthy or partial_failure). */
   delivery_ready: boolean;
 };
 
@@ -35,6 +95,14 @@ const SAVED_SEARCH_ALERTS_ROUTE_PREFIX = '/api/cron/saved-search-alerts';
 const DAILY_WINDOW_GRACE_MS = 2 * 60 * 60 * 1000;
 const EARLY_START_TOLERANCE_MS = 5 * 60 * 1000;
 const RUN_HISTORY_LIMIT = 45;
+/** The route self-aborts before its 290s platform timeout; a run's effects cannot be later than this. */
+const RUN_EFFECT_WINDOW_MS = 300_000;
+const RUN_FINISH_SLACK_MS = 60_000;
+/** Provider statuses meaning "accepted for delivery" (Resend 'delivered' = handed to the receiving server, not the inbox). */
+const ACCEPTED_STATUSES = ['sent', 'delivered'];
+/** Failure classes that mean the job itself could not run, not that one search failed. */
+const RUN_LEVEL_CLASSES = new Set(['saved_search_query_failed']);
+const TERMINAL_STATUSES = new Set(['success', 'error', 'partial', 'timeout', 'failed']);
 
 type CronConfigRow = {
   job_name: string;
@@ -47,9 +115,23 @@ type CronConfigRow = {
 
 type CronRunRow = {
   started_at: string;
+  finished_at?: string | null;
   status: string;
   http_status: number | null;
+  error?: string | null;
 };
+
+/** Split a run's self-reported failures with the watchdog's classifier (single source of truth). */
+export function classifyRunFailures(status: string | null | undefined, error: string | null | undefined) {
+  const c = classifyObservation({ key: SAVED_SEARCH_ALERTS_JOB, kind: 'failing', status: status ?? 'error', error: error ?? null });
+  return {
+    processing: c.processing,
+    suppression: c.suppression,
+    suppressionOnly: c.suppressionOnly,
+    /** Free-text error that is not a class list — cannot be attributed to individual searches. */
+    unclassified: !!(error && error.trim()) && c.signature.includes('|msg:'),
+  };
+}
 
 function tableMissing(error: { code?: string; message?: string } | null): boolean {
   return !!error && (error.code === '42P01' || (error.message || '').includes('saved_searches'));
@@ -87,22 +169,100 @@ function runTimestamp(run: CronRunRow): number {
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
-function isSuccessfulRun(run: CronRunRow): boolean {
-  if (run.status !== 'success') return false;
-  // Long routes self-report after the dispatcher has stopped listening, so
-  // http_status remains null. The route-authored terminal status is authoritative;
-  // an explicit non-2xx still cannot count as success.
-  return run.http_status === null
-    || (run.http_status >= 200 && run.http_status < 300);
-}
-
-function isFailedRun(run: CronRunRow): boolean {
-  if (['error', 'timeout', 'failed', 'partial'].includes(run.status)) return true;
+function non2xx(run: CronRunRow): boolean {
   return typeof run.http_status === 'number' && (run.http_status < 200 || run.http_status >= 300);
 }
 
-function unavailableReadiness(): SavedSearchDeliveryReadiness {
+/** A run with no processing failure: success, or failures that are ONLY confirmed suppressions. */
+function isCleanRun(run: CronRunRow): boolean {
+  if (non2xx(run)) return false;
+  if (run.status === 'success') return true;
+  return run.status === 'error' && classifyRunFailures(run.status, run.error).suppressionOnly;
+}
+
+function runWindow(run: CronRunRow): { start: string; end: string } | null {
+  const start = runTimestamp(run);
+  if (!start) return null;
+  const finished = run.finished_at ? Date.parse(run.finished_at) : NaN;
+  const end = Number.isFinite(finished) ? finished + RUN_FINISH_SLACK_MS : start + RUN_EFFECT_WINDOW_MS;
+  return { start: new Date(start).toISOString(), end: new Date(end).toISOString() };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function lastAlertAcceptedAt(supabase: any): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('email_provider_sends')
+    .select('sent_at')
+    .eq('email_type', 'saved_search_alert')
+    .in('status', ACCEPTED_STATUSES)
+    .order('sent_at', { ascending: false })
+    .limit(1);
+  if (error) return null;
+  return (data?.[0]?.sent_at as string | undefined) ?? null;
+}
+
+/** Provider-accepted alerts during one run. null = unreadable — an unknown is never a zero. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function alertsAcceptedDuringRun(supabase: any, run: CronRunRow): Promise<number | null> {
+  const w = runWindow(run);
+  if (!w) return null;
+  const { count, error } = await supabase
+    .from('email_provider_sends')
+    .select('id', { count: 'exact', head: true })
+    .eq('email_type', 'saved_search_alert')
+    .in('status', ACCEPTED_STATUSES)
+    .gte('sent_at', w.start)
+    .lte('sent_at', w.end);
+  if (error || count === null || count === undefined) return null;
+  return count;
+}
+
+/**
+ * Searches the run evaluated: every evaluation (baseline, no new matches, send) stamps
+ * last_alerted_at, so the count stamped inside the run's window is the run's evaluated set. Valid for
+ * the LATEST run only (a later run re-stamps). null = unreadable.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function searchesEvaluatedDuringRun(supabase: any, run: CronRunRow): Promise<number | null> {
+  const w = runWindow(run);
+  if (!w) return null;
+  const { count, error } = await supabase
+    .from('saved_searches')
+    .select('id', { count: 'exact', head: true })
+    .gte('last_alerted_at', w.start)
+    .lte('last_alerted_at', w.end);
+  if (error || count === null || count === undefined) return null;
+  return count;
+}
+
+function counts(c: Record<string, number>): string {
+  return Object.entries(c).map(([k, n]) => `${k}=${n}`).join(', ');
+}
+
+function stateFor(job: SavedSearchJobStatus): DeliveryState {
+  switch (job) {
+    case 'healthy': return 'delivery_ready';
+    case 'partial_failure': return 'delivery_partial';
+    case 'job_failure': return 'delivery_degraded';
+    case 'not_observed': return 'delivery_configured';
+    case 'unknown': return 'delivery_unknown';
+  }
+}
+
+const NO_RUN_EVIDENCE = {
+  last_clean_run_at: null,
+  latest_run_started_at: null,
+  latest_run_in_window: false,
+  latest_run_failures: null,
+  latest_run_processing_failures: {},
+  suppression_action_items: {},
+  latest_run_alerts_provider_accepted: null,
+  latest_run_searches_evaluated: null,
+};
+
+function unavailableReadiness(job_status: SavedSearchJobStatus, reason: string): SavedSearchDeliveryReadiness {
   return {
+    job: SAVED_SEARCH_ALERTS_JOB,
     storage_ready: false,
     cron_registered: false,
     cron_enabled: false,
@@ -112,18 +272,21 @@ function unavailableReadiness(): SavedSearchDeliveryReadiness {
     cron_expr: null,
     last_run_at: null,
     last_run_status: null,
-    last_success_at: null,
+    ...NO_RUN_EVIDENCE,
+    last_alert_provider_accepted_at: null,
+    inbox_delivery: 'not_observable',
+    job_status_reason: `saved-search alerts: ${reason}`,
     execution_health: 'service_unavailable',
-    delivery_state: 'scheduler_unavailable',
+    delivery_state: job_status === 'job_failure' ? 'scheduler_unavailable' : 'delivery_unknown',
+    job_status,
     delivery_ready: false,
   };
 }
 
 /**
- * Read-only probe: storage, cron configuration, and sanitized execution evidence.
- * `delivery_ready` is earned only by a terminal success in the expected daily window,
- * with no later failed run. Long routes self-report that terminal status after the
- * dispatcher aborts, so http_status may remain null. `dispatched` alone is never success.
+ * Read-only probe of the saved-search alerts job. Judges the latest terminal run in today's expected
+ * daily window with the rules in the header. `dispatched` alone is never success; long routes
+ * self-report their terminal status after the dispatcher aborts, so http_status may be null.
  */
 export async function getSavedSearchDeliveryReadiness(
   now: Date = new Date(),
@@ -131,15 +294,18 @@ export async function getSavedSearchDeliveryReadiness(
   const supabase = getAppSupabase();
 
   const { error: storageErr } = await supabase.from('saved_searches').select('id').limit(1);
-  if (storageErr || tableMissing(storageErr)) return unavailableReadiness();
+  if (storageErr) {
+    return tableMissing(storageErr)
+      ? unavailableReadiness('job_failure', 'saved-search storage is missing')
+      : unavailableReadiness('unknown', 'saved-search storage could not be read');
+  }
 
   const { data: cronRows, error: cronErr } = await supabase
     .from('cron_jobs')
     .select('job_name, route, enabled, cron_expr, last_run_at, last_status')
     .ilike('route', `${SAVED_SEARCH_ALERTS_ROUTE_PREFIX}%`)
     .limit(1);
-
-  if (cronErr) return unavailableReadiness();
+  if (cronErr) return unavailableReadiness('unknown', 'the job registration could not be read');
 
   const cronRow = cronRows?.length ? (cronRows[0] as CronConfigRow) : null;
   const cron_registered = !!cronRow;
@@ -147,6 +313,7 @@ export async function getSavedSearchDeliveryReadiness(
   const cron_schedule_daily = cronRow ? parseDailyCron(cronRow.cron_expr) !== null : false;
 
   const base = {
+    job: SAVED_SEARCH_ALERTS_JOB,
     storage_ready: true,
     cron_registered,
     cron_enabled,
@@ -156,83 +323,105 @@ export async function getSavedSearchDeliveryReadiness(
     cron_expr: cronRow?.cron_expr ?? null,
     last_run_at: cronRow?.last_run_at ?? null,
     last_run_status: cronRow?.last_status ?? null,
+    inbox_delivery: 'not_observable' as const,
   };
 
-  if (!cronRow || !cron_enabled) {
-    return {
-      ...base,
-      last_success_at: null,
-      execution_health: 'not_observed',
-      delivery_state: 'delivery_degraded',
-      delivery_ready: false,
-    };
-  }
+  const finish = (
+    job_status: SavedSearchJobStatus,
+    execution_health: DeliveryExecutionHealth,
+    reason: string,
+    evidence: Omit<SavedSearchDeliveryReadiness, keyof typeof base | 'job_status' | 'execution_health' | 'job_status_reason' | 'delivery_state' | 'delivery_ready'>,
+  ): SavedSearchDeliveryReadiness => ({
+    ...base,
+    ...evidence,
+    job_status,
+    execution_health,
+    job_status_reason: `saved-search alerts: ${reason}`,
+    delivery_state: stateFor(job_status),
+    delivery_ready: job_status === 'healthy' || job_status === 'partial_failure',
+  });
 
+  if (!cronRow || !cron_enabled) {
+    return finish('job_failure', 'not_observed', cronRow ? 'the job is disabled' : 'the job is not registered', {
+      ...NO_RUN_EVIDENCE, last_alert_provider_accepted_at: await lastAlertAcceptedAt(supabase),
+    });
+  }
   if (!cron_schedule_daily) {
-    return {
-      ...base,
-      last_success_at: null,
-      execution_health: 'invalid_daily_schedule',
-      delivery_state: 'delivery_degraded',
-      delivery_ready: false,
-    };
+    return finish('job_failure', 'invalid_daily_schedule', `the job schedule "${cronRow.cron_expr}" is not daily`, {
+      ...NO_RUN_EVIDENCE, last_alert_provider_accepted_at: await lastAlertAcceptedAt(supabase),
+    });
   }
 
   const { data: runRows, error: runsErr } = await supabase
     .from('cron_job_runs')
-    .select('started_at, status, http_status')
+    .select('started_at, finished_at, status, http_status, error')
     .eq('job_name', cronRow.job_name)
     .order('started_at', { ascending: false })
     .limit(RUN_HISTORY_LIMIT);
-
-  if (runsErr) return unavailableReadiness();
+  if (runsErr) return unavailableReadiness('unknown', 'the job run history could not be read');
 
   const runs = (runRows || []) as CronRunRow[];
-  const latestSuccess = runs.find(isSuccessfulRun) ?? null;
-  const latestFailure = runs.find(isFailedRun) ?? null;
   const expectedAt = expectedDailyRunAt(cronRow.cron_expr, now);
-  const successAt = latestSuccess ? runTimestamp(latestSuccess) : 0;
-  const failureAt = latestFailure ? runTimestamp(latestFailure) : 0;
-  const successInWindow = !!expectedAt
-    && successAt >= expectedAt.getTime() - EARLY_START_TOLERANCE_MS
-    && successAt <= expectedAt.getTime() + DAILY_WINDOW_GRACE_MS;
-  const failureSupersedesSuccess = failureAt > successAt;
+  // A run counts as current if it started at or after the most recent expected run (minus a small
+  // early-start tolerance). No upper bound: today's run that already finished inside its grace period
+  // is newer evidence than yesterday's, and judging the older one would read stamps it overwrote.
+  const inWindow = (r: CronRunRow) => !!expectedAt && runTimestamp(r) >= expectedAt.getTime() - EARLY_START_TOLERANCE_MS;
+  const judged = runs.find((r) => inWindow(r) && TERMINAL_STATUSES.has(r.status)) ?? null;
+  const lastClean = runs.find(isCleanRun) ?? null;
+  const acceptedAt = await lastAlertAcceptedAt(supabase);
 
-  if (successInWindow && !failureSupersedesSuccess) {
-    return {
-      ...base,
-      last_success_at: latestSuccess?.started_at ?? null,
-      execution_health: 'recent_success',
-      delivery_state: 'delivery_ready',
-      delivery_ready: true,
-    };
-  }
-
-  if (failureSupersedesSuccess) {
-    return {
-      ...base,
-      last_success_at: latestSuccess?.started_at ?? null,
-      execution_health: 'latest_failed',
-      delivery_state: 'delivery_degraded',
-      delivery_ready: false,
-    };
-  }
-
-  if (latestSuccess) {
-    return {
-      ...base,
-      last_success_at: latestSuccess.started_at,
-      execution_health: 'stale_success',
-      delivery_state: 'delivery_degraded',
-      delivery_ready: false,
-    };
-  }
-
-  return {
-    ...base,
-    last_success_at: null,
-    execution_health: 'not_observed',
-    delivery_state: 'delivery_configured',
-    delivery_ready: false,
+  const shared = {
+    ...NO_RUN_EVIDENCE,
+    last_clean_run_at: lastClean?.started_at ?? null,
+    last_alert_provider_accepted_at: acceptedAt,
   };
+
+  if (!judged) {
+    if (runs.some(inWindow)) return finish('unknown', 'unreported', "today's run has started but not reported an outcome", shared);
+    if (!runs.length) return finish('not_observed', 'not_observed', 'the job has never been seen to run', shared);
+    return finish('job_failure', 'stale_success', "the job did not run in today's window", shared);
+  }
+
+  const cls = classifyRunFailures(judged.status, judged.error);
+  const [sent, evaluated] = await Promise.all([
+    alertsAcceptedDuringRun(supabase, judged),
+    searchesEvaluatedDuringRun(supabase, judged),
+  ]);
+  const evidence = {
+    ...shared,
+    latest_run_started_at: judged.started_at,
+    latest_run_in_window: true,
+    latest_run_failures: judged.error || null,
+    latest_run_processing_failures: cls.processing,
+    suppression_action_items: cls.suppression,
+    latest_run_alerts_provider_accepted: sent,
+    latest_run_searches_evaluated: evaluated,
+  };
+  const ran = `evaluated ${evaluated ?? 'an unknown number of'} searches, ${sent ?? 'an unknown number of'} alerts accepted by the email provider`;
+
+  if (isCleanRun(judged)) {
+    // A clean run checked every due search without a processing failure. Zero emails then means no
+    // checked search had a new match (or it was taking its first-check baseline): nothing was owed.
+    const sup = Object.keys(cls.suppression).length ? `; action item: ${counts(cls.suppression)} (confirmed suppressed recipients)` : '';
+    const none = sent === 0 ? '; no alert email was required (no checked search had a new match)' : '';
+    return finish('healthy', 'recent_success', `latest run completed (${ran})${none}${sup}`, evidence);
+  }
+
+  const runLevel = Object.keys(cls.processing).filter((k) => RUN_LEVEL_CLASSES.has(k));
+  const unattributed = judged.status === 'error' && !Object.keys(cls.processing).length && !Object.keys(cls.suppression).length;
+  if (non2xx(judged) || judged.status === 'timeout' || judged.status === 'failed' || cls.unclassified || unattributed || runLevel.length) {
+    const why = runLevel.length ? counts(Object.fromEntries(runLevel.map((k) => [k, cls.processing[k]])))
+      : cls.unclassified ? (judged.error || '').slice(0, 120) : unattributed ? 'run error with no failure detail' : `run ${judged.status}${judged.http_status ? ` (HTTP ${judged.http_status})` : ''}`;
+    return finish('job_failure', 'latest_failed', `latest run failed as a whole (${why})`, evidence);
+  }
+
+  // Per-search processing failures and/or a capacity backlog: the job ran; some searches failed.
+  if (sent === null || evaluated === null) {
+    return finish('unknown', 'latest_failed', `latest run reported ${counts(cls.processing) || 'a backlog'}; whether other searches were processed could not be read`, evidence);
+  }
+  if (sent === 0 && evaluated === 0) {
+    return finish('job_failure', 'latest_failed', `latest run reported ${counts(cls.processing) || 'a backlog'} and evaluated no searches`, evidence);
+  }
+  const what = Object.keys(cls.processing).length ? `${counts(cls.processing)} failed` : 'a backlog was left unprocessed';
+  return finish('partial_failure', 'partial_failure', `partial failure: ${what}; the rest ran (${ran})`, evidence);
 }
