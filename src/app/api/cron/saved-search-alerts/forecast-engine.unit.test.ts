@@ -463,3 +463,27 @@ describe('DELIVERY GUARANTEES — overlapping runs, failure before send, save fa
     expect(state.search!.forecast_seen_through).toBe('2026-09-24T11:00:00.000Z');
   });
 });
+
+describe('a filter forecasts cannot represent (Marine Corps) — the Forecast half is withheld, never run unfiltered', () => {
+  for (const engine of ['canonical', 'legacy'] as const) {
+    it(`${engine}: no forecast query, no forecast email, coverage says unsupported_filter; Open still evaluated`, async () => {
+      if (engine === 'legacy') delete process.env.SAVED_SEARCH_FORECAST_CANONICAL;
+      state.search = search({ naics: '541611', subAgency: 'Marine Corps', horizons: { open: true, forecast: true } }, engine === 'legacy' ? { forecast_seen_through: null } : {});
+      state.forecasts = [fc('VA', '2026-09-24T02:00:00Z'), fc('DHS', '2026-09-24T03:00:00Z')];
+      const { status, body } = await run();
+      expect(status).toBe(200);
+      expect(state.forecastQueries).toHaveLength(0);
+      expect(forecastEmails()).toHaveLength(0);
+      expect(body.forecastCoverage).toEqual({ unsupported_filter: 1 });
+      expect(body.processed).toBe(1);
+    });
+  }
+
+  it('control: the same search WITHOUT the Marine Corps filter still runs the Forecast half', async () => {
+    state.search = search({ naics: '541611', subAgency: 'DEPT OF THE NAVY', horizons: { open: true, forecast: true } });
+    state.forecasts = [fc('VA', '2026-09-24T02:00:00Z')];
+    const { body } = await run();
+    expect(state.forecastQueries.length).toBeGreaterThan(0);
+    expect(body.forecastCoverage?.unsupported_filter).toBeUndefined();
+  });
+});

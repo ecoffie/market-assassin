@@ -7472,3 +7472,25 @@ nightly job reported failures every day while the provider ledger shows 46 alert
 alert sent, not "no successful sends since Sept 29" (unit tests `delivery-readiness.unit.test.ts`,
 `schedule-market-search.unit.test.ts`).
 
+---
+
+## "Marine Corps" means the Marine Corps (2026-10-06)
+
+**What.** Filtering opportunities, map views and saved-search alerts by "Marine Corps" (or "USMC")
+now returns Marine Corps contracting offices. Previously it returned nothing, because SAM.gov files
+every Marine Corps notice under the Department of the Navy.
+
+**Why it matters.** Small businesses that target the Marine Corps were getting empty results and
+silent watches. Mindy now reads SAM's own organization hierarchy for the contracting office, so the
+filter selects Marine Corps buying offices without pulling in the rest of the Navy.
+
+**Honest scope.** Covers SAM.gov opportunities (Map open notices, saved-search alerts). A few Navy
+notices that SAM publishes without a contracting-office path cannot be attributed and are not
+included. Recompete and forecast views still use their own agency fields.
+
+**SEO.** Marine Corps contracting opportunities / USMC government contracts / Marine Corps RFPs small business.
+
+**Proof.** SAM.gov opportunity data in Mindy (2026-10-06): 1,135 Marine Corps notices identified
+through the SAM Federal Hierarchy path, 19 open, versus 0 before. Unit test
+`hierarchy-sub-agency.unit.test.ts` checks real Marine Corps and non-Marine Navy notices.
+
