@@ -7447,10 +7447,12 @@ lookup_solicitation, get_legislation_status, get_solicitation_documents, find_ca
 ## Honest alert status: what YOUR watch can do, not a guess about everyone's (2026-10-05)
 
 **What.** When a customer saves a market watch through Mindy's AI connector, the response now
-reports five things separately: the search was saved and validated; whether its filters have ever
-matched a notice; whether delivery for this search has actually been tested yet (the first check
-records current matches without emailing); whether this search's own delivery is blocked or
-failing; and whether alert delivery is degraded for other searches or confirmed down for everyone.
+reports these separately: the search was saved and validated; whether its filters have matched a
+notice, have not matched one YET (a future posting can still alert), or use a value that cannot
+select anything in the data; whether delivery for this search has actually been tested yet (the
+first check records current matches without emailing); whether this search's own delivery is
+blocked or failing; and whether delivery is partially degraded for other searches or confirmed
+down for everyone.
 
 **Why it matters.** A single failing search used to mark the whole nightly alert run as failed,
 and an AI assistant turned that into "Mindy's email alerts are unreliable" for a customer whose
@@ -7460,13 +7462,13 @@ succeeded. Customers now hear what is true about their own watch, with real warn
 **Honest scope.** Status is computed from Mindy's own job records and the email provider's send
 ledger. It can say a watch was skipped by the latest run or that its recipient is suppressed; it
 cannot see an email after the provider accepts it (inbox placement). Filter reach checks Mindy's
-SAM.gov opportunity corpus only.
+SAM.gov opportunity corpus only, and "no matches yet" is never presented as "will never alert".
 
 **SEO.** reliable federal contract alerts / SAM.gov opportunity email alerts / saved search alerts government contracts.
 
 **Proof.** Replayed against the real production run history of 2026-09-29 to 2026-10-05: the
 nightly job reported failures every day while the provider ledger shows 46 alert emails sent on
-2026-10-04 and 48 on 2026-10-05. The new status reports partial degradation with Oct 5 as the last
+2026-10-04 (from 118 searches evaluated) and 48 on 2026-10-05 (from 134 evaluated). The new status reports partial degradation with Oct 5 as the last
 alert sent, not "no successful sends since Sept 29" (unit tests `delivery-readiness.unit.test.ts`,
 `schedule-market-search.unit.test.ts`).
 

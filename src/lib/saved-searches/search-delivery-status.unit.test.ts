@@ -23,6 +23,8 @@ const system = (over: Partial<SavedSearchDeliveryReadiness> = {}): SavedSearchDe
   latest_run_started_at: '2026-10-05T11:00:29Z',
   latest_run_in_window: true,
   latest_run_failures: 'unexpected_schedule_error=1,email_send_rejected=3',
+  latest_run_processing_failures: { unexpected_schedule_error: 1, email_send_rejected: 3 },
+  suppression_action_items: {},
   latest_run_alerts_sent: 48,
   execution_health: 'partial_failure',
   delivery_state: 'delivery_partial',
@@ -52,15 +54,15 @@ const clean = { suppressed: null, lastAlertAt: null };
 
 describe('composeSearchAlertStatus', () => {
   it('new search during a partial run: saved+validated, delivery not yet tested, baseline pending, next check tomorrow', () => {
-    const r = composeSearchAlertStatus(search(), system(), clean, 'matched_historically', NOW);
+    const r = composeSearchAlertStatus(search(), system(), clean, { reach: 'matched_historically', detail: null }, NOW);
     expect(r.saved).toBe(true);
     expect(r.validated).toBe(true);
     expect(r.search_delivery).toBe('not_yet_tested');
     expect(r.baseline).toBe('pending');
     expect(r.headline).toBe('delivery_not_yet_tested');
     expect(r.next_evaluation_at).toBe('2026-10-06T11:00:00.000Z');
-    expect(r.summary).toMatch(/other saved searches/i);
-    expect(r.summary).not.toMatch(/unreliable|won't arrive|will not arrive|down/i);
+    expect(r.summary).toMatch(/partial degradation/i);
+    expect(r.summary).not.toMatch(/unreliable|won't arrive|will not arrive|down|stopped/i);
   });
 
   it('another customer\'s failure never becomes this search\'s failure', () => {
@@ -69,7 +71,7 @@ describe('composeSearchAlertStatus', () => {
       search({ created_at: '2026-09-01T00:00:00Z', last_alerted_at: '2026-10-05T11:00:40Z', total_alerts_sent: 12 }),
       system(),
       { suppressed: null, lastAlertAt: '2026-10-05T11:00:41Z' },
-      'matches_open_now',
+      { reach: 'matches_open_now', detail: null },
       NOW,
     );
     expect(r.search_delivery).toBe('delivered');
@@ -78,7 +80,7 @@ describe('composeSearchAlertStatus', () => {
   });
 
   it('this recipient suppressed → blocked, even when the system is healthy', () => {
-    const r = composeSearchAlertStatus(search(), system({ system_status: 'healthy' }), { suppressed: 'hard_bounce', lastAlertAt: null }, 'matches_open_now', NOW);
+    const r = composeSearchAlertStatus(search(), system({ system_status: 'healthy' }), { suppressed: 'hard_bounce', lastAlertAt: null }, { reach: 'matches_open_now', detail: null }, NOW);
     expect(r.search_delivery).toBe('blocked');
     expect(r.headline).toBe('search_delivery_blocked');
     expect(r.summary).toMatch(/hard_bounce/);
@@ -89,7 +91,7 @@ describe('composeSearchAlertStatus', () => {
       search({ created_at: '2026-09-01T00:00:00Z', last_alerted_at: '2026-10-02T11:00:40Z', total_alerts_sent: 3 }),
       system(),
       { suppressed: null, lastAlertAt: '2026-10-02T11:00:41Z' },
-      'matches_open_now',
+      { reach: 'matches_open_now', detail: null },
       NOW,
     );
     expect(r.search_delivery).toBe('failing');
@@ -101,38 +103,52 @@ describe('composeSearchAlertStatus', () => {
       search({ created_at: '2026-09-01T00:00:00Z', last_alerted_at: '2026-10-02T11:00:40Z' }),
       system({ system_status: 'degraded_unconfirmed', delivery_ready: false, latest_run_alerts_sent: 0 }),
       clean,
-      'matches_open_now',
+      { reach: 'matches_open_now', detail: null },
       NOW,
     );
     expect(r.search_delivery).not.toBe('failing');
   });
 
   it('confirmed system failure outranks everything for an active search', () => {
-    const r = composeSearchAlertStatus(search(), system({ system_status: 'system_failure', delivery_ready: false }), clean, 'matches_open_now', NOW);
+    const r = composeSearchAlertStatus(search(), system({ system_status: 'system_failure', delivery_ready: false }), clean, { reach: 'matches_open_now', detail: null }, NOW);
     expect(r.headline).toBe('system_delivery_failure');
     expect(r.summary).toMatch(/down for all saved searches/i);
   });
 
-  it('filters that never matched are surfaced, not reported as a working watch', () => {
-    const r = composeSearchAlertStatus(search({ filters: { subAgency: 'Marine Corps' } }), system(), clean, 'never_matched', NOW);
-    expect(r.headline).toBe('search_never_matches');
+  it('an unrepresentable filter value is surfaced with the field named', () => {
+    const r = composeSearchAlertStatus(
+      search({ filters: { subAgency: 'Marine Corps' } }),
+      system(),
+      clean,
+      { reach: 'filter_not_representable', detail: 'subAgency "Marine Corps" does not occur as a sub-agency (sub_tier) value' },
+      NOW,
+    );
+    expect(r.headline).toBe('search_filter_not_representable');
+    expect(r.summary).toMatch(/subAgency "Marine Corps"/);
+  });
+
+  it('zero historical matches alone is not a dead watch', () => {
+    const r = composeSearchAlertStatus(search(), system(), clean, { reach: 'no_matches_in_available_data', detail: null }, NOW);
+    expect(r.headline).toBe('delivery_not_yet_tested');
+    expect(r.summary).toMatch(/matching notice posted later will alert/i);
+    expect(r.summary).not.toMatch(/never|cannot/i);
   });
 
   it('paused is a choice, not a failure', () => {
-    const r = composeSearchAlertStatus(search({ alerts_enabled: false }), system({ system_status: 'system_failure' }), clean, 'matches_open_now', NOW);
+    const r = composeSearchAlertStatus(search({ alerts_enabled: false }), system({ system_status: 'system_failure' }), clean, { reach: 'matches_open_now', detail: null }, NOW);
     expect(r.search_delivery).toBe('paused');
     expect(r.headline).toBe('paused');
     expect(r.next_evaluation_at).toBeNull();
   });
 
   it('unreadable recipient evidence is unknown, never delivered', () => {
-    const r = composeSearchAlertStatus(search({ total_alerts_sent: 4 }), system(), { suppressed: undefined, lastAlertAt: undefined }, 'unknown', NOW);
+    const r = composeSearchAlertStatus(search({ total_alerts_sent: 4 }), system(), { suppressed: undefined, lastAlertAt: undefined }, { reach: 'unknown', detail: null }, NOW);
     expect(r.search_delivery).toBe('unknown');
     expect(r.headline).toBe('delivery_not_yet_tested');
   });
 
   it('weekly cadence: next check is the next Monday run', () => {
-    const r = composeSearchAlertStatus(search({ alert_frequency: 'weekly' }), system(), clean, 'matches_open_now', NOW);
+    const r = composeSearchAlertStatus(search({ alert_frequency: 'weekly' }), system(), clean, { reach: 'matches_open_now', detail: null }, NOW);
     expect(r.next_evaluation_at).toBe('2026-10-12T11:00:00.000Z');
   });
 });

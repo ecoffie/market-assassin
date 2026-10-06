@@ -19,7 +19,7 @@ import {
   updateSavedSearch,
   type DeliveryExecutionHealth,
   type DeliveryState,
-  type FilterReach,
+  type FilterReachResult,
   type SavedSearchAlertStatus,
   type SavedSearchDeliveryReadiness,
   type SystemDeliveryStatus,
@@ -52,8 +52,10 @@ export type ScheduleDeliveryMeta = {
   delivery_last_clean_run_at?: string | null;
   /** Last saved-search alert email the provider accepted, any account. */
   delivery_last_alert_sent_at?: string | null;
-  /** Failure classes of the latest run (other searches), e.g. "email_send_rejected=3". */
+  /** Raw failure summary of the latest run (other searches), e.g. "email_send_rejected=3". */
   delivery_latest_run_failures?: string | null;
+  /** Confirmed recipient suppressions in the latest run: an action item, not an outage. */
+  delivery_suppression_action_items?: Record<string, number>;
   idempotent: boolean;
   bbox_omitted?: boolean;
   bbox_restored?: boolean;
@@ -104,6 +106,7 @@ function deliveryMeta(delivery: SavedSearchDeliveryReadiness) {
     delivery_last_clean_run_at: delivery.last_clean_run_at,
     delivery_last_alert_sent_at: delivery.last_alert_sent_at,
     delivery_latest_run_failures: delivery.latest_run_failures,
+    delivery_suppression_action_items: delivery.suppression_action_items,
   };
 }
 
@@ -122,7 +125,7 @@ function scheduleDegraded(status: SavedSearchAlertStatus): boolean {
 async function statusFor(
   search: SavedSearchRow,
   delivery: SavedSearchDeliveryReadiness,
-  reach?: FilterReach,
+  reach?: FilterReachResult,
 ): Promise<SavedSearchAlertStatus> {
   const [recipient, filterReach] = await Promise.all([
     readRecipientEvidence(search.user_email),
@@ -250,6 +253,7 @@ export type ListMarketSchedulesResult = {
     delivery_last_clean_run_at: string | null;
     delivery_last_alert_sent_at: string | null;
     delivery_latest_run_failures: string | null;
+    delivery_suppression_action_items: Record<string, number>;
     count: number;
   };
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string };
@@ -278,7 +282,9 @@ export async function listMarketSchedules(input: ListMarketSchedulesInput): Prom
   const searches = res.data.searches;
   const recipient = searches.length ? await readRecipientEvidence(input.userEmail) : null;
   const reaches = await Promise.all(
-    searches.map((s, i) => (i < LIST_REACH_PROBE_CAP ? probeFilterReach(s.filters) : Promise.resolve<FilterReach>('unknown'))),
+    searches.map((s, i) => (i < LIST_REACH_PROBE_CAP
+      ? probeFilterReach(s.filters)
+      : Promise.resolve<FilterReachResult>({ reach: 'unknown', detail: 'not probed (list cap)' }))),
   );
   const statuses = searches.map((s, i) => composeSearchAlertStatus(s, delivery, recipient!, reaches[i]));
 
@@ -332,6 +338,7 @@ export type UpdateMarketScheduleResult = {
     delivery_last_clean_run_at: string | null;
     delivery_last_alert_sent_at: string | null;
     delivery_latest_run_failures: string | null;
+    delivery_suppression_action_items: Record<string, number>;
     noop?: boolean;
   };
 };

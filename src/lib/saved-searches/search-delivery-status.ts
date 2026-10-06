@@ -38,18 +38,37 @@ export type SearchDeliveryStatus =
 export type SearchBaseline = 'pending' | 'established';
 
 /**
- * Can this filter set match anything in Mindy's SAM corpus? Structural validation does not answer
- * this: `subAgency: "Marine Corps"` is a well-formed filter that has never matched a row, because SAM
- * files Marine Corps buys under sub_tier "DEPT OF THE NAVY".
+ * Can this filter set match anything in Mindy's SAM corpus? Structural validation does not answer it.
+ * Two different "zero" answers are kept apart:
+ *   no_matches_in_available_data  every filter value occurs in the data, but no notice has carried
+ *                                 the combination yet. A future posting CAN alert — zero history is
+ *                                 not proof a watch is dead.
+ *   filter_not_representable      a filter VALUE never occurs in the column it is matched against, on
+ *                                 its own, across the whole corpus (e.g. `subAgency: "Marine Corps"`:
+ *                                 SAM's sub_tier never says that). The filter cannot select what the
+ *                                 user meant until it is expressed differently; detail names the field.
  */
-export type FilterReach = 'matches_open_now' | 'matched_historically' | 'never_matched' | 'unknown';
+export type FilterReach =
+  | 'matches_open_now'
+  | 'matched_historically'
+  | 'no_matches_in_available_data'
+  | 'filter_not_representable'
+  | 'unknown';
+
+export type FilterReachResult = { reach: FilterReach; detail: string | null };
+
+/** Facets matched by free-text needle against a column; their VALUES can be absent from the data. */
+const NEEDLE_FACETS: Array<{ key: string; column: string }> = [
+  { key: 'subAgency', column: 'sub-agency (sub_tier)' },
+  { key: 'agency', column: 'agency (department / sub_tier)' },
+];
 
 /** The single most important thing to tell the customer, most severe first. */
 export type AlertHeadline =
   | 'system_delivery_failure'
   | 'search_delivery_blocked'
   | 'search_delivery_failing'
-  | 'search_never_matches'
+  | 'search_filter_not_representable'
   | 'paused'
   | 'delivery_not_yet_tested'
   | 'delivering';
@@ -59,6 +78,7 @@ export type SavedSearchAlertStatus = {
   /** Structural validation passed (it ran at save time — rows that fail it are never stored). */
   validated: true;
   filter_reach: FilterReach;
+  filter_reach_detail: string | null;
   search_delivery: SearchDeliveryStatus;
   search_delivery_reason: string | null;
   baseline: SearchBaseline;
@@ -101,37 +121,58 @@ export async function readRecipientEvidence(userEmail: string): Promise<Recipien
   };
 }
 
-/**
- * Probe whether the saved filters can reach any SAM notice — open now, else ever. Profile-scoped
- * searches resolve against the owner's profile at send time, so they are not probed here.
- */
-export async function probeFilterReach(filters: Record<string, unknown>): Promise<FilterReach> {
-  if (filters.scope === 'profile') return 'unknown';
-  const supabase = getAppSupabase();
-  const get = (k: string) => {
+function filterGetter(filters: Record<string, unknown>, only?: string) {
+  return (k: string) => {
+    if (only && k !== only) return null;
     const v = filters[k];
     if (v === undefined || v === null) return null;
     return Array.isArray(v) ? v.join(',') : typeof v === 'object' ? null : String(v);
   };
-  try {
-    const open = parseMapFilters(get);
-    const { data: openRows, error: openErr } = await applyMapFilters(
-      supabase.from('sam_opportunities').select('notice_id').limit(1),
-      open,
-    );
-    if (openErr) return 'unknown';
-    if (openRows?.length) return 'matches_open_now';
+}
 
-    const all = parseMapFilters(get);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function anyRow(supabase: any, f: ReturnType<typeof parseMapFilters>): Promise<boolean | null> {
+  const { data, error } = await applyMapFilters(supabase.from('sam_opportunities').select('notice_id').limit(1), f);
+  if (error) return null;
+  return !!data?.length;
+}
+
+/**
+ * Probe whether the saved filters can reach any SAM notice — open now, else ever — through the SAME
+ * parseMapFilters/applyMapFilters the Map and the alert cron use. On zero, each needle facet is
+ * re-run ALONE over the whole corpus to tell "no notice yet" from "this value is not in the data".
+ * Profile-scoped searches resolve against the owner's profile at send time, so they are not probed.
+ */
+export async function probeFilterReach(filters: Record<string, unknown>): Promise<FilterReachResult> {
+  if (filters.scope === 'profile') return { reach: 'unknown', detail: 'profile-scoped search' };
+  const supabase = getAppSupabase();
+  try {
+    const open = await anyRow(supabase, parseMapFilters(filterGetter(filters)));
+    if (open === null) return { reach: 'unknown', detail: null };
+    if (open) return { reach: 'matches_open_now', detail: null };
+
+    const all = parseMapFilters(filterGetter(filters));
     all.status = 'all';
-    const { data: anyRows, error: anyErr } = await applyMapFilters(
-      supabase.from('sam_opportunities').select('notice_id').limit(1),
-      all,
-    );
-    if (anyErr) return 'unknown';
-    return anyRows?.length ? 'matched_historically' : 'never_matched';
+    const ever = await anyRow(supabase, all);
+    if (ever === null) return { reach: 'unknown', detail: null };
+    if (ever) return { reach: 'matched_historically', detail: null };
+
+    for (const { key, column } of NEEDLE_FACETS) {
+      if (filters[key] === undefined || filters[key] === null || filters[key] === '') continue;
+      const alone = parseMapFilters(filterGetter(filters, key));
+      alone.status = 'all';
+      const hit = await anyRow(supabase, alone);
+      if (hit === null) return { reach: 'unknown', detail: null };
+      if (!hit) {
+        return {
+          reach: 'filter_not_representable',
+          detail: `${key} "${filterGetter(filters)(key)}" does not occur as a ${column} value anywhere in Mindy's SAM data`,
+        };
+      }
+    }
+    return { reach: 'no_matches_in_available_data', detail: null };
   } catch {
-    return 'unknown';
+    return { reach: 'unknown', detail: null };
   }
 }
 
@@ -185,8 +226,8 @@ function summarize(s: Omit<SavedSearchAlertStatus, 'summary'>): string {
       return `Search saved, but alerts cannot be delivered to this account's email (${s.search_delivery_reason}).`;
     case 'search_delivery_failing':
       return 'Search saved, but this search was skipped by the latest alert run — its alerts are not currently being delivered.';
-    case 'search_never_matches':
-      return 'Search saved, but these filters have never matched any notice in Mindy — it will not alert unless they are changed.';
+    case 'search_filter_not_representable':
+      return `Search saved, but one filter cannot select what it names in Mindy's data (${s.filter_reach_detail}). It will not alert on that scope until the filter is expressed differently.`;
     case 'paused':
       return 'Search saved with alerts paused — no emails until alerts are re-enabled.';
     case 'delivery_not_yet_tested':
@@ -195,8 +236,11 @@ function summarize(s: Omit<SavedSearchAlertStatus, 'summary'>): string {
           ? 'Search saved and validated. Delivery not yet tested: the first check records current matches without emailing, and an alert is sent only when a NEW match appears after that.'
           : 'Search saved and validated. No alert has been sent for it yet; one is sent only when a new match appears.') +
         when +
+        (s.filter_reach === 'no_matches_in_available_data'
+          ? ' No notice in Mindy\'s data has matched these filters yet; a matching notice posted later will alert.'
+          : '') +
         (s.system_status === 'partial_degradation'
-          ? ' (Alert delivery is working; a few other saved searches had problems in the latest run.)'
+          ? ' (Partial degradation: alert delivery is working, but some other saved searches failed in the latest run.)'
           : s.system_status === 'degraded_unconfirmed'
             ? ' (The latest alert run reported errors and Mindy could not confirm it delivered — not yet established whether this affects you.)'
             : '')
@@ -205,7 +249,7 @@ function summarize(s: Omit<SavedSearchAlertStatus, 'summary'>): string {
       return (
         'Alerts for this search have been delivered to this account.' +
         (s.system_status === 'partial_degradation'
-          ? ' (A few other saved searches had problems in the latest run; this one is unaffected.)'
+          ? ' (Partial degradation: some other saved searches failed in the latest run; this one is unaffected.)'
           : s.system_status === 'degraded_unconfirmed'
             ? ' (The latest alert run reported errors and Mindy could not confirm it delivered — not yet established whether this affects you.)'
             : '')
@@ -218,7 +262,7 @@ export function composeSearchAlertStatus(
   search: SavedSearchRow,
   system: SavedSearchDeliveryReadiness,
   recipient: RecipientEvidence,
-  filterReach: FilterReach,
+  reach: FilterReachResult,
   now: Date = new Date(),
 ): SavedSearchAlertStatus {
   const baseline: SearchBaseline = search.last_alerted_at ? 'established' : 'pending';
@@ -252,7 +296,7 @@ export function composeSearchAlertStatus(
   if (system_status === 'system_failure' && !paused) headline = 'system_delivery_failure';
   else if (search_delivery === 'blocked') headline = 'search_delivery_blocked';
   else if (search_delivery === 'failing') headline = 'search_delivery_failing';
-  else if (filterReach === 'never_matched' && !paused) headline = 'search_never_matches';
+  else if (reach.reach === 'filter_not_representable' && !paused) headline = 'search_filter_not_representable';
   else if (paused) headline = 'paused';
   else if (search_delivery === 'delivered') headline = 'delivering';
   else headline = 'delivery_not_yet_tested';
@@ -260,7 +304,8 @@ export function composeSearchAlertStatus(
   const partial: Omit<SavedSearchAlertStatus, 'summary'> = {
     saved: true,
     validated: true,
-    filter_reach: filterReach,
+    filter_reach: reach.reach,
+    filter_reach_detail: reach.detail,
     search_delivery,
     search_delivery_reason: reason,
     baseline,

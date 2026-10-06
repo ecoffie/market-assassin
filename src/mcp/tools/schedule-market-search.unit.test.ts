@@ -55,6 +55,8 @@ const deliveryReady: SavedSearchDeliveryReadiness = {
   latest_run_started_at: '2026-08-30T11:01:00Z',
   latest_run_in_window: true,
   latest_run_failures: null,
+  latest_run_processing_failures: {},
+  suppression_action_items: {},
   latest_run_alerts_sent: null,
   execution_health: 'recent_success',
   delivery_state: 'delivery_ready',
@@ -67,7 +69,7 @@ describe('schedule_market_search MCP tool', () => {
     vi.clearAllMocks();
     mockDelivery.mockResolvedValue(deliveryReady);
     mockRecipient.mockResolvedValue({ suppressed: null, lastAlertAt: null });
-    mockReach.mockResolvedValue('matches_open_now');
+    mockReach.mockResolvedValue({ reach: 'matches_open_now', detail: null });
   });
 
   it('is registered with 0-credit scheduling config pricing', () => {
@@ -293,6 +295,25 @@ describe('schedule_market_search MCP tool', () => {
     expect(deleteBlock.slice(0, 700)).toContain('z.literal(true)');
   });
 
+  /** What a partial run must never be turned into: a claim that ALL delivery stopped. */
+  const FALSE_TOTAL_OUTAGE =
+    /2026-09-29|Sept|September|unreliable|not currently guaranteed|delivery is (currently )?down|stopped|won't arrive|will not arrive|no (successful )?(sends|emails)/i;
+
+  it('a confirmed total outage still says so (the warning is preserved, not suppressed)', async () => {
+    mockDelivery.mockResolvedValue({ ...deliveryReady, system_status: 'system_failure', delivery_ready: false, delivery_state: 'delivery_degraded' });
+    mockCreate.mockResolvedValue({
+      ok: true,
+      data: { idempotent: false, bbox_omitted: false, search: {
+        id: 'x', user_email: 'u@example.com', name: 'n', mode: 'open', filters: { naics: '541611' }, bbox: null,
+        alerts_enabled: true, alert_frequency: 'daily', last_alerted_at: null, last_seen_notice_ids: [],
+        total_alerts_sent: 0, created_at: '2026-10-05T23:20:18Z', updated_at: '2026-10-05T23:20:18Z',
+      } },
+    });
+    const r = await scheduleMarketSearch({ userEmail: 'u@example.com', name: 'n', filters: { naics: '541611' } });
+    expect(r._meta.degraded).toBe(true);
+    expect(r.message).toMatch(/delivery is currently down for all saved searches/i);
+  });
+
   describe('alert-health status for the 2026-10-05 Marine Corps WOSB 541611 watches', () => {
     // Exact production state when the watches were saved (2026-10-05 23:20 UTC): every run since
     // 2026-09-30 reported `error` because three suppressed internal addresses were rejected and one
@@ -306,6 +327,7 @@ describe('schedule_market_search MCP tool', () => {
       latest_run_started_at: '2026-10-05T11:00:29Z',
       latest_run_in_window: true,
       latest_run_failures: 'unexpected_schedule_error=1,email_send_rejected=3',
+      latest_run_processing_failures: { unexpected_schedule_error: 1, email_send_rejected: 3 },
       latest_run_alerts_sent: 48,
       execution_health: 'partial_failure',
       delivery_state: 'delivery_partial',
@@ -330,7 +352,7 @@ describe('schedule_market_search MCP tool', () => {
 
     it('a partially failed job with successful deliveries never reports "no successful sends since Sept 29"', async () => {
       mockDelivery.mockResolvedValue(partialProd);
-      mockReach.mockResolvedValue('matched_historically');
+      mockReach.mockResolvedValue({ reach: 'matched_historically', detail: null });
       mockCreate.mockResolvedValue({ ok: true, data: { idempotent: false, bbox_omitted: false, search: marineWatch } });
 
       const r = await scheduleMarketSearch({ userEmail: 'customer@example.com', name: marineWatch.name, filters: marineWatch.filters });
@@ -346,9 +368,11 @@ describe('schedule_market_search MCP tool', () => {
       expect(r.alert_status?.headline).toBe('delivery_not_yet_tested');
       expect(r.alert_status?.search_delivery).toBe('not_yet_tested');
       expect(r.alert_status?.baseline).toBe('pending');
-      expect(r.message).not.toMatch(/2026-09-29|Sept|September|unreliable|not currently guaranteed|degraded/i);
-      expect(r.message).toMatch(/delivery not yet tested/i);
+      // Partial degradation is preserved and named; what is prohibited is claiming delivery stopped.
+      expect(r.message).toMatch(/partial degradation/i);
       expect(r.message).toMatch(/alert delivery is working/i);
+      expect(r.message).toMatch(/delivery not yet tested/i);
+      expect(r.message).not.toMatch(FALSE_TOTAL_OUTAGE);
       expect(r.message).not.toMatch(/will be emailed|will email/i);
     });
 
@@ -363,20 +387,37 @@ describe('schedule_market_search MCP tool', () => {
       expect(r.message).toMatch(/cannot be delivered.*hard_bounce/i);
     });
 
-    it('flags filters that have never matched instead of calling the watch healthy', async () => {
+    it('an unrepresentable filter value is flagged, naming the field', async () => {
       mockDelivery.mockResolvedValue(partialProd);
-      mockReach.mockResolvedValue('never_matched');
+      mockReach.mockResolvedValue({
+        reach: 'filter_not_representable',
+        detail: 'subAgency "Marine Corps" does not occur as a sub-agency (sub_tier) value anywhere in Mindy\'s SAM data',
+      });
       mockCreate.mockResolvedValue({ ok: true, data: { idempotent: false, bbox_omitted: false, search: marineWatch } });
 
       const r = await scheduleMarketSearch({ userEmail: 'customer@example.com', name: marineWatch.name, filters: marineWatch.filters });
-      expect(r.alert_status?.filter_reach).toBe('never_matched');
-      expect(r.alert_status?.headline).toBe('search_never_matches');
-      expect(r.message).toMatch(/never matched/i);
+      expect(r.alert_status?.filter_reach).toBe('filter_not_representable');
+      expect(r.alert_status?.headline).toBe('search_filter_not_representable');
+      expect(r.message).toMatch(/subAgency "Marine Corps"/);
+      expect(r._meta.degraded).toBe(false); // a filter problem is not a delivery outage
+    });
+
+    it('zero matches in the available data is NOT reported as a dead watch', async () => {
+      mockDelivery.mockResolvedValue(partialProd);
+      mockReach.mockResolvedValue({ reach: 'no_matches_in_available_data', detail: null });
+      mockCreate.mockResolvedValue({ ok: true, data: { idempotent: false, bbox_omitted: false, search: marineWatch } });
+
+      const r = await scheduleMarketSearch({ userEmail: 'customer@example.com', name: marineWatch.name, filters: marineWatch.filters });
+      expect(r.alert_status?.headline).toBe('delivery_not_yet_tested');
+      expect(r.message).toMatch(/a matching notice posted later will alert/i);
+      expect(r.message).not.toMatch(/never|cannot|will not alert/i);
     });
 
     it('list reports each watch on its own evidence, reading recipient evidence once', async () => {
       mockDelivery.mockResolvedValue(partialProd);
-      mockReach.mockResolvedValueOnce('never_matched').mockResolvedValueOnce('matched_historically');
+      mockReach
+        .mockResolvedValueOnce({ reach: 'filter_not_representable', detail: 'subAgency "Marine Corps" …' })
+        .mockResolvedValueOnce({ reach: 'matched_historically', detail: null });
       mockList.mockResolvedValue({
         ok: true,
         data: { searches: [marineWatch, { ...marineWatch, id: 'dai', name: 'DAI follow-on', filters: { q: 'DAI', naics: '541611', setAside: 'WOSB' } }] },
@@ -384,7 +425,7 @@ describe('schedule_market_search MCP tool', () => {
 
       const r = await listMarketSchedules({ userEmail: 'customer@example.com' });
       expect(mockRecipient).toHaveBeenCalledTimes(1);
-      expect(r.schedules.map((x) => x.alert_status?.headline)).toEqual(['search_never_matches', 'delivery_not_yet_tested']);
+      expect(r.schedules.map((x) => x.alert_status?.headline)).toEqual(['search_filter_not_representable', 'delivery_not_yet_tested']);
       expect(r._meta.system_delivery_status).toBe('partial_degradation');
     });
   });

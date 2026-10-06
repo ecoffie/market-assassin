@@ -39,6 +39,7 @@ export type {
   SavedSearchAlertFailureClass,
 } from './alert-drain';
 export { getSavedSearchDeliveryReadiness } from './delivery-readiness';
+export { classifyRunFailures, CONFIRMED_SUPPRESSION_CLASSES } from './delivery-readiness';
 export type {
   DeliveryExecutionHealth,
   DeliveryState,
@@ -53,6 +54,7 @@ export {
 export type {
   AlertHeadline,
   FilterReach,
+  FilterReachResult,
   SavedSearchAlertStatus,
   SearchBaseline,
   SearchDeliveryStatus,

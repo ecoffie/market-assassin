@@ -48,9 +48,10 @@ export type SavedSearchDeliveryReadiness = {
   last_run_at: string | null;
   last_run_status: string | null;
   /**
-   * Last run that finished with ZERO failures. This is a JOB-RUN timestamp, NOT the last time an
-   * alert email went out: one suppressed recipient marks a whole run `error`. Never present it to a
-   * customer as "last successful send" (it once said Sept 29 while alerts were going out daily).
+   * Last run with NO processing failures (confirmed recipient suppression is not one). This is a
+   * JOB-RUN timestamp, NOT the last time an alert email went out: any one failing search marks a
+   * whole run `error`. Never present it as "last successful send" (it once said Sept 29 while
+   * alerts were going out daily).
    */
   last_clean_run_at: string | null;
   /** Last saved-search alert the email provider accepted (email_provider_sends). null = none or unreadable. */
@@ -58,8 +59,15 @@ export type SavedSearchDeliveryReadiness = {
   /** Most recent run row (any status) and whether it falls in today's expected daily window. */
   latest_run_started_at: string | null;
   latest_run_in_window: boolean;
-  /** Route-reported failure classes of the latest failed run, e.g. "email_send_rejected=3". */
+  /** Route-reported failure summary of the latest run, raw, e.g. "unexpected_schedule_error=1,email_send_rejected=3". */
   latest_run_failures: string | null;
+  /** Processing-failure classes of the latest run (outage-relevant). */
+  latest_run_processing_failures: Record<string, number>;
+  /**
+   * Confirmed recipient suppressions in the latest run — an ACTION ITEM (review those recipients),
+   * never a processing outage, and never reported to other customers as delivery trouble.
+   */
+  suppression_action_items: Record<string, number>;
   /** Alerts the provider accepted during the latest run. null = not measured / unreadable (never 0). */
   latest_run_alerts_sent: number | null;
   execution_health: DeliveryExecutionHealth;
@@ -90,6 +98,41 @@ type CronRunRow = {
   http_status: number | null;
   error?: string | null;
 };
+
+/**
+ * Failure classes that are CONFIRMED recipient suppression (an email_suppressions row exists) —
+ * an action item for that recipient, not a processing outage. Must match SUPPRESSION_CLASSES in
+ * src/lib/cron/watchdog-incidents.ts (#1836, which introduces the class via #1834); import it from
+ * there once both are on main. The legacy `email_send_rejected` stays a PROCESSING failure: it
+ * cannot distinguish a suppression from a provider rejection.
+ */
+export const CONFIRMED_SUPPRESSION_CLASSES = new Set(['recipient_suppressed']);
+
+/** Parse a route-reported summary ("a=1,b=3") into processing vs confirmed-suppression counts. */
+export function classifyRunFailures(summary: string | null | undefined): {
+  processing: Record<string, number>;
+  suppression: Record<string, number>;
+} {
+  const processing: Record<string, number> = {};
+  const suppression: Record<string, number> = {};
+  for (const part of (summary || '').split(',')) {
+    const [rawName, rawN] = part.split('=');
+    const name = (rawName || '').trim();
+    if (!name) continue;
+    const n = Number(rawN);
+    const count = Number.isFinite(n) && n > 0 ? n : 1;
+    (CONFIRMED_SUPPRESSION_CLASSES.has(name) ? suppression : processing)[name] = count;
+  }
+  return { processing, suppression };
+}
+
+/** A failed run whose ONLY failures are confirmed recipient suppressions delivered everything else. */
+function isSuppressionOnlyRun(run: CronRunRow): boolean {
+  if (run.status !== 'error' && run.status !== 'partial') return false;
+  if (typeof run.http_status === 'number' && (run.http_status < 200 || run.http_status >= 300)) return false;
+  const { processing, suppression } = classifyRunFailures(run.error);
+  return Object.keys(processing).length === 0 && Object.keys(suppression).length > 0;
+}
 
 /** The route self-aborts before its 290s platform timeout; a run's sends cannot be later than this. */
 const RUN_SEND_WINDOW_MS = 300_000;
@@ -133,6 +176,7 @@ function runTimestamp(run: CronRunRow): number {
 }
 
 function isSuccessfulRun(run: CronRunRow): boolean {
+  if (isSuppressionOnlyRun(run)) return true;
   if (run.status !== 'success') return false;
   // Long routes self-report after the dispatcher has stopped listening, so
   // http_status remains null. The route-authored terminal status is authoritative;
@@ -142,6 +186,7 @@ function isSuccessfulRun(run: CronRunRow): boolean {
 }
 
 function isFailedRun(run: CronRunRow): boolean {
+  if (isSuppressionOnlyRun(run)) return false;
   if (['error', 'timeout', 'failed', 'partial'].includes(run.status)) return true;
   return typeof run.http_status === 'number' && (run.http_status < 200 || run.http_status >= 300);
 }
@@ -162,6 +207,8 @@ function unavailableReadiness(system_status: SystemDeliveryStatus): SavedSearchD
     latest_run_started_at: null,
     latest_run_in_window: false,
     latest_run_failures: null,
+    latest_run_processing_failures: {},
+    suppression_action_items: {},
     latest_run_alerts_sent: null,
     execution_health: 'service_unavailable',
     delivery_state: 'scheduler_unavailable',
@@ -246,6 +293,8 @@ export async function getSavedSearchDeliveryReadiness(
     latest_run_started_at: null,
     latest_run_in_window: false,
     latest_run_failures: null,
+    latest_run_processing_failures: {},
+    suppression_action_items: {},
     latest_run_alerts_sent: null,
   };
 
@@ -301,7 +350,9 @@ export async function getSavedSearchDeliveryReadiness(
     last_alert_sent_at: await lastAlertSentAt(supabase),
     latest_run_started_at: latestRun?.started_at ?? null,
     latest_run_in_window: latestRun ? inWindow(runTimestamp(latestRun)) : false,
-    latest_run_failures: failureSupersedesSuccess ? (latestFailure?.error || latestFailure?.status || null) : null,
+    latest_run_failures: latestRun?.error || null,
+    latest_run_processing_failures: classifyRunFailures(latestRun?.error).processing,
+    suppression_action_items: classifyRunFailures(latestRun?.error).suppression,
     latest_run_alerts_sent: null as number | null,
   };
 

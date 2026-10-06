@@ -217,6 +217,8 @@ describe('getSavedSearchDeliveryReadiness', () => {
       expect(r.delivery_ready).toBe(true);
       expect(r.latest_run_alerts_sent).toBe(48);
       expect(r.latest_run_failures).toBe(failures);
+      expect(r.latest_run_processing_failures).toEqual({ unexpected_schedule_error: 1, email_send_rejected: 3 });
+      expect(r.suppression_action_items).toEqual({});
       expect(r.last_alert_sent_at).toBe('2026-10-05T11:01:41.561Z');
       // the job-run fact is preserved, but only under a name that says what it is
       expect(r.last_clean_run_at).toBe('2026-09-29T11:00:28.490Z');
@@ -256,6 +258,50 @@ describe('getSavedSearchDeliveryReadiness', () => {
       const r = await getSavedSearchDeliveryReadiness(SAVE_TIME);
       expect(r.system_status).toBe('unknown');
       expect(r.delivery_ready).toBe(false);
+    });
+  });
+
+  describe('confirmed recipient suppression is an action item, not an outage (#1834/#1836 classes)', () => {
+    const T = new Date('2026-10-05T23:20:13Z');
+    const cron = { ...enabledCron, cron_expr: '0 11 * * *' };
+    const prior = { started_at: '2026-10-04T11:00:28Z', status: 'success', http_status: null, error: null };
+
+    it('a run whose ONLY failures are recipient_suppressed is healthy, with the suppression listed', async () => {
+      setup({
+        cron: [cron],
+        runs: [{ started_at: '2026-10-05T11:00:29Z', finished_at: '2026-10-05T11:01:49Z', status: 'error', http_status: null, error: 'recipient_suppressed=3' }, prior],
+        lastSentAt: '2026-10-05T11:01:41Z',
+      });
+      const r = await getSavedSearchDeliveryReadiness(T);
+      expect(r.system_status).toBe('healthy');
+      expect(r.delivery_ready).toBe(true);
+      expect(r.suppression_action_items).toEqual({ recipient_suppressed: 3 });
+      expect(r.latest_run_processing_failures).toEqual({});
+      expect(r.last_clean_run_at).toBe('2026-10-05T11:00:29Z');
+    });
+
+    it('suppression alongside a processing failure is still partial degradation, suppression kept separate', async () => {
+      setup({
+        cron: [cron],
+        runs: [{ started_at: '2026-10-05T11:00:29Z', finished_at: '2026-10-05T11:01:49Z', status: 'error', http_status: null, error: 'unexpected_schedule_error=1,recipient_suppressed=3' }, prior],
+        lastSentAt: '2026-10-05T11:01:41Z',
+        sendsDuringRun: 48,
+      });
+      const r = await getSavedSearchDeliveryReadiness(T);
+      expect(r.system_status).toBe('partial_degradation');
+      expect(r.latest_run_processing_failures).toEqual({ unexpected_schedule_error: 1 });
+      expect(r.suppression_action_items).toEqual({ recipient_suppressed: 3 });
+    });
+
+    it('legacy email_send_rejected stays a processing failure (it cannot prove suppression)', async () => {
+      setup({
+        cron: [cron],
+        runs: [{ started_at: '2026-10-05T11:00:29Z', finished_at: '2026-10-05T11:01:49Z', status: 'error', http_status: null, error: 'email_send_rejected=3' }, prior],
+        sendsDuringRun: 0,
+      });
+      const r = await getSavedSearchDeliveryReadiness(T);
+      expect(r.system_status).toBe('degraded_unconfirmed');
+      expect(r.suppression_action_items).toEqual({});
     });
   });
 });
