@@ -13,13 +13,19 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 interface Priority { level: 'go' | 'watch' | 'stop'; title: string; body: string; rec: string }
 interface Health {
   agency: string; windowDays: number; grounded: boolean;
-  smallBizParticipation: { activeOpps: number; withSetAside: number; pct: number | null };
+  scope: { status: 'department' | 'subagency' | 'unsupported'; reason: string | null };
+  smallBizParticipation: {
+    activeOpps: number; withSetAside: number; pct: number | null;
+    status: 'measured' | 'unavailable' | 'unsupported'; reason: string | null;
+  };
   setAsideMix: { label: string; count: number }[];
   openNoticeSample: { rows: number; of: number; complete: boolean };
   awardedSetAsideMix: { label: string; count: number }[];
   awardedSetAside: { identity: { name: string; tier: 'toptier' | 'subtier' } | null; total: number | null; note: string | null };
   marketCoverage: { distinctNaics: number; topNaics: { naics: string; opps: number }[] };
   winners: {
+    status: 'measured' | 'zero' | 'unavailable' | 'unsupported'; reason: string | null;
+    awardNoticesInWindow: number | null;
     window: { since: string; until: string; days: number; basis: string };
     awardsWithAwardee: number | null; distinctWinners: number | null; awardsWithAmount: number | null;
     topWinners: { name: string; total: number; awards: number }[];
@@ -186,6 +192,10 @@ export default function CompetitionHealthDashboard() {
           {/* SUPPLIER HEALTH + DIVERSITY */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))', gap: 16 }}>
             <Card title="Small-business participation" sub="% of active solicitations carrying a set-aside — the number a procurement director is graded on.">
+              {sb && sb.status !== 'measured' ? (
+                <StatusNote status={sb.status} reason={sb.reason} />
+              ) : (
+                <>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 34, fontWeight: 800, color: '#3ecf8e', fontVariantNumeric: 'tabular-nums' }}>{sb?.pct == null ? '—' : `${Math.round(sb.pct)}%`}</span>
                 {/* EXACT, not sampled — a head-count over every active solicitation. The chip is
@@ -196,6 +206,8 @@ export default function CompetitionHealthDashboard() {
               <div style={{ fontSize: 13, color: '#94a3b8' }}>
                 <b style={{ color: '#e2e8f0' }}>{sb?.withSetAside.toLocaleString()}</b> of <b style={{ color: '#e2e8f0' }}>{sb?.activeOpps.toLocaleString()}</b> active solicitations carry a set-aside.
               </div>
+                </>
+              )}
               {h.setAsideMix.length > 0 && (
                 <div style={{ marginTop: 14 }}>
                   <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.04em', color: '#64748b', marginBottom: 8 }}>Set-aside mix · open notices</div>
@@ -255,8 +267,13 @@ export default function CompetitionHealthDashboard() {
               slice (712 shown vs 4,763 real for DoD). It stays off until the population calculation
               is verified in production. */}
           <Card title="Who won · supplier-base breadth" sub={`Award notices posted ${fmtDate(h.winners.window.since)} – ${fmtDate(h.winners.window.until)} (${h.winners.window.days} days, by ${h.winners.window.basis}). Winner = distinct awardee name.`}>
-            {h.winners.error ? (
-              <div style={{ padding: '14px 4px', fontSize: 13, color: '#64748b' }}>Not available: {h.winners.error}. Shown as unknown, never as zero.</div>
+            {(h.winners.status === 'unavailable' || h.winners.status === 'unsupported') ? (
+              <StatusNote status={h.winners.status} reason={h.winners.reason} />
+            ) : h.winners.status === 'zero' ? (
+              <div style={{ padding: '10px 4px', fontSize: 13, color: '#94a3b8' }}>
+                <div style={{ fontSize: 26, fontWeight: 800, color: '#e2e8f0' }}>0</div>
+                distinct winners · {h.winners.reason}
+              </div>
             ) : (
               <>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
@@ -450,6 +467,21 @@ function Provenance({ kind, n, of, strength, unit = 'with offer counts' }: {
         </span>
       )}
     </span>
+  );
+}
+
+/**
+ * An unavailable or unsupported measure. Never renders a number: a blank wall that says why beats a
+ * measured-looking zero (Navy / unknown agencies used to show "0 distinct winners").
+ */
+function StatusNote({ status, reason }: { status: 'unavailable' | 'unsupported'; reason: string | null }) {
+  return (
+    <div style={{ padding: '12px 4px', fontSize: 13, color: '#94a3b8' }}>
+      <span style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 700, color: '#e8b13a', marginRight: 8 }}>
+        {status === 'unsupported' ? 'Unsupported' : 'Unavailable'}
+      </span>
+      {reason ?? 'Not measured for this agency.'} Shown as {status}, never as zero.
+    </div>
   );
 }
 
