@@ -224,3 +224,42 @@ describe('incident notifications (captured Slack messages)', () => {
     expect(store.rows.size).toBe(0);
   });
 });
+
+describe('exhausted notification retries are exposed, never swallowed', () => {
+  it('an open incident whose last post was abandoned is flagged in the daily summary', async () => {
+    const store = memoryStore(); const { sent, send } = capture();
+    await pass(store, [SAVED_SEARCH()], '2026-10-04T15:00:00Z', send);
+    const r = store.rows.get('failing:saved-search-alerts')!;
+    store.rows.set(r.incident_key, { ...r, last_notified_event: 'abandoned:opened', notify_pending: null, notify_attempts: 0 });
+    await pass(store, [SAVED_SEARCH()], '2026-10-05T12:00:00Z', send);
+    const summary = sent.find((m) => m.subject.startsWith('Cron watchdog daily summary'))!;
+    expect(summary.text).toMatch(/saved-search-alerts — open .* — ⚠️ "opened" notification undelivered after 5 attempts/);
+  });
+
+  it('a RESOLVED incident whose recovery post was abandoned in the last 24h is listed, so the recovery is not lost', async () => {
+    const store = memoryStore(); const { sent, send } = capture();
+    await pass(store, [SAVED_SEARCH()], '2026-10-04T15:00:00Z', send);
+    const r = store.rows.get('failing:saved-search-alerts')!;
+    store.rows.set(r.incident_key, { ...r, status: 'resolved', resolved_at: '2026-10-05T03:00:00.000Z', last_notified_event: 'abandoned:recovered', notify_pending: null });
+    await pass(store, [], '2026-10-05T12:00:00Z', send);
+    const summary = sent.find((m) => m.subject.startsWith('Cron watchdog daily summary'))!;
+    expect(summary.subject).toBe('Cron watchdog daily summary: 1 undelivered recovery notice(s)');
+    expect(summary.text).toContain('⚠️ saved-search-alerts — RECOVERED at 2026-10-05T03:00Z, but the recovery notification was undelivered after 5 attempts');
+  });
+
+  it('an abandoned recovery older than 24h is not repeated', async () => {
+    const store = memoryStore(); const { sent, send } = capture();
+    await pass(store, [SAVED_SEARCH()], '2026-10-01T15:00:00Z', send);
+    const r = store.rows.get('failing:saved-search-alerts')!;
+    store.rows.set(r.incident_key, { ...r, status: 'resolved', resolved_at: '2026-10-02T03:00:00.000Z', last_notified_event: 'abandoned:recovered' });
+    await pass(store, [], '2026-10-05T12:00:00Z', send);
+    expect(sent.filter((m) => m.subject.startsWith('Cron watchdog daily summary'))).toHaveLength(0);
+  });
+
+  it('the watchdog route response carries abandoned + confirmFailed', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync('src/app/api/cron/dispatcher-watchdog/route.ts', 'utf8');
+    expect(src).toContain('abandoned: incidents.abandoned,');
+    expect(src).toContain('confirmFailed: incidents.confirmFailed,');
+  });
+});

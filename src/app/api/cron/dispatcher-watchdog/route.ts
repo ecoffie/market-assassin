@@ -327,6 +327,9 @@ export async function GET(request: NextRequest) {
       lostRaces: incidents.lostRaces,
       sent: incidents.sent,
       summarySent: incidents.summarySent,
+      // Exhausted / unconfirmed notification retries are exposed, never swallowed.
+      abandoned: incidents.abandoned,
+      confirmFailed: incidents.confirmFailed,
       ...(dryRun ? { preview: incidents.messages } : {}),
     },
   });

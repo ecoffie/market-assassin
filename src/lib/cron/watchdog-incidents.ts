@@ -336,7 +336,21 @@ export function renderEventsMessage(events: ClaimedEvent[], nowIso: string): { s
   };
 }
 
-export function renderDailySummary(open: IncidentRow[], nowIso: string): { subject: string; html: string; text: string } {
+/** "abandoned:<event>" → the event whose Slack post was never confirmed after MAX_NOTIFY_ATTEMPTS. */
+function abandonedEvent(r: { last_notified_event: string | null }): string | null {
+  return r.last_notified_event?.startsWith('abandoned:') ? r.last_notified_event.slice('abandoned:'.length) : null;
+}
+
+/**
+ * The daily summary. Unchanged open incidents, plus EXHAUSTED notification retries: an open incident
+ * whose last post was abandoned is flagged on its line, and a RESOLVED incident whose recovery post
+ * was abandoned in the last 24h is listed separately — otherwise that recovery would be silently lost.
+ */
+export function renderDailySummary(
+  open: IncidentRow[],
+  nowIso: string,
+  undeliveredResolved: IncidentRow[] = [],
+): { subject: string; html: string; text: string } {
   const lines = open
     .slice()
     .sort((a, b) => a.opened_at.localeCompare(b.opened_at))
@@ -345,11 +359,19 @@ export function renderDailySummary(open: IncidentRow[], nowIso: string): { subje
         ? counts(r.processing_counts)
         : (r.signature?.includes('|msg:') ? r.signature.split('|msg:')[1] : r.signature === 'error|suppression-only' ? 'recipient suppression only' : KIND_LABEL[r.kind] || r.kind);
       const sup = suppressionLine(r.suppression_counts || {});
-      return `• ${subject(r)} — open ${hoursBetween(r.opened_at, nowIso)}h, ${r.observations} pass(es), ${proc}${r.last_detail ? ` — ${r.last_detail}` : ''}${sup ? `\n   ${sup}` : ''}`;
+      const ab = abandonedEvent(r);
+      const undelivered = ab ? ` — ⚠️ "${ab}" notification undelivered after ${MAX_NOTIFY_ATTEMPTS} attempts` : '';
+      return `• ${subject(r)} — open ${hoursBetween(r.opened_at, nowIso)}h, ${r.observations} pass(es), ${proc}${r.last_detail ? ` — ${r.last_detail}` : ''}${undelivered}${sup ? `\n   ${sup}` : ''}`;
     });
+  for (const r of undeliveredResolved) {
+    lines.push(`• ⚠️ ${subject(r)} — RECOVERED${r.resolved_at ? ` at ${r.resolved_at.slice(0, 16)}Z` : ''}, but the recovery notification was undelivered after ${MAX_NOTIFY_ATTEMPTS} attempts`);
+  }
+  const parts: string[] = [];
+  if (open.length) parts.push(`${open.length} open incident(s), unchanged`);
+  if (undeliveredResolved.length) parts.push(`${undeliveredResolved.length} undelivered recovery notice(s)`);
   return {
-    subject: `Cron watchdog daily summary: ${open.length} open incident(s), unchanged`,
-    html: lines.map((l) => `<p>${l.replace('\n', '<br/>')}</p>`).join('') + `<p style="color:#888">Unchanged since last notified. ${nowIso}.</p>`,
+    subject: `Cron watchdog daily summary: ${parts.join('; ')}`,
+    html: lines.map((l) => `<p>${l.replace('\n', '<br/>')}</p>`).join('') + `<p style="color:#888">Unchanged since last notified. Run history: cron_job_runs. ${nowIso}.</p>`,
     text: lines.join('\n'),
   };
 }
@@ -529,14 +551,19 @@ export async function runWatchdogIncidents(opts: {
       const won = preview ? true : sRow
         ? await store.compareAndSet(sKey, sRow.version, { signature: today, last_seen_at: nowIso, version: sRow.version + 1 })
         : await store.insertIfAbsent({ ...emptyRow(source, sKey, nowIso), signature: today });
-      if (won && persistent.length) {
+      // Exhausted retries are surfaced, not swallowed: a recovery whose post was abandoned in the last
+      // 24h would otherwise never be seen (resolved incidents get no summary line of their own).
+      const dayAgo = Date.parse(nowIso) - 24 * 3600_000;
+      const undeliveredResolved = rows.filter((r) => r.kind !== 'daily_summary' && r.status === 'resolved'
+        && abandonedEvent(r) !== null && !!r.resolved_at && Date.parse(r.resolved_at) >= dayAgo);
+      if (won && (persistent.length || undeliveredResolved.length)) {
         // Present the latest observation for each persistent incident.
         const fresh = persistent.map((r) => {
           const o = obsByKey.get(r.incident_key)!;
           const c = classifyObservation(o);
           return { ...r, processing_counts: c.processing, suppression_counts: c.suppression, last_detail: o.detail ?? r.last_detail, observations: r.observations + 1 };
         });
-        const msg = renderDailySummary(fresh, nowIso);
+        const msg = renderDailySummary(fresh, nowIso, undeliveredResolved);
         result.messages.push({ subject: msg.subject, text: msg.text });
         if (!preview) {
           const r = await sendWithTimeout(send, msg, opts.sendTimeoutMs ?? SEND_TIMEOUT_MS);
