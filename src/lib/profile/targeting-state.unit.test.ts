@@ -21,6 +21,15 @@ describe('targetingStateFrom mirrors the daily-alerts gate', () => {
     expect(targetingStateFrom({ naics_codes: [], keywords: ['roofing'] })).toBe('targeted');
   });
 
+  it('none: no NAICS and only GENERIC keywords — the shared search has no filter, weekly skips them, daily cannot personalize', () => {
+    // Same rule as weekly-alerts (distinctiveKeywords): a keyword-only profile counts as targeted
+    // only when at least one keyword is distinctive enough to search on.
+    expect(targetingStateFrom({ naics_codes: [], keywords: ['services', 'government'] })).toBe('none');
+    expect(targetingStateFrom({ naics_codes: [], keywords: ['services', 'janitorial services'] })).toBe('targeted');
+    // A real NAICS market is targeted regardless of how generic its keywords are.
+    expect(targetingStateFrom({ naics_codes: ['238160'], keywords: ['services'] })).toBe('targeted');
+  });
+
   it('notice copy only claims alerts when alerts are on, and is silent when targeted', () => {
     expect(targetingNotice('none', true)).toMatch(/alerts haven’t started/);
     expect(targetingNotice('none', false)).not.toMatch(/alert/i);
