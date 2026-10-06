@@ -44,22 +44,10 @@
       "limit": 5000
     },
     {
-      "fingerprint": "52d7a52cf6aba2a8",
-      "file": "src/lib/analytics/competition-health.ts",
-      "table": "sam_opportunities",
-      "limit": 4000
-    },
-    {
       "fingerprint": "53089df8bf269eda",
       "file": "src/app/api/admin/upgrade-intent/route.ts",
       "table": "stripe_subscriptions",
       "limit": 2000
-    },
-    {
-      "fingerprint": "5729f8acd759bed6",
-      "file": "src/lib/analytics/competition-health.ts",
-      "table": "recompete_opportunities",
-      "limit": 4000
     },
     {
       "fingerprint": "59fb4b10d5103e20",

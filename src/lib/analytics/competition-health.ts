@@ -165,14 +165,19 @@ export async function computeCompetitionHealth(
 
   // ── 1b) set-aside MIX + NAICS breadth — a bounded SAMPLE (up to 1000) is fine for shape/ranking. ──
   //    (The exact % comes from the head-counts above; this pull only ranks the categories.)
-  const { data: sample } = await supabase
+  const { data: sample, error: sampleErr } = await supabase
     .from('sam_opportunities')
     .select('set_aside_code, naics_code')
     .eq('department', AG)
     .eq('active', true)
     .limit(1000);
-  const rows = sample || [];
-  base.openNoticeSample = { rows: rows.length, of: activeOpps, complete: rows.length >= activeOpps };
+  if (sampleErr) {
+    // Non-fatal: the exact % above still ships. The mix/coverage stay empty and are labeled a
+    // 0-row sample (complete:false) — never presented as "this agency buys across 0 NAICS".
+    console.error('[competition-health] open-notice sample failed:', sampleErr.message);
+  }
+  const rows = sampleErr ? [] : (sample || []);
+  base.openNoticeSample = { rows: rows.length, of: activeOpps, complete: !sampleErr && rows.length >= activeOpps };
   const saTally: Record<string, number> = {};
   const naicsTally: Record<string, number> = {};
   for (const r of rows) {
