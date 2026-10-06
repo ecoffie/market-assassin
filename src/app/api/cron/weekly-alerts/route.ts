@@ -435,8 +435,28 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
           return;
         }
 
-        // Send email with tier info
-        await sendAlertEmail(user.user_email, topOpps, user, tier, scoredOpps.length);
+        // Send email with tier info.
+        // RESIDUAL (shared with daily-alerts, not changed here): the email is sent BEFORE its
+        // `sent` row is written. If that write fails, the catch below writes a `failed` row,
+        // which still dedups this cycle; a duplicate needs both writes to fail.
+        const delivered = await sendAlertEmail(user.user_email, topOpps, user, tier, scoredOpps.length);
+
+        // Parity with daily-alerts: a guard-blocked send (unsubscribed / bounced) is a visible
+        // skip, never a phantom `sent` with last_alert_sent / total_alerts_sent bumped.
+        if (delivered === false) {
+          await persistProcessedWeeklyAlert({
+            user,
+            alertDate,
+            status: 'skipped',
+            source: alertSource,
+            tier,
+            opportunitiesCount: topOpps.length,
+            errorMessage: 'send_guard_blocked',
+          });
+          console.warn(`[Weekly Alerts] Send guard blocked ${user.user_email} (suppression) — recorded as skipped, NOT sent`);
+          results.skipped++;
+          return;
+        }
 
         await persistSentAlert({
           supabase: getSupabase(),
@@ -653,7 +673,7 @@ async function sendAlertEmail(
   user: AlertUser,
   tier: 'free' | 'pro' = 'free',
   totalAvailable: number = 0
-) {
+): Promise<boolean> {
   const emailDate = new Date().toISOString().split('T')[0];
   const tokenResult = await createEmailTrackingToken(email, 'weekly_alert', emailDate);
   const trackingToken = tokenResult?.token;
@@ -826,7 +846,9 @@ async function sendAlertEmail(
 </html>
 `;
 
-  await sendEmail({
+  // sendEmail returns false (not throw) when the send guard blocks the recipient —
+  // suppression list (unsubscribed / bounced). The caller must record that as a skip.
+  return sendEmail({
     from: `"${MINDY_FROM_NAME}" <${process.env.EMAIL_FROM || 'alerts@mail.getmindy.ai'}>`,
     // Coach-managed client rows deliver to the client's real inbox; else user_email.
     to: user.alert_recipient_email || email,

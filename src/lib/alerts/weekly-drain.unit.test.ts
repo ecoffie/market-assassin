@@ -127,6 +127,17 @@ describe('route wiring (architectural guard — source text)', () => {
     expect(i).toBeGreaterThan(-1);
     expect(src.slice(i, i + 900)).toContain('fetchAllPaged');
   });
+  it('a guard-blocked send (unsubscribed / bounced) is recorded as skipped, never as sent', () => {
+    expect(src).toContain('): Promise<boolean> {');
+    expect(src).toContain('return sendEmail({');
+    const i = src.indexOf('const delivered = await sendAlertEmail(');
+    expect(i).toBeGreaterThan(-1);
+    const after = src.slice(i, i + 900);
+    expect(after).toMatch(/if \(delivered === false\)[\s\S]*errorMessage: 'send_guard_blocked'[\s\S]*return;/);
+    // the skip happens BEFORE persistSentAlert can run
+    expect(after.indexOf("'send_guard_blocked'")).toBeLessThan(src.slice(i).indexOf('persistSentAlert'));
+  });
+
   it('the per-user body keeps its own try/catch so one failure cannot abort the drain', () => {
     const i = src.indexOf('drainCycle(pending, async (user) => {');
     expect(src.slice(i, i + 400)).toContain('try {');
