@@ -57,7 +57,13 @@ export type SavedSearchAlertEvalCounts = {
 export type SavedSearchForecastCoverageState =
   | 'covered' | 'partial' | 'unavailable' | 'needs_refinement' | 'baseline' | 'in_progress'
   /** Legacy engine skipped Forecast delivery for a canonically-measured search (emergency rollback). */
-  | 'rollback_paused';
+  | 'rollback_paused'
+  /**
+   * The saved filter cannot be represented on forecasts (a sub-agency SAM files below sub_tier, e.g.
+   * Marine Corps — see hierarchy-sub-agency.ts). Forecast delivery is withheld rather than run with
+   * the filter silently dropped (which would alert on every agency's forecasts). Open is unaffected.
+   */
+  | 'unsupported_filter';
 
 export type SavedSearchAlertDueRow = {
   id: string;

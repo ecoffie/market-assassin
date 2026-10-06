@@ -120,3 +120,53 @@ describe('Marine Corps filter on the shared map filters (Map Open, saved-search 
     expect(selects(p, NOT_USMC_ROWS[2])).toBe(false);
   });
 });
+
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { ALIASES, HIERARCHY_HORIZON_LIMIT_JS, hierarchyFilterLimitations } from './hierarchy-sub-agency';
+
+describe('Forecast / Awarded: Marine Corps is a disclosed limitation, never ignored or broadened', () => {
+  it('limitations name every unsupported horizon and only those', () => {
+    const l = hierarchyFilterLimitations({ subAgency: 'Marine Corps' }, ['open', 'recompete', 'forecast']);
+    expect(l.map((x) => x.horizon)).toEqual(['recompete', 'forecast']);
+    expect(l[0].reason).toMatch(/not broadened to Navy/);
+    expect(hierarchyFilterLimitations({ agency: 'ARMY|USMC' }, ['forecast'])).toHaveLength(1);
+    expect(hierarchyFilterLimitations({ subAgency: 'DEPT OF THE NAVY' }, ['recompete', 'forecast'])).toEqual([]);
+    expect(hierarchyFilterLimitations({ subAgency: 'Marine Corps' }, ['open'])).toEqual([]);
+  });
+
+  // The Map's browser check is generated from the server alias table; evaluate it and compare.
+  const win: Record<string, (f: unknown) => unknown> = {};
+  new Function('window', 'document', HIERARCHY_HORIZON_LIMIT_JS.replace(/^<script>|<\/script>$/g, ''))(win, {});
+  const clientLimit = win.__hierarchyLimit as (f: Record<string, string>) => { label: string; supported: string[]; unsupported: string[] } | null;
+
+  it.each([...Object.keys(ALIASES), 'U.S. Marine Corps', 'United States Marine Corps', ' usmc '])('client resolves %s like the server', (v) => {
+    expect(clientLimit({ subAgency: v })).toEqual({ label: 'U.S. Marine Corps', supported: ['open'], unsupported: ['recompete', 'forecast'] });
+    expect(resolveHierarchySubAgency(v)?.label).toBe('U.S. Marine Corps');
+  });
+  it.each(['DEPT OF THE NAVY', 'Army', 'Marine Corps Logistics Command', 'USMCFP', ''])('client leaves %s alone, like the server', (v) => {
+    expect(clientLimit({ subAgency: v })).toBeNull();
+    expect(resolveHierarchySubAgency(v)).toBeNull();
+  });
+  it('client reads the Agency box too (pipe-joined)', () => {
+    expect(clientLimit({ agency: 'ARMY|Marine Corps' })?.label).toBe('U.S. Marine Corps');
+  });
+
+  it('the Map fetches only supported horizons under the limit and renders the disclosure (both fetch paths)', () => {
+    const src = readFileSync(join(process.cwd(), 'src/app/opportunity-map/route.ts'), 'utf8');
+    expect(src).toContain("_enabled=_enabled.filter(function(m){ return _hl.supported.indexOf(m)>-1; });");
+    expect(src).toContain('window.__renderHierarchyLimit(_hl)');
+    expect(src).toContain('hz=hz.filter(function(h){ return _hl2.supported.indexOf(h)>-1; });');
+    expect(src).toContain('HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS');
+  });
+
+  it('the disclosure text says the layers are hidden, not shown as Navy', () => {
+    const doc = { getElementById: () => null, createElement: () => ({ style: {}, setAttribute() {} }), body: { appendChild() {} } };
+    const w: Record<string, unknown> = { innerWidth: 1200 };
+    let el: Record<string, unknown> | null = null;
+    doc.createElement = () => { el = { style: {}, setAttribute() {} }; return el; };
+    new Function('window', 'document', HIERARCHY_HORIZON_LIMIT_JS.replace(/^<script>|<\/script>$/g, ''))(w, doc);
+    (w.__renderHierarchyLimit as (l: unknown) => void)({ label: 'U.S. Marine Corps', supported: ['open'], unsupported: ['recompete', 'forecast'] });
+    expect(String(el!.textContent)).toMatch(/showing open notices only.*Awarded contracts and forecasts cannot be filtered.*not shown as all of Navy/);
+  });
+});
