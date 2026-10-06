@@ -62,3 +62,29 @@ export function openSearchAttempts(row: AlertLogOutcome): number {
 export function retryOpenSearchToday(row: AlertLogOutcome | null | undefined): boolean {
   return isOpenSearchFailure(row) && openSearchAttempts(row as AlertLogOutcome) < MAX_SAME_DAY_OPEN_SEARCH_ATTEMPTS;
 }
+
+/**
+ * PARTIAL SEND (Eric, 2026-10-06): when the Open search is still failing on the FINAL same-day
+ * attempt and another section has useful results (Coming Back cards or grants), the alert is
+ * sent with the Open section replaced by OPEN_UNAVAILABLE_LINE — never a zero claim. The row is
+ * recorded delivery_status='sent' with error_message `open_unavailable_partial:<code> …`:
+ *   - 'sent' is final for the day (the same-day guard only re-admits isOpenSearchFailure rows),
+ *   - the cross-day retry loop selects only 'failed' rows, so it can never re-send it,
+ *   - the prefix keeps it distinguishable from a full send in every alert_log report.
+ */
+export const OPEN_UNAVAILABLE_PARTIAL_PREFIX = 'open_unavailable_partial';
+export const OPEN_UNAVAILABLE_LINE = 'Open opportunities could not be checked today.';
+
+/** `open_unavailable_partial:57014 … [sections=coming_back,grants attempts=3]` (bounded length). */
+export function openUnavailablePartialNote(
+  err: OpenSearchError | null | undefined,
+  attempts: number,
+  sections: string[],
+): string {
+  const base = openSearchFailureReason(err).slice(`${OPEN_SEARCH_FAILED_PREFIX}:`.length);
+  return `${OPEN_UNAVAILABLE_PARTIAL_PREFIX}:${base} [sections=${sections.join(',')} attempts=${attempts}]`;
+}
+
+export function isOpenUnavailablePartial(row: AlertLogOutcome | null | undefined): boolean {
+  return !!row && typeof row.error_message === 'string' && row.error_message.startsWith(`${OPEN_UNAVAILABLE_PARTIAL_PREFIX}:`);
+}

@@ -16,7 +16,7 @@
  * the failed-and-retryable set for good instead of being re-examined for three days.
  */
 
-import { OPEN_SEARCH_FAILED_PREFIX } from './open-search-failure';
+import { OPEN_SEARCH_FAILED_PREFIX, OPEN_UNAVAILABLE_PARTIAL_PREFIX } from './open-search-failure';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseLike = { from: (table: string) => any };
@@ -105,6 +105,9 @@ export async function retryFailedDailyAlerts(deps: RetryDeps): Promise<RetryResu
     // A failed OPEN SEARCH has nothing to re-send (see ./open-search-failure.ts). Leave the
     // row and its reason intact; the next normal run searches the user again.
     if (typeof alert.error_message === 'string' && alert.error_message.startsWith(`${OPEN_SEARCH_FAILED_PREFIX}:`)) continue;
+    // A partial send (Open unavailable) is delivered: never re-send it. The query already selects
+    // only 'failed' rows; this is the second line of defence if a status is ever rewritten.
+    if (typeof alert.error_message === 'string' && alert.error_message.startsWith(`${OPEN_UNAVAILABLE_PARTIAL_PREFIX}:`)) continue;
     result.retried++;
     try {
       const { data: user, error: userErr } = await supabase
