@@ -15,6 +15,8 @@ let MARKET: Row[] = [];
 const calls = { range: 0, limit: 0 };
 /** Optional hook: runs before each range read (used to simulate a sync moving rows between pages). */
 let onRange: ((from: number) => void) | null = null;
+/** When set, any read starting at or after this row offset answers a PostgREST error (statement timeout). */
+let FAIL_FROM: number | null = null;
 
 function fakeQuery() {
   let from = 0;
@@ -24,7 +26,11 @@ function fakeQuery() {
   for (const m of ['select', 'eq', 'or', 'gte', 'lte', 'order', 'in', 'like', 'ilike', 'is']) q[m] = chain;
   q.limit = (n: number) => { calls.limit++; to = n - 1; return q; };
   q.range = (a: number, b: number) => { calls.range++; onRange?.(a); from = a; to = b; return q; };
-  q.then = (resolve: (v: unknown) => void) => resolve({ data: MARKET.slice(from, to + 1), error: null });
+  q.then = (resolve: (v: unknown) => void) => resolve(
+    FAIL_FROM !== null && from >= FAIL_FROM
+      ? { data: null, error: { code: '57014', message: 'canceling statement due to statement timeout' } }
+      : { data: MARKET.slice(from, to + 1), error: null },
+  );
   return q;
 }
 
@@ -226,5 +232,38 @@ describe('paging over a live table: de-duplication fixes REPEATS only', () => {
       // limitation is REAL so no one reads the de-dup as a consistency guarantee.
       expect(r.opportunities.some((o) => o.noticeId === 'n01000')).toBe(false);
     } finally { onRange = null; }
+  });
+});
+
+describe('fetchSamOpportunitiesFromCache — a failed page is a FAILED read, never a smaller market (#1853 contract)', () => {
+  it('a timeout on page 2 of the full-market scan → queryStatus error, no partial rows returned as ok', async () => {
+    MARKET = market(MAX_PREFER_SCAN_ROWS > 1500 ? 1500 : MAX_PREFER_SCAN_ROWS, [3]);
+    FAIL_FROM = 1; // page 1 (from=0) succeeds; every later page fails
+    try {
+      const r = await fetchSamOpportunitiesFromCache({
+        naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200, fullMarketKeywordScan: true,
+      });
+      expect(r.queryStatus).toBe('error');
+      expect(r.queryError?.code).toBe('57014');
+      expect(r.opportunities).toEqual([]);
+    } finally { FAIL_FROM = null; }
+  });
+
+  it('a timeout on the single capped read (no keyword preference) → queryStatus error', async () => {
+    MARKET = market(50, []);
+    FAIL_FROM = 0;
+    try {
+      const r = await fetchSamOpportunitiesFromCache({ naicsCodes: ['541511'], savedNaics: ['541511'], limit: 200 });
+      expect(r.queryStatus).toBe('error');
+      expect(r.opportunities).toEqual([]);
+    } finally { FAIL_FROM = null; }
+  });
+
+  it('control: a successful scan reports queryStatus ok', async () => {
+    MARKET = market(50, [3]);
+    const r = await fetchSamOpportunitiesFromCache({
+      naicsCodes: ['541511'], savedNaics: ['541511'], keywords: ['artificial intelligence'], limit: 200, fullMarketKeywordScan: true,
+    });
+    expect(r.queryStatus).toBe('ok');
   });
 });
