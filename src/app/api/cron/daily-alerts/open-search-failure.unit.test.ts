@@ -57,6 +57,8 @@ const TIMEOUT = { code: '57014', details: null, hint: null, message: 'canceling 
 
 /** 'error' = every sam_opportunities read fails; 'empty' = a measured zero; 'rows' = one open match. */
 let SAM_MODE: 'error' | 'empty' | 'rows' = 'error';
+/** Per-test profile changes (Coming Back loads only for a NAICS/PSC market). */
+let USER_OVERRIDES: Row = {};
 let SAM_READS = 0;
 /** alert_log keyed like the real unique constraint (user_email, alert_date, alert_type). */
 const ALERT_LOG = new Map<string, Row>();
@@ -81,7 +83,7 @@ function fakeClient() {
           const d = SAM_MODE === 'rows' ? [OPEN_ROW] : [];
           return { data: d, error: null, count: d.length };
         }
-        if (table === 'user_notification_settings') return { data: [USER_ROW], error: null, count: 1 };
+        if (table === 'user_notification_settings') return { data: [{ ...USER_ROW, ...USER_OVERRIDES }], error: null, count: 1 };
         if (table === 'alert_log') { const d = [...ALERT_LOG.values()]; return { data: d, error: null, count: d.length }; }
         return { data: [], error: null, count: 0 };
       };
@@ -122,9 +124,10 @@ vi.mock('@/lib/briefings/pipelines/grants-gov', async (orig) => ({
   scoreGrant: () => 100,
 }));
 vi.mock('@/lib/dashboard/todays-lens', () => ({ computeTodaysLens: async () => null }));
+let COMING_BACK: Row = { kind: 'omit', reason: 'no_naics_market' };
 vi.mock('@/lib/alerts/coming-back-to-market', async (orig) => ({
   ...(await orig<typeof import('@/lib/alerts/coming-back-to-market')>()),
-  loadComingBackSection: async () => ({ kind: 'omit', reason: 'no_naics_market' }),
+  loadComingBackSection: async () => COMING_BACK,
 }));
 vi.mock('@/lib/alerts/retry-failed-daily', async (orig) => ({
   ...(await orig<typeof import('@/lib/alerts/retry-failed-daily')>()),
@@ -152,7 +155,7 @@ beforeAll(async () => {
   ({ POST } = await import('./route'));
 });
 
-beforeEach(() => { SENT.length = 0; ALERT_LOG.clear(); SAM_MODE = 'error'; SAM_READS = 0; GRANTS = []; });
+beforeEach(() => { SENT.length = 0; ALERT_LOG.clear(); SAM_MODE = 'error'; SAM_READS = 0; GRANTS = []; COMING_BACK = { kind: 'omit', reason: 'no_naics_market' }; USER_OVERRIDES = {}; });
 
 /** A scheduled-style run scoped to the one user. NOT forceResend: the same-day guard must be exercised. */
 async function run() {
@@ -200,7 +203,7 @@ describe('daily-alerts cron — a failed Open search is recorded as a failure, n
     expect(todayRow()!.delivery_status).toBe('failed'); // still an honest failure, never re-labelled
   });
 
-  it('a failed Open search sends NO email even when other sections (grants) have content — no "Nothing new matched" claim', async () => {
+  it('a NON-FINAL failed attempt sends NO email even when other sections (grants) have content — no "Nothing new matched" claim', async () => {
     // Production shape: a keyword-only timeout user had alerts logged "sent" with 0 Open rows.
     // On main the grants section made the email sendable and the Open section rendered the
     // quiet-day line "Nothing new matched your filters today" — a zero nobody measured.
@@ -220,5 +223,88 @@ describe('daily-alerts cron — a failed Open search is recorded as a failure, n
     expect(todayRow()).toMatchObject({ delivery_status: 'skipped', error_message: 'no_new_or_active_opportunities' });
     const again = await run();
     expect(again.message).toBe('All users already processed today'); // a real zero is final for the day
+  });
+});
+
+const GRANT: Row = {
+  oppNumber: 'G-1', title: 'Community Facilities Grant', agency: 'USDA', closeDate: future(20),
+  awardCeiling: 50000, oppId: 'g1', link: 'https://grants.gov/g1',
+};
+const PARTIAL_LINE = 'Open opportunities could not be checked today.';
+
+describe('daily-alerts cron — Open stays unavailable after the same-day budget: useful partial email, never a zero claim', () => {
+  it('final attempt fails + grants exist → ONE email with the grants and the exact "could not be checked" line; logged as a partial send', async () => {
+    GRANTS = [GRANT];
+    await run(); await run();            // attempts 1, 2: failed, no email (retry-eligible)
+    expect(SENT).toHaveLength(0);
+    const third = await run();           // attempt 3 = final
+    expect(SENT).toHaveLength(1);
+    const html = SENT[0].html;
+    expect(html).toContain(PARTIAL_LINE);
+    expect(html).toContain('Community Facilities Grant');
+    expect(html).not.toMatch(/Nothing new matched your filters today/);
+    expect(html).not.toMatch(/\b0 new opportunit/);
+    expect(SENT[0].subject).not.toMatch(/\b0 new|new opportunit/i);
+    const row = todayRow()!;
+    expect(row.delivery_status).toBe('sent');
+    expect(String(row.error_message)).toMatch(/^open_unavailable_partial:57014/);
+    expect(third.results).toMatchObject({ sent: 1, openUnavailablePartial: 1, noOpps: 0 });
+  });
+
+  it('final attempt fails + Coming Back has cards (NAICS profile) → partial email with Coming Back, no Open rows, no zero claim', async () => {
+    // Coming Back is evaluated only for a NAICS/PSC market, so this case is a NAICS profile whose
+    // Open search fails — keyword-only profiles can only ever be partial through grants.
+    USER_OVERRIDES = { naics_codes: ['561720'] };
+    COMING_BACK = {
+      kind: 'show', matchedNaics: [], starterMarket: false,
+      rows: [{
+        contract_id: 'C-1', incumbent: 'Acme Custodial LLC', agency: 'GENERAL SERVICES ADMINISTRATION', naics: '561720', psc: 'S201',
+        value: 1200000, valueKind: 'obligated', obligated: 1200000, popEnd: future(200).slice(0, 10), leadMonths: 7,
+        window: 'lead_6_18', codeState: 'primary_confirmed', codeProvenance: 'test', censusTitle: 'Janitorial Services',
+        fit: 'prime', nuclearMo: false, why: 'Same NAICS as your profile',
+      }],
+    };
+    const r1 = await run(); const r2 = await run(); const r3 = await run();
+    void r1; void r2; expect(r3.results).toMatchObject({ sent: 1, openUnavailablePartial: 1 });
+    expect(SENT).toHaveLength(1);
+    expect(SENT[0].html).toContain(PARTIAL_LINE);
+    expect(SENT[0].html).not.toMatch(/Nothing new matched your filters today/);
+    expect(SENT[0].html).toContain('Acme Custodial LLC');
+    expect(todayRow()!.delivery_status).toBe('sent');
+    expect(String(todayRow()!.error_message)).toMatch(/sections=coming_back/);
+  });
+
+  it('(a) after a partial send, later runs the same day send nothing and do not search again', async () => {
+    GRANTS = [GRANT];
+    await run(); await run(); await run();
+    expect(SENT).toHaveLength(1);
+    const reads = SAM_READS;
+    const fourth = await run();
+    const fifth = await run();
+    expect(SENT).toHaveLength(1);
+    expect(SAM_READS).toBe(reads);
+    expect(fourth.message).toBe('All users already processed today');
+    expect(fifth.message).toBe('All users already processed today');
+  });
+
+  it('final attempt fails + nothing useful → recorded failure, NO email (never an empty email), never "no opportunities"', async () => {
+    await run(); await run(); await run();
+    expect(SENT).toHaveLength(0);
+    const row = todayRow()!;
+    expect(row.delivery_status).toBe('failed');
+    expect(String(row.error_message)).toMatch(/^open_search_failed:57014/);
+    expect(row.retry_count).toBe(2);
+  });
+
+  it('(c) Open succeeds on attempt 2 → exactly one NORMAL email (with grants), no partial line, no duplicate', async () => {
+    GRANTS = [GRANT];
+    await run();                         // attempt 1 fails, no email
+    SAM_MODE = 'rows';
+    await run();                         // attempt 2 succeeds
+    await run();                         // later run: already processed
+    expect(SENT).toHaveLength(1);
+    expect(SENT[0].html).toMatch(/Janitorial Services/);
+    expect(SENT[0].html).not.toContain(PARTIAL_LINE);
+    expect(todayRow()!.error_message ?? null).toBeNull();
   });
 });
