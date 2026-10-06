@@ -10,7 +10,8 @@
 -- Same class as tasks/OBSERVATORY-TRUNCATION-DEFECT.md and 20260825_observatory_aggregates.sql.
 --
 -- THE FIX
--- One function, one row, nothing to truncate. Read-only (STABLE, SELECT only).
+-- One function, one row, nothing to truncate. Read-only (STABLE, SELECT only), SECURITY INVOKER,
+-- fixed search_path, EXECUTE revoked from PUBLIC/anon/authenticated and granted to service_role only.
 --
 -- DEFINITIONS (these are what the admin card states)
 --   award notice   = sam_opportunities row, notice_type = 'Award Notice', non-blank awardee_name,
@@ -46,7 +47,8 @@ RETURNS TABLE(
 )
 LANGUAGE sql
 STABLE
-SECURITY DEFINER
+SECURITY INVOKER          -- runs with the caller's rights; only service_role may call it (below),
+                          -- and service_role already reads both tables. No definer escalation needed.
 SET search_path TO 'public'
 AS $function$
   WITH win AS (

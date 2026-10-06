@@ -143,14 +143,16 @@ describe('competition-depth grounding contract', () => {
     expect(body.sort).not.toBe('Award ID');
   });
 
-  it('publishes n and a 95% CI with every grounded rate', async () => {
+  it('publishes n and a sample-scoped interval (never an agency-wide estimate) with every grounded rate', async () => {
     const ids = Array.from({ length: 12 }, (_, i) => `id${i}`);
     const offersById: Record<string, number | null> = {};
     ids.forEach((id, i) => { offersById[id] = i < 6 ? 1 : 4; });
     globalThis.fetch = stubFetch({ ids, offersById }) as unknown as typeof fetch;
     const d = await computeCompetitionDepth('VETERANS AFFAIRS, DEPARTMENT OF');
     expect(d.sampledWithData).toBe(12);
-    expect(d.singleBidCi).toEqual({ low: 21.7, high: 78.3 }); // 50% ± 28.3 at n=12
+    expect(d.singleBidSampleInterval).toEqual({ low: 21.7, high: 78.3 }); // 50% ± 28.3 at n=12
+    expect(d.intervalScope).toMatch(/recency-selected, non-random/);
+    expect(d.intervalScope).toMatch(/not an estimate for the agency/);
     expect(d.sampleOrder).toContain('most recent');
     expect(proportionCi(57.5, 80)).toEqual({ low: 46.7, high: 68.3 }); // the screenshot's figure, honestly bounded
     expect(proportionCi(null, 80)).toBeNull();

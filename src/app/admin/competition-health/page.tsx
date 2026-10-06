@@ -33,7 +33,7 @@ interface Health {
     singleBidCount: number; singleBidPct: number | null; note: string;
     strength: 'insufficient' | 'limited' | 'sampled' | 'strong';
     singleBidMoe: number | null; singleBidPlain: string | null;
-    singleBidCi: { low: number; high: number } | null; sampleOrder: string;
+    singleBidSampleInterval: { low: number; high: number } | null; intervalScope: string; sampleOrder: string;
   };
   notYetMeasurable: { metric: string; needs: string }[];
 }
@@ -320,9 +320,7 @@ export default function CompetitionHealthDashboard() {
                   </div>
                   <div style={{ fontSize: 12, color: '#64748b', marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>
                     Observed single-bid rate: <b style={{ color: '#94a3b8' }}>{h.competitionDepth.singleBidPct == null ? '—' : `${Math.round(h.competitionDepth.singleBidPct)}%`}</b>
-                    {' '}(n={h.competitionDepth.sampledWithData}
-                    {h.competitionDepth.singleBidMoe != null ? `, \u00b1${Math.round(h.competitionDepth.singleBidMoe)} pts` : ''}
-                    {h.competitionDepth.singleBidCi ? `, 95% CI ${Math.round(h.competitionDepth.singleBidCi.low)}\u2013${Math.round(h.competitionDepth.singleBidCi.high)}%` : ''})
+                    {' '}(n={h.competitionDepth.sampledWithData})
                     {' · '}
                     <b style={{ color: '#94a3b8' }}>~{h.competitionDepth.avgBidders}</b> average offers
                     {' · '}median <b style={{ color: '#94a3b8' }}>{h.competitionDepth.medianBidders}</b>
@@ -331,6 +329,16 @@ export default function CompetitionHealthDashboard() {
                     <Provenance kind="sampled" n={h.competitionDepth.sampledWithData} strength={h.competitionDepth.strength} of={h.competitionDepth.sampled} />
                     {h.competitionDepth.sampleOrder && <span style={{ marginLeft: 8 }}>Sample: {h.competitionDepth.sampleOrder}.</span>}
                   </div>
+                  {/* The interval is shown ONLY with its scope. The sample is the most recent awards,
+                      not a random draw, so it cannot support an agency-wide estimate (review 2026-10-06). */}
+                  {h.competitionDepth.singleBidSampleInterval && (
+                    <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 6, lineHeight: 1.5 }}>
+                      Sampling interval for these {h.competitionDepth.sampledWithData} awards:{' '}
+                      <b style={{ color: '#94a3b8' }}>{Math.round(h.competitionDepth.singleBidSampleInterval.low)}&ndash;{Math.round(h.competitionDepth.singleBidSampleInterval.high)}%</b>
+                      {h.competitionDepth.singleBidMoe != null && <> (&plusmn;{Math.round(h.competitionDepth.singleBidMoe)} pts)</>}.{' '}
+                      {h.competitionDepth.intervalScope}
+                    </div>
+                  )}
                 </div>
                 {h.competitionDepth.singleBidPct != null && h.competitionDepth.singleBidPct >= 40 && (
                   <div style={{ fontSize: 13, color: '#e2e8f0', background: 'rgba(232,177,58,.10)', border: '1px solid rgba(232,177,58,.24)', borderRadius: 9, padding: '10px 13px', marginBottom: 10 }}>

@@ -266,3 +266,18 @@ describe('page load performs no business-data writes', () => {
     expect(body).not.toMatch(/\b(INSERT|UPDATE|DELETE|TRUNCATE|ALTER|DROP|CREATE)\b/i);
   });
 });
+
+describe('the depth interval is never presented as an agency-wide estimate (review 2026-10-06)', () => {
+  it('the card renders the interval only together with its recency/non-random scope statement', async () => {
+    const { readFileSync } = await import('node:fs');
+    const page = readFileSync('src/app/admin/competition-health/page.tsx', 'utf8');
+    const rendered = page.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/^\s*\/\/.*$/gm, '');
+    expect(rendered).toContain('singleBidSampleInterval');
+    expect(rendered).toContain('intervalScope');
+    // no confidence-interval language in anything the card renders
+    expect(rendered).not.toMatch(/95% CI|confidence interval/i);
+    const block = rendered.slice(rendered.indexOf('singleBidSampleInterval &&'));
+    expect(block.slice(0, 900)).toContain('intervalScope');
+  });
+});
+

@@ -120,13 +120,20 @@ export interface CompetitionDepth {
   medianBidders: number | null;
   singleBidCount: number;    // awards with EXACTLY one reported offer (OBS-009 v1.1)
   singleBidPct: number | null; // % single-bid — the "under-competed" signal
-  /** 95% CI on singleBidPct, in percent, clamped to [0,100]. Null when not grounded. */
-  singleBidCi: { low: number; high: number } | null;
+  /**
+   * Sampling interval on singleBidPct for THIS sample, in percent, clamped to [0,100]. Null when not
+   * grounded. ⚠️ SCOPE: the sample is the most recent awards (recency-selected, NOT random), so this
+   * interval describes only the observed recent sample. It is NOT confidence in the buyer's full
+   * award population and must never be presented as an agency-wide estimate (see INTERVAL_SCOPE).
+   */
+  singleBidSampleInterval: { low: number; high: number } | null;
+  /** The plain-language scope statement that must accompany singleBidSampleInterval wherever shown. */
+  intervalScope: string;
   /** How the sample was drawn — stated so nobody mistakes it for a random or full-history sample. */
   sampleOrder: string;
   /** How much weight this number should carry. NOT the same as MIN_SAMPLE (see above). */
   strength: EvidenceStrength;
-  /** 95% CI half-width on singleBidPct, in points — why we do not print a decimal. */
+  /** Half-width of the sampling interval on singleBidPct, in points (same scope caveat as above). */
   singleBidMoe: number | null;
   /** Executive read: "About half" rather than "47.9%". */
   singleBidPlain: string | null;
@@ -151,7 +158,15 @@ const SAMPLE_ORDER_LABEL = 'most recent base obligation date first (last 365 day
  */
 const DEPTH_SEMANTICS_VERSION = 2;
 
-/** 95% CI bounds on a proportion (normal approximation, matching marginOfErrorPct), clamped. */
+/**
+ * Plain-language scope for the interval. The sample is recency-selected (newest awards first), not a
+ * random draw from the buyer's awards, so no interval computed from it supports inference about the
+ * buyer's full award population. Reviewed 2026-10-06: keep the interval only with this statement.
+ */
+export const INTERVAL_SCOPE =
+  'Describes only this recency-selected, non-random sample of the most recent awards. It is not an estimate for the agency’s full award population.';
+
+/** Interval bounds on a proportion (normal approximation, matching marginOfErrorPct), clamped. */
 export function proportionCi(pct: number | null, n: number): { low: number; high: number } | null {
   const moe = marginOfErrorPct(pct, n);
   if (pct == null || moe == null) return null;
@@ -229,7 +244,7 @@ export async function computeCompetitionDepth(
   const empty = (note: string, resolvedAgency: string | null = null): CompetitionDepth => ({
     agency: AG, scope: { naics: naics ?? null, state: state ?? null },
     resolvedAgency, grounded: false, sampled: 0, sampledWithData: 0,
-    avgBidders: null, medianBidders: null, singleBidCount: 0, singleBidPct: null, singleBidCi: null, sampleOrder: SAMPLE_ORDER_LABEL, strength: 'insufficient' as EvidenceStrength, singleBidMoe: null, singleBidPlain: null, note,
+    avgBidders: null, medianBidders: null, singleBidCount: 0, singleBidPct: null, singleBidSampleInterval: null, intervalScope: INTERVAL_SCOPE, sampleOrder: SAMPLE_ORDER_LABEL, strength: 'insufficient' as EvidenceStrength, singleBidMoe: null, singleBidPlain: null, note,
   });
 
   // ⚠️ PROVE THE BUYER before sampling. If we can't confidently map the SAM long-name to a
@@ -334,7 +349,8 @@ export async function computeCompetitionDepth(
           medianBidders: median,
           singleBidCount: single,
           singleBidPct: singlePct,
-          singleBidCi: proportionCi(singlePct, withData),
+          singleBidSampleInterval: proportionCi(singlePct, withData),
+          intervalScope: INTERVAL_SCOPE,
           sampleOrder: SAMPLE_ORDER_LABEL,
           strength: evidenceStrength(withData),
           singleBidMoe: marginOfErrorPct(singlePct, withData),
