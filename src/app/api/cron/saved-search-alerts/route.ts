@@ -55,6 +55,7 @@ import {
   type ForecastHorizonOutcome,
 } from '@/lib/saved-searches/forecast-discovery';
 import { decideSavedSearchAlert } from '@/lib/saved-searches/alert-decision';
+import { hierarchyFilterLimitations } from '@/lib/opportunities/hierarchy-sub-agency';
 import {
   evaluateForecastWatermark,
   readForecastSnapshot,
@@ -115,6 +116,10 @@ export type WatermarkColumns = 'absent' | 'present' | 'unknown';
  * search into a new corpus retroactively; that is a surprise alert, not a
  * feature.
  */
+function forecastFilterUnsupported(s: SavedSearch): boolean {
+  return hierarchyFilterLimitations((s.filters || {}) as Record<string, unknown>, ['forecast']).length > 0;
+}
+
 function wantsForecasts(s: SavedSearch): boolean {
   const h = (s.filters as Record<string, unknown>)?.horizons;
   if (h && typeof h === 'object') return (h as Record<string, unknown>).forecast === true;
@@ -236,8 +241,11 @@ async function evaluateSavedSearch(
   if (!isSavedSearchDueAt(s.alert_frequency, now)) return { skippedNotDue: 1 };
 
   const doOpen = s.mode === 'open';
-  const doForecast = wantsForecasts(s);
-  if (!doOpen && !doForecast) return {};
+  // A filter forecasts cannot represent (Marine Corps) withholds the Forecast half instead of running it
+  // with the filter silently dropped — that would email every agency's forecasts as this watch's market.
+  const forecastLimited = wantsForecasts(s) && forecastFilterUnsupported(s);
+  const doForecast = wantsForecasts(s) && !forecastLimited;
+  if (!doOpen && !doForecast) return forecastLimited ? { forecastCoverage: 'unsupported_filter' } : {};
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let opps: any[] = [];
@@ -528,7 +536,12 @@ export async function GET(request: NextRequest) {
       if (error || count === null) return null;
       return count;
     },
-    evaluate: (row) => evaluateSavedSearch(db, row, now, preview, previewRows, forecastEngine, watermarkColumns),
+    evaluate: async (row) => {
+      const counts = await evaluateSavedSearch(db, row, now, preview, previewRows, forecastEngine, watermarkColumns);
+      return wantsForecasts(row) && forecastFilterUnsupported(row) && !counts.forecastCoverage
+        ? { ...counts, forecastCoverage: 'unsupported_filter' as const }
+        : counts;
+    },
   });
 
   if (dispatcherRun) {
