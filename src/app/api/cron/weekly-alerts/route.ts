@@ -229,6 +229,7 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
     try {
       allUsers = await fetchAllPaged<AlertUser>(() => getSupabase()
         .from('user_notification_settings')
+        // truncation-ok: wrapped in fetchAllPaged (pages with .range inside the helper)
         .select('*')
         .eq('is_active', true)
         .eq('alerts_enabled', true)
@@ -297,6 +298,7 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
     try {
       processedThisWeek = await fetchAllPaged<{ user_email: string }>(() => getSupabase()
         .from('alert_log')
+        // truncation-ok: wrapped in fetchAllPaged (pages with .range inside the helper)
         .select('user_email')
         .eq('alert_date', alertDate)
         .eq('alert_type', 'weekly')
@@ -592,6 +594,7 @@ export async function GET(request: NextRequest) {
   // Test mode for specific user
   const { data: user } = await getSupabase()
     .from('user_notification_settings')
+    // truncation-ok: one user by email, .single()
     .select('*')
     .eq('user_email', email.toLowerCase())
     .single();
