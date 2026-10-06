@@ -8,6 +8,9 @@ import { createSecureAccessUrl } from '@/lib/access-links';
 import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 import { sendEmail } from '@/lib/send-email';
 import { drainCycle, pendingForCycle } from '@/lib/alerts/weekly-drain';
+import { prioritizeExplicitWeekly } from '@/lib/alerts/weekly-queue';
+import { isOpenSearchFailure, openSearchAttempts, openSearchFailureReason, retryOpenSearchToday } from '@/lib/alerts/open-search-failure';
+import { distinctiveKeywords } from '@/lib/market/keyword-sanitize';
 import { reportCronOutcome } from '@/lib/cron-self-report';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 import { resolveBriefingAudience } from '@/lib/briefings/delivery/rollout';
@@ -145,6 +148,53 @@ function getWeeklyCycleDate(referenceDate = new Date()): string {
   return cycle.toISOString().split('T')[0];
 }
 
+type WeeklyRow = { user_email: string; delivery_status?: string | null; error_message?: string | null; retry_count?: number | null };
+
+/** Saved keywords are user-typed text; escape before they go into email HTML. */
+function escHtml(text: string): string {
+  return String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * CYCLE TRUTH (2026-10-06): who was expected this cycle, who has been processed, who is not yet
+ * reached — explicit weekly vs free weekly fallback — and every outcome reason, read back from this
+ * cycle's alert_log rows. Users never reached have NO row, so they appear only as notYetReached.
+ * A failed read is reported as unknown, never as zeros.
+ */
+async function cycleTruth(alertDate: string, expectedUsers: readonly { user_email: string; alert_frequency: string }[]): Promise<Record<string, unknown>> {
+  try {
+    const rows = await fetchAllPaged<WeeklyRow>(() => getSupabase()
+      .from('alert_log')
+      // truncation-ok: wrapped in fetchAllPaged (pages with .range inside the helper)
+      .select('user_email, delivery_status, error_message, retry_count')
+      .eq('alert_date', alertDate)
+      .eq('alert_type', 'weekly')
+      .order('user_email', { ascending: true }));
+    const explicit = new Set(expectedUsers.filter((u) => u.alert_frequency === 'weekly').map((u) => u.user_email.toLowerCase()));
+    const expected = new Set(expectedUsers.map((u) => u.user_email.toLowerCase()));
+    const outcomes: Record<string, number> = {};
+    const done = new Set<string>();
+    for (const r of rows) {
+      const reason = isOpenSearchFailure(r)
+        ? (retryOpenSearchToday(r) ? 'failed:open_search_failed (retry pending)' : 'failed:open_search_failed (attempts exhausted)')
+        : r.delivery_status === 'sent' ? 'sent' : `${r.delivery_status}:${r.error_message || 'unspecified'}`;
+      outcomes[reason] = (outcomes[reason] || 0) + 1;
+      if (!retryOpenSearchToday(r)) done.add(r.user_email.toLowerCase());
+    }
+    const explicitDone = [...explicit].filter((e) => done.has(e)).length;
+    const fallbackDone = [...expected].filter((e) => !explicit.has(e) && done.has(e)).length;
+    return {
+      alertDate,
+      expected: { explicitWeekly: explicit.size, freeWeeklyFallback: expected.size - explicit.size, total: expected.size },
+      processed: { explicitWeekly: explicitDone, freeWeeklyFallback: fallbackDone, rowsInCycle: rows.length },
+      notYetReached: { explicitWeekly: explicit.size - explicitDone, freeWeeklyFallback: expected.size - explicit.size - fallbackDone },
+      outcomes,
+    };
+  } catch (error) {
+    return { alertDate, unknown: true, error: getErrorMessage(error) };
+  }
+}
+
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Unknown error';
 }
@@ -178,6 +228,7 @@ async function persistProcessedWeeklyAlert({
   opportunitiesCount,
   opportunitiesData,
   errorMessage,
+  retryCount,
 }: {
   user: AlertUser;
   alertDate: string;
@@ -187,6 +238,7 @@ async function persistProcessedWeeklyAlert({
   opportunitiesCount: number;
   opportunitiesData?: Record<string, unknown>[];
   errorMessage?: string;
+  retryCount?: number;
 }) {
   const processedAt = new Date().toISOString();
 
@@ -203,6 +255,7 @@ async function persistProcessedWeeklyAlert({
     sent_at: processedAt,
     delivery_status: status,
     error_message: errorMessage || null,
+    ...(typeof retryCount === 'number' ? { retry_count: retryCount } : {}),
   });
 }
 
@@ -294,12 +347,12 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
     // Already processed this cycle = the drain cursor. PAGED: once a cycle can hold more
     // than 1,000 rows (it now drains ~1,790), an unpaged read would truncate the dedup set
     // and re-send to users who already got this week's alert.
-    let processedThisWeek: Array<{ user_email: string }>;
+    let processedThisWeek: WeeklyRow[];
     try {
-      processedThisWeek = await fetchAllPaged<{ user_email: string }>(() => getSupabase()
+      processedThisWeek = await fetchAllPaged<WeeklyRow>(() => getSupabase()
         .from('alert_log')
         // truncation-ok: wrapped in fetchAllPaged (pages with .range inside the helper)
-        .select('user_email')
+        .select('user_email, delivery_status, error_message, retry_count')
         .eq('alert_date', alertDate)
         .eq('alert_type', 'weekly')
         .order('user_email', { ascending: true }));
@@ -310,8 +363,17 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
       return NextResponse.json({ error: 'Failed to read this cycle\'s alert_log' }, { status: 500 });
     }
 
-    const processedEmails = new Set(processedThisWeek.map((r) => r.user_email.toLowerCase()));
-    const pending = pendingForCycle(users, processedEmails);
+    // An Open-search FAILURE is the one row that is not final: the user is searched again by a later
+    // window of the same cycle, at most MAX_SAME_DAY_OPEN_SEARCH_ATTEMPTS times — the same policy as
+    // daily-alerts (lib/alerts/open-search-failure.ts). Every other row is the drain cursor's "done".
+    const processedEmails = new Set(processedThisWeek.filter((r) => !retryOpenSearchToday(r)).map((r) => r.user_email.toLowerCase()));
+    const priorOpenSearchAttempts = new Map<string, number>();
+    for (const r of processedThisWeek) {
+      if (isOpenSearchFailure(r)) priorOpenSearchAttempts.set(r.user_email.toLowerCase(), openSearchAttempts(r));
+    }
+    // Explicit weekly subscribers first: if a run's budget is spent, the fallback audience waits,
+    // never the users who chose weekly (lib/alerts/weekly-queue.ts).
+    const pending = prioritizeExplicitWeekly(pendingForCycle(users, processedEmails));
 
     console.log(`[Weekly Alerts] ${pending.length} pending of ${users.length} eligible (${processedEmails.size} already processed this cycle); budget ${RUN_BUDGET_MS}ms`);
 
@@ -321,6 +383,7 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
         message: 'All users already processed this week',
         sent: 0,
         alreadyProcessed: processedEmails.size,
+        cycle: await cycleTruth(alertDate, users),
       });
     }
 
@@ -330,6 +393,7 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
       failed: 0,
       noNaics: 0,
       noMatches: 0,
+      openSearchFailed: 0, // the Open search itself errored — NOT a zero; retried in a later window
       errors: [] as string[],
     };
 
@@ -360,7 +424,17 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
           return;
         }
 
-        if (!user.naics_codes || user.naics_codes.length === 0) {
+        // TARGETING (2026-10-06). Weekly searched on NAICS only and skipped everyone without codes as
+        // 'No NAICS configured' — including users whose saved KEYWORDS are their whole targeting,
+        // while the app tells them they are set up. Keyword-only users now search on their keywords
+        // through the SAME shared cache path as daily alerts (same keyword mode, same error contract).
+        // A NAICS profile is UNCHANGED: its weekly search and score still ignore keywords.
+        // Guard: no NAICS and no DISTINCTIVE keyword leaves the shared search with no filter at all —
+        // that would mail the whole market as "matched your profile", so it is an explicit skip.
+        const weeklyNaics: string[] = user.naics_codes || [];
+        const savedKeywords: string[] = (user.keywords || []).filter(Boolean) as string[];
+        const keywordOnly = weeklyNaics.length === 0 && distinctiveKeywords(savedKeywords).length > 0;
+        if (weeklyNaics.length === 0 && !keywordOnly) {
           await persistProcessedWeeklyAlert({
             user,
             alertDate,
@@ -368,7 +442,7 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
             source: alertSource,
             tier,
             opportunitiesCount: 0,
-            errorMessage: 'No NAICS configured',
+            errorMessage: savedKeywords.length > 0 ? 'No NAICS configured; keywords too generic to search' : 'No NAICS configured',
           });
           results.skipped++;
           results.noNaics++;
@@ -391,7 +465,8 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
         // Fetch opportunities from the local SAM cache. The cache is synced by cron
         // and avoids per-user SAM.gov API calls in the weekly send hot path.
         const searchResult = await fetchSamOpportunitiesFromCache({
-          naicsCodes: user.naics_codes || [],
+          naicsCodes: weeklyNaics,
+          keywords: keywordOnly ? savedKeywords : undefined,
           setAsides,
           state: user.location_state || undefined,
           // Only actionable opportunity types
@@ -400,15 +475,36 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
           limit: 50,
         });
 
+        // A failed search is UNKNOWN, not an empty market (#1853's contract). Recording it as
+        // 'No matching opportunities found' claimed a zero nobody measured and closed the user out of
+        // the cycle. Record the failure; a later window of the cycle searches the user again.
+        if (searchResult.queryStatus === 'error') {
+          const prior = priorOpenSearchAttempts.get(user.user_email.toLowerCase()) ?? 0;
+          await persistProcessedWeeklyAlert({
+            user,
+            alertDate,
+            status: 'failed',
+            source: alertSource,
+            tier,
+            opportunitiesCount: 0,
+            opportunitiesData: [],
+            errorMessage: openSearchFailureReason(searchResult.queryError),
+            retryCount: prior,
+          });
+          console.warn(`[Weekly Alerts] ${user.user_email}: Open search FAILED (attempt ${prior + 1}) — recorded failed, NOT "No matching opportunities found"`);
+          results.openSearchFailed++;
+          return;
+        }
+
         const opportunities = searchResult.opportunities;
 
         // Score and rank opportunities
         const scoredOpps = opportunities.map(opp => ({
           ...opp,
           score: scoreOpportunity(opp, {
-            naics_codes: user.naics_codes || [],
+            naics_codes: weeklyNaics,
             agencies: user.agencies || [],
-            keywords: [],
+            keywords: keywordOnly ? savedKeywords : [],
             business_description: user.business_description || null,
             business_type: user.business_type || null,
             setAsides: user.set_aside_preferences || undefined,
@@ -533,6 +629,7 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
         runBudgetMs: RUN_BUDGET_MS,
         alertDate,
       },
+      cycle: await cycleTruth(alertDate, users),
     });
   } catch (error: unknown) {
     console.error('[Weekly Alerts] Error:', error);
@@ -777,7 +874,9 @@ async function sendAlertEmail(
 
     <div style="background: #f8fafc; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; color: #64748b;">
       <strong>Your filters:</strong>
-      NAICS: ${user.naics_codes?.slice(0, 3).join(', ') || 'Any'}${user.naics_codes?.length > 3 ? ` +${user.naics_codes.length - 3} more` : ''}
+      ${user.naics_codes?.length
+        ? `NAICS: ${user.naics_codes.slice(0, 3).join(', ')}${user.naics_codes.length > 3 ? ` +${user.naics_codes.length - 3} more` : ''}`
+        : `Keywords: ${escHtml((user.keywords || []).filter(Boolean).slice(0, 3).join(', '))}${(user.keywords || []).filter(Boolean).length > 3 ? ` +${(user.keywords || []).filter(Boolean).length - 3} more` : ''}`}
       ${user.business_type ? ` | Set-aside: ${user.business_type}` : ''}
       ${user.location_state ? ` | Location: ${user.location_state}` : ''}
     </div>
