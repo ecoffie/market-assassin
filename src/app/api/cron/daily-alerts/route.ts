@@ -1497,9 +1497,10 @@ async function sendDailyAlertEmail(
 
   const encodedEmail = encodeURIComponent(email.toLowerCase().trim());
   const preferencesAuth = generateEmailToken(email);
-  // One-click "Track in Mindy" (the alert→action fix): a signed token so the
-  // add-to-pipeline GET link authenticates straight from the email. Reuses the
-  // same email-token scheme as the preferences link.
+  // "Track in Mindy": a signed token so the link can prove it came from this email. The link
+  // opens a CONFIRMATION page and never saves on its own: mail scanners fetch every link on
+  // delivery, and when this GET saved they created pipeline rows nobody chose (2026-10-06).
+  // The save happens only on that page's button POST. Same email-token scheme as preferences.
   const actionAuth = generateEmailToken(email);
   const trackUrl = (opp: { noticeId?: string; title: string; agency?: string; naicsCode?: string }) => {
     const p = new URLSearchParams({

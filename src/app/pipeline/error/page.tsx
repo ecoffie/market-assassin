@@ -11,6 +11,9 @@ function ErrorContent() {
   const errorMessages: Record<string, string> = {
     missing_params: 'The link was missing required information.',
     db_error: 'There was a problem saving to your pipeline.',
+    link_expired: 'This save link has expired. Open Mindy to add the opportunity to your pipeline.',
+    link_invalid: 'This save link is not valid. Open Mindy to add the opportunity to your pipeline.',
+    unauthorized: 'We could not confirm this save. Open Mindy to add the opportunity to your pipeline.',
     unknown: 'Something went wrong. Please try again.',
   };
 

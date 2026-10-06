@@ -1,13 +1,8 @@
 /**
  * Email Action: Add to Pipeline
  *
- * One-click action from email to add opportunity to BD Assist pipeline.
- * Uses GET for email link compatibility.
- *
- * Usage in email:
- * <a href="https://getmindy.ai/api/actions/add-to-pipeline?email=user@example.com&notice_id=FA8773-24-R-0001&title=Navy%20IT%20Support&stage=tracking">
- *   Track This
- * </a>
+ * The email link (GET) opens a confirmation page; it never saves. See GET below.
+ * POST (JSON, authenticated) is the in-app programmatic save; PATCH updates next actions.
  */
 
 import { NextRequest, NextResponse, after } from 'next/server';
@@ -17,7 +12,6 @@ import { fetchPursuitDocsAuto } from '@/lib/grants/fetch-grant-docs';
 import { isValidSamNoticeId } from '@/lib/sam/utils';
 import { sanitizeValueEstimate } from '@/lib/pipeline/value-estimate';
 import { lookupSamOpportunityForPipeline } from '@/lib/pipeline/sam-opportunity-lookup';
-import { resolveDiscoveredAt } from '@/lib/pipeline/discovered-at';
 
 // Lazy initialization to avoid build-time errors
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -32,164 +26,36 @@ function getSupabase() {
   return _supabase;
 }
 
+/**
+ * GET / HEAD / OPTIONS NEVER WRITE (2026-10-06, the link-scanner defect).
+ *
+ * This URL is in every daily alert. Mail security scanners fetch it on delivery, and when GET
+ * saved, they created pipeline rows nobody chose (83% of email saves in 30 days landed within
+ * 2 minutes of the send). The link now only forwards to the confirmation page, which is itself
+ * read-only; the save happens solely on that page's explicit button POST
+ * (/api/actions/add-to-pipeline/confirm). No database access happens here at all.
+ *
+ * The full query string is forwarded unchanged, so links already sitting in inboxes keep working.
+ */
+function toConfirmationPage(request: NextRequest) {
+  const target = new URL('/pipeline/confirm', request.url);
+  target.search = request.nextUrl.search;
+  const res = NextResponse.redirect(target, 303);
+  res.headers.set('Cache-Control', 'no-store');
+  res.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  return res;
+}
+
 export async function GET(request: NextRequest) {
-  const params = request.nextUrl.searchParams;
+  return toConfirmationPage(request);
+}
 
-  // Required params
-  const email = params.get('email');
-  const title = params.get('title');
+export async function HEAD(request: NextRequest) {
+  return toConfirmationPage(request);
+}
 
-  // Optional params
-  const notice_id = params.get('notice_id') || params.get('noticeId');
-  const stage = params.get('stage') || 'tracking';
-  const agency = params.get('agency');
-  const value = params.get('value');
-  const deadline = params.get('deadline');
-  const naics = params.get('naics');
-  const setAside = params.get('setAside') || params.get('set_aside');
-  const source = params.get('source') || 'email_action';
-  const externalUrl = params.get('url') || params.get('samLink');
-
-  // Validate required fields
-  if (!email || !title) {
-    return NextResponse.redirect(
-      new URL('/pipeline/error?reason=missing_params', request.url)
-    );
-  }
-
-  // SECURITY: Verify user owns this email (via signed token or cookie)
-  const auth = await verifyUserOwnsEmail(request, email);
-  if (!auth.authenticated) {
-    return NextResponse.redirect(
-      new URL('/pipeline/error?reason=unauthorized', request.url)
-    );
-  }
-
-  try {
-    // Check if already in pipeline (by notice_id or title+email)
-    let existingQuery = getSupabase()
-      .from('user_pipeline')
-      .select('id, stage')
-      .eq('user_email', email.toLowerCase());
-
-    if (notice_id) {
-      existingQuery = existingQuery.eq('notice_id', notice_id);
-    } else {
-      existingQuery = existingQuery.eq('title', title);
-    }
-
-    const { data: existing } = await existingQuery.single() as { data: { id: string; stage: string } | null };
-
-    if (existing) {
-      // Already tracking - redirect to pipeline with message
-      const redirectUrl = new URL('/pipeline/already-tracking', request.url);
-      redirectUrl.searchParams.set('title', title);
-      redirectUrl.searchParams.set('stage', existing.stage);
-      return NextResponse.redirect(redirectUrl);
-    }
-
-    // Reject malformed notice_id values before persisting. React render
-    // keys like 'deadline-140R6026Q0068' have been leaking in via email
-    // action URLs, which then breaks downstream SAM lookups.
-    let cleanNoticeId = notice_id && isValidSamNoticeId(notice_id)
-      ? notice_id
-      : (notice_id ? (console.warn(`[add-to-pipeline GET] dropping malformed notice_id "${notice_id}" for "${title}"`), null) : null);
-    const samMatch = await lookupSamOpportunityForPipeline(getSupabase(), {
-      noticeId: cleanNoticeId,
-      title: decodeURIComponent(title),
-      agency: agency ? decodeURIComponent(agency) : null,
-    });
-    // Prefer the canonical SAM UUID over a solicitation number — the attachment
-    // fetcher needs the UUID. Resolve whenever the current value isn't a UUID.
-    const isUuid = (v?: string | null) => !!v && /^[a-f0-9]{32}$/i.test(v.trim());
-    if (samMatch?.noticeId && isUuid(samMatch.noticeId) && !isUuid(cleanNoticeId)) {
-      cleanNoticeId = samMatch.noticeId;
-    }
-
-    // Decision-time (#122): freeze WHEN this user first discovered this opportunity — earliest
-    // logged view of this notice, else now() as an honest floor. Same shared resolver the app
-    // POST path uses, so decision_time is stamped identically no matter the save route.
-    const nowIso = new Date().toISOString();
-    const discovered_at = await resolveDiscoveredAt(getSupabase(), {
-      userEmail: email.toLowerCase(),
-      noticeId: cleanNoticeId,
-      nowIso,
-    });
-
-    // Add to pipeline
-    const pipelineEntry = {
-      user_email: email.toLowerCase(),
-      notice_id: cleanNoticeId,
-      discovered_at,
-      title: decodeURIComponent(title),
-      agency: agency ? decodeURIComponent(agency) : null,
-      // Sanitize value_estimate — reject display labels like "Due in
-      // 6 days" or "Open market research window..." that leaked from
-      // briefing UIs (audit 2026-05-26).
-      value_estimate: sanitizeValueEstimate(value ? decodeURIComponent(value) : null),
-      response_deadline: deadline || samMatch?.responseDeadline || null,
-      naics_code: naics || null,
-      set_aside: setAside ? decodeURIComponent(setAside) : null,
-      stage: stage as 'tracking' | 'pursuing' | 'bidding' | 'submitted',
-      source: source,
-      external_url: externalUrl ? decodeURIComponent(externalUrl) : null,
-      priority: 'medium',
-      created_at: nowIso,
-      updated_at: nowIso,
-    };
-
-    let { data: insertedRow, error } = await getSupabase()
-      .from('user_pipeline')
-      .insert(pipelineEntry)
-      .select()
-      .single();
-
-    // Migration-order safety: retry without discovered_at if the column hasn't landed yet (42703),
-    // so a save never 500s on deploy ordering. Stamping activates once the migration is applied.
-    if (error && error.code === '42703' && /discovered_at/.test(error.message || '')) {
-      const { discovered_at: _drop, ...entryNoDiscovered } = pipelineEntry;
-      ({ data: insertedRow, error } = await getSupabase().from('user_pipeline').insert(entryNoDiscovered).select().single());
-    }
-
-    if (error) {
-      console.error('Failed to add to pipeline:', error);
-      return NextResponse.redirect(
-        new URL('/pipeline/error?reason=db_error', request.url)
-      );
-    }
-
-    // Background task via Next.js after() — keeps lambda alive past
-    // the redirect so pdf-parse can finish initializing without being
-    // killed mid-extraction (see commit 2026-05-26).
-    if (insertedRow?.notice_id && insertedRow?.id) {
-      after(async () => {
-        try {
-          await fetchPursuitDocsAuto({
-            pipelineId: insertedRow.id,
-            userEmail: email,
-            noticeId: insertedRow.notice_id,
-            source: insertedRow.source ?? source,
-            title: insertedRow.title,
-            agency: insertedRow.agency,
-          });
-        } catch (err) {
-          console.warn('[add-to-pipeline GET] background doc fetch threw:', err);
-        }
-      });
-    }
-
-    // Success - redirect to confirmation
-    const redirectUrl = new URL('/pipeline/added', request.url);
-    redirectUrl.searchParams.set('title', title);
-    redirectUrl.searchParams.set('stage', stage);
-    return NextResponse.redirect(redirectUrl);
-
-  } catch (err) {
-    console.error('Add to pipeline error:', err);
-    return NextResponse.redirect(
-      new URL('/pipeline/error?reason=unknown', request.url)
-    );
-  }
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: { Allow: 'GET, HEAD, OPTIONS, POST, PATCH' } });
 }
 
 // POST endpoint for programmatic use
