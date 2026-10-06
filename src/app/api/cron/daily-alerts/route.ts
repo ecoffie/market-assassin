@@ -27,6 +27,7 @@ import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 import { sendEmail } from '@/lib/send-email';
 import { retryFailedDailyAlerts } from '@/lib/alerts/retry-failed-daily';
+import { openSearchFailureReason, retryOpenSearchToday, isOpenSearchFailure, openSearchAttempts, type OpenSearchError } from '@/lib/alerts/open-search-failure';
 import { isMailboxSuppressed } from '@/lib/email/suppression';
 import { getInsightForNoticeType, bucketNoticeType, renderInsightHtml } from '@/lib/briefings/mindy-insights';
 import { runwayRank } from '@/lib/opportunities/runway';
@@ -270,6 +271,29 @@ async function saveFailedAlert(
   });
 }
 
+/**
+ * The Open search itself failed (query error / statement timeout). NOT an empty market:
+ * recorded as 'failed' with the reason, an EMPTY payload (nothing for the cross-day
+ * re-send loop to send), and retry_count = attempts already made today, which is what
+ * the same-day guard reads to re-admit the user (see lib/alerts/open-search-failure.ts).
+ */
+async function saveOpenSearchFailedAlert(
+  email: string,
+  err: OpenSearchError | undefined,
+  priorAttempts: number,
+) {
+  await upsertAlertLog(getSupabase(), {
+    user_email: email,
+    alert_date: new Date().toISOString().split('T')[0],
+    alert_type: 'daily',
+    opportunities_count: 0,
+    opportunities_data: [],
+    delivery_status: 'failed',
+    error_message: openSearchFailureReason(err),
+    retry_count: priorAttempts,
+  });
+}
+
 async function saveSkippedAlert(
   email: string,
   reason: string,
@@ -426,12 +450,13 @@ async function runDailyAlertJob(options?: {
     // Page this too: once daily volume exceeds 1000, a capped read here would return
     // an INCOMPLETE already-processed set → users past row 1000 look un-processed and
     // get re-sent (duplicate alerts). Order for clean .range() paging.
-    let alreadyProcessedToday: { user_email: string; delivery_status: string }[] = [];
+    type ProcessedRow = { user_email: string; delivery_status: string; error_message?: string | null; retry_count?: number | null };
+    let alreadyProcessedToday: ProcessedRow[] = [];
     try {
-      alreadyProcessedToday = await fetchAllPaged<{ user_email: string; delivery_status: string }>(() =>
+      alreadyProcessedToday = await fetchAllPaged<ProcessedRow>(() =>
         getSupabase()
           .from('alert_log')
-          .select('user_email, delivery_status') // truncation-ok: fetchAllPaged applies .range() until drained
+          .select('user_email, delivery_status, error_message, retry_count') // truncation-ok: fetchAllPaged applies .range() until drained
           .eq('alert_date', today)
           .eq('alert_type', 'daily')
           .in('delivery_status', ['sent', 'skipped', 'failed'])
@@ -442,7 +467,17 @@ async function runDailyAlertJob(options?: {
       console.error('[Daily Alerts] Error fetching already-processed set:', e);
     }
 
-    const alreadyProcessedEmails = new Set((alreadyProcessedToday || []).map((s: { user_email: string }) => s.user_email));
+    // A failed OPEN SEARCH is the one 'failed' row that is not final for the day: the user is
+    // searched again by a later run, up to MAX_SAME_DAY_OPEN_SEARCH_ATTEMPTS. Every other
+    // sent/skipped/failed row still means "done today". priorOpenSearchAttempts carries the
+    // count forward so the next failure records attempt N+1.
+    const priorOpenSearchAttempts = new Map<string, number>();
+    for (const r of alreadyProcessedToday || []) {
+      if (isOpenSearchFailure(r)) priorOpenSearchAttempts.set(r.user_email, openSearchAttempts(r));
+    }
+    const alreadyProcessedEmails = new Set(
+      (alreadyProcessedToday || []).filter((r) => !retryOpenSearchToday(r)).map((r) => r.user_email),
+    );
     if (options?.forceResend && options.testEmail) {
       alreadyProcessedEmails.delete(options.testEmail);
     }
@@ -503,6 +538,7 @@ async function runDailyAlertJob(options?: {
       noNaics: 0,
       noTargeting: 0, // no NAICS AND no keywords → skipped, not given a default profile
       noOpps: 0,
+      openSearchFailed: 0, // the Open query errored — recorded failed + retryable, never counted as noOpps
       wrongTimezone: 0,
       deduplicated: 0,
       freeTierSkipped: 0, // Free tier users (they get weekly alerts instead)
@@ -676,6 +712,7 @@ async function runDailyAlertJob(options?: {
         let noticeSummary: SAMNoticeSummary | undefined;
         let openKeywordOutcome: OpenKeywordOutcome | undefined;
         let comingBack: ComingBackDecision = { kind: 'omit', reason: 'no_naics_market' };
+        let openSearchError: OpenSearchError | undefined;
         try {
           noticeSummary = await fetchSamOpportunityNoticeSummaryFromCache({
             naicsCodes: expandedNaics,
@@ -704,6 +741,13 @@ async function runDailyAlertJob(options?: {
             limit: 200, // Get more from cache, filter locally
             savedNaics: userNaics,
           });
+          if (cacheResult.queryStatus === 'error') {
+            // UNKNOWN, not zero. Do not rank, do not fall back to "all active", do not
+            // reach the no-opportunities skip below. The live-API fallback in the catch is
+            // deliberately NOT used: a database incident would turn into one live SAM call
+            // per user against a 10/min budget (cache-first rule).
+            openSearchError = cacheResult.queryError ?? { message: 'open search failed' };
+          }
 
           const appliedOpen = applyOpenAlertMode(
             {
@@ -777,6 +821,17 @@ async function runDailyAlertJob(options?: {
           } else {
             console.warn(`[Daily Alerts] ${user.user_email}: Skipping live SAM fallback because SAM_API_KEY is not configured`);
           }
+        }
+
+        if (openSearchError) {
+          const prior = priorOpenSearchAttempts.get(user.user_email) ?? 0;
+          await saveOpenSearchFailedAlert(user.user_email, openSearchError, prior);
+          console.warn(`[Daily Alerts] ${user.user_email}: Open search FAILED (attempt ${prior + 1}) — recorded failed, NOT "no opportunities": ${openSearchFailureReason(openSearchError)}`);
+          // Its own counter, NOT results.failed: postSendValidation reads failed/(sent+failed)
+          // as an EMAIL send-failure rate, and no send was attempted here.
+          results.openSearchFailed++;
+          metrics.recordUserSkipped();
+          continue;
         }
 
         // FAILSAFE: If no NEW opportunities, fall back to ALL active opportunities
@@ -1117,7 +1172,7 @@ async function runDailyAlertJob(options?: {
       }
     }
 
-    console.log(`[Daily Alerts] Complete. Batch: ${usersToProcess.length}/${totalEligible}, Sent: ${results.sent}, No Opps: ${results.noOpps}, No NAICS: ${results.noNaics}, Free Tier: ${results.freeTierSkipped}, Failed: ${results.failed}, Remaining: ${remainingAfterBatch}`);
+    console.log(`[Daily Alerts] Complete. Batch: ${usersToProcess.length}/${totalEligible}, Sent: ${results.sent}, No Opps: ${results.noOpps}, No NAICS: ${results.noNaics}, Free Tier: ${results.freeTierSkipped}, Failed: ${results.failed}, Open search failed: ${results.openSearchFailed}, Remaining: ${remainingAfterBatch}`);
 
     // Save metrics to database
     await metrics.save();

@@ -115,9 +115,11 @@ vi.mock('@/lib/intelligence', () => {
   class CircuitBreaker { async isOpen() { return false; } async record() { return undefined; } }
   return { IntelligenceMetrics, GuardrailMonitor, CircuitBreaker, logIntelligenceDelivery: async () => undefined, postSendValidation: async () => ({ ok: true }) };
 });
+let GRANTS: Row[] = [];
 vi.mock('@/lib/briefings/pipelines/grants-gov', async (orig) => ({
   ...(await orig<typeof import('@/lib/briefings/pipelines/grants-gov')>()),
-  searchGrantsByNAICS: async () => ({ grants: [], totalRecords: 0 }),
+  searchGrantsByNAICS: async () => ({ grants: GRANTS, totalRecords: GRANTS.length }),
+  scoreGrant: () => 100,
 }));
 vi.mock('@/lib/dashboard/todays-lens', () => ({ computeTodaysLens: async () => null }));
 vi.mock('@/lib/alerts/coming-back-to-market', async (orig) => ({
@@ -150,7 +152,7 @@ beforeAll(async () => {
   ({ POST } = await import('./route'));
 });
 
-beforeEach(() => { SENT.length = 0; ALERT_LOG.clear(); SAM_MODE = 'error'; SAM_READS = 0; });
+beforeEach(() => { SENT.length = 0; ALERT_LOG.clear(); SAM_MODE = 'error'; SAM_READS = 0; GRANTS = []; });
 
 /** A scheduled-style run scoped to the one user. NOT forceResend: the same-day guard must be exercised. */
 async function run() {
@@ -166,7 +168,8 @@ const todayRow = () => ALERT_LOG.get(`${USER}|${TODAY}|daily`);
 
 describe('daily-alerts cron — a failed Open search is recorded as a failure, not as an empty market', () => {
   it('timeout on a keyword-only profile: no "no opportunities" row, recorded failed with the reason, no email', async () => {
-    await run();
+    const body = await run();
+    expect(body.results).toMatchObject({ openSearchFailed: 1, noOpps: 0, failed: 0, sent: 0 });
     const row = todayRow();
     expect(row, 'the run must leave an alert_log record for the user').toBeTruthy();
     expect(row!.error_message).not.toBe('no_new_or_active_opportunities');
@@ -195,6 +198,20 @@ describe('daily-alerts cron — a failed Open search is recorded as a failure, n
     expect(SAM_READS).toBe(reads);
     expect(fourth.message).toBe('All users already processed today');
     expect(todayRow()!.delivery_status).toBe('failed'); // still an honest failure, never re-labelled
+  });
+
+  it('a failed Open search sends NO email even when other sections (grants) have content — no "Nothing new matched" claim', async () => {
+    // Production shape: a keyword-only timeout user had alerts logged "sent" with 0 Open rows.
+    // On main the grants section made the email sendable and the Open section rendered the
+    // quiet-day line "Nothing new matched your filters today" — a zero nobody measured.
+    GRANTS = [{
+      oppNumber: 'G-1', title: 'Community Facilities Grant', agency: 'USDA', closeDate: future(20),
+      awardCeiling: 50000, oppId: 'g1', link: 'https://grants.gov/g1',
+    }];
+    await run();
+    expect(SENT.map((m) => m.html).join('\n')).not.toMatch(/Nothing new matched your filters today/);
+    expect(SENT).toHaveLength(0);
+    expect(todayRow()).toMatchObject({ delivery_status: 'failed' });
   });
 
   it('control: a SUCCESSFUL search with zero rows is still the honest "no opportunities" skip', async () => {

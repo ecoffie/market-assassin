@@ -16,6 +16,8 @@
  * the failed-and-retryable set for good instead of being re-examined for three days.
  */
 
+import { OPEN_SEARCH_FAILED_PREFIX } from './open-search-failure';
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseLike = { from: (table: string) => any };
 
@@ -32,6 +34,7 @@ export interface FailedAlertRow {
   user_email: string;
   retry_count?: number | null;
   opportunities_data?: unknown[] | null;
+  error_message?: string | null;
 }
 
 export type RetryDecision =
@@ -76,7 +79,7 @@ export async function retryFailedDailyAlerts(deps: RetryDeps): Promise<RetryResu
 
   const { data: failedAlerts, error } = await supabase
     .from('alert_log')
-    .select('id, user_email, retry_count, opportunities_data')
+    .select('id, user_email, retry_count, opportunities_data, error_message')
     .eq('alert_type', 'daily')
     .eq('delivery_status', 'failed')
     .lt('retry_count', 3)
@@ -99,6 +102,9 @@ export async function retryFailedDailyAlerts(deps: RetryDeps): Promise<RetryResu
   };
 
   for (const alert of failedAlerts as FailedAlertRow[]) {
+    // A failed OPEN SEARCH has nothing to re-send (see ./open-search-failure.ts). Leave the
+    // row and its reason intact; the next normal run searches the user again.
+    if (typeof alert.error_message === 'string' && alert.error_message.startsWith(`${OPEN_SEARCH_FAILED_PREFIX}:`)) continue;
     result.retried++;
     try {
       const { data: user, error: userErr } = await supabase

@@ -98,4 +98,21 @@ describe('retryFailedDailyAlerts — a retry never resurrects a recipient', () =
     await retryFailedDailyAlerts({ supabase, send: async () => { throw new Error('provider 503'); }, isSuppressed: async () => false, today });
     expect(updates['1']).toMatchObject({ retry_count: 1, error_message: 'provider 503' });
   });
+
+  it('a failed OPEN SEARCH row is left alone: not re-sent, not retired, its reason kept', async () => {
+    // match-health audit 2026-10-06: a statement timeout is recorded failed /
+    // open_search_failed:<code> with no payload. This loop re-SENDS stored payloads, so it
+    // has nothing to send; retiring the row as retry_skipped:no_payload would overwrite the
+    // real reason. Tomorrow's normal run searches the user again.
+    const row: FailedAlertRow = {
+      id: '9', user_email: 'kw@x.com', retry_count: 2, opportunities_data: [],
+      error_message: 'open_search_failed:57014 canceling statement due to statement timeout',
+    } as FailedAlertRow;
+    const { supabase, updates } = fakeSupabase([row], [user('kw@x.com')]);
+    const send = vi.fn(async () => true);
+    const r = await retryFailedDailyAlerts({ supabase, send, isSuppressed: async () => false, today });
+    expect(send).not.toHaveBeenCalled();
+    expect(updates['9']).toBeUndefined();
+    expect(r).toMatchObject({ retried: 0, skipped: 0, succeeded: 0 });
+  });
 });
