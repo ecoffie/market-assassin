@@ -5,14 +5,14 @@ import {
   fetchSamOpportunities,
   fetchSamOpportunitiesFromCache,
   fetchSamOpportunityNoticeSummaryFromCache,
-  scoreOpportunity,
+  scoreOpportunityDetailed,
+  type OpportunityMatchEvidence,
   SAMOpportunity,
   SAMNoticeSummary,
 } from '@/lib/briefings/pipelines/sam-gov';
 import { searchGrantsByNAICS, scoreGrant, GrantOpportunity, GRANT_RELEVANCE_THRESHOLD } from '@/lib/briefings/pipelines/grants-gov';
 import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
-import { getVocabularyForCodes } from '@/lib/market/vocabulary';
 import Anthropic from '@anthropic-ai/sdk';
 import { getCapabilityVector } from '@/lib/alerts/capability-vector';
 import { fetchHiddenMatchPool, findHiddenMatches, type HiddenMatch } from '@/lib/alerts/hidden-match';
@@ -31,7 +31,8 @@ import { openSearchFailureReason, retryOpenSearchToday, isOpenSearchFailure, ope
 import { isMailboxSuppressed } from '@/lib/email/suppression';
 import { getInsightForNoticeType, bucketNoticeType, renderInsightHtml } from '@/lib/briefings/mindy-insights';
 import { runwayRank } from '@/lib/opportunities/runway';
-import { applyOpenAlertMode, filterMarketToSavedIndustry, openMarketNote, preferDistinctiveInOpenMarket, OPEN_NOW_HEADING, OPEN_NOW_EXPLAIN, type OpenKeywordOutcome } from '@/lib/alerts/open-contract-d';
+import { applyOpenAlertMode, filterMarketToSavedIndustry, openMarketNote, preferDistinctiveInOpenMarket, OPEN_NOW_HEADING, OPEN_NOW_EXPLAIN, type OpenKeywordOutcome, type KeywordScanCoverage } from '@/lib/alerts/open-contract-d';
+import { renderMatchReason, renderStageLabel, OPEN_STILL_OPEN_EXPLAIN } from '@/lib/alerts/match-evidence-copy';
 import { alertModeFromAggregated } from '@/lib/alerts/alert-mode';
 import {
   COMING_BACK_PANEL_PATH,
@@ -245,12 +246,15 @@ function isDeliveryTimeForTimezone(timezone: string | undefined): boolean {
   return localHour >= 5 && localHour <= 8;
 }
 
+/** A ranked alert row: display score, unclamped rank, and the evidence behind both. */
+type RankedOpp = SAMOpportunity & { score: number; rank?: number; evidence?: OpportunityMatchEvidence };
+
 /**
  * Save failed email for retry
  */
 async function saveFailedAlert(
   email: string,
-  opportunities: (SAMOpportunity & { score: number })[],
+  opportunities: RankedOpp[],
   error: string
 ) {
   await upsertAlertLog(getSupabase(), {
@@ -258,12 +262,18 @@ async function saveFailedAlert(
     alert_date: new Date().toISOString().split('T')[0],
     alert_type: 'daily',
     opportunities_count: opportunities.length,
+    // The retry re-sends from THIS payload (there is no description to recompute
+    // from), so it must carry the match evidence and stage the email renders.
     opportunities_data: opportunities.slice(0, 20).map(o => ({
       noticeId: o.noticeId,
       title: o.title,
       agency: o.department,
       naics: o.naicsCode,
       deadline: o.responseDeadline,
+      postedDate: o.postedDate,
+      noticeType: o.noticeType,
+      setAside: o.setAside,
+      evidence: o.evidence,
     })),
     delivery_status: 'failed',
     error_message: error,
@@ -326,8 +336,16 @@ async function retryFailedAlerts(): Promise<{ retried: number; succeeded: number
       sendDailyAlertEmail(
         alert.user_email,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // Map the stored payload back onto the fields the email reads. It used to spread
+        // the stored keys as-is, so department / NAICS / due date came through as
+        // `agency` / `naics` / `deadline` and rendered blank. `evidence` (stored since
+        // 2026-09-26) gives the retry the same reason line and stage label; rows failed
+        // before that have none and render no reason line rather than an invented one.
         (alert.opportunities_data || []).map((o: any) => ({
           ...o,
+          department: o.department ?? o.agency,
+          naicsCode: o.naicsCode ?? o.naics,
+          responseDeadline: o.responseDeadline ?? o.deadline,
           score: 50, // Default score for retry
           uiLink: `https://sam.gov/opp/${o.noticeId}/view`,
         })),
@@ -660,26 +678,20 @@ async function runDailyAlertJob(options?: {
         // Get user keywords
         const userKeywords = user.keywords || [];
 
-        // VOCABULARY EXPANSION (flag: VOCAB_ALERT_EXPANSION) — widen the match with
-        // the REAL buyer work-words for the user's NAICS (naics_vocabulary, mined
-        // from award text). An opp whose title/description uses a buyer-word the
-        // user never typed as a keyword now matches. Top 5 highest-weight terms
-        // only (keeps the OR query small + avoids generic noise), and NOT for
-        // default-only profiles (would inject generic 5415xx terms for everyone).
-        // Flows through the EXISTING keyword OR-match in sam-gov.ts — no matcher
-        // change. Fails soft: any error → the user's own keywords, unchanged.
-        let vocabTerms: string[] = [];
-        const usingDefaults = (user.naics_codes || []).length === 0;
-        if (process.env.VOCAB_ALERT_EXPANSION === 'on' && !usingDefaults) {
-          try {
-            const vocab = await getVocabularyForCodes(userNaics, { limit: 5 });
-            const have = new Set(userKeywords.map((k: string) => k.toLowerCase()));
-            vocabTerms = vocab.map((t) => t.term).filter((t) => !have.has(t.toLowerCase())).slice(0, 5);
-          } catch { /* vocab unavailable — degrade to the user's own keywords */ }
-        }
-        const matchKeywords = [...userKeywords, ...vocabTerms];
+        // VOCABULARY TERMS NO LONGER ADMIT ROWS (2026-09-26).
+        //
+        // VOCAB_ALERT_EXPANSION appended the top-5 mined buyer words for the user's
+        // NAICS to the keyword list. Under Contract D keywords only PREFER inside the
+        // NAICS/PSC market, so those words never widened recall — they only chose
+        // which market rows counted as "keyword hits". Measured on live profiles:
+        // a fire-alarm/security firm's alert led with three "Berlin Roof Replacement"
+        // notices (vocab "roof"), a medical-linen firm's only row was "Residential
+        // Reentry Services" (vocab "reentry"), an AI firm carried "renal disease".
+        // A term the user never typed may not decide what they are shown as a match.
+        // The flag is inert until someone decides whether vocab earns a rank-only role.
+        const matchKeywords = userKeywords;
 
-        console.log(`[Daily Alerts] ${user.user_email}: ${userNaics.length} NAICS → ${expandedNaics.length} expanded, ${uniquePSCs.length} PSCs, ${userKeywords.length} keywords${vocabTerms.length ? ` +${vocabTerms.length} vocab [${vocabTerms.join(', ')}]` : ''}`);
+        console.log(`[Daily Alerts] ${user.user_email}: ${userNaics.length} NAICS → ${expandedNaics.length} expanded, ${uniquePSCs.length} PSCs, ${userKeywords.length} keywords`);
 
         // Get recently sent opportunity IDs for deduplication
         const recentlySentIds = await getRecentlySentOpportunityIds(user.user_email);
@@ -712,6 +724,9 @@ async function runDailyAlertJob(options?: {
         let allActiveOpportunities: SAMOpportunity[] = [];
         let noticeSummary: SAMNoticeSummary | undefined;
         let openKeywordOutcome: OpenKeywordOutcome | undefined;
+        // Carried to the email: a keyword check over a TRUNCATED market scan must say
+        // coverage was incomplete, never "no keyword match" (openMarketNote).
+        let keywordScan: KeywordScanCoverage = {};
         let comingBack: ComingBackDecision = { kind: 'omit', reason: 'no_naics_market' };
         let openSearchError: OpenSearchError | undefined;
         try {
@@ -741,6 +756,10 @@ async function runDailyAlertJob(options?: {
             states: userStates,
             limit: 200, // Get more from cache, filter locally
             savedNaics: userNaics,
+            // Opt-in (daily alerts only): scan the whole market for keyword matches and
+            // return every preferred row. Newness, dedupe and RANKING below run on all of
+            // them; the final cut happens after ranking, not by deadline inside the fetch.
+            fullMarketKeywordScan: true,
           });
           if (cacheResult.queryStatus === 'error') {
             // UNKNOWN, not zero. Do not rank, do not fall back to "all active", do not
@@ -761,6 +780,10 @@ async function runDailyAlertJob(options?: {
           );
           allActiveOpportunities = appliedOpen.rows;
           openKeywordOutcome = appliedOpen.outcome;
+          keywordScan = { scanTruncated: cacheResult.scanTruncated, marketRowsScanned: cacheResult.marketRowsScanned };
+          if (keywordScan.scanTruncated) {
+            console.warn(`[Daily Alerts] ${user.user_email}: keyword scan truncated at ${keywordScan.marketRowsScanned} market rows — email will disclose incomplete coverage`);
+          }
 
           const industry = filterMarketToSavedIndustry(
             allActiveOpportunities,
@@ -873,18 +896,26 @@ async function runDailyAlertJob(options?: {
         // Tiebreaker: actionable RUNWAY (higher = more days to respond) so a
         // strong-fit opp with real runway leads the email, not a 1-day scramble.
         // The email's own urgency badge still flags the tight ones lower down.
-        let scoredOpps = opportunities.map(opp => ({
-          ...opp,
-          score: scoreOpportunity(opp, {
-            naics_codes: userNaics, // Original codes, not expanded
-            agencies: user.agencies || [],
-            keywords: userKeywords,
-            business_description: user.business_description || null,
-            business_type: user.business_type || null,
-            setAsides: user.set_aside_preferences || undefined,
-          }),
-        })).sort((a, b) => {
-          if (b.score !== a.score) return b.score - a.score;
+        // Sort on the UNCLAMPED rank: the 0–100 display score tied 6 of 7 notices
+        // at 100 on a real alert, leaving the order to the deadline. Evidence rides
+        // along so the email shows why each notice is here instead of recomputing it.
+        const userPscForLabel = (user.psc_codes || []).filter(Boolean);
+        const scoreProfile = {
+          naics_codes: userNaics, // Original codes, not expanded
+          // The PSCs the market query used (user's own, else derived) — only to label
+          // which market admitted a row.
+          psc_codes: userPscForLabel.length > 0 ? userPscForLabel : uniquePSCs,
+          agencies: user.agencies || [],
+          keywords: userKeywords,
+          business_description: user.business_description || null,
+          business_type: user.business_type || null,
+          setAsides: user.set_aside_preferences || undefined,
+        };
+        let scoredOpps: RankedOpp[] = opportunities.map(opp => {
+          const d = scoreOpportunityDetailed(opp, scoreProfile);
+          return { ...opp, score: d.score, rank: d.rank, evidence: d.evidence };
+        }).sort((a, b) => {
+          if (b.rank !== a.rank) return b.rank - a.rank;
           return runwayRank(b.responseDeadline) - runwayRank(a.responseDeadline);
         });
 
@@ -942,21 +973,14 @@ async function runDailyAlertJob(options?: {
         // product rather than an exact-match-only trigger.
         let usedRepeatFallback = false;
         if (scoredOpps.length === 0 && allActiveOpportunities.length > 0) {
-          const resurfacedOpps = allActiveOpportunities
-            .map(opp => ({
-              ...opp,
-              score: scoreOpportunity(opp, {
-                naics_codes: userNaics,
-                agencies: user.agencies || [],
-                keywords: userKeywords,
-                business_description: user.business_description || null,
-                business_type: user.business_type || null,
-                setAsides: user.set_aside_preferences || undefined,
-              }),
-            }))
+          const resurfacedOpps: RankedOpp[] = allActiveOpportunities
+            .map(opp => {
+              const d = scoreOpportunityDetailed(opp, scoreProfile);
+              return { ...opp, score: d.score, rank: d.rank, evidence: d.evidence };
+            })
             .filter(opp => getDaysUntil(opp.responseDeadline) <= 14)
             .sort((a, b) => {
-              if (b.score !== a.score) return b.score - a.score;
+              if (b.rank !== a.rank) return b.rank - a.rank;
               // Real runway first (pursuable over tight), soonest-deadline only
               // as the final tiebreaker within the same runway tier.
               const rank = runwayRank(b.responseDeadline) - runwayRank(a.responseDeadline);
@@ -1078,7 +1102,7 @@ async function runDailyAlertJob(options?: {
             noticeSummary,
             hiddenMatches,
             {
-              openKeywordNote: openUnavailable ? undefined : (openMarketNote(openKeywordOutcome ?? 'no_keywords_configured') ?? undefined),
+              openKeywordNote: openUnavailable ? undefined : (openMarketNote(openKeywordOutcome ?? 'no_keywords_configured', keywordScan) ?? undefined),
               comingBack,
               openUnavailable: !!openUnavailable,
             },
@@ -1128,6 +1152,12 @@ async function runDailyAlertJob(options?: {
                 naics: o.naicsCode,
                 deadline: o.responseDeadline,
                 score: o.score,
+                rank: o.rank,
+                basis: o.evidence?.basis,
+                keywordsInTitle: o.evidence?.keywords.title,
+                keywordsInDescription: o.evidence?.keywords.body,
+                agencyMatch: o.evidence?.agencies,
+                stage: o.evidence?.stage.respondability,
                 repeatFallback: usedRepeatFallback || undefined,
               })),
               // 💡 Hidden matches appended with a flag so the Source Feed can badge them.
@@ -1506,10 +1536,22 @@ async function sendFixtureDailyAlertTest(toEmail: string) {
   };
 
   const cached = await fetchSamOpportunitiesFromCache({ limit: 10 });
-  const opportunities = (cached.opportunities || []).slice(0, 3).map((opp, i) => ({
-    ...opp,
-    score: 72 - i * 8,
-  }));
+  // Score with the SAME function the live path uses, so the fixture shows the real
+  // "why this is here" line and stage label. Hard-coded scores with no evidence
+  // rendered cards with no reason line and no stage prefix, so a regression in that
+  // copy would pass fixture QA unseen.
+  const fixtureProfile = {
+    naics_codes: fixtureUser.naics_codes || [],
+    agencies: fixtureUser.agencies || [],
+    keywords: fixtureUser.keywords || [],
+    business_description: fixtureUser.business_description || null,
+    business_type: fixtureUser.business_type || null,
+    setAsides: fixtureUser.set_aside_preferences || undefined,
+  };
+  const opportunities: RankedOpp[] = (cached.opportunities || []).slice(0, 3).map((opp) => {
+    const d = scoreOpportunityDetailed(opp, fixtureProfile);
+    return { ...opp, score: d.score, rank: d.rank, evidence: d.evidence };
+  });
 
   if (opportunities.length === 0) {
     return NextResponse.json(
@@ -1555,7 +1597,7 @@ async function sendFixtureDailyAlertTest(toEmail: string) {
 // Send daily alert email - alert product format (distinct from Market Intelligence briefings)
 async function sendDailyAlertEmail(
   email: string,
-  opportunities: (SAMOpportunity & { score: number })[],
+  opportunities: RankedOpp[],
   user: AlertUser,
   grants: (GrantOpportunity & { score: number })[] = [],
   allActiveOpportunities: SAMOpportunity[] = [],
@@ -1715,18 +1757,11 @@ function mindyDayBannerHtml(): string {
     return ''; // a banner must never break the alert it rides on
   }
 }
-  const profileNaics: string[] = Array.isArray(user.naics_codes) ? user.naics_codes : [];
-  const matchReason = (opp: SAMOpportunity & { score: number }): string => {
-    const bits: string[] = [];
-    const code = opp.naicsCode || '';
-    if (code && profileNaics.includes(code)) bits.push(`NAICS ${code}`);
-    else if (code && profileNaics.some((n) => code.startsWith(n) || n.startsWith(code))) bits.push(`NAICS ${code} (related)`);
-    if (opp.setAside && user.business_type && opp.setAside.toLowerCase().includes(String(user.business_type).toLowerCase().slice(0, 4))) {
-      bits.push(`${opp.setAside} eligible`);
-    } else if (opp.setAside) bits.push(opp.setAside);
-    return bits.slice(0, 2).join(' · ');
-  };
-
+  // "Why this is here" comes from the evidence computed at ranking time
+  // (lib/alerts/match-evidence-copy). It used to print NAICS + the raw set-aside
+  // code only — "Matched on NAICS 611430 · NONE" — hiding the keyword that
+  // actually admitted the notice and printing SAM's no-set-aside literal as a reason.
+  const matchReason = (opp: RankedOpp): string => renderMatchReason(opp);
   const opportunitiesHtml = shownOpps.map((opp, i) => {
     const daysUntil = getDaysUntil(opp.responseDeadline);
     // Urgency is EDITORIAL, not alarmist: a small rust-red word, no fire emoji, no pink
@@ -1734,7 +1769,10 @@ function mindyDayBannerHtml(): string {
     const urgent = daysUntil <= 7;
     const dayLabel = daysUntil <= 0 ? 'DUE TODAY' : `${daysUntil} DAY${daysUntil === 1 ? '' : 'S'} LEFT`;
     const reason = matchReason(opp);
-    const meta = [opp.noticeType || 'Solicitation', opp.setAside, opp.naicsCode ? `NAICS ${opp.naicsCode}` : '']
+    // Stage first: a Special Notice ("ceiling increase") or Presolicitation has
+    // nothing to submit and must not read as a bid. 'NONE' is not a set-aside.
+    const realSetAside = opp.setAside && !/^none$/i.test(opp.setAside) ? opp.setAside : '';
+    const meta = [renderStageLabel(opp), realSetAside, opp.naicsCode ? `NAICS ${opp.naicsCode}` : '']
       .filter(Boolean).join(' &middot; ');
     return `
       <tr>
@@ -1754,7 +1792,7 @@ function mindyDayBannerHtml(): string {
           </p>
           <p style="color:#64748b;font-size:12px;line-height:1.5;margin:6px 0 0 0;">${meta}</p>
           <p style="color:#94a3b8;font-size:12px;line-height:1.5;margin:3px 0 0 0;">
-            Posted ${formatDate(opp.postedDate)} &middot; Due ${formatDate(opp.responseDeadline)}${reason ? ` &middot; Matched on ${reason}` : ''}
+            Posted ${formatDate(opp.postedDate)} &middot; Due ${formatDate(opp.responseDeadline)}${reason ? ` &middot; ${reason}` : ''}
           </p>
           <p style="margin:11px 0 0 0;">
             <a href="${trackedUrl(mapUrl(opp), 'open_in_map', `map_${opp.noticeId || i + 1}`)}" style="color:#4f46e5;font-size:13px;font-weight:700;text-decoration:none;">View opportunity &rarr;</a>
@@ -1899,7 +1937,7 @@ function mindyDayBannerHtml(): string {
   <!-- ── OPEN NOW: respondable SAM. Never mixed with Coming Back recompetes. ── -->
   <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:32px 0 0 0;">${OPEN_NOW_HEADING}</p>
   <div style="height:1px;background:#e5e7eb;margin:10px 0 0 0;"></div>
-  <p style="color:#475569;font-size:13px;line-height:1.6;margin:14px 0 0 0;">${isUsingFallback ? 'These solicitations are still open in your market.' : OPEN_NOW_EXPLAIN}</p>
+  <p style="color:#475569;font-size:13px;line-height:1.6;margin:14px 0 0 0;">${isUsingFallback ? OPEN_STILL_OPEN_EXPLAIN : OPEN_NOW_EXPLAIN}</p>
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
     ${opportunitiesHtml}
   </table>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { naicsSourceForUserWrite } from '@/lib/profile/naics-provenance';
+import { KEYWORD_MAX_COUNT, validateKeywordSave } from '@/lib/keywords/sanitize';
 import { createClient } from '@supabase/supabase-js';
 import { hashNaicsProfile } from '@/lib/briefings/naics-profile-hash';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
@@ -330,16 +331,24 @@ export async function POST(request: NextRequest) {
     }
 
     if (keywords !== undefined) {
-      // Normalize on write (was storing the raw client array): trim, drop empties,
-      // drop bare NAICS numbers (the #239 pollution class — a code typed into the
-      // keyword box), and CASE-INSENSITIVE dedupe. This is the path that had let
-      // mixed-case duplicates ("ERP","ERP"...) accumulate across re-saves. Cap 40.
-      const seen = new Set<string>();
-      record.keywords = (Array.isArray(keywords) ? keywords : [])
-        .map((k: unknown) => String(k).trim())
-        .filter((k: string) => k.length > 0 && !/^\d{2,6}$/.test(k))
-        .filter((k: string) => { const lc = k.toLowerCase(); if (seen.has(lc)) return false; seen.add(lc); return true; })
-        .slice(0, 40);
+      // ONE normalizer for every keyword writer (validateKeywordSave): split real
+      // separators, trim, case-insensitive dedupe keeping the first spelling. An
+      // unusable entry (over-long blob, bare NAICS code) or more than
+      // KEYWORD_MAX_COUNT keywords REJECTS the save before any write, so the
+      // previously saved settings stay untouched. This used to be a silent
+      // .slice(0, 40) (2026-09-24: 53 saved as 40) and did not split pastes, so a
+      // comma blob counted as ONE keyword here and many on the onboarding path.
+      const checked = validateKeywordSave(keywords);
+      if (!checked.ok) {
+        return NextResponse.json({
+          success: false,
+          error: checked.error,
+          code: checked.code,
+          submitted: checked.submitted,
+          max: KEYWORD_MAX_COUNT,
+        }, { status: 400 });
+      }
+      record.keywords = checked.keywords;
     }
 
     // NAICS or keywords changed → the capability vector (hidden-match base-wide

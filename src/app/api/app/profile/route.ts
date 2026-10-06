@@ -5,7 +5,7 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { normalizeNAICSForPersist } from '@/lib/utils/naics-expansion';
 import { checkAmplification } from '@/lib/data-invariants/amplification';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
-import { sanitizeKeywords } from '@/lib/keywords/sanitize';
+import { KEYWORD_MAX_COUNT, validateKeywordSave } from '@/lib/keywords/sanitize';
 import { resolveAlertsEnabledWrite } from '@/lib/alerts/alerts-enabled-write';
 import {
   mergePrioritiesIntoAggregated,
@@ -139,13 +139,21 @@ export async function POST(request: NextRequest) {
     // search signal — far better than back-deriving keywords from NAICS. Persist
     // them directly so onboarding stops throwing them away (the keyword-empty
     // profile bug). Dedup + lowercase + cap to keep the array sane.
-    // Splits paste-blobs and drops over-long entries. This previously deduped
-    // and capped the ARRAY but never checked an individual string's length, so
-    // a pasted capability list stored as one 1,600-char "keyword". 30 stays the
-    // cap for this onboarding path.
-    const { keywords: safeKeywords, dropped: droppedKw } = sanitizeKeywords(keywords, { max: 30 });
-    if (droppedKw.length) {
-      console.warn(`[profile] dropped ${droppedKw.length} unsplittable keyword blob(s) for ${email}`);
+    // The shared normalizer (validateKeywordSave) — the SAME rules as Settings and
+    // add-keywords, so one input behaves the same on every surface. An unusable entry
+    // or more than KEYWORD_MAX_COUNT keywords rejects the save with nothing written.
+    // (This path used its own silent cap of 30 and dropped over-long entries with
+    // only a server log.) The onboarding page shows the returned error.
+    let safeKeywords: string[] = [];
+    if (keywords !== undefined) {
+      const checked = validateKeywordSave(keywords);
+      if (!checked.ok) {
+        return NextResponse.json(
+          { error: checked.error, code: checked.code, submitted: checked.submitted, max: KEYWORD_MAX_COUNT },
+          { status: 400 },
+        );
+      }
+      safeKeywords = checked.keywords;
     }
 
     // Only update fields that were provided
