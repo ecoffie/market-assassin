@@ -21,7 +21,9 @@ import { classifyObservation } from '@/lib/cron/watchdog-incidents';
  *                    unclassifiable error), or a failed run that evaluated nothing and sent nothing.
  *   not_observed     configured, never seen to run.
  *   unknown          evidence unreadable or today's run not yet reported — never turned into 0 or healthy.
- * Zero alerts sent is NOT by itself a failure: no new matches and baseline-only runs send nothing.
+ * Zero alerts sent never implies a failure on its own: a clean run that checked every due search and
+ * found no new match (or only took first-check baselines) is `healthy` with no email required. A
+ * failure needs a recorded failure class or run-level evidence; zero sends only matters alongside one.
  */
 export type SavedSearchJobStatus = 'healthy' | 'partial_failure' | 'job_failure' | 'not_observed' | 'unknown';
 
@@ -398,8 +400,11 @@ export async function getSavedSearchDeliveryReadiness(
   const ran = `evaluated ${evaluated ?? 'an unknown number of'} searches, ${sent ?? 'an unknown number of'} alerts accepted by the email provider`;
 
   if (isCleanRun(judged)) {
+    // A clean run checked every due search without a processing failure. Zero emails then means no
+    // checked search had a new match (or it was taking its first-check baseline): nothing was owed.
     const sup = Object.keys(cls.suppression).length ? `; action item: ${counts(cls.suppression)} (confirmed suppressed recipients)` : '';
-    return finish('healthy', 'recent_success', `latest run completed (${ran})${sup}`, evidence);
+    const none = sent === 0 ? '; no alert email was required (no checked search had a new match)' : '';
+    return finish('healthy', 'recent_success', `latest run completed (${ran})${none}${sup}`, evidence);
   }
 
   const runLevel = Object.keys(cls.processing).filter((k) => RUN_LEVEL_CLASSES.has(k));

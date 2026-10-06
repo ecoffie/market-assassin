@@ -13,7 +13,9 @@
  *   - One invalid search is THAT search blocked; valid searches continue.
  *   - A confirmed suppressed recipient is an action item for that recipient, not an outage.
  *   - A suppression LOOKUP that fails is a processing error (unknown), never "suppressed".
- *   - No email yet is explained: not yet evaluated, baseline-only, no new matches, or skipped.
+ *   - No email yet is explained from RECORDED facts only: not yet checked, checked with no alert sent
+ *     (baseline vs no-new-match is not recorded, so it is stated as unknown), or skipped.
+ *   - No future alert is promised: it depends on the schedule, a new match, and a successful send.
  *   - Another customer's failure never becomes this search's status.
  *   - Provider acceptance is not inbox delivery; Mindy never claims the latter.
  *   - Unreadable evidence is `unknown`, never "fine" and never "failed".
@@ -40,10 +42,13 @@ export type SearchDeliveryStatus =
   | 'failing'
   /** Saved after the latest run; its first check has not happened yet. */
   | 'not_yet_evaluated'
-  /** Evaluated once: current matches recorded as the baseline, nothing emailed by design. */
-  | 'baseline_only'
-  /** Evaluated past its baseline with no new matches yet, so nothing emailed. */
-  | 'no_new_matches'
+  /**
+   * Checked at least once (recorded: last_alerted_at) and no alert sent yet (recorded:
+   * total_alerts_sent = 0). The records do NOT say whether only the first-check baseline has run or
+   * later checks found no new match (the cron stores no per-check outcome), so this is reported as
+   * exactly that, never guessed from timing.
+   */
+  | 'checked_no_alert_sent'
   /** Alerts for this search were sent and the provider accepted mail to this account. */
   | 'delivered'
   /** The recipient check could not be read — a processing error, not a verdict. */
@@ -222,13 +227,6 @@ function missedLatestRun(search: SavedSearchRow, job: SavedSearchDeliveryReadine
   return last < runAt - RUN_EVAL_SLACK_MS;
 }
 
-/** First evaluation happens at the first run after creation; a stamp within one cadence of it is the baseline. */
-function isBaselineOnly(search: SavedSearchRow): boolean {
-  if (!search.last_alerted_at || (search.total_alerts_sent || 0) > 0) return false;
-  const span = search.alert_frequency === 'weekly' ? WEEKLY_STALE_MS : DAY_MS + 2 * 60 * 60 * 1000;
-  return Date.parse(search.last_alerted_at) - Date.parse(search.created_at) <= span;
-}
-
 function utc(iso: string | null): string {
   return iso ? `${iso.slice(0, 16).replace('T', ' ')} UTC` : 'an unknown time';
 }
@@ -252,11 +250,11 @@ function jobNote(job: SavedSearchDeliveryReadiness, thisSearchAffected: boolean)
 }
 
 function summarize(s: Omit<SavedSearchAlertStatus, 'summary'>, job: SavedSearchDeliveryReadiness): string {
-  const first = s.next_evaluation_at ? ` Next check: ${utc(s.next_evaluation_at)}.` : '';
+  const first = s.next_evaluation_at ? ` Next scheduled check: ${utc(s.next_evaluation_at)}.` : '';
   const reach = s.filter_reach === 'matched_historically'
     ? ' Its filters have matched past notices; none are open right now.'
     : s.filter_reach === 'no_matches_in_available_data'
-      ? " No notice in Mindy's data has matched these filters yet; a matching notice posted later will alert."
+      ? " No notice in Mindy's data has matched these filters yet; that alone does not make the search invalid."
       : s.filter_reach === 'matches_open_now' ? ' Its filters match notices that are open now.' : '';
   const limits = s.filter_support === 'partially_supported'
     ? ` ${[...new Set(s.filter_limitations.map((l) => l.reason))].join(' ')}`
@@ -283,12 +281,10 @@ function summarize(s: Omit<SavedSearchAlertStatus, 'summary'>, job: SavedSearchD
       lead = 'This saved search is saved with alerts paused; no emails until alerts are re-enabled.';
       break;
     case 'awaiting_first_check':
-      lead = 'This saved search is saved and valid. Delivery is not yet tested: its first check records current matches without emailing, and an alert is sent only when a NEW match appears after that.';
+      lead = 'This saved search is saved and valid. Delivery is not yet tested. Its first scheduled check records current matches without emailing; after that, an alert email is sent only if a later check finds a new matching notice and the send succeeds.';
       break;
     case 'no_alert_yet':
-      lead = s.search_delivery === 'baseline_only'
-        ? 'This saved search has had its first check (current matches recorded, nothing emailed by design). No new match has appeared since, so no alert has been sent yet.'
-        : 'This saved search is being checked; no new match has appeared since its first check, so no alert has been sent yet.';
+      lead = 'This saved search has been checked, but no alert has been sent for it yet. Mindy records that it was checked, not whether that was only its first check (which records current matches without emailing) or a later check that found no new match.';
       break;
     case 'delivering':
       lead = `Alerts for this search have been sent; our email provider last accepted one for this account at ${utc(s.recipient_last_alert_provider_accepted_at)} (inbox delivery is not tracked).`;
@@ -347,7 +343,7 @@ export function composeSearchAlertStatus(
   } else if (!search.last_alerted_at) {
     search_delivery = 'not_yet_evaluated';
   } else {
-    search_delivery = isBaselineOnly(search) ? 'baseline_only' : 'no_new_matches';
+    search_delivery = 'checked_no_alert_sent';
   }
 
   let headline: AlertHeadline;
@@ -359,7 +355,7 @@ export function composeSearchAlertStatus(
   else if (job.job_status === 'job_failure') headline = 'job_failure';
   else if (search_delivery === 'delivered') headline = 'delivering';
   else if (search_delivery === 'not_yet_evaluated') headline = 'awaiting_first_check';
-  else if (search_delivery === 'baseline_only' || search_delivery === 'no_new_matches') headline = 'no_alert_yet';
+  else if (search_delivery === 'checked_no_alert_sent') headline = 'no_alert_yet';
   else headline = 'unknown';
 
   const partial: Omit<SavedSearchAlertStatus, 'summary'> = {

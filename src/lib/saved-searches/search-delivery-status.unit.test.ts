@@ -66,7 +66,7 @@ describe('composeSearchAlertStatus — this search first, the job labelled', () 
     expect(r.headline).toBe('awaiting_first_check');
     expect(r.search_delivery).toBe('not_yet_evaluated');
     expect(r.next_evaluation_at).toBe('2026-10-06T11:00:00.000Z');
-    expect(r.summary).toMatch(/^This saved search is saved and valid\. Delivery is not yet tested/);
+    expect(r.summary).toMatch(/^This saved search is saved and valid\. Delivery is not yet tested\. Its first scheduled check records current matches without emailing; after that, an alert email is sent only if a later check finds a new matching notice and the send succeeds\./);
     expect(r.summary).toContain('Its filters have matched past notices; none are open right now.');
     expect(r.summary).toContain('Saved-search alerts: the latest run had failures in other saved searches; this one is not affected.');
     expect(r.summary).not.toMatch(/not representable|cannot run|unsupported|never/i);
@@ -75,7 +75,8 @@ describe('composeSearchAlertStatus — this search first, the job labelled', () 
   it('a supported filter with no records is "no matches in available data", not unsupported', () => {
     const r = composeSearchAlertStatus(search(), job(), clean, reach('no_matches_in_available_data'), NOW);
     expect(r.filter_support).toBe('supported');
-    expect(r.summary).toContain("No notice in Mindy's data has matched these filters yet; a matching notice posted later will alert.");
+    expect(r.summary).toContain("No notice in Mindy's data has matched these filters yet; that alone does not make the search invalid.");
+    expect(r.summary).not.toMatch(/will alert|you will (be emailed|receive)/i);
   });
 
   it('Marine Corps with forecasts on: Open supported, Forecast disclosed as a limitation (partially supported)', () => {
@@ -111,12 +112,18 @@ describe('composeSearchAlertStatus — this search first, the job labelled', () 
     expect(r.summary).toMatch(/processing error/);
   });
 
-  it('no emails yet, explained: baseline-only vs no new matches vs not yet evaluated', () => {
-    const base = composeSearchAlertStatus(search({ created_at: '2026-10-04T20:00:00Z', last_alerted_at: '2026-10-05T11:00:40Z' }), job(), clean, reach('matches_open_now'), NOW);
-    expect(base.search_delivery).toBe('baseline_only');
-    const none = composeSearchAlertStatus(search({ created_at: '2026-09-01T00:00:00Z', last_alerted_at: '2026-10-05T11:00:40Z' }), job(), clean, reach('matches_open_now'), NOW);
-    expect(none.search_delivery).toBe('no_new_matches');
-    expect(none.summary).toMatch(/no new match has appeared since its first check/);
+  it('checked, no alert sent: reported from recorded facts only — never a timing guess about baseline vs no new match', () => {
+    // Same recorded facts (checked once, 0 alerts), very different ages: the answer must not change.
+    const recent = composeSearchAlertStatus(search({ created_at: '2026-10-04T20:00:00Z', last_alerted_at: '2026-10-05T11:00:40Z' }), job(), clean, reach('matches_open_now'), NOW);
+    const old = composeSearchAlertStatus(search({ created_at: '2026-06-01T00:00:00Z', last_alerted_at: '2026-10-05T11:00:40Z' }), job(), clean, reach('matches_open_now'), NOW);
+    for (const r of [recent, old]) {
+      expect(r.search_delivery).toBe('checked_no_alert_sent');
+      expect(r.baseline).toBe('established');
+      expect(r.summary).toMatch(/^This saved search has been checked, but no alert has been sent for it yet\. Mindy records that it was checked, not whether that was only its first check .* or a later check that found no new match\./);
+    }
+    expect(recent.summary).toBe(old.summary);
+    const never = composeSearchAlertStatus(search(), job(), clean, reach('matches_open_now'), NOW);
+    expect(never.search_delivery).toBe('not_yet_evaluated');
   });
 
   it('due in the latest processing run but not evaluated → this search is failing', () => {

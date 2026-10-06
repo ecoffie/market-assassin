@@ -5,7 +5,7 @@
  *   B  malformed stored filters (sapBuyer)   → THIS search blocked; others continue
  *   C  confirmed suppressed recipient        → action item, not an outage
  *   D  suppression LOOKUP fails (DB error)   → processing error, never "suppressed"
- *   E  created between runs                  → baseline only, nothing emailed by design
+ *   E  created between runs                  → checked, no alert sent (baseline vs no-new-match not recorded)
  *
  * The REAL saved-search-alerts route runs twice (the watchdog needs two consecutive failures); its
  * self-report becomes the cron_job_runs row; the REAL dispatcher-watchdog posts to a captured Slack.
@@ -248,11 +248,11 @@ describe('mixed run: successful send + malformed search + suppressed recipient +
     expect(s.summary).not.toMatch(/suppression list|suppressed recipient/);
   });
 
-  it('E (new): baseline only — zero emails explained, not an outage', () => {
+  it('E (new): checked, no alert sent — stated from recorded facts, without guessing baseline vs no-new-match', () => {
     const s = out.status['Brand new'];
-    expect(s.search_delivery).toBe('baseline_only');
+    expect(s.search_delivery).toBe('checked_no_alert_sent');
     expect(s.headline).toBe('no_alert_yet');
-    expect(s.summary).toMatch(/^This saved search has had its first check \(current matches recorded, nothing emailed by design\)/);
+    expect(s.summary).toMatch(/^This saved search has been checked, but no alert has been sent for it yet\. Mindy records that it was checked, not whether/);
   });
 
   it('no customer message generalizes the job to all Mindy email or calls it an outage', () => {

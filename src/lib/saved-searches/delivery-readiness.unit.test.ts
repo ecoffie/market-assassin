@@ -136,7 +136,27 @@ describe('job status — the named saved-search alerts job', () => {
     expect(r.suppression_action_items).toEqual({});
   });
 
-  it('ZERO sends alone is not an outage: per-search failures + searches evaluated → partial failure', async () => {
+  it('zero sends after a clean run (every due search checked, no new match / baseline only) → healthy, no email required', async () => {
+    setup({ cron: [cron], runs: [run('success')], acceptedDuringRun: 0, evaluatedDuringRun: 30 });
+    const r = await getSavedSearchDeliveryReadiness(NOW);
+    expect(r.job_status).toBe('healthy');
+    expect(r.delivery_ready).toBe(true);
+    expect(r.latest_run_alerts_provider_accepted).toBe(0);
+    expect(r.job_status_reason).toBe('saved-search alerts: latest run completed (evaluated 30 searches, 0 alerts accepted by the email provider); no alert email was required (no checked search had a new match)');
+  });
+
+  it('zero sends never decides the class: the same processing failure is partial with 0 or 5 sends', async () => {
+    for (const sent of [0, 5]) {
+      setup({ cron: [cron], runs: [run('error', 'invalid_saved_filters=1')], acceptedDuringRun: sent, evaluatedDuringRun: 30 });
+      expect((await getSavedSearchDeliveryReadiness(NOW)).job_status).toBe('partial_failure');
+    }
+    for (const sent of [0, 5]) {
+      setup({ cron: [cron], runs: [run('success')], acceptedDuringRun: sent, evaluatedDuringRun: 30 });
+      expect((await getSavedSearchDeliveryReadiness(NOW)).job_status).toBe('healthy');
+    }
+  });
+
+  it('processing failures: per-search scope → partial failure (even with ZERO sends)', async () => {
     setup({ cron: [cron], runs: [run('error', 'invalid_saved_filters=1')], acceptedDuringRun: 0, evaluatedDuringRun: 30 });
     const r = await getSavedSearchDeliveryReadiness(NOW);
     expect(r.job_status).toBe('partial_failure');

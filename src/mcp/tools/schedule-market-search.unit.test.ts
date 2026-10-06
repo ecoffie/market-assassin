@@ -378,7 +378,7 @@ describe('schedule_market_search MCP tool', () => {
       expect(r.alert_status?.baseline).toBe('pending');
       expect(r.alert_status?.filter_support).toBe('supported');
       // This search first; the job's partial failure is named and labelled, never a claim that delivery stopped.
-      expect(r.message).toMatch(/^This saved search is saved and valid\. Delivery is not yet tested/);
+      expect(r.message).toMatch(/^This saved search is saved and valid\. Delivery is not yet tested\. Its first scheduled check records current matches without emailing; after that, an alert email is sent only if a later check finds a new matching notice and the send succeeds\./);
       expect(r.message).toContain('Its filters have matched past notices; none are open right now.');
       expect(r.message).toContain('Saved-search alerts: the latest run had failures in other saved searches; this one is not affected.');
       expect(r.message).not.toMatch(FALSE_TOTAL_OUTAGE);
@@ -416,8 +416,8 @@ describe('schedule_market_search MCP tool', () => {
       const r = await scheduleMarketSearch({ userEmail: 'customer@example.com', name: marineWatch.name, filters: marineWatch.filters });
       expect(r.alert_status?.headline).toBe('awaiting_first_check');
       expect(r.alert_status?.filter_support).toBe('supported');
-      expect(r.message).toMatch(/a matching notice posted later will alert/i);
-      expect(r.message).not.toMatch(/never|cannot|will not alert/i);
+      expect(r.message).toContain("No notice in Mindy's data has matched these filters yet; that alone does not make the search invalid.");
+      expect(r.message).not.toMatch(/never|cannot|will not alert|will alert/i);
     });
 
     it('list reports each watch on its own evidence, reading recipient evidence once', async () => {
