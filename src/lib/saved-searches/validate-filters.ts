@@ -1,5 +1,6 @@
 import { STRATEGY_STRAND_KEYS } from '@/lib/opportunities/map-filters';
 import type { SavedSearchFilters } from './types';
+import { storedNaicsValidity } from './stored-naics';
 
 const TRUTHY_STRINGS = new Set(['1', 'true', 'yes']);
 
@@ -28,6 +29,61 @@ export const ALLOWED_SAVED_SEARCH_FILTER_KEYS = [
 ] as const;
 
 const ALLOWED_KEY_SET = new Set<string>(ALLOWED_SAVED_SEARCH_FILTER_KEYS);
+
+/**
+ * VALUE SHAPES. The key allowlist alone let `{ naics: '541510', sapBuyer: true }` through
+ * schedule_market_search (the hosted MCP schema is z.record(unknown), so the advertised enum is
+ * never enforced). The cron's parseMapFilters calls .toLowerCase() on sapBuyer, threw on the
+ * boolean, and the search failed every day as unexpected_schedule_error while the agent had been
+ * told "success" (2026-10-01 → 10-04). Reject a wrong shape at write time; never coerce it —
+ * `true` is not a tier, and dropping it would save a broader watch than the user asked for.
+ */
+const SAP_BUYER_VALUES = new Set(['', 'most', 'somewhat', 'vehicle']);
+const STATUS_VALUES = new Set(['active', 'inactive', 'all']);
+/** Scalar-only: parseMapFilters string-methods these directly. */
+const STRING_KEYS = new Set(['q', 'country', 'scope']);
+/** A string or a list of strings (the Map + MCP both store multi-selects as arrays). */
+const STRING_OR_LIST_KEYS = new Set(['naics', 'agency', 'subAgency', 'state', 'psc', 'setAside', 'noticeType']);
+const FLAG_KEYS = new Set(['fullOpen', 'hideCommodity', 'hasDocs', 'hasContact']);
+const NUMBER_KEYS = new Set(['closingDays', 'postedDays']);
+
+function describeValue(v: unknown): string {
+  if (Array.isArray(v)) return 'array';
+  return v === null ? 'null' : typeof v;
+}
+
+/**
+ * First value-shape violation, or null. null/undefined values are absent, not invalid. Exported because the
+ * Map's watch path (/api/app/map-watch → saveMapWatch) persists keys this module's allowlist does not cover
+ * (valueRange, setAsideMulti, noticeMulti, fsc), so it cannot run the full validator — but every stored value
+ * the alert cron parses must still be a shape the cron can read. Unknown keys are not checked here.
+ */
+export function valueShapeError(filters: Record<string, unknown>): string | null {
+  for (const [k, v] of Object.entries(filters)) {
+    if (v === null || v === undefined) continue;
+    const got = describeValue(v);
+    if (k === 'sapBuyer') {
+      if (typeof v !== 'string' || !SAP_BUYER_VALUES.has(v.trim().toLowerCase())) {
+        return `Invalid sapBuyer value (${got} ${JSON.stringify(v)}). Allowed: "most", "somewhat", "vehicle" (or omit it).`;
+      }
+    } else if (k === 'status') {
+      if (typeof v !== 'string' || !STATUS_VALUES.has(v.trim().toLowerCase())) {
+        return `Invalid status value (${got} ${JSON.stringify(v)}). Allowed: "active", "inactive", "all".`;
+      }
+    } else if (STRING_KEYS.has(k)) {
+      if (typeof v !== 'string') return `Filter ${k} must be a string (got ${got}).`;
+    } else if (STRING_OR_LIST_KEYS.has(k)) {
+      const ok = typeof v === 'string' || (Array.isArray(v) && v.every((x) => typeof x === 'string'));
+      if (!ok) return `Filter ${k} must be a string or a list of strings (got ${got}).`;
+    } else if (FLAG_KEYS.has(k)) {
+      if (typeof v !== 'boolean' && typeof v !== 'string') return `Filter ${k} must be true/false (got ${got}).`;
+    } else if (NUMBER_KEYS.has(k)) {
+      const ok = (typeof v === 'number' && Number.isFinite(v)) || typeof v === 'string';
+      if (!ok) return `Filter ${k} must be a number (got ${got}).`;
+    }
+  }
+  return null;
+}
 const STRATEGY_KEY_SET = new Set<string>(STRATEGY_STRAND_KEYS as readonly string[]);
 
 function asTrimmedString(v: unknown): string {
@@ -35,6 +91,12 @@ function asTrimmedString(v: unknown): string {
   if (typeof v === 'string') return v.trim();
   if (typeof v === 'number' && Number.isFinite(v)) return String(v);
   return '';
+}
+
+/** A narrowing value: a non-blank string, or a list holding at least one non-blank string (multi-selects). */
+function hasValue(v: unknown): boolean {
+  if (Array.isArray(v)) return v.some((x) => asTrimmedString(x) !== '');
+  return asTrimmedString(v) !== '';
 }
 
 function isTruthyFlag(v: unknown): boolean {
@@ -77,13 +139,13 @@ export function savedSearchHasNarrowingFilter(filters: SavedSearchFilters): bool
   if (!filters || typeof filters !== 'object' || Array.isArray(filters)) return false;
 
   if (asTrimmedString(filters.q)) return true;
-  if (asTrimmedString(filters.naics)) return true;
-  if (asTrimmedString(filters.agency)) return true;
-  if (asTrimmedString(filters.subAgency)) return true;
-  if (asTrimmedString(filters.state)) return true;
-  if (asTrimmedString(filters.psc)) return true;
-  if (asTrimmedString(filters.setAside)) return true;
-  if (asTrimmedString(filters.noticeType)) return true;
+  if (hasValue(filters.naics)) return true;
+  if (hasValue(filters.agency)) return true;
+  if (hasValue(filters.subAgency)) return true;
+  if (hasValue(filters.state)) return true;
+  if (hasValue(filters.psc)) return true;
+  if (hasValue(filters.setAside)) return true;
+  if (hasValue(filters.noticeType)) return true;
   if (asTrimmedString(filters.country)) return true;
   if (asTrimmedString(filters.sapBuyer)) return true;
   if (isTruthyFlag(filters.fullOpen)) return true;
@@ -100,6 +162,18 @@ export function savedSearchHasNarrowingFilter(filters: SavedSearchFilters): bool
   if (status && status !== 'active') return true;
 
   return false;
+}
+
+/**
+ * Unknown NAICS (not Census 2022) are rejected at save. `541510` was saved twice on 2026-10-01 and matched
+ * nothing every day while the tool reported success. Same rule as profile NAICS (validate-market-codes):
+ * 6-digit must exist, 2–5 digit prefixes must prefix a real code. The message never proposes a replacement
+ * code — choosing one is the user's decision, not the validator's.
+ */
+export function savedSearchNaicsError(filters: Record<string, unknown>): string | null {
+  const { invalid } = storedNaicsValidity(filters);
+  if (!invalid.length) return null;
+  return `Unknown NAICS code${invalid.length > 1 ? 's' : ''} ${invalid.map((c) => `"${c}"`).join(', ')} — not a Census 2022 NAICS code or prefix. Confirm the intended code with the user; do not substitute one.`;
 }
 
 export type ValidateFiltersResult =
@@ -131,6 +205,13 @@ export function validateSavedSearchFilters(raw: unknown): ValidateFiltersResult 
         `Do not drop unsupported filters and activate a broader watch — ask the user to adjust.${hint}`,
     };
   }
+
+  const shapeErr = valueShapeError(rawObj);
+  if (shapeErr) {
+    return { ok: false, error: `${shapeErr} Do not coerce or drop the filter and save a broader watch — ask the user to adjust.` };
+  }
+  const naicsErr = savedSearchNaicsError(rawObj);
+  if (naicsErr) return { ok: false, error: naicsErr };
 
   const filters: SavedSearchFilters = { ...(raw as SavedSearchFilters) };
 

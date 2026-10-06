@@ -52,6 +52,13 @@ interface SendEmailParams {
   // suppression list + daily cap — the user expects them in response to an action.
   // Default false = it's a digest/alert/marketing email and IS guarded (#58).
   transactional?: boolean;
+  /**
+   * Called with the guard's reason when the send is BLOCKED before any provider call (the only case
+   * sendEmail returns false). Callers that must tell a confirmed recipient suppression
+   * (`suppressed:<reason>`) apart from a failed suppression LOOKUP (`suppression_check_failed`, a
+   * database error) read it here; `false` alone cannot distinguish them.
+   */
+  onBlocked?: (reason: string) => void;
 }
 
 // Transactional emailTypes that ALWAYS bypass the cap/suppression — an EXPLICIT
@@ -272,12 +279,14 @@ export async function sendEmail({
   tags,
   metadata,
   transactional,
+  onBlocked,
 }: SendEmailParams): Promise<boolean> {
   // GLOBAL SEND GUARD (#58) — suppression + per-recipient daily cap, across every
   // stream, BEFORE we touch any provider. Transactional bypasses.
   const block = await emailGuardBlock(to, emailType, !!transactional);
   if (block) {
     console.log(`[SendEmail] 🛑 blocked ${to} (${emailType || 'general'}): ${block}`);
+    try { onBlocked?.(block); } catch { /* a reporting callback must never turn a block into a throw */ }
     return false;
   }
 

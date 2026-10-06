@@ -24,9 +24,36 @@ export type SavedSearchAlertFailureClass =
   | 'opportunity_query_failed'
   | 'forecast_query_failed'
   | 'email_send_failed'
+  /** sendEmail returned false and gave no reason (legacy / unclassified block). A processing failure. */
   | 'email_send_rejected'
+  /** CONFIRMED recipient suppression (email_suppressions row: bounce/complaint/unsubscribe). Not an outage. */
+  | 'recipient_suppressed'
+  /** The suppression LOOKUP failed (database error) — the guard failed closed. A processing failure. */
+  | 'suppression_lookup_failed'
+  /** The recipient is not a deliverable address (synthetic client namespace). A data/config failure. */
+  | 'invalid_recipient_address'
+  /** Every stored NAICS code is unknown (not Census 2022) — the search can never match. Nothing is written. */
+  | 'invalid_saved_naics'
   | 'state_update_failed'
+  /** The STORED filters cannot be evaluated (e.g. sapBuyer saved as a boolean). Per-row; never blocks other searches. */
+  | 'invalid_saved_filters'
   | 'unexpected_schedule_error';
+
+/** Most per-search failures listed individually in one invocation's result (the class counts stay complete). */
+export const SAVED_SEARCH_FAILED_LIST_CAP = 50;
+
+/**
+ * sendEmail's guard reason → failure class. Only a CONFIRMED suppression is recipient_suppressed; a
+ * failed lookup is a database error and must stay a processing failure, never be presented as "the
+ * recipient opted out". Unknown/absent reasons keep the generic class rather than guessing.
+ */
+export function classifySendBlock(reason: string | null | undefined): SavedSearchAlertFailureClass {
+  if (!reason) return 'email_send_rejected';
+  if (reason.startsWith('suppressed:')) return 'recipient_suppressed';
+  if (reason === 'suppression_check_failed') return 'suppression_lookup_failed';
+  if (reason === 'synthetic_client_address') return 'invalid_recipient_address';
+  return 'email_send_rejected';
+}
 
 export type SavedSearchAlertDrainOutcome = 'success' | 'error' | 'partial';
 
@@ -47,6 +74,8 @@ export type SavedSearchAlertEvalCounts = {
   skippedConcurrent?: number;
   failed?: number;
   failureClass?: SavedSearchAlertFailureClass;
+  /** Unknown NAICS codes stored on a search that still evaluated (it also has valid codes). Reported, never dropped. */
+  invalidNaics?: string[];
   /**
    * Canonical Forecast engine only: the coverage state this evaluation measured. Tallied separately
    * from noMatches so an unavailable horizon is never reported as "checked, nothing found".
@@ -98,6 +127,13 @@ export type SavedSearchAlertDrainResult = {
   batches: number;
   stopReason: SavedSearchAlertDrainStopReason;
   failuresByClass: Partial<Record<SavedSearchAlertFailureClass, number>>;
+  /**
+   * WHICH searches failed, not just how many — a class count alone made a single malformed customer search
+   * indistinguishable from a systemic failure. Capped at SAVED_SEARCH_FAILED_LIST_CAP; failuresByClass is complete.
+   */
+  failedSearches: Array<{ id: string; failureClass: SavedSearchAlertFailureClass }>;
+  /** Searches that evaluated but carry unknown NAICS codes (mixed valid/invalid). Not failures; never hidden. */
+  invalidNaicsSearches: Array<{ id: string; codes: string[] }>;
   /** Canonical Forecast engine only; empty under the legacy engine. */
   forecastCoverage: Partial<Record<SavedSearchForecastCoverageState, number>>;
   errorSummary?: string;
@@ -223,6 +259,8 @@ export async function runSavedSearchAlertDrain(opts: {
     batches: 0,
     stopReason: 'drained',
     failuresByClass: {},
+    failedSearches: [],
+    invalidNaicsSearches: [],
     forecastCoverage: {},
   };
 
@@ -279,10 +317,18 @@ export async function runSavedSearchAlertDrain(opts: {
 
       excludeIds.push(row.id);
       results.processed += 1;
+      let counts: SavedSearchAlertEvalCounts;
       try {
-        addCounts(results, await opts.evaluate(row));
+        counts = await opts.evaluate(row);
       } catch {
-        addCounts(results, { failureClass: 'unexpected_schedule_error' });
+        counts = { failureClass: 'unexpected_schedule_error' };
+      }
+      addCounts(results, counts);
+      if (counts.failureClass && results.failedSearches.length < SAVED_SEARCH_FAILED_LIST_CAP) {
+        results.failedSearches.push({ id: row.id, failureClass: counts.failureClass });
+      }
+      if (counts.invalidNaics?.length && results.invalidNaicsSearches.length < SAVED_SEARCH_FAILED_LIST_CAP) {
+        results.invalidNaicsSearches.push({ id: row.id, codes: counts.invalidNaics });
       }
     }
   }

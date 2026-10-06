@@ -45,7 +45,8 @@ describe('saved-search-alerts telemetry and same-invocation drain seams', () => 
 
   it('does not mark matches seen when the send is rejected', () => {
     const sendStart = ROUTE.indexOf("emailType: 'saved_search_alert'");
-    const rejected = ROUTE.indexOf("failureClass: 'email_send_rejected'", sendStart);
+    // A blocked send returns its classified failure (classifySendBlock) BEFORE the seen stamp.
+    const rejected = ROUTE.indexOf('failureClass: classifySendBlock(blockReason)', sendStart);
     const seenStamp = ROUTE.indexOf('last_seen_notice_ids: cappedSeen', sendStart);
     expect(sendStart).toBeGreaterThan(-1);
     expect(rejected).toBeGreaterThan(sendStart);

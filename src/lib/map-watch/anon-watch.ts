@@ -28,6 +28,7 @@
  * email is attached, which is also the moment the watch becomes a habit loop.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { valueShapeError, savedSearchNaicsError } from '@/lib/saved-searches/validate-filters';
 
 /** `anon:` + a uuid, as emitted by the map's telemetry identity. */
 const ANON_RE = /^anon:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -183,6 +184,14 @@ export function checkWatchPayload(
 ): PayloadCheck {
   if (filters != null && (typeof filters !== 'object' || Array.isArray(filters))) {
     return { ok: false, error: 'filters must be an object' };
+  }
+  // Every value the alert cron will parse must be a shape it can read. A verified owner's watch alerts
+  // immediately, and claimAnonWatch turns an anon row into an alerting one without re-reading it — so the
+  // check belongs here, at the only insert. (2026-10-01: `sapBuyer: true` broke a search for 4 days.)
+  if (filters != null) {
+    const valueErr = valueShapeError(filters as Record<string, unknown>)
+      ?? savedSearchNaicsError(filters as Record<string, unknown>);
+    if (valueErr) return { ok: false, error: valueErr };
   }
   if (bbox != null && (typeof bbox !== 'object' || Array.isArray(bbox))) {
     return { ok: false, error: 'bbox must be an object' };

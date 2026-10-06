@@ -9,7 +9,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  isAnonId, watchOwner, deriveWatchName, saveMapWatch, claimAnonWatch,
+  isAnonId, watchOwner, deriveWatchName, saveMapWatch, claimAnonWatch, checkWatchPayload,
 } from './anon-watch';
 
 const ANON = 'anon:57b9d751-9451-40c8-9f3e-2b1c4d5e6f70';
@@ -132,5 +132,34 @@ describe('claiming is the only way alerts turn on', () => {
     const r = await claimAnonWatch(db, ANON, 'a@b.com');
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/UNKNOWN, not zero/i);
+  });
+});
+
+describe('checkWatchPayload — stored values must be readable by the alert cron', () => {
+  it('rejects sapBuyer saved as a boolean (the 2026-10-01 incident shape)', () => {
+    const r = checkWatchPayload({ naics: '541510', sapBuyer: true }, null, null);
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/Invalid sapBuyer value/);
+  });
+
+  it('rejects an unknown NAICS (541510) on the Map watch path too', () => {
+    const r = checkWatchPayload({ naics: '541510' }, null, null);
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/Unknown NAICS code "541510"/);
+  });
+
+  it('rejects non-string q / status', () => {
+    expect(checkWatchPayload({ q: ['cyber'] }, null, null).ok).toBe(false);
+    expect(checkWatchPayload({ naics: '541512', status: true }, null, null).ok).toBe(false);
+  });
+
+  it('accepts the Map payload shapes measured in production (incl. keys outside the MCP allowlist)', () => {
+    const real = {
+      naics: '541512', state: ['FL', 'GA'], valueRange: '-10297772', setAsideMulti: 'SDVOSB',
+      noticeMulti: 'Solicitation,Presolicitation,Sources Sought', fsc: '7030', closingDays: '30',
+      postedDays: '30', country: 'us', status: 'active', scope: 'profile', hasDocs: '1', fullOpen: true,
+      sapBuyer: 'most', strategy: ['repeat_buyer', 'sb_friendly'], horizons: { open: true, forecast: true },
+    };
+    expect(checkWatchPayload(real, null, null)).toEqual({ ok: true });
   });
 });

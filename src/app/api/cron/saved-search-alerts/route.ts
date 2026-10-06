@@ -68,10 +68,12 @@ import {
   SAVED_SEARCH_ALERT_ROW_CEILING,
   SAVED_SEARCH_ALERT_TIME_BUDGET_MS,
   runSavedSearchAlertDrain,
+  classifySendBlock,
   type SavedSearchAlertDueRow,
   type SavedSearchAlertEvalCounts,
 } from '@/lib/saved-searches/alert-drain';
 import { dueSavedSearchFrequenciesAt, isSavedSearchDueAt } from '@/lib/saved-searches';
+import { storedNaicsValidity } from '@/lib/saved-searches/stored-naics';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -247,6 +249,16 @@ async function evaluateSavedSearch(
   const doForecast = wantsForecasts(s) && !forecastLimited;
   if (!doOpen && !doForecast) return forecastLimited ? { forecastCoverage: 'unsupported_filter' } : {};
 
+  // STORED NAICS VALIDITY (2026-10-05). A code that is not Census 2022 matches nothing, so a search whose
+  // codes are ALL unknown "succeeds" every day with zero results — indistinguishable from a quiet market.
+  // Report it by id and write nothing (its state is preserved for a corrected search). Never drop or replace
+  // an unknown code: dropping the only code would WIDEN the search to every opportunity.
+  const { stored: storedNaics, invalid: badNaics } = storedNaicsValidity(s.filters);
+  if (badNaics.length && badNaics.length === storedNaics.length) {
+    console.error(`[saved-search-alerts] ${s.id}: every stored NAICS is unknown (${badNaics.join(',')}) — not evaluated`);
+    return { failureClass: 'invalid_saved_naics', invalidNaics: badNaics };
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let opps: any[] = [];
 
@@ -290,7 +302,16 @@ async function evaluateSavedSearch(
       }
       profileOpts = { profileNaics: pn, profileStates: ps };
     }
-    const f = parseMapFilters((k) => savedFilters[k] ?? null, profileOpts);
+    // A stored filter the parser cannot read (sapBuyer saved as `true`, 2026-10-01) is THIS search's
+    // failure, reported by id — never an anonymous unexpected_schedule_error, and nothing is stamped, so
+    // the search's missed interval is preserved for an explicit recovery instead of silently baselined.
+    let f: ReturnType<typeof parseMapFilters>;
+    try {
+      f = parseMapFilters((k) => savedFilters[k] ?? null, profileOpts);
+    } catch (e) {
+      console.error(`[saved-search-alerts] ${s.id}: stored filters cannot be evaluated:`, (e as Error)?.message);
+      return { failureClass: 'invalid_saved_filters' };
+    }
     f.postedDays = f.postedDays || 30;
     let q = db.from('sam_opportunities').select(PIN_COLS).limit(200);
     q = applyMapFilters(q, f);
@@ -360,16 +381,18 @@ async function evaluateSavedSearch(
 
   const { subject, html, text } = buildEmail(s, fresh);
   let ok = false;
+  let blockReason: string | undefined;
   try {
     ok = await sendEmail({
       to: s.user_email, subject, html, text,
       emailType: 'saved_search_alert', eventSource: 'saved_search',
+      onBlocked: (r) => { blockReason = r; },
     });
   } catch {
     return { matched: 1, sendAttempts: 1, failureClass: 'email_send_failed' };
   }
 
-  if (!ok) return { matched: 1, sendAttempts: 1, failureClass: 'email_send_rejected' };
+  if (!ok) return { matched: 1, sendAttempts: 1, failureClass: classifySendBlock(blockReason) };
 
   const cappedSeen = decision.nextSeenAfterSend;
   const stamped = await stampSearchEvaluation(db, s.id, {
@@ -466,15 +489,19 @@ async function evaluateCanonicalForecast(
 
   const { subject, html, text } = buildEmail(s, fresh, coverageNotices, { total });
   let ok = false;
+  let blockReason: string | undefined;
   try {
-    ok = await sendEmail({ to: s.user_email, subject, html, text, emailType: 'saved_search_alert', eventSource: 'saved_search' });
+    ok = await sendEmail({
+      to: s.user_email, subject, html, text, emailType: 'saved_search_alert', eventSource: 'saved_search',
+      onBlocked: (r) => { blockReason = r; },
+    });
   } catch {
     await releaseClaim(db, s.id, claim.until).catch(() => {});
     return { matched: 1, sendAttempts: 1, failureClass: 'email_send_failed', ...cov };
   }
   if (!ok) {
     await releaseClaim(db, s.id, claim.until).catch(() => {});
-    return { matched: 1, sendAttempts: 1, failureClass: 'email_send_rejected', ...cov };
+    return { matched: 1, sendAttempts: 1, failureClass: classifySendBlock(blockReason), ...cov };
   }
 
   const after = { ...openSeen, ...forecastState, total_alerts_sent: (s.total_alerts_sent || 0) + 1 };
@@ -538,9 +565,15 @@ export async function GET(request: NextRequest) {
     },
     evaluate: async (row) => {
       const counts = await evaluateSavedSearch(db, row, now, preview, previewRows, forecastEngine, watermarkColumns);
-      return wantsForecasts(row) && forecastFilterUnsupported(row) && !counts.forecastCoverage
+      // A filter forecasts cannot represent (Marine Corps) is reported, never run unfiltered (#1840).
+      const withCoverage = wantsForecasts(row) && forecastFilterUnsupported(row) && !counts.forecastCoverage
         ? { ...counts, forecastCoverage: 'unsupported_filter' as const }
         : counts;
+      // A search with SOME unknown NAICS still evaluates (its valid codes match); its unknown codes are reported
+      // on every outcome so they are never silently tolerated.
+      if (withCoverage.invalidNaics) return withCoverage;
+      const { invalid } = storedNaicsValidity(row.filters);
+      return invalid.length ? { ...withCoverage, invalidNaics: invalid } : withCoverage;
     },
   });
 
@@ -583,6 +616,8 @@ export async function GET(request: NextRequest) {
       batches: results.batches,
       stopReason: results.stopReason,
       failuresByClass: results.failuresByClass,
+      failedSearches: results.failedSearches,
+      invalidNaicsSearches: results.invalidNaicsSearches,
       ...(preview ? { preview: previewRows } : {}),
     },
     { status: results.success ? 200 : 500 },
