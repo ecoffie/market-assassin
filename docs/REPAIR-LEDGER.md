@@ -28,6 +28,13 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+
+## 2026-10-06 — "Marine Corps" sub-agency filter matched nothing, ever
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-06 | Map Open / saved-search alerts / watchlist badge / dashboard (shared `applyMapFilters`) | SAM gives Marine Corps notices `sub_tier = "DEPT OF THE NAVY"`, so `subAgency: "Marine Corps"` (`sub_tier ILIKE '%Marine Corps%'`) matched 0 of 26,631 Navy notices, and a customer's MCP watch could never alert. Marine Corps sits only in the contracting office's Federal Hierarchy path (`agency_hierarchy` = fullParentPathName, third segment `USMC`; code path `017.1700.USMC.…`; name and code paths agree on all 1,135 rows). Marine Corps aliases on subAgency and on the Agency box now resolve to that exact path segment. Rejected, by measurement: solicitation prefix "M" (26 non-USMC hits: NAVSEA/SPAWAR/MSC/NAVFAC; 24 USMC misses), strict uniform-PIID "M" (2 non-USMC), and substring `%USMC%` (Bureau of Prisons USMCFP). Never broadens to Navy. 51 Navy rows with a truncated path are not matched (known gap). Recompete/forecast horizons are unchanged. | `return h ? hierarchyPathConds(h) : [` → `src/lib/opportunities/map-filters.ts` · `pathPrefix: 'DEPT OF DEFENSE.DEPT OF THE NAVY.USMC'` → `src/lib/opportunities/hierarchy-sub-agency.ts` | `hierarchy-sub-agency.unit.test.ts` evaluates the generated conditions on real prod rows: 10/37 red on main, 37/37 green. Live read-only on prod through the real filters: Marine Corps 0 → 1,135 (19 open); `USMC` and the Agency box give the same 1,135; Navy control unchanged at 26,631; included M9549426R0009 / GFSC / 26172; excluded ML26-85 / MEA-26-01-001 / MSC_ETFO_FY26_1455 / USMCFP. The 2026-10-05 watch (541611 + WOSB + Marine Corps) matches 1 historical (M9549426R0009), 0 open. Saved search NOT edited. | PR open |
+
 ## 2026-10-05 — Password reset form vanished after 8 seconds
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

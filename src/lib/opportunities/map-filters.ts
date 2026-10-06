@@ -7,6 +7,7 @@ import { SET_GROUPS } from './map-data';
 import { multiAgency, agencyIlikeConds, agencyOrExpr } from './agency-match';
 import { buildSearchOr } from '@/lib/mi-dashboard/search';
 import { resolveQueryIntent, setAsideOrExpr } from '@/lib/search/query-intent';
+import { hierarchyPathConds, resolveHierarchySubAgency } from './hierarchy-sub-agency';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import { SAM_DEPARTMENT_TIERS, type SapBuyerTier } from './sap-friendly-agencies';
 
@@ -236,11 +237,18 @@ export function applyMapFilters(query: any, f: MapFilters) {
   // input that finds nothing). The dedicated Sub-agency field still narrows WITHIN a department;
   // this makes the top-level Agency box do what a user expects when they type a service branch.
   // (Oracle-caught, Eric 2026-08-02: "do an oracle on our filters tab".)
+  // A needle naming a sub-agency SAM files below sub_tier (Marine Corps) resolves through the
+  // contracting office's Federal Hierarchy path instead — see hierarchy-sub-agency.ts.
   const agencies = multiAgency(f.agency);
   if (agencies.length) {
-    const dep = agencyOrExpr('department', agencies);
-    const sub = agencyOrExpr('sub_tier', agencies);
-    const expr = [dep, sub].filter(Boolean).join(',');
+    const plain = agencies.filter((a) => !resolveHierarchySubAgency(a));
+    const viaPath = agencies.flatMap((a) => {
+      const h = resolveHierarchySubAgency(a);
+      return h ? hierarchyPathConds(h) : [];
+    });
+    const dep = plain.length ? agencyOrExpr('department', plain) : '';
+    const sub = plain.length ? agencyOrExpr('sub_tier', plain) : '';
+    const expr = [dep, sub, ...viaPath].filter(Boolean).join(',');
     if (expr) query = query.or(expr);
   }
 
@@ -293,10 +301,15 @@ export function applyMapFilters(query: any, f: MapFilters) {
   if (f.country === 'us') query = query.eq('pop_country', 'USA');
   else if (f.country === 'oconus') query = query.neq('pop_country', 'USA');
 
-  // Sub-agency — narrow within a department (Army/Navy/… under DoD). Free-text ilike.
+  // Sub-agency — narrow within a department (Army/Navy/… under DoD). Free-text ilike on sub_tier,
+  // EXCEPT a sub-agency SAM files below sub_tier (Marine Corps → sub_tier "DEPT OF THE NAVY"): that
+  // resolves to the exact Federal Hierarchy path segment, never to all of Navy and never a substring.
   const subs = multiVal(f.subAgency);
   if (subs.length) {
-    query = query.or(subs.map((s) => `sub_tier.ilike.%${s.replace(/[%,]/g, '')}%`).join(','));
+    query = query.or(subs.flatMap((s) => {
+      const h = resolveHierarchySubAgency(s);
+      return h ? hierarchyPathConds(h) : [`sub_tier.ilike.%${s.replace(/[%,]/g, '')}%`];
+    }).join(','));
   }
 
   // Has documents — only opps carrying an attachment/SOW to actually respond to.
