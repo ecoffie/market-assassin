@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { isPlaceholderNaicsSet } from '@/lib/profile/naics-provenance';
 import { safeNext } from '@/lib/mindy/safe-next';
 import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
 import { useRouter } from 'next/navigation';
@@ -432,7 +433,9 @@ export default function OnboardingPage() {
         if (res.ok) {
           const data = await res.json();
           const codes: string[] = data?.data?.naicsCodes || [];
-          if (codes.length > 0) {
+          // The 5-code placeholder is not a profile. Email signups were given it before this
+          // page loaded, so `codes.length > 0` waved them past setup they never did.
+          if (codes.length > 0 && !isPlaceholderNaicsSet(codes)) {
             // Honor ?next= so a returning user lands back where they started sign-in.
             // ⚠️ This used to declare a LOCAL `const safeNext` that SHADOWED the imported
             // guard — and its inline check was weaker: it accepted "/app…" (re-entering the

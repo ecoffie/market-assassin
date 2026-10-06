@@ -24,6 +24,7 @@ import type { AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import { isDistinctiveKeyword, sanitizeKeywords } from '@/lib/market/keyword-sanitize';
 import { isAcceptablePscCode, isKnownNaicsCode } from '@/lib/codes/validate-market-codes';
+import TargetingSetupNotice from '../TargetingSetupNotice';
 
 /** Fire-and-forget engagement so we can decide this card's fate with evidence.
  *
@@ -334,6 +335,8 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, impressionSent, email, data, place]);
 
+  // `data` is null only when the workspace read FAILED (a profile with no targeting still loads,
+  // with empty arrays) — so the setup notice below still reaches every untargeted user.
   if (loading || !data) return null;
 
   const { naics, keywords, psc, states } = data;
@@ -371,6 +374,8 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
   const statesLabel = states.length > 0 ? states.join(', ') : 'Nationwide';
 
   return (
+    <>
+    <TargetingSetupNotice email={email} surface={place} />
     <div className="mb-4 rounded-xl border border-surface bg-ground/60 p-4">
       <div className="flex items-start justify-between gap-3">
         <button
@@ -674,5 +679,6 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
       </>
       )}
     </div>
+    </>
   );
 }

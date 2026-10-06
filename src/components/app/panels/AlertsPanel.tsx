@@ -5,6 +5,7 @@ import { Target, RefreshCw, Check, Lock, Flame, Zap, Star, Users, MapPin, Landma
 import Link from 'next/link';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders, authedFetch } from '../authHeaders';
+import TargetingSetupNotice from '../TargetingSetupNotice';
 import { useToast } from '../Toast';
 import { formatOpportunityLocation } from '@/lib/mindy/opportunity-location';
 import { getBuyerAgencyParts } from '@/lib/mindy/agency-display';
@@ -892,6 +893,8 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
 
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
+      {/* Why personalized alerts have not started (no targeting / starter codes) + typed-code offers. */}
+      <TargetingSetupNotice email={email} surface="alerts_panel" />
       {/* Branded header card — mirrors the daily-alert email banner so the
           in-app feed has the same visual rhythm as what users see in
           their inbox: title, date, match count, profile filter summary.

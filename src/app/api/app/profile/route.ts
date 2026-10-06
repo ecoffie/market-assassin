@@ -22,6 +22,7 @@ import {
 import { validateMarketCodesInput } from '@/lib/codes/validate-market-codes';
 import { freeNotificationSettingsInsert } from '@/lib/onboarding/free-notification-defaults';
 import { buildBusinessProfileInsert, buildBusinessProfileUpdate } from '@/lib/profile/business-profile-patch';
+import { naicsSourceForUserWrite } from '@/lib/profile/naics-provenance';
 
 /**
  * MI Beta Profile API
@@ -226,6 +227,16 @@ export async function POST(request: NextRequest) {
       .eq('user_email', rowEmail)
       .maybeSingle();
     if (existingSettingsErr) console.error('[profile] existing settings query error:', existingSettingsErr.message);
+
+    // Provenance for a user-initiated code change. Onboarding, the Map settings drawer and
+    // "save research to profile" all land here; none of them recorded naics_source, so a
+    // user's own codes and an untouched placeholder were indistinguishable. An unchanged set
+    // leaves provenance alone; the exact placeholder is never a choice.
+    // A failed read is UNKNOWN, not empty: never claim provenance against a baseline we did not see.
+    if (Array.isArray(updateData.naics_codes) && !existingSettingsErr) {
+      const naicsSource = naicsSourceForUserWrite(updateData.naics_codes as string[], existingSettings?.naics_codes as string[] | undefined);
+      if (naicsSource !== undefined) updateData.naics_source = naicsSource;
+    }
 
     // Only an explicit instruction changes alerts_enabled: a submitted boolean,
     // choosing Paused (keeps the daily-alerts cron from emailing a user who paused),
