@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-
-const DEFAULT_NAICS_CODES = ['541512', '541611', '541330', '541990', '561210'];
+import { freeNotificationSettingsInsert } from '@/lib/onboarding/free-notification-defaults';
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -47,16 +46,20 @@ export async function ensureMindyFreeProfile(email: string): Promise<void> {
     return;
   }
 
+  // NO NAICS on a new row. This insert used to write the 5-code placeholder
+  // (541512/541611/541330/541990/561210) with naics_source NULL. Measured 2026-10-06: all 64
+  // September–October signups holding the placeholder came through here (email signup via
+  // /app/setup-password); Google/Microsoft signups never got it. The daily-alert cron reads
+  // stored codes as targeting, so these accounts were mailed generic IT/admin work as if it
+  // matched their business, while naics_source said "unknown", not "default".
+  // A user with no targeting is skipped by the alert cron and reached by the profile-setup
+  // flow instead (daily-alerts "NO TARGETING -> SKIP", 2026-07-27) — the same state every
+  // OAuth signup already starts in. Use the ONE shared free-row definition so this path
+  // cannot drift from /api/app/profile and /api/company-setup again.
+  const nowIso = new Date().toISOString();
   const { error: insertError } = await supabase.from('user_notification_settings').insert({
-    user_email: normalizedEmail,
-    naics_codes: DEFAULT_NAICS_CODES,
-    treatment_type: 'free',
-    alerts_enabled: true,
-    briefings_enabled: false,
-    alert_frequency: 'daily',
-    timezone: 'America/New_York',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    ...freeNotificationSettingsInsert(normalizedEmail, nowIso),
+    updated_at: nowIso,
   });
 
   if (insertError) {

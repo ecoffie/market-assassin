@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { naicsSourceForUserWrite } from '@/lib/profile/naics-provenance';
 import { createClient } from '@supabase/supabase-js';
 import { hashNaicsProfile } from '@/lib/briefings/naics-profile-hash';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
@@ -318,6 +319,11 @@ export async function POST(request: NextRequest) {
         }, { status: 400 });
       }
       record.naics_codes = persist.codes;
+      // Record who chose these codes when the set actually changes (see naics-provenance.ts):
+      // the exact placeholder is never a choice; re-sending the unchanged set says nothing new.
+      const naicsSource = naicsSourceForUserWrite(persist.codes, existing?.naics_codes as string[] | undefined);
+      // A failed read of the existing row is UNKNOWN, not empty — never claim provenance then.
+      if (naicsSource !== undefined && !existingErr) record.naics_source = naicsSource;
       // Store profile hash for template matching
       record.naics_profile_hash = persist.codes.length > 0 ? hashNaicsProfile(persist.codes) : null;
       record.profile_updated_at = new Date().toISOString();
