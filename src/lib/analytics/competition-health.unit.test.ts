@@ -80,12 +80,19 @@ function makeClient(opts: {
 }
 
 const eqOf = (call: Call, col: string) => call.ops.find((o) => o.op === 'eq' && o.args[0] === col)?.args[1];
+const rowPulls = (calls: Call[]) => calls.filter((c) => !c.ops.some((o) => o.op === 'select' && (o.args[1] as { head?: boolean } | undefined)?.head));
 
 /** Resolver backed by the recorded fixture. */
-function fixtureResolver(agency: string, active = 1000, withSA = 400) {
+function fixtureResolver(agency: string, active = 1000, withSA = 400, opts: { deptExists?: boolean; notices?: number } = {}) {
+  const deptExists = opts.deptExists ?? true;
+  const recorded = (fixture.winners as Record<string, { awards: number }>)[agency];
+  const notices = opts.notices ?? (recorded ? recorded.awards : 10);
   return (call: Call): Res => {
     if (call.table === 'sam_opportunities') {
       const isHead = call.ops.some((o) => o.op === 'select' && (o.args[1] as { head?: boolean } | undefined)?.head);
+      const isScopeCheck = !isHead && call.ops.some((o) => o.op === 'select' && o.args[0] === 'department');
+      if (isScopeCheck) return { data: deptExists ? [{ department: agency }] : [] };
+      if (isHead && eqOf(call, 'notice_type') === 'Award Notice') return { count: notices };
       if (isHead) return { count: call.ops.some((o) => o.op === 'neq' && o.args[1] === 'NONE') ? withSA : active };
       return { data: [{ set_aside_code: 'SBA', naics_code: '236220' }] };
     }
@@ -117,7 +124,7 @@ describe('competition-health grounding contract', () => {
   it('computes set-aside % from EXACT head-counts (DoD screenshot: 8,667 of 22,906 = 37.8%)', async () => {
     const { client } = makeClient({ resolve: fixtureResolver('DEPT OF DEFENSE', 22906, 8667), rpc: fixtureRpc });
     const h = await computeCompetitionHealth(client, 'DEPT OF DEFENSE', 90, NOW);
-    expect(h.smallBizParticipation).toEqual({ activeOpps: 22906, withSetAside: 8667, pct: 37.8 });
+    expect(h.smallBizParticipation).toEqual({ activeOpps: 22906, withSetAside: 8667, pct: 37.8, status: 'measured', reason: null });
   });
 
   it('a failed set-aside count is UNKNOWN (pct null), never 0%', async () => {
@@ -160,8 +167,8 @@ describe('supplier-base breadth — population RPC, not a capped pull (2026-10-0
     expect(rpcCalls).toHaveLength(1);
     expect(rpcCalls[0].args).toMatchObject({ p_department: 'DEPT OF DEFENSE', p_until: new Date(NOW).toISOString() });
     expect(Date.parse(rpcCalls[0].args.p_until as string) - Date.parse(rpcCalls[0].args.p_since as string)).toBe(90 * 86400_000);
-    // no award-notice row pull at all — the capped path is gone
-    expect(calls.some((c) => c.ops.some((o) => o.op === 'eq' && o.args[0] === 'notice_type'))).toBe(false);
+    // no award-notice ROW pull at all — the capped path is gone (only an exact head-count remains)
+    expect(rowPulls(calls).some((c) => eqOf(c, 'notice_type') != null)).toBe(false);
   });
 
   it('first-time winners are population-level but flagged insufficient history (record starts 2026-03-16)', async () => {
@@ -194,7 +201,7 @@ describe('supplier-base breadth — population RPC, not a capped pull (2026-10-0
     expect(h.winners.firstTimeVendors).toBeNull();
     expect(h.winners.concentrationPct).toBeNull();
     expect(h.winners.error).toContain('does not exist');
-    expect(calls.some((c) => c.ops.some((o) => o.op === 'eq' && o.args[0] === 'notice_type'))).toBe(false);
+    expect(rowPulls(calls).some((c) => eqOf(c, 'notice_type') != null)).toBe(false);
     expect(buildCompetitionPriorities(h).some((p) => /supplier/i.test(p.title))).toBe(false);
   });
 
@@ -278,6 +285,89 @@ describe('the depth interval is never presented as an agency-wide estimate (revi
     expect(rendered).not.toMatch(/95% CI|confidence interval/i);
     const block = rendered.slice(rendered.indexOf('singleBidSampleInterval &&'));
     expect(block.slice(0, 900)).toContain('intervalScope');
+  });
+});
+
+describe('winner counts: measured vs genuine zero vs unavailable/unsupported (never a false zero)', () => {
+  const ZERO_ROW = { awards: 0, distinct_winners: 0, awards_with_amount: 0, total_dollars: 0, top3_dollars: 0, first_time_winners: 0, lookback_start: '2026-03-16T00:00:00+00:00', top_winners: [] };
+
+  it('MEASURED: a department with winners in the window', async () => {
+    const { client } = makeClient({ resolve: fixtureResolver('DEPT OF DEFENSE'), rpc: fixtureRpc });
+    const h = await computeCompetitionHealth(client, 'DEPT OF DEFENSE', 90, NOW);
+    expect(h.scope.status).toBe('department');
+    expect(h.winners.status).toBe('measured');
+    expect(h.winners.distinctWinners).toBe(4763);
+    expect(h.winners.awardNoticesInWindow).toBe(17742);
+    expect(h.smallBizParticipation.status).toBe('measured');
+  });
+
+  it('GENUINE ZERO: a department WITH award notices in the window but none naming an awardee', async () => {
+    const { client } = makeClient({
+      resolve: fixtureResolver('LIBRARY OF CONGRESS', 14, 3, { notices: 5 }),
+      rpc: () => ({ data: [ZERO_ROW] }),
+    });
+    const h = await computeCompetitionHealth(client, 'LIBRARY OF CONGRESS', 90, NOW);
+    expect(h.winners.status).toBe('zero');
+    expect(h.winners.distinctWinners).toBe(0);
+    expect(h.winners.awardNoticesInWindow).toBe(5);
+    expect(h.winners.reason).toContain('5 award notices');
+  });
+
+  it('UNAVAILABLE: a valid department with NO award notices in the window is not a zero', async () => {
+    const { client } = makeClient({
+      resolve: fixtureResolver('FEDERAL DEPOSIT INSURANCE CORPORATION', 20, 5, { notices: 0 }),
+      rpc: () => ({ data: [ZERO_ROW] }),
+    });
+    const h = await computeCompetitionHealth(client, 'FEDERAL DEPOSIT INSURANCE CORPORATION', 90, NOW);
+    expect(h.winners.status).toBe('unavailable');
+    expect(h.winners.distinctWinners).toBeNull();
+    expect(h.winners.awardNoticesInWindow).toBe(0);
+    expect(h.winners.reason).toMatch(/No award notices/);
+  });
+
+  it('UNAVAILABLE: a sub-agency (Navy) — no department-keyed count is run, nothing reads as 0', async () => {
+    const { client, rpcCalls, calls } = makeClient({ resolve: fixtureResolver('DEPT OF THE NAVY', 0, 0, { deptExists: false }), rpc: fixtureRpc });
+    const h = await computeCompetitionHealth(client, 'DEPT OF THE NAVY', 90, NOW);
+    expect(h.scope.status).toBe('subagency');
+    expect(h.winners.status).toBe('unavailable');
+    expect(h.winners.reason).toMatch(/sub-agency/);
+    expect(h.winners.distinctWinners).toBeNull();
+    expect(h.winners.awardsWithAwardee).toBeNull();
+    expect(h.smallBizParticipation.status).toBe('unavailable');
+    expect(h.smallBizParticipation.pct).toBeNull();
+    expect(rpcCalls).toHaveLength(0);
+    // only the existence check touched sam_opportunities
+    expect(calls.filter((c) => c.table === 'sam_opportunities')).toHaveLength(1);
+    // the awarded mix is still measured at sub-agency level (5,299 rows) — unchanged
+    expect(h.awardedSetAside.total).toBe(5299);
+  });
+
+  it('UNSUPPORTED: an unknown agency returns unsupported, not zero', async () => {
+    const { client, rpcCalls } = makeClient({ resolve: fixtureResolver('SOME MADE-UP OFFICE', 0, 0, { deptExists: false }), rpc: fixtureRpc });
+    const h = await computeCompetitionHealth(client, 'SOME MADE-UP OFFICE', 90, NOW);
+    expect(h.scope.status).toBe('unsupported');
+    expect(h.winners.status).toBe('unsupported');
+    expect(h.winners.distinctWinners).toBeNull();
+    expect(h.winners.firstTimeVendors).toBeNull();
+    expect(h.smallBizParticipation.status).toBe('unsupported');
+    expect(rpcCalls).toHaveLength(0);
+  });
+
+  it('UNAVAILABLE: the aggregate failing is unknown, never zero', async () => {
+    const { client } = makeClient({ resolve: fixtureResolver('DEPT OF DEFENSE') });
+    const h = await computeCompetitionHealth(client, 'DEPT OF DEFENSE', 90, NOW);
+    expect(h.winners.status).toBe('unavailable');
+    expect(h.winners.distinctWinners).toBeNull();
+  });
+
+  it('the page renders a number only for measured/zero; unavailable/unsupported get a reason, never "0"', async () => {
+    const { readFileSync } = await import('node:fs');
+    const page = readFileSync('src/app/admin/competition-health/page.tsx', 'utf8');
+    expect(page).toContain("h.winners.status === 'unavailable' || h.winners.status === 'unsupported'");
+    expect(page).toContain("sb.status !== 'measured'");
+    const note = page.slice(page.indexOf('function StatusNote'), page.indexOf('function Kpi'));
+    expect(note).toContain('never as zero');
+    expect(note).not.toMatch(/toLocaleString|\{0\}/);
   });
 });
 

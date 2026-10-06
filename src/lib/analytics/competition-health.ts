@@ -37,7 +37,19 @@ export interface CompetitionHealth {
   windowDays: number;
   grounded: boolean;
   // ✅ groundable now
-  smallBizParticipation: { activeOpps: number; withSetAside: number; pct: number | null };
+  /**
+   * Which kind of agency key this is. Participation and winner counts are computed from SAM records
+   * keyed by `sam_opportunities.department`, so they are only MEASURABLE for a department key.
+   *   department   — a department name present in Mindy's SAM record
+   *   subagency    — a known sub-agency (e.g. Navy) stored under sub_tier, not department → unavailable
+   *   unsupported  — not a department in the record and not a known sub-agency → unsupported
+   * An unavailable/unsupported measure is null + reason, never a measured zero.
+   */
+  scope: { status: 'department' | 'subagency' | 'unsupported'; reason: string | null };
+  smallBizParticipation: {
+    activeOpps: number; withSetAside: number; pct: number | null;
+    status: 'measured' | 'unavailable' | 'unsupported'; reason: string | null;
+  };
   setAsideMix: { label: string; count: number }[];          // from ACTIVE open notices — SAMPLED (see openNoticeSample)
   /** The open-notice mix + NAICS coverage come from a bounded row pull (PostgREST caps at 1,000).
    *  Disclosed so the card never presents a sample as the population. Population fix = follow-up. */
@@ -57,6 +69,17 @@ export interface CompetitionHealth {
    * unavailable: unknown, never zero.
    */
   winners: {
+    /**
+     * measured     — a valid department with award notices in the window, ≥1 winner identity
+     * zero         — a valid department WITH award notices in the window but zero qualifying winner
+     *                identities (no notice carried an awardee name). The only state that shows "0".
+     * unavailable  — sub-agency scope, no award notices in the window, or the aggregate failed
+     * unsupported  — the agency key is not a department in Mindy's SAM record
+     */
+    status: 'measured' | 'zero' | 'unavailable' | 'unsupported';
+    reason: string | null;
+    /** Award notices posted in-window for this department, with or without an awardee (exact). */
+    awardNoticesInWindow: number | null;
     window: { since: string; until: string; days: number; basis: string };
     awardsWithAwardee: number | null;       // award notices posted in-window carrying an awardee
     distinctWinners: number | null;         // distinct exact awardee names in-window
@@ -95,8 +118,15 @@ export const AWARDED_SETASIDE_LABELS = ['Full & Open', 'SB-Total', '8(a)', 'SDVO
 const FIRST_TIME_DEFINITION =
   'A winner in the window with no award notice at this agency posted before the window starts, within the history Mindy holds.';
 
-function emptyWinners(windowDays: number, nowMs: number, error: string | null = null): CompetitionHealth['winners'] {
+function emptyWinners(
+  windowDays: number,
+  nowMs: number,
+  error: string | null = null,
+  status: CompetitionHealth['winners']['status'] = 'unavailable',
+  reason: string | null = null,
+): CompetitionHealth['winners'] {
   return {
+    status, reason: reason ?? error, awardNoticesInWindow: null,
     window: {
       since: new Date(nowMs - windowDays * 86400_000).toISOString(),
       until: new Date(nowMs).toISOString(),
@@ -126,7 +156,8 @@ export async function computeCompetitionHealth(
 
   const base: CompetitionHealth = {
     agency: AG, windowDays, grounded: false,
-    smallBizParticipation: { activeOpps: 0, withSetAside: 0, pct: null },
+    scope: { status: 'department', reason: null },
+    smallBizParticipation: { activeOpps: 0, withSetAside: 0, pct: null, status: 'measured', reason: null },
     setAsideMix: [], awardedSetAsideMix: [],
     openNoticeSample: { rows: 0, of: 0, complete: false },
     awardedSetAside: { identity: null, total: null, note: 'not computed' },
@@ -140,44 +171,76 @@ export async function computeCompetitionHealth(
     error: null,
   };
 
+  // ── 0) SCOPE — is this a department key the SAM-based measures can actually be computed for? ──
+  //    A sub-agency (Navy) lives in sub_tier, and an unknown name matches no department; for both,
+  //    the department-keyed counts below would return 0 — a FALSE zero. Decide the scope first.
+  const ident = resolveAgencyIdentity(AG);
+  // Existence check (one row), not a count: we only need to know whether the key exists at all.
+  const { data: deptRows, error: deptErr } = await supabase
+    .from('sam_opportunities').select('department').eq('department', AG).limit(1);
+  if (deptErr || !deptRows) {
+    return { ...base, error: `competition-health scope check failed: ${deptErr?.message ?? 'no data'}` };
+  }
+  if (deptRows.length === 0) {
+    const scope: CompetitionHealth['scope'] = ident.resolved && ident.tier === 'subtier'
+      ? { status: 'subagency', reason: `${ident.name} is a sub-agency. Mindy's SAM record files it under its parent department (sub_tier), and these counts are computed per department only.` }
+      : { status: 'unsupported', reason: `"${AG}" is not a department in Mindy's SAM opportunity record.` };
+    const st = scope.status === 'subagency' ? 'unavailable' : 'unsupported';
+    base.scope = scope;
+    base.smallBizParticipation = { activeOpps: 0, withSetAside: 0, pct: null, status: st, reason: scope.reason };
+    base.openNoticeSample = { rows: 0, of: 0, complete: false };
+    base.winners = emptyWinners(windowDays, nowMs, null, st, scope.reason);
+  }
+  const deptScoped = base.scope.status === 'department';
+
   // ── 1) small-business participation — EXACT head-counts (NOT a sampled ratio) ──
   // ⚠️ PostgREST caps a `.select()` at 1000 rows regardless of `.limit()`, so counting set-aside %
   //    from a fetched page would silently sample the first 1000 of a 2,882-opp agency (the documented
   //    1000-row-cap trap). Use two EXACT head-counts instead so the ratio is over the WHOLE set.
-  const activeQ = supabase.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('department', AG).eq('active', true);
+  const activeQ = () => supabase.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('department', AG).eq('active', true);
   // "with a set-aside" = set_aside_code present AND not the literal 'NONE'/'' (full & open).
-  const saQ = supabase.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('department', AG).eq('active', true)
+  const saQ = () => supabase.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('department', AG).eq('active', true)
     .not('set_aside_code', 'is', null).neq('set_aside_code', '').neq('set_aside_code', 'NONE');
-  const [activeRes, saRes] = await Promise.all([activeQ, saQ]);
-  if (activeRes.error) {
-    // The PRIMARY count failed — surface it; do not pretend the market is empty.
-    return { ...base, error: `competition-health read failed: ${activeRes.error.message}` };
+  // Out of scope → no department-keyed count is even built (it could only return a false 0).
+  const [activeRes, saRes] = deptScoped
+    ? await Promise.all([activeQ(), saQ()])
+    : [{ count: 0, error: null }, { count: 0, error: null }];
+  const { count: activeCount, error: activeErr } = activeRes;
+  if (activeErr || activeCount == null) {
+    // The PRIMARY count failed or came back null (unknown) — surface it; never pretend the market is empty.
+    return { ...base, error: `competition-health read failed: ${activeErr?.message ?? 'null active count'}` };
   }
-  const activeOpps = activeRes.count ?? 0;
+  const activeOpps = activeCount;
   // A failed/null set-aside count is UNKNOWN, not zero (Bug Prevention Rule #11) → pct null.
   const saKnown = !saRes.error && saRes.count != null;
   const withSetAside = saKnown ? (saRes.count as number) : 0;
-  base.smallBizParticipation = {
-    activeOpps,
-    withSetAside,
-    pct: saKnown && activeOpps > 0 ? Math.round((withSetAside / activeOpps) * 1000) / 10 : null,
-  };
+  if (deptScoped) {
+    base.smallBizParticipation = {
+      activeOpps,
+      withSetAside,
+      pct: saKnown && activeOpps > 0 ? Math.round((withSetAside / activeOpps) * 1000) / 10 : null,
+      status: 'measured',
+      reason: saKnown ? null : 'set-aside count unavailable',
+    };
+  }
 
   // ── 1b) set-aside MIX + NAICS breadth — a bounded SAMPLE (up to 1000) is fine for shape/ranking. ──
   //    (The exact % comes from the head-counts above; this pull only ranks the categories.)
-  const { data: sample, error: sampleErr } = await supabase
-    .from('sam_opportunities')
-    .select('set_aside_code, naics_code')
-    .eq('department', AG)
-    .eq('active', true)
-    .limit(1000);
+  const { data: sample, error: sampleErr } = deptScoped
+    ? await supabase
+      .from('sam_opportunities')
+      .select('set_aside_code, naics_code')
+      .eq('department', AG)
+      .eq('active', true)
+      .limit(1000)
+    : { data: [] as { set_aside_code: string | null; naics_code: string | null }[], error: null };
   if (sampleErr) {
     // Non-fatal: the exact % above still ships. The mix/coverage stay empty and are labeled a
     // 0-row sample (complete:false) — never presented as "this agency buys across 0 NAICS".
     console.error('[competition-health] open-notice sample failed:', sampleErr.message);
   }
   const rows = sampleErr ? [] : (sample || []);
-  base.openNoticeSample = { rows: rows.length, of: activeOpps, complete: !sampleErr && rows.length >= activeOpps };
+  if (deptScoped) base.openNoticeSample = { rows: rows.length, of: activeOpps, complete: !sampleErr && rows.length >= activeOpps };
   const saTally: Record<string, number> = {};
   const naicsTally: Record<string, number> = {};
   for (const r of rows) {
@@ -199,7 +262,6 @@ export async function computeCompetitionHealth(
   // USASpending toptier name ("Department of Defense"); service branches live in
   // `awarding_sub_agency`. An unresolvable agency is refused (null + note), not guessed.
   // Exact per-category head-counts (the OBS-002 method), not a row pull capped at 1,000.
-  const ident = resolveAgencyIdentity(AG);
   if (!ident.resolved) {
     base.awardedSetAside = { identity: null, total: null, note: `Can't confidently map "${AG}" to a USASpending agency, so the awarded mix is withheld rather than risk counting another buyer's awards.` };
   } else {
@@ -231,37 +293,61 @@ export async function computeCompetitionHealth(
   //    competition_health_winners (migration 20261006) returns ONE row: no page to truncate. The old
   //    `.limit(4000)` pull was silently capped at 1,000 rows. On failure (incl. the function not yet
   //    applied) every figure is null + the error is surfaced — there is no capped-fetch fallback.
-  const winners = emptyWinners(windowDays, nowMs);
-  const { data: wData, error: wErr } = await supabase.rpc('competition_health_winners', {
-    p_department: AG, p_since: winners.window.since, p_until: winners.window.until, p_top: 6,
-  });
-  const wRow = (Array.isArray(wData) ? wData[0] : wData) as WinnersRow | null | undefined;
-  if (wErr || !wRow) {
-    base.winners = { ...winners, error: `supplier-breadth aggregate unavailable: ${wErr?.message ?? 'no row returned'}` };
-  } else {
-    const num = (v: number | string | null | undefined) => (v == null ? 0 : Number(v));
-    const total = num(wRow.total_dollars);
-    const lookbackStart = wRow.lookback_start;
-    const lookbackDays = lookbackStart
-      ? Math.max(0, Math.floor((Date.parse(winners.window.since) - Date.parse(lookbackStart)) / 86400_000))
-      : null;
-    base.winners = {
-      ...winners,
-      awardsWithAwardee: num(wRow.awards),
-      distinctWinners: num(wRow.distinct_winners),
-      awardsWithAmount: num(wRow.awards_with_amount),
-      topWinners: (wRow.top_winners || []).map((w) => ({ name: w.name, total: num(w.total), awards: num(w.awards) })),
-      firstTimeVendors: num(wRow.first_time_winners),
-      firstTime: {
-        lookbackStart,
-        lookbackDays,
-        historySufficient: lookbackDays != null && lookbackDays >= MIN_FIRST_TIME_LOOKBACK_DAYS,
-        definition: FIRST_TIME_DEFINITION,
-      },
-      concentrationPct: total > 0 ? Math.round((num(wRow.top3_dollars) / total) * 1000) / 10 : null,
-      complete: true,
-      error: null,
-    };
+  if (deptScoped) {
+    const winners = emptyWinners(windowDays, nowMs);
+    // Exact count of ALL award notices in the window (awardee or not) — separates a genuine zero
+    // (notices exist, none name a winner) from "nothing to measure" (no notices in the window).
+    const [rpcRes, noticesRes] = await Promise.all([
+      supabase.rpc('competition_health_winners', {
+        p_department: AG, p_since: winners.window.since, p_until: winners.window.until, p_top: 6,
+      }),
+      supabase.from('sam_opportunities').select('*', { count: 'exact', head: true })
+        .eq('department', AG).eq('notice_type', 'Award Notice')
+        .gte('posted_date', winners.window.since).lt('posted_date', winners.window.until),
+    ]);
+    const { data: wData, error: wErr } = rpcRes;
+    const wRow = (Array.isArray(wData) ? wData[0] : wData) as WinnersRow | null | undefined;
+    const notices = noticesRes.error || noticesRes.count == null ? null : noticesRes.count;
+    if (wErr || !wRow) {
+      const msg = `supplier-breadth aggregate unavailable: ${wErr?.message ?? 'no row returned'}`;
+      base.winners = { ...winners, status: 'unavailable', reason: msg, error: msg };
+    } else if (notices == null) {
+      const msg = `award-notice count unavailable: ${noticesRes.error?.message ?? 'null count'}`;
+      base.winners = { ...winners, status: 'unavailable', reason: msg, error: msg };
+    } else if (notices === 0) {
+      base.winners = {
+        ...winners, status: 'unavailable', awardNoticesInWindow: 0,
+        reason: `No award notices were posted for this department in the ${windowDays}-day window, so there is nothing to measure.`,
+      };
+    } else {
+      const num = (v: number | string | null | undefined) => (v == null ? 0 : Number(v));
+      const total = num(wRow.total_dollars);
+      const distinct = num(wRow.distinct_winners);
+      const lookbackStart = wRow.lookback_start;
+      const lookbackDays = lookbackStart
+        ? Math.max(0, Math.floor((Date.parse(winners.window.since) - Date.parse(lookbackStart)) / 86400_000))
+        : null;
+      base.winners = {
+        ...winners,
+        status: distinct > 0 ? 'measured' : 'zero',
+        reason: distinct > 0 ? null : `${notices.toLocaleString()} award notice${notices === 1 ? '' : 's'} posted in the window, none naming an awardee.`,
+        awardNoticesInWindow: notices,
+        awardsWithAwardee: num(wRow.awards),
+        distinctWinners: distinct,
+        awardsWithAmount: num(wRow.awards_with_amount),
+        topWinners: (wRow.top_winners || []).map((w) => ({ name: w.name, total: num(w.total), awards: num(w.awards) })),
+        firstTimeVendors: num(wRow.first_time_winners),
+        firstTime: {
+          lookbackStart,
+          lookbackDays,
+          historySufficient: lookbackDays != null && lookbackDays >= MIN_FIRST_TIME_LOOKBACK_DAYS,
+          definition: FIRST_TIME_DEFINITION,
+        },
+        concentrationPct: total > 0 ? Math.round((num(wRow.top3_dollars) / total) * 1000) / 10 : null,
+        complete: true,
+        error: null,
+      };
+    }
   }
 
   // ── 4) COMPETITION DEPTH — avg bidders + single-bid rate (per-award detail endpoint, cached 24h). ──
