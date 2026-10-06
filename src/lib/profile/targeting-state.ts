@@ -7,8 +7,12 @@
  * so a PSC-only profile is reported as `none` here too: saying alerts have started when the cron
  * skips them would be the same false-completeness the provenance column exists to end.
  *
+ * One refinement (2026-10-06): with no NAICS market, only DISTINCTIVE keywords count
+ * (distinctiveKeywords). Generic-only keywords leave the shared search unfiltered, so weekly-alerts
+ * skips them and daily cannot personalize — calling that profile "targeted" would be false.
+ *
  * States:
- *   - `none`           — the daily cron skips this user. Personalized alerts have not started.
+ *   - `none`           — no NAICS market and no distinctive keyword. Personalized alerts have not started.
  *   - `starter_codes`  — the codes are exactly the 5-code placeholder and nobody confirmed them
  *                        (naics_source system_default, or NULL — the email-signup write). Alerts
  *                        run, but on generic IT/admin codes, not on this business.
@@ -19,6 +23,7 @@
  *                        punish a recording gap, not a missing profile.
  */
 import { knownNaicsForMatch } from '@/lib/codes/validate-market-codes';
+import { distinctiveKeywords } from '@/lib/market/keyword-sanitize';
 import { isPlaceholderNaicsSet } from './naics-provenance';
 
 export type TargetingState = 'none' | 'starter_codes' | 'targeted';
@@ -32,8 +37,11 @@ export interface TargetingInput {
 export function targetingStateFrom(row: TargetingInput | null | undefined): TargetingState {
   if (!row) return 'none';
   const naics = knownNaicsForMatch((row.naics_codes || []).map(String));
-  const keywords = (row.keywords || []).map((k) => String(k).trim()).filter(Boolean);
-  if (naics.length === 0 && keywords.length === 0) return 'none';
+  // With no NAICS market, keywords ARE the targeting — but only distinctive ones. Generic words
+  // ("services", "government") give the shared search no filter at all: weekly-alerts skips the
+  // user ('keywords too generic to search') and daily cannot personalize. Same rule as weekly.
+  const keywords = (row.keywords || []).map((k) => String(k)).filter((k) => k.trim());
+  if (naics.length === 0 && distinctiveKeywords(keywords).length === 0) return 'none';
   if (
     isPlaceholderNaicsSet(row.naics_codes)
     && row.naics_source !== 'user_confirmed'
