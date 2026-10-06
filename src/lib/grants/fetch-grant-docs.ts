@@ -333,11 +333,14 @@ export async function fetchPursuitDocsAuto(opts: {
   solicitationNumber?: string | null;
   title?: string | null;
   agency?: string | null;
+  /** Explicit user request — bypasses the scanner-save suppression (see fetchPursuitDocs). */
+  userInitiated?: boolean;
 }): Promise<{
   attempted: number;
   succeeded: number;
   failed: number;
   status: 'ready' | 'none' | 'failed';
+  suppressed?: boolean;
   // SAM-path diagnostics (undefined on the grants path).
   downloadNulls?: number;
   lastInsertError?: string | null;
@@ -353,5 +356,6 @@ export async function fetchPursuitDocsAuto(opts: {
     solicitationNumber: opts.solicitationNumber,
     title: opts.title,
     agency: opts.agency,
+    userInitiated: opts.userInitiated,
   });
 }
