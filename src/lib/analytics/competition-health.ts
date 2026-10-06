@@ -15,7 +15,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { computeCompetitionDepth, type CompetitionDepth } from './competition-depth';
+import { computeCompetitionDepth, resolveAgencyIdentity, type CompetitionDepth } from './competition-depth';
 
 // Set-aside code → readable label + whether it counts as a small-business set-aside.
 // SAM `set_aside_code` values seen live: SDVOSBC, SDVOSBS, SBA, WOSB, VSA, NONE, HZC, 8A, EDWOSB, ...
@@ -38,16 +38,40 @@ export interface CompetitionHealth {
   grounded: boolean;
   // ✅ groundable now
   smallBizParticipation: { activeOpps: number; withSetAside: number; pct: number | null };
-  setAsideMix: { label: string; count: number }[];          // from ACTIVE open notices
-  awardedSetAsideMix: { label: string; count: number }[];    // from the recompete/award record (set_aside_enriched)
+  setAsideMix: { label: string; count: number }[];          // from ACTIVE open notices — SAMPLED (see openNoticeSample)
+  /** The open-notice mix + NAICS coverage come from a bounded row pull (PostgREST caps at 1,000).
+   *  Disclosed so the card never presents a sample as the population. Population fix = follow-up. */
+  openNoticeSample: { rows: number; of: number; complete: boolean };
+  awardedSetAsideMix: { label: string; count: number }[];    // from the recompete/award record (set_aside_enriched) — exact head-counts
+  awardedSetAside: {
+    identity: { name: string; tier: 'toptier' | 'subtier' } | null; // canonical USASpending agency matched EXACTLY
+    total: number | null;                                           // enriched rows for that agency (null = unknown)
+    note: string | null;                                            // why the mix is empty/unknown, when it is
+  };
   marketCoverage: { distinctNaics: number; topNaics: { naics: string; opps: number }[] };
-  // ✅ NEW (PR #1062 awardee backfill): the award record on sam_opportunities.
+  /**
+   * SUPPLIER-BASE BREADTH (the OBS-008 input; "supplier churn" was the earlier internal name for the
+   * same input). An implemented signal, NOT a published Observatory standard. Population-level via
+   * the competition_health_winners RPC — never a capped row pull (the defect that displayed 712
+   * distinct DoD winners against an actual 4,763). Every field is null when the aggregate is
+   * unavailable: unknown, never zero.
+   */
   winners: {
-    awardsWithAwardee: number;              // award notices posted in-window carrying an awardee
-    distinctWinners: number;                // how many different firms won
+    window: { since: string; until: string; days: number; basis: string };
+    awardsWithAwardee: number | null;       // award notices posted in-window carrying an awardee
+    distinctWinners: number | null;         // distinct exact awardee names in-window
+    awardsWithAmount: number | null;        // notices carrying a positive amount (the $ denominator)
     topWinners: { name: string; total: number; awards: number }[]; // by $ won
-    firstTimeVendors: number | null;        // winners with no prior award at this agency (null if not computed)
-    concentrationPct: number | null;        // % of $ captured by the top 3 winners — a competition-health signal
+    firstTimeVendors: number | null;        // winners with no award notice at this agency before the window
+    firstTime: {
+      lookbackStart: string | null;         // earliest award notice in the record for this agency
+      lookbackDays: number | null;          // history available BEFORE the window
+      historySufficient: boolean;           // lookbackDays >= MIN_FIRST_TIME_LOOKBACK_DAYS
+      definition: string;
+    };
+    concentrationPct: number | null;        // % of $ captured by the top 3 winners
+    complete: boolean;                      // true only when computed over the whole window population
+    error: string | null;
   };
   // ✅ NEW (competition depth via the per-award detail endpoint) — avg bidders + single-bid rate.
   competitionDepth: CompetitionDepth;
@@ -57,12 +81,46 @@ export interface CompetitionHealth {
   error: string | null;
 }
 
-const norm = (a: string) => a.trim().toUpperCase();
+/**
+ * "First-time winner" needs history BEFORE the window to mean anything. The sam_opportunities
+ * corpus begins 2026-03-15, so a 90-day window in Oct 2026 has ~4 months of prior record: most
+ * "first-time" winners are simply firms the record had not yet seen. Below a year of lookback the
+ * count is still computed and shown, but labeled insufficient and never used to claim "broadening".
+ */
+export const MIN_FIRST_TIME_LOOKBACK_DAYS = 365;
+
+/** The OBS-002 enriched set-aside categories (measured 2026-10-06: these 10 cover every row). */
+export const AWARDED_SETASIDE_LABELS = ['Full & Open', 'SB-Total', '8(a)', 'SDVOSB', 'WOSB', 'Indian-SB', 'HUBZone', 'SB-Partial', 'VOSB', 'EDWOSB'];
+
+const FIRST_TIME_DEFINITION =
+  'A winner in the window with no award notice at this agency posted before the window starts, within the history Mindy holds.';
+
+function emptyWinners(windowDays: number, nowMs: number, error: string | null = null): CompetitionHealth['winners'] {
+  return {
+    window: {
+      since: new Date(nowMs - windowDays * 86400_000).toISOString(),
+      until: new Date(nowMs).toISOString(),
+      days: windowDays,
+      basis: 'award-notice posting date',
+    },
+    awardsWithAwardee: null, distinctWinners: null, awardsWithAmount: null, topWinners: [],
+    firstTimeVendors: null,
+    firstTime: { lookbackStart: null, lookbackDays: null, historySufficient: false, definition: FIRST_TIME_DEFINITION },
+    concentrationPct: null, complete: false, error,
+  };
+}
+
+interface WinnersRow {
+  awards: number | string; distinct_winners: number | string; awards_with_amount: number | string;
+  total_dollars: number | string; top3_dollars: number | string; first_time_winners: number | string;
+  lookback_start: string | null; top_winners: { name: string; total: number | string; awards: number | string }[] | null;
+}
 
 export async function computeCompetitionHealth(
   supabase: SupabaseClient,
   agency: string,
   windowDays = 90,
+  nowMs: number = Date.now(),
 ): Promise<CompetitionHealth> {
   const AG = agency.trim();
 
@@ -70,9 +128,11 @@ export async function computeCompetitionHealth(
     agency: AG, windowDays, grounded: false,
     smallBizParticipation: { activeOpps: 0, withSetAside: 0, pct: null },
     setAsideMix: [], awardedSetAsideMix: [],
+    openNoticeSample: { rows: 0, of: 0, complete: false },
+    awardedSetAside: { identity: null, total: null, note: 'not computed' },
     marketCoverage: { distinctNaics: 0, topNaics: [] },
-    winners: { awardsWithAwardee: 0, distinctWinners: 0, topWinners: [], firstTimeVendors: null, concentrationPct: null },
-    competitionDepth: { agency: AG, scope: { naics: null, state: null }, resolvedAgency: null, grounded: false, sampled: 0, sampledWithData: 0, avgBidders: null, medianBidders: null, singleBidCount: 0, singleBidPct: null, strength: 'insufficient' as const, singleBidMoe: null, singleBidPlain: null, note: 'not computed' },
+    winners: emptyWinners(windowDays, nowMs),
+    competitionDepth: { agency: AG, scope: { naics: null, state: null }, resolvedAgency: null, grounded: false, sampled: 0, sampledWithData: 0, avgBidders: null, medianBidders: null, singleBidCount: 0, singleBidPct: null, singleBidCi: null, sampleOrder: '', strength: 'insufficient' as const, singleBidMoe: null, singleBidPlain: null, note: 'not computed' },
     supplierReach: null,
     notYetMeasurable: [
       { metric: 'Supplier reach / opportunity visibility', needs: 'the map card-view events (user_engagement) do not yet carry the listing\'s agency — the emitters must tag agency on impression/click so we can count distinct contractors who viewed THIS buyer\'s listings' },
@@ -94,11 +154,13 @@ export async function computeCompetitionHealth(
     return { ...base, error: `competition-health read failed: ${activeRes.error.message}` };
   }
   const activeOpps = activeRes.count ?? 0;
-  const withSetAside = saRes.error ? 0 : (saRes.count ?? 0);
+  // A failed/null set-aside count is UNKNOWN, not zero (Bug Prevention Rule #11) → pct null.
+  const saKnown = !saRes.error && saRes.count != null;
+  const withSetAside = saKnown ? (saRes.count as number) : 0;
   base.smallBizParticipation = {
     activeOpps,
     withSetAside,
-    pct: activeOpps > 0 ? Math.round((withSetAside / activeOpps) * 1000) / 10 : null,
+    pct: saKnown && activeOpps > 0 ? Math.round((withSetAside / activeOpps) * 1000) / 10 : null,
   };
 
   // ── 1b) set-aside MIX + NAICS breadth — a bounded SAMPLE (up to 1000) is fine for shape/ranking. ──
@@ -110,6 +172,7 @@ export async function computeCompetitionHealth(
     .eq('active', true)
     .limit(1000);
   const rows = sample || [];
+  base.openNoticeSample = { rows: rows.length, of: activeOpps, complete: rows.length >= activeOpps };
   const saTally: Record<string, number> = {};
   const naicsTally: Record<string, number> = {};
   for (const r of rows) {
@@ -127,79 +190,74 @@ export async function computeCompetitionHealth(
   };
 
   // ── 2) awarded set-aside mix (the AWARD record — stronger than open notices) ──
-  // recompete_opportunities.set_aside_enriched is filled on ~51k rows; match the agency by keyword
-  // (awarding_agency stores full names, e.g. "VETERANS AFFAIRS, DEPARTMENT OF").
-  const kw = AG.split(',')[0].trim(); // "VETERANS AFFAIRS" from "VETERANS AFFAIRS, DEPARTMENT OF"
-  const { data: awarded, error: awErr } = await supabase
-    .from('recompete_opportunities')
-    .select('set_aside_enriched')
-    .not('set_aside_enriched', 'is', null)
-    .ilike('awarding_agency', `%${kw}%`)
-    .limit(4000);
-  if (!awErr && awarded) {
-    const t: Record<string, number> = {};
-    for (const r of awarded as { set_aside_enriched: string | null }[]) {
-      const c = (r.set_aside_enriched || '').trim();
-      if (c) t[c] = (t[c] || 0) + 1;
-    }
-    base.awardedSetAsideMix = Object.entries(t).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([label, count]) => ({ label, count }));
-  }
-  // awErr is non-fatal — the open-notice metrics still ship; the awarded mix is a bonus.
-
-  // ── 3) THE AWARD RECORD — who won, from the enriched awardee fields (PR #1062 backfill) ──
-  //    ⚠️ Window on `posted_date` (clean), NOT `award_date`: the awardee backfill left `award_date`
-  //    with parse-garbage (year 2260, future dates) on many rows. posted_date is the notice-posting
-  //    date and a reliable proxy for "recently awarded". awardee_name is empty on ~0.4% (the guard
-  //    dropped empty-string names) — filter those out so a blank never counts as a winner.
-  const winSince = new Date(Date.now() - windowDays * 86400_000).toISOString();
-  const { data: awards, error: awdErr } = await supabase
-    .from('sam_opportunities')
-    .select('awardee_name, award_amount')
-    .eq('department', AG)
-    .eq('notice_type', 'Award Notice')
-    .neq('awardee_name', '')
-    .not('awardee_name', 'is', null)
-    .gte('posted_date', winSince)
-    .limit(4000);
-  if (!awdErr && awards) {
-    const byVendor: Record<string, { total: number; awards: number }> = {};
-    for (const a of awards as { awardee_name: string | null; award_amount: string | number | null }[]) {
-      const name = (a.awardee_name || '').trim();
-      if (!name) continue;
-      const amt = Number(a.award_amount) || 0;
-      const v = (byVendor[name] ||= { total: 0, awards: 0 });
-      v.total += amt;
-      v.awards += 1;
-    }
-    const ranked = Object.entries(byVendor).sort((x, y) => y[1].total - x[1].total);
-    const totalDollars = ranked.reduce((s, [, v]) => s + v.total, 0);
-    const top3Dollars = ranked.slice(0, 3).reduce((s, [, v]) => s + v.total, 0);
-    base.winners = {
-      awardsWithAwardee: awards.length,
-      distinctWinners: ranked.length,
-      topWinners: ranked.slice(0, 6).map(([name, v]) => ({ name, total: v.total, awards: v.awards })),
-      // first-time vendors computed below (needs a per-vendor prior-award check — bounded to the top set)
-      firstTimeVendors: null,
-      concentrationPct: totalDollars > 0 ? Math.round((top3Dollars / totalDollars) * 1000) / 10 : null,
+  // Canonical agency identity, EXACT match — never a keyword ILIKE. `awarding_agency` stores the
+  // USASpending toptier name ("Department of Defense"); service branches live in
+  // `awarding_sub_agency`. An unresolvable agency is refused (null + note), not guessed.
+  // Exact per-category head-counts (the OBS-002 method), not a row pull capped at 1,000.
+  const ident = resolveAgencyIdentity(AG);
+  if (!ident.resolved) {
+    base.awardedSetAside = { identity: null, total: null, note: `Can't confidently map "${AG}" to a USASpending agency, so the awarded mix is withheld rather than risk counting another buyer's awards.` };
+  } else {
+    const col = ident.tier === 'subtier' ? 'awarding_sub_agency' : 'awarding_agency';
+    const headAw = (label?: string) => {
+      let q = supabase.from('recompete_opportunities').select('*', { count: 'exact', head: true }).eq(col, ident.name);
+      q = label ? q.eq('set_aside_enriched', label) : q.not('set_aside_enriched', 'is', null);
+      return q;
     };
-
-    // First-time vendors: of the top winners this window, how many have NO award at this agency
-    // BEFORE the window? Bounded to the top ~15 (a head-count each; a full-population scan would be
-    // heavy). This is a real "is the supplier base broadening?" signal, honestly scoped.
-    const topForCheck = ranked.slice(0, 15).map(([name]) => name);
-    if (topForCheck.length > 0) {
-      const checks = await Promise.all(topForCheck.map((name) =>
-        supabase.from('sam_opportunities').select('*', { count: 'exact', head: true })
-          .eq('department', AG).eq('notice_type', 'Award Notice').eq('awardee_name', name).lt('posted_date', winSince)
-          .then((r) => ({ name, prior: r.error ? null : (r.count ?? 0) })),
-      ));
-      const firstTime = checks.filter((c) => c.prior === 0).length;
-      const measurable = checks.filter((c) => c.prior != null).length;
-      // Only report if we actually measured (a query error on all → leave null, disclosed).
-      base.winners.firstTimeVendors = measurable > 0 ? firstTime : null;
+    const [totRes, ...catRes] = await Promise.all([headAw(), ...AWARDED_SETASIDE_LABELS.map((l) => headAw(l))]);
+    const failed = [totRes, ...catRes].find((r) => r.error || r.count == null);
+    if (failed) {
+      base.awardedSetAside = { identity: { name: ident.name, tier: ident.tier }, total: null, note: `awarded set-aside counts unavailable: ${failed.error?.message ?? 'null count'}` };
+    } else {
+      const total = totRes.count as number;
+      const mix = AWARDED_SETASIDE_LABELS.map((label, i) => ({ label, count: catRes[i].count as number })).filter((m) => m.count > 0);
+      const other = total - mix.reduce((acc, m) => acc + m.count, 0);
+      if (other > 0) mix.push({ label: 'Other', count: other });
+      base.awardedSetAsideMix = mix.sort((a, b) => b.count - a.count);
+      base.awardedSetAside = {
+        identity: { name: ident.name, tier: ident.tier },
+        total,
+        note: total === 0 ? `No enriched award set-aside records for ${ident.name}.` : null,
+      };
     }
   }
-  // awdErr is non-fatal — participation/mix/coverage still ship; the award record is additive.
+
+  // ── 3) SUPPLIER-BASE BREADTH — who won, over the WHOLE window population (DB-side aggregate) ──
+  //    competition_health_winners (migration 20261006) returns ONE row: no page to truncate. The old
+  //    `.limit(4000)` pull was silently capped at 1,000 rows. On failure (incl. the function not yet
+  //    applied) every figure is null + the error is surfaced — there is no capped-fetch fallback.
+  const winners = emptyWinners(windowDays, nowMs);
+  const { data: wData, error: wErr } = await supabase.rpc('competition_health_winners', {
+    p_department: AG, p_since: winners.window.since, p_until: winners.window.until, p_top: 6,
+  });
+  const wRow = (Array.isArray(wData) ? wData[0] : wData) as WinnersRow | null | undefined;
+  if (wErr || !wRow) {
+    base.winners = { ...winners, error: `supplier-breadth aggregate unavailable: ${wErr?.message ?? 'no row returned'}` };
+  } else {
+    const num = (v: number | string | null | undefined) => (v == null ? 0 : Number(v));
+    const total = num(wRow.total_dollars);
+    const lookbackStart = wRow.lookback_start;
+    const lookbackDays = lookbackStart
+      ? Math.max(0, Math.floor((Date.parse(winners.window.since) - Date.parse(lookbackStart)) / 86400_000))
+      : null;
+    base.winners = {
+      ...winners,
+      awardsWithAwardee: num(wRow.awards),
+      distinctWinners: num(wRow.distinct_winners),
+      awardsWithAmount: num(wRow.awards_with_amount),
+      topWinners: (wRow.top_winners || []).map((w) => ({ name: w.name, total: num(w.total), awards: num(w.awards) })),
+      firstTimeVendors: num(wRow.first_time_winners),
+      firstTime: {
+        lookbackStart,
+        lookbackDays,
+        historySufficient: lookbackDays != null && lookbackDays >= MIN_FIRST_TIME_LOOKBACK_DAYS,
+        definition: FIRST_TIME_DEFINITION,
+      },
+      concentrationPct: total > 0 ? Math.round((num(wRow.top3_dollars) / total) * 1000) / 10 : null,
+      complete: true,
+      error: null,
+    };
+  }
 
   // ── 4) COMPETITION DEPTH — avg bidders + single-bid rate (per-award detail endpoint, cached 24h). ──
   //    Best-effort + self-contained: a failure yields grounded:false (the dashboard shows "not enough
@@ -262,7 +320,7 @@ export function buildCompetitionPriorities(h: CompetitionHealth): { level: 'go' 
       out.push({
         level: 'watch',
         title: 'Many awards are drawing a single bidder',
-        body: `${cd.singleBidPct}% of your recent awards received 1 or fewer offers (avg ${cd.avgBidders} bidders across ${cd.sampledWithData} sampled). Under-competed markets cost more.`,
+        body: `${cd.singleBidPct}% of your recent awards received exactly one reported offer (avg ${cd.avgBidders} bidders across ${cd.sampledWithData} sampled). Under-competed markets cost more.`,
         rec: 'These are the markets to broaden outreach on — a Rule-of-Two set-aside or an industry day can pull in more bidders.',
       });
     } else if (cd.avgBidders != null && cd.avgBidders >= 3) {
@@ -277,7 +335,8 @@ export function buildCompetitionPriorities(h: CompetitionHealth): { level: 'go' 
 
   // Winner concentration — is the supplier base broad, or are a few firms winning everything?
   const w = h.winners;
-  if (w.distinctWinners >= 10 && w.concentrationPct != null) {
+  // Only over a COMPLETE population — a sampled or unavailable winner count never drives a call.
+  if (w.complete && w.distinctWinners != null && w.distinctWinners >= 10 && w.concentrationPct != null) {
     if (w.concentrationPct >= 60) {
       out.push({
         level: 'watch',
@@ -285,7 +344,9 @@ export function buildCompetitionPriorities(h: CompetitionHealth): { level: 'go' 
         body: `The top 3 winners captured ${w.concentrationPct}% of award dollars across ${w.distinctWinners.toLocaleString()} distinct winners this period.`,
         rec: 'A broad supplier base is healthier — check whether the concentrated markets are genuinely sole-capable or just under-marketed.',
       });
-    } else if (w.firstTimeVendors != null && w.firstTimeVendors >= 2) {
+    } else if (w.firstTime.historySufficient && w.firstTimeVendors != null && w.firstTimeVendors >= 2) {
+      // Gated on history: with < a year of record before the window, "first-time" mostly means
+      // "first time Mindy saw them", which cannot support a "broadening" claim.
       out.push({
         level: 'go',
         title: 'Your supplier base is broadening',

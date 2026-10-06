@@ -68,6 +68,23 @@ function resolveSubtier(agency: string): string | null {
   return SUBTIER_BRANCHES[agency.trim().toUpperCase()] ?? null;
 }
 
+/**
+ * CANONICAL AGENCY IDENTITY — the one resolver every Competition Health card uses to name a buyer
+ * in USASpending-shaped data (the per-award API AND `recompete_opportunities.awarding_agency` /
+ * `awarding_sub_agency`, which store the same USASpending names).
+ *
+ * Exported so the awarded set-aside mix stops keyword-matching. That keyword path took the SAM
+ * long-name prefix ("DEPT OF DEFENSE") and ran `awarding_agency ILIKE '%DEPT OF DEFENSE%'`, which
+ * matched 0 of the 24,617 enriched DoD rows stored as "Department of Defense" (measured 2026-10-06).
+ * `resolved:false` means: refuse, do not guess.
+ */
+export function resolveAgencyIdentity(agency: string): { name: string; tier: 'toptier' | 'subtier'; resolved: boolean } {
+  const subtier = resolveSubtier(agency);
+  if (subtier) return { name: subtier, tier: 'subtier', resolved: true };
+  const t = resolveToptier(agency);
+  return { name: t.name, tier: 'toptier', resolved: t.resolved };
+}
+
 // Resolve a SAM long-form name to the USASpending toptier name.
 // `resolved` is TRUE only when we KNOW the mapping (a dictionary hit or the "X, DEPARTMENT OF"
 // pattern). An unmapped agency yields resolved:FALSE — the caller must NOT sample it, because a
@@ -101,8 +118,12 @@ export interface CompetitionDepth {
   sampledWithData: number;   // of those, how many carried a real offers count (denominator)
   avgBidders: number | null; // mean offers received (null when not grounded)
   medianBidders: number | null;
-  singleBidCount: number;    // awards with ≤1 offer
+  singleBidCount: number;    // awards with EXACTLY one reported offer (OBS-009 v1.1)
   singleBidPct: number | null; // % single-bid — the "under-competed" signal
+  /** 95% CI on singleBidPct, in percent, clamped to [0,100]. Null when not grounded. */
+  singleBidCi: { low: number; high: number } | null;
+  /** How the sample was drawn — stated so nobody mistakes it for a random or full-history sample. */
+  sampleOrder: string;
   /** How much weight this number should carry. NOT the same as MIN_SAMPLE (see above). */
   strength: EvidenceStrength;
   /** 95% CI half-width on singleBidPct, in points — why we do not print a decimal. */
@@ -113,6 +134,30 @@ export interface CompetitionDepth {
 }
 
 const MIN_SAMPLE = 12; // below this, the average isn't meaningful — say so, don't fake it.
+
+/**
+ * SAMPLE ORDER — explicit, recent-first. Before 2026-10-06 the search used `sort: 'Award ID'` with
+ * no `order`, so the "recent awards" were really the highest Award-ID strings in the window: neither
+ * random nor recent. Base Obligation Date desc is the newest awards first (verified sortable live).
+ */
+const SAMPLE_SORT_FIELD = 'Base Obligation Date';
+const SAMPLE_ORDER_LABEL = 'most recent base obligation date first (last 365 days)';
+
+/**
+ * Cache-key version. The OBS-009 semantics changed in v2 (exactly one offer; zero/missing
+ * excluded; recency ordering), so v1 entries — computed as "≤1 offer" over an Award-ID-ordered
+ * sample — must NOT be served for their remaining 24h. Bumping orphans them; the cost is at most
+ * one USASpending sample per agency, fetched on that agency's next view.
+ */
+const DEPTH_SEMANTICS_VERSION = 2;
+
+/** 95% CI bounds on a proportion (normal approximation, matching marginOfErrorPct), clamped. */
+export function proportionCi(pct: number | null, n: number): { low: number; high: number } | null {
+  const moe = marginOfErrorPct(pct, n);
+  if (pct == null || moe == null) return null;
+  const clamp = (x: number) => Math.round(Math.min(100, Math.max(0, x)) * 10) / 10;
+  return { low: clamp(pct - moe), high: clamp(pct + moe) };
+}
 
 /**
  * EVIDENCE STRENGTH — separate from MIN_SAMPLE, on purpose.
@@ -184,7 +229,7 @@ export async function computeCompetitionDepth(
   const empty = (note: string, resolvedAgency: string | null = null): CompetitionDepth => ({
     agency: AG, scope: { naics: naics ?? null, state: state ?? null },
     resolvedAgency, grounded: false, sampled: 0, sampledWithData: 0,
-    avgBidders: null, medianBidders: null, singleBidCount: 0, singleBidPct: null, strength: 'insufficient' as EvidenceStrength, singleBidMoe: null, singleBidPlain: null, note,
+    avgBidders: null, medianBidders: null, singleBidCount: 0, singleBidPct: null, singleBidCi: null, sampleOrder: SAMPLE_ORDER_LABEL, strength: 'insufficient' as EvidenceStrength, singleBidMoe: null, singleBidPlain: null, note,
   });
 
   // ⚠️ PROVE THE BUYER before sampling. If we can't confidently map the SAM long-name to a
@@ -205,7 +250,7 @@ export async function computeCompetitionDepth(
       // re-triggers a USASpending fetch storm. It's an internal string, never user-visible. The
       // DATA is USASpending (see file header); this legacy key name does NOT imply an FPDS source.
       'fpds_competition_depth',
-      { agency: AG, sampleSize, naics: naics ?? '', state: state ?? '' },
+      { agency: AG, sampleSize, naics: naics ?? '', state: state ?? '', v: DEPTH_SEMANTICS_VERSION },
       24 * 3600,
       async () => {
         // 1) recent awards for this agency (ids only) — filtered to the RESOLVED toptier name.
@@ -228,9 +273,10 @@ export async function computeCompetitionDepth(
               ...(naics ? { naics_codes: [naics] } : {}),
               ...(state ? { place_of_performance_locations: [{ country: 'USA', state }] } : {}),
             },
-            fields: ['Award ID'],
+            fields: ['Award ID', SAMPLE_SORT_FIELD],
             limit: Math.min(Math.max(sampleSize, 20), 100),
-            sort: 'Award ID',
+            sort: SAMPLE_SORT_FIELD,
+            order: 'desc',
           }),
         });
         if (!searchRes.ok) return empty(`USASpending search returned ${searchRes.status}`, toptier);
@@ -248,7 +294,10 @@ export async function computeCompetitionDepth(
               .then((d) => {
                 const n = d?.latest_transaction_contract_data?.number_of_offers_received;
                 const v = n == null || n === '' ? null : Number(n);
-                return v != null && isFinite(v) && v >= 0 ? v : null;
+                // OBS-009 v1.1: a REPORTED offer count is >= 1. Zero is not a competed award with
+                // no bidders — it is a non-report (an award cannot be made on zero offers), so it
+                // is excluded from numerator AND denominator, exactly like a missing field.
+                return v != null && isFinite(v) && v >= 1 ? v : null;
               })
               .catch(() => null),
           ));
@@ -262,7 +311,7 @@ export async function computeCompetitionDepth(
           // real counts (`sampled`/`sampledWithData`) so the card can disclose "only N of M carried
           // offers", never a fabricated average.
           return {
-            ...empty(`Only ${withData} of ${sampled} sampled awards carried an offers count${naics ? ` for NAICS ${naics}` : ''}${state ? ` in ${state}` : ''} — too few to report a meaningful average. (IDVs and some SAP awards don't record offers.)`, toptier),
+            ...empty(`Only ${withData} of ${sampled} sampled awards carried a reported offer count${naics ? ` for NAICS ${naics}` : ''}${state ? ` in ${state}` : ''} — too few to report a meaningful average. (IDVs and some SAP awards don't record offers.)`, toptier),
             sampled,
             sampledWithData: withData,
           };
@@ -270,7 +319,8 @@ export async function computeCompetitionDepth(
         offers.sort((a, b) => a - b);
         const avg = Math.round((offers.reduce((s, x) => s + x, 0) / withData) * 10) / 10;
         const median = offers[Math.floor(withData / 2)];
-        const single = offers.filter((x) => x <= 1).length;
+        const single = offers.filter((x) => x === 1).length;
+        const singlePct = Math.round((single / withData) * 1000) / 10;
         const scopeLabel = [naics ? `NAICS ${naics}` : null, state || null]
           .filter(Boolean).join(', ');
         return {
@@ -283,11 +333,13 @@ export async function computeCompetitionDepth(
           avgBidders: avg,
           medianBidders: median,
           singleBidCount: single,
-          singleBidPct: Math.round((single / withData) * 1000) / 10,
+          singleBidPct: singlePct,
+          singleBidCi: proportionCi(singlePct, withData),
+          sampleOrder: SAMPLE_ORDER_LABEL,
           strength: evidenceStrength(withData),
-          singleBidMoe: marginOfErrorPct(Math.round((single / withData) * 1000) / 10, withData),
-          singleBidPlain: plainRate(Math.round((single / withData) * 1000) / 10),
-          note: `Sampled ${withData} of ${sampled} recent ${toptier}${scopeLabel ? ` (${scopeLabel})` : ''} awards that carried an offers count. IDVs/SAP awards without an offers field are excluded, not counted as zero.`,
+          singleBidMoe: marginOfErrorPct(singlePct, withData),
+          singleBidPlain: plainRate(singlePct),
+          note: `Sampled ${withData} of ${sampled} ${toptier}${scopeLabel ? ` (${scopeLabel})` : ''} awards (${SAMPLE_ORDER_LABEL}) that reported at least one offer. Single-bid = exactly one reported offer. Awards with no offer field (IDVs, some SAP) or a reported 0 are excluded from both numerator and denominator, never counted as zero.`,
         };
       },
     );

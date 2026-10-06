@@ -15,12 +15,17 @@ interface Health {
   agency: string; windowDays: number; grounded: boolean;
   smallBizParticipation: { activeOpps: number; withSetAside: number; pct: number | null };
   setAsideMix: { label: string; count: number }[];
+  openNoticeSample: { rows: number; of: number; complete: boolean };
   awardedSetAsideMix: { label: string; count: number }[];
+  awardedSetAside: { identity: { name: string; tier: 'toptier' | 'subtier' } | null; total: number | null; note: string | null };
   marketCoverage: { distinctNaics: number; topNaics: { naics: string; opps: number }[] };
   winners: {
-    awardsWithAwardee: number; distinctWinners: number;
+    window: { since: string; until: string; days: number; basis: string };
+    awardsWithAwardee: number | null; distinctWinners: number | null; awardsWithAmount: number | null;
     topWinners: { name: string; total: number; awards: number }[];
-    firstTimeVendors: number | null; concentrationPct: number | null;
+    firstTimeVendors: number | null;
+    firstTime: { lookbackStart: string | null; lookbackDays: number | null; historySufficient: boolean; definition: string };
+    concentrationPct: number | null; complete: boolean; error: string | null;
   };
   competitionDepth: {
     resolvedAgency: string | null; grounded: boolean; sampled: number; sampledWithData: number;
@@ -28,6 +33,7 @@ interface Health {
     singleBidCount: number; singleBidPct: number | null; note: string;
     strength: 'insufficient' | 'limited' | 'sampled' | 'strong';
     singleBidMoe: number | null; singleBidPlain: string | null;
+    singleBidCi: { low: number; high: number } | null; sampleOrder: string;
   };
   notYetMeasurable: { metric: string; needs: string }[];
 }
@@ -188,19 +194,30 @@ export default function CompetitionHealthDashboard() {
                 <Provenance kind="exact" />
               </div>
               <div style={{ fontSize: 13, color: '#94a3b8' }}>
-                <b style={{ color: '#e2e8f0' }}>{sb?.withSetAside.toLocaleString()}</b> of <b style={{ color: '#e2e8f0' }}>{sb?.activeOpps.toLocaleString()}</b> active solicitations carry a set-aside · buying across <b style={{ color: '#e2e8f0' }}>{h.marketCoverage.distinctNaics}</b> NAICS.
+                <b style={{ color: '#e2e8f0' }}>{sb?.withSetAside.toLocaleString()}</b> of <b style={{ color: '#e2e8f0' }}>{sb?.activeOpps.toLocaleString()}</b> active solicitations carry a set-aside.
               </div>
               {h.setAsideMix.length > 0 && (
                 <div style={{ marginTop: 14 }}>
                   <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.04em', color: '#64748b', marginBottom: 8 }}>Set-aside mix · open notices</div>
+                  {/* The mix (and NAICS coverage) come from a bounded row pull. Say so: the % above is
+                      exact, this breakdown is not. */}
+                  {!h.openNoticeSample.complete && (
+                    <div style={{ marginBottom: 8 }}><Provenance kind="sampled" n={h.openNoticeSample.rows} of={h.openNoticeSample.of} unit="active notices (unordered, not the population)" /></div>
+                  )}
                   {h.setAsideMix.map((m) => <MixRow key={m.label} label={m.label} count={m.count} max={mixMax} color="#6366f1" />)}
                 </div>
               )}
             </Card>
 
             <Card title="Award record · who actually won" sub="Set-aside mix from the recompete/award record (set_aside_enriched) — stronger signal than open notices.">
+              {h.awardedSetAside.identity && (
+                <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 10 }}>
+                  Matched exactly to <b style={{ color: '#e2e8f0' }}>{h.awardedSetAside.identity.name}</b>
+                  {h.awardedSetAside.total != null && <> · {h.awardedSetAside.total.toLocaleString()} enriched awards</>}
+                </div>
+              )}
               {h.awardedSetAsideMix.length === 0 ? (
-                <div style={{ padding: '18px 4px', fontSize: 13, color: '#64748b' }}>No enriched award set-aside data for this agency yet.</div>
+                <div style={{ padding: '18px 4px', fontSize: 13, color: '#64748b' }}>{h.awardedSetAside.note ?? 'No enriched award set-aside data for this agency.'}</div>
               ) : (
                 <div>
                   {h.awardedSetAsideMix.map((m) => <MixRow key={m.label} label={m.label} count={m.count} max={awMax} color="#3ecf8e" />)}
@@ -215,6 +232,9 @@ export default function CompetitionHealthDashboard() {
           {/* MARKET COVERAGE */}
           {h.marketCoverage.topNaics.length > 0 && (
             <Card title="Market coverage · where the buying concentrates" sub="Top NAICS by active-solicitation volume — is competition spread, or piled into a few codes?">
+              <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 8 }}>
+                {h.marketCoverage.distinctNaics} NAICS seen{!h.openNoticeSample.complete && <> in a {h.openNoticeSample.rows.toLocaleString()}-row sample of {h.openNoticeSample.of.toLocaleString()} active notices (a lower bound, not the population)</>}.
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                 {h.marketCoverage.topNaics.map((n, i) => (
                   <div key={n.naics} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderBottom: i < h.marketCoverage.topNaics.length - 1 ? '1px solid #1e293b' : 'none', fontSize: 13 }}>
@@ -230,32 +250,46 @@ export default function CompetitionHealthDashboard() {
             </Card>
           )}
 
-          {/* WHO WON — the award record (awardee name + $ from PR #1062 backfill) */}
-          {h.winners.distinctWinners > 0 && (
-            <Card title="Who won · the award record" sub={`Recent winners at this buyer — name + $ from the award notices. ${h.winners.awardsWithAwardee.toLocaleString()} awards, ${h.winners.distinctWinners.toLocaleString()} distinct firms.`}>
-              {/* KPI strip */}
-              <div style={{ marginBottom: 8 }}><Provenance kind="exact" /></div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
-                <Kpi value={h.winners.distinctWinners.toLocaleString()} label="distinct winners" />
-                <Kpi value={h.winners.firstTimeVendors == null ? '—' : String(h.winners.firstTimeVendors)} label="first-time (top 15)" color="#3ecf8e" />
-                <Kpi value={h.winners.concentrationPct == null ? '—' : `${h.winners.concentrationPct}%`} label="top-3 share of $" color={h.winners.concentrationPct != null && h.winners.concentrationPct >= 60 ? '#e8b13a' : '#e2e8f0'} />
-              </div>
-              {/* top winners by $ */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                {h.winners.topWinners.map((w, i) => (
-                  <div key={w.name} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderBottom: i < h.winners.topWinners.length - 1 ? '1px solid #1e293b' : 'none', fontSize: 13 }}>
-                    <span style={{ width: 18, fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 12, color: '#64748b' }}>{i + 1}</span>
-                    <span style={{ flex: 1, color: '#cbd5e1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</span>
-                    {w.awards > 1 && <span style={{ fontSize: 11, color: '#64748b' }}>{w.awards} awards</span>}
-                    <span style={{ width: 76, textAlign: 'right', color: '#e2e8f0', fontWeight: 600, fontSize: 12.5, fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(w.total)}</span>
+          {/* WHO WON — supplier-base breadth over the WHOLE window (DB aggregate, migration 20261006).
+              No "Exact" chip: the previous card claimed one while computing from a capped 1,000-row
+              slice (712 shown vs 4,763 real for DoD). It stays off until the population calculation
+              is verified in production. */}
+          <Card title="Who won · supplier-base breadth" sub={`Award notices posted ${fmtDate(h.winners.window.since)} – ${fmtDate(h.winners.window.until)} (${h.winners.window.days} days, by ${h.winners.window.basis}). Winner = distinct awardee name.`}>
+            {h.winners.error ? (
+              <div style={{ padding: '14px 4px', fontSize: 13, color: '#64748b' }}>Not available: {h.winners.error}. Shown as unknown, never as zero.</div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+                  <Kpi value={h.winners.distinctWinners == null ? '—' : h.winners.distinctWinners.toLocaleString()} label={`distinct winners · ${h.winners.awardsWithAwardee?.toLocaleString() ?? '—'} awards`} />
+                  <Kpi
+                    value={h.winners.firstTimeVendors == null ? '—' : h.winners.firstTimeVendors.toLocaleString()}
+                    label={h.winners.firstTime.historySufficient ? 'first-time winners' : 'not seen before (history too short)'}
+                    color={h.winners.firstTime.historySufficient ? '#3ecf8e' : '#64748b'}
+                  />
+                  <Kpi value={h.winners.concentrationPct == null ? '—' : `${h.winners.concentrationPct}%`} label={`top-3 share of $ · ${h.winners.awardsWithAmount?.toLocaleString() ?? '—'} with amounts`} color={h.winners.concentrationPct != null && h.winners.concentrationPct >= 60 ? '#e8b13a' : '#e2e8f0'} />
+                </div>
+                {!h.winners.firstTime.historySufficient && (
+                  <div style={{ fontSize: 12, color: '#94a3b8', background: 'rgba(148,163,184,.06)', border: '1px solid #1e293b', borderRadius: 8, padding: '8px 11px', marginBottom: 12 }}>
+                    Mindy&apos;s award record for this agency starts {h.winners.firstTime.lookbackStart ? fmtDate(h.winners.firstTime.lookbackStart) : 'at an unknown date'}
+                    {h.winners.firstTime.lookbackDays != null && <> ({h.winners.firstTime.lookbackDays} days before this window)</>}. That is too little history to call a winner &quot;first-time&quot;; most of these are firms the record had not seen yet. {h.winners.firstTime.definition}
                   </div>
-                ))}
-              </div>
-              <div style={{ fontSize: 12, color: '#64748b', marginTop: 10, paddingTop: 9, borderTop: '1px solid #1e293b' }}>
-                Windowed on notice posting date (the award-date field has parse errors in the source backfill). Amounts as reported on the award notice.
-              </div>
-            </Card>
-          )}
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                  {h.winners.topWinners.map((w, i) => (
+                    <div key={w.name} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderBottom: i < h.winners.topWinners.length - 1 ? '1px solid #1e293b' : 'none', fontSize: 13 }}>
+                      <span style={{ width: 18, fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 12, color: '#64748b' }}>{i + 1}</span>
+                      <span style={{ flex: 1, color: '#cbd5e1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</span>
+                      {w.awards > 1 && <span style={{ fontSize: 11, color: '#64748b' }}>{w.awards} awards</span>}
+                      <span style={{ width: 76, textAlign: 'right', color: '#e2e8f0', fontWeight: 600, fontSize: 12.5, fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(w.total)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 10, paddingTop: 9, borderTop: '1px solid #1e293b' }}>
+                  Windowed on notice posting date (the award-date field has parse errors in the source backfill). Amounts as reported on the award notice. Exact-name identity: case variants of one firm count separately.
+                </div>
+              </>
+            )}
+          </Card>
 
           {/* COMPETITION DEPTH — NOW LIVE (avg bidders + single-bid rate from the award detail endpoint) */}
           <Card title="Competition depth · average bidders" sub="How many firms actually bid on this buyer's awards — the marquee competition metric. Sampled from the award record.">
@@ -282,23 +316,25 @@ export default function CompetitionHealthDashboard() {
                     {h.competitionDepth.singleBidPlain ?? '—'}
                   </div>
                   <div style={{ fontSize: 13.5, color: '#cbd5e1', marginTop: 3 }}>
-                    of sampled recent awards received one or fewer offers
+                    of sampled recent awards received exactly one reported offer
                   </div>
                   <div style={{ fontSize: 12, color: '#64748b', marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>
                     Observed single-bid rate: <b style={{ color: '#94a3b8' }}>{h.competitionDepth.singleBidPct == null ? '—' : `${Math.round(h.competitionDepth.singleBidPct)}%`}</b>
                     {' '}(n={h.competitionDepth.sampledWithData}
-                    {h.competitionDepth.singleBidMoe != null ? `, \u00b1${Math.round(h.competitionDepth.singleBidMoe)} pts` : ''})
+                    {h.competitionDepth.singleBidMoe != null ? `, \u00b1${Math.round(h.competitionDepth.singleBidMoe)} pts` : ''}
+                    {h.competitionDepth.singleBidCi ? `, 95% CI ${Math.round(h.competitionDepth.singleBidCi.low)}\u2013${Math.round(h.competitionDepth.singleBidCi.high)}%` : ''})
                     {' · '}
                     <b style={{ color: '#94a3b8' }}>~{h.competitionDepth.avgBidders}</b> average offers
                     {' · '}median <b style={{ color: '#94a3b8' }}>{h.competitionDepth.medianBidders}</b>
                   </div>
                   <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>
                     <Provenance kind="sampled" n={h.competitionDepth.sampledWithData} strength={h.competitionDepth.strength} of={h.competitionDepth.sampled} />
+                    {h.competitionDepth.sampleOrder && <span style={{ marginLeft: 8 }}>Sample: {h.competitionDepth.sampleOrder}.</span>}
                   </div>
                 </div>
                 {h.competitionDepth.singleBidPct != null && h.competitionDepth.singleBidPct >= 40 && (
                   <div style={{ fontSize: 13, color: '#e2e8f0', background: 'rgba(232,177,58,.10)', border: '1px solid rgba(232,177,58,.24)', borderRadius: 9, padding: '10px 13px', marginBottom: 10 }}>
-                    <b style={{ color: '#e8b13a' }}>Roughly {Math.round(h.competitionDepth.singleBidPct)}% of sampled awards drew ≤1 bidder.</b> These are under-competed markets — the ones where broadening outreach (Rule-of-Two set-asides, industry days) most improves price and participation.
+                    <b style={{ color: '#e8b13a' }}>Roughly {Math.round(h.competitionDepth.singleBidPct)}% of sampled awards drew exactly one reported offer.</b> These are under-competed markets — the ones where broadening outreach (Rule-of-Two set-asides, industry days) most improves price and participation.
                   </div>
                 )}
                 <div style={{ fontSize: 12, color: '#64748b', paddingTop: 4 }}>{h.competitionDepth.note}</div>
@@ -356,6 +392,7 @@ function MixRow({ label, count, max, color }: { label: string; count: number; ma
     </div>
   );
 }
+const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 const fmtMoney = (n: number) => {
   if (!n) return '—';
   if (n >= 1e9) return `$${(n / 1e9).toFixed(n / 1e9 >= 100 ? 0 : 1)}B`;
@@ -377,11 +414,12 @@ const fmtMoney = (n: number) => {
  * floor (below it we do not report at all); this is "given that we can report, how strong
  * is the evidence" — a sample can be valid enough to observe and still too thin to headline.
  */
-function Provenance({ kind, n, of, strength }: {
+function Provenance({ kind, n, of, strength, unit = 'with offer counts' }: {
   kind: 'exact' | 'sampled';
   n?: number;
   of?: number;
   strength?: 'insufficient' | 'limited' | 'sampled' | 'strong';
+  unit?: string;
 }) {
   const LABEL: Record<string, string> = {
     insufficient: 'Insufficient evidence',
@@ -400,7 +438,7 @@ function Provenance({ kind, n, of, strength }: {
       {head}
       {kind === 'sampled' && n != null && (
         <span style={{ color: '#94a3b8', fontWeight: 600, textTransform: 'none', letterSpacing: 0, fontVariantNumeric: 'tabular-nums' }}>
-          n={n}{of != null ? ` of ${of}` : ''} with offer counts
+          n={n.toLocaleString()}{of != null ? ` of ${of.toLocaleString()}` : ''} {unit}
         </span>
       )}
     </span>
