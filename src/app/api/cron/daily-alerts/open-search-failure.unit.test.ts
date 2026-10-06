@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 /**
@@ -68,12 +68,22 @@ function fakeClient() {
   return {
     from(table: string) {
       let write: string | null = null;
+      const filters: Array<[string, unknown[]]> = [];
+
       let payload: unknown = null;
       const result = () => {
         if (write) {
           const rows = (Array.isArray(payload) ? payload : [payload]).filter(Boolean) as Row[];
           if (table === 'alert_log' && (write === 'upsert' || write === 'insert')) {
-            for (const r of rows) ALERT_LOG.set(logKey(r), { ...(ALERT_LOG.get(logKey(r)) || {}), ...r });
+            for (const r of rows) {
+              const prev = ALERT_LOG.get(logKey(r));
+              ALERT_LOG.set(logKey(r), { ...(prev || {}), ...r, id: prev?.id ?? `al-${logKey(r)}` });
+            }
+          }
+          // The cross-day retry job writes with .update(...).eq('id', ...) — apply it like Postgres would.
+          if (table === 'alert_log' && write === 'update') {
+            const id = filters.find(([m, a]) => m === 'eq' && a[0] === 'id')?.[1][1];
+            for (const [k, r] of ALERT_LOG) if (r.id === id) ALERT_LOG.set(k, { ...r, ...(payload as Row) });
           }
           return { data: rows, error: null, count: rows.length };
         }
@@ -84,13 +94,28 @@ function fakeClient() {
           return { data: d, error: null, count: d.length };
         }
         if (table === 'user_notification_settings') return { data: [{ ...USER_ROW, ...USER_OVERRIDES }], error: null, count: 1 };
-        if (table === 'alert_log') { const d = [...ALERT_LOG.values()]; return { data: d, error: null, count: d.length }; }
+        if (table === 'alert_log') {
+          const d = [...ALERT_LOG.values()].filter((r) => filters.every(([m, a]) => {
+            const [col, val] = a as [string, unknown];
+            if (m === 'eq') return r[col] === undefined || r[col] === val;
+            if (m === 'gte') return r[col] === undefined || String(r[col]) >= String(val);
+            if (m === 'lt') return r[col] === undefined || (typeof val === 'number' ? Number(r[col] ?? 0) < val : String(r[col]) < String(val));
+            if (m === 'in') return r[col] === undefined || (val as unknown[]).includes(r[col]);
+            return true;
+          }));
+          return { data: d, error: null, count: d.length };
+        }
         return { data: [], error: null, count: 0 };
       };
       let ranged = false;
       const b: Record<string, unknown> = {};
       const self = () => b;
-      for (const m of ['eq', 'neq', 'or', 'gte', 'lte', 'gt', 'lt', 'in', 'is', 'not', 'like', 'ilike', 'order', 'contains', 'overlaps', 'filter', 'match', 'textSearch', 'limit', 'select']) b[m] = self;
+      // alert_log honours the filters the job actually applies (eq / gte / in), so a run on a LATER
+      // day does not see an earlier day's row as "already processed today". Other tables ignore them.
+      for (const m of ['eq', 'neq', 'or', 'gte', 'lte', 'gt', 'lt', 'in', 'is', 'not', 'like', 'ilike', 'order', 'contains', 'overlaps', 'filter', 'match', 'textSearch', 'limit', 'select']) {
+        b[m] = (...args: unknown[]) => { filters.push([m, args]); return b; };
+      }
+      void self;
       // fetchAllPaged pages with .range(); the fake returns everything on the first page only.
       b.range = (a: number) => { ranged = true; if (a > 0) { write = null; (b as { _empty?: boolean })._empty = true; } return b; };
       for (const op of ['insert', 'update', 'upsert', 'delete']) b[op] = (p?: unknown) => { write = op; payload = p ?? null; return b; };
@@ -129,10 +154,17 @@ vi.mock('@/lib/alerts/coming-back-to-market', async (orig) => ({
   ...(await orig<typeof import('@/lib/alerts/coming-back-to-market')>()),
   loadComingBackSection: async () => COMING_BACK,
 }));
-vi.mock('@/lib/alerts/retry-failed-daily', async (orig) => ({
-  ...(await orig<typeof import('@/lib/alerts/retry-failed-daily')>()),
-  retryFailedDailyAlerts: async () => ({ retried: 0, succeeded: 0, skipped: 0, failed: 0, skipReasons: {} }),
-}));
+/** When true, the REAL cross-day retry job runs at the start of each cron run (against the fake DB). */
+let USE_REAL_RETRY = false;
+vi.mock('@/lib/alerts/retry-failed-daily', async (orig) => {
+  const real = await orig<typeof import('@/lib/alerts/retry-failed-daily')>();
+  return {
+    ...real,
+    retryFailedDailyAlerts: async (...a: Parameters<typeof real.retryFailedDailyAlerts>) => (USE_REAL_RETRY
+      ? real.retryFailedDailyAlerts(...a)
+      : { retried: 0, succeeded: 0, skipped: 0, failed: 0, skipReasons: {} }),
+  };
+});
 vi.mock('@/lib/market/vault-eligibility', () => ({ loadVaultEligibility: async () => new Map() }));
 vi.mock('@/lib/tool-errors', async (orig) => ({ ...(await orig<typeof import('@/lib/tool-errors')>()), logToolError: async () => undefined }));
 vi.mock('@/lib/engagement', async (orig) => ({
@@ -306,5 +338,112 @@ describe('daily-alerts cron — Open stays unavailable after the same-day budget
     expect(SENT[0].html).toMatch(/Janitorial Services/);
     expect(SENT[0].html).not.toContain(PARTIAL_LINE);
     expect(todayRow()!.error_message ?? null).toBeNull();
+  });
+});
+
+/**
+ * PARTIAL-SEND DEDUPE, END TO END THROUGH THE REAL JOB (Eric, 2026-10-06): what "never repeats" means.
+ *
+ *   The EMAIL is never repeated: a partial send is a final 'sent' row for the day, so a same-day retry
+ *   sends nothing; the cross-day retry job only selects 'failed' rows (and skips the partial note —
+ *   proven in retry-failed-daily.unit.test.ts).
+ *   CONTENT is a different rule, and it is NOT changed by this repair: the 7-day dedupe reads only
+ *   noticeIds stored in alert_log.opportunities_data, and every send — normal or partial — stores only
+ *   Open rows there. Coming Back cards and grants are never recorded, so they can appear again the next
+ *   day, exactly as they do after a NORMAL send (control case below).
+ */
+describe('partial-send dedupe across days — the real job, three phases', () => {
+  const DAY1 = '2026-10-07';
+  const DAY2 = '2026-10-08';
+  const rowOn = (d: string) => ALERT_LOG.get(`${USER}|${d}|daily`);
+  const has = (html: string) => ({
+    open: /Janitorial Services — Federal Building/.test(html),
+    comingBack: /Acme Custodial LLC/.test(html),
+    grant: /Community Facilities Grant/.test(html),
+    unavailableLine: html.includes(PARTIAL_LINE),
+  });
+  const CB: Row = {
+    kind: 'show', matchedNaics: [], starterMarket: false,
+    rows: [{
+      contract_id: 'C-1', incumbent: 'Acme Custodial LLC', agency: 'GENERAL SERVICES ADMINISTRATION', naics: '561720', psc: 'S201',
+      value: 1200000, valueKind: 'obligated', obligated: 1200000, popEnd: future(200).slice(0, 10), leadMonths: 7,
+      window: 'lead_6_18', codeState: 'primary_confirmed', codeProvenance: 'test', censusTitle: 'Janitorial Services',
+      fit: 'prime', nuclearMo: false, why: 'Same NAICS as your profile',
+    }],
+  };
+
+  beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); USE_REAL_RETRY = true; });
+  afterEach(() => { vi.useRealTimers(); USE_REAL_RETRY = false; });
+
+  it('Day 1 partial (Coming Back + grant) → same-day retry sends nothing → Day 2 Open search runs and sends normally', async () => {
+    USER_OVERRIDES = { naics_codes: ['561720'] };
+    COMING_BACK = CB;
+    GRANTS = [GRANT];
+
+    // ── Day 1: Open fails on all three same-day attempts → ONE partial email ──
+    vi.setSystemTime(new Date(`${DAY1}T11:00:00Z`));
+    await run(); await run(); await run();
+    expect(SENT).toHaveLength(1);
+    expect(has(SENT[0].html)).toEqual({ open: false, comingBack: true, grant: true, unavailableLine: true });
+    expect(rowOn(DAY1)).toMatchObject({ delivery_status: 'sent' });
+    expect(String(rowOn(DAY1)!.error_message)).toMatch(/^open_unavailable_partial:57014 .*sections=coming_back,grants/);
+    expect(rowOn(DAY1)!.opportunities_data).toEqual([]); // nothing recorded for the 7-day dedupe
+
+    // ── Day 1, later run: the email is final for the day — no second send, no new search ──
+    const reads = SAM_READS;
+    const retry = await run();
+    expect(retry.message).toBe('All users already processed today');
+    expect(SENT).toHaveLength(1);
+    expect(SAM_READS).toBe(reads);
+
+    // ── Day 2: the Open search gets its next opportunity and succeeds ──
+    SAM_MODE = 'rows';
+    vi.setSystemTime(new Date(`${DAY2}T11:00:00Z`));
+    await run();
+    expect(SAM_READS).toBeGreaterThan(reads); // the search ran again
+    expect(SENT).toHaveLength(2);
+    // Day 2 = a normal email: the Open item, plus Coming Back and the grant AGAIN — unchanged
+    // existing content policy (neither is recorded by any send). No "could not be checked" line.
+    expect(has(SENT[1].html)).toEqual({ open: true, comingBack: true, grant: true, unavailableLine: false });
+    expect(rowOn(DAY2)).toMatchObject({ delivery_status: 'sent', error_message: null });
+    expect((rowOn(DAY2)!.opportunities_data as Row[]).map((o) => o.noticeId)).toEqual(['n-janitorial-1']);
+
+    // ── Day 2, later run: no duplicate of the successful send ──
+    const again = await run();
+    expect(again.message).toBe('All users already processed today');
+    expect(SENT).toHaveLength(2);
+  });
+
+  it('Day 1 nothing useful (no email, honest failure) → Day 2 the real retry job leaves it alone and the Open search runs and sends once', async () => {
+    vi.setSystemTime(new Date(`${DAY1}T11:00:00Z`));
+    await run(); await run(); await run();
+    expect(SENT).toHaveLength(0);
+    expect(rowOn(DAY1)).toMatchObject({ delivery_status: 'failed' });
+    const day1Row = { ...rowOn(DAY1)! };
+
+    SAM_MODE = 'rows';
+    vi.setSystemTime(new Date(`${DAY2}T11:00:00Z`));
+    await run();
+    expect(rowOn(DAY1)).toEqual(day1Row); // the retry job did not re-label or re-send Day 1's failure
+    expect(SENT).toHaveLength(1);
+    expect(has(SENT[0].html)).toMatchObject({ open: true, unavailableLine: false });
+    await run();
+    expect(SENT).toHaveLength(1); // no duplicate of the successful Day 2 send
+  });
+
+  it('control: after a NORMAL Day 1 send, Day 2 also repeats Coming Back and the grant — the content rule is not partial-specific', async () => {
+    USER_OVERRIDES = { naics_codes: ['561720'] };
+    COMING_BACK = CB;
+    GRANTS = [GRANT];
+    SAM_MODE = 'rows';
+    vi.setSystemTime(new Date(`${DAY1}T11:00:00Z`));
+    await run();
+    vi.setSystemTime(new Date(`${DAY2}T11:00:00Z`));
+    await run();
+    expect(SENT).toHaveLength(2);
+    expect(has(SENT[0].html)).toMatchObject({ open: true, comingBack: true, grant: true });
+    // Day 2: the Open item was recorded Day 1, so it is deduped out of the new list (it may only
+    // reappear through the existing "resurface active deadlines" fallback); Coming Back + grant repeat.
+    expect(has(SENT[1].html)).toMatchObject({ comingBack: true, grant: true });
   });
 });
