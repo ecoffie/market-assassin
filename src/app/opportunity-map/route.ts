@@ -18,6 +18,7 @@ import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from './account-
 import { SETTINGS_DRAWER_CSS, SETTINGS_DRAWER_HTML, SETTINGS_DRAWER_JS } from './settings-drawer';
 import { MARKET_FEEDBACK_CSS, MARKET_BOOT_HTML, MARKET_BOOT_APP_OPEN, MARKET_FEEDBACK_MAP_HTML, MARKET_FEEDBACK_JS } from './market-feedback';
 import { LAYOUT_MOVE_JS } from './layout-move';
+import { HIERARCHY_HORIZON_LIMIT_JS } from '@/lib/opportunities/hierarchy-sub-agency';
 
 export const dynamic = 'force-dynamic';
 
@@ -2251,6 +2252,8 @@ const VIEWPORT_JS = `<script>
     opts=opts||{}; var done=function(r){ try{ if(opts.done)opts.done(r); }catch(e){} };
     if(isContactMode(MODE)||typeof _buildOppUrl!=='function'){ done({ok:false,reason:'unavailable'}); return; }
     var H=window.__horizons||{open:true}, hz=(window.__mapMode==='dla')?['open']:['open','recompete','forecast'].filter(function(h){ return h==='open'?H.open!==false:!!H[h]; });
+    var _hl2=(window.__mapMode!=='dla'&&window.__hierarchyLimit)?window.__hierarchyLimit(FILT):null;
+    if(_hl2){ hz=hz.filter(function(h){ return _hl2.supported.indexOf(h)>-1; }); }
     var c0=map.getCenter(), z0=map.getZoom(), sig0=window.__mapIntentSig?window.__mapIntentSig():null;
     Promise.all(hz.map(function(h){ return fetch(_buildOppUrl(h,WORLD_BOX)).then(function(r){ return r.ok?r.json():null; }).catch(function(){ return null; }); }))
       .then(function(rs){
@@ -2895,6 +2898,13 @@ const VIEWPORT_JS = `<script>
     // a scope — forcing Awarded there painted the UNSCOPED Awarded market as the DLA map (integration
     // review, 2026-09-25). The scope stays in FILT and applies again when the user returns.
     if(window.__mapMode!=='dla'&&(FILT.vehicle||FILT.parent||FILT.work)){ _enabled=['recompete']; }
+    // A sub-agency SAM files below sub_tier (Marine Corps) is filterable ONLY on Open (the contracting
+    // office's Federal Hierarchy path, hierarchy-sub-agency.ts). Awarded and Forecast have no such
+    // identifier: Awarded would read 0 silently, Forecast would ignore the filter (all agencies). So
+    // fetch only the supported horizons and say so — never silently empty, never broadened to Navy.
+    var _hl=(window.__mapMode!=='dla'&&window.__hierarchyLimit)?window.__hierarchyLimit(FILT):null;
+    if(_hl){ _enabled=_enabled.filter(function(m){ return _hl.supported.indexOf(m)>-1; }); }
+    if(window.__renderHierarchyLimit)window.__renderHierarchyLimit(_hl);
     if(_enabled.length===0){ _fetchGen++; if(window.__mf)window.__mf.idle(); window.__roundEnabled=[]; OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; render(); return; }
     // Horizons no longer part of this view: their in-flight requests can never paint — abort them.
     ['open','recompete','forecast'].forEach(function(k){
@@ -11124,7 +11134,7 @@ export async function GET(request: NextRequest) {
     // LOGIN_MODAL_HTML has a latent unclosed <div>, so blocks parsed after it can nest inside a
     // hidden overlay. Its own HTML is div-balanced; the JS goes at the end with the other scripts.
     // MARKET_FEEDBACK_JS precedes VIEWPORT_JS so window.__mf exists before the first fetch round reports to it.
-    const bodyInject = MOBILE_HTML + SETTINGS_DRAWER_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + SETTINGS_DRAWER_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
+    const bodyInject = MOBILE_HTML + SETTINGS_DRAWER_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + SETTINGS_DRAWER_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Code→name for the State picker (50 states + DC). Already a shared constant — the Filters

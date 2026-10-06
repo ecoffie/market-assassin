@@ -55,6 +55,7 @@ import {
   type ForecastHorizonOutcome,
 } from '@/lib/saved-searches/forecast-discovery';
 import { decideSavedSearchAlert } from '@/lib/saved-searches/alert-decision';
+import { hierarchyFilterLimitations } from '@/lib/opportunities/hierarchy-sub-agency';
 import {
   evaluateForecastWatermark,
   readForecastSnapshot,
@@ -117,6 +118,10 @@ export type WatermarkColumns = 'absent' | 'present' | 'unknown';
  * search into a new corpus retroactively; that is a surprise alert, not a
  * feature.
  */
+function forecastFilterUnsupported(s: SavedSearch): boolean {
+  return hierarchyFilterLimitations((s.filters || {}) as Record<string, unknown>, ['forecast']).length > 0;
+}
+
 function wantsForecasts(s: SavedSearch): boolean {
   const h = (s.filters as Record<string, unknown>)?.horizons;
   if (h && typeof h === 'object') return (h as Record<string, unknown>).forecast === true;
@@ -238,8 +243,11 @@ async function evaluateSavedSearch(
   if (!isSavedSearchDueAt(s.alert_frequency, now)) return { skippedNotDue: 1 };
 
   const doOpen = s.mode === 'open';
-  const doForecast = wantsForecasts(s);
-  if (!doOpen && !doForecast) return {};
+  // A filter forecasts cannot represent (Marine Corps) withholds the Forecast half instead of running it
+  // with the filter silently dropped — that would email every agency's forecasts as this watch's market.
+  const forecastLimited = wantsForecasts(s) && forecastFilterUnsupported(s);
+  const doForecast = wantsForecasts(s) && !forecastLimited;
+  if (!doOpen && !doForecast) return forecastLimited ? { forecastCoverage: 'unsupported_filter' } : {};
 
   // STORED NAICS VALIDITY (2026-10-05). A code that is not Census 2022 matches nothing, so a search whose
   // codes are ALL unknown "succeeds" every day with zero results — indistinguishable from a quiet market.
@@ -557,11 +565,15 @@ export async function GET(request: NextRequest) {
     },
     evaluate: async (row) => {
       const counts = await evaluateSavedSearch(db, row, now, preview, previewRows, forecastEngine, watermarkColumns);
+      // A filter forecasts cannot represent (Marine Corps) is reported, never run unfiltered (#1840).
+      const withCoverage = wantsForecasts(row) && forecastFilterUnsupported(row) && !counts.forecastCoverage
+        ? { ...counts, forecastCoverage: 'unsupported_filter' as const }
+        : counts;
       // A search with SOME unknown NAICS still evaluates (its valid codes match); its unknown codes are reported
       // on every outcome so they are never silently tolerated.
-      if (counts.invalidNaics) return counts;
+      if (withCoverage.invalidNaics) return withCoverage;
       const { invalid } = storedNaicsValidity(row.filters);
-      return invalid.length ? { ...counts, invalidNaics: invalid } : counts;
+      return invalid.length ? { ...withCoverage, invalidNaics: invalid } : withCoverage;
     },
   });
 
