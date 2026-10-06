@@ -24,6 +24,7 @@ import { DECLARABLE_CERTIFICATIONS, type CertificationAnswer } from '@/lib/profi
 import { rankSuggestions, groundingLabel } from '@/lib/profile/suggestion-ranking';
 import type { SetupAction } from '@/lib/profile/company-setup-outcome';
 import { authedFetch, storedMIEmail } from '@/components/app/authHeaders';
+import { typedCodeOffers, type TypedCodeOffer } from '@/lib/profile/typed-codes';
 
 type Suggestion = { code: string; name: string; reason?: string };
 
@@ -42,6 +43,10 @@ function CompanySetupInner() {
   const [states, setStates] = useState('');
 
   const [naics, setNaics] = useState<Suggestion[]>([]);
+  // Codes the user TYPED in their description: validated + titled, shown apart from Mindy's
+  // inferences, and NOT selected until the user adds each one. Never applied automatically.
+  const [typed, setTyped] = useState<TypedCodeOffer[]>([]);
+  const [typedAdded, setTypedAdded] = useState<string[]>([]);
   const [keywords, setKeywords] = useState<string[]>([]);
 
   const leadTerm = useMemo(() => description.trim().split(/\s+/).find((w) => w.length > 3) || null, [description]);
@@ -62,7 +67,12 @@ function CompanySetupInner() {
         body: JSON.stringify({ description }),
       });
       const j = await r.json();
-      setNaics(j?.naicsSuggestions || []);
+      const typedOffers = typedCodeOffers([description]);
+      const typedSet = new Set(typedOffers.map((t) => t.code));
+      setTyped(typedOffers);
+      setTypedAdded([]);
+      // A code the user typed is theirs to confirm — it is not also listed as Mindy's suggestion.
+      setNaics(((j?.naicsSuggestions || []) as Suggestion[]).filter((s) => !typedSet.has(s.code)));
       setKeywords((j?.keywords || []).length ? j.keywords : deriveDisplayKeywords(description));
       setStep(2);
     } finally { setBusy(false); }
@@ -86,7 +96,7 @@ function CompanySetupInner() {
           companyName, description,
           certifications: certs,
           states: nationwide ? null : states.split(',').map((s) => s.trim()).filter(Boolean),
-          selection: { naicsCodes: rankedNaics.map((s) => s.code), keywords },
+          selection: { naicsCodes: [...new Set([...rankedNaics.map((s) => s.code), ...typedAdded])], keywords },
           next: params.get('next'), intent: params.get('intent'),
         }),
       }).catch(() => null);
@@ -231,6 +241,32 @@ function CompanySetupInner() {
                 </>
               )}
             </section>
+
+            {typed.length > 0 && (
+              <section className="mt-6 rounded-2xl border border-white/15 bg-white/[0.03] p-5">
+                <p className="text-xs font-bold uppercase tracking-widest text-slate-300">Codes you typed · not added yet</p>
+                <p className="mt-1 text-sm text-slate-400">You wrote these NAICS codes in your description. Add the ones you want Mindy to use.</p>
+                <ul className="mt-3 space-y-2">
+                  {typed.map((t) => {
+                    const added = typedAdded.includes(t.code);
+                    return (
+                      <li key={t.code} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+                        <span><span className="font-mono text-sm text-emerald-300">{t.code}</span> <span className="text-sm">{t.title}</span></span>
+                        <span className="flex shrink-0 gap-2">
+                          <button onClick={() => setTypedAdded((p) => added ? p.filter((c) => c !== t.code) : [...p, t.code])}
+                            aria-pressed={added}
+                            className={added ? 'rounded-lg bg-emerald-500 px-3 py-1 text-sm font-semibold text-[#06120c]' : 'rounded-lg border border-white/25 px-3 py-1 text-sm'}>
+                            {added ? 'Added ✓' : 'Add'}
+                          </button>
+                          <button onClick={() => { setTyped((p) => p.filter((x) => x.code !== t.code)); setTypedAdded((p) => p.filter((c) => c !== t.code)); }}
+                            className="text-sm text-slate-500 hover:text-white" aria-label={`Not mine: ${t.code}`}>Not mine</button>
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            )}
 
             {/* The two SAVE actions are equal size and adjacent — neither is the safe path. */}
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
