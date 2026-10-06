@@ -7,6 +7,8 @@ import { fetchSamOpportunitiesFromCache, scoreOpportunity, SAMOpportunity } from
 import { createSecureAccessUrl } from '@/lib/access-links';
 import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 import { sendEmail } from '@/lib/send-email';
+import { drainCycle, pendingForCycle } from '@/lib/alerts/weekly-drain';
+import { reportCronOutcome } from '@/lib/cron-self-report';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 import { resolveBriefingAudience } from '@/lib/briefings/delivery/rollout';
 import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, mindyDashboardUrlFor, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
@@ -40,7 +42,14 @@ const ALERT_LIMITS = {
 
 // Uses local SAM cache instead of per-user SAM.gov API calls, so the Sunday batch
 // window can cover the free weekly audience without external API rate limits.
-const BATCH_SIZE = 75;
+// Each run drains pending users until this budget is spent (see src/lib/alerts/weekly-drain.ts).
+// Was a fixed BATCH_SIZE = 75/run × 10 windows = 750/cycle against ~1,790 eligible: the
+// alphabetical tail was never evaluated. Measured ~1s/user, so a 220s run covers ~200 users
+// and the cycle drains well inside the existing Sunday window. Below maxDuration (300s) with
+// room for the slowest user, and far below the 10-minute window gap, so runs never overlap.
+const RUN_BUDGET_MS = Number(process.env.WEEKLY_ALERT_RUN_BUDGET_MS) || 220_000;
+
+export const maxDuration = 300;
 
 // Products that grant Pro tier (15 opps)
 const PRO_TIER_PRODUCTS = [
@@ -220,6 +229,7 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
     try {
       allUsers = await fetchAllPaged<AlertUser>(() => getSupabase()
         .from('user_notification_settings')
+        // truncation-ok: wrapped in fetchAllPaged (pages with .range inside the helper)
         .select('*')
         .eq('is_active', true)
         .eq('alerts_enabled', true)
@@ -281,28 +291,31 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
       return NextResponse.json({ success: true, message: 'No users to process', sent: 0 });
     }
 
-    // Check for already processed this week (deduplication)
-    const { data: processedThisWeek } = await getSupabase()
-      .from('alert_log')
-      // truncation-ok: scoped to ONE weekly cycle, and BATCH_SIZE (75/run) caps how many rows
-      // a cycle can accumulate — measured flat at 750 for 10 consecutive weeks vs the 1,000
-      // cap. The 131,217-row table size is irrelevant here; the PREDICATE is the population.
-      // ⚠️ If BATCH_SIZE or the dispatcher window grows so a cycle can exceed 1,000, this
-      // MUST become a paged read — a truncated dedup re-sends to users who already got theirs.
-      .select('user_email')
-      .eq('alert_date', alertDate)
-      .eq('alert_type', 'weekly');
+    // Already processed this cycle = the drain cursor. PAGED: once a cycle can hold more
+    // than 1,000 rows (it now drains ~1,790), an unpaged read would truncate the dedup set
+    // and re-send to users who already got this week's alert.
+    let processedThisWeek: Array<{ user_email: string }>;
+    try {
+      processedThisWeek = await fetchAllPaged<{ user_email: string }>(() => getSupabase()
+        .from('alert_log')
+        // truncation-ok: wrapped in fetchAllPaged (pages with .range inside the helper)
+        .select('user_email')
+        .eq('alert_date', alertDate)
+        .eq('alert_type', 'weekly')
+        .order('user_email', { ascending: true }));
+    } catch (dedupError) {
+      // Without the dedup set we cannot tell who already got this week's alert. Refuse
+      // rather than risk a duplicate send; the next window retries.
+      console.error('[Weekly Alerts] Dedup read failed — not sending this run:', dedupError);
+      return NextResponse.json({ error: 'Failed to read this cycle\'s alert_log' }, { status: 500 });
+    }
 
-    const processedEmails = new Set((processedThisWeek || []).map((r: { user_email: string }) => r.user_email.toLowerCase()));
+    const processedEmails = new Set(processedThisWeek.map((r) => r.user_email.toLowerCase()));
+    const pending = pendingForCycle(users, processedEmails);
 
-    // Filter out already processed and limit to batch size
-    const usersToProcess = users
-      .filter(u => !processedEmails.has(u.user_email.toLowerCase()))
-      .slice(0, BATCH_SIZE);
+    console.log(`[Weekly Alerts] ${pending.length} pending of ${users.length} eligible (${processedEmails.size} already processed this cycle); budget ${RUN_BUDGET_MS}ms`);
 
-    console.log(`[Weekly Alerts] Processing ${usersToProcess.length}/${users.length} users (${processedEmails.size} already processed this week)...`);
-
-    if (usersToProcess.length === 0) {
+    if (pending.length === 0) {
       return NextResponse.json({
         success: true,
         message: 'All users already processed this week',
@@ -323,15 +336,28 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
     // Clear buyer cache for fresh data
     buyerEmailsCache = null;
 
-    // Process each user in this batch
-    for (const user of usersToProcess) {
+    // Drain this cycle's pending users until done or the run budget is spent.
+    const drain = await drainCycle(pending, async (user) => {
       try {
         // Determine user's alert tier based on purchase history
         const { limit: alertLimit, tier } = await getAlertLimit(user.user_email);
         const alertSource = getAlertSource(user, tier);
 
         if (!alertSource) {
-          continue;
+          // Selected as eligible, but no longer eligible at send time (tier changed or the
+          // tier lookup degraded). Record it, so the user is evaluated once this cycle
+          // instead of being re-selected by every later window and never resolved.
+          await persistProcessedWeeklyAlert({
+            user,
+            alertDate,
+            status: 'skipped',
+            source: 'free_weekly_fallback',
+            tier,
+            opportunitiesCount: 0,
+            errorMessage: 'not_eligible_at_send',
+          });
+          results.skipped++;
+          return;
         }
 
         if (!user.naics_codes || user.naics_codes.length === 0) {
@@ -346,7 +372,7 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
           });
           results.skipped++;
           results.noNaics++;
-          continue;
+          return;
         }
 
         // Build search params from user profile
@@ -406,11 +432,31 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
           });
           results.skipped++;
           results.noMatches++;
-          continue;
+          return;
         }
 
-        // Send email with tier info
-        await sendAlertEmail(user.user_email, topOpps, user, tier, scoredOpps.length);
+        // Send email with tier info.
+        // RESIDUAL (shared with daily-alerts, not changed here): the email is sent BEFORE its
+        // `sent` row is written. If that write fails, the catch below writes a `failed` row,
+        // which still dedups this cycle; a duplicate needs both writes to fail.
+        const delivered = await sendAlertEmail(user.user_email, topOpps, user, tier, scoredOpps.length);
+
+        // Parity with daily-alerts: a guard-blocked send (unsubscribed / bounced) is a visible
+        // skip, never a phantom `sent` with last_alert_sent / total_alerts_sent bumped.
+        if (delivered === false) {
+          await persistProcessedWeeklyAlert({
+            user,
+            alertDate,
+            status: 'skipped',
+            source: alertSource,
+            tier,
+            opportunitiesCount: topOpps.length,
+            errorMessage: 'send_guard_blocked',
+          });
+          console.warn(`[Weekly Alerts] Send guard blocked ${user.user_email} (suppression) — recorded as skipped, NOT sent`);
+          results.skipped++;
+          return;
+        }
 
         await persistSentAlert({
           supabase: getSupabase(),
@@ -453,20 +499,38 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
         results.failed++;
         results.errors.push(`${user.user_email}: ${errorMessage}`);
       }
-    }
+        }, { budgetMs: RUN_BUDGET_MS });
 
-    const remainingUsers = users.length - processedEmails.size - usersToProcess.length;
-    console.log(`[Weekly Alerts] Complete. Sent: ${results.sent}, Skipped: ${results.skipped}, Failed: ${results.failed}, Remaining: ${remainingUsers}`);
+    const remainingUsers = drain.remaining;
+    console.log(`[Weekly Alerts] Run done. Sent: ${results.sent}, Skipped: ${results.skipped}, Failed: ${results.failed}, Remaining this cycle: ${remainingUsers}`);
+
+    // The dispatcher stops listening after 12s, so this run reports its own outcome.
+    // Users still pending is never silent: Sunday windows mark the job `partial`
+    // (later windows continue the drain); on the Monday catch-up windows it is an
+    // `error`, because the cycle is about to end with users unevaluated.
+    const jobName = new Date().getUTCDay() === 1 ? 'weekly-alerts-mon' : 'weekly-alerts';
+    if (!options.email) {
+      if (remainingUsers > 0) {
+        await reportCronOutcome(
+          jobName,
+          jobName === 'weekly-alerts-mon' ? 'error' : 'partial',
+          `weekly cycle ${alertDate}: ${remainingUsers} of ${users.length} eligible still pending after this run`,
+        );
+      } else {
+        await reportCronOutcome(jobName, 'success');
+      }
+    }
 
     return NextResponse.json({
       success: true,
       results,
       batch: {
-        processed: usersToProcess.length,
+        processed: drain.attempted,
         alreadyProcessed: processedEmails.size,
         remaining: remainingUsers,
         totalEligible: users.length,
-        batchSize: BATCH_SIZE,
+        stoppedForBudget: drain.stoppedForBudget,
+        runBudgetMs: RUN_BUDGET_MS,
         alertDate,
       },
     });
@@ -543,13 +607,14 @@ export async function GET(request: NextRequest) {
       message: 'Weekly Alerts Cron Job',
       usage: 'GET ?email=xxx to inspect a user. Use authorized GET/POST with ?catchup=true for manual catch-up.',
       schedule: 'Sunday batch window from 23:00 UTC into Monday 00:30 UTC',
-      batchSize: BATCH_SIZE,
+      runBudgetMs: RUN_BUDGET_MS,
     });
   }
 
   // Test mode for specific user
   const { data: user } = await getSupabase()
     .from('user_notification_settings')
+    // truncation-ok: one user by email, .single()
     .select('*')
     .eq('user_email', email.toLowerCase())
     .single();
@@ -608,7 +673,7 @@ async function sendAlertEmail(
   user: AlertUser,
   tier: 'free' | 'pro' = 'free',
   totalAvailable: number = 0
-) {
+): Promise<boolean> {
   const emailDate = new Date().toISOString().split('T')[0];
   const tokenResult = await createEmailTrackingToken(email, 'weekly_alert', emailDate);
   const trackingToken = tokenResult?.token;
@@ -781,7 +846,9 @@ async function sendAlertEmail(
 </html>
 `;
 
-  await sendEmail({
+  // sendEmail returns false (not throw) when the send guard blocks the recipient —
+  // suppression list (unsubscribed / bounced). The caller must record that as a skip.
+  return sendEmail({
     from: `"${MINDY_FROM_NAME}" <${process.env.EMAIL_FROM || 'alerts@mail.getmindy.ai'}>`,
     // Coach-managed client rows deliver to the client's real inbox; else user_email.
     to: user.alert_recipient_email || email,
