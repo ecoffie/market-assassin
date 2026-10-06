@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getSavedSearchDeliveryReadiness } from './delivery-readiness';
+import { getSavedSearchDeliveryReadiness, classifyRunFailures } from './delivery-readiness';
+import { SUPPRESSION_CLASSES } from '@/lib/cron/watchdog-incidents';
 
 type Result = { data?: unknown; error?: unknown; count?: number | null };
 
@@ -22,17 +23,13 @@ function chain(result: Result | ((ctx: { head: boolean }) => Result)) {
   return proxy;
 }
 
-let tables: Record<string, ReturnType<typeof chain>> = {};
+let tables: Record<string, () => ReturnType<typeof chain>> = {};
 const mockFrom = vi.fn((table: string) => {
   const t = tables[table];
   if (!t) throw new Error(`unexpected table ${table}`);
-  return t;
+  return t();
 });
-const mockSupabase = { from: mockFrom };
-
-vi.mock('@/lib/app/workspace', () => ({
-  getAppSupabase: () => mockSupabase,
-}));
+vi.mock('@/lib/app/workspace', () => ({ getAppSupabase: () => ({ from: mockFrom }) }));
 
 function setup(opts: {
   storageError?: unknown;
@@ -40,22 +37,26 @@ function setup(opts: {
   cronError?: unknown;
   runs?: unknown[];
   runsError?: unknown;
-  lastSentAt?: string | null;
-  sendsDuringRun?: number | null;
+  lastAcceptedAt?: string | null;
+  acceptedDuringRun?: number | null;
   sendsError?: unknown;
+  evaluatedDuringRun?: number | null;
+  evaluatedError?: unknown;
 }) {
   tables = {
-    saved_searches: chain({ error: opts.storageError ?? null }),
-    cron_jobs: chain({ data: opts.cron ?? [], error: opts.cronError ?? null }),
-    cron_job_runs: chain({ data: opts.runs ?? [], error: opts.runsError ?? null }),
-    email_provider_sends: chain(({ head }) => head
-      ? { count: opts.sendsDuringRun ?? null, error: opts.sendsError ?? null }
-      : { data: opts.lastSentAt ? [{ sent_at: opts.lastSentAt }] : [], error: opts.sendsError ?? null }),
+    saved_searches: () => chain(({ head }) => head
+      ? { count: opts.evaluatedDuringRun ?? null, error: opts.evaluatedError ?? null }
+      : { error: opts.storageError ?? null }),
+    cron_jobs: () => chain({ data: opts.cron ?? [], error: opts.cronError ?? null }),
+    cron_job_runs: () => chain({ data: opts.runs ?? [], error: opts.runsError ?? null }),
+    email_provider_sends: () => chain(({ head }) => head
+      ? { count: opts.acceptedDuringRun ?? null, error: opts.sendsError ?? null }
+      : { data: opts.lastAcceptedAt ? [{ sent_at: opts.lastAcceptedAt }] : [], error: opts.sendsError ?? null }),
   };
 }
 
 const NOW = new Date('2026-08-30T17:38:00Z');
-const enabledCron = {
+const cron = {
   job_name: 'saved-search-alerts',
   route: '/api/cron/saved-search-alerts?limit=50',
   enabled: true,
@@ -63,245 +64,159 @@ const enabledCron = {
   last_run_at: '2026-08-30T11:01:00Z',
   last_status: 'success',
 };
+const run = (status: string, error: string | null = null, at = '2026-08-30T11:01:00Z', http_status: number | null = null) =>
+  ({ started_at: at, finished_at: null, status, http_status, error });
 
-describe('getSavedSearchDeliveryReadiness', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+beforeEach(() => vi.clearAllMocks());
+
+describe('classifyRunFailures — the watchdog classifier is the single source', () => {
+  it('splits processing from confirmed suppression exactly as SUPPRESSION_CLASSES says', () => {
+    const c = classifyRunFailures('error', 'unexpected_schedule_error=1,recipient_suppressed=3,suppression_lookup_failed=2');
+    expect(c.processing).toEqual({ unexpected_schedule_error: 1, suppression_lookup_failed: 2 });
+    expect(c.suppression).toEqual({ recipient_suppressed: 3 });
+    expect([...SUPPRESSION_CLASSES]).toEqual(['recipient_suppressed']);
   });
+  it('moves with the watchdog, never apart: a class added there changes the result here', () => {
+    SUPPRESSION_CLASSES.add('suppression_lookup_failed');
+    try {
+      expect(classifyRunFailures('error', 'suppression_lookup_failed=1').suppressionOnly).toBe(true);
+    } finally {
+      SUPPRESSION_CLASSES.delete('suppression_lookup_failed');
+    }
+    expect(classifyRunFailures('error', 'suppression_lookup_failed=1').suppressionOnly).toBe(false);
+  });
+});
 
-  it('scheduler_unavailable when saved_searches table missing', async () => {
+describe('job status — the named saved-search alerts job', () => {
+  it('storage missing → job_failure (confirmed)', async () => {
     setup({ storageError: { code: '42P01', message: 'saved_searches' } });
-
     const r = await getSavedSearchDeliveryReadiness(NOW);
-    expect(r.storage_ready).toBe(false);
+    expect(r.job_status).toBe('job_failure');
     expect(r.delivery_state).toBe('scheduler_unavailable');
-    expect(r.execution_health).toBe('service_unavailable');
-    expect(r.delivery_ready).toBe(false);
-    expect(r.system_status).toBe('system_failure');
-    expect(mockFrom).toHaveBeenCalledTimes(1);
+    expect(r.job_status_reason).toMatch(/^saved-search alerts: /);
   });
 
-  it('delivery_degraded when cron row missing', async () => {
-    setup({ cron: [] });
-
+  it('a probe read error is unknown, never failure or healthy', async () => {
+    setup({ cron: [cron], runsError: { message: 'timeout' } });
     const r = await getSavedSearchDeliveryReadiness(NOW);
-    expect(r.storage_ready).toBe(true);
-    expect(r.cron_registered).toBe(false);
-    expect(r.delivery_state).toBe('delivery_degraded');
+    expect(r.job_status).toBe('unknown');
     expect(r.delivery_ready).toBe(false);
   });
 
-  it('delivery_configured when enabled but no completed execution is observed', async () => {
-    setup({
-      cron: [{ ...enabledCron, last_status: 'dispatched' }],
-      runs: [{ started_at: '2026-08-30T11:01:00Z', status: 'dispatched', http_status: null }],
-    });
-
-    const r = await getSavedSearchDeliveryReadiness(NOW);
-    expect(r.delivery_ready).toBe(false);
-    expect(r.delivery_state).toBe('delivery_configured');
-    expect(r.execution_health).toBe('not_observed');
+  it('job missing / disabled / non-daily → job_failure', async () => {
+    for (const c of [[], [{ ...cron, enabled: false }], [{ ...cron, cron_expr: '0 11 * * 1' }]]) {
+      setup({ cron: c });
+      expect((await getSavedSearchDeliveryReadiness(NOW)).job_status).toBe('job_failure');
+    }
   });
 
-  it('delivery_ready only after a recent successful 2xx run', async () => {
-    setup({
-      cron: [enabledCron],
-      runs: [{ started_at: '2026-08-30T11:01:00Z', status: 'success', http_status: 200 }],
-    });
-
+  it('clean run in window → healthy, with provider acceptance (not inbox) reported', async () => {
+    setup({ cron: [cron], runs: [run('success')], lastAcceptedAt: '2026-08-30T11:01:09Z', acceptedDuringRun: 12, evaluatedDuringRun: 40 });
     const r = await getSavedSearchDeliveryReadiness(NOW);
+    expect(r.job_status).toBe('healthy');
     expect(r.delivery_ready).toBe(true);
-    expect(r.delivery_state).toBe('delivery_ready');
-    expect(r.execution_health).toBe('recent_success');
-    expect(r.cron_job_name).toBe('saved-search-alerts');
+    expect(r.last_alert_provider_accepted_at).toBe('2026-08-30T11:01:09Z');
+    expect(r.inbox_delivery).toBe('not_observable');
+    expect(r).not.toHaveProperty('last_success_at');
   });
 
-  it('accepts a recent route-self-reported success with null dispatcher HTTP status', async () => {
-    setup({
-      cron: [{ ...enabledCron, last_status: 'success' }],
-      runs: [{ started_at: '2026-08-30T11:01:00Z', status: 'success', http_status: null }],
-    });
-
+  it('suppression-only failures → healthy with an action item, not a failure', async () => {
+    setup({ cron: [cron], runs: [run('error', 'recipient_suppressed=3')], acceptedDuringRun: 5, evaluatedDuringRun: 9 });
     const r = await getSavedSearchDeliveryReadiness(NOW);
+    expect(r.job_status).toBe('healthy');
+    expect(r.suppression_action_items).toEqual({ recipient_suppressed: 3 });
+    expect(r.job_status_reason).toMatch(/action item: recipient_suppressed=3/);
+  });
+
+  it('failed suppression LOOKUP is a processing error → partial failure, never suppression', async () => {
+    setup({ cron: [cron], runs: [run('error', 'suppression_lookup_failed=1')], acceptedDuringRun: 4, evaluatedDuringRun: 9 });
+    const r = await getSavedSearchDeliveryReadiness(NOW);
+    expect(r.job_status).toBe('partial_failure');
+    expect(r.latest_run_processing_failures).toEqual({ suppression_lookup_failed: 1 });
+    expect(r.suppression_action_items).toEqual({});
+  });
+
+  it('ZERO sends alone is not an outage: per-search failures + searches evaluated → partial failure', async () => {
+    setup({ cron: [cron], runs: [run('error', 'invalid_saved_filters=1')], acceptedDuringRun: 0, evaluatedDuringRun: 30 });
+    const r = await getSavedSearchDeliveryReadiness(NOW);
+    expect(r.job_status).toBe('partial_failure');
+    expect(r.latest_run_alerts_provider_accepted).toBe(0);
+  });
+
+  it('per-search failures with nothing evaluated and nothing sent → job_failure', async () => {
+    setup({ cron: [cron], runs: [run('error', 'invalid_saved_filters=1')], acceptedDuringRun: 0, evaluatedDuringRun: 0 });
+    expect((await getSavedSearchDeliveryReadiness(NOW)).job_status).toBe('job_failure');
+  });
+
+  it('unreadable evidence for a failed run → unknown, never zero, never healthy', async () => {
+    setup({ cron: [cron], runs: [run('error', 'invalid_saved_filters=1')], sendsError: { message: 'boom' }, evaluatedDuringRun: 30 });
+    const r = await getSavedSearchDeliveryReadiness(NOW);
+    expect(r.job_status).toBe('unknown');
+    expect(r.latest_run_alerts_provider_accepted).toBeNull();
+    expect(r.last_alert_provider_accepted_at).toBeNull();
+  });
+
+  it('run-level failures are the job failing as a whole', async () => {
+    for (const r0 of [run('error', 'saved_search_query_failed=1'), run('timeout'), run('error', 'This operation was aborted'), run('error', null), run('success', null, undefined, 500)]) {
+      setup({ cron: [cron], runs: [r0], acceptedDuringRun: 3, evaluatedDuringRun: 3 });
+      expect((await getSavedSearchDeliveryReadiness(NOW)).job_status).toBe('job_failure');
+    }
+  });
+
+  it('a capacity backlog (status partial) with work done → partial failure', async () => {
+    setup({ cron: [cron], runs: [run('partial', 'backlog=40')], acceptedDuringRun: 20, evaluatedDuringRun: 400 });
+    const r = await getSavedSearchDeliveryReadiness(NOW);
+    expect(r.job_status).toBe('partial_failure');
+    expect(r.job_status_reason).toMatch(/backlog/);
+  });
+
+  it("no run in today's window → job_failure; today's run dispatched but unreported → unknown; never ran → not_observed", async () => {
+    setup({ cron: [cron], runs: [run('success', null, '2026-08-12T11:00:00Z')] });
+    expect((await getSavedSearchDeliveryReadiness(NOW)).job_status).toBe('job_failure');
+    setup({ cron: [cron], runs: [run('dispatched'), run('success', null, '2026-08-29T09:00:00Z')] });
+    expect((await getSavedSearchDeliveryReadiness(NOW)).job_status).toBe('unknown');
+    setup({ cron: [cron], runs: [] });
+    expect((await getSavedSearchDeliveryReadiness(NOW)).job_status).toBe('not_observed');
+  });
+
+  it("today's run that finished inside its grace period is judged, not yesterday's", async () => {
+    setup({ cron: [cron], runs: [run('success', null, '2026-08-30T11:00:30Z'), run('error', 'saved_search_query_failed=1', '2026-08-29T11:00:30Z')], acceptedDuringRun: 2, evaluatedDuringRun: 5 });
+    const r = await getSavedSearchDeliveryReadiness(new Date('2026-08-30T12:00:00Z'));
+    expect(r.job_status).toBe('healthy');
+    expect(r.latest_run_started_at).toBe('2026-08-30T11:00:30Z');
+  });
+});
+
+describe('production replay: one failing search must not read as "no successful sends since Sept 29"', () => {
+  // saved-search-alerts reported `error` every day from 2026-09-30 (3 searches on one suppressed internal
+  // address rejected under the legacy class + 1 malformed customer search) while each run delivered 46-48.
+  const SAVE_TIME = new Date('2026-10-05T23:20:13Z');
+  const failures = 'unexpected_schedule_error=1,email_send_rejected=3';
+  const prodRuns = [
+    { started_at: '2026-10-05T11:00:29.934Z', finished_at: '2026-10-05T11:01:49.080Z', status: 'error', http_status: null, error: failures },
+    { started_at: '2026-10-04T11:00:28.413Z', finished_at: '2026-10-04T11:01:42.085Z', status: 'error', http_status: null, error: failures },
+    { started_at: '2026-09-30T11:00:28.304Z', finished_at: '2026-09-30T11:01:54.133Z', status: 'error', http_status: null, error: 'email_send_rejected=3' },
+    { started_at: '2026-09-29T11:00:28.490Z', finished_at: '2026-09-29T11:01:43.892Z', status: 'success', http_status: null, error: null },
+  ];
+
+  it('→ partial failure of the saved-search alerts job, 48 provider-accepted, 134 evaluated, last accepted Oct 5', async () => {
+    setup({ cron: [cron], runs: prodRuns, lastAcceptedAt: '2026-10-05T11:01:48.549Z', acceptedDuringRun: 48, evaluatedDuringRun: 134 });
+    const r = await getSavedSearchDeliveryReadiness(SAVE_TIME);
+    expect(r.job_status).toBe('partial_failure');
     expect(r.delivery_ready).toBe(true);
-    expect(r.delivery_state).toBe('delivery_ready');
-    expect(r.execution_health).toBe('recent_success');
+    expect(r.latest_run_alerts_provider_accepted).toBe(48);
+    expect(r.latest_run_searches_evaluated).toBe(134);
+    expect(r.last_alert_provider_accepted_at).toBe('2026-10-05T11:01:48.549Z');
+    expect(r.last_clean_run_at).toBe('2026-09-29T11:00:28.490Z');
+    expect(r.job_status_reason).toBe('saved-search alerts: partial failure: unexpected_schedule_error=1, email_send_rejected=3 failed; the rest ran (evaluated 134 searches, 48 alerts accepted by the email provider)');
+    expect(r.job_status_reason).not.toMatch(/2026-09-29|no successful/);
   });
 
-  it('delivery_degraded when cron disabled', async () => {
-    setup({ cron: [{ ...enabledCron, enabled: false }] });
-
-    const r = await getSavedSearchDeliveryReadiness(NOW);
-    expect(r.cron_registered).toBe(true);
-    expect(r.cron_enabled).toBe(false);
-    expect(r.delivery_state).toBe('delivery_degraded');
-  });
-
-  it('delivery_degraded when the latest success is stale', async () => {
-    setup({
-      cron: [{ ...enabledCron, last_status: 'dispatched' }],
-      runs: [
-        { started_at: '2026-08-30T11:01:00Z', status: 'dispatched', http_status: null },
-        { started_at: '2026-08-12T11:00:00Z', status: 'success', http_status: 200 },
-      ],
-    });
-
-    const r = await getSavedSearchDeliveryReadiness(NOW);
-    expect(r.delivery_ready).toBe(false);
-    expect(r.delivery_state).toBe('delivery_degraded');
-    expect(r.execution_health).toBe('stale_success');
-  });
-
-  it('delivery_degraded when the latest run is a capacity-exhausted partial', async () => {
-    setup({
-      cron: [{ ...enabledCron, last_status: 'partial' }],
-      runs: [{ started_at: '2026-08-30T11:01:00Z', status: 'partial', http_status: null }],
-      sendsDuringRun: 0,
-    });
-
-    const r = await getSavedSearchDeliveryReadiness(NOW);
-    expect(r.delivery_ready).toBe(false);
-    expect(r.delivery_state).toBe('delivery_degraded');
-    expect(r.execution_health).toBe('latest_failed');
-  });
-
-  it('delivery_degraded when a newer failure supersedes a recent success', async () => {
-    setup({
-      cron: [{ ...enabledCron, last_status: 'error' }],
-      runs: [
-        { started_at: '2026-08-30T11:02:00Z', status: 'error', http_status: 500 },
-        { started_at: '2026-08-30T11:01:00Z', status: 'success', http_status: 200 },
-      ],
-      sendsDuringRun: 0,
-    });
-
-    const r = await getSavedSearchDeliveryReadiness(NOW);
-    expect(r.delivery_ready).toBe(false);
-    expect(r.delivery_state).toBe('delivery_degraded');
-    expect(r.execution_health).toBe('latest_failed');
-  });
-
-  it('delivery_degraded when registration is not a daily schedule', async () => {
-    setup({ cron: [{ ...enabledCron, cron_expr: '0 11 * * 1' }] });
-
-    const r = await getSavedSearchDeliveryReadiness(NOW);
-    expect(r.cron_schedule_daily).toBe(false);
-    expect(r.delivery_state).toBe('delivery_degraded');
-    expect(r.execution_health).toBe('invalid_daily_schedule');
-  });
-
-  describe('a run that fails for SOME searches is not a delivery outage', () => {
-    // Production, replayed exactly: saved-search-alerts reported `error` every day from 2026-09-30
-    // (3 suppressed internal recipients rejected + 1 other customer's search threw) while the same
-    // runs delivered 46-48 alerts a day. The probe used to answer "last success 2026-09-29".
-    const SAVE_TIME = new Date('2026-10-05T23:20:13Z');
-    const failures = 'unexpected_schedule_error=1,email_send_rejected=3';
-    const prodRuns = [
-      { started_at: '2026-10-05T11:00:29.934Z', finished_at: '2026-10-05T11:01:49.080Z', status: 'error', http_status: null, error: failures },
-      { started_at: '2026-10-04T11:00:28.413Z', finished_at: '2026-10-04T11:01:42.085Z', status: 'error', http_status: null, error: failures },
-      { started_at: '2026-10-03T11:00:27.793Z', finished_at: '2026-10-03T11:01:38.306Z', status: 'error', http_status: null, error: failures },
-      { started_at: '2026-10-02T11:00:28.305Z', finished_at: '2026-10-02T11:01:53.117Z', status: 'error', http_status: null, error: failures },
-      { started_at: '2026-10-01T11:00:27.980Z', finished_at: '2026-10-01T11:01:46.301Z', status: 'error', http_status: null, error: failures },
-      { started_at: '2026-09-30T11:00:28.304Z', finished_at: '2026-09-30T11:01:54.133Z', status: 'error', http_status: null, error: 'email_send_rejected=3' },
-      { started_at: '2026-09-29T11:00:28.490Z', finished_at: '2026-09-29T11:01:43.892Z', status: 'success', http_status: null, error: null },
-    ];
-    const prodCron = { ...enabledCron, cron_expr: '0 11 * * *', last_run_at: '2026-10-05T11:00:29Z', last_status: 'error' };
-
-    it('partially failed job with successful deliveries → partial_degradation, last send = Oct 5, not Sept 29', async () => {
-      setup({ cron: [prodCron], runs: prodRuns, lastSentAt: '2026-10-05T11:01:41.561Z', sendsDuringRun: 48 });
-
-      const r = await getSavedSearchDeliveryReadiness(SAVE_TIME);
-      expect(r.system_status).toBe('partial_degradation');
-      expect(r.execution_health).toBe('partial_failure');
-      expect(r.delivery_state).toBe('delivery_partial');
-      expect(r.delivery_ready).toBe(true);
-      expect(r.latest_run_alerts_sent).toBe(48);
-      expect(r.latest_run_failures).toBe(failures);
-      expect(r.latest_run_processing_failures).toEqual({ unexpected_schedule_error: 1, email_send_rejected: 3 });
-      expect(r.suppression_action_items).toEqual({});
-      expect(r.last_alert_sent_at).toBe('2026-10-05T11:01:41.561Z');
-      // the job-run fact is preserved, but only under a name that says what it is
-      expect(r.last_clean_run_at).toBe('2026-09-29T11:00:28.490Z');
-      expect(r).not.toHaveProperty('last_success_at');
-    });
-
-    it('the same failed run with ZERO provider sends is not called healthy (degraded_unconfirmed)', async () => {
-      setup({ cron: [prodCron], runs: prodRuns, lastSentAt: '2026-10-04T11:01:41Z', sendsDuringRun: 0 });
-
-      const r = await getSavedSearchDeliveryReadiness(SAVE_TIME);
-      expect(r.system_status).toBe('degraded_unconfirmed');
-      expect(r.delivery_ready).toBe(false);
-      expect(r.latest_run_alerts_sent).toBe(0);
-    });
-
-    it('an unreadable send ledger is unknown, never a zero and never healthy', async () => {
-      setup({ cron: [prodCron], runs: prodRuns, sendsError: { message: 'boom' } });
-
-      const r = await getSavedSearchDeliveryReadiness(SAVE_TIME);
-      expect(r.latest_run_alerts_sent).toBeNull();
-      expect(r.last_alert_sent_at).toBeNull();
-      expect(r.system_status).toBe('degraded_unconfirmed');
-      expect(r.delivery_ready).toBe(false);
-    });
-
-    it('no run at all in today\'s window is a confirmed system failure', async () => {
-      setup({ cron: [prodCron], runs: prodRuns.slice(1), lastSentAt: '2026-10-04T11:01:41Z', sendsDuringRun: 46 });
-
-      const r = await getSavedSearchDeliveryReadiness(SAVE_TIME);
-      expect(r.system_status).toBe('system_failure');
-      expect(r.delivery_ready).toBe(false);
-    });
-
-    it('a probe read error is unknown, not a system failure', async () => {
-      setup({ cron: [prodCron], runsError: { message: 'timeout' } });
-
-      const r = await getSavedSearchDeliveryReadiness(SAVE_TIME);
-      expect(r.system_status).toBe('unknown');
-      expect(r.delivery_ready).toBe(false);
-    });
-  });
-
-  describe('confirmed recipient suppression is an action item, not an outage (#1834/#1836 classes)', () => {
-    const T = new Date('2026-10-05T23:20:13Z');
-    const cron = { ...enabledCron, cron_expr: '0 11 * * *' };
-    const prior = { started_at: '2026-10-04T11:00:28Z', status: 'success', http_status: null, error: null };
-
-    it('a run whose ONLY failures are recipient_suppressed is healthy, with the suppression listed', async () => {
-      setup({
-        cron: [cron],
-        runs: [{ started_at: '2026-10-05T11:00:29Z', finished_at: '2026-10-05T11:01:49Z', status: 'error', http_status: null, error: 'recipient_suppressed=3' }, prior],
-        lastSentAt: '2026-10-05T11:01:41Z',
-      });
-      const r = await getSavedSearchDeliveryReadiness(T);
-      expect(r.system_status).toBe('healthy');
-      expect(r.delivery_ready).toBe(true);
-      expect(r.suppression_action_items).toEqual({ recipient_suppressed: 3 });
-      expect(r.latest_run_processing_failures).toEqual({});
-      expect(r.last_clean_run_at).toBe('2026-10-05T11:00:29Z');
-    });
-
-    it('suppression alongside a processing failure is still partial degradation, suppression kept separate', async () => {
-      setup({
-        cron: [cron],
-        runs: [{ started_at: '2026-10-05T11:00:29Z', finished_at: '2026-10-05T11:01:49Z', status: 'error', http_status: null, error: 'unexpected_schedule_error=1,recipient_suppressed=3' }, prior],
-        lastSentAt: '2026-10-05T11:01:41Z',
-        sendsDuringRun: 48,
-      });
-      const r = await getSavedSearchDeliveryReadiness(T);
-      expect(r.system_status).toBe('partial_degradation');
-      expect(r.latest_run_processing_failures).toEqual({ unexpected_schedule_error: 1 });
-      expect(r.suppression_action_items).toEqual({ recipient_suppressed: 3 });
-    });
-
-    it('legacy email_send_rejected stays a processing failure (it cannot prove suppression)', async () => {
-      setup({
-        cron: [cron],
-        runs: [{ started_at: '2026-10-05T11:00:29Z', finished_at: '2026-10-05T11:01:49Z', status: 'error', http_status: null, error: 'email_send_rejected=3' }, prior],
-        sendsDuringRun: 0,
-      });
-      const r = await getSavedSearchDeliveryReadiness(T);
-      expect(r.system_status).toBe('degraded_unconfirmed');
-      expect(r.suppression_action_items).toEqual({});
-    });
+  it('after #1834 the same rejects classify as recipient_suppressed → action item; still a partial failure (the malformed search)', async () => {
+    setup({ cron: [cron], runs: [{ ...prodRuns[0], error: 'unexpected_schedule_error=1,recipient_suppressed=3' }], acceptedDuringRun: 48, evaluatedDuringRun: 134 });
+    const r = await getSavedSearchDeliveryReadiness(SAVE_TIME);
+    expect(r.job_status).toBe('partial_failure');
+    expect(r.latest_run_processing_failures).toEqual({ unexpected_schedule_error: 1 });
+    expect(r.suppression_action_items).toEqual({ recipient_suppressed: 3 });
   });
 });

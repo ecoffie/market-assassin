@@ -7446,31 +7446,29 @@ lookup_solicitation, get_legislation_status, get_solicitation_documents, find_ca
 
 ## Honest alert status: what YOUR watch can do, not a guess about everyone's (2026-10-05)
 
-**What.** When a customer saves a market watch through Mindy's AI connector, the response now
-reports these separately: the search was saved and validated; whether its filters have matched a
-notice, have not matched one YET (a future posting can still alert), or use a value that cannot
-select anything in the data; whether delivery for this search has actually been tested yet (the
-first check records current matches without emailing); whether this search's own delivery is
-blocked or failing; and whether delivery is partially degraded for other searches or confirmed
-down for everyone.
+**What.** When a customer saves or lists a market watch through Mindy's AI connector, the answer
+starts with THAT watch: saved and valid; blocked (and why); skipped by the last run; waiting for its
+first check (which records today's matches without emailing); no new match yet; or alerts sent. Only
+then, and only if it matters, it says how the "saved-search alerts" job did — a partial failure that
+did not affect this watch, or a confirmed failure of the job — never a claim about all Mindy email.
 
-**Why it matters.** A single failing search used to mark the whole nightly alert run as failed,
-and an AI assistant turned that into "Mindy's email alerts are unreliable" for a customer whose
-alerts were fine. The reverse error is just as bad: calling delivery healthy because a save
-succeeded. Customers now hear what is true about their own watch, with real warnings kept.
+**Why it matters.** One broken search used to mark the whole nightly alert run as failed, and an AI
+assistant turned that into "Mindy's email alerts are unreliable" for a customer whose watches were
+fine. The reverse error is as bad: calling delivery healthy because a save succeeded. A bounced
+address is now an action item, not an outage; a failed database lookup is an error, not a bounce.
 
-**Honest scope.** Status is computed from Mindy's own job records and the email provider's send
-ledger. It can say a watch was skipped by the latest run or that its recipient is suppressed; it
-cannot see an email after the provider accepts it (inbox placement). Filter reach checks Mindy's
-SAM.gov opportunity corpus only, and "no matches yet" is never presented as "will never alert".
+**Honest scope.** Built from Mindy's own job records and the email provider's send ledger. "Sent"
+means the provider accepted the email; inbox placement is not visible to Mindy and is never claimed.
+Watches on filters a data source cannot represent (for example Marine Corps on forecasts) say so.
 
 **SEO.** reliable federal contract alerts / SAM.gov opportunity email alerts / saved search alerts government contracts.
 
-**Proof.** Replayed against the real production run history of 2026-09-29 to 2026-10-05: the
-nightly job reported failures every day while the provider ledger shows 46 alert emails sent on
-2026-10-04 (from 118 searches evaluated) and 48 on 2026-10-05 (from 134 evaluated). The new status reports partial degradation with Oct 5 as the last
-alert sent, not "no successful sends since Sept 29" (unit tests `delivery-readiness.unit.test.ts`,
-`schedule-market-search.unit.test.ts`).
+**Proof.** Production run history 2026-09-29 to 2026-10-05: the job reported failures every day
+while the provider ledger shows 46 alert emails accepted on 2026-10-04 (from 118 searches evaluated)
+and 48 on 2026-10-05 (from 134). The status now reads "partial failure" with Oct 5 as the last
+accepted alert, not "no successful sends since Sept 29". End-to-end test: a mixed run (successful
+send, malformed search, bounced address, failed lookup, brand-new watch) produces the right message
+for each customer and one correctly classified ops alert (`mixed-run-release.unit.test.ts`).
 
 ---
 

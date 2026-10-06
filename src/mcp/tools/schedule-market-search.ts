@@ -22,7 +22,7 @@ import {
   type FilterReachResult,
   type SavedSearchAlertStatus,
   type SavedSearchDeliveryReadiness,
-  type SystemDeliveryStatus,
+  type SavedSearchJobStatus,
   type SavedSearchAlertFrequency,
   type SavedSearchMode,
   type SavedSearchRow,
@@ -46,12 +46,14 @@ export type ScheduleDeliveryMeta = {
   delivery_state: DeliveryState;
   delivery_ready: boolean;
   delivery_execution_health?: DeliveryExecutionHealth;
-  /** SYSTEM-wide delivery (other customers' searches included). Never this search's own status. */
-  system_delivery_status?: SystemDeliveryStatus;
+  /** The saved-search alerts JOB (all customers' searches). Never this search's own status. */
+  saved_search_alerts_job_status?: SavedSearchJobStatus;
+  saved_search_alerts_job_reason?: string;
   /** Last alert-job run with zero failures. A job-run time — NOT "last successful email send". */
   delivery_last_clean_run_at?: string | null;
-  /** Last saved-search alert email the provider accepted, any account. */
-  delivery_last_alert_sent_at?: string | null;
+  /** Last saved-search alert the email PROVIDER accepted, any account. Not inbox delivery. */
+  delivery_last_alert_provider_accepted_at?: string | null;
+  inbox_delivery?: 'not_observable';
   /** Raw failure summary of the latest run (other searches), e.g. "email_send_rejected=3". */
   delivery_latest_run_failures?: string | null;
   /** Confirmed recipient suppressions in the latest run: an action item, not an outage. */
@@ -102,24 +104,25 @@ function deliveryMeta(delivery: SavedSearchDeliveryReadiness) {
     delivery_state: delivery.delivery_state,
     delivery_ready: delivery.delivery_ready,
     delivery_execution_health: delivery.execution_health,
-    system_delivery_status: delivery.system_status,
+    saved_search_alerts_job_status: delivery.job_status,
+    saved_search_alerts_job_reason: delivery.job_status_reason,
     delivery_last_clean_run_at: delivery.last_clean_run_at,
-    delivery_last_alert_sent_at: delivery.last_alert_sent_at,
+    delivery_last_alert_provider_accepted_at: delivery.last_alert_provider_accepted_at,
+    inbox_delivery: delivery.inbox_delivery,
     delivery_latest_run_failures: delivery.latest_run_failures,
     delivery_suppression_action_items: delivery.suppression_action_items,
   };
 }
 
 /**
- * `_meta.degraded` for a schedule: true only when THIS search is affected — a system problem that
- * is not a proven partial, or a failure specific to the search. Another customer's failure is not.
+ * `_meta.degraded` for a schedule: true only when THIS search's alerts are affected — the search is
+ * blocked or failing, its filter cannot run, or the saved-search alerts job failed / is unknown.
+ * A partial failure of the job (other customers' searches) is not this search's degradation.
  */
 function scheduleDegraded(status: SavedSearchAlertStatus): boolean {
   if (status.search_delivery === 'paused') return false;
-  if (status.search_delivery === 'blocked' || status.search_delivery === 'failing') return true;
-  return status.system_status === 'system_failure'
-    || status.system_status === 'degraded_unconfirmed'
-    || status.system_status === 'unknown';
+  if (['search_blocked_invalid_filters', 'search_blocked_recipient', 'search_failing', 'search_filter_unsupported', 'job_failure', 'unknown'].includes(status.headline)) return true;
+  return status.job_status === 'unknown';
 }
 
 async function statusFor(
@@ -249,9 +252,11 @@ export type ListMarketSchedulesResult = {
     delivery_state: DeliveryState;
     delivery_ready: boolean;
     delivery_execution_health: DeliveryExecutionHealth;
-    system_delivery_status: SystemDeliveryStatus;
+    saved_search_alerts_job_status: SavedSearchJobStatus;
+    saved_search_alerts_job_reason: string;
     delivery_last_clean_run_at: string | null;
-    delivery_last_alert_sent_at: string | null;
+    delivery_last_alert_provider_accepted_at: string | null;
+    inbox_delivery: 'not_observable';
     delivery_latest_run_failures: string | null;
     delivery_suppression_action_items: Record<string, number>;
     count: number;
@@ -334,9 +339,11 @@ export type UpdateMarketScheduleResult = {
     delivery_state: DeliveryState;
     delivery_ready: boolean;
     delivery_execution_health: DeliveryExecutionHealth;
-    system_delivery_status: SystemDeliveryStatus;
+    saved_search_alerts_job_status: SavedSearchJobStatus;
+    saved_search_alerts_job_reason: string;
     delivery_last_clean_run_at: string | null;
-    delivery_last_alert_sent_at: string | null;
+    delivery_last_alert_provider_accepted_at: string | null;
+    inbox_delivery: 'not_observable';
     delivery_latest_run_failures: string | null;
     delivery_suppression_action_items: Record<string, number>;
     noop?: boolean;
@@ -459,7 +466,7 @@ function buildScheduleHint(r: ScheduleMarketSearchResult): NonNullable<ScheduleM
   }
   const st = r.alert_status;
   const deliveryNote = st
-    ? `${st.summary} (headline=${st.headline}, search_delivery=${st.search_delivery}, system=${st.system_status}).`
+    ? `${st.summary} (headline=${st.headline}, search_delivery=${st.search_delivery}, saved_search_alerts_job=${st.job_status}).`
     : `Delivery state is ${r._meta.delivery_state}.`;
   return {
     summary: r.idempotent
@@ -469,8 +476,9 @@ function buildScheduleHint(r: ScheduleMarketSearchResult): NonNullable<ScheduleM
     key_caveats:
       'Do not quote or invent the user email address. alert_destination=account_email only. ' +
       'Relay alert_status.summary; do not restate system status as this search failing. ' +
-      'delivery_last_clean_run_at is the last job run with ZERO failures across all customers — never call it "last successful send"; ' +
-      'delivery_last_alert_sent_at is the last alert email actually sent. ' +
+      'Describe THIS search first (alert_status.summary). Job-level fields are about the "saved-search alerts" job only — never generalize them to all Mindy email. ' +
+      'delivery_last_clean_run_at is the last job run with no processing failure — never call it "last successful send"; ' +
+      'delivery_last_alert_provider_accepted_at is the last alert accepted by the email provider (inbox delivery is not observable). ' +
       (r._meta.bbox_omitted ? 'bbox was omitted — viewport is NOT restored.' : ''),
   };
 }

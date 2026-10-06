@@ -2,13 +2,14 @@ import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('@/lib/app/workspace', () => ({ getAppSupabase: () => ({}) }));
 
-import { composeSearchAlertStatus } from './search-delivery-status';
+import { composeSearchAlertStatus, type FilterReachResult } from './search-delivery-status';
 import type { SavedSearchDeliveryReadiness } from './delivery-readiness';
 import type { SavedSearchRow } from './types';
 
 const NOW = new Date('2026-10-05T23:20:13Z');
 
-const system = (over: Partial<SavedSearchDeliveryReadiness> = {}): SavedSearchDeliveryReadiness => ({
+const job = (over: Partial<SavedSearchDeliveryReadiness> = {}): SavedSearchDeliveryReadiness => ({
+  job: 'saved-search-alerts',
   storage_ready: true,
   cron_registered: true,
   cron_enabled: true,
@@ -19,16 +20,19 @@ const system = (over: Partial<SavedSearchDeliveryReadiness> = {}): SavedSearchDe
   last_run_at: '2026-10-05T11:00:29Z',
   last_run_status: 'error',
   last_clean_run_at: '2026-09-29T11:00:28Z',
-  last_alert_sent_at: '2026-10-05T11:01:41Z',
+  last_alert_provider_accepted_at: '2026-10-05T11:01:41Z',
+  inbox_delivery: 'not_observable',
   latest_run_started_at: '2026-10-05T11:00:29Z',
   latest_run_in_window: true,
-  latest_run_failures: 'unexpected_schedule_error=1,email_send_rejected=3',
-  latest_run_processing_failures: { unexpected_schedule_error: 1, email_send_rejected: 3 },
-  suppression_action_items: {},
-  latest_run_alerts_sent: 48,
+  latest_run_failures: 'unexpected_schedule_error=1,recipient_suppressed=3',
+  latest_run_processing_failures: { unexpected_schedule_error: 1 },
+  suppression_action_items: { recipient_suppressed: 3 },
+  latest_run_alerts_provider_accepted: 48,
+  latest_run_searches_evaluated: 134,
+  job_status_reason: 'saved-search alerts: partial failure: unexpected_schedule_error=1 failed; the rest ran (evaluated 134 searches, 48 alerts accepted by the email provider)',
   execution_health: 'partial_failure',
   delivery_state: 'delivery_partial',
-  system_status: 'partial_degradation',
+  job_status: 'partial_failure',
   delivery_ready: true,
   ...over,
 });
@@ -51,104 +55,97 @@ const search = (over: Partial<SavedSearchRow> = {}): SavedSearchRow => ({
 });
 
 const clean = { suppressed: null, lastAlertAt: null };
+const reach = (r: FilterReachResult['reach']): FilterReachResult => ({ reach: r, detail: null });
 
-describe('composeSearchAlertStatus', () => {
-  it('new search during a partial run: saved+validated, delivery not yet tested, baseline pending, next check tomorrow', () => {
-    const r = composeSearchAlertStatus(search(), system(), clean, { reach: 'matched_historically', detail: null }, NOW);
-    expect(r.saved).toBe(true);
-    expect(r.validated).toBe(true);
-    expect(r.search_delivery).toBe('not_yet_tested');
-    expect(r.baseline).toBe('pending');
-    expect(r.headline).toBe('delivery_not_yet_tested');
+describe('composeSearchAlertStatus — this search first, the job labelled', () => {
+  it("Denise's Marine Corps watch (with #1840): supported, matched historically, no open matches, not yet tested", () => {
+    const r = composeSearchAlertStatus(search({ filters: { naics: '541611', setAside: 'WOSB', subAgency: 'Marine Corps' } }), job(), clean, reach('matched_historically'), NOW);
+    expect(r.filter_support).toBe('supported');
+    expect(r.filter_limitations).toEqual([]);
+    expect(r.filter_reach).toBe('matched_historically');
+    expect(r.headline).toBe('awaiting_first_check');
+    expect(r.search_delivery).toBe('not_yet_evaluated');
     expect(r.next_evaluation_at).toBe('2026-10-06T11:00:00.000Z');
-    expect(r.summary).toMatch(/partial degradation/i);
-    expect(r.summary).not.toMatch(/unreliable|won't arrive|will not arrive|down|stopped/i);
+    expect(r.summary).toMatch(/^This saved search is saved and valid\. Delivery is not yet tested/);
+    expect(r.summary).toContain('Its filters have matched past notices; none are open right now.');
+    expect(r.summary).toContain('Saved-search alerts: the latest run had failures in other saved searches; this one is not affected.');
+    expect(r.summary).not.toMatch(/not representable|cannot run|unsupported|never/i);
   });
 
-  it('another customer\'s failure never becomes this search\'s failure', () => {
-    // same partial run; this search was evaluated in it and has delivered before
+  it('a supported filter with no records is "no matches in available data", not unsupported', () => {
+    const r = composeSearchAlertStatus(search(), job(), clean, reach('no_matches_in_available_data'), NOW);
+    expect(r.filter_support).toBe('supported');
+    expect(r.summary).toContain("No notice in Mindy's data has matched these filters yet; a matching notice posted later will alert.");
+  });
+
+  it('Marine Corps with forecasts on: Open supported, Forecast disclosed as a limitation (partially supported)', () => {
+    const r = composeSearchAlertStatus(search({ filters: { subAgency: 'Marine Corps', horizons: { open: true, forecast: true } } }), job(), clean, reach('matches_open_now'), NOW);
+    expect(r.filter_support).toBe('partially_supported');
+    expect(r.filter_limitations.map((l) => l.horizon)).toEqual(['forecast']);
+    expect(r.summary).toMatch(/cannot be filtered on agency forecasts.*not broadened to Navy/);
+  });
+
+  it('one invalid search → THIS search blocked; nothing about the job', () => {
+    const r = composeSearchAlertStatus(search({ filters: { naics: '541511', sapBuyer: true as unknown as string }, created_at: '2026-10-01T00:00:00Z' }), job(), clean, reach('unknown'), NOW);
+    expect(r.search_delivery).toBe('blocked_invalid_filters');
+    expect(r.summary).toMatch(/^This saved search is blocked: .*your other searches are unaffected\./);
+  });
+
+  it('every NAICS unknown → blocked; some unknown → evaluated and the bad codes named', () => {
+    expect(composeSearchAlertStatus(search({ filters: { naics: '541510' } }), job(), clean, reach('unknown'), NOW).search_delivery).toBe('blocked_invalid_filters');
+    const r = composeSearchAlertStatus(search({ filters: { naics: '541510,541512' } }), job(), clean, reach('matches_open_now'), NOW);
+    expect(r.search_delivery).toBe('not_yet_evaluated');
+    expect(r.invalid_naics).toEqual(['541510']);
+  });
+
+  it('confirmed suppressed recipient → action item, explicitly not an outage', () => {
+    const r = composeSearchAlertStatus(search(), job({ job_status: 'healthy' }), { suppressed: 'hard_bounce', lastAlertAt: null }, reach('matches_open_now'), NOW);
+    expect(r.search_delivery).toBe('blocked_recipient_suppressed');
+    expect(r.summary).toMatch(/held: the account email is on the suppression list \(hard_bounce\)\. Action needed .* not a system outage/);
+  });
+
+  it('a failed suppression LOOKUP is unknown (processing error), never "suppressed"', () => {
+    const r = composeSearchAlertStatus(search(), job(), { suppressed: undefined, lastAlertAt: undefined }, reach('matches_open_now'), NOW);
+    expect(r.search_delivery).toBe('unknown');
+    expect(r.summary).not.toMatch(/suppression list/);
+    expect(r.summary).toMatch(/processing error/);
+  });
+
+  it('no emails yet, explained: baseline-only vs no new matches vs not yet evaluated', () => {
+    const base = composeSearchAlertStatus(search({ created_at: '2026-10-04T20:00:00Z', last_alerted_at: '2026-10-05T11:00:40Z' }), job(), clean, reach('matches_open_now'), NOW);
+    expect(base.search_delivery).toBe('baseline_only');
+    const none = composeSearchAlertStatus(search({ created_at: '2026-09-01T00:00:00Z', last_alerted_at: '2026-10-05T11:00:40Z' }), job(), clean, reach('matches_open_now'), NOW);
+    expect(none.search_delivery).toBe('no_new_matches');
+    expect(none.summary).toMatch(/no new match has appeared since its first check/);
+  });
+
+  it('due in the latest processing run but not evaluated → this search is failing', () => {
+    const r = composeSearchAlertStatus(search({ created_at: '2026-09-01T00:00:00Z', last_alerted_at: '2026-10-02T11:00:40Z', total_alerts_sent: 3 }), job(), { suppressed: null, lastAlertAt: '2026-10-02T11:00:41Z' }, reach('matches_open_now'), NOW);
+    expect(r.headline).toBe('search_failing');
+    expect(r.summary).toContain('Saved-search alerts: partial failure: unexpected_schedule_error=1 failed');
+  });
+
+  it('another customer\'s failure never becomes this search\'s failure; delivery is provider acceptance, not inbox', () => {
     const r = composeSearchAlertStatus(
       search({ created_at: '2026-09-01T00:00:00Z', last_alerted_at: '2026-10-05T11:00:40Z', total_alerts_sent: 12 }),
-      system(),
-      { suppressed: null, lastAlertAt: '2026-10-05T11:00:41Z' },
-      { reach: 'matches_open_now', detail: null },
-      NOW,
+      job(), { suppressed: null, lastAlertAt: '2026-10-05T11:00:41Z' }, reach('matches_open_now'), NOW,
     );
-    expect(r.search_delivery).toBe('delivered');
     expect(r.headline).toBe('delivering');
-    expect(r.summary).toMatch(/unaffected/i);
+    expect(r.summary).toMatch(/our email provider last accepted one for this account at 2026-10-05 11:00 UTC \(inbox delivery is not tracked\)/);
+    expect(r.summary).toContain('this one is not affected');
   });
 
-  it('this recipient suppressed → blocked, even when the system is healthy', () => {
-    const r = composeSearchAlertStatus(search(), system({ system_status: 'healthy' }), { suppressed: 'hard_bounce', lastAlertAt: null }, { reach: 'matches_open_now', detail: null }, NOW);
-    expect(r.search_delivery).toBe('blocked');
-    expect(r.headline).toBe('search_delivery_blocked');
-    expect(r.summary).toMatch(/hard_bounce/);
-  });
-
-  it('due in the latest delivering run but not evaluated → this search is failing', () => {
-    const r = composeSearchAlertStatus(
-      search({ created_at: '2026-09-01T00:00:00Z', last_alerted_at: '2026-10-02T11:00:40Z', total_alerts_sent: 3 }),
-      system(),
-      { suppressed: null, lastAlertAt: '2026-10-02T11:00:41Z' },
-      { reach: 'matches_open_now', detail: null },
-      NOW,
-    );
-    expect(r.search_delivery).toBe('failing');
-    expect(r.headline).toBe('search_delivery_failing');
-  });
-
-  it('an un-delivering run does not convict one search (that is the system status)', () => {
-    const r = composeSearchAlertStatus(
-      search({ created_at: '2026-09-01T00:00:00Z', last_alerted_at: '2026-10-02T11:00:40Z' }),
-      system({ system_status: 'degraded_unconfirmed', delivery_ready: false, latest_run_alerts_sent: 0 }),
-      clean,
-      { reach: 'matches_open_now', detail: null },
-      NOW,
-    );
-    expect(r.search_delivery).not.toBe('failing');
-  });
-
-  it('confirmed system failure outranks everything for an active search', () => {
-    const r = composeSearchAlertStatus(search(), system({ system_status: 'system_failure', delivery_ready: false }), clean, { reach: 'matches_open_now', detail: null }, NOW);
-    expect(r.headline).toBe('system_delivery_failure');
-    expect(r.summary).toMatch(/down for all saved searches/i);
-  });
-
-  it('an unrepresentable filter value is surfaced with the field named', () => {
-    const r = composeSearchAlertStatus(
-      search({ filters: { subAgency: 'Marine Corps' } }),
-      system(),
-      clean,
-      { reach: 'filter_not_representable', detail: 'subAgency "Marine Corps" does not occur as a sub-agency (sub_tier) value' },
-      NOW,
-    );
-    expect(r.headline).toBe('search_filter_not_representable');
-    expect(r.summary).toMatch(/subAgency "Marine Corps"/);
-  });
-
-  it('zero historical matches alone is not a dead watch', () => {
-    const r = composeSearchAlertStatus(search(), system(), clean, { reach: 'no_matches_in_available_data', detail: null }, NOW);
-    expect(r.headline).toBe('delivery_not_yet_tested');
-    expect(r.summary).toMatch(/matching notice posted later will alert/i);
-    expect(r.summary).not.toMatch(/never|cannot/i);
+  it('a confirmed job failure is said plainly, labelled as the saved-search alerts job', () => {
+    const r = composeSearchAlertStatus(search(), job({ job_status: 'job_failure', job_status_reason: "saved-search alerts: the job did not run in today's window", delivery_ready: false }), clean, reach('matches_open_now'), NOW);
+    expect(r.headline).toBe('job_failure');
+    expect(r.summary).toMatch(/^This saved search is saved and valid\./);
+    expect(r.summary).toContain("Saved-search alerts: the job did not run in today's window. No saved-search alert emails can be expected until it recovers.");
+    expect(r.summary).not.toMatch(/Mindy email|all email/i);
   });
 
   it('paused is a choice, not a failure', () => {
-    const r = composeSearchAlertStatus(search({ alerts_enabled: false }), system({ system_status: 'system_failure' }), clean, { reach: 'matches_open_now', detail: null }, NOW);
-    expect(r.search_delivery).toBe('paused');
+    const r = composeSearchAlertStatus(search({ alerts_enabled: false }), job({ job_status: 'job_failure' }), clean, reach('matches_open_now'), NOW);
     expect(r.headline).toBe('paused');
     expect(r.next_evaluation_at).toBeNull();
-  });
-
-  it('unreadable recipient evidence is unknown, never delivered', () => {
-    const r = composeSearchAlertStatus(search({ total_alerts_sent: 4 }), system(), { suppressed: undefined, lastAlertAt: undefined }, { reach: 'unknown', detail: null }, NOW);
-    expect(r.search_delivery).toBe('unknown');
-    expect(r.headline).toBe('delivery_not_yet_tested');
-  });
-
-  it('weekly cadence: next check is the next Monday run', () => {
-    const r = composeSearchAlertStatus(search({ alert_frequency: 'weekly' }), system(), clean, { reach: 'matches_open_now', detail: null }, NOW);
-    expect(r.next_evaluation_at).toBe('2026-10-12T11:00:00.000Z');
   });
 });

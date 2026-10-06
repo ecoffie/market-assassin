@@ -50,17 +50,21 @@ const deliveryReady: SavedSearchDeliveryReadiness = {
   cron_expr: '0 11 * * *',
   last_run_at: '2026-08-30T11:01:00Z',
   last_run_status: 'success',
+  job: 'saved-search-alerts',
   last_clean_run_at: '2026-08-30T11:01:00Z',
-  last_alert_sent_at: '2026-08-30T11:01:10Z',
+  last_alert_provider_accepted_at: '2026-08-30T11:01:10Z',
+  inbox_delivery: 'not_observable',
   latest_run_started_at: '2026-08-30T11:01:00Z',
   latest_run_in_window: true,
   latest_run_failures: null,
   latest_run_processing_failures: {},
   suppression_action_items: {},
-  latest_run_alerts_sent: null,
+  latest_run_alerts_provider_accepted: 7,
+  latest_run_searches_evaluated: 40,
+  job_status_reason: 'saved-search alerts: latest run completed (evaluated 40 searches, 7 alerts accepted by the email provider)',
   execution_health: 'recent_success',
   delivery_state: 'delivery_ready',
-  system_status: 'healthy',
+  job_status: 'healthy',
   delivery_ready: true,
 };
 
@@ -171,7 +175,7 @@ describe('schedule_market_search MCP tool', () => {
       last_clean_run_at: null,
       execution_health: 'not_observed',
       delivery_state: 'delivery_configured',
-      system_status: 'not_observed',
+      job_status: 'not_observed',
       delivery_ready: false,
     });
     mockCreate.mockResolvedValue({
@@ -215,7 +219,8 @@ describe('schedule_market_search MCP tool', () => {
       delivery_state: 'delivery_degraded',
       cron_enabled: false,
       execution_health: 'not_observed',
-      system_status: 'system_failure',
+      job_status: 'job_failure',
+      job_status_reason: 'saved-search alerts: the job is disabled',
     });
     mockCreate.mockResolvedValue({
       ok: true,
@@ -250,8 +255,8 @@ describe('schedule_market_search MCP tool', () => {
     expect(r._meta.delivery_ready).toBe(false);
     expect(r._meta.degraded).toBe(true);
     expect(r.message).not.toMatch(/will be emailed/i);
-    expect(r.message).toMatch(/delivery is currently down/i);
-    expect(r.alert_status?.headline).toBe('system_delivery_failure');
+    expect(r.message).toContain('Saved-search alerts: the job is disabled. No saved-search alert emails can be expected until it recovers.');
+    expect(r.alert_status?.headline).toBe('job_failure');
   });
 
   it('delete without confirm is rejected', async () => {
@@ -297,10 +302,10 @@ describe('schedule_market_search MCP tool', () => {
 
   /** What a partial run must never be turned into: a claim that ALL delivery stopped. */
   const FALSE_TOTAL_OUTAGE =
-    /2026-09-29|Sept|September|unreliable|not currently guaranteed|delivery is (currently )?down|stopped|won't arrive|will not arrive|no (successful )?(sends|emails)/i;
+    /2026-09-29|Sept|September|unreliable|not currently guaranteed|no saved-search alert emails can be expected|stopped|won't arrive|will not arrive|no (successful )?(sends|emails)|Mindy email|all email/i;
 
   it('a confirmed total outage still says so (the warning is preserved, not suppressed)', async () => {
-    mockDelivery.mockResolvedValue({ ...deliveryReady, system_status: 'system_failure', delivery_ready: false, delivery_state: 'delivery_degraded' });
+    mockDelivery.mockResolvedValue({ ...deliveryReady, job_status: 'job_failure', job_status_reason: "saved-search alerts: the job did not run in today's window", delivery_ready: false, delivery_state: 'delivery_degraded' });
     mockCreate.mockResolvedValue({
       ok: true,
       data: { idempotent: false, bbox_omitted: false, search: {
@@ -311,7 +316,7 @@ describe('schedule_market_search MCP tool', () => {
     });
     const r = await scheduleMarketSearch({ userEmail: 'u@example.com', name: 'n', filters: { naics: '541611' } });
     expect(r._meta.degraded).toBe(true);
-    expect(r.message).toMatch(/delivery is currently down for all saved searches/i);
+    expect(r.message).toMatch(/^This saved search is saved and valid\. .*Saved-search alerts: the job did not run in today's window\. No saved-search alert emails can be expected until it recovers\.$/);
   });
 
   describe('alert-health status for the 2026-10-05 Marine Corps WOSB 541611 watches', () => {
@@ -323,15 +328,17 @@ describe('schedule_market_search MCP tool', () => {
       last_run_at: '2026-10-05T11:00:29Z',
       last_run_status: 'error',
       last_clean_run_at: '2026-09-29T11:00:28Z',
-      last_alert_sent_at: '2026-10-05T11:01:41Z',
+      last_alert_provider_accepted_at: '2026-10-05T11:01:41Z',
       latest_run_started_at: '2026-10-05T11:00:29Z',
       latest_run_in_window: true,
       latest_run_failures: 'unexpected_schedule_error=1,email_send_rejected=3',
       latest_run_processing_failures: { unexpected_schedule_error: 1, email_send_rejected: 3 },
-      latest_run_alerts_sent: 48,
+      latest_run_alerts_provider_accepted: 48,
+      latest_run_searches_evaluated: 134,
+      job_status_reason: 'saved-search alerts: partial failure: unexpected_schedule_error=1, email_send_rejected=3 failed; the rest ran (evaluated 134 searches, 48 alerts accepted by the email provider)',
       execution_health: 'partial_failure',
       delivery_state: 'delivery_partial',
-      system_status: 'partial_degradation',
+      job_status: 'partial_failure',
       delivery_ready: true,
     };
     const marineWatch = {
@@ -360,18 +367,20 @@ describe('schedule_market_search MCP tool', () => {
       expect(r._meta.schedule_saved).toBe(true);
       expect(r._meta.degraded).toBe(false);
       expect(r._meta.delivery_ready).toBe(true);
-      expect(r._meta.system_delivery_status).toBe('partial_degradation');
-      expect(r._meta.delivery_last_alert_sent_at).toBe('2026-10-05T11:01:41Z');
+      expect(r._meta.saved_search_alerts_job_status).toBe('partial_failure');
+      expect(r._meta.delivery_last_alert_provider_accepted_at).toBe('2026-10-05T11:01:41Z');
+      expect(r._meta.inbox_delivery).toBe('not_observable');
       // the job-run time stays available, under a name that cannot be read as an email send
       expect(r._meta.delivery_last_clean_run_at).toBe('2026-09-29T11:00:28Z');
       expect(r._meta).not.toHaveProperty('delivery_last_success_at');
-      expect(r.alert_status?.headline).toBe('delivery_not_yet_tested');
-      expect(r.alert_status?.search_delivery).toBe('not_yet_tested');
+      expect(r.alert_status?.headline).toBe('awaiting_first_check');
+      expect(r.alert_status?.search_delivery).toBe('not_yet_evaluated');
       expect(r.alert_status?.baseline).toBe('pending');
-      // Partial degradation is preserved and named; what is prohibited is claiming delivery stopped.
-      expect(r.message).toMatch(/partial degradation/i);
-      expect(r.message).toMatch(/alert delivery is working/i);
-      expect(r.message).toMatch(/delivery not yet tested/i);
+      expect(r.alert_status?.filter_support).toBe('supported');
+      // This search first; the job's partial failure is named and labelled, never a claim that delivery stopped.
+      expect(r.message).toMatch(/^This saved search is saved and valid\. Delivery is not yet tested/);
+      expect(r.message).toContain('Its filters have matched past notices; none are open right now.');
+      expect(r.message).toContain('Saved-search alerts: the latest run had failures in other saved searches; this one is not affected.');
       expect(r.message).not.toMatch(FALSE_TOTAL_OUTAGE);
       expect(r.message).not.toMatch(/will be emailed|will email/i);
     });
@@ -383,23 +392,20 @@ describe('schedule_market_search MCP tool', () => {
 
       const r = await scheduleMarketSearch({ userEmail: 'customer@example.com', name: marineWatch.name, filters: marineWatch.filters });
       expect(r._meta.degraded).toBe(true);
-      expect(r.alert_status?.headline).toBe('search_delivery_blocked');
-      expect(r.message).toMatch(/cannot be delivered.*hard_bounce/i);
+      expect(r.alert_status?.headline).toBe('search_blocked_recipient');
+      expect(r.message).toMatch(/held: the account email is on the suppression list \(hard_bounce\)\. Action needed on the account email; this is not a system outage/);
     });
 
-    it('an unrepresentable filter value is flagged, naming the field', async () => {
+    it('Marine Corps with forecasts on: the Forecast limitation is disclosed, the watch stays on Open', async () => {
       mockDelivery.mockResolvedValue(partialProd);
-      mockReach.mockResolvedValue({
-        reach: 'filter_not_representable',
-        detail: 'subAgency "Marine Corps" does not occur as a sub-agency (sub_tier) value anywhere in Mindy\'s SAM data',
-      });
-      mockCreate.mockResolvedValue({ ok: true, data: { idempotent: false, bbox_omitted: false, search: marineWatch } });
+      const withForecast = { ...marineWatch, filters: { ...marineWatch.filters, horizons: { open: true, forecast: true } } };
+      mockCreate.mockResolvedValue({ ok: true, data: { idempotent: false, bbox_omitted: false, search: withForecast } });
 
-      const r = await scheduleMarketSearch({ userEmail: 'customer@example.com', name: marineWatch.name, filters: marineWatch.filters });
-      expect(r.alert_status?.filter_reach).toBe('filter_not_representable');
-      expect(r.alert_status?.headline).toBe('search_filter_not_representable');
-      expect(r.message).toMatch(/subAgency "Marine Corps"/);
-      expect(r._meta.degraded).toBe(false); // a filter problem is not a delivery outage
+      const r = await scheduleMarketSearch({ userEmail: 'customer@example.com', name: marineWatch.name, filters: withForecast.filters });
+      expect(r.alert_status?.filter_support).toBe('partially_supported');
+      expect(r.alert_status?.filter_limitations.map((l) => l.horizon)).toEqual(['forecast']);
+      expect(r.message).toMatch(/U\.S\. Marine Corps cannot be filtered on agency forecasts.*not broadened to Navy/);
+      expect(r._meta.degraded).toBe(false);
     });
 
     it('zero matches in the available data is NOT reported as a dead watch', async () => {
@@ -408,7 +414,8 @@ describe('schedule_market_search MCP tool', () => {
       mockCreate.mockResolvedValue({ ok: true, data: { idempotent: false, bbox_omitted: false, search: marineWatch } });
 
       const r = await scheduleMarketSearch({ userEmail: 'customer@example.com', name: marineWatch.name, filters: marineWatch.filters });
-      expect(r.alert_status?.headline).toBe('delivery_not_yet_tested');
+      expect(r.alert_status?.headline).toBe('awaiting_first_check');
+      expect(r.alert_status?.filter_support).toBe('supported');
       expect(r.message).toMatch(/a matching notice posted later will alert/i);
       expect(r.message).not.toMatch(/never|cannot|will not alert/i);
     });
@@ -416,8 +423,8 @@ describe('schedule_market_search MCP tool', () => {
     it('list reports each watch on its own evidence, reading recipient evidence once', async () => {
       mockDelivery.mockResolvedValue(partialProd);
       mockReach
-        .mockResolvedValueOnce({ reach: 'filter_not_representable', detail: 'subAgency "Marine Corps" …' })
-        .mockResolvedValueOnce({ reach: 'matched_historically', detail: null });
+        .mockResolvedValueOnce({ reach: 'matched_historically', detail: null })
+        .mockResolvedValueOnce({ reach: 'no_matches_in_available_data', detail: null });
       mockList.mockResolvedValue({
         ok: true,
         data: { searches: [marineWatch, { ...marineWatch, id: 'dai', name: 'DAI follow-on', filters: { q: 'DAI', naics: '541611', setAside: 'WOSB' } }] },
@@ -425,8 +432,11 @@ describe('schedule_market_search MCP tool', () => {
 
       const r = await listMarketSchedules({ userEmail: 'customer@example.com' });
       expect(mockRecipient).toHaveBeenCalledTimes(1);
-      expect(r.schedules.map((x) => x.alert_status?.headline)).toEqual(['search_filter_not_representable', 'delivery_not_yet_tested']);
-      expect(r._meta.system_delivery_status).toBe('partial_degradation');
+      expect(r.schedules.map((x) => [x.alert_status?.headline, x.alert_status?.filter_support, x.alert_status?.filter_reach])).toEqual([
+        ['awaiting_first_check', 'supported', 'matched_historically'],
+        ['awaiting_first_check', 'supported', 'no_matches_in_available_data'],
+      ]);
+      expect(r._meta.saved_search_alerts_job_status).toBe('partial_failure');
     });
   });
 });
