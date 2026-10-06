@@ -15,6 +15,8 @@ interface PersistSentAlertParams {
   profileTable?: ProfileTable;
   sentAt?: string;
   alertDate?: string;
+  /** Optional note on a SENT row (e.g. a partial send). Default null — unchanged for every existing caller. */
+  errorMessage?: string | null;
 }
 
 function isMissingConflictConstraintError(error: unknown): boolean {
@@ -77,6 +79,7 @@ export async function persistSentAlert({
   profileTable = 'user_notification_settings',
   sentAt = new Date().toISOString(),
   alertDate: explicitAlertDate,
+  errorMessage = null,
 }: PersistSentAlertParams): Promise<{ alertDate: string; sentAt: string }> {
   const alertDate = explicitAlertDate || sentAt.split('T')[0];
 
@@ -87,7 +90,7 @@ export async function persistSentAlert({
     opportunities_count: opportunitiesCount,
     sent_at: sentAt,
     delivery_status: 'sent',
-    error_message: null,
+    error_message: errorMessage,
   };
 
   if (opportunitiesData) {

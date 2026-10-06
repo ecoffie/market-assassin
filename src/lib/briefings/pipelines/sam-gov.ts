@@ -118,6 +118,14 @@ interface SAMSearchResult {
   distinctiveMatchCount?: number;
   openKeywordOutcome?: OpenKeywordOutcome;
   fetchedAt: string;
+  /**
+   * Did the cache query itself succeed? Set by fetchSamOpportunitiesFromCache only.
+   * 'error' means `opportunities: []` is UNKNOWN, not an empty market — a statement
+   * timeout used to be logged as "no opportunities" (match-health audit 2026-10-06).
+   * Absent on results from other producers (live API), which is treated as 'ok'.
+   */
+  queryStatus?: 'ok' | 'error';
+  queryError?: { code?: string | null; message: string };
 }
 
 interface SAMNoticeSummary {
@@ -128,6 +136,11 @@ interface SAMNoticeSummary {
   preSol: number;
   combined: number;
   other: number;
+  /**
+   * false when a page failed: the counts above are a PARTIAL tally (or zero) of an
+   * unknown total and must not be presented as the market's size. Absent = complete.
+   */
+  complete?: boolean;
 }
 
 interface SAMRawOpportunity {
@@ -903,7 +916,10 @@ export async function fetchSamOpportunitiesFromCache(
 
   if (!supabase) {
     console.error('[SAM Cache] Supabase client not initialized');
-    return { opportunities: [], totalRecords: 0, fetchedAt: new Date().toISOString() };
+    return {
+      opportunities: [], totalRecords: 0, fetchedAt: new Date().toISOString(),
+      queryStatus: 'error', queryError: { code: 'no_client', message: 'Supabase client not initialized' },
+    };
   }
 
   const searchCriteria = [
@@ -935,7 +951,11 @@ export async function fetchSamOpportunitiesFromCache(
 
     if (error) {
       console.error('[SAM Cache] Query error:', error);
-      return { opportunities: [], totalRecords: 0, fetchedAt: new Date().toISOString() };
+      return {
+        opportunities: [], totalRecords: 0, fetchedAt: new Date().toISOString(),
+        queryStatus: 'error',
+        queryError: { code: (error as { code?: string }).code ?? null, message: String((error as { message?: string }).message || 'query failed') },
+      };
     }
 
     console.log(`[SAM Cache] Found ${data?.length || 0} opportunities from database`);
@@ -1010,10 +1030,15 @@ export async function fetchSamOpportunitiesFromCache(
       distinctiveMatchCount: preferred.distinctiveMatchCount,
       openKeywordOutcome: preferred.outcome,
       fetchedAt: new Date().toISOString(),
+      queryStatus: 'ok',
     };
   } catch (error) {
     console.error('[SAM Cache] Error querying cache:', error);
-    return { opportunities: [], totalRecords: 0, fetchedAt: new Date().toISOString() };
+    return {
+      opportunities: [], totalRecords: 0, fetchedAt: new Date().toISOString(),
+      queryStatus: 'error',
+      queryError: { code: 'exception', message: error instanceof Error ? error.message : String(error) },
+    };
   }
 }
 
@@ -1201,7 +1226,7 @@ export async function fetchSamOpportunityNoticeSummaryFromCache(
 ): Promise<SAMNoticeSummary> {
   if (!supabase) {
     console.error('[SAM Cache] Supabase client not initialized');
-    return { totalMatched: 0, rfp: 0, rfq: 0, sourcesSought: 0, preSol: 0, combined: 0, other: 0 };
+    return { totalMatched: 0, rfp: 0, rfq: 0, sourcesSought: 0, preSol: 0, combined: 0, other: 0, complete: false };
   }
 
   const summary: SAMNoticeSummary = {
@@ -1230,7 +1255,7 @@ export async function fetchSamOpportunityNoticeSummaryFromCache(
       const { data, error } = await query;
       if (error) {
         console.error('[SAM Cache] Notice summary query error:', error);
-        return summary;
+        return { ...summary, complete: false };
       }
 
       const rows = (data || []) as SAMCacheNoticeSummaryRow[];
@@ -1251,7 +1276,7 @@ export async function fetchSamOpportunityNoticeSummaryFromCache(
     return summary;
   } catch (error) {
     console.error('[SAM Cache] Error building notice summary:', error);
-    return summary;
+    return { ...summary, complete: false };
   }
 }
 

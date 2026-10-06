@@ -98,4 +98,69 @@ describe('retryFailedDailyAlerts — a retry never resurrects a recipient', () =
     await retryFailedDailyAlerts({ supabase, send: async () => { throw new Error('provider 503'); }, isSuppressed: async () => false, today });
     expect(updates['1']).toMatchObject({ retry_count: 1, error_message: 'provider 503' });
   });
+
+  it('a failed OPEN SEARCH row is left alone: not re-sent, not retired, its reason kept', async () => {
+    // match-health audit 2026-10-06: a statement timeout is recorded failed /
+    // open_search_failed:<code> with no payload. This loop re-SENDS stored payloads, so it
+    // has nothing to send; retiring the row as retry_skipped:no_payload would overwrite the
+    // real reason. Tomorrow's normal run searches the user again.
+    const row: FailedAlertRow = {
+      id: '9', user_email: 'kw@x.com', retry_count: 2, opportunities_data: [],
+      error_message: 'open_search_failed:57014 canceling statement due to statement timeout',
+    } as FailedAlertRow;
+    const { supabase, updates } = fakeSupabase([row], [user('kw@x.com')]);
+    const send = vi.fn(async () => true);
+    const r = await retryFailedDailyAlerts({ supabase, send, isSuppressed: async () => false, today });
+    expect(send).not.toHaveBeenCalled();
+    expect(updates['9']).toBeUndefined();
+    expect(r).toMatchObject({ retried: 0, skipped: 0, succeeded: 0 });
+  });
+});
+
+describe('retryFailedDailyAlerts — a PARTIAL send (Open unavailable) is never re-sent', () => {
+  // A fake that HONOURS the delivery_status filter, so the test exercises the real query shape.
+  function filteringSupabase(rows: Array<FailedAlertRow & { delivery_status: string }>) {
+    const sends: string[] = [];
+    const from = () => {
+      const filters: Record<string, unknown> = {};
+      const builder: Record<string, unknown> = {};
+      const chain = () => builder;
+      Object.assign(builder, {
+        select: chain, lt: chain, gte: chain, update: chain,
+        eq: (col: string, val: unknown) => { filters[col] = val; return builder; },
+        maybeSingle: async () => ({ data: user(String(filters.user_email)), error: null }),
+        then: (resolve: (v: unknown) => void) => resolve({
+          data: rows.filter((r) => !filters.delivery_status || r.delivery_status === filters.delivery_status),
+          error: null,
+        }),
+      });
+      return builder;
+    };
+    return { supabase: { from }, sends };
+  }
+
+  it('a sent row marked open_unavailable_partial with a payload generates ZERO send attempts', async () => {
+    const partial = {
+      ...failedRow('p1', 'partial@x.com'),
+      delivery_status: 'sent',
+      error_message: 'open_unavailable_partial:57014 canceling statement due to statement timeout [sections=grants attempts=3]',
+    };
+    const { supabase } = filteringSupabase([partial]);
+    const send = vi.fn(async () => true);
+    const r = await retryFailedDailyAlerts({ supabase, send, isSuppressed: async () => false, today: '2026-10-07' });
+    expect(send).not.toHaveBeenCalled();
+    expect(r.retried).toBe(0);
+  });
+
+  it('second line of defence: even a FAILED-status row carrying the partial note is not re-sent', async () => {
+    const odd = {
+      ...failedRow('p2', 'partial@x.com'),
+      delivery_status: 'failed',
+      error_message: 'open_unavailable_partial:57014 x [sections=grants attempts=3]',
+    };
+    const { supabase } = filteringSupabase([odd]);
+    const send = vi.fn(async () => true);
+    await retryFailedDailyAlerts({ supabase, send, isSuppressed: async () => false, today: '2026-10-07' });
+    expect(send).not.toHaveBeenCalled();
+  });
 });

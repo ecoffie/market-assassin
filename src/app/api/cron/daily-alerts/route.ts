@@ -27,6 +27,7 @@ import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 import { sendEmail } from '@/lib/send-email';
 import { retryFailedDailyAlerts } from '@/lib/alerts/retry-failed-daily';
+import { openSearchFailureReason, retryOpenSearchToday, isOpenSearchFailure, openSearchAttempts, openUnavailablePartialNote, OPEN_UNAVAILABLE_LINE, MAX_SAME_DAY_OPEN_SEARCH_ATTEMPTS, type OpenSearchError } from '@/lib/alerts/open-search-failure';
 import { isMailboxSuppressed } from '@/lib/email/suppression';
 import { getInsightForNoticeType, bucketNoticeType, renderInsightHtml } from '@/lib/briefings/mindy-insights';
 import { runwayRank } from '@/lib/opportunities/runway';
@@ -270,6 +271,29 @@ async function saveFailedAlert(
   });
 }
 
+/**
+ * The Open search itself failed (query error / statement timeout). NOT an empty market:
+ * recorded as 'failed' with the reason, an EMPTY payload (nothing for the cross-day
+ * re-send loop to send), and retry_count = attempts already made today, which is what
+ * the same-day guard reads to re-admit the user (see lib/alerts/open-search-failure.ts).
+ */
+async function saveOpenSearchFailedAlert(
+  email: string,
+  err: OpenSearchError | undefined,
+  priorAttempts: number,
+) {
+  await upsertAlertLog(getSupabase(), {
+    user_email: email,
+    alert_date: new Date().toISOString().split('T')[0],
+    alert_type: 'daily',
+    opportunities_count: 0,
+    opportunities_data: [],
+    delivery_status: 'failed',
+    error_message: openSearchFailureReason(err),
+    retry_count: priorAttempts,
+  });
+}
+
 async function saveSkippedAlert(
   email: string,
   reason: string,
@@ -426,12 +450,13 @@ async function runDailyAlertJob(options?: {
     // Page this too: once daily volume exceeds 1000, a capped read here would return
     // an INCOMPLETE already-processed set → users past row 1000 look un-processed and
     // get re-sent (duplicate alerts). Order for clean .range() paging.
-    let alreadyProcessedToday: { user_email: string; delivery_status: string }[] = [];
+    type ProcessedRow = { user_email: string; delivery_status: string; error_message?: string | null; retry_count?: number | null };
+    let alreadyProcessedToday: ProcessedRow[] = [];
     try {
-      alreadyProcessedToday = await fetchAllPaged<{ user_email: string; delivery_status: string }>(() =>
+      alreadyProcessedToday = await fetchAllPaged<ProcessedRow>(() =>
         getSupabase()
           .from('alert_log')
-          .select('user_email, delivery_status') // truncation-ok: fetchAllPaged applies .range() until drained
+          .select('user_email, delivery_status, error_message, retry_count') // truncation-ok: fetchAllPaged applies .range() until drained
           .eq('alert_date', today)
           .eq('alert_type', 'daily')
           .in('delivery_status', ['sent', 'skipped', 'failed'])
@@ -442,7 +467,17 @@ async function runDailyAlertJob(options?: {
       console.error('[Daily Alerts] Error fetching already-processed set:', e);
     }
 
-    const alreadyProcessedEmails = new Set((alreadyProcessedToday || []).map((s: { user_email: string }) => s.user_email));
+    // A failed OPEN SEARCH is the one 'failed' row that is not final for the day: the user is
+    // searched again by a later run, up to MAX_SAME_DAY_OPEN_SEARCH_ATTEMPTS. Every other
+    // sent/skipped/failed row still means "done today". priorOpenSearchAttempts carries the
+    // count forward so the next failure records attempt N+1.
+    const priorOpenSearchAttempts = new Map<string, number>();
+    for (const r of alreadyProcessedToday || []) {
+      if (isOpenSearchFailure(r)) priorOpenSearchAttempts.set(r.user_email, openSearchAttempts(r));
+    }
+    const alreadyProcessedEmails = new Set(
+      (alreadyProcessedToday || []).filter((r) => !retryOpenSearchToday(r)).map((r) => r.user_email),
+    );
     if (options?.forceResend && options.testEmail) {
       alreadyProcessedEmails.delete(options.testEmail);
     }
@@ -503,6 +538,8 @@ async function runDailyAlertJob(options?: {
       noNaics: 0,
       noTargeting: 0, // no NAICS AND no keywords → skipped, not given a default profile
       noOpps: 0,
+      openSearchFailed: 0, // the Open query errored — recorded failed + retryable, never counted as noOpps
+      openUnavailablePartial: 0, // final attempt still failing; other useful sections sent with the 'could not be checked' line (also counted in sent)
       wrongTimezone: 0,
       deduplicated: 0,
       freeTierSkipped: 0, // Free tier users (they get weekly alerts instead)
@@ -676,6 +713,7 @@ async function runDailyAlertJob(options?: {
         let noticeSummary: SAMNoticeSummary | undefined;
         let openKeywordOutcome: OpenKeywordOutcome | undefined;
         let comingBack: ComingBackDecision = { kind: 'omit', reason: 'no_naics_market' };
+        let openSearchError: OpenSearchError | undefined;
         try {
           noticeSummary = await fetchSamOpportunityNoticeSummaryFromCache({
             naicsCodes: expandedNaics,
@@ -704,6 +742,13 @@ async function runDailyAlertJob(options?: {
             limit: 200, // Get more from cache, filter locally
             savedNaics: userNaics,
           });
+          if (cacheResult.queryStatus === 'error') {
+            // UNKNOWN, not zero. Do not rank, do not fall back to "all active", do not
+            // reach the no-opportunities skip below. The live-API fallback in the catch is
+            // deliberately NOT used: a database incident would turn into one live SAM call
+            // per user against a 10/min budget (cache-first rule).
+            openSearchError = cacheResult.queryError ?? { message: 'open search failed' };
+          }
 
           const appliedOpen = applyOpenAlertMode(
             {
@@ -777,6 +822,29 @@ async function runDailyAlertJob(options?: {
           } else {
             console.warn(`[Daily Alerts] ${user.user_email}: Skipping live SAM fallback because SAM_API_KEY is not configured`);
           }
+        }
+
+        // Set only on the FINAL same-day attempt of a still-failing Open search: the run goes on to
+        // evaluate the OTHER sections, and sends them only if one is useful (see below).
+        let openUnavailable: { error: OpenSearchError; priorAttempts: number } | null = null;
+        if (openSearchError) {
+          const prior = priorOpenSearchAttempts.get(user.user_email) ?? 0;
+          if (prior + 1 < MAX_SAME_DAY_OPEN_SEARCH_ATTEMPTS) {
+            await saveOpenSearchFailedAlert(user.user_email, openSearchError, prior);
+            console.warn(`[Daily Alerts] ${user.user_email}: Open search FAILED (attempt ${prior + 1}) — recorded failed, NOT "no opportunities": ${openSearchFailureReason(openSearchError)}`);
+            // Its own counter, NOT results.failed: postSendValidation reads failed/(sent+failed)
+            // as an EMAIL send-failure rate, and no send was attempted here.
+            results.openSearchFailed++;
+            metrics.recordUserSkipped();
+            continue;
+          }
+          // Final attempt. Open is UNKNOWN for today: no Open rows, no fallback to "all active",
+          // no notice summary (it may be partial) — and nothing downstream may read it as zero.
+          openUnavailable = { error: openSearchError, priorAttempts: prior };
+          newOpportunities = [];
+          allActiveOpportunities = [];
+          noticeSummary = undefined;
+          openKeywordOutcome = undefined;
         }
 
         // FAILSAFE: If no NEW opportunities, fall back to ALL active opportunities
@@ -904,6 +972,23 @@ async function runDailyAlertJob(options?: {
           }
         }
 
+        // OPEN UNAVAILABLE (final attempt): send only if another section is genuinely useful —
+        // Coming Back cards or relevant grants. NOT Today's Lens, action tips or hidden matches
+        // (hidden matches are no longer rendered in the email). Nothing useful → record the
+        // failure; an email with nothing in it is never sent.
+        let partialSections: string[] = [];
+        if (openUnavailable) {
+          if (comingBack.kind === 'show' && comingBack.rows.length > 0) partialSections.push('coming_back');
+          if (scoredGrants.length > 0) partialSections.push('grants');
+          if (partialSections.length === 0) {
+            await saveOpenSearchFailedAlert(user.user_email, openUnavailable.error, openUnavailable.priorAttempts);
+            console.warn(`[Daily Alerts] ${user.user_email}: Open search still failing on the final attempt and no other useful section — recorded failed, no email`);
+            results.openSearchFailed++;
+            metrics.recordUserSkipped();
+            continue;
+          }
+        }
+
         // Even if no NEW opportunities, we still want to send if there are deadlines or active opportunities
         const hasNewOpps = scoredOpps.length > 0 || scoredGrants.length > 0;
         const hasActiveDeadlines = allActiveOpportunities.length > 0;
@@ -973,7 +1058,9 @@ async function runDailyAlertJob(options?: {
         // email so contractors get the "why open the map today" strand counts + a pre-filtered map
         // CTA in their inbox. ADDITIVE: the opportunity list is the primary payload; a lens failure
         // must NEVER block the alert, so we .catch(() => null) and simply omit the block on null.
-        const todaysLens = await computeTodaysLens(user.user_email).catch((lensErr) => {
+        // The lens reports open-market strand counts; with Open unavailable it would contradict
+        // "could not be checked", so a partial send omits it.
+        const todaysLens = openUnavailable ? null : await computeTodaysLens(user.user_email).catch((lensErr) => {
           console.warn(`[Daily Alerts] Today's Lens failed for ${user.user_email} (omitting block):`, lensErr instanceof Error ? lensErr.message : lensErr);
           return null;
         });
@@ -991,8 +1078,9 @@ async function runDailyAlertJob(options?: {
             noticeSummary,
             hiddenMatches,
             {
-              openKeywordNote: openMarketNote(openKeywordOutcome ?? 'no_keywords_configured') ?? undefined,
+              openKeywordNote: openUnavailable ? undefined : (openMarketNote(openKeywordOutcome ?? 'no_keywords_configured') ?? undefined),
               comingBack,
+              openUnavailable: !!openUnavailable,
             },
             todaysLens,
             isUsingFallback,
@@ -1054,10 +1142,16 @@ async function runDailyAlertJob(options?: {
               })),
             ],
             currentTotalAlertsSent: (user as any).total_alerts_sent,
+            // A partial send is a real send (final for the day, never re-sent) whose Open section
+            // could not be checked — the note keeps it distinguishable in every alert_log report.
+            errorMessage: openUnavailable
+              ? openUnavailablePartialNote(openUnavailable.error, openUnavailable.priorAttempts + 1, partialSections)
+              : null,
           });
 
-          console.log(`[Daily Alerts] ✅ Sent ${scoredOpps.length} opps to ${user.user_email}`);
+          console.log(`[Daily Alerts] ✅ Sent ${scoredOpps.length} opps to ${user.user_email}${openUnavailable ? ` (PARTIAL: Open unavailable; sections=${partialSections.join(',')})` : ''}`);
           results.sent++;
+          if (openUnavailable) results.openUnavailablePartial++;
 
         } catch (emailError: any) {
           console.error(`[Daily Alerts] Email send failed for ${user.user_email}:`, emailError.message);
@@ -1117,7 +1211,7 @@ async function runDailyAlertJob(options?: {
       }
     }
 
-    console.log(`[Daily Alerts] Complete. Batch: ${usersToProcess.length}/${totalEligible}, Sent: ${results.sent}, No Opps: ${results.noOpps}, No NAICS: ${results.noNaics}, Free Tier: ${results.freeTierSkipped}, Failed: ${results.failed}, Remaining: ${remainingAfterBatch}`);
+    console.log(`[Daily Alerts] Complete. Batch: ${usersToProcess.length}/${totalEligible}, Sent: ${results.sent}, No Opps: ${results.noOpps}, No NAICS: ${results.noNaics}, Free Tier: ${results.freeTierSkipped}, Failed: ${results.failed}, Open search failed: ${results.openSearchFailed}, Remaining: ${remainingAfterBatch}`);
 
     // Save metrics to database
     await metrics.save();
@@ -1472,6 +1566,8 @@ async function sendDailyAlertEmail(
     transactional?: boolean;
     openKeywordNote?: string;
     comingBack?: ComingBackDecision;
+    /** Open search failed on every same-day attempt: render OPEN_UNAVAILABLE_LINE, claim no count and no zero. */
+    openUnavailable?: boolean;
   },
   todaysLens?: TodaysLens | null,
   /**
@@ -1784,7 +1880,9 @@ function mindyDayBannerHtml(): string {
        "17 new" vs "1,089 total" — they are different facts, so they get different
        weights instead of competing as two big numbers. ── -->
   <p style="color:#0f172a;font-size:23px;font-weight:700;line-height:1.3;margin:0;">
-    ${totalCount} new ${totalCount === 1 ? 'opportunity matches' : 'opportunities match'} your market.
+    ${sendOptions?.openUnavailable
+      ? 'Your market update for today.'
+      : `${totalCount} new ${totalCount === 1 ? 'opportunity matches' : 'opportunities match'} your market.`}
   </p>
   ${leadBreakdown}
   ${sendOptions?.openKeywordNote ? `<p style="color:#475569;font-size:14px;line-height:1.6;margin:9px 0 0 0;">${sendOptions.openKeywordNote}</p>` : ''}
@@ -1792,7 +1890,12 @@ function mindyDayBannerHtml(): string {
 
   ${mindyInsightHtml}
 
-  ${opportunities.length > 0 ? `
+  ${sendOptions?.openUnavailable ? `
+  <!-- ── OPEN NOW could not be checked (search failed on every attempt today). UNKNOWN, not zero. ── -->
+  <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:32px 0 0 0;">${OPEN_NOW_HEADING}</p>
+  <div style="height:1px;background:#e5e7eb;margin:10px 0 16px 0;"></div>
+  <p style="color:#475569;font-size:14px;line-height:1.6;margin:0;">${OPEN_UNAVAILABLE_LINE}</p>
+  ` : opportunities.length > 0 ? `
   <!-- ── OPEN NOW: respondable SAM. Never mixed with Coming Back recompetes. ── -->
   <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:32px 0 0 0;">${OPEN_NOW_HEADING}</p>
   <div style="height:1px;background:#e5e7eb;margin:10px 0 0 0;"></div>
@@ -1911,9 +2014,13 @@ function mindyDayBannerHtml(): string {
     // active opportunities so the email is not empty, which is fine -- but the subject said
     // "N new opportunities" about rows whose newness was never established. isUsingFallback
     // was computed and never consulted.
+    // A partial send (Open unavailable) is never on the fallback path — it has no Open rows — so
+    // its count-free subject lives in the non-fallback arm.
     subject: isUsingFallback
       ? `${totalCount} ${totalCount === 1 ? 'opportunity' : 'opportunities'} in your market — ${formatDate(new Date().toISOString())}`
-      : `${totalCount} new ${totalCount === 1 ? 'opportunity' : 'opportunities'} in your market — ${formatDate(new Date().toISOString())}`,
+      : sendOptions?.openUnavailable
+        ? `Your market update — ${formatDate(new Date().toISOString())}`
+        : `${totalCount} new ${totalCount === 1 ? 'opportunity' : 'opportunities'} in your market — ${formatDate(new Date().toISOString())}`,
     html: htmlContent,
     emailType: 'daily_alert',
     eventSource: 'daily_alert',
@@ -1924,6 +2031,7 @@ function mindyDayBannerHtml(): string {
       match_count: totalCount,
       sam_match_count: opportunities.length,
       grant_match_count: grants.length,
+      open_unavailable: sendOptions?.openUnavailable ? 'true' : 'false',
       naics_primary: user.naics_codes?.[0] || 'none',
       user_segment: user.business_type || 'uncertified',
       state: user.location_state || 'none',
