@@ -26,6 +26,15 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-07 — VA office 36C250: false "no buyer history" and an office pick that looped
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-07 | Market research / office code | The office-code parser required a leading letter, rejected VA's 36C250 and accepted the WORD "OFFICE" from "250-NETWORK CONTRACT OFFICE 10" — buyer history queried office "OFFICE" and showed "Measured zero" though 36C250 has 22 matching awards. Codes now need letters AND digits. | `const OFFICE_CODE =` → `src/lib/mrr/market-scope.ts` | `interpret-market.unit.test.ts` (fails on old code); live: 36C250 / 541512 / OH → 22 awards | ACTIVE |
+| 2026-10-07 | Market research / office choice | Choosing an office offered after a buyer answer (36C250) looped back to "Which buyer or contracting office?" because the pick was matched only against offices found from the question. The picked code is now resolved exactly. | `exact code the user picked; never a broader match.` → `src/lib/mrr/interpret-market.ts` | `interpret-market.unit.test.ts` (fails on old code); live probe → ready | ACTIVE |
+
+---
+
 ## 2026-10-07 — Market research dead-ended on any office not named in the question
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

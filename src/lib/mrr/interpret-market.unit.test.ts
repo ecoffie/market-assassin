@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { extractDodaac } from './market-scope';
 import type { KeywordCoverage } from '@/lib/market/keyword-coverage';
 import {
   confirmationToRequirement,
@@ -300,5 +301,43 @@ describe('clarification answers and requirement wording (hosted acceptance 2026-
     expect(installationSearchToken('Camp Lejeune')).toBe('Lejeune');
     expect(installationSearchToken('Vandenberg Space Force Base')).toBe('Vandenberg');
     expect(installationSearchToken('Walter Reed National Military Medical Center')).toBe('Walter');
+  });
+});
+
+describe('office codes that start with digits (VA 36C250) — hosted acceptance 2026-10-07', () => {
+  it('reads the office code from the confirmed office, never a word like "OFFICE"', () => {
+    expect(extractDodaac('36C250 250-NETWORK CONTRACT OFFICE 10 (36C250)')).toBe('36C250');
+    expect(extractDodaac('FA4610 30 CONS PK')).toBe('FA4610');
+    expect(extractDodaac('W91247 MICC FDO FT BRAGG')).toBe('W91247');
+    expect(extractDodaac('NETWORK CONTRACT OFFICE')).toBeUndefined();
+  });
+
+  it('choosing an office offered after a buyer answer resolves it instead of asking again', async () => {
+    const nco10: OfficeCandidate = {
+      dodaac: '36C250',
+      officeName: '250-NETWORK CONTRACT OFFICE 10 (36C250)',
+      subAgency: 'VETERANS AFFAIRS, DEPARTMENT OF',
+      source: 'dodaac_directory',
+    };
+    const lookupsByName: InterpretLookups = {
+      async searchOfficesByName(query: string) {
+        return query === '36C250' ? [nco10] : [];
+      },
+      async searchOfficesAtInstallation() {
+        return [];
+      },
+      async coverageFor(keyword: string) {
+        return { keyword };
+      },
+    };
+    const result = await interpretMarketQuestion(
+      {
+        question: 'IT help desk support for the VA medical center in Cleveland, Ohio',
+        clarification: { dimension: 'office', value: '36C250' },
+      },
+      lookupsByName,
+    );
+    expect(result.status).toBe('ready');
+    expect(result.confirmation?.contractingOfficeCode).toBe('36C250');
   });
 });

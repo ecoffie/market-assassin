@@ -590,7 +590,16 @@ export async function interpretMarketQuestion(
   offices = applyConstructionConsFilter(keyword, offices);
 
   if (input.clarification?.dimension === 'office' && input.clarification.value) {
-    const chosen = pickClarifiedOffice(offices.length ? offices : [...namedHits, ...installationHits], input.clarification.value);
+    let chosen = pickClarifiedOffice(offices.length ? offices : [...namedHits, ...installationHits], input.clarification.value);
+    // The options may have come from the user's earlier buyer answer, not from
+    // the question — so the chosen code is not in `offices` here. Resolve the
+    // exact code the user picked; never a broader match.
+    if (!chosen) {
+      chosen = pickClarifiedOffice(
+        uniqueOffices(await live.searchOfficesByName(clean(input.clarification.value))),
+        input.clarification.value,
+      );
+    }
     if (chosen) offices = [chosen];
   }
 

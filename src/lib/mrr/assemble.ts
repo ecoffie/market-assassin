@@ -15,7 +15,7 @@ import type { Section11 } from './section-11-suppliers';
 import type { Section12 } from './section-12-rule-of-two';
 import type { Section15 } from './section-15-intel';
 import type { Requirement } from './types';
-import { EvidenceCollector, type RenderedCell } from './grounding';
+import { EvidenceCollector, value, type RenderedCell } from './grounding';
 import { formatSizeStandard } from './sba-size-standards';
 import {
   PROTOTYPE_BANNER, assertTemplateUnchanged, blockText, findAnchorIndex,
@@ -418,6 +418,11 @@ function fillSection9(
       const pop = collector.render(`§9 Award ${n} period of performance`, a.periodOfPerformance);
 
       const desc = a.description ? collector.render(`§9 Award ${n} description`, a.description) : null;
+      // Registered as its own field so the appendix carries the same relevance
+      // statement the report prints, with the award's provenance.
+      if (a.relevance && a.contractNumber.state === 'value') {
+        collector.render(`§9 Award ${n} relevance`, value(a.relevance.label, a.contractNumber.evidence));
+      }
       const what = [
         desc && desc.state === 'value' ? desc.text : null,
         a.relevance?.label ?? null,
