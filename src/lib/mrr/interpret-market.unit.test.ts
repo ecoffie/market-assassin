@@ -6,6 +6,7 @@ import {
   interpretMarketQuestion,
   type InterpretLookups,
   type OfficeCandidate,
+  installationSearchToken,
 } from './interpret-market';
 
 const vandenbergCons: OfficeCandidate = {
@@ -235,5 +236,69 @@ describe('interpretMarketQuestion', () => {
     });
     expect(requirement.office).toContain('FA4610');
     expect(requirement.installation).toBe('Vandenberg Space Force Base');
+  });
+});
+
+describe('clarification answers and requirement wording (hosted acceptance 2026-10-07)', () => {
+  const nco10: OfficeCandidate = {
+    dodaac: '36C250',
+    officeName: '250-NETWORK CONTRACT OFFICE 10 (36C250)',
+    subAgency: 'VETERANS AFFAIRS, DEPARTMENT OF',
+    source: 'dodaac_directory',
+  };
+  function namedLookups(byName: Record<string, OfficeCandidate[]>): InterpretLookups {
+    return {
+      async searchOfficesByName(query: string) {
+        return byName[query] ?? [];
+      },
+      async searchOfficesAtInstallation() {
+        return [];
+      },
+      async coverageFor(keyword: string) {
+        return keyword === 'IT help desk support'
+          ? { keyword, leadNaics: { code: '541512', name: 'Computer Systems Design Services' } }
+          : { keyword };
+      },
+    };
+  }
+  const question = 'IT help desk support for the VA medical center in Cleveland, Ohio';
+
+  it('uses the answer to "which buyer or office?" instead of asking the same question forever', async () => {
+    const result = await interpretMarketQuestion(
+      { question, clarification: { dimension: 'buyer', value: '36C250' } },
+      namedLookups({ '36C250': [nco10] }),
+    );
+    expect(result.status).toBe('ready');
+    expect(result.confirmation?.contractingOfficeCode).toBe('36C250');
+    expect(result.confirmation?.buyerDepartment).toBe('Department of Veterans Affairs');
+  });
+
+  it('an answer that matches no office says so — it does not repeat the identical prompt or broaden', async () => {
+    const first = await interpretMarketQuestion({ question }, namedLookups({}));
+    const second = await interpretMarketQuestion(
+      { question, clarification: { dimension: 'buyer', value: 'Louis Stokes Cleveland VA Medical Center' } },
+      namedLookups({}),
+    );
+    expect(second.status).toBe('needs_clarification');
+    expect(second.clarification?.prompt).toMatch(/could not find a contracting office matching "Louis Stokes Cleveland VA Medical Center"/);
+    expect(second.clarification?.prompt).not.toBe(first.clarification?.prompt);
+    expect(second.confirmation).toBeUndefined();
+  });
+
+  it('takes the requirement from before "for" when the question leads with it', async () => {
+    const result = await interpretMarketQuestion(
+      { question, clarification: { dimension: 'buyer', value: '36C250' } },
+      namedLookups({ '36C250': [nco10] }),
+    );
+    expect(result.confirmation?.keyword).toBe('IT help desk support');
+    expect(result.naicsSuggestion?.code).toBe('541512');
+    expect(result.confirmation?.naics).toBeUndefined();
+  });
+
+  it('searches installations by their distinctive word, not "Fort"', () => {
+    expect(installationSearchToken('Fort Bragg, North Carolina')).toBe('Bragg');
+    expect(installationSearchToken('Camp Lejeune')).toBe('Lejeune');
+    expect(installationSearchToken('Vandenberg Space Force Base')).toBe('Vandenberg');
+    expect(installationSearchToken('Walter Reed National Military Medical Center')).toBe('Walter');
   });
 });

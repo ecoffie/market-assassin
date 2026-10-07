@@ -137,8 +137,30 @@ function extractBuyerPhrase(question: string): string | undefined {
   return undefined;
 }
 
+/**
+ * "IT help desk support for the VA medical center in Cleveland" names the
+ * requirement BEFORE "for"; "the small-business market for X at Y" names it
+ * after. Use the lead when, once filler and question words are removed, it
+ * still says something — otherwise the buyer phrase became the requirement
+ * (measured 2026-10-07: keyword "the VA medical center" → NAICS 621111).
+ */
+function requirementBeforeFor(question: string): string | undefined {
+  const lead = question.match(/^(.*?)\s+for\s+/i)?.[1];
+  if (!lead) return undefined;
+  const phrase = clean(
+    lead
+      .replace(FILLER, ' ')
+      .replace(/^\s*(what(?:'s| is| are)?|how (?:big|large) is|who|show me|tell me about|is there)\b/i, ' ')
+      .replace(/\b(the|a|an|market|opportunities|suppliers)\b/gi, ' ')
+      .replace(/[?.!]/g, ''),
+  );
+  return /[a-z]{3,}/i.test(phrase) ? clean(lead.replace(/^\s*(the|a|an)\s+/i, '')) : undefined;
+}
+
 function extractKeyword(question: string): string | undefined {
   if (/\bSABER\b/i.test(question)) return 'SABER';
+  const lead = requirementBeforeFor(question);
+  if (lead) return lead;
   const forClause = question.match(
     /\bfor\s+(.+?)\s+(?:at|awarded by|in|for [A-Z]{2} performance)\b/i,
   );
@@ -268,6 +290,33 @@ export function coverageSnapshotFromKeywordCoverage(
   };
 }
 
+/** Words that start many installation names and identify none of them. */
+const GENERIC_PLACE_WORDS = new Set([
+  'fort', 'ft', 'camp', 'joint', 'base', 'naval', 'navy', 'air', 'station', 'national',
+  'mount', 'mt', 'port', 'the', 'north', 'south', 'east', 'west', 'new', 'saint', 'st',
+  'marine', 'corps', 'army', 'military', 'medical', 'center', 'reserve',
+]);
+
+/**
+ * The one word used to find offices at an installation (SAM office city
+ * ILIKE). It was the FIRST word, so "Fort Bragg" searched every city
+ * containing "Fort" (Fort Riley, Fort Hood, …) and "Louis Stokes" searched
+ * Louisville. Use the first distinctive word before any comma.
+ */
+export function installationSearchToken(place: string): string | undefined {
+  const head = clean(place)
+    .split(',')[0]
+    .replace(/\b(space force base|air force base|sfb|afb)\b/gi, ' ');
+  const words = head.split(/\s+/).filter(Boolean);
+  const distinctive = words.find((word) => !GENERIC_PLACE_WORDS.has(word.toLowerCase()));
+  const token = distinctive ?? words[0];
+  return token && token.length >= 4 ? token : undefined;
+}
+
+function normalizeOfficeName(value: string): string {
+  return value.toUpperCase().replace(/\bCONTRACTING\b/g, 'CONTRACT').replace(/\s+/g, ' ').trim();
+}
+
 export async function defaultInterpretLookups(): Promise<InterpretLookups> {
   return {
     async searchOfficesByName(query: string): Promise<OfficeCandidate[]> {
@@ -275,9 +324,20 @@ export async function defaultInterpretLookups(): Promise<InterpretLookups> {
       if (q.length < 3) return [];
       const dir = await loadDodaacDirectory();
       const hits: OfficeCandidate[] = [];
-      const needle = q.toUpperCase();
+      // "Network Contracting Office 10" is listed as "NETWORK CONTRACT OFFICE 10".
+      const needle = normalizeOfficeName(q);
+      // An exact office code (e.g. 36C250, FA4610) names one office directly.
+      const exact = /^[A-Z0-9]{6}$/i.test(q) ? dir.get(q.toUpperCase()) : undefined;
+      if (exact) {
+        hits.push({
+          dodaac: q.toUpperCase(),
+          officeName: exact.officeName || q.toUpperCase(),
+          subAgency: exact.subAgency,
+          source: 'dodaac_directory',
+        });
+      }
       for (const [dodaac, info] of dir) {
-        const name = (info.officeName || '').toUpperCase();
+        const name = normalizeOfficeName(info.officeName || '');
         if (!name) continue;
         if (name.includes(needle) || needle.includes(name)) {
           hits.push({
@@ -318,8 +378,7 @@ export async function defaultInterpretLookups(): Promise<InterpretLookups> {
     },
 
     async searchOfficesAtInstallation(place: string): Promise<OfficeCandidate[]> {
-      const token = clean(place).replace(/\b(space force base|air force base|sfb|afb|base)\b/gi, '').trim();
-      const search = token.split(/\s+/)[0];
+      const search = installationSearchToken(place);
       if (!search || search.length < 4) return [];
       const client = sb();
       const { data, error } = await client
@@ -535,6 +594,16 @@ export async function interpretMarketQuestion(
     if (chosen) offices = [chosen];
   }
 
+  // The user's answer to "which buyer or contracting office?" must be used.
+  // It was ignored, so every answer re-asked the same question (a dead end for
+  // any requirement whose office is not named in the question itself).
+  // Only office names/codes are searched — never a broadened installation guess.
+  const buyerAnswer =
+    input.clarification?.dimension === 'buyer' ? clean(input.clarification.value ?? '') : '';
+  if (offices.length === 0 && buyerAnswer) {
+    offices = uniqueOffices(await live.searchOfficesByName(buyerAnswer));
+  }
+
   if (offices.length === 0) {
     unresolved.push('contracting office was not established from the question');
     return {
@@ -542,8 +611,9 @@ export async function interpretMarketQuestion(
       question,
       clarification: {
         dimension: 'buyer',
-        prompt:
-          'Which buyer or contracting office should Mindy research? Name the command, installation, or office.',
+        prompt: buyerAnswer
+          ? `Mindy could not find a contracting office matching "${buyerAnswer}". Enter the contracting office's name or its six-character office code (the first six characters of its SAM solicitation numbers, for example 36C250).`
+          : 'Which buyer or contracting office should Mindy research? Name the command, installation, or office.',
       },
       unresolved,
     };

@@ -26,6 +26,16 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-07 — Market research dead-ended on any office not named in the question
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-07 | Market research / interpretation | The answer to "Which buyer or contracting office?" was never read (only `office` answers were), so every reply re-asked the same question — a dead end for "IT help desk support for the VA medical center in Cleveland, Ohio". The answer now searches office names and exact office codes (36C250); an unmatched answer says so instead of repeating. "Contracting" ≈ "Contract" in office names. | `const buyerAnswer =` → `src/lib/mrr/interpret-market.ts` | `interpret-market.unit.test.ts` (fails on the old code); live interpreter probe | ACTIVE |
+| 2026-10-07 | Market research / requirement wording | A question that leads with the requirement ("IT help desk support for the VA …") took the buyer phrase as the requirement → keyword "the VA medical center" → NAICS suggestion 621111 Offices of Physicians. | `function requirementBeforeFor(` → `src/lib/mrr/interpret-market.ts` | `interpret-market.unit.test.ts` | ACTIVE |
+| 2026-10-07 | Market research / installation offices | Installation offices were searched by the FIRST word, so "Fort Bragg" offered 34 offices from every "Fort" city (Riley, Hood, Belvoir…) and "Louis Stokes" matched Louisville. Now the first distinctive word before any comma ("Bragg"). | `export function installationSearchToken(` → `src/lib/mrr/interpret-market.ts` | `interpret-market.unit.test.ts`; live probe: W91247 MICC FDO FT BRAGG first of 6 | ACTIVE |
+
+---
+
 ## 2026-10-07 — Market research files were never downloadable on getmindy.ai
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
