@@ -18,7 +18,6 @@ import { getWriteClient } from '@/lib/supabase/server-clients';
 import { publishedBySlug } from '@/lib/analytics/research-publications';
 import { computeSbBenchmark } from '@/lib/analytics/sb-participation-benchmark';
 import { renderSbBenchmarkHtml } from '@/lib/analytics/sb-benchmark-html';
-import { HALVIK_STUDY_SLUG, renderHalvikStudyHtml } from '@/lib/analytics/transaction-studies/halvik-tetra-tech-html';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,15 +68,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ slug: string }
         version: pub.version ?? 'v1.0',
         generatedDate,
         canonical: `${SITE}${pub.url ?? `/research/${slug}`}`,
-        corrections: pub.corrections,
       }),
     );
-  }
-
-  // Transaction Study 001 is a FROZEN historical study (as-of 2026-01-21). It must never regenerate from
-  // live data — later federal actions would leak into the reconstruction. Static HTML from frozen data.
-  if (slug === HALVIK_STUDY_SLUG) {
-    return html(renderHalvikStudyHtml({ canonical: `${SITE}${pub.url ?? `/research/${slug}`}`, draft: false }));
   }
 
   // A published slug with no renderer wired is a build error, not a public 404.

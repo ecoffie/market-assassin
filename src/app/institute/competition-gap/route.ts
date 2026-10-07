@@ -313,7 +313,7 @@ const BODY = `
       <div class="r"><b>U.S. Government Accountability Office.</b> <em>Small Business Contracting: Actions Needed to Implement and Monitor DoD's Small Business Strategy</em>, GAO&#8209;22&#8209;104621 (2022). Documents the decline in DoD small-business vendors from 42,723 (2011) to 24,296 (2020) alongside rising small-business obligations. gao.gov.</div>
       <div class="r"><b>Office of Management and Budget.</b> Memorandum M&#8209;23&#8209;11, <em>Creating a More Diverse and Resilient Federal Marketplace</em> (2023). Directs agencies to increase attention on new-entrant participation, where the supplier-base decline has been especially acute. whitehouse.gov.</div>
     </div>
-    <p style="margin-top:26px;font-family:var(--mp-font-mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--mp-muted)">The Mindy Institute &middot; Independent research and measurement of the public procurement economy &middot; getmindy.ai/research</p>
+    <p style="margin-top:26px;font-family:var(--mp-font-mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--mp-muted)">The Mindy Institute &middot; The research arm of Mindy, operated by GovCon Giants AI &middot; getmindy.ai/research</p>
   </section>
 
   ${conceptFooter(GAP_CONCEPT)}

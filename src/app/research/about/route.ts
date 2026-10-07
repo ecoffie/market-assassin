@@ -2,8 +2,7 @@
  * GET /research/about — Why the Mindy Institute Exists (manifesto).
  *
  * Same civic shell as /gov + /research so the Institute family shares one visual identity.
- * Honest present comes from instituteState(), evaluated at BUILD time (force-static) from the code
- * registries — so the counts are exact as of each deploy, not live.
+ * Honest present is computed live from instituteState().
  */
 import { NextResponse } from 'next/server';
 import { govPage } from '@/lib/gov/shell';
@@ -63,7 +62,7 @@ function buildBody(): string {
       <div class="ce">The editorial charter</div>
       <p class="cl">The Mindy Institute publishes findings only when the supporting Observatory standards meet the Institute’s publication criteria. Three rules hold that line:</p>
       <ol>
-        <li><b>Every published claim traces to a defined measure.</b> That is an Observatory standard, or a methodology published with the study itself. No finding rests on a number we can’t point back to how it was made.</li>
+        <li><b>Every published claim traces to one or more Observatory standards.</b> No finding rests on a number we can’t point back to a defined measure.</li>
         <li><b>Every standard has a permanent OBS identifier and public methodology.</b> Its definition, how it’s computed, its sources, and its limits are on the record.</li>
         <li><b>If the evidence isn’t mature enough, the Institute does not publish the conclusion.</b> The claim waits in the <a href="/institute">research backlog</a> until its standard is ready.</li>
       </ol>
@@ -72,7 +71,7 @@ function buildBody(): string {
     <h2>Why it matters</h2>
     <p>Better measurement leads to better decisions. Better decisions lead to healthier procurement markets — ones where suppliers can find the work they are suited for, and agencies can reach the businesses they are trying to serve. That is the outcome the Institute is built to move toward: not more data, but shared, trustworthy measures the whole market can reason from.</p>
 
-    <p class="note">Every publication follows the <a href="/research/standard">Mindy Institute Research Standard</a>. Curious what we can and can’t yet stand behind? <a href="/research/how-we-publish">See why some research isn’t published yet →</a></p>
+    <p class="note">Curious what we can and can’t yet stand behind? <a href="/research/how-we-publish">See why some research isn’t published yet →</a></p>
     <div class="cta-row"><a class="btn primary" href="/research">See the published research →</a></div>
   </div>
 </div></article>`;
