@@ -84,3 +84,6 @@ docs/internal/
 
 # Full & Open DNA reconciliation snapshots (scripts/reconcile-full-open-dna.ts) — local evidence, never committed
 tmp/full-open-reconcile/
+
+# Diligence register run outputs (workbooks, raw USASpending downloads) — never commit
+.claude/diligence/
