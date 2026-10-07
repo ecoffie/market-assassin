@@ -3,7 +3,9 @@ import fixture from './__fixtures__/halvik-register-2026-01-21.json';
 import halvikFacts from '../../../../scripts/diligence/fixtures/halvik-deal-facts.json';
 import type { RegisterRow } from '../register';
 import { assertPermittedWording, reviewRecertification, type DealFacts, type RecertReview } from './engine';
-import { G_THRESHOLD, RULES, gCite, type FactId } from './policy';
+import { G_THRESHOLD, POLICY_LEGAL_REVIEW_STATUS, RULES, gCite, type FactId } from './policy';
+import golden from './__fixtures__/halvik-recert-review.golden.json';
+import { projectReview } from './regression';
 
 const ROWS = fixture.rows as unknown as RegisterRow[];
 const UEI = 'VMRTJLWMQRH7';
@@ -68,6 +70,45 @@ describe('Halvik regression (all deal facts unknown, as of 2026-01-21)', () => {
     const t3 = r.diligence_requests.find((q) => q.fact === 'T3_acquirer_size_under_naics')!;
     expect(t3.scope_detail.every((s) => /^NAICS \d{6}$/.test(s))).toBe(true);
     expect(r.diligence_requests.find((q) => q.fact === 'F_partial_set_aside_portion')!.instruments).toEqual(['1333BJ21D00280002']);
+  });
+});
+
+describe('Halvik regression result is frozen', () => {
+  it('the minimized fixture reproduces the golden three-layer output and Diligence Request List exactly', () => {
+    expect(JSON.parse(JSON.stringify(projectReview(run())))).toEqual(golden);
+  });
+
+  it('the fixture is public federal data only, carries provenance, and holds only whitelisted fields', () => {
+    const meta = (fixture as { _meta: Record<string, any> })._meta;
+    expect(meta.public_federal_data_only).toBe(true);
+    expect(meta.as_of).toBe(AS_OF);
+    expect(meta.source.file_name).toMatch(/^PrimeTransactionsAndSubawards_/);
+    expect(meta.generated_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    const allowed = new Set(meta.fields);
+    for (const row of fixture.rows) for (const k of Object.keys(row)) expect(allowed.has(k), k).toBe(true);
+    expect(meta.counts).toEqual({ awards: 46, vehicles: 30 });
+  });
+
+  it('an award ended at as-of is not reviewed', () => {
+    const award = ROWS.find((r) => r.kind === 'award')!;
+    const ended = { ...award, award_key: 'CONT_AWD_ENDED_TEST', piid: 'ENDEDTEST', status_as_of: 'ended' } as RegisterRow;
+    const r = reviewRecertification({ rows: [...ROWS, ended], facts: BASE, asOf: AS_OF });
+    expect(r.instruments.find((i) => i.federal_fact.piid === 'ENDEDTEST')).toBeUndefined();
+  });
+});
+
+describe('legal review status', () => {
+  it('every output states the policy has not been reviewed by counsel', () => {
+    const r = run();
+    expect(POLICY_LEGAL_REVIEW_STATUS).toBe('NOT_REVIEWED_BY_COUNSEL');
+    expect(r.policy_legal_review_status).toBe('NOT_REVIEWED_BY_COUNSEL');
+    expect(r.boundary).toMatch(/NOT been reviewed by counsel/);
+  });
+
+  it('the wording guard rejects any claim of legal approval', () => {
+    const bad = structuredClone(run());
+    bad.instruments[0].rules[0].review.review_flag = 'This rule is legally approved.';
+    expect(() => assertPermittedWording(bad)).toThrow(/reviewed by counsel/);
   });
 });
 

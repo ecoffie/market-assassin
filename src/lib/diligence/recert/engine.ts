@@ -17,7 +17,7 @@
  */
 import type { RegisterRow } from '../register';
 import {
-  G_THRESHOLD, POLICY_VERSION, PROHIBITED_WORDING, RULES,
+  G_THRESHOLD, POLICY_LEGAL_REVIEW_STATUS, POLICY_VERSION, PROHIBITED_WORDING, RULES,
   type Branch, type Citation, type FactId, type InstrumentClass, type RuleDef,
 } from './policy';
 
@@ -119,6 +119,7 @@ export interface DiligenceRequest {
 
 export interface RecertReview {
   policy_version: string;
+  policy_legal_review_status: typeof POLICY_LEGAL_REVIEW_STATUS;
   as_of: string;
   fact_mode: FactMode;
   target_uei: string;
@@ -130,7 +131,7 @@ export interface RecertReview {
   informational_context: Record<string, unknown>;
 }
 
-const BOUNDARY = 'Public federal prime award record only. Ceiling (base + all options) is a contract ceiling, never a forecast of work. No economic or price figure is computed. Review flags state what a rule provides on stated facts; they are not legal determinations.';
+const BOUNDARY = 'Public federal prime award record only. Ceiling (base + all options) is a contract ceiling, never a forecast of work. No economic or price figure is computed. Review flags state what a rule provides on stated facts; they are not legal determinations. The policy encoding these rules has NOT been reviewed by counsel.';
 
 // ---------------- classification ----------------
 const isSetAside = (s: string | null) => !!s && !/NO SET ASIDE USED|^NONE$/i.test(s.trim());
@@ -470,6 +471,7 @@ export function reviewRecertification(input: { rows: RegisterRow[]; facts: DealF
 
   const review: RecertReview = {
     policy_version: POLICY_VERSION,
+    policy_legal_review_status: POLICY_LEGAL_REVIEW_STATUS,
     as_of: asOf,
     fact_mode: mode,
     target_uei: facts.target_uei,

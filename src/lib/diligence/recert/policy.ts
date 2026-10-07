@@ -19,6 +19,13 @@
 
 export const POLICY_VERSION = 'recert-policy/2026-10-07.1';
 
+/**
+ * Legal review status of this policy version. Every rule here is an engineering transcription of
+ * primary text; NONE has been reviewed by qualified counsel. Do not change this value except to
+ * record an actual counsel review (who, when, scope) in the same commit.
+ */
+export const POLICY_LEGAL_REVIEW_STATUS = 'NOT_REVIEWED_BY_COUNSEL' as const;
+
 /** The 125.12(g) transaction-date threshold. A TRANSACTION date test — not an effective date. */
 export const G_THRESHOLD = '2026-01-17';
 export const RULE_125_12_EFFECTIVE = '2025-01-16';
@@ -113,6 +120,7 @@ export const PROHIBITED_WORDING: Array<{ pattern: RegExp; why: string }> = [
   { pattern: /will be terminated/i, why: '124.515 states a requirement; it does not report an event' },
   { pattern: /purchase[- ]price|valuation|discount|haircut/i, why: 'no price or valuation output' },
   { pattern: /\bclosed on\b|\bclosing date (is|was)\b/i, why: 'closing date is never inferred' },
+  { pattern: /legally approved|approved by counsel|counsel[- ]approved|legally (sound|correct|compliant)/i, why: 'no rule has been reviewed by counsel' },
 ];
 
 export const RULES: RuleDef[] = [

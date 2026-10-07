@@ -41,7 +41,7 @@ function usd(n: number | null | undefined) {
 function renderReview(r: RecertReview): string {
   const L: string[] = [];
   L.push(`# Recertification review — ${r.target_uei} as of ${r.as_of}`, '');
-  L.push(`Policy \`${r.policy_version}\` · fact mode \`${r.fact_mode}\``, '', `> ${r.boundary}`, '');
+  L.push(`Policy \`${r.policy_version}\` · legal review status **${r.policy_legal_review_status}** · fact mode \`${r.fact_mode}\``, '', `> ${r.boundary}`, '');
   L.push('## Summary by rule', '', '_Rows overlap: one instrument can carry several rules. Do not sum across rows. Values are awards only (vehicle ceilings are program-wide)._', '');
   L.push('| Rule | Status | Instruments | Awards | Vehicles | Public obligated | Public ceiling | Ceiling not yet obligated |', '|---|---|---|---|---|---|---|---|');
   for (const s of r.summary) L.push(`| ${s.rule_id} ${s.title} | ${s.status} | ${s.instruments} | ${s.awards} | ${s.vehicles} | ${usd(s.public_obligated)} | ${usd(s.public_ceiling)} | ${usd(s.ceiling_not_yet_obligated)} |`);
