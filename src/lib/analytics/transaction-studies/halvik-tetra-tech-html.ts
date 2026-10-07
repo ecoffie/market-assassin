@@ -14,11 +14,12 @@
  *    used in the reconstruction;
  *  - no eligibility / legal consequence is stated.
  *
- * Publication = add a registry entry (research-publications.ts) with status 'published' and this slug.
- * Until then /research/halvik-tetra-tech returns 404 (publishedBySlug gates it).
+ * Registered as RES-004 in research-publications.ts; version, publish date and corrections are read from
+ * there. /research/halvik-tetra-tech serves only while that entry's status is 'published'.
  */
 import data from './halvik-tetra-tech.data.json';
-import { TRANSACTION, HISTORY, RECONCILIATION, STUDY_META } from './halvik-tetra-tech.facts';
+import { TRANSACTION, HISTORY, RECONCILIATION, STUDY_META, KIND_LABEL, type StatementKind } from './halvik-tetra-tech.facts';
+import { PUBLICATIONS, RESEARCH_STANDARD } from '@/lib/analytics/research-publications';
 import { mpRawBodyClose, mpRawBodyOpen, mpRawHeadHtml } from '@/lib/public-site/html';
 
 export const HALVIK_STUDY_SLUG = 'halvik-tetra-tech';
@@ -144,13 +145,39 @@ function reconciliationTable(): string {
   return `<div class="tablewrap"><table class="recon"><thead><tr><th>Public assertion</th><th>Source</th><th>Federal record at cutoff</th><th>Result</th></tr></thead><tbody>${body}</tbody></table></div>`;
 }
 
+
+function kindTag(k: StatementKind): string {
+  return `<span class="kind">${esc(KIND_LABEL[k])}</span>`;
+}
+
+/** Version, dates and corrections come from the publications registry, so the page cannot disagree with it. */
+function registryEntry() {
+  const pub = PUBLICATIONS.find((p) => p.slug === HALVIK_STUDY_SLUG);
+  if (!pub) throw new Error('Transaction Study 001 is missing from the publications registry');
+  return pub;
+}
+
+function knowBox(): string {
+  const can = STUDY_META.canEstablish.map(([c, st]) => `<li>${esc(c)}<span class="st">${esc(st)}</span></li>`).join('');
+  const cannot = STUDY_META.cannotEstablish.map((c) => `<li>${esc(c)}</li>`).join('');
+  return `<section class="know" aria-label="What the public record can and cannot establish">
+    <div class="can"><h3>What the public record can establish</h3><ul>${can}</ul></div>
+    <div class="cannot-box"><h3>What the public record cannot establish</h3><ul>${cannot}</ul></div>
+  </section>`;
+}
+
 export function renderHalvikStudyHtml(opts: { canonical: string; draft: boolean }): string {
   const { canonical, draft } = opts;
   const d = data;
+  const pub = registryEntry();
+  const version = pub.version ?? 'v1.0';
+  const published = draft ? 'not yet published' : (pub.publishedDate ?? 'not yet published');
+  const corrections = pub.corrections ?? [];
   const smallShare = 1 - (d.set_aside_family.find((r) => r.family === 'No set-aside')?.share ?? 0) - (d.set_aside_family.find((r) => r.family === 'Not recorded')?.share ?? 0);
   const fy17 = d.annual_obligations.find((r) => r.fy === 2017)!.obligations;
   const fy25 = d.annual_obligations.find((r) => r.fy === 2025)!.obligations;
   const desc = STUDY_META.description;
+  const citation = `The Federal Portfolio Behind a $210 Million Acquisition: Halvik / Tetra Tech. Mindy Institute Transaction Study 001, ${version}, published ${published}; historical cutoff January 21, 2026. ${canonical}`;
 
   return `<!doctype html>
 <html lang="en">
@@ -166,6 +193,7 @@ export function renderHalvikStudyHtml(opts: { canonical: string; draft: boolean 
 <meta property="og:url" content="${esc(canonical)}">
 <meta name="robots" content="${draft ? 'noindex,nofollow' : 'index,follow'}">
 ${mpRawHeadHtml()}
+<style>
 <style>
   html{-webkit-text-size-adjust:100%}
   body{margin:0;line-height:1.6;font-size:16px}
@@ -227,6 +255,21 @@ ${mpRawHeadHtml()}
   .ts .sources li{font-size:13.5px;word-break:break-word}
   @media (max-width:600px){ .ts h1{font-size:27px} .ts .cannot{columns:1} .ts .hb{grid-template-columns:1fr auto} .ts .hb-t{grid-column:1 / -1;grid-row:2} .ts .col-v{font-size:9px} }
   @media print{ [data-mp-chrome]{display:none!important} .ts .tablewrap{overflow:visible} .ts details.tbl{display:block} .ts .col-b,.ts .hb-f{-webkit-print-color-adjust:exact;print-color-adjust:exact} }
+  .ts .kind{display:inline-block;font:600 10.5px/1.4 var(--mp-font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--mp-navy);border:1px solid var(--mp-line);background:var(--mp-surface);padding:1px 6px;margin-right:6px;vertical-align:1px;white-space:nowrap}
+  .ts .seckind{margin:-2px 0 8px}
+  .ts .legend{font-size:13px;color:var(--mp-muted)}
+  .ts .know{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--mp-line);margin:22px 0 8px}
+  .ts .know > div{padding:16px 18px}
+  .ts .know .can{background:var(--mp-surface)}
+  .ts .know .cannot-box{background:var(--mp-wash);border-left:1px solid var(--mp-line)}
+  .ts .know h3{font:700 11px var(--mp-font-sans);letter-spacing:.14em;text-transform:uppercase;color:var(--mp-ink);margin:0 0 8px}
+  .ts .know ul{margin:0;padding-left:18px}
+  .ts .know li{font-size:14px;margin:7px 0}
+  .ts .know .st{display:block;font:500 11.5px/1.4 var(--mp-font-mono);color:var(--mp-muted)}
+  .ts .meth h3{font:700 15px var(--mp-font-sans);margin:22px 0 2px;color:var(--mp-ink)}
+  .ts .meth p{margin:6px 0 10px}
+  .ts .srckind{font:600 11px var(--mp-font-mono);color:var(--mp-muted);text-transform:uppercase;letter-spacing:.05em;margin-right:6px}
+  @media (max-width:600px){ .ts .know{grid-template-columns:1fr} .ts .know .cannot-box{border-left:0;border-top:1px solid var(--mp-line)} }
 </style>
 </head>
 <body>
@@ -242,87 +285,117 @@ ${mpRawBodyOpen()}
     <h1>${esc(STUDY_META.title)}</h1>
     <p class="subhead">${esc(STUDY_META.subhead)}</p>
     <div class="meta">
+      <span class="chip">${esc(version)}</span>
+      <span class="chip">${draft ? 'Not yet published' : `Published ${esc(published)}`}</span>
       <span class="chip">Historical cutoff ${esc(d.as_of)}</span>
-      <span class="chip">${esc(STUDY_META.version)}</span>
-      <span class="chip">Published ${esc(STUDY_META.publishedDate)}</span>
-      <span class="chip">Data retrieved ${esc(d.source.retrieved)}</span>
+      <span class="chip">Measured ${esc(STUDY_META.measuredOn)}</span>
+      <a class="chip" href="${RESEARCH_STANDARD.url}">Research Standard ${esc(RESEARCH_STANDARD.version)}</a>
     </div>
   </section>
 
   <div class="headline">
-    <div><div class="big">${d.counts.awards_admissible}</div><div class="lab">prime awards and vehicles in the federal record by ${esc(d.as_of)}</div></div>
+    <div><div class="big">${d.counts.awards_admissible}</div><div class="lab">prime awards and contract vehicles in the federal record by ${esc(d.as_of)}</div></div>
     <div><div class="big">${usdM(d.obligations_through_cutoff)}</div><div class="lab">cumulative public federal obligations, FY2014 to cutoff</div></div>
-    <div><div class="big">${pct(smallShare)}</div><div class="lab">of those obligations ran through small-business or 8(a) set-aside awards</div></div>
-    <div><div class="big">${usdM(d.ttm.obligations)}</div><div class="lab">obligations in the 12 months before the announcement</div></div>
+    <div><div class="big">${pct(smallShare)}</div><div class="lab">of those obligations associated with awards recorded under small-business, 8(a) or WOSB set-aside classifications</div></div>
+    <div><div class="big">${usdM(d.ttm.obligations)}</div><div class="lab">obligations in the 12 months before the cutoff</div></div>
   </div>
+
+  ${knowBox()}
 
   <h2><span class="n">1</span>Executive finding</h2>
   <div class="finding">
     <p>${STUDY_META.executive}</p>
-    <ol>${STUDY_META.findings.map((f) => `<li>${f}</li>`).join('')}</ol>
+    <ol>${STUDY_META.findings.map((f) => `<li>${kindTag(f.kind)}${f.html}</li>`).join('')}</ol>
   </div>
-  <p>This study measures the <b>public federal prime-contract record</b>. It does not measure revenue, backlog, profit or value, and it does not say what the acquisition means for any contract's eligibility. Section 7 lists what the public record cannot establish.</p>
+  <p class="legend">Labels follow <a href="${RESEARCH_STANDARD.url}#p6">Research Standard principle 6</a>. A <b>federal fact</b> is what a public record says. A <b>derived measure</b> is a number this study computed from those records, using the method in section 9. An <b>interpretation</b> is what we think it may mean. A <b>company filing</b> is what a company disclosed about itself.</p>
+  <p>This study measures the <b>public federal prime-contract record</b>. It does not measure revenue, backlog, profit or value, and it does not determine what the acquisition means for any contract's eligibility.</p>
 
   <h2><span class="n">2</span>The transaction</h2>
+  <p class="seckind">${kindTag('filing')}</p>
   ${TRANSACTION.prose}
   <div class="later"><span class="tag">Subsequently reported — not used in the reconstruction</span>${TRANSACTION.subsequent}</div>
 
   <h2><span class="n">3</span>Halvik's federal trajectory</h2>
+  <p class="seckind">${kindTag('fact')}${kindTag('derived')}</p>
   ${HISTORY.prose}
-  <p>Public obligations to Halvik rose from ${usdM(fy17)} in FY2017 to ${usdM(fy25)} in FY2025. The first prime action in the record is dated ${esc(d.counts.first_action_date)}. Obligations are amounts the government committed on Halvik's prime awards in each year. They are <b>not</b> Halvik's revenue: revenue is recognized as work is performed and also includes subcontract and any commercial work.</p>
+  <p>Public obligations to Halvik rose from ${usdM(fy17)} in FY2017 to ${usdM(fy25)} in FY2025. The first prime action in the record is dated ${esc(d.counts.first_action_date)}. Obligations are the amounts the government committed on Halvik's prime awards in each year. They are <b>not</b> Halvik's revenue: revenue is recognized as work is performed, and it also includes subcontract and any commercial work.</p>
   ${annualChart()}
   ${annualTable()}
 
-  <h2><span class="n">4</span>The portfolio at acquisition</h2>
-  <p>By ${esc(d.as_of)} the record holds <b>${d.counts.awards_admissible} Halvik prime awards</b>: ${d.counts.contracts_admissible} contracts and task orders, and ${d.counts.vehicles_admissible} contract vehicles (IDIQs, BPAs, GWACs and GSA Schedules) under which orders can be placed. ${d.active.count} contracts and orders had a recorded period of performance running past the cutoff. Together they carried ${usdM(d.active.obligated)} obligated against a ${usdM(d.active.ceiling)} ceiling.</p>
-  <p><b>Buyers.</b> Four departments account for ${pct(d.agencies_lifetime.slice(0, 4).reduce((s, r) => s + r.share, 0))} of cumulative obligations. In the trailing twelve months the mix was Defense ${pct(d.ttm.agencies[0].share)}, Transportation ${pct(d.ttm.agencies[1].share)}, NASA ${pct(d.ttm.agencies[2].share)} and Commerce ${pct(d.ttm.agencies[3].share)}.</p>
+  <h2><span class="n">4</span>The portfolio at the cutoff</h2>
+  <p class="seckind">${kindTag('derived')}</p>
+  <p>By ${esc(d.as_of)} the record holds <b>${d.counts.awards_admissible} Halvik prime awards</b>: ${d.counts.contracts_admissible} contracts and task orders, and ${d.counts.vehicles_admissible} contract vehicles (IDIQs, BPAs, GWACs and GSA Schedules) under which orders can be placed. ${d.active.count} contracts and orders had a recorded period of performance running past the cutoff. Together they carried ${usdM(d.active.obligated)} obligated against a ${usdM(d.active.ceiling)} ceiling. Ceiling is the maximum the government had authorized; it is not backlog.</p>
+  <p><b>Buyers.</b> Of cumulative obligations (${usd(d.obligations_through_cutoff)}), four departments account for ${pct(d.agencies_lifetime.slice(0, 4).reduce((s, r) => s + r.share, 0))}. Of obligations in the twelve months before the cutoff (${usd(d.ttm.obligations)}), the mix was Defense ${pct(d.ttm.agencies[0].share)}, Transportation ${pct(d.ttm.agencies[1].share)}, NASA ${pct(d.ttm.agencies[2].share)} and Commerce ${pct(d.ttm.agencies[3].share)}.</p>
   ${agencyFigure()}
-  <p><b>Channels.</b> Most of the money came through a few vehicles. The five largest channels carried ${pct(d.vehicles_top.slice(0, 5).reduce((s, r) => s + r.share, 0))} of obligations.</p>
+  <p><b>Channels.</b> Most obligations were on orders under a few vehicles. Orders under the five largest vehicles carried ${pct(d.vehicles_top.filter((v) => !v.vehicle.startsWith('(')).slice(0, 5).reduce((s, r) => s + r.share, 0))} of cumulative obligations.</p>
   ${vehicleTable()}
-  <p><b>Concentration.</b> The single largest award, NASA's IT Support Services order, holds ${pct(d.concentration.top1)} of cumulative obligations. The five largest hold ${pct(d.concentration.top5)} and the ten largest ${pct(d.concentration.top10)}.</p>
+  <p><b>Concentration.</b> The single largest award, NASA's IT Support Services order, holds ${pct(d.concentration.top1)} of cumulative obligations. The five largest awards hold ${pct(d.concentration.top5)} and the ten largest ${pct(d.concentration.top10)}.</p>
   ${topAwardsTable()}
-  <p><b>Set-aside history.</b> ${pct(smallShare)} of obligations flowed through awards competed or placed under a small-business, 8(a) or women-owned small-business set-aside. ${pct(d.set_aside_family.find((r) => r.family === 'No set-aside')!.share)} came through awards recorded with no set-aside.</p>
+  <p><b>Set-aside classifications.</b> ${pct(smallShare)} of Halvik's cumulative public federal obligations through the cutoff were associated with awards recorded under small-business, 8(a) or WOSB set-aside classifications. ${pct(d.set_aside_family.find((r) => r.family === 'No set-aside')!.share)} were associated with awards recorded with no set-aside.</p>
   ${setAsideFigure()}
 
   <h2><span class="n">5</span>What Halvik said, and what the federal record shows</h2>
-  <p>We compiled the vehicles and awards Halvik, its customers and the press named in public, and checked each against the record as it stood at the cutoff. A match means the named instrument is held by Halvik's UEI. It does not validate any dollar figure the claim attached.</p>
+  <p class="seckind">${kindTag('fact')}</p>
+  <p>We compiled the vehicles and awards that Halvik, its customers and the press named in public, and checked each against the record as it stood at the cutoff. "Found" means the named instrument is held by Halvik's UEI. It does not validate any dollar figure the claim attached.</p>
   ${reconciliationTable()}
   <p class="src">Unresolved stays unresolved. Where a claim names no contract number and the record holds more than one plausible award, we do not pick one.</p>
 
   <h2><span class="n">6</span>What the public record flags for diligence</h2>
+  <p class="seckind">${kindTag('derived')}</p>
   <p>These are observations a diligence team would want explained. None is a conclusion about value, risk or eligibility.</p>
   <ul>${STUDY_META.flags.map((f) => `<li>${f}</li>`).join('')}</ul>
-  <p><b>Set-aside exposure.</b> The record shows which awards were competed or placed under a set-aside, and which carry an 8(a) basis. This study identifies that exposure but does not determine the post-acquisition eligibility consequence. That depends on facts the public record does not contain: the closing date, the legal structure, the acquirer's size under each award's NAICS code, any recertifications, and SBA decisions.</p>
+  <p><b>Recertification.</b> The public record identifies instruments whose treatment following an acquisition may require transaction-specific recertification analysis. This study does not determine those consequences. They depend on facts the public award record does not contain, including the legal structure of the transaction, the acquirer's size under each award's NAICS code, any recertifications filed, and SBA decisions.</p>
 
-  <h2><span class="n">7</span>What we cannot know from public data</h2>
-  <p>Public award data does not establish any of the following. Treat any figure in this study as silent on them.</p>
-  <ul class="cannot">
-    <li>Recognized revenue</li><li>Financial backlog or funded/unfunded backlog</li><li>Profitability, margins or EBITDA</li><li>Commercial or non-federal revenue</li>
-    <li>Complete subcontract revenue (only ${d.counts.subawards_as_sub_by_cutoff} prime-reported subawards to Halvik or SP Systems appear, and subaward reporting is incomplete by nature)</li>
-    <li>Past-performance ratings (CPARS)</li><li>Indirect rates or cost structure</li><li>Classified work</li><li>Employee counts or retention</li>
-    <li>Pending proposals and win rates</li><li>Why Tetra Tech paid what it paid</li>
-  </ul>
+  <h2><span class="n">7</span>What the public record cannot establish</h2>
+  <p>Public award data does not establish any of the following. Treat every figure in this study as silent on them.</p>
+  <ul class="cannot">${STUDY_META.cannotEstablish.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>
+  <p>Only ${d.counts.subawards_as_sub_by_cutoff} prime-reported subawards to Halvik or SP Systems appear in the record by the cutoff, and subaward reporting is incomplete by nature.</p>
 
   <h2><span class="n">8</span>Why this case matters</h2>
-  <p class="src" style="font-size:13px;margin-top:0">Interpretation — separate from the measurements above.</p>
+  <p class="seckind">${kindTag('interpretation')}</p>
   ${STUDY_META.whyItMatters}
 
   <h2><span class="n">9</span>Methodology</h2>
-  <p><b>Entity.</b> HALVIK, LLC, UEI ${esc(d.uei)}, CAGE ${esc(d.cage)}. The names "Halvik Corp", "Halvik" and "HALVIK, LLC" and the CAGE code each resolve to this single UEI. SP Systems, Inc. (UEI ${esc(d.affiliate_sp_systems.uei)}), which Halvik acquired in 2016, reports Halvik as its parent on 110 actions between 2016-08-04 and 2025-05-14. Its ${d.affiliate_sp_systems.awards} awards (${usdM(d.affiliate_sp_systems.obligations_through_cutoff)} obligated through the cutoff, most of it before 2016) are reported here separately and are <b>not</b> included in any Halvik figure.</p>
-  <p><b>Source.</b> ${esc(d.source.name)}, file ${esc(d.source.file)}, retrieved ${esc(d.source.retrieved)}. The award listing returned ${d.counts.awards_listed} awards (223 contracts, 30 vehicles) and the transaction download contained every one of them.</p>
-  <p><b>Historical cutoff.</b> ${esc(d.admissibility)} ${d.counts.actions_after_cutoff} later actions, including ${d.counts.awards_entirely_after_cutoff} awards that begin after the cutoff, and ${d.counts.actions_reported_after_cutoff} action reported after it, are excluded. Of ${d.counts.actions_total} Halvik actions, ${d.counts.actions_included} are included.</p>
-  <p><b>Obligations</b> are the sum of the federal action obligation on each included action, net of de-obligations. <b>Ceiling</b> is the sum of the change in "base and all options value" on each included action. We do not use USASpending's award-level "potential total value" column: it is a snapshot that differs from row to row within the same award on 78 Halvik awards, so it cannot represent the value as of a past date. <b>Active</b> means the latest period-of-performance end date recorded by the cutoff is on or after the cutoff. <b>Set-aside basis</b> is the award's own set-aside field, or its parent vehicle's when blank (138 of 215 awards). <b>Fiscal year</b> is the federal fiscal year of the action date.</p>
-  <p><b>Verification.</b> All figures were recomputed independently from the raw download file (SHA-256 <span class="id">${esc(d.source.csv_sha256.slice(0, 16))}…</span>) and agree to the cent with the register produced by Mindy's diligence pipeline. Federal data can be corrected after the fact; a re-download on a later date may differ slightly.</p>
+  <div class="meth">
+    <p>This study follows the <a href="${RESEARCH_STANDARD.url}">Mindy Institute Research Standard ${esc(RESEARCH_STANDARD.version)}</a>.</p>
+    <h3>Entity resolution</h3>
+    <p>The target is HALVIK, LLC, UEI ${esc(d.uei)}, CAGE ${esc(d.cage)}. The names "Halvik Corp" (used in Tetra Tech's filings), "Halvik" and "HALVIK, LLC", and the CAGE code, each resolve to this single UEI. Every federal action in this study is recorded against it.</p>
+    <h3>Historical cutoff</h3>
+    <p>January 21, 2026, the day before the public announcement (see section 2). The study reconstructs what the public federal record showed immediately before an outside observer learned of the deal.</p>
+    <h3>Inclusion and report-date rules</h3>
+    <p>${esc(d.admissibility)} Of ${d.counts.actions_total} Halvik actions, ${d.counts.actions_included} are included. Excluded: ${d.counts.actions_after_cutoff} actions dated after the cutoff, including the whole of ${d.counts.awards_entirely_after_cutoff} awards that begin after it, and ${d.counts.actions_reported_after_cutoff} action dated before the cutoff but first reported after it. An award is in the register if at least one of its actions is included. The award listing returned ${d.counts.awards_listed} awards (223 contracts, 30 vehicles), and the transaction download contained every one of them.</p>
+    <h3>Affiliate handling</h3>
+    <p>SP Systems, Inc. (UEI ${esc(d.affiliate_sp_systems.uei)}), which Halvik acquired in 2016, reports Halvik as its parent on 110 actions between 2016-08-04 and 2025-05-14. Its ${d.affiliate_sp_systems.awards} awards (${usdM(d.affiliate_sp_systems.obligations_through_cutoff)} obligated through the cutoff, most of it before 2016) are <b>not</b> included in any Halvik figure. They are reported here separately.</p>
+    <h3>Vehicle handling</h3>
+    <p>The ${d.counts.vehicles_admissible} vehicles (IDIQs, BPAs, GWACs and GSA Schedules) are counted as awards but carry almost no obligations themselves. Orders under them are counted as contracts and attributed to their parent vehicle. Vehicle ceilings are program-wide, shared by every holder, so they are not attributed to Halvik and no vehicle ceiling appears in any figure.</p>
+    <h3>Obligation calculation</h3>
+    <p>Obligations are the sum of the federal action obligation on each included action, net of de-obligations, grouped by the federal fiscal year of the action date. Department shares use the department of the awarding agency on each action. Every share in this study has the same denominator: cumulative obligations through the cutoff (${usd(d.obligations_through_cutoff)}), or the twelve-month total where stated. ${usd(d.vehicle_level_obligations.amount)} was obligated directly on the OASIS+ vehicle rather than on an order. It is included in the total but not in the set-aside breakdown, which covers the ${d.counts.contracts_admissible} contracts and orders.</p>
+    <h3>Ceiling reconstruction</h3>
+    <p>A contract's ceiling is the sum of the change in "base and all options value" recorded on each included action, so it reflects the ceiling as of the cutoff. We do not use USASpending's award-level "potential total value" column. It is a current-state snapshot that differs from row to row within the same award on 78 Halvik awards, so it cannot represent a past date. Where a ceiling cannot be reconstructed from the actions, it is UNKNOWN; no snapshot value is substituted.</p>
+    <h3>Set-aside classification</h3>
+    <p>The set-aside recorded on the contract or order itself. When that field is blank, which is common on orders, we use the set-aside recorded on its parent vehicle; this applied to 138 of 215 awards. A classification describes how an award was competed or placed. It does not describe eligibility after the acquisition.</p>
+    <h3>Public assertion reconciliation</h3>
+    <p>Each assertion was matched to the record by contract number where the claim named one, and by vehicle identity otherwise. A dollar claim with no contract number and more than one plausible award is reported as UNRESOLVED; we do not choose a candidate.</p>
+    <h3>Source hierarchy</h3>
+    <p>The federal record is primary for every federal figure. Company and agency filings and releases are primary for what those organizations said. Press and third-party profiles are secondary and are used only as labeled context. Anything published after the cutoff appears only in the "subsequently reported" section.</p>
+    <h3>Limitations</h3>
+    <p>The study measures prime contracts only. Subawards are incomplete by nature. Federal data can be corrected after the fact, so a later re-download may differ slightly; this study is computed from the stored download dated 2026-10-07. Section 7 lists what the record cannot establish.</p>
+    <h3>Verification</h3>
+    <p>Every figure was recomputed independently from the raw download file (SHA-256 <span class="id">${esc(d.source.csv_sha256.slice(0, 16))}…</span>), separately from Mindy's diligence pipeline, and the two agree to the cent. Mindy, the Institute's data engine, assembled the register; the evidence is the federal record and the filings cited, not the software.</p>
+  </div>
 
   <h2><span class="n">10</span>Sources</h2>
-  <ol class="sources">${STUDY_META.sources.map((s) => `<li>${s}</li>`).join('')}</ol>
+  <ol class="sources">${STUDY_META.sources.map((s) => `<li><span class="srckind">${esc(s.kind)}</span>${s.html}</li>`).join('')}</ol>
 
-  <h2><span class="n">11</span>Corrections and version</h2>
-  <p>${esc(STUDY_META.version)}, published ${esc(STUDY_META.publishedDate)}. If a figure here is wrong, the correction will be published at this address with the date, the original statement and the corrected one. Corrections never remove the original text.</p>
+  <h2><span class="n">11</span>Version and corrections</h2>
+  <p>${esc(version)}, published ${esc(published)}. Measured ${esc(STUDY_META.measuredOn)}; historical cutoff ${esc(d.as_of)}.</p>
+  <p>${corrections.length === 0 ? 'No corrections.' : ''}</p>
+  ${corrections.map((c) => `<p><b>${esc(c.date)} · ${esc(c.version)}.</b> ${esc(c.note)}</p>`).join('')}
+  <p class="src">Corrections are published at this address with the date, what changed and why. Original text is not silently replaced.</p>
 
   <footer>
-    <p>Published by <b>The Mindy Institute</b>, the research arm of Mindy, operated by GovCon Giants AI. Mindy's diligence pipeline assembled the contract register; the analysis and every judgment in it are the Institute's. Permanent URL: <a href="${esc(canonical)}">${esc(canonical)}</a></p>
-    <p>To cite: "${esc(STUDY_META.citation)}"</p>
+    <p>Published by <b>The Mindy Institute</b>: independent research and measurement of the public procurement economy. The Institute is operated by GovCon Giants AI, which also makes Mindy, the data engine used for this analysis. Permanent URL: <a href="${esc(canonical)}">${esc(canonical)}</a></p>
+    <p>To cite: "${esc(citation)}"</p>
   </footer>
 </article>
 ${mpRawBodyClose()}

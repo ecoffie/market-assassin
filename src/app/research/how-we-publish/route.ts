@@ -114,6 +114,7 @@ function buildBody(): string {
     <h2>What this means in practice</h2>
     ${exampleHtml}
     <p>${shelfHtml}</p>
+    <p>The full set of rules every publication follows — dates, provenance, completeness, terminology, corrections and limitations — is the <a href="/research/standard">Mindy Institute Research Standard</a>.</p>
     <div class="cta-row"><a class="btn primary" href="/research">See what we’ve published →</a></div>
   </div>
 </div></article>`;

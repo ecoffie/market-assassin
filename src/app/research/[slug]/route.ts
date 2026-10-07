@@ -69,6 +69,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ slug: string }
         version: pub.version ?? 'v1.0',
         generatedDate,
         canonical: `${SITE}${pub.url ?? `/research/${slug}`}`,
+        corrections: pub.corrections,
       }),
     );
   }

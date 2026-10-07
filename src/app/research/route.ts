@@ -18,6 +18,7 @@ const KIND_LABEL: Record<PubKind, string> = {
   press: 'Press',
   index: 'Benchmark',
   dataset: 'Dataset',
+  transaction_study: 'Transaction Study',
 };
 
 const AGENDA: { slug: string; title: string; claim: string; awaits: string | null }[] = [
@@ -144,7 +145,7 @@ function buildBody(): string {
   <div class="wrap">
     <span class="kicker">The Mindy Institute</span>
     <h1>How the federal procurement market actually behaves.</h1>
-    <p class="sub">Grounded research on the public procurement market — who buys, how competition really works, and where small business has room to win. Every figure is derived from live federal data, not estimated.</p>
+    <p class="sub">Grounded research on the public procurement market — who buys, how competition really works, and where small business has room to win. Every figure is derived from federal data and dated, not estimated.</p>
     <div class="cta-row">
       <a class="btn ghost" href="/research/about">Why the Institute exists →</a>
       <a class="btn ghost" href="/research/how-we-publish">Why some research isn’t published yet →</a>
@@ -153,7 +154,7 @@ function buildBody(): string {
 </header>
 
 <section class="intro"><div class="wrap">
-  <p>Our work is built in layers. <b>Standards</b> define a measure; <b>Benchmarks</b> apply one to the real market; <b>Research</b> interprets several to make an argument. Research sits on top of standards — so every finding traces back to a measure we can defend.</p>
+  <p>Our work is built in layers. <b>Standards</b> define a measure; <b>Benchmarks</b> apply one to the real market; <b>Research</b> interprets measured evidence to make an argument. Every finding traces back to a measure or a published method we can defend, under our <a href="/research/standard">Research Standard</a>.</p>
 </div></section>
 
 ${sections}
@@ -170,7 +171,7 @@ const HTML = govPage({
   canonical: 'https://getmindy.ai/research',
   title: 'The Mindy Institute — Research on the Federal Procurement Market',
   description:
-    'The Mindy Institute publishes grounded research on how the public procurement market actually behaves — benchmarks, white papers, and an annual report, each derived from live federal data.',
+    'The Mindy Institute publishes grounded research on how the public procurement market actually behaves — benchmarks, white papers, and an annual report, each derived from federal data and dated.',
   active: 'research',
   body: buildBody(),
 });

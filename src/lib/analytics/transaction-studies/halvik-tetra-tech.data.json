@@ -529,5 +529,13 @@
  "vehicle_level_obligations": {
   "amount": 2500.0,
   "note": "Obligated directly on the OASIS+ vehicle 47QRCA25DU152 (2024-12-17), not on an order. Other vehicle-level obligations (STARS III, GSA 47QTCH18D0102, DOT 693JK418D600022) net to $0."
+ },
+ "leakage": {
+  "max_included_action_date": "2026-01-21",
+  "max_included_report_date": "2026-01-21",
+  "excluded_actions": 149,
+  "excluded_obligations": 122442613.21,
+  "actions_between_acquisition_and_cutoff": 2,
+  "obligations_between_acquisition_and_cutoff": 0.0
  }
 }

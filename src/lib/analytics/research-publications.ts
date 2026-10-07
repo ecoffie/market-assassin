@@ -18,7 +18,30 @@
  */
 import { METHODOLOGY, methodologyById, type Methodology, type Audience } from './observatory-methodology';
 
-export type PubKind = 'annual' | 'white_paper' | 'press' | 'index' | 'dataset';
+export type PubKind = 'annual' | 'white_paper' | 'press' | 'index' | 'dataset' | 'transaction_study';
+
+/**
+ * Release 001 date — the day the Research Standard v1, the RES-003 correction and Transaction Study 001
+ * go live together. ⚠️ Set this to the ACTUAL release date in the final release commit; it is the
+ * published date of RES-004 and the dated correction on RES-003.
+ */
+export const RELEASE_001_DATE = '2026-10-07';
+
+/** Research Standard v1 — the rules every publication follows. Public at /research/standard. */
+export const RESEARCH_STANDARD = { version: 'v1', url: '/research/standard' } as const;
+
+/**
+ * How a publication's numbers were produced (Research Standard v1, principles 1, 2 and 8).
+ *  - live:   recomputed from current data on each request. NOT a fixed historical edition; cite the
+ *            computed date with any figure.
+ *  - frozen: computed once on `measuredOn` from data as of `asOf` and stored; reproducible.
+ */
+export type Measurement =
+  | { mode: 'live' }
+  | { mode: 'frozen'; measuredOn: string; asOf: string };
+
+/** A dated, permanently visible correction (Research Standard v1, principle 9). */
+export interface Correction { date: string; version: string; note: string }
 export type PubStatus = 'planned' | 'drafting' | 'review' | 'published' | 'archived';
 
 /**
@@ -32,7 +55,7 @@ export type PubClass = 'standard' | 'benchmark' | 'research';
 export const PUB_CLASS_META: Record<PubClass, { label: string; blurb: string; order: number }> = {
   standard:  { label: 'Standards',  blurb: 'Define a measure.',           order: 0 },
   benchmark: { label: 'Benchmarks', blurb: 'Apply a standard.',           order: 1 },
-  research:  { label: 'Research',   blurb: 'Interpret several standards.', order: 2 },
+  research:  { label: 'Research',   blurb: 'Interpret measured evidence.', order: 2 },
 };
 
 export interface Publication {
@@ -55,6 +78,10 @@ export interface Publication {
   publishedDate: string | null;
   // honest note on WHY it's not published yet (usually: a cited metric isn't mature enough)
   gate: string;
+  /** Research Standard v1 fields — REQUIRED once published (enforced by research-standard.unit.test.ts). */
+  standard?: typeof RESEARCH_STANDARD.version;
+  measurement?: Measurement;
+  corrections?: Correction[];
 }
 
 const STATUS_ORDER: Record<PubStatus, number> = { published: 0, review: 1, drafting: 2, planned: 3, archived: 4 };
@@ -98,14 +125,45 @@ export const PUBLICATIONS: Publication[] = [
     kind: 'index',
     status: 'published',
     summary: 'A per-agency benchmark ranking federal buyers by the share of their active solicitations that carry a small-business set-aside — the OSDBU scorecard, derived directly from the production supply-side metrics with exact head-counts.',
-    citesMetrics: ['OBS-001', 'OBS-002'],
+    // Computes OBS-001 only (sam_opportunities set-aside head-counts). It previously also cited OBS-002;
+    // nothing in the benchmark computes OBS-002, so the citation was corrected in v1.1 (see corrections).
+    citesMetrics: ['OBS-001'],
     audience: ['government', 'contractor', 'research'],
-    edition: '2026', version: 'v1.0',
+    edition: '2026', version: 'v1.1',
     // PERMANENT public URL — no year (the edition is a field). The Mindy Institute's first publication.
     slug: 'small-business-participation-benchmark',
     url: '/research/small-business-participation-benchmark',
     publishedDate: '2026-08-07',
-    gate: 'Published. Both cited metrics (OBS-001/002) are Production — the benchmark rests entirely on exact head-counts. Low-volume agencies are excluded (a percentage below the minimum-volume floor is noise) and that exclusion is disclosed on the page.',
+    gate: 'Published. Its cited metric (OBS-001) is Production — the benchmark rests entirely on exact head-counts. Low-volume agencies are excluded (a percentage below the minimum-volume floor is noise) and that exclusion is disclosed on the page. It is LIVE: recomputed on every request, not a frozen edition — a stored snapshot is not built yet, and the page says so.',
+    standard: 'v1',
+    measurement: { mode: 'live' },
+    corrections: [
+      {
+        date: RELEASE_001_DATE,
+        version: 'v1.1',
+        note: 'Corrected the methodology note. Earlier versions said this benchmark is derived from two Observatory metrics, OBS-001 and OBS-002. It computes only OBS-001 (the small-business set-aside share of active solicitations); OBS-002 was never an input. No figure changed. The page also now states that it is recomputed from live data on each load rather than being a fixed edition.',
+      },
+    ],
+  },
+  {
+    id: 'RES-004',
+    title: 'The Federal Portfolio Behind a $210 Million Acquisition',
+    class: 'research',
+    kind: 'transaction_study',
+    status: 'published',
+    summary: "Transaction Study 001: Halvik's federal prime-contract portfolio reconstructed as it stood on January 21, 2026, the day before Tetra Tech announced the acquisition — and what that public record can and cannot tell a buyer.",
+    citesMetrics: [],
+    audience: ['contractor', 'research', 'press'],
+    edition: null, version: 'v1.0',
+    // PERMANENT public URL. Studies stay flat under /research/<slug>; a future series view groups them
+    // without moving the URL.
+    slug: 'halvik-tetra-tech',
+    url: '/research/halvik-tetra-tech',
+    publishedDate: RELEASE_001_DATE,
+    gate: 'Frozen historical study. Every material claim is traced in tasks/halvik-transaction-study-publication-gate-2026-10-07.md. It cites no Observatory metric: its measures are defined in its own published methodology, as Research Standard v1 allows.',
+    standard: 'v1',
+    measurement: { mode: 'frozen', measuredOn: '2026-10-07', asOf: '2026-01-21' },
+    corrections: [],
   },
 ];
 

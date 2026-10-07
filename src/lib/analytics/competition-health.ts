@@ -2,8 +2,8 @@
  * Competition Health — the buyer-side mirror of the Market Intelligence dashboard.
  *
  * A procurement director's scorecard: is my market competitive and healthy? Grounded ENTIRELY in
- * data we already have (sam_opportunities + recompete_opportunities + BigQuery awards), scoped to
- * one agency/department. Every metric is real or honestly flagged — NEVER a fabricated number.
+ * data we already have (sam_opportunities + recompete_opportunities, plus a cached sample of USASpending
+ * per-award detail via competition-depth.ts — it does NOT query BigQuery), scoped to one agency/department. Every metric is real or honestly flagged — NEVER a fabricated number.
  * (PRD: docs/strategy/PRD-buyer-competition-health.md.)
  *
  * ⚠️ HONESTY (Bug Prevention Rule #11): every count binds { count/data, error } and surfaces it. A
