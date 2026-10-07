@@ -10,6 +10,7 @@ import { createHash } from 'node:crypto';
 import type { Phase1Artifacts, Phase1RunResult, RunPhase1Options } from './run-phase1';
 import { reviewSourceFromEvidence } from './review-from-evidence';
 import { createPhase1ReviewDto } from './workspace-dto';
+import { MRR_REPORT_VERSION } from './workspace-constants';
 import {
   createOrGetMrrJob,
   createOrGetMrrJobAsync,
@@ -217,6 +218,7 @@ export async function startMrrJob(
     job.review = createPhase1ReviewDto(result);
     job.status = 'done';
     job.error = null;
+    job.reportVersion = MRR_REPORT_VERSION;
     await stampProgressAsync(
       job,
       result.cells.some((cell) => cell.state === 'degraded')
@@ -309,6 +311,8 @@ export function persistCompletedMrrJobFromEvidence(args: {
     error: null,
     createdAt: existing?.createdAt ?? reviewSource.generatedAt,
     updatedAt: existing?.updatedAt ?? reviewSource.generatedAt,
+    // An operator-restamped run binds locked artifacts on purpose; reuse it as current.
+    reportVersion: MRR_REPORT_VERSION,
   };
   rememberJob(job);
   persistJob(job);

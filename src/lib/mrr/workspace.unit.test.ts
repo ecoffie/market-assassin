@@ -574,6 +574,19 @@ describe('hosted durability — files survive instance changes, ownership enforc
     expect(again.job.status).toBe('done');
   });
 
+  it('a run built by an older report generator is rebuilt when the question is asked again', async () => {
+    const { setMrrArtifactStoreForTests } = await import('./artifact-storage');
+    const { needsRerun, loadJob } = await import('./run-store-read');
+    const { MRR_REPORT_VERSION } = await import('./workspace-constants');
+    setMrrArtifactStoreForTests(memoryStore().store);
+    const { id } = await completedRun();
+    const job = loadJob(id)!;
+    expect(job.reportVersion).toBe(MRR_REPORT_VERSION);
+    expect(await needsRerun(job)).toBe(false);
+    delete job.reportVersion; // a run saved before versioning (v1)
+    expect(await needsRerun(job)).toBe(true);
+  });
+
   it('a failed or stalled run is re-run when the same question is asked again', async () => {
     const { needsRerun, MRR_STALE_RUN_MS, loadJob } = await import('./run-store-read');
     const normalized = normalizeRequirement(REQUIREMENT).normalized;

@@ -10,6 +10,7 @@ import { basename, dirname, join, resolve, sep } from 'node:path';
 import type { Requirement } from './types';
 import type { Phase1ReviewDto } from './workspace-dto';
 import {
+  MRR_REPORT_VERSION,
   PROGRESS_LABEL,
   isSafeMrrRunId,
   type MrrArtifactKind,
@@ -57,6 +58,8 @@ export interface MrrRunJob {
   error: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Generator version that produced the completed files (absent = v1). */
+  reportVersion?: number;
 }
 
 interface PersistedMrrJob {
@@ -73,6 +76,7 @@ interface PersistedMrrJob {
   error: string | null;
   createdAt: string;
   updatedAt: string;
+  reportVersion?: number;
 }
 
 export interface MrrRunJobDto {
@@ -252,6 +256,7 @@ function jobRecord(job: MrrRunJob): PersistedMrrJob {
     error: job.error,
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
+    ...(job.reportVersion ? { reportVersion: job.reportVersion } : {}),
   };
 }
 
@@ -338,6 +343,7 @@ export function hydratePersisted(raw: unknown): MrrRunJob | null {
     error: record.error ?? null,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt ?? record.createdAt,
+    ...(typeof record.reportVersion === 'number' ? { reportVersion: record.reportVersion } : {}),
   };
 }
 
@@ -451,6 +457,7 @@ export async function needsRerun(job: MrrRunJob, now = Date.now()): Promise<bool
     const updated = Date.parse(job.updatedAt);
     return Number.isFinite(updated) && now - updated > MRR_STALE_RUN_MS;
   }
+  if ((job.reportVersion ?? 1) < MRR_REPORT_VERSION) return true;
   return (await mrrFilesAvailable(job)) === false;
 }
 
@@ -465,6 +472,7 @@ export async function requeueMrrJobAsync(job: MrrRunJob): Promise<void> {
   job.review = null;
   job.error = null;
   job.updatedAt = now;
+  delete job.reportVersion;
   rememberJob(job);
   await persistJobAsync(job);
 }

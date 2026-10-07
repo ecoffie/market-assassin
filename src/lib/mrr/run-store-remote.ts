@@ -51,6 +51,7 @@ export async function mirrorMrrJob(job: MrrRunJob): Promise<void> {
       error: job.error,
       createdAt: job.createdAt,
       updatedAt: job.updatedAt,
+      ...(job.reportVersion ? { reportVersion: job.reportVersion } : {}),
     };
     await kv.set(jobKey(job.id), record, { ex: JOB_TTL_SECONDS });
     await kv.set(
