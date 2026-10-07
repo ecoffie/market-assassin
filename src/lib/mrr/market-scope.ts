@@ -9,7 +9,6 @@
  * Expansion is an explicit operation (expandMarketScope); Phase 1 may choose
  * not to expand at all.
  */
-import { isValidDodaac } from '@/lib/gov-contacts/agency-key';
 import type { Requirement } from './types';
 
 export const SCOPE_DIMENSIONS = [
@@ -68,11 +67,20 @@ export interface RetrievalManifest {
   strict_scope_result?: StrictScopeResult;
 }
 
+/**
+ * A federal contracting-office code: six characters mixing letters AND digits —
+ * DoD DoDAACs (FA4610, W91247, N00024) and civilian codes (VA 36C250, DHS
+ * 70Z030). A letter-first-only rule rejected 36C250 and then accepted the WORD
+ * "OFFICE" from "250-NETWORK CONTRACT OFFICE 10", so buyer history queried
+ * office "OFFICE" and reported a false zero (2026-10-07).
+ */
+const OFFICE_CODE = /^(?=[A-Z0-9]*[A-Z])(?=[A-Z0-9]*\d)[A-Z0-9]{6}$/;
+
 export function extractDodaac(office: string | undefined): string | undefined {
   if (!office) return undefined;
   const tokens = office.toUpperCase().split(/[^A-Z0-9]+/);
   for (const token of tokens) {
-    if (isValidDodaac(token)) return token;
+    if (OFFICE_CODE.test(token)) return token;
   }
   return undefined;
 }
