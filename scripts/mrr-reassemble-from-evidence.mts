@@ -18,6 +18,7 @@
  *   npx tsx scripts/mrr-reassemble-from-evidence.mts \
  *     --persist-completed-job --run-id <id> --owner <email>
  */
+import { supplierFunnel } from '../src/lib/mrr/supplier-funnel';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -474,7 +475,7 @@ function rebuildSection5(
       ? value(marketNum, marketEv)
       : unknown('market total missing', [marketEv]),
     marketBasis:
-      'Federal prime-contract obligations matching the exact keyword phrase, as measured by Mindy get_keyword_coverage over USASpending.',
+      'Federal prime-contract obligations matching the exact keyword phrase, as measured by Mindy from USASpending.',
     primaryPsc: gfFromCell(byLabel.get('§5 Primary PSC'), '§5 Primary PSC', (t) => t),
     primaryPscOrigin: 'supplied',
     pscTitle: gfFromCell(byLabel.get('§5 PSC description'), '§5 PSC description', (t) => t),
@@ -785,8 +786,33 @@ async function main() {
     depthEv,
   );
 
+  const scoredRaw = (bundle.suppliers as { scoredSample?: GroundedField<number> } | undefined)?.scoredSample;
+  const capableRaw = (bundle.suppliers as { capableInScoredSample?: GroundedField<number> } | undefined)
+    ?.capableInScoredSample;
+  const scoredSample: GroundedField<number> =
+    scoredRaw && scoredRaw.state === 'value'
+      ? value(scoredRaw.value, depthEv)
+      : unknown('this evidence file predates the scored-sample count', [depthEv]);
+  const capableInScoredSample: GroundedField<number> =
+    capableRaw && capableRaw.state === 'value'
+      ? value(capableRaw.value, depthEv)
+      : unknown('this evidence file predates the capable-in-sample count', [depthEv]);
   const s11: Section11 = {
     suppliers,
+    scoredSample,
+    capableInScoredSample,
+    notRun: null,
+    funnel: supplierFunnel({
+      naics: identity.naics ?? null,
+      state: normalized.place_of_performance_state ?? null,
+      eligiblePopulation: value(eligiblePop, depthEv),
+      matchingPerformers: value(raw, depthEv),
+      scoredSample,
+      capableInScoredSample,
+      returnedRows: value(boundedSample, depthEv),
+      resolvedFamilies: value(dedup, depthEv),
+      unresolvedParents: value(ambiguous, depthEv),
+    }),
     rawUeiCount: value(raw, depthEv),
     boundedSampleReturned: value(boundedSample, depthEv),
     capableActiveCount: value(capableActive, depthEv),

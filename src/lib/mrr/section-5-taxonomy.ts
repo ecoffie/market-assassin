@@ -17,10 +17,11 @@
  *     selection RULE is fixed in code and the selected phrase plus the rule are
  *     both recorded and rendered.
  */
+import { readableTitle } from './readable-title';
 import type { GroundedField, Requirement } from './types';
 import { callTool, metaDegraded, metaGrounded, type ToolCall } from './mindy-client';
 import { degraded, evidence, unknown, unknownFromError, value } from './grounding';
-import { formatSizeStandard, sizeStandardFor, tableCitation, type SizeStandard } from './sba-size-standards';
+import { formatSizeStandard, resolveSizeStandard, type SizeStandard } from './sba-size-standards';
 import {
   marketScopeFromRequirement,
   retrievalManifest,
@@ -157,7 +158,7 @@ export async function buildSection5(req: Requirement): Promise<Section5> {
     primaryNaicsOrigin = 'supplied';
     const match = (coverageSet.state === 'value' ? coverageSet.value : []).find((n) => n.code === req.naics);
     naicsTitle = match
-      ? value(match.name, covCall.evidence)
+      ? value(readableTitle(match.name), covCall.evidence)
       : unknown(`no title for NAICS ${req.naics} in the grounded coverage set`, [covCall.evidence]);
   } else {
     primaryNaics = unknown('no NAICS supplied; keyword coverage does not establish market identity', [covCall.evidence]);
@@ -181,8 +182,11 @@ export async function buildSection5(req: Requirement): Promise<Section5> {
     pscTitle = unknown('no primary PSC established', [covCall.evidence]);
   }
 
-  // --- 5. size standard from the versioned fixture ---
-  const sizeStandard = sizeStandardFor(primaryNaics.state === 'value' ? primaryNaics.value : undefined);
+  // --- 5. size standard from the regulation (eCFR 13 CFR 121.201), fixture fallback ---
+  const resolvedSize = await resolveSizeStandard(
+    primaryNaics.state === 'value' ? primaryNaics.value : undefined,
+  );
+  const sizeStandard = resolvedSize.field;
 
   // --- 6. the §5 "basis for NAICS selection" the template REQUIRES ---
   // The template says an explanation that only states the code was used on the
@@ -252,14 +256,14 @@ export async function buildSection5(req: Requirement): Promise<Section5> {
     cumulativeCoveragePct,
     marketTotal,
     marketBasis:
-      'Federal prime-contract obligations matching the exact keyword phrase, as measured by Mindy get_keyword_coverage over USASpending. ' +
+      'Federal prime-contract obligations matching the exact keyword phrase, as measured by Mindy from USASpending. ' +
       'Keyword coverage is measured over a single fiscal year and is an exact-phrase match, so it is a lower bound on the addressable PHRASE market. ' +
       'It is not a census of the entire primary-NAICS market and must not be silently equated with one.',
     primaryPsc,
     primaryPscOrigin,
     pscTitle,
     sizeStandard,
-    sizeStandardCitation: tableCitation(),
+    sizeStandardCitation: resolvedSize.citation,
     naicsBasis,
     retrievalManifests,
     calls,

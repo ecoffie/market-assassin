@@ -201,7 +201,10 @@ export function closeUnsupportedScope(
 
 /** Statewide (or unscoped) market-capacity label — never "this office has N families." */
 export function marketCapacityLabel(scope: MarketScope, naics: string | undefined): string {
-  const code = naics || scope.naics || 'the stated NAICS';
+  const code = naics || scope.naics;
+  if (!code) {
+    return 'Supplier capacity not measured (no NAICS code was provided)';
+  }
   if (scope.geography) {
     return `${geographyName(scope.geography)} small-business capacity for NAICS ${code}`;
   }
@@ -222,7 +225,7 @@ const USPS_NAME: Record<string, string> = {
   WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming',
 };
 
-function geographyName(code: string): string {
+export function geographyName(code: string): string {
   const key = code.trim().toUpperCase();
   return USPS_NAME[key] ?? key;
 }

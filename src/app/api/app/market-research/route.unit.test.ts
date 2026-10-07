@@ -521,3 +521,76 @@ describe('reassembled completed run survives process restart', () => {
     bqSpy.mockRestore();
   });
 });
+
+describe('rebuild and file availability are owner-bound', () => {
+  let storeDir = '';
+  beforeEach(() => {
+    storeDir = mkdtempSync(join(tmpdir(), 'mrr-rebuild-'));
+    setMrrWorkspaceStoreRootForTests(storeDir);
+  });
+  afterEach(() => {
+    resetMrrRunStoreForTests();
+    delete process.env.MRR_WORKSPACE_STORE_ROOT;
+    rmSync(storeDir, { recursive: true, force: true });
+  });
+
+  async function completed() {
+    const normalized = normalizeRequirement(VALID_BODY).normalized;
+    const created = createOrGetMrrJob({ ownerEmail: 'ko@example.mil', input: VALID_BODY, normalizedRequirement: normalized });
+    await startMrrJob(created.job.id, 'ko@example.mil', async (_input, options) =>
+      syntheticResult(options.runId, options.intakeHash, join(storeDir, options.runId, 'scratch')),
+    );
+    return created.job.id;
+  }
+
+  it('status reports filesAvailable to the owner and 404s for anyone else', async () => {
+    const id = await completed();
+    const own = await GET(new NextRequest(`http://localhost/api/app/market-research?id=${id}`, { headers: authHeaders() }));
+    expect(own.status).toBe(200);
+    expect((await own.json()).job.filesAvailable).toBe(true);
+    const other = await GET(
+      new NextRequest(`http://localhost/api/app/market-research?id=${id}`, { headers: authHeaders('other@example.com') }),
+    );
+    expect(other.status).toBe(404);
+  });
+
+  it('another account cannot rebuild (or learn about) the run', async () => {
+    const id = await completed();
+    const response = await POST(
+      new NextRequest('http://localhost/api/app/market-research', {
+        method: 'POST',
+        body: JSON.stringify({ rebuild_run_id: id }),
+        headers: authHeaders('other@example.com'),
+      }),
+    );
+    expect(response.status).toBe(404);
+  });
+
+  it('rebuild of a run whose files are present is a no-op that returns the same run', async () => {
+    const id = await completed();
+    const response = await POST(
+      new NextRequest('http://localhost/api/app/market-research', {
+        method: 'POST',
+        body: JSON.stringify({ rebuild_run_id: id }),
+        headers: authHeaders(),
+      }),
+    );
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.deduplicated).toBe(true);
+    expect(payload.job.id).toBe(id);
+    expect(payload.job.status).toBe('done');
+  });
+
+  it('another account gets 404 on every download, even with a valid run id', async () => {
+    const id = await completed();
+    for (const kind of ['mrr', 'appendix', 'evidence'] as const) {
+      const response = await DOWNLOAD(
+        new NextRequest(`http://localhost/api/app/market-research/download?id=${id}&kind=${kind}`, {
+          headers: authHeaders('other@example.com'),
+        }),
+      );
+      expect(response.status).toBe(404);
+    }
+  });
+});

@@ -3,11 +3,7 @@ import {
   WORKSPACE_PROTOTYPE_BANNER,
   type MrrArtifactKind,
 } from '@/lib/mrr/workspace-constants';
-import {
-  getMrrArtifact,
-  isSafeMrrRunId,
-  readBoundArtifactFile,
-} from '@/lib/mrr/run-store-read';
+import { isSafeMrrRunId, readOwnedMrrArtifact } from '@/lib/mrr/run-store-read';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 
 export const runtime = 'nodejs';
@@ -40,21 +36,9 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const artifact = getMrrArtifact(id, auth.session.email!, kind);
-  if (!artifact) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Artifact not found or run is incomplete',
-        prototypeBanner: WORKSPACE_PROTOTYPE_BANNER,
-      },
-      { status: 404 },
-    );
-  }
-
   try {
-    const bytes = readBoundArtifactFile(id, artifact.fileName);
-    if (!bytes) {
+    const read = await readOwnedMrrArtifact(id, auth.session.email!, kind);
+    if (read.status === 'not_found') {
       return NextResponse.json(
         {
           success: false,
@@ -64,15 +48,26 @@ export async function GET(request: NextRequest) {
         { status: 404 },
       );
     }
-    return new NextResponse(new Uint8Array(bytes), {
+    if (read.status === 'unavailable') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: read.reason,
+          filesAvailable: false,
+          prototypeBanner: WORKSPACE_PROTOTYPE_BANNER,
+        },
+        { status: 410 },
+      );
+    }
+    return new NextResponse(new Uint8Array(read.bytes), {
       status: 200,
       headers: {
         'Content-Type': CONTENT_TYPE[kind],
-        'Content-Disposition': `attachment; filename="${artifact.fileName}"`,
+        'Content-Disposition': `attachment; filename="${read.fileName}"`,
         'Cache-Control': 'private, no-store',
         'X-MRR-Run-Id': id,
-        'X-MRR-Intake-Hash': artifact.intakeHash,
-        'X-MRR-Artifact-Sha256': artifact.sha256,
+        'X-MRR-Intake-Hash': read.intakeHash,
+        'X-MRR-Artifact-Sha256': read.sha256,
       },
     });
   } catch (error) {

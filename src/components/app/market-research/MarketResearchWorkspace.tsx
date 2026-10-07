@@ -16,6 +16,7 @@ import type { MrrRunJobDto } from '@/lib/mrr/run-store';
 import type { Phase1ReviewDto, ReviewFinding, ReviewState } from '@/lib/mrr/workspace-dto';
 import type { DecisionBrief } from '@/lib/mrr/decision-brief';
 import type { EvidenceBucket, EvidenceBuckets } from '@/lib/mrr/evidence-buckets';
+import type { SupplierFunnel } from '@/lib/mrr/supplier-funnel';
 import type { InterpretMarketResult, MarketConfirmation } from '@/lib/mrr/interpret-market';
 import { geographyDisplayName } from '@/lib/utils/us-states';
 import {
@@ -165,7 +166,7 @@ function DecisionCard({ decision }: { decision: DecisionBrief }) {
       </div>
       <dl className="mt-5 grid gap-4 lg:grid-cols-2">
         {[
-          ['What Ralph found', decision.found],
+          ['What Mindy found', decision.found],
           ['What the evidence supports', decision.supports],
           ['What it does not support', decision.doesNotSupport],
           ['Recommended next action', decision.nextAction],
@@ -206,7 +207,21 @@ function EvidenceCard({ row }: { row: EvidenceBucket['rows'][number] }) {
   );
 }
 
-function BucketSection({ buckets }: { buckets: EvidenceBuckets }) {
+function FunnelList({ funnel }: { funnel: SupplierFunnel }) {
+  if (!funnel.ran) return <p className="mt-3 text-sm text-amber-100">{funnel.summary}</p>;
+  return (
+    <ol className="mt-3 space-y-2 text-sm text-gray-200">
+      {funnel.steps.map((step) => (
+        <li key={step.key} className="rounded-lg bg-black/20 p-3">
+          <span className="font-semibold text-white">{step.count.toLocaleString('en-US')}</span> {step.label}
+          {step.share && <span className="block text-xs text-gray-400">{step.share}</span>}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function BucketSection({ buckets, funnel }: { buckets: EvidenceBuckets; funnel: SupplierFunnel | null }) {
   const items = [
     { title: 'Buyer history', bucket: buckets.buyerHistory },
     { title: 'Installation / mission context', bucket: buckets.installationContext },
@@ -218,7 +233,9 @@ function BucketSection({ buckets }: { buckets: EvidenceBuckets }) {
         <article key={title} className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-emerald-200">{title}</h2>
           <p className="mt-2 text-sm leading-6 text-gray-400">{bucket.summary}</p>
-          {bucket.rows.length === 0 ? (
+          {bucket === buckets.broaderMarketCapacity && funnel ? (
+            <FunnelList funnel={funnel} />
+          ) : bucket.rows.length === 0 ? (
             <div className="mt-3 space-y-2">
               {bucket.emptyReason && <p className="text-sm text-gray-300">{bucket.emptyReason}</p>}
               {bucket.emptyNote && <p className="text-sm text-gray-500">{bucket.emptyNote}</p>}
@@ -332,7 +349,7 @@ function MethodologyPanel({ review }: { review: Phase1ReviewDto }) {
           <div className="rounded-xl border border-white/8 bg-black/15 p-4">
             <h3 className="text-sm font-semibold text-emerald-200">Explicit expansions</h3>
             {expansions.length === 0 ? (
-              <p className="mt-3 text-sm text-gray-500">None — Ralph did not broaden the search automatically.</p>
+              <p className="mt-3 text-sm text-gray-500">None — Mindy did not broaden the search automatically.</p>
             ) : (
               <ul className="mt-3 space-y-2 text-sm text-gray-300">
                 {expansions.map((item, index) => (
@@ -405,28 +422,20 @@ function MethodologyPanel({ review }: { review: Phase1ReviewDto }) {
         </section>
 
         <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-          <h2 className="text-lg font-semibold text-white">§11 supplier populations</h2>
+          <h2 className="text-lg font-semibold text-white">How the supplier numbers relate</h2>
           <p className="mt-1 text-sm leading-6 text-amber-100/80">{review.suppliers.completenessWarning}</p>
-          {review.suppliers.exclusionNote && (
-            <p className="mt-2 text-sm leading-6 text-gray-200">{review.suppliers.exclusionNote}</p>
+          {review.suppliers.funnel ? (
+            <>
+              <FunnelList funnel={review.suppliers.funnel} />
+              {review.suppliers.funnel.definitions.length > 0 && (
+                <ul className="mt-4 space-y-1 text-xs leading-5 text-gray-400">
+                  {review.suppliers.funnel.definitions.map((item) => <li key={item}>• {item}</li>)}
+                </ul>
+              )}
+            </>
+          ) : (
+            <p className="mt-3 text-sm text-gray-400">This run was saved before the supplier summary existed. Rebuild it to see the counts with their denominators.</p>
           )}
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {[
-              review.suppliers.eligiblePopulation,
-              review.suppliers.matchingUeis,
-              review.suppliers.boundedSampleReturned,
-              review.suppliers.capableActiveUeis,
-              review.suppliers.evaluatedUeis,
-              review.suppliers.resolvedCorporateFamilies,
-              review.suppliers.ambiguousOrUnresolvedParents,
-              review.suppliers.displayedVendorRows,
-            ].map((finding) => <Finding key={finding.label} finding={finding} />)}
-          </div>
-          <div className="mt-4 grid gap-3 text-sm text-gray-300 md:grid-cols-3">
-            <p className="rounded-lg bg-black/20 p-3">Matching coverage: {review.suppliers.matchingCoverageRatio ?? 'Unknown / Insufficient evidence'}</p>
-            <p className="rounded-lg bg-black/20 p-3">Family-resolution coverage: {review.suppliers.familyResolutionCoverageRatio ?? 'Unknown / Insufficient evidence'}</p>
-            <p className="rounded-lg bg-black/20 p-3">Sample coverage: {review.suppliers.sampleToMatchingRatio ?? 'Unknown / Insufficient evidence'}</p>
-          </div>
         </section>
 
         <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
@@ -476,9 +485,17 @@ function MethodologyPanel({ review }: { review: Phase1ReviewDto }) {
 function ReviewScreen({
   review,
   email,
+  filesAvailable,
+  rebuilding,
+  onRebuild,
+  onFilesMissing,
 }: {
   review: Phase1ReviewDto;
   email: string;
+  filesAvailable: boolean | null | undefined;
+  rebuilding: boolean;
+  onRebuild: () => void;
+  onFilesMissing: () => void;
 }) {
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -490,6 +507,7 @@ function ReviewScreen({
       const response = await authedFetch(href, email);
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
+        if (response.status === 410) onFilesMissing();
         throw new Error(payload?.error || 'Download failed');
       }
       const blob = await response.blob();
@@ -499,8 +517,11 @@ function ReviewScreen({
       const anchor = document.createElement('a');
       anchor.href = url;
       anchor.download = fileName;
+      document.body.appendChild(anchor);
       anchor.click();
-      URL.revokeObjectURL(url);
+      anchor.remove();
+      // Revoking synchronously can cancel the download in some browsers.
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (error) {
       setDownloadError(error instanceof Error ? error.message : 'Download failed');
     } finally {
@@ -511,15 +532,35 @@ function ReviewScreen({
   return (
     <div className="space-y-6">
       {review.decision && <DecisionCard decision={review.decision} />}
-      {review.evidenceBuckets && <BucketSection buckets={review.evidenceBuckets} />}
+      {review.evidenceBuckets && (
+        <BucketSection buckets={review.evidenceBuckets} funnel={review.suppliers?.funnel ?? null} />
+      )}
 
       <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Saved research run</p>
-            <p className="mt-1 font-mono text-xs text-gray-300">Run {review.runId}</p>
-            <p className="mt-1 break-all font-mono text-[11px] text-gray-500">Intake hash {review.intakeHash}</p>
+            <p className="mt-1 text-sm text-gray-300">
+              Generated {new Date(review.generatedAt).toLocaleString()} · Run {review.runId}
+            </p>
+            <p className="mt-1 text-xs text-gray-500">
+              This page and its files stay available from this link after you leave or sign in again.
+            </p>
           </div>
+          {filesAvailable === false ? (
+            <div className="max-w-sm rounded-lg border border-amber-500/25 bg-amber-500/[0.06] p-3 text-sm text-amber-100">
+              <p>The files for this run are no longer available. Rebuilding runs the same question again and saves new files.</p>
+              <button
+                type="button"
+                onClick={onRebuild}
+                disabled={rebuilding}
+                className="mt-2 inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+              >
+                {rebuilding && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                Rebuild files
+              </button>
+            </div>
+          ) : (
           <div className="flex flex-wrap gap-2">
             {review.downloads.map((item) => (
               <button
@@ -534,6 +575,7 @@ function ReviewScreen({
               </button>
             ))}
           </div>
+          )}
         </div>
         {downloadError && <p className="mt-3 text-sm text-red-300">{downloadError}</p>}
       </section>
@@ -547,7 +589,7 @@ const QUESTION_PLACEHOLDER =
   'I need to understand the small-business market for facilities maintenance at Fort Belvoir.';
 
 const PUBLIC_DATA_BANNER_DETAIL =
-  'Enter a public requirement. Ralph assembles sourced evidence for FAR market-research sections (§5, §9, §11, §12, and §15). Ralph does not generate signatures, certifications, or contracting-officer judgments.';
+  'Enter a public requirement. Mindy assembles sourced evidence for FAR market-research sections (§5, §9, §11, §12, and §15). Mindy does not generate signatures, certifications, or contracting-officer judgments.';
 
 function confirmationToIntake(question: string, confirmation: MarketConfirmation, extra?: Partial<Intake>): Intake {
   return {
@@ -581,6 +623,7 @@ export default function MarketResearchWorkspace() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [deduplicated, setDeduplicated] = useState(false);
+  const [rebuilding, setRebuilding] = useState(false);
 
   const fetchJob = useCallback(async (runId: string, ownerEmail: string) => {
     const response = await authedFetch(`/api/app/market-research?id=${encodeURIComponent(runId)}`, ownerEmail, {
@@ -740,6 +783,33 @@ export default function MarketResearchWorkspace() {
     }
   };
 
+  const rebuild = async () => {
+    if (!email || !job) return;
+    setRebuilding(true);
+    setError(null);
+    try {
+      const headers = getMIApiHeaders(email);
+      headers.set('Content-Type', 'application/json');
+      const response = await authedFetch('/api/app/market-research', email, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ rebuild_run_id: job.id }),
+      });
+      const payload = (await response.json().catch(() => null)) as ApiResponse | null;
+      if (!response.ok || !payload?.success || !payload.job) {
+        throw new Error(payload?.error || 'Could not rebuild the files');
+      }
+      setDeduplicated(false);
+      setJob(payload.job);
+    } catch (rebuildError) {
+      setError(rebuildError instanceof Error ? rebuildError.message : 'Could not rebuild the files');
+    } finally {
+      setRebuilding(false);
+    }
+  };
+
+  const naicsValid = /^\d{6}$/.test(intake.naics.trim());
+
   const progressIndex = job
     ? demoProgressIndex(job.progress as Phase1ProgressStage)
     : -1;
@@ -773,12 +843,12 @@ export default function MarketResearchWorkspace() {
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-emerald-300">Government buyer workspace</p>
-              <h1 className="text-xl font-semibold">Ralph market research</h1>
+              <h1 className="text-xl font-semibold">Mindy market research</h1>
               <p className="mt-1 text-sm font-medium text-gray-200">
                 Turn a requirement into defensible market research.
               </p>
               <p className="mt-1 max-w-2xl text-xs leading-5 text-gray-500">
-                Ralph identifies the buyer, market, supplier capacity, buying history, and evidence needed to support an acquisition decision.
+                Mindy identifies the buyer, market, supplier capacity, buying history, and evidence needed to support an acquisition decision.
               </p>
             </div>
           </div>
@@ -795,7 +865,7 @@ export default function MarketResearchWorkspace() {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-gray-200">Public-data research</p>
               <p className="mt-0.5 text-xs leading-5 text-gray-400">
-                Ralph uses public sources only. Do not enter CUI, source-selection information, proprietary requirements, or government estimates.
+                Mindy uses public sources only. Do not enter CUI, source-selection information, proprietary requirements, or government estimates.
               </p>
               <details className="mt-1.5">
                 <summary className="cursor-pointer text-xs text-gray-500 hover:text-gray-300">Learn more</summary>
@@ -833,7 +903,7 @@ export default function MarketResearchWorkspace() {
               >
                 <h2 className="text-lg font-semibold">What market are you researching?</h2>
                 <p className="mt-1 text-sm text-gray-400">
-                  One question is enough. You do not need NAICS, PSC, or office codes.
+                  One question is enough. You do not need office codes; Mindy will ask for a NAICS code if it needs one.
                 </p>
                 <textarea
                   value={question}
@@ -930,7 +1000,7 @@ export default function MarketResearchWorkspace() {
             {interpreted?.status === 'ready' && interpreted.confirmation && (
               <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-white/[0.035] p-6">
                 <h2 className="text-lg font-semibold">Here&apos;s the market I&apos;ll research</h2>
-                <p className="mt-1 text-sm text-gray-400">Correct this before research if Ralph misread the question.</p>
+                <p className="mt-1 text-sm text-gray-400">Correct this before research if Mindy misread the question.</p>
                 <dl className="mt-4 grid gap-3 md:grid-cols-2">
                   {[
                     ['Department', interpreted.confirmation.buyerDepartment],
@@ -963,6 +1033,50 @@ export default function MarketResearchWorkspace() {
                     <div>Retrieved aliases: {interpreted.confirmation.keyword || 'not established'}</div>
                   </dl>
                 )}
+
+                <div
+                  className={`mt-5 rounded-xl border p-4 text-sm ${
+                    naicsValid ? 'border-white/8 bg-black/15 text-gray-300' : 'border-amber-500/25 bg-amber-500/[0.06] text-amber-50'
+                  }`}
+                >
+                  <label className="block">
+                    <span className="block text-xs uppercase tracking-wide text-gray-400">NAICS code</span>
+                    <input
+                      value={intake.naics}
+                      onChange={(event) => update('naics', event.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                      inputMode="numeric"
+                      placeholder="6 digits, e.g. 236220"
+                      aria-describedby="naics-help"
+                      className="mt-1 w-48 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white outline-none placeholder:text-gray-600 focus:border-emerald-500/50"
+                    />
+                  </label>
+                  {!naicsValid && (
+                    <p id="naics-help" className="mt-2 leading-6">
+                      No NAICS code yet. Without one, Mindy researches buyer history and market size only. Potential
+                      suppliers, the Rule-of-Two evidence and pricing evidence will not run.
+                    </p>
+                  )}
+                  {!naicsValid && interpreted.naicsSuggestion && (
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => update('naics', interpreted.naicsSuggestion!.code)}
+                        className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/15"
+                      >
+                        Use {interpreted.naicsSuggestion.code} — {interpreted.naicsSuggestion.name}
+                      </button>
+                      <span className="text-xs text-gray-400">
+                        Suggested because it leads federal spending that matches “{interpreted.naicsSuggestion.keyword}”.
+                        Use it only if it fits this requirement.
+                      </span>
+                    </div>
+                  )}
+                  {naicsValid && (
+                    <p id="naics-help" className="mt-2 text-xs text-gray-400">
+                      Suppliers, the Rule-of-Two evidence, pricing and the SBA size standard will be researched for NAICS {intake.naics}.
+                    </p>
+                  )}
+                </div>
 
                 <label className="mt-5 flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.05] p-4 text-sm text-gray-300">
                   <input
@@ -1021,7 +1135,7 @@ export default function MarketResearchWorkspace() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">Edit research scope</h2>
-                <p className="mt-1 text-sm text-gray-400">Structured fields stay available after Ralph interprets. They are not required for the Ask path.</p>
+                <p className="mt-1 text-sm text-gray-400">Structured fields stay available after Mindy interprets. They are not required for the Ask path.</p>
               </div>
               <button
                 type="button"
@@ -1144,7 +1258,7 @@ export default function MarketResearchWorkspace() {
                     </div>
                   ))}
                 </div>
-                {deduplicated && <p className="mt-3 text-xs text-sky-300">Reused the existing run for this normalized intake; no second research job was started.</p>}
+                {deduplicated && <p className="mt-3 text-xs text-sky-300">This question is already being researched. Mindy is showing that run instead of starting a second one.</p>}
               </div>
             </div>
             {job.status === 'error' && (
@@ -1166,10 +1280,20 @@ export default function MarketResearchWorkspace() {
           <>
             {deduplicated && (
               <p className="rounded-lg border border-sky-500/20 bg-sky-500/10 p-3 text-sm text-sky-200">
-                Reused the existing run for this normalized intake. No duplicate research was started.
+                You asked this question before. Mindy is showing the saved run instead of researching it again.
               </p>
             )}
-            <ReviewScreen review={job.review} email={email!} />
+            <ReviewScreen
+              review={job.review}
+              email={email!}
+              filesAvailable={job.filesAvailable}
+              rebuilding={rebuilding}
+              onRebuild={() => void rebuild()}
+              onFilesMissing={() => setJob((current) => (current ? { ...current, filesAvailable: false } : current))}
+            />
+            {error && (
+              <p className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>
+            )}
             <button
               type="button"
               onClick={() => {

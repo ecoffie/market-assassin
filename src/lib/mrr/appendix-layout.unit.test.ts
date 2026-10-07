@@ -131,7 +131,7 @@ describe('appendix layout helpers', () => {
   });
 
   it('expandRenderedField keeps Field/State/Source/Retrieved on every continuation', () => {
-    const long = `START ${'evidence-body '.repeat(80)} END`;
+    const long = `START ${'evidence-body '.repeat(240)} END`;
     const rows = expandRenderedField(cell('§9 Award 20 recipient', long));
     expect(rows.length).toBeGreaterThan(1);
     expect(rows.map((r) => r.value).join('')).toBe(long);

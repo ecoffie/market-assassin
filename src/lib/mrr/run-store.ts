@@ -156,6 +156,32 @@ function readJson(path: string): unknown | null {
   }
 }
 
+/**
+ * Copy the three deliverables to durable storage before the run is marked done.
+ * On Vercel the bound files live in /tmp on one instance, so a run without a
+ * durable copy cannot be downloaded — that is a failed run, not a finished one.
+ * A workstation run without storage configured keeps its local files only.
+ */
+async function storeArtifactsDurably(runId: string, artifacts: MrrBoundArtifacts): Promise<void> {
+  const { isMrrArtifactStorageConfigured, putMrrArtifact } = await import('./artifact-storage');
+  if (!isMrrArtifactStorageConfigured()) {
+    if (process.env.VERCEL) {
+      throw new Error('the report files could not be saved: durable storage is not configured');
+    }
+    return;
+  }
+  for (const kind of ['mrr', 'appendix', 'evidence'] as const) {
+    const item = artifacts[kind];
+    try {
+      await putMrrArtifact(runId, kind, item.fileName, readFileSync(item.path));
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(`the report files could not be saved (${kind}): ${detail}`);
+    }
+    item.stored = true;
+  }
+}
+
 export async function startMrrJob(
   id: string,
   ownerEmail: string,
@@ -185,6 +211,7 @@ export async function startMrrJob(
     if (!artifacts) {
       throw new Error('Completed artifacts are not bound to this run directory');
     }
+    await storeArtifactsDurably(job.id, artifacts);
     job.result = result;
     job.artifacts = artifacts;
     job.review = createPhase1ReviewDto(result);

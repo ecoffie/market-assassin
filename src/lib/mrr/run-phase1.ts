@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { normalizeRequirement } from './normalizer';
+import { awardAmountLabel } from './award-amount';
 import { buildSection5, type Section5 } from './section-5-taxonomy';
 import { buildSection9, type Section9 } from './section-9-history';
 import { buildSection11, type Section11 } from './section-11-suppliers';
@@ -18,7 +19,6 @@ import {
   sha256File,
   writeDocx,
 } from './docx-fill';
-import { isPrimaryVerified, tableCitation } from './sba-size-standards';
 import type { NormalizedRequirement } from './types';
 
 export const DEFAULT_REQUIREMENT = {
@@ -111,6 +111,7 @@ function safeBase(value: string): string {
 }
 
 function buildLimitations(
+  sizeCitation: string,
   s11: Section11,
   s12: Section12,
   s15: Section15,
@@ -120,7 +121,7 @@ function buildLimitations(
   return [
     'Phase 1 populates §5 (Taxonomy), §9 (Procurement History), §11 (Potential Suppliers), §12 (Small Business / Rule of Two), and §15 (Market Intelligence). Remaining sections are Phase 2 placeholders.',
     'Predecessor / incumbent results are inferential and agency-validated; they are never a certified contract lineage.',
-    `SBA size standards come from a limited versioned local fixture (${tableCitation()}), not the full published table${isPrimaryVerified() ? ', though every included value was read from the authoritative source' : ', and the value was corroborated only from SECONDARY sources because the primary host blocks automated retrieval — REQUIRES HUMAN CONFIRMATION before signature'}.`,
+    `SBA size standard source: ${sizeCitation}`,
     'Corporate-family deduplication uses current-state USASpending parent_uei edges only. It is NOT point-in-time safe for investment backtests. Name/amount/keyword heuristics never create a parent match. Ambiguous parentage stays unresolved and cannot satisfy Rule of Two.',
     'Supplier counts distinguish raw UEI rows from parent-deduplicated families. Truncated samples are never treated as populations.',
     'Pricing in §15 is supporting market evidence only — never an Independent Government Estimate. The KO owns the IGE in Phase 2.',
@@ -175,6 +176,10 @@ function buildEvidenceBundle(result: Omit<Phase1RunResult, 'artifacts'>, templat
       candidate: s9.predecessorCandidate,
     },
     suppliers: {
+      funnel: s11.funnel,
+      notRun: s11.notRun,
+      scoredSample: s11.scoredSample,
+      capableInScoredSample: s11.capableInScoredSample,
       rawUeiCount: s11.rawUeiCount,
       boundedSampleReturned: s11.boundedSampleReturned,
       capableActiveCount: s11.capableActiveCount,
@@ -233,7 +238,7 @@ function buildEvidenceBundle(result: Omit<Phase1RunResult, 'artifacts'>, templat
           row.awardType.state === 'value'
             ? row.awardType.value
             : null,
-        amountLabel: row.amount.state === 'value' ? row.amount.value.label : null,
+        amountLabel: awardAmountLabel(row.amount),
         period: row.periodOfPerformance.state === 'value' ? row.periodOfPerformance.value : null,
         awardType: row.awardType.state === 'value' ? row.awardType.value : null,
         evidenceClass: row.evidenceClass,
@@ -315,6 +320,7 @@ export async function runPhase1(
   );
   dependencies.applyWorkspaceBanner(mrr.path);
   const limitations = buildLimitations(
+    section5.sizeStandardCitation,
     section11,
     section12,
     section15,

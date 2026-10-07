@@ -33,6 +33,8 @@ export interface MrrBoundArtifact {
   path: string;
   fileName: string;
   sha256: string;
+  /** True once the bytes are in durable storage (survive instance changes). */
+  stored?: boolean;
 }
 
 export interface MrrBoundArtifacts {
@@ -84,6 +86,11 @@ export interface MrrRunJobDto {
   createdAt: string;
   updatedAt: string;
   review: Phase1ReviewDto | null;
+  /**
+   * Completed runs only: whether all three files can be downloaded right now.
+   * `null` = could not be checked. Absent on queued/running/error runs.
+   */
+  filesAvailable?: boolean | null;
 }
 
 /**
@@ -423,6 +430,45 @@ export function createOrGetMrrJob(args: {
   return { job: toMrrJobDto(job), created: true };
 }
 
+/** A run that started but has not advanced for this long died with its instance. */
+export const MRR_STALE_RUN_MS = 8 * 60 * 1000;
+
+function loadDedupLocal(ownerEmail: string, intakeHash: string): MrrRunJob | null {
+  const id = dedupIndex.get(dedupKey(ownerEmail, intakeHash));
+  const cached = id ? loadJob(id) : null;
+  return cached ?? loadDedupFromDisk(ownerEmail, intakeHash);
+}
+
+/**
+ * Should repeating this exact question run it again instead of returning the
+ * cached run? Yes when the cached run failed, stalled, or completed but its
+ * files can no longer be served (e.g. built in /tmp before durable storage).
+ * An unknown file check (storage unreachable) is NOT treated as missing.
+ */
+export async function needsRerun(job: MrrRunJob, now = Date.now()): Promise<boolean> {
+  if (job.status === 'error') return true;
+  if (job.status === 'queued' || job.status === 'running') {
+    const updated = Date.parse(job.updatedAt);
+    return Number.isFinite(updated) && now - updated > MRR_STALE_RUN_MS;
+  }
+  return (await mrrFilesAvailable(job)) === false;
+}
+
+/** Reset a run to queued under the SAME id, then persist durably. */
+export async function requeueMrrJobAsync(job: MrrRunJob): Promise<void> {
+  const now = new Date().toISOString();
+  job.status = 'queued';
+  job.progress = 'queued';
+  job.progressHistory = [{ stage: 'queued', at: now }];
+  job.result = null;
+  job.artifacts = null;
+  job.review = null;
+  job.error = null;
+  job.updatedAt = now;
+  rememberJob(job);
+  await persistJobAsync(job);
+}
+
 /**
  * Hosted accept path. Prefers KV dedup, then creates a job and **awaits** KV
  * mirror so reopen/poll work across Vercel instances. Local disk is cache only.
@@ -436,7 +482,18 @@ export async function createOrGetMrrJobAsync(args: {
   const intakeHash = normalizedIntakeHash(args.normalizedRequirement);
   const { loadMrrDedupFromKv, mirrorMrrJob, isMrrKvConfigured } = await import('./run-store-remote');
   const remote = await loadMrrDedupFromKv(ownerEmail, intakeHash);
-  if (remote) return { job: toMrrJobDto(remote), created: false };
+  if (remote) {
+    if (await needsRerun(remote)) {
+      await requeueMrrJobAsync(remote);
+      return { job: toMrrJobDto(remote), created: true };
+    }
+    return { job: toMrrJobDto(remote), created: false };
+  }
+  const local = loadDedupLocal(ownerEmail, intakeHash);
+  if (local && (await needsRerun(local))) {
+    await requeueMrrJobAsync(local);
+    return { job: toMrrJobDto(local), created: true };
+  }
   const { job, created } = createOrGetMrrJob(args);
   if (created) {
     const full = loadJob(job.id);
@@ -542,4 +599,90 @@ export function toMrrJobDto(job: MrrRunJob): MrrRunJobDto {
 export function resetMrrRunStoreForTests(): void {
   jobs.clear();
   dedupIndex.clear();
+}
+
+/** Owner-bound job from this instance's cache, else Vercel KV. */
+export async function loadOwnedMrrJobAsync(
+  id: string,
+  ownerEmail: string,
+): Promise<MrrRunJob | null> {
+  if (!isSafeMrrRunId(id)) return null;
+  const owner = ownerEmail.toLowerCase().trim();
+  // KV is the source of truth across instances. A process-local copy can be a
+  // stale snapshot (loaded mid-run by another request), so it is consulted only
+  // when KV has no record (workstation runs, or KV unreachable).
+  const { loadMrrJobFromKv } = await import('./run-store-remote');
+  const remote = await loadMrrJobFromKv(id);
+  if (remote) return remote.ownerEmail === owner ? remote : null;
+  const local = loadJob(id);
+  return local && local.ownerEmail === owner ? local : null;
+}
+
+function sha256Hex(bytes: Buffer): string {
+  return createHash('sha256').update(bytes).digest('hex');
+}
+
+export type OwnedArtifactRead =
+  | { status: 'not_found' }
+  | { status: 'unavailable'; reason: string }
+  | {
+      status: 'ok';
+      bytes: Buffer;
+      fileName: string;
+      sha256: string;
+      intakeHash: string;
+    };
+
+/**
+ * Read one deliverable for its owner. Unknown run, wrong owner and unfinished
+ * run are indistinguishable (`not_found`) so a run id cannot be probed.
+ * Local bytes are used when this instance assembled the run; otherwise the
+ * durable copy is read. Both are verified against the recorded sha256.
+ */
+export async function readOwnedMrrArtifact(
+  id: string,
+  ownerEmail: string,
+  kind: MrrArtifactKind,
+): Promise<OwnedArtifactRead> {
+  const job = await loadOwnedMrrJobAsync(id, ownerEmail);
+  if (!job || job.status !== 'done' || !job.artifacts) return { status: 'not_found' };
+  const artifact = job.artifacts[kind];
+  const base = basename(artifact.fileName);
+  if (!base || base !== artifact.fileName) return { status: 'not_found' };
+
+  try {
+    const local = readBoundArtifactFile(id, base);
+    if (local && sha256Hex(local) === artifact.sha256) {
+      return { status: 'ok', bytes: local, fileName: base, sha256: artifact.sha256, intakeHash: job.intakeHash };
+    }
+  } catch {
+    // fall through to durable storage
+  }
+  const { getMrrArtifactBytes } = await import('./artifact-storage');
+  const stored = await getMrrArtifactBytes(id, base, artifact.sha256);
+  if (stored) {
+    return { status: 'ok', bytes: stored, fileName: base, sha256: artifact.sha256, intakeHash: job.intakeHash };
+  }
+  return {
+    status: 'unavailable',
+    reason: 'The files for this run are no longer available. Rebuild them to download.',
+  };
+}
+
+/**
+ * Can every deliverable of a completed run be served? true/false, or null when
+ * durable storage could not be checked (never reported as "missing").
+ */
+export async function mrrFilesAvailable(job: MrrRunJob): Promise<boolean | null> {
+  if (job.status !== 'done' || !job.artifacts) return false;
+  const kinds = ['mrr', 'appendix', 'evidence'] as const;
+  const localOk = kinds.every((kind) => {
+    const base = basename(job.artifacts![kind].fileName);
+    return Boolean(base) && workspaceExists([job.id, base]);
+  });
+  if (localOk) return true;
+  const { storedMrrArtifactNames } = await import('./artifact-storage');
+  const names = await storedMrrArtifactNames(job.id);
+  if (!names) return null;
+  return kinds.every((kind) => names.has(job.artifacts![kind].fileName));
 }

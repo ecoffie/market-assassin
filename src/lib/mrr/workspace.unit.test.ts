@@ -299,7 +299,7 @@ describe('workspace review DTO', () => {
       '50 suppliers sampled; 43 met the capable/active evaluation gate; 7 were excluded before corporate-family resolution.',
     );
     expect(review.suppliers.completenessWarning).not.toMatch(/six counts are separate/i);
-    expect(review.suppliers.completenessWarning).toMatch(/Capable\/active is never the complete bounded sample/i);
+    expect(review.suppliers.completenessWarning).toMatch(/each percentage names its denominator/i);
   });
 
   it('keeps Rule of Two undetermined when sample and size evidence are incomplete', () => {
@@ -442,5 +442,187 @@ describe('page render boundary', () => {
     );
     expect(page).not.toMatch(/run-phase1|section-5|section-9|section-11|section-12|section-15/);
     expect(page).not.toMatch(/bigquery|assessMarketDepth|assess_market_depth/);
+  });
+});
+
+describe('hosted durability — files survive instance changes, ownership enforced', () => {
+  // In-memory stand-in for the private Supabase Storage bucket.
+  function memoryStore() {
+    const objects = new Map<string, Buffer>();
+    return {
+      objects,
+      store: {
+        async put(path: string, bytes: Buffer) {
+          objects.set(path, Buffer.from(bytes));
+        },
+        async get(path: string) {
+          return objects.get(path) ?? null;
+        },
+        async list(runId: string) {
+          return [...objects.keys()].filter((k) => k.startsWith(`${runId}/`)).map((k) => k.slice(runId.length + 1));
+        },
+      },
+    };
+  }
+
+  async function completedRun(owner = 'ko@example.mil') {
+    const normalized = normalizeRequirement(REQUIREMENT).normalized;
+    const created = createOrGetMrrJob({ ownerEmail: owner, input: REQUIREMENT, normalizedRequirement: normalized });
+    await startMrrJob(created.job.id, owner, async (_input, options) => fakeResult(options.runId, options.intakeHash));
+    return { id: created.job.id, normalized };
+  }
+
+  /** What another Vercel instance sees: metadata (KV in prod), no local /tmp files. */
+  function dropLocalFiles(id: string) {
+    for (const name of ['mrr.docx', 'appendix.docx', 'evidence.json']) {
+      rmSync(join(storeDir, id, name), { force: true });
+    }
+  }
+
+  afterEach(async () => {
+    const { setMrrArtifactStoreForTests } = await import('./artifact-storage');
+    setMrrArtifactStoreForTests(null);
+  });
+
+  it('stores all three files durably before the run is marked done', async () => {
+    const { setMrrArtifactStoreForTests } = await import('./artifact-storage');
+    const mem = memoryStore();
+    setMrrArtifactStoreForTests(mem.store);
+    const { id } = await completedRun();
+    expect([...mem.objects.keys()].sort()).toEqual(
+      [`${id}/appendix.docx`, `${id}/evidence.json`, `${id}/mrr.docx`],
+    );
+    const job = getMrrJob(id, 'ko@example.mil');
+    expect(job?.status).toBe('done');
+  });
+
+  it('serves the durable copy when this instance never had the files, verified by hash', async () => {
+    const { setMrrArtifactStoreForTests } = await import('./artifact-storage');
+    const { readOwnedMrrArtifact, mrrFilesAvailable, loadJob } = await import('./run-store-read');
+    const mem = memoryStore();
+    setMrrArtifactStoreForTests(mem.store);
+    const { id } = await completedRun();
+    dropLocalFiles(id);
+
+    for (const [kind, body] of [['mrr', 'mrr'], ['appendix', 'appendix'], ['evidence', '{}']] as const) {
+      const read = await readOwnedMrrArtifact(id, 'ko@example.mil', kind);
+      expect(read.status).toBe('ok');
+      if (read.status === 'ok') expect(read.bytes.toString()).toBe(body);
+    }
+    expect(await mrrFilesAvailable(loadJob(id)!)).toBe(true);
+  });
+
+  it('another account cannot read the run or any of its files', async () => {
+    const { setMrrArtifactStoreForTests } = await import('./artifact-storage');
+    const { readOwnedMrrArtifact, loadOwnedMrrJobAsync } = await import('./run-store-read');
+    setMrrArtifactStoreForTests(memoryStore().store);
+    const { id } = await completedRun();
+    expect(await loadOwnedMrrJobAsync(id, 'someone-else@example.com')).toBeNull();
+    for (const kind of ['mrr', 'appendix', 'evidence'] as const) {
+      expect(await readOwnedMrrArtifact(id, 'someone-else@example.com', kind)).toEqual({ status: 'not_found' });
+    }
+  });
+
+  it('never serves tampered bytes: a hash mismatch is reported as unavailable', async () => {
+    const { setMrrArtifactStoreForTests } = await import('./artifact-storage');
+    const { readOwnedMrrArtifact } = await import('./run-store-read');
+    const mem = memoryStore();
+    setMrrArtifactStoreForTests(mem.store);
+    const { id } = await completedRun();
+    dropLocalFiles(id);
+    mem.objects.set(`${id}/mrr.docx`, Buffer.from('not the report'));
+    expect((await readOwnedMrrArtifact(id, 'ko@example.mil', 'mrr')).status).toBe('unavailable');
+  });
+
+  it('asking the same question again rebuilds a run whose files are gone — same run id', async () => {
+    const { setMrrArtifactStoreForTests } = await import('./artifact-storage');
+    const { createOrGetMrrJobAsync, loadJob, mrrFilesAvailable } = await import('./run-store-read');
+    const mem = memoryStore();
+    setMrrArtifactStoreForTests(mem.store);
+    const { id, normalized } = await completedRun();
+    // A run assembled before durable storage existed: done, no stored copy, local /tmp gone.
+    mem.objects.clear();
+    dropLocalFiles(id);
+    expect(await mrrFilesAvailable(loadJob(id)!)).toBe(false);
+
+    const again = await createOrGetMrrJobAsync({
+      ownerEmail: 'ko@example.mil',
+      input: REQUIREMENT,
+      normalizedRequirement: normalized,
+    });
+    expect(again.created).toBe(true);
+    expect(again.job.id).toBe(id);
+    expect(again.job.status).toBe('queued');
+
+    await startMrrJob(id, 'ko@example.mil', async (_input, options) => fakeResult(options.runId, options.intakeHash));
+    dropLocalFiles(id);
+    expect(await mrrFilesAvailable(loadJob(id)!)).toBe(true);
+  });
+
+  it('a completed run with available files is reused, not re-run', async () => {
+    const { setMrrArtifactStoreForTests } = await import('./artifact-storage');
+    const { createOrGetMrrJobAsync } = await import('./run-store-read');
+    setMrrArtifactStoreForTests(memoryStore().store);
+    const { id, normalized } = await completedRun();
+    const again = await createOrGetMrrJobAsync({
+      ownerEmail: 'ko@example.mil',
+      input: REQUIREMENT,
+      normalizedRequirement: normalized,
+    });
+    expect(again.created).toBe(false);
+    expect(again.job.id).toBe(id);
+    expect(again.job.status).toBe('done');
+  });
+
+  it('a failed or stalled run is re-run when the same question is asked again', async () => {
+    const { needsRerun, MRR_STALE_RUN_MS, loadJob } = await import('./run-store-read');
+    const normalized = normalizeRequirement(REQUIREMENT).normalized;
+    const created = createOrGetMrrJob({ ownerEmail: 'ko@example.mil', input: REQUIREMENT, normalizedRequirement: normalized });
+    const job = loadJob(created.job.id)!;
+    job.status = 'running';
+    job.updatedAt = new Date(Date.now() - MRR_STALE_RUN_MS - 1000).toISOString();
+    expect(await needsRerun(job)).toBe(true);
+    job.updatedAt = new Date().toISOString();
+    expect(await needsRerun(job)).toBe(false);
+    job.status = 'error';
+    expect(await needsRerun(job)).toBe(true);
+  });
+
+  it('an unreachable store is "unknown", never "missing" — no needless rebuild', async () => {
+    const { setMrrArtifactStoreForTests } = await import('./artifact-storage');
+    const { needsRerun, mrrFilesAvailable, loadJob } = await import('./run-store-read');
+    const mem = memoryStore();
+    setMrrArtifactStoreForTests(mem.store);
+    const { id } = await completedRun();
+    dropLocalFiles(id);
+    setMrrArtifactStoreForTests({
+      ...mem.store,
+      async list() {
+        throw new Error('storage down');
+      },
+    });
+    expect(await mrrFilesAvailable(loadJob(id)!)).toBeNull();
+    expect(await needsRerun(loadJob(id)!)).toBe(false);
+  });
+
+  it('a run whose files cannot be saved fails visibly instead of finishing without files', async () => {
+    const { setMrrArtifactStoreForTests } = await import('./artifact-storage');
+    setMrrArtifactStoreForTests({
+      async put() {
+        throw new Error('bucket unavailable');
+      },
+      async get() {
+        return null;
+      },
+      async list() {
+        return [];
+      },
+    });
+    const normalized = normalizeRequirement(REQUIREMENT).normalized;
+    const created = createOrGetMrrJob({ ownerEmail: 'ko@example.mil', input: REQUIREMENT, normalizedRequirement: normalized });
+    await startMrrJob(created.job.id, 'ko@example.mil', async (_input, options) => fakeResult(options.runId, options.intakeHash));
+    const job = getMrrJob(created.job.id, 'ko@example.mil');
+    expect(job?.status).toBe('error');
+    expect(job?.error).toMatch(/report files could not be saved/);
   });
 });

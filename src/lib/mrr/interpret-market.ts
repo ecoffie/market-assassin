@@ -6,6 +6,7 @@
  * not establish market identity. Load-bearing uncertainty asks ONE clarification.
  * Nothing is guessed.
  */
+import { readableTitle } from './readable-title';
 import { createClient } from '@supabase/supabase-js';
 import { DLA_DODAAC_LOCATIONS } from '@/data/dla-dodaac-locations';
 import {
@@ -72,6 +73,12 @@ export interface InterpretMarketResult {
   intake?: Requirement;
   clarification?: InterpretClarification;
   unresolved: string[];
+  /**
+   * Shown only when no NAICS was supplied: the NAICS that leads federal spending
+   * matching the requirement phrase. A SUGGESTION for the user to accept or
+   * replace — never written onto `confirmation` or `intake`.
+   */
+  naicsSuggestion?: { code: string; name: string; keyword: string };
 }
 
 export interface InterpretMarketInput {
@@ -492,7 +499,7 @@ export async function interpretMarketQuestion(
       question,
       clarification: {
         dimension: 'requirement',
-        prompt: 'What requirement or category should Ralph research? For example, SABER-type construction or shipbuilding.',
+        prompt: 'What requirement or category should Mindy research? For example, SABER-type construction or shipbuilding.',
       },
       unresolved: ['requirement phrase was not established'],
     };
@@ -536,7 +543,7 @@ export async function interpretMarketQuestion(
       clarification: {
         dimension: 'buyer',
         prompt:
-          'Which buyer or contracting office should Ralph research? Name the command, installation, or office.',
+          'Which buyer or contracting office should Mindy research? Name the command, installation, or office.',
       },
       unresolved,
     };
@@ -548,7 +555,7 @@ export async function interpretMarketQuestion(
       question,
       clarification: {
         dimension: 'office',
-        prompt: 'Which contracting office should Ralph research? Ralph will not guess among these offices.',
+        prompt: 'Which contracting office should Mindy research? Mindy will not guess among these offices.',
         options: rankOfficeOptions(offices).map((hit) => ({
           id: hit.dodaac,
           label: `${officeLabel(hit)} (${hit.dodaac})`,
@@ -578,10 +585,26 @@ export async function interpretMarketQuestion(
       question,
       clarification: {
         dimension: 'buyer',
-        prompt: 'Which department or buyer owns this market? Ralph will not guess the buyer.',
+        prompt: 'Which department or buyer owns this market? Mindy will not guess the buyer.',
       },
       unresolved,
     };
+  }
+
+  let naicsSuggestion: InterpretMarketResult['naicsSuggestion'];
+  if (!confirmation.naics) {
+    try {
+      const snapshot = await live.coverageFor(confirmation.keyword);
+      if (snapshot?.leadNaics) {
+        naicsSuggestion = {
+          code: snapshot.leadNaics.code,
+          name: readableTitle(snapshot.leadNaics.name),
+          keyword: confirmation.keyword,
+        };
+      }
+    } catch {
+      naicsSuggestion = undefined;
+    }
   }
 
   return {
@@ -590,5 +613,6 @@ export async function interpretMarketQuestion(
     confirmation,
     intake: confirmationToRequirement(question, confirmation),
     unresolved,
+    ...(naicsSuggestion ? { naicsSuggestion } : {}),
   };
 }

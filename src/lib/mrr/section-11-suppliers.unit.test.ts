@@ -91,9 +91,13 @@ describe('§11 missing NAICS', () => {
     expect(s.rawUeiCount.state).toBe('unknown');
     expect(s.deduplicatedFamilyCount.state).toBe('unknown');
     expect(s.effortsToLocate.state).toBe('value');
-    expect((s.effortsToLocate as { value: string }).value).toMatch(/primary NAICS/i);
+    expect((s.effortsToLocate as { value: string }).value).toMatch(/no NAICS code was provided/i);
     expect(s.calls).toHaveLength(0);
-    expect(s.limitations.some((l) => /Primary NAICS missing/i.test(l))).toBe(true);
+    // Missing input is never described as a failed lookup.
+    expect(s.notRun).toBe('missing_naics');
+    expect(s.funnel.ran).toBe(false);
+    expect(s.limitations.some((l) => /missing input, not a failed lookup/i.test(l))).toBe(true);
+    expect(JSON.stringify(s)).not.toMatch(/lookup failed|the stated NAICS/i);
   });
 });
 
@@ -188,9 +192,11 @@ describe('§11 mutation: truncated sample is not a population', () => {
       resolveFamily: async (uei) => family(uei),
     });
     expect(s.rawUeiCount).toMatchObject({ state: 'value', value: 2 });
-    expect(s.limitations.some((l) => /sample_coverage\)?=0\.05|sample_coverage=0\.05/.test(l))).toBe(true);
-    expect(s.limitations.some((l) => /not the eligible population/i.test(l))).toBe(true);
-    expect((s.effortsToLocate as { value: string }).value).toMatch(/sample_coverage=0\.05/);
+    expect(s.limitations.some((l) => /a sample, not a census/i.test(l))).toBe(true);
+    const efforts = (s.effortsToLocate as { value: string }).value;
+    // Every figure names its population; no raw engine ratio reaches the reader.
+    expect(efforts).toMatch(/Of 400 small businesses registered in SAM for NAICS 561720 in Florida, 2 \(0\.5%\)/);
+    expect(efforts).not.toMatch(/sample_coverage|0\.05/);
     // Must not claim the sample size is the population
     expect(JSON.stringify(s.limitations)).not.toMatch(/complete population/i);
     expect(JSON.stringify(s)).not.toMatch(/matching\/eligible population/i);
@@ -384,14 +390,16 @@ describe('§11 field honesty', () => {
       depthEvidence: EV,
       resolveFamily: async (uei) => family(uei),
     });
+    // Exact arguments live on the call record (rendered in the appendix calls table).
+    expect(s.calls[0].args).toMatchObject({
+      naics: '561720',
+      set_aside: 'Small Business',
+      limit: 50,
+      state: 'FL',
+    });
     const efforts = (s.effortsToLocate as { value: string }).value;
-    expect(efforts).toContain('assess_market_depth');
-    expect(efforts).toContain('"naics":"561720"');
-    expect(efforts).toContain('"set_aside":"Small Business"');
-    expect(efforts).toContain('"limit":50');
-    expect(efforts).toContain('"state":"FL"');
-    expect(efforts).toMatch(/tool-reported matching UEIs \(depth result\)=1/);
-    expect(efforts).toMatch(/UEIs submitted for family resolution=1/);
+    expect(efforts).toMatch(/NAICS 561720 located in Florida/);
+    expect(efforts).toMatch(/does not filter by contracting office/);
     expect(efforts).not.toMatch(/matching\/eligible population/i);
     expect(s.evaluatedUeiCount).toMatchObject({ state: 'value', value: 1 });
     expect(s.toolLimit).toMatchObject({ state: 'value', value: 50 });
@@ -414,9 +422,6 @@ describe('§11 field honesty', () => {
       resolveFamily: async (uei) => family(uei),
     });
     expect(s.limitations.some((l) => /Rule of Two is MET/i.test(l))).toBe(false);
-    expect(
-      s.limitations.some((l) => /ignored\. §12 owns the parent-deduplicated Rule-of-Two/i.test(l)),
-    ).toBe(true);
     expect(s.limitations.some((l) => /SAM-registered, active entities/i.test(l))).toBe(true);
   });
 });
@@ -470,16 +475,16 @@ describe('§11 sample semantics — matching census vs evaluated sample vs eligi
     expect(s.eligiblePopulation).toMatchObject({ state: 'value', value: 39848 });
     expect(s.suppliers.length).toBeGreaterThanOrEqual(25);
 
-    const efforts = (s.effortsToLocate as { value: string }).value;
-    expect(efforts).toMatch(/tool-reported matching UEIs \(depth result\)=1366/);
-    expect(efforts).toMatch(/UEIs submitted for family resolution=50/);
-    expect(efforts).toMatch(/resolved corporate families among submitted UEIs=32/);
-    expect(efforts).toMatch(/ambiguous\/unresolved parents among submitted UEIs=18/);
-    expect(efforts).toMatch(/NOT a dedup of all matching UEIs/);
-    expect(efforts).toMatch(/\(1366\/39848\)/);
-    expect(efforts).toMatch(/\(50\/1366\)/);
+    const steps = Object.fromEntries(s.funnel.steps.map((step) => [step.key, step]));
+    expect(steps.registered.count).toBe(39848);
+    expect(steps.performers).toMatchObject({ count: 1366, share: '3.4% of the 39,848 registered firms' });
+    expect(steps.scored).toMatchObject({ count: 50, share: '0.1% of the 39,848 registered firms' });
+    expect(steps.returned.count).toBe(50);
+    expect(steps.families).toMatchObject({ count: 32, label: 'distinct parent companies among those 50 firms' });
+    expect(steps.unresolved.count).toBe(18);
+    expect(steps.checked).toBeUndefined();
     expect(JSON.stringify(s.deduplicatedFamilyCount)).not.toMatch(/1366|39848/);
-    expect(efforts).not.toMatch(/complete market population of 32/i);
+    expect(s.funnel.summary).not.toMatch(/complete market/i);
   });
 
   it('does not describe 43 capable/active UEIs as the complete 50-row sample', async () => {
@@ -506,12 +511,12 @@ describe('§11 sample semantics — matching census vs evaluated sample vs eligi
     expect(s.excludedBeforeFamilyResolution).toMatchObject({ state: 'value', value: 7 });
     expect(s.rawUeiCount).toMatchObject({ state: 'value', value: 791 });
     const blob = JSON.stringify(s);
-    expect(blob).toMatch(
-      /50 suppliers sampled; 43 met the capable\/active evaluation gate; 7 were excluded before corporate-family resolution/,
-    );
-    expect((s.effortsToLocate as { value: string }).value).toMatch(/family-resolution coverage of matching UEIs=5\.4% \(43\/791\)/);
-    expect((s.effortsToLocate as { value: string }).value).toMatch(/sample coverage of matching UEIs=6\.3% \(50\/791\)/);
-    expect((s.effortsToLocate as { value: string }).value).toMatch(/matching coverage of eligible population=.*\(791\/39848\)/);
+    const steps = Object.fromEntries(s.funnel.steps.map((step) => [step.key, step]));
+    expect(steps.returned.count).toBe(50);
+    expect(steps.checked).toMatchObject({ count: 43, share: '86.0% of the 50 listed firms' });
+    expect(steps.families.label).toBe('distinct parent companies among those 43 firms');
+    expect(steps.performers.share).toBe('2.0% of the 39,848 registered firms');
+    expect(s.funnel.summary).toMatch(/43 of them are capable or active/);
     expect(blob).not.toMatch(/43-row bounded sample/);
     expect(blob).not.toMatch(/complete 50-row sample of 43/);
   });

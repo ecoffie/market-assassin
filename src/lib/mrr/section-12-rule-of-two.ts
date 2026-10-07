@@ -160,12 +160,23 @@ async function resolveDepthCall(
   return call;
 }
 
+/**
+ * The most recent fiscal year whose contract data is complete in USASpending.
+ * FY N ends Sep 30 of calendar year N, and DoD publishes contract actions with
+ * a 90-day delay, so FY N is not complete until about Jan 1 of N+1. That makes
+ * the latest complete FY always (current calendar year − 1). A partial year
+ * understates set-aside shares, so the report never uses one.
+ */
+export function lastCompleteFiscalYear(now: Date = new Date()): number {
+  return now.getUTCFullYear() - 1;
+}
+
 async function resolveGoalingCall(
   req: Requirement,
   opts: BuildSection12Opts | undefined,
   calls: ToolCall[],
 ): Promise<ToolCall> {
-  const args = { agency: req.agency };
+  const args: Record<string, unknown> = { agency: req.agency, fiscal_year: lastCompleteFiscalYear() };
   if (opts?.goalingResult !== undefined || opts?.goalingOk === false) {
     const ev = evidence('Mindy MCP get_sba_goaling_share', args);
     const ok = opts.goalingOk !== false;
@@ -280,18 +291,28 @@ function formatGoaling(call: ToolCall): GroundedField<string> {
       [call.evidence],
     );
   }
-  const agency = r.agency ?? 'agency';
+  const agency = r.agency ?? 'this agency';
   const fy = r.fiscal_year ?? 'n/a';
   const sbShare = r._meta?.small_business_setaside_share;
-  const lines = r.goals.map(
+  // Set-aside shares only. The statutory goals (23% small business, 5% SDB, …)
+  // are measured by SBA against small-business-ELIGIBLE dollars and count every
+  // award won by a small firm, set-aside or not. Set-aside-code obligations over
+  // total obligations is a different population, so "x% vs goal 23%" would
+  // compare unlike numbers. The goals are therefore not shown beside them.
+  const shares = r.goals.map(
     (g) =>
-      `${g.category}: actual ${g.actual_setaside_pct}% vs goal ${g.goal_pct}% (${g.meets_goal ? 'meets' : 'below'})`,
+      `${/prime/i.test(g.category) ? 'general small-business set-aside' : g.category} ${g.actual_setaside_pct}%`,
   );
   const head =
     typeof sbShare === 'number'
-      ? `${agency} FY${fy}: ${sbShare}% of dollars through small-business set-aside codes.`
-      : `${agency} FY${fy}: set-aside goaling vs statutory floors.`;
-  return value(`${head} ${lines.join('; ')}.`, call.evidence);
+      ? `${agency}, FY${fy} (latest complete fiscal year): ${sbShare}% of contract obligations were made under small-business set-aside codes.`
+      : `${agency}, FY${fy} (latest complete fiscal year): set-aside obligations by program.`;
+  const programs = shares.length ? ` By program: ${shares.join('; ')}.` : '';
+  return value(
+    `${head}${programs} This is a floor on small-business participation, because small firms also win unrestricted awards. ` +
+      'It is not comparable to the government-wide small-business goals, which SBA measures against small-business-eligible dollars. Source: USASpending.',
+    call.evidence,
+  );
 }
 
 function buildSocioCounts(
@@ -486,6 +507,10 @@ function buildDeterminationAndRecommendation(args: {
   sampleTruncated?: boolean;
   /** n===0 mostly because business size was unknown — not a measured market zero. */
   sizeUnresolvedDominates?: boolean;
+  /** No NAICS was provided, so the supplier search never ran (missing input). */
+  naicsMissing?: boolean;
+  /** "Mindy scored 50 of the 2,442 registered small businesses" — the sample, with its denominator. */
+  sampleText?: string | null;
   evidence: EvidenceRef;
 }): {
   determination: GroundedField<RuleOfTwoDetermination>;
@@ -502,9 +527,25 @@ function buildDeterminationAndRecommendation(args: {
     fleetResolveFailed,
     sampleTruncated,
     sizeUnresolvedDominates,
+    naicsMissing,
+    sampleText,
     evidence: ev,
   } = args;
   const limitations: string[] = [];
+
+  if (naicsMissing) {
+    return {
+      determination: unknown(
+        'not determined — no NAICS code was provided, so potential suppliers were not searched',
+        [ev],
+      ),
+      recommendation: value(
+        'No set-aside conclusion: the supplier search was not run because no NAICS code was provided. This is missing input, not a failed lookup and not a finding of zero small businesses.',
+        ev,
+      ),
+      limitations: ['No NAICS code was provided; Rule-of-Two evidence was not gathered.'],
+    };
+  }
   const names = countedFamilies.map((f) => f.displayName).join('; ');
   const toolDet = toolDetermination(depth);
 
@@ -570,31 +611,31 @@ function buildDeterminationAndRecommendation(args: {
     const whyParts: string[] = [];
     if (sampleTruncated || (coverage !== null && coverage < 1)) {
       whyParts.push(
-        coverage !== null && coverage < 1
-          ? `sample_coverage=${coverage} (< 1) — sample is not exhaustive`
-          : 'evaluated UEI sample is smaller than the source-reported matching UEIs (truncated tool return)',
+        sampleText
+          ? `the supplier evidence is a sample, not the full market (${sampleText})`
+          : 'the supplier evidence is a sample, not the full market',
       );
     } else if (coverage === null) {
-      whyParts.push('sample coverage was not established');
+      whyParts.push('how much of the market the sample covers could not be established');
     }
     if (sizeUnresolvedDominates) {
       whyParts.push(
-        'business-size status was not established for most evaluated firms — cannot treat missing size as other-than-small',
+        'small-business status was not established for most of the firms evaluated, and missing status is not treated as other-than-small',
       );
     }
     if (n >= 2) {
       whyParts.push(
-        `${n} parent-deduplicated capable families in the evaluated sample do not establish a market-wide Rule-of-Two`,
+        `${n} distinct small-business parent companies with capable performance were found among the listed firms. That shows such firms exist, but this report does not turn a sample into a market-wide Rule-of-Two determination`,
       );
     }
     const why = whyParts.join('; ');
     limitations.push(
-      `${why}; a truncated sample or unresolved size remains Insufficient Evidence, never a conclusive met/not_met.`,
+      'A sample, or unresolved small-business status, stays "not determined"; this report never reports it as met or not met.',
     );
     return {
       determination: value('undetermined', ev),
       recommendation: value(
-        `Insufficient evidence to support a set-aside — ${why}.`,
+        `Insufficient evidence to support a set-aside: ${why}.`,
         ev,
       ),
       limitations,
@@ -643,6 +684,14 @@ function buildDeterminationAndRecommendation(args: {
   };
 }
 
+/** "Mindy scored 50 of the 2,442 registered small businesses" — or null when not established. */
+function sampleDescription(s11: Section11): string | null {
+  const scored = s11.scoredSample?.state === 'value' ? s11.scoredSample.value : null;
+  const registered = s11.eligiblePopulation.state === 'value' ? s11.eligiblePopulation.value : null;
+  if (scored == null || registered == null || registered <= 0) return null;
+  return `Mindy scored ${scored.toLocaleString('en-US')} of the ${registered.toLocaleString('en-US')} registered small businesses`;
+}
+
 export async function buildSection12(
   req: Requirement,
   primaryNaics: string | undefined,
@@ -660,11 +709,8 @@ export async function buildSection12(
   const depthDegraded = !!depth && depth.ok && metaDegraded(depth.result) === true;
 
   const { coverage, field: matchingCoverage } = readMatchingCoverage(depth);
-  if (coverage !== null && coverage < 1) {
-    limitations.push(
-      `sample_coverage=${coverage} (< 1): Rule-of-Two "not met" is not conclusive on a truncated sample`,
-    );
-  }
+  const naicsMissing = s11.notRun === 'missing_naics';
+  const sampleText = sampleDescription(s11);
 
   const sectionEv =
     depth?.evidence ??
@@ -679,6 +725,7 @@ export async function buildSection12(
   const n = countedFamilies.length;
 
   const fleetResolveFailed =
+    !naicsMissing && (
     s11.deduplicatedFamilyCount.state === 'unknown'
     || (
       s11.suppliers.length > 0
@@ -688,13 +735,15 @@ export async function buildSection12(
           || s.family.method === 'malformed_uei'
           || s.family.confidence === 'unresolved',
       )
-    );
+    ));
 
   const sampleTruncated = isTruncatedSample(s11, coverage);
   const sizeUnresolved = sizeUnresolvedDominatesZero(excluded, n);
 
   let capableFamilyCount: GroundedField<number>;
-  if (depthFailed && s11.suppliers.length === 0) {
+  if (naicsMissing) {
+    capableFamilyCount = unknown('not counted — no NAICS code was provided, so suppliers were not searched', [sectionEv]);
+  } else if (depthFailed && s11.suppliers.length === 0) {
     // Failed read with no supplier evidence → unknown count, never 0.
     capableFamilyCount = unknown(
       `assess_market_depth failed: ${depth?.error ?? 'unknown error'} — capable family count cannot be established`,
@@ -749,6 +798,8 @@ export async function buildSection12(
       fleetResolveFailed,
       sampleTruncated,
       sizeUnresolvedDominates: sizeUnresolved,
+      naicsMissing,
+      sampleText,
       evidence: sectionEv,
     });
   limitations.push(...detLimits);
@@ -762,26 +813,22 @@ export async function buildSection12(
   const framedRecommendation =
     recommendation.state === 'value'
       ? value(
-          `${recommendation.value} Scope of this evidence: ${scopeLabel} (contextual market-capacity; observed dimensions: ${observedDimensions.join(', ') || 'none'}` +
-            `${scope.contractingOfficeCode ? `; contracting office ${scope.contractingOfficeCode} was NOT consumed by the supplier query` : ''}` +
-            ').',
+          naicsMissing
+            ? recommendation.value
+            : `${recommendation.value} Scope of this evidence: ${scopeLabel}` +
+              `${scope.contractingOfficeCode ? `; the supplier search did not filter by contracting office ${scope.contractingOfficeCode}` : ''}.`,
           recommendation.evidence,
         )
       : recommendation;
-  limitations.push(
-    `Rule-of-Two evidence dimensions actually observed: ${observedDimensions.join(', ') || 'none'}. ` +
-      `This determination does not claim buyer/office-specific supply unless contracting_office was consumed.`,
-  );
+  if (!naicsMissing) {
+    limitations.push(
+      `The supplier search was filtered by ${observedDimensions.map((d) => (d === 'geography' ? 'state' : d === 'naics' ? 'NAICS' : d)).join(' and ') || 'nothing'} only. It does not show which firms sell to the scoped contracting office.`,
+    );
+  }
 
   const socioCounts = buildSocioCounts(counted, sectionEv);
   const goalingContext = formatGoaling(goalingCall);
 
-  // Carry forward §11 truncation notes that matter for RoT.
-  for (const lim of s11.limitations) {
-    if (/sample_coverage/i.test(lim) && !limitations.includes(lim)) {
-      limitations.push(lim);
-    }
-  }
 
   return {
     determination,

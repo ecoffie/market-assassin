@@ -8,6 +8,7 @@
  *
  * Spec: INTERFACE-CONTRACTS.md §15; mrw-phase1-dev-spec.md §15.
  */
+import { readableTitle } from './readable-title';
 import type { EvidenceRef, GroundedField, Requirement } from './types';
 import { callTool, metaDegraded, metaGrounded, type ToolCall } from './mindy-client';
 import { degraded, unknown, unknownFromError, value } from './grounding';
@@ -133,7 +134,7 @@ function buildPricingEvidence(
 ): GroundedField<string> {
   if (!primaryNaics) {
     return unknown(
-      'no primary NAICS available — GSA CALC pricing evidence was not queried (Phase 2 / KO-owned Independent Government Estimate remains the KO\'s responsibility)',
+      'not researched — no NAICS code was provided. Pricing here is supporting evidence only; the contracting officer owns the Independent Government Estimate.',
     );
   }
   if (!call) {
@@ -148,14 +149,14 @@ function buildPricingEvidence(
 
   if (isDegraded) {
     return degraded(
-      'get_pricing_intel reported degraded upstream data — GSA CALC rates unavailable; this is supporting labor-rate evidence only and is not a Phase 2 / KO-owned Independent Government Estimate',
+      'GSA CALC labor-rate data was unavailable when this report ran. Pricing here is supporting evidence only; the contracting officer owns the Independent Government Estimate.',
       [call.evidence],
     );
   }
 
   if (grounded === false) {
     return unknown(
-      'get_pricing_intel returned grounded:false — no GSA CALC labor rates for this NAICS; Mindy does not fabricate rates and does not produce the Independent Government Estimate (Phase 2 / KO-owned)',
+      `GSA CALC returned no labor rates for NAICS ${primaryNaics}, so no rates are shown. Mindy does not estimate rates; the contracting officer owns the Independent Government Estimate.`,
       [call.evidence],
     );
   }
@@ -253,7 +254,7 @@ function buildSbFootprint(s12: Section12Slice): GroundedField<string> {
   // Undetermined RoT must not be narrated as a market-wide "0 capable" footprint.
   if (detTxt === 'undetermined') {
     return unknown(
-      'Insufficient evidence for small-business footprint — Rule of Two undetermined; capable-family count from the evaluated sample is not a complete-market supplier population',
+      'not stated — the small-business evidence in §12 is a sample, so a market-wide small-business footprint is not reported',
       [
         ...(count.state === 'value' || count.state === 'true_zero' ? [count.evidence] : []),
         ...(det.state === 'value' ? [det.evidence] : []),
@@ -348,7 +349,7 @@ function buildSocioFootprint(s12: Section12Slice): GroundedField<string> {
   }
 
   const text =
-    `Socioeconomic footprint (parent-deduplicated families from §12): ${parts.join('; ')}.` +
+    `${parts.join('; ')} (parent companies counted in §12).` +
     (anyUnknown || anyDegraded
       ? ' Some designation counts were not fully established (see per-designation notes).'
       : '');
@@ -396,11 +397,11 @@ function buildConcentrationAndDiversity(
   const top = [...shares].sort((a, b) => b.pct - a.pct)[0];
   const namePart = top.name ? ` (${top.name})` : '';
   const concentration = value(
-    `Largest NAICS share ${formatSharePct(top.pct)} — ${top.code}${namePart} of the measured keyword-coverage market`,
+    `Largest NAICS share ${formatSharePct(top.pct)} — ${top.code}${readableTitle(namePart)} of the measured keyword-coverage market`,
     coverageSet.evidence,
   );
   const diversity = value(
-    `Market diversity proxy: ${shares.length} NAICS code${shares.length === 1 ? '' : 's'} in the §5 coverage set`,
+    `${shares.length} NAICS code${shares.length === 1 ? '' : 's'} in the §5 coverage set`,
     coverageSet.evidence,
   );
   return { supplierConcentration: concentration, marketDiversity: diversity };

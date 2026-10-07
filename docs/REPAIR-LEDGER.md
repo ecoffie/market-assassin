@@ -26,6 +26,17 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-07 — Market research files were never downloadable on getmindy.ai
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-07 | Market research / hosted deliverables | Report, appendix and evidence files were written to `/tmp` on the Vercel instance that ran the job; every download landed on another instance → 404 (0/18 on 2026-10-06). Files now go to the private Supabase Storage bucket `mrr-artifacts` before a run is marked done; downloads are owner-checked against the KV job and sha256-verified. Repeating the same question re-runs (same run id) a run whose files are gone, that failed, or that stalled. | `export const MRR_ARTIFACT_BUCKET = 'mrr-artifacts';` → `src/lib/mrr/artifact-storage.ts` | `workspace.unit.test.ts` hosted-durability block + local prod build: downloads byte-identical after the local copies were deleted; audit run `mzv9axJ0mNw3u7e0vJLKwA` rebuilt in place | ACTIVE |
+| 2026-10-07 | Market research / supplier counts | The market-depth tool scores 50 firms but returns its top 15; §11 called the 15 "the sample" and printed `sample_coverage=0.039…`. One shared funnel now states every count with its denominator on screen, in the report and in the evidence file. | `export function supplierFunnel(` → `src/lib/mrr/supplier-funnel.ts` | `demo-readiness.unit.test.ts` pins the live Vandenberg 236220/CA numbers | ACTIVE |
+| 2026-10-07 | Market research / missing NAICS | No NAICS → §12 reported "parent-edge resolution failed … (lookup failed)" and "capacity for NAICS the stated NAICS". Missing input is now stated as not run, with a NAICS step (and suggestion) before research. | `missing input, not a failed lookup` → `src/lib/mrr/section-12-rule-of-two.ts` | `demo-readiness.unit.test.ts` | ACTIVE |
+| 2026-10-07 | Market research / SBA size standard + goaling | Size standard read live from 13 CFR 121.201 on eCFR (as-of + last-amended dates, exceptions surfaced; fixture only as labelled fallback). Agency goaling no longer sets set-aside-code shares against the 23% goal (different denominators) and uses the latest complete FY. | `export async function resolveSizeStandard(` → `src/lib/mrr/sba-size-standards.ts` | `demo-readiness.unit.test.ts` | ACTIVE |
+
+---
+
 ## 2026-10-06 — Weekly alerts never reached anyone after "j"
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
