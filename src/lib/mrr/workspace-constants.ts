@@ -7,8 +7,10 @@
  * funnel; contract-holder label; buyer-history descriptions and relevance).
  * v4 = 2026-10-07 (office codes starting with digits, e.g. VA 36C250 — v3 runs
  * for such offices queried the word "OFFICE" and saved a false zero).
+ * v5 = 2026-10-07 (office history that only matches the code is not presented
+ * as prior purchases; unknown office codes are "unavailable", never zero).
  */
-export const MRR_REPORT_VERSION = 4;
+export const MRR_REPORT_VERSION = 5;
 
 export const WORKSPACE_PROTOTYPE_BANNER =
   'PROTOTYPE — PUBLIC-DATA DEMO — NOT FOR SIGNATURE';

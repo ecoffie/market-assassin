@@ -374,3 +374,46 @@ describe('VA office 36C250 buyer history (hosted acceptance 2026-10-07)', () => 
     expect(s.awards[0].relevance?.label).toMatch(/does not mention the requirement/);
   });
 });
+
+describe('office buyer history: unavailable is never "Measured zero" (2026-10-07)', () => {
+  const vaReq = (office: string) =>
+    normalizeRequirement({
+      title: 'IT help desk support for the VA medical center in Cleveland, Ohio',
+      agency: 'Department of Veterans Affairs',
+      office,
+      keyword: 'IT help desk support',
+      description: 'IT help desk support for the VA medical center in Cleveland, Ohio',
+      naics: '541512',
+      place_of_performance_state: 'OH',
+    }).normalized;
+  const row = {
+    piid: 'ZZ0001', recipientName: 'X', recipientUei: 'X', awardAmount: 1, description: 'PHARMACY', startDate: '2020-01-01',
+    endDate: '2021-01-01', awardingAgency: 'Department of Veterans Affairs', awardingSubAgency: 'Department of Veterans Affairs',
+    awardingOffice: '36C250', awardingOfficeCode: '36C250', naicsCode: '325412', pscCode: '6505', popState: 'CA', popCity: 'X',
+    awardType: 'PO', awardId: 'CONT_AWD_ZZ0001', asOf: '2026-07-23',
+  };
+  const result = (rows: typeof row[]) => ({ ok: true, asOf: '2026-07-23', retrievedAt: '2026-10-07T00:00:00.000Z', query: {}, rows });
+
+  it('an office code with no awards at all is unavailable — possibly mistyped — not a measured zero', async () => {
+    calls.impl = () => ({ incumbent: null, _meta: { grounded: false, degraded: false } });
+    const s = await buildSection9(vaReq('ZZ9999 NOT A REAL OFFICE'), '541512', { officeAwardLookup: async () => result([]) });
+    expect(s.awardsFinding.state).toBe('unknown');
+    expect(JSON.stringify(s.awardsFinding)).toMatch(/has no awards at all .* may be mistyped .* unavailable, not zero/);
+  });
+
+  it('a real office with awards, none under the scope, is a genuine measured zero', async () => {
+    calls.impl = () => ({ incumbent: null, _meta: { grounded: false, degraded: false } });
+    const s = await buildSection9(vaReq('36C250 250-NETWORK CONTRACT OFFICE 10 (36C250)'), '541512', {
+      officeAwardLookup: async (q) => result(q.naics ? [] : [row]),
+    });
+    expect(s.awardsFinding.state).toBe('true_zero');
+    expect(JSON.stringify(s.awardsFinding)).toMatch(/has federal awards, but none under the stated/);
+  });
+
+  it('office text with no recognisable code is unavailable, never a measured zero', async () => {
+    calls.impl = (tool) => (tool === 'search_past_contracts' ? { awards: [], _meta: { grounded: true, degraded: false } } : { incumbent: null, _meta: { grounded: false, degraded: false } });
+    const s = await buildSection9(vaReq('Louis Stokes Cleveland VA Medical Center'), '541512');
+    expect(s.awardsFinding.state).toBe('unknown');
+    expect(JSON.stringify(s.awardsFinding)).toMatch(/no recognisable office code.*unavailable, not zero/);
+  });
+});
