@@ -44,6 +44,10 @@ export interface MarketDepthToolResult {
   /** null = unknown coverage (population count failed). */
   sample_coverage: number | null;
   capable_in_sample: number;
+  /** Scored firms that are matching contract holders (seeded first). */
+  contract_holders_in_sample: number | null;
+  /** Contract holders among the capable/active scored firms. */
+  capable_contract_holders_in_sample: number | null;
   market_depth_in_sample: number;
   /**
    * met = >=2 found (conclusive at any coverage) · not_met = <2 AND exhaustive ·
@@ -132,6 +136,8 @@ export async function assessMarketDepth(input: MarketDepthToolInput): Promise<Ma
     sample_size: res?.sampleSize ?? 0,
     sample_coverage: res?.sampleCoverage ?? null,
     capable_in_sample: res?.capableInSample ?? 0,
+    contract_holders_in_sample: res?.contractHoldersInSample ?? null,
+    capable_contract_holders_in_sample: res?.capableContractHoldersInSample ?? null,
     market_depth_in_sample: res?.marketDepthInSample ?? 0,
     // A degraded lookup is ALSO 'undetermined' — same principle, different cause.
     rule_of_two_determination: res?.ruleOfTwoDetermination ?? 'undetermined',

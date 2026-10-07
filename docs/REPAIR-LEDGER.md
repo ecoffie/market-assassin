@@ -26,6 +26,18 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-07 — Market research dead-ended on any office not named in the question
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-07 | Market research / supplier populations | The supplier counts were shown as a funnel (633 → 9 → 50 → 12 → 15) though they are overlapping subsets: the 50 scored were all 9 contract holders + 41 other registrants, and the 15 listed contain all 12 capable firms. "Have held a federal prime contract" overstated the matching census (current/recently ended contracts only). The market-depth tool now reports contract holders in the scored sample; every surface states the overlaps. | `not steps in a funnel` → `src/lib/mrr/supplier-funnel.ts` | `demo-readiness.unit.test.ts` (Fort Bragg 561730/NC numbers); live probe | ACTIVE |
+| 2026-10-07 | Market research / buyer-history relevance | Buyer-history cards showed the contract type, not what was bought, so grounds work could not be told from other purchases by the office. Each award now shows its description and whether the description names the requirement, matched on codes only, or is another purchase. | `export function awardRelevance(` → `src/lib/mrr/award-relevance.ts` | `award-relevance.unit.test.ts`; live: Fort Bragg W91247 19 named / 6 code-only of 25 | ACTIVE |
+| 2026-10-07 | Market research / interpretation | The answer to "Which buyer or contracting office?" was never read (only `office` answers were), so every reply re-asked the same question — a dead end for "IT help desk support for the VA medical center in Cleveland, Ohio". The answer now searches office names and exact office codes (36C250); an unmatched answer says so instead of repeating. "Contracting" ≈ "Contract" in office names. | `const buyerAnswer =` → `src/lib/mrr/interpret-market.ts` | `interpret-market.unit.test.ts` (fails on the old code); live interpreter probe | ACTIVE |
+| 2026-10-07 | Market research / requirement wording | A question that leads with the requirement ("IT help desk support for the VA …") took the buyer phrase as the requirement → keyword "the VA medical center" → NAICS suggestion 621111 Offices of Physicians. | `function requirementBeforeFor(` → `src/lib/mrr/interpret-market.ts` | `interpret-market.unit.test.ts` | ACTIVE |
+| 2026-10-07 | Market research / installation offices | Installation offices were searched by the FIRST word, so "Fort Bragg" offered 34 offices from every "Fort" city (Riley, Hood, Belvoir…) and "Louis Stokes" matched Louisville. Now the first distinctive word before any comma ("Bragg"). | `export function installationSearchToken(` → `src/lib/mrr/interpret-market.ts` | `interpret-market.unit.test.ts`; live probe: W91247 MICC FDO FT BRAGG first of 6 | ACTIVE |
+
+---
+
 ## 2026-10-07 — Market research files were never downloadable on getmindy.ai
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

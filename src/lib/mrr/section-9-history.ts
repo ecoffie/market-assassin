@@ -30,6 +30,7 @@ import {
   type RetrievalManifest,
   type ScopeExpansionRecord,
 } from './market-scope';
+import { awardRelevance, type AwardRelevance } from './award-relevance';
 import { queryAwardsByAwardingOffice, type OfficeAwardLookup, type OfficeAwardRow } from './office-awards';
 import { usaSpendingSubtierRewrite } from '@/lib/usaspending/awarding-agency-filter';
 
@@ -44,6 +45,10 @@ export interface AwardRow {
   naics: GroundedField<string>;
   psc: GroundedField<string>;
   awardingAgency: GroundedField<string>;
+  /** What was bought, as the source describes it. */
+  description?: GroundedField<string>;
+  /** Whether this award is the requested work or another purchase by the office. */
+  relevance?: AwardRelevance;
   usaSpendingUrl?: string;
   evidenceClass: EvidenceClass;
   awardingOffice?: string;
@@ -325,6 +330,7 @@ function awardRowFromSource(
       return unknown('the source did not report a period of performance', [ev]);
     })(),
     naics: fieldFrom(row, ['naicsCode', 'naics', 'naics_code'], 'the source did not report a NAICS code', ev),
+    description: fieldFrom(row, ['description', 'award_description', 'title'], 'the source did not report a description', ev),
     psc: fieldFrom(row, ['pscCode', 'psc', 'psc_code'], 'the source did not report a PSC code', ev),
     awardingAgency: fieldFrom(row, ['awardingSubAgency', 'subAgency', 'awardingAgency', 'agency', 'awarding_agency'], 'the source did not report an awarding agency', ev),
     evidenceClass,
@@ -776,6 +782,17 @@ export async function buildSection9(
       asOf: predCall.evidence.retrievedAt,
       evidenceClass: predecessorEvidenceClass ?? 'unresolved',
     }));
+  }
+
+  for (const award of awards) {
+    award.relevance = awardRelevance({
+      description: award.description?.state === 'value' ? award.description.value : null,
+      awardNaics: award.naics.state === 'value' ? award.naics.value : null,
+      awardPsc: award.psc.state === 'value' ? award.psc.value : null,
+      requirement: req.keyword,
+      requiredNaics: primaryNaics ?? req.naics ?? null,
+      requiredPsc: req.psc ?? null,
+    });
   }
 
   return {

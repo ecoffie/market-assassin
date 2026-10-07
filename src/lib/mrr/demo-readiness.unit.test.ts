@@ -29,9 +29,9 @@ describe('supplier funnel — every count names its population', () => {
     const f = supplierFunnel(VANDENBERG_FUNNEL);
     expect(f.ran).toBe(true);
     expect(f.summary).toBe(
-      'Of 2,442 small businesses registered in SAM for NAICS 236220 in California, 96 (3.9%) have held a federal prime contract in that NAICS. ' +
-        'Mindy scored 50 of them; 44 of the 50 show capable or active performance. ' +
-        'The 15 highest-scoring firms are listed with full detail. They belong to 14 distinct parent companies (1 with a parent not confirmed).',
+      '2,442 small businesses are registered in SAM for NAICS 236220 in California; 96 of them (3.9%) hold a current or recently ended federal prime contract in NAICS 236220. ' +
+        'Mindy scored 50 of the registered firms. 44 of the 50 show capable or active performance. ' +
+        'The report lists the 15 highest-scoring scored firms, 15 of them capable or active. The 15 capable listed firms belong to 14 distinct parent companies (1 with a parent not confirmed).',
     );
     const shares = Object.fromEntries(f.steps.map((s) => [s.key, s.share]));
     expect(shares).toEqual({
@@ -43,6 +43,33 @@ describe('supplier funnel — every count names its population', () => {
       families: null,
       unresolved: null,
     });
+  });
+
+  it('states Fort Bragg as overlapping populations, not a funnel (633 / 9 / 50 / 12 / 15)', () => {
+    const f = supplierFunnel({
+      naics: '561730',
+      state: 'NC',
+      eligiblePopulation: value(633, ev),
+      matchingPerformers: value(9, ev),
+      scoredSample: value(50, ev),
+      capableInScoredSample: value(12, ev),
+      contractHoldersInScored: 9,
+      capableContractHolders: 9,
+      returnedRows: value(15, ev),
+      checkedForParent: value(12, ev),
+      resolvedFamilies: value(12, ev),
+      unresolvedParents: value(0, ev),
+    });
+    const label = Object.fromEntries(f.steps.map((s) => [s.key, s.label]));
+    expect(label.registered).toMatch(/every count below is a subset of these/);
+    expect(label.performers).toBe('of the registered firms hold a current or recently ended federal prime contract in NAICS 561730');
+    expect(label.scored).toBe('registered firms scored by Mindy: all 9 contract holders and 41 other registered firms');
+    expect(label.capable).toBe('of the 50 scored firms show capable or active performance (9 contract holders, 3 not)');
+    expect(label.returned).toBe('highest-scoring of the 50 scored firms, listed with full detail — all 12 capable firms plus 3 that are not capable');
+    expect(label.families).toBe('distinct parent companies among the 12 capable listed firms');
+    expect(f.summary).toContain('Mindy scored 50 of the registered firms: all 9 contract holders and 41 other registered firms.');
+    expect(f.summary).not.toMatch(/scored 50 of them/);
+    expect(f.definitions[0]).toMatch(/not steps in a funnel/);
   });
 
   it('never prints a raw engine ratio', () => {

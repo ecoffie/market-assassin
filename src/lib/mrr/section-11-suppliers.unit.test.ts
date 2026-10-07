@@ -195,7 +195,7 @@ describe('§11 mutation: truncated sample is not a population', () => {
     expect(s.limitations.some((l) => /a sample, not a census/i.test(l))).toBe(true);
     const efforts = (s.effortsToLocate as { value: string }).value;
     // Every figure names its population; no raw engine ratio reaches the reader.
-    expect(efforts).toMatch(/Of 400 small businesses registered in SAM for NAICS 561720 in Florida, 2 \(0\.5%\)/);
+    expect(efforts).toMatch(/400 small businesses are registered in SAM for NAICS 561720 in Florida; 2 of them \(0\.5%\) hold a current or recently ended federal prime contract/);
     expect(efforts).not.toMatch(/sample_coverage|0\.05/);
     // Must not claim the sample size is the population
     expect(JSON.stringify(s.limitations)).not.toMatch(/complete population/i);
@@ -480,9 +480,9 @@ describe('§11 sample semantics — matching census vs evaluated sample vs eligi
     expect(steps.performers).toMatchObject({ count: 1366, share: '3.4% of the 39,848 registered firms' });
     expect(steps.scored).toMatchObject({ count: 50, share: '0.1% of the 39,848 registered firms' });
     expect(steps.returned.count).toBe(50);
-    expect(steps.families).toMatchObject({ count: 32, label: 'distinct parent companies among those 50 firms' });
+    expect(steps.families).toMatchObject({ count: 32, label: 'distinct parent companies among the 50 capable listed firms' });
     expect(steps.unresolved.count).toBe(18);
-    expect(steps.checked).toBeUndefined();
+    expect(steps.returned.label).toMatch(/50 of them capable or active/);
     expect(JSON.stringify(s.deduplicatedFamilyCount)).not.toMatch(/1366|39848/);
     expect(s.funnel.summary).not.toMatch(/complete market/i);
   });
@@ -513,10 +513,10 @@ describe('§11 sample semantics — matching census vs evaluated sample vs eligi
     const blob = JSON.stringify(s);
     const steps = Object.fromEntries(s.funnel.steps.map((step) => [step.key, step]));
     expect(steps.returned.count).toBe(50);
-    expect(steps.checked).toMatchObject({ count: 43, share: '86.0% of the 50 listed firms' });
-    expect(steps.families.label).toBe('distinct parent companies among those 43 firms');
+    expect(steps.returned.label).toMatch(/43 of them capable or active/);
+    expect(steps.families.label).toBe('distinct parent companies among the 43 capable listed firms');
     expect(steps.performers.share).toBe('2.0% of the 39,848 registered firms');
-    expect(s.funnel.summary).toMatch(/43 of them are capable or active/);
+    expect(s.funnel.summary).toMatch(/43 of them capable or active/);
     expect(blob).not.toMatch(/43-row bounded sample/);
     expect(blob).not.toMatch(/complete 50-row sample of 43/);
   });

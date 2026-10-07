@@ -16,6 +16,9 @@ export interface EvidenceBucketRow {
   amountLabel?: string | null;
   period?: string | null;
   awardType?: string | null;
+  description?: string | null;
+  relevanceBasis?: 'description' | 'code' | 'none' | null;
+  relevanceLabel?: string | null;
   whyItMatters: string;
   evidenceClass: EvidenceClass;
 }
@@ -45,6 +48,9 @@ export interface HistoryAwardLite {
   period?: string | null;
   awardType?: string | null;
   evidenceClass?: EvidenceClass | null;
+  description?: string | null;
+  relevanceBasis?: 'description' | 'code' | 'none' | null;
+  relevanceLabel?: string | null;
 }
 
 export interface EvidenceBucketSource {
@@ -93,9 +99,26 @@ function toRow(row: HistoryAwardLite, evidenceClass: EvidenceClass): EvidenceBuc
     amountLabel: row.amountLabel ?? null,
     period: row.period ?? null,
     awardType: row.awardType ?? null,
+    description: row.description ?? null,
+    relevanceBasis: row.relevanceBasis ?? null,
+    relevanceLabel: row.relevanceLabel ?? null,
     whyItMatters: whyItMatters(evidenceClass),
     evidenceClass,
   };
+}
+
+function buyerSummary(rows: HistoryAwardLite[]): string {
+  const base =
+    'Work procured by the scoped contracting office. Installation work bought by another agency is not listed here.';
+  const rated = rows.filter((r) => r.relevanceBasis);
+  if (!rated.length) return base;
+  const described = rated.filter((r) => r.relevanceBasis === 'description').length;
+  const codeOnly = rated.filter((r) => r.relevanceBasis === 'code').length;
+  const other = rated.filter((r) => r.relevanceBasis === 'none').length;
+  const parts = [`${described} of ${rated.length} award descriptions name the requirement`];
+  if (codeOnly) parts.push(`${codeOnly} match on codes only`);
+  if (other) parts.push(`${other} are other purchases by this office`);
+  return `${base} ${parts.join('; ')}.`;
 }
 
 export function buildEvidenceBuckets(source: EvidenceBucketSource): EvidenceBuckets {
@@ -129,8 +152,7 @@ export function buildEvidenceBuckets(source: EvidenceBucketSource): EvidenceBuck
   return {
     buyerHistory: {
       title: 'Buyer history',
-      summary:
-        'Work procured by the scoped contracting office. Installation work bought by another agency is not listed here.',
+      summary: buyerSummary(buyerRows),
       rows: buyerRows.map((row) => toRow(row, 'in_scope')),
       ...(buyerEmpty
         ? {

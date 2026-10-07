@@ -78,6 +78,10 @@ export interface Section11 {
   capableInScoredSample: GroundedField<number>;
   /** Why the supplier search did not run; null when it ran. */
   notRun: 'missing_naics' | 'failed' | 'degraded' | null;
+  /** Scored firms that are contract holders; null when the tool did not report it. */
+  contractHoldersInScored?: number | null;
+  /** Contract holders among the capable scored firms. */
+  capableContractHolders?: number | null;
   /** Every supplier count with its denominator — the one source for all surfaces. */
   funnel: SupplierFunnel;
   effortsToLocate: GroundedField<string>;
@@ -384,6 +388,10 @@ function emptySampleFields(
   };
 }
 
+function finiteOrNull(v: unknown): number | null {
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
 function funnelFor(
   req: Requirement,
   naics: string | undefined,
@@ -397,7 +405,11 @@ function funnelFor(
     | 'boundedSampleReturned'
     | 'deduplicatedFamilyCount'
     | 'ambiguousParentCount'
-  > & { evaluatedUeiCount?: GroundedField<number> },
+  > & {
+    evaluatedUeiCount?: GroundedField<number>;
+    contractHoldersInScored?: number | null;
+    capableContractHolders?: number | null;
+  },
 ): SupplierFunnel {
   return supplierFunnel({
     naics: naics ?? null,
@@ -407,6 +419,8 @@ function funnelFor(
     matchingPerformers: f.rawUeiCount,
     scoredSample: f.scoredSample,
     capableInScoredSample: f.capableInScoredSample,
+    contractHoldersInScored: f.contractHoldersInScored ?? null,
+    capableContractHolders: f.capableContractHolders ?? null,
     returnedRows: f.boundedSampleReturned,
     checkedForParent: f.evaluatedUeiCount,
     resolvedFamilies: f.deduplicatedFamilyCount,
@@ -518,6 +532,8 @@ export async function buildSection11(
     sample_coverage?: number | null;
     sample_size?: number;
     capable_in_sample?: number;
+    contract_holders_in_sample?: number | null;
+    capable_contract_holders_in_sample?: number | null;
     matching_uei_count?: number | null;
     capable_depth?: number;
     market_depth?: number;
@@ -756,6 +772,8 @@ export async function buildSection11(
       ? unknown<number>('parent-company lookup failed for every listed firm', [depthCall.evidence])
       : value(eligibleKeys.size, depthCall.evidence),
     ambiguousParentCount: value(ambiguousCount, depthCall.evidence),
+    contractHoldersInScored: finiteOrNull(result.contract_holders_in_sample),
+    capableContractHolders: finiteOrNull(result.capable_contract_holders_in_sample),
   };
   const funnel = funnelFor(req, primaryNaics, null, funnelFields);
   const effortsToLocate = value(
@@ -784,6 +802,8 @@ export async function buildSection11(
     scoredSample,
     capableInScoredSample,
     notRun: null,
+    contractHoldersInScored: funnelFields.contractHoldersInScored,
+    capableContractHolders: funnelFields.capableContractHolders,
     funnel,
     rawUeiCount,
     deduplicatedFamilyCount,
