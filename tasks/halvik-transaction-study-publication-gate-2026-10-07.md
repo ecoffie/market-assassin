@@ -15,7 +15,7 @@ Nothing has been pushed, merged, deployed, posted or sent. Branch: `research/hal
 | Transaction Study 001 | `/research/halvik-tetra-tech` (registry RES-004, `published`) | serves once merged and deployed |
 | RES-003 correction | `/research/small-business-participation-benchmark` | v1.0 → **v1.1**, with a dated correction shown on the page |
 | Truth cleanup | `/research`, `/research/about`, `/research/how-we-publish`, `/institute/competition-gap` footer, `competition-health.ts` header | narrow copy and comment edits |
-| Distribution drafts | `tasks/halvik-transaction-study-distribution-drafts-2026-10-07.md` | prepared, **not sent** |
+| Distribution drafts | kept outside the public repo until distribution is approved | prepared, **not sent** |
 
 ## 2. Brand architecture (locked) and how the release reflects it
 
@@ -49,7 +49,7 @@ Nothing has been pushed, merged, deployed, posted or sent. Branch: `research/hal
 | Historical cutoff | **2026-01-21** | The study reconstructs what was publicly knowable immediately before the announcement. |
 | Actions between acquisition and cutoff | 2, both $0 | `1333BJ24F00000001` P26013 and `GS35F328BA` PS0033, both dated 2026-01-21. Every figure is identical under a 2026-01-15 cutoff. Disclosed on the page and tested. |
 
-The January 16 date is used only to describe the transaction. **No recertification conclusion is drawn.** It remains an input for the separate recertification workstream (rule T2), and that question is for counsel.
+The January 16 date is used only to describe the transaction. **No recertification or eligibility conclusion is drawn.**
 
 ## 5. Final material-claim ledger
 
@@ -144,7 +144,7 @@ The January 16 date is used only to describe the transaction. **No recertificati
 ## 7. Remaining human approvals
 
 1. **Eric approves publication** of Release 001: the Standard, Study 001 and the RES-003 v1.1 correction together.
-2. **Read-through of the wording** (`~/Documents/halvik-transaction-study-DRAFT-2026-10-07.html` and `~/Documents/mindy-institute-research-standard-v1-PREVIEW-2026-10-07.html`). Figures are final.
+2. **Read-through of the wording** (local draft previews rendered with `scripts/render-halvik-study-preview.ts`). Figures are final.
 3. **Distribution sign-off**, after the study is live.
 
 ## 8. Exact publication sequence (after approval)
@@ -169,5 +169,5 @@ The January 16 date is used only to describe the transaction. **No recertificati
 - `src/app/research/route.ts`, `src/app/research/about/route.ts`, `src/app/research/how-we-publish/route.ts`, `src/app/sitemap.ts`, `src/app/institute/competition-gap/route.ts`, `src/lib/analytics/competition-health.ts`: truth cleanup and links
 - `src/lib/analytics/transaction-studies/halvik-tetra-tech{.data.json,.facts.ts,-html.ts,-html.unit.test.ts}`: the study
 - `scripts/render-halvik-study-preview.ts`: draft preview (noindex)
-- `tasks/halvik-transaction-study-publication-gate-2026-10-07.md` (this file) and `tasks/halvik-transaction-study-distribution-drafts-2026-10-07.md`
-- The original workbook `~/Documents/halvik-contract-register-as-of-2026-01-21.xlsx` is untouched.
+- `tasks/halvik-transaction-study-publication-gate-2026-10-07.md` (this file)
+- The original contract-register workbook is untouched and is not in this repository.
