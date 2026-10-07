@@ -134,7 +134,8 @@ export function buildDecisionBrief(input: DecisionBriefInput): DecisionBrief {
       stateLabel: 'A NAICS code is needed before suppliers and small-business evidence can be researched.',
       found,
       supports:
-        'The buyer history above. Potential suppliers, the Rule-of-Two evidence and pricing evidence were not researched because no NAICS code was provided. This is missing input, not a failed lookup and not a finding of zero small businesses.',
+        `${input.buyerAwardCount ? 'The buyer history below.' : 'Only the buyer-history search, which found no in-scope awards.'} ` +
+        'Potential suppliers, the Rule-of-Two evidence and pricing evidence were not researched because no NAICS code was provided. This is missing input, not a failed lookup and not a finding of zero small businesses.',
       doesNotSupport:
         'It does not support a set-aside, an unrestricted award decision, or any statement about how many small businesses can perform.',
       nextAction: 'Add the NAICS code for this requirement and run the research again.',
