@@ -211,3 +211,23 @@ describe('award amounts show the dollar figure', () => {
     expect(awardAmountLabel(unknown('not reported'))).toBeNull();
   });
 });
+
+describe('office history that only matches the code is not presented as prior purchases', () => {
+  it('says the awards show what the office buys under the code, not this work', () => {
+    const decision = buildDecisionBrief({
+      determination: value('undetermined', ev),
+      recommendation: value('Insufficient evidence to support a set-aside: sample.', ev),
+      buyerAwardCount: 22,
+      buyerHistoryEmpty: false,
+      buyerHistoryUnknown: false,
+      installationContextPresent: false,
+      pricingUnknown: false,
+      pricingDegraded: false,
+      buyerAwardsDescribed: 0,
+      buyerHistoryCode: 'NAICS 541512',
+    });
+    expect(decision.found).toMatch(/22 awards coded NAICS 541512, but none of their descriptions mention the requirement/);
+    expect(decision.found).toMatch(/not prior purchases of this work/);
+    expect(decision.found).not.toMatch(/in-scope award/);
+  });
+});

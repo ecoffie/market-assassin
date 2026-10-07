@@ -26,6 +26,15 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-07 — Office buyer history: unavailable vs zero, and code-only matches
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-07 | Market research / office existence | A format-valid but unknown office code (or office text with no code) returned no rows and was reported as "Measured zero". The office is now checked on its own: no awards at all → unavailable ("may be mistyped or not an awarding office"); real office with no scoped awards → genuine zero. | `has no awards at all in the federal award data` → `src/lib/mrr/section-9-history.ts` | `market-scope.unit.test.ts` (fails on old code) | ACTIVE |
+| 2026-10-07 | Market research / code-only office history | VA 36C250: 22 awards coded 541512, none describing help desk work, were summarised as "22 in-scope awards" and "buyer history for this market". Decision, §9 finding and cards now say they show what the office buys under the code, not prior purchases of this work. | `not prior purchases of this work` → `src/lib/mrr/decision-brief.ts` | `demo-readiness.unit.test.ts` (fails on old code) | ACTIVE |
+
+---
+
 ## 2026-10-07 — VA office 36C250: false "no buyer history" and an office pick that looped
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

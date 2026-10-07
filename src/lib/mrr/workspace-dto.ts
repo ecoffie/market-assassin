@@ -448,6 +448,10 @@ export function createPhase1ReviewDto(result: Phase1ReviewSource): Phase1ReviewD
     supplierScopeLabel: supplierScope?.scopeLabel,
     supplierEvidenceClass: supplierScope?.evidenceClass,
     naicsMissing: s11.notRun === 'missing_naics',
+    buyerAwardsDescribed: evidenceBuckets.buyerHistory.rows.some((row) => row.relevanceBasis)
+      ? evidenceBuckets.buyerHistory.rows.filter((row) => row.relevanceBasis === 'description').length
+      : null,
+    buyerHistoryCode: result.requirement.normalized.naics ? `NAICS ${result.requirement.normalized.naics}` : null,
     supplierSummary: s11.funnel?.ran ? s11.funnel.summary : null,
     pricingUnknown: result.section15.pricingEvidence.state === 'unknown',
     pricingDegraded: result.section15.pricingEvidence.state === 'degraded',

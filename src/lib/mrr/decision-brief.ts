@@ -40,6 +40,10 @@ export interface DecisionBriefInput {
   naicsMissing?: boolean;
   /** Denominator-labelled supplier funnel summary, when the supplier search ran. */
   supplierSummary?: string | null;
+  /** How many buyer-history awards' descriptions name the requirement (null = not assessed). */
+  buyerAwardsDescribed?: number | null;
+  /** The code the buyer history was filtered on, e.g. "NAICS 541512". */
+  buyerHistoryCode?: string | null;
 }
 
 function fieldState(
@@ -116,7 +120,11 @@ export function buildDecisionBrief(input: DecisionBriefInput): DecisionBrief {
       ? 'Buyer-history award count was not established.'
       : input.buyerAwardCount === 0
         ? 'The scoped contracting office returned no in-scope awards for this requirement.'
-        : `The scoped contracting office has ${input.buyerAwardCount} in-scope award${input.buyerAwardCount === 1 ? '' : 's'} in the retrieved buyer history.`;
+        : input.buyerAwardsDescribed === 0
+          ? `The scoped contracting office has ${input.buyerAwardCount} award${input.buyerAwardCount === 1 ? '' : 's'}${input.buyerHistoryCode ? ` coded ${input.buyerHistoryCode}` : ''}, but none of their descriptions mention the requirement. They show what this office buys under that code, not prior purchases of this work.`
+          : typeof input.buyerAwardsDescribed === 'number'
+            ? `The scoped contracting office has ${input.buyerAwardCount} award${input.buyerAwardCount === 1 ? '' : 's'} in the retrieved buyer history; ${input.buyerAwardsDescribed} of them describe the requirement.`
+            : `The scoped contracting office has ${input.buyerAwardCount} in-scope award${input.buyerAwardCount === 1 ? '' : 's'} in the retrieved buyer history.`;
 
   const capacityClause = input.naicsMissing
     ? 'Supplier search was not run because no NAICS code was provided.'

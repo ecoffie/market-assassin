@@ -17,7 +17,7 @@
  * parent does not make an Army or Air Force award a DHA predecessor; the check
  * compares at the SUB-AGENCY / component level when the requirement names one.
  */
-import type { GroundedField, Requirement } from './types';
+import type { EvidenceRef, GroundedField, Requirement } from './types';
 import { callTool, metaDegraded, metaGrounded, type ToolCall } from './mindy-client';
 import { degraded, evidence, unknown, unknownFromError, value } from './grounding';
 import {
@@ -453,24 +453,46 @@ export async function buildSection9(
         strictScopeResult: 'unknown',
       }));
     } else if (officeResult.rows.length === 0) {
-      awardsFinding = {
-        state: 'true_zero',
-        value: 0,
-        label: `No matching buyer-history awards for contracting office ${scope.contractingOfficeCode} under the stated NAICS/PSC/geography. Strict scope was not expanded.`,
-        evidence: officeEv,
-      };
+      // Zero under the strict scope is only a finding if the office itself is real.
+      // A mistyped or non-awarding code also returns nothing — that is "unavailable",
+      // never "Measured zero" (2026-10-07: VA 36C250 was queried as "OFFICE").
+      const officeOnly = await lookup({ officeCode: scope.contractingOfficeCode, limit: 1 });
+      calls.push({
+        tool: 'bq.awards.awarding_office_code',
+        args: { officeCode: scope.contractingOfficeCode, limit: 1, purpose: 'office exists check' },
+        evidence: evidence('bq.usaspending.awards awarding_office_code', { officeCode: scope.contractingOfficeCode, limit: 1 }),
+        ok: officeOnly.ok,
+        ...(officeOnly.ok ? { result: { count: officeOnly.rows.length } } : {}),
+        ...(officeOnly.error ? { error: officeOnly.error } : {}),
+      });
+      awardsFinding = !officeOnly.ok
+        ? unknown(
+            `could not confirm that contracting office ${scope.contractingOfficeCode} exists (${officeOnly.error ?? 'query failed'}) — buyer history is unavailable, not zero`,
+            [officeEv],
+          )
+        : officeOnly.rows.length === 0
+          ? unknown(
+              `contracting office code ${scope.contractingOfficeCode} has no awards at all in the federal award data — it may be mistyped or not an awarding office. Buyer history is unavailable, not zero.`,
+              [officeEv],
+            )
+          : {
+              state: 'true_zero',
+              value: 0,
+              label: `Contracting office ${scope.contractingOfficeCode} has federal awards, but none under the stated NAICS/PSC/geography. Strict scope was not expanded.`,
+              evidence: officeEv,
+            };
       retrievalManifests.push(retrievalManifest({
         section: '9',
         tool: 'bq.awards.awarding_office_code',
         requested: scope,
         consumed,
         unsupported,
-        resultCount: 0,
-        grounded: true,
+        resultCount: awardsFinding.state === 'true_zero' ? 0 : null,
+        grounded: awardsFinding.state === 'true_zero' ? true : null,
         source: 'bq.usaspending.awards',
         asOf: officeResult.retrievedAt,
-        evidenceClass: 'in_scope',
-        strictScopeResult: 'empty',
+        evidenceClass: awardsFinding.state === 'true_zero' ? 'in_scope' : 'unresolved',
+        strictScopeResult: awardsFinding.state === 'true_zero' ? 'empty' : 'unknown',
       }));
     } else {
       for (const row of officeResult.rows) {
@@ -602,12 +624,17 @@ export async function buildSection9(
       }
       awardsFinding = awards.length > 0
         ? value(`${awards.length} in-scope buyer-history award row(s) for the stated filters.`, pastCall.evidence)
-        : {
-            state: 'true_zero',
-            value: 0,
-            label: 'No matching award history found for the stated filters. Strict scope was not expanded.',
-            evidence: pastCall.evidence,
-          };
+        : req.office
+          ? unknown(
+              `contracting office "${req.office}" has no recognisable office code, so its buyer history could not be retrieved — unavailable, not zero`,
+              [pastCall.evidence],
+            )
+          : {
+              state: 'true_zero',
+              value: 0,
+              label: 'No matching award history found for the stated filters. Strict scope was not expanded.',
+              evidence: pastCall.evidence,
+            };
       retrievalManifests.push(retrievalManifest({
         section: '9',
         tool: 'search_past_contracts',
@@ -793,6 +820,16 @@ export async function buildSection9(
       requiredNaics: primaryNaics ?? req.naics ?? null,
       requiredPsc: req.psc ?? null,
     });
+  }
+  if (awards.length && awardsFinding.state === 'value') {
+    const described = awards.filter((a) => a.relevance?.basis === 'description').length;
+    const finding = awardsFinding as { state: 'value'; value: string; evidence: EvidenceRef };
+    awardsFinding = value(
+      described === 0
+        ? `${finding.value} None of the ${awards.length} award descriptions mention the requirement: they show what this office buys under the same code, not prior purchases of this work.`
+        : `${finding.value} ${described} of the ${awards.length} award descriptions name the requirement; the rest match on codes only.`,
+      finding.evidence,
+    );
   }
 
   return {

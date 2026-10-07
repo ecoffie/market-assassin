@@ -74,7 +74,13 @@ function findingText(
   return undefined;
 }
 
-function whyItMatters(evidenceClass: EvidenceClass): string {
+function whyItMatters(evidenceClass: EvidenceClass, relevance?: HistoryAwardLite['relevanceBasis']): string {
+  if (evidenceClass === 'in_scope' && relevance === 'code') {
+    return 'Bought by the scoped contracting office under the same code — the description does not show it is this kind of work.';
+  }
+  if (evidenceClass === 'in_scope' && relevance === 'none') {
+    return 'Another purchase by the scoped contracting office — not this kind of work.';
+  }
   switch (evidenceClass) {
     case 'in_scope':
       return 'Procured by the scoped contracting office — buyer history for this market.';
@@ -102,7 +108,7 @@ function toRow(row: HistoryAwardLite, evidenceClass: EvidenceClass): EvidenceBuc
     description: row.description ?? null,
     relevanceBasis: row.relevanceBasis ?? null,
     relevanceLabel: row.relevanceLabel ?? null,
-    whyItMatters: whyItMatters(evidenceClass),
+    whyItMatters: whyItMatters(evidenceClass, row.relevanceBasis),
     evidenceClass,
   };
 }
