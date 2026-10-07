@@ -1,0 +1,541 @@
+{
+ "study_id": "Transaction Study 001",
+ "target": "HALVIK, LLC",
+ "uei": "VMRTJLWMQRH7",
+ "cage": "5GRR4",
+ "as_of": "2026-01-21",
+ "source": {
+  "name": "USASpending.gov custom award download (prime transactions + subawards)",
+  "file": "PrimeTransactionsAndSubawards_2026-10-07_H07M45S24618047.zip",
+  "csv": "Contracts_PrimeTransactions_2026-10-07_H07M45S34_1.csv",
+  "csv_sha256": "5abd49c7f33b2614cd3613f6218bc4053f953cc2d864a6918df39cc79a8ca77c",
+  "retrieved": "2026-10-07",
+  "window": "FY2008 through 2026-10-07 (download end date)"
+ },
+ "admissibility": "An action is included only if its action date AND its initial report date are on or before 2026-01-21 (13 Halvik actions dated 2014-09-26..2015-05-28 carry no report date and are included on action date).",
+ "counts": {
+  "actions_total": 1684,
+  "actions_included": 1535,
+  "actions_after_cutoff": 148,
+  "actions_reported_after_cutoff": 1,
+  "awards_listed": 253,
+  "awards_admissible": 245,
+  "contracts_admissible": 215,
+  "vehicles_admissible": 30,
+  "awards_entirely_after_cutoff": 8,
+  "first_action_date": "2014-04-16",
+  "subawards_as_sub_by_cutoff": 35
+ },
+ "obligations_through_cutoff": 724711413.15,
+ "annual_obligations": [
+  {
+   "fy": 2014,
+   "obligations": 155230.0,
+   "partial": false
+  },
+  {
+   "fy": 2015,
+   "obligations": 2347143.79,
+   "partial": false
+  },
+  {
+   "fy": 2016,
+   "obligations": 659466.59,
+   "partial": false
+  },
+  {
+   "fy": 2017,
+   "obligations": 3072853.53,
+   "partial": false
+  },
+  {
+   "fy": 2018,
+   "obligations": 8399627.58,
+   "partial": false
+  },
+  {
+   "fy": 2019,
+   "obligations": 17579372.67,
+   "partial": false
+  },
+  {
+   "fy": 2020,
+   "obligations": 29420848.66,
+   "partial": false
+  },
+  {
+   "fy": 2021,
+   "obligations": 70135219.27,
+   "partial": false
+  },
+  {
+   "fy": 2022,
+   "obligations": 117048821.19,
+   "partial": false
+  },
+  {
+   "fy": 2023,
+   "obligations": 125956907.28,
+   "partial": false
+  },
+  {
+   "fy": 2024,
+   "obligations": 132271228.54,
+   "partial": false
+  },
+  {
+   "fy": 2025,
+   "obligations": 186733084.77,
+   "partial": false
+  },
+  {
+   "fy": 2026,
+   "obligations": 30931609.28,
+   "partial": true
+  }
+ ],
+ "agencies_lifetime": [
+  {
+   "agency": "Department of Defense",
+   "obligations": 262056464.41,
+   "share": 0.361601
+  },
+  {
+   "agency": "Department of Transportation",
+   "obligations": 165415592.02,
+   "share": 0.22825
+  },
+  {
+   "agency": "Department of Commerce",
+   "obligations": 140340721.99,
+   "share": 0.19365
+  },
+  {
+   "agency": "National Aeronautics and Space Administration",
+   "obligations": 114250000.0,
+   "share": 0.157649
+  },
+  {
+   "agency": "Department of the Treasury",
+   "obligations": 13458694.24,
+   "share": 0.018571
+  },
+  {
+   "agency": "Federal Communications Commission",
+   "obligations": 6586189.87,
+   "share": 0.009088
+  },
+  {
+   "agency": "Institute of Museum and Library Services",
+   "obligations": 5501208.07,
+   "share": 0.007591
+  },
+  {
+   "agency": "Department of State",
+   "obligations": 4840767.54,
+   "share": 0.00668
+  },
+  {
+   "agency": "Department of Homeland Security",
+   "obligations": 4184478.06,
+   "share": 0.005774
+  },
+  {
+   "agency": "Department of Housing and Urban Development",
+   "obligations": 3949045.96,
+   "share": 0.005449
+  },
+  {
+   "agency": "Office of Personnel Management",
+   "obligations": 3285343.22,
+   "share": 0.004533
+  },
+  {
+   "agency": "General Services Administration",
+   "obligations": 743067.77,
+   "share": 0.001025
+  },
+  {
+   "agency": "Department of Education",
+   "obligations": 99840.0,
+   "share": 0.000138
+  }
+ ],
+ "ttm": {
+  "window": "2025-01-22..2026-01-21",
+  "obligations": 169186988.88,
+  "agencies": [
+   {
+    "agency": "Department of Defense",
+    "obligations": 62862354.28,
+    "share": 0.371555
+   },
+   {
+    "agency": "Department of Transportation",
+    "obligations": 37478515.47,
+    "share": 0.221521
+   },
+   {
+    "agency": "National Aeronautics and Space Administration",
+    "obligations": 34250000.0,
+    "share": 0.202439
+   },
+   {
+    "agency": "Department of Commerce",
+    "obligations": 34086944.45,
+    "share": 0.201475
+   }
+  ]
+ },
+ "set_aside_family": [
+  {
+   "family": "Small-business set-aside",
+   "contracts": 63,
+   "obligations": 330989980.35,
+   "share": 0.45672
+  },
+  {
+   "family": "8(a)",
+   "contracts": 128,
+   "obligations": 247314617.85,
+   "share": 0.341259
+  },
+  {
+   "family": "Women-owned small business",
+   "contracts": 5,
+   "obligations": 93039462.78,
+   "share": 0.128381
+  },
+  {
+   "family": "No set-aside",
+   "contracts": 18,
+   "obligations": 50676413.43,
+   "share": 0.069926
+  },
+  {
+   "family": "Not recorded",
+   "contracts": 1,
+   "obligations": 2688438.74,
+   "share": 0.00371
+  }
+ ],
+ "set_aside_family_by_fy": [
+  {
+   "fy": 2014,
+   "No set-aside": 155230.0
+  },
+  {
+   "fy": 2015,
+   "No set-aside": 2347143.79
+  },
+  {
+   "fy": 2016,
+   "No set-aside": 659466.59
+  },
+  {
+   "fy": 2017,
+   "Women-owned small business": 473894.88,
+   "No set-aside": -1722.59,
+   "8(a)": 1891008.24,
+   "Small-business set-aside": 709673.0
+  },
+  {
+   "fy": 2018,
+   "8(a)": 6680885.19,
+   "Women-owned small business": 641410.05,
+   "Small-business set-aside": 1073832.34
+  },
+  {
+   "fy": 2019,
+   "8(a)": 12255548.24,
+   "Women-owned small business": 2499505.19,
+   "Small-business set-aside": 1761559.62,
+   "Not recorded": 1064759.62,
+   "No set-aside": 500.0
+  },
+  {
+   "fy": 2020,
+   "Women-owned small business": 2535266.98,
+   "8(a)": 16882802.52,
+   "Small-business set-aside": 8901079.43,
+   "Not recorded": 1085687.41,
+   "No set-aside": 17012.32
+  },
+  {
+   "fy": 2021,
+   "Women-owned small business": 14851520.4,
+   "8(a)": 13288104.98,
+   "Small-business set-aside": 33985989.58,
+   "Not recorded": 537991.71,
+   "No set-aside": 7471362.6
+  },
+  {
+   "fy": 2022,
+   "Small-business set-aside": 37511064.25,
+   "8(a)": 48918810.98,
+   "Women-owned small business": 18972664.27,
+   "No set-aside": 11646281.69,
+   "Not recorded": 0.0
+  },
+  {
+   "fy": 2023,
+   "8(a)": 56114343.14,
+   "Small-business set-aside": 48185518.41,
+   "Women-owned small business": 16573276.81,
+   "No set-aside": 5084018.92
+  },
+  {
+   "fy": 2024,
+   "8(a)": 40738413.27,
+   "Small-business set-aside": 84145864.27,
+   "No set-aside": -6490119.55,
+   "Women-owned small business": 13877070.55
+  },
+  {
+   "fy": 2025,
+   "8(a)": 49156629.48,
+   "Small-business set-aside": 94978194.98,
+   "No set-aside": 21075631.66,
+   "Women-owned small business": 21520128.65
+  },
+  {
+   "fy": 2026,
+   "Small-business set-aside": 19737204.47,
+   "8(a)": 1388071.81,
+   "Women-owned small business": 1094725.0,
+   "No set-aside": 8711608.0
+  }
+ ],
+ "vehicles_top": [
+  {
+   "vehicle": "693JJ319A000013",
+   "orders": 43,
+   "obligations": 140251626.79,
+   "share": 0.193528
+  },
+  {
+   "vehicle": "47QRAD20D8115",
+   "orders": 4,
+   "obligations": 131322548.36,
+   "share": 0.181207
+  },
+  {
+   "vehicle": "W52P1J18DA078",
+   "orders": 7,
+   "obligations": 112007915.9,
+   "share": 0.154555
+  },
+  {
+   "vehicle": "1333BJ21D00280002",
+   "orders": 10,
+   "obligations": 95700568.5,
+   "share": 0.132053
+  },
+  {
+   "vehicle": "47QRAD20D1046",
+   "orders": 4,
+   "obligations": 85797702.19,
+   "share": 0.118389
+  },
+  {
+   "vehicle": "(standalone)",
+   "orders": 15,
+   "obligations": 33098408.56,
+   "share": 0.045671
+  },
+  {
+   "vehicle": "N0017819D7751",
+   "orders": 2,
+   "obligations": 32140980.76,
+   "share": 0.04435
+  },
+  {
+   "vehicle": "GS35F328BA",
+   "orders": 11,
+   "obligations": 31665069.3,
+   "share": 0.043693
+  }
+ ],
+ "concentration": {
+  "top1": 0.1576,
+  "top5": 0.4409,
+  "top10": 0.5563
+ },
+ "top_awards": [
+  {
+   "key": "CONT_AWD_80TECH22FA001_8000_47QRAD20D8115_4732",
+   "piid": "80TECH22FA001",
+   "parent": "47QRAD20D8115",
+   "agency": "National Aeronautics and Space Administration",
+   "sub": "National Aeronautics and Space Administration",
+   "first": "2021-11-09",
+   "obligated": 114250000.0,
+   "ceiling": 148756175.0,
+   "pop_current_end": "2026-11-30",
+   "pop_potential_end": "2026-11-30",
+   "set_aside_basis": "8A COMPETED",
+   "family": "8(a)",
+   "desc": "E014042 NASA SITSS-THE SCOPE OF SERVICES SUPPORT SOLUTIONS FOR ENTERPRISE-WIDE PROCUREMENT (SEWP): BUSINESS SUPPORT, PRO"
+  },
+  {
+   "key": "CONT_AWD_H9240421F0077_9700_W52P1J18DA078_9700",
+   "piid": "H9240421F0077",
+   "parent": "W52P1J18DA078",
+   "agency": "Department of Defense",
+   "sub": "U.S. Special Operations Command",
+   "first": "2021-04-22",
+   "obligated": 76345975.14,
+   "ceiling": 93015603.07,
+   "pop_current_end": "2026-08-31",
+   "pop_potential_end": "2027-08-28",
+   "set_aside_basis": "WOMEN OWNED SMALL BUSINESS",
+   "family": "Women-owned small business",
+   "desc": "EKM CONTRACT"
+  },
+  {
+   "key": "CONT_AWD_W52P1J21F0063_9700_47QRAD20D1046_4732",
+   "piid": "W52P1J21F0063",
+   "parent": "47QRAD20D1046",
+   "agency": "Department of Defense",
+   "sub": "Department of the Army",
+   "first": "2021-01-25",
+   "obligated": 76157956.48,
+   "ceiling": 76157956.48,
+   "pop_current_end": "2026-02-25",
+   "pop_potential_end": "2026-02-25",
+   "set_aside_basis": "SMALL BUSINESS SET ASIDE - TOTAL",
+   "family": "Small-business set-aside",
+   "desc": "ENTERPRISE SERVICES FOR G-4."
+  },
+  {
+   "key": "CONT_AWD_N0016421F3025_9700_N0017819D7751_9700",
+   "piid": "N0016421F3025",
+   "parent": "N0017819D7751",
+   "agency": "Department of Defense",
+   "sub": "Department of the Navy",
+   "first": "2021-08-17",
+   "obligated": 32140980.76,
+   "ceiling": 39048114.37,
+   "pop_current_end": "2026-08-16",
+   "pop_potential_end": "2026-08-16",
+   "set_aside_basis": "8A COMPETED",
+   "family": "8(a)",
+   "desc": "NON PERSONAL SERVICES FOR ACQUISITION AND COR SUPPORT SERVICES, PREAWARD AND POST AWARD CONTRACT PERFORMANCE TRACKING, D"
+  },
+  {
+   "key": "CONT_AWD_1333BJ24F00280005_1344_1333BJ21D00280002_1344",
+   "piid": "1333BJ24F00280005",
+   "parent": "1333BJ21D00280002",
+   "agency": "Department of Commerce",
+   "sub": "U.S. Patent and Trademark Office",
+   "first": "2024-03-08",
+   "obligated": 20665737.06,
+   "ceiling": 22165737.06,
+   "pop_current_end": "2026-12-14",
+   "pop_potential_end": "2028-12-14",
+   "set_aside_basis": "SMALL BUSINESS SET ASIDE - PARTIAL",
+   "family": "Small-business set-aside",
+   "desc": "IT SERVICES SUPPORTING THE DEVELOPMENT, MODERNIZATION, ENHANCEMENT, AND OPERATIONS OF THE INTERNATIONAL DATA EXCHANGE BI"
+  },
+  {
+   "key": "CONT_AWD_1333BJ24F00000001_1344_1333BJ21D00280002_1344",
+   "piid": "1333BJ24F00000001",
+   "parent": "1333BJ21D00280002",
+   "agency": "Department of Commerce",
+   "sub": "U.S. Patent and Trademark Office",
+   "first": "2023-12-29",
+   "obligated": 18752562.13,
+   "ceiling": 24047135.36,
+   "pop_current_end": "2026-10-15",
+   "pop_potential_end": "2028-10-15",
+   "set_aside_basis": "SMALL BUSINESS SET ASIDE - PARTIAL",
+   "family": "Small-business set-aside",
+   "desc": "IT SERVICES IN SUPPORT OF DEVELOPMENT, MODERNIZATION, ENHANCEMENT AND OPERATIONS AND MAINTENANCE FOR PATENT CENTER."
+  },
+  {
+   "key": "CONT_AWD_W519TC24F0308_9700_W52P1J18DA078_9700",
+   "piid": "W519TC24F0308",
+   "parent": "W52P1J18DA078",
+   "agency": "Department of Defense",
+   "sub": "Department of the Army",
+   "first": "2024-08-28",
+   "obligated": 17250309.75,
+   "ceiling": 78165383.71,
+   "pop_current_end": "2026-11-12",
+   "pop_potential_end": "2026-11-12",
+   "set_aside_basis": "NO SET ASIDE USED.",
+   "family": "No set-aside",
+   "desc": "INCREMENTAL FUNDING ON CLIN 0001AA IN THE AMOUNT OF $27,000.00"
+  },
+  {
+   "key": "CONT_AWD_693JJ321F000103_6925_693JJ319A000013_6925",
+   "piid": "693JJ321F000103",
+   "parent": "693JJ319A000013",
+   "agency": "Department of Transportation",
+   "sub": "Federal Highway Administration",
+   "first": "2021-04-09",
+   "obligated": 17104557.25,
+   "ceiling": 18499670.69,
+   "pop_current_end": "2026-04-30",
+   "pop_potential_end": "2026-10-31",
+   "set_aside_basis": "SMALL BUSINESS SET ASIDE - TOTAL",
+   "family": "Small-business set-aside",
+   "desc": "SOFTWARE ENGINEERING SUPPORT FOR POLICY APPLICATIONS INCLUDING TMAS, FUELS AND FASH, PIDP-ER AND HPMS"
+  },
+  {
+   "key": "CONT_AWD_693JK323F00005N_6957_693JJ319A000013_6925",
+   "piid": "693JK323F00005N",
+   "parent": "693JJ319A000013",
+   "agency": "Department of Transportation",
+   "sub": "Pipeline and Hazardous Materials Safety Administration",
+   "first": "2023-02-27",
+   "obligated": 15512125.3,
+   "ceiling": 15512125.3,
+   "pop_current_end": "2026-02-28",
+   "pop_potential_end": "2026-02-28",
+   "set_aside_basis": "SMALL BUSINESS SET ASIDE - TOTAL",
+   "family": "Small-business set-aside",
+   "desc": "PHMSA PROJECT MANAGEMENT AND OPERATIONS & MAINTENANCE SUPPORT - SWES BPA CALL"
+  },
+  {
+   "key": "CONT_AWD_1333BJ24F00000002_1344_1333BJ21D00280002_1344",
+   "piid": "1333BJ24F00000002",
+   "parent": "1333BJ21D00280002",
+   "agency": "Department of Commerce",
+   "sub": "U.S. Patent and Trademark Office",
+   "first": "2024-02-07",
+   "obligated": 15003303.08,
+   "ceiling": 43546638.44,
+   "pop_current_end": "2026-01-31",
+   "pop_potential_end": "2029-01-31",
+   "set_aside_basis": "SMALL BUSINESS SET ASIDE - PARTIAL",
+   "family": "Small-business set-aside",
+   "desc": "ENTERPRISE OPERATION SERVICES"
+  }
+ ],
+ "active": {
+  "count": 46,
+  "obligated": 547168053.55,
+  "ceiling": 795503576.49,
+  "current_end_by_2027_01_21": 39,
+  "current_end_by_2027_01_21_obligated": 520690287.82
+ },
+ "affiliate_sp_systems": {
+  "uei": "GBNYDRT5ZZ53",
+  "awards": 71,
+  "obligations_through_cutoff": 51781594.79,
+  "obligations_fy2017_onward": 21300222.8
+ },
+ "vehicle_level_obligations": {
+  "amount": 2500.0,
+  "note": "Obligated directly on the OASIS+ vehicle 47QRCA25DU152 (2024-12-17), not on an order. Other vehicle-level obligations (STARS III, GSA 47QTCH18D0102, DOT 693JK418D600022) net to $0."
+ },
+ "leakage": {
+  "max_included_action_date": "2026-01-21",
+  "max_included_report_date": "2026-01-21",
+  "excluded_actions": 149,
+  "excluded_obligations": 122442613.21,
+  "actions_between_acquisition_and_cutoff": 2,
+  "obligations_between_acquisition_and_cutoff": 0.0
+ }
+}
