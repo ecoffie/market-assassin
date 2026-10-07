@@ -188,7 +188,20 @@ function EvidenceCard({ row }: { row: EvidenceBucket['rows'][number] }) {
       <p className="mt-1 text-sm text-gray-300">
         {[row.awardingOffice, row.awardingAgency].filter(Boolean).join(' · ') || 'Buyer not established'}
       </p>
-      <p className="mt-1 text-sm text-gray-200">{row.title || row.awardType || 'Requirement not labeled'}</p>
+      <p className="mt-1 text-sm text-gray-200">{row.description || row.title || row.awardType || 'Requirement not labeled'}</p>
+      {row.relevanceLabel && (
+        <p
+          className={`mt-1 text-xs ${
+            row.relevanceBasis === 'description'
+              ? 'text-emerald-300'
+              : row.relevanceBasis === 'code'
+                ? 'text-amber-200'
+                : 'text-gray-400'
+          }`}
+        >
+          {row.relevanceLabel}
+        </p>
+      )}
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-400">
         {row.amountLabel && <span>{row.amountLabel}</span>}
         {row.period && <span>{row.period}</span>}
@@ -210,14 +223,14 @@ function EvidenceCard({ row }: { row: EvidenceBucket['rows'][number] }) {
 function FunnelList({ funnel }: { funnel: SupplierFunnel }) {
   if (!funnel.ran) return <p className="mt-3 text-sm text-amber-100">{funnel.summary}</p>;
   return (
-    <ol className="mt-3 space-y-2 text-sm text-gray-200">
+    <ul className="mt-3 space-y-2 text-sm text-gray-200">
       {funnel.steps.map((step) => (
         <li key={step.key} className="rounded-lg bg-black/20 p-3">
           <span className="font-semibold text-white">{step.count.toLocaleString('en-US')}</span> {step.label}
           {step.share && <span className="block text-xs text-gray-400">{step.share}</span>}
         </li>
       ))}
-    </ol>
+    </ul>
   );
 }
 

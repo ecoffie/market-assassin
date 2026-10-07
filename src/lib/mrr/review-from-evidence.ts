@@ -390,6 +390,12 @@ function parseOptionalHistory(raw: unknown): Pick<Phase1ReviewSource, 'history'>
           period: typeof row.period === 'string' ? row.period : null,
           awardType: typeof row.awardType === 'string' ? row.awardType : null,
           evidenceClass: parseEvidenceClass(row.evidenceClass) ?? undefined,
+          description: typeof row.description === 'string' ? row.description : null,
+          relevanceBasis:
+            row.relevanceBasis === 'description' || row.relevanceBasis === 'code' || row.relevanceBasis === 'none'
+              ? (row.relevanceBasis as 'description' | 'code' | 'none')
+              : null,
+          relevanceLabel: typeof row.relevanceLabel === 'string' ? row.relevanceLabel : null,
         };
       })
     : [];

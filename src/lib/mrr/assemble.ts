@@ -313,7 +313,7 @@ function fillSection11(blocks: string[], collector: EvidenceCollector, s11: Sect
     ),
   ];
   if (s11.funnel.ran) {
-    after.push(paragraph('Supplier population — each figure states what it was counted from:', { bold: true }));
+    after.push(paragraph('Supplier populations — each is a subset of the registered firms, not a step in a funnel:', { bold: true }));
     for (const step of s11.funnel.steps) {
       after.push(paragraph(`• ${step.count.toLocaleString('en-US')} ${step.label}${step.share ? ` (${step.share})` : ''}`));
     }
@@ -417,9 +417,15 @@ function fillSection9(
       const amtFigure = a.amount.state === 'value' ? money((a.amount as { value: { value: number } }).value.value) : amt.text;
       const pop = collector.render(`§9 Award ${n} period of performance`, a.periodOfPerformance);
 
+      const desc = a.description ? collector.render(`§9 Award ${n} description`, a.description) : null;
+      const what = [
+        desc && desc.state === 'value' ? desc.text : null,
+        a.relevance?.label ?? null,
+      ].filter(Boolean).join(' — ');
+      const head = `${num.text} — ${rec.text}${what ? `. ${what}` : ''}`;
       const firstCell = a.usaSpendingUrl
-        ? tableCellLink(`${num.text} — ${rec.text}`, 'USASpending source', linkIds[linkCursor++], WIDTHS[0])
-        : tableCell(`${num.text} — ${rec.text}`, WIDTHS[0]);
+        ? tableCellLink(head, 'USASpending source', linkIds[linkCursor++], WIDTHS[0])
+        : tableCell(head, WIDTHS[0]);
 
       bodyRows.push(tableRow(
         [

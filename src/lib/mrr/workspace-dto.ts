@@ -331,6 +331,8 @@ function historyFromLiveResult(result: Phase1ReviewSource): Phase1ReviewSource['
         amount?: GroundedField<{ value: number; label: string }>;
         periodOfPerformance?: GroundedField<string>;
         evidenceClass: EvidenceClass;
+        description?: GroundedField<string>;
+        relevance?: { basis: 'description' | 'code' | 'none'; label: string };
       }>;
       awardsFinding?: GroundedField<string>;
       predecessorEvidenceClass?: EvidenceClass;
@@ -362,6 +364,9 @@ function historyFromLiveResult(result: Phase1ReviewSource): Phase1ReviewSource['
       period: groundedString(row.periodOfPerformance),
       awardType: groundedString(row.awardType),
       evidenceClass: row.evidenceClass,
+      description: groundedString(row.description),
+      relevanceBasis: row.relevance?.basis ?? null,
+      relevanceLabel: row.relevance?.label ?? null,
     })),
     awardsFinding: section9.awardsFinding,
     predecessorEvidenceClass: section9.predecessorEvidenceClass ?? null,

@@ -121,6 +121,14 @@ export interface MarketResearchResult {
   sampleCoverage: number | null;
   /** Capable (score>=45) among EVALUATED firms. Not a market total unless coverage is 1. */
   capableInSample: number;
+  /**
+   * Of the scored firms, how many were seeded from the matching contract holders
+   * (the pool takes contract holders first, then registrants in UEI order).
+   * Lets callers state the overlap instead of implying a funnel.
+   */
+  contractHoldersInSample?: number;
+  /** Contract holders among the capable/active_performer scored firms. */
+  capableContractHoldersInSample?: number;
   /** Capable + emerging among EVALUATED firms. */
   marketDepthInSample: number;
   /**
@@ -369,7 +377,9 @@ function resultCacheKey(p: MarketResearchParams): string {
     // (no 2,500-UEI activity EXISTS). Without a bump, v3 cache entries would
     // deserialize without matchingUeiCount/size and look like "size unknown"
     // for firms whose SAM status was already on the row.
-    'gov-buyer:mr:v4',
+    // v4 → v5 (2026-10-07): contractHoldersInSample / capableContractHoldersInSample
+    // added so reports can state how the populations overlap.
+    'gov-buyer:mr:v5',
     p.naics,
     (p.state || '').toUpperCase(),
     p.setAside || '',
@@ -644,6 +654,7 @@ const GENERAL_SMALL_BUSINESS = new Set(['small business', 'sba', 'sb', 'small'])
   const registrantFloor = Math.floor(POOL_TARGET * REGISTRANT_RESERVE);
   const performerCeiling = POOL_TARGET - registrantFloor;
   if (pool.length > performerCeiling) pool.length = performerCeiling;
+  const contractHolderUeis = new Set(pool.map((r) => r.uei));
 
   for (let from = 0; pool.length < POOL_TARGET; from += 1000) {
     const { data, error } = await buildQuery()
@@ -938,6 +949,10 @@ const GENERAL_SMALL_BUSINESS = new Set(['small business', 'sba', 'sb', 'small'])
     sampleSize,                       // firms actually scored
     sampleCoverage,                   // matching UEIs / eligible population (not limit)
     capableInSample: capableDepth,    // honestly named: capable among those EVALUATED
+    contractHoldersInSample: scored.filter((s) => contractHolderUeis.has(s.uei)).length,
+    capableContractHoldersInSample: scored.filter(
+      (s) => contractHolderUeis.has(s.uei) && (s.tier === 'active_performer' || s.tier === 'capable'),
+    ).length,
     marketDepthInSample: marketDepth,
     // A DEGRADED lookup is also 'undetermined' (#1289): every firm scored
     // registered_only for lack of evidence, so <2 capable is an artefact, not a finding.

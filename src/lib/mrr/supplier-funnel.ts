@@ -1,13 +1,19 @@
 /**
- * The supplier population, stated ONCE with every denominator named.
+ * The supplier populations, stated ONCE with every denominator and overlap named.
  *
- * Before this module the screen, the report and the appendix each phrased the
- * counts differently ("matching UEIs", "bounded sample", "sample_coverage=0.039…"),
- * and one of them was wrong: the market-depth tool scores up to 50 firms but
- * returns only its top 15 rows, and §11 called those 15 "the sample".
+ * These are NOT the steps of a funnel. Every population is a subset of the
+ * registered firms, but they are not nested in order:
  *
- * Every surface renders from `supplierFunnel()`, so a count can only appear
- * with the population it was counted from.
+ *   registered (e.g. 633)  ⊇ contract holders (9)
+ *   registered             ⊇ scored (50) = contract holders first + other registrants
+ *   scored                 ⊇ capable (12)  (some contract holders, some not)
+ *   scored                 ⊇ listed (15)   = the highest scorers, so listed ⊇ capable
+ *                                            whenever every capable firm made the list
+ *   capable listed firms   → parent companies (12)
+ *
+ * Presenting them as 633 → 9 → 50 → 12 → 15 implied the 50 were drawn from the
+ * 9 and that 15 narrows 12 (Fort Bragg 561730/NC run, 2026-10-07). Every surface
+ * renders from `supplierFunnel()`.
  */
 import type { GroundedField } from './types';
 import { geographyName } from './market-scope';
@@ -21,25 +27,21 @@ export interface SupplierFunnelInput {
   matchingPerformers: GroundedField<number>;
   scoredSample?: GroundedField<number>;
   capableInScoredSample?: GroundedField<number>;
+  /** Scored firms that are contract holders (seeded first). */
+  contractHoldersInScored?: number | null;
+  /** Contract holders among the capable scored firms. */
+  capableContractHolders?: number | null;
   returnedRows: GroundedField<number>;
-  /** Listed firms in the capable/active tiers, which were checked for a parent company. */
+  /** Listed firms in the capable/active tiers (checked for a parent company). */
   checkedForParent?: GroundedField<number>;
   resolvedFamilies: GroundedField<number>;
   unresolvedParents: GroundedField<number>;
 }
 
 export interface FunnelStep {
-  key:
-    | 'registered'
-    | 'performers'
-    | 'scored'
-    | 'capable'
-    | 'returned'
-    | 'checked'
-    | 'families'
-    | 'unresolved';
+  key: 'registered' | 'performers' | 'scored' | 'capable' | 'returned' | 'families' | 'unresolved';
   count: number;
-  /** Plain statement of what was counted. */
+  /** Plain statement of what was counted, including how it overlaps the others. */
   label: string;
   /** "3.9% of the 2,442 registered firms" — null when no meaningful denominator. */
   share: string | null;
@@ -58,7 +60,12 @@ function num(field: GroundedField<number> | undefined): number | null {
   return field && field.state === 'value' ? field.value : field?.state === 'true_zero' ? 0 : null;
 }
 
+function finite(n: number | null | undefined): number | null {
+  return typeof n === 'number' && Number.isFinite(n) ? n : null;
+}
+
 const fmt = (n: number) => n.toLocaleString('en-US');
+const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 function pct(part: number, whole: number): string {
   const p = (part / whole) * 100;
@@ -68,6 +75,15 @@ function pct(part: number, whole: number): string {
 function share(part: number, whole: number | null, of: string): string | null {
   if (whole == null || whole <= 0) return null;
   return `${pct(part, whole)} of the ${fmt(whole)} ${of}`;
+}
+
+/** The matching census is current / recently ended contracts only — say so. */
+function holderPhrase(naics: string): string {
+  return `hold a current or recently ended federal prime contract in NAICS ${naics}`;
+}
+
+function holders(n: number): string {
+  return `${fmt(n)} contract ${plural(n, 'holder', 'holders')}`;
 }
 
 export function supplierFunnel(input: SupplierFunnelInput): SupplierFunnel {
@@ -86,44 +102,50 @@ export function supplierFunnel(input: SupplierFunnelInput): SupplierFunnel {
   if (input.notRun === 'failed' || input.notRun === 'degraded') {
     return {
       ran: false,
-      summary:
-        `The supplier search for NAICS ${naics}${where} did not complete, so supplier counts are unknown. Unknown is not zero.`,
+      summary: `The supplier search for NAICS ${naics}${where} did not complete, so supplier counts are unknown. Unknown is not zero.`,
       steps: [],
       definitions: [],
     };
   }
 
   const registered = num(input.eligiblePopulation);
-  const performers = num(input.matchingPerformers);
+  const holderCount = num(input.matchingPerformers);
   const scored = num(input.scoredSample);
   const capable = num(input.capableInScoredSample);
-  const returned = num(input.returnedRows);
+  const holdersScored = finite(input.contractHoldersInScored);
+  const capableHolders = finite(input.capableContractHolders);
+  const listed = num(input.returnedRows);
   const checked = num(input.checkedForParent);
   const families = num(input.resolvedFamilies);
   const unresolved = num(input.unresolvedParents);
+  const allHoldersScored = holdersScored != null && holderCount != null && holdersScored === holderCount;
+  const allCapableListed = capable != null && checked != null && checked === capable;
 
   const steps: FunnelStep[] = [];
   if (registered != null) {
     steps.push({
       key: 'registered',
       count: registered,
-      label: `small businesses registered in SAM for NAICS ${naics}${where}`,
+      label: `small businesses registered in SAM for NAICS ${naics}${where} — every count below is a subset of these`,
       share: null,
     });
   }
-  if (performers != null) {
+  if (holderCount != null) {
     steps.push({
       key: 'performers',
-      count: performers,
-      label: `of those have held a federal prime contract in NAICS ${naics}`,
-      share: share(performers, registered, 'registered firms'),
+      count: holderCount,
+      label: `of the registered firms ${holderPhrase(naics)}`,
+      share: share(holderCount, registered, 'registered firms'),
     });
   }
   if (scored != null) {
     steps.push({
       key: 'scored',
       count: scored,
-      label: 'firms scored by Mindy, a limited sample drawn from contract holders first',
+      label:
+        holdersScored != null
+          ? `registered firms scored by Mindy: ${allHoldersScored ? 'all ' : ''}${holders(holdersScored)} and ${fmt(scored - holdersScored)} other registered ${plural(scored - holdersScored, 'firm', 'firms')}`
+          : 'registered firms scored by Mindy (contract holders first, then other registered firms)',
       share: share(scored, registered, 'registered firms'),
     });
   }
@@ -131,32 +153,30 @@ export function supplierFunnel(input: SupplierFunnelInput): SupplierFunnel {
     steps.push({
       key: 'capable',
       count: capable,
-      label: `of the ${fmt(scored)} scored firms show capable or active performance`,
+      label:
+        capableHolders != null
+          ? `of the ${fmt(scored)} scored firms show capable or active performance (${holders(capableHolders)}, ${fmt(capable - capableHolders)} not)`
+          : `of the ${fmt(scored)} scored firms show capable or active performance`,
       share: share(capable, scored, 'scored firms'),
     });
   }
-  if (returned != null) {
-    steps.push({
-      key: 'returned',
-      count: returned,
-      label: 'highest-scoring firms listed with full detail',
-      share: scored != null ? share(returned, scored, 'scored firms') : null,
-    });
+  if (listed != null) {
+    let label =
+      scored != null
+        ? `highest-scoring of the ${fmt(scored)} scored firms, listed with full detail`
+        : 'highest-scoring firms, listed with full detail';
+    if (checked != null) {
+      label += allCapableListed
+        ? ` — all ${fmt(checked)} capable firms plus ${fmt(listed - checked)} that are not capable`
+        : ` — ${fmt(checked)} of them capable or active`;
+    }
+    steps.push({ key: 'returned', count: listed, label, share: scored != null ? share(listed, scored, 'scored firms') : null });
   }
-  const checkedBase = checked != null && returned != null && checked < returned ? checked : returned;
-  if (checked != null && returned != null && checked < returned) {
-    steps.push({
-      key: 'checked',
-      count: checked,
-      label: `of the ${fmt(returned)} listed firms are capable or active and were checked for a parent company`,
-      share: share(checked, returned, 'listed firms'),
-    });
-  }
-  if (families != null && checkedBase != null) {
+  if (families != null && checked != null) {
     steps.push({
       key: 'families',
       count: families,
-      label: `distinct parent companies among those ${fmt(checkedBase)} firms`,
+      label: `distinct parent companies among the ${fmt(checked)} capable listed ${plural(checked, 'firm', 'firms')}`,
       share: null,
     });
   }
@@ -170,28 +190,38 @@ export function supplierFunnel(input: SupplierFunnelInput): SupplierFunnel {
   }
 
   const sentences: string[] = [];
-  if (registered != null && performers != null) {
+  if (registered != null && holderCount != null) {
     sentences.push(
-      `Of ${fmt(registered)} small businesses registered in SAM for NAICS ${naics}${where}, ${fmt(performers)} (${pct(performers, registered || 1)}) have held a federal prime contract in that NAICS.`,
+      `${fmt(registered)} small businesses are registered in SAM for NAICS ${naics}${where}; ${fmt(holderCount)} of them (${pct(holderCount, registered || 1)}) ${holderPhrase(naics)}.`,
     );
   } else if (registered != null) {
     sentences.push(`${fmt(registered)} small businesses are registered in SAM for NAICS ${naics}${where}.`);
   }
   if (scored != null) {
-    sentences.push(
-      capable != null
-        ? `Mindy scored ${fmt(scored)} of them; ${fmt(capable)} of the ${fmt(scored)} show capable or active performance.`
-        : `Mindy scored ${fmt(scored)} of them.`,
-    );
+    let s =
+      holdersScored != null
+        ? `Mindy scored ${fmt(scored)} of the registered firms: ${allHoldersScored ? 'all ' : ''}${holders(holdersScored)} and ${fmt(scored - holdersScored)} other registered ${plural(scored - holdersScored, 'firm', 'firms')}.`
+        : `Mindy scored ${fmt(scored)} of the registered firms.`;
+    if (capable != null) {
+      s +=
+        capableHolders != null
+          ? ` ${fmt(capable)} of the ${fmt(scored)} show capable or active performance (${holders(capableHolders)}, ${fmt(capable - capableHolders)} not).`
+          : ` ${fmt(capable)} of the ${fmt(scored)} show capable or active performance.`;
+    }
+    sentences.push(s);
   }
-  if (returned != null) {
-    sentences.push(
-      families != null
-        ? `The ${fmt(returned)} highest-scoring firms are listed with full detail` +
-          (checked != null && checked < returned ? `; ${fmt(checked)} of them are capable or active and were checked for a parent company` : '') +
-          `. They belong to ${fmt(families)} distinct parent compan${families === 1 ? 'y' : 'ies'}${unresolved ? ` (${fmt(unresolved)} with a parent not confirmed)` : ''}.`
-        : `The ${fmt(returned)} highest-scoring firms are listed with full detail.`,
-    );
+  if (listed != null) {
+    const which =
+      checked != null
+        ? allCapableListed
+          ? `: all ${fmt(checked)} capable firms and ${fmt(listed - checked)} that are not`
+          : `, ${fmt(checked)} of them capable or active`
+        : '';
+    const parents =
+      families != null && checked != null
+        ? ` The ${fmt(checked)} capable listed ${plural(checked, 'firm belongs', 'firms belong')} to ${fmt(families)} distinct parent ${plural(families, 'company', 'companies')}${unresolved ? ` (${fmt(unresolved)} with a parent not confirmed)` : ''}.`
+        : '';
+    sentences.push(`The report lists the ${fmt(listed)} highest-scoring scored firms${which}.${parents}`);
   }
 
   return {
@@ -199,12 +229,13 @@ export function supplierFunnel(input: SupplierFunnelInput): SupplierFunnel {
     summary: sentences.join(' '),
     steps,
     definitions: [
+      'These counts are separate populations, not steps in a funnel. Each is a subset of the registered firms, and each percentage names its own denominator.',
       `Registered: active SAM registrations that list NAICS ${naics}, represent themselves as small for that NAICS${input.state ? `, and are located${where}` : ''}. Small-business status is the firm's own SAM representation, not an SBA size determination.`,
-      `Contract holders: registered firms that appear as the awardee on a federal prime contract coded NAICS ${naics} in USASpending.`,
-      'Scored: the firms Mindy evaluated for capability. The sample is limited in size; it is drawn first from contract holders (largest contract value first), then from other registrants.',
-      'Capable or active: scored firms whose federal award history (recency, track record, breadth of agencies, and whether they have won in this NAICS) reaches Mindy’s capability threshold. Registered firms with no relevant award history are not counted.',
-      'Listed: the market-depth tool returns at most 15 firms with full detail. Parent-company deduplication is applied to these listed firms only.',
-      'Every percentage above names its own denominator. None of these counts is a complete census of the market.',
+      `Contract holders: registered firms that are the awardee on a current or recently ended federal prime contract coded NAICS ${naics} in Mindy's contract data from USASpending (performance ending from early 2026 onward). Firms whose ${naics} contracts ended earlier are not counted.`,
+      'Scored: the firms Mindy evaluated for capability. Contract holders are scored first; the rest of the sample is other registered firms taken in a fixed order, not at random.',
+      'Capable or active: scored firms whose federal award history (recency, track record, breadth of agencies, and whether they have won in this NAICS) reaches Mindy’s capability threshold.',
+      'Listed: the highest-scoring scored firms (the market-depth tool returns at most 15). Parent-company deduplication is applied to the capable listed firms only.',
+      'None of these counts is a complete census of the market.',
     ],
   };
 }
