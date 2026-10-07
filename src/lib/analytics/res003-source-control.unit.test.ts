@@ -14,17 +14,10 @@ import { PUBLICATIONS } from './research-publications';
 const MIGRATION = 'supabase/migrations/20260920_sam_opportunities_source_instance.sql';
 
 describe('RES-003 rests on a controlled input', () => {
-  it('RES-003 is still published at its permanent URL', () => {
+  it('RES-003 is still the only published publication', () => {
     const published = PUBLICATIONS.filter((p) => p.status === 'published');
-    const res003 = published.find((p) => p.id === 'RES-003');
-    expect(res003?.slug).toBe('small-business-participation-benchmark');
-  });
-
-  it('RES-003 is the only LIVE publication; every other published study is frozen', () => {
-    // A live publication depends on sam_opportunities staying healthy (this file's subject). Anything
-    // else published must be a frozen snapshot that no live input can change.
-    const live = PUBLICATIONS.filter((p) => p.status === 'published' && p.measurement?.mode !== 'frozen');
-    expect(live.map((p) => p.id)).toEqual(['RES-003']);
+    expect(published.map((p) => p.id)).toEqual(['RES-003']);
+    expect(published[0].slug).toBe('small-business-participation-benchmark');
   });
 
   it('its input is registered in the control plane', () => {

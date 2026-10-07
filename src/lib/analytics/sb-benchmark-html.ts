@@ -7,15 +7,13 @@
  *  - every number is the exact head-count the engine returned (no rounding of counts, one-decimal %),
  *  - the minimum-volume floor + the count of excluded agencies is DISCLOSED, not hidden,
  *  - the methodology (what was measured, over what, its limits) is stated plainly,
- *  - it CITES OBS-001 by its permanent Observatory id (it computes only OBS-001 — corrected v1.1),
- *  - it says plainly that it is LIVE (recomputed per request), not a frozen edition,
+ *  - it CITES OBS-001 / OBS-002 by their permanent Observatory ids,
  *  - the edition + version + generated date are shown (the URL is permanent; the edition evolves).
  *
  * Visual system: the Mindy public site (src/lib/public-site) — shared header/footer, self-hosted
  * fonts (no CDN) and the `--mp-*` roles. Print hides the shared chrome so the report prints alone.
  */
 import type { Benchmark, AgencyRow } from './sb-participation-benchmark';
-import type { Correction } from './research-publications';
 import { mpRawBodyClose, mpRawBodyOpen, mpRawHeadHtml } from '@/lib/public-site/html';
 
 const esc = (s: string) =>
@@ -41,9 +39,8 @@ function row(r: AgencyRow, rank: number, maxPct: number): string {
   </tr>`;
 }
 
-export function renderSbBenchmarkHtml(b: Benchmark, opts: { edition: string; version: string; generatedDate: string; canonical: string; corrections?: Correction[] }): string {
+export function renderSbBenchmarkHtml(b: Benchmark, opts: { edition: string; version: string; generatedDate: string; canonical: string }): string {
   const { edition, version, generatedDate, canonical } = opts;
-  const corrections = opts.corrections ?? [];
   const maxPct = b.rows.reduce((m, r) => Math.max(m, r.pct), 0);
   const rowsHtml = b.rows.map((r, i) => row(r, i + 1, maxPct)).join('\n');
   const fleetPct = b.fleetPct == null ? 'unknown' : `${b.fleetPct.toFixed(1)}%`;
@@ -129,8 +126,9 @@ ${mpRawBodyOpen()}
     <div class="meta">
       <span class="chip">Edition ${esc(edition)}</span>
       <span class="chip">${esc(version)}</span>
-      <span class="chip">Live · computed ${esc(generatedDate)}</span>
+      <span class="chip">Generated ${esc(generatedDate)}</span>
       <span class="chip cite">Cites OBS-001</span>
+      <span class="chip cite">Cites OBS-002</span>
     </div>
   </section>
 
@@ -139,10 +137,6 @@ ${mpRawBodyOpen()}
     <div class="stat"><div class="big">${fmt(b.fleetActive)}</div><div class="lab">Active solicitations</div></div>
     <div class="stat"><div class="big">${fmt(b.fleetWithSetAside)}</div><div class="lab">Carry a set-aside</div></div>
     <div class="stat"><div class="big">${fmt(b.agenciesRanked)}</div><div class="lab">Agencies ranked (≥${b.minActive} active)</div></div>
-  </div>
-
-  <div class="disclose">
-    <b>A live benchmark, not a frozen edition.</b> Every figure on this page is recomputed from current SAM.gov solicitation data each time the page loads, so the numbers change as solicitations open and close. The Institute has not yet built the stored snapshot that would make a fixed, reproducible edition. When citing a figure, cite the computed date shown above.
   </div>
 
   <h2>Ranked by active-solicitation volume</h2>
@@ -166,18 +160,13 @@ ${rowsHtml}
   <div class="method">
     <p><b>What this measures.</b> For each federal department, the share of its currently-active SAM.gov solicitations that carry a small-business set-aside (any 8(a), HUBZone, SDVOSB, WOSB, or total/partial small-business designation). This is a measure of <b>opportunity set aside for small business</b>, not of dollars ultimately awarded.</p>
     <p><b>How it is computed.</b> Exact head-counts — for every department we count all active solicitations and, of those, how many carry a set-aside code. The percentage is that ratio. No sampling, no estimation. Departments are ranked by active-solicitation volume (market size), so the largest buyers anchor the list and a tiny high-percentage office cannot top it.</p>
-    <p><b>Cited Observatory metric.</b> This benchmark is derived directly from one production metric in the Mindy Procurement Observatory: <b>OBS-001</b> (Small-business participation). A publication can only be as credible as the metrics it rests on; OBS-001 is at Production maturity.</p>
+    <p><b>Cited Observatory metrics.</b> This benchmark is derived directly from two production metrics in the Mindy Procurement Observatory: <b>OBS-001</b> (Small-business participation) and <b>OBS-002</b> (Awarded set-aside mix). A publication can only be as credible as the metrics it rests on; both are at Production maturity.</p>
     <p><b>Limitations.</b> "Active" is a point-in-time snapshot of open solicitations as of the generated date — it is not a fiscal-year total and it is not award dollars. A set-aside on a solicitation is an intent to reserve, not a completed award. Agencies below the minimum-volume floor are excluded (see above).</p>
   </div>
 
-  <h2>Corrections</h2>
-  <div class="method">
-    ${corrections.length === 0 ? '<p>No corrections.</p>' : corrections.map((c) => `<p><b>${esc(c.date)} · ${esc(c.version)}.</b> ${esc(c.note)}</p>`).join('')}
-  </div>
-
   <footer>
-    <p>Published by <b>The Mindy Institute</b>: independent research and measurement of the public procurement economy. The Institute is operated by GovCon Giants AI, which also makes Mindy, the data engine that computes this benchmark. It follows the <a href="/research/standard">Mindy Institute Research Standard v1</a>. Figures are grounded in live federal solicitation data; this page regenerates from the current data each time it is loaded. Permanent URL: <a href="${esc(canonical)}">${esc(canonical)}</a></p>
-    <p>Edition ${esc(edition)} · ${esc(version)} · computed ${esc(generatedDate)}. To cite: "Small-Business Participation Benchmark, Edition ${esc(edition)}, The Mindy Institute (OBS-001), computed ${esc(generatedDate)}."</p>
+    <p><b>Powered by the Mindy Observatory.</b> Published by <b>The Mindy Institute</b> — the research arm of Mindy, operated by GovCon Giants AI. Figures are grounded in live federal solicitation data; this page regenerates from the current data each time it is loaded. Permanent URL: <a href="${esc(canonical)}">${esc(canonical)}</a></p>
+    <p>Edition ${esc(edition)} · ${esc(version)} · generated ${esc(generatedDate)}. To cite: "Small-Business Participation Benchmark, Edition ${esc(edition)}, The Mindy Institute (OBS-001, OBS-002)."</p>
   </footer>
 </div>
 ${mpRawBodyClose()}
