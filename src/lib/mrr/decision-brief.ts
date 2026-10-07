@@ -36,6 +36,10 @@ export interface DecisionBriefInput {
   supplierEvidenceClass?: EvidenceClass | null;
   pricingUnknown: boolean;
   pricingDegraded: boolean;
+  /** No NAICS was provided, so §11/§12/pricing never ran (missing input, not a failure). */
+  naicsMissing?: boolean;
+  /** Denominator-labelled supplier funnel summary, when the supplier search ran. */
+  supplierSummary?: string | null;
 }
 
 function fieldState(
@@ -114,11 +118,29 @@ export function buildDecisionBrief(input: DecisionBriefInput): DecisionBrief {
         ? 'The scoped contracting office returned no in-scope awards for this requirement.'
         : `The scoped contracting office has ${input.buyerAwardCount} in-scope award${input.buyerAwardCount === 1 ? '' : 's'} in the retrieved buyer history.`;
 
-  const capacityClause = input.supplierScopeLabel
-    ? `Supplier evidence is ${input.supplierScopeLabel}.`
-    : 'Broader market-capacity evidence was not separately labeled.';
+  const capacityClause = input.naicsMissing
+    ? 'Supplier search was not run because no NAICS code was provided.'
+    : input.supplierSummary
+      ? `${input.supplierSummary} Scope: ${input.supplierScopeLabel ?? 'broader market capacity'}, not the contracting office’s own suppliers.`
+      : input.supplierScopeLabel
+        ? `Supplier evidence is ${input.supplierScopeLabel}.`
+        : 'Broader market-capacity evidence was not separately labeled.';
 
   const found = [awardClause, capacityClause].join(' ');
+
+  if (input.naicsMissing) {
+    return present({
+      state: 'MORE RESEARCH NEEDED',
+      stateLabel: 'A NAICS code is needed before suppliers and small-business evidence can be researched.',
+      found,
+      supports:
+        `${input.buyerAwardCount ? 'The buyer history below.' : 'Only the buyer-history search, which found no in-scope awards.'} ` +
+        'Potential suppliers, the Rule-of-Two evidence and pricing evidence were not researched because no NAICS code was provided. This is missing input, not a failed lookup and not a finding of zero small businesses.',
+      doesNotSupport:
+        'It does not support a set-aside, an unrestricted award decision, or any statement about how many small businesses can perform.',
+      nextAction: 'Add the NAICS code for this requirement and run the research again.',
+    });
+  }
 
   if (
     detState === 'degraded' ||
@@ -152,7 +174,7 @@ export function buildDecisionBrief(input: DecisionBriefInput): DecisionBrief {
         stateLabel: 'Required evidence could not be established.',
         found,
         supports:
-          'The empty or unknown buyer-history result is itself a finding: Ralph did not invent awards for this office.',
+          'The empty or unknown buyer-history result is itself a finding: Mindy did not invent awards for this office.',
         doesNotSupport:
           'It does not support a Rule-of-Two set-aside or an unrestricted strategy, and it does not support treating installation-context work as this office’s history.',
         nextAction: input.installationContextPresent

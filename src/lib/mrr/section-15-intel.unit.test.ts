@@ -49,7 +49,7 @@ const S5_OK = {
     EV,
   ) as GroundedField<Array<{ code: string; pct: number; name?: string }>>,
   marketBasis:
-    'Federal prime-contract obligations matching the exact keyword phrase, as measured by Mindy get_keyword_coverage over USASpending.',
+    'Federal prime-contract obligations matching the exact keyword phrase, as measured by Mindy from USASpending.',
 };
 
 const S12_OK = {
@@ -224,7 +224,7 @@ describe('§15 Market Intelligence', () => {
     // Explicit: no fabricated rate figures in the ungrounded field.
     expect(blob).not.toMatch(/\$\d+\.\d{2}\/hr/);
     if (s.pricingEvidence.state === 'unknown') {
-      expect(s.pricingEvidence.reason).toMatch(/grounded:false|no GSA CALC/i);
+      expect(s.pricingEvidence.reason).toMatch(/returned no labor rates|no GSA CALC/i);
     }
   });
 

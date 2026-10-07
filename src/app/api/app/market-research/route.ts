@@ -4,7 +4,16 @@ import {
   RequirementValidationError,
   normalizeRequirement,
 } from '@/lib/mrr/normalizer';
-import { createOrGetMrrJobAsync, getMrrJobAsync } from '@/lib/mrr/run-store-read';
+import {
+  createOrGetMrrJobAsync,
+  isSafeMrrRunId,
+  loadOwnedMrrJobAsync,
+  mrrFilesAvailable,
+  needsRerun,
+  requeueMrrJobAsync,
+  toMrrJobDto,
+  type MrrRunJob,
+} from '@/lib/mrr/run-store-read';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 
 export const runtime = 'nodejs';
@@ -38,6 +47,23 @@ function noticeIdFromUrl(value: unknown): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Keep the run alive after the response returns. A detached void promise is
+ * dropped when the request context ends; after() is the App Router hook for
+ * "enqueue then continue".
+ */
+function scheduleRun(runId: string, ownerEmail: string): void {
+  after(() =>
+    import('@/lib/mrr/run-store').then(({ startMrrJob }) => startMrrJob(runId, ownerEmail)),
+  );
+}
+
+async function withFilesAvailable(job: MrrRunJob) {
+  const dto = toMrrJobDto(job);
+  if (job.status === 'done') dto.filesAvailable = await mrrFilesAvailable(job);
+  return dto;
 }
 
 export function parsePublicMrrIntake(body: Record<string, unknown>) {
@@ -93,6 +119,34 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Rebuild an existing run in place (same id, same question) when its files are
+  // gone or it failed/stalled. Owner-bound: another account gets a 404.
+  const rebuildId = text(body.rebuild_run_id);
+  if (rebuildId) {
+    const owner = auth.session.email!;
+    const existing = isSafeMrrRunId(rebuildId) ? await loadOwnedMrrJobAsync(rebuildId, owner) : null;
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, error: 'Run not found', prototypeBanner: WORKSPACE_PROTOTYPE_BANNER },
+        { status: 404 },
+      );
+    }
+    const rerun = await needsRerun(existing);
+    if (rerun) {
+      await requeueMrrJobAsync(existing);
+      scheduleRun(existing.id, owner);
+    }
+    return NextResponse.json(
+      {
+        success: true,
+        deduplicated: !rerun,
+        prototypeBanner: WORKSPACE_PROTOTYPE_BANNER,
+        job: await withFilesAvailable(existing),
+      },
+      { status: rerun ? 202 : 200 },
+    );
+  }
+
   try {
     const normalized = parsePublicMrrIntake(body);
     const { job, created } = await createOrGetMrrJobAsync({
@@ -100,16 +154,7 @@ export async function POST(request: NextRequest) {
       input: body,
       normalizedRequirement: normalized.normalized,
     });
-    if (created) {
-      // Keep the run alive after the 202 returns. A detached void promise is
-      // dropped when the request context ends; after() is the App Router hook
-      // for exactly this "enqueue then continue" local-demo path.
-      const ownerEmail = auth.session.email!;
-      const runId = job.id;
-      after(() =>
-        import('@/lib/mrr/run-store').then(({ startMrrJob }) => startMrrJob(runId, ownerEmail)),
-      );
-    }
+    if (created) scheduleRun(job.id, auth.session.email!);
     return NextResponse.json(
       {
         success: true,
@@ -165,12 +210,16 @@ export async function GET(request: NextRequest) {
       { status: 400 },
     );
   }
-  const job = await getMrrJobAsync(id, auth.session.email!);
+  const job = isSafeMrrRunId(id) ? await loadOwnedMrrJobAsync(id, auth.session.email!) : null;
   if (!job) {
     return NextResponse.json(
       { success: false, error: 'Run not found', prototypeBanner: WORKSPACE_PROTOTYPE_BANNER },
       { status: 404 },
     );
   }
-  return NextResponse.json({ success: true, prototypeBanner: WORKSPACE_PROTOTYPE_BANNER, job });
+  return NextResponse.json({
+    success: true,
+    prototypeBanner: WORKSPACE_PROTOTYPE_BANNER,
+    job: await withFilesAvailable(job),
+  });
 }

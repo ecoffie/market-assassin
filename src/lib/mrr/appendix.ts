@@ -45,16 +45,17 @@ export const APPENDIX_PRINTABLE_WIDTH_TWIP =
   APPENDIX_PAGE_WIDTH_TWIP - 2 * APPENDIX_MARGIN_TWIP;
 
 /**
- * Worst-case 8pt Times glyph advance. Larger → fewer chars/line → taller
- * estimates → fewer rows packed into a table. LibreOffice wrap is wider than
- * Word's 8pt average (~80 twip).
+ * Conservative 8pt Times glyph advance (Word averages ~80 twip). Larger → fewer
+ * chars/line → taller estimates → fewer rows per page. 130 left roughly four
+ * rows per page and a 75-page appendix of mostly white space (measured
+ * 2026-10-07 in LibreOffice); 90 still over-estimates and keeps packs on one page.
  */
-export const APPENDIX_CHAR_WIDTH_TWIP = 130;
-/** Conservative single-line pitch (LibreOffice has measured taller than Word's 240). */
-export const APPENDIX_LINE_HEIGHT_TWIP = 360;
+export const APPENDIX_CHAR_WIDTH_TWIP = 90;
+/** Single-line pitch for 8pt text — LibreOffice renders ~200 twip; 220 keeps slack. */
+export const APPENDIX_LINE_HEIGHT_TWIP = 220;
 export const APPENDIX_CELL_PAD_TWIP = 100;
 /** Borders, page-break paragraph, and LibreOffice row-pitch slack. */
-export const APPENDIX_PAGE_SAFETY_TWIP = 2400;
+export const APPENDIX_PAGE_SAFETY_TWIP = 900;
 export const APPENDIX_PAGE_TABLE_BUDGET_TWIP =
   APPENDIX_PRINTABLE_HEIGHT_TWIP - APPENDIX_PAGE_SAFETY_TWIP;
 

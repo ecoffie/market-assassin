@@ -136,7 +136,7 @@ describe('§5 Taxonomy', () => {
     calls.impl = () => COVERAGE_OK;
     const s = await buildSection5({ ...REQ, naics: '238220' }); // not in the fixture
     expect(s.sizeStandard.state).toBe('unknown');
-    expect((s.sizeStandard as { reason: string }).reason).toMatch(/not in the versioned local SBA fixture/);
+    expect((s.sizeStandard as { reason: string }).reason).toMatch(/not in the stored copy; size standard not stated/);
   });
 
   it('carries the size-standard table citation and units', async () => {

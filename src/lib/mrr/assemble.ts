@@ -127,50 +127,59 @@ function fillSection12(blocks: string[], collector: EvidenceCollector, s12: Sect
   let end = anchor + 1;
   while (end < blocks.length && !blockText(blocks[end]).startsWith('13. Mandatory')) end++;
 
-  const det = collector.render('§12 Rule of Two determination', s12.determination);
+  const det = collector.render('§12 Rule of Two determination', s12.determination, determinationLabel);
   const rec = collector.render('§12 Set-aside recommendation', s12.recommendation);
-  const n = collector.render('§12 Capable parent-deduplicated SB families', s12.capableFamilyCount);
-  const cov = collector.render(
-    '§12 Matching coverage of eligible population',
+  const n = collector.render('§12 Capable small-business parent companies counted', s12.capableFamilyCount);
+  collector.render(
+    '§12 Share of registered firms with federal contract history',
     s12.matchingCoverage,
     (v) => `${(v * 100).toFixed(1)}%`,
   );
-  const goal = collector.render('§12 SBA goaling context', s12.goalingContext);
+  const goal = collector.render('§12 Agency small-business context', s12.goalingContext);
 
   const socioLines = s12.socioCounts.map((s) => {
     const cell = collector.render(`§12 ${s.designation} family count`, s.familyCount);
-    return `${s.designation}: ${cell.text}`;
+    const n = s.familyCount.state === 'value' ? String(s.familyCount.value) : s.familyCount.state === 'true_zero' ? '0' : 'unknown';
+    void cell;
+    return `${s.designation} ${n}`;
   });
 
   const listed = s12.countedFamilies.length
-    ? s12.countedFamilies.map((f) => `${f.displayName} (${f.familyKey} / UEI ${f.uei})`).join('; ')
+    ? s12.countedFamilies.map((f) => `${f.displayName} (UEI ${f.uei})`).join('; ')
     : 'none counted';
 
-  // Collapse identical exclusion reasons (e.g. the same BQ quota error on 50 UEIs)
-  // so the Word body does not become pages of duplicated URLs.
-  const excludedText = summarizeExclusions(s12.excluded);
+  const counted =
+    s12.capableFamilyCount.state === 'value' || s12.capableFamilyCount.state === 'true_zero'
+      ? `Capable small-business parent companies counted: ${n.text}. They are counted among the firms listed in §11, not across the whole market.`
+      : `Capable small-business parent companies counted: ${n.text}.`;
 
   const body = [
-    paragraph(`Rule of Two determination: ${det.text}`),
+    paragraph(`Rule of Two determination: ${det.text}`, { bold: true }),
     paragraph(`Recommendation: ${rec.text}`),
-    paragraph(
-      s12.capableFamilyCount.state === 'unknown' || s12.capableFamilyCount.state === 'degraded'
-        ? `Capable small-business family count (parent-deduplicated, among the evaluated sample only): ${n.text}. ` +
-          `This is not a measured market-wide finding of zero capable small businesses. ` +
-          `Matching coverage of eligible population (depth sample_coverage): ${cov.text}.`
-        : `Capable small-business concerns counted (distinct parent-deduplicated corporate families among the evaluated sample, ` +
-          `not raw UEIs and not a complete-market census): ${n.text}. ` +
-          `Matching coverage of eligible population (depth sample_coverage): ${cov.text}.`,
-    ),
-    paragraph(`Counted families: ${listed}`),
-    paragraph(`Excluded from the Rule-of-Two count: ${excludedText}`),
-    paragraph(`Socioeconomic designations (family-deduplicated; no double-count across UEIs): ${socioLines.join(' · ') || 'Unknown'}`),
-    paragraph(`SBA goaling context: ${goal.text}`),
-    ...(s12.limitations.length
-      ? [paragraph(`§12 limitations: ${s12.limitations.join(' | ')}`)]
+    paragraph(counted),
+    ...(s12.countedFamilies.length ? [paragraph(`Counted parent companies: ${listed}`)] : []),
+    ...(s12.excluded.length ? [paragraph(`Not counted toward the Rule of Two: ${summarizeExclusions(s12.excluded)}`)] : []),
+    ...(s12.countedFamilies.length
+      ? [paragraph(`Socioeconomic status of counted parent companies (from SAM): ${socioLines.join(' · ')}`)]
       : []),
+    paragraph(`Agency small-business context: ${goal.text}`),
+    ...limitationParagraphs('§12 limitations', s12.limitations),
   ];
   blocks.splice(anchor + 1, end - (anchor + 1), ...body);
+}
+
+/** One bullet per limitation — never a " | "-joined wall of text. */
+function limitationParagraphs(heading: string, items: string[]): string[] {
+  const unique = [...new Set(items.map((item) => item.trim()).filter(Boolean))];
+  if (!unique.length) return [];
+  return [paragraph(`${heading}:`, { bold: true }), ...unique.map((item) => paragraph(`• ${item}`))];
+}
+
+function determinationLabel(v: string): string {
+  if (v === 'met') return 'Met';
+  if (v === 'not_met') return 'Not met';
+  if (v === 'undetermined') return 'Not determined';
+  return v;
 }
 
 /** Summarize RoT exclusions: group by reason, list a few UEIs, avoid URL spam. */
@@ -187,7 +196,7 @@ function summarizeExclusions(excluded: Array<{ uei: string; reason: string }>): 
   for (const [reason, ueis] of byReason) {
     const sample = ueis.slice(0, 5).join(', ');
     const more = ueis.length > 5 ? ` (+${ueis.length - 5} more)` : '';
-    parts.push(`${ueis.length} UEI(s) — ${reason} [e.g. ${sample}${more}]`);
+    parts.push(`${ueis.length} firm(s): ${reason} (UEI ${sample}${more})`);
   }
   return parts.join('; ');
 }
@@ -197,6 +206,11 @@ function shortenReason(reason: string): string {
   if (/QueryUsagePerDay|Custom quota exceeded/i.test(r)) {
     return 'parent-edge lookup failed (BigQuery QueryUsagePerDay quota exceeded)';
   }
+  if (/sibling UEI under familyKey/i.test(r)) return 'same parent company as a firm already counted';
+  if (/Rule-of-Two ineligible|lookup_failed|unresolved|ambiguous/i.test(r)) return 'parent company could not be confirmed';
+  if (/business size not established/i.test(r)) return 'small-business status for this NAICS not established in SAM';
+  if (/other than small/i.test(r)) return 'other than small for this NAICS';
+  if (/capable\/active_performer capability evidence/i.test(r)) return 'no capable award history in this NAICS';
   if (r.length > 160) return `${r.slice(0, 157)}…`;
   return r || 'unspecified';
 }
@@ -250,7 +264,9 @@ function fillSection11(blocks: string[], collector: EvidenceCollector, s11: Sect
         : conf.text;
 
       // Compact vendor cell: one line name + UEI (no multi-line award dump — that overflowed pages).
-      const vendorCell = `${name.text} [${confMark}] · ${legal.text} · UEI ${uei.text}`;
+      const vendorCell =
+        `${name.text}${legal.state === 'value' && legal.text !== name.text ? ` (${legal.text})` : ''} · UEI ${uei.text}` +
+        (confMark === UNKNOWN_MARK ? ' · parent company unconfirmed¹' : '');
       const sizeCell = `${concise(size)}${socio.state === 'value' ? ` · ${socio.text}` : ''}`;
       const capText = cap.state === 'value'
         ? compactCapability(cap.text)
@@ -272,79 +288,45 @@ function fillSection11(blocks: string[], collector: EvidenceCollector, s11: Sect
 
   blocks[tblIdx] = setTableWidths(rebuildTable(original, [header, ...bodyRows]), WIDTHS);
 
-  const raw = collector.render('§11 Matching UEI total (tool-reported)', s11.rawUeiCount);
-  const evaluated = collector.render('§11 Evaluated UEI count (returned sample)', s11.evaluatedUeiCount);
-  const toolLim = collector.render('§11 Tool limit', s11.toolLimit);
-  const dedup = collector.render(
-    '§11 Resolved families in evaluated sample (not full-population dedup)',
-    s11.deduplicatedFamilyCount,
-  );
-  const ambiguous = collector.render(
-    '§11 Ambiguous/unresolved parents in evaluated sample',
-    s11.ambiguousParentCount,
-  );
-  const matchingCoverage = collector.render(
-    '§11 Matching coverage of eligible population',
+  // Every count is registered as provenance (appendix + screen); the report body
+  // prints them once, through the supplier funnel, each with its denominator.
+  collector.render('§11 Small businesses registered in SAM', s11.eligiblePopulation);
+  collector.render('§11 Registered firms with federal contract history', s11.rawUeiCount);
+  collector.render('§11 Firms scored by Mindy', s11.scoredSample);
+  collector.render('§11 Scored firms with capable or active performance', s11.capableInScoredSample);
+  collector.render('§11 Firms listed with full detail', s11.boundedSampleReturned);
+  collector.render('§11 Firms checked for parent company', s11.evaluatedUeiCount);
+  collector.render('§11 Distinct parent companies among listed firms', s11.deduplicatedFamilyCount);
+  collector.render('§11 Listed firms with unconfirmed parent company', s11.ambiguousParentCount);
+  collector.render('§11 Market-depth request limit', s11.toolLimit);
+  collector.render(
+    '§11 Share of registered firms with federal contract history',
     s11.matchingCoverage,
     (v) => (typeof v === 'number' ? `${(v * 100).toFixed(1)}%` : String(v)),
   );
-  const eligiblePop = collector.render('§11 Eligible population (tool-reported)', s11.eligiblePopulation);
   const efforts = collector.render('§11 Efforts to locate sources', s11.effortsToLocate);
-
-  const rawN = s11.rawUeiCount.state === 'value' ? s11.rawUeiCount.value : null;
-  const evaluatedN = s11.evaluatedUeiCount.state === 'value' ? s11.evaluatedUeiCount.value : null;
-  const familyResolutionCoverage =
-    rawN != null && evaluatedN != null && rawN > 0
-      ? `${((evaluatedN / rawN) * 100).toFixed(1)}%`
-      : 'Unknown';
-
-  const truncated =
-    (evaluatedN != null && rawN != null && evaluatedN < rawN) ||
-    (s11.matchingCoverage.state === 'value' && s11.matchingCoverage.value < 1);
 
   const after: string[] = [
     paragraph(
-      '¹ Missing CAGE, business size, socioeconomic designation, location, or POC is Unknown — ' +
-      'not empty, not false, and not zero. Parent-company resolution is current-state USASpending ' +
-      'parent_uei only; ambiguous parentage cannot satisfy Rule of Two.',
+      '¹ Unknown means the source did not report the value. It is not zero and not "no". ' +
+      'Parent companies come from current USASpending parent records; a firm whose parent cannot be confirmed is not counted toward the Rule of Two.',
     ),
-    paragraph(
-      `Tool-reported matching UEIs: ${raw.text}. ` +
-      `Eligible population (broader depth-tool population): ${eligiblePop.text}. ` +
-      `Tool limit: ${toolLim.text}. ` +
-      `UEIs returned and evaluated for corporate-family resolution: ${evaluated.text}. ` +
-      `Resolved corporate families in that evaluated sample: ${dedup.text}. ` +
-      `Ambiguous/unresolved parents in that evaluated sample: ${ambiguous.text}. ` +
-      (truncated
-        ? 'The resolved-family count is NOT a deduplication of all matching UEIs, ' +
-          'and this evaluated sample is not the complete market.'
-        : 'Family counts above describe the evaluated set only.'),
-    ),
-    paragraph(
-      `Matching coverage of eligible population: ${matchingCoverage.text}` +
-        (rawN != null && s11.eligiblePopulation.state === 'value'
-          ? ` (${rawN.toLocaleString('en-US')} matching UEIs / ${s11.eligiblePopulation.value.toLocaleString('en-US')} eligible population).`
-          : '.') +
-      ` Family-resolution coverage of matching UEIs: ${familyResolutionCoverage}` +
-        (rawN != null && evaluatedN != null
-          ? ` (${evaluatedN.toLocaleString('en-US')} evaluated UEIs / ${rawN.toLocaleString('en-US')} matching UEIs).`
-          : '.'),
-    ),
-    paragraph(
-      evaluatedN != null && evaluatedN > 25
-        ? `Vendor table shows the top 25 of ${evaluatedN} evaluated UEI rows by capability score.`
-        : `Vendor table rows: ${displaySuppliers.length}.`,
-    ),
-    paragraph(`Efforts to locate sources: ${efforts.text}`),
   ];
-  if (s11.scopeLabel) {
-    after.splice(after.length - 1, 0, paragraph(
-      `Supplier-sample scope: ${s11.scopeLabel}. This is contextual market-capacity evidence. It does not establish the scoped contracting office’s supplier census.`,
+  if (s11.funnel.ran) {
+    after.push(paragraph('Supplier population — each figure states what it was counted from:', { bold: true }));
+    for (const step of s11.funnel.steps) {
+      after.push(paragraph(`• ${step.count.toLocaleString('en-US')} ${step.label}${step.share ? ` (${step.share})` : ''}`));
+    }
+  } else {
+    after.push(paragraph(s11.funnel.summary, { bold: true }));
+  }
+  if (s11.scopeLabel && s11.funnel.ran) {
+    after.push(paragraph(
+      `Scope: ${s11.scopeLabel}. These firms are statewide market capacity, not the contracting office’s own suppliers.`,
     ));
   }
-  if (s11.limitations.length) {
-    after.push(paragraph(`§11 limitations: ${s11.limitations.join(' | ')}`));
-  }
+  after.push(paragraph(`Efforts to locate sources: ${efforts.text}`));
+  after.push(...limitationParagraphs('§11 limitations', s11.limitations));
   blocks.splice(tblIdx + 1, 0, ...after);
 }
 
@@ -364,8 +346,9 @@ function unknownAsFinding(s11: Section11): Section11['effortsToLocate'] {
 function compactCapability(text: string): string {
   const tier = /tier=([a-z_]+)/i.exec(text)?.[1];
   const awards = /awards?=(\d+)/i.exec(text)?.[1];
-  if (tier && awards) return `tier=${tier}; awards=${awards}`;
-  if (tier) return `tier=${tier}`;
+  const tierLabel = tier ? (tier === 'active_performer' ? 'Active performer' : tier.charAt(0).toUpperCase() + tier.slice(1)) : null;
+  if (tierLabel && awards) return `${tierLabel} · ${awards} federal award${awards === '1' ? '' : 's'} (all NAICS)`;
+  if (tierLabel) return tierLabel;
   const one = text.replace(/\s+/g, ' ').trim();
   return one.length > 48 ? `${one.slice(0, 45)}…` : one;
 }
@@ -387,7 +370,7 @@ function fillSection9(
       tableCell('Type', WIDTHS[1], { bold: true }),
       tableCell('Method', WIDTHS[2], { bold: true }),
       tableCell('Offers', WIDTHS[3], { bold: true }),
-      tableCell('Amount', WIDTHS[4], { bold: true }),
+      tableCell('Amount (lifetime to date)', WIDTHS[4], { bold: true }),
       tableCell('Period of Performance', WIDTHS[5], { bold: true }),
     ],
     { header: true, cantSplit: true },
@@ -432,7 +415,6 @@ function fillSection9(
       const off = collector.render(`§9 Award ${n} offerors`, a.offerors);
       const amt = collector.render(`§9 Award ${n} amount`, a.amount, (v) => `${money(v.value)} — ${v.label}`);
       const amtFigure = a.amount.state === 'value' ? money((a.amount as { value: { value: number } }).value.value) : amt.text;
-      const amtLabel = a.amount.state === 'value' ? (a.amount as { value: { label: string } }).value.label : '';
       const pop = collector.render(`§9 Award ${n} period of performance`, a.periodOfPerformance);
 
       const firstCell = a.usaSpendingUrl
@@ -443,9 +425,9 @@ function fillSection9(
         [
           firstCell,
           tableCell(typ.text, WIDTHS[1]),
-          tableCell(concise(met), WIDTHS[2]),
-          tableCell(concise(off), WIDTHS[3]),
-          tableCellAmount(amtFigure, amtLabel, WIDTHS[4]),
+          tableCell(met.state === 'unknown' ? '—¹' : met.text, WIDTHS[2]),
+          tableCell(off.state === 'unknown' ? '—¹' : off.text, WIDTHS[3]),
+          tableCellAmount(amtFigure, '', WIDTHS[4]),
           tableCell(pop.text, WIDTHS[5]),
         ],
         { cantSplit: true },
@@ -459,8 +441,8 @@ function fillSection9(
   const pred = collector.render('§9 Predecessor / incumbent', s9.predecessor);
   const after: string[] = [];
   after.push(paragraph(
-    '¹ The source did not report the procurement method or number of offerors. ' +
-    'Unknown is not treated as zero.',
+    '¹ — means USASpending did not report the procurement method or number of offers for that award. It is not zero. ' +
+    'Amounts are each award’s lifetime obligations to date, as reported by USASpending.',
   ));
   if (findingCell) after.push(paragraph(`Award history: ${findingCell.text}`));
   after.push(paragraph(`Predecessor / incumbent: ${pred.text}`));

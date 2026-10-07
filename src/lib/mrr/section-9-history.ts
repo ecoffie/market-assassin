@@ -476,7 +476,7 @@ export async function buildSection9(
         awards.push(awardRowFromSource(src, ev, 'in_scope'));
       }
       awardsFinding = value(
-        `${awards.length} in-scope buyer-history award(s) for contracting office ${scope.contractingOfficeCode} (awarding_office_code predicate, not office-name keyword). These are BUYER / CONTRACTING HISTORY rows, not installation-context awards bought by another agency.`,
+        `${awards.length} award(s) made by contracting office ${scope.contractingOfficeCode}, matched on the awarding office code (BUYER / CONTRACTING HISTORY). Work at the installation bought by another agency is listed separately as installation context.`,
         officeEv,
       );
       retrievalManifests.push(retrievalManifest({

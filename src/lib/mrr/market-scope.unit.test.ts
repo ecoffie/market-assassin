@@ -313,7 +313,7 @@ describe('§11/§12 statewide capacity is not office supply', () => {
     expect(s11.retrievalManifests[0].unsupported_scope.contracting_office).toBeTruthy();
     expect(s11.retrievalManifests[0].consumed_scope.contracting_office).toBeUndefined();
     expect(s11.effortsToLocate.state).toBe('value');
-    expect((s11.effortsToLocate as { value: string }).value).toMatch(/NOT buyer\/office-specific/);
+    expect((s11.effortsToLocate as { value: string }).value).toMatch(/does not filter by contracting office/);
 
     const s12 = await buildSection12(VANDENBERG, '236220', s11, {
       goalingOk: true,
@@ -328,7 +328,7 @@ describe('§11/§12 statewide capacity is not office supply', () => {
     expect(s12.recommendation.state).toBe('value');
     expect((s12.recommendation as { value: string }).value).toMatch(/Insufficient evidence to support a set-aside/);
     expect((s12.recommendation as { value: string }).value).toMatch(/California small-business capacity/);
-    expect((s12.recommendation as { value: string }).value).toMatch(/FA4610 was NOT consumed/);
+    expect((s12.recommendation as { value: string }).value).toMatch(/did not filter by contracting office FA4610/);
     expect(s12.observedDimensions).not.toContain('contracting_office');
   });
 

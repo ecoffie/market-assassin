@@ -128,6 +128,13 @@ describe('interpretMarketQuestion', () => {
     expect(result.intake?.naics).toBeUndefined();
     expect(result.intake?.office).toMatch(/FA4610/);
     expect(JSON.stringify(result.confirmation)).not.toMatch(/W912PL/);
+    // Missing NAICS is surfaced as a suggestion the user accepts — never written onto scope.
+    expect(result.naicsSuggestion).toEqual({
+      code: '236220',
+      name: 'Commercial and Institutional Building Construction',
+      keyword: 'SABER',
+    });
+    expect(result.confirmation?.naics).toBeUndefined();
   });
 
   it('resolves NAVSEA HQ to N00024 and does not keep warfare centers', async () => {

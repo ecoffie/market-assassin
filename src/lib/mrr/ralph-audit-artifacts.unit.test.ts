@@ -31,14 +31,14 @@ describe('artifact identity and reopen-without-requery', () => {
     const download = src('src/app/api/app/market-research/download/route.ts');
     const page = src('src/app/app/market-research/page.tsx');
     const getRoute = src('src/app/api/app/market-research/route.ts');
-    expect(download).toMatch(/readBoundArtifactFile/);
-    expect(download).toMatch(/getMrrArtifact/);
+    // Owner-checked read: local bound file or the durable copy, hash-verified.
+    expect(download).toMatch(/readOwnedMrrArtifact/);
     expect(download).not.toMatch(/from ['"]@\/lib\/mrr\/run-store['"]/);
     expect(download).not.toMatch(/from ['"]@\/lib\/mrr\/run-phase1['"]/);
     expect(download).not.toMatch(/assessMarketDepth|bqQuery|callTool|mindy-client|assembleMrr|writeAppendix|docx-fill/);
     expect(page).not.toMatch(/run-phase1|assessMarketDepth|bigquery|callTool/);
     const getFn = getRoute.slice(getRoute.indexOf('export async function GET'));
-    expect(getFn).toMatch(/getMrrJob/);
+    expect(getFn).toMatch(/loadOwnedMrrJobAsync/);
     expect(getFn).not.toMatch(/startMrrJob|runPhase1|bqQuery|callTool|persistCompletedMrrJobFromEvidence|writeFileSync/);
     expect(download).not.toMatch(/persistCompletedMrrJobFromEvidence|writeFileSync/);
     const persist = src('src/lib/mrr/run-store.ts');
@@ -54,18 +54,13 @@ describe('artifact identity and reopen-without-requery', () => {
     const ui = src('src/components/app/market-research/MarketResearchWorkspace.tsx');
     const buckets = src('src/lib/mrr/evidence-buckets.ts');
     const progress = src('src/lib/mrr/workspace-constants.ts');
-    expect(ui).toMatch(/review\.suppliers\.eligiblePopulation/);
-    expect(ui).toMatch(/review\.suppliers\.matchingUeis/);
-    expect(ui).toMatch(/review\.suppliers\.boundedSampleReturned/);
-    expect(ui).toMatch(/review\.suppliers\.capableActiveUeis/);
-    expect(ui).toMatch(/review\.suppliers\.evaluatedUeis/);
-    expect(ui).toMatch(/review\.suppliers\.resolvedCorporateFamilies/);
-    expect(ui).toMatch(/review\.suppliers\.ambiguousOrUnresolvedParents/);
-    expect(ui).toMatch(/review\.suppliers\.displayedVendorRows/);
-    expect(ui).toMatch(/Matching coverage:/);
-    expect(ui).toMatch(/Family-resolution coverage:/);
-    expect(ui).toMatch(/Sample coverage:/);
-    expect(ui).toMatch(/exclusionNote/);
+    // Supplier counts render ONLY through the shared funnel, each with its denominator.
+    expect(ui).toMatch(/review\.suppliers\?\.funnel|review\.suppliers\.funnel/);
+    expect(ui).toMatch(/FunnelList/);
+    expect(ui).toMatch(/step\.share/);
+    expect(ui).toMatch(/How the supplier numbers relate/);
+    expect(ui).not.toMatch(/sample_coverage/);
+    expect(ui).not.toMatch(/Ralph/);
     expect(ui).toMatch(/Research this market/);
     expect(ui).toMatch(/Run research/);
     expect(ui).toMatch(/Edit scope/);
@@ -77,7 +72,7 @@ describe('artifact identity and reopen-without-requery', () => {
     expect(ui).toMatch(/Turn a requirement into defensible market research/);
     expect(ui).toMatch(/Recommended next action/);
     expect(buckets).toMatch(/No buyer-specific history was found/);
-    expect(buckets).toMatch(/Ralph did not broaden the search automatically/);
+    expect(buckets).toMatch(/Mindy did not broaden the search automatically/);
     expect(progress).toMatch(/DEMO_PROGRESS_STAGES/);
     expect(ui).toMatch(/What market are you researching\?/);
     expect(ui).toMatch(/Here&apos;s the market I&apos;ll research/);

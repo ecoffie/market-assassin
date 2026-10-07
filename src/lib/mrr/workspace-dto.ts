@@ -12,6 +12,8 @@ import type {
   ScopeExpansionRecord,
 } from './market-scope';
 import { WORKSPACE_PROTOTYPE_BANNER } from './workspace-constants';
+import { awardAmountLabel } from './award-amount';
+import type { SupplierFunnel } from './supplier-funnel';
 import type { EvidenceRef, GroundedField, Requirement, RuleOfTwoDetermination } from './types';
 
 export type ReviewState = 'Sourced' | 'Unknown' | 'Degraded' | 'Measured zero';
@@ -56,6 +58,8 @@ export interface SupplierPopulationReview {
   sampleToMatchingRatio: string | null;
   exclusionNote: string | null;
   completenessWarning: string;
+  /** The single denominator-labelled statement of the supplier counts. */
+  funnel: SupplierFunnel | null;
 }
 
 export interface RuleOfTwoReview {
@@ -85,6 +89,8 @@ export interface Phase1ReviewSource {
     ambiguousParentCount: GroundedField<number>;
     eligiblePopulation: GroundedField<number>;
     limitations: string[];
+    funnel?: SupplierFunnel;
+    notRun?: 'missing_naics' | 'failed' | 'degraded' | null;
   };
   section12: {
     determination: GroundedField<RuleOfTwoDetermination>;
@@ -309,8 +315,7 @@ function groundedString(field: GroundedField<string> | undefined): string | null
 function groundedAmountLabel(
   field: GroundedField<{ value: number; label: string }> | undefined,
 ): string | null {
-  if (!field || field.state !== 'value') return null;
-  return field.value.label;
+  return awardAmountLabel(field);
 }
 
 function historyFromLiveResult(result: Phase1ReviewSource): Phase1ReviewSource['history'] {
@@ -437,6 +442,8 @@ export function createPhase1ReviewDto(result: Phase1ReviewSource): Phase1ReviewD
     predecessorEvidenceClass: history?.predecessorEvidenceClass,
     supplierScopeLabel: supplierScope?.scopeLabel,
     supplierEvidenceClass: supplierScope?.evidenceClass,
+    naicsMissing: s11.notRun === 'missing_naics',
+    supplierSummary: s11.funnel?.ran ? s11.funnel.summary : null,
     pricingUnknown: result.section15.pricingEvidence.state === 'unknown',
     pricingDegraded: result.section15.pricingEvidence.state === 'degraded',
   });
@@ -505,7 +512,8 @@ export function createPhase1ReviewDto(result: Phase1ReviewSource): Phase1ReviewD
           ? `${s11.boundedSampleReturned.value} suppliers sampled; ${s11.capableActiveCount.value} met the capable/active evaluation gate; ${s11.excludedBeforeFamilyResolution.value} were excluded before corporate-family resolution.`
           : null,
       completenessWarning:
-        'These counts are separate and must not be interchanged: eligible population, matching UEIs, bounded sample returned, capable/active after tier filtering, UEIs submitted for family resolution, resolved families, ambiguous/unresolved families, and suppliers displayed. Matching coverage is matching UEIs / eligible population. Family-resolution coverage is submitted-for-family-resolution UEIs / matching UEIs. Sample coverage is bounded sample / matching UEIs. Capable/active is never the complete bounded sample when firms were excluded before family resolution. Resolved-family count is never the deduplicated full market unless the evidence establishes complete matching and complete evaluation.',
+        'Each count below is taken from a different population, and each percentage names its denominator. None of them is a complete census of the market.',
+      funnel: s11.funnel ?? null,
     },
     ruleOfTwo: {
       determination: findingFromGrounded(
@@ -531,7 +539,7 @@ export function createPhase1ReviewDto(result: Phase1ReviewSource): Phase1ReviewD
         '§11 Potential Suppliers',
         '§12 Small Business / Rule of Two evidence',
         '§15 Market Intelligence',
-        'MRR DOCX, Sourced Evidence Appendix, and Evidence JSON',
+        'Market research report, sourced evidence appendix and evidence file',
       ],
       koMustComplete: [
         'All Phase 2 sections and acquisition-specific context',
@@ -551,17 +559,17 @@ export function createPhase1ReviewDto(result: Phase1ReviewSource): Phase1ReviewD
     downloads: [
       {
         kind: 'mrr',
-        label: 'MRR DOCX',
+        label: 'Market research report (.docx)',
         href: `/api/app/market-research/download?id=${encodeURIComponent(result.runId)}&kind=mrr`,
       },
       {
         kind: 'appendix',
-        label: 'Sourced Evidence Appendix DOCX',
+        label: 'Sourced evidence appendix (.docx)',
         href: `/api/app/market-research/download?id=${encodeURIComponent(result.runId)}&kind=appendix`,
       },
       {
         kind: 'evidence',
-        label: 'Evidence JSON',
+        label: 'Evidence file (.json)',
         href: `/api/app/market-research/download?id=${encodeURIComponent(result.runId)}&kind=evidence`,
       },
     ],

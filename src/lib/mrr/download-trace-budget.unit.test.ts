@@ -25,7 +25,7 @@ describe('download function import graph', () => {
     expect(download).toMatch(/from ['"]@\/lib\/two-factor-session['"]/);
     expect(download).not.toMatch(/from ['"]@\/lib\/mrr\/run-store['"]/);
     expect(download).not.toMatch(/from ['"][^'"]*(run-phase1|docx-fill|assemble|review-from-evidence|bigquery|tool-registry|mindy-client|normalizer)['"]/);
-    expect(download).toMatch(/readBoundArtifactFile/);
+    expect(download).toMatch(/readOwnedMrrArtifact/);
     expect(download).not.toMatch(/readFileSync\(artifact\.path\)/);
   });
 

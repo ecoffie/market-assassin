@@ -136,8 +136,8 @@ export function buildEvidenceBuckets(source: EvidenceBucketSource): EvidenceBuck
         ? {
             emptyReason: 'No buyer-specific history was found for this exact scope.',
             emptyNote: awardsFinding
-              ? `Ralph did not broaden the search automatically. ${awardsFinding}`
-              : 'Ralph did not broaden the search automatically.',
+              ? `Mindy did not broaden the search automatically. ${awardsFinding}`
+              : 'Mindy did not broaden the search automatically.',
           }
         : {}),
     },

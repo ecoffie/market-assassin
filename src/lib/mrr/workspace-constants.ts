@@ -1,3 +1,11 @@
+/**
+ * Bump when the report, appendix or review wording/format changes. A completed
+ * run built by an older generator is rebuilt when the same question is asked
+ * again, so a buyer never re-opens a superseded document. v2 = 2026-10-07
+ * (supplier funnel, eCFR size standard, Mindy branding, durable files).
+ */
+export const MRR_REPORT_VERSION = 2;
+
 export const WORKSPACE_PROTOTYPE_BANNER =
   'PROTOTYPE — PUBLIC-DATA DEMO — NOT FOR SIGNATURE';
 
