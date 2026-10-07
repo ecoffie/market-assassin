@@ -338,3 +338,39 @@ describe('§11/§12 statewide capacity is not office supply', () => {
     );
   });
 });
+
+describe('VA office 36C250 buyer history (hosted acceptance 2026-10-07)', () => {
+  it('queries the real office code, never the word "OFFICE", and labels each award\'s relevance', async () => {
+    calls.impl = () => ({ incumbent: null, _meta: { grounded: false, degraded: false } });
+    const req = normalizeRequirement({
+      title: 'IT help desk support for the VA medical center in Cleveland, Ohio',
+      agency: 'Department of Veterans Affairs',
+      office: '36C250 250-NETWORK CONTRACT OFFICE 10 (36C250)',
+      keyword: 'IT help desk support',
+      description: 'IT help desk support for the VA medical center in Cleveland, Ohio',
+      naics: '541512',
+      place_of_performance_state: 'OH',
+    }).normalized;
+    const seen: string[] = [];
+    const s = await buildSection9(req, '541512', {
+      officeAwardLookup: async (q) => {
+        seen.push(q.officeCode);
+        return {
+          ok: true,
+          asOf: '2026-07-23',
+          retrievedAt: '2026-10-07T00:00:00.000Z',
+          query: { awarding_office_code: q.officeCode },
+          rows: [
+            { piid: '36C25020P0593', recipientName: 'MEDIALINK', recipientUei: 'X', awardAmount: 265_593, description: 'MEDIALINK TELEHEALTH FOR THE CLEVELAND VAMC', startDate: '2020-01-01', endDate: '2021-01-01', awardingAgency: 'Department of Veterans Affairs', awardingSubAgency: 'Department of Veterans Affairs', awardingOffice: '36C250', awardingOfficeCode: '36C250', naicsCode: '541512', pscCode: 'DA01', popState: 'OH', popCity: 'Cleveland', awardType: 'PURCHASE ORDER', awardId: 'CONT_AWD_36C25020P0593', asOf: '2026-07-23' },
+            { piid: '36C25099P0001', recipientName: 'HELPCO', recipientUei: 'Y', awardAmount: 100_000, description: 'IT HELP DESK SUPPORT SERVICES', startDate: '2024-01-01', endDate: '2025-01-01', awardingAgency: 'Department of Veterans Affairs', awardingSubAgency: 'Department of Veterans Affairs', awardingOffice: '36C250', awardingOfficeCode: '36C250', naicsCode: '541512', pscCode: 'DA01', popState: 'OH', popCity: 'Cleveland', awardType: 'PURCHASE ORDER', awardId: 'CONT_AWD_36C25099P0001', asOf: '2026-07-23' },
+          ],
+        };
+      },
+    });
+    expect(seen).toEqual(['36C250']);
+    expect(s.awards).toHaveLength(2);
+    const bases = s.awards.map((a) => a.relevance?.basis);
+    expect(bases).toEqual(['code', 'description']);
+    expect(s.awards[0].relevance?.label).toMatch(/does not mention the requirement/);
+  });
+});
