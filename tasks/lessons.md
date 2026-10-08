@@ -4,6 +4,28 @@ Rules and patterns to prevent repeated mistakes.
 
 ---
 
+## Saved-search alert status: report the search, then the named job (Oct 6, 2026)
+
+**Always report a customer's own search first and the job as "saved-search alerts", not a job-run status presented as "email delivery", because one failing search marks the whole run `error`.** A host told a customer "Mindy's email alerts are unreliable, last successful send Sept 29" while the same runs evaluated 118-134 searches and the provider accepted 46-48 alerts a day. Fixed in #1839 (`alert_status`, `job_status`), released with #1834/#1836/#1840.
+
+- **A run's status is not delivery evidence.** Read the provider ledger (`email_provider_sends`) and the run's evaluation stamps. Zero sends alone never decides the class: a clean run with no new matches is healthy.
+- **Classify failures with ONE definition.** `classifyObservation` (`src/lib/cron/watchdog-incidents.ts`) is used by both the watchdog and the status probe. Only `recipient_suppressed` is a non-outage action item; a failed suppression lookup is a processing error.
+- **Do not infer what is not recorded.** The cron stores no per-check outcome, so "baseline only" vs "no new match" is stated as unknown, never guessed from created/checked timestamps.
+- **Keep evidence types apart.** Filter support (public map API) is not verification of a customer's account; open and historical counts are reported separately; candidate code run against prod data is pre-release evidence, not proof production serves it. Never write "costs nothing" or "will alert" without evidence.
+- **A zero-match filter can be a representation bug.** `subAgency: "Marine Corps"` matched 0 rows ever because SAM files USMC under `sub_tier` "DEPT OF THE NAVY"; the authority is the Federal Hierarchy path (`agency_hierarchy`), not the solicitation "M" prefix (measured: 26 false hits, 24 misses).
+
+## Release mechanics: stacked PRs and approved heads (Oct 6, 2026)
+
+**Always merge stacked PRs with merge commits and re-ask approval when a head changes, because squash breaks the stack and an approval covers a commit, not a branch.**
+
+- Pin every merge: `gh pr merge N --merge --match-head-commit <sha>`.
+- After the base lands, a stacked PR can show CONFLICTING on GitHub while `git merge-tree` is clean (two merge bases, criss-cross). Merging main in fixes it but changes the head: prove the tree is identical (`git rev-parse <old>^{tree} <new>^{tree}`) and get re-approval.
+- Migrations with other pending files: `npm run migrate -- --go --only <file>`, check the runner checksum (sha256, first 16 hex) and that held files stay pending. Never a bare `--go`.
+- Production deploys from `main` via the Vercel Git integration; no separate `vercel --prod`.
+- To revert a mutation test, restore from a backup copy, never `git checkout -- <file>` (it discards uncommitted work).
+
+---
+
 ## Client proposals: claim only what the product delivers today (Sep 29, 2026)
 
 **Always verify a proposal's promises against the code and live data, not against the last proposal, because a sales document is a contract offer.** Found while writing a Mindy subscription proposal for a two-user client (full framework lives in the PRIVATE `ecoffie/govcon-proposals` repo, never here: this repo is public).

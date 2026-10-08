@@ -151,3 +151,18 @@ share a cause.
 - [ ] **Pooled Team credits (priority).** Spec: `tasks/PRD-pooled-team-credits.md` (PRD only). `mcp_credit_pool` has 0 rows in production; `payer.ts` resolves every caller to `personal`. Multi-user deals are currently delivered as plan + sponsored entitlement, which grants extra credits instead of splitting one allowance. Fund pools (PR 4B) so one payment can back a team, then offer Team as a standard SKU.
 - [ ] **Conference discovery.** `search_federal_events` with `include_ai_discovery` returned 0 association conferences (e.g. SAME SBC, DON Gold Coast). Decide whether to ingest major federal-industry conference calendars.
 - [ ] **Grants.gov integration** reported not working; removed from proposal copy until verified.
+
+---
+
+## Saved-search alerts — follow-ups after the 2026-10-06 release
+
+Released: #1840 `6001c4c3`, #1834 `c7429266`, #1836 `885e2d35`, #1839 `9bf4e422`; `ops_incidents` applied (checksum `4806ba030d52a4fb`). Evidence: `tasks/release-saved-search-alerts-2026-10-06.md`.
+
+- [x] Corrected failure classes live (runs Oct 6 + Oct 7: `invalid_saved_naics=2,recipient_suppressed=3`)
+- [x] Watchdog incident opened once (Oct 6 12:00Z), no repeats (14 later observations)
+- [x] First daily summary claimed and kept Oct 7 12:00Z (send succeeded per claim logic; Slack text not read)
+- [ ] **Decision (customer):** 2 saved searches store NAICS 541510 (not a real code) — recovery preview in #1834; no edit without approval
+- [ ] **Held:** 3 searches on the hard-bounced internal govconedu.com address stay suppressed
+- [ ] **Held:** Forecast watermark migration `20260924_saved_search_forecast_watermark.sql`
+- [ ] Not supported, disclosed: Marine Corps on Forecast/Awarded; 51 Navy notices with a truncated hierarchy path
+
