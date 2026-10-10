@@ -21,6 +21,8 @@ export {
   isUnsupportedAlertScope,
   savedSearchRequestsRecompetes,
   savedSearchWantsForecasts,
+  savedSearchWantsOpen,
+  alertableScope,
   unsupportedAlertScopeMessage,
 } from './alert-scope';
 export { normalizeAlertPreferences } from './alert-preferences';

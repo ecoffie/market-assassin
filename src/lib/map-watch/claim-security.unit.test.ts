@@ -33,7 +33,7 @@ describe('an unauthenticated caller cannot name an alert recipient', () => {
   });
 
   it('an anon id can never be treated as an account', () => {
-    expect(LIB).toMatch(/if \(isAnonId\(e\)\) return \{ ok: false[^}]*anon id is not an account/);
+    expect(LIB).toMatch(/if \(isAnonId\(e\)\) return fail\('anon id is not an account'\)/);
   });
 });
 

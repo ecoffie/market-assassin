@@ -27,14 +27,36 @@ export function savedSearchWantsForecasts(_mode: SavedSearchMode, filters: Saved
   return false;
 }
 
+function isOffFlag(value: unknown): boolean {
+  if (value === false || value === 0) return true;
+  if (typeof value !== 'string') return false;
+  return ['0', 'false', 'no'].includes(value.trim().toLowerCase());
+}
+
+/**
+ * Does this saved search want OPEN alerts? (F2, 2026-10-10)
+ *
+ * The cron used `mode === 'open'` alone, so a watch saved with the Open chip
+ * UNCHECKED (Forecast only) was emailed Open listings anyway — measured on prod:
+ * 9 such watches, 6 users, 8 of them already carrying sent Open ids. The saved
+ * horizon is the user's instruction. A search saved before horizons were
+ * captured has no `horizons` key and stays Open, which is what its owner saw.
+ */
+export function savedSearchWantsOpen(mode: SavedSearchMode, filters: SavedSearchFilters): boolean {
+  if (mode !== 'open') return false;
+  const h = filters?.horizons;
+  if (!h || typeof h !== 'object' || Array.isArray(h)) return true;
+  return !isOffFlag((h as Record<string, unknown>).open);
+}
+
 /**
  * Mirrors the saved-search-alerts cron dispatch gate:
- *   doOpen = mode === 'open'
+ *   doOpen = savedSearchWantsOpen(...)
  *   doForecast = wantsForecasts(...)
  *   if (!doOpen && !doForecast) continue  // silent skip today
  */
 export function cronWillDeliverAlerts(mode: SavedSearchMode, filters: SavedSearchFilters): boolean {
-  const doOpen = mode === 'open';
+  const doOpen = savedSearchWantsOpen(mode, filters);
   const doForecast = savedSearchWantsForecasts(mode, filters);
   return doOpen || doForecast;
 }
@@ -56,4 +78,29 @@ export function isProfileScopedFilters(filters: SavedSearchFilters): boolean {
   const scope = filters?.scope;
   if (typeof scope !== 'string') return false;
   return scope.trim().toLowerCase() === 'profile';
+}
+
+/**
+ * What an alert can actually deliver for a watch, with recompete removed (F3).
+ *
+ *   full    — no recompete requested; deliverable as stored.
+ *   partial — recompete requested alongside Open and/or Forecast; deliverable once
+ *             `horizons.recompete` is false (returned in `filters`).
+ *   none    — nothing emailable (recompete only, or the recompete dataset).
+ *
+ * Server mirror of the Map's window.__watchScopePlan. Never broadens: it only
+ * removes recompete, and never turns on a horizon the user did not select.
+ */
+export function alertableScope(
+  mode: SavedSearchMode,
+  filters: SavedSearchFilters,
+): { kind: 'full' | 'partial' | 'none'; filters: SavedSearchFilters | null } {
+  const f = (filters && typeof filters === 'object' && !Array.isArray(filters)) ? filters : {};
+  if (mode === 'recompete') return { kind: 'none', filters: null };
+  if (!savedSearchRequestsRecompetes(mode, f)) {
+    return cronWillDeliverAlerts(mode, f) ? { kind: 'full', filters: f } : { kind: 'none', filters: null };
+  }
+  const h = f.horizons as Record<string, unknown>;
+  const narrowed: SavedSearchFilters = { ...f, horizons: { ...h, recompete: false } };
+  return cronWillDeliverAlerts(mode, narrowed) ? { kind: 'partial', filters: narrowed } : { kind: 'none', filters: null };
 }

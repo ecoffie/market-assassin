@@ -43,6 +43,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { applyMapFilters, parseMapFilters } from '@/lib/opportunities/map-filters';
 import { sendEmail } from '@/lib/send-email';
+import { savedSearchWantsOpen } from '@/lib/saved-searches/alert-scope';
+import type { SavedSearchMode } from '@/lib/saved-searches/constants';
 import { claimSend, releaseClaim, saveEvaluation } from '@/lib/saved-searches/send-claim';
 import { buildEmail } from '@/lib/alerts/saved-search-email';
 import { applyForecastFilters } from '@/lib/opportunities/map-data';
@@ -242,7 +244,8 @@ async function evaluateSavedSearch(
 ): Promise<SavedSearchAlertEvalCounts> {
   if (!isSavedSearchDueAt(s.alert_frequency, now)) return { skippedNotDue: 1 };
 
-  const doOpen = s.mode === 'open';
+  // F2: the saved Open horizon is the user's instruction — a Forecast-only watch gets no Open email.
+  const doOpen = savedSearchWantsOpen(s.mode as SavedSearchMode, (s.filters || {}) as Record<string, unknown>);
   // A filter forecasts cannot represent (Marine Corps) withholds the Forecast half instead of running it
   // with the filter silently dropped — that would email every agency's forecasts as this watch's market.
   const forecastLimited = wantsForecasts(s) && forecastFilterUnsupported(s);

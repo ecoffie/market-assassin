@@ -85,7 +85,16 @@ export async function POST(request: NextRequest) {
     }
     const r = await claimAnonWatch(db(), anonId, verifiedEmail);
     if (!r.ok) return NextResponse.json({ success: false, error: r.error }, { status: 400 });
-    return NextResponse.json({ success: true, claimed: r.claimed, alertsEnabled: r.claimed > 0 });
+    // alertsEnabled is now TRUE only when a claimed watch actually alerts (F3). The counts let the
+    // client say what was turned on and what cannot be emailed.
+    return NextResponse.json({
+      success: true,
+      claimed: r.claimed,
+      alertsEnabled: r.alertsOn > 0,
+      alertsOn: r.alertsOn,
+      notEmailable: r.notEmailable,
+      comingBackExcluded: r.comingBackExcluded,
+    });
   }
 
   const { owner, refusal } = resolveOwner(request, email, anonId);

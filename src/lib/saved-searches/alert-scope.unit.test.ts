@@ -4,6 +4,8 @@ import {
   isUnsupportedAlertScope,
   savedSearchRequestsRecompetes,
   savedSearchWantsForecasts,
+  savedSearchWantsOpen,
+  alertableScope,
 } from './alert-scope';
 
 describe('alert-scope (cron parity)', () => {
@@ -38,5 +40,37 @@ describe('alert-scope (cron parity)', () => {
     expect(isUnsupportedAlertScope('open', { horizons: { recompete: 'true' } })).toBe(true);
     expect(isUnsupportedAlertScope('open', { horizons: { recompete: '1' } })).toBe(true);
     expect(isUnsupportedAlertScope('open', { horizons: { recompete: false } })).toBe(false);
+  });
+});
+
+describe('F2 — the saved Open horizon is honoured', () => {
+  it('Open unchecked → no Open alerts; pre-horizon searches stay Open', () => {
+    expect(savedSearchWantsOpen('open', { horizons: { open: false, forecast: true } })).toBe(false);
+    expect(savedSearchWantsOpen('open', { horizons: { open: 'false', forecast: true } })).toBe(false);
+    expect(savedSearchWantsOpen('open', { horizons: { open: true } })).toBe(true);
+    expect(savedSearchWantsOpen('open', { naics: '541512' })).toBe(true);
+    expect(savedSearchWantsOpen('recompete', {})).toBe(false);
+  });
+  it('a watch with neither Open nor Forecast is not deliverable', () => {
+    expect(cronWillDeliverAlerts('open', { horizons: { open: false, recompete: false, forecast: false } })).toBe(false);
+    expect(cronWillDeliverAlerts('open', { horizons: { open: false, forecast: true } })).toBe(true);
+  });
+});
+
+describe('F3 — alertableScope only ever removes recompete', () => {
+  it('classifies full / partial / none', () => {
+    expect(alertableScope('open', { naics: '1', horizons: { open: true, forecast: false } }).kind).toBe('full');
+    expect(alertableScope('open', { naics: '1', horizons: { open: true, recompete: true } })).toEqual({
+      kind: 'partial', filters: { naics: '1', horizons: { open: true, recompete: false } },
+    });
+    expect(alertableScope('open', { horizons: { open: false, recompete: true, forecast: false } }).kind).toBe('none');
+    expect(alertableScope('recompete', { horizons: { forecast: true } }).kind).toBe('none');
+  });
+  it('every non-none result passes the service rule', () => {
+    for (const h of [{ open: true, recompete: true, forecast: true }, { open: false, recompete: true, forecast: true }, { open: true }]) {
+      const p = alertableScope('open', { horizons: h });
+      expect(isUnsupportedAlertScope('open', p.filters!)).toBe(false);
+      expect(cronWillDeliverAlerts('open', p.filters!)).toBe(true);
+    }
   });
 });
