@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parseIndexFile, formatSolicitationNumber, formatNsn,
   parseReturnByDate, indexFileName, isBusinessDay, recentIndexFiles,
+  isPublicationDay, classifyArchiveResponse,
 } from './direct';
 
 // A REAL line captured from in260731.txt (2026-08-02). Every field below is
@@ -49,10 +50,54 @@ describe('DIBBS direct parser', () => {
     expect(isBusinessDay(new Date('2026-07-31T12:00:00Z'))).toBe(true);  // Friday
   });
 
-  it('emits no files for an all-weekend window, and skips weekends otherwise', () => {
-    // Sunday, looking back 2 days = Sat+Sun -> nothing published
-    expect(recentIndexFiles(2, new Date('2026-08-02T12:00:00Z'))).toEqual([]);
-    // Sunday, looking back 3 days reaches Friday
-    expect(recentIndexFiles(3, new Date('2026-08-02T12:00:00Z'))).toEqual(['in260731.txt']);
+  it('requests SUNDAY files and skips only Saturday (DLA publishes Sun–Fri)', () => {
+    // Verified 2026-10-10: in261004.txt (Sunday) = 1,416 rows; in261003.txt (Saturday)
+    // redirects to FileNotFound.aspx. The old Mon–Fri rule skipped every Sunday file.
+    expect(isPublicationDay(new Date('2026-10-04T12:00:00Z'))).toBe(true);  // Sunday
+    expect(isPublicationDay(new Date('2026-10-03T12:00:00Z'))).toBe(false); // Saturday
+    expect(isPublicationDay(new Date('2026-10-02T12:00:00Z'))).toBe(true);  // Friday
+    // Sunday, looking back 2 days = Sun + Sat -> only Sunday's file
+    expect(recentIndexFiles(2, new Date('2026-08-02T12:00:00Z'))).toEqual(['in260802.txt']);
+    // Monday, looking back 3 days = Mon + Sun + Sat
+    expect(recentIndexFiles(3, new Date('2026-10-05T12:00:00Z'))).toEqual(['in261005.txt', 'in261004.txt']);
+    // A Saturday-only window is the one genuinely empty case
+    expect(recentIndexFiles(1, new Date('2026-10-03T12:00:00Z'))).toEqual([]);
+  });
+
+  it('dashes letter-suffixed serials exactly like the actor (no more twin rows)', () => {
+    // Real ids from in261006/in261007; the actor stored these dashed. The digits-only pattern
+    // left them raw, so one RFQ became two dibbs_rfqs rows.
+    expect(formatSolicitationNumber('SPE7MC26T252L')).toBe('SPE7MC-26-T-252L');
+    expect(formatSolicitationNumber('SPE2DS26T213Q')).toBe('SPE2DS-26-T-213Q');
+    expect(formatSolicitationNumber('SPE4A526T449G')).toBe('SPE4A5-26-T-449G');
+    expect(formatSolicitationNumber('SPE2DP26T4251')).toBe('SPE2DP-26-T-4251'); // unchanged
+    const line = 'SPE7MC26T252L' + REAL.slice(13);
+    expect(parseIndexFile(line)[0].solicitationNumber).toBe('SPE7MC-26-T-252L');
+  });
+});
+
+describe('archive response classification — missing is not blocked', () => {
+  const ARCH = 'https://dibbs2.bsm.dla.mil/Downloads/RFQ/Archive/in261007.txt';
+  it('a real file is data', () => {
+    expect(classifyArchiveResponse({ status: 200, contentType: 'text/plain; charset=ISO-8859-1', finalUrl: ARCH, text: REAL })).toBe('data');
+  });
+  it('the FileNotFound redirect is MISSING (Saturday, not-yet-posted, bogus date)', () => {
+    // Measured 2026-10-10: 302 -> /FileNotFound.aspx, 200 text/html, 4,900 B.
+    expect(classifyArchiveResponse({
+      status: 200, contentType: 'text/html; charset=utf-8',
+      finalUrl: 'https://dibbs2.bsm.dla.mil/FileNotFound.aspx', text: '\r<!DOCTYPE html PUBLIC',
+    })).toBe('missing');
+    expect(classifyArchiveResponse({ status: 404, contentType: 'text/html', finalUrl: ARCH, text: '' })).toBe('missing');
+  });
+  it('the consent page (or any other HTML) on the file URL is BLOCKED', () => {
+    expect(classifyArchiveResponse({
+      status: 200, contentType: 'text/html; charset=utf-8', finalUrl: ARCH,
+      text: '<!DOCTYPE html><title>Department of Defense (DoD) Warning and Consent ~ DIBBS</title>',
+    })).toBe('blocked');
+    // HTML served with a misleading content-type is still HTML
+    expect(classifyArchiveResponse({ status: 200, contentType: 'text/plain', finalUrl: ARCH, text: '  <html><body>Request Rejected' })).toBe('blocked');
+  });
+  it('other statuses are errors, not "no data"', () => {
+    expect(classifyArchiveResponse({ status: 500, contentType: 'text/html', finalUrl: ARCH, text: 'x' })).toBe('error');
   });
 });

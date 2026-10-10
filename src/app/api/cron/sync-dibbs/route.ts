@@ -24,7 +24,9 @@ import { reportCronOutcome } from '@/lib/cron-self-report';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 120;
+// 300 (was 120): with DIBBS_PROXY_MODE=primary a bad day can run proxy, a second proxy
+// session, direct, then the actor in sequence. A normal proxy run is ~10 s.
+export const maxDuration = 300;
 
 export async function GET(request: NextRequest) {
   // AUTH FIRST — this route SPENDS REAL MONEY on every call (~$36 per 2500-item
@@ -70,6 +72,35 @@ export async function GET(request: NextRequest) {
     // ~$35.85). Only reach for this when the direct path is genuinely blocked; the
     // guard exists because a handful of wide pulls ate a $300 monthly cap.
     const forceApify = request.nextUrl.searchParams.get('forceApify') === '1';
+
+    // DRY RUN — fetch, parse, classify and report; write NOTHING. No dibbs_rfqs upsert, no
+    // cron_job_runs outcome, no ops alert. This is how the proxy path is verified from a
+    // Vercel preview before the flag is ever turned on. Only here may a caller override the
+    // flag (`proxyMode`), run a single leg (`only=proxy|direct|apify`), or opt into the paid
+    // actor (`allowApify=1` — a dry run must not bill $35 by accident).
+    const sp = request.nextUrl.searchParams;
+    const dryRun = sp.get('dryRun') === '1';
+    if (dryRun) {
+      const pm = sp.get('proxyMode');
+      const only = sp.get('only');
+      const result = await ingestDibbs(supabase, {
+        maxItems,
+        daysBack,
+        forceApify,
+        dryRun: true,
+        allowApify: sp.get('allowApify') === '1',
+        ...(pm === 'primary' || pm === 'off' ? { proxyMode: pm } : {}),
+        ...(only === 'proxy' || only === 'direct' || only === 'apify' ? { only } : {}),
+      });
+      // The fetched rows are not returned (they can be 3,000+); ids only on request, so a
+      // preview run can be diffed against the actor's dataset for the same source date.
+      const { dryRunIds, ...summary } = result;
+      return NextResponse.json({
+        success: true, dryRun: true, wrote: false, ...summary,
+        ...(sp.get('includeIds') === '1' ? { ids: dryRunIds ?? [] } : {}),
+      });
+    }
+
     const result = await ingestDibbs(supabase, { maxItems, daysBack, forceApify });
     // Two silent-failure modes this surfaces, because BOTH previously returned success:true
     // and looked identical to a healthy run in the cron_jobs row:
@@ -91,7 +122,10 @@ export async function GET(request: NextRequest) {
     //    Never diagnose starved from this route alone; the account is the authoritative source.
     //
     // Either way: do NOT retry or burst. Retrying deepens a WAF block AND burns more budget.
-    const truncated = result.fetched >= maxItems;
+    // Only the ACTOR truncates (its 2,500 cap is a per-row billing ceiling). The browser
+    // paths read whole daily files — 3,157 rows on 2026-10-07 — so `fetched >= maxItems` would
+    // flag a COMPLETE file as truncated. Judge truncation by the actor's own attempt.
+    const truncated = (result.attempts ?? []).some((a) => a.path === 'apify' && a.records >= maxItems);
 
     // NO-DATA WINDOW ≠ STARVED. DLA publishes ONE index file per BUSINESS day, so a
     // window covering only weekend/holiday dates legitimately has nothing to fetch:
@@ -133,7 +167,10 @@ export async function GET(request: NextRequest) {
     // applies when EVERY day in the lookback is Sat/Sun. Verified against the real
     // Aug 6-9 spend-cap outage: Aug 8 (Sat) had Friday in its window and Aug 6-7 were
     // weekdays, so all three still alarm. Only the two Sundays go quiet.
-    const noDataWindow = result.fetched <= 1 && noBusinessDayInWindow;
+    // Proxy chain only: every file in the window came back as DLA's FileNotFound redirect —
+    // CONFIRMED absent (holiday, or not posted yet), not refused. That is a no-data window
+    // whatever the weekday. Never set on the flag-OFF path, so its behaviour is unchanged.
+    const noDataWindow = result.fetched <= 1 && (noBusinessDayInWindow || result.noDataConfirmed === true);
     const starved = result.fetched <= 1 && !noDataWindow;
     if (truncated) console.warn(`[sync-dibbs] TRUNCATED at maxItems=${maxItems} — more current RFQs exist; the daily run will accumulate the rest via dedupe.`);
 
@@ -217,7 +254,9 @@ export async function GET(request: NextRequest) {
     // last calendar run. `lastSyncAgeHours` below carries that so the caller cannot mistake a
     // weekend for health.
     if (noDataWindow) {
-      console.log(`[sync-dibbs] NO-DATA WINDOW: last ${daysBack} day(s) are all weekend — DLA publishes one index file per business day, so ${result.fetched} record(s) is expected.`);
+      console.log(result.noDataConfirmed && !noBusinessDayInWindow
+        ? `[sync-dibbs] NO-DATA WINDOW: every file in the window was CONFIRMED missing (DLA FileNotFound) — holiday or not yet posted, not a refusal.`
+        : `[sync-dibbs] NO-DATA WINDOW: last ${daysBack} day(s) are all weekend — DLA publishes one index file per business day, so ${result.fetched} record(s) is expected.`);
       await reportCronOutcome('sync-dibbs', 'success');
       // How stale is the CORPUS, independent of whether today's run was expected to find
       // anything. A weekend pass with a 4-day-old corpus is not health.
@@ -235,7 +274,9 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
         success: true, ...result, truncated, starved: false, noDataWindow: true, lastSyncAgeHours,
-        message: `DIBBS: no business days in the last ${daysBack} day(s) — DLA publishes per business day, so ${result.fetched} record(s) is expected (not starved).`,
+        message: result.noDataConfirmed && !noBusinessDayInWindow
+          ? `DIBBS: every file in the window was confirmed missing at DLA (FileNotFound) — no data published yet, not starved.`
+          : `DIBBS: no business days in the last ${daysBack} day(s) — DLA publishes per business day, so ${result.fetched} record(s) is expected (not starved).`,
       });
     }
 
