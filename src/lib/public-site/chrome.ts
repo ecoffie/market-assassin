@@ -17,6 +17,8 @@ export const MP_HEADER_PRODUCT_LINKS: readonly MpChromeLink[] = [
 
 export const MP_HEADER_ACCOUNT_LINKS: readonly MpChromeLink[] = [
   { href: '/bid', label: 'Bid with confidence' },
+  // Mindy Learn. Second, not first: at <=1000px the first account link is hidden (css.ts).
+  { href: '/learn', label: 'Learn' },
   { href: '/pricing', label: 'Pricing' },
 ];
 

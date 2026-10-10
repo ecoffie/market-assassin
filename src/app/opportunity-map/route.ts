@@ -1537,6 +1537,9 @@ const ZHEAD_HTML = '<header class="zhead">'
   // floating button, not two competing entries. window.openAskMindy is defined by ASK_MINDY_JS.
   // "Bid with confidence" moved to the RIGHT of the Mindy logo (Eric 2026-08-01), out of the left nav.
   + '<a href="/bid">Bid with confidence</a>'
+  // Mindy Learn (2026-10-10). SECOND, not first: at <=1000px `.zh-right a:first-child` is hidden, and Learn
+  // must stay visible at every width the desktop cluster shows.
+  + '<a href="/learn">Learn</a>'
   + '<a href="/pricing">Pricing</a>'
   // "My Pursuits" moved to the LEFT primary nav as "Pursuits" (the two-map + board split,
   // 2026-07-30) — dropped here to avoid the duplicate. Still reachable in the account menu.
@@ -1574,6 +1577,8 @@ const MOBILE_HTML = ''
   +   '<a href="/opportunity-map/favorites"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg>Saved</a>'
   +   '<a href="/opportunity-map/pursuits"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>Pursuits</a>'
   +   '<div class="md-sep"></div>'
+  // Mindy Learn (2026-10-10) — the mobile entry point to the GovCon Action Plan tutorials.
+  +   '<a href="/learn"><svg viewBox="0 0 24 24"><path d="M2 7l10-4 10 4-10 4z"/><path d="M6 9v5c0 1.7 2.7 3 6 3s6-1.3 6-3V9"/><path d="M22 7v6"/></svg>Learn</a>'
   +   '<a href="/pricing"><svg viewBox="0 0 24 24"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Pricing</a>'
   +   '<a href="/bid"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Bid with confidence</a>'
   + '</nav>';

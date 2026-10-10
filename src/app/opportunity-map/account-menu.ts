@@ -101,6 +101,8 @@ export function accountMenuHtml(identity?: { email?: string | null; name?: strin
   // map now owns. Icon matches the shield every rail uses, so one destination has ONE identity
   // (it was a padlock here and a shield in the rails — same page, two symbols).
   + '<a href="/opportunity-map/vault" role="menuitem"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.4-3 8.5-7 10-4-1.5-7-5.6-7-10V6z"/><path d="M9.2 12.2l1.9 1.9 3.7-3.9"/></svg>Company Vault</a>'
+  // Mindy Learn (2026-10-10): the GovCon Action Plan tutorials. Public page; signed-in progress comes later.
+  + '<a href="/learn" role="menuitem"><svg viewBox="0 0 24 24"><path d="M2 7l10-4 10 4-10 4z"/><path d="M6 9v5c0 1.7 2.7 3 6 3s6-1.3 6-3V9"/><path d="M22 7v6"/></svg>Your Action Plan</a>'
   + '<div class="sep"></div>'
   // Settings opens the map-native essentials drawer (window.openSettingsDrawer) — no page leave —
   // and falls back to /app only where the drawer isn't present (favorites/saved don't inject it).

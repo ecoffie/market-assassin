@@ -109,6 +109,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   <a href="${MAPS_HOME_PATH}" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
   <nav class="zh-right">
     <a href="/bid">Bid with confidence</a>
+    <a href="/learn">Learn</a>
     <a href="/pricing">Pricing</a>
     ${ACCOUNT_MENU_HTML}
   </nav>
