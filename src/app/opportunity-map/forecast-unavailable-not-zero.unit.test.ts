@@ -108,7 +108,7 @@ describe('wiring — no null-to-zero coercion left on the horizon path', () => {
   it('the empty feed says "coverage unavailable", not "No opportunities match" (source + served)', () => {
     for (const src of [tmpl, served]) {
       expect(src).toContain('window.__coverageAllUnavailable');
-      expect(src).toContain('Forecast coverage unavailable');
+      expect(src).toContain('Coming Soon coverage unavailable');
     }
     const draw = extractFn(tmpl, 'drawFeed');
     expect(draw.indexOf('window.__coverageAllUnavailable')).toBeLessThan(draw.indexOf('No opportunities match'));
