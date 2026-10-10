@@ -8,6 +8,15 @@
  *
  * Auth: shared secret. Accepts Authorization: Bearer <CRON_SECRET> OR
  * ?password=<ADMIN_PASSWORD>. Without it → 401.
+ *
+ * Response contract — the caller must read `status`, never infer a send from the
+ * HTTP code alone (this used to answer 200 `{ ok: false }` for a blocked send):
+ *   200 { ok: true,  status: 'accepted', provider, providerMessageId }  a provider accepted it
+ *   422 { ok: false, status: 'blocked', reason }                         guard stopped it; nothing sent
+ *   502 { ok: false, status: 'failed', error }                           both providers failed; nothing sent
+ *   500 { ok: false, status: 'unconfirmed' }                             outcome unknown
+ * Acceptance is not delivery. Each request sends at most one email, and there is no
+ * idempotency store, so a caller must NOT retry a request whose outcome it didn't see.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { sendMindyLaunchConfirmationEmail } from '@/lib/mindy/launch-confirmation-email';
@@ -39,18 +48,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'email is required' }, { status: 400 });
   }
 
+  let outcome;
   try {
-    const ok = await sendMindyLaunchConfirmationEmail({
+    outcome = await sendMindyLaunchConfirmationEmail({
       to: email,
       name: body.name?.trim() || '',
       getsZoom: body.getsZoom,
     });
-    return NextResponse.json({ ok });
   } catch (err) {
     console.error('[mindy-launch/send-confirmation] failed:', err);
     return NextResponse.json(
-      { ok: false, error: err instanceof Error ? err.message : 'send failed' },
-      { status: 500 },
+      { ok: false, status: 'failed', error: err instanceof Error ? err.message : 'send failed' },
+      { status: 502 },
     );
   }
+  if (outcome.status === 'accepted') {
+    return NextResponse.json({ ok: true, ...outcome });
+  }
+  if (outcome.status === 'blocked') {
+    console.error('[mindy-launch/send-confirmation] blocked:', outcome.reason);
+    return NextResponse.json({ ok: false, ...outcome }, { status: 422 });
+  }
+  console.error('[mindy-launch/send-confirmation] provider accepted but did not report which one');
+  return NextResponse.json({ ok: false, status: 'unconfirmed' }, { status: 500 });
 }

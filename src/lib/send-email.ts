@@ -59,6 +59,14 @@ interface SendEmailParams {
    * database error) read it here; `false` alone cannot distinguish them.
    */
   onBlocked?: (reason: string) => void;
+  /**
+   * Called once a provider has ACCEPTED the message (the only case sendEmail returns true),
+   * with which provider took it and its message id when the provider gives one (Resend does;
+   * Office365 SMTP returns its own Message-ID). Acceptance is not delivery — bounces arrive
+   * later through the Resend webhook. Callers that must report what actually happened read it
+   * here; `true` alone cannot say which provider, or prove which message.
+   */
+  onSent?: (info: { provider: 'resend' | 'office365'; providerMessageId: string | null }) => void;
 }
 
 // Transactional emailTypes that ALWAYS bypass the cap/suppression — an EXPLICIT
@@ -280,6 +288,7 @@ export async function sendEmail({
   metadata,
   transactional,
   onBlocked,
+  onSent,
 }: SendEmailParams): Promise<boolean> {
   // GLOBAL SEND GUARD (#58) — suppression + per-recipient daily cap, across every
   // stream, BEFORE we touch any provider. Transactional bypasses.
@@ -344,6 +353,7 @@ export async function sendEmail({
       });
 
       console.log(`[SendEmail] ✅ Sent via Resend to ${to}: ${subject}`);
+      try { onSent?.({ provider: 'resend', providerMessageId: data?.id ?? null }); } catch { /* reporting must never turn a send into a throw */ }
       return true;
     } catch (resendError: unknown) {
       const message = resendError instanceof Error ? resendError.message : String(resendError);
@@ -353,7 +363,7 @@ export async function sendEmail({
 
   // Fallback to Office365 SMTP
   try {
-    await transporter.sendMail({
+    const smtpInfo = await transporter.sendMail({
       from: fromAddress,
       to,
       replyTo: replyToAddress,
@@ -374,6 +384,7 @@ export async function sendEmail({
     });
 
     console.log(`[SendEmail] ✅ Sent via Office365 to ${to}: ${subject}`);
+    try { onSent?.({ provider: 'office365', providerMessageId: smtpInfo?.messageId ?? null }); } catch { /* reporting must never turn a send into a throw */ }
     return true;
   } catch (error) {
     console.error(`[SendEmail] ❌ Both providers failed for ${to}:`, error);

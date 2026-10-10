@@ -23,11 +23,22 @@ import { MINDY_DAY } from '@/lib/mindy/mindy-day';
  *
  * Facts verified from govcongiants.com/mindy-launch.
  */
+/**
+ * What happened to one confirmation. `accepted` means a provider took the message
+ * (Resend or Office365) — not that it was delivered. `blocked` means the send guard
+ * stopped it before any provider call, so nothing was sent. A provider failure is
+ * not a return value: sendEmail throws when both providers fail.
+ */
+export type MindyLaunchConfirmationOutcome =
+  | { status: 'accepted'; provider: 'resend' | 'office365'; providerMessageId: string | null }
+  | { status: 'blocked'; reason: string }
+  | { status: 'unconfirmed' }; // sendEmail returned true without reporting a provider — should not happen
+
 export async function sendMindyLaunchConfirmationEmail(params: {
   to: string;
   name: string;
   getsZoom?: boolean;
-}): Promise<boolean> {
+}): Promise<MindyLaunchConfirmationOutcome> {
   const firstName = (params.name || '').split(' ')[0] || 'there';
   const eventUrl = 'https://govcongiants.com/mindy-launch';
 
@@ -252,7 +263,12 @@ export async function sendMindyLaunchConfirmationEmail(params: {
 
   const subject = `${firstName}, you're registered — Mindy Launch, Sat ${MINDY_DAY.shortDate} (10 AM ET)`;
 
-  return sendEmail({
+  // Callbacks fire inside sendEmail; a holder object keeps TypeScript from narrowing to null.
+  const report: {
+    sent?: { provider: 'resend' | 'office365'; providerMessageId: string | null };
+    blockedReason?: string;
+  } = {};
+  const ok = await sendEmail({
     to: params.to,
     subject,
     html,
@@ -261,5 +277,9 @@ export async function sendMindyLaunchConfirmationEmail(params: {
     eventSource: 'mindy_launch',
     transactional: true, // confirmation in direct response to signup — always deliver
     tags: { stream: 'mindy_launch' },
+    onSent: (info) => { report.sent = info; },
+    onBlocked: (reason) => { report.blockedReason = reason; },
   });
+  if (ok) return report.sent ? { status: 'accepted', ...report.sent } : { status: 'unconfirmed' };
+  return { status: 'blocked', reason: report.blockedReason ?? 'blocked (no reason reported)' };
 }
