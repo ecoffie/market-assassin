@@ -27,7 +27,9 @@ import { MINDY_DAY } from '@/lib/mindy/mindy-day';
  * What happened to one confirmation. `accepted` means a provider took the message
  * (Resend or Office365) — not that it was delivered. `blocked` means the send guard
  * stopped it before any provider call, so nothing was sent. A provider failure is
- * not a return value: sendEmail throws when both providers fail.
+ * not a return value: sendEmail throws — EmailOutcomeUnknownError when a provider may
+ * have accepted it (no response, 5xx, dropped SMTP connection), a plain Error when every
+ * provider explicitly rejected it.
  */
 export type MindyLaunchConfirmationOutcome =
   | { status: 'accepted'; provider: 'resend' | 'office365'; providerMessageId: string | null }
@@ -277,6 +279,9 @@ export async function sendMindyLaunchConfirmationEmail(params: {
     eventSource: 'mindy_launch',
     transactional: true, // confirmation in direct response to signup — always deliver
     tags: { stream: 'mindy_launch' },
+    // One confirmation per request: never let an unknown Resend outcome fall back to
+    // Office365 (that could send a second copy). Unknown → EmailOutcomeUnknownError.
+    strictOutcome: true,
     onSent: (info) => { report.sent = info; },
     onBlocked: (reason) => { report.blockedReason = reason; },
   });

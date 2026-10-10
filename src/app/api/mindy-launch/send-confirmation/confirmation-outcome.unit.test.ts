@@ -10,9 +10,12 @@ import { NextRequest } from 'next/server';
  * from the HTTP code. These tests drive the real route, the real confirmation builder
  * and the real sendEmail with only the providers and database mocked. They pin:
  *   1. `accepted` only when a provider accepted the message, with provider + message id.
- *   2. A provider failure is 502 `failed`; a guard block is 422 `blocked`; neither sends.
- *   3. One request makes at most one successful provider send — no internal retry —
- *      so the endpoint can't be the source of a duplicate confirmation.
+ *   2. An EXPLICIT rejection by every provider is 502 `failed`; a guard block is 422
+ *      `blocked`. A provider outcome we can't see (no response, 5xx, dropped SMTP
+ *      connection) is 500 `unconfirmed` — never `failed`.
+ *   3. Within one request an unknown Resend outcome never falls back to Office365, so
+ *      one request makes at most one send attempt that could have succeeded. Nothing
+ *      here deduplicates ACROSS requests; that needs a durable store (follow-up).
  */
 
 const h = vi.hoisted(() => {
@@ -83,24 +86,61 @@ describe('send-confirmation reports provider acceptance, not just an HTTP code',
     expect(h.inserts.filter((i) => i.table === 'email_provider_sends')).toHaveLength(1);
   });
 
-  it('Resend rejects, Office365 accepts: 200 accepted via office365, exactly one accepted send', async () => {
-    h.resendSend.mockResolvedValue({ data: null, error: { message: 'domain not verified' } });
+  it('Resend explicitly rejects (4xx), Office365 accepts: 200 accepted via office365', async () => {
+    h.resendSend.mockResolvedValue({ data: null, error: { name: 'validation_error', statusCode: 403, message: 'domain not verified' } });
     const res = await POST(req(REGISTRANT));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, status: 'accepted', provider: 'office365', providerMessageId: '<smtp-1@o365>' });
     expect(h.smtpSend).toHaveBeenCalledOnce();
   });
 
-  it('both providers fail: 502 failed, never accepted', async () => {
-    h.resendSend.mockResolvedValue({ data: null, error: { message: 'rate limited' } });
-    h.smtpSend.mockRejectedValue(new Error('SMTP auth failed'));
+  it('both providers explicitly reject: 502 failed, never accepted', async () => {
+    h.resendSend.mockResolvedValue({ data: null, error: { name: 'rate_limit_exceeded', statusCode: 429, message: 'rate limited' } });
+    h.smtpSend.mockRejectedValue(Object.assign(new Error('Invalid login: 535 5.7.3 Authentication unsuccessful'), { code: 'EAUTH', responseCode: 535 }));
     const res = await POST(req(REGISTRANT));
     expect(res.status).toBe(502);
-    const body = await res.json();
-    expect(body).toMatchObject({ ok: false, status: 'failed', error: 'SMTP auth failed' });
+    expect(await res.json()).toMatchObject({ ok: false, status: 'failed' });
     expect(h.inserts.filter((i) => i.table === 'email_provider_sends')).toHaveLength(0);
   });
+});
 
+describe('an unknown provider outcome is unconfirmed, never failed, and never falls back', () => {
+  // The exact shape Resend SDK 6.x returns when fetch throws (network error, timeout,
+  // lost response): it never throws, so this is indistinguishable from "not sent"
+  // unless the status code is checked.
+  const NO_RESPONSE = { name: 'application_error', statusCode: null, message: 'Unable to fetch data. The request could not be resolved.' };
+
+  it('Resend gives no response: 500 unconfirmed, Office365 NOT tried (Resend may have accepted)', async () => {
+    h.resendSend.mockResolvedValue({ data: null, error: NO_RESPONSE });
+    const res = await POST(req(REGISTRANT));
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body).toMatchObject({ ok: false, status: 'unconfirmed' });
+    expect(body.error).toMatch(/^outcome unknown at resend: no response/);
+    expect(h.smtpSend).not.toHaveBeenCalled();
+  });
+
+  it('Resend 5xx: 500 unconfirmed, Office365 NOT tried', async () => {
+    h.resendSend.mockResolvedValue({ data: null, error: { name: 'application_error', statusCode: 500, message: 'Internal server error' } });
+    const res = await POST(req(REGISTRANT));
+    expect(res.status).toBe(500);
+    expect((await res.json()).status).toBe('unconfirmed');
+    expect(h.smtpSend).not.toHaveBeenCalled();
+  });
+
+  it('Resend rejects, then the Office365 connection drops with no SMTP reply: 500 unconfirmed', async () => {
+    h.resendSend.mockResolvedValue({ data: null, error: { name: 'validation_error', statusCode: 422, message: 'bad' } });
+    h.smtpSend.mockRejectedValue(Object.assign(new Error('Connection timeout'), { code: 'ETIMEDOUT' }));
+    const res = await POST(req(REGISTRANT));
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.status).toBe('unconfirmed');
+    expect(body.error).toMatch(/^outcome unknown at office365/);
+    expect(h.smtpSend).toHaveBeenCalledOnce();
+  });
+});
+
+describe('guard, auth and retry', () => {
   it('guard block: 422 blocked with the reason, zero provider calls', async () => {
     const res = await POST(req({ email: 'ws_123@clients.getmindy.ai', name: 'X' }));
     expect(res.status).toBe(422);
@@ -120,5 +160,16 @@ describe('send-confirmation reports provider acceptance, not just an HTTP code',
     const res = await POST(req(REGISTRANT));
     expect((await res.json()).providerMessageId).toBe('re_slow');
     expect(providerCalls()).toBe(1);
+  });
+});
+
+describe('other streams keep today\'s fallback (documented duplicate risk, unchanged here)', () => {
+  it('without strictOutcome, a no-response Resend result still falls back to Office365', async () => {
+    const { sendEmail } = await import('@/lib/send-email');
+    h.resendSend.mockResolvedValue({ data: null, error: { name: 'application_error', statusCode: null, message: 'Unable to fetch data.' } });
+    await expect(sendEmail({ to: 'jane@acme.co', subject: 's', html: '<p>x</p>', transactional: true })).resolves.toBe(true);
+    // Resend may have accepted the first copy: this is the duplicate exposure for every
+    // stream that has not opted in. Tracked as a follow-up, not fixed by this PR.
+    expect(h.smtpSend).toHaveBeenCalledOnce();
   });
 });

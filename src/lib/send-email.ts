@@ -67,6 +67,44 @@ interface SendEmailParams {
    * here; `true` alone cannot say which provider, or prove which message.
    */
   onSent?: (info: { provider: 'resend' | 'office365'; providerMessageId: string | null }) => void;
+  /**
+   * Opt-in for callers that must report exactly what happened (the Mindy Launch confirmation).
+   * Default false keeps today's behaviour for every other stream.
+   *
+   * When true: if Resend's outcome is UNKNOWN — no response (network error, timeout, lost
+   * response) or a 5xx — sendEmail does NOT fall back to Office365, because Resend may already
+   * have accepted the message and the fallback would send a second copy. It throws
+   * EmailOutcomeUnknownError instead. An explicit Resend rejection (4xx, e.g. validation or rate
+   * limit) still falls back: Resend definitely did not take it. An Office365 failure with no SMTP
+   * reply code is also unknown (the connection may have dropped after the server took it).
+   */
+  strictOutcome?: boolean;
+}
+
+/** Thrown only under `strictOutcome`: a provider may or may not have accepted the message. */
+export class EmailOutcomeUnknownError extends Error {
+  readonly provider: 'resend' | 'office365';
+  constructor(provider: 'resend' | 'office365', detail: string) {
+    super(`outcome unknown at ${provider}: ${detail}`);
+    this.name = 'EmailOutcomeUnknownError';
+    this.provider = provider;
+  }
+}
+
+/**
+ * Resend SDK (6.x) never throws: a network error, timeout or unreadable response comes back as
+ * `{ error: { statusCode: null } }`, the same shape as a rejection. Only a 4xx is an explicit
+ * "not accepted". No status (no response) or a 5xx cannot rule out acceptance.
+ */
+export function resendErrorIsExplicitRejection(error: { statusCode?: number | null } | null | undefined): boolean {
+  const code = error?.statusCode;
+  return typeof code === 'number' && code >= 400 && code < 500;
+}
+
+/** nodemailer sets `responseCode` when the SMTP server replied with an error. No reply → unknown. */
+function smtpErrorIsExplicitRejection(error: unknown): boolean {
+  const code = (error as { responseCode?: unknown } | null)?.responseCode;
+  return typeof code === 'number' && code >= 400;
 }
 
 // Transactional emailTypes that ALWAYS bypass the cap/suppression — an EXPLICIT
@@ -289,6 +327,7 @@ export async function sendEmail({
   transactional,
   onBlocked,
   onSent,
+  strictOutcome,
 }: SendEmailParams): Promise<boolean> {
   // GLOBAL SEND GUARD (#58) — suppression + per-recipient daily cap, across every
   // stream, BEFORE we touch any provider. Transactional bypasses.
@@ -337,6 +376,10 @@ export async function sendEmail({
 
       if (error) {
         console.error(`[SendEmail] Resend error for ${to}:`, error);
+        if (strictOutcome && !resendErrorIsExplicitRejection(error as { statusCode?: number | null })) {
+          // Resend may have accepted it; an Office365 fallback could send a second copy.
+          throw new EmailOutcomeUnknownError('resend', `${(error as { statusCode?: number | null }).statusCode ?? 'no response'}: ${error.message}`);
+        }
         throw new Error(error.message);
       }
 
@@ -357,6 +400,10 @@ export async function sendEmail({
       return true;
     } catch (resendError: unknown) {
       const message = resendError instanceof Error ? resendError.message : String(resendError);
+      if (resendError instanceof EmailOutcomeUnknownError) {
+        console.error(`[SendEmail] Resend outcome unknown for ${to}; NOT falling back (could duplicate):`, message);
+        throw resendError;
+      }
       console.error(`[SendEmail] Resend failed, trying Office365 fallback:`, message);
     }
   }
@@ -388,6 +435,9 @@ export async function sendEmail({
     return true;
   } catch (error) {
     console.error(`[SendEmail] ❌ Both providers failed for ${to}:`, error);
+    if (strictOutcome && !smtpErrorIsExplicitRejection(error)) {
+      throw new EmailOutcomeUnknownError('office365', error instanceof Error ? error.message : String(error));
+    }
     throw error;
   }
 }
