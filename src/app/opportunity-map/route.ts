@@ -19,6 +19,7 @@ import { SETTINGS_DRAWER_CSS, SETTINGS_DRAWER_HTML, SETTINGS_DRAWER_JS } from '.
 import { MARKET_FEEDBACK_CSS, MARKET_BOOT_HTML, MARKET_BOOT_APP_OPEN, MARKET_FEEDBACK_MAP_HTML, MARKET_FEEDBACK_JS } from './market-feedback';
 import { LAYOUT_MOVE_JS } from './layout-move';
 import { HIERARCHY_HORIZON_LIMIT_JS } from '@/lib/opportunities/hierarchy-sub-agency';
+import { WATCH_SCOPE_JS } from '@/lib/saved-searches/watch-scope-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -1628,6 +1629,8 @@ const MOBILE_JS = '<script>(function(){'
 // <script>, loaded before VIEWPORT_JS (which calls it), so no template interpolation sits inside
 // the statically syntax-checked viewport script.
 const PLAYERS_COPY_JS = '<script>window.__playersHeaderText=' + PLAYERS_HEADER_TEXT_JS + ';</script>';
+// What a signed-in Save search can watch (F1). Defined before VIEWPORT_JS, whose handler calls it.
+const WATCH_SCOPE_SCRIPT = '<script>' + WATCH_SCOPE_JS + '</script>';
 const VIEWPORT_JS = `<script>
 (function(){
   var SETMAP={SDVOSB:'SDVOSB',SB:'SB','8A':'8(a)',WOSB:'WOSB',HZ:'HUBZone',OTHER:'Other',NONE:'None'};
@@ -5236,8 +5239,28 @@ const VIEWPORT_JS = `<script>
         }).catch(function(){ _ssMsg('Couldn\\'t save'); });
       return;
     }
+    // ── F1: WATCH ONLY WHAT CAN BE EMAILED, AND SAY SO ───────────────────────
+    // The map boots with Recompetes on, and saved-search alerts cannot email
+    // recompetes (the service answers unsupported_alert_scope). Every signed-in
+    // save from the DEFAULT map used to end in "Couldn't save". The server rule
+    // stays; this narrows the SAVED payload to the emailable horizons, only after
+    // telling the user, and never touches the map's own horizon toggles.
+    var _plan=window.__watchScopePlan?window.__watchScopePlan(MODE,window.__horizons||{}):null;
+    if(_plan&&_plan.kind==='none'){
+      try{ if(window.__track) window.__track('tool_use','watch_scope_blocked',{mode:MODE}); }catch(e){}
+      _ss.textContent='Recompetes aren\\u2019t emailed';
+      _ss.title='Email alerts cover Open and Forecast listings. Turn one on to save a watch, or open a recompete and use \\u201cTrack this recompete\\u201d.';
+      setTimeout(_ssReset,4200);
+      return;
+    }
+    if(_plan&&_plan.kind==='partial'){
+      var _keep=[]; if(_plan.horizons.open)_keep.push('Open'); if(_plan.horizons.forecast)_keep.push('Forecasts');
+      if(!confirm('Email alerts cover Open and Forecast listings. Recompetes are not emailed \\u2014 to follow one, open it and use \\u201cTrack this recompete\\u201d.\\n\\nSave a watch for '+_keep.join(' + ')+'? Your map stays as it is.')){ return; }
+      try{ if(window.__track) window.__track('tool_use','watch_scope_narrowed',{mode:MODE,keep:_keep.join('+')}); }catch(e){}
+    }
+    var _watchLabel=(_plan&&_plan.horizons)?(function(hz){ var on=[]; if(hz.open)on.push('Open'); if(hz.forecast)on.push('Forecasts'); return on.join(' + ')||'Open'; })(_plan.horizons):_ssScopeLabel();
     var name=window.prompt('Name this saved search (you\\'ll get alerts on new matches):',
-      (FILT.setAside||FILT.naics||Q||'My opportunities')+' — '+_ssScopeLabel());
+      (FILT.setAside||FILT.naics||Q||'My opportunities')+' — '+_watchLabel);
     if(!name)return;
     // Snapshot the active filters (skip empties + scope=all) + the current viewport.
     var filters={}; for(var k in FILT){ if(FILT[k]&&FILT[k]!=='all')filters[k]=FILT[k]; }
@@ -5247,6 +5270,8 @@ const VIEWPORT_JS = `<script>
     // agency_forecasts — and forecasts are the one corpus with no other push channel
     // (14,389 of them have no coordinate and never appear on the map at all).
     try{ var _h=window.__horizons||{}; filters.horizons={open:_h.open!==false,recompete:!!_h.recompete,forecast:!!_h.forecast}; }catch(e){}
+    // The disclosed narrowing above: the saved watch carries only emailable horizons.
+    if(_plan&&_plan.horizons)filters.horizons=_plan.horizons;
     var b=null; try{ var mb2=map.getBounds(); b={w:mb2.getWest(),s:mb2.getSouth(),e:mb2.getEast(),n:mb2.getNorth()}; }catch(e){}
     _ss.textContent='Saving…';
     fetch('/api/app/saved-searches',{method:'POST',
@@ -5265,6 +5290,8 @@ const VIEWPORT_JS = `<script>
           // (No backticks in here: this block lives inside a TS template literal.)
           try{ if(window.__track) window.__track('tool_use','watch_created',{anonymous:false,mode:MODE}); }catch(e){}
           _ss.textContent='✓ Saved — alerts on'; setTimeout(function(){ if(confirm('Saved! We\\'ll email you when new opportunities match. View your saved searches?'))location.href='/opportunity-map/saved'; else _ssReset(); },400); }
+        // Never a bare "Couldn't save" for a scope the server refused on purpose.
+        else if(d&&d.code==='unsupported_alert_scope'){ _ss.textContent='Recompetes aren\\u2019t emailed'; setTimeout(_ssReset,4200); }
         else _ssMsg('Couldn\\'t save');
       }).catch(function(){ _ssMsg('Couldn\\'t save'); });
   };
@@ -11134,7 +11161,7 @@ export async function GET(request: NextRequest) {
     // LOGIN_MODAL_HTML has a latent unclosed <div>, so blocks parsed after it can nest inside a
     // hidden overlay. Its own HTML is div-balanced; the JS goes at the end with the other scripts.
     // MARKET_FEEDBACK_JS precedes VIEWPORT_JS so window.__mf exists before the first fetch round reports to it.
-    const bodyInject = MOBILE_HTML + SETTINGS_DRAWER_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + SETTINGS_DRAWER_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
+    const bodyInject = MOBILE_HTML + SETTINGS_DRAWER_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + WATCH_SCOPE_SCRIPT + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + SETTINGS_DRAWER_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Code→name for the State picker (50 states + DC). Already a shared constant — the Filters

@@ -172,7 +172,8 @@ export async function POST(request: NextRequest) {
       created.code === 'unsupported_alert_scope' ||
       created.code === 'profile_scope_unavailable'
     ) {
-      return NextResponse.json({ success: false, error: created.message }, { status: 400 });
+      // `code` is additive: lets a client explain a deliberate refusal instead of "Couldn't save".
+      return NextResponse.json({ success: false, error: created.message, code: created.code }, { status: 400 });
     }
     return NextResponse.json({ success: false, error: created.message }, { status: 500 });
   }
