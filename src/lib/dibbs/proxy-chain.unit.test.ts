@@ -188,7 +188,7 @@ describe('dry-run — no production writes, no accidental actor bill', () => {
     const sb = supabaseSpy();
     const { ingestDibbs } = await import('./ingest');
     const r = await ingestDibbs(sb.client, { maxItems: 2500, daysBack: 2, dryRun: true });
-    expect(sb.from).not.toHaveBeenCalled();
+    expect(sb.upsert).not.toHaveBeenCalled(); // dry-run may READ (legacy-key lookup), never write
     expect(actor).not.toHaveBeenCalled();
     expect(r.attempts.at(-1)).toMatchObject({ path: 'apify', outcome: 'skipped' });
     expect(r.upserted).toBe(0);
@@ -202,7 +202,7 @@ describe('dry-run — no production writes, no accidental actor bill', () => {
     const sb = supabaseSpy();
     const { ingestDibbs } = await import('./ingest');
     const r = await ingestDibbs(sb.client, { maxItems: 2500, daysBack: 2, dryRun: true });
-    expect(sb.from).not.toHaveBeenCalled();
+    expect(sb.upsert).not.toHaveBeenCalled(); // dry-run may READ (legacy-key lookup), never write
     expect(actor).not.toHaveBeenCalled();
     expect(r.attempts.some((a) => a.path === 'apify' && a.outcome === 'skipped')).toBe(true);
   });
@@ -217,7 +217,7 @@ describe('dry-run — no production writes, no accidental actor bill', () => {
     expect(actor).toHaveBeenCalledTimes(1);
     expect(r.source).toBe('apify');
     expect(r.dryRunIds).toHaveLength(5);
-    expect(sb.from).not.toHaveBeenCalled();
+    expect(sb.upsert).not.toHaveBeenCalled(); // dry-run may READ (legacy-key lookup), never write
   });
 });
 
@@ -276,5 +276,43 @@ describe('proxy credentials are never exposed', () => {
     const { apifyProxyUsername } = await import('./apify-proxy');
     expect(apifyProxyUsername('dibbs20261010a')).toBe('groups-RESIDENTIAL,country-US,session-dibbs20261010a');
     expect(apifyProxyUsername('bad id!/x')).toBe('groups-RESIDENTIAL,country-US,session-badidx');
+  });
+});
+
+describe('no NEW twin rows from the id fix', () => {
+  function fakeDb(existing: string[], opts: { failLookup?: boolean } = {}) {
+    const written: string[][] = [];
+    const client = {
+      from: () => ({
+        select: () => ({
+          in: async (_c: string, list: string[]) => (opts.failLookup
+            ? { data: null, error: { message: 'boom' } }
+            : { data: list.filter((x) => existing.includes(x)).map((solicitation_number) => ({ solicitation_number })), error: null }),
+        }),
+        upsert: async (rows: Array<{ solicitation_number: string }>) => { written.push(rows.map((r) => r.solicitation_number)); return { error: null }; },
+      }),
+    } as never;
+    return { client, written };
+  }
+
+  it('writes onto the legacy undashed key when that is the only stored row', async () => {
+    const { upsertDibbsRfqs } = await import('./ingest');
+    // Preview dry run, 2026-10-10: 47 of 7,252 ids were stored ONLY undashed.
+    const db = fakeDb(['SPE4A526T482J', 'SPE7MC-26-T-252L', 'SPE7MC26T252L']);
+    await upsertDibbsRfqs(db.client, [
+      { solicitationNumber: 'SPE4A5-26-T-482J' },  // legacy-only  -> adopt legacy key
+      { solicitationNumber: 'SPE7MC-26-T-252L' },  // dashed exists -> keep canonical
+      { solicitationNumber: 'SPE2DS-26-T-213Q' },  // brand new     -> canonical
+      { solicitationNumber: 'SPE2DP-26-T-4251' },  // digit serial  -> never had a twin
+    ]);
+    expect(db.written[0].sort()).toEqual(['SPE2DP-26-T-4251', 'SPE2DS-26-T-213Q', 'SPE4A526T482J', 'SPE7MC-26-T-252L'].sort());
+  });
+
+  it('a failed lookup never blocks ingestion — canonical ids are written', async () => {
+    const { upsertDibbsRfqs } = await import('./ingest');
+    const db = fakeDb([], { failLookup: true });
+    const r = await upsertDibbsRfqs(db.client, [{ solicitationNumber: 'SPE4A5-26-T-482J' }]);
+    expect(r.upserted).toBe(1);
+    expect(db.written[0]).toEqual(['SPE4A5-26-T-482J']);
   });
 });
