@@ -5188,11 +5188,15 @@ const VIEWPORT_JS = `<script>
       var h={}; try{ h=window.__horizons||{}; }catch(e){}
       var rec=(MODE==='recompete')||!!h.recompete;
       var open=(MODE!=='recompete')&&h.open!==false, fc=(MODE!=='recompete')&&!!h.forecast;
-      var on=[]; if(open)on.push('Open'); if(fc)on.push('Forecast');
-      return {horizons:{open:open,recompete:false,forecast:fc},label:on.join(' + '),droppedRecompete:rec,ok:on.length>0};
+      // The LABEL is what the cron will actually email, not the toggles: it sends Open for every
+      // mode='open' search (doOpen ignores horizons.open), so a Forecast-only save still gets Open.
+      // Stored horizons stay as toggled; the copy must not promise less than will arrive.
+      var label=fc?'Open + Forecast':'Open';
+      return {horizons:{open:open,recompete:false,forecast:fc},label:label,droppedRecompete:rec,openForced:!open&&fc,ok:open||fc};
     }
     var _ssNoAlertMsg='Recompete (coming back) is not available as an email alert yet. Turn on Open or Forecast to save this search with alerts.';
     var _ssRecNote='Recompete (coming back) is not included in email alerts.';
+    var _ssOpenNote='Open opportunities are always included in map alerts.';
     var em=_uemail();
     // ── ANONYMOUS VISITORS KEEP THE MARKET, NO ACCOUNT REQUIRED ──────────────
     // Measured over 30 days: 8,583 people used this map and only 329 were signed
@@ -5245,7 +5249,7 @@ const VIEWPORT_JS = `<script>
     }
     var plan=_ssAlertPlan();
     if(!plan.ok){ alert(_ssNoAlertMsg); return; }
-    var name=window.prompt('Name this saved search. Email alerts will include: '+plan.label+'.'+(plan.droppedRecompete?' '+_ssRecNote:''),
+    var name=window.prompt('Name this saved search. Email alerts will include: '+plan.label+'.'+(plan.openForced?' '+_ssOpenNote:'')+(plan.droppedRecompete?' '+_ssRecNote:''),
       (FILT.setAside||FILT.naics||Q||'My opportunities')+' — '+plan.label);
     if(!name)return;
     // Snapshot the active filters (skip empties + scope=all) + the current viewport.

@@ -133,7 +133,7 @@ describe('Save search from the Map — horizons the alert can deliver', () => {
   it.each<[string, Horizons, Horizons, string]>([
     ['Open only', { open: true, recompete: false, forecast: false }, { open: true, recompete: false, forecast: false }, 'Open'],
     ['Open + Forecast', { open: true, recompete: false, forecast: true }, { open: true, recompete: false, forecast: true }, 'Open + Forecast'],
-    ['Forecast only', { open: false, recompete: false, forecast: true }, { open: false, recompete: false, forecast: true }, 'Forecast'],
+
     ['no horizon state (pre-horizon map)', undefined as unknown as Horizons, { open: true, recompete: false, forecast: false }, 'Open'],
   ])('supported set %s saves exactly as toggled, with no Recompete note', async (_n, on, want, label) => {
     const run = await clickSave({ horizons: on });
@@ -143,6 +143,15 @@ describe('Save search from the Map — horizons the alert can deliver', () => {
     expect(run.prompts[0]).not.toContain('Recompete');
     const { res } = await serverAccepts(sent);
     expect(res.ok).toBe(true);
+  });
+
+  it('Forecast only is stored as toggled, but the copy names Open too — the cron emails Open for every map search', async () => {
+    const run = await clickSave({ horizons: { open: false, recompete: false, forecast: true } });
+    expect((run.posts[0].body.filters as Record<string, unknown>).horizons).toEqual({ open: false, recompete: false, forecast: true });
+    expect(run.prompts[0]).toContain('Email alerts will include: Open + Forecast.');
+    expect(run.prompts[0]).toContain('Open opportunities are always included in map alerts.');
+    expect(run.prompts[0]).not.toContain('Recompete');
+    expect((await serverAccepts(run.posts[0].body)).res.ok).toBe(true);
   });
 
   it('Open + Recompete saves Open only and says so', async () => {
