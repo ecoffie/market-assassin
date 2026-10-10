@@ -88,7 +88,7 @@ describe('flag ON — proxy → direct → actor, per file', () => {
     expect(r.source).toBe('proxy');
     expect(r.fetched).toBe(20);
     expect(d.fetchDibbsDirectReport).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(d.fetchDibbsDirectReport).mock.calls[0][0]).toMatchObject({ proxy: { sessionId: expect.stringMatching(/a$/) } });
+    expect(vi.mocked(d.fetchDibbsDirectReport).mock.calls[0][0]).toMatchObject({ proxy: { sessionId: expect.stringMatching(/^dibbs\d{8}a[a-z0-9]+$/) } });
     expect(actor).not.toHaveBeenCalled();
     expect(r.estimatedCostUsd).toBe(0);
     expect(r.files?.every((f) => f.via === 'proxy' && f.outcome === 'data')).toBe(true);
@@ -106,7 +106,9 @@ describe('flag ON — proxy → direct → actor, per file', () => {
     const r = await ingestDibbs(supabaseSpy().client, { maxItems: 2500, daysBack: 2 });
 
     const calls = vi.mocked(d.fetchDibbsDirectReport).mock.calls.map((c) => c[0]);
-    expect(calls[1]).toMatchObject({ files: ['in261007.txt'], proxy: { sessionId: expect.stringMatching(/b$/) } });
+    expect(calls[1]).toMatchObject({ files: ['in261007.txt'], proxy: { sessionId: expect.stringMatching(/^dibbs\d{8}b[a-z0-9]+$/) } });
+    // the retry must NOT reuse the first session (Apify pins a session to one exit IP)
+    expect(calls[1]!.proxy!.sessionId).not.toBe(calls[0]!.proxy!.sessionId);
     expect(calls[2]).toEqual({ files: ['in261007.txt'] }); // direct = no proxy option
     expect(actor).not.toHaveBeenCalled();
     expect(r.attempts.map((a) => `${a.path}:${a.outcome}`)).toEqual(['proxy:rows', 'proxy:empty', 'direct:rows']);
@@ -270,6 +272,17 @@ describe('proxy credentials are never exposed', () => {
       const src = readFileSync(join(process.cwd(), 'src/lib/dibbs', file), 'utf8');
       expect(src).not.toMatch(/console\.\w+\([^)]*[pP]assword/);
     }
+  });
+
+  it('two runs on the same day never share a proxy session', async () => {
+    process.env.DIBBS_PROXY_MODE = 'primary';
+    const d = await import('./direct');
+    vi.mocked(d.fetchDibbsDirectReport).mockResolvedValue(report('proxy', { 'in261008.txt': 'data', 'in261007.txt': 'data' }) as never);
+    const { ingestDibbs } = await import('./ingest');
+    await ingestDibbs(supabaseSpy().client, { daysBack: 2 });
+    await ingestDibbs(supabaseSpy().client, { daysBack: 2 });
+    const ids = vi.mocked(d.fetchDibbsDirectReport).mock.calls.map((c) => c[0]!.proxy!.sessionId);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('builds a residential US username with a sanitized session', async () => {
