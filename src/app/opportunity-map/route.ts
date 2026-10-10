@@ -5177,19 +5177,22 @@ const VIEWPORT_JS = `<script>
   window.__ssMsg=_ssMsg; window.__ssReset=_ssReset;
   if(_ss)_ss.onclick=function(){
     var t=null; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){}
-    // What this search WATCHES, for the default name — "Open", "Forecasts", or
-    // "Open + Forecasts". The old label hard-coded Open/Recompetes and so lied about a
-    // forecast search the moment horizons existed.
-    function _ssScopeLabel(){
-      try{
-        if(MODE==='recompete')return 'Recompetes';
-        var h=window.__horizons||{}; var on=[];
-        if(h.open!==false)on.push('Open');
-        if(h.recompete)on.push('Recompetes');
-        if(h.forecast)on.push('Forecasts');
-        return on.length?on.join(' + '):'Open';
-      }catch(e){ return 'Open'; }
+    // What this search can EMAIL. The alert cron delivers Open (open now) and Forecast (coming
+    // soon) only; Recompete (coming back) has no alert corpus, and the shared saved-search
+    // service refuses it (400 unsupported_alert_scope) rather than substitute. The default map
+    // turns all three horizons ON, so sending the raw toggles made EVERY default signed-in save
+    // fail from 2026-08-30 (#1400) on — 34 such saves in the month before, 0 after. The plan
+    // sends only the emailable horizons and SAYS that Recompete is left out; it never adds a
+    // horizon the reader did not have on. Nothing alertable on (Recompete only) → no save.
+    function _ssAlertPlan(){
+      var h={}; try{ h=window.__horizons||{}; }catch(e){}
+      var rec=(MODE==='recompete')||!!h.recompete;
+      var open=(MODE!=='recompete')&&h.open!==false, fc=(MODE!=='recompete')&&!!h.forecast;
+      var on=[]; if(open)on.push('Open'); if(fc)on.push('Forecast');
+      return {horizons:{open:open,recompete:false,forecast:fc},label:on.join(' + '),droppedRecompete:rec,ok:on.length>0};
     }
+    var _ssNoAlertMsg='Recompete (coming back) is not available as an email alert yet. Turn on Open or Forecast to save this search with alerts.';
+    var _ssRecNote='Recompete (coming back) is not included in email alerts.';
     var em=_uemail();
     // ── ANONYMOUS VISITORS KEEP THE MARKET, NO ACCOUNT REQUIRED ──────────────
     // Measured over 30 days: 8,583 people used this map and only 329 were signed
@@ -5227,7 +5230,11 @@ const VIEWPORT_JS = `<script>
             // this is an offer, not a wall.
             setTimeout(function(){
               if(!window.requireSignIn){ _ssReset(); return; }
-              if(!confirm('Watching this market. Get alerted when new opportunities match? (sign-in required so we email the right person)')){ _ssReset(); return; }
+              // Say WHICH horizons an alert would email. With nothing emailable on (Recompete only)
+              // there is no alert to offer — the watch is kept, nothing is promised.
+              var _ap=_ssAlertPlan();
+              if(!_ap.ok){ _ssReset(); return; }
+              if(!confirm('Watching this market. Get email alerts for new '+_ap.label+' matches? (sign-in required so we email the right person)'+(_ap.droppedRecompete?'\\n\\n'+_ssRecNote:''))){ _ssReset(); return; }
               var _a=window.requireSignIn('get alerts for this market', function(){ window.__claimAnonWatches&&window.__claimAnonWatches(); });
               if(!_a){ _ssReset(); return; }
               window.__claimAnonWatches&&window.__claimAnonWatches();
@@ -5236,8 +5243,10 @@ const VIEWPORT_JS = `<script>
         }).catch(function(){ _ssMsg('Couldn\\'t save'); });
       return;
     }
-    var name=window.prompt('Name this saved search (you\\'ll get alerts on new matches):',
-      (FILT.setAside||FILT.naics||Q||'My opportunities')+' — '+_ssScopeLabel());
+    var plan=_ssAlertPlan();
+    if(!plan.ok){ alert(_ssNoAlertMsg); return; }
+    var name=window.prompt('Name this saved search. Email alerts will include: '+plan.label+'.'+(plan.droppedRecompete?' '+_ssRecNote:''),
+      (FILT.setAside||FILT.naics||Q||'My opportunities')+' — '+plan.label);
     if(!name)return;
     // Snapshot the active filters (skip empties + scope=all) + the current viewport.
     var filters={}; for(var k in FILT){ if(FILT[k]&&FILT[k]!=='all')filters[k]=FILT[k]; }
@@ -5246,7 +5255,8 @@ const VIEWPORT_JS = `<script>
     // search that recorded only "open", so the alert cron could never know to diff
     // agency_forecasts — and forecasts are the one corpus with no other push channel
     // (14,389 of them have no coordinate and never appear on the map at all).
-    try{ var _h=window.__horizons||{}; filters.horizons={open:_h.open!==false,recompete:!!_h.recompete,forecast:!!_h.forecast}; }catch(e){}
+    // Only the EMAILABLE horizons (see _ssAlertPlan) — recompete is always false here.
+    filters.horizons=plan.horizons;
     var b=null; try{ var mb2=map.getBounds(); b={w:mb2.getWest(),s:mb2.getSouth(),e:mb2.getEast(),n:mb2.getNorth()}; }catch(e){}
     _ss.textContent='Saving…';
     fetch('/api/app/saved-searches',{method:'POST',
@@ -5264,8 +5274,8 @@ const VIEWPORT_JS = `<script>
           // distinguishable without needing two tokens.
           // (No backticks in here: this block lives inside a TS template literal.)
           try{ if(window.__track) window.__track('tool_use','watch_created',{anonymous:false,mode:MODE}); }catch(e){}
-          _ss.textContent='✓ Saved — alerts on'; setTimeout(function(){ if(confirm('Saved! We\\'ll email you when new opportunities match. View your saved searches?'))location.href='/opportunity-map/saved'; else _ssReset(); },400); }
-        else _ssMsg('Couldn\\'t save');
+          _ss.textContent='✓ Saved — alerts on'; setTimeout(function(){ if(confirm('Saved! We\\'ll email you new '+plan.label+' matches.'+(plan.droppedRecompete?' '+_ssRecNote:'')+' View your saved searches?'))location.href='/opportunity-map/saved'; else _ssReset(); },400); }
+        else { _ssMsg('Couldn\\'t save'); if(d&&d.error){ try{ alert('Couldn\\'t save this search: '+d.error); }catch(e){} } }
       }).catch(function(){ _ssMsg('Couldn\\'t save'); });
   };
 
