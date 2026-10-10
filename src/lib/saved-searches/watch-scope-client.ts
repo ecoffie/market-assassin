@@ -35,4 +35,22 @@ export const WATCH_SCOPE_JS = `
     return {kind:comingBack?'partial':'full',comingBack:comingBack,
             horizons:{open:open,recompete:false,forecast:forecast}};
   };
+  // A FAILED save, in words the reader can act on — never a bare "Couldn't save". status = HTTP status
+  // (0 = no response at all), d = the JSON body ({error, code}; null when the body was not JSON).
+  // Returns {short} for the button and {detail} for the dialog. Every known service code is mapped.
+  window.__saveSearchError=function(status,d){
+    d=(d&&typeof d==='object')?d:{};
+    var code=(typeof d.code==='string')?d.code:'', msg=(typeof d.error==='string')?d.error:'';
+    if(status===0)return {short:'No connection',detail:'Couldn\u2019t reach Mindy, so nothing was saved. Check your connection and try again.'};
+    if(status===401||status===403)return {short:'Sign in again',detail:'Your sign-in has expired, so nothing was saved. Sign in again, then click Save search.'};
+    if(code==='unsupported_alert_scope')return {short:'Recompetes aren\u2019t emailed',detail:'Email alerts cover Open and Forecast listings. Recompetes are not emailed \u2014 turn on Open or Forecast to save a watch, or open a recompete and use \u201cTrack this recompete\u201d.'};
+    if(code==='no_deliverable_horizon')return {short:'Turn on Open or Forecast',detail:'Nothing selected on this map can be emailed. Turn on Open or Forecast, then save again. Recompetes are not emailed.'};
+    if(code==='profile_scope_unavailable')return {short:'Add NAICS to your profile',detail:'This search follows your profile\u2019s market, but your Mindy profile has no NAICS codes yet. Add at least one in Settings, then save again.'};
+    if(code==='invalid_filters')return {short:'A filter can\u2019t be saved',detail:'One of the filters on this map can\u2019t be saved'+(msg?': '+msg:'.')+' Adjust it, then save again.'};
+    if(code==='invalid_mode')return {short:'Switch to Opportunities',detail:'Save search works on the Opportunities map. Switch back to Opportunities, then save.'};
+    if(code==='invalid_frequency')return {short:'Pick daily or weekly',detail:'Alerts can be daily or weekly. Choose one, then save again.'};
+    if(code==='invalid_name'||(status===400&&/name.*required/i.test(msg)))return {short:'Name the search',detail:'Give this search a name, then save again.'};
+    if(code==='scheduler_unavailable'||status===503)return {short:'Try again shortly',detail:'Saved searches are temporarily unavailable, so nothing was saved. Try again in a few minutes.'};
+    return {short:'Couldn\u2019t save',detail:'Nothing was saved'+(msg?': '+msg:'.')+' Try again, or email support@getmindy.ai if it keeps happening.'};
+  };
 `;

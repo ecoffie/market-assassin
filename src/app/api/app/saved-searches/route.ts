@@ -163,19 +163,20 @@ export async function POST(request: NextRequest) {
 
   if (!created.ok) {
     if (created.code === 'scheduler_unavailable') {
-      return NextResponse.json({ success: false, error: created.message }, { status: 503 });
+      return NextResponse.json({ success: false, error: created.message, code: created.code }, { status: 503 });
     }
     if (
       created.code === 'invalid_filters' ||
       created.code === 'invalid_mode' ||
       created.code === 'invalid_frequency' ||
       created.code === 'unsupported_alert_scope' ||
+      created.code === 'no_deliverable_horizon' ||
       created.code === 'profile_scope_unavailable'
     ) {
       // `code` is additive: lets a client explain a deliberate refusal instead of "Couldn't save".
       return NextResponse.json({ success: false, error: created.message, code: created.code }, { status: 400 });
     }
-    return NextResponse.json({ success: false, error: created.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: created.message, code: created.code }, { status: 500 });
   }
 
   return NextResponse.json({

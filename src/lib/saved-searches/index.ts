@@ -19,6 +19,7 @@ export {
   cronWillDeliverAlerts,
   isProfileScopedFilters,
   isUnsupportedAlertScope,
+  noDeliverableHorizonMessage,
   savedSearchRequestsRecompetes,
   savedSearchWantsForecasts,
   savedSearchWantsOpen,

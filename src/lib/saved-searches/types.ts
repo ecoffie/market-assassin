@@ -55,6 +55,7 @@ export type SavedSearchServiceErrorCode =
   | 'not_found'
   | 'confirmation_required'
   | 'unsupported_alert_scope'
+  | 'no_deliverable_horizon'
   | 'profile_scope_unavailable'
   | 'scheduler_unavailable';
 
