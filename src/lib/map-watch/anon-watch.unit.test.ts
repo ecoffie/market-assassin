@@ -96,25 +96,56 @@ describe('an anonymous watch can NEVER email anyone', () => {
   });
 });
 
+type WRow = { id: string; user_email: string; mode: string; filters: Record<string, unknown>; alerts_enabled: boolean };
+/** A saved_searches fake honouring select/update + eq/in, with exact counts — like PostgREST. */
+function claimDb(rows: WRow[], opts: { nullCount?: boolean; failFilterUpdate?: boolean } = {}) {
+  const writes: Array<{ payload: Record<string, unknown>; ids: string[] }> = [];
+  const db = {
+    from: () => {
+      const conds: Array<[string, string, unknown]> = [];
+      let payload: Record<string, unknown> | null = null;
+      const match = (r: WRow) => conds.every(([op, k, v]) =>
+        op === 'eq' ? (r as unknown as Record<string, unknown>)[k] === v : (v as string[]).includes((r as unknown as Record<string, string>)[k]));
+      const q: Record<string, unknown> = {
+        select: () => q,
+        update: (p: Record<string, unknown>) => { payload = p; return q; },
+        eq: (k: string, v: unknown) => { conds.push(['eq', k, v]); return q; },
+        in: (k: string, v: unknown[]) => { conds.push(['in', k, v]); return q; },
+        then: (res: (v: unknown) => unknown) => {
+          const hit = rows.filter(match);
+          if (!payload) return Promise.resolve({ data: hit.map((r) => ({ ...r })), error: null }).then(res);
+          if (opts.failFilterUpdate && 'filters' in payload) return Promise.resolve({ error: { message: 'boom' }, count: null }).then(res);
+          for (const r of hit) Object.assign(r, payload);
+          writes.push({ payload, ids: hit.map((r) => r.id) });
+          return Promise.resolve({ error: null, count: opts.nullCount ? null : hit.length }).then(res);
+        },
+      };
+      return q;
+    },
+  };
+  return { db: db as never, writes };
+}
+const w = (id: string, mode: string, horizons?: Record<string, unknown>): WRow =>
+  ({ id, user_email: ANON, mode, filters: { naics: '541512', state: 'VA', ...(horizons ? { horizons } : {}) }, alerts_enabled: false });
+
 describe('claiming is the only way alerts turn on', () => {
-  it('attaches the email and enables alerts, scoped to that anon id', async () => {
-    const { db, captured } = mockDb();
+  it('attaches the verified email and enables alerts on an emailable watch, scoped to that anon id', async () => {
+    const rows = [w('a', 'open', { open: true, recompete: false, forecast: true }), { ...w('x', 'open'), user_email: 'anon:someone-else' }];
+    const { db } = claimDb(rows);
     const r = await claimAnonWatch(db, ANON, 'Buyer@Example.com');
-    expect(r.ok).toBe(true);
-    expect(captured.update!.user_email).toBe('buyer@example.com');
-    expect(captured.update!.alerts_enabled).toBe(true);
-    // scoped — one visitor cannot claim another's watch
-    expect(captured.eq).toEqual(['user_email', ANON]);
+    expect(r).toMatchObject({ ok: true, claimed: 1, alertsOn: 1, notEmailable: 0, comingBackExcluded: 0 });
+    expect(rows[0]).toMatchObject({ user_email: 'buyer@example.com', alerts_enabled: true });
+    expect(rows[0].filters).toEqual({ naics: '541512', state: 'VA', horizons: { open: true, recompete: false, forecast: true } });
+    // one visitor cannot claim another's watch
+    expect(rows[1].user_email).toBe('anon:someone-else');
   });
 
   it('refuses a malformed anon id', async () => {
-    const { db } = mockDb();
-    expect((await claimAnonWatch(db, 'nope', 'a@b.com')).ok).toBe(false);
+    expect((await claimAnonWatch(claimDb([]).db, 'nope', 'a@b.com')).ok).toBe(false);
   });
 
   it('refuses a non-email', async () => {
-    const { db } = mockDb();
-    expect((await claimAnonWatch(db, ANON, 'not-an-email')).ok).toBe(false);
+    expect((await claimAnonWatch(claimDb([]).db, ANON, 'not-an-email')).ok).toBe(false);
   });
 
   it('uses an EXACT count, never the capped RETURNING payload (INT-005)', async () => {
@@ -124,14 +155,53 @@ describe('claiming is the only way alerts turn on', () => {
   });
 
   it('a NULL count is UNKNOWN, never reported as zero claimed', async () => {
-    const q: Record<string, unknown> = {};
-    q.update = () => q; q.eq = () => q;
-    q.then = (res: (v: unknown) => unknown) =>
-      Promise.resolve({ data: null, count: null, error: null }).then(res);
-    const db = { from: () => q } as never;
+    const { db } = claimDb([w('a', 'open')], { nullCount: true });
     const r = await claimAnonWatch(db, ANON, 'a@b.com');
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/UNKNOWN, not zero/i);
+  });
+});
+
+// F3 (2026-10-10): claiming turned alerts on for EVERY anon watch, including scopes the alert cron cannot
+// deliver. Prod: 46 pending anon watches carry Recompete; one claimed watch (2026-10-04) alerts with it.
+describe('F3 — claiming never activates an unsupported alert scope', () => {
+  it('a watch kept with Recompetes on alerts for Open/Forecast only; every other filter is preserved', async () => {
+    const rows = [w('a', 'open', { open: true, recompete: true, forecast: true })];
+    const { db } = claimDb(rows);
+    const r = await claimAnonWatch(db, ANON, 'a@b.com');
+    expect(r).toMatchObject({ ok: true, claimed: 1, alertsOn: 1, comingBackExcluded: 1, notEmailable: 0 });
+    expect(rows[0].alerts_enabled).toBe(true);
+    expect(rows[0].filters).toEqual({ naics: '541512', state: 'VA', horizons: { open: true, recompete: false, forecast: true } });
+  });
+
+  it('a Recompete-only watch is claimed with alerts OFF and its filters untouched', async () => {
+    const rows = [w('a', 'open', { open: false, recompete: true, forecast: false }), w('b', 'recompete')];
+    const before = JSON.parse(JSON.stringify(rows.map((r) => r.filters)));
+    const { db } = claimDb(rows);
+    const r = await claimAnonWatch(db, ANON, 'a@b.com');
+    expect(r).toMatchObject({ ok: true, claimed: 2, alertsOn: 0, notEmailable: 2, comingBackExcluded: 0 });
+    expect(rows.map((x) => x.alerts_enabled)).toEqual([false, false]);
+    expect(rows.map((x) => x.user_email)).toEqual(['a@b.com', 'a@b.com']);
+    expect(rows.map((x) => x.filters)).toEqual(before);
+  });
+
+  it('never turns on a horizon the user did not choose (no broadening)', async () => {
+    const rows = [w('a', 'open', { open: false, recompete: true, forecast: true })];
+    await claimAnonWatch(claimDb(rows).db, ANON, 'a@b.com');
+    expect(rows[0].filters.horizons).toEqual({ open: false, recompete: false, forecast: true });
+  });
+
+  it('a failed narrowing turns NOTHING on', async () => {
+    const rows = [w('a', 'open', { open: true, recompete: true, forecast: false })];
+    const r = await claimAnonWatch(claimDb(rows, { failFilterUpdate: true }).db, ANON, 'a@b.com');
+    expect(r.ok).toBe(false);
+    expect(rows[0]).toMatchObject({ user_email: ANON, alerts_enabled: false });
+  });
+
+  it('a mixed browser: each watch gets the truthful state', async () => {
+    const rows = [w('a', 'open'), w('b', 'open', { open: true, recompete: true, forecast: false }), w('c', 'recompete')];
+    const r = await claimAnonWatch(claimDb(rows).db, ANON, 'a@b.com');
+    expect(r).toMatchObject({ ok: true, claimed: 3, alertsOn: 2, notEmailable: 1, comingBackExcluded: 1 });
   });
 });
 

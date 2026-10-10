@@ -174,3 +174,73 @@ describe('the server rule is not relaxed', () => {
     expect(isUnsupportedAlertScope('recompete', {})).toBe(true);
   });
 });
+
+// F3 (2026-10-10): the signed-OUT save kept Recompetes and then offered "Get alerted?" with no word that
+// recompetes are never emailed. The disclosure must come BEFORE sign-in turns alerts on.
+function runAnon(horizons: Horizons, confirmAnswer = true) {
+  const confirms: string[] = [];
+  const signIns: string[] = [];
+  const win: Record<string, unknown> = {
+    __horizons: { ...horizons },
+    requireSignIn: (why: string) => { signIns.push(why); return false; },
+  };
+  new Function('window', WATCH_SCOPE_JS)(win);
+  const btn: { textContent: string; innerHTML: string; title: string; onclick: null | (() => void) } =
+    { textContent: 'Save search', innerHTML: '', title: '', onclick: null };
+  const later: Array<() => void> = [];
+  const deps = {
+    window: win,
+    localStorage: { getItem: () => null },
+    _uemail: () => '',
+    _anonId: () => 'anon:57b9d751-9451-40c8-9f3e-2b1c4d5e6f70',
+    _track: () => {},
+    _ss: btn,
+    _ssReset: () => { btn.textContent = 'Save search'; },
+    _ssMsg: (t: string) => { btn.textContent = t; },
+    FILT: { naics: '541512' },
+    Q: '',
+    MODE: 'open',
+    map: { getBounds: () => ({ getWest: () => -80, getSouth: () => 36, getEast: () => -75, getNorth: () => 39 }) },
+    confirm: (m: string) => { confirms.push(m); return confirmAnswer; },
+    prompt: () => null,
+    fetch: () => Promise.resolve({ json: () => Promise.resolve({ success: true, name: 'n' }) }),
+    location: { href: '' },
+    setTimeout: (fn: () => void) => { later.push(fn); return 0; },
+  };
+  const names = Object.keys(deps);
+  new Function(...names, handlerSource())(...names.map((n) => deps[n as keyof typeof deps]));
+  btn.onclick!();
+  // Run ONE level of timers (the offer), not the follow-up reset scheduled from inside it.
+  const flush = async () => { await new Promise((r) => setImmediate(r)); later.splice(0).forEach((fn) => fn()); };
+  return { confirms, signIns, btn, flush };
+}
+
+describe('F3 — signed-out watch: disclosure before alerts', () => {
+  it('Recompetes on: the alert offer names Open + Forecasts and says Recompetes are not emailed', async () => {
+    const r = runAnon({ open: true, recompete: true, forecast: true });
+    await r.flush();
+    expect(r.confirms[0]).toMatch(/email alerts for Open \+ Forecasts\?/);
+    expect(r.confirms[0]).toMatch(/Recompetes are not emailed/);
+    expect(r.signIns).toEqual(['get alerts for this market']);
+  });
+
+  it('declining the offer never reaches sign-in', async () => {
+    const r = runAnon({ open: true, recompete: true, forecast: false }, false);
+    await r.flush();
+    expect(r.signIns).toHaveLength(0);
+  });
+
+  it('Recompete-only: no alert is offered at all', async () => {
+    const r = runAnon({ open: false, recompete: true, forecast: false });
+    await r.flush();
+    expect(r.confirms).toHaveLength(0);
+    expect(r.signIns).toHaveLength(0);
+    expect(r.btn.textContent).toMatch(/Recompetes aren.t emailed/);
+  });
+
+  it('no Recompete: the original offer, unchanged', async () => {
+    const r = runAnon({ open: true, recompete: false, forecast: false });
+    await r.flush();
+    expect(r.confirms[0]).toBe('Watching this market. Get alerted when new opportunities match? (sign-in required so we email the right person)');
+  });
+});

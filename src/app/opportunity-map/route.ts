@@ -5228,9 +5228,20 @@ const VIEWPORT_JS = `<script>
             //
             // The save above already happened, so value still precedes sign-in;
             // this is an offer, not a wall.
+            // F3: disclose what alerts can cover BEFORE sign-in turns them on. Recompetes are never
+            // emailed; a Recompete-only watch is kept, but no alert is offered for it.
+            var _ap=window.__watchScopePlan?window.__watchScopePlan(MODE,_af.horizons||{}):null;
             setTimeout(function(){
               if(!window.requireSignIn){ _ssReset(); return; }
-              if(!confirm('Watching this market. Get alerted when new opportunities match? (sign-in required so we email the right person)')){ _ssReset(); return; }
+              if(_ap&&_ap.kind==='none'){
+                _ss.textContent='\\u2713 Watching \\u2014 Recompetes aren\\u2019t emailed';
+                _ss.title='Email alerts cover Open and Forecast listings. To follow a recompete, open it and use \\u201cTrack this recompete\\u201d.';
+                setTimeout(_ssReset,4200); return;
+              }
+              var _askAlerts=(_ap&&_ap.kind==='partial')
+                ? 'Watching this market. Get email alerts for '+[_ap.horizons.open?'Open':'',_ap.horizons.forecast?'Forecasts':''].filter(Boolean).join(' + ')+'? Recompetes are not emailed \\u2014 to follow one, open it and use \\u201cTrack this recompete\\u201d. (sign-in required so we email the right person)'
+                : 'Watching this market. Get alerted when new opportunities match? (sign-in required so we email the right person)';
+              if(!confirm(_askAlerts)){ _ssReset(); return; }
               var _a=window.requireSignIn('get alerts for this market', function(){ window.__claimAnonWatches&&window.__claimAnonWatches(); });
               if(!_a){ _ssReset(); return; }
               window.__claimAnonWatches&&window.__claimAnonWatches();
@@ -5594,8 +5605,10 @@ const SAVE_JS = `<script>
       body:JSON.stringify({action:'claim',anonId:aid})})
       .then(function(r){return r.json();}).then(function(c){
         // Only a VERIFIED claim counts.
-        if(c&&c.success&&c.claimed>0){ try{ if(window.__track)window.__track('tool_use','watch_claimed',{watches:c.claimed}); }catch(e){}
-          ui('__ssMsg','\u2713 Alerts on'); }
+        if(c&&c.success&&c.claimed>0){ try{ if(window.__track)window.__track('tool_use','watch_claimed',{watches:c.claimed,alerts_on:c.alertsOn,not_emailable:c.notEmailable,coming_back_excluded:c.comingBackExcluded}); }catch(e){}
+          // F3: say what actually turned on. "Alerts on" only when a claimed watch really alerts.
+          ui('__ssMsg', c.alertsEnabled===false ? '\u2713 Saved \u2014 Recompetes aren\u2019t emailed'
+            : (c.comingBackExcluded>0||c.notEmailable>0) ? '\u2713 Alerts on (no Recompetes)' : '\u2713 Alerts on'); }
         else ui('__ssReset');
       }).catch(function(){ ui('__ssReset'); });
   };

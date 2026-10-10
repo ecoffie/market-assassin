@@ -27,6 +27,8 @@
  * to email an address that is not an address. Alerts turn on only when a real
  * email is attached, which is also the moment the watch becomes a habit loop.
  */
+import { alertableScope } from '@/lib/saved-searches/alert-scope';
+import type { SavedSearchMode } from '@/lib/saved-searches/constants';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { valueShapeError, savedSearchNaicsError } from '@/lib/saved-searches/validate-filters';
 
@@ -133,33 +135,99 @@ export async function saveMapWatch(
  * emailing anyone who did not verify that they own the mailbox. Scoped to the
  * anon id that owns the row, so one visitor cannot claim another's watch.
  */
+export interface ClaimResult {
+  ok: boolean;
+  /** Watches moved onto the account (all of them, emailable or not). */
+  claimed: number;
+  /** Of those, how many now send email alerts. */
+  alertsOn: number;
+  /** Claimed with alerts OFF because nothing in them can be emailed (recompete only). */
+  notEmailable: number;
+  /** Alerting watches whose recompete horizon was removed — recompetes are not emailed. */
+  comingBackExcluded: number;
+  error?: string;
+}
+
+/**
+ * F3 (2026-10-10): claiming used to set `alerts_enabled = true` on EVERY anon
+ * watch, including ones whose scope the alert cron cannot deliver. A watch kept
+ * with Recompetes on became an alerting watch that silently never emails
+ * recompetes; a Recompete-only watch became "alerts on" and never emails at all.
+ * The signed-in Save path refuses both shapes (unsupported_alert_scope), so this
+ * was also the one route around that rule.
+ *
+ * Now each watch is classified by alertableScope():
+ *   full    → alerts on, filters untouched
+ *   partial → alerts on, horizons.recompete set false (the client disclosed this
+ *             BEFORE sign-in); every other filter untouched
+ *   none    → claimed with alerts OFF, filters untouched
+ * Nothing is broadened: no horizon is ever turned on, and recompete is never emailed.
+ */
 export async function claimAnonWatch(
   db: SupabaseClient,
   anonId: string,
   verifiedEmail: string,
-): Promise<{ ok: boolean; claimed: number; error?: string }> {
-  if (!isAnonId(anonId)) return { ok: false, claimed: 0, error: 'invalid anon id' };
+): Promise<ClaimResult> {
+  const fail = (error: string): ClaimResult =>
+    ({ ok: false, claimed: 0, alertsOn: 0, notEmailable: 0, comingBackExcluded: 0, error });
+  if (!isAnonId(anonId)) return fail('invalid anon id');
   const e = verifiedEmail.trim().toLowerCase();
-  if (!e.includes('@')) return { ok: false, claimed: 0, error: 'invalid email' };
+  if (!e.includes('@')) return fail('invalid email');
   // Defence in depth: an anon id must never become an "account".
-  if (isAnonId(e)) return { ok: false, claimed: 0, error: 'anon id is not an account' };
+  if (isAnonId(e)) return fail('anon id is not an account');
+  const owner = anonId.trim().toLowerCase();
+
+  const { data: rows, error: readErr } = await db
+    .from('saved_searches')
+    .select('id,mode,filters')
+    .eq('user_email', owner);
+  if (readErr) return fail(readErr.message);
+  const list = (rows || []) as Array<{ id: string; mode: string; filters: Record<string, unknown> | null }>;
+  if (list.length === 0) return { ok: true, claimed: 0, alertsOn: 0, notEmailable: 0, comingBackExcluded: 0 };
+
+  const alerting: string[] = [];
+  const silent: string[] = [];
+  let comingBackExcluded = 0;
+  for (const r of list) {
+    const plan = alertableScope((r.mode || 'open') as SavedSearchMode, r.filters || {});
+    if (plan.kind === 'none') { silent.push(r.id); continue; }
+    alerting.push(r.id);
+    if (plan.kind === 'partial') {
+      // Narrow BEFORE alerts turn on, while the row is still anon-owned and silent: a failure
+      // here leaves nothing alerting on an unsupported scope.
+      const { error } = await db
+        .from('saved_searches')
+        .update({ filters: plan.filters, updated_at: new Date().toISOString() })
+        .eq('id', r.id)
+        .eq('user_email', owner);
+      if (error) return fail(error.message);
+      comingBackExcluded++;
+    }
+  }
 
   // ⚠️ Never count a RETURNING payload as the write total. `UPDATE … .select()`
   // updates every matching row but RETURNS at most 1,000, so `data.length` would
   // silently under-report. `{ count: 'exact' }` reports the real number, and a
   // NULL count is UNKNOWN — never coerced to 0 (Bug Prevention Rule #11).
-  const { count, error } = await db
-    .from('saved_searches')
-    .update(
-      { user_email: e, alerts_enabled: true, updated_at: new Date().toISOString() },
-      { count: 'exact' },
-    )
-    .eq('user_email', anonId.trim().toLowerCase());
-  if (error) return { ok: false, claimed: 0, error: error.message };
-  if (count == null) {
-    return { ok: false, claimed: 0, error: 'claim count returned NULL — unknown, not zero' };
-  }
-  return { ok: true, claimed: count };
+  const move = async (ids: string[], alerts: boolean): Promise<number | string> => {
+    if (ids.length === 0) return 0;
+    const { count, error } = await db
+      .from('saved_searches')
+      .update(
+        { user_email: e, alerts_enabled: alerts, updated_at: new Date().toISOString() },
+        { count: 'exact' },
+      )
+      .eq('user_email', owner)
+      .in('id', ids);
+    if (error) return error.message;
+    if (count == null) return 'claim count returned NULL — unknown, not zero';
+    return count;
+  };
+  const on = await move(alerting, true);
+  if (typeof on === 'string') return fail(on);
+  const off = await move(silent, false);
+  if (typeof off === 'string') return { ...fail(off), claimed: on, alertsOn: on };
+  return { ok: true, claimed: on + off, alertsOn: on, notEmailable: off, comingBackExcluded };
 }
 
 /** Most watches one anonymous identity may hold. Bounds unauthenticated writes. */

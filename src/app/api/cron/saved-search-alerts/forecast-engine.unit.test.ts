@@ -487,3 +487,31 @@ describe('a filter forecasts cannot represent (Marine Corps) — the Forecast ha
     expect(body.forecastCoverage?.unsupported_filter).toBeUndefined();
   });
 });
+
+// F2 (2026-10-10): a watch saved with the Open chip UNCHECKED was emailed Open listings, because the
+// cron gated Open on `mode === 'open'` alone. Measured on prod: 9 Forecast-only watches, 6 users, 8
+// already carrying sent Open ids. The saved horizon is the instruction — in BOTH engines.
+describe('F2 — a Forecast-only watch never receives Open listings', () => {
+  const FORECAST_ONLY = { naics: '541512', horizons: { open: false, recompete: false, forecast: true } };
+  for (const engine of ['canonical', 'legacy'] as const) {
+    it(`${engine}: only the forecast is emailed; the Open seen list is untouched`, async () => {
+      if (engine === 'legacy') { delete process.env.SAVED_SEARCH_FORECAST_CANONICAL; state.columns = 'absent'; }
+      state.search = search(FORECAST_ONLY, engine === 'legacy' ? { forecast_seen_through: null } : {});
+      state.open = [{ notice_id: 'OPEN-NEW', title: 'Open listing the user did not ask for' }];
+      state.forecasts = [fc('DHS', '2026-09-24T01:00:00Z')];
+      await run();
+      expect(state.sends).toHaveLength(1);
+      expect(state.sends[0].html).not.toContain('Open listing the user did not ask for');
+      expect(state.sends[0].subject).toBe('1 new match in “My market”');
+      const seen = state.updates.map((u) => u.payload.last_seen_notice_ids).find(Boolean) as string[] | undefined;
+      expect(seen ?? []).not.toContain('OPEN-NEW');
+    });
+  }
+
+  it('control: Open checked (or a pre-horizon search) still gets Open', async () => {
+    state.search = search({ naics: '541512', horizons: { open: true, forecast: true } });
+    state.open = [{ notice_id: 'OPEN-OLD', title: 'o' }, { notice_id: 'OPEN-NEW', title: 'Open listing' }];
+    await run();
+    expect(state.sends[0].html).toContain('Open listing');
+  });
+});
