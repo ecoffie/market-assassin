@@ -41,8 +41,8 @@ describe('NAICS chips resolve through the canonical catalog', () => {
   });
 
   it('renders live inventory on the suggestion row', () => {
-    expect(SRC).toContain("bits.push(r.open+' open')");
-    expect(SRC).toMatch(/recompetes\+' recompete'/);
+    expect(SRC).toContain("bits.push(r.open+' open now')");
+    expect(SRC).toContain("bits.push(r.recompetes+' coming back')");
   });
 
   it('omits a count it could not compute rather than showing zero', () => {

@@ -51,12 +51,12 @@ describe('horizonCount keeps four meanings apart', () => {
     const c = lib.horizonCount(PARTIAL);
     expect(c).toEqual({ total: 15, state: 'partial', gaps: ['NOAA'] });
     expect(lib.horizonCountLabel(c, fmt)).toBe('15*');
-    expect(lib.coverageNote({ forecast: c })).toBe('Forecasts partial — not measured for NOAA');
+    expect(lib.coverageNote({ forecast: c })).toBe('Coming Soon partial — not measured for NOAA');
   });
   it('a FAILED horizon request → "couldn\u2019t load", never 0 and never "loading"', () => {
     const c = { total: null, state: 'failed', gaps: [] };
     expect(lib.horizonCountLabel(c, fmt)).toBe('!');
-    expect(lib.coverageNote({ open: c })).toBe('Open couldn\u2019t load');
+    expect(lib.coverageNote({ open: c })).toBe('Open Now couldn\u2019t load');
   });
   it('a failed count (null, coverage ok) → unknown, never 0', () => {
     const c = lib.horizonCount(COUNT_FAILED);
@@ -65,7 +65,7 @@ describe('horizonCount keeps four meanings apart', () => {
     expect(lib.horizonCountLabel(c, fmt)).toBe('?');
   });
   it('the note names the unavailable buyer and says it is not zero', () => {
-    expect(lib.coverageNote({ forecast: lib.horizonCount(NOAA) })).toBe('Forecasts unavailable for NOAA (no forecast publisher) — not zero');
+    expect(lib.coverageNote({ forecast: lib.horizonCount(NOAA) })).toBe('Coming Soon unavailable for NOAA (no forecast publisher) — not zero');
   });
 });
 

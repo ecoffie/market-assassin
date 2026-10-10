@@ -71,9 +71,9 @@ describe('Ask Mindy removed for now (Eric 2026-08-03) — no doorway, drawer cod
 describe('legend — tiny, bottom-left, TWO variants (horizons on Opportunity, entities on Network)', () => {
   it('the OPPORTUNITY variant lists the three horizons with their pin colors', () => {
     expect(tmpl).toContain('class="maplegend"');
-    expect(tmpl).toMatch(/lg-opps[\s\S]{0,400}background:var\(--grnd\)"><\/i>Open/);
-    expect(tmpl).toMatch(/background:var\(--recomp\)"><\/i>Recompete/);
-    expect(tmpl).toMatch(/background:var\(--forecast\)"><\/i>Forecast/);
+    expect(tmpl).toMatch(/lg-opps[\s\S]{0,400}background:var\(--grnd\)"><\/i>Open Now/);
+    expect(tmpl).toMatch(/background:var\(--recomp\)"><\/i>Coming Back/);
+    expect(tmpl).toMatch(/background:var\(--forecast\)"><\/i>Coming Soon/);
   });
   it('the NETWORK variant lists the two entities with their real pin colors (Eric: "add a Network legend variant instead of hiding")', () => {
     // contractors purple #7c3aed, gov buyers red #dc2626 — the contactColorFor pin colors

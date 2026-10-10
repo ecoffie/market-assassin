@@ -123,7 +123,7 @@ describe('watch scope plan', () => {
 describe('signed-in Save search from the default map', () => {
   it('discloses, then saves a watch without recompete — map toggles untouched', async () => {
     const r = run({ horizons: { open: true, recompete: true, forecast: true } });
-    expect(r.confirms[0]).toMatch(/Recompetes are not emailed/);
+    expect(r.confirms[0]).toMatch(/Coming Back contracts are not emailed/);
     expect(r.calls).toHaveLength(1);
     const body = r.calls[0].body as { mode: string; filters: Record<string, unknown>; bbox: unknown };
     expect(r.calls[0].url).toBe('/api/app/saved-searches');
@@ -134,7 +134,7 @@ describe('signed-in Save search from the default map', () => {
     expect(body.filters).not.toHaveProperty('setAside');
     expect(body.bbox).toEqual({ w: -80, s: 36, e: -75, n: 39 });
     // the default name no longer claims recompetes
-    expect(r.prompts[0]).toMatch(/Open \+ Forecasts$/);
+    expect(r.prompts[0]).toMatch(/Open Now \+ Coming Soon$/);
     expect(r.horizons).toEqual({ open: true, recompete: true, forecast: true });
     await r.settle();
     expect(r.btn.textContent).toMatch(/Saved/);
@@ -149,7 +149,7 @@ describe('signed-in Save search from the default map', () => {
   it('recompete-only posts nothing and says why', () => {
     const r = run({ horizons: { open: false, recompete: true, forecast: false } });
     expect(r.calls).toHaveLength(0);
-    expect(r.btn.textContent).toMatch(/Recompetes aren.t emailed/);
+    expect(r.btn.textContent).toMatch(/Coming Back isn.t emailed/);
   });
 
   it('a map without recompete saves exactly as before, with no extra prompt', () => {
@@ -164,7 +164,7 @@ describe('signed-in Save search from the default map', () => {
       resp: { success: false, code: 'unsupported_alert_scope' },
     });
     await r.settle();
-    expect(r.btn.textContent).toMatch(/Recompetes aren.t emailed/);
+    expect(r.btn.textContent).toMatch(/Coming Back isn.t emailed/);
   });
 });
 
@@ -219,8 +219,8 @@ describe('F3 — signed-out watch: disclosure before alerts', () => {
   it('Recompetes on: the alert offer names Open + Forecasts and says Recompetes are not emailed', async () => {
     const r = runAnon({ open: true, recompete: true, forecast: true });
     await r.flush();
-    expect(r.confirms[0]).toMatch(/email alerts for Open \+ Forecasts\?/);
-    expect(r.confirms[0]).toMatch(/Recompetes are not emailed/);
+    expect(r.confirms[0]).toMatch(/email alerts for Open Now \+ Coming Soon\?/);
+    expect(r.confirms[0]).toMatch(/Coming Back contracts are not emailed/);
     expect(r.signIns).toEqual(['get alerts for this market']);
   });
 
@@ -235,7 +235,7 @@ describe('F3 — signed-out watch: disclosure before alerts', () => {
     await r.flush();
     expect(r.confirms).toHaveLength(0);
     expect(r.signIns).toHaveLength(0);
-    expect(r.btn.textContent).toMatch(/Recompetes aren.t emailed/);
+    expect(r.btn.textContent).toMatch(/Coming Back isn.t emailed/);
   });
 
   it('no Recompete: the original offer, unchanged', async () => {

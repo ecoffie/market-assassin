@@ -43,8 +43,8 @@ export const WATCH_SCOPE_JS = `
     var code=(typeof d.code==='string')?d.code:'', msg=(typeof d.error==='string')?d.error:'';
     if(status===0)return {short:'No connection',detail:'Couldn\u2019t reach Mindy, so nothing was saved. Check your connection and try again.'};
     if(status===401||status===403)return {short:'Sign in again',detail:'Your sign-in has expired, so nothing was saved. Sign in again, then click Save search.'};
-    if(code==='unsupported_alert_scope')return {short:'Recompetes aren\u2019t emailed',detail:'Email alerts cover Open and Forecast listings. Recompetes are not emailed \u2014 turn on Open or Forecast to save a watch, or open a recompete and use \u201cTrack this recompete\u201d.'};
-    if(code==='no_deliverable_horizon')return {short:'Turn on Open or Forecast',detail:'Nothing selected on this map can be emailed. Turn on Open or Forecast, then save again. Recompetes are not emailed.'};
+    if(code==='unsupported_alert_scope')return {short:'Coming Back isn\u2019t emailed',detail:'Email alerts cover Open Now and Coming Soon. Coming Back contracts are not emailed \u2014 turn on Open Now or Coming Soon to save a watch, or open a Coming Back contract and use \u201cTrack this recompete\u201d.'};
+    if(code==='no_deliverable_horizon')return {short:'Turn on Open Now or Coming Soon',detail:'Nothing selected on this map can be emailed. Turn on Open Now or Coming Soon, then save again. Coming Back contracts are not emailed.'};
     if(code==='profile_scope_unavailable')return {short:'Add NAICS to your profile',detail:'This search follows your profile\u2019s market, but your Mindy profile has no NAICS codes yet. Add at least one in Settings, then save again.'};
     if(code==='invalid_filters')return {short:'A filter can\u2019t be saved',detail:'One of the filters on this map can\u2019t be saved'+(msg?': '+msg:'.')+' Adjust it, then save again.'};
     if(code==='invalid_mode')return {short:'Switch to Opportunities',detail:'Save search works on the Opportunities map. Switch back to Opportunities, then save.'};

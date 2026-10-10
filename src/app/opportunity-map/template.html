@@ -495,9 +495,9 @@
          Network legend variant instead of hiding"). -->
     <div class="maplegend" id="mapLegend" aria-hidden="false">
       <span class="lg-grp lg-opps">
-        <span class="lg"><i style="background:var(--grnd)"></i>Open</span>
-        <span class="lg"><i style="background:var(--recomp)"></i>Recompete</span>
-        <span class="lg"><i style="background:var(--forecast)"></i>Forecast</span>
+        <span class="lg"><i style="background:var(--grnd)"></i>Open Now</span>
+        <span class="lg"><i style="background:var(--recomp)"></i>Coming Back</span>
+        <span class="lg"><i style="background:var(--forecast)"></i>Coming Soon</span>
       </span>
       <span class="lg-grp lg-net">
         <span class="lg"><i style="background:#7c3aed"></i>Contractors</span>
@@ -1172,9 +1172,9 @@ function lcHeader(o){
   if(o.src!=='RECOMPETE'&&o.src!=='FORECAST'&&isFinite(_dOpen)&&_dOpen>=0&&_dOpen<=14){
     _urgent = _dOpen===0?'DUE TODAY':_dOpen===1?'1 DAY LEFT':_dOpen+' DAYS LEFT';
   }
-  var kind = o.src==='RECOMPETE' ? {c:'recomp',t:'Recompete',when:o.exp?('Expires '+shortDate(o.exp)):''}
-    : (o.src==='FORECAST' ? {c:'fore',t:'Forecast',when:(_ft&&!/^forecast$/i.test(_ft))?_ft:''}
-      : {c:'open',t:'Open now',when:_urgent});
+  var kind = o.src==='RECOMPETE' ? {c:'recomp',t:'Coming Back',when:o.exp?('Expires '+shortDate(o.exp)):''}
+    : (o.src==='FORECAST' ? {c:'fore',t:'Coming Soon',when:(_ft&&!/^forecast$/i.test(_ft))?_ft:''}
+      : {c:'open',t:'Open Now',when:_urgent});
   // urgent OPEN deadlines get the alert color (≤3d hot); the rest are quiet.
   var whenCls = (kind.c==='open'&&_urgent) ? (_dOpen<=3?'lcwhen urg':'lcwhen soon') : 'lcwhen';
   return '<div class="lchdr '+kind.c+'"><span class="lcdot"></span>'+kind.t
@@ -1404,7 +1404,7 @@ function cardHTML(o){
     <div class="cmeta">${o.src==='RECOMPETE'&&o.cat?'<span class="ind">'+o.cat+'</span><span class="dot"></span>':''}${o.noPin?('<span class="loc noloc">○ '+(o.noLoc||o.loc)+'</span>'):('<span class="loc">'+o.loc+'</span>')}</div>
     <div class="stats">${stats}</div>
     <div class="cfoot">
-      <span class="solno">${o.noPin?'Forecast — not yet on SAM':o.sol}</span>
+      <span class="solno">${o.noPin?'Coming Soon — not yet on SAM':o.sol}</span>
       <a class="act" href="${samURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">SAM.gov</a>
       <a class="act pri" href="${draftURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${draftCTA(o)}</a>
     </div></div>`;

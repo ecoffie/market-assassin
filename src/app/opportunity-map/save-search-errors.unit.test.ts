@@ -127,7 +127,7 @@ describe('targeting matrix — signed-in Save search, real handler → real serv
     if (sent === null) {
       // Nothing emailable: nothing is POSTed, and no Open is substituted.
       expect(r.calls).toEqual([]);
-      expect(r.btn.textContent).toMatch(/Recompetes aren/);
+      expect(r.btn.textContent).toMatch(/Coming Back isn/);
       return;
     }
     expect(r.calls).toHaveLength(1);
@@ -149,7 +149,7 @@ describe('service — refusals are specific', () => {
     expect(res.ok).toBe(false);
     if (!res.ok) {
       expect(res.code).toBe('no_deliverable_horizon');
-      expect(res.message).toMatch(/Turn on Open or Forecast/);
+      expect(res.message).toMatch(/Turn on Open Now or Coming Soon/);
     }
   });
 
@@ -189,8 +189,8 @@ describe('a failed save says what to do — never a bare "Couldn\'t save"', () =
   const H: Horizons = { open: true, recompete: false, forecast: true };
   it.each<[string, Reply, RegExp, RegExp]>([
     ['expired session (401)', { status: 401, body: { success: false, error: 'Sign in required' } }, /Sign in again/, /Sign in again, then click Save search/],
-    ['nothing deliverable', { status: 400, body: { success: false, code: 'no_deliverable_horizon', error: 'x' } }, /Turn on Open or Forecast/, /Turn on Open or Forecast, then save again/],
-    ['recompete refused', { status: 400, body: { success: false, code: 'unsupported_alert_scope', error: 'x' } }, /Recompetes aren/, /Track this recompete/],
+    ['nothing deliverable', { status: 400, body: { success: false, code: 'no_deliverable_horizon', error: 'x' } }, /Turn on Open Now or Coming Soon/, /Turn on Open Now or Coming Soon, then save again/],
+    ['recompete refused', { status: 400, body: { success: false, code: 'unsupported_alert_scope', error: 'x' } }, /Coming Back isn/, /Track this recompete/],
     ['profile has no NAICS', { status: 400, body: { success: false, code: 'profile_scope_unavailable', error: 'x' } }, /Add NAICS to your profile/, /Add at least one in Settings/],
     ['invalid filter', { status: 400, body: { success: false, code: 'invalid_filters', error: 'Invalid sapBuyer value' } }, /A filter can/, /Invalid sapBuyer value.*Adjust it/],
     ['invalid mode', { status: 400, body: { success: false, code: 'invalid_mode', error: 'x' } }, /Switch to Opportunities/, /works on the Opportunities map/],

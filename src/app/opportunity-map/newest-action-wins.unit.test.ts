@@ -139,7 +139,7 @@ describe('progressive horizons — no horizon waits for the slowest', () => {
     await sleep(400);
     expect(w.__horizonsLoading).toEqual([]);
     expect(w.__horizonCounts.open).toEqual({ total: null, state: 'failed', gaps: [] });
-    expect(w.__coverageNote).toBe('Open couldn\u2019t load');
+    expect(w.__coverageNote).toBe('Open Now couldn\u2019t load');
     expect(w.__coverageNote).not.toContain('loading');
     expect(w.__horizonCounts.recompete.total).toBe(7);
   });

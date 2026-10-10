@@ -22,7 +22,7 @@ export const dynamic = 'force-dynamic';
 
 const PAGE = `<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Forecasts — Mindy</title>
+<title>Coming Soon — Mindy</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
   :root{--ink:#111c26;--sub:#6b7787;--faint:#9aa5b3;--line:#e6eaef;--hair:#f0f3f7;--wash:#f7f9fb;--blue:#2563eb;--jan:#2563eb;--green:#137a41;--violet:#7c3aed;--red:#e5484d}
@@ -121,7 +121,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
 </nav>
 <div class="main">
 <div class="wrap">
-  <div class="kick">Forecasts · coming work</div>
+  <div class="kick">Coming Soon · forecasts</div>
   <h1>Upcoming federal forecasts</h1>
   <div class="sub"><b>33,000+</b> planned procurements 6–18 months out — including the ones with no map location. Filter by your NAICS, agency, state or fiscal year to see what's coming before it hits SAM.</div>
   <div class="fbar">
@@ -170,7 +170,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     if(f.naics)meta.push('<span class="dot">·</span><span>NAICS '+h(f.naics)+'</span>');
     meta.push('<span class="dot">·</span><span class="'+pl.cls+'">'+h(pl.txt)+'</span>');
     if(f.setAside)meta.push('<span class="dot">·</span><span class="set">'+h(f.setAside)+'</span>');
-    return '<div class="fc"><div class="m"><span class="tag">Forecast — not yet on SAM</span>'
+    return '<div class="fc"><div class="m"><span class="tag">Coming Soon — not yet on SAM</span>'
       + '<div class="t">'+h(f.title||'Forecast opportunity')+'</div>'
       + '<div class="s">'+meta.join('')+'</div></div>'
       + '<div class="r">'+(v?'<div class="v">'+h(v)+'</div>':'')+'<div class="fy">'+h(timing(f))+'</div></div></div>';

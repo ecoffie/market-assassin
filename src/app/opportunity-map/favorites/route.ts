@@ -345,9 +345,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       _urgent=_dOpen===0?'DUE TODAY':_dOpen===1?'1 DAY LEFT':_dOpen+' DAYS LEFT';
     }
     var closedOpen=(o.src!=='RECOMPETE'&&o.src!=='FORECAST'&&isFinite(_dOpen)&&_dOpen<0);
-    var kind = o.src==='FORECAST' ? {c:'fore',t:'Forecast',when:(o.estRange?'':'')}
+    var kind = o.src==='FORECAST' ? {c:'fore',t:'Coming Soon',when:(o.estRange?'':'')}
       : (closedOpen ? {c:'closed',t:'Closed',when:o.close?('Closed '+shortDate(o.close)):''}
-        : {c:'open',t:'Open now',when:_urgent});
+        : {c:'open',t:'Open Now',when:_urgent});
     var whenCls=(kind.c==='open'&&_urgent)?(_dOpen<=3?'lcwhen urg':'lcwhen soon'):'lcwhen';
     return '<div class="lchdr '+kind.c+'"><span class="lcdot"></span>'+kind.t
       + (kind.when?'<span class="'+whenCls+'">'+esc(kind.when)+'</span>':'')+'</div>';
@@ -502,7 +502,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     if(c.attn)opts.push(['attn','Needs Attention',c.attn]);
     if(c.soon)opts.push(['soon','Closing Soon',c.soon]);
     if(c.watch)opts.push(['watch','Watching',c.watch]);
-    if(c.forecast)opts.push(['forecast','Forecasts',c.forecast]);
+    if(c.forecast)opts.push(['forecast','Coming Soon',c.forecast]);
     bar.innerHTML=opts.map(function(o){
       return '<button class="fchip'+(o[0]===FILTER?' on':'')+'" data-f="'+o[0]+'">'+h(o[1])+' <span class="fct">'+o[2]+'</span></button>';
     }).join('');

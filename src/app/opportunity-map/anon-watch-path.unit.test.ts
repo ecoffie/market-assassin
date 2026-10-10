@@ -67,7 +67,7 @@ describe('it never implies alerts it will not send', () => {
   it('only a successful claim reports alerts on', () => {
     const h = SRC.slice(SRC.indexOf('_ss.onclick=function()'));
     // F3: "Alerts on" only when the server says a claimed watch actually alerts.
-    expect(h).toMatch(/c\.claimed>0[\s\S]*c\.alertsEnabled===false \? '\\u2713 Saved \\u2014 Recompetes aren\\u2019t emailed'/);
+    expect(h).toMatch(/c\.claimed>0[\s\S]*c\.alertsEnabled===false \? '\\u2713 Saved \\u2014 Coming Back isn\\u2019t emailed'/);
     expect(h).toMatch(/: '\\u2713 Alerts on'\); \}/);
   });
 });

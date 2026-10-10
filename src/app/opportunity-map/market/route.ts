@@ -287,10 +287,10 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     body.innerHTML='<div class="rptbox"><div class="top"></div><div class="in">'
       + '<div class="rpthd">Market report \\u00b7 '+h(d.subject||'market')+'</div>'
       + '<div class="rptkpi">'+k1
-      +   '<div class="c"><div class="k">Recompetes</div><div class="v">'+((s.recompetes)||0)+'</div><div class="n">expiring primes</div></div>'
+      +   '<div class="c"><div class="k">Coming Back</div><div class="v">'+((s.recompetes)||0)+'</div><div class="n">expiring primes</div></div>'
       // Forecasts KPI is CLICKABLE — expands the actual matching upcoming buys inline (incl. the
       // location-less ones), so "coming work" is real rows, not just a count (Eric 2026-08-02).
-      +   '<button class="c ce" id="fcCard"'+(fcCount?'':' disabled')+'><div class="k">Forecasts</div><div class="v">'+fcCount+'</div><div class="n">coming work'+(fcCount?' \\u00b7 show \\u25be':'')+'</div></button>'
+      +   '<button class="c ce" id="fcCard"'+(fcCount?'':' disabled')+'><div class="k">Coming Soon</div><div class="v">'+fcCount+'</div><div class="n">coming work'+(fcCount?' \\u00b7 show \\u25be':'')+'</div></button>'
       +   k4
       + '</div>'
       + '<div id="fcList"></div>'
