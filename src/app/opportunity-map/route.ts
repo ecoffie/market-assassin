@@ -5285,10 +5285,19 @@ const VIEWPORT_JS = `<script>
     if(_plan&&_plan.horizons)filters.horizons=_plan.horizons;
     var b=null; try{ var mb2=map.getBounds(); b={w:mb2.getWest(),s:mb2.getSouth(),e:mb2.getEast(),n:mb2.getNorth()}; }catch(e){}
     _ss.textContent='Saving…';
+    // A failed save says what to do (window.__saveSearchError) — the button carries the short form, a
+    // dialog the full one. status 0 = no response; a non-JSON body still gets an actionable message.
+    var _ssFail=function(status,d){
+      var m=window.__saveSearchError?window.__saveSearchError(status,d):{short:'Couldn\\'t save',detail:''};
+      try{ if(window.__track) window.__track('tool_use','watch_save_failed',{status:status,code:(d&&d.code)||''}); }catch(e){}
+      _ss.textContent=m.short; _ss.title=m.detail||''; setTimeout(_ssReset,4200);
+      if(m.detail){ try{ alert(m.detail); }catch(e){} }
+    };
     fetch('/api/app/saved-searches',{method:'POST',
       headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
       body:JSON.stringify({email:em,name:name.slice(0,80),mode:MODE,filters:filters,bbox:b})})
-      .then(function(r){return r.json();}).then(function(d){
+      .then(function(r){ return r.json().then(function(j){ return {s:r.status,d:j}; },function(){ return {s:r.status,d:null}; }); })
+      .then(function(res){ var d=res.d;
         if(d&&d.success){
           // WATCHING is a first-class state and this is the path MOST people use:
           // measured on prod 2026-09-21, 62 of 62 saved_searches created in 30 days
@@ -5301,10 +5310,9 @@ const VIEWPORT_JS = `<script>
           // (No backticks in here: this block lives inside a TS template literal.)
           try{ if(window.__track) window.__track('tool_use','watch_created',{anonymous:false,mode:MODE}); }catch(e){}
           _ss.textContent='✓ Saved — alerts on'; setTimeout(function(){ if(confirm('Saved! We\\'ll email you when new opportunities match. View your saved searches?'))location.href='/opportunity-map/saved'; else _ssReset(); },400); }
-        // Never a bare "Couldn't save" for a scope the server refused on purpose.
-        else if(d&&d.code==='unsupported_alert_scope'){ _ss.textContent='Recompetes aren\\u2019t emailed'; setTimeout(_ssReset,4200); }
-        else _ssMsg('Couldn\\'t save');
-      }).catch(function(){ _ssMsg('Couldn\\'t save'); });
+        // Never a bare "Couldn't save": every known refusal says what to do next.
+        else _ssFail(res.s,d);
+      }).catch(function(){ _ssFail(0,null); });
   };
 
   // Apply a SAVED SEARCH to the map in-place (the reverse of Save search): take its stored

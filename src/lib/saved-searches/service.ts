@@ -12,6 +12,7 @@ import {
   cronWillDeliverAlerts,
   isProfileScopedFilters,
   isUnsupportedAlertScope,
+  noDeliverableHorizonMessage,
   unsupportedAlertScopeMessage,
 } from './alert-scope';
 import { savedSearchFingerprint, savedSearchesMatchFingerprint } from './fingerprint';
@@ -124,8 +125,10 @@ export async function createSavedSearch(
     return { ok: false, code: 'unsupported_alert_scope', message: unsupportedAlertScopeMessage() };
   }
 
+  // Not a recompete request — nothing deliverable is selected (Open and Forecast both off). Its own code,
+  // so the reader is told to turn one on rather than that recompetes are unsupported.
   if (!cronWillDeliverAlerts(mode, validated.filters)) {
-    return { ok: false, code: 'unsupported_alert_scope', message: unsupportedAlertScopeMessage() };
+    return { ok: false, code: 'no_deliverable_horizon', message: noDeliverableHorizonMessage() };
   }
 
   const email = normalizeEmail(input.userEmail);
