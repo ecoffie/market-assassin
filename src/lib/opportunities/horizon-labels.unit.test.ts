@@ -46,6 +46,12 @@ describe('every Map surface that names a horizon uses the label', () => {
   it('header coverage note', () => {
     expect(ROUTE).toContain(`var name=h==='forecast'?'${L.forecast}':(h==='recompete'?'${L.recompete}':'${L.open}');`);
   });
+  it('drawer fallback signals, saved-search "Showing" row and the Coming Soon empty state (follow-up)', () => {
+    expect(ROUTE).toContain(`s.push({t:'${L.recompete}',d:'An existing contract coming up for rebid`);
+    expect(ROUTE).toContain(`s.push({t:'${L.forecast}',d:'Planned work, not yet on SAM`);
+    expect(ROUTE).toContain(`hz.push('${L.open}'); if(h.recompete)hz.push('${L.recompete}'); if(h.forecast)hz.push('${L.forecast}');`);
+    expect(TMPL).toContain(`<h4>${L.forecast} coverage unavailable</h4>`);
+  });
   it('no old horizon label survives on a chip, dropdown row, legend or card header', () => {
     expect(ROUTE).not.toMatch(/>(Recompete|Forecast|Open)<\/button>'/);
     expect(ROUTE).not.toMatch(/class="hznlbl">(Recompete|Forecast|Open)</);

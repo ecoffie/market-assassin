@@ -7067,8 +7067,8 @@ const DRAWER_JS = `<script>
     if(/sources sought|presolicitation|pre-solicitation|request for information|\\brfi\\b/.test(nt))
       s.push({t:'Early in the buying cycle',d:'A '+esc(opp.noticeType)+' \\u2014 the window to influence the requirement before the solicitation.'});
     var src=pin&&pin.src;
-    if(src==='RECOMPETE')s.push({t:'Recompete',d:'An existing contract coming up for rebid \\u2014 there is an incumbent to unseat.'});
-    else if(src==='FORECAST')s.push({t:'Forecast',d:'Planned work, not yet on SAM \\u2014 position early.'});
+    if(src==='RECOMPETE')s.push({t:'Coming Back',d:'An existing contract coming up for rebid \\u2014 there is an incumbent to unseat.'});
+    else if(src==='FORECAST')s.push({t:'Coming Soon',d:'Planned work, not yet on SAM \\u2014 position early.'});
     if(opp&&opp.deadline){ var n=Math.ceil((new Date(opp.deadline)-new Date())/86400000);
       if(n!=null&&isFinite(n)&&n>=0&&n<=7)s.push({t:'Closes soon',d:(n===0?'Due today':(n===1?'1 day left':n+' days left'))+' \\u2014 decide fast.'}); }
     if(!s.length)return '';
@@ -9808,7 +9808,7 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
         else if(v===true||s==='1'||s==='true')s='Yes';
         rows.push([LBL[k]||k,s]);
       }
-      var h=window.__horizons||{}, hz=[]; if(h.open!==false)hz.push('Open'); if(h.recompete)hz.push('Recompete'); if(h.forecast)hz.push('Forecast');
+      var h=window.__horizons||{}, hz=[]; if(h.open!==false)hz.push('Open Now'); if(h.recompete)hz.push('Coming Back'); if(h.forecast)hz.push('Coming Soon');
       if(hz.length)rows.push(['Showing',hz.join(', ')]);
       var b=ss.bbox, hasArea=!!(b&&typeof b==='object'&&b.s!=null&&b.n!=null&&b.w!=null&&b.e!=null);
       rows.push(['Location',hasArea?'The map area saved with this search':'No geographic restriction']);

@@ -1608,7 +1608,7 @@ function drawFeed(){
     return;
   }
   if(!rows.length && window.__coverageAllUnavailable){
-    feed.innerHTML=`<div class="empty"><h4>Forecast coverage unavailable</h4>
+    feed.innerHTML=`<div class="empty"><h4>Coming Soon coverage unavailable</h4>
       <p>${esc(window.__coverageNote||'We hold no forecasts from this buyer.')}. This is a coverage gap, not zero upcoming buys.</p>
       <button onclick="document.getElementById('clrAll').click()">Clear all filters</button></div>`;
     return;
