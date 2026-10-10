@@ -18,9 +18,10 @@
  */
 'use client';
 
-import { Suspense, useMemo, useState } from 'react';
+import { Suspense, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { DECLARABLE_CERTIFICATIONS, type CertificationAnswer } from '@/lib/profile/company-setup-input';
+import { DECLARABLE_CERTIFICATIONS, describeWorkIssue, type CertificationAnswer } from '@/lib/profile/company-setup-input';
+import { postSignupPath } from '@/lib/mindy/post-signup-destination';
 import { rankSuggestions, groundingLabel } from '@/lib/profile/suggestion-ranking';
 import type { SetupAction } from '@/lib/profile/company-setup-outcome';
 import { authedFetch, storedMIEmail } from '@/components/app/authHeaders';
@@ -34,6 +35,10 @@ function CompanySetupInner() {
   const [busy, setBusy] = useState(false);
   // A failed SAVE is shown, never turned into a redirect that looks like success.
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Screen 1's own problems (an unusable description, a lookup that failed). ALWAYS rendered —
+  // the button is never silently disabled (2026-10-10: "Roofing" disabled it with no message).
+  const [formError, setFormError] = useState<string | null>(null);
+  const descRef = useRef<HTMLTextAreaElement>(null);
 
   const [companyName, setCompanyName] = useState('');
   const [description, setDescription] = useState('');
@@ -52,21 +57,38 @@ function CompanySetupInner() {
   const leadTerm = useMemo(() => description.trim().split(/\s+/).find((w) => w.length > 3) || null, [description]);
   const rankedNaics = useMemo(() => rankSuggestions(naics, { leadTerm }), [naics, leadTerm]);
 
+  /** Where leaving should land when the server cannot be asked: the SAME pure resolver the
+   *  destination route wraps, so a dropped request still honours ?next=/learn instead of
+   *  falling through to the Map. */
+  const localDestination = () => postSignupPath({
+    next: params.get('next'), intent: params.get('intent'), purchaseNext: params.get('purchase_next'),
+  });
+
   /** Leave setup without writing anything, honouring the original intent. */
   const leave = async () => {
     const res = await fetch(`/api/company-setup/destination?${params.toString()}`).catch(() => null);
     const j = await res?.json().catch(() => null);
-    window.location.href = j?.path || '/opportunity-map';
+    window.location.href = j?.path || localDestination();
   };
 
   const seeMarket = async () => {
+    const issue = describeWorkIssue(description);
+    if (issue) { setFormError(issue); descRef.current?.focus(); return; }
+    setFormError(null);
     setBusy(true);
     try {
       const r = await fetch('/api/suggest-codes', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ description }),
-      });
-      const j = await r.json();
+      }).catch(() => null);
+      const j = await r?.json().catch(() => null);
+      // A failed lookup stays on this screen and SAYS so. It used to throw out of try/finally
+      // into nowhere: the button flashed "Looking…" and then did nothing at all.
+      if (!r || !r.ok || !j || j.success === false) {
+        setFormError((j && typeof j.error === 'string' && j.error)
+          || 'Mindy couldn\u2019t look up your market right now \u2014 nothing was saved. Try again, or skip for now.');
+        return;
+      }
       const typedOffers = typedCodeOffers([description]);
       const typedSet = new Set(typedOffers.map((t) => t.code));
       setTyped(typedOffers);
@@ -110,7 +132,7 @@ function CompanySetupInner() {
           : 'We couldn\u2019t save your selections — nothing was saved. Please try again.');
         return;
       }
-      window.location.href = j?.path || '/opportunity-map';
+      window.location.href = j?.path || localDestination();
     } finally { setBusy(false); }
   };
 
@@ -149,10 +171,13 @@ function CompanySetupInner() {
             <label className="mt-6 block text-sm font-semibold">What does your company do?</label>
             <p className="text-sm text-slate-400">In your own words — no codes needed.</p>
             <textarea
-              value={description} onChange={(e) => setDescription(e.target.value)} rows={3}
+              ref={descRef} id="describeWork" aria-describedby="descHint"
+              aria-invalid={formError ? true : undefined}
+              value={description} onChange={(e) => { setDescription(e.target.value); if (formError) setFormError(null); }} rows={3}
               className="mt-2 w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 outline-none focus:border-emerald-400"
               placeholder="We do commercial roofing and building envelope repair for military bases."
             />
+            <p id="descHint" className="mt-1 text-xs text-slate-500">{'A word or two is enough \u2014 for example, \u201cRoofing\u201d. More detail sharpens the match.'}</p>
 
             <div className="mt-6 flex items-baseline gap-2">
               <span className="text-sm font-semibold">Certifications</span>
@@ -185,8 +210,14 @@ function CompanySetupInner() {
                 className="mt-3 w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 outline-none focus:border-emerald-400" />
             )}
 
+            {formError && (
+              <p role="alert" className="mt-6 rounded-lg border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                {formError}
+              </p>
+            )}
+
             <div className="mt-10 flex justify-end">
-              <button onClick={seeMarket} disabled={busy || description.trim().length < 8}
+              <button onClick={seeMarket} disabled={busy}
                 className="rounded-xl bg-emerald-500 px-6 py-3 font-semibold text-[#06120c] disabled:opacity-40">
                 {busy ? 'Looking…' : 'Show me my market →'}
               </button>

@@ -22,6 +22,8 @@ import { fiscalYearTimePeriod, fiscalYearLabel } from '@/lib/utils/fiscal-year';
 import { sectorSubTradeKeywords } from '@/lib/market/sector-expansions';
 import { keywordCandidates, isDistinctiveKeyword } from '@/lib/market/keyword-sanitize';
 import { isKnownNaicsCode, isKnownPscCode } from '@/lib/codes/validate-market-codes';
+// Shared with /welcome/company so the page can never be stricter than this route.
+import { MIN_DESCRIPTION_CHARS } from '@/lib/profile/company-setup-input';
 
 // Groq API configuration
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -311,7 +313,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<SuggestCo
     // Allow short single-word industry queries ("drones", "HVAC", "janitorial")
     // — a 10-char minimum blocked legitimate keyword lookups (Eric: "drone does
     // nothing"). Just need 2+ chars of a real word.
-    if (!description || typeof description !== 'string' || description.trim().length < 2) {
+    if (!description || typeof description !== 'string' || description.trim().length < MIN_DESCRIPTION_CHARS) {
       return NextResponse.json({
         success: false,
         naicsSuggestions: [],
