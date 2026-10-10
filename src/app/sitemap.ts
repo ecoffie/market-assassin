@@ -27,6 +27,7 @@ import {
 import { getServeableSlugs } from '@/lib/seo/served-slugs';
 import { getServedContractsUeis } from '@/lib/awards-serving';
 import { glossaryTerms } from '@/data/glossary';
+import { MISSIONS } from '@/lib/learn/missions';
 import { BLOG_POSTS } from '@/data/blog-posts';
 import { NAICS_TOP_100 } from '@/data/naics-top100';
 import { getSubpageRowCounts } from '@/lib/seo/subpage-row-counts';
@@ -95,6 +96,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // are emitted below as their own block so Google sees the full
     // vocabulary, not just the landing page.
     { url: `${SITE_URL}/glossary`,              lastModified: now, changeFrequency: 'weekly',  priority: 0.7 },
+    // Mindy Learn — public GovCon tutorials (Learn PR B). Index + one page per mission, from static data.
+    { url: `${SITE_URL}/learn`,                 lastModified: now, changeFrequency: 'weekly',  priority: 0.8 },
+    ...MISSIONS.map((m) => ({ url: `${SITE_URL}/learn/${m.slug}`, lastModified: now, changeFrequency: 'monthly' as const, priority: 0.6 })),
     // NAICS index — top-of-funnel for "naics codes" / industry-discovery
     // queries. Per-code detail pages emitted in their own block below so
     // Google sees the full set, not just the landing page.

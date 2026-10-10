@@ -40,6 +40,8 @@
     "src/app/research",
     "src/lib/analytics/sb-benchmark-html.ts",
     "src/app/bid",
+    "src/app/learn",
+    "src/lib/learn",
     "src/app/mcp/page.tsx",
     "src/app/mcp/mcp-console.tsx",
     "src/app/mcp/public-ui.tsx",
@@ -83,6 +85,8 @@
   ],
   "runtimeRoutes": [
     "/today",
+    "/learn",
+    "/learn/tell-mindy-what-you-sell",
     "/design-fixtures/public-site",
     "/set-asides",
     "/set-asides/8a",
