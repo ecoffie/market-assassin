@@ -169,7 +169,7 @@ export const MISSIONS: readonly Mission[] = [
       'Confirm you see ✓ Saved — alerts on.',
     ],
     doIt: { label: 'Watch my market', href: '/opportunity-map?horizon=open,forecast' },
-    access: 'signin', accessNote: 'Signed out, the watch is kept on this browser with alerts off, until you sign in and turn alerts on.',
+    access: 'signin', accessNote: 'Signed out, the watch is kept on this browser with alerts off \u2014 find it under Watchlist. When you sign in it moves to your account with alerts still off; you choose which watches email you. If this browser\u2019s data is cleared first, Mindy can\u2019t recover it.',
     status: 'live', tracked: true,
     evidence: '>=1 saved_searches row for the email (not anon) with alerts_enabled=true. Claude schedule_market_search watches count.',
     next: 'B6', glossary: ['sources-sought', 'set-aside', 'rule-of-two'],

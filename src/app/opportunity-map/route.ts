@@ -5247,9 +5247,9 @@ const VIEWPORT_JS = `<script>
                 ? 'Watching this market. Get email alerts for '+[_ap.horizons.open?'Open Now':'',_ap.horizons.forecast?'Coming Soon':''].filter(Boolean).join(' + ')+'? Coming Back contracts are not emailed \\u2014 to follow one, open it and use \\u201cTrack this recompete\\u201d. (sign-in required so we email the right person)'
                 : 'Watching this market. Get alerted when new opportunities match? (sign-in required so we email the right person)';
               if(!confirm(_askAlerts)){ _ssReset(); return; }
-              var _a=window.requireSignIn('get alerts for this market', function(){ window.__claimAnonWatches&&window.__claimAnonWatches(); });
+              var _a=window.requireSignIn('get alerts for this market', function(){ window.__claimAnonWatches&&window.__claimAnonWatches(d.id); });
               if(!_a){ _ssReset(); return; }
-              window.__claimAnonWatches&&window.__claimAnonWatches();
+              window.__claimAnonWatches&&window.__claimAnonWatches(d.id);
             },500);
           } else _ssMsg('Couldn\\'t save');
         }).catch(function(){ _ssMsg('Couldn\\'t save'); });
@@ -5609,22 +5609,36 @@ const SAVE_JS = `<script>
   // IIFE — so it threw a ReferenceError on its first statement and no anonymous
   // watch was ever claimed (prod: 37 unclaimed, 0 watch_claimed events). Every
   // identifier below is either this block's own or read off window.
-  window.__claimAnonWatches=function(){
+  // optInWatchId = the ONE watch the visitor just said yes to alerts for. Without it, a claim moves
+  // this browser's watches onto the account with alerts OFF (option A, 2026-10-10): signing in,
+  // claiming or retrying never subscribes anyone. The server also claims on every verified sign-in.
+  window.__claimAnonWatches=function(optInWatchId){
     var t=tok(); var em=t?email(t):''; if(!t||!em)return;
     var aid=_anonKey(); if(!aid)return;
     var ui=function(name,arg){ try{ if(typeof window[name]==='function')window[name](arg); }catch(e){} };
+    var body={action:'claim',anonId:aid};
+    if(optInWatchId){ body.enableAlerts=true; body.watchId=String(optInWatchId); }
     fetch('/api/app/map-watch',{method:'POST',
       headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
-      body:JSON.stringify({action:'claim',anonId:aid})})
+      body:JSON.stringify(body)})
       .then(function(r){return r.json();}).then(function(c){
-        // Only a VERIFIED claim counts.
-        if(c&&c.success&&c.claimed>0){ try{ if(window.__track)window.__track('tool_use','watch_claimed',{watches:c.claimed,alerts_on:c.alertsOn,not_emailable:c.notEmailable,coming_back_excluded:c.comingBackExcluded}); }catch(e){}
-          // F3: say what actually turned on. "Alerts on" only when a claimed watch really alerts.
-          ui('__ssMsg', c.alertsEnabled===false ? '\u2713 Saved \u2014 Coming Back isn\u2019t emailed'
-            : (c.comingBackExcluded>0||c.notEmailable>0) ? '\u2713 Alerts on (not Coming Back)' : '\u2713 Alerts on'); }
-        else ui('__ssReset');
-      }).catch(function(){ ui('__ssReset'); });
+        // Only a VERIFIED claim counts. The sign-in hook may already have moved the watch, so an
+        // opt-in can turn alerts on with claimed=0 — judge by what actually happened.
+        if(c&&c.success&&(c.claimed>0||c.alertsOn>0||c.notEmailable>0)){ try{ if(window.__track)window.__track('tool_use','watch_claimed',{watches:c.claimed,alerts_on:c.alertsOn,not_emailable:c.notEmailable,coming_back_excluded:c.comingBackExcluded,opt_in:!!optInWatchId}); }catch(e){}
+          if(!optInWatchId){ return; }
+          // "Alerts on" only when the opted-in watch really alerts.
+          ui('__ssMsg', c.alertsOn>0 ? (c.comingBackExcluded>0 ? '\u2713 Alerts on (not Coming Back)' : '\u2713 Alerts on')
+            : '\u2713 Saved \u2014 Coming Back isn\u2019t emailed'); }
+        else if(optInWatchId) ui('__ssReset');
+      }).catch(function(){ if(optInWatchId) ui('__ssReset'); });
   };
+  // Safety net for sessions that did not pass through a sign-in route this visit: once per browser
+  // session, a signed-in visitor's anonymous watches move to the account — alerts OFF.
+  // Reads the STORED id only — never mints one: a visitor who never saved anything has nothing to claim.
+  try{ (function(){ var t=tok(); var em=t?email(t):''; var aid=''; try{ aid=localStorage.getItem('mindy_anon_id')||''; }catch(e){}
+    if(!t||!em||!aid) return; if(typeof window.__tokenExpired==='function'&&window.__tokenExpired(t)) return;
+    var k='mindy_anon_claimed:'+em; if(sessionStorage.getItem(k)) return; sessionStorage.setItem(k,'1');
+    window.__claimAnonWatches(); })(); }catch(e){}
 
   // ── RESTORE ──────────────────────────────────────────────────────────────
   // Show what this visitor already kept, rather than making them click Save
@@ -9753,7 +9767,23 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
           return failError('not_ready');
         }
         var sess=window.__mapSession();
-        if(!sess){ waitForAuth(); return failSignin(); }
+        // SIGNED OUT: a watch this BROWSER saved opens without signing in (option A). Ownership is the
+        // browser's stored anon id — the watch id in the URL alone can never open someone else's.
+        if(!sess){
+          var aid=''; try{ aid=localStorage.getItem('mindy_anon_id')||''; }catch(e){}
+          if(!/^anon:[0-9a-f-]{36}$/i.test(aid)){ waitForAuth(); return failSignin(); }
+          var adone=false;
+          fetch('/api/app/map-watch?anonId='+encodeURIComponent(aid)+'&id='+encodeURIComponent(wantId))
+            .then(function(r){ return r.json().catch(function(){ return null; }); })
+            .then(function(d){
+              if(adone||my!==seq)return; adone=true;
+              var w=d&&d.success&&d.watches&&d.watches[0];
+              if(!w||String(w.id)!==wantId){ waitForAuth(); return failSignin(); }
+              applyNow(w);
+            })
+            .catch(function(){ if(adone||my!==seq)return; adone=true; failError('network'); });
+          return;
+        }
         if(sess.expired){ waitForAuth(); return failExpired(); }
         var done=false;
         // The market as it stands when we ask. If it differs when the answer lands, the reader has

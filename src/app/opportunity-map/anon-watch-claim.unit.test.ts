@@ -29,7 +29,7 @@ const SAVE_START = MAP.indexOf('const SAVE_JS = `<script>');
 const HELPERS =
   slice('  function tok(){', '  // THE flywheel gate', SAVE_START) +
   slice('  function _anonKey(){', '\n', SAVE_START) + '\n';
-const CLAIM = slice("  window.__claimAnonWatches=function(){", '  // ── RESTORE', SAVE_START);
+const CLAIM = slice("  window.__claimAnonWatches=function(optInWatchId){", '  // Safety net for sessions', SAVE_START);
 
 const ANON = '3f2b8c1e-7a4d-4b8e-9c1f-2a6d5e8b7c90';
 const token = (email: string) =>
@@ -52,7 +52,7 @@ function run(opts: { signedIn: boolean; anonId?: string; resp?: unknown; ok?: bo
   };
   const fn = new Function('window', 'localStorage', 'fetch', 'atob', `${HELPERS}\n${CLAIM}\nreturn window.__claimAnonWatches;`);
   const claim = fn(win, { getItem: (k: string) => store[k] ?? null }, fetchFn, (s: string) => Buffer.from(s, 'base64').toString('binary'));
-  return { claim: claim as () => void, calls, events, ui };
+  return { claim: claim as (optIn?: string) => void, calls, events, ui };
 }
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
@@ -62,7 +62,7 @@ describe('the claim runs in SAVE_JS scope', () => {
     expect(() => h.claim()).not.toThrow();
   });
 
-  it('posts the anon id with the session token; identity comes from the token, not a body email', async () => {
+  it('a bare claim posts the anon id with the session token and NO alert opt-in (option A)', async () => {
     const h = run({ signedIn: true });
     h.claim(); await flush();
     expect(h.calls).toHaveLength(1);
@@ -71,17 +71,27 @@ describe('the claim runs in SAVE_JS scope', () => {
     expect(h.calls[0].headers['x-mi-auth-token']).toBe(token('pat@example.com'));
   });
 
-  it('a verified claim fires watch_claimed and says Alerts on', async () => {
-    const h = run({ signedIn: true, resp: { success: true, claimed: 2 } });
+  it('a bare claim is silent in the UI and never says "Alerts on"', async () => {
+    const h = run({ signedIn: true, resp: { success: true, claimed: 2, alertsOn: 0 } });
     h.claim(); await flush(); await flush();
-    expect(h.events).toEqual([['tool_use', 'watch_claimed', { watches: 2 }]]);
+    expect(h.events).toEqual([['tool_use', 'watch_claimed', { watches: 2, alerts_on: 0, opt_in: false }]]);
+    expect(h.ui).toEqual([]);
+  });
+
+  it('the explicit opt-in names the ONE watch and says Alerts on only when it really alerts', async () => {
+    const h = run({ signedIn: true, resp: { success: true, claimed: 0, alertsOn: 1 } });
+    h.claim('w-123'); await flush(); await flush();
+    expect(h.calls[0].body).toEqual({ action: 'claim', anonId: ANON, enableAlerts: true, watchId: 'w-123' });
     expect(h.ui).toEqual(['msg:✓ Alerts on']);
+    const off = run({ signedIn: true, resp: { success: true, claimed: 1, alertsOn: 0, notEmailable: 1 } });
+    off.claim('w-9'); await flush(); await flush();
+    expect(off.ui).toEqual(['msg:✓ Saved — Coming Back isn’t emailed']);
   });
 
   it('claiming nothing (or a refusal) fires no event and claims no success', async () => {
-    for (const resp of [{ success: true, claimed: 0 }, { success: false, error: 'Unauthorized' }]) {
+    for (const resp of [{ success: true, claimed: 0, alertsOn: 0 }, { success: false, error: 'Unauthorized' }]) {
       const h = run({ signedIn: true, resp, ok: resp.success });
-      h.claim(); await flush(); await flush();
+      h.claim('w-1'); await flush(); await flush();
       expect(h.events).toHaveLength(0);
       expect(h.ui).toEqual(['reset']);
     }

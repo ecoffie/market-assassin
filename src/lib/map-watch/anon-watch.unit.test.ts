@@ -97,8 +97,8 @@ describe('an anonymous watch can NEVER email anyone', () => {
 });
 
 type WRow = { id: string; user_email: string; mode: string; filters: Record<string, unknown>; alerts_enabled: boolean };
-/** A saved_searches fake honouring select/update + eq/in, with exact counts — like PostgREST. */
-function claimDb(rows: WRow[], opts: { nullCount?: boolean; failFilterUpdate?: boolean } = {}) {
+/** A saved_searches fake honouring select/update + eq/in/maybeSingle, with exact counts — like PostgREST. */
+function claimDb(rows: WRow[], opts: { nullCount?: boolean; failMove?: boolean } = {}) {
   const writes: Array<{ payload: Record<string, unknown>; ids: string[] }> = [];
   const db = {
     from: () => {
@@ -106,45 +106,74 @@ function claimDb(rows: WRow[], opts: { nullCount?: boolean; failFilterUpdate?: b
       let payload: Record<string, unknown> | null = null;
       const match = (r: WRow) => conds.every(([op, k, v]) =>
         op === 'eq' ? (r as unknown as Record<string, unknown>)[k] === v : (v as string[]).includes((r as unknown as Record<string, string>)[k]));
+      const run = () => {
+        const hit = rows.filter(match);
+        if (!payload) return { data: hit.map((r) => ({ ...r })), error: null };
+        if (opts.failMove && 'user_email' in payload) return { error: { message: 'boom' }, count: null };
+        for (const r of hit) Object.assign(r, payload);
+        writes.push({ payload, ids: hit.map((r) => r.id) });
+        return { error: null, count: opts.nullCount ? null : hit.length };
+      };
       const q: Record<string, unknown> = {
         select: () => q,
         update: (p: Record<string, unknown>) => { payload = p; return q; },
         eq: (k: string, v: unknown) => { conds.push(['eq', k, v]); return q; },
         in: (k: string, v: unknown[]) => { conds.push(['in', k, v]); return q; },
-        then: (res: (v: unknown) => unknown) => {
-          const hit = rows.filter(match);
-          if (!payload) return Promise.resolve({ data: hit.map((r) => ({ ...r })), error: null }).then(res);
-          if (opts.failFilterUpdate && 'filters' in payload) return Promise.resolve({ error: { message: 'boom' }, count: null }).then(res);
-          for (const r of hit) Object.assign(r, payload);
-          writes.push({ payload, ids: hit.map((r) => r.id) });
-          return Promise.resolve({ error: null, count: opts.nullCount ? null : hit.length }).then(res);
-        },
+        maybeSingle: () => { const r = run() as { data: WRow[] }; return Promise.resolve({ data: r.data[0] ?? null, error: null }); },
+        then: (res: (v: unknown) => unknown) => Promise.resolve(run()).then(res),
       };
       return q;
     },
   };
   return { db: db as never, writes };
 }
-const w = (id: string, mode: string, horizons?: Record<string, unknown>): WRow =>
-  ({ id, user_email: ANON, mode, filters: { naics: '541512', state: 'VA', ...(horizons ? { horizons } : {}) }, alerts_enabled: false });
+const w = (id: string, mode: string, horizons?: Record<string, unknown>, owner = ANON): WRow =>
+  ({ id, user_email: owner, mode, filters: { naics: '541512', state: 'VA', ...(horizons ? { horizons } : {}) }, alerts_enabled: false });
+const ME = 'buyer@example.com';
 
-describe('claiming is the only way alerts turn on', () => {
-  it('attaches the verified email and enables alerts on an emailable watch, scoped to that anon id', async () => {
-    const rows = [w('a', 'open', { open: true, recompete: false, forecast: true }), { ...w('x', 'open'), user_email: 'anon:someone-else' }];
+describe('claiming moves THIS browser\u2019s watches — alerts OFF (option A)', () => {
+  it('a bare claim (sign-in, retry, page load) moves the watch with the same filters and alerts off', async () => {
+    const rows = [w('a', 'open', { open: true, recompete: true, forecast: true })];
+    const before = JSON.parse(JSON.stringify(rows[0].filters));
+    const r = await claimAnonWatch(claimDb(rows).db, ANON, 'Buyer@Example.com');
+    expect(r).toMatchObject({ ok: true, claimed: 1, alertsOn: 0, alreadyOnAccount: 0 });
+    expect(rows[0]).toMatchObject({ user_email: ME, alerts_enabled: false });
+    expect(rows[0].filters).toEqual(before);
+  });
+
+  it('is scoped to the caller\u2019s anon id: another browser\u2019s watch never moves', async () => {
+    const rows = [w('a', 'open'), w('x', 'open', undefined, 'anon:11111111-1111-4111-8111-111111111111')];
+    await claimAnonWatch(claimDb(rows).db, ANON, ME);
+    expect(rows[1].user_email).toBe('anon:11111111-1111-4111-8111-111111111111');
+  });
+
+  it('IDEMPOTENT: a second sign-in moves nothing and creates no duplicate', async () => {
+    const rows = [w('a', 'open')];
     const { db } = claimDb(rows);
-    const r = await claimAnonWatch(db, ANON, 'Buyer@Example.com');
-    expect(r).toMatchObject({ ok: true, claimed: 1, alertsOn: 1, notEmailable: 0, comingBackExcluded: 0 });
-    expect(rows[0]).toMatchObject({ user_email: 'buyer@example.com', alerts_enabled: true });
-    expect(rows[0].filters).toEqual({ naics: '541512', state: 'VA', horizons: { open: true, recompete: false, forecast: true } });
-    // one visitor cannot claim another's watch
-    expect(rows[1].user_email).toBe('anon:someone-else');
+    await claimAnonWatch(db, ANON, ME);
+    const again = await claimAnonWatch(db, ANON, ME);
+    expect(again).toMatchObject({ ok: true, claimed: 0, alreadyOnAccount: 0 });
+    expect(rows).toHaveLength(1);
   });
 
-  it('refuses a malformed anon id', async () => {
+  it('switching accounts never transfers a watch already owned by another account', async () => {
+    const rows = [w('a', 'open')];
+    const { db } = claimDb(rows);
+    await claimAnonWatch(db, ANON, ME);
+    const other = await claimAnonWatch(db, ANON, 'someone-else@example.com');
+    expect(other.claimed).toBe(0);
+    expect(rows[0].user_email).toBe(ME);
+  });
+
+  it('an identical watch already on the account is not duplicated', async () => {
+    const rows = [w('mine', 'open', { open: true }, ME), w('a', 'open', { open: true })];
+    const r = await claimAnonWatch(claimDb(rows).db, ANON, ME);
+    expect(r).toMatchObject({ claimed: 0, alreadyOnAccount: 1 });
+    expect(rows.filter((x) => x.user_email === ME)).toHaveLength(1);
+  });
+
+  it('refuses a malformed anon id, a non-email, and an anon id posing as an account', async () => {
     expect((await claimAnonWatch(claimDb([]).db, 'nope', 'a@b.com')).ok).toBe(false);
-  });
-
-  it('refuses a non-email', async () => {
     expect((await claimAnonWatch(claimDb([]).db, ANON, 'not-an-email')).ok).toBe(false);
   });
 
@@ -155,53 +184,55 @@ describe('claiming is the only way alerts turn on', () => {
   });
 
   it('a NULL count is UNKNOWN, never reported as zero claimed', async () => {
-    const { db } = claimDb([w('a', 'open')], { nullCount: true });
-    const r = await claimAnonWatch(db, ANON, 'a@b.com');
+    const r = await claimAnonWatch(claimDb([w('a', 'open')], { nullCount: true }).db, ANON, 'a@b.com');
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/UNKNOWN, not zero/i);
   });
-});
 
-// F3 (2026-10-10): claiming turned alerts on for EVERY anon watch, including scopes the alert cron cannot
-// deliver. Prod: 46 pending anon watches carry Recompete; one claimed watch (2026-10-04) alerts with it.
-describe('F3 — claiming never activates an unsupported alert scope', () => {
-  it('a watch kept with Recompetes on alerts for Open/Forecast only; every other filter is preserved', async () => {
-    const rows = [w('a', 'open', { open: true, recompete: true, forecast: true })];
-    const { db } = claimDb(rows);
-    const r = await claimAnonWatch(db, ANON, 'a@b.com');
-    expect(r).toMatchObject({ ok: true, claimed: 1, alertsOn: 1, comingBackExcluded: 1, notEmailable: 0 });
-    expect(rows[0].alerts_enabled).toBe(true);
-    expect(rows[0].filters).toEqual({ naics: '541512', state: 'VA', horizons: { open: true, recompete: false, forecast: true } });
-  });
-
-  it('a Recompete-only watch is claimed with alerts OFF and its filters untouched', async () => {
-    const rows = [w('a', 'open', { open: false, recompete: true, forecast: false }), w('b', 'recompete')];
-    const before = JSON.parse(JSON.stringify(rows.map((r) => r.filters)));
-    const { db } = claimDb(rows);
-    const r = await claimAnonWatch(db, ANON, 'a@b.com');
-    expect(r).toMatchObject({ ok: true, claimed: 2, alertsOn: 0, notEmailable: 2, comingBackExcluded: 0 });
-    expect(rows.map((x) => x.alerts_enabled)).toEqual([false, false]);
-    expect(rows.map((x) => x.user_email)).toEqual(['a@b.com', 'a@b.com']);
-    expect(rows.map((x) => x.filters)).toEqual(before);
-  });
-
-  it('never turns on a horizon the user did not choose (no broadening)', async () => {
-    const rows = [w('a', 'open', { open: false, recompete: true, forecast: true })];
-    await claimAnonWatch(claimDb(rows).db, ANON, 'a@b.com');
-    expect(rows[0].filters.horizons).toEqual({ open: false, recompete: false, forecast: true });
-  });
-
-  it('a failed narrowing turns NOTHING on', async () => {
-    const rows = [w('a', 'open', { open: true, recompete: true, forecast: false })];
-    const r = await claimAnonWatch(claimDb(rows, { failFilterUpdate: true }).db, ANON, 'a@b.com');
+  it('a failed move turns nothing on and moves nothing', async () => {
+    const rows = [w('a', 'open', { open: true })];
+    const r = await claimAnonWatch(claimDb(rows, { failMove: true }).db, ANON, ME, { enableAlertsFor: 'a' });
     expect(r.ok).toBe(false);
     expect(rows[0]).toMatchObject({ user_email: ANON, alerts_enabled: false });
   });
+});
 
-  it('a mixed browser: each watch gets the truthful state', async () => {
-    const rows = [w('a', 'open'), w('b', 'open', { open: true, recompete: true, forecast: false }), w('c', 'recompete')];
-    const r = await claimAnonWatch(claimDb(rows).db, ANON, 'a@b.com');
-    expect(r).toMatchObject({ ok: true, claimed: 3, alertsOn: 2, notEmailable: 1, comingBackExcluded: 1 });
+describe('alerts turn on ONLY for the one watch the user explicitly opted into', () => {
+  it('opt-in on an emailable watch: alerts on, every filter preserved', async () => {
+    const rows = [w('a', 'open', { open: true, recompete: false, forecast: true }), w('b', 'open', { open: true })];
+    const r = await claimAnonWatch(claimDb(rows).db, ANON, ME, { enableAlertsFor: 'a' });
+    expect(r).toMatchObject({ ok: true, claimed: 2, alertsOn: 1 });
+    expect(rows[0].alerts_enabled).toBe(true);
+    expect(rows[1].alerts_enabled).toBe(false); // the other watch stays off
+  });
+
+  it('opt-in with Coming Back on: alerts for Open Now / Coming Soon only (F3), nothing broadened', async () => {
+    const rows = [w('a', 'open', { open: false, recompete: true, forecast: true })];
+    const r = await claimAnonWatch(claimDb(rows).db, ANON, ME, { enableAlertsFor: 'a' });
+    expect(r).toMatchObject({ alertsOn: 1, comingBackExcluded: 1 });
+    expect(rows[0].filters.horizons).toEqual({ open: false, recompete: false, forecast: true });
+  });
+
+  it('opt-in on a Coming Back-only watch: claimed, alerts stay OFF', async () => {
+    const rows = [w('a', 'recompete')];
+    const r = await claimAnonWatch(claimDb(rows).db, ANON, ME, { enableAlertsFor: 'a' });
+    expect(r).toMatchObject({ claimed: 1, alertsOn: 0, notEmailable: 1 });
+    expect(rows[0].alerts_enabled).toBe(false);
+  });
+
+  it('opt-in works when the sign-in hook already moved the watch (claimed 0, alerts on)', async () => {
+    const rows = [w('a', 'open', { open: true }, ME)];
+    const r = await claimAnonWatch(claimDb(rows).db, ANON, ME, { enableAlertsFor: 'a' });
+    expect(r).toMatchObject({ claimed: 0, alertsOn: 1 });
+  });
+
+  it('a WATCH ID ALONE authorizes nothing: opting in to someone else\u2019s watch changes nothing', async () => {
+    const rows = [w('theirs', 'open', { open: true }, 'victim@example.com'), w('anonOther', 'open', { open: true }, 'anon:22222222-2222-4222-8222-222222222222')];
+    const r = await claimAnonWatch(claimDb(rows).db, ANON, ME, { enableAlertsFor: 'theirs' });
+    expect(r).toMatchObject({ claimed: 0, alertsOn: 0 });
+    const r2 = await claimAnonWatch(claimDb(rows).db, ANON, ME, { enableAlertsFor: 'anonOther' });
+    expect(r2).toMatchObject({ claimed: 0, alertsOn: 0 });
+    expect(rows.map((x) => [x.user_email, x.alerts_enabled])).toEqual([['victim@example.com', false], ['anon:22222222-2222-4222-8222-222222222222', false]]);
   });
 });
 
