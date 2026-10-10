@@ -74,7 +74,27 @@ export function resolveSetupInput(input: CompanySetupInput, now = new Date().toI
   return out;
 }
 
+/**
+ * The ONE rule for "has the user described their work enough to look up a market?" — shared by the
+ * /welcome/company button and POST /api/suggest-codes, so the page can never be stricter than the API.
+ *
+ * One industry word is enough: "Roofing" returns 238160 Roofing Contractors. The page used to require
+ * 8 characters while the API accepted 2, so "Roofing" (7) silently DISABLED "Show me my market" with no
+ * message — the button looked broken (2026-10-10, reported on /welcome/company?next=/learn).
+ */
+export const MIN_DESCRIPTION_CHARS = 2;
+
+/** null when the description is usable; otherwise the sentence to SHOW the user. Never silent. */
+export function describeWorkIssue(description: string | null | undefined): string | null {
+  const d = trim(description);
+  if (!d) return 'Tell Mindy what your company does \u2014 one word like \u201cRoofing\u201d is enough.';
+  if (d.length < MIN_DESCRIPTION_CHARS || !/[a-z]/i.test(d)) {
+    return 'Use at least two letters to describe your work \u2014 for example, \u201cRoofing\u201d.';
+  }
+  return null;
+}
+
 /** True when the user gave Mindy enough to derive a market from. */
 export function canDeriveMarket(input: CompanySetupInput): boolean {
-  return trim(input.description).length >= 8;
+  return describeWorkIssue(input.description) === null;
 }
