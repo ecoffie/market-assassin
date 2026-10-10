@@ -12,9 +12,10 @@ import { join } from 'node:path';
 const route = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 const tmpl = readFileSync(join(__dirname, 'template.html'), 'utf8');
 
-describe('recompete dataset is named "Recompetes"', () => {
-  it('the MODES header title is "Recompetes"', () => {
-    expect(route).toContain("recompete:{ ep:'/api/app/recompete-map', title:'Recompetes'");
+// 2026-10-10 (Mindy Learn decision 2): the user-facing name is now "Coming Back"; the key stays `recompete`.
+describe('recompete dataset is named "Coming Back"', () => {
+  it('the MODES header title is "Coming Back"', () => {
+    expect(route).toContain("recompete:{ ep:'/api/app/recompete-map', title:'Coming Back'");
   });
   it('no superseded label survives (Awarded Contracts / Contract Vehicles)', () => {
     expect(route).not.toContain("title:'Awarded Contracts'");

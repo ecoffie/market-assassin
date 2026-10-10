@@ -143,9 +143,9 @@ const MORE_FILTERS = '<div class="mfwrap">'
   // top-bar control). Opportunities-map only (mfv-open). Drives window.__horizons → merged fetch.
   + '<div class="mf-sec mfv-open" data-mfsec="horizons">Show on the map <em>(categories)</em></div>'
   + '<div class="mf-checks mfv-open" data-mfsec="horizons" id="hznToggles">'
-  +   '<button class="hzc on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')">Open</button>'
-  +   '<button class="hzc on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')">Recompete</button>'
-  +   '<button class="hzc on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')">Forecast</button>'
+  +   '<button class="hzc on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')">Open Now</button>'
+  +   '<button class="hzc on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')">Coming Back</button>'
+  +   '<button class="hzc on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')">Coming Soon</button>'
   // Grants removed from the Horizons set (Eric 2026-08-01). The grants-map endpoint stays for now,
   // but Grants is no longer an Opportunities horizon toggle.
   + '</div>'
@@ -365,9 +365,9 @@ const SERVER_FILTERS =
   + '<div class="hznwrap mfv-open" id="hznWrap">'
   +   '<button class="fsel fsel-mode" id="hznBtn" type="button" title="Which categories to show" aria-haspopup="true" aria-expanded="false">Horizons</button>'
   +   '<div class="hznpop" id="hznPop" role="menu" hidden>'
-  +     '<button class="hznrow on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')"><i></i><span class="hznlbl">Open</span><span class="hznn" data-hzn="open"></span></button>'
-  +     '<button class="hznrow on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')"><i></i><span class="hznlbl">Recompete</span><span class="hznn" data-hzn="recompete"></span></button>'
-  +     '<button class="hznrow on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')"><i></i><span class="hznlbl">Forecast</span><span class="hznn" data-hzn="forecast"></span></button>'
+  +     '<button class="hznrow on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')"><i></i><span class="hznlbl">Open Now</span><span class="hznn" data-hzn="open"></span></button>'
+  +     '<button class="hznrow on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')"><i></i><span class="hznlbl">Coming Back</span><span class="hznn" data-hzn="recompete"></span></button>'
+  +     '<button class="hznrow on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')"><i></i><span class="hznlbl">Coming Soon</span><span class="hznn" data-hzn="forecast"></span></button>'
   +   '</div>'
   + '</div>'
   // PLAYERS multi-select dropdown — Companies + Gov Buyers coexist on ONE Players map (same pattern
@@ -1644,9 +1644,9 @@ const VIEWPORT_JS = `<script>
   // dataset dropdown/nav directly instead of a nested control.
   var MODES={
     open:{ ep:'/api/app/opportunity-map', title:'Open Opportunities', unit:'active opportunities' },
-    forecast:{ ep:'/api/app/forecast-map', title:'Forecasts', unit:'upcoming opportunities' },
+    forecast:{ ep:'/api/app/forecast-map', title:'Coming Soon', unit:'upcoming opportunities' },
     grants:{ ep:'/api/app/grants-map', title:'Grants', unit:'open grants' },
-    recompete:{ ep:'/api/app/recompete-map', title:'Recompetes', unit:'expiring contracts' },
+    recompete:{ ep:'/api/app/recompete-map', title:'Coming Back', unit:'expiring contracts' },
     companies:{ ep:'/api/app/contacts-map', ctype:'companies', title:'Companies', unit:'companies' },
     buyers:{ ep:'/api/app/contacts-map', ctype:'buyers', title:'Government Buyers', unit:'buyers' },
     // DLA = its OWN top-level map (3rd, sibling to Opportunities/Players). A DLA/DIBBS supply RFQ
@@ -2038,7 +2038,7 @@ const VIEWPORT_JS = `<script>
     ['open','recompete','forecast'].forEach(function(h){
       var c=counts&&counts[h]; if(!c) return;
       if(c.state==='needs_scope') return;   // not a coverage fact — rendered by needsScopeNote()
-      var name=h==='forecast'?'Forecasts':(h==='recompete'?'Recompetes':'Open');
+      var name=h==='forecast'?'Coming Soon':(h==='recompete'?'Coming Back':'Open Now');
       var who=c.gaps&&c.gaps.length?' for '+c.gaps.join(', '):'';
       // Horizons still loading: ONE short entry (the Updating panel carries per-horizon progress).
       if(c.state==='loading') loadingNames.push(name);
@@ -4783,9 +4783,9 @@ const VIEWPORT_JS = `<script>
           // their market has anything in it before committing the chip. Omitted (not zeroed)
           // when the endpoint could not count -- "0 open" on a failed query is a lie.
           var bits=[];
-          if(typeof r.open==='number')bits.push(r.open+' open');
-          if(typeof r.recompetes==='number'&&r.recompetes)bits.push(r.recompetes+' recompete'+(r.recompetes===1?'':'s'));
-          if(typeof r.forecasts==='number'&&r.forecasts)bits.push(r.forecasts+' forecast'+(r.forecasts===1?'':'s'));
+          if(typeof r.open==='number')bits.push(r.open+' open now');
+          if(typeof r.recompetes==='number'&&r.recompetes)bits.push(r.recompetes+' coming back');
+          if(typeof r.forecasts==='number'&&r.forecasts)bits.push(r.forecasts+' coming soon');
           var meta=bits.length?'<span class="k">'+esc(bits.join(' \u00b7 '))+'</span>':'';
           return '<button type="button" data-i="'+i+'"><span class="c">'+esc(r.code)+'</span>'
             + '<span class="n">'+esc(r.name||'')+'</span>'+meta+'</button>';
@@ -5185,13 +5185,13 @@ const VIEWPORT_JS = `<script>
     // forecast search the moment horizons existed.
     function _ssScopeLabel(){
       try{
-        if(MODE==='recompete')return 'Recompetes';
+        if(MODE==='recompete')return 'Coming Back';
         var h=window.__horizons||{}; var on=[];
-        if(h.open!==false)on.push('Open');
-        if(h.recompete)on.push('Recompetes');
-        if(h.forecast)on.push('Forecasts');
-        return on.length?on.join(' + '):'Open';
-      }catch(e){ return 'Open'; }
+        if(h.open!==false)on.push('Open Now');
+        if(h.recompete)on.push('Coming Back');
+        if(h.forecast)on.push('Coming Soon');
+        return on.length?on.join(' + '):'Open Now';
+      }catch(e){ return 'Open Now'; }
     }
     var em=_uemail();
     // ── ANONYMOUS VISITORS KEEP THE MARKET, NO ACCOUNT REQUIRED ──────────────
@@ -5234,12 +5234,12 @@ const VIEWPORT_JS = `<script>
             setTimeout(function(){
               if(!window.requireSignIn){ _ssReset(); return; }
               if(_ap&&_ap.kind==='none'){
-                _ss.textContent='\\u2713 Watching \\u2014 Recompetes aren\\u2019t emailed';
-                _ss.title='Email alerts cover Open and Forecast listings. To follow a recompete, open it and use \\u201cTrack this recompete\\u201d.';
+                _ss.textContent='\\u2713 Watching \\u2014 Coming Back isn\\u2019t emailed';
+                _ss.title='Email alerts cover Open Now and Coming Soon. To follow a Coming Back contract, open it and use \\u201cTrack this recompete\\u201d.';
                 setTimeout(_ssReset,4200); return;
               }
               var _askAlerts=(_ap&&_ap.kind==='partial')
-                ? 'Watching this market. Get email alerts for '+[_ap.horizons.open?'Open':'',_ap.horizons.forecast?'Forecasts':''].filter(Boolean).join(' + ')+'? Recompetes are not emailed \\u2014 to follow one, open it and use \\u201cTrack this recompete\\u201d. (sign-in required so we email the right person)'
+                ? 'Watching this market. Get email alerts for '+[_ap.horizons.open?'Open Now':'',_ap.horizons.forecast?'Coming Soon':''].filter(Boolean).join(' + ')+'? Coming Back contracts are not emailed \\u2014 to follow one, open it and use \\u201cTrack this recompete\\u201d. (sign-in required so we email the right person)'
                 : 'Watching this market. Get alerted when new opportunities match? (sign-in required so we email the right person)';
               if(!confirm(_askAlerts)){ _ssReset(); return; }
               var _a=window.requireSignIn('get alerts for this market', function(){ window.__claimAnonWatches&&window.__claimAnonWatches(); });
@@ -5259,17 +5259,17 @@ const VIEWPORT_JS = `<script>
     var _plan=window.__watchScopePlan?window.__watchScopePlan(MODE,window.__horizons||{}):null;
     if(_plan&&_plan.kind==='none'){
       try{ if(window.__track) window.__track('tool_use','watch_scope_blocked',{mode:MODE}); }catch(e){}
-      _ss.textContent='Recompetes aren\\u2019t emailed';
-      _ss.title='Email alerts cover Open and Forecast listings. Turn one on to save a watch, or open a recompete and use \\u201cTrack this recompete\\u201d.';
+      _ss.textContent='Coming Back isn\\u2019t emailed';
+      _ss.title='Email alerts cover Open Now and Coming Soon. Turn one on to save a watch, or open a Coming Back contract and use \\u201cTrack this recompete\\u201d.';
       setTimeout(_ssReset,4200);
       return;
     }
     if(_plan&&_plan.kind==='partial'){
-      var _keep=[]; if(_plan.horizons.open)_keep.push('Open'); if(_plan.horizons.forecast)_keep.push('Forecasts');
-      if(!confirm('Email alerts cover Open and Forecast listings. Recompetes are not emailed \\u2014 to follow one, open it and use \\u201cTrack this recompete\\u201d.\\n\\nSave a watch for '+_keep.join(' + ')+'? Your map stays as it is.')){ return; }
+      var _keep=[]; if(_plan.horizons.open)_keep.push('Open Now'); if(_plan.horizons.forecast)_keep.push('Coming Soon');
+      if(!confirm('Email alerts cover Open Now and Coming Soon. Coming Back contracts are not emailed \\u2014 to follow one, open it and use \\u201cTrack this recompete\\u201d.\\n\\nSave a watch for '+_keep.join(' + ')+'? Your map stays as it is.')){ return; }
       try{ if(window.__track) window.__track('tool_use','watch_scope_narrowed',{mode:MODE,keep:_keep.join('+')}); }catch(e){}
     }
-    var _watchLabel=(_plan&&_plan.horizons)?(function(hz){ var on=[]; if(hz.open)on.push('Open'); if(hz.forecast)on.push('Forecasts'); return on.join(' + ')||'Open'; })(_plan.horizons):_ssScopeLabel();
+    var _watchLabel=(_plan&&_plan.horizons)?(function(hz){ var on=[]; if(hz.open)on.push('Open Now'); if(hz.forecast)on.push('Coming Soon'); return on.join(' + ')||'Open Now'; })(_plan.horizons):_ssScopeLabel();
     var name=window.prompt('Name this saved search (you\\'ll get alerts on new matches):',
       (FILT.setAside||FILT.naics||Q||'My opportunities')+' — '+_watchLabel);
     if(!name)return;
@@ -5615,8 +5615,8 @@ const SAVE_JS = `<script>
         // Only a VERIFIED claim counts.
         if(c&&c.success&&c.claimed>0){ try{ if(window.__track)window.__track('tool_use','watch_claimed',{watches:c.claimed,alerts_on:c.alertsOn,not_emailable:c.notEmailable,coming_back_excluded:c.comingBackExcluded}); }catch(e){}
           // F3: say what actually turned on. "Alerts on" only when a claimed watch really alerts.
-          ui('__ssMsg', c.alertsEnabled===false ? '\u2713 Saved \u2014 Recompetes aren\u2019t emailed'
-            : (c.comingBackExcluded>0||c.notEmailable>0) ? '\u2713 Alerts on (no Recompetes)' : '\u2713 Alerts on'); }
+          ui('__ssMsg', c.alertsEnabled===false ? '\u2713 Saved \u2014 Coming Back isn\u2019t emailed'
+            : (c.comingBackExcluded>0||c.notEmailable>0) ? '\u2713 Alerts on (not Coming Back)' : '\u2713 Alerts on'); }
         else ui('__ssReset');
       }).catch(function(){ ui('__ssReset'); });
   };
@@ -10543,8 +10543,8 @@ const SEARCH_PANEL_JS = `<script>(function(){
     {val:'sba', syns:['small business set aside','small business set-aside','sb set aside','total small business']}
   ];
   var _LIFECYCLE_INTENTS=[
-    {hz:'recompete', syns:['recompete','recompetes','expiring','expiration','expire']},
-    {hz:'forecast', syns:['forecast','forecasts','planned','upcoming']}
+    {hz:'recompete', syns:['coming back','recompete','recompetes','expiring','expiration','expire']},
+    {hz:'forecast', syns:['coming soon','forecast','forecasts','planned','upcoming']}
   ];
   // "biggest / top / largest" → sort by size (Players/Companies: sort by total $ won). Only meaningful
   // on the Players dataset; the applier gates it to Players mode. (Eric 2026-08-03 — "biggest VA
@@ -10712,7 +10712,7 @@ const ASK_MINDY_JS = `<script>(function(){
   // Read fresh from the map's bridge every time the drawer opens — never a stale snapshot, never fabricated.
   function viewCtx(){ try{ if(typeof window.__mindyViewCtx==='function') return window.__mindyViewCtx()||{}; }catch(e){} return {}; }
   function fmtN(n){ n=+n||0; return n>=1000?n.toLocaleString():String(n); }
-  var SCOPE_LABEL={all:'open opps',open:'open opps',recompete:'recompetes',forecast:'forecasts',grants:'grants',companies:'firms',buyers:'buyers'};
+  var SCOPE_LABEL={all:'Open Now opps',open:'Open Now opps',recompete:'Coming Back contracts',forecast:'Coming Soon buys',grants:'grants',companies:'firms',buyers:'buyers'};
   function ctxParts(c){
     var noun=SCOPE_LABEL[c.scope]||'opps';
     var p=[fmtN(c.count)+(c.capped?'+':'')+' '+noun+' in view'];

@@ -69,8 +69,8 @@ export function isUnsupportedAlertScope(mode: SavedSearchMode, filters: SavedSea
 /** Neither Open nor Forecast is on: nothing an alert could email. Distinct from a recompete request. */
 export function noDeliverableHorizonMessage(): string {
   return (
-    'This search has nothing email alerts can deliver. Turn on Open or Forecast, then save again — ' +
-    'Recompetes are not emailed.'
+    'This search has nothing email alerts can deliver. Turn on Open Now or Coming Soon (forecasts), then save again — ' +
+    'Coming Back contracts (recompetes) are not emailed.'
   );
 }
 
