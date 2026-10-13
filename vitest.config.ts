@@ -54,6 +54,14 @@ export default defineConfig({
     // this ceiling bounds CPU oversubscription so one machine's other work cannot starve the
     // run. Half the cores, capped at 8 and floored at 2, is the fastest measured clean point.
     pool: 'forks',
+    // Node 25+ defines its OWN `globalThis.localStorage` (experimental Web Storage, on by default):
+    // a getter that returns `undefined` unless `--localstorage-file` is given. Vitest's jsdom
+    // environment does not replace a global that already exists, so under Node 25/26 every jsdom
+    // test saw `localStorage === undefined` instead of jsdom's Storage — 6 keyword UI tests failed
+    // in the pre-push gate on a Node 26 machine while passing on the pinned Node 24 (engines 24.x).
+    // Turning Node's implementation off in the workers lets jsdom's apply. The flag is accepted
+    // (and a no-op) on Node 24, where Web Storage is already off.
+    poolOptions: { forks: { execArgv: ['--no-experimental-webstorage'] } },
     maxWorkers: Math.max(2, Math.min(8, Math.floor(availableParallelism() / 2))),
     minWorkers: 1,
     // Keep runs snappy and deterministic for the pre-commit / CI path.
