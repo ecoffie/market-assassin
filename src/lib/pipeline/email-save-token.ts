@@ -13,7 +13,8 @@
  *   email + the opportunity key + a one-time idempotency key + an expiry.
  * Tampering with any of them (a different notice, a reused key, a late submit) fails verification.
  */
-import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
+import { emailActionSigningSecret, emailActionVerificationSecrets, hexEquals } from '@/lib/email-action-secret';
 
 /** How long the confirmation form stays valid after the page renders. */
 export const SAVE_ACTION_TTL_SECONDS = 30 * 60;
@@ -29,11 +30,6 @@ export interface SaveActionClaims {
   exp: number;
 }
 
-function secret(): string {
-  const s = process.env.EMAIL_ACTION_SECRET || process.env.ADMIN_PASSWORD;
-  if (!s) throw new Error('EMAIL_ACTION_SECRET not configured');
-  return s;
-}
 
 export function opportunityKeyFor(noticeId: string | null | undefined, title: string): string {
   const n = (noticeId || '').trim();
@@ -43,8 +39,8 @@ export function opportunityKeyFor(noticeId: string | null | undefined, title: st
 const payload = (c: SaveActionClaims) =>
   `${VERSION}:${c.email.trim().toLowerCase()}:${c.opportunityKey}:${c.idempotencyKey}:${c.exp}`;
 
-export function signSaveAction(c: SaveActionClaims): string {
-  return createHmac('sha256', secret()).update(payload(c)).digest('hex');
+export function signSaveAction(c: SaveActionClaims, secret: string = emailActionSigningSecret()): string {
+  return createHmac('sha256', secret).update(payload(c)).digest('hex');
 }
 
 /** Mint the claims + signature the confirmation form carries. */
@@ -77,9 +73,8 @@ export function verifySaveAction(
     return { ok: false, reason: 'malformed' };
   }
   if (nowSeconds > c.exp) return { ok: false, reason: 'expired' };
-  const expected = Buffer.from(signSaveAction(c), 'hex');
-  const given = Buffer.from(sig, 'hex');
-  if (expected.length !== given.length || !timingSafeEqual(expected, given)) {
+  // A form minted just before a secret rotation still verifies (current, previous, legacy).
+  if (!emailActionVerificationSecrets().some((s) => hexEquals(signSaveAction(c, s), sig))) {
     return { ok: false, reason: 'bad_signature' };
   }
   return { ok: true };

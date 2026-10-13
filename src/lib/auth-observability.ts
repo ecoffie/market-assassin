@@ -22,8 +22,8 @@
  *      and capped per day inside the RPC.
  *   4. Kill switch: AUTH_OBSERVE=off disables every write.
  */
+import { emailActionVerificationSecrets, verifyEmailLinkSignature } from '@/lib/email-action-secret';
 import { after, type NextRequest } from 'next/server';
-import { createHmac } from 'crypto';
 import { verifyTwoFactorSessionToken } from '@/lib/two-factor-session';
 
 // ─── vocabulary ────────────────────────────────────────────────────────────
@@ -287,13 +287,11 @@ export async function resolveVerifiedIdentity(
 }
 
 function verifySignedLink(email: string, token: string, ts: string): boolean {
-  const secret = process.env.EMAIL_ACTION_SECRET || process.env.ADMIN_PASSWORD;
-  if (!secret) return false;
+  if (emailActionVerificationSecrets().length === 0) return false;
   const tsNum = parseInt(ts, 10);
   if (!Number.isFinite(tsNum)) return false;
   if (Math.floor(Date.now() / 1000) - tsNum > 7 * 24 * 60 * 60) return false;
-  const expected = createHmac('sha256', secret).update(`${email}:${ts}`).digest('hex').substring(0, 32);
-  return expected === token;
+  return verifyEmailLinkSignature(email, token, ts);
 }
 
 async function defaultSupabaseEmail(jwt: string): Promise<string | null> {

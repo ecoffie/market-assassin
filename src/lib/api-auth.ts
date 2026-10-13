@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { emailActionSigningSecret, emailActionVerificationSecrets, emailLinkToken, verifyEmailLinkSignature } from '@/lib/email-action-secret';
 import { createClient } from '@supabase/supabase-js';
-import { createHmac } from 'crypto';
 import { observeVerifyResult } from '@/lib/auth-observability';
 import {
   getMarketAssassinAccessResilient,
@@ -363,9 +363,9 @@ export function verifyEmailToken(
   timestamp: string | number,
   maxAgeSeconds = 86400 // 24 hours default
 ): AuthResult {
-  const secret = process.env.EMAIL_ACTION_SECRET || process.env.ADMIN_PASSWORD;
-
-  if (!secret) {
+  // Dedicated EMAIL_ACTION_SECRET, plus the legacy ADMIN_PASSWORD during rotation
+  // (src/lib/email-action-secret.ts).
+  if (emailActionVerificationSecrets().length === 0) {
     console.error('[API Auth] EMAIL_ACTION_SECRET not configured');
     return { authenticated: false, email: null, error: 'Auth not configured' };
   }
@@ -378,13 +378,8 @@ export function verifyEmailToken(
     return { authenticated: false, email: null, error: 'Link expired' };
   }
 
-  // Verify HMAC signature
-  const expectedToken = createHmac('sha256', secret)
-    .update(`${email.toLowerCase()}:${ts}`)
-    .digest('hex')
-    .substring(0, 32);
-
-  if (token !== expectedToken) {
+  // Verify HMAC signature (constant-time, against every accepted secret)
+  if (!verifyEmailLinkSignature(email, token, ts)) {
     return { authenticated: false, email: null, error: 'Invalid token' };
   }
 
@@ -395,19 +390,8 @@ export function verifyEmailToken(
  * Generate a signed email action token for use in email links.
  */
 export function generateEmailToken(email: string): { token: string; ts: number } {
-  const secret = process.env.EMAIL_ACTION_SECRET || process.env.ADMIN_PASSWORD;
-
-  if (!secret) {
-    throw new Error('EMAIL_ACTION_SECRET not configured');
-  }
-
   const ts = Math.floor(Date.now() / 1000);
-  const token = createHmac('sha256', secret)
-    .update(`${email.toLowerCase()}:${ts}`)
-    .digest('hex')
-    .substring(0, 32);
-
-  return { token, ts };
+  return { token: emailLinkToken(emailActionSigningSecret(), email, ts), ts };
 }
 
 /**
