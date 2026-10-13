@@ -27,7 +27,9 @@ describe('an unauthenticated caller cannot name an alert recipient', () => {
   it('the account email comes FROM the session, never from the body', () => {
     const claim = ROUTE.slice(ROUTE.indexOf("body.action === 'claim'"), ROUTE.indexOf('const { owner, refusal }'));
     expect(claim).toMatch(/const verifiedEmail = session\.session\.email/);
-    expect(claim).toMatch(/claimAnonWatch\(db\(\), anonId, verifiedEmail\)/);
+    expect(claim).toMatch(/claimAnonWatch\(db\(\), anonId, verifiedEmail, \{ enableAlertsFor \}\)/);
+    // alerts need an explicit opt-in naming one watch
+    expect(claim).toMatch(/body\.enableAlerts === true && typeof body\.watchId === 'string'/);
     // the body's email must not reach the claim
     expect(claim).not.toMatch(/claimAnonWatch\([^)]*\bemail\b\s*\)/);
   });
@@ -97,13 +99,13 @@ describe('value still comes before sign-in', () => {
   });
 
   it('the client never sends an email on claim', () => {
-    const helper = MAP.slice(MAP.indexOf('window.__claimAnonWatches=function()'), MAP.indexOf('window.savePursuit=function'));
+    const helper = MAP.slice(MAP.indexOf('window.__claimAnonWatches=function(optInWatchId)'), MAP.indexOf('window.savePursuit=function'));
     expect(helper).toMatch(/action:'claim',anonId:aid/);
     expect(helper).not.toMatch(/email:_?em2?/);
   });
 
   it('only a verified claim emits watch_claimed', () => {
-    const helper = MAP.slice(MAP.indexOf('window.__claimAnonWatches=function()'), MAP.indexOf('window.savePursuit=function'));
-    expect(helper).toMatch(/c\.claimed>0[\s\S]{0,120}watch_claimed/);
+    const helper = MAP.slice(MAP.indexOf('window.__claimAnonWatches=function(optInWatchId)'), MAP.indexOf('window.savePursuit=function'));
+    expect(helper).toMatch(/c\.claimed>0\|\|c\.alertsOn>0\|\|c\.notEmailable>0[\s\S]{0,160}watch_claimed/);
   });
 });

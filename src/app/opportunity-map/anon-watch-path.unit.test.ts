@@ -64,11 +64,10 @@ describe('it never implies alerts it will not send', () => {
     expect(h).toMatch(/_ss\.textContent='\\u2713 Watching'/);
   });
 
-  it('only a successful claim reports alerts on', () => {
+  it('only a successful claim reports alerts on — and only for the opted-in watch', () => {
     const h = SRC.slice(SRC.indexOf('_ss.onclick=function()'));
-    // F3: "Alerts on" only when the server says a claimed watch actually alerts.
-    expect(h).toMatch(/c\.claimed>0[\s\S]*c\.alertsEnabled===false \? '\\u2713 Saved \\u2014 Coming Back isn\\u2019t emailed'/);
-    expect(h).toMatch(/: '\\u2713 Alerts on'\); \}/);
+    expect(h).toMatch(/window\.__claimAnonWatches\(d\.id\)/);
+    expect(SRC).toContain("ui('__ssMsg', c.alertsOn>0 ? (c.comingBackExcluded>0 ?");
   });
 });
 
