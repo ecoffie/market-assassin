@@ -26,6 +26,7 @@ import { fetchAllPaged, fetchAllByKeys } from '@/lib/supabase/paged-read';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/send-email';
 import { sendViaGHL } from '@/lib/ghl/sms';
+import { suppressedPipelineIds, dropSuppressedFromDigests } from '@/lib/pipeline/side-effect-suppression';
 import {
   detectFamilyNewVersion,
   indexFamiliesByNoticeId,
@@ -277,7 +278,7 @@ export async function GET(request: NextRequest) {
     last_current_notice_id: s.last_current_notice_id || null,
   });
 
-  const changesByUser = new Map<string, Array<{ title: string; changes: Change[] }>>();
+  const changesByUser = new Map<string, Array<{ pursuitId: string; title: string; changes: Change[] }>>();
   let totalChanges = 0;
   let processed = 0;
 
@@ -322,7 +323,7 @@ export async function GET(request: NextRequest) {
         }))
       );
       if (!changesByUser.has(owner)) changesByUser.set(owner, []);
-      changesByUser.get(owner)!.push({ title: p.title || 'Untitled pursuit', changes });
+      changesByUser.get(owner)!.push({ pursuitId: p.id, title: p.title || 'Untitled pursuit', changes });
     }
 
     // Upsert the snapshot to the current live state. NOTE: we reuse the existing
@@ -346,6 +347,14 @@ export async function GET(request: NextRequest) {
       await supabase.from('pursuit_monitor_state').upsert(snapPayload);
     }
   }
+
+  // SCANNER-SAVE SUPPRESSION (hotfix 2026-10-06). Pursuits that a mail link scanner created (before
+  // #1845, the email save link was a GET) are recorded in pipeline_side_effect_suppressions. Their
+  // change-log rows above are still written, so the in-app badge and the pipeline stay exactly as
+  // they were; only the outbound digest (email + SMS) leaves them out. Lookup errors fail OPEN.
+  const changedIds = Array.from(changesByUser.values()).flatMap((items) => items.map((it) => it.pursuitId));
+  const { ids: suppressed } = await suppressedPipelineIds(supabase, changedIds, 'change_notifications');
+  const suppressedNotifications = dropSuppressedFromDigests(changesByUser, suppressed);
 
   // SMS opt-in: amendment/deadline changes are time-sensitive, so users who
   // turned on SMS get the same digest as a text. Owner-attributed like the
@@ -399,8 +408,10 @@ export async function GET(request: NextRequest) {
     });
     if (ok) {
       emailsSent++;
-      // Mark those rows emailed.
-      await supabase.from('pursuit_change_log').update({ emailed: true }).eq('user_email', email).eq('emailed', false);
+      // Mark emailed only the rows for pursuits that were actually in this digest (a suppressed
+      // pursuit's change rows stay emailed=false, which is the truth).
+      await supabase.from('pursuit_change_log').update({ emailed: true })
+        .eq('user_email', email).eq('emailed', false).in('pursuit_id', items.map((it) => it.pursuitId));
     }
 
     // SMS (opt-in): a short text with the most urgent change(s). The email is the
@@ -442,6 +453,7 @@ export async function GET(request: NextRequest) {
     changes: totalChanges,
     emailsSent,
     smsSent,
+    suppressedNotifications,
     remaining: remainingThisRun,
     batchSize: BATCH_SIZE,
   });

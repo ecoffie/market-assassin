@@ -20,6 +20,7 @@
  * step that was making the Proposal panel feel like dead weight.
  */
 
+import { isSideEffectSuppressed } from '@/lib/pipeline/side-effect-suppression';
 import { createClient } from '@supabase/supabase-js';
 import { getRotatedSAMKey } from './utils';
 import { extractPdf, extractDocx, extractTxt, extractXlsx } from './pdf-extract';
@@ -437,11 +438,16 @@ export async function fetchPursuitDocs(opts: {
   solicitationNumber?: string | null;
   title?: string | null;
   agency?: string | null;
+  /** A person explicitly asked for this pursuit's documents (e.g. Proposal Assist). Bypasses the
+   *  scanner-save suppression: acting on a row is evidence a human wants it. */
+  userInitiated?: boolean;
 }): Promise<{
   attempted: number;
   succeeded: number;
   failed: number;
   status: 'ready' | 'none' | 'failed';
+  /** Set when the fetch was skipped because the pursuit is a recorded scanner-created row. */
+  suppressed?: boolean;
   // Optional diagnostics — populated on the cold/download path only.
   downloadNulls?: number;
   lastInsertError?: string | null;
@@ -449,6 +455,13 @@ export async function fetchPursuitDocs(opts: {
 }> {
   const { pipelineId, userEmail } = opts;
   const supabase = getSupabase();
+
+  // SCANNER-SAVE SUPPRESSION (hotfix 2026-10-06): an automatic fetch for a pursuit a mail link
+  // scanner created is skipped BEFORE any write (including the notice-id normalization below), so
+  // the row is left exactly as it is. User-initiated fetches always run. Lookup errors fail OPEN.
+  if (!opts.userInitiated && (await isSideEffectSuppressed(supabase, pipelineId, 'doc_fetch'))) {
+    return { attempted: 0, succeeded: 0, failed: 0, status: 'none', suppressed: true, discoverTrace: ['skipped: scanner-created pursuit (pipeline_side_effect_suppressions)'] };
+  }
 
   // Normalize the stored id up front: strip leaked 'opp-'/'deadline-' render-key
   // prefixes and collapse dashed UUIDs to bare 32-hex. Everything below (dedup,

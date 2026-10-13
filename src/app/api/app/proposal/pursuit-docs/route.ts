@@ -393,6 +393,8 @@ export async function POST(request: NextRequest) {
       source: pipelineRow.source,
       title: pipelineRow.title,
       agency: pipelineRow.agency,
+      // The owner pressed "fetch documents" — a person acting on the pursuit, never suppressed.
+      userInitiated: true,
     });
     return NextResponse.json({
       success: true,
