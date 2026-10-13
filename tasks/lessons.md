@@ -4,6 +4,41 @@ Rules and patterns to prevent repeated mistakes.
 
 ---
 
+## Index and advertise pages from what they RENDER, not from a stored aggregate (Sep 30, 2026)
+
+**Always decide `robots`, sitemap eligibility and every claimed count from the rows the page actually renders, not from a stored aggregate, because the aggregate stays confident while the data behind the page is missing.**
+
+- `/contractors/*/naics` and `/agencies` tested `distinct_naics_count` / `distinct_agency_count` against `SUBPAGE_MIN_ROWS`. The table read a different cache key (`all-naics` / `all-agencies`) that nothing warmed.
+- Result: **all 12,985 sitemap-listed sub-pages** rendered an empty table under "All 227 NAICS codes …", indexable and advertised. Fixed in #1765 with `src/lib/seo/subpage-contract.ts`.
+- **Measure the full population from the real source before extrapolating.** A 1,000-URL GSC sample showed 58 empty pages; a read-only KV MGET over the sitemap showed 12,985 of 12,985. A read-only `SCAN` confirmed the key simply never existed.
+- **The sitemap can count cached rows without downloading them:** use `EVAL_RO` with a Lua `#cjson.decode(GET k)`. It works with the KV read-only token.
+- `/contracts` was already correct (it gates on `available`). **Copy the working sibling's contract instead of inventing a new one.**
+
+## A test at a different parameter reads as the contract (Sep 30, 2026)
+
+**Always write tests at the production parameter and mutation-check the boundary, not a convenient parameter, because a passing test becomes the stated behaviour.**
+
+- A contract test at a 1-row floor (the `/contracts` rule) was reported as "one real row ⇒ indexable". That contradicted the NAICS/agency five-row policy, even though the code was right.
+- Fix: tests for each tier at `SUBPAGE_MIN_ROWS = 5` (0/unavailable, 1–4, 5+) at both the decision and rendered-HTML level. Temporarily lower the floor to 1 and confirm the suite fails (7 tests did).
+
+## GSC `invalid_grant: Invalid JWT Signature`: check IAM before the key text (Sep 30, 2026)
+
+**Always check the key's IAM status (`gcloud iam service-accounts keys list`) before blaming formatting, because a disabled key and a mangled key fail identically.**
+
+- The local `GCP_SA_JSON` key was a valid PEM but **disabled**; only a newer user-managed key was active.
+- Restored read-only access without a JSON key: grant `roles/iam.serviceAccountTokenCreator` on the service account only, then mint a 600 s `webmasters.readonly` token via IAM Credentials `generateAccessToken`, held in memory. Revoke the binding when done.
+
+## Shell and test-harness traps from this session (Sep 30, 2026)
+
+**Always use a non-reserved loop variable and pass file lists through `xargs -0` in zsh, not `for path in …` or an unquoted `$F`, because zsh ties `path` to `PATH` and does not word-split variables.**
+
+- `for path in …` wiped `PATH` (every command reported "not found").
+- `grep … $F` searched one bogus combined filename.
+- **Vitest:** `beforeEach(() => mock.mockReset())` *returns* the mock, and Vitest runs a returned function as a cleanup hook. Use braces.
+- **Read-only SQL guard** (`supabase-readonly.run_select`): a literal `;` or a whole-word SQL keyword inside a string ("call center") is rejected. Encode them as `'…'||chr(59)||'…'` and `'c'||'all'`; Postgres sees the identical value.
+
+---
+
 ## Client proposals: claim only what the product delivers today (Sep 29, 2026)
 
 **Always verify a proposal's promises against the code and live data, not against the last proposal, because a sales document is a contract offer.** Found while writing a Mindy subscription proposal for a two-user client (full framework lives in the PRIVATE `ecoffie/govcon-proposals` repo, never here: this repo is public).

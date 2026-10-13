@@ -1,5 +1,13 @@
 # MCP Decision-Chain Integrity — implementation plan
 
+> **SEO status (2026-09-30), separate workstream.** Empty contractor sub-pages are fixed (#1765, merge `b4ec5bcc`; sitemap 35,326 → 22,336). Full record: `tasks/SEO-CLOSEOUT-2026-09-30.md`.
+> Deferred, in order, and each needs fresh approval:
+> - [ ] **SEO-health activation.** Gates 1–2 done. **Blocked at Gate 3:** `MINDY_OPS_SLACK_CHANNEL` is not in Vercel prod (Eric: add the `#mindy-ops` channel ID with printf, then redeploy).
+> - [ ] **Canonical-discovery parser defects.** P1: "washington dc" resolves to WA, TVA to TN (`intent.ts` STATE_PHRASES). P2: inconsistent agency keys (`intent.ts` AGENCY_LEXICON).
+> - [ ] **Buyer-intent pilot**, only after the two items above. Details are private (GOS `04_rnd/mindy-buyer-intent-2026-09-29`).
+> - [ ] **Cache warmer for `all-naics` / `all-agencies`**, only if the evidence justifies restoring sub-pages (5+ real rows AND a reason to index). Not designed.
+> - [ ] **GSC "Validate fix" (404)**, only after Google recrawls the repaired site.
+
 **From:** `docs/PRD-mcp-decision-chain.md`
 **Scaffolded:** 2026-08-23
 **Sequence:** P0-1 → P0-2 → P0-3 → [CI GATE] → P1-1 → P2-1 → ⛔ STOP at P2-2
