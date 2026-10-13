@@ -166,3 +166,10 @@ Released: #1840 `6001c4c3`, #1834 `c7429266`, #1836 `885e2d35`, #1839 `9bf4e422`
 - [ ] **Held:** Forecast watermark migration `20260924_saved_search_forecast_watermark.sql`
 - [ ] Not supported, disclosed: Marine Corps on Forecast/Awarded; 51 Navy notices with a truncated hierarchy path
 
+## Keyword UI tests blocked the pre-push gate — CLOSED 2026-10-13 (#1882, merged `87ac61f8`)
+
+- [x] Cause: test environment, not product. Node 25+ defines its own `globalThis.localStorage` (undefined without `--localstorage-file`), which hid jsdom's; 6 tests from #1717 failed on Node 26, passed on pinned Node 24. Fix: test workers run with `--no-experimental-webstorage`. No test, assertion, limit or product code changed.
+- [x] Verified: 7/7 on Node 26 and 24; full pre-push gate green; 4 mutations each caught.
+- [x] Browser checks (17/17, headless Chromium, local dev server) used **mocked `/api` responses**: they show UI behavior (messages shown, payload sent), **not production persistence**. "Nothing is written" is covered by the unit tests' real handlers over a write-recording fake.
+- [x] Local work uses the repo's pinned Node 24 (`engines: 24.x`) via Homebrew `node@24` first on PATH; no second version config added.
+
