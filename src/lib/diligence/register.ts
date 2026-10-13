@@ -65,6 +65,10 @@ export interface RegisterRow {
   set_aside_base: string | null;
   set_aside_latest: string | null;
   extent_competed_base: string | null;
+  /** Latest CO business-size determination on an included action. */
+  co_business_size_latest: string | null;
+  /** Latest 8(a) participant flag on an included action. */
+  c8a_participant_latest: string | null;
   obligated: SummedValue;
   base_and_exercised_options: SummedValue;
   base_and_all_options: SummedValue;
@@ -290,6 +294,8 @@ export function buildRegister(input: DiligenceTxn[], opts: RegisterOptions): Reg
       set_aside_base: base.set_aside,
       set_aside_latest: latest(included, 'set_aside') as string | null,
       extent_competed_base: base.extent_competed,
+      co_business_size_latest: latest(included, 'co_business_size') as string | null,
+      c8a_participant_latest: latest(included, 'c8a_participant') as string | null,
       obligated: sum(included, 'federal_action_obligation'),
       base_and_exercised_options: sum(included, 'base_and_exercised_options_value'),
       base_and_all_options: sum(included, 'base_and_all_options_value'),

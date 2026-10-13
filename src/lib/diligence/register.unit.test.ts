@@ -19,7 +19,7 @@ function txn(over: Partial<DiligenceTxn>): DiligenceTxn {
     recipient_uei: T, recipient_name: 'TARGET LLC', recipient_parent_uei: T, recipient_parent_name: 'TARGET LLC', cage_code: null,
     awarding_agency: 'Department of Transportation', awarding_sub_agency: null, awarding_office: null,
     set_aside: 'SMALL BUSINESS SET ASIDE - TOTAL', extent_competed: null, naics: '541512', psc: null, pricing: null,
-    description: 'IT SUPPORT', solicitation_identifier: null,
+    description: 'IT SUPPORT', solicitation_identifier: null, co_business_size: 'SMALL BUSINESS', c8a_participant: null,
     ...over,
   };
 }
