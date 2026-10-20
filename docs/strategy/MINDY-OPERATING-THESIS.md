@@ -91,6 +91,12 @@ VALUE.**
   for "too many" is value-tag legibility + overlap (Zillow), not collapsing to dots/bubbles.
 - **Prerequisite: pins at REAL locations.** Value tags in a fake state-centroid ring is a wall of
   numbers in the wrong place. Real-city geocoding (the board-wide `geocodeCity` lib) must land first.
+- **Approximate-location honesty lives in the DETAIL DRAWER only — one place, board-wide (Eric, Jul 26).**
+  Pins are ALWAYS solid (no dashed/approximate pin styling — it clutters and makes pile-ups look worse).
+  List cards + popups show the location WITHOUT an "approx." tag (don't crowd compact surfaces). The
+  single honest disclosure — "(approximate — based on state, not a confirmed address)" — appears ONLY in
+  the drawer's location section, when precision is state-level. Same treatment across ALL datasets. The
+  honesty is in ONE authoritative place (the drawer), not scattered on every surface.
 
 ## Standard protocol — EVERY dataset/dropdown item gets a detail drawer (Eric, Jul 26)
 
