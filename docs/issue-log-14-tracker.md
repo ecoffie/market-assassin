@@ -153,9 +153,11 @@ For each original issue: exact input · expected · observed · tested commit/en
 
 ## Still open — audit gaps (track separately from release)
 
-- **#12 retrieval** — open until both inputs return the same non-empty sourced description.
-- **Round-PDF independence** — needs recorded execution UTC + serving commit for “independently verified” labels.
-- **#13 original payload** — preserved limitation only; representative regression is the forward path.
+- **#12 retrieval** — **only unresolved functional audit item.** Open until sol `N00024-26-R-4160` and UUID `85a62e9a…` return the **same non-empty sourced** description. Bounded recheck 2026-09-20T22:15:37Z still all-key **429**; identity same; `audit_12_closed: false`. Evidence: `tasks/issue-log-14-noticedesc-recheck-bounded-2026-09-20.json`.
+- **#13** — **passed** with documented verification limitation (comparable-size representative succeeded; original payload unavailable — not an indefinite blocker).
+- **Round-PDF independence** — documented limitation only (not a functional product blocker).
+
+**Status line:** audit closeout pending #12; other limitations documented.
 
 ## Post-release checks
 

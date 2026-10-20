@@ -1,0 +1,31 @@
+{
+  "label": "BOUNDED_12_RECHECK",
+  "note": "Closeout pending #12 until both inputs return the same non-empty sourced description. Disclosure alone does not close.",
+  "checked_at": "2026-09-20T22:15:37.414Z",
+  "N00024-26-R-4160": {
+    "notice_id": "85a62e9a3f4f4f54b0ade7aa855fcc89",
+    "solicitation_number": "N00024-26-R-4160",
+    "description_chars": 0,
+    "description_sha256": null,
+    "description_head": "",
+    "degraded": true,
+    "retrieval_limitation": "SAM.gov noticedesc rate-limited every configured API key (2 tried) \u2014 quota: key 1 \u2192 429 (quota); key 2 \u2192 429 (quota). The solicitation identity resolved, but the synopsis body is unavailable until a usable key or a prior cached description exists. Absence of description text does not mean the notice has no scope.",
+    "source": "none",
+    "doc_count": 0
+  },
+  "85a62e9a3f4f4f54b0ade7aa855fcc89": {
+    "notice_id": "85a62e9a3f4f4f54b0ade7aa855fcc89",
+    "solicitation_number": "N00024-26-R-4160",
+    "description_chars": 0,
+    "description_sha256": null,
+    "description_head": "",
+    "degraded": true,
+    "retrieval_limitation": "SAM.gov noticedesc rate-limited every configured API key (2 tried) \u2014 quota: key 1 \u2192 429 (quota); key 2 \u2192 429 (quota). The solicitation identity resolved, but the synopsis body is unavailable until a usable key or a prior cached description exists. Absence of description text does not mean the notice has no scope.",
+    "source": "none",
+    "doc_count": 0
+  },
+  "identity_same": true,
+  "content_same": false,
+  "retrieval_success": false,
+  "audit_12_closed": false
+}
