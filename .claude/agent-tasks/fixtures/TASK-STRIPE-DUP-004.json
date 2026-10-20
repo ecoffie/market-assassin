@@ -1,0 +1,56 @@
+{
+  "id": "TASK-STRIPE-DUP-004",
+  "title": "Build an audited both-sides entitlement repair (profile + KV + delivery)",
+  "priority": "high",
+  "state": "proposed",
+  "authorizedScope": "INCIDENT METRIC (corrected 2026-09-04): THREE confirmed paid-without-access identities totalling $239.42/month equivalent - one $149/month Pro, one $49/month grandfathered Pro, and one $497/year Pro ($41.42/mo equivalent). The $99/month MCP-Entry subscriber is NOT an access gap: MCP grants credits, not app entitlement, so that account is correctly provisioned and is excluded from this task. Any earlier figure of four identities or $338.42/month is superseded and must not be reused. PROBLEM: No supported operation writes BOTH sides of the briefings entitlement, so a paid-but-locked-out customer cannot be repaired without hand-writing one side. Verified read-only on 2026-09-04: admin grant-briefings?grant= writes KV only (recordAccessGrant wroteProfile:false); admin sync-access execute-mode writes KV only (kv.set); reconcileEntitlementsFromPurchases writes profile+KV but short-circuits on 'if (!row.tier && !row.bundle) continue', and every affected row carries tier NULL or 'backfill_unknown' written by scripts/backfill-purchases-from-stripe.ts, which deliberately does not invent a tier. Root cause of the gaps: the webhook's purchases insert referenced four non-existent columns, so 154 paid sessions ($121,824, back to 2024-08-17) recorded zero ledger rows while Stripe logged every delivery as successful. DELIVER a single Administrator-only entitlement-repair operation meeting ALL of the following; each is a hard acceptance criterion and a missing one fails verification. (1) ADMIN-ONLY + CONFIRM-REQUIRED: refuses without administrator role and an explicit --confirm, matching the existing CLI convention (reconcile-state, supersede, recover-lock). (2) DRY-RUN DEFAULT: a dry-run mode performing zero writes that prints the exact intended end-state; writes occur only on explicit opt-in; dry-run is the default. (3) EVIDENCE-DERIVED ENTITLEMENT: entitlement derived from verified LIVE Stripe evidence - product id, price id, subscription id and status - never from caller-supplied flags. The caller names an identity; the operation independently establishes what that identity is owed. Authoritative mapping is Stripe product/price metadata (prod_UI5RX* carries metadata.tier='briefings'), NOT the product-name /mindy/i heuristic and NOT price amount alone. (4) NO RETROACTIVE LEDGER EDITS: purchases.tier and all historical purchase rows are read-only; the operation must work with tier NULL / 'backfill_unknown' rows in place and never rewrite them. (5) ADDITIVE TRUTHFUL AUDIT: writes an additive access_grants row recording what was ACTUALLY written per side; no mutation or deletion of prior audit rows. (6) IDEMPOTENT + POSTCONDITION-VERIFIED: reconciles Supabase and KV idempotently, then RE-READS both and asserts the intended end-state; a write whose postcondition read fails is reported as failure, never success; repeat invocation is a no-op reporting changed=false. (7) NO EMPTY-UPDATE RECORDED AS SUCCESS: Boolean({}) === true, so 'wroteProfile: Boolean(accessUpdates)' in src/app/api/stripe-webhook currently records profile writes that never happened - observed live on TWO access_grants rows for a customer whose access_briefings is false. Fix that call site and forbid the pattern: success must be determined by an actual verified column change, never by object truthiness. (8) ERRORS ARE ERRORS: every Supabase/KV/Stripe query binds and inspects both data and error; a failed query is a hard error that aborts the repair and is NEVER interpreted as a missing record; count ?? 0 and equivalent null-to-zero coercions are forbidden (Bug Prevention Rule #11). (9) PRODUCT-SPECIFIC EXPIRY RULES: monthly Pro sets no expiry (revocation on cancel); annual Pro sets briefings_expires_at to the subscription's real current_period_end from live Stripe; expiry is derived, never guessed or hardcoded. (10) briefings_enabled SEMANTICS MUST BE PROVEN BEFORE IT IS TOUCHED: do NOT change it until its contract is established and documented. Evidence is genuinely MIXED - src/lib/supabase/briefings-entitlement.ts documents it as provisioning state ('the cron will send to them'; precompute-briefings filters .eq(briefings_enabled,true); defaults FALSE on profile creation), yet src/app/api/app/profile/route.ts also writes it, which is user-preference-shaped; enableBriefingsDelivery already refuses to re-enable when is_active=false, treating that as an explicit opt-out. Builder must determine which contract holds, DOCUMENT it in docs/engineering/, and TEST it. If it is a user preference, preserve the user's value and never override it. If it is provisioning state, enable it as part of repair and test that contract explicitly. Shipping a repair that flips it without resolving this is a verification failure. (11) SYMMETRIC REVOCATION: when the FINAL qualifying entitlement ends, both Supabase and KV are cleared together; when ONE duplicate subscription ends while another qualifying subscription remains active, access MUST NOT be revoked. Today revokeBriefingsAccess clears KV only, so a profile flag can strand access after cancellation, and the inverse would wrongly lock out a paying customer. (12) REGRESSION TEST - the September 17 risk modelled exactly: two identical active Pro subscriptions on one normalized identity with the same price id; one scheduled to end (cancel_at_period_end true, no upcoming invoice); the other surviving with a real upcoming invoice. Assert the surviving subscription is recognised as still qualifying, and that processing deletion/expiry of the redundant subscription PRESERVES access on both sides. This models a live account whose redundant subscription lapses 2026-09-17 and whose access currently rests on the KV key alone. (13) TESTS FOR THE THREE HISTORICAL SHAPES: $49/month grandfathered Pro (price metadata tier='briefings'), $149/month Pro, and $497/year annual Pro asserting the correct derived expiry equal to the live current_period_end. Each starts from the observed broken state - purchases row present with tier NULL or 'backfill_unknown', access_briefings false, KV key absent. (14) NO PRODUCTION CUSTOMER REPAIR OR DEPLOY IN THIS TASK: Builder ships code and tests only; allowedMutations excludes any production or deploy capability; no customer rows mutated, no Stripe API writes, no refunds, no cancellations, no access grants, no deployment. Repairing the three affected identities happens ONLY after human review and deployment under a separate authorization. (15) scripts/backfill-purchases-from-stripe.ts REMAINS EXCLUDED via forbiddenPaths - retroactive ledger repair is a separate unmade decision and must not be smuggled into this task. (16) COMMIT HYGIENE: the runtime registry, credentials, reconciliation exports and customer identifiers are forbidden from commits; no real customer email, Stripe customer/subscription/charge/invoice id, or reconciliation artifact may appear in code, tests, fixtures or docs - tests use synthetic identifiers only, and /tmp reconciliation artifacts are never copied into the repo.",
+  "allowedPaths": [
+    "tests/**",
+    "src/lib/briefings/access.ts",
+    "src/lib/supabase/briefings-entitlement.ts",
+    "src/lib/supabase/user-profiles.ts",
+    "src/lib/access/grant-audit.ts",
+    "src/lib/access/resolve-access.ts",
+    "src/app/api/stripe-webhook/**",
+    "src/app/api/admin/grant-briefings/**",
+    "docs/engineering/**"
+  ],
+  "forbiddenPaths": [
+    ".env*",
+    "**/credentials*",
+    "supabase/migrations/**",
+    "scripts/backfill-purchases-from-stripe.ts",
+    "vercel.json",
+    ".claude/agent-tasks/registry.json",
+    ".git/agent-tasks/**",
+    "public/**"
+  ],
+  "dependencies": [],
+  "assignedRole": null,
+  "branch": null,
+  "worktree": null,
+  "baseSha": "ee8b2a929592b636a9c88253085057f5ebee64ed",
+  "lease": null,
+  "verificationProfile": [
+    "ma-skills",
+    "oracles"
+  ],
+  "allowSameAgentVerification": false,
+  "checkpoints": [],
+  "auditLog": [],
+  "prRef": null,
+  "mergeSha": null,
+  "deploymentRef": null,
+  "deploySha": null,
+  "allowedMutations": [
+    "read_only",
+    "repo_files",
+    "git_commit"
+  ],
+  "approvalRequired": "human_review",
+  "supersededByTaskId": null,
+  "supersedesTaskId": null,
+  "candidateEvidenceAttestation": null,
+  "createdAt": "2026-09-04T15:50:00.000Z",
+  "updatedAt": "2026-09-04T16:05:00.000Z"
+}

@@ -1,0 +1,36 @@
+{
+  "id": "TASK-STRIPE-DUP-003",
+  "title": "Fix check-access reporting gapCount 0 against a real KV/Supabase gap",
+  "priority": "normal",
+  "state": "proposed",
+  "authorizedScope": "check-access returned gapCount 0 for a user holding an active paid subscription with access_briefings=false and a null stripe_customer_id. Make the gap detector catch the KV-true / Supabase-false divergence. Silent-failure class, same family as the existing audit gates. Read-only against production; no customer rows mutated.",
+  "allowedPaths": [
+    "tests/**",
+    "src/app/api/admin/check-access/**",
+    "scripts/audit-*.mjs",
+    "docs/engineering/**"
+  ],
+  "forbiddenPaths": [
+    ".env*",
+    "**/credentials*",
+    "supabase/migrations/**"
+  ],
+  "dependencies": [],
+  "assignedRole": null,
+  "branch": null,
+  "worktree": null,
+  "baseSha": "ee8b2a929592b636a9c88253085057f5ebee64ed",
+  "lease": null,
+  "verificationProfile": ["ma-skills"],
+  "allowSameAgentVerification": false,
+  "checkpoints": [],
+  "auditLog": [],
+  "prRef": null,
+  "mergeSha": null,
+  "deploymentRef": null,
+  "deploySha": null,
+  "allowedMutations": ["read_only", "repo_files", "git_commit"],
+  "approvalRequired": "human_review",
+  "createdAt": "2026-08-31T13:00:00.000Z",
+  "updatedAt": "2026-08-31T13:00:00.000Z"
+}
