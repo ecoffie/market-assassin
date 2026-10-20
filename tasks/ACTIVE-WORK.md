@@ -1,5 +1,25 @@
 # ACTIVE WORK — read this BEFORE writing code
 
+> ## 🔍 PROVE THE DEFECT STILL EXISTS BEFORE EXECUTING AN OLD TASK (Eric, 2026-09-08)
+> **A task file, backlog row, or code comment describing a defect is a HISTORICAL CLAIM, not
+> current state.** Before writing a line against one, verify the defect in current production:
+> read the code at today's HEAD (line numbers drift), run the fixture, query the live table.
+>
+> **This rule has now prevented several unnecessary builds in a row.** A 2026-09-08 sweep of the
+> pre-map-switchover backlog found SEVEN "open" items already resolved: the NAICS invariant
+> (fixed #1289), `_uemail()` (never broken as alleged), Agency/Office/State autocomplete (built),
+> icon standardisation (#1178), recompete likelihood + lead-time filters (shipped), Missouri
+> geocoding (largely fixed), the Players gate (fixed #1399, pending browser proof). Zero live bugs.
+>
+> Two specific traps this sweep hit, both of which cost real investigation time:
+> - **A grep on the SERVER parser is a false negative for the map.** Its deep-link and filter
+>   handlers are client-side JS emitted as strings inside `route.ts`. Read the emitted JS.
+> - **A comment describing a bug is often a FIX RECORD, not a defect.** `by-office.ts:144` reads
+>   "This site carried the old `<= 4`" — that is the repair note, and the sweep flagged it as the bug.
+>
+> **Duplication risk is not a live defect.** Two files independently implementing the same CORRECT
+> rule is a consolidation candidate for the backlog, not a PR under BUG-FIX MODE.
+
 > ## ⛔ BUG-FIX MODE (Eric, 2026-08-25)
 > **No new Rule-of-Two or SBA-data capabilities unless they are required to close an
 > existing bug.** The SBA certification-freshness track is FROZEN — see

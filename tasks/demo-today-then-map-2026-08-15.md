@@ -135,12 +135,39 @@ Ordered by what I'd pick up first.
 Every `/today` card lands on the same unfiltered national map. Fix is WIRING, not new
 machinery (reuse `applyIntent`). Note the `naics`/`psc` gap and the `?opp=` drawer path.
 
-### 2. `_uemail()` census — NOT TAKEN
-The new `/today` code correctly gates on the TOKEN, and `_uemail()` is known-wrong at
-`opportunity-map/route.ts:5399` (it decodes the wrong JWT segment and returns `''` for
-genuinely signed-in users). **But I never counted the other call sites.** "Multiple auth
-philosophies are alive in the product" is Eric's inference and mine — it is NOT a measurement.
-Count before acting. (memory: `gate-on-token-not-decoded-email`)
+### 2. `_uemail()` census — ✅ TAKEN 2026-09-08. NO DEFECT. Closed.
+
+**The premise was false.** `_uemail()` does NOT decode "the wrong JWT segment" — the MI session
+token is **not a JWT**. `createMIAuthSessionToken` (`src/lib/two-factor-session.ts:92`) mints
+`base64url(payload).hmac` — **two parts, payload FIRST** — so `split('.')[0]` is exactly right.
+Proved by minting a real token and running the shipped `_uemail` body against it verbatim:
+2 parts, returns the correct email. A JWT would be `header.payload.signature`; someone
+pattern-matched "dot-separated base64" to JWT and filed a bug against working code.
+⚠️ **Do NOT "fix" `_uemail` to read segment `[1]`** — that would break every signed-in user.
+
+**All 9 map call sites checked** (17 repo-wide; the other 8 are unrelated identifiers):
+
+| line | purpose | gates on | verdict |
+|---|---|---|---|
+| 2253 | Players fetch headers | token + email | OK — server ignores `x-user-email` |
+| 2335 | `scope=profile` param | email | OK — server re-resolves from token |
+| 3077 | `_track` telemetry | email + token + `__tokenExpired` | OK — strongest gate, anon fallback |
+| 3171 | **the definition** | — | correct for the real token format |
+| 4291 | Save Search | email + token | OK — checks both |
+| 6191 | `loadMWin` | token only, deliberately | OK — the 2026-08-04 fix |
+| 8122 | deep-link readiness | function existence | OK |
+| 8125 | saved-search deep link | email AND token | OK |
+
+**The one real (minor, unexploitable) risk:** `_uemail()` falls back to `briefings_access_email`,
+an unsigned localStorage value. But every server route that matters calls
+`requireMIAuthSession(request, email)`, which verifies the HMAC **and** binds the payload email to
+the claimed one — a forged fallback yields a 401, not another user's data. `x-user-email` is sent
+by the client and read by **no** server route. Confirmed on prod: 0 saved-search rows with a
+null/empty `user_email`.
+
+The misleading comment at `route.ts:6193` is corrected in this same commit — it had already cost
+one full "possible auth defect across nine sites" investigation.
+(memory: `gate-on-token-not-decoded-email` — the token-not-email gating lesson still stands.)
 
 ### 3. BigQuery — what burned the 2 TiB is still UNKNOWN
 The project carries a manual `QueryUsagePerDay` override of 2 TiB/day vs the 200 TiB default.
@@ -186,7 +213,7 @@ browser before any edit. Two branches shipped:
 
 | PR | What |
 |---|---|
-| #1168 `fix/map-filter-dead-js` | Industry filter dead in BOTH directions (`commitLive is not defined`); Today's Lens ✕ silently inert; logged-out header decoded the wrong JWT segment + gated on email; bare glyph → labelled "Log In" button |
+| #1168 `fix/map-filter-dead-js` | Industry filter dead in BOTH directions (`commitLive is not defined`); Today's Lens ✕ silently inert; logged-out header gated on the decoded email (see the census at item 2 — the "wrong JWT segment" reading of this was later DISPROVED; the real fix was gating on the token); bare glyph → labelled "Log In" button |
 | #1169 `perf/map-count-query` | The map's ~3s-per-pan lag: the headline count walked 155,629 rows in ~156 SEQUENTIAL round-trips, uncached, on every request |
 
 **The transferable lesson:** 625/625 unit tests were green the entire time all three controls
@@ -216,5 +243,5 @@ browser found them — same finding as `brittle-test-anchors-false-verdicts`.
   rows, honest empty state) — this is a CONVERSION dead end, not a leak, so it is deliberately
   deferred past the demo. Full write-up + the two dead ends already ruled out:
   **`tasks/players-gate-deeplink-2026-08-17.md`**. (memory: `players-first-premium-moment`)
-- The `_uemail()` census is STILL not taken (carried from the 08-15 session, item 2 below).
+- The `_uemail()` census is ✅ TAKEN (2026-09-08) — NO defect; the "wrong JWT segment" premise was false (the MI token is not a JWT). See item 2 above.
 
