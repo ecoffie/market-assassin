@@ -18,6 +18,7 @@
 import { after } from 'next/server';
 import { getWriteClient } from '@/lib/supabase/server-clients';
 import { claimAnonAttribution, isAnonId } from './share-attribution';
+import { claimAnonWatch } from '@/lib/map-watch/anon-watch';
 
 export const ANON_COOKIE = 'mindy_anon';
 export const ATTR_COOKIE = 'gca_attr';
@@ -53,6 +54,15 @@ export async function claimAttributionFromRequest(
 }
 
 async function runClaim(anonId: string, firstTouch: unknown, verifiedEmail: string, accountCreatedAt: string | null): Promise<void> {
+  // Saved searches made on this browser while signed out move onto the account — with alerts OFF.
+  // Signing in never subscribes anyone to email (option A, 2026-10-10). Idempotent: a moved watch is
+  // no longer anonymous, so the next sign-in finds nothing; an account-owned watch is never touched.
+  try {
+    const w = await claimAnonWatch(getWriteClient(), anonId, verifiedEmail);
+    if (!w.ok) console.error('[anon-watch] sign-in claim failed:', w.error);
+  } catch (err) {
+    console.error('[anon-watch] sign-in claim errored (non-fatal):', err);
+  }
   try {
     const r = await claimAnonAttribution(getWriteClient(), {
       anonId, verifiedEmail, accountCreatedAt, clientFirstTouch: firstTouch,

@@ -122,54 +122,62 @@ export async function saveMapWatch(
 }
 
 /**
- * Attach a VERIFIED account to an anonymous watch — the upgrade moment.
+ * Attach this browser's anonymous watches to a VERIFIED account.
  *
- * ⚠️ SECURITY: `verifiedEmail` MUST come from a validated MI session, never from
- * a request body. The first version of this function accepted an arbitrary email
- * and enabled alerts on it, which let any holder of an anon uuid point alert
- * email at a victim's address. That is an email-abuse path, and the fix is that
- * the caller cannot supply the address at all — the server derives it from the
- * signed session.
+ * ⚠️ SECURITY: `verifiedEmail` MUST come from a validated MI session, never from a request body
+ * (the first version enabled alerts on an arbitrary body email — an email-abuse path).
  *
- * This is still the ONLY path that turns alerts on, so a watch cannot start
- * emailing anyone who did not verify that they own the mailbox. Scoped to the
- * anon id that owns the row, so one visitor cannot claim another's watch.
+ * OWNERSHIP PROOF = the browser's `anon:<uuid>` (localStorage `mindy_anon_id`, mirrored to the
+ * first-party `mindy_anon` cookie). It is minted with crypto.randomUUID and never shown in a URL
+ * another person sees. A WATCH ID ALONE CANNOT CLAIM ANYTHING: rows move only where
+ * `user_email = <that anon id>`.
+ *
+ * Rules (option A, Eric 2026-10-10):
+ *   · Claiming NEVER subscribes anyone. Watches move with `alerts_enabled = false`, filters untouched.
+ *   · Alerts turn on only for `enableAlertsFor` — the ONE watch the user explicitly opted into — and
+ *     only when that watch is now owned by `verifiedEmail` (an owner settings change, like PATCH).
+ *     Its scope is narrowed to what email can deliver (alertableScope); recompete-only stays off.
+ *   · IDEMPOTENT: a moved row is no longer anonymous, so a repeat claim (another sign-in, a retry)
+ *     finds nothing to move. A watch already OWNED by any account can never be transferred, because
+ *     only `anon:` rows are ever matched — switching accounts cannot move it.
+ *   · NO DUPLICATES: an anonymous watch identical (mode + filters) to one the account already holds
+ *     is left where it is and counted as `alreadyOnAccount`.
+ *   · Never bulk-claims history: only the caller's own anon id is ever read.
  */
 export interface ClaimResult {
   ok: boolean;
-  /** Watches moved onto the account (all of them, emailable or not). */
+  /** Watches moved onto the account in THIS call (alerts off). */
   claimed: number;
-  /** Of those, how many now send email alerts. */
+  /** Anonymous watches skipped because the account already holds an identical one. */
+  alreadyOnAccount: number;
+  /** Watches whose alerts were turned on by this call (0 or 1 — only an explicit opt-in). */
   alertsOn: number;
-  /** Claimed with alerts OFF because nothing in them can be emailed (recompete only). */
+  /** The opted-in watch could not be emailed (recompete only), so its alerts stay off. */
   notEmailable: number;
-  /** Alerting watches whose recompete horizon was removed — recompetes are not emailed. */
+  /** The opted-in watch had recompete removed from its alert scope (not emailable). */
   comingBackExcluded: number;
   error?: string;
 }
 
-/**
- * F3 (2026-10-10): claiming used to set `alerts_enabled = true` on EVERY anon
- * watch, including ones whose scope the alert cron cannot deliver. A watch kept
- * with Recompetes on became an alerting watch that silently never emails
- * recompetes; a Recompete-only watch became "alerts on" and never emails at all.
- * The signed-in Save path refuses both shapes (unsupported_alert_scope), so this
- * was also the one route around that rule.
- *
- * Now each watch is classified by alertableScope():
- *   full    → alerts on, filters untouched
- *   partial → alerts on, horizons.recompete set false (the client disclosed this
- *             BEFORE sign-in); every other filter untouched
- *   none    → claimed with alerts OFF, filters untouched
- * Nothing is broadened: no horizon is ever turned on, and recompete is never emailed.
- */
+function watchKey(mode: unknown, filters: unknown): string {
+  const sortDeep = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(sortDeep);
+    if (v && typeof v === 'object') {
+      return Object.fromEntries(Object.keys(v as Record<string, unknown>).sort().map((k) => [k, sortDeep((v as Record<string, unknown>)[k])]));
+    }
+    return v;
+  };
+  return JSON.stringify([String(mode || 'open'), sortDeep(filters ?? {})]);
+}
+
 export async function claimAnonWatch(
   db: SupabaseClient,
   anonId: string,
   verifiedEmail: string,
+  opts: { enableAlertsFor?: string | null } = {},
 ): Promise<ClaimResult> {
-  const fail = (error: string): ClaimResult =>
-    ({ ok: false, claimed: 0, alertsOn: 0, notEmailable: 0, comingBackExcluded: 0, error });
+  const zero = { claimed: 0, alreadyOnAccount: 0, alertsOn: 0, notEmailable: 0, comingBackExcluded: 0 };
+  const fail = (error: string): ClaimResult => ({ ok: false, ...zero, error });
   if (!isAnonId(anonId)) return fail('invalid anon id');
   const e = verifiedEmail.trim().toLowerCase();
   if (!e.includes('@')) return fail('invalid email');
@@ -177,57 +185,56 @@ export async function claimAnonWatch(
   if (isAnonId(e)) return fail('anon id is not an account');
   const owner = anonId.trim().toLowerCase();
 
-  const { data: rows, error: readErr } = await db
-    .from('saved_searches')
-    .select('id,mode,filters')
-    .eq('user_email', owner);
+  const { data: anonRows, error: readErr } = await db
+    .from('saved_searches').select('id,mode,filters').eq('user_email', owner);
   if (readErr) return fail(readErr.message);
-  const list = (rows || []) as Array<{ id: string; mode: string; filters: Record<string, unknown> | null }>;
-  if (list.length === 0) return { ok: true, claimed: 0, alertsOn: 0, notEmailable: 0, comingBackExcluded: 0 };
+  const pending = (anonRows || []) as Array<{ id: string; mode: string; filters: Record<string, unknown> | null }>;
 
-  const alerting: string[] = [];
-  const silent: string[] = [];
-  let comingBackExcluded = 0;
-  for (const r of list) {
-    const plan = alertableScope((r.mode || 'open') as SavedSearchMode, r.filters || {});
-    if (plan.kind === 'none') { silent.push(r.id); continue; }
-    alerting.push(r.id);
-    if (plan.kind === 'partial') {
-      // Narrow BEFORE alerts turn on, while the row is still anon-owned and silent: a failure
-      // here leaves nothing alerting on an unsupported scope.
-      const { error } = await db
+  let claimed = 0;
+  let alreadyOnAccount = 0;
+  if (pending.length) {
+    const { data: mine, error: mineErr } = await db
+      .from('saved_searches').select('mode,filters').eq('user_email', e);
+    if (mineErr) return fail(mineErr.message);
+    const held = new Set(((mine || []) as Array<{ mode: string; filters: unknown }>).map((r) => watchKey(r.mode, r.filters)));
+    const move = pending.filter((r) => !held.has(watchKey(r.mode, r.filters))).map((r) => r.id);
+    alreadyOnAccount = pending.length - move.length;
+    if (move.length) {
+      // ⚠️ Never count a capped RETURNING payload; a NULL count is UNKNOWN, never 0 (Rule #11).
+      const { count, error } = await db
         .from('saved_searches')
-        .update({ filters: plan.filters, updated_at: new Date().toISOString() })
-        .eq('id', r.id)
-        .eq('user_email', owner);
+        .update({ user_email: e, alerts_enabled: false, updated_at: new Date().toISOString() }, { count: 'exact' })
+        .eq('user_email', owner)
+        .in('id', move);
       if (error) return fail(error.message);
-      comingBackExcluded++;
+      if (count == null) return fail('claim count returned NULL — unknown, not zero');
+      claimed = count;
     }
   }
 
-  // ⚠️ Never count a RETURNING payload as the write total. `UPDATE … .select()`
-  // updates every matching row but RETURNS at most 1,000, so `data.length` would
-  // silently under-report. `{ count: 'exact' }` reports the real number, and a
-  // NULL count is UNKNOWN — never coerced to 0 (Bug Prevention Rule #11).
-  const move = async (ids: string[], alerts: boolean): Promise<number | string> => {
-    if (ids.length === 0) return 0;
-    const { count, error } = await db
-      .from('saved_searches')
-      .update(
-        { user_email: e, alerts_enabled: alerts, updated_at: new Date().toISOString() },
-        { count: 'exact' },
-      )
-      .eq('user_email', owner)
-      .in('id', ids);
-    if (error) return error.message;
-    if (count == null) return 'claim count returned NULL — unknown, not zero';
-    return count;
-  };
-  const on = await move(alerting, true);
-  if (typeof on === 'string') return fail(on);
-  const off = await move(silent, false);
-  if (typeof off === 'string') return { ...fail(off), claimed: on, alertsOn: on };
-  return { ok: true, claimed: on + off, alertsOn: on, notEmailable: off, comingBackExcluded };
+  // The explicit opt-in — the only way alerts turn on, and only for a watch this account now owns.
+  let alertsOn = 0;
+  let notEmailable = 0;
+  let comingBackExcluded = 0;
+  const optIn = typeof opts.enableAlertsFor === 'string' ? opts.enableAlertsFor.trim() : '';
+  if (optIn) {
+    const { data: row, error } = await db
+      .from('saved_searches').select('id,mode,filters,user_email').eq('id', optIn).eq('user_email', e).maybeSingle();
+    if (error) return { ok: false, claimed, alreadyOnAccount, alertsOn, notEmailable, comingBackExcluded, error: error.message };
+    if (row) {
+      const r = row as { id: string; mode: string; filters: Record<string, unknown> | null };
+      const plan = alertableScope((r.mode || 'open') as SavedSearchMode, r.filters || {});
+      if (plan.kind === 'none') notEmailable = 1;
+      else {
+        const patch: Record<string, unknown> = { alerts_enabled: true, updated_at: new Date().toISOString() };
+        if (plan.kind === 'partial') { patch.filters = plan.filters; comingBackExcluded = 1; }
+        const { error: upErr } = await db.from('saved_searches').update(patch).eq('id', r.id).eq('user_email', e);
+        if (upErr) return { ok: false, claimed, alreadyOnAccount, alertsOn, notEmailable, comingBackExcluded, error: upErr.message };
+        alertsOn = 1;
+      }
+    }
+  }
+  return { ok: true, claimed, alreadyOnAccount, alertsOn, notEmailable, comingBackExcluded };
 }
 
 /** Most watches one anonymous identity may hold. Bounds unauthenticated writes. */

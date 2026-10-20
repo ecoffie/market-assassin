@@ -83,13 +83,15 @@ export async function POST(request: NextRequest) {
     if (!verifiedEmail) {
       return NextResponse.json({ success: false, error: 'session carries no account' }, { status: 401 });
     }
-    const r = await claimAnonWatch(db(), anonId, verifiedEmail);
+    // Alerts turn on ONLY for an explicit opt-in naming the ONE watch (enableAlerts:true + watchId).
+    // A bare claim — sign-in, retry, page load — moves this browser's watches with alerts OFF.
+    const enableAlertsFor = body.enableAlerts === true && typeof body.watchId === 'string' ? body.watchId : null;
+    const r = await claimAnonWatch(db(), anonId, verifiedEmail, { enableAlertsFor });
     if (!r.ok) return NextResponse.json({ success: false, error: r.error }, { status: 400 });
-    // alertsEnabled is now TRUE only when a claimed watch actually alerts (F3). The counts let the
-    // client say what was turned on and what cannot be emailed.
     return NextResponse.json({
       success: true,
       claimed: r.claimed,
+      alreadyOnAccount: r.alreadyOnAccount,
       alertsEnabled: r.alertsOn > 0,
       alertsOn: r.alertsOn,
       notEmailable: r.notEmailable,
@@ -164,10 +166,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'a verified email or a well-formed anonId is required' }, { status: 400 });
   }
 
-  const { data, error } = await db()
+  // `id` narrows to ONE watch, still scoped to the owner — a watch id never reaches another owner's row.
+  const one = request.nextUrl.searchParams.get('id');
+  let q = db()
     .from('saved_searches')
     .select('id,name,mode,filters,bbox,alerts_enabled,created_at')
-    .eq('user_email', owner)
+    .eq('user_email', owner);
+  if (one) q = q.eq('id', one);
+  const { data, error } = await q
     .order('created_at', { ascending: false })
     .limit(50);
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });

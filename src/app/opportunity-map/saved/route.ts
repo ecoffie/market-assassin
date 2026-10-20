@@ -235,7 +235,26 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   function h(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function esc(s){ return h(s); }
 
-  if(!t||!em){ bodyEl.innerHTML='<div class="signin" style="text-align:center;padding:70px 20px">Please <a href="#" onclick="return window.__mapsSignIn()">sign in</a> to see your Morning Brief.</div>'; return; }
+  if(!t||!em){
+    var SIGNIN='<div class="signin" style="text-align:center;padding:70px 20px">Please <a href="#" onclick="return window.__mapsSignIn()">sign in</a> to see your Morning Brief.</div>';
+    // SIGNED OUT (option A, 2026-10-10): show the watches THIS BROWSER saved, so a declined alerts
+    // offer never loses them. Ownership = the stored anon id; nothing here can subscribe to email.
+    var aid=''; try{ aid=localStorage.getItem('mindy_anon_id')||''; }catch(e){ aid=''; }
+    if(!/^anon:[0-9a-f-]{36}$/i.test(aid)){ bodyEl.innerHTML=SIGNIN; return; }
+    fetch('/api/app/map-watch?anonId='+encodeURIComponent(aid)).then(function(r){ return r.json(); }).then(function(d){
+      var ws=(d&&d.success&&d.watches)||[];
+      if(!ws.length){ bodyEl.innerHTML=SIGNIN; return; }
+      var hz=function(f){ var h=(f&&f.horizons)||null; if(!h) return ''; var on=[]; if(h.open!==false)on.push('Open Now'); if(h.recompete)on.push('Coming Back'); if(h.forecast)on.push('Coming Soon'); return on.join(' \u00b7 '); };
+      bodyEl.innerHTML='<div class="anonwatch" style="max-width:720px;margin:28px auto;padding:0 16px">'
+        +'<h2 style="font-size:20px;margin:0 0 6px">Saved on this browser</h2>'
+        +'<p style="color:#5b6672;margin:0 0 14px;font-size:14.5px">Alerts are off. <a href="#" onclick="return window.__mapsSignIn()">Sign in</a> to keep these on your account \u2014 they move over with alerts still off, and you choose which ones email you.</p>'
+        +ws.map(function(w){ return '<div class="aw" style="border:1px solid #e6eaef;border-radius:10px;padding:12px 14px;margin:8px 0;display:flex;justify-content:space-between;gap:12px;align-items:center">'
+          +'<div><div style="font-weight:600">'+esc(w.name||'Saved search')+'</div><div style="color:#6b7787;font-size:13px">'+esc(hz(w.filters))+(hz(w.filters)?' \u00b7 ':'')+'Alerts off</div></div>'
+          +'<a href="/opportunity-map?ss='+encodeURIComponent(w.id)+'" style="white-space:nowrap;font-weight:600">Open on map \u2192</a></div>'; }).join('')
+        +'<p style="color:#6b7787;margin:14px 0 0;font-size:13px">These are kept only for this browser. If this browser\u2019s data is cleared before you sign in, Mindy can\u2019t tell they were yours and can\u2019t recover them.</p></div>';
+    }).catch(function(){ bodyEl.innerHTML='<div class="signin" style="text-align:center;padding:70px 20px">Couldn\u2019t load the searches saved on this browser. <a href="#" onclick="location.reload();return false">Try again</a> or <a href="#" onclick="return window.__mapsSignIn()">sign in</a>.</div>'; });
+    return;
+  }
   function hdrs(){ return {'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}; }
 
   // Friendly first-name greeting derived SAFELY from the email local-part (never a hardcoded name).
