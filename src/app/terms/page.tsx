@@ -16,7 +16,7 @@ export default function TermsPage() {
     <main className="bg-(--mp-paper) text-(--mp-ink)">
       <div className="max-w-3xl mx-auto px-6 py-16">
         <h1 className="text-4xl font-bold text-(--mp-ink) mb-4 font-(family-name:--mp-font-serif)">Terms of Service</h1>
-        <p className="text-(--mp-muted) mb-10">Last Updated: March 9, 2026</p>
+        <p className="text-(--mp-muted) mb-10">Last Updated: October 24, 2026</p>
 
         <div className="space-y-6 leading-relaxed">
           <p>
@@ -67,13 +67,72 @@ export default function TermsPage() {
             within 7 days of purchase.
           </p>
 
-          <h2 className="text-2xl font-semibold text-(--mp-ink) pt-6 font-(family-name:--mp-font-serif)">4. Subscriptions</h2>
+          <h2 className="text-2xl font-semibold text-(--mp-ink) pt-6 font-(family-name:--mp-font-serif)">4. Subscriptions and Mindy Credits</h2>
           <p>Some services are offered on a subscription basis:</p>
           <ul className="list-disc pl-6 space-y-1">
             <li>Subscriptions automatically renew unless cancelled</li>
             <li>You may cancel at any time through your account settings or by contacting us</li>
             <li>Cancellation takes effect at the end of the current billing period</li>
             <li>No refunds are provided for partial billing periods</li>
+          </ul>
+
+          <h3 id="credits" className="text-lg font-semibold text-(--mp-ink)">Mindy Credits</h3>
+          <p>
+            Some Mindy features, including Mindy tools used inside AI assistants, use credits. Credits are
+            held either on your individual account or, for Team plans, in a shared pool for your organization.
+          </p>
+
+          <h4 className="font-semibold text-(--mp-ink)">Individual credits</h4>
+          <ul className="list-disc pl-6 space-y-1">
+            <li>Monthly credit plans add the plan&apos;s credits each time a monthly payment is processed.</li>
+            <li>
+              Some individual annual plans add the full year of credits up front when the annual payment is
+              processed. Other plans, such as Mindy Pro, add their credit allowance each month, including when
+              billed annually.
+            </li>
+            <li>One-time top-ups add credits when the payment is processed.</li>
+            <li>New accounts may receive a one-time allotment of free credits.</li>
+            <li>Unused credits on your individual account carry forward while your account remains open.</li>
+          </ul>
+
+          <h4 className="font-semibold text-(--mp-ink)">Team credit pools</h4>
+          <ul className="list-disc pl-6 space-y-1">
+            <li>
+              Team plans use a shared pool. Requests made by Team members draw on the pool, not on their
+              individual balances.
+            </li>
+            <li>
+              The pool is replenished up to the plan&apos;s monthly allowance on the plan&apos;s configured funding
+              schedule, including for Team plans billed annually. Unused monthly allowance does not accumulate
+              beyond that limit.
+            </li>
+            <li>A Team member whose requests draw on a Team pool may not also receive an individual Mindy Pro allowance.</li>
+          </ul>
+
+          <h4 className="font-semibold text-(--mp-ink)">How credits are used</h4>
+          <ul className="list-disc pl-6 space-y-1">
+            <li>Each tool uses a set number of credits per billable request. Current costs are shown in your Mindy account. We may change tool costs going forward; changes do not affect credits already used.</li>
+            <li>A completed billable request may use credits even when it finds no matching records.</li>
+            <li>Requests that are refused, and requests that perform no billable work, are not charged.</li>
+          </ul>
+
+          <h4 className="font-semibold text-(--mp-ink)">Cancellation</h4>
+          <p>
+            Cancelling a subscription stops future credit allowances after the current billing period ends. It
+            does not automatically remove credits already on your individual account.
+          </p>
+
+          <h4 className="font-semibold text-(--mp-ink)">Value and transfers</h4>
+          <ul className="list-disc pl-6 space-y-1">
+            <li>
+              Credits have no cash value and are not refundable, except as described in Section 3 or as required
+              by applicable law. Nothing in this section limits any rights you have under applicable consumer law.
+            </li>
+            <li>
+              Credits may not be sold or transferred to another person. We may make authorized administrative
+              adjustments, including moving credits between accounts that belong to the same customer.
+            </li>
+            <li>Free, promotional, or complimentary credits may be changed or withdrawn at any time.</li>
           </ul>
 
           <h2 id="sms-terms" className="text-2xl font-semibold text-(--mp-ink) pt-6 font-(family-name:--mp-font-serif)">
