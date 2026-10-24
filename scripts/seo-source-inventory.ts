@@ -107,7 +107,6 @@ async function supabaseTables() {
     'awards_serving_pages',
     'agency_forecasts',
     'forecast_sources',
-    'opengov_iq_entities',
     'user_business_profiles',
     'sam_entities',
     'recompetes',

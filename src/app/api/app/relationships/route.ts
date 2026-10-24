@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { displayContactName } from '@/lib/gov-contacts/contact-quality';
-import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
-import { assertLiveBigQueryAllowed } from '@/lib/bigquery/guard';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { ensureWorkspaceMember, recordAppActivity, resolveActiveWorkspace } from '@/lib/app/workspace';
 import { searchContractors } from '@/lib/contractor-database';
@@ -32,12 +30,6 @@ type RelationshipType = 'government_buyer' | 'osbp' | 'prime' | 'subcontractor' 
  * narrow your search".
  */
 const MAX_DIRECTORY_RESULTS = 250;
-
-const BIGQUERY_CONTACTS_PROJECT_ID = process.env.BIGQUERY_CONTACTS_PROJECT_ID || 'fresh-ward-455220-j0';
-const BIGQUERY_CONTACTS_DATASET_ID = process.env.BIGQUERY_CONTACTS_DATASET_ID || 'samgovcons';
-const BIGQUERY_CONTACTS_TABLE_ID = process.env.BIGQUERY_CONTACTS_TABLE_ID || 'AllSamContacts';
-const BIGQUERY_TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const BIGQUERY_SCOPE = 'https://www.googleapis.com/auth/bigquery.readonly';
 
 interface RelationshipContactInput {
   user_email: string;
@@ -71,15 +63,6 @@ interface RelationshipCandidate {
   source?: string;
   source_record_id?: string;
   context?: string;
-}
-
-interface BigQueryCredentials {
-  client_email: string;
-  private_key: string;
-}
-
-interface BigQueryField {
-  name: string;
 }
 
 async function ensureRelationshipSchema() {
@@ -141,28 +124,6 @@ async function ensureRelationshipSchema() {
       CREATE INDEX IF NOT EXISTS idx_mi_beta_contact_links_workspace ON mi_beta_contact_opportunity_links(workspace_id);
       CREATE INDEX IF NOT EXISTS idx_mi_beta_contact_links_pipeline ON mi_beta_contact_opportunity_links(pipeline_id);
 
-      CREATE TABLE IF NOT EXISTS opengov_iq_contacts (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        source_table TEXT NOT NULL DEFAULT 'AllSamContacts',
-        source_row_key TEXT NOT NULL UNIQUE,
-        contact_fullname TEXT,
-        contact_title TEXT,
-        contact_email TEXT,
-        contact_phone TEXT,
-        department_ind_agency TEXT,
-        office TEXT,
-        sub_tier TEXT,
-        posted_date TEXT,
-        solicitation_number TEXT,
-        raw_data JSONB DEFAULT '{}'::jsonb,
-        imported_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_at TIMESTAMPTZ DEFAULT NOW()
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_opengov_iq_contacts_search ON opengov_iq_contacts
-        USING GIN (to_tsvector('english', coalesce(contact_fullname, '') || ' ' || coalesce(contact_title, '') || ' ' || coalesce(department_ind_agency, '') || ' ' || coalesce(office, '') || ' ' || coalesce(sub_tier, '')));
-      CREATE INDEX IF NOT EXISTS idx_opengov_iq_contacts_agency ON opengov_iq_contacts(department_ind_agency);
-      CREATE INDEX IF NOT EXISTS idx_opengov_iq_contacts_email ON opengov_iq_contacts(contact_email);
     `,
   });
 
@@ -175,113 +136,6 @@ function normalizeEmail(value?: string | null) {
 
 function normalizeText(value?: string | null) {
   return (value || '').toLowerCase().trim();
-}
-
-function base64UrlEncode(value: Buffer | string) {
-  return Buffer.from(value)
-    .toString('base64')
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_');
-}
-
-function getBigQueryCredentials(): BigQueryCredentials | null {
-  const rawJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || process.env.BIGQUERY_SERVICE_ACCOUNT_JSON;
-
-  if (rawJson) {
-    try {
-      const parsed = JSON.parse(rawJson) as BigQueryCredentials;
-      if (parsed.client_email && parsed.private_key) return parsed;
-    } catch (error) {
-      console.error('Invalid BigQuery service account JSON:', error);
-    }
-  }
-
-  const clientEmail = process.env.GOOGLE_CLIENT_EMAIL || process.env.BIGQUERY_CLIENT_EMAIL;
-  const privateKey = process.env.GOOGLE_PRIVATE_KEY || process.env.BIGQUERY_PRIVATE_KEY;
-
-  if (!clientEmail || !privateKey) return null;
-
-  return {
-    client_email: clientEmail,
-    private_key: privateKey.replace(/\\n/g, '\n'),
-  };
-}
-
-async function getBigQueryAccessToken(credentials: BigQueryCredentials) {
-  const now = Math.floor(Date.now() / 1000);
-  const header = { alg: 'RS256', typ: 'JWT' };
-  const claimSet = {
-    iss: credentials.client_email,
-    scope: BIGQUERY_SCOPE,
-    aud: BIGQUERY_TOKEN_URL,
-    exp: now + 3600,
-    iat: now,
-  };
-
-  const unsignedToken = `${base64UrlEncode(JSON.stringify(header))}.${base64UrlEncode(JSON.stringify(claimSet))}`;
-  const signature = crypto
-    .createSign('RSA-SHA256')
-    .update(unsignedToken)
-    .sign(credentials.private_key);
-  const jwt = `${unsignedToken}.${base64UrlEncode(signature)}`;
-
-  const response = await fetch(BIGQUERY_TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwt,
-    }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`BigQuery auth failed: ${response.status} ${text.slice(0, 200)}`);
-  }
-
-  const data = await response.json() as { access_token?: string };
-  if (!data.access_token) throw new Error('BigQuery auth did not return an access token');
-  return data.access_token;
-}
-
-function bigQueryStringParam(name: string, value: string) {
-  return {
-    name,
-    parameterType: { type: 'STRING' },
-    parameterValue: { value },
-  };
-}
-
-function bigQueryIntParam(name: string, value: number) {
-  return {
-    name,
-    parameterType: { type: 'INT64' },
-    parameterValue: { value: String(value) },
-  };
-}
-
-function parseBigQueryRows(fields: BigQueryField[] = [], rows: Array<{ f?: Array<{ v?: unknown }> }> = []) {
-  return rows.map(row => {
-    const record: Record<string, string> = {};
-    fields.forEach((field, index) => {
-      const rawValue = row.f?.[index]?.v;
-      record[field.name] = rawValue == null ? '' : String(rawValue);
-    });
-    return record;
-  });
-}
-
-function getFirstRecordValue(record: Record<string, string>, keys: string[]) {
-  for (const key of keys) {
-    const direct = record[key];
-    if (direct && direct.trim()) return direct.trim();
-
-    const matchingKey = Object.keys(record).find(recordKey => recordKey.toLowerCase() === key.toLowerCase());
-    if (matchingKey && record[matchingKey]?.trim()) return record[matchingKey].trim();
-  }
-
-  return '';
 }
 
 function matchesCandidateSearch(candidate: RelationshipCandidate, search: string, agency: string) {
@@ -312,90 +166,6 @@ function pushUniqueCandidate(
   if (!key || seen.has(key)) return;
   seen.add(key);
   candidates.push(candidate);
-}
-
-function sanitizeSupabasePattern(value: string) {
-  return value.replace(/[%,()]/g, ' ').trim();
-}
-
-async function queryImportedOpenGovContacts(search: string, agency: string) {
-  let query = getSupabase()
-    .from('opengov_iq_contacts')
-    .select('id,source_table,source_row_key,contact_fullname,contact_title,contact_email,contact_phone,department_ind_agency,office,sub_tier,posted_date,solicitation_number')
-    .order('imported_at', { ascending: false })
-    // Was 80 — too tight when paired with the 40-row cap downstream.
-    // Bumped to 500 so the downstream MAX_DIRECTORY_RESULTS cap actually
-    // gets useful candidates to choose from.
-    .limit(500);
-
-  const searchTerm = sanitizeSupabasePattern(search);
-  if (searchTerm) {
-    const pattern = `%${searchTerm}%`;
-    query = query.or([
-      `contact_fullname.ilike.${pattern}`,
-      `contact_title.ilike.${pattern}`,
-      `contact_email.ilike.${pattern}`,
-      `department_ind_agency.ilike.${pattern}`,
-      `office.ilike.${pattern}`,
-      `sub_tier.ilike.${pattern}`,
-      `solicitation_number.ilike.${pattern}`,
-    ].join(','));
-  }
-
-  const agencyTerm = sanitizeSupabasePattern(agency);
-  if (agencyTerm) {
-    const pattern = `%${agencyTerm}%`;
-    query = query.or([
-      `department_ind_agency.ilike.${pattern}`,
-      `office.ilike.${pattern}`,
-      `sub_tier.ilike.${pattern}`,
-    ].join(','));
-  }
-
-  const { data, error } = await query;
-  if (error) {
-    if (error.code === '42P01' || error.code === '42703') {
-      return { candidates: [] as RelationshipCandidate[], total: 0, configured: false };
-    }
-    throw error;
-  }
-
-  const seen = new Set<string>();
-  const candidates: RelationshipCandidate[] = [];
-
-  for (const row of (data || []) as Record<string, string>[]) {
-    const candidate: RelationshipCandidate = {
-      id: `opengov-contact:${row.id}`,
-      contact_type: 'government_buyer',
-      // This directory had NO name guard at all, so it emitted the raw SAM placeholder
-      // ("Telephone: 7175503112", "ELECTRONIC MAIL: x@y.gov") as a CRM candidate's name.
-      full_name: displayContactName(row.contact_fullname) || row.contact_email || 'Government point of contact',
-      title: row.contact_title || 'Government point of contact',
-      email: row.contact_email || '',
-      phone: row.contact_phone || '',
-      organization: row.office || row.sub_tier || row.department_ind_agency || '',
-      agency: row.department_ind_agency || '',
-      office: row.office || '',
-      sub_tier: row.sub_tier || '',
-      source: 'opengov_iq_contacts_import',
-      source_record_id: `opengov-import:${row.source_row_key}`,
-      context: [
-        row.solicitation_number ? `Sol# ${row.solicitation_number}` : '',
-        row.posted_date ? `Posted ${row.posted_date}` : '',
-        row.source_table || 'AllSamContacts',
-      ].filter(Boolean).join(' · '),
-    };
-
-    if (matchesCandidateSearch(candidate, search, agency)) {
-      pushUniqueCandidate(candidates, seen, candidate);
-    }
-  }
-
-  return {
-    candidates: candidates.slice(0, MAX_DIRECTORY_RESULTS),
-    total: candidates.length,
-    configured: true,
-  };
 }
 
 function mapOSBPContact(
@@ -510,105 +280,6 @@ function mapContractorCandidates(search: string, naics: string, agency: string) 
       contractor.total_contract_value ? `${contractor.total_contract_value} in visible value` : '',
     ].filter(Boolean).join(' · '),
   }));
-}
-
-async function queryBigQueryContacts(search: string, agency: string) {
-  // Raw REST path to BigQuery: same fail-closed guard as the shared client (build / unit suite).
-  assertLiveBigQueryAllowed('relationships contacts REST');
-  const credentials = getBigQueryCredentials();
-  if (!credentials) return { candidates: [] as RelationshipCandidate[], configured: false };
-
-  const token = await getBigQueryAccessToken(credentials);
-  const tablePath = `\`${BIGQUERY_CONTACTS_PROJECT_ID}.${BIGQUERY_CONTACTS_DATASET_ID}.${BIGQUERY_CONTACTS_TABLE_ID}\``;
-  const searchTerm = search.trim() ? `%${search.trim().toLowerCase()}%` : '';
-  const agencyTerm = agency.trim() ? `%${agency.trim().toLowerCase()}%` : '';
-
-  const query = `
-    SELECT *
-    FROM ${tablePath}
-    WHERE
-      (@searchTerm = '' OR (
-        LOWER(TRIM(CAST(ContactFullname AS STRING))) LIKE @searchTerm OR
-        LOWER(TRIM(CAST(ContactTitle AS STRING))) LIKE @searchTerm OR
-        LOWER(TRIM(CAST(Department_Ind_Agency AS STRING))) LIKE @searchTerm OR
-        LOWER(TRIM(CAST(Office AS STRING))) LIKE @searchTerm OR
-        LOWER(TRIM(CAST(Sub_Tier AS STRING))) LIKE @searchTerm
-      ))
-      AND
-      (@agencyTerm = '' OR (
-        LOWER(TRIM(CAST(Department_Ind_Agency AS STRING))) LIKE @agencyTerm OR
-        LOWER(TRIM(CAST(Office AS STRING))) LIKE @agencyTerm OR
-        LOWER(TRIM(CAST(Sub_Tier AS STRING))) LIKE @agencyTerm
-      ))
-    ORDER BY SAFE_CAST(PostedDate AS TIMESTAMP) DESC
-    LIMIT @limit
-  `;
-
-  const response = await fetch(`https://bigquery.googleapis.com/bigquery/v2/projects/${BIGQUERY_CONTACTS_PROJECT_ID}/queries`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      query,
-      useLegacySql: false,
-      parameterMode: 'NAMED',
-      queryParameters: [
-        bigQueryStringParam('searchTerm', searchTerm),
-        bigQueryStringParam('agencyTerm', agencyTerm),
-        bigQueryIntParam('limit', 40),
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`BigQuery contacts query failed: ${response.status} ${text.slice(0, 300)}`);
-  }
-
-  const result = await response.json() as {
-    schema?: { fields?: BigQueryField[] };
-    rows?: Array<{ f?: Array<{ v?: unknown }> }>;
-  };
-
-  const records = parseBigQueryRows(result.schema?.fields || [], result.rows || []);
-  const seen = new Set<string>();
-  const candidates: RelationshipCandidate[] = [];
-
-  for (const record of records) {
-    const fullName = getFirstRecordValue(record, ['ContactFullname', 'contact_fullname', 'full_name', 'name']);
-    const title = getFirstRecordValue(record, ['ContactTitle', 'contact_title', 'title']);
-    const department = getFirstRecordValue(record, ['Department_Ind_Agency', 'department_ind_agency', 'department', 'agency']);
-    const office = getFirstRecordValue(record, ['Office', 'office']);
-    const subTier = getFirstRecordValue(record, ['Sub_Tier', 'sub_tier', 'subtier']);
-    const email = getFirstRecordValue(record, ['ContactEmail', 'Email', 'email', 'email_address', 'POCEmail']);
-    const phone = getFirstRecordValue(record, ['ContactPhone', 'Phone', 'phone', 'phone_number', 'POCPhone']);
-    const postedDate = getFirstRecordValue(record, ['PostedDate', 'posted_date']);
-    const solicitation = getFirstRecordValue(record, ['SolNum', 'SolicitationNumber', 'solicitation_number', 'NoticeId', 'notice_id']);
-
-    const candidate: RelationshipCandidate = {
-      id: `bigquery-contact:${email || `${fullName}:${department}:${office}:${solicitation}`}`,
-      contact_type: 'government_buyer',
-      full_name: fullName || email || 'Government point of contact',
-      title: title || 'Government point of contact',
-      email,
-      phone,
-      organization: office || subTier || department,
-      agency: department,
-      office,
-      sub_tier: subTier,
-      source: 'opengov_iq_all_sam_contacts',
-      source_record_id: `opengov:${email || `${fullName}:${department}:${office}:${solicitation}`}`,
-      context: [solicitation ? `Sol# ${solicitation}` : '', postedDate ? `Posted ${postedDate}` : '', `${BIGQUERY_CONTACTS_TABLE_ID}`].filter(Boolean).join(' · '),
-    };
-
-    if (matchesCandidateSearch(candidate, search, agency)) {
-      pushUniqueCandidate(candidates, seen, candidate);
-    }
-  }
-
-  return { candidates, configured: true };
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -806,43 +477,12 @@ export async function GET(request: NextRequest) {
       let dataSourceStatus = '';
 
       if (type === 'government_buyer') {
-        try {
-          const importedResult = await queryImportedOpenGovContacts(search, agency);
-          candidates = importedResult.candidates;
-          total = importedResult.total;
-          dataSourceStatus = importedResult.configured
-            ? 'opengov_iq_contacts_import'
-            : 'OpenGov IQ import table is not loaded yet.';
-        } catch (importError) {
-          console.error('OpenGov IQ imported contacts query failed:', importError);
-          dataSourceStatus = 'OpenGov IQ imported contacts query failed. Trying live BigQuery when available.';
-        }
-
-        if (candidates.length === 0) {
-          try {
-            const bigQueryResult = await queryBigQueryContacts(search, agency);
-            candidates = bigQueryResult.candidates;
-            // BigQuery path doesn't surface a pre-truncation count.
-            // Use candidates.length as a best-guess total here. Could
-            // be enhanced by threading total through queryBigQueryContacts.
-            total = bigQueryResult.candidates.length;
-            dataSourceStatus = bigQueryResult.configured
-              ? 'opengov_iq_all_sam_contacts'
-              : `${dataSourceStatus} BigQuery contacts table is identified, but credentials are not configured yet. Showing SAM cache contacts when available.`;
-          } catch (bigQueryError) {
-            console.error('OpenGov IQ BigQuery contacts query failed:', bigQueryError);
-            dataSourceStatus = `${dataSourceStatus} Live BigQuery query failed. Showing SAM cache contacts when available.`;
-          }
-        }
-
-        if (candidates.length === 0) {
-          const fallback = await mapGovernmentBuyerCandidates(search, naics, agency);
-          candidates = fallback.candidates;
-          total = fallback.total;
-          dataSourceStatus = candidates.length > 0
-            ? `${dataSourceStatus} Fallback: sam_opportunities.`
-            : 'No buyer contacts found for this search. Try an agency or broader keyword, or use OSBP contacts for relationship outreach.';
-        }
+        const buyers = await mapGovernmentBuyerCandidates(search, naics, agency);
+        candidates = buyers.candidates;
+        total = buyers.total;
+        dataSourceStatus = candidates.length > 0
+          ? 'sam_opportunities'
+          : 'No buyer contacts found for this search. Try an agency or broader keyword, or use OSBP contacts for relationship outreach.';
       } else if (type === 'osbp') {
         const osbpResult = mapOSBPCandidates(search, agency);
         candidates = osbpResult.candidates;

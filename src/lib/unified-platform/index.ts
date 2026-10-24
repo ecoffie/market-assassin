@@ -2,7 +2,7 @@
  * Unified Platform MVP Service
  * Created: May 3, 2026
  *
- * Handles contacts, pipeline, and conversations for OpenGovIQ migration.
+ * Handles contacts, pipeline, and conversations for the unified Mindy platform.
  */
 
 import { createClient } from '@supabase/supabase-js';
