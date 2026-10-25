@@ -89,7 +89,9 @@ describe('buildEmail', () => {
     const many = Array.from({ length: 30 }, (_, i) => opp({ notice_id: `n${i}` }));
     const { html } = buildEmail({ id: 's1', name: 'Cyber' }, many);
     expect((html.match(/opportunity-map\?opp=/g) || []).length).toBe(3);
-    expect(html).toContain('view all on the map');
+    expect(html).toContain('See this search on the map');
+    // The link opens the WHOLE saved search, so it must not carry the new-only count.
+    expect(html).not.toMatch(/See all \d+/);
   });
 
   it('high-volume Forecast summary (total > evidence): says the rows are EXAMPLES, not the complete set, in html AND text', () => {
