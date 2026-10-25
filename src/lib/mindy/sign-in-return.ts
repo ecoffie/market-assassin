@@ -28,6 +28,34 @@ export function signInReturnPath(rawNext: string | null | undefined): string | n
 }
 
 /**
+ * MAGIC LINK. The emailed link lands on bare /app (Supabase `redirectTo`); its `next` cannot ride
+ * along without changing Supabase's redirect allow-list, and a URL Supabase rejects falls back to
+ * the Site URL — breaking magic-link sign-in outright. So /app remembers the requested `next` in
+ * THIS browser when the link is requested and honours it when the link is opened. Opened on a
+ * different device → no pending value → /app, exactly as before. Stored value is re-validated
+ * on read (it is user-writable), expires with the link, and is used once.
+ */
+export const PENDING_NEXT_KEY = 'mindy_signin_next';
+export const PENDING_NEXT_TTL_MS = 60 * 60 * 1000;
+
+export function encodePendingNext(rawNext: string | null | undefined, now: number): string | null {
+  const dest = signInReturnPath(rawNext);
+  return dest ? JSON.stringify({ next: dest, at: now }) : null;
+}
+
+export function readPendingNext(stored: string | null | undefined, now: number): string | null {
+  if (!stored) return null;
+  try {
+    const v = JSON.parse(stored) as { next?: unknown; at?: unknown };
+    if (typeof v.next !== 'string' || typeof v.at !== 'number') return null;
+    if (v.at > now || now - v.at > PENDING_NEXT_TTL_MS) return null;
+    return signInReturnPath(v.next);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * OAuth `redirectTo` for /app/onboarding, carrying `next` only when `safeNext` accepts it.
  * Replaces an inline `startsWith('/') && !startsWith('//')` check that let `/\evil.com` through
  * (onboarding re-guarded it, but the first hop should not carry it at all).

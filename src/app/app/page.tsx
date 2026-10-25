@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { WELCOME_PATH } from '@/lib/mindy/post-signup-destination';
-import { oauthOnboardingRedirect, signInReturnPath } from '@/lib/mindy/sign-in-return';
+import { encodePendingNext, oauthOnboardingRedirect, PENDING_NEXT_KEY, readPendingNext, signInReturnPath } from '@/lib/mindy/sign-in-return';
 import { useSearchParams } from 'next/navigation';
 import UnifiedSidebar, { type AppPanel, type AppTier } from '@/components/app/UnifiedSidebar';
 import GlobalLookup from '@/components/app/GlobalLookup';
@@ -244,9 +244,18 @@ function AppDashboard() {
   // Google/Microsoft already did via /app/onboarding — it used to stay on /app regardless. The
   // onboarding redirect inside loadUserProfile wins: a user with no profile goes there first.
   const leavingForOnboardingRef = useRef(false);
-  const returnToNextAfterSignIn = useCallback(() => {
-    if (typeof window === 'undefined' || leavingForOnboardingRef.current) return;
-    const dest = signInReturnPath(new URLSearchParams(window.location.search).get('next'));
+  // `fromMagicLink`: the emailed link lands on bare /app, so its destination was remembered in
+  // this browser when the link was requested (see PENDING_NEXT_KEY). Only that path reads it, so a
+  // stale request can never hijack a later password sign-in. Any sign-in clears it.
+  const returnToNextAfterSignIn = useCallback((opts: { fromMagicLink?: boolean } = {}) => {
+    if (typeof window === 'undefined') return;
+    let pending: string | null = null;
+    try {
+      pending = opts.fromMagicLink ? readPendingNext(localStorage.getItem(PENDING_NEXT_KEY), Date.now()) : null;
+      localStorage.removeItem(PENDING_NEXT_KEY);
+    } catch { /* storage blocked → no pending destination */ }
+    if (leavingForOnboardingRef.current) return;
+    const dest = signInReturnPath(new URLSearchParams(window.location.search).get('next')) || pending;
     if (dest) window.location.href = dest;
   }, []);
 
@@ -747,6 +756,10 @@ function AppDashboard() {
         return;
       }
 
+      try {
+        const pendingNext = encodePendingNext(new URLSearchParams(window.location.search).get('next'), Date.now());
+        if (pendingNext) localStorage.setItem(PENDING_NEXT_KEY, pendingNext);
+      } catch { /* storage blocked → the link still signs in, landing on /app */ }
       setPendingEmail(normalizedEmail);
       setMagicLinkSent(true);
       setAuthMessage(data.message || 'Check your inbox — click the link to open Mindy.');
@@ -1016,6 +1029,7 @@ function AppDashboard() {
         const ok = await bootstrapFromSupabaseSession();
         if (ok && typeof window !== 'undefined') {
           window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+          returnToNextAfterSignIn({ fromMagicLink: true });
         } else if (!ok) {
           clearStoredAppAuth();
           setIsLoading(false);
@@ -1025,7 +1039,7 @@ function AppDashboard() {
     });
 
     return () => subscription.unsubscribe();
-  }, [searchParams, loadUserProfile, bootstrapFromSupabaseSession, peekSupabaseSessionEmail, maybeRefreshMIToken]);
+  }, [searchParams, loadUserProfile, bootstrapFromSupabaseSession, peekSupabaseSessionEmail, maybeRefreshMIToken, returnToNextAfterSignIn]);
 
   // Loading state
   if (isLoading) {
