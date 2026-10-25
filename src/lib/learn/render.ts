@@ -133,14 +133,17 @@ function accessTags(m: Mission, opts: { link?: boolean } = { link: true }): stri
   return `<span class="${cls}">${esc(ACCESS_LABEL[m.access])}</span>`;
 }
 
-/** Display only: a live (unexpired) session token means "signed in" — the server still verifies
- *  every call. Expired / undecodable / absent → the sign-in link stays. */
+/** Display only. "Signed in" only after the shared header's /api/app/me check ACCEPTS the session
+ *  (window.__mindySession / the "mindy:session" event, account-menu.ts) — an unexpired token the
+ *  server rejects must not read as signed in. No token, expired, 401 or no answer → the sign-in
+ *  link stays. The server still verifies every call. */
 const LEARN_AUTH_JS = `<script>(function(){
-  var t=null;try{t=localStorage.getItem('mi_beta_auth_token');}catch(e){}
-  if(!t)return;
-  try{var s=String(t).split('.')[0].replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';var p=JSON.parse(atob(s));if(!p||(p.exp&&Number(p.exp)<Date.now()))return;}catch(e){return;}
-  [].forEach.call(document.querySelectorAll('[data-learn-signin]'),function(el){var sp=document.createElement('span');sp.className='tag';sp.textContent='Free \u00b7 signed in';el.parentNode.replaceChild(sp,el);});
-  [].forEach.call(document.querySelectorAll('[data-learn-signin-label]'),function(el){el.textContent='Free \u00b7 signed in';});
+  function relabel(){
+    [].forEach.call(document.querySelectorAll('[data-learn-signin]'),function(el){var sp=document.createElement('span');sp.className='tag';sp.textContent='Free \u00b7 signed in';el.parentNode.replaceChild(sp,el);});
+    [].forEach.call(document.querySelectorAll('[data-learn-signin-label]'),function(el){el.textContent='Free \u00b7 signed in';});
+  }
+  if(window.__mindySession==='valid'){relabel();return;}
+  document.addEventListener('mindy:session',function(e){if(e&&e.detail==='valid')relabel();});
 })();</script>`;
 
 function stepTags(m: Mission): string {

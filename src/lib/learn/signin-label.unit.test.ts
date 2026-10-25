@@ -12,17 +12,27 @@ const SIGNIN = MISSIONS.filter((m) => m.access === 'signin');
 const DAY = 24 * 60 * 60 * 1000;
 const tok = (exp: number) => Buffer.from(JSON.stringify({ email: 'jb@example.com', exp })).toString('base64url') + '.sig';
 
-function run(html: string, token: string | null) {
+/** Executes the REAL page scripts (shared header + Learn) with a stubbed /api/app/me. */
+async function run(html: string, token: string | null, meStatus: number | 'hang' = 'hang') {
   const dom = new JSDOM(html, { url: 'https://getmindy.ai/learn', runScripts: 'outside-only' });
   const w = dom.window as unknown as Window & { eval: (s: string) => unknown };
   if (token) w.localStorage.setItem('mi_beta_auth_token', token);
-  (w as unknown as { fetch: unknown }).fetch = () => new Promise(() => {}); // header /me never answers
-  // Execute only the Learn auth script (the header has its own tests).
-  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).filter((s) => s.includes('data-learn-signin'));
-  expect(scripts.length).toBe(1);
-  w.eval(scripts[0]);
+  (w as unknown as { fetch: unknown }).fetch = (url: string) => {
+    if (meStatus === 'hang' || !String(url).startsWith('/api/app/me')) return new Promise(() => {});
+    return Promise.resolve({ status: meStatus, ok: meStatus < 300, json: () => Promise.resolve({ email: 'jb@example.com', name: 'J B', picture: null }) });
+  };
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  const header = scripts.find((x) => x.includes('mindyAcct'));
+  const learn = scripts.filter((x) => x.includes('data-learn-signin'));
+  expect(learn.length).toBe(1);
+  if (header) w.eval(header.replace(/<\/script>[\s\S]*$/, ''));
+  w.eval(learn[0]);
+  for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
   return w.document;
 }
+
+/** Rendered access labels only — body.textContent would also include the inline script's source. */
+const labels = (d: Document) => [...d.querySelectorAll('.tag, [data-learn-signin-label]')].map((e) => e.textContent || '').join('|');
 
 describe('Learn sign-in label is a real action that returns to the tutorial', () => {
   it('there are 10 sign-in tutorials (B1 B3 B5 B6 B7 I1 I3 I4 I5 A2)', () => {
@@ -57,22 +67,35 @@ describe('Learn sign-in label is a real action that returns to the tutorial', ()
     }
   });
 
-  it('signed out → the sign-in links stay', () => {
-    const d = run(learnIndexHtml(), null);
+  it('signed out → the sign-in links stay', async () => {
+    const d = await run(learnIndexHtml(), null);
     expect(d.querySelectorAll('a[data-learn-signin]').length).toBe(SIGNIN.length);
   });
 
-  it('live session → "Free · signed in", no sign-in link (a signed-in reader is not sent to /app)', () => {
-    const d = run(learnIndexHtml(), tok(Date.now() + DAY));
+  it('session ACCEPTED by the server (/me 200) → "Free · signed in", no sign-in link', async () => {
+    const d = await run(learnIndexHtml(), tok(Date.now() + DAY), 200);
     expect(d.querySelectorAll('a[data-learn-signin]').length).toBe(0);
-    expect(d.body.textContent).not.toContain('Free · sign in');
-    expect(d.body.textContent).toContain('Free · signed in');
-    const m = run(missionHtml(SIGNIN[0]), tok(Date.now() + DAY));
+    expect(labels(d)).not.toContain('Free · sign in');
+    expect(labels(d)).toContain('Free · signed in');
+    const m = await run(missionHtml(SIGNIN[0]), tok(Date.now() + DAY), 200);
     expect(m.querySelectorAll('a[data-learn-signin]').length).toBe(0);
   });
 
-  it('expired session → still offered sign-in (the destination would reject the token)', () => {
-    const d = run(missionHtml(SIGNIN[0]), tok(Date.now() - 1000));
+  it('unexpired token the SERVER REJECTS (/me 401) → still offered sign-in, never "signed in"', async () => {
+    const d = await run(learnIndexHtml(), tok(Date.now() + DAY), 401);
+    expect(d.querySelectorAll('a[data-learn-signin]').length).toBe(SIGNIN.length);
+    expect(labels(d)).not.toContain('Free · signed in');
+  });
+
+  it('no server answer yet / 5xx → not claimed as signed in', async () => {
+    for (const st of ['hang', 500] as const) {
+      const d = await run(learnIndexHtml(), tok(Date.now() + DAY), st);
+      expect(labels(d)).not.toContain('Free · signed in');
+    }
+  });
+
+  it('expired session → still offered sign-in (the destination would reject the token)', async () => {
+    const d = await run(missionHtml(SIGNIN[0]), tok(Date.now() - 1000), 200);
     expect(d.querySelectorAll('a[data-learn-signin]').length).toBeGreaterThan(0);
   });
 

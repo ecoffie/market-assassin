@@ -10,7 +10,7 @@
  * "stay on /app" — the pre-existing behaviour, never an external site.
  */
 import { isSafeNext, safeNext, withNext } from './safe-next';
-import { isLegacyDestination, postSignupPath } from './post-signup-destination';
+import { isLegacyDestination, postSignupPath, WELCOME_PATH } from './post-signup-destination';
 
 /**
  * The ONE sign-in action link: Mindy's only sign-in surface is /app, which now returns to `next`.
@@ -53,6 +53,15 @@ export function readPendingNext(stored: string | null | undefined, now: number):
   } catch {
     return null;
   }
+}
+
+/**
+ * A NEW account is sent to the /welcome intent router before anything else. It must carry the
+ * destination the user signed in for: /welcome's "show me the map" link and its company-setup
+ * step both already return to a safe `next` (welcome/page.tsx). Without one → bare /welcome.
+ */
+export function onboardingRedirectPath(returnPath: string | null): string {
+  return withNext(WELCOME_PATH, returnPath);
 }
 
 /**

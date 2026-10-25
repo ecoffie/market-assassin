@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { WELCOME_PATH } from '@/lib/mindy/post-signup-destination';
-import { encodePendingNext, oauthOnboardingRedirect, PENDING_NEXT_KEY, readPendingNext, signInReturnPath } from '@/lib/mindy/sign-in-return';
+import { encodePendingNext, oauthOnboardingRedirect, onboardingRedirectPath, PENDING_NEXT_KEY, readPendingNext, signInReturnPath } from '@/lib/mindy/sign-in-return';
 import { useSearchParams } from 'next/navigation';
 import UnifiedSidebar, { type AppPanel, type AppTier } from '@/components/app/UnifiedSidebar';
 import GlobalLookup from '@/components/app/GlobalLookup';
@@ -349,8 +349,17 @@ function AppDashboard() {
           try { localStorage.setItem('mi_beta_email', userEmail); } catch { /* */ }
           // Legacy default removed 2026-08-25 — an account with no intent belongs in the
           // intent router, never the retired profile builder.
+          // Carry the destination the user signed in for (?next=, or the magic link's remembered
+          // one while its #access_token is still in the URL) through /welcome.
+          let returnPath = signInReturnPath(new URLSearchParams(window.location.search).get('next'));
+          try {
+            if (!returnPath && window.location.hash.includes('access_token')) {
+              returnPath = readPendingNext(localStorage.getItem(PENDING_NEXT_KEY), Date.now());
+            }
+            localStorage.removeItem(PENDING_NEXT_KEY);
+          } catch { /* storage blocked → bare /welcome */ }
           leavingForOnboardingRef.current = true;
-          window.location.href = WELCOME_PATH;
+          window.location.href = onboardingRedirectPath(returnPath);
           return;
         }
       }

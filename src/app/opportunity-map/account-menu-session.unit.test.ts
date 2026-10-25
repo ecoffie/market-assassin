@@ -67,6 +67,17 @@ describe('account chip reflects a LIVE session, not a present token', () => {
     expect(w.document.getElementById('mindyAcctHd')!.style.display).toBe('none');
   });
 
+  it('publishes the server verdict for page scripts: valid only after /me accepts, signed-out on 401/expired', async () => {
+    const ok = await mount({ token: token({ email: 'jb@example.com', exp: Date.now() + DAY }) });
+    expect((ok.w as unknown as { __mindySession?: string }).__mindySession).toBe('valid');
+    const rej = await mount({ token: token({ email: 'jb@example.com', exp: Date.now() + DAY }), meStatus: 401 });
+    expect((rej.w as unknown as { __mindySession?: string }).__mindySession).toBe('signed-out');
+    const exp = await mount({ token: token({ email: 'jb@example.com', exp: Date.now() - 1000 }) });
+    expect((exp.w as unknown as { __mindySession?: string }).__mindySession).toBe('signed-out');
+    const err = await mount({ token: token({ email: 'jb@example.com', exp: Date.now() + DAY }), meStatus: 500 });
+    expect((err.w as unknown as { __mindySession?: string }).__mindySession).toBeUndefined();
+  });
+
   it('a transient /me failure (500) does NOT sign the user out', async () => {
     const { btn } = await mount({ token: token({ email: 'jb@example.com', exp: Date.now() + DAY }), meStatus: 500 });
     expect(btn.textContent).toBe('J'); // initials from the token email; /me never answered

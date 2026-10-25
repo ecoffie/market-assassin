@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { encodePendingNext, oauthOnboardingRedirect, PENDING_NEXT_TTL_MS, readPendingNext, signInHref, signInReturnPath } from './sign-in-return';
+import { encodePendingNext, oauthOnboardingRedirect, onboardingRedirectPath, PENDING_NEXT_TTL_MS, readPendingNext, signInHref, signInReturnPath } from './sign-in-return';
 
 describe('signInReturnPath — password / email-code sign-in returns to a SAFE next only', () => {
   it('a Learn tutorial is preserved exactly', () => {
@@ -42,7 +42,7 @@ describe('/app wires the return for every sign-in method', () => {
     expect(hits.length).toBe(2);
   });
   it('the onboarding redirect wins over next', () => {
-    expect(src).toMatch(/leavingForOnboardingRef\.current = true;\n\s*window\.location\.href = WELCOME_PATH;/);
+    expect(src).toMatch(/leavingForOnboardingRef\.current = true;\n\s*window\.location\.href = onboardingRedirectPath\(returnPath\);/);
     expect(src).toContain('leavingForOnboardingRef.current) return;');
   });
   it('OAuth uses the shared guard, not the old inline startsWith check', () => {
@@ -102,5 +102,23 @@ describe('magic link: destination remembered in this browser only', () => {
     expect(src).toMatch(/window\.history\.replaceState\(null, '', `\$\{window\.location\.pathname\}\$\{window\.location\.search\}`\);\n\s*returnToNextAfterSignIn\(\{ fromMagicLink: true \}\);/);
     expect((src.match(/fromMagicLink: true/g) || []).length).toBe(1);
     expect(src).toContain('localStorage.removeItem(PENDING_NEXT_KEY)');
+  });
+});
+
+describe('a new account keeps its destination through /welcome (onboarding)', () => {
+  it('carries the tutorial; none → bare /welcome', () => {
+    expect(onboardingRedirectPath('/learn/should-i-bid')).toBe('/welcome?next=%2Flearn%2Fshould-i-bid');
+    expect(onboardingRedirectPath(null)).toBe('/welcome');
+  });
+  it('/app passes the URL next, or the magic link\'s remembered one, into the /welcome redirect', () => {
+    const src = readFileSync(join(process.cwd(), 'src/app/app/page.tsx'), 'utf8');
+    expect(src).toContain('window.location.href = onboardingRedirectPath(returnPath);');
+    expect(src).not.toMatch(/window\.location\.href = WELCOME_PATH;/);
+    expect(src).toMatch(/!returnPath && window\.location\.hash\.includes\('access_token'\)/);
+  });
+  it('/welcome forwards it: the map link and company setup both return to a safe next', () => {
+    const w = readFileSync(join(process.cwd(), 'src/app/welcome/page.tsx'), 'utf8');
+    expect(w).toContain("const mapHref = raw ? safeNext(raw, '/opportunity-map') : '/opportunity-map';");
+    expect(w).toContain("c.href === '/welcome/company' ? `${c.href}${carry}`");
   });
 });
