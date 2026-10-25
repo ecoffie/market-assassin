@@ -22,7 +22,8 @@ import { sapBuyerTier } from '@/lib/opportunities/sap-friendly-agencies';
 import { computeGenome } from '@/lib/opportunities/genome';
 import { multiVal } from '@/lib/opportunities/map-filters';
 import { mapsOpenRequest, applyMapsOpenFilters, mapsOpenDiscoveryMeta } from '@/lib/opportunities/maps-open-discovery';
-import { dedupeByListing, countDistinctListings } from '@/lib/opportunities/canonical-listing';
+import { dedupeByListing } from '@/lib/opportunities/canonical-listing';
+import { countOpenMarket } from '@/lib/opportunities/open-market-count';
 import { decorateWithEarlySignal, filterByEarlySignal, dodaacFromSolicitation } from '@/lib/opportunities/early-signal-pins';
 import { isRepeatBuyer } from '@/lib/opportunities/repeat-buyer';
 import { loadDodaacEarlySignal } from '@/lib/gov-contacts/dodaac-directory';
@@ -213,103 +214,25 @@ export async function GET(request: NextRequest) {
     // intent's market-wide counts, so skip every bbox-independent count (the paged distinct-listing
     // walk, the unmapped head count, the DLA total). The viewport pins + totalInView still run.
     const withCounts = wantsMarketCounts(p);
-    // totalForFilters — the headline count, NO bbox (reconciles with the dashboard). It must count
-    // UNIQUE LISTINGS, not raw rows (Eric 2026-08-04: the pins are deduped by solicitation, so a raw
-    // row count would read "4,712 results" over fewer unique pins — a second trust gap). A PostgREST
-    // count(exact) can't count(distinct), so we fetch ONLY the two canonical-key columns for the
-    // filtered set (cheap — 2 short columns, no bbox) and count distinct with the SAME
-    // canonical-listing key the pins use (countDistinctListings). Paged to clear the 1000-row cap.
-    // ⚡ PAGED IN PARALLEL, not sequentially. This count is VIEWPORT-INDEPENDENT (no bbox by
-    // design — it reconciles with the dashboard), so it walks the whole filtered corpus: ~155k
-    // mappable rows = ~156 pages. Awaiting them one after another made this the single slowest
-    // thing on the map — measured 2026-08-17 on prod, ~3.4s of fixed cost on EVERY pan/zoom,
-    // identical whether the viewport held 968 pins or 3 (a tiny-bbox request cost 3.65s while
-    // grants-map on the same bbox cost 0.51s). fetchView() fans out to 4 horizon endpoints per
-    // pan, so this route gated the whole interaction.
+    // totalForFilters — the headline count, NO bbox (reconciles with the dashboard), in UNIQUE
+    // LISTINGS, not raw rows (Eric 2026-08-04: the pins are deduped by solicitation, so a raw row count
+    // would read "4,712 results" over fewer unique pins). PostgREST can't count(distinct), so the walk
+    // fetches only the canonical-key columns (+ map_lat), paged in PARALLEL after the first page sizes
+    // it (sequential paging cost ~3.4s on every pan, measured 2026-08-17). Deliberately PostgREST +
+    // applyFilters, NOT a SQL RPC — re-expressing the predicates in SQL would fork "what matches".
+    // ONE walk of the complete filtered set (with and without coordinates), tallied by canonical
+    // listing: mapped = listings with a drawable row, unmapped = listings with none, same unit, so
+    // they add up to the market total. Replaced a distinct(mapped) + RAW-row(unmapped) sum that mixed
+    // units (an amended locationless listing counted once per amendment) and disagreed with the
+    // Today's Lens CTA, which prints this same count (open-market-count.ts, 2026-10-25).
     //
-    // The first page carries `count: 'exact'` for the filtered set, so ONE round-trip tells us how
-    // many pages exist; the rest are fetched concurrently. Same rows, same order, same key.
-    //
-    // ⚠️ Deliberately still PostgREST + applyFilters (the canonical-plan adapter) + countDistinctListings,
-    // NOT a hand-written SQL RPC. The same adapter builds the viewport query; re-expressing those
-    // predicates in SQL would fork the definition of "what matches" and drift (the exact class the
-    // filters oracle and the cross-surface discovery gate guard).
-    async function countUniqueListingsForFilters(): Promise<number> {
-      const PAGE = 1000;
-      const pageQuery = (from: number, withCount: boolean) => {
-        let q = db.from('sam_opportunities')
-          .select('solicitation_number, notice_id', withCount ? { count: 'exact' } : undefined)
-          .not('map_lat', 'is', null)
-          .order('notice_id', { ascending: true })
-          .range(from, from + PAGE - 1);
-        q = applyFilters(q);
-        return q;
-      };
-
-      const { data: first, count, error: firstErr } = await pageQuery(0, true);
-      if (firstErr) throw firstErr;
-      const keyRows: Array<{ solicitation_number: string | null; notice_id: string | null }> =
-        [...((first ?? []) as Array<{ solicitation_number: string | null; notice_id: string | null }>)];
-
-      // count is the RAW filtered row count (pre-dedupe) — it sizes the pagination only; the
-      // returned number is still countDistinctListings over the real keys. A null count means
-      // UNKNOWN, never zero (Bug Prevention Rule #11) — fall back to sequential paging rather
-      // than silently reporting whatever the first page happened to hold.
-      if (count == null) {
-        for (let from = PAGE; ; from += PAGE) {
-          const { data: page, error: pErr } = await pageQuery(from, false);
-          if (pErr) throw pErr;
-          if (!page || !page.length) break;
-          keyRows.push(...(page as typeof keyRows));
-          if (page.length < PAGE) break;
-        }
-        return countDistinctListings(keyRows);
-      }
-
-      if (keyRows.length >= count) return countDistinctListings(keyRows);
-
-      const offsets: number[] = [];
-      for (let from = PAGE; from < count; from += PAGE) offsets.push(from);
-      const pages = await Promise.all(offsets.map(async (from) => {
-        const { data: page, error: pErr } = await pageQuery(from, false);
-        if (pErr) throw pErr;
-        return (page ?? []) as typeof keyRows;
-      }));
-      for (const page of pages) keyRows.push(...page);
-      return countDistinctListings(keyRows);
-    }
-    /**
-     * THE MAP-TRUTH CONTRACT (Eric 2026-09-12, `map-truth-disclosure.ts`):
-     *   "The map may show only mappable rows, but Mindy must never present that number
-     *    as the total market truth."
-     *
-     * `countUniqueListingsForFilters()` above applies `.not('map_lat','is',null)` — that ONE
-     * predicate is precisely where market truth silently narrows into mappable truth. This is
-     * its honest counterpart: the SAME filters, minus that predicate, counting ONLY the rows
-     * the map cannot draw.
-     *
-     * Counted DIRECTLY (`map_lat IS NULL`) rather than subtracting mapped-from-total, because
-     * the mapped figure is DEDUPED by canonical listing while a raw count is not — subtracting
-     * the two would mix units and overstate what's missing. A head-only `count: 'exact'` costs
-     * one round-trip and no paging.
-     *
-     * A null count is UNKNOWN, not zero (Bug Prevention Rule #11): it surfaces as `null` so the
-     * client can say "total unknown" instead of fabricating "everything is mapped".
-     */
-    async function countUnmappedForFilters(): Promise<number | null> {
-      let q = db.from('sam_opportunities')
-        .select('notice_id', { count: 'exact', head: true })
-        .is('map_lat', null);
-      q = applyFilters(q);
-      const { count, error } = await q;
-      if (error) { console.error('[opportunity-map] unmapped count failed:', error.message); return null; }
-      return count ?? null;
-    }
-
+    // THE MAP-TRUTH CONTRACT (map-truth-disclosure.ts) still holds: `totalForFilters` is what the map
+    // can draw, `unmappedForFilters` is how many more genuinely match, never folded together silently.
     const samQueries = includeSam
       ? (() => {
-          const totalP = withCounts ? countUniqueListingsForFilters() : Promise.resolve(0);
-          const unmappedP = withCounts ? countUnmappedForFilters() : Promise.resolve(null);
+          const marketP = withCounts ? countOpenMarket(db, applyFilters) : Promise.resolve(null);
+          const totalP = marketP.then((c) => (c ? c.mapped : 0));
+          const unmappedP = marketP.then((c) => (c ? c.unmapped : null));
           let viewQ = db.from('sam_opportunities').select(PIN_COLS, { count: 'exact' })
             .not('map_lat', 'is', null)
             .gte('map_lat', south).lte('map_lat', north)
@@ -442,7 +365,7 @@ export async function GET(request: NextRequest) {
         v === 'high' || v === 'medium' || v === 'low' || v === 'none');
     if (earlyParam.length) merged = filterByEarlySignal(merged, earlyParam);
     // Headline count. When SAM is INCLUDED it's the SAM filter-set count of UNIQUE LISTINGS
-    // (totalForFilters, computed via countDistinctListings — reconciles with the deduped pins/rail).
+    // (totalForFilters, from countOpenMarket's canonical-listing tally — reconciles with the deduped pins/rail).
     // When SAM is EXCLUDED (e.g. "DLA only"), it's the DLA total — NOT 0, which the old
     // `totalForFilters ?? 0` produced and the client then showed as the 1,000 pin cap (Eric 2026-07-31).
     const samTotal = includeSam ? totalForFilters : 0;

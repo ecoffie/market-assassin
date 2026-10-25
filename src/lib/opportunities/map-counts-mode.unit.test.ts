@@ -35,8 +35,9 @@ describe('each Maps horizon route honors counts=0 without fabricating a number',
   }
   it('opportunity-map skips BOTH whole-corpus counts (paged distinct walk + unmapped head)', () => {
     const src = api('opportunity-map');
-    expect(src).toContain('const totalP = withCounts ? countUniqueListingsForFilters() : Promise.resolve(0);');
-    expect(src).toContain('const unmappedP = withCounts ? countUnmappedForFilters() : Promise.resolve(null);');
+    // One walk now yields both (open-market-count.ts); skipped as a whole, unmapped stays unknown (null).
+    expect(src).toContain('const marketP = withCounts ? countOpenMarket(db, applyFilters) : Promise.resolve(null);');
+    expect(src).toContain('const unmappedP = marketP.then((c) => (c ? c.unmapped : null));');
     expect(src).toContain('totalForFilters: withCounts || earlyFiltered ?');
   });
   it('recompete-map runs its market counts CONCURRENTLY with the pins (no sequential phase) and skips them on a pan', () => {

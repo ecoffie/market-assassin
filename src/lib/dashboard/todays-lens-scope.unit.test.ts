@@ -14,9 +14,13 @@ function builder(table: string) {
   type Q = Record<string, (...a: never[]) => unknown>;
   const q: Q = {
     select: () => q, eq: () => q, gt: () => q, not: () => q, overlaps: () => q, contains: () => q,
+    order: () => q, range: () => q,
     or: (c: string) => { orClauses.push(c); return q; },
     maybeSingle: async () => ({ data: profileCodes === null ? null : { naics_codes: profileCodes }, error: null }),
-    then: (res: (v: unknown) => unknown) => res({ count: table === 'sam_opportunities' ? 5 : 0, error: null }),
+    // 5 distinct listings, every strand present (the lens walk and the Map counter both read these).
+    then: (res: (v: unknown) => unknown) => res(table === 'sam_opportunities'
+      ? { data: Array.from({ length: 5 }, (_, i) => ({ solicitation_number: `S${i}`, notice_id: `n${i}`, map_lat: 1, opportunity_dna_keys: ['repeat_buyer', 'sb_friendly', 'sources_sought'] })), count: 5, error: null }
+      : { data: [], count: 0, error: null }),
   };
   return q;
 }
