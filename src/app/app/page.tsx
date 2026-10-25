@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { WELCOME_PATH } from '@/lib/mindy/post-signup-destination';
+import { oauthOnboardingRedirect, signInReturnPath } from '@/lib/mindy/sign-in-return';
 import { useSearchParams } from 'next/navigation';
 import UnifiedSidebar, { type AppPanel, type AppTier } from '@/components/app/UnifiedSidebar';
 import GlobalLookup from '@/components/app/GlobalLookup';
@@ -131,10 +132,7 @@ function AppDashboard() {
   // Onboarding reads this next and honors it for returning users. Open-redirect guarded.
   const oauthRedirectTo = useCallback((): string | undefined => {
     if (typeof window === 'undefined') return undefined;
-    const raw = new URLSearchParams(window.location.search).get('next') || '';
-    const safe = raw.startsWith('/') && !raw.startsWith('//') ? raw : '';
-    const base = `${window.location.origin}/app/onboarding`;
-    return safe ? `${base}?next=${encodeURIComponent(safe)}` : base;
+    return oauthOnboardingRedirect(window.location.origin, new URLSearchParams(window.location.search).get('next'));
   }, []);
 
   const handleGoogleSignIn = useCallback(async () => {
@@ -242,6 +240,16 @@ function AppDashboard() {
     });
   }, [trackEngagement]);
 
+  // Password / email-code sign-in returns to a safe ?next= (a Learn tutorial, a Map page) the way
+  // Google/Microsoft already did via /app/onboarding — it used to stay on /app regardless. The
+  // onboarding redirect inside loadUserProfile wins: a user with no profile goes there first.
+  const leavingForOnboardingRef = useRef(false);
+  const returnToNextAfterSignIn = useCallback(() => {
+    if (typeof window === 'undefined' || leavingForOnboardingRef.current) return;
+    const dest = signInReturnPath(new URLSearchParams(window.location.search).get('next'));
+    if (dest) window.location.href = dest;
+  }, []);
+
   const loadUserProfile = useCallback(async (userEmail: string) => {
     setIsLoading(true);
     try {
@@ -332,6 +340,7 @@ function AppDashboard() {
           try { localStorage.setItem('mi_beta_email', userEmail); } catch { /* */ }
           // Legacy default removed 2026-08-25 — an account with no intent belongs in the
           // intent router, never the retired profile builder.
+          leavingForOnboardingRef.current = true;
           window.location.href = WELCOME_PATH;
           return;
         }
@@ -695,13 +704,14 @@ function AppDashboard() {
       }
 
       await loadUserProfile(normalizedEmail);
+      returnToNextAfterSignIn();
     } catch (error) {
       console.error('Failed to sign in:', error);
       setAuthError('Failed to sign in');
     } finally {
       setAuthLoading(false);
     }
-  }, [loadUserProfile]);
+  }, [loadUserProfile, returnToNextAfterSignIn]);
 
   const requestMagicLinkSignIn = useCallback(async (userEmail: string) => {
     const normalizedEmail = userEmail.toLowerCase().trim();
@@ -816,6 +826,7 @@ function AppDashboard() {
       }
 
       await loadUserProfile(normalizedEmail);
+      returnToNextAfterSignIn();
     } catch (error) {
       console.error('Failed to verify 2FA code:', error);
       setAuthError('Failed to verify code');

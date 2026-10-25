@@ -12,6 +12,7 @@
  */
 import { mpRawBodyClose, mpRawBodyOpen, mpRawHeadHtml } from '@/lib/public-site/html';
 import { ACTION_PLAN, ACTION_PLAN_STEPS, actionPlanStep } from './action-plan';
+import { withNext } from '@/lib/mindy/safe-next';
 import { ACCESS_LABEL, MISSIONS, OUTSIDE_STEPS, STAGES, missionById, type Mission, type StageKey } from './missions';
 
 export const LEARN_ORIGIN = 'https://getmindy.ai';
@@ -22,6 +23,8 @@ function esc(v: string): string {
 
 const stageOf = (k: StageKey) => STAGES.find((s) => s.key === k)!;
 const missionHref = (m: Mission) => `/learn/${m.slug}`;
+/** Sign in, then come back to THIS tutorial. `withNext` only appends a `safeNext`-valid path. */
+export const signinHref = (m: Mission) => withNext('/app', missionHref(m));
 const missionsIn = (k: StageKey) => MISSIONS.filter((m) => m.stage === k);
 
 const LEARN_CSS = `
@@ -52,6 +55,7 @@ const LEARN_CSS = `
   .tag{font-family:var(--mp-font-sans);font-size:11.5px;font-weight:600;padding:3px 8px;border:1px solid var(--mp-line);color:var(--mp-body);background:var(--mp-wash)}
   .tag.pro{border-color:var(--mp-navy);color:var(--mp-navy);background:var(--mp-navy-wash)}
   .tag.next,.tag.outside{border-style:dashed;color:var(--mp-muted)}
+  a.tag.signin{color:var(--mp-navy);border-color:var(--mp-navy);text-decoration:underline;text-underline-offset:2px}
   .ap{padding:40px 0;border-bottom:1px solid var(--mp-hair)}
   .ap h2{font-size:clamp(24px,3.2vw,30px)}
   .phase{margin-top:22px}
@@ -114,10 +118,30 @@ ${opts.script || ''}
 </body></html>`;
 }
 
-function accessTags(m: Mission): string {
+// "Free · sign in" used to be a static <span> everywhere, so the one label that names an action
+// did nothing when clicked (Joseph Boyd, 2026-10-25). Outside a card it is now a real sign-in link
+// that returns to this tutorial. Inside a card it stays a label — the whole card is already a link
+// to the tutorial, and an <a> may not nest inside another <a>. LEARN_AUTH_JS relabels both for a
+// visitor whose session is live, since this page is static and cannot know who is reading it.
+function accessTags(m: Mission, opts: { link?: boolean } = { link: true }): string {
+  if (m.access === 'signin') {
+    return opts.link
+      ? `<a class="tag signin" data-learn-signin href="${esc(signinHref(m))}">${esc(ACCESS_LABEL.signin)}</a>`
+      : `<span class="tag" data-learn-signin-label>${esc(ACCESS_LABEL.signin)}</span>`;
+  }
   const cls = m.access === 'pro' ? 'tag pro' : m.access === 'coming-next' ? 'tag next' : m.access === 'outside' ? 'tag outside' : 'tag';
   return `<span class="${cls}">${esc(ACCESS_LABEL[m.access])}</span>`;
 }
+
+/** Display only: a live (unexpired) session token means "signed in" — the server still verifies
+ *  every call. Expired / undecodable / absent → the sign-in link stays. */
+const LEARN_AUTH_JS = `<script>(function(){
+  var t=null;try{t=localStorage.getItem('mi_beta_auth_token');}catch(e){}
+  if(!t)return;
+  try{var s=String(t).split('.')[0].replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';var p=JSON.parse(atob(s));if(!p||(p.exp&&Number(p.exp)<Date.now()))return;}catch(e){return;}
+  [].forEach.call(document.querySelectorAll('[data-learn-signin]'),function(el){var sp=document.createElement('span');sp.className='tag';sp.textContent='Free \u00b7 signed in';el.parentNode.replaceChild(sp,el);});
+  [].forEach.call(document.querySelectorAll('[data-learn-signin-label]'),function(el){el.textContent='Free \u00b7 signed in';});
+})();</script>`;
 
 function stepTags(m: Mission): string {
   return m.steps.map((id) => `<span class="tag" title="${esc(actionPlanStep(id)?.title || '')}">${esc(id)}</span>`).join('');
@@ -125,7 +149,7 @@ function stepTags(m: Mission): string {
 
 function missionCard(m: Mission): string {
   return `<a class="mcard" href="${missionHref(m)}"><div class="mid">${esc(m.id)}${m.minutes ? ` · ~${m.minutes} min` : ''}</div>`
-    + `<h3>${esc(m.title)}</h3><p>${esc(m.learn)}</p><div class="tags">${accessTags(m)}${stepTags(m)}</div></a>`;
+    + `<h3>${esc(m.title)}</h3><p>${esc(m.learn)}</p><div class="tags">${accessTags(m, { link: false })}${stepTags(m)}</div></a>`;
 }
 
 /** Which missions / Outside entries cover an Action Plan step. */
@@ -137,14 +161,16 @@ export function coverageFor(stepId: string): { missions: Mission[]; outside: str
 }
 
 /** Everything the Tutorial Library can find: missions, truth rules and all 27 Action Plan steps. */
-export function libraryItems(): Array<{ kind: string; key: string; title: string; text: string; href: string | null; haystack: string }> {
-  const items: Array<{ kind: string; key: string; title: string; text: string; href: string | null; haystack: string }> = [];
+type LibraryItem = { kind: string; key: string; title: string; text: string; href: string | null; signinHref: string | null; haystack: string };
+export function libraryItems(): LibraryItem[] {
+  const items: LibraryItem[] = [];
   for (const m of MISSIONS) {
     const s = stageOf(m.stage);
     const text = m.learn;
     const steps = m.steps.map((id) => `${id} ${actionPlanStep(id)?.title || ''}`).join(' ');
     items.push({
       kind: `${s.level} · ${ACCESS_LABEL[m.access]}`, key: m.id, title: m.title, text, href: missionHref(m),
+      signinHref: m.access === 'signin' ? signinHref(m) : null,
       haystack: [m.id, m.title, m.learn, m.why, m.example, m.mindy, ...(m.truths || []), ...(m.howTo || []), steps, s.level, s.name, ACCESS_LABEL[m.access]].filter(Boolean).join(' ').toLowerCase(),
     });
   }
@@ -155,7 +181,7 @@ export function libraryItems(): Array<{ kind: string; key: string; title: string
       : `Covered by: ${cov.missions.map((m) => m.title).join(' · ')}`;
     const href = cov.missions.length ? missionHref(cov.missions[0]) : null;
     items.push({
-      kind: `Action Plan · Phase ${st.phase} ${st.phaseName}`, key: st.id, title: st.title, text, href,
+      kind: `Action Plan · Phase ${st.phase} ${st.phaseName}`, key: st.id, title: st.title, text, href, signinHref: null,
       haystack: [st.id, st.title, st.phaseName, text].join(' ').toLowerCase(),
     });
   }
@@ -192,8 +218,13 @@ export function learnIndexHtml(): string {
         : `<span class="cov">${cov.missions.map((m) => `<a href="${missionHref(m)}">${esc(m.title)}</a>`).join(' · ')}</span>`;
       return `<li><span class="sid">${esc(st.id)}</span><span>${esc(st.title)}${covHtml}</span></li>`;
     }).join('') + `</ul></div>`).join('');
-  const lib = libraryItems().map((it) => `<li data-h="${esc(it.haystack)}"><div class="k">${esc(it.key)} · ${esc(it.kind)}</div>`
-    + `<div>${it.href ? `<a href="${it.href}">${esc(it.title)}</a>` : `<b>${esc(it.title)}</b>`}</div><p>${esc(it.text)}</p></li>`).join('');
+  // The caption's access label is wrapped so LEARN_AUTH_JS can relabel it for a live session too.
+  const kindHtml = (it: LibraryItem) => it.signinHref && it.kind.endsWith(ACCESS_LABEL.signin)
+    ? `${esc(it.kind.slice(0, -ACCESS_LABEL.signin.length))}<span data-learn-signin-label>${esc(ACCESS_LABEL.signin)}</span>`
+    : esc(it.kind);
+  const lib = libraryItems().map((it) => `<li data-h="${esc(it.haystack)}"><div class="k">${esc(it.key)} · ${kindHtml(it)}</div>`
+    + `<div>${it.href ? `<a href="${it.href}">${esc(it.title)}</a>` : `<b>${esc(it.title)}</b>`}`
+    + `${it.signinHref ? ` <a class="tag signin" data-learn-signin href="${esc(it.signinHref)}">${esc(ACCESS_LABEL.signin)}</a>` : ''}</div><p>${esc(it.text)}</p></li>`).join('');
 
   const body = `<section class="lhero"><div class="lw">
   <div class="eyebrow">Mindy Learn</div>
@@ -224,7 +255,7 @@ ${stageSection('after')}
   return page({
     title: 'Mindy Learn — Your GovCon Action Plan',
     description: 'Free GovCon tutorials: learn how federal buyers buy, then do each step in Mindy. Beginner, Intermediate and Advanced stages mapped to the 27-step GovCon Action Plan.',
-    path: '/learn', body, script: LIBRARY_JS,
+    path: '/learn', body, script: LIBRARY_JS + LEARN_AUTH_JS,
   });
 }
 
@@ -267,5 +298,6 @@ export function missionHtml(m: Mission): string {
     description: m.learn,
     path: missionHref(m),
     body,
+    script: LEARN_AUTH_JS,
   });
 }
