@@ -582,8 +582,10 @@ export function featuredLens(
  * Append Today's Lens to a hero href WITHOUT losing what the branch is about.
  *
  * The concentration headline names DoD, so its link is "DoD AND today's lens" — not one or the
- * other. The map reads scope params and ?strategy= in INDEPENDENT handlers, so they compose with
- * no new map code. No lens (or an href that already carries one) → returned untouched.
+ * other. ⚠️ They used to be applied by TWO independent Map handlers, which raced: the scope reset
+ * dropped the strands. Since 2026-10-25 the scope-link handler applies both in one call
+ * (opportunity-map/route.ts, `opts.strategy`). No lens (or an href that already carries one) →
+ * returned untouched.
  */
 export function withLens(href: string, strategy: string): string {
   if (!strategy) return href;

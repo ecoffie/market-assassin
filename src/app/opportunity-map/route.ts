@@ -5339,6 +5339,11 @@ const VIEWPORT_JS = `<script>
   window.__applySavedSearch=function(ss,opts){
     if(!ss||typeof ss!=='object')return;
     var _asSaved=!!(opts&&opts.savedSearch);
+    // opts.strategy: a scope link that ALSO carries ?strategy= (Today's Lens, /today hero links).
+    // Applying both HERE makes this the one writer — the separate lens handler used to apply the
+    // strands while this reset dropped them (FILT below has no strategy key), so the map showed the
+    // lens over the WHOLE corpus: "Explore 13 recommended" → 137 (Joseph Boyd, 2026-10-25).
+    var _withStrategy=_asSaved||!!(opts&&opts.strategy);
     var f=(ss.filters&&typeof ss.filters==='object')?ss.filters:{};
     // Switch dataset first (open|recompete|companies|buyers). setMapMode resets Q + FILT-driving controls.
     var wantMode=(ss.mode==='recompete')?'recompete':((ss.mode==='companies'||ss.mode==='buyers')?ss.mode:'open');
@@ -5367,14 +5372,14 @@ const VIEWPORT_JS = `<script>
     var _unsupported=[];
     for(var uk in f){
       if(uk in FILT||uk==='q'||uk==='horizons'||uk==='fsc')continue;
-      if(uk==='strategy'&&_asSaved)continue;
+      if(uk==='strategy'&&_withStrategy)continue;
       if(uk==='status'&&String(f[uk]).toLowerCase()==='active')continue;
       if(f[uk]==null||f[uk]===''||f[uk]===false)continue;
       _unsupported.push(uk);
     }
     // Opportunity DNA strands (saved as an array or a comma list). FILT.strategy is an ARRAY —
     // the URL builder joins it — and the boxes are the control readDeep reads back on Apply.
-    if(_asSaved){
+    if(_withStrategy){
       var _strat=Array.isArray(f.strategy)?f.strategy:String(f.strategy||'').split(',');
       _strat=_strat.map(function(x){return String(x).trim();}).filter(Boolean);
       var _known={}; document.querySelectorAll('.mf-strategy').forEach(function(c){ _known[c.value]=1; c.checked=_strat.indexOf(c.value)>=0; });
@@ -9879,6 +9884,9 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     // Parent-contract / vehicle scope (+ work subject and its window). Resolved SERVER-side against the
     // verified vehicle registry; an unknown/ambiguous name comes back as a refinement, never all orders.
     var vehicle=P('vehicle'), parent=P('parent'), work=P('work'), leadMax=P('leadMax'), minValue=P('minValue');
+    // ?strategy= alone stays the lens handler's job (below). WITH a scope it is applied HERE, in the
+    // same __applySavedSearch call, so one writer sets both and neither can erase the other.
+    var strategy=P('strategy');
     if(!agency&&!naics&&!state&&!setAside&&!psc&&!q&&!posted&&!mode&&!horizon&&!office&&!subAgency&&!vehicle&&!parent&&!work)return;   // nothing asked for -> leave the map alone
     var tries=0; (function go(){
       if(typeof window.__applySavedSearch!=='function'){
@@ -9979,7 +9987,8 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
         // Horizon toggles during this restore must not rewrite the link being restored.
         window.__urlRestoring=true;
         try{
-          window.__applySavedSearch({ mode:_mode, filters:f });
+          if(strategy)f.strategy=strategy;
+          window.__applySavedSearch({ mode:_mode, filters:f }, strategy?{strategy:true}:undefined);
           // Legacy isolation (unchanged for agency/naics/… links without q or horizon): an explicit
           // ?mode= isolates that horizon; otherwise the pre-existing _mode fallback applies. Skipped
           // whenever the link states its horizons (f.horizons) — the URL is exact, not a fallback.
@@ -10166,6 +10175,11 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     var m=(location.search||'').match(/[?&]strategy=([^&]+)/); if(!m)return;
     var want=decodeURIComponent(m[1]).split(',').map(function(s){return s.trim();}).filter(Boolean);
     if(!want.length)return;
+    // WITH a scope param the scope-link handler above is the ONE writer: it applies ?strategy= in the
+    // same __applySavedSearch call as ?naics=. Writing here too was a race — whichever ran second
+    // won, and the scope reset drops strategy. So here we only wait for its boxes and name the lens.
+    // Keys = exactly the ones that make the scope handler run (its early-return list).
+    var scoped=/[?&](agency|naics|state|setAside|psc|q|posted|mode|horizon|office|subAgency|subagency|vehicle|parent|work)=[^&]/.test(location.search||'');
     var tries=0; (function go(){
       var boxes=document.querySelectorAll('.mf-strategy');
       // Guard on the BRIDGE (a real global), not on readDeep/fetchView — those are VIEWPORT_JS
@@ -10173,9 +10187,14 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       // never applied. See window.__applyStrategyBoxes for the measured failure.
       if(boxes.length && typeof window.__applyStrategyBoxes==='function'){
         var applied=[];
-        boxes.forEach(function(b){ if(want.indexOf(b.value)>=0){ b.checked=true; applied.push(b.value); } });
-        if(!applied.length)return;           // junk param → nothing to apply (no fabricated lens)
-        applied=window.__applyStrategyBoxes()||applied;
+        if(scoped){
+          boxes.forEach(function(b){ if(b.checked&&want.indexOf(b.value)>=0)applied.push(b.value); });
+          if(!applied.length){ if(tries++<40)setTimeout(go,150); return; }   // not applied yet (or junk)
+        } else {
+          boxes.forEach(function(b){ if(want.indexOf(b.value)>=0){ b.checked=true; applied.push(b.value); } });
+          if(!applied.length)return;           // junk param → nothing to apply (no fabricated lens)
+          applied=window.__applyStrategyBoxes()||applied;
+        }
         // The "Today's Lens" pill — names the lens the briefing configured; click ✕ to clear it.
         try{
           // ANCHOR: .mapwrap (position:relative, the map's own box). The original selector

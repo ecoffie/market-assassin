@@ -19,6 +19,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { computeTodaysLens } from '@/lib/dashboard/todays-lens';
+import { lensMapHref } from '@/lib/dashboard/lens-link';
 
 export async function GET(request: NextRequest) {
   const email = String(request.nextUrl.searchParams.get('email') || '').trim();
@@ -37,7 +38,8 @@ export async function GET(request: NextRequest) {
       date: nowIso.slice(0, 10),
       totalOpen: lens.totalOpen,
       strands: lens.strands,               // [{key,label,icon,count}] — the "why today matters" lines
-      lensStrategy: lens.lensStrategy,     // → /opportunity-map?strategy=<this> (the CTA target)
+      lensStrategy: lens.lensStrategy,
+      lensHref: lensMapHref(lens),         // the CTA target: strands AND the profile codes counted over
       note: lens.grounded
         ? 'Real strand counts over your profile-scoped open corpus (opportunity_dna_keys). Not an LLM guess.'
         : 'No open opportunities match your profile codes right now — an honest empty, not a broken pipe.',

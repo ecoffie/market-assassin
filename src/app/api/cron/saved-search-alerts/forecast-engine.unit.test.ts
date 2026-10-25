@@ -265,7 +265,9 @@ describe('high volume — the notification TOTAL is the complete interval count,
     // The complete interval count — not 500 (one keyset page), 3 (evidence), 1 (the stored Open seen list) or the batch.
     expect(m.subject).toBe('1237 new matches in “My market”');
     expect(m.html).toContain('1237 new matches');
-    expect(m.html).toContain('See all 1237');
+    // The overflow link opens the WHOLE saved search (?ss=), so it no longer says "See all 1237"
+    // (2026-10-25). The complete count still leads the email (subject + headline above).
+    expect(m.html).toContain('See your full search on the map');
     expect(m.text).toContain('1237 new matches');
     for (const wrong of ['500 new', '501 new', '3 new', '1 new', '1000 new']) expect(m.subject).not.toContain(wrong);
     // ≤ 3 examples, disclosed as examples of the complete set.

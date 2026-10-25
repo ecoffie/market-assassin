@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-25 — Alert count vs Map results: lens CTA carries its NAICS scope; one Map writer (Joseph Boyd, fix #1)
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-25 | Daily alert lens CTA / Map filter init / saved-search copy | "Explore 13 recommended" opened 137: lensCount = profile NAICS ∩ lens strands, but the link carried only ?strategy=, so the Map applied the strands to the whole corpus. (A) One link builder lensMapHref carries strategy AND the exact codes counted (email, in-app hero via /api/app/todays-lens lensHref); 0/null count → the market link (codes only), matching "Explore this market". (B) Map: ?strategy= + any scope param is applied by ONE writer — the scope-link handler passes it to __applySavedSearch(…, {strategy:true}); the lens handler only names the lens. Previously two handlers raced and the scope reset dropped the strands (also fixes /today hero withLens links). (C) Saved-search email: "See all N" (N = new-only) → "See your full search on the map" (?ss= opens the whole search). No migration; past alerts' 13 ids were never stored and are not reconstructed. | `export function lensMapHref` → `src/lib/dashboard/lens-link.ts` · `var _withStrategy=_asSaved\|\|!!(opts&&opts.strategy);` → `src/app/opportunity-map/route.ts` · `See your full search on the map` → `src/lib/alerts/saved-search-email.ts` | jsdom runs the two shipped Map boot handlers: lens+NAICS and agency+strategy → exactly one __applySavedSearch with both, zero lens writes; strategy-only and scope-only unchanged; junk strand → no pill. Lens link + email + hero tests. All red on origin/main. Live read-only oracle scripts/verify-lens-cta.ts: 59/59 profiles promised == Map filter count (old link: 137/178 for every one). Not browser-tested | PR — not merged |
+
 ## 2026-10-25 — Learn sign-in: actionable label, honest header, return to the tutorial (Joseph Boyd, fix #2)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
