@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { oauthOnboardingRedirect, signInReturnPath } from './sign-in-return';
+import { oauthOnboardingRedirect, signInHref, signInReturnPath } from './sign-in-return';
 
 describe('signInReturnPath — password / email-code sign-in returns to a SAFE next only', () => {
   it('a Learn tutorial is preserved exactly', () => {
@@ -13,6 +13,15 @@ describe('signInReturnPath — password / email-code sign-in returns to a SAFE n
     '/app', '/app/onboarding', '/briefings', '', null, undefined,
   ])('rejects %s → stay on /app (null)', (raw) => {
     expect(signInReturnPath(raw as string | null | undefined)).toBeNull();
+  });
+});
+
+describe('signInHref — the one sign-in link builder', () => {
+  it('carries a safe next', () => {
+    expect(signInHref('/learn/find-your-buyers')).toBe('/app?next=%2Flearn%2Ffind-your-buyers');
+  });
+  it.each(['//evil.com', 'https://evil.com', '/\\evil.com', '/app/x', null])('drops %s', (raw) => {
+    expect(signInHref(raw as string | null)).toBe('/app');
   });
 });
 

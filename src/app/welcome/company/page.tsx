@@ -22,7 +22,7 @@ import { Suspense, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { DECLARABLE_CERTIFICATIONS, describeWorkIssue, type CertificationAnswer } from '@/lib/profile/company-setup-input';
 import { postSignupPath } from '@/lib/mindy/post-signup-destination';
-import { withNext } from '@/lib/mindy/safe-next';
+import { signInHref } from '@/lib/mindy/sign-in-return';
 import { rankSuggestions, groundingLabel } from '@/lib/profile/suggestion-ranking';
 import type { SetupAction } from '@/lib/profile/company-setup-outcome';
 import { authedFetch, storedMIEmail } from '@/components/app/authHeaders';
@@ -323,7 +323,7 @@ function CompanySetupInner() {
                 {needsSignIn && (
                   <>
                     <a
-                      href={withNext('/app', typeof window === 'undefined' ? null : window.location.pathname + window.location.search)}
+                      href={signInHref(typeof window === 'undefined' ? null : window.location.pathname + window.location.search)}
                       className="font-semibold underline underline-offset-4"
                     >
                       Sign in

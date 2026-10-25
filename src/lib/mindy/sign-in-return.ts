@@ -9,8 +9,18 @@
  * or backslash tricks, never /app) and is not a legacy surface. Anything else → null, meaning
  * "stay on /app" — the pre-existing behaviour, never an external site.
  */
-import { isSafeNext, safeNext } from './safe-next';
+import { isSafeNext, safeNext, withNext } from './safe-next';
 import { isLegacyDestination, postSignupPath } from './post-signup-destination';
+
+/**
+ * The ONE sign-in action link: Mindy's only sign-in surface is /app, which now returns to `next`.
+ * Pages that must never link INTO the legacy app as a destination (/welcome/company) may still
+ * offer sign-in through this — the user comes back to the page they were on, not to /app.
+ */
+export const SIGN_IN_PATH = '/app';
+export function signInHref(rawNext: string | null | undefined): string {
+  return withNext(SIGN_IN_PATH, rawNext);
+}
 
 export function signInReturnPath(rawNext: string | null | undefined): string | null {
   if (!isSafeNext(rawNext) || isLegacyDestination(rawNext)) return null;

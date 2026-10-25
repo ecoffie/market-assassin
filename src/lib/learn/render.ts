@@ -12,7 +12,7 @@
  */
 import { mpRawBodyClose, mpRawBodyOpen, mpRawHeadHtml } from '@/lib/public-site/html';
 import { ACTION_PLAN, ACTION_PLAN_STEPS, actionPlanStep } from './action-plan';
-import { withNext } from '@/lib/mindy/safe-next';
+import { signInHref } from '@/lib/mindy/sign-in-return';
 import { ACCESS_LABEL, MISSIONS, OUTSIDE_STEPS, STAGES, missionById, type Mission, type StageKey } from './missions';
 
 export const LEARN_ORIGIN = 'https://getmindy.ai';
@@ -23,8 +23,8 @@ function esc(v: string): string {
 
 const stageOf = (k: StageKey) => STAGES.find((s) => s.key === k)!;
 const missionHref = (m: Mission) => `/learn/${m.slug}`;
-/** Sign in, then come back to THIS tutorial. `withNext` only appends a `safeNext`-valid path. */
-export const signinHref = (m: Mission) => withNext('/app', missionHref(m));
+/** Sign in, then come back to THIS tutorial. Only a `safeNext`-valid path is carried. */
+export const signinHref = (m: Mission) => signInHref(missionHref(m));
 const missionsIn = (k: StageKey) => MISSIONS.filter((m) => m.stage === k);
 
 const LEARN_CSS = `
