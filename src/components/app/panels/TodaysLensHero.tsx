@@ -16,11 +16,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import { getMIApiHeaders } from '../authHeaders';
 import { useAppTracker } from '../track';
+import { todaysLensMapPath } from '@/lib/dashboard/todays-lens-link';
 
 interface LensStrand { key: string; label: string; icon: string; count: number }
 interface LensData {
   ok: boolean; grounded: boolean; usingFallback: boolean;
   totalOpen: number; strands: LensStrand[]; lensStrategy: string;
+  lensNaics?: string[]; lensCount?: number | null;
 }
 
 const nf = new Intl.NumberFormat('en-US');
@@ -66,8 +68,13 @@ export default function TodaysLensHero({ email }: { email: string }) {
 
   if (!data) return null;
 
+  // Same builder as the daily alert email: strands + the exact NAICS the counts used, so the map
+  // opens the population this hero counted — not the same strands across every NAICS.
   const mapHref = data.lensStrategy
-    ? `/opportunity-map?strategy=${encodeURIComponent(data.lensStrategy)}`
+    ? todaysLensMapPath(
+        { lensStrategy: data.lensStrategy, lensNaics: data.lensNaics || [], lensCount: data.lensCount ?? null },
+        { src: 'todays_intel' },
+      )
     : '/opportunity-map';
 
   // Quiet day (no open opps in the user's codes) â honest, not a fabricated pep talk. Still offer the map.

@@ -33,6 +33,13 @@ export interface TodaysLens {
   lensStrategy: string;
   /** Rows the CTA's ?strategy= link actually lands on. null = could not count. */
   lensCount: number | null;
+  /**
+   * The EXACT NAICS codes every count above was scoped to — the profile's codes, or FALLBACK_NAICS
+   * when the profile has none. The map link MUST carry these: the map's default scope is the whole
+   * corpus, so a ?strategy=-only link applied the same strands to EVERY NAICS and opened a population
+   * ~7-11x larger than lensCount (Joseph Boyd, 2026-10-25: "Explore 13 recommended" → 95 / 137).
+   */
+  lensNaics: string[];
 }
 
 let _sb: ReturnType<typeof createClient> | null = null;
@@ -130,7 +137,8 @@ export async function computeTodaysLens(email: string): Promise<TodaysLens> {
     totalOpen: totalOpen ?? 0,
     strands: present,
     lensStrategy: lensStrategyKeys.join(','),
-    /** How many opps the map shows when the CTA's ?strategy= link is followed. */
+    /** How many opps the map shows when the CTA's link (strategy + lensNaics) is followed. */
     lensCount,
+    lensNaics: [...codes],
   };
 }

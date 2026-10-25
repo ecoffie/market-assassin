@@ -46,13 +46,13 @@ describe('saved-search alert email deep-links back to the search', () => {
   it('carries the search id through the "+ N more" overflow link', () => {
     const many = Array.from({ length: 30 }, (_, i) => ({ ...OPPS[0], notice_id: `n${i}` }));
     const { html } = buildEmail(SEARCH, many);
-    expect(html).toContain('view all on the map');
+    expect(html).toContain('See this search on the map');
     // The CONTRACT is that the overflow link carries the search id. The old assertion
     // also pinned "+ 5 more" — arithmetic from the 25-card limit (30 - 25). The email now
     // shows 3 opportunities as EVIDENCE (2026-08-19: the map is the destination, not a
     // list to work through), so that count is 27. Matching the LINK, not the number,
     // keeps this testing the contract instead of the layout.
-    const overflow = html.match(/view all on the map[\s\S]{0,40}/) && html.match(/href="([^"]+)"[^>]*>[^<]*view all on the map/);
+    const overflow = html.match(/href="([^"]+)"[^>]*>See this search on the map/);
     expect(overflow?.[1]).toContain(`ss=${SEARCH.id}`);
   });
 

@@ -265,7 +265,8 @@ describe('high volume — the notification TOTAL is the complete interval count,
     // The complete interval count — not 500 (one keyset page), 3 (evidence), 1 (the stored Open seen list) or the batch.
     expect(m.subject).toBe('1237 new matches in “My market”');
     expect(m.html).toContain('1237 new matches');
-    expect(m.html).toContain('See all 1237');
+    expect(m.html).toContain('See this search on the map');
+    expect(m.html).not.toContain('See all 1237');   // the link opens the full search, not "all 1237 new"
     expect(m.text).toContain('1237 new matches');
     for (const wrong of ['500 new', '501 new', '3 new', '1 new', '1000 new']) expect(m.subject).not.toContain(wrong);
     // ≤ 3 examples, disclosed as examples of the complete set.

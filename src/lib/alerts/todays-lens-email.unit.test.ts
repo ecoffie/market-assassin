@@ -189,3 +189,50 @@ describe('renderTodaysLensEmailBlock', () => {
     expect(html).not.toContain('strategy=');       // still no fabricated strategy on a quiet day
   });
 });
+
+// Joseph Boyd, 2026-10-25: "Explore 13 recommended" opened 95 / 137 because the link carried the
+// strands but NOT the NAICS scope the 13 was counted in. The link must carry both.
+describe('Today\'s Lens CTA carries the scope its count used', () => {
+  const lens: TodaysLens = {
+    grounded: true,
+    usingFallback: false,
+    totalOpen: 140,
+    strands: [
+      { key: 'repeat_buyer', label: 'Repeat Buyers', icon: '🔥', count: 90 },
+      { key: 'sb_friendly', label: 'SB-Friendly', icon: '🟢', count: 60 },
+      { key: 'sources_sought', label: 'Shapeable (Sources Sought)', icon: '📣', count: 20 },
+    ],
+    lensStrategy: 'repeat_buyer,sb_friendly,sources_sought',
+    lensCount: 13,
+    lensNaics: ['236220', '237310', '238', '541330', '541310', '562910'],
+  };
+  const href = (html: string) => {
+    const m = html.match(/href="([^"]*opportunity-map\?strategy=[^"]*)"/);
+    expect(m).not.toBeNull();
+    return new URL(m![1].replace(/&amp;/g, '&'));
+  };
+
+  it('every NAICS code the count used is on the link, with all three strands', () => {
+    const u = href(renderTodaysLensEmailBlock(lens, BASE, undefined, { sentOn: '2026-10-21' }));
+    expect(u.searchParams.get('naics')!.split(',')).toEqual(lens.lensNaics);
+    expect(u.searchParams.get('strategy')!.split(',')).toEqual(['repeat_buyer', 'sb_friendly', 'sources_sought']);
+  });
+
+  it('labels the count and the send date (then vs now on the map)', () => {
+    const u = href(renderTodaysLensEmailBlock(lens, BASE, undefined, { sentOn: '2026-10-21' }));
+    expect(u.searchParams.get('lens_n')).toBe('13');
+    expect(u.searchParams.get('lens_on')).toBe('2026-10-21');
+    expect(u.searchParams.get('src')).toBe('alert');
+  });
+
+  it('the CTA number is the count of that same link\'s population', () => {
+    const html = renderTodaysLensEmailBlock(lens, BASE, undefined, { sentOn: '2026-10-21' });
+    expect(html).toContain('Explore 13 recommended');
+    expect(href(html).searchParams.get('lens_n')).toBe('13');
+  });
+
+  it('a strategy-only link is never emitted again (the 13 → 95 defect)', () => {
+    const html = renderTodaysLensEmailBlock(lens, BASE, undefined, { sentOn: '2026-10-21' });
+    expect(html).not.toMatch(/opportunity-map\?strategy=[^"&]*&(?:amp;)?src=alert"/);
+  });
+});

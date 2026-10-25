@@ -248,7 +248,10 @@ export function buildEmail(
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;margin-top:${examplesNote ? 10 : 26}px;">
         ${rows}
       </table>
-      ${n > EVIDENCE ? `<p style="font:600 13px/1.5 ${FONT};margin:16px 0 0 0;"><a href="${mapHref(search)}" style="color:#4f46e5;text-decoration:none;">See all ${n} &mdash; view all on the map &rarr;</a></p>` : ''}
+      ${/* "See all N" counted the NEW matches but linked to the FULL saved search (95 for Joseph Boyd,
+           2026-10-25, against "11 new"). The link opens the search, so it says so — no number that the
+           destination cannot reproduce. The accurate new-match count stays in the subject + header. */''}
+      ${n > EVIDENCE ? `<p style="font:600 13px/1.5 ${FONT};margin:16px 0 0 0;"><a href="${mapHref(search)}" style="color:#4f46e5;text-decoration:none;">See this search on the map &rarr;</a></p>` : ''}
 
       <div style="height:1px;background:#e5e7eb;margin:28px 0 0 0;"></div>
       <p style="font:700 13px/1 ${FONT};color:#0f172a;margin:18px 0 0 0;">Mindy</p>
@@ -266,6 +269,6 @@ export function buildEmail(
       const nt = noticeTypeLabel(o.notice_type);
       return `• ${o.title}\n  ${agencyCase(o.department || '')}${o.naics_code ? ` · NAICS ${o.naics_code}` : ''}${sa ? ` · ${sa}` : ''}${nt ? ` · ${nt}` : ''} · due ${due}`;
     }).join('\n\n')
-    + (n > EVIDENCE ? `\n\nSee all ${n} on the map: ${mapHref(search, undefined, '&')}` : '');
+    + (n > EVIDENCE ? `\n\nSee this search on the map: ${mapHref(search, undefined, '&')}` : '');
   return { subject, html, text };
 }

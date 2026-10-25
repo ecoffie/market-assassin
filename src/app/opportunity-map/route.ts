@@ -1709,6 +1709,11 @@ const VIEWPORT_JS = `<script>
   // the current viewport, and every active filter. Every field is a REAL number/value
   // off the map's own state — the drawer never fabricates the context line, and it
   // threads the same filters into the chat so answers are about THIS view.
+  // Today's Lens pill (strategy handler, another block) reads the LIVE filters through this getter, so
+  // its "N now" is only shown while the map still shows the lens the link opened.
+  window.__lensFilters=function(){
+    return { strategy:(FILT.strategy||[]).slice().sort().join(','), naics:String(FILT.naics||'') };
+  };
   window.__mindyViewCtx = function(){
     function pick(){ for(var i=0;i<arguments.length;i++){ var v=arguments[i]; if(v!=null&&v!=='') return v; } return ''; }
     return {
@@ -5339,6 +5344,11 @@ const VIEWPORT_JS = `<script>
   window.__applySavedSearch=function(ss,opts){
     if(!ss||typeof ss!=='object')return;
     var _asSaved=!!(opts&&opts.savedSearch);
+    // opts.strategy — a SCOPE LINK that also carries ?strategy= (the Today's Lens link: strands +
+    // the exact NAICS its count used). The strands are applied HERE, in the same pass as naics, so
+    // ONE writer sets FILT. The standalone ?strategy= handler stands down for such links; before,
+    // two handlers raced and this restorer's FILT reset dropped the strands (2026-10-25).
+    var _withStrategy=_asSaved||!!(opts&&opts.strategy);
     var f=(ss.filters&&typeof ss.filters==='object')?ss.filters:{};
     // Switch dataset first (open|recompete|companies|buyers). setMapMode resets Q + FILT-driving controls.
     var wantMode=(ss.mode==='recompete')?'recompete':((ss.mode==='companies'||ss.mode==='buyers')?ss.mode:'open');
@@ -5367,14 +5377,14 @@ const VIEWPORT_JS = `<script>
     var _unsupported=[];
     for(var uk in f){
       if(uk in FILT||uk==='q'||uk==='horizons'||uk==='fsc')continue;
-      if(uk==='strategy'&&_asSaved)continue;
+      if(uk==='strategy'&&_withStrategy)continue;
       if(uk==='status'&&String(f[uk]).toLowerCase()==='active')continue;
       if(f[uk]==null||f[uk]===''||f[uk]===false)continue;
       _unsupported.push(uk);
     }
     // Opportunity DNA strands (saved as an array or a comma list). FILT.strategy is an ARRAY —
     // the URL builder joins it — and the boxes are the control readDeep reads back on Apply.
-    if(_asSaved){
+    if(_withStrategy){
       var _strat=Array.isArray(f.strategy)?f.strategy:String(f.strategy||'').split(',');
       _strat=_strat.map(function(x){return String(x).trim();}).filter(Boolean);
       var _known={}; document.querySelectorAll('.mf-strategy').forEach(function(c){ _known[c.value]=1; c.checked=_strat.indexOf(c.value)>=0; });
@@ -9863,6 +9873,13 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // same q. Eric (2026-09-23): "Any explicit discovery intent in the URL suppresses conflicting/
   // restored discovery memory. Equality of one field does not authorize restoring the rest of the
   // remembered market." So a reload after typing restores the query only — by design.
+  // The scope-link trigger, published so the ?strategy= handler uses the SAME test (one list, no drift):
+  // true when this URL carries any key the scope handler below applies.
+  window.__scopeLinkPresent=function(){
+    var qs=location.search||'';
+    return ['agency','naics','state','setAside','psc','q','posted','mode','horizon','office','subAgency','subagency','vehicle','parent','work']
+      .some(function(k){ var m=qs.match(new RegExp('[?&]'+k+'=([^&]+)')); return !!(m&&decodeURIComponent(m[1].split('+').join(' ')).trim()); });
+  };
   (function(){ try{
     function P(k){ var m=(location.search||'').match(new RegExp('[?&]'+k+'=([^&]+)')); return m?decodeURIComponent(m[1].split('+').join(' ')).trim():''; }
     var agency=P('agency'), naics=P('naics'), state=P('state'), setAside=P('setAside'), psc=P('psc'), q=P('q');
@@ -9880,6 +9897,11 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     // verified vehicle registry; an unknown/ambiguous name comes back as a refinement, never all orders.
     var vehicle=P('vehicle'), parent=P('parent'), work=P('work'), leadMax=P('leadMax'), minValue=P('minValue');
     if(!agency&&!naics&&!state&&!setAside&&!psc&&!q&&!posted&&!mode&&!horizon&&!office&&!subAgency&&!vehicle&&!parent&&!work)return;   // nothing asked for -> leave the map alone
+    // TODAY'S LENS with a scope (?strategy=…&naics=…, todays-lens-link.ts). The strands ride THIS
+    // restore (opts.strategy) so naics + strategy land in ONE __applySavedSearch pass. The standalone
+    // ?strategy= handler below checks window.__scopeLinkPresent() and stands down for such links —
+    // exactly one handler initializes the filters. A strategy-only link (older emails) is unchanged.
+    var strategy=P('strategy');
     var tries=0; (function go(){
       if(typeof window.__applySavedSearch!=='function'){
         if(++tries<40)return setTimeout(go,150); return;
@@ -9979,7 +10001,8 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
         // Horizon toggles during this restore must not rewrite the link being restored.
         window.__urlRestoring=true;
         try{
-          window.__applySavedSearch({ mode:_mode, filters:f });
+          if(strategy){ f.strategy=strategy; window.__applySavedSearch({ mode:_mode, filters:f },{ strategy:true }); }
+          else window.__applySavedSearch({ mode:_mode, filters:f });
           // Legacy isolation (unchanged for agency/naics/… links without q or horizon): an explicit
           // ?mode= isolates that horizon; otherwise the pre-existing _mode fallback applies. Skipped
           // whenever the link states its horizons (f.horizons) — the URL is exact, not a fallback.
@@ -10166,8 +10189,86 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     var m=(location.search||'').match(/[?&]strategy=([^&]+)/); if(!m)return;
     var want=decodeURIComponent(m[1]).split(',').map(function(s){return s.trim();}).filter(Boolean);
     if(!want.length)return;
+    function qp(k){ var x=(location.search||'').match(new RegExp('[?&]'+k+'=([^&]+)')); return x?decodeURIComponent(x[1]).trim():''; }
+    // ONE WRITER. A lens link that also carries a scope (?naics= …) is applied by the scope-link
+    // handler in the same __applySavedSearch pass (opts.strategy). This handler then only draws the
+    // pill once those boxes are checked — it must NOT write FILT a second time (that race let the
+    // scope restore's FILT reset drop the strands). A strategy-only link (older emails) still applies
+    // here, exactly as before.
+    var scoped=(typeof window.__scopeLinkPresent==='function')&&window.__scopeLinkPresent();
+    // What the lens counted and WHEN (todays-lens-link.ts). Labels only — the exact historical set
+    // was never stored, so the pill never claims to show "the alert's N".
+    var lensN=qp('lens_n'), lensOn=qp('lens_on'), src=qp('src');
+    var nThen=/^[0-9]{1,7}$/.test(lensN)?parseInt(lensN,10):null;
+    var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var onLabel=''; var dm=lensOn.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/); if(dm&&+dm[2]>=1&&+dm[2]<=12)onLabel=MON[+dm[2]-1]+' '+(+dm[3]);
+    var linkNaics=qp('naics');
+    function drawPill(applied){
+      try{
+        // ANCHOR: .mapwrap (position:relative, the map's own box). The original selector
+        // '.map-controls' does NOT EXIST anywhere in this codebase, so querySelector returned
+        // null and the pill fell through to document.body — absolutely positioned against the
+        // PAGE, which is how it landed on top of the "Pursuits" nav item (Eric, 2026-08-17).
+        // template.html:903 already appends overlays to .mapwrap; same pattern.
+        if(document.getElementById('todaysLensPill'))return;
+        var host=document.querySelector('.mapwrap')||document.body;
+        var pill=document.createElement('div'); pill.id='todaysLensPill';
+        pill.style.cssText='position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:600;display:flex;align-items:center;gap:8px;background:linear-gradient(90deg,#1e3a8a,#7c3aed);color:#fff;font:600 13px Inter,system-ui,sans-serif;padding:7px 12px;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,.25)';
+        // Name each strand with its OWN checkbox label ("SB-Friendly", "Set-Aside"), not a
+        // title-cased key — that rendered "Sb Friendly" / "Set Aside" in the pill.
+        var human=applied.map(function(k){
+          var box=document.querySelector('.mf-strategy[value="'+k+'"]');
+          var lbl=box&&box.parentNode?String(box.parentNode.textContent||'').trim():'';
+          return lbl||k.split('_').map(function(w){return w.charAt(0).toUpperCase()+w.slice(1);}).join(' ');
+        }).join(' · ');
+        var col=document.createElement('div'); col.style.cssText='display:flex;flex-direction:column;align-items:center;line-height:1.25';
+        var ttl=document.createElement('span'); ttl.textContent='\\uD83D\\uDD2D Today\\u2019s Lens: '+human; col.appendChild(ttl);
+        // THEN vs NOW — the count the alert/hero showed is labelled with WHEN it was counted, and the
+        // map's own live total is labelled "now". Two numbers, two times, never presented as one.
+        var sub=null;
+        if(nThen!==null){
+          sub=document.createElement('span'); sub.id='todaysLensCounts'; sub.style.cssText='font:500 11.5px Inter,system-ui,sans-serif;opacity:.92';
+          col.appendChild(sub); pill.style.borderRadius='14px';
+        }
+        pill.appendChild(col);
+        var x=document.createElement('button'); x.textContent='\\u2715'; x.setAttribute('aria-label','Clear Today\\u2019s Lens');
+        x.style.cssText='all:unset;cursor:pointer;font-weight:700;opacity:.85;padding:0 2px';
+        // Clear through the BRIDGE, exactly like the apply path below. readDeep/fetchView
+        // are VIEWPORT_JS locals invisible from this block — calling them bare threw a
+        // ReferenceError that the catch swallowed, so the ✕ unchecked the boxes and then silently
+        // left the map filtered (measured on prod 2026-08-17).
+        x.onclick=function(){ try{ document.querySelectorAll('.mf-strategy:checked').forEach(function(b){b.checked=false;}); if(typeof window.__applyStrategyBoxes==='function')window.__applyStrategyBoxes(); pill.remove(); }catch(e){} };
+        pill.appendChild(x); host.appendChild(pill);
+        if(!sub)return;
+        var thenTxt=(src==='alert')
+          ? nThen.toLocaleString('en-US')+' recommended when your alert was sent'+(onLabel?' ('+onLabel+')':'')
+          : nThen.toLocaleString('en-US')+' recommended in Today\\u2019s Intel';
+        var wantStrat=applied.slice().sort().join(',');
+        var tick=function(){
+          if(!document.getElementById('todaysLensPill'))return;
+          var nowTxt='';
+          var lf=(typeof window.__lensFilters==='function')?window.__lensFilters():null;
+          var same=!!lf&&lf.strategy===wantStrat&&(!linkNaics||lf.naics===linkNaics);
+          var t=window.__mapMatchTotals;
+          if(!same) nowTxt='';                                   // filters changed — the "now" number would describe a different set
+          else if(!t||!t.settled) nowTxt=' \\u00b7 counting now\\u2026';
+          else if(t.totalKnown===false||t.anyFailed) nowTxt=' \\u00b7 current count unavailable';
+          else nowTxt=' \\u00b7 '+Number(t.total||0).toLocaleString('en-US')+' match now';
+          sub.textContent=thenTxt+nowTxt;
+          setTimeout(tick,1000);
+        };
+        tick();
+      }catch(e){}
+    }
     var tries=0; (function go(){
       var boxes=document.querySelectorAll('.mf-strategy');
+      if(scoped){
+        // The scope handler owns the filters; wait for ITS checked boxes, then name them. Never write.
+        var on=[]; boxes.forEach(function(b){ if(b.checked&&want.indexOf(b.value)>=0)on.push(b.value); });
+        if(on.length){ drawPill(on); return; }
+        if(tries++<40)setTimeout(go,150);
+        return;
+      }
       // Guard on the BRIDGE (a real global), not on readDeep/fetchView — those are VIEWPORT_JS
       // locals this block cannot see, so guarding on them never passed and the lens silently
       // never applied. See window.__applyStrategyBoxes for the measured failure.
@@ -10176,33 +10277,7 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
         boxes.forEach(function(b){ if(want.indexOf(b.value)>=0){ b.checked=true; applied.push(b.value); } });
         if(!applied.length)return;           // junk param → nothing to apply (no fabricated lens)
         applied=window.__applyStrategyBoxes()||applied;
-        // The "Today's Lens" pill — names the lens the briefing configured; click ✕ to clear it.
-        try{
-          // ANCHOR: .mapwrap (position:relative, the map's own box). The original selector
-          // '.map-controls' does NOT EXIST anywhere in this codebase, so querySelector returned
-          // null and the pill fell through to document.body — absolutely positioned against the
-          // PAGE, which is how it landed on top of the "Pursuits" nav item (Eric, 2026-08-17).
-          // template.html:903 already appends overlays to .mapwrap; same pattern.
-          var host=document.querySelector('.mapwrap')||document.body;
-          var pill=document.createElement('div'); pill.id='todaysLensPill';
-          pill.style.cssText='position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:600;display:flex;align-items:center;gap:8px;background:linear-gradient(90deg,#1e3a8a,#7c3aed);color:#fff;font:600 13px Inter,system-ui,sans-serif;padding:7px 12px;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,.25)';
-          // Name each strand with its OWN checkbox label ("SB-Friendly", "Set-Aside"), not a
-          // title-cased key — that rendered "Sb Friendly" / "Set Aside" in the pill.
-          var human=applied.map(function(k){
-            var box=document.querySelector('.mf-strategy[value="'+k+'"]');
-            var lbl=box&&box.parentNode?String(box.parentNode.textContent||'').trim():'';
-            return lbl||k.split('_').map(function(w){return w.charAt(0).toUpperCase()+w.slice(1);}).join(' ');
-          }).join(' · ');
-          pill.innerHTML='<span>\\uD83D\\uDD2D Today\\u2019s Lens: '+human+'</span>';
-          var x=document.createElement('button'); x.textContent='\\u2715'; x.setAttribute('aria-label','Clear Today\\u2019s Lens');
-          x.style.cssText='all:unset;cursor:pointer;font-weight:700;opacity:.85;padding:0 2px';
-          // Clear through the BRIDGE, exactly like the apply path 20 lines above. readDeep/fetchView
-          // are VIEWPORT_JS locals invisible from this block — calling them bare threw a
-          // ReferenceError that the catch swallowed, so the ✕ unchecked the boxes and then silently
-          // left the map filtered (measured on prod 2026-08-17).
-          x.onclick=function(){ try{ document.querySelectorAll('.mf-strategy:checked').forEach(function(b){b.checked=false;}); if(typeof window.__applyStrategyBoxes==='function')window.__applyStrategyBoxes(); pill.remove(); }catch(e){} };
-          pill.appendChild(x); host.appendChild(pill);
-        }catch(e){}
+        drawPill(applied);
         return;
       }
       if(tries++<40)setTimeout(go,150);

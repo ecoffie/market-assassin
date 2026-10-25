@@ -32,7 +32,7 @@
  * Run:  npm run verify:oracles          (needs .env.local — vercel env pull)
  *       npm run verify:oracles -- --json
  *       npm run verify:oracles -- --only contacts   (run one check while iterating)
- *       --only <scope|report|contacts|alert|pricing|mwin|filters|strategy|freshness|recompete-count|forecast-match|awards-schema|players>
+ *       --only <scope|report|contacts|alert|pricing|mwin|filters|strategy|freshness|recompete-count|forecast-match|awards-schema|players|lens-link>
  *       --players-preview  (with --only players) build Players in an ephemeral BQ session — code proof, not acceptance
  */
 
@@ -602,6 +602,51 @@ if (want('players')) {
       (failed.length ? ` e.g. ${failed.filter((f) => !PLAYERS_REGRESSION_FIXTURES.some((x) => x.naics === f.naics && x.state === f.state)).slice(0, 4).map((f) => `${f.naics}/${f.state} ${f.players ?? '?'}/${f.truth}`).join(', ')}` : '') + datasetNote);
   } catch (e) {
     record('players: reconciliation unmeasured', false, 'could not observe Players or truth: ' + String(e?.message || e).slice(0, 200), 'unmeasured');
+  }
+}
+
+// ── LENS LINK — the Today's Lens CTA count equals what its link opens on the map ──────────────
+// Joseph Boyd, 2026-10-25: "Explore 13 recommended" opened 95 / 137 because the link carried the
+// strands but not the NAICS scope the 13 was counted in. Oracle: for real profiles (and one with no
+// NAICS → the fallback codes), compute the lens, build the REAL link (todaysLensMapPath), run that
+// link's params through the map's SHARED filter authority (applyMapFilters ∘ parseMapFilters) and
+// require the count to EQUAL lensCount. Prints counts only — never an email.
+if (want('lens-link')) {
+  try {
+    const { computeTodaysLens } = await import('@/lib/dashboard/todays-lens');
+    const { todaysLensMapPath } = await import('@/lib/dashboard/todays-lens-link');
+    const { applyMapFilters, parseMapFilters } = await import('@/lib/opportunities/map-filters');
+    const { data: profs, error: pErr } = await sb.from('user_notification_settings')
+      .select('user_email,naics_codes').eq('alerts_enabled', true).not('naics_codes', 'is', null).limit(400);
+    if (pErr) throw new Error(`profile sample failed: ${pErr.message}`);
+    const withCodes = (profs || []).filter((r) => Array.isArray(r.naics_codes) && r.naics_codes.length > 0);
+    // Spread the sample across the list (not just the first rows), plus a no-profile address (fallback codes).
+    const step = Math.max(1, Math.floor(withCodes.length / 8));
+    const sample = withCodes.filter((_, i) => i % step === 0).slice(0, 8).map((r) => r.user_email);
+    sample.push('lens-oracle-no-profile@invalid.example');
+    const rows = [];
+    for (const [i, email] of sample.entries()) {
+      const lens = await computeTodaysLens(email);
+      if (!lens.lensStrategy || typeof lens.lensCount !== 'number') { rows.push({ i, skipped: 'no lens today' }); continue; }
+      const path = todaysLensMapPath(lens, { src: 'alert', sentOn: new Date().toISOString().slice(0, 10) });
+      const qp = new URL(path, 'https://getmindy.ai').searchParams;
+      const getter = (k) => (k === 'status' ? 'open' : qp.get(k));
+      let q = sb.from('sam_opportunities').select('notice_id', { count: 'exact', head: true });
+      q = applyMapFilters(q, parseMapFilters(getter));
+      const { count, error } = await q;
+      if (error) throw new Error(`map filter query failed: ${error.message}`);
+      rows.push({ i, fallback: lens.usingFallback, naics: lens.lensNaics.length, strands: lens.lensStrategy.split(',').length, lensCount: lens.lensCount, mapCount: count, ok: count === lens.lensCount });
+    }
+    const measured = rows.filter((r) => !r.skipped);
+    const bad = measured.filter((r) => !r.ok);
+    const fallbackSeen = measured.some((r) => r.fallback);
+    const pass = measured.length >= 3 && bad.length === 0 && fallbackSeen;
+    record(`lens-link: email count == map count through applyMapFilters (${measured.length} profiles${fallbackSeen ? ', incl. fallback codes' : ''})`, pass,
+      measured.map((r) => `#${r.i}${r.fallback ? '(fallback)' : ''} ${r.lensCount}=${r.mapCount}${r.ok ? '' : ' ✗'}`).join(' · ')
+      + (rows.length - measured.length ? `; ${rows.length - measured.length} skipped (no lens today)` : '')
+      + (fallbackSeen ? '' : '; fallback profile NOT measured'));
+  } catch (e) {
+    record('lens-link: count vs map', false, 'threw: ' + (e?.message || e));
   }
 }
 
