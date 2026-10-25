@@ -68,7 +68,8 @@ describe('location-less rows are requested ONLY in Lens mode, and only with a NA
     expect(page).toContain("return m==='open'?openUnplacedToRow(u):unplacedToRow(u);");
     expect(page).toContain("var r=toRow(u,'open'); r.noPin=true; r.lat=null; r.lng=null;");
     // "not yet on SAM" stays a FORECAST-only footer — a SAM notice with no location IS on SAM.
-    expect(page).toContain("${o.noPin&&o.src===\\'FORECAST\\'?\\'Forecast — not yet on SAM\\':\\'\\'}");
+    const tpl = readFileSync(join(process.cwd(), 'src/app/opportunity-map/template.html'), 'utf8');
+    expect(tpl).toContain("${o.noPin&&o.src==='FORECAST'?'Coming Soon — not yet on SAM':o.sol}");
   });
   it('server: rows only with includeUnplaced=1 AND a NAICS scope; same filters; capped; full total kept', () => {
     expect(api).toContain("p.get('includeUnplaced') === '1' && (p.get('naics') || '').trim()");

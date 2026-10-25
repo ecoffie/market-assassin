@@ -11150,7 +11150,7 @@ export async function GET(request: NextRequest) {
     // W912DS26A016 — it pulls the card back toward database"): the .solno span is emptied so only the
     // "Review Opportunity →" hint remains. (History: View details → Open Listing → Review Opportunity.)
     html = repl(html, '<span class="solno">${o.noPin?\'Forecast — not yet on SAM\':o.sol}</span>',
-      '<span class="solno">${o.noPin&&o.src===\'FORECAST\'?\'Forecast — not yet on SAM\':\'\'}</span>');
+      '<span class="solno">${o.noPin?\'Forecast — not yet on SAM\':\'\'}</span>');
     html = repl(html, '<a class="act" href="${samURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">SAM.gov</a>',
       '<span class="viewdet">Review Opportunity →</span>');
     // NOTE: the CTA literal is `${draftCTA(o)}` (the two-play label — Plan recompete / Plan outreach /
