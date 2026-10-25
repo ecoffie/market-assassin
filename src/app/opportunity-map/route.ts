@@ -1840,6 +1840,12 @@ const VIEWPORT_JS = `<script>
   function unplacedToRow(u){
     return {src:'FORECAST',noPin:true,naics:u.naics||'',cat:u.cat||'Forecast',title:u.title,agency:clean(u.agency||''),set:SETMAP[u.set]||'None',setOpen:u.setOpen===true,loc:u.noLoc||'No location yet',noLoc:u.noLoc||'No location yet',close:(u.close||'').slice(0,10),sol:u.id,nid:u.id,uiLink:null,lat:null,lng:null,locSrc:'none',est:u.est||0,estRange:u.estRange||''};
   }
+  // A location-less OPEN notice (Today's Lens only) → the normal SAM card, list-only: no pin, no
+  // fly-to, an honest "No map location". It opens its drawer by notice_id like any other card.
+  function openUnplacedToRow(u){
+    var r=toRow(u,'open'); r.noPin=true; r.lat=null; r.lng=null; r.locSrc='none';
+    r.noLoc='No map location'; r.loc=r.noLoc; return r;
+  }
   function bbox(){
     // When the user has drawn an area (Draw button), query THAT rectangle instead of the
     // full viewport — Zillow's draw-to-filter. window.__drawBounds is set by DRAW_JS.
@@ -1985,6 +1991,14 @@ const VIEWPORT_JS = `<script>
     el.textContent=(more&&shown>0&&total>shown)
       ? shown.toLocaleString()+' of '+total.toLocaleString()+' '+unit
       : total.toLocaleString()+' '+unit;
+    // TODAY'S LENS: total now INCLUDES the location-less matches listed in the results, so state the
+    // mappable part separately — "12 on the map · 3 without a location" — instead of "N of 15".
+    var _uo=window.__unplacedOpenTotal;
+    if(window.__lensFromLink&&typeof _uo==='number'&&_uo>0&&total>=_uo){
+      var _mapped=total-_uo;
+      el.textContent=((more&&shown>0&&_mapped>shown)?shown.toLocaleString()+' of '+_mapped.toLocaleString():_mapped.toLocaleString())
+        +' on the map \u00b7 '+_uo.toLocaleString()+' without a location';
+    }
     // THE MAP-TRUTH CONTRACT (Eric 2026-09-12): "the map may show only mappable rows, but Mindy
     // must never present that number as the total market truth."
     //
@@ -2631,7 +2645,7 @@ const VIEWPORT_JS = `<script>
     // Pass the horizon m into toRow so recompete pins get the recompete shape (toRow cannot
     // read the global MODE during a merge, it is always open). open/forecast/grants key off p.src.
     var hc=horizonCount(d);
-    return {m:m,pins:(d.pins||[]).map(function(p){return toRow(p,m);}),total:hc.total,count:hc,capped:!!d.capped,inview:d.totalInView||0,unplaced:(d.unplaced||[]).map(unplacedToRow),unplacedTotal:d.unplacedTotal||0,unmappedTotal:(typeof d.unmappedForFilters==='number'?d.unmappedForFilters:(d.unmappedForFilters===null?null:0))};
+    return {m:m,pins:(d.pins||[]).map(function(p){return toRow(p,m);}),total:hc.total,count:hc,capped:!!d.capped,inview:d.totalInView||0,unplaced:(d.unplaced||[]).map(function(u){ return m==='open'?openUnplacedToRow(u):unplacedToRow(u); }),unplacedTotal:d.unplacedTotal||0,unmappedTotal:(typeof d.unmappedForFilters==='number'?d.unmappedForFilters:(d.unmappedForFilters===null?null:0))};
   }
   // Load ONE horizon for this round: cache → join an identical in-flight request → network.
   // Resolves {d, t, src} on success, {failed:true} on error, {aborted:true} when superseded.
@@ -2723,6 +2737,10 @@ const VIEWPORT_JS = `<script>
       // them comma-joined. The API (applyMapFilters) does a JSONB-keys @> ALL over the persisted
       // opportunity_dna_keys → "filter by strategy, not NAICS", corpus-wide.
       if(FILT.strategy&&FILT.strategy.length)url+='&strategy='+encodeURIComponent(FILT.strategy.join(','));
+      // TODAY'S LENS: the CTA promised the FULL matching population, so ask for the location-less
+      // matches as list rows. Only while a lens link's NAICS AND strands are still applied — any other
+      // view (or the reader unchecking the strands) keeps the standard mappable-only behavior.
+      if(window.__lensFromLink&&FILT.naics&&FILT.strategy&&FILT.strategy.length)url+='&includeUnplaced=1';
     }
     if(m==='recompete'){
       // NAICS/PSC were only ever sent in the m==='open' block, so a Filters-panel NAICS
@@ -3001,7 +3019,7 @@ const VIEWPORT_JS = `<script>
     // A horizon whose count is UNKNOWN (null) makes the whole line unknown rather than
     // letting a missing number quietly read as zero (Bug Prevention Rule #11). A horizon still
     // LOADING is unknown too.
-    var unmappedTot=0, unmappedUnknown=loading.length>0;
+    var unmappedTot=0, unmappedUnknown=loading.length>0, unplacedOpenTot=0;
     window.__horizonCounts=window.__horizonCounts||{};
     ['open','recompete','forecast'].forEach(function(k){ if(_enabled.indexOf(k)===-1)delete window.__horizonCounts[k]; });
     // A horizon still loading for a NEW intent has no number yet — say so, never keep its old one.
@@ -3023,12 +3041,13 @@ const VIEWPORT_JS = `<script>
       // Only a SUCCESSFUL part writes its horizon total — a failed part preserves the
       // prior value (never overwrites a real count with 0).
       if(p.m && !p.failed)window.__horizonTotals[p.m]=p.total;
-      if(p.unplaced&&p.unplaced.length){ unplacedRows=unplacedRows.concat(p.unplaced); unplacedTot+=(p.unplacedTotal||p.unplaced.length); } });
+      if(p.unplaced&&p.unplaced.length){ unplacedRows=unplacedRows.concat(p.unplaced); unplacedTot+=(p.unplacedTotal||p.unplaced.length); if(p.m==='open')unplacedOpenTot+=(p.unplacedTotal||p.unplaced.length); } });
     // Location-less forecast rows go at the END of the list (they can't be a pin, so map-first
     // users see the mappable results first; the searcher still finds them below). They count
     // toward the headline total so "N results" is honest about what the search returned.
     OPPS=merged.concat(unplacedRows); TOTAL=tot+unplacedTot; CAPPED=cap; INVIEW=inv+unplacedRows.length;
     window.__unplacedForecastTotal=unplacedTot;
+    window.__unplacedOpenTotal=unplacedOpenTot;   // > 0 only in Today's Lens mode (includeUnplaced)
     window.__horizonsLoading=loading.slice();
     // Coverage: every enabled horizon unavailable → the empty feed/header must say so, never "0".
     window.__coverageNote=coverageNote(window.__horizonCounts);
@@ -9988,6 +10007,8 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
         window.__urlRestoring=true;
         try{
           if(strategy)f.strategy=strategy;
+          // A lens link (strands + NAICS): the map shows the lens's FULL population (see _buildOppUrl).
+          if(strategy&&f.naics)window.__lensFromLink=true;
           window.__applySavedSearch({ mode:_mode, filters:f }, strategy?{strategy:true}:undefined);
           // Legacy isolation (unchanged for agency/naics/… links without q or horizon): an explicit
           // ?mode= isolates that horizon; otherwise the pre-existing _mode fallback applies. Skipped
@@ -10219,7 +10240,7 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
           // are VIEWPORT_JS locals invisible from this block — calling them bare threw a
           // ReferenceError that the catch swallowed, so the ✕ unchecked the boxes and then silently
           // left the map filtered (measured on prod 2026-08-17).
-          x.onclick=function(){ try{ document.querySelectorAll('.mf-strategy:checked').forEach(function(b){b.checked=false;}); if(typeof window.__applyStrategyBoxes==='function')window.__applyStrategyBoxes(); pill.remove(); }catch(e){} };
+          x.onclick=function(){ try{ window.__lensFromLink=false; document.querySelectorAll('.mf-strategy:checked').forEach(function(b){b.checked=false;}); if(typeof window.__applyStrategyBoxes==='function')window.__applyStrategyBoxes(); pill.remove(); }catch(e){} };
           pill.appendChild(x); host.appendChild(pill);
         }catch(e){}
         return;
@@ -11129,7 +11150,7 @@ export async function GET(request: NextRequest) {
     // W912DS26A016 — it pulls the card back toward database"): the .solno span is emptied so only the
     // "Review Opportunity →" hint remains. (History: View details → Open Listing → Review Opportunity.)
     html = repl(html, '<span class="solno">${o.noPin?\'Forecast — not yet on SAM\':o.sol}</span>',
-      '<span class="solno">${o.noPin?\'Forecast — not yet on SAM\':\'\'}</span>');
+      '<span class="solno">${o.noPin&&o.src===\'FORECAST\'?\'Forecast — not yet on SAM\':\'\'}</span>');
     html = repl(html, '<a class="act" href="${samURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">SAM.gov</a>',
       '<span class="viewdet">Review Opportunity →</span>');
     // NOTE: the CTA literal is `${draftCTA(o)}` (the two-play label — Plan recompete / Plan outreach /
