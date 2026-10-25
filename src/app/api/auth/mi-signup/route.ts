@@ -7,6 +7,7 @@ import { sendEmail } from '@/lib/send-email';
 import { getPartnerReferralByCode } from '@/lib/mindy/partner-referrals';
 import { enqueuePendingSignup } from '@/lib/resilience/signup-queue';
 import { normalizeAttribution, pushLeadToGhl, isYouTubeSource } from '@/lib/mindy/lead-attribution';
+import { signupEmailFormatError, isInvalidRecipientError, MISTYPED_EMAIL_MESSAGE } from '@/lib/mindy/signup-email';
 
 export const runtime = 'nodejs';
 
@@ -122,9 +123,11 @@ async function generateSetupLink(email: string, redirectTo: string): Promise<{ u
 }
 
 async function validateSignupEmail(email: string): Promise<string | null> {
-  const emailRegex = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+$/i;
-  if (!emailRegex.test(email)) {
-    return 'Invalid email format';
+  // Format (incl. consecutive / leading / trailing dots in the local part) is checked here,
+  // BEFORE generateSetupLink creates the auth user. See src/lib/mindy/signup-email.ts.
+  const formatError = signupEmailFormatError(email);
+  if (formatError) {
+    return formatError;
   }
 
   const domain = email.split('@')[1];
@@ -295,24 +298,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Send welcome email
-    await sendEmail({
-      to: email,
-      subject: 'Welcome to Mindy — Set up your password',
-      html: buildWelcomeEmailHtml(link.url, partner?.trialDays),
-      text: `Welcome to Mindy! Set up your password: ${link.url}`,
-      emailType: 'mindy_free_signup',
-      eventSource: 'mindy_signup',
-      tags: {
-        type: 'mindy_free_signup',
-        link: link.type,
-      },
-      metadata: {
-        email,
-        linkType: link.type,
-        tier: 'free',
-      },
-    });
+    // Send welcome email. If both providers PERMANENTLY reject the recipient address, that is
+    // the user's typo, not our outage: answer 400 with a fix-it message instead of a 500.
+    // Outages, timeouts, rate limits and every other send failure still fall through to the
+    // outer catch (500). Note the auth user already exists at this point (generateSetupLink
+    // created it) — the format check above is what prevents that; this is the backstop.
+    try {
+      await sendEmail({
+        to: email,
+        subject: 'Welcome to Mindy — Set up your password',
+        html: buildWelcomeEmailHtml(link.url, partner?.trialDays),
+        text: `Welcome to Mindy! Set up your password: ${link.url}`,
+        emailType: 'mindy_free_signup',
+        eventSource: 'mindy_signup',
+        tags: {
+          type: 'mindy_free_signup',
+          link: link.type,
+        },
+        metadata: {
+          email,
+          linkType: link.type,
+          tier: 'free',
+        },
+      });
+    } catch (sendError) {
+      if (isInvalidRecipientError(sendError)) {
+        console.warn('[Mindy Signup] recipient address rejected by mail provider — returning 400');
+        return NextResponse.json({ success: false, error: MISTYPED_EMAIL_MESSAGE }, { status: 400 });
+      }
+      throw sendError;
+    }
 
     // Record source attribution (non-fatal) so free signups are countable by
     // channel — e.g. "how many free signups came from YouTube this week?".
