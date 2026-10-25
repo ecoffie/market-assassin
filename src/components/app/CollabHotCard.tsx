@@ -17,7 +17,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { getMIApiHeaders } from './authHeaders';
+import { useAppTracker } from './track';
 import type { AppPanel } from './UnifiedSidebar';
+import { bestFitAction } from '@/lib/today/best-fit-link';
 
 interface HotOpp {
   noticeId: string;
@@ -34,6 +36,9 @@ interface CollabHotCardProps {
   email: string | null;
   onPanelChange?: (panel: AppPanel, context?: Record<string, unknown>) => void;
 }
+
+const CTA_CLASS =
+  'mt-3 inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 text-white text-sm font-semibold px-4 py-2 transition shadow shadow-purple-900/30';
 
 export function CollabHotCard({ email, onPanelChange }: CollabHotCardProps) {
   const [hot, setHot] = useState<HotOpp | null>(null);
@@ -63,23 +68,31 @@ export function CollabHotCard({ email, onPanelChange }: CollabHotCardProps) {
     return () => { cancelled = true; clearInterval(interval); };
   }, [email]);
 
-  // For a Sources Sought, take the user to Proposal Assist to actually DRAFT a
-  // response to THIS notice (passing the notice context so the panel can frame the
-  // draft around it) — not "respond together" with another contractor. For other
-  // opp types, fall back to the Source Feed to view it.
-  const handleRespond = useCallback(() => {
-    if (!hot) return;
-    if (hot.isSourcesSought) {
-      onPanelChange?.('proposals', {
-        noticeId: hot.noticeId,
-        title: hot.title,
-        agency: hot.agency,
-        isSourcesSought: true,
-      });
-    } else {
-      onPanelChange?.('alerts');
-    }
-  }, [onPanelChange, hot]);
+  const track = useAppTracker(email);
+
+  // Sources Sought → Proposal Assist to DRAFT a response to THIS notice (unchanged
+  // workflow). Any other opportunity → open EXACTLY this notice on the map via
+  // ?opp=<notice_id> (see src/lib/today/best-fit-link.ts — this branch used to drop the
+  // id and dump the user on the profile-wide Source Feed, "604 matches found").
+  // Only an id the map cannot resolve (the demo card) falls back to the feed.
+  const action = hot ? bestFitAction(hot) : null;
+
+  const trackClick = useCallback(() => {
+    if (!hot || !action) return;
+    track('link_click', 'todays_intel', {
+      action: 'best_fit_view',
+      notice_id: hot.noticeId,
+      destination: action.kind,
+      is_sources_sought: hot.isSourcesSought,
+    });
+  }, [track, hot, action]);
+
+  const handlePanelAction = useCallback(() => {
+    if (!action) return;
+    trackClick();
+    if (action.kind === 'sources_sought') onPanelChange?.(action.panel, action.context);
+    else if (action.kind === 'feed') onPanelChange?.(action.panel);
+  }, [onPanelChange, action, trackClick]);
 
   if (hidden || !hot) return null;
 
@@ -141,12 +154,22 @@ export function CollabHotCard({ email, onPanelChange }: CollabHotCardProps) {
         </p>
 
         {/* CTA */}
-        <button
-          onClick={handleRespond}
-          className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 text-white text-sm font-semibold px-4 py-2 transition shadow shadow-purple-900/30"
-        >
-          {hot.isSourcesSought ? 'Respond to this Sources Sought' : 'View opportunity'} →
-        </button>
+        {action?.kind === 'record' ? (
+          <a
+            href={action.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={trackClick}
+            data-notice-id={action.noticeId}
+            className={CTA_CLASS}
+          >
+            View opportunity →
+          </a>
+        ) : (
+          <button onClick={handlePanelAction} className={CTA_CLASS}>
+            {action?.kind === 'sources_sought' ? 'Respond to this Sources Sought' : 'View in Source Feed'} →
+          </button>
+        )}
       </div>
     </div>
   );
