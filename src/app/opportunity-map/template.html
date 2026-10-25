@@ -1404,7 +1404,7 @@ function cardHTML(o){
     <div class="cmeta">${o.src==='RECOMPETE'&&o.cat?'<span class="ind">'+o.cat+'</span><span class="dot"></span>':''}${o.noPin?('<span class="loc noloc">○ '+(o.noLoc||o.loc)+'</span>'):('<span class="loc">'+o.loc+'</span>')}</div>
     <div class="stats">${stats}</div>
     <div class="cfoot">
-      <span class="solno">${o.noPin?'Coming Soon — not yet on SAM':o.sol}</span>
+      <span class="solno">${o.noPin&&o.src==='FORECAST'?'Coming Soon — not yet on SAM':o.sol}</span>
       <a class="act" href="${samURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">SAM.gov</a>
       <a class="act pri" href="${draftURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${draftCTA(o)}</a>
     </div></div>`;

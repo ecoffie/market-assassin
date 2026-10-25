@@ -13,6 +13,7 @@
  */
 
 import type { TodaysLens } from '@/lib/dashboard/todays-lens';
+import { lensMapHref } from '@/lib/dashboard/lens-link';
 
 // Mindy navy→purple button (matches the existing alert email CTA palette).
 const BUTTON_STYLE =
@@ -79,7 +80,8 @@ export function renderTodaysLensEmailBlock(
         .join('<span style="color:#cbd5e1;"> &nbsp;·&nbsp; </span>')}</p>`
     : '';
 
-  const mapUrl = wrap(`${baseUrl}/opportunity-map?strategy=${encodeURIComponent(lens.lensStrategy)}&src=alert`, 'todays_lens_map');
+  // Same population as lensCount: the strands AND the profile codes it was counted over.
+  const mapUrl = wrap(lensMapHref(lens, { base: baseUrl, src: 'alert' }), 'todays_lens_map');
 
   // Naming what is on the other side of the click converts better than a bare "Open Today's Map".
   // MUST be lens.totalOpen — the single real count from computeTodaysLens. Do NOT sum the strands:

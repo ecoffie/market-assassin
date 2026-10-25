@@ -31,7 +31,9 @@ export interface TodaysLens {
   totalOpen: number;
   strands: LensStrand[];
   lensStrategy: string;
-  /** Rows the CTA's ?strategy= link actually lands on. null = could not count. */
+  /** The NAICS codes `lensCount` was counted over — the CTA must carry them (lens-link.ts). */
+  lensNaics: string[];
+  /** Rows the CTA's link (lensMapHref) actually lands on. null = could not count. */
   lensCount: number | null;
 }
 
@@ -130,6 +132,7 @@ export async function computeTodaysLens(email: string): Promise<TodaysLens> {
     totalOpen: totalOpen ?? 0,
     strands: present,
     lensStrategy: lensStrategyKeys.join(','),
+    lensNaics: codes,
     /** How many opps the map shows when the CTA's ?strategy= link is followed. */
     lensCount,
   };

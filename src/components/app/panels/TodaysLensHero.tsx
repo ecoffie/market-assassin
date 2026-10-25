@@ -20,7 +20,7 @@ import { useAppTracker } from '../track';
 interface LensStrand { key: string; label: string; icon: string; count: number }
 interface LensData {
   ok: boolean; grounded: boolean; usingFallback: boolean;
-  totalOpen: number; strands: LensStrand[]; lensStrategy: string;
+  totalOpen: number; strands: LensStrand[]; lensStrategy: string; lensHref?: string;
 }
 
 const nf = new Intl.NumberFormat('en-US');
@@ -66,9 +66,8 @@ export default function TodaysLensHero({ email }: { email: string }) {
 
   if (!data) return null;
 
-  const mapHref = data.lensStrategy
-    ? `/opportunity-map?strategy=${encodeURIComponent(data.lensStrategy)}`
-    : '/opportunity-map';
+  // Server-built (lensMapHref) so the link carries the same NAICS scope the counts used.
+  const mapHref = data.lensHref || '/opportunity-map';
 
   // Quiet day (no open opps in the user's codes) â honest, not a fabricated pep talk. Still offer the map.
   if (!data.grounded || data.totalOpen === 0) {

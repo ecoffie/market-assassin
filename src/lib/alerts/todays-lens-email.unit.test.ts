@@ -64,9 +64,11 @@ describe('renderTodaysLensEmailBlock', () => {
     // as implementation language and raised a question nobody was asking.
     expect(html).not.toContain('can match more than one signal');
 
-    // The href carries strategy=<lensStrategy> (URL-encoded commas).
-    expect(html).toContain(`${BASE}/opportunity-map?strategy=`);
-    expect(html).toContain(`strategy=${encodeURIComponent(lens.lensStrategy)}`);
+    // lensCount is null here, so the CTA reads "Explore this market" — and the link must be the
+    // MARKET too, not the strand slice (2026-10-25: a link and its label describe one population).
+    // A lens with a real count carries strategy + NAICS: see lens-link.unit.test.ts.
+    expect(html).toContain(`href="${BASE}/opportunity-map"`);
+    expect(html).not.toContain('strategy=');
 
     // NO emoji anywhere — neither the strand icons nor any emoji-range codepoint.
     for (const e of STRAND_EMOJI) expect(html).not.toContain(e);
@@ -150,7 +152,7 @@ describe('renderTodaysLensEmailBlock', () => {
         { key: 'set_aside', label: 'Set-Aside', icon: '🎯', count: 8 },
       ],
       lensStrategy: 'repeat_buyer,set_aside',
-      lensCount: null,
+      lensCount: 5,   // a real lens slice: the link carries the strands
     };
 
     const html = renderTodaysLensEmailBlock(lens, BASE);
@@ -164,7 +166,7 @@ describe('renderTodaysLensEmailBlock', () => {
       grounded: true, usingFallback: false, totalOpen: 5,
       strands: [{ key: 'repeat_buyer', label: 'Repeat Buyers', icon: '🔥', count: 5 }],
       lensStrategy: 'repeat_buyer',
-      lensCount: null,
+      lensCount: 5,   // a real lens slice: the link carries the strands
     };
     // A stub tracker that wraps the raw url in a redirect + records the label it was given.
     const seen: { url: string; label: string }[] = [];

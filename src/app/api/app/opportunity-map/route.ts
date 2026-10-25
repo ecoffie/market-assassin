@@ -32,6 +32,8 @@ import { wantsMarketCounts } from '@/lib/opportunities/map-counts-mode';
 export const dynamic = 'force-dynamic';
 
 const MAX_PINS = 1000; // PostgREST hard-caps a response at 1000; clustering handles density.
+// Location-less list rows returned in Today's Lens mode (see includeUnplaced below).
+const UNPLACED_OPEN_CAP = 150;
 const PIN_COLS = 'notice_id, title, department, sub_tier, office, naics_code, set_aside_code, set_aside_description, notice_type, response_deadline, posted_date, ui_link, solicitation_number, pop_state, pop_city, office_address, map_lat, map_lng, map_loc_source, has_sow_doc, attachments, points_of_contact, intel_value_range';
 // FSC commodity micro-buy title: 1–4 leading digits then "--" ("48--VALVE,GLOBE").
 const FSC_REGEX = '^[0-9]{1,4}--';
@@ -324,6 +326,33 @@ export async function GET(request: NextRequest) {
     const [totalForFilters, { data, count: totalInView, error }, unmappedForFilters] = await samQueries;
     if (error) throw error;
 
+    // LOCATION-LESS MATCHES AS LIST ROWS — Today's Lens only (2026-10-25, Joseph Boyd follow-up).
+    // A lens CTA promises the FULL matching population (computeTodaysLens counts every row), but the
+    // map can only draw the located ones, so "Explore 15 recommended" opened "12 results · 3 not shown
+    // on map" with the 3 unreachable. The client asks for them (includeUnplaced=1) ONLY in lens mode,
+    // and only with a NAICS scope — never on an unscoped view, which would drag every one of the ~477
+    // permanently location-less open notices onto each pan. Same filters (applyFilters), no
+    // eligibility or location change; capped. unplacedTotal is the full unmapped count when the rows
+    // were fetched (the Forecast contract), so the client's total stays complete beyond the cap.
+    let unplaced: Array<Record<string, unknown>> = [];
+    let unplacedTotal = 0;
+    if (includeSam && withCounts && p.get('includeUnplaced') === '1' && (p.get('naics') || '').trim()) {
+      let uq = db.from('sam_opportunities').select(PIN_COLS).is('map_lat', null)
+        .order('response_deadline', { ascending: true }).limit(UNPLACED_OPEN_CAP);
+      uq = applyFilters(uq);
+      const { data: urows, error: uerr } = await uq;
+      if (uerr) {
+        console.error('[opportunity-map] unplaced rows failed:', uerr.message);
+      } else {
+        unplaced = dedupeByListing((urows || []) as Record<string, unknown>[]).map((r) => {
+          const pin = toPin(r);
+          const dna = computeGenome({ src: pin.src, noticeType: pin.noticeType, title: pin.title, set: pin.set, setOpen: (pin as { setOpen?: boolean }).setOpen === true, close: pin.close, sbf: 0, repeatBuyer: isRepeatBuyer(pin.agency, pin.naics) ? 1 : 0, postsEarly: 0 }, Date.now());
+          return { ...pin, lat: null, lng: null, dna };
+        });
+        unplacedTotal = typeof unmappedForFilters === 'number' ? unmappedForFilters : unplaced.length;
+      }
+    }
+
     // "Fits your NAICS" fit chip (Eric 2026-08-03, approved card artifact): flag each pin whose NAICS
     // is in the SIGNED-IN user's profile codes. Only set when scope=profile resolved a real profile
     // (profileNaics non-empty) — a signed-out / no-profile viewer gets NO fits flag, never a false ✓.
@@ -494,6 +523,7 @@ export async function GET(request: NextRequest) {
           ? null
           : (earlyFiltered ? merged.length : headlineTotal) + unmappedForFilters),
       pins: merged,
+      ...(unplaced.length || unplacedTotal ? { unplaced, unplacedTotal } : {}),
     });
   } catch (e) {
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });

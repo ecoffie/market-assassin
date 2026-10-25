@@ -103,7 +103,9 @@ describe('the strategy handler guards on a real global, not cross-block locals',
     // '.map-controls' matched NOTHING, so querySelector returned null and the pill fell through
     // to document.body — positioned against the PAGE, landing on top of the "Pursuits" nav item.
     const handler = mapSrc.slice(mapSrc.indexOf("// \"Today's Lens\" pill names the lens"));
-    const block = handler.slice(0, handler.indexOf('if(tries++<40)'));
+    // End of this IIFE (its own retry line). The scoped branch has an earlier retry, so cut at the
+    // handler's closing instead of the first 'if(tries++<40)'.
+    const block = handler.slice(0, handler.indexOf('}catch(e){} })();'));
     expect(block).toContain("querySelector('.mapwrap')");
     // the dead selector must not come back as LIVE code (a comment explaining it is fine)
     const code = block.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
