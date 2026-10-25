@@ -10253,7 +10253,11 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
           if(!same) nowTxt='';                                   // filters changed — the "now" number would describe a different set
           else if(!t||!t.settled) nowTxt=' \\u00b7 counting now\\u2026';
           else if(t.totalKnown===false||t.anyFailed) nowTxt=' \\u00b7 current count unavailable';
-          else nowTxt=' \\u00b7 '+Number(t.total||0).toLocaleString('en-US')+' match now';
+          // MARKET truth, not the mappable count: the lens counted every matching notice, mapped
+          // or not, so "now" adds the matches with no map location (map-truth contract). Unknown
+          // unmapped → "at least", never a number that silently leaves them out.
+          else if(typeof t.unmapped==='number') nowTxt=' \\u00b7 '+(Number(t.total||0)+t.unmapped).toLocaleString('en-US')+' match now';
+          else nowTxt=' \\u00b7 at least '+Number(t.total||0).toLocaleString('en-US')+' match now';
           sub.textContent=thenTxt+nowTxt;
           setTimeout(tick,1000);
         };

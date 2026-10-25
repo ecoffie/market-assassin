@@ -120,10 +120,19 @@ describe('lens link WITH a scope — exactly one writer', () => {
 
   it('then vs now: the alert\'s count is labelled with its send date; the live total is labelled "now"', () => {
     const r = run(LENS_LINK, {
-      totals: { settled: true, total: 12, totalKnown: true, anyFailed: false },
+      totals: { settled: true, total: 10, unmapped: 2, totalKnown: true, anyFailed: false },
       lensFilters: { strategy: 'repeat_buyer,sb_friendly,sources_sought', naics: '236220,541330' },
     });
+    // 10 on the map + 2 with no map location = 12 in the market — the population the lens counted.
     expect(r.counts).toBe('13 recommended when your alert was sent (Oct 21) · 12 match now');
+  });
+
+  it('unmapped unknown → "at least", never a number that silently drops the unmapped matches', () => {
+    const r = run(LENS_LINK, {
+      totals: { settled: true, total: 10, unmapped: null, totalKnown: true },
+      lensFilters: { strategy: 'repeat_buyer,sb_friendly,sources_sought', naics: '236220,541330' },
+    });
+    expect(r.counts).toBe('13 recommended when your alert was sent (Oct 21) · at least 10 match now');
   });
 
   it('while the map is still counting, it says so — never a 0 or a stale number', () => {
@@ -153,7 +162,7 @@ describe('lens link WITH a scope — exactly one writer', () => {
 
   it('in-app hero link (src=todays_intel) says where the count came from, with no send date', () => {
     const r = run('?strategy=repeat_buyer%2Csb_friendly&naics=541512&lens_n=7&src=todays_intel', {
-      totals: { settled: true, total: 7, totalKnown: true },
+      totals: { settled: true, total: 7, unmapped: 0, totalKnown: true },
       lensFilters: { strategy: 'repeat_buyer,sb_friendly', naics: '541512' },
     });
     expect(r.counts).toBe('7 recommended in Today’s Intel · 7 match now');
