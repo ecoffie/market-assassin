@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { WELCOME_PATH } from '@/lib/mindy/post-signup-destination';
+import { encodePendingNext, oauthOnboardingRedirect, onboardingRedirectPath, PENDING_NEXT_KEY, readPendingNext, signInReturnPath } from '@/lib/mindy/sign-in-return';
 import { useSearchParams } from 'next/navigation';
 import UnifiedSidebar, { type AppPanel, type AppTier } from '@/components/app/UnifiedSidebar';
 import GlobalLookup from '@/components/app/GlobalLookup';
@@ -131,10 +132,7 @@ function AppDashboard() {
   // Onboarding reads this next and honors it for returning users. Open-redirect guarded.
   const oauthRedirectTo = useCallback((): string | undefined => {
     if (typeof window === 'undefined') return undefined;
-    const raw = new URLSearchParams(window.location.search).get('next') || '';
-    const safe = raw.startsWith('/') && !raw.startsWith('//') ? raw : '';
-    const base = `${window.location.origin}/app/onboarding`;
-    return safe ? `${base}?next=${encodeURIComponent(safe)}` : base;
+    return oauthOnboardingRedirect(window.location.origin, new URLSearchParams(window.location.search).get('next'));
   }, []);
 
   const handleGoogleSignIn = useCallback(async () => {
@@ -242,6 +240,25 @@ function AppDashboard() {
     });
   }, [trackEngagement]);
 
+  // Password / email-code sign-in returns to a safe ?next= (a Learn tutorial, a Map page) the way
+  // Google/Microsoft already did via /app/onboarding — it used to stay on /app regardless. The
+  // onboarding redirect inside loadUserProfile wins: a user with no profile goes there first.
+  const leavingForOnboardingRef = useRef(false);
+  // `fromMagicLink`: the emailed link lands on bare /app, so its destination was remembered in
+  // this browser when the link was requested (see PENDING_NEXT_KEY). Only that path reads it, so a
+  // stale request can never hijack a later password sign-in. Any sign-in clears it.
+  const returnToNextAfterSignIn = useCallback((opts: { fromMagicLink?: boolean } = {}) => {
+    if (typeof window === 'undefined') return;
+    let pending: string | null = null;
+    try {
+      pending = opts.fromMagicLink ? readPendingNext(localStorage.getItem(PENDING_NEXT_KEY), Date.now()) : null;
+      localStorage.removeItem(PENDING_NEXT_KEY);
+    } catch { /* storage blocked → no pending destination */ }
+    if (leavingForOnboardingRef.current) return;
+    const dest = signInReturnPath(new URLSearchParams(window.location.search).get('next')) || pending;
+    if (dest) window.location.href = dest;
+  }, []);
+
   const loadUserProfile = useCallback(async (userEmail: string) => {
     setIsLoading(true);
     try {
@@ -332,7 +349,17 @@ function AppDashboard() {
           try { localStorage.setItem('mi_beta_email', userEmail); } catch { /* */ }
           // Legacy default removed 2026-08-25 — an account with no intent belongs in the
           // intent router, never the retired profile builder.
-          window.location.href = WELCOME_PATH;
+          // Carry the destination the user signed in for (?next=, or the magic link's remembered
+          // one while its #access_token is still in the URL) through /welcome.
+          let returnPath = signInReturnPath(new URLSearchParams(window.location.search).get('next'));
+          try {
+            if (!returnPath && window.location.hash.includes('access_token')) {
+              returnPath = readPendingNext(localStorage.getItem(PENDING_NEXT_KEY), Date.now());
+            }
+            localStorage.removeItem(PENDING_NEXT_KEY);
+          } catch { /* storage blocked → bare /welcome */ }
+          leavingForOnboardingRef.current = true;
+          window.location.href = onboardingRedirectPath(returnPath);
           return;
         }
       }
@@ -695,13 +722,14 @@ function AppDashboard() {
       }
 
       await loadUserProfile(normalizedEmail);
+      returnToNextAfterSignIn();
     } catch (error) {
       console.error('Failed to sign in:', error);
       setAuthError('Failed to sign in');
     } finally {
       setAuthLoading(false);
     }
-  }, [loadUserProfile]);
+  }, [loadUserProfile, returnToNextAfterSignIn]);
 
   const requestMagicLinkSignIn = useCallback(async (userEmail: string) => {
     const normalizedEmail = userEmail.toLowerCase().trim();
@@ -737,6 +765,10 @@ function AppDashboard() {
         return;
       }
 
+      try {
+        const pendingNext = encodePendingNext(new URLSearchParams(window.location.search).get('next'), Date.now());
+        if (pendingNext) localStorage.setItem(PENDING_NEXT_KEY, pendingNext);
+      } catch { /* storage blocked → the link still signs in, landing on /app */ }
       setPendingEmail(normalizedEmail);
       setMagicLinkSent(true);
       setAuthMessage(data.message || 'Check your inbox — click the link to open Mindy.');
@@ -816,6 +848,7 @@ function AppDashboard() {
       }
 
       await loadUserProfile(normalizedEmail);
+      returnToNextAfterSignIn();
     } catch (error) {
       console.error('Failed to verify 2FA code:', error);
       setAuthError('Failed to verify code');
@@ -1005,6 +1038,7 @@ function AppDashboard() {
         const ok = await bootstrapFromSupabaseSession();
         if (ok && typeof window !== 'undefined') {
           window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+          returnToNextAfterSignIn({ fromMagicLink: true });
         } else if (!ok) {
           clearStoredAppAuth();
           setIsLoading(false);
@@ -1014,7 +1048,7 @@ function AppDashboard() {
     });
 
     return () => subscription.unsubscribe();
-  }, [searchParams, loadUserProfile, bootstrapFromSupabaseSession, peekSupabaseSessionEmail, maybeRefreshMIToken]);
+  }, [searchParams, loadUserProfile, bootstrapFromSupabaseSession, peekSupabaseSessionEmail, maybeRefreshMIToken, returnToNextAfterSignIn]);
 
   // Loading state
   if (isLoading) {

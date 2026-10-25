@@ -80,6 +80,15 @@ describe('the screens carry no legacy destinations', () => {
     expect(uiCode).not.toMatch(/\/briefings/);
   });
 
+  // The ONE permitted route through /app is the sign-in ACTION on a 401 save (2026-10-25,
+  // Joseph Boyd): /app is Mindy's only sign-in surface and it returns to `next` = this page.
+  // It must go through the shared signInHref (safeNext-guarded), never a hand-written '/app'.
+  it('sign-in on a 401 goes through signInHref and returns to this page', () => {
+    expect(uiCode).toContain("import { signInHref } from '@/lib/mindy/sign-in-return';");
+    expect(uiCode).toContain('href={signInHref(');
+    expect((uiCode.match(/signInHref\(/g) || []).length).toBe(1);
+  });
+
   it('Skip is present on BOTH screens', () => {
     expect(uiCode).toContain('Skip for now →');                       // header, always visible
     expect(uiCode).toContain("Skip for now — don't save any of this"  // Screen 2, consequence stated

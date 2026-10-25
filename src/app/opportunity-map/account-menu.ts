@@ -128,22 +128,31 @@ export const ACCOUNT_MENU_JS = '<script>'
   // Gold master: verifyTwoFactorSessionToken in two-factor-session.ts.
   + 'function b64json(s){s=(s||"").replace(/-/g,"+").replace(/_/g,"/");while(s.length%4)s+="=";return JSON.parse(atob(s));}'
   + 'function tokEmail(){try{var raw=tok()||"";var parts=raw.split(".");var j=null;if(parts.length>=2){try{j=b64json(parts[0]);}catch(e0){j=null;}if(!(j&&j.email)&&parts.length>=3){try{j=b64json(parts[1]);}catch(e1){j=null;}}if(j&&j.email)return String(j.email).toLowerCase();}}catch(e){}try{var b=localStorage.getItem("mi_beta_email")||localStorage.getItem("briefings_access_email");return b?b.toLowerCase().trim():"";}catch(e2){return "";}}'
+  // Expired session = signed out FOR DISPLAY. Tokens carry exp (30d, two-factor-session.ts) and
+  // every destination rejects a dead one, so painting initials from a merely-PRESENT token told
+  // the user "you're signed in" while the click behind it said "sign in" (Joseph Boyd, 2026-10-25).
+  // Decode only — the signature is the server's business. Undecodable → let /me decide.
+  + 'function tokExpired(s){try{var p=b64json(String(s||"").split(".")[0]);return !!(p&&p.exp&&Number(p.exp)<Date.now());}catch(e){return false;}}'
   + 'var wrap=document.getElementById("mindyAcct");if(!wrap)return;'
   + 'var btn=document.getElementById("mindyAcctBtn"),menu=document.getElementById("mindyAcctMenu");'
   + 'var t=tok(),em=tokEmail();'
   + 'function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;"}[c];});}'
   + 'function initials(name,email){var n=(name||"").trim();if(n){var w=n.split(/\\s+/).filter(Boolean);if(w.length>=2)return (w[0][0]+w[1][0]).toUpperCase();return w[0][0].toUpperCase();}var local=((email||"").trim().split("@")[0]||"");var p=local.split(/[._-]+/).filter(Boolean);var a=p[0]?p[0][0]:local[0];if(!a)return "";var b=p[1]?p[1][0]:"";return (a+b).toUpperCase();}'
   + 'function ariaWho(name,email){var who=(name||"").trim()||((email||"").trim().split("@")[0]||"");return who?("Account menu, "+who):"Account menu";}'
-  + 'function paintSignedOut(){var out=document.getElementById("mindyAcctOut");if(out)out.style.display="none";btn.classList.add("mindy-acct-signin");btn.innerHTML="Log In";btn.setAttribute("title","Log in");btn.setAttribute("aria-label","Log in");btn.onclick=function(e){e.stopPropagation();if(typeof window.openSignInModal==="function"){window.openSignInModal("Log in to Mindy",function(){location.reload();});return;}location.href="/app?next="+encodeURIComponent(location.pathname+location.search);};}'
+  // Publish the session verdict for page scripts (Learn's "Free · sign in" label): "valid" only once
+  // /api/app/me has ACCEPTED the token, "signed-out" for none/expired/401. A late listener reads
+  // window.__mindySession. Display only — the server still verifies every call.
+  + 'function announce(s){window.__mindySession=s;try{document.dispatchEvent(new CustomEvent("mindy:session",{detail:s}));}catch(e){}}'
+  + 'function paintSignedOut(){announce("signed-out");menu.classList.remove("open");btn.setAttribute("aria-expanded","false");var hd0=document.getElementById("mindyAcctHd");if(hd0)hd0.style.display="none";var out=document.getElementById("mindyAcctOut");if(out)out.style.display="none";btn.classList.add("mindy-acct-signin");btn.innerHTML="Log In";btn.setAttribute("title","Log in");btn.setAttribute("aria-label","Log in");btn.onclick=function(e){e.stopPropagation();if(typeof window.openSignInModal==="function"){window.openSignInModal("Log in to Mindy",function(){location.reload();});return;}location.href="/app?next="+encodeURIComponent(location.pathname+location.search);};}'
   + 'function paintInitial(name,email){var ini=initials(name,email);if(!ini)return;btn.classList.remove("mindy-acct-signin");btn.innerHTML="<span class=\\"mindy-acct-ini\\">"+esc(ini)+"</span>";btn.setAttribute("title",name||email||"Account");btn.setAttribute("aria-label",ariaWho(name,email));}'
   + 'function renderAvatar(name,picture){paintInitial(name,em);if(!picture)return;var img=new Image();img.referrerPolicy="no-referrer";img.alt="";img.onload=function(){btn.innerHTML="";btn.appendChild(img);};img.onerror=function(){paintInitial(name,em);};img.src=picture;}'
   + 'function renderHeader(name){var hd=document.getElementById("mindyAcctHd");if(!hd)return;var nmEl=document.getElementById("mindyAcctNm"),emEl=document.getElementById("mindyAcctEm");if(name){nmEl.textContent=name;emEl.textContent=em;}else{nmEl.textContent=em;emEl.textContent="";}hd.style.display="block";}'
   // Logged OUT: labelled "Log In", no dropdown, no /me fetch. Gate on the TOKEN, not the
   // decoded email (Eric 2026-08-04: treating missing email as signed-out logged real users out).
-  + 'if(!t){paintSignedOut();return;}'
+  + 'if(!t||tokExpired(t)){paintSignedOut();return;}'
   + 'if(em){paintInitial("",em);renderHeader("");}'
   + 'var meHdrs={"x-mi-auth-token":t};if(em)meHdrs["x-user-email"]=em;'
-  + 'fetch("/api/app/me"+(em?("?email="+encodeURIComponent(em)):""),{credentials:"same-origin",headers:meHdrs}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d||!d.email)return;em=d.email;renderAvatar(d.name||"",d.picture||"");renderHeader(d.name||"");}).catch(function(){});'
+  + 'fetch("/api/app/me"+(em?("?email="+encodeURIComponent(em)):""),{credentials:"same-origin",headers:meHdrs}).then(function(r){if(r.status===401){paintSignedOut();return null;}return r.ok?r.json():null;}).then(function(d){if(!d||!d.email)return;announce("valid");em=d.email;renderAvatar(d.name||"",d.picture||"");renderHeader(d.name||"");}).catch(function(){});'
   // Usage-gated Proposals entry: reveal it only when the signed-in user isPro OR has
   // drafted before (approved display rule). One cheap probe (exact count + Pro resolve).
   // Fails silent — the entry just stays hidden, never a broken/dead link.

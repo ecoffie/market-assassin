@@ -22,6 +22,7 @@ import { Suspense, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { DECLARABLE_CERTIFICATIONS, describeWorkIssue, type CertificationAnswer } from '@/lib/profile/company-setup-input';
 import { postSignupPath } from '@/lib/mindy/post-signup-destination';
+import { signInHref } from '@/lib/mindy/sign-in-return';
 import { rankSuggestions, groundingLabel } from '@/lib/profile/suggestion-ranking';
 import type { SetupAction } from '@/lib/profile/company-setup-outcome';
 import { authedFetch, storedMIEmail } from '@/components/app/authHeaders';
@@ -35,6 +36,9 @@ function CompanySetupInner() {
   const [busy, setBusy] = useState(false);
   // A failed SAVE is shown, never turned into a redirect that looks like success.
   const [saveError, setSaveError] = useState<string | null>(null);
+  // A 401 save said "Sign in…" with nothing to click. Sign-in now returns to THIS page (and its
+  // own ?next=), so the user lands back here instead of on /app.
+  const [needsSignIn, setNeedsSignIn] = useState(false);
   // Screen 1's own problems (an unusable description, a lookup that failed). ALWAYS rendered —
   // the button is never silently disabled (2026-10-10: "Roofing" disabled it with no message).
   const [formError, setFormError] = useState<string | null>(null);
@@ -104,6 +108,7 @@ function CompanySetupInner() {
   const finish = async (action: SetupAction) => {
     setBusy(true);
     setSaveError(null);
+    setNeedsSignIn(false);
     try {
       // The route only writes the caller's OWN profile and takes strong auth, so the request
       // must NAME the account and carry its session token. It used to send neither: every
@@ -127,6 +132,7 @@ function CompanySetupInner() {
       // Skip saves nothing the user asked to keep, so it always moves on. A SAVE that did not
       // land stays on this screen and says so — moving on would read as success.
       if (!saved && action !== 'skip') {
+        setNeedsSignIn(!email || r?.status === 401);
         setSaveError(!email || r?.status === 401
           ? 'Sign in to save your selections — nothing was saved.'
           : 'We couldn\u2019t save your selections — nothing was saved. Please try again.');
@@ -314,6 +320,17 @@ function CompanySetupInner() {
             {saveError && (
               <p role="alert" className="mt-4 rounded-lg border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
                 {saveError}{' '}
+                {needsSignIn && (
+                  <>
+                    <a
+                      href={signInHref(typeof window === 'undefined' ? null : window.location.pathname + window.location.search)}
+                      className="font-semibold underline underline-offset-4"
+                    >
+                      Sign in
+                    </a>
+                    {' · '}
+                  </>
+                )}
                 <button onClick={leave} className="underline underline-offset-4">Continue without saving</button>
               </p>
             )}
