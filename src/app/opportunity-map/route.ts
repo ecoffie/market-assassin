@@ -45,6 +45,13 @@ const EMBED_CSS = '<style>html,body{height:100%!important;min-height:0!important
   + '.panel,.railbtn,.sbtoggle,.sb,.maptop{display:none!important}</style>';
 // Force Leaflet to re-measure once the iframe has its real size (else tiles render blank).
 const EMBED_JS = "<script>window.addEventListener('load',function(){[200,600,1200].forEach(function(t){setTimeout(function(){try{map.invalidateSize();fitView();}catch(e){}},t);});});</script>";
+// ⚠️ The popup CTA ("Review Opportunity →") calls `window.openOppDrawer&&openOppDrawer(nid)`.
+// DRAWER_JS ships on the NON-embed branch only, so inside the /today hero iframe that guard was
+// always false and the button silently did nothing (Kashif, 2026-10-26). The embed has no drawer
+// to open, so the CTA leaves the iframe for the full map on the RECORD link (?opp=<id> — the
+// typed address Share/Favorites already use; never profile filters). `top` so the visitor lands
+// on the real map, not a map nested inside the home page.
+const EMBED_CTA_JS = "<script>if(!window.openOppDrawer){window.openOppDrawer=function(id){if(!id)return;var u='/opportunity-map?opp='+encodeURIComponent(id);try{window.top.location.href=u;}catch(e){window.location.href=u;}};}</script>";
 
 // Our set-aside group key → the token the prototype's setKey()/cardHTML expect.
 const SET_TO_EVC: Record<string, string> = {
@@ -11004,7 +11011,7 @@ export async function GET(request: NextRequest) {
     // lonely dots, which reads as "they don't have much data" — the exact opposite of true. The
     // same map zoomed to one metro shows 734 with dollar values. The hero on /today was showing
     // the empty version to every visitor.
-    html = repl(html, '</body>', BOOT_VIEW_JS + EMBED_JS + '</body>');
+    html = repl(html, '</body>', BOOT_VIEW_JS + EMBED_JS + EMBED_CTA_JS + '</body>');
     // BOOT_VIEW_JS carries five `__PLACEHOLDER__` tokens that the non-embed branch substitutes.
     // Shipping the script without them emits `window.__STATE_CENTROIDS=__STATE_CENTROIDS__` —
     // a SyntaxError that kills the entire boot script silently, so the cascade never runs and the
