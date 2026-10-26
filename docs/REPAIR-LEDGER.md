@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-26 — Home-page map: "Review Opportunity" did nothing (Kashif, #1897)
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-26 | Home (/today) embedded Map / popup CTA | Report: on getmindy.ai home, clicking **Review Opportunity →** in a map popup did nothing. `/today` embeds `/opportunity-map?embed=1`; the popup CTA is `onclick="window.openOppDrawer&&openOppDrawer(nid)"`, but `DRAWER_JS` ships on the NON-embed branch only, so inside the iframe the guard was always false and the click silently no-op'd (same class as the embed's earlier silent `typeof` fallbacks). Embed-only `EMBED_CTA_JS` defines a fallback `openOppDrawer(id)` that sends the TOP window to the record link `/opportunity-map?opp=<id>`; never overrides a real drawer; empty id = no-op. Non-embed output unchanged. | `const EMBED_CTA_JS =` → `src/app/opportunity-map/route.ts` | `embed-popup-cta.unit.test.ts` (5); all 120 map test files / 1,302 tests; tsc clean; pre-push gate passed (warn-only: unrelated players oracle + lookup_solicitation live tests); CI `verify` pass; preview served the shim. **Production (real Chrome, getmindy.ai, serving `maps-account-build:827ce0f4`):** /today → pin near Lincoln NE opened its popup (ordinary pin click OK) → Review Opportunity → top URL `/opportunity-map?opp=37a5b7df3e7b42bfb41b04372277738f`, drawer matched the pin's record exactly (title "Notice of Intent to Sole Source - Telecommunications Analysis Software Support", Homeland Security, due Oct 26 2026, Lincoln NE, sol 192127VHQ6XXX0001). Full map: real drawer present, shim absent; Omaha pin popup → Review Opportunity opened the drawer IN PLACE, URL stayed `/opportunity-map` (unchanged). Share: copied `?opp=…&src=share&sh=…` → opened the same "Cooling Water System Repair…" drawer. Saved: "NCFI Forklifts" card → `?opp=` → correct drawer (Homeland Security, due Jul 29 2026). | ✅ LIVE — merged 827ce0f4 (#1897), prod-accepted 2026-10-26 |
+
 ## 2026-10-25 — Learn sign-in: actionable label, honest header, return to the tutorial (Joseph Boyd, fix #2)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
