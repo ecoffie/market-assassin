@@ -4,10 +4,17 @@
  * Lets us seed + inspect credit balances before the Stripe top-up (Slice 4) exists,
  * so Slice 3 is testable on its own.
  *   GET  ?email=E            → { email, balance }
- *   POST { email, amount }   → grant `amount` credits (reason 'admin_grant')
+ *   POST { email, amount }   → amount > 0: grant (reason 'admin_grant')
+ *                               amount < 0: debit |amount| (reason 'admin_debit'),
+ *                               409 if the balance can't cover it
+ *
+ * A negative amount must go through the debit RPC: `mcp_grant_credits` treats
+ * p_amount <= 0 as a no-op and returns the current balance, so routing a negative
+ * through it reported success while changing nothing (2026-10-27, a goodwill
+ * reversal that silently didn't happen).
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { getBalance, grantCredits } from '@/lib/mcp/credits';
+import { debitCredits, getBalance, grantCredits } from '@/lib/mcp/credits';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -38,7 +45,23 @@ export async function POST(req: NextRequest) {
   if (!email || !Number.isFinite(amount) || (amount as number) === 0) {
     return NextResponse.json({ error: 'email and non-zero numeric amount required' }, { status: 400 });
   }
+  if (!Number.isInteger(amount)) {
+    return NextResponse.json({ error: 'amount must be a whole number of credits' }, { status: 400 });
+  }
   try {
+    if ((amount as number) < 0) {
+      const { ok, newBalance } = await debitCredits(email, -(amount as number), {
+        reason: 'admin_debit',
+        toolName: 'admin_debit',
+      });
+      if (!ok) {
+        return NextResponse.json(
+          { error: 'insufficient balance — nothing debited', email: email.toLowerCase(), balance: newBalance },
+          { status: 409 },
+        );
+      }
+      return NextResponse.json({ success: true, email: email.toLowerCase(), debited: -(amount as number), balance: newBalance });
+    }
     const newBalance = await grantCredits(email, amount as number, 'admin_grant');
     return NextResponse.json({ success: true, email: email.toLowerCase(), granted: amount, balance: newBalance });
   } catch (err) {
