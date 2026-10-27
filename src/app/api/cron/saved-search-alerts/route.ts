@@ -41,7 +41,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { applyMapFilters, parseMapFilters } from '@/lib/opportunities/map-filters';
+import { applyMapFilters, multiVal, parseMapFilters } from '@/lib/opportunities/map-filters';
 import { sendEmail } from '@/lib/send-email';
 import { savedSearchWantsOpen } from '@/lib/saved-searches/alert-scope';
 import type { SavedSearchMode } from '@/lib/saved-searches/constants';
@@ -131,6 +131,22 @@ function wantsForecasts(s: SavedSearch): boolean {
 }
 
 /**
+ * A stored filter value as the string applyForecastFilters expects.
+ *
+ * Saved searches written by the MCP/agent path store lists as JSON ARRAYS (`naics: ['492110', …]`), while
+ * the map stores comma-separated strings. applyForecastFilters calls `.trim()`, so an array threw, the whole
+ * search was reported as forecast_query_failed and never stamped (bcfb5381, every Monday from 2026-10-19).
+ * The Open half already accepts both shapes. Strings pass through UNCHANGED, so existing searches keep their
+ * exact semantics. An array is joined via multiVal, so it builds the same query as its comma-separated twin.
+ * Any other shape becomes "no filter on that field" rather than a throw (same rule as multiVal).
+ */
+function forecastFilterValue(v: unknown): string | null {
+  if (typeof v === 'string') return v;
+  if (Array.isArray(v)) return multiVal(v).join(',') || null;
+  return null;
+}
+
+/**
  * Forecast rows matching a saved search's filters.
  *
  * ⚠️ NO map_lat FILTER. This is the whole point: 14,389 of 33,075 forecasts
@@ -141,10 +157,11 @@ function wantsForecasts(s: SavedSearch): boolean {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function fetchForecastMatches(db: any, s: SavedSearch): Promise<ForecastRowForAlert[]> {
-  const f = (s.filters || {}) as Record<string, string>;
+  const f = (s.filters || {}) as Record<string, unknown>;
   let q = db.from('agency_forecasts').select(FORECAST_COLS).limit(200);
   q = applyForecastFilters(q, {
-    q: f.q ?? null, naics: f.naics ?? null, agency: f.agency ?? null, state: f.state ?? null,
+    q: forecastFilterValue(f.q), naics: forecastFilterValue(f.naics),
+    agency: forecastFilterValue(f.agency), state: forecastFilterValue(f.state),
   });
   const { data, error } = await q.order('last_synced_at', { ascending: false });
   if (error) {
