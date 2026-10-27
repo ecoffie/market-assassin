@@ -15,7 +15,7 @@
  *   2. SAM cache read (sample one user's filtered opportunities)
  *   3. Mindy Insights — calls getInsightForNoticeType for all 5 buckets
  *      (this is the test the May 28 outage would have failed)
- *   4. Resend / Office365 — checks env vars + tries a no-op send
+ *   4. Resend — checks the API key is configured (the only Mindy email provider)
  *   5. Email template renders for a sample user
  *
  * Stage 3 alone would have caught the May 28 regression: insights
@@ -118,10 +118,10 @@ export async function GET(request: NextRequest) {
 
   // ---- Stage 4: Email provider env vars ----
   results.push(await timed('email.config', async () => {
-    const hasResend = !!process.env.RESEND_API_KEY;
-    const hasOffice = !!(process.env.OFFICE365_USER && process.env.OFFICE365_PASSWORD);
-    if (!hasResend && !hasOffice) throw new Error('neither RESEND_API_KEY nor OFFICE365 creds are set');
-    return { resend: hasResend, office365: hasOffice };
+    // Resend is the only Mindy email provider (no Office365 fallback since 2026-10-27), so a
+    // missing key means no alert email can go out at all.
+    if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is not set (Resend is the only Mindy email provider)');
+    return { resend: true };
   }));
 
   // ---- Stage 5: bucketNoticeType handles unknown gracefully ----

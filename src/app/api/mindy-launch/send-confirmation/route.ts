@@ -2,7 +2,7 @@
  * POST /api/mindy-launch/send-confirmation
  *
  * Sends the Mindy Free Live Launch confirmation (save-the-date) through the
- * guarded Mindy sendEmail() path — Resend → Office365 as alerts@govcongiants.com,
+ * guarded Mindy sendEmail() path — Resend only, from mail.getmindy.ai (no fallback),
  * with suppression + deliverability tracking. This is the SEND owner; govcongiants.com
  * funnels (/api/lead, source=mindy-launch) calls it after recording the signup.
  *
@@ -13,11 +13,11 @@
  * HTTP code alone (this used to answer 200 `{ ok: false }` for a blocked send):
  *   200 { ok: true,  status: 'accepted', provider, providerMessageId }  a provider accepted it
  *   422 { ok: false, status: 'blocked', reason }                         guard stopped it; nothing sent
- *   502 { ok: false, status: 'failed', error }                           every provider explicitly rejected it
- *   500 { ok: false, status: 'unconfirmed', error? }                     a provider MAY have accepted it
- *                                                                        (no response, 5xx, dropped connection)
- * Acceptance is not delivery. Within one request an unknown Resend outcome never falls
- * back to Office365, so this endpoint makes at most one send attempt that could succeed.
+ *   502 { ok: false, status: 'failed', error }                           Resend explicitly rejected it (4xx)
+ *   500 { ok: false, status: 'unconfirmed', error? }                     Resend MAY have accepted it
+ *                                                                        (no response, 5xx, SDK throw)
+ * Acceptance is not delivery. There is no second provider, so this endpoint makes exactly
+ * one send attempt per request.
  * There is no idempotency store across requests: a caller must NOT retry a request whose
  * outcome it didn't see.
  */

@@ -21,8 +21,8 @@ import { createClient } from '@supabase/supabase-js';
 
 // IMPORTANT: send-email.ts builds its Resend client from RESEND_API_KEY at
 // MODULE-LOAD time. A static `import` is hoisted ABOVE dotenv.config(), so the
-// key would be undefined → resend=null → it falls through to SMTP (no local
-// creds) and fails. Load it DYNAMICALLY inside main(), after dotenv has run.
+// key would be undefined → resend=null → sendEmail throws (there is no fallback
+// provider). Load it DYNAMICALLY inside main(), after dotenv has run.
 type SendEmailFn = (p: { to: string; subject: string; html: string; from?: string; replyTo?: string; emailType?: string; eventSource?: string }) => Promise<unknown>;
 let sendEmail: SendEmailFn;
 
@@ -39,8 +39,8 @@ const COHORT = 'beta_preview_v1_extension';
 const CONCURRENCY = 4;            // gentle — protect domain reputation
 const PER_SEND_DELAY_MS = 250;
 // Beta emails send from the verified getmindy.ai Resend domain ONLY. This is a
-// per-send override — it does NOT change the global EMAIL_FROM that the daily
-// alerts depend on (alerts@govcongiants.com via Office365). Scoped + safe.
+// per-send override — it does NOT change the global EMAIL_FROM (Mindy
+// <alerts@mail.getmindy.ai>) that the daily alerts use. Scoped + safe.
 const BETA_FROM = 'Mindy <hello@mail.getmindy.ai>';
 // mail.getmindy.ai SENDS (Resend) but has no inbox. Replies route to the real
 // hello@getmindy.ai Google Group (shared inbox, Annelle monitors). So a recipient

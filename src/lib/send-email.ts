@@ -1,10 +1,12 @@
-import nodemailer from 'nodemailer';
 import { assertNoLegacyDestinations } from '@/lib/email/legacy-destination-guard';
 import { Resend } from 'resend';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { createSecureAccessUrl } from '@/lib/access-links';
 
-// Primary: Resend (more reliable)
+// Resend is the ONLY Mindy product-email provider. There is no fallback: the old
+// Office365 SMTP fallback authenticated as a govcongiants.com mailbox, so a Resend
+// failure silently moved Mindy mail onto another company's domain (last fired
+// 2026-08-03, 27 profile_reminder sends). A Resend failure now throws.
 const resendApiKey = process.env.RESEND_API_KEY?.replace(/\\n$/, '').trim();
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
@@ -20,19 +22,9 @@ function getSupabase() {
   return _supabase;
 }
 
-// Fallback: Office365 SMTP
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.office365.com',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER || 'alerts@govcongiants.com',
-    pass: process.env.SMTP_PASSWORD,
-  },
-});
-
 /**
- * Generic email sending function - uses Resend as primary, Office365 as fallback
+ * Generic email sending function - Resend only. A provider failure throws; it never
+ * changes the sender domain.
  */
 interface SendEmailParams {
   to: string;
@@ -61,30 +53,72 @@ interface SendEmailParams {
   onBlocked?: (reason: string) => void;
   /**
    * Called once a provider has ACCEPTED the message (the only case sendEmail returns true),
-   * with which provider took it and its message id when the provider gives one (Resend does;
-   * Office365 SMTP returns its own Message-ID). Acceptance is not delivery — bounces arrive
+   * with which provider took it and its message id. Acceptance is not delivery — bounces arrive
    * later through the Resend webhook. Callers that must report what actually happened read it
    * here; `true` alone cannot say which provider, or prove which message.
    */
-  onSent?: (info: { provider: 'resend' | 'office365'; providerMessageId: string | null }) => void;
+  onSent?: (info: { provider: 'resend'; providerMessageId: string | null }) => void;
   /**
    * Opt-in for callers that must report exactly what happened (the Mindy Launch confirmation).
    * Default false keeps today's behaviour for every other stream.
    *
    * When true: if Resend's outcome is UNKNOWN — no response (network error, timeout, lost
-   * response) or a 5xx — sendEmail does NOT fall back to Office365, because Resend may already
-   * have accepted the message and the fallback would send a second copy. It throws
-   * EmailOutcomeUnknownError instead. An explicit Resend rejection (4xx, e.g. validation or rate
-   * limit) still falls back: Resend definitely did not take it. An Office365 failure with no SMTP
-   * reply code is also unknown (the connection may have dropped after the server took it).
+   * response) or a 5xx — sendEmail throws EmailOutcomeUnknownError, because Resend may already
+   * have accepted the message. An explicit Resend rejection (4xx, e.g. validation or rate limit)
+   * throws a plain Error: Resend definitely did not take it. Without strictOutcome every Resend
+   * failure throws a plain Error.
    */
   strictOutcome?: boolean;
 }
 
+/**
+ * The only domain Mindy product email may be sent FROM: the Resend-verified sending domain.
+ * Verified 2026-10-27 against Resend's domain list (mail.getmindy.ai = verified; nothing else
+ * we own is). Any other sender, and *@govcongiants.com in particular, is refused before the
+ * provider call, so a stray EMAIL_FROM or caller override can never put Mindy mail on another
+ * company's domain.
+ */
+export const MINDY_SENDER_DOMAINS: ReadonlySet<string> = new Set(['mail.getmindy.ai']);
+
+/** Domain of a From header (`Name <a@b.c>` or `a@b.c`), lowercased; null if unparseable. */
+export function senderDomain(fromAddress: string): string | null {
+  const addr = (fromAddress.match(/<([^>]+)>/)?.[1] ?? fromAddress).trim();
+  const at = addr.lastIndexOf('@');
+  if (at < 1 || at === addr.length - 1) return null;
+  return addr.slice(at + 1).toLowerCase();
+}
+
+/** Thrown when a send would use a From domain outside MINDY_SENDER_DOMAINS. Nothing is sent. */
+export class UnapprovedSenderError extends Error {
+  readonly fromAddress: string;
+  constructor(fromAddress: string) {
+    super(`refusing to send: From "${fromAddress}" is not an approved Mindy sender domain (${[...MINDY_SENDER_DOMAINS].join(', ')})`);
+    this.name = 'UnapprovedSenderError';
+    this.fromAddress = fromAddress;
+  }
+}
+
+/**
+ * Thrown when Resend returns an error and the message definitely was not sent (or, without
+ * `strictOutcome`, for every Resend error). Carries Resend's status + error name so callers can
+ * tell a bad recipient (422 "Invalid `to` field") from an outage without parsing a string.
+ */
+export class ResendSendError extends Error {
+  readonly provider = 'resend' as const;
+  readonly statusCode: number | null;
+  readonly resendName: string | null;
+  constructor(statusCode: number | null, resendName: string | null, detail: string) {
+    super(`Resend send failed${statusCode ? ` (${statusCode})` : ''}: ${detail}`);
+    this.name = 'ResendSendError';
+    this.statusCode = statusCode;
+    this.resendName = resendName;
+  }
+}
+
 /** Thrown only under `strictOutcome`: a provider may or may not have accepted the message. */
 export class EmailOutcomeUnknownError extends Error {
-  readonly provider: 'resend' | 'office365';
-  constructor(provider: 'resend' | 'office365', detail: string) {
+  readonly provider: 'resend';
+  constructor(provider: 'resend', detail: string) {
     super(`outcome unknown at ${provider}: ${detail}`);
     this.name = 'EmailOutcomeUnknownError';
     this.provider = provider;
@@ -99,12 +133,6 @@ export class EmailOutcomeUnknownError extends Error {
 export function resendErrorIsExplicitRejection(error: { statusCode?: number | null } | null | undefined): boolean {
   const code = error?.statusCode;
   return typeof code === 'number' && code >= 400 && code < 500;
-}
-
-/** nodemailer sets `responseCode` when the SMTP server replied with an error. No reply → unknown. */
-function smtpErrorIsExplicitRejection(error: unknown): boolean {
-  const code = (error as { responseCode?: unknown } | null)?.responseCode;
-  return typeof code === 'number' && code >= 400;
 }
 
 // Transactional emailTypes that ALWAYS bypass the cap/suppression — an EXPLICIT
@@ -275,7 +303,7 @@ async function recordProviderSend({
   metadata,
   status,
 }: {
-  provider: 'resend' | 'office365';
+  provider: 'resend';
   providerMessageId?: string | null;
   to: string;
   subject: string;
@@ -290,8 +318,8 @@ async function recordProviderSend({
     // idx_eps_provider_msg is PARTIAL (WHERE provider_message_id IS NOT NULL),
     // and PostgREST's onConflict cannot target a partial index — so the old
     // upsert threw 42P10 for every Resend send (which always has a message id)
-    // and the catch below silently dropped the row. Only Office365 rows (null
-    // message id → no onConflict) ever recorded. A plain insert records both;
+    // and the catch below silently dropped the row. Only the (since-removed)
+    // Office365 fallback rows ever recorded. A plain insert records both;
     // the partial unique index still rejects a true duplicate (same
     // provider+message_id), which lands in the catch as a harmless no-op.
     await getSupabase()
@@ -307,7 +335,7 @@ async function recordProviderSend({
         metadata: metadata || {},
         status,
         sent_at: new Date().toISOString(),
-      });
+    });
   } catch (error) {
     console.error('[SendEmail] Failed to record provider send:', error);
   }
@@ -356,90 +384,72 @@ export async function sendEmail({
   // (reply-to hello@getmindy.ai) is sent via GHL, not this path.
   const replyToAddress = replyTo || process.env.EMAIL_REPLY_TO || 'support@getmindy.ai';
 
-  // Try Resend first (primary)
-  if (resend) {
-    try {
-      const resendTags = toResendTags(tags);
-      const { data, error } = await resend.emails.send({
-        from: fromAddress,
-        to: [to],
-        replyTo: replyToAddress,
-        subject,
-        html,
-        text: text || html.replace(/<[^>]*>/g, ''),
-        tags: resendTags.length > 0 ? resendTags : undefined,
-        headers: {
-          'X-GCG-Email-Type': sanitizeResendTagValue(emailType || 'general'),
-          'X-GCG-Event-Source': sanitizeResendTagValue(eventSource || 'general'),
-        },
-      });
-
-      if (error) {
-        console.error(`[SendEmail] Resend error for ${to}:`, error);
-        if (strictOutcome && !resendErrorIsExplicitRejection(error as { statusCode?: number | null })) {
-          // Resend may have accepted it; an Office365 fallback could send a second copy.
-          throw new EmailOutcomeUnknownError('resend', `${(error as { statusCode?: number | null }).statusCode ?? 'no response'}: ${error.message}`);
-        }
-        throw new Error(error.message);
-      }
-
-      await recordProviderSend({
-        provider: 'resend',
-        providerMessageId: data?.id,
-        to,
-        subject,
-        emailType,
-        eventSource,
-        tags,
-        metadata,
-        status: 'sent',
-      });
-
-      console.log(`[SendEmail] ✅ Sent via Resend to ${to}: ${subject}`);
-      try { onSent?.({ provider: 'resend', providerMessageId: data?.id ?? null }); } catch { /* reporting must never turn a send into a throw */ }
-      return true;
-    } catch (resendError: unknown) {
-      const message = resendError instanceof Error ? resendError.message : String(resendError);
-      if (resendError instanceof EmailOutcomeUnknownError) {
-        console.error(`[SendEmail] Resend outcome unknown for ${to}; NOT falling back (could duplicate):`, message);
-        throw resendError;
-      }
-      console.error(`[SendEmail] Resend failed, trying Office365 fallback:`, message);
-    }
+  // Sender isolation: refuse any From outside the verified Mindy domain BEFORE any provider
+  // call. Definite non-send, so a plain error (never "outcome unknown").
+  const domain = senderDomain(fromAddress);
+  if (!domain || !MINDY_SENDER_DOMAINS.has(domain)) {
+    console.error(`[SendEmail] ❌ unapproved sender "${fromAddress}" for ${to}; not sending`);
+    throw new UnapprovedSenderError(fromAddress);
   }
 
-  // Fallback to Office365 SMTP
+  // Resend is the only provider. No API key = a definite non-send: fail loudly rather
+  // than reaching for another transport (or another company's domain).
+  if (!resend) {
+    console.error(`[SendEmail] ❌ RESEND_API_KEY not configured; not sending to ${to}`);
+    throw new Error('Email provider unavailable: RESEND_API_KEY is not configured (Mindy has no fallback sender)');
+  }
+
+  const resendTags = toResendTags(tags);
+  let sendResult: Awaited<ReturnType<typeof resend.emails.send>>;
   try {
-    const smtpInfo = await transporter.sendMail({
+    sendResult = await resend.emails.send({
       from: fromAddress,
-      to,
+      to: [to],
       replyTo: replyToAddress,
       subject,
       html,
       text: text || html.replace(/<[^>]*>/g, ''),
+      tags: resendTags.length > 0 ? resendTags : undefined,
+      headers: {
+        'X-GCG-Email-Type': sanitizeResendTagValue(emailType || 'general'),
+        'X-GCG-Event-Source': sanitizeResendTagValue(eventSource || 'general'),
+      },
     });
-
-    await recordProviderSend({
-      provider: 'office365',
-      to,
-      subject,
-      emailType,
-      eventSource,
-      tags,
-      metadata,
-      status: 'sent',
-    });
-
-    console.log(`[SendEmail] ✅ Sent via Office365 to ${to}: ${subject}`);
-    try { onSent?.({ provider: 'office365', providerMessageId: smtpInfo?.messageId ?? null }); } catch { /* reporting must never turn a send into a throw */ }
-    return true;
-  } catch (error) {
-    console.error(`[SendEmail] ❌ Both providers failed for ${to}:`, error);
-    if (strictOutcome && !smtpErrorIsExplicitRejection(error)) {
-      throw new EmailOutcomeUnknownError('office365', error instanceof Error ? error.message : String(error));
-    }
-    throw error;
+  } catch (thrown) {
+    // SDK 6.x reports failures as `{ error }` rather than throwing, so a throw here is
+    // unexpected and we cannot tell whether Resend took the message.
+    const detail = thrown instanceof Error ? thrown.message : String(thrown);
+    console.error(`[SendEmail] ❌ Resend threw for ${to} (no fallback):`, detail);
+    if (strictOutcome) throw new EmailOutcomeUnknownError('resend', `threw: ${detail}`);
+    throw thrown;
   }
+  const { data, error } = sendResult;
+
+  if (error) {
+    const status = (error as { statusCode?: number | null }).statusCode;
+    console.error(`[SendEmail] ❌ Resend failed for ${to} (no fallback):`, error);
+    if (strictOutcome && !resendErrorIsExplicitRejection(error as { statusCode?: number | null })) {
+      // Resend may have accepted it; the caller must not report failed or retry blindly.
+      throw new EmailOutcomeUnknownError('resend', `${status ?? 'no response'}: ${error.message}`);
+    }
+    throw new ResendSendError(status ?? null, (error as { name?: string }).name ?? null, error.message);
+  }
+
+  await recordProviderSend({
+    provider: 'resend',
+    providerMessageId: data?.id,
+    to,
+    subject,
+    emailType,
+    eventSource,
+    tags,
+    metadata,
+    status: 'sent',
+  });
+
+  console.log(`[SendEmail] ✅ Sent via Resend to ${to}: ${subject}`);
+  try { onSent?.({ provider: 'resend', providerMessageId: data?.id ?? null }); } catch { /* reporting must never turn a send into a throw */ }
+  return true;
 }
 
 interface SendAccessCodeEmailParams {

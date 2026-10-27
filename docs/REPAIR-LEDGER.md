@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-10-27 — Mindy sender isolation: Resend only, no govcongiants.com path
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-10-27 | Email / sendEmail sender isolation | `sendEmail()` fell back to Office 365 SMTP (authenticated as a govcongiants.com mailbox) whenever Resend failed, so Mindy mail could leave on another company's domain. It last fired 2026-08-03 (27 `profile_reminder` rows, `email_provider_sends.provider='office365'`). Two manual scripts (`send-profile-setup-emails`, `send-market-intel-samples`) also built their own Office 365 transport as `alerts@govcongiants.com`; the sender gate never scanned `scripts/`. Fix: the fallback is removed (Resend failure throws `ResendSendError`, or `EmailOutcomeUnknownError` under `strictOutcome`; no key throws); `sendEmail` refuses any From outside `mail.getmindy.ai` (`UnapprovedSenderError`, before the provider call, transactional included); both scripts send via `sendEmail`; signup still maps a Resend 422 invalid `to` to the 400 mistyped-address answer; `pursuit-changes` catches per recipient so one rejection cannot stop the digest; `audit-email-sender.mjs` is zero-exception over `src/` + `scripts/` and also blocks any `@govcongiants.com` From. | `MINDY_SENDER_DOMAINS` → `src/lib/send-email.ts` · `UnapprovedSenderError` → `src/lib/send-email.ts` · `govcongiants-from` → `scripts/audit-email-sender.mjs` · `emailsFailed` → `src/app/api/cron/pursuit-changes/route.ts` | `send-email.sender-isolation.unit.test.ts` 14/14 (red against main: 16 failures incl. the confirmation suite); confirmation-outcome 10/10; full unit suite 10,482 passed; tsc clean; `next build` OK; sender gate exit 0 on branch, exit 1 on main (10 transport + 3 govcongiants-From hits). Resend API 2026-10-27: last 100 sends all `Mindy <alerts@mail.getmindy.ai>`; only `mail.getmindy.ai` verified. | PR OPEN |
+
 ## 2026-10-26 — Home-page map: "Review Opportunity" did nothing (Kashif, #1897)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
