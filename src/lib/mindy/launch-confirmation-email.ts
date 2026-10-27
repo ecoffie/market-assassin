@@ -4,11 +4,10 @@ import { MINDY_DAY } from '@/lib/mindy/mindy-day';
 /**
  * Mindy Free Live Launch confirmation — see MINDY_DAY for the current date/time.
  *
- * Sent through the GUARDED sendEmail() (Resend → Office365 fallback) FROM the
- * Resend-verified mail.getmindy.ai domain so it actually lands in the inbox. NOTE:
- * govcongiants.com is NOT verified in Resend (status=failed) — sending as
- * alerts@govcongiants.com 403s at Resend and silently falls back to Office365 SMTP,
- * which fails the domain's SPF/DKIM and gets dropped/spam-filtered by Gmail.
+ * Sent through the GUARDED sendEmail() (Resend only, no fallback) FROM the
+ * Resend-verified mail.getmindy.ai domain so it actually lands in the inbox.
+ * govcongiants.com is NOT a Mindy sender: sendEmail refuses any From outside
+ * mail.getmindy.ai (UnapprovedSenderError) before calling the provider.
  * It gets suppression-list + deliverability tracking like every other Mindy stream.
  * Marked transactional:
  * it's a confirmation the registrant expects in direct response to signing up, so it
@@ -24,15 +23,14 @@ import { MINDY_DAY } from '@/lib/mindy/mindy-day';
  * Facts verified from govcongiants.com/mindy-launch.
  */
 /**
- * What happened to one confirmation. `accepted` means a provider took the message
- * (Resend or Office365) — not that it was delivered. `blocked` means the send guard
- * stopped it before any provider call, so nothing was sent. A provider failure is
- * not a return value: sendEmail throws — EmailOutcomeUnknownError when a provider may
- * have accepted it (no response, 5xx, dropped SMTP connection), a plain Error when every
- * provider explicitly rejected it.
+ * What happened to one confirmation. `accepted` means Resend took the message — not
+ * that it was delivered. `blocked` means the send guard stopped it before any provider
+ * call, so nothing was sent. A provider failure is not a return value: sendEmail throws —
+ * EmailOutcomeUnknownError when Resend may have accepted it (no response, 5xx, SDK throw),
+ * a ResendSendError when Resend explicitly rejected it (4xx).
  */
 export type MindyLaunchConfirmationOutcome =
-  | { status: 'accepted'; provider: 'resend' | 'office365'; providerMessageId: string | null }
+  | { status: 'accepted'; provider: 'resend'; providerMessageId: string | null }
   | { status: 'blocked'; reason: string }
   | { status: 'unconfirmed' }; // sendEmail returned true without reporting a provider — should not happen
 
@@ -267,7 +265,7 @@ export async function sendMindyLaunchConfirmationEmail(params: {
 
   // Callbacks fire inside sendEmail; a holder object keeps TypeScript from narrowing to null.
   const report: {
-    sent?: { provider: 'resend' | 'office365'; providerMessageId: string | null };
+    sent?: { provider: 'resend'; providerMessageId: string | null };
     blockedReason?: string;
   } = {};
   const ok = await sendEmail({
@@ -279,8 +277,8 @@ export async function sendMindyLaunchConfirmationEmail(params: {
     eventSource: 'mindy_launch',
     transactional: true, // confirmation in direct response to signup — always deliver
     tags: { stream: 'mindy_launch' },
-    // One confirmation per request: never let an unknown Resend outcome fall back to
-    // Office365 (that could send a second copy). Unknown → EmailOutcomeUnknownError.
+    // One confirmation per request: an unknown Resend outcome must be reported as
+    // unconfirmed, never failed (a retry could send a second copy). → EmailOutcomeUnknownError.
     strictOutcome: true,
     onSent: (info) => { report.sent = info; },
     onBlocked: (reason) => { report.blockedReason = reason; },

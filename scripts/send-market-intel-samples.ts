@@ -1,16 +1,24 @@
-const nodemailer = require('nodemailer');
+#!/usr/bin/env tsx
+/**
+ * Send the Weekly Deep Dive + Pursuit Brief sample previews (for screenshots) to one inbox.
+ *
+ *   npx tsx scripts/send-market-intel-samples.ts            # sends to the default address
+ *   npx tsx scripts/send-market-intel-samples.ts --to=a@b.c # sends to another address
+ *
+ * Sends through the shared sendEmail() (Resend, from Mindy <alerts@mail.getmindy.ai>).
+ * This script used to build its own Office365 transport and send as
+ * "GovCon Giants AI" <alerts@govcongiants.com>; Mindy mail never goes out on govcongiants.com
+ * (sender isolation, 2026-10-27).
+ */
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
 
-const to = 'evankoffdev@gmail.com';
+// send-email.ts builds its Resend client at module load; import it after dotenv (see main()).
+type SendEmailFn = (p: {
+  to: string; subject: string; html: string; text?: string; emailType?: string; eventSource?: string; transactional?: boolean;
+}) => Promise<boolean>;
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.office365.com',
-  port: parseInt(process.env.SMTP_PORT || '587', 10),
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER || 'alerts@govcongiants.com',
-    pass: process.env.SMTP_PASSWORD,
-  },
-});
+const to = process.argv.find((a) => a.startsWith('--to='))?.slice(5) || 'evankoffdev@gmail.com';
 
 function weeklyHtml() {
   return `<!DOCTYPE html>
@@ -239,21 +247,19 @@ function pursuitHtml() {
 }
 
 async function main() {
-  await transporter.sendMail({
-    from: `"GovCon Giants AI" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
-    to,
-    subject: '📊 Weekly Deep Dive - Sample Preview for Screenshots',
-    html: weeklyHtml(),
-    text: 'Weekly Deep Dive sample preview for screenshots.',
-  });
+  if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY not found in environment (.env.local)');
+  const { sendEmail } = (await import('../src/lib/send-email')) as unknown as { sendEmail: SendEmailFn };
 
-  await transporter.sendMail({
-    from: `"GovCon Giants AI" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
-    to,
-    subject: '🎯 Pursuit Brief - Sample Preview for Screenshots',
-    html: pursuitHtml(),
-    text: 'Pursuit Brief sample preview for screenshots.',
-  });
+  // transactional: a one-off internal preview to our own inbox, not a campaign; it must not be
+  // eaten by the per-recipient daily cap. sendEmail throws if Resend rejects it.
+  const samples = [
+    { subject: '📊 Weekly Deep Dive - Sample Preview for Screenshots', html: weeklyHtml(), text: 'Weekly Deep Dive sample preview for screenshots.' },
+    { subject: '🎯 Pursuit Brief - Sample Preview for Screenshots', html: pursuitHtml(), text: 'Pursuit Brief sample preview for screenshots.' },
+  ];
+  for (const s of samples) {
+    const ok = await sendEmail({ to, ...s, emailType: 'market_intel_sample', eventSource: 'script:send-market-intel-samples', transactional: true });
+    if (!ok) throw new Error(`send blocked for ${to}: ${s.subject}`);
+  }
 
   console.log(`Sent weekly and pursuit preview samples to ${to}`);
 }

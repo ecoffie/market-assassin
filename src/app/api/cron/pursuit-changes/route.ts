@@ -385,6 +385,7 @@ export async function GET(request: NextRequest) {
 
   // Email each affected user a digest.
   let emailsSent = 0;
+  let emailsFailed = 0;
   let smsSent = 0;
   for (const [email, items] of changesByUser) {
     const rows = items.map(it => `
@@ -399,13 +400,22 @@ export async function GET(request: NextRequest) {
         ${rows}
         <p style="margin-top:18px"><a href="https://getmindy.ai/app" style="background:#7c3aed;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">Open My Pursuits →</a></p>
       </div>`;
-    const ok = await sendEmail({
-      to: email,
-      subject: `⚠️ ${items.reduce((n, it) => n + it.changes.length, 0)} update(s) on your tracked pursuits`,
-      html,
-      emailType: 'pursuit_change_alert',
-      eventSource: 'pursuit-changes-cron',
-    });
+    // sendEmail THROWS on a Resend failure (no fallback provider since 2026-10-27). Catch per
+    // recipient so one rejected address cannot stop the digest for everyone after it. Nothing is
+    // marked emailed on a throw, so the change rows stay emailed=false and the next run retries.
+    let ok = false;
+    try {
+      ok = await sendEmail({
+        to: email,
+        subject: `⚠️ ${items.reduce((n, it) => n + it.changes.length, 0)} update(s) on your tracked pursuits`,
+        html,
+        emailType: 'pursuit_change_alert',
+        eventSource: 'pursuit-changes-cron',
+      });
+    } catch (sendError) {
+      emailsFailed++;
+      console.error(`[pursuit-changes] email failed for ${email} (left emailed=false for retry):`, sendError instanceof Error ? sendError.message : sendError);
+    }
     if (ok) {
       emailsSent++;
       // Mark emailed only the rows for pursuits that were actually in this digest (a suppressed
@@ -447,11 +457,13 @@ export async function GET(request: NextRequest) {
   // skipped by the time budget. The dispatcher re-fires until remaining hits 0.
   const remainingThisRun = remaining + (pursuits.length - processed);
   return NextResponse.json({
-    success: true,
+    // A failed send is not success: the run reports it rather than claiming a clean pass.
+    success: emailsFailed === 0,
     totalMonitorable,
     processed,
     changes: totalChanges,
     emailsSent,
+    emailsFailed,
     smsSent,
     suppressedNotifications,
     remaining: remainingThisRun,

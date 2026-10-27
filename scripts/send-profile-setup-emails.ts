@@ -1,54 +1,41 @@
-#!/usr/bin/env node
+#!/usr/bin/env tsx
 /**
  * Send Profile Setup Emails (Drip Campaign)
  *
  * Usage:
- *   node scripts/send-profile-setup-emails.js --dry-run     # Preview only
- *   node scripts/send-profile-setup-emails.js --limit=2000  # Send up to 2000
- *   node scripts/send-profile-setup-emails.js               # Default: 2000/run
+ *   npx tsx scripts/send-profile-setup-emails.ts --dry-run     # Preview only
+ *   npx tsx scripts/send-profile-setup-emails.ts --limit=2000  # Send up to 2000
+ *   npx tsx scripts/send-profile-setup-emails.ts               # Default: 2000/run
  *
  * Sends profile setup emails to bootcamp enrollees who haven't set up their profiles.
  * Run daily for 4-5 days to complete the 8K user drip.
+ *
+ * Sends through the shared sendEmail() (Resend, from Mindy <alerts@mail.getmindy.ai>), so the
+ * suppression list and per-recipient daily cap apply. This script used to build its own
+ * Office365 transport and send as "GovCon Giants" <alerts@govcongiants.com>; Mindy mail never
+ * goes out on govcongiants.com (sender isolation, 2026-10-27). A send the guard blocks is
+ * counted as blocked and NOT stamped invitation_sent_at, so it is not recorded as delivered.
  */
 
-const fs = require('fs');
-const path = require('path');
-const nodemailer = require('nodemailer');
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
 
-// Load environment variables from .env.local file
-const envPath = path.join(__dirname, '../.env.local');
-if (fs.existsSync(envPath)) {
-  const envContent = fs.readFileSync(envPath, 'utf8');
-  envContent.split('\n').forEach(line => {
-    const [key, ...valueParts] = line.split('=');
-    if (key && valueParts.length) {
-      const value = valueParts.join('=').replace(/^["']|["']$/g, '');
-      if (!process.env[key]) process.env[key] = value;
-    }
-  });
-}
+// send-email.ts builds its Resend client from RESEND_API_KEY at module load. A static import is
+// hoisted above dotenv.config(), so load it dynamically in main(), after the env is in place.
+type SendEmailFn = (p: {
+  to: string; subject: string; html: string; emailType?: string; eventSource?: string;
+}) => Promise<boolean>;
+let sendEmail: SendEmailFn;
 
 const SUPABASE_URL = 'https://krpyelfrbicmvsmwovti.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
 
-// Office365 SMTP transporter
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.office365.com',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER || 'alerts@govcongiants.com',
-    pass: process.env.SMTP_PASSWORD,
-  },
-});
-
-if (!process.env.SMTP_PASSWORD) {
-  console.error('ERROR: SMTP_PASSWORD not found in environment');
+if (!process.env.RESEND_API_KEY) {
+  console.error('ERROR: RESEND_API_KEY not found in environment (.env.local)');
   process.exit(1);
 }
 
 const DEFAULT_LIMIT = 2000;
-const BATCH_SIZE = 100; // Resend batch limit
 
 async function main() {
   const args = process.argv.slice(2);
@@ -84,7 +71,8 @@ async function main() {
     process.exit(1);
   }
 
-  const users = await res.json();
+  const users: { user_email: string }[] = await res.json();
+  ({ sendEmail } = (await import('../src/lib/send-email')) as unknown as { sendEmail: SendEmailFn });
   console.log(`Found ${users.length} users to email`);
 
   if (users.length === 0) {
@@ -94,15 +82,16 @@ async function main() {
 
   if (isDryRun) {
     console.log('\nDRY RUN - Sample of first 10:');
-    users.slice(0, 10).forEach(u => console.log(`  - ${u.user_email}`));
+    users.slice(0, 10).forEach((u) => console.log(`  - ${u.user_email}`));
     console.log(`\nWould send ${users.length} emails.`);
     return;
   }
 
-  // Send emails one by one (Office365 doesn't support batch)
+  // Send one by one through sendEmail()
   let sent = 0;
+  let blocked = 0;
   let failed = 0;
-  const sentEmails = [];
+  const sentEmails: string[] = [];
 
   for (let i = 0; i < users.length; i++) {
     const user = users[i];
@@ -116,12 +105,18 @@ async function main() {
     }
 
     try {
-      await transporter.sendMail({
-        from: '"GovCon Giants" <alerts@govcongiants.com>',
+      const ok = await sendEmail({
         to: email,
         subject: '🎯 Set Up Your GovCon Alerts Profile',
         html: generateEmailHtml(email),
+        emailType: 'profile_reminder',
+        eventSource: 'script:send-profile-setup-emails',
       });
+      if (!ok) {
+        // Suppressed or over the daily cap: nothing was sent, so do not stamp it as sent.
+        blocked++;
+        continue;
+      }
 
       sentEmails.push(email);
       sent++;
@@ -132,12 +127,12 @@ async function main() {
         sentEmails.length = 0;
       }
 
-      process.stdout.write(`\rProgress: ${sent}/${users.length} sent, ${failed} failed`);
+      process.stdout.write(`\rProgress: ${sent}/${users.length} sent, ${blocked} blocked, ${failed} failed`);
 
       // Rate limit: small delay between emails
       await new Promise(r => setTimeout(r, 100));
     } catch (err) {
-      console.error(`\nFailed to send to ${email}:`, err.message);
+      console.error(`\nFailed to send to ${email}:`, (err as Error).message);
       failed++;
     }
   }
@@ -152,6 +147,7 @@ async function main() {
   console.log('RESULTS');
   console.log('='.repeat(60));
   console.log(`Sent: ${sent}`);
+  console.log(`Blocked (suppressed / daily cap, not stamped): ${blocked}`);
   console.log(`Failed: ${failed}`);
   console.log('');
 
@@ -172,7 +168,7 @@ async function main() {
   console.log(`Remaining to send: ${remaining}`);
 }
 
-async function markAsSent(emails) {
+async function markAsSent(emails: string[]) {
   // Update in batches of 50 for the IN clause
   for (let i = 0; i < emails.length; i += 50) {
     const chunk = emails.slice(i, i + 50);
@@ -196,7 +192,7 @@ async function markAsSent(emails) {
   }
 }
 
-function generateEmailHtml(email) {
+function generateEmailHtml(email: string) {
   const setupUrl = `https://tools.govcongiants.org/alerts/signup?email=${encodeURIComponent(email)}`;
 
   return `

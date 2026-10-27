@@ -14,7 +14,7 @@
 10. **Daily briefings MUST use fast GREEN builder.** `send-briefings-fast` must use `buildSamGreenBriefing()` (instant, no AI), NOT `generateDailyBriefFromSam()` which calls Claude API (~4s/user, causes timeouts). Run `tests/test-briefing-architecture.sh` to verify.
 11. **Briefing log MUST include briefing_type in all queries.** The `briefing_log` table has a unique constraint on `(user_email, briefing_date, briefing_type)`. All INSERT/UPDATE/SELECT must filter by `briefing_type` ('daily', 'weekly', 'pursuit') to avoid collisions between briefing types.
 12. **Weekly-alerts drains the whole cycle.** Each cron run evaluates pending users until done or a 220s time budget (`WEEKLY_ALERT_RUN_BUDGET_MS`) is spent — never a fixed per-run user count. The old `BATCH_SIZE=75` × 10 windows silently capped every cycle at 750 of ~1,790 eligible, so everyone after roughly "j" never got a weekly alert (fixed 2026-10-06, `src/lib/alerts/weekly-drain.ts`). The cursor is this cycle's `alert_log` rows (unique on `user_email`+`alert_date`+`alert_type='weekly'`), read PAGED; every evaluated user writes `sent`/`skipped`/`failed`. Runs self-report pending users via `reportCronOutcome`. Uses the local `sam_opportunities` cache in the hot path.
-13. **Alert and briefing email sends use shared `sendEmail()`.** Resend is primary. Office 365 is fallback only. Do not add route-local Office365-only `nodemailer` transports for weekly alerts, daily alerts, weekly deep dives, or pursuit briefs.
+13. **All Mindy email sends use shared `sendEmail()` — Resend ONLY, from `mail.getmindy.ai`, NO fallback** (sender isolation, 2026-10-27). A Resend failure throws (`ResendSendError` / `EmailOutcomeUnknownError`); `sendEmail` refuses any From outside `mail.getmindy.ai` (`UnapprovedSenderError`). Never add a nodemailer/Office365 transport or a `@govcongiants.com` From in `src/` or `scripts/` — `scripts/audit-email-sender.mjs` blocks the push.
 14. **Unified MI Platform Architecture.** All tools live inside `/briefings` as panels switched by sidebar, NOT separate routes. This follows the Atlassian navigation pattern. See "Unified MI Platform Architecture" section below.
 
 ---
@@ -1361,7 +1361,7 @@ Instead of generating 928 individual briefings per type, we pre-compute 49 templ
 
 **Email delivery rule (April 25, 2026):**
 All production alert/briefing send paths should call `src/lib/send-email.ts` via `sendEmail()`.
-This makes Resend the primary provider and keeps Office 365 as fallback only.
+Resend is the only provider (the Office 365 fallback was removed 2026-10-27; a Resend failure throws).
 Verified paths include `weekly-alerts`, `send-briefings-fast`, `send-weekly-fast`, `send-pursuit-fast`, legacy `weekly-deep-dive`, legacy `pursuit-brief`, and admin `send-all-briefings`.
 
 **Weekly deep dive catch-up rule (April 25, 2026):**
@@ -2581,10 +2581,11 @@ repo sends TRANSACTIONAL email only; marketing/bulk is GHL (`send.getmindy.ai`).
   rendered in Gmail/Outlook email).
 - **Footer branding:** "GovCon Giants AI" (the operating entity behind the Mindy product).
 - **Include:** activation link, "Manage preferences", "Unsubscribe".
-- **⚠️ Office365 FALLBACK caveat:** route-local O365 nodemailer transports authenticate as
-  `SMTP_USER` (a `govcongiants.com` O365 mailbox), so if Resend is down the FALLBACK still sends
-  from govcongiants. Making the fallback Mindy needs a `mail.getmindy.ai` SMTP mailbox (infra).
-  Resend (primary) is Mindy.
+- **No fallback provider (2026-10-27).** The Office 365 fallback authenticated as a
+  `govcongiants.com` mailbox, so a Resend failure moved Mindy mail onto govcongiants (last fired
+  2026-08-03: 27 `profile_reminder` sends). It is removed: a Resend failure throws, callers'
+  existing retry/error handling runs, and nothing is recorded as sent. `SMTP_*` env vars are no
+  longer read by this repo (they stay in Vercel until removal is approved).
 
 ---
 
@@ -2596,8 +2597,8 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 NEXT_PUBLIC_SUPABASE_URL=https://...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
-SMTP_USER=hello@govcongiants.com
-SMTP_PASSWORD=...
+RESEND_API_KEY=re_...                 # the ONLY Mindy email provider
+EMAIL_FROM=alerts@mail.getmindy.ai   # must be on mail.getmindy.ai (sendEmail refuses anything else)
 OPENAI_API_KEY=sk-...
 GROQ_API_KEY=gsk_...
 ```

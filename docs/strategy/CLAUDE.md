@@ -38,7 +38,7 @@ cd /Users/ericcoffie/govcon-funnels && npm run dev
 
 **Current ops notes (April 25, 2026):**
 - Weekly alerts use a cache-backed Sunday/Monday batch window in `market-assassin/vercel.json`.
-- Weekly alerts, weekly deep dives, pursuit briefs, and briefing sends should use the shared `sendEmail()` helper: Resend primary, Office 365 fallback only.
+- Weekly alerts, weekly deep dives, pursuit briefs, and briefing sends should use the shared `sendEmail()` helper: Resend only, from mail.getmindy.ai, no fallback (2026-10-27).
 - Weekly alert health is tracked in the Market Assassin Operations dashboard separately from daily alerts.
 
 **Tools:**

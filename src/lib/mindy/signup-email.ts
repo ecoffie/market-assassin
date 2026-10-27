@@ -40,8 +40,9 @@ export function signupEmailFormatError(email: string): string | null {
  * True ONLY when the send failed because the mail server PERMANENTLY rejected the RECIPIENT ADDRESS
  * itself — i.e. retrying cannot help and the user must fix what they typed.
  *
- * sendEmail tries Resend, then Office 365, and rethrows the Office 365 (nodemailer) error. So this
- * reads that error: an SMTP reply to `RCPT TO` (the recipient step) with a permanent 5xx code and an
+ * Resend (sendEmail's only provider) → a ResendSendError with statusCode 422 and a message naming
+ * the `to` field. The SMTP branch below predates the removal of the Office 365 fallback
+ * (2026-10-27) and still classifies a nodemailer error correctly if one ever reaches here: an SMTP reply to `RCPT TO` (the recipient step) with a permanent 5xx code and an
  * address-status enhanced code (5.1.1 bad mailbox, 5.1.3 bad address syntax, 5.1.10 recipient not
  * found), or a bare 501 (syntax error in the address parameter).
  *
@@ -50,10 +51,18 @@ export function signupEmailFormatError(email: string): string | null {
  *  - 5.7.x (policy / auth / relay denied), 5.4.x (routing / network), 5.3.x (system), 5.5.x
  *  - failures at any other SMTP step (connection, AUTH, MAIL FROM, DATA)
  *  - no SMTP reply at all (timeouts, ECONNECTION, ETIMEDOUT, DNS) — provider outage
- *  - anything that is not an SMTP error object (Resend outage, unknown errors)
+ *  - any other Resend error (4xx rate limit / unverified sender, 5xx, no response)
+ *  - anything that is neither a Resend nor an SMTP error object (unknown errors)
  */
 export function isInvalidRecipientError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
+  // Resend (the only Mindy provider since 2026-10-27) rejects a malformed recipient with a 422
+  // whose message names the `to` field. Any other Resend error (rate limit, outage, unverified
+  // sender, 5xx, no response) is not the user's typo.
+  const r = error as { provider?: unknown; statusCode?: unknown; message?: unknown };
+  if (r.provider === 'resend') {
+    return r.statusCode === 422 && typeof r.message === 'string' && /invalid `?to`? field/i.test(r.message);
+  }
   const e = error as { command?: unknown; responseCode?: unknown; response?: unknown };
   if (typeof e.command !== 'string' || e.command.trim().toUpperCase() !== 'RCPT TO') return false;
   const code = e.responseCode;

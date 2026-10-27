@@ -14,7 +14,6 @@ const h = vi.hoisted(() => {
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role';
   return {
     resendSend: vi.fn(async () => ({ data: { id: 'msg_1' }, error: null })),
-    smtpSend: vi.fn(async () => ({})),
     suppressed: new Set<string>(),
     tablesRead: [] as string[],
   };
@@ -22,9 +21,6 @@ const h = vi.hoisted(() => {
 
 vi.mock('resend', () => ({
   Resend: class { emails = { send: h.resendSend }; },
-}));
-vi.mock('nodemailer', () => ({
-  default: { createTransport: () => ({ sendMail: h.smtpSend }) },
 }));
 vi.mock('@/lib/email/legacy-destination-guard', () => ({ assertNoLegacyDestinations: () => {} }));
 vi.mock('@/lib/access-links', () => ({ createSecureAccessUrl: () => 'https://getmindy.ai/x' }));
@@ -57,7 +53,6 @@ const base = { subject: 's', html: '<p>hi</p>' };
 
 beforeEach(() => {
   h.resendSend.mockClear();
-  h.smtpSend.mockClear();
   h.suppressed.clear();
   h.tablesRead.length = 0;
 });
@@ -68,7 +63,6 @@ describe('sendEmail — mailbox suppression at the provider boundary', () => {
     const ok = await sendEmail({ ...base, to: 'Dead@Corp.com', emailType: 'daily_alert' });
     expect(ok).toBe(false);
     expect(h.resendSend).not.toHaveBeenCalled();
-    expect(h.smtpSend).not.toHaveBeenCalled();
   });
 
   it('suppressed recipient: weekly, saved-search, briefing and marketing mail are all blocked', async () => {

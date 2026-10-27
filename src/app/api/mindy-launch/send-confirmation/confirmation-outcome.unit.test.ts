@@ -10,11 +10,11 @@ import { NextRequest } from 'next/server';
  * from the HTTP code. These tests drive the real route, the real confirmation builder
  * and the real sendEmail with only the providers and database mocked. They pin:
  *   1. `accepted` only when a provider accepted the message, with provider + message id.
- *   2. An EXPLICIT rejection by every provider is 502 `failed`; a guard block is 422
- *      `blocked`. A provider outcome we can't see (no response, 5xx, dropped SMTP
- *      connection) is 500 `unconfirmed` — never `failed`.
- *   3. Within one request an unknown Resend outcome never falls back to Office365, so
- *      one request makes at most one send attempt that could have succeeded. Nothing
+ *   2. An EXPLICIT Resend rejection (4xx) is 502 `failed`; a guard block is 422
+ *      `blocked`. A provider outcome we can't see (no response, 5xx, SDK throw) is 500
+ *      `unconfirmed` — never `failed`.
+ *   3. Resend is the only provider (sender isolation, 2026-10-27): no failure ever reaches
+ *      a second transport, so one request makes exactly one provider attempt. Nothing
  *      here deduplicates ACROSS requests; that needs a durable store (follow-up).
  */
 
@@ -25,16 +25,12 @@ const h = vi.hoisted(() => {
   process.env.CRON_SECRET = 'cron-test-secret';
   return {
     resendSend: vi.fn(),
-    smtpSend: vi.fn(),
     inserts: [] as { table: string; row: Record<string, unknown> }[],
   };
 });
 
 vi.mock('resend', () => ({
   Resend: class { emails = { send: h.resendSend }; },
-}));
-vi.mock('nodemailer', () => ({
-  default: { createTransport: () => ({ sendMail: h.smtpSend }) },
 }));
 vi.mock('@/lib/email/legacy-destination-guard', () => ({ assertNoLegacyDestinations: () => {} }));
 vi.mock('@/lib/access-links', () => ({ createSecureAccessUrl: () => 'https://getmindy.ai/x' }));
@@ -66,11 +62,10 @@ function req(body: Record<string, unknown>, auth = 'Bearer cron-test-secret') {
 }
 
 const REGISTRANT = { email: 'jane@acme.co', name: 'Jane Doe' };
-const providerCalls = () => h.resendSend.mock.calls.length + h.smtpSend.mock.calls.length;
+const providerCalls = () => h.resendSend.mock.calls.length;
 
 beforeEach(() => {
   h.resendSend.mockReset().mockResolvedValue({ data: { id: 're_msg_1' }, error: null });
-  h.smtpSend.mockReset().mockResolvedValue({ messageId: '<smtp-1@o365>' });
   h.inserts.length = 0;
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -82,24 +77,25 @@ describe('send-confirmation reports provider acceptance, not just an HTTP code',
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, status: 'accepted', provider: 'resend', providerMessageId: 're_msg_1' });
     expect(h.resendSend).toHaveBeenCalledOnce();
-    expect(h.smtpSend).not.toHaveBeenCalled();
+    expect(h.resendSend.mock.calls[0][0].from).toBe('"Mindy" <mindy@mail.getmindy.ai>');
     expect(h.inserts.filter((i) => i.table === 'email_provider_sends')).toHaveLength(1);
   });
 
-  it('Resend explicitly rejects (4xx), Office365 accepts: 200 accepted via office365', async () => {
+  it('Resend explicitly rejects (403): 502 failed, no fallback, no send record', async () => {
     h.resendSend.mockResolvedValue({ data: null, error: { name: 'validation_error', statusCode: 403, message: 'domain not verified' } });
-    const res = await POST(req(REGISTRANT));
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, status: 'accepted', provider: 'office365', providerMessageId: '<smtp-1@o365>' });
-    expect(h.smtpSend).toHaveBeenCalledOnce();
-  });
-
-  it('both providers explicitly reject: 502 failed, never accepted', async () => {
-    h.resendSend.mockResolvedValue({ data: null, error: { name: 'rate_limit_exceeded', statusCode: 429, message: 'rate limited' } });
-    h.smtpSend.mockRejectedValue(Object.assign(new Error('Invalid login: 535 5.7.3 Authentication unsuccessful'), { code: 'EAUTH', responseCode: 535 }));
     const res = await POST(req(REGISTRANT));
     expect(res.status).toBe(502);
     expect(await res.json()).toMatchObject({ ok: false, status: 'failed' });
+    expect(providerCalls()).toBe(1);
+    expect(h.inserts.filter((i) => i.table === 'email_provider_sends')).toHaveLength(0);
+  });
+
+  it('Resend rate-limits (429): 502 failed, never accepted', async () => {
+    h.resendSend.mockResolvedValue({ data: null, error: { name: 'rate_limit_exceeded', statusCode: 429, message: 'rate limited' } });
+    const res = await POST(req(REGISTRANT));
+    expect(res.status).toBe(502);
+    expect(await res.json()).toMatchObject({ ok: false, status: 'failed' });
+    expect(providerCalls()).toBe(1);
     expect(h.inserts.filter((i) => i.table === 'email_provider_sends')).toHaveLength(0);
   });
 });
@@ -110,33 +106,32 @@ describe('an unknown provider outcome is unconfirmed, never failed, and never fa
   // unless the status code is checked.
   const NO_RESPONSE = { name: 'application_error', statusCode: null, message: 'Unable to fetch data. The request could not be resolved.' };
 
-  it('Resend gives no response: 500 unconfirmed, Office365 NOT tried (Resend may have accepted)', async () => {
+  it('Resend gives no response: 500 unconfirmed, nothing else tried (Resend may have accepted)', async () => {
     h.resendSend.mockResolvedValue({ data: null, error: NO_RESPONSE });
     const res = await POST(req(REGISTRANT));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body).toMatchObject({ ok: false, status: 'unconfirmed' });
     expect(body.error).toMatch(/^outcome unknown at resend: no response/);
-    expect(h.smtpSend).not.toHaveBeenCalled();
+    expect(providerCalls()).toBe(1);
   });
 
-  it('Resend 5xx: 500 unconfirmed, Office365 NOT tried', async () => {
+  it('Resend 5xx: 500 unconfirmed, nothing else tried', async () => {
     h.resendSend.mockResolvedValue({ data: null, error: { name: 'application_error', statusCode: 500, message: 'Internal server error' } });
     const res = await POST(req(REGISTRANT));
     expect(res.status).toBe(500);
     expect((await res.json()).status).toBe('unconfirmed');
-    expect(h.smtpSend).not.toHaveBeenCalled();
+    expect(providerCalls()).toBe(1);
   });
 
-  it('Resend rejects, then the Office365 connection drops with no SMTP reply: 500 unconfirmed', async () => {
-    h.resendSend.mockResolvedValue({ data: null, error: { name: 'validation_error', statusCode: 422, message: 'bad' } });
-    h.smtpSend.mockRejectedValue(Object.assign(new Error('Connection timeout'), { code: 'ETIMEDOUT' }));
+  it('Resend SDK throws (unexpected): 500 unconfirmed, nothing else tried', async () => {
+    h.resendSend.mockRejectedValue(new Error('socket hang up'));
     const res = await POST(req(REGISTRANT));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.status).toBe('unconfirmed');
-    expect(body.error).toMatch(/^outcome unknown at office365/);
-    expect(h.smtpSend).toHaveBeenCalledOnce();
+    expect(body.error).toMatch(/^outcome unknown at resend: threw: socket hang up/);
+    expect(providerCalls()).toBe(1);
   });
 });
 
@@ -163,13 +158,12 @@ describe('guard, auth and retry', () => {
   });
 });
 
-describe('other streams keep today\'s fallback (documented duplicate risk, unchanged here)', () => {
-  it('without strictOutcome, a no-response Resend result still falls back to Office365', async () => {
-    const { sendEmail } = await import('@/lib/send-email');
+describe('every stream: Resend failure never reaches a second transport', () => {
+  it('without strictOutcome, a no-response Resend result throws instead of falling back', async () => {
+    const { sendEmail, ResendSendError } = await import('@/lib/send-email');
     h.resendSend.mockResolvedValue({ data: null, error: { name: 'application_error', statusCode: null, message: 'Unable to fetch data.' } });
-    await expect(sendEmail({ to: 'jane@acme.co', subject: 's', html: '<p>x</p>', transactional: true })).resolves.toBe(true);
-    // Resend may have accepted the first copy: this is the duplicate exposure for every
-    // stream that has not opted in. Tracked as a follow-up, not fixed by this PR.
-    expect(h.smtpSend).toHaveBeenCalledOnce();
+    await expect(sendEmail({ to: 'jane@acme.co', subject: 's', html: '<p>x</p>', transactional: true })).rejects.toBeInstanceOf(ResendSendError);
+    expect(providerCalls()).toBe(1);
+    expect(h.inserts.filter((i) => i.table === 'email_provider_sends')).toHaveLength(0);
   });
 });
