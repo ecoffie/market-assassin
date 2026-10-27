@@ -335,7 +335,12 @@ async function evaluateSavedSearch(
     f.postedDays = f.postedDays || 30;
     let q = db.from('sam_opportunities').select(PIN_COLS).limit(200);
     q = applyMapFilters(q, f);
-    const { data, error: qErr } = await q.order('posted_date', { ascending: false });
+    // posted_date is DAY-granular: hundreds of notices can share one (682 on 2026-10-23). Without a tiebreaker the
+    // 200-row window is an arbitrary subset that changes between runs, and rows rotating in read as "new". notice_id
+    // makes it a total order, so the window only moves when the data does.
+    const { data, error: qErr } = await q
+      .order('posted_date', { ascending: false })
+      .order('notice_id', { ascending: true });
     if (qErr) return { failureClass: 'opportunity_query_failed' };
     opps = data || [];
   }
