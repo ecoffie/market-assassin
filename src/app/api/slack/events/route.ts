@@ -8,6 +8,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { verifySlackSignature } from '@/lib/slack/verify-signature';
 
 // Simple in-memory cache to prevent duplicate event processing
 const processedEvents = new Map<string, number>();
@@ -53,7 +54,27 @@ interface SlackEventPayload {
 }
 
 export async function POST(request: Request) {
-  const body: SlackEventPayload = await request.json();
+  // Verify Slack's request signature over the RAW body BEFORE parsing or doing any work
+  // (including the url_verification challenge). Unsigned, tampered, stale (replayed) or
+  // unverifiable requests are rejected with no LLM call and no Slack post. Fails closed
+  // when SLACK_SIGNING_SECRET is unset.
+  const rawBody = await request.text();
+  const verified = verifySlackSignature({
+    rawBody,
+    timestamp: request.headers.get('x-slack-request-timestamp'),
+    signature: request.headers.get('x-slack-signature'),
+  });
+  if (!verified.ok) {
+    console.warn(`[Slack] rejected request: ${verified.reason}`);
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  let body: SlackEventPayload;
+  try {
+    body = JSON.parse(rawBody) as SlackEventPayload;
+  } catch {
+    return NextResponse.json({ error: 'Bad request' }, { status: 400 });
+  }
 
   // Handle URL verification challenge from Slack
   if (body.type === 'url_verification') {
