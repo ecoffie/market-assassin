@@ -151,6 +151,20 @@ describe('Phase D — adversarial', () => {
     expect((await run(Array.from({ length: 870 }, () => row('DOE', T('01T12:00:00'), { last_synced_at: T('23T13:00:38') })), ALL, W0, T('24T11:00:00'))).count).toBe(0);
   });
 
+  it('14b · an earlier-stamped publisher is never hidden behind a later one (the legacy DHS-below-DOE miss, 2026-10-27)', async () => {
+    // Prod 2026-10-26: the 13:00 sync stamps all DHS rows at 13:00:30.642 and then all 870 DOE rows at 13:00:31.087.
+    // The legacy window (last_synced_at desc, limit 200) was filled entirely by DOE, so a genuinely new DHS forecast
+    // never reached it — and the re-stamped DOE rows rotated in as "new". Newness on created_at has neither failure.
+    const doe = Array.from({ length: 870 }, () => row('DOE', T('01T12:00:00'), { last_synced_at: '2026-09-23T13:00:31.087+00:00' }));
+    const oldDhs = Array.from({ length: 649 }, () => row('DHS', T('10T00:00:00'), { last_synced_at: '2026-09-23T13:00:30.642+00:00' }));
+    const newDhs = row('DHS', '2026-09-23T13:00:30.500+00:00', { last_synced_at: '2026-09-23T13:00:30.642+00:00' });
+    const a = await run([...doe, ...oldDhs, newDhs], ALL, W0, T('24T11:00:00'));
+    expect(a.count).toBe(1); expect(a.ids).toEqual([newDhs.external_id]);
+    // Next day both publishers are re-stamped again (DOE still last): nothing is new, and the DHS row does not repeat.
+    const restamped = [...doe, ...oldDhs, newDhs].map((r) => ({ ...r, last_synced_at: r.source_agency === 'DOE' ? '2026-09-24T13:00:31.1+00:00' : '2026-09-24T13:00:30.6+00:00' }));
+    expect((await run(restamped, ALL, a.next, T('25T11:00:00'))).count).toBe(0);
+  });
+
   it('15 · an amendment to an old row (fields change, created_at does not) is not new', async () => {
     expect((await run([row('DHS', T('10T00:00:00'), { title: 'AMENDED', fiscal_year: 'FY2027', last_synced_at: T('23T13:00:00') })], ALL, W0, T('24T11:00:00'))).count).toBe(0);
   });
