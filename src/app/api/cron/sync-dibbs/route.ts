@@ -1,6 +1,11 @@
 /**
- * Cron: sync DLA DIBBS RFQs via the Apify actor. Steady-state refresh of recent
- * small-buy solicitations into dibbs_rfqs. Schedule via cron_jobs row (rule #5).
+ * Cron: sync DLA DIBBS RFQs. Steady-state refresh of recent small-buy solicitations
+ * into dibbs_rfqs. Schedule via cron_jobs row (rule #5).
+ *
+ * FAIL-CLOSED (2026-11-02): the LIVE path never calls the paid Apify actor. It runs the
+ * free direct fetcher and, if that produces nothing, reports the failure (HTTP 500 +
+ * cron outcome 'error') instead of spending. The actor is reachable only from a DRY RUN
+ * with an explicit `allowApify=1`. Feed is PARKED (cron_jobs row disabled 2026-11-02).
  * Needs a VALID paid-tier APIFY_TOKEN — note a dead token still reads as
  * `present:true` to Vercel's env check, so verify with
  * `GET https://api.apify.com/v2/users/me` (that 401 was the whole Jul-2026 outage).
@@ -45,9 +50,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  if (!process.env.APIFY_TOKEN) {
-    return NextResponse.json({ success: false, error: 'APIFY_TOKEN not set — DIBBS pilot disabled' }, { status: 503 });
-  }
+  // No APIFY_TOKEN gate: the live path is free-only now. A dry run that opts into the
+  // actor without a token fails inside fetchDibbsRfqs and is recorded as a thrown attempt.
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return NextResponse.json({ success: false, error: 'Supabase not configured' }, { status: 500 });
@@ -67,10 +71,8 @@ export async function GET(request: NextRequest) {
   const daysBackParam = request.nextUrl.searchParams.get('daysBack');
   const daysBack = daysBackParam == null ? null : Math.min(parseInt(daysBackParam, 10), 30);
   try {
-    // ?forceApify=1 bypasses the cost guard for a large pull (see APIFY_USD_PER_ITEM
-    // in lib/dibbs/ingest.ts — the actor bills per result-item, so 2,500 items is
-    // ~$35.85). Only reach for this when the direct path is genuinely blocked; the
-    // guard exists because a handful of wide pulls ate a $300 monthly cap.
+    // ?forceApify=1 (skip the free path) is DRY-RUN ONLY and ignored without allowApify=1.
+    // The actor bills per result-item (~$35.85 per 2,500); see APIFY_USD_PER_ITEM.
     const forceApify = request.nextUrl.searchParams.get('forceApify') === '1';
 
     // DRY RUN — fetch, parse, classify and report; write NOTHING. No dibbs_rfqs upsert, no
@@ -101,7 +103,8 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const result = await ingestDibbs(supabase, { maxItems, daysBack, forceApify });
+    // LIVE: free path only. No forceApify / allowApify here — the paid actor is never automatic.
+    const result = await ingestDibbs(supabase, { maxItems, daysBack });
     // Two silent-failure modes this surfaces, because BOTH previously returned success:true
     // and looked identical to a healthy run in the cron_jobs row:
     //  • truncated — hit maxItems exactly, so current RFQs were left unfetched.
@@ -201,14 +204,15 @@ export async function GET(request: NextRequest) {
       // never have been called and billing cannot be the cause. Telling an operator to check
       // a bill that was never charged sends them to the wrong system — the same misdirection
       // SR-001 caused by defaulting `source` to 'apify'.
-      const apifyWasReached = (result.attempts ?? []).some((a) => a.path === 'apify');
+      // A 'skipped' actor attempt is the fail-closed record, not a call — it cost nothing.
+      const apifyWasReached = (result.attempts ?? []).some((a) => a.path === 'apify' && a.outcome !== 'skipped');
       const firstCheck = apifyWasReached
         ? `<b>CHECK BILLING:</b> console.apify.com/billing/current-period<br>` +
           `A spend cap is indistinguishable from WAF throttling from here, and it does NOT clear ` +
           `by waiting (only on the billing-cycle reset or a limit raise).`
-        : `<b>APIFY WAS NOT REACHED.</b> The cost guard routed to the free direct fetcher ` +
-          `(requested ${maxItems} > threshold), so billing is not the cause. ` +
-          `Inspect the direct attempt outcome below before checking Apify.`;
+        : `<b>FAIL-CLOSED — NOTHING WAS SPENT.</b> The free direct fetcher produced nothing and ` +
+          `the paid actor was deliberately NOT called. Inspect the direct attempt below ` +
+          `(a WAF block from this egress is the known cause).`;
 
       const detail =
         `Fetched only <b>${result.fetched}</b> item(s) — nothing was committed.<br><br>` +
@@ -217,9 +221,12 @@ export async function GET(request: NextRequest) {
         (result.vendorBuild ? `<b>Vendor build:</b> ${result.vendorBuild}<br>` : '') +
         `<br>${firstCheck}<br><br>` +
         `<b>Do NOT retry or burst</b> — retrying deepens a WAF block and burns budget.`;
-      console.error(`[sync-dibbs] STARVED: fetched only ${result.fetched}. CHECK APIFY BILLING FIRST (console.apify.com/billing/current-period) — a spend cap looks identical to WAF throttling. Do NOT retry/burst either way.`);
+      console.error(`[sync-dibbs] STARVED: fetched only ${result.fetched} via ${provenance}. Do NOT retry/burst.`);
       // Never let a failed alert mask the failed sync.
-      await sendOpsAlert({ subject: 'DIBBS sync STARVED — check Apify billing', html: detail })
+      await sendOpsAlert({
+        subject: apifyWasReached ? 'DIBBS sync STARVED — check Apify billing' : 'DIBBS sync FAILED CLOSED — free source failed, nothing spent',
+        html: detail,
+      })
         .catch((e) => console.error('[sync-dibbs] ops alert failed:', (e as Error).message));
       // The 500 below is NOT enough on its own: this job's timeout_ms (120s)
       // exceeds the dispatcher's 55s await cap, so it is fire-and-forget and the
@@ -238,7 +245,7 @@ export async function GET(request: NextRequest) {
         error: `STARVED: fetched ${result.fetched} via ${provenance}. `
           + (apifyWasReached
             ? 'Check Apify billing (spend cap) before assuming WAF. Do not retry.'
-            : 'Apify was NOT reached — the cost guard used the direct fetcher. Billing is not the cause.'),
+            : 'Fail-closed: the free source failed and the paid actor was NOT called. Nothing was spent.'),
       }, { status: 500 });
     }
 
