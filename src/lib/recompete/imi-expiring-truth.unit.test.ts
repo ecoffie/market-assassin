@@ -221,7 +221,11 @@ describe('(7) place of performance is exposed as reported by USASpending — not
         text: async () => JSON.stringify({
           results: [{
             'Award ID': 'FA805126F0034', 'Recipient Name': 'APEX FSE JV LLC', 'Recipient UEI': 'PZNLVGANJ3U3',
-            'Awarding Agency': 'Department of Defense', 'Award Amount': 157000, 'End Date': '2026-10-28',
+            'Awarding Agency': 'Department of Defense', 'Award Amount': 157000,
+            // RELATIVE, not a literal: this case runs fetchExpiringForNaics on the REAL clock, whose
+            // client-side window drops past end dates. A literal '2026-10-28' expired on that day and
+            // turned main red. 90 days out stays inside the 18-month window on any run date.
+            'End Date': new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10),
             'NAICS Code': '238220', 'Place of Performance State Code': 'FL',
             // Present in the payload to prove it is ignored even if the API ever returned it.
             'Recipient State Code': 'GA',
