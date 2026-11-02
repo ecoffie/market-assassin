@@ -14,6 +14,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { authorizeCronRequest } from '@/lib/cron/cron-request-auth';
 import { createClient } from '@supabase/supabase-js';
 import { getReadClient } from '@/lib/supabase/server-clients';
 import { expandNaicsForBriefing as expandNaicsCodes } from '@/lib/briefings/naics-briefing-expansion';
@@ -67,21 +68,13 @@ function shouldStopForTimeBudget(startTime: number): boolean {
 }
 
 export async function GET(request: NextRequest) {
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
-  const authHeader = request.headers.get('authorization');
-  const hasCronSecret = authHeader === `Bearer ${process.env.CRON_SECRET}`;
   const isTest = request.nextUrl.searchParams.get('test') === 'true';
 
-  if (!isVercelCron && !hasCronSecret && !isTest) {
-    if (process.env.NODE_ENV === 'production') {
-      return NextResponse.json({
-        message: 'Pre-compute Weekly Deep Dive Templates',
-        description: 'Generates weekly templates by NAICS profile (enterprise architecture)',
-        schedule: 'Thursday 8 PM UTC',
-        benefit: '95% reduction in LLM calls (928 users → 49 templates)',
-      });
-    }
-  }
+  // AUTH: the CRON_SECRET bearer (sent by /api/cron/dispatch) for any run; ?test=true also
+  // accepts verified admin auth. ?email= is only a test FILTER, never authorization, and
+  // x-vercel-cron is client-supplied, so it is not trusted. Rejected before any LLM call or send.
+  const cronAuth = await authorizeCronRequest(request, { isTest });
+  if (!cronAuth.ok) return cronAuth.response;
 
   // DAY-OF-WEEK GUARD: Weekly precompute only runs on Thursday (UTC)
   const today = new Date();
