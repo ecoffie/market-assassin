@@ -56,7 +56,7 @@ const TOPUP_FALLBACK: Pkg = { id: 'refill', credits: 1000, usd: 119, label: 'Top
 const MCP_META: Record<string, { tag: string; badge?: string; color?: 'navy' | 'ink' }> = {
   entry: { tag: 'The on-ramp for project-based federal BD.' },
   mid: { tag: 'The daily-driver — work opportunities every day.', badge: '✦ Best for daily use', color: 'navy' },
-  growth: { tag: 'For working several markets at once.', badge: 'Popular' },
+  growth: { tag: 'For working several markets at once.', badge: 'High volume', color: 'ink' },
   agency: { tag: 'For shops running many pursuits at once.', badge: 'High volume', color: 'ink' },
 };
 
@@ -147,7 +147,10 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
   }, [signupCredits, proCredits]);
 
   const tools: Tool[] = cat?.tools ?? [];
-  const plans = cat?.subscriptionPlans?.length ? cat.subscriptionPlans : PLANS_FALLBACK;
+  // Plans shown publicly. Agency is hidden from the pricing page (the Stripe plan and its
+  // checkout link still exist for current subscribers — this only stops advertising it).
+  const HIDDEN_PLANS = new Set(['agency']);
+  const plans = (cat?.subscriptionPlans?.length ? cat.subscriptionPlans : PLANS_FALLBACK).filter((p) => !HIDDEN_PLANS.has(p.id));
   const topup = cat?.packages?.find((p) => p.id === 'refill') ?? TOPUP_FALLBACK;
   const trial = cat?.signupCredits ?? signupCredits;
   const proCr = cat?.tierCredits?.pro.credits ?? proCredits;
@@ -326,7 +329,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
           </div>
         </div>
 
-        <div className={`grid ${tab === 'app' ? 'c3' : 'c4'}`}>
+        <div className={`grid ${tab === 'app' || mcpCards.length <= 3 ? 'c3' : 'c4'}`}>
           {(tab === 'app' ? appCards : mcpCards).map((p) => <PlanCard key={p.name} p={p} />)}
         </div>
 

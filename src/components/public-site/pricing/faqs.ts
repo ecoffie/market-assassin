@@ -23,8 +23,8 @@ export function pricingFaqs(c: { signupCredits: number; proCredits: number; team
       a: "Each tool call costs a set number of credits. You're charged when Mindy does the research — even a search that honestly finds nothing. You're not charged for refused requests, failures on our side, or calls stopped before they run.",
     },
     {
-      q: 'Entry, Mid, Growth or Agency — which do I need?',
-      a: 'Every plan has the same tools; they differ only in monthly credits. Entry suits occasional use, Mid is the daily driver, Growth covers several markets, Agency is for shops running many pursuits. Use the plan finder above to size it.',
+      q: 'Entry, Mid or Growth — which do I need?',
+      a: 'Every plan has the same tools; they differ only in monthly credits. Entry suits occasional use, Mid is the daily driver, Growth covers several markets at once. Need more than that? Email us for an Enterprise pool. Use the plan finder above to size it.',
     },
     {
       q: 'What happens when I run out of credits?',
