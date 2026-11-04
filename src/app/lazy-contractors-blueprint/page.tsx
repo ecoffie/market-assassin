@@ -29,10 +29,11 @@ export default function LazyContractorsBlueprintPage() {
         <Container>
           <div style={{ display: 'grid', gap: 40, gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', alignItems: 'start' }}>
             <div>
-              <Eyebrow accent>{EVENT.format}</Eyebrow>
-              <Heading as="h1" variant="display">{EVENT.title}</Heading>
+              <Eyebrow accent>{EVENT.title} · {EVENT.format}</Eyebrow>
+              <Heading as="h1" variant="display">Show up live. Get $50 in free Mindy credits.</Heading>
               <Standfirst style={{ marginTop: 18 }}>
-                The easiest way to win federal contracts, with Mindy doing the heavy lifting.
+                Watch the easiest way to win federal contracts, with Mindy doing the heavy lifting. Live
+                attendees walk away with $50 in free credits to run it on their own business.
               </Standfirst>
               <Dateline style={{ marginTop: 18 }}>{when} · Live online · Hosted by Eric Coffie</Dateline>
 
