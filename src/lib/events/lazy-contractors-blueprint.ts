@@ -15,8 +15,8 @@ export const LAZY_CONTRACTORS_BLUEPRINT = {
   dateLabel: 'Saturday, November 28, 2026',
   shortDate: 'Nov 28',
   iso: '2026-11-28',
-  /** Start time not set yet. Fill in (e.g. '11:00 AM ET') and it shows on the page. */
-  timeLabel: '' as string,
+  /** Start time, shown on the page. */
+  timeLabel: '11:00 AM ET' as string,
   format: 'Free live online event',
   /** The tag GHL workflows trigger on. */
   ghlTag: 'MD Lazy Contractors Blueprint',

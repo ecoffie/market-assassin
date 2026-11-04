@@ -58,7 +58,7 @@ export default function RegistrationForm() {
         <h2 className="mp-title" style={{ marginTop: 10 }}>Your seat is saved.</h2>
         <p className="mp-standfirst" style={{ marginTop: 12 }}>
           Check your email for the confirmation. We&apos;ll send your join link before we go live on{' '}
-          {EVENT.dateLabel}. Show up live to get $50 in free Mindy credits.
+          {EVENT.dateLabel}{EVENT.timeLabel ? ` at ${EVENT.timeLabel}` : ''}. Show up live to get $50 in free Mindy credits.
         </p>
       </div>
     );
