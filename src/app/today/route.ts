@@ -36,6 +36,7 @@
 import { NextResponse } from 'next/server';
 import { MAPS_HOME_URL, MAPS_HOME_PATH, MAPS_HOME_IS_APEX } from '@/lib/mindy/maps-home';
 import { siteFooterHtml } from '@/lib/seo/site-links';
+import { LAZY_CONTRACTORS_BLUEPRINT as LCB, lazyBlueprintIsOver } from '@/lib/events/lazy-contractors-blueprint';
 import { getTodayIntel, buildHeroStory, getFeaturedOpportunities, featuredLens, withLens } from '@/lib/today/intel';
 import type { FeaturedOpp, TodayIntel } from '@/lib/today/intel';
 import { estMoneyServer } from '@/lib/opportunities/map-data';
@@ -215,6 +216,12 @@ ${mpFontPreloadLinksHtml({ includeInter: true })}
   body{font-family:Inter,system-ui,sans-serif;color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased}
   /* ── App chrome: top nav + left rail. VERBATIM from opportunity-map ZHEAD/ZRAIL so a visitor
        crossing between /today and the map cannot perceive a boundary. ── */
+  /* Event banner — The Lazy Contractor's Blueprint (Nov 28). Hides itself after the event. */
+  .evbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 14px;margin:0 0 22px;padding:12px 18px;background:var(--mp-navy);color:#fff;text-decoration:none;font:500 14px/1.4 Inter,system-ui,sans-serif}
+  .evbar:hover{background:var(--mp-navy-hover)}
+  .evbar-k{font:700 11px Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;padding:3px 8px;border:1px solid rgba(255,255,255,.5)}
+  .evbar b{font-weight:700}
+  .evbar-c{font-weight:700;text-decoration:underline;text-underline-offset:3px}
   .zhead{position:sticky;top:0;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--line);background:var(--mp-surface);z-index:40}
   .zh-left,.zh-right{display:flex;align-items:center;gap:22px}
   .zh-left a{font:700 16px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}
@@ -479,6 +486,7 @@ ${mpFontPreloadLinksHtml({ includeInter: true })}
   <a href="/opportunity-map/pursuits" title="Pursuits — opportunities you are actively working"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg><span>Pursuits</span></a>
 </nav>
 <div class="main"><div class="wrap">
+  ${lazyBlueprintIsOver() ? '' : `<a class="evbar" href="${LCB.path}"><span class="evbar-k">Free live · ${esc(LCB.shortDate)}</span><span><b>${esc(LCB.title)}</b> — the easiest way to win federal contracts, with Mindy doing the work</span><span class="evbar-c">Register free →</span></a>`}
   <div class="dline"><b>Federal Procurement Desk</b> · ${esc(dateLine)}</div>
 
   <section class="thero">
