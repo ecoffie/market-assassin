@@ -486,7 +486,7 @@ ${mpFontPreloadLinksHtml({ includeInter: true })}
   <a href="/opportunity-map/pursuits" title="Pursuits — opportunities you are actively working"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg><span>Pursuits</span></a>
 </nav>
 <div class="main"><div class="wrap">
-  ${lazyBlueprintIsOver() ? '' : `<a class="evbar" href="${LCB.path}"><span class="evbar-k">Free live · ${esc(LCB.shortDate)}</span><span><b>${esc(LCB.title)}</b> — the easiest way to win federal contracts, with Mindy doing the work</span><span class="evbar-c">Register free →</span></a>`}
+  ${lazyBlueprintIsOver() ? '' : `<a class="evbar" href="${LCB.path}"><span class="evbar-k">Free live · ${esc(LCB.shortDate)}</span><span><b>Show up live, get $50 in free Mindy credits</b> — ${esc(LCB.title)}</span><span class="evbar-c">Register free →</span></a>`}
   <div class="dline"><b>Federal Procurement Desk</b> · ${esc(dateLine)}</div>
 
   <section class="thero">
