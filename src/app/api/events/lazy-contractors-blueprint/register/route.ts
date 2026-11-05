@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { LAZY_CONTRACTORS_BLUEPRINT as EVENT, lazyBlueprintZoomEvent } from '@/lib/events/lazy-contractors-blueprint';
 import { addZoomRegistrant, zoomConfigured } from '@/lib/zoom/client';
 import { registerContactForEvent } from '@/lib/ghl/event-registration';
-import { normalizePhoneNumber } from '@/lib/ghl/sms';
+import { normalizePhoneNumber, sendSmsToContact } from '@/lib/ghl/sms';
 import { normalizeAttribution } from '@/lib/mindy/lead-attribution';
-import { sendLazyBlueprintConfirmation } from '@/lib/events/lazy-blueprint-confirmation-email';
+import { lazyBlueprintWelcomeSms, sendLazyBlueprintConfirmation } from '@/lib/events/lazy-blueprint-confirmation-email';
 
 export const dynamic = 'force-dynamic';
 
@@ -91,6 +91,17 @@ export async function POST(req: NextRequest) {
     if (outcome.status !== 'accepted') console.error('[lazy-blueprint-register] confirmation not sent', outcome);
   } catch (err) {
     console.error('[lazy-blueprint-register] confirmation email error', err instanceof Error ? err.message : err);
+  }
+
+  // Welcome text, only for people who ticked the text-reminder box. Best-effort: sent to the
+  // contact id GHL just returned (never re-matched by phone), and a failure is only logged.
+  if (smsConsent && phoneRaw && result.contactId) {
+    try {
+      const sms = await sendSmsToContact(result.contactId, lazyBlueprintWelcomeSms(firstName));
+      if (!sms.success) console.error('[lazy-blueprint-register] welcome SMS not sent', sms.optedOut ? 'opted out' : sms.error);
+    } catch (err) {
+      console.error('[lazy-blueprint-register] welcome SMS error', err instanceof Error ? err.message : err);
+    }
   }
 
   return NextResponse.json({ success: true });

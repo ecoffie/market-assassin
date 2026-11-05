@@ -38,3 +38,14 @@ describe('Lazy Blueprint confirmation email room note', () => {
     expect(text).toContain('join 10 minutes early');
   });
 });
+
+import { lazyBlueprintWelcomeSms } from './lazy-blueprint-confirmation-email';
+describe('Lazy Blueprint welcome text', () => {
+  it('names the person, the date and time, and says how to opt out, in two segments or less', () => {
+    const t = lazyBlueprintWelcomeSms('Ann');
+    expect(t).toContain("You're in, Ann!");
+    expect(t).toContain('Sat Nov 28 at 11:00 AM ET');
+    expect(t).toContain('Reply STOP to opt out.');
+    expect(t.length).toBeLessThanOrEqual(306);
+  });
+});

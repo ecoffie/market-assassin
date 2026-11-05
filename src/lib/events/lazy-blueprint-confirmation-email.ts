@@ -141,3 +141,9 @@ export async function sendLazyBlueprintConfirmation(params: {
   if (ok) return report.sent ? { status: 'accepted', ...report.sent } : { status: 'unconfirmed' };
   return { status: 'blocked', reason: report.blockedReason ?? 'blocked (no reason reported)' };
 }
+
+/** The welcome text sent right after registration (only with SMS consent). Kept short: one or two segments. */
+export function lazyBlueprintWelcomeSms(firstName: string): string {
+  const name = (firstName || '').trim() || 'there';
+  return `You're in, ${name}! ${EVENT.title} is Sat Nov 28 at ${EVENT.timeLabel || '11:00 AM ET'}. Your join link is in your email. Show up live for $50 in Mindy credits. Reply STOP to opt out.`;
+}
