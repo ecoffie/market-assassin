@@ -37,6 +37,9 @@ export const LAZY_CONTRACTORS_BLUEPRINT = {
   zoomCapacity: 500,
   /** YouTube live link for overflow. Empty until Cash sets up the stream; shown in emails once filled. */
   youtubeOverflowUrl: '' as string,
+  /** Tags the site writes when it sends the confirmation email / welcome text (for counting). */
+  emailConfirmationTag: 'lcb-email-confirmation',
+  smsWelcomeTag: 'lcb-sms-welcome',
   /** Attendance tags written after the event. */
   attendedTag: 'mindy-day-attended',
   noShowTag: 'mindy-day-no-show',

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LAZY_CONTRACTORS_BLUEPRINT as EVENT, lazyBlueprintZoomEvent } from '@/lib/events/lazy-contractors-blueprint';
 import { addZoomRegistrant, zoomConfigured } from '@/lib/zoom/client';
-import { registerContactForEvent } from '@/lib/ghl/event-registration';
+import { changeContactTags, registerContactForEvent } from '@/lib/ghl/event-registration';
 import { normalizePhoneNumber, sendSmsToContact } from '@/lib/ghl/sms';
 import { normalizeAttribution } from '@/lib/mindy/lead-attribution';
 import { lazyBlueprintWelcomeSms, sendLazyBlueprintConfirmation } from '@/lib/events/lazy-blueprint-confirmation-email';
@@ -90,6 +90,7 @@ export async function POST(req: NextRequest) {
   try {
     const outcome = await sendLazyBlueprintConfirmation({ to: email, firstName, joinUrl });
     if (outcome.status !== 'accepted') console.error('[lazy-blueprint-register] confirmation not sent', outcome);
+    else if (result.contactId) await changeContactTags(result.contactId, [EVENT.emailConfirmationTag], 'add').catch(() => {});
   } catch (err) {
     console.error('[lazy-blueprint-register] confirmation email error', err instanceof Error ? err.message : err);
   }
@@ -100,6 +101,7 @@ export async function POST(req: NextRequest) {
     try {
       const sms = await sendSmsToContact(result.contactId, lazyBlueprintWelcomeSms(firstName));
       if (!sms.success) console.error('[lazy-blueprint-register] welcome SMS not sent', sms.optedOut ? 'opted out' : sms.error);
+      else await changeContactTags(result.contactId, [EVENT.smsWelcomeTag], 'add').catch(() => {});
     } catch (err) {
       console.error('[lazy-blueprint-register] welcome SMS error', err instanceof Error ? err.message : err);
     }
