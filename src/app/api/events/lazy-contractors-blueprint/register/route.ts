@@ -37,7 +37,8 @@ export async function POST(req: NextRequest) {
 
   if (!firstName) return NextResponse.json({ success: false, error: 'Please enter your first name.' }, { status: 400 });
   if (!EMAIL_RE.test(email)) return NextResponse.json({ success: false, error: 'Please enter a valid email.' }, { status: 400 });
-  if (phoneRaw && !normalizePhoneNumber(phoneRaw)) {
+  if (!phoneRaw) return NextResponse.json({ success: false, error: 'Please enter your phone number.' }, { status: 400 });
+  if (!normalizePhoneNumber(phoneRaw)) {
     return NextResponse.json({ success: false, error: 'Please enter a valid phone number.' }, { status: 400 });
   }
 

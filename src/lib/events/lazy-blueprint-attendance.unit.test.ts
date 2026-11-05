@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { classifyAttendance, hasZoomLink } from './lazy-blueprint-attendance';
 
 const c = (id: string, email: string, customFields: Array<{ id: string; value: unknown }> = []) =>
-  ({ id, email, firstName: '', lastName: '', tags: [], customFields });
+  ({ id, email, firstName: '', lastName: '', phone: '', tags: [], customFields });
 
 describe('Lazy Blueprint attendance', () => {
   it('counts 60+ seconds as attended, less as no-show, and keeps no-email registrants apart', () => {

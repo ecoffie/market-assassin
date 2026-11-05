@@ -133,6 +133,7 @@ export interface TaggedContact {
   email: string;
   firstName: string;
   lastName: string;
+  phone: string;
   tags: string[];
   customFields: Array<{ id: string; value: unknown }>;
 }
@@ -170,6 +171,7 @@ export async function listContactsByTag(tag: string, fetchImpl: typeof fetch = f
         email: String(c.email || '').toLowerCase(),
         firstName: String(c.firstName || ''),
         lastName: String(c.lastName || ''),
+        phone: String(c.phone || ''),
         tags: (c.tags as string[]) || [],
         customFields: (c.customFields as Array<{ id: string; value: unknown }>) || [],
       });
