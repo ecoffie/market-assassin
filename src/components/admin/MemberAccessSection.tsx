@@ -90,6 +90,27 @@ const SOURCES: { value: GrantSource; label: string }[] = [
   { value: 'other', label: 'Other' },
 ];
 
+/** RFC 4180 CSV: quote every field, double embedded quotes, CRLF rows. */
+function toCsv(headers: string[], rows: (string | number | boolean | null | undefined)[][]): string {
+  const cell = (v: string | number | boolean | null | undefined) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  return [headers, ...rows].map((r) => r.map(cell).join(',')).join('\r\n');
+}
+
+function downloadCsv(filename: string, csv: string) {
+  // BOM so Excel opens UTF-8 names correctly.
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+const today = () => new Date().toISOString().slice(0, 10);
+
 interface Props {
   adminPassword?: string;
   callerEmail?: string | null;
@@ -121,6 +142,7 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
   const [listOpen, setListOpen] = useState(false); // collapse the member list by default — keeps the section compact
   const [hasMore, setHasMore] = useState(false);   // another page exists beyond what's loaded
   const [loadingMore, setLoadingMore] = useState(false);
+  const [exporting, setExporting] = useState<string | null>(null); // progress label while a CSV builds
 
   const authHeaders = useCallback(
     (json = false): HeadersInit => {
@@ -180,6 +202,62 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
 
   useEffect(() => { if (ready) loadLog(); }, [ready, loadLog]);
   useEffect(() => { if (ready && fullMode) loadList(tab); }, [ready, fullMode, tab, loadList]);
+
+  // Export EVERY member in the selected tab — pages through the API (100 per page) rather than
+  // dumping only the rows on screen, so the file matches the tab's count, not the loaded slice.
+  const exportMembers = useCallback(async () => {
+    if (!ready || exporting) return;
+    setExporting('Exporting…');
+    try {
+      const all: MemberRow[] = [];
+      for (let page = 0; page < 500; page++) {
+        const url = withPassword(`/api/admin/members?list=1&tier=${tab}&offset=${all.length}`);
+        const res = await fetch(url, { headers: authHeaders() });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const d = await res.json();
+        const rows: MemberRow[] = d.members || [];
+        all.push(...rows);
+        setExporting(`Exporting… ${all.length.toLocaleString()}`);
+        if (!d.hasMore || rows.length === 0) break;
+      }
+      const csv = toCsv(
+        ['email', 'name', 'tier', 'access_source', 'created_at'],
+        all.map((m) => [m.email, m.name, m.tier, m.accessSource, m.created_at]),
+      );
+      downloadCsv(`mindy-members-${tab}-${today()}.csv`, csv);
+      setMessage({ kind: 'ok', text: `Downloaded ${all.length.toLocaleString()} ${tab === 'all' ? '' : tab + ' '}members.` });
+    } catch (e) {
+      setMessage({ kind: 'err', text: `CSV export failed: ${e instanceof Error ? e.message : 'unknown error'}` });
+    } finally {
+      setExporting(null);
+    }
+  }, [ready, exporting, tab, authHeaders, withPassword]);
+
+  const exportLog = useCallback(async () => {
+    if (!ready || exporting) return;
+    setExporting('Exporting activity…');
+    try {
+      const res = await fetch(withPassword('/api/admin/members?log=1&limit=1000'), { headers: authHeaders() });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const d = await res.json();
+      const rows: LogEntry[] = d.log || [];
+      const csv = toCsv(
+        ['created_at', 'action', 'tier', 'target_email', 'actor_email', 'grant_source', 'note', 'sent_welcome'],
+        rows.map((e) => [e.created_at, e.action, e.tier, e.target_email, e.actor_email, e.grant_source, e.note, e.sent_welcome]),
+      );
+      downloadCsv(`mindy-access-activity-${today()}.csv`, csv);
+      setMessage({
+        kind: 'ok',
+        text: rows.length >= 1000
+          ? 'Downloaded the latest 1,000 activity entries (older entries not included).'
+          : `Downloaded ${rows.length.toLocaleString()} activity entries.`,
+      });
+    } catch (e) {
+      setMessage({ kind: 'err', text: `CSV export failed: ${e instanceof Error ? e.message : 'unknown error'}` });
+    } finally {
+      setExporting(null);
+    }
+  }, [ready, exporting, authHeaders, withPassword]);
 
   const lookup = useCallback(async (override?: string) => {
     const target = (override ?? email).trim();
@@ -288,6 +366,13 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
             </button>
             <button onClick={() => loadList(tab)} className="rounded-lg border border-hairline px-3 py-1.5 text-xs text-muted hover:bg-surface">
               Refresh
+            </button>
+            <button
+              onClick={exportMembers}
+              disabled={!!exporting}
+              className="rounded-lg border border-emerald-500/40 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-surface disabled:opacity-50"
+            >
+              {exporting && exporting.startsWith('Exporting…') ? exporting : `Download CSV${counts ? ` (${counts[tab].toLocaleString()})` : ''}`}
             </button>
           </div>
 
@@ -456,7 +541,12 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
       <div className="mt-6 border-t border-surface pt-5">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-bold text-slate-200">Recent activity</h3>
-          <button onClick={loadLog} className="text-xs text-emerald-400 hover:text-emerald-300">Refresh</button>
+          <div className="flex items-center gap-4">
+            <button onClick={exportLog} disabled={!!exporting} className="text-xs text-emerald-400 hover:text-emerald-300 disabled:opacity-50">
+              {exporting === 'Exporting activity…' ? exporting : 'Download CSV'}
+            </button>
+            <button onClick={loadLog} className="text-xs text-emerald-400 hover:text-emerald-300">Refresh</button>
+          </div>
         </div>
         {log.length === 0 ? (
           <p className="text-sm text-faint">No grants recorded yet.</p>
