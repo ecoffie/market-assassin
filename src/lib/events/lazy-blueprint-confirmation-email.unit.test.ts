@@ -30,3 +30,11 @@ describe('Lazy Blueprint confirmation email with a personal Zoom link', () => {
     expect(renderLazyBlueprintConfirmation('Ann').html).not.toContain('Join the live event');
   });
 });
+
+describe('Lazy Blueprint confirmation email room note', () => {
+  it('tells people the room size and to join early', () => {
+    const { html, text } = renderLazyBlueprintConfirmation('Ann', 'https://us06web.zoom.us/w/1');
+    expect(html).toContain('The room seats 500. Join 10 minutes early.');
+    expect(text).toContain('join 10 minutes early');
+  });
+});

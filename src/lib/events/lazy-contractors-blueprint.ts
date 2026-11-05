@@ -33,6 +33,10 @@ export const LAZY_CONTRACTORS_BLUEPRINT = {
   /** GHL contact field that holds each registrant's personal Zoom link ({{contact.zoom_join_link}}). */
   ghlZoomFieldId: 'Gis0uE1EkzuqDwcl2Gdo',
   ghlZoomFieldKey: 'zoom_join_link',
+  /** Seats in the Zoom room. When it fills, Zoom turns people away: they go to the YouTube overflow. */
+  zoomCapacity: 500,
+  /** YouTube live link for overflow. Empty until Cash sets up the stream; shown in emails once filled. */
+  youtubeOverflowUrl: '' as string,
   /** Attendance tags written after the event. */
   attendedTag: 'mindy-day-attended',
   noShowTag: 'mindy-day-no-show',
