@@ -78,8 +78,8 @@ export default function RegistrationForm() {
       <Field label="Email" htmlFor="lcb-email">
         <Input id="lcb-email" name="email" type="email" autoComplete="email" required maxLength={254} />
       </Field>
-      <Field label="Phone (for event reminders)" htmlFor="lcb-phone">
-        <Input id="lcb-phone" name="phone" type="tel" autoComplete="tel" maxLength={30} />
+      <Field label="Phone" htmlFor="lcb-phone">
+        <Input id="lcb-phone" name="phone" type="tel" autoComplete="tel" required maxLength={30} />
       </Field>
       <label className="mp-meta" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', lineHeight: 1.5 }}>
         <input type="checkbox" name="smsConsent" style={{ marginTop: 3 }} />

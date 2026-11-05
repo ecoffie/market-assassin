@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LAZY_CONTRACTORS_BLUEPRINT as EVENT, lazyBlueprintZoomEvent } from '@/lib/events/lazy-contractors-blueprint';
 import { addZoomRegistrant, zoomConfigured } from '@/lib/zoom/client';
-import { registerContactForEvent } from '@/lib/ghl/event-registration';
-import { normalizePhoneNumber } from '@/lib/ghl/sms';
+import { changeContactTags, registerContactForEvent } from '@/lib/ghl/event-registration';
+import { normalizePhoneNumber, sendSmsToContact } from '@/lib/ghl/sms';
 import { normalizeAttribution } from '@/lib/mindy/lead-attribution';
-import { sendLazyBlueprintConfirmation } from '@/lib/events/lazy-blueprint-confirmation-email';
+import { lazyBlueprintWelcomeSms, sendLazyBlueprintConfirmation } from '@/lib/events/lazy-blueprint-confirmation-email';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +37,8 @@ export async function POST(req: NextRequest) {
 
   if (!firstName) return NextResponse.json({ success: false, error: 'Please enter your first name.' }, { status: 400 });
   if (!EMAIL_RE.test(email)) return NextResponse.json({ success: false, error: 'Please enter a valid email.' }, { status: 400 });
-  if (phoneRaw && !normalizePhoneNumber(phoneRaw)) {
+  if (!phoneRaw) return NextResponse.json({ success: false, error: 'Please enter your phone number.' }, { status: 400 });
+  if (!normalizePhoneNumber(phoneRaw)) {
     return NextResponse.json({ success: false, error: 'Please enter a valid phone number.' }, { status: 400 });
   }
 
@@ -89,8 +90,21 @@ export async function POST(req: NextRequest) {
   try {
     const outcome = await sendLazyBlueprintConfirmation({ to: email, firstName, joinUrl });
     if (outcome.status !== 'accepted') console.error('[lazy-blueprint-register] confirmation not sent', outcome);
+    else if (result.contactId) await changeContactTags(result.contactId, [EVENT.emailConfirmationTag], 'add').catch(() => {});
   } catch (err) {
     console.error('[lazy-blueprint-register] confirmation email error', err instanceof Error ? err.message : err);
+  }
+
+  // Welcome text, only for people who ticked the text-reminder box. Best-effort: sent to the
+  // contact id GHL just returned (never re-matched by phone), and a failure is only logged.
+  if (smsConsent && phoneRaw && result.contactId) {
+    try {
+      const sms = await sendSmsToContact(result.contactId, lazyBlueprintWelcomeSms(firstName));
+      if (!sms.success) console.error('[lazy-blueprint-register] welcome SMS not sent', sms.optedOut ? 'opted out' : sms.error);
+      else await changeContactTags(result.contactId, [EVENT.smsWelcomeTag], 'add').catch(() => {});
+    } catch (err) {
+      console.error('[lazy-blueprint-register] welcome SMS error', err instanceof Error ? err.message : err);
+    }
   }
 
   return NextResponse.json({ success: true });

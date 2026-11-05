@@ -52,28 +52,50 @@ export async function registerContactForEvent(
   const f = opts.fetchImpl ?? fetch;
 
   const phone = reg.phone ? normalizePhoneNumber(reg.phone) : null;
-  const body: Record<string, unknown> = {
-    locationId,
-    email: reg.email.toLowerCase().trim(),
+  const email = reg.email.toLowerCase().trim();
+  // Fields we write. locationId is only sent on create (the update endpoint rejects it).
+  const fields: Record<string, unknown> = {
+    email,
     firstName: reg.firstName.trim(),
     ...(reg.lastName?.trim() ? { lastName: reg.lastName.trim() } : {}),
-    ...(phone ? { phone } : {}),
     source: opts.source,
     ...(opts.customFields?.length ? { customFields: opts.customFields } : {}),
   };
 
+  // MATCH BY EMAIL FIRST. /contacts/upsert can match on PHONE, so a registrant who
+  // reuses a phone already on another contact was merged into THAT contact and kept
+  // its old email: GHL reminders then went to someone else. Look the email up first;
+  // update that contact if it exists, else create a new one. If GHL refuses the phone
+  // (it belongs to another contact), save without it rather than fail the seat.
+  const send = async (method: 'POST' | 'PUT', url: string, body: Record<string, unknown>) => {
+    const res = await f(url, { method, headers: headers(token), body: JSON.stringify(body) });
+    const text = res.ok ? '' : await res.text().catch(() => '');
+    const data = res.ok ? await res.json().catch(() => ({})) : null;
+    return { ok: res.ok, status: res.status, text, data };
+  };
+
   let contactId: string | undefined;
   try {
-    const res = await f(`${GHL_BASE}/contacts/upsert`, { method: 'POST', headers: headers(token), body: JSON.stringify(body) });
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      return { ok: false, error: `GHL upsert ${res.status}: ${text.slice(0, 200)}` };
+    const dup = await f(
+      `${GHL_BASE}/contacts/search/duplicate?locationId=${encodeURIComponent(locationId)}&email=${encodeURIComponent(email)}`,
+      { method: 'GET', headers: headers(token) },
+    );
+    const existingId: string | undefined = dup.ok ? (await dup.json().catch(() => ({})))?.contact?.id : undefined;
+
+    if (existingId) {
+      let r = await send('PUT', `${GHL_BASE}/contacts/${existingId}`, { ...fields, ...(phone ? { phone } : {}) });
+      if (!r.ok && phone) r = await send('PUT', `${GHL_BASE}/contacts/${existingId}`, fields);
+      if (!r.ok) return { ok: false, error: `GHL update ${r.status}: ${r.text.slice(0, 200)}` };
+      contactId = existingId;
+    } else {
+      let r = await send('POST', `${GHL_BASE}/contacts/`, { locationId, ...fields, ...(phone ? { phone } : {}) });
+      if (!r.ok && phone) r = await send('POST', `${GHL_BASE}/contacts/`, { locationId, ...fields });
+      if (!r.ok) return { ok: false, error: `GHL create ${r.status}: ${r.text.slice(0, 200)}` };
+      contactId = r.data?.contact?.id;
     }
-    const data = await res.json().catch(() => ({}));
-    contactId = data?.contact?.id;
-    if (!contactId) return { ok: false, error: 'GHL upsert returned no contact id' };
+    if (!contactId) return { ok: false, error: 'GHL returned no contact id' };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'GHL upsert failed' };
+    return { ok: false, error: err instanceof Error ? err.message : 'GHL contact write failed' };
   }
 
   try {
@@ -111,6 +133,7 @@ export interface TaggedContact {
   email: string;
   firstName: string;
   lastName: string;
+  phone: string;
   tags: string[];
   customFields: Array<{ id: string; value: unknown }>;
 }
@@ -148,6 +171,7 @@ export async function listContactsByTag(tag: string, fetchImpl: typeof fetch = f
         email: String(c.email || '').toLowerCase(),
         firstName: String(c.firstName || ''),
         lastName: String(c.lastName || ''),
+        phone: String(c.phone || ''),
         tags: (c.tags as string[]) || [],
         customFields: (c.customFields as Array<{ id: string; value: unknown }>) || [],
       });
