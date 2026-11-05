@@ -37,7 +37,14 @@ function headers(token: string): HeadersInit {
 
 export async function registerContactForEvent(
   reg: EventRegistrant,
-  opts: { tags: string[]; source: string; note?: string; fetchImpl?: typeof fetch },
+  opts: {
+    tags: string[];
+    source: string;
+    note?: string;
+    /** Contact custom fields to set, e.g. [{ id, key, field_value }]. */
+    customFields?: Array<{ id?: string; key?: string; field_value: string }>;
+    fetchImpl?: typeof fetch;
+  },
 ): Promise<EventRegistrationResult> {
   const token = (process.env.GHL_API_KEY || '').trim();
   const locationId = (process.env.GHL_LOCATION_ID || '').trim();
@@ -52,6 +59,7 @@ export async function registerContactForEvent(
     ...(reg.lastName?.trim() ? { lastName: reg.lastName.trim() } : {}),
     ...(phone ? { phone } : {}),
     source: opts.source,
+    ...(opts.customFields?.length ? { customFields: opts.customFields } : {}),
   };
 
   let contactId: string | undefined;
@@ -96,4 +104,87 @@ export async function registerContactForEvent(
   }
 
   return { ok: true, contactId };
+}
+
+export interface TaggedContact {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  tags: string[];
+  customFields: Array<{ id: string; value: unknown }>;
+}
+
+function ghlEnv(): { token: string; locationId: string } {
+  const token = (process.env.GHL_API_KEY || '').trim();
+  const locationId = (process.env.GHL_LOCATION_ID || '').trim();
+  if (!token || !locationId) throw new Error('GHL not configured');
+  return { token, locationId };
+}
+
+/** Every contact carrying `tag` (GHL stores tags lowercase), paged 500 at a time. */
+export async function listContactsByTag(tag: string, fetchImpl: typeof fetch = fetch): Promise<TaggedContact[]> {
+  const { token, locationId } = ghlEnv();
+  const out: TaggedContact[] = [];
+  let searchAfter: unknown = undefined;
+  for (let page = 0; page < 40; page++) {
+    const res = await fetchImpl(`${GHL_BASE}/contacts/search`, {
+      method: 'POST',
+      headers: headers(token),
+      body: JSON.stringify({
+        locationId,
+        pageLimit: 500,
+        filters: [{ field: 'tags', operator: 'contains', value: tag.toLowerCase() }],
+        sort: [{ field: 'dateAdded', direction: 'desc' }],
+        ...(searchAfter ? { searchAfter } : {}),
+      }),
+    });
+    if (!res.ok) throw new Error(`GHL search ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
+    const data = await res.json();
+    const contacts: Array<Record<string, unknown>> = data.contacts || [];
+    for (const c of contacts) {
+      out.push({
+        id: String(c.id),
+        email: String(c.email || '').toLowerCase(),
+        firstName: String(c.firstName || ''),
+        lastName: String(c.lastName || ''),
+        tags: (c.tags as string[]) || [],
+        customFields: (c.customFields as Array<{ id: string; value: unknown }>) || [],
+      });
+    }
+    if (contacts.length < 500) break;
+    searchAfter = contacts[contacts.length - 1].searchAfter;
+  }
+  return out;
+}
+
+/** Set custom fields on one contact. */
+export async function updateContactFields(
+  contactId: string,
+  customFields: Array<{ id?: string; key?: string; field_value: string }>,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  const { token } = ghlEnv();
+  const res = await fetchImpl(`${GHL_BASE}/contacts/${contactId}`, {
+    method: 'PUT',
+    headers: headers(token),
+    body: JSON.stringify({ customFields }),
+  });
+  if (!res.ok) throw new Error(`GHL update ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
+}
+
+/** Add or remove tags on one contact (the tags endpoint keeps the contact's other tags). */
+export async function changeContactTags(
+  contactId: string,
+  tags: string[],
+  op: 'add' | 'remove',
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  const { token } = ghlEnv();
+  const res = await fetchImpl(`${GHL_BASE}/contacts/${contactId}/tags`, {
+    method: op === 'add' ? 'POST' : 'DELETE',
+    headers: headers(token),
+    body: JSON.stringify({ tags }),
+  });
+  if (!res.ok) throw new Error(`GHL tag ${op} ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
 }

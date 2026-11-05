@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { LAZY_CONTRACTORS_BLUEPRINT as EVENT } from '@/lib/events/lazy-contractors-blueprint';
+import { LAZY_CONTRACTORS_BLUEPRINT as EVENT, lazyBlueprintZoomEvent } from '@/lib/events/lazy-contractors-blueprint';
+import { addZoomRegistrant, zoomConfigured } from '@/lib/zoom/client';
 import { registerContactForEvent } from '@/lib/ghl/event-registration';
 import { normalizePhoneNumber } from '@/lib/ghl/sms';
 import { normalizeAttribution } from '@/lib/mindy/lead-attribution';
@@ -53,9 +54,26 @@ export async function POST(req: NextRequest) {
     attr.utm_source ? `Source: ${attr.utm_source}${attr.utm_campaign ? ` / ${attr.utm_campaign}` : ''}` : '',
   ].filter(Boolean);
 
+  // Personal Zoom link (tracks attendance per registrant). Best-effort: a Zoom problem
+  // never blocks the registration; the person can be added later by the backfill.
+  let joinUrl: string | null = null;
+  const zoomEvent = lazyBlueprintZoomEvent();
+  if (zoomEvent && zoomConfigured()) {
+    try {
+      joinUrl = (await addZoomRegistrant(zoomEvent.kind, zoomEvent.id, { email, firstName, lastName })).joinUrl;
+    } catch (err) {
+      console.error('[lazy-blueprint-register] Zoom registrant failed', err instanceof Error ? err.message : err);
+    }
+  }
+
   const result = await registerContactForEvent(
     { firstName, lastName, email, phone: phoneRaw, smsConsent, ownsBusiness, samRegistered },
-    { tags, source: EVENT.title, note: noteLines.join('\n') },
+    {
+      tags,
+      source: EVENT.title,
+      note: noteLines.join('\n'),
+      ...(joinUrl ? { customFields: [{ id: EVENT.ghlZoomFieldId, key: EVENT.ghlZoomFieldKey, field_value: joinUrl }] } : {}),
+    },
   );
 
   if (!result.ok) {
@@ -69,7 +87,7 @@ export async function POST(req: NextRequest) {
   // Confirmation email. The seat is already saved in GHL, so an email failure is logged,
   // not returned as a failed registration (a retry would create no new seat, only noise).
   try {
-    const outcome = await sendLazyBlueprintConfirmation({ to: email, firstName });
+    const outcome = await sendLazyBlueprintConfirmation({ to: email, firstName, joinUrl });
     if (outcome.status !== 'accepted') console.error('[lazy-blueprint-register] confirmation not sent', outcome);
   } catch (err) {
     console.error('[lazy-blueprint-register] confirmation email error', err instanceof Error ? err.message : err);

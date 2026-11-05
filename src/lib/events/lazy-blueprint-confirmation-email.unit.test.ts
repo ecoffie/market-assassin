@@ -20,3 +20,13 @@ describe('Lazy Blueprint confirmation email', () => {
     expect(renderLazyBlueprintConfirmation('<b>x</b>').html).not.toContain('<b>x</b>');
   });
 });
+
+describe('Lazy Blueprint confirmation email with a personal Zoom link', () => {
+  it('shows the join button and the link in the text version', () => {
+    const { html, text } = renderLazyBlueprintConfirmation('Ann', 'https://us06web.zoom.us/w/123?tk=abc');
+    expect(html).toContain('href="https://us06web.zoom.us/w/123?tk=abc"');
+    expect(html).toContain('Join the live event');
+    expect(text).toContain('https://us06web.zoom.us/w/123?tk=abc');
+    expect(renderLazyBlueprintConfirmation('Ann').html).not.toContain('Join the live event');
+  });
+});
