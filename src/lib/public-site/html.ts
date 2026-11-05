@@ -12,7 +12,9 @@
  *   + mpRawBodyOpen() + pageHtml + mpRawBodyClose() + `</body>`
  */
 import { ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '@/app/opportunity-map/account-menu';
-import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
+// The public-site logo goes to the marketing homepage (getmindy.ai/), not MAPS_HOME_PATH
+// (Today's Intel), since 2026-11-05.
+const SITE_HOME_PATH = '/';
 import { SITE_LINK_GROUPS } from '@/lib/seo/site-links';
 import { MP_FOOTER_TAGLINE, MP_HEADER_ACCOUNT_LINKS, MP_HEADER_PRODUCT_LINKS, MP_LOGO_SRC, type MpChromeLink } from './chrome';
 import { MP_RAW_SITE_CSS, MP_ROOT_PAINT_CSS } from './css';
@@ -32,7 +34,7 @@ export function mpRawHeadHtml(): string {
 /** The homepage header, as markup. */
 export function mpRawHeaderHtml(): string {
   return `<header class="mp-head" data-mp-chrome=""><nav class="mp-head-left" aria-label="Product">${links(MP_HEADER_PRODUCT_LINKS)}</nav>`
-    + `<a href="${esc(MAPS_HOME_PATH)}" title="Mindy" class="mp-logo"><img src="${MP_LOGO_SRC}" alt=""><span>Mindy</span></a>`
+    + `<a href="${esc(SITE_HOME_PATH)}" title="Mindy" class="mp-logo"><img src="${MP_LOGO_SRC}" alt=""><span>Mindy</span></a>`
     + `<nav class="mp-head-right" aria-label="Account">${links(MP_HEADER_ACCOUNT_LINKS)}${ACCOUNT_MENU_HTML}</nav></header>`;
 }
 

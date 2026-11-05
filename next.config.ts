@@ -223,7 +223,12 @@ const nextConfig: NextConfig = {
               value: 'getmindy.ai',
             },
           ],
-          destination: '/today',
+          // 2026-11-05: the apex now serves the Zoom-style marketing homepage (/home).
+          // Today's Intel stays live at /today and is still MAPS_HOME_PATH, so the Maps
+          // logo and post-signout keep landing signed-in users in the product.
+          // ROLLBACK to the product-as-homepage = set this back to '/today' and
+          // MAPS_HOME_PATH back to '/'.
+          destination: '/home',
         },
       {
         source: '/signin',

@@ -30,7 +30,9 @@
 /** Where the logo, "back to home", and post-signout landings go. Relative, for in-app links. */
 // Typed as `string`, not the literal: the whole point is that this value CHANGES at cutover,
 // and a narrowed literal type makes `MAPS_HOME_PATH === '/'` a compile error today.
-export const MAPS_HOME_PATH: string = '/';
+// 2026-11-05: back to '/today' — getmindy.ai/ now serves the marketing homepage (/home),
+// so the product's own front door is /today again and /today self-canonicals.
+export const MAPS_HOME_PATH: string = '/today';
 
 /** Absolute origin of the site. Used for canonical/og:url, which must be absolute. */
 export const MINDY_ORIGIN = 'https://getmindy.ai';
