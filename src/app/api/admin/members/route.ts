@@ -10,7 +10,7 @@
  *      Grants made this way are attributed to `admin@command-center` in the audit.
  *
  *   GET  ?email=<user>   → look up that user's current Pro/Team status
- *   GET  ?log=1          → recent grant/revoke activity (audit trail)
+ *   GET  ?log=1          → recent grant/revoke activity (audit trail); &limit=N (max 1000) for CSV export
  *   POST { email, tier: 'pro'|'team', action: 'grant'|'revoke',
  *          sendWelcome?, customerName? } → apply it
  */
@@ -82,7 +82,9 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
 
   if (searchParams.get('log') === '1') {
-    const log = await getRecentGrants(25);
+    // ?limit= lets the CSV export pull the full trail (one PostgREST page, capped at 1000).
+    const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '25', 10) || 25, 1), 1000);
+    const log = await getRecentGrants(limit);
     return NextResponse.json({ success: true, log }, { headers: { 'Cache-Control': 'no-store' } });
   }
 
