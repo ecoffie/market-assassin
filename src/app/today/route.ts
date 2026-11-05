@@ -228,17 +228,25 @@ ${mpFontPreloadLinksHtml({ includeInter: true })}
   .evbar-t{min-width:0;overflow:hidden;text-overflow:ellipsis}
   .evbar b{font-weight:700}
   .evbar-c{flex:0 0 auto;font-weight:700;text-decoration:underline;text-underline-offset:3px}
-  /* Event pop-up: small card, bottom-right, shown once per visitor after 4s. */
-  .evpop{position:fixed;right:20px;bottom:20px;z-index:70;width:320px;max-width:calc(100vw - 32px);padding:18px 20px 20px;background:var(--mp-surface);border:1px solid var(--line);border-top:3px solid var(--mp-navy);box-shadow:0 10px 30px rgba(18,16,14,.14)}
+  /* Event pop-up: full modal over a dimmed page, shown once per visitor after 4s. */
+  .evpop{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));background:rgba(18,16,14,.55)}
   .evpop[hidden]{display:none}
-  .evpop-x{position:absolute;top:6px;right:8px;width:30px;height:30px;border:0;background:none;color:var(--sub);font:400 22px/1 Inter,system-ui,sans-serif;cursor:pointer}
+  .evpop-card{position:relative;width:100%;max-width:560px;max-height:100%;overflow:auto;background:var(--mp-surface);border-top:5px solid var(--mp-navy);box-shadow:0 24px 60px rgba(18,16,14,.35);padding:40px 40px 34px;text-align:center}
+  .evpop-x{position:absolute;top:10px;right:12px;width:40px;height:40px;border:0;background:none;color:var(--sub);font:400 28px/1 Inter,system-ui,sans-serif;cursor:pointer}
   .evpop-x:hover{color:var(--ink)}
-  .evpop-k{display:block;font:700 11px Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--stamp);padding-right:24px}
-  .evpop-h{margin-top:10px;font:700 1.15rem/1.35 "Libre Baskerville",Georgia,serif;color:var(--ink)}
-  .evpop-t{margin-top:8px;font:400 14px/1.5 Inter,system-ui,sans-serif;color:var(--body)}
-  .evpop-b{display:block;margin-top:14px;padding:11px 14px;background:var(--mp-navy);color:#fff;text-align:center;text-decoration:none;font:700 14px Inter,system-ui,sans-serif}
+  .evpop-k{display:block;font:700 12px Inter,system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--stamp)}
+  .evpop-h{margin-top:16px;font:700 clamp(1.7rem,4.5vw,2.3rem)/1.2 "Libre Baskerville",Georgia,serif;color:var(--ink);text-wrap:balance}
+  .evpop-n{margin-top:10px;font:400 1.05rem/1.5 "Libre Baskerville",Georgia,serif;color:var(--ink)}
+  .evpop-t{margin:16px auto 0;max-width:42ch;font:400 16px/1.6 Inter,system-ui,sans-serif;color:var(--body)}
+  .evpop-l{margin:20px auto 0;max-width:40ch;padding:0;list-style:none;text-align:left;display:grid;gap:10px;font:400 15px/1.5 Inter,system-ui,sans-serif;color:var(--body)}
+  .evpop-l li{position:relative;padding-left:22px}
+  .evpop-l li::before{content:"";position:absolute;left:4px;top:.55em;width:8px;height:8px;background:var(--mp-navy)}
+  .evpop-b{display:block;margin-top:26px;padding:16px 18px;background:var(--mp-navy);color:#fff;text-align:center;text-decoration:none;font:700 17px Inter,system-ui,sans-serif}
   .evpop-b:hover{background:var(--mp-navy-hover)}
-  @media(max-width:760px){.evpop{right:16px;left:16px;width:auto;bottom:calc(76px + env(safe-area-inset-bottom))}}
+  .evpop-s{margin-top:12px;font:400 13px Inter,system-ui,sans-serif;color:var(--sub)}
+  .evpop-later{margin-top:6px;border:0;background:none;color:var(--sub);font:500 14px Inter,system-ui,sans-serif;text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:6px}
+  @media(max-width:560px){.evpop-card{padding:34px 22px 24px}}
+  body.evpop-open{overflow:hidden}
   .has-evbar .zrail{top:92px;height:calc(100vh - 92px);height:calc(100dvh - 92px)}
   @media(max-width:760px){
     .evbar{height:auto;flex-wrap:wrap;gap:6px 10px;padding:9px 14px;white-space:normal;text-align:center}
@@ -625,20 +633,33 @@ ${/* ACCOUNT_MENU_JS ships its OWN <script> tags (see account-menu.ts) — wrapp
      page LOOKED perfect because the account menu is the only thing that script powers. */''}
 ${ACCOUNT_MENU_JS}
 ${YOUR_MARKET_JS}
-${evbarOn ? `<div class="evpop" id="evpop" role="dialog" aria-labelledby="evpop-h" hidden>
-  <button type="button" class="evpop-x" id="evpop-x" aria-label="Close">×</button>
-  <span class="evpop-k">Free live event · ${esc(LCB.shortDate)}${LCB.timeLabel ? ` · ${esc(LCB.timeLabel)}` : ''}</span>
-  <p class="evpop-h" id="evpop-h">Show up live, get $50 in free Mindy credits</p>
-  <p class="evpop-t">${esc(LCB.title)}: Eric shows the easiest way to win federal contracts, with Mindy doing the work.</p>
-  <a class="evpop-b" id="evpop-b" href="${LCB.path}">Save my free seat</a>
+${evbarOn ? `<div class="evpop" id="evpop" role="dialog" aria-modal="true" aria-labelledby="evpop-h" hidden>
+  <div class="evpop-card">
+    <button type="button" class="evpop-x" id="evpop-x" aria-label="Close">×</button>
+    <span class="evpop-k">Free live event · ${esc(LCB.dateLabel)}${LCB.timeLabel ? ` · ${esc(LCB.timeLabel)}` : ''}</span>
+    <p class="evpop-h" id="evpop-h">Show up live. Get $50 in free Mindy credits.</p>
+    <p class="evpop-n">${esc(LCB.title)}</p>
+    <p class="evpop-t">Eric Coffie goes live to show the easiest way to win federal contracts, with Mindy doing the heavy lifting.</p>
+    <ul class="evpop-l">
+      <li>How small businesses find contracts that fit, without searching SAM.gov for hours</li>
+      <li>A live look at Mindy finding real contracts for real businesses</li>
+      <li>$50 in free Mindy credits for live attendees</li>
+    </ul>
+    <a class="evpop-b" id="evpop-b" href="${LCB.path}">Save My Free Seat</a>
+    <p class="evpop-s">Free to attend. No credit card.</p>
+    <button type="button" class="evpop-later" id="evpop-later">Maybe later</button>
+  </div>
 </div>
 <script>(function(){var K="lcb-popup-${LCB.iso}";try{if(localStorage.getItem(K))return}catch(e){}
 var el=document.getElementById("evpop");if(!el)return;
-function done(){el.hidden=true;try{localStorage.setItem(K,"1")}catch(e){}}
+function mark(){try{localStorage.setItem(K,"1")}catch(e){}}
+function done(){el.hidden=true;document.body.classList.remove("evpop-open");mark()}
 document.getElementById("evpop-x").addEventListener("click",done);
-document.getElementById("evpop-b").addEventListener("click",function(){try{localStorage.setItem(K,"1")}catch(e){}});
+document.getElementById("evpop-later").addEventListener("click",done);
+el.addEventListener("click",function(e){if(e.target===el)done()});
+document.getElementById("evpop-b").addEventListener("click",mark);
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!el.hidden)done()});
-setTimeout(function(){el.hidden=false},4000);})();</script>` : ''}
+setTimeout(function(){el.hidden=false;document.body.classList.add("evpop-open");var b=document.getElementById("evpop-b");if(b)b.focus()},4000);})();</script>` : ''}
 </body></html>`;
 }
 
