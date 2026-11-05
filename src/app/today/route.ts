@@ -36,6 +36,7 @@
 import { NextResponse } from 'next/server';
 import { MAPS_HOME_URL, MAPS_HOME_PATH, MAPS_HOME_IS_APEX } from '@/lib/mindy/maps-home';
 import { siteFooterHtml } from '@/lib/seo/site-links';
+import { LAZY_CONTRACTORS_BLUEPRINT as LCB, lazyBlueprintIsOver } from '@/lib/events/lazy-contractors-blueprint';
 import { getTodayIntel, buildHeroStory, getFeaturedOpportunities, featuredLens, withLens } from '@/lib/today/intel';
 import type { FeaturedOpp, TodayIntel } from '@/lib/today/intel';
 import { estMoneyServer } from '@/lib/opportunities/map-data';
@@ -140,6 +141,7 @@ function render(intel: TodayIntel, featured: FeaturedOpp[], tiles: MarketTile[])
   const observation = share >= 40
     ? `${topAg!.display} generated ${share >= 60 ? 'two-thirds' : 'more than a third'} of all new opportunities this week.`
     : '';
+  const evbarOn = !lazyBlueprintIsOver();
   const dateLine = new Date().toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
   });
@@ -215,6 +217,35 @@ ${mpFontPreloadLinksHtml({ includeInter: true })}
   body{font-family:Inter,system-ui,sans-serif;color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased}
   /* ── App chrome: top nav + left rail. VERBATIM from opportunity-map ZHEAD/ZRAIL so a visitor
        crossing between /today and the map cannot perceive a boundary. ── */
+  /* Event banner — The Lazy Contractor's Blueprint (Nov 28), pinned above the header. Banner +
+     header share one sticky block (.ztop). On desktop the banner is a fixed 40px so the fixed
+     left rail can start under it; on phones the rail is a bottom bar, so the banner may wrap. */
+  .ztop{position:sticky;top:0;z-index:45}
+  .ztop .zhead{position:static}
+  .evbar{display:flex;align-items:center;justify-content:center;gap:14px;height:40px;padding:0 18px;background:var(--mp-navy);color:#fff;text-decoration:none;font:500 14px/1.3 Inter,system-ui,sans-serif;white-space:nowrap;overflow:hidden}
+  .evbar:hover{background:var(--mp-navy-hover)}
+  .evbar-k{flex:0 0 auto;font:700 11px Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;padding:3px 8px;border:1px solid rgba(255,255,255,.5)}
+  .evbar-t{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .evbar b{font-weight:700}
+  .evbar-c{flex:0 0 auto;font-weight:700;text-decoration:underline;text-underline-offset:3px}
+  /* Event pop-up: small card, bottom-right, shown once per visitor after 4s. */
+  .evpop{position:fixed;right:20px;bottom:20px;z-index:70;width:320px;max-width:calc(100vw - 32px);padding:18px 20px 20px;background:var(--mp-surface);border:1px solid var(--line);border-top:3px solid var(--mp-navy);box-shadow:0 10px 30px rgba(18,16,14,.14)}
+  .evpop[hidden]{display:none}
+  .evpop-x{position:absolute;top:6px;right:8px;width:30px;height:30px;border:0;background:none;color:var(--sub);font:400 22px/1 Inter,system-ui,sans-serif;cursor:pointer}
+  .evpop-x:hover{color:var(--ink)}
+  .evpop-k{display:block;font:700 11px Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--stamp);padding-right:24px}
+  .evpop-h{margin-top:10px;font:700 1.15rem/1.35 "Libre Baskerville",Georgia,serif;color:var(--ink)}
+  .evpop-t{margin-top:8px;font:400 14px/1.5 Inter,system-ui,sans-serif;color:var(--body)}
+  .evpop-b{display:block;margin-top:14px;padding:11px 14px;background:var(--mp-navy);color:#fff;text-align:center;text-decoration:none;font:700 14px Inter,system-ui,sans-serif}
+  .evpop-b:hover{background:var(--mp-navy-hover)}
+  @media(max-width:760px){.evpop{right:16px;left:16px;width:auto;bottom:calc(76px + env(safe-area-inset-bottom))}}
+  .has-evbar .zrail{top:92px;height:calc(100vh - 92px);height:calc(100dvh - 92px)}
+  @media(max-width:760px){
+    .evbar{height:auto;flex-wrap:wrap;gap:6px 10px;padding:9px 14px;white-space:normal;text-align:center}
+    .evbar-t{overflow:visible}
+    .evbar-n{display:none}
+    .has-evbar .zrail{top:auto;height:auto}
+  }
   .zhead{position:sticky;top:0;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--line);background:var(--mp-surface);z-index:40}
   .zh-left,.zh-right{display:flex;align-items:center;gap:22px}
   .zh-left a{font:700 16px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}
@@ -456,7 +487,9 @@ ${mpFontPreloadLinksHtml({ includeInter: true })}
   ${ACCOUNT_MENU_CSS}
   ${MP_ACCOUNT_OVERRIDES_CSS}
   ${mpA11yCss('')}
-</style></head><body>
+</style></head><body${evbarOn ? ' class="has-evbar"' : ''}>
+<div class="ztop">
+${evbarOn ? `<a class="evbar" href="${LCB.path}"><span class="evbar-k">Free live · ${esc(LCB.shortDate)}</span><span class="evbar-t"><b>Show up live, get $50 in free Mindy credits</b><span class="evbar-n"> — ${esc(LCB.title)}</span></span><span class="evbar-c">Register free →</span></a>` : ''}
 <header class="zhead">
   <nav class="zh-left">
     <a href="/opportunity-map">Opportunities</a>
@@ -472,6 +505,7 @@ ${mpFontPreloadLinksHtml({ includeInter: true })}
     ${ACCOUNT_MENU_HTML}
   </nav>
 </header>
+</div>
 <nav class="zrail">
   <a href="/opportunity-map" title="Map"><svg viewBox="0 0 24 24"><path d="M12 21s-7-5.2-7-11a7 7 0 0114 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg><span>Map</span></a>
   <a href="/opportunity-map/saved" title="Watchlist — saved searches &amp; new matches"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg><span>Watchlist</span></a>
@@ -591,6 +625,20 @@ ${/* ACCOUNT_MENU_JS ships its OWN <script> tags (see account-menu.ts) — wrapp
      page LOOKED perfect because the account menu is the only thing that script powers. */''}
 ${ACCOUNT_MENU_JS}
 ${YOUR_MARKET_JS}
+${evbarOn ? `<div class="evpop" id="evpop" role="dialog" aria-labelledby="evpop-h" hidden>
+  <button type="button" class="evpop-x" id="evpop-x" aria-label="Close">×</button>
+  <span class="evpop-k">Free live event · ${esc(LCB.shortDate)}${LCB.timeLabel ? ` · ${esc(LCB.timeLabel)}` : ''}</span>
+  <p class="evpop-h" id="evpop-h">Show up live, get $50 in free Mindy credits</p>
+  <p class="evpop-t">${esc(LCB.title)}: Eric shows the easiest way to win federal contracts, with Mindy doing the work.</p>
+  <a class="evpop-b" id="evpop-b" href="${LCB.path}">Save my free seat</a>
+</div>
+<script>(function(){var K="lcb-popup-${LCB.iso}";try{if(localStorage.getItem(K))return}catch(e){}
+var el=document.getElementById("evpop");if(!el)return;
+function done(){el.hidden=true;try{localStorage.setItem(K,"1")}catch(e){}}
+document.getElementById("evpop-x").addEventListener("click",done);
+document.getElementById("evpop-b").addEventListener("click",function(){try{localStorage.setItem(K,"1")}catch(e){}});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!el.hidden)done()});
+setTimeout(function(){el.hidden=false},4000);})();</script>` : ''}
 </body></html>`;
 }
 
