@@ -30,7 +30,10 @@ export function lazyBlueprintCalendarUrl(): string {
   );
 }
 
-export function renderLazyBlueprintConfirmation(firstName: string): { subject: string; html: string; text: string } {
+export function renderLazyBlueprintConfirmation(
+  firstName: string,
+  joinUrl?: string | null,
+): { subject: string; html: string; text: string } {
   const name = esc((firstName || '').trim() || 'there');
   const cal = lazyBlueprintCalendarUrl();
   const when = `${EVENT.dateLabel}${EVENT.timeLabel ? ` at ${EVENT.timeLabel}` : ''}`;
@@ -63,7 +66,11 @@ export function renderLazyBlueprintConfirmation(firstName: string): { subject: s
         <tr><td style="padding:24px 32px 0;">
           <p style="margin:0 0 14px;font-size:16px;line-height:1.6;color:#3A352E;">Your seat is saved. On ${esc(when)}, Eric Coffie goes live to show the easiest way to win federal contracts, with Mindy doing the heavy lifting.</p>
           <p style="margin:0 0 14px;font-size:16px;line-height:1.6;color:#3A352E;"><strong style="color:#12100E;">Show up live and you get $50 in free Mindy credits.</strong> Live attendees only.</p>
-          <p style="margin:0;font-size:16px;line-height:1.6;color:#3A352E;">We&rsquo;ll email your join link before we go live. Keep an eye on your inbox.</p>
+          ${joinUrl
+            ? `<p style="margin:0 0 12px;font-size:16px;line-height:1.6;color:#3A352E;">This is your personal link to join. Please don&rsquo;t share it: it&rsquo;s how we know you were there for the $50.</p>
+          <p style="margin:0;text-align:center;"><a href="${esc(joinUrl)}" style="display:inline-block;background-color:#1B3A6B;color:#ffffff;padding:14px 28px;text-decoration:none;font-weight:700;font-size:15px;">Join the live event</a></p>
+          <p style="margin:14px 0 0;padding:12px 14px;background-color:#FFFAEB;border:1px solid #FEDF89;font-size:14px;line-height:1.6;color:#3A352E;"><strong>The room seats ${EVENT.zoomCapacity}. Join 10 minutes early.</strong> ${EVENT.youtubeOverflowUrl ? `If it&rsquo;s full, watch live here: <a href="${esc(EVENT.youtubeOverflowUrl)}" style="color:#1B3A6B;">YouTube livestream</a>. You can still claim your $50 from there.` : 'If it&rsquo;s full, we&rsquo;ll send a YouTube livestream link so you can still watch and claim your $50.'}</p>`
+            : `<p style="margin:0;font-size:16px;line-height:1.6;color:#3A352E;">We&rsquo;ll email your join link before we go live. Keep an eye on your inbox.</p>`}
         </td></tr>
 
         <tr><td style="padding:24px 32px 0;">
@@ -94,7 +101,8 @@ export function renderLazyBlueprintConfirmation(firstName: string): { subject: s
     `${when} · Live online`,
     '',
     'Show up live and you get $50 in free Mindy credits. Live attendees only.',
-    "We'll email your join link before we go live.",
+    joinUrl ? `Your personal join link (please don't share it): ${joinUrl}` : "We'll email your join link before we go live.",
+    `The room seats ${EVENT.zoomCapacity}, so join 10 minutes early.${EVENT.youtubeOverflowUrl ? ` If it's full, watch on YouTube: ${EVENT.youtubeOverflowUrl}` : ''}`,
     '',
     `Add to Google Calendar: ${cal}`,
     '',
@@ -112,8 +120,9 @@ export type LazyBlueprintConfirmationOutcome =
 export async function sendLazyBlueprintConfirmation(params: {
   to: string;
   firstName: string;
+  joinUrl?: string | null;
 }): Promise<LazyBlueprintConfirmationOutcome> {
-  const { subject, html, text } = renderLazyBlueprintConfirmation(params.firstName);
+  const { subject, html, text } = renderLazyBlueprintConfirmation(params.firstName, params.joinUrl);
   const report: { sent?: { providerMessageId: string | null }; blockedReason?: string } = {};
   const ok = await sendEmail({
     to: params.to,
