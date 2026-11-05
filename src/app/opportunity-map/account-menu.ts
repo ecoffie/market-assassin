@@ -56,7 +56,20 @@ export const ACCOUNT_MENU_CSS =
   + '.mindy-acct-menu a svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}'
   + '.mindy-acct-menu .sep{height:1px;background:var(--hair,#f0f3f7);margin:4px 0}'
   + '.mindy-acct-menu a.out{color:#e5484d}'
-  + '.mindy-acct-menu a.out:hover{background:#fff5f5}';
+  + '.mindy-acct-menu a.out:hover{background:#fff5f5}'
+  // Logged-out chrome (html.mindy-anon, set by paintSignedOut). The left workspace rail is for
+  // signed-in work (Watchlist / Saved / Pursuits), so a visitor never sees it — the content takes
+  // the rail's column instead. Desktop only: phones already hide the rail behind the hamburger.
+  + '.mindy-anon-link{font:600 14px Inter,system-ui,sans-serif;color:var(--ink,#111c26);text-decoration:none;white-space:nowrap;cursor:pointer}'
+  + '.mindy-anon-link:hover{text-decoration:underline;text-underline-offset:3px}'
+  + '@media(max-width:640px){.mindy-anon-link{display:none!important}}'
+  + '@media(min-width:641px){'
+  +   'html.mindy-anon .zrail{display:none!important}'
+  +   'html.mindy-anon .main{margin-left:0!important}'
+  +   'html.mindy-anon .actionbar{left:0!important}'
+  +   'html.mindy-anon .app{grid-template-columns:0 minmax(0,1fr) 400px!important}'
+  +   'html.mindy-anon .app.collapsed{grid-template-columns:0 minmax(0,1fr) 0px!important}'
+  + '}';
 
 // ── HTML ────────────────────────────────────────────────────────────────────
 // The avatar button + the dropdown. Rendered in the top-right of every page.
@@ -143,7 +156,14 @@ export const ACCOUNT_MENU_JS = '<script>'
   // /api/app/me has ACCEPTED the token, "signed-out" for none/expired/401. A late listener reads
   // window.__mindySession. Display only — the server still verifies every call.
   + 'function announce(s){window.__mindySession=s;try{document.dispatchEvent(new CustomEvent("mindy:session",{detail:s}));}catch(e){}}'
-  + 'function paintSignedOut(){announce("signed-out");menu.classList.remove("open");btn.setAttribute("aria-expanded","false");var hd0=document.getElementById("mindyAcctHd");if(hd0)hd0.style.display="none";var out=document.getElementById("mindyAcctOut");if(out)out.style.display="none";btn.classList.add("mindy-acct-signin");btn.innerHTML="Log In";btn.setAttribute("title","Log in");btn.setAttribute("aria-label","Log in");btn.onclick=function(e){e.stopPropagation();if(typeof window.openSignInModal==="function"){window.openSignInModal("Log in to Mindy",function(){location.reload();});return;}location.href="/app?next="+encodeURIComponent(location.pathname+location.search);};}'
+  // Logged OUT (Zoom-style, 2026-11-05): the page gets html.mindy-anon (shared CSS hides the left
+  // workspace rail), the avatar button becomes "Sign up free", and a "Contact sales" link + a
+  // "Sign in" link are inserted just before it. Both open the SAME sign-in pop-up as before —
+  // "Sign up free" opens it on its "Create your free account" step. Without a pop-up on the page
+  // they fall back to /signup and /app?next=<this page>.
+  + 'function openAuth(signup){if(typeof window.openSignInModal==="function"){window.openSignInModal("Log in to Mindy",function(){location.reload();});if(signup){var c=document.getElementById("lgmCreate");if(c)c.click();}return;}if(signup){location.href="/signup";return;}location.href="/app?next="+encodeURIComponent(location.pathname+location.search);}'
+  + 'function addAnonLinks(){if(document.getElementById("mindyAnonSignIn"))return;var p=wrap.parentNode;if(!p)return;var cs=document.createElement("a");cs.id="mindyAnonSales";cs.className="mindy-anon-link";cs.href="mailto:hello@getmindy.ai?subject=Mindy%20sales%20question";cs.textContent="Contact sales";var si=document.createElement("a");si.id="mindyAnonSignIn";si.className="mindy-anon-link mindy-anon-signin";si.href="#";si.setAttribute("role","button");si.textContent="Sign in";si.onclick=function(e){e.preventDefault();openAuth(false);};p.insertBefore(cs,wrap);p.insertBefore(si,wrap);}'
+  + 'function paintSignedOut(){announce("signed-out");try{document.documentElement.classList.add("mindy-anon");}catch(e){}menu.classList.remove("open");btn.setAttribute("aria-expanded","false");var hd0=document.getElementById("mindyAcctHd");if(hd0)hd0.style.display="none";var out=document.getElementById("mindyAcctOut");if(out)out.style.display="none";btn.classList.add("mindy-acct-signin");btn.innerHTML="Sign up free";btn.setAttribute("title","Sign up free");btn.setAttribute("aria-label","Sign up free");btn.onclick=function(e){e.stopPropagation();openAuth(true);};addAnonLinks();}'
   + 'function paintInitial(name,email){var ini=initials(name,email);if(!ini)return;btn.classList.remove("mindy-acct-signin");btn.innerHTML="<span class=\\"mindy-acct-ini\\">"+esc(ini)+"</span>";btn.setAttribute("title",name||email||"Account");btn.setAttribute("aria-label",ariaWho(name,email));}'
   + 'function renderAvatar(name,picture){paintInitial(name,em);if(!picture)return;var img=new Image();img.referrerPolicy="no-referrer";img.alt="";img.onload=function(){btn.innerHTML="";btn.appendChild(img);};img.onerror=function(){paintInitial(name,em);};img.src=picture;}'
   + 'function renderHeader(name){var hd=document.getElementById("mindyAcctHd");if(!hd)return;var nmEl=document.getElementById("mindyAcctNm"),emEl=document.getElementById("mindyAcctEm");if(name){nmEl.textContent=name;emEl.textContent=em;}else{nmEl.textContent=em;emEl.textContent="";}hd.style.display="block";}'
