@@ -32,7 +32,7 @@ export function mpTokenDeclarations(): string {
  */
 export const MP_ROOT_PAINT_CSS =
   `html{background-color:${MP_COLORS.paper};color-scheme:light}`
-  + `html body{margin:0;background-color:${MP_COLORS.paper};color:${MP_COLORS.ink}}`
+  + `html body{background-color:${MP_COLORS.paper};color:${MP_COLORS.ink};margin:0}`
   + `::-webkit-scrollbar-track{background:${MP_COLORS.wash}}`
   + `::-webkit-scrollbar-thumb{background:${MP_COLORS.line}}`
   + `::-webkit-scrollbar-thumb:hover{background:${MP_COLORS.faint}}`;
