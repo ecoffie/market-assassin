@@ -1,5 +1,7 @@
 import { ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '@/app/opportunity-map/account-menu';
-import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
+// The public-site logo goes to the marketing homepage (getmindy.ai/), not MAPS_HOME_PATH
+// (Today's Intel), since 2026-11-05.
+const SITE_HOME_PATH = '/';
 import { MP_HEADER_ACCOUNT_LINKS, MP_HEADER_PRODUCT_LINKS, MP_LOGO_SRC } from '@/lib/public-site/chrome';
 import PublicAccountMenu from './PublicAccountMenu';
 
@@ -15,7 +17,7 @@ export default function PublicHeader() {
           <a key={l.href} href={l.href}>{l.label}</a>
         ))}
       </nav>
-      <a href={MAPS_HOME_PATH} title="Mindy" className="mp-logo">
+      <a href={SITE_HOME_PATH} title="Mindy" className="mp-logo">
         {/* eslint-disable-next-line @next/next/no-img-element -- the protected brand mark, same file and markup as the homepage */}
         <img src={MP_LOGO_SRC} alt="" />
         <span>Mindy</span>

@@ -597,7 +597,7 @@ const CSS = `
 .up .tasks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .up .task{border:1px solid var(--mp-line);border-radius:8px;padding:12px;background:var(--mp-surface);text-align:left;display:flex;flex-direction:column;gap:20px;min-height:110px;transition:.15s}
 .up .task:hover{border-color:var(--mp-navy)}
-.up .task .box{width:18px;height:18px;border-radius:4px;border:1.5px solid var(--mp-faint);display:grid;place-items:center;color:transparent;background:#fff}
+.up .task .box{width:18px;height:18px;border-radius:4px;border:1.5px solid var(--mp-faint);display:grid;place-items:center;color:var(--mp-surface);background:var(--mp-surface)}
 .up .task .box svg{width:11px;height:11px}
 .up .task.on{border-color:var(--mp-navy);background:var(--mp-navy-wash)}
 .up .task.on .box{background:var(--mp-navy);border-color:var(--mp-navy);color:#fff}
