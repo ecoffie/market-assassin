@@ -3,6 +3,7 @@ import { LAZY_CONTRACTORS_BLUEPRINT as EVENT } from '@/lib/events/lazy-contracto
 import { registerContactForEvent } from '@/lib/ghl/event-registration';
 import { normalizePhoneNumber } from '@/lib/ghl/sms';
 import { normalizeAttribution } from '@/lib/mindy/lead-attribution';
+import { sendLazyBlueprintConfirmation } from '@/lib/events/lazy-blueprint-confirmation-email';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,5 +65,15 @@ export async function POST(req: NextRequest) {
       { status: 502 },
     );
   }
+
+  // Confirmation email. The seat is already saved in GHL, so an email failure is logged,
+  // not returned as a failed registration (a retry would create no new seat, only noise).
+  try {
+    const outcome = await sendLazyBlueprintConfirmation({ to: email, firstName });
+    if (outcome.status !== 'accepted') console.error('[lazy-blueprint-register] confirmation not sent', outcome);
+  } catch (err) {
+    console.error('[lazy-blueprint-register] confirmation email error', err instanceof Error ? err.message : err);
+  }
+
   return NextResponse.json({ success: true });
 }
