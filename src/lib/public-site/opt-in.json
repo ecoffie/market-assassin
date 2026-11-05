@@ -166,7 +166,8 @@
     "/legal/referral-terms",
     "/ncmbc",
     "/mdeat",
-    "/lazy-contractors-blueprint"
+    "/lazy-contractors-blueprint",
+    "/lazy-contractors-blueprint/program"
   ],
   "parityRoutes": [
     "/today",

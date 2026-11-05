@@ -22,6 +22,14 @@ export const LAZY_CONTRACTORS_BLUEPRINT = {
   ghlTag: 'MD Lazy Contractors Blueprint',
   /** Extra tag when the registrant checks the SMS consent box. */
   smsOptInTag: 'sms-opt-in',
+  /** Interest form for the New Year program (shown after the Mindy sign-up). */
+  programPath: '/lazy-contractors-blueprint/program',
+  programName: 'Lazy Contractor First Contract Program',
+  programStartLabel: 'January 2027',
+  /** Everyone who fills in the interest form. */
+  programInterestTag: 'MD LCB Program Interest',
+  /** Added when they say they are ready to start in January. */
+  programHotTag: 'MD LCB Program Hot',
 } as const;
 
 /** True once the event day is over (ET). The banner hides itself after this. */
