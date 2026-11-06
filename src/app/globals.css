@@ -30,6 +30,12 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-inter);
   --font-mono: var(--font-jetbrains-mono);
+}
+
+/* Non-inline on purpose: these compile to var(--color-*) instead of literals,
+   so the signed-in app's light look (src/app/app/mi-light.css) can redefine
+   them under .mi-light. Values are unchanged, so dark pages look the same. */
+@theme {
 
   /* ─────────────────────────────────────────────────────────────────────────
      SEMANTIC DESIGN TOKENS (Phase 1 — de-vibe-coding, Jul 2026)

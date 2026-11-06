@@ -5,6 +5,7 @@ import { WELCOME_PATH } from '@/lib/mindy/post-signup-destination';
 import { encodePendingNext, oauthOnboardingRedirect, onboardingRedirectPath, PENDING_NEXT_KEY, readPendingNext, signInReturnPath } from '@/lib/mindy/sign-in-return';
 import { useSearchParams } from 'next/navigation';
 import UnifiedSidebar, { type AppPanel, type AppTier } from '@/components/app/UnifiedSidebar';
+import AppNavTabs from '@/components/app/AppNavTabs';
 import GlobalLookup from '@/components/app/GlobalLookup';
 import ProductTour from '@/components/app/ProductTour';
 import PanelContainer from '@/components/app/panels';
@@ -1575,6 +1576,17 @@ function AppDashboard() {
         {/* Thin-profile nudge: users on generic-only codes get a one-line describe
             prompt → real keywords + sharper matches (reuses onboarding's describe path). */}
         <CapabilityNudge email={email} />
+
+        {/* Tabs for the active sidebar group (nav-groups.ts) — only when it has 2+ pages.
+            Tab clicks use the same handlePanelChange as the sidebar. */}
+        <AppNavTabs
+          activePanel={activePanel}
+          onPanelChange={handlePanelChange}
+          userTier={tier}
+          coachModeAllowed={coachModeAllowed}
+          canSeePrototypes={canSeePrototypes}
+          userEmail={email}
+        />
 
         {/* Panel Content */}
         <PanelContainer
