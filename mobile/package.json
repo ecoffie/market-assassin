@@ -1,0 +1,26 @@
+{
+  "name": "mindy-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mindy iOS + Android app (Capacitor shell around getmindy.ai/app)",
+  "scripts": {
+    "assets": "capacitor-assets generate --ios --android --iconBackgroundColor '#1e3a8a' --iconBackgroundColorDark '#1e3a8a' --splashBackgroundColor '#1e3a8a' --splashBackgroundColorDark '#0f172a'",
+    "sync": "cap sync",
+    "ios": "cap open ios",
+    "android": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/browser": "^8.0.5",
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/ios": "^8.6.0",
+    "@capacitor/push-notifications": "^8.1.3",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^4.0.0",
+    "@capacitor/cli": "^8.6.0"
+  }
+}
