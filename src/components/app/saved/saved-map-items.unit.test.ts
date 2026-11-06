@@ -55,7 +55,7 @@ describe('saved map rows → kind + record link', () => {
     const opp = toSavedMapItem({ notice_id: SAM, title: 'Unknown Opportunity' })!;
     expect(opp.title).toBe(`Notice ${SAM}`);
     expect(opp.canStartPursuit).toBe(true);
-    expect(toSavedMapItem({ notice_id: 'C1', source: 'recompete_map' })!.canStartPursuit).toBe(true);
+    expect(toSavedMapItem({ notice_id: 'C1', source: 'recompete_map', opportunity_data: { solicitationNumber: 'P1' } })!.canStartPursuit).toBe(true);
     expect(toSavedMapItem({ notice_id: 'U1', source: 'company_map' })!.canStartPursuit).toBe(false);
     expect(toSavedMapItem({ notice_id: 'B1', source: 'buyer_map' })!.canStartPursuit).toBe(false);
   });
@@ -97,5 +97,23 @@ describe('saved searches', () => {
     );
     expect(items[0]).toMatchObject({ name: 'FL cyber', modeLabel: 'Open opportunities', summary: 'in FL', alertsOn: true, newCount: 4, mapHref: '/opportunity-map?ss=id-1' });
     expect(items[1]).toMatchObject({ name: 'Saved search', modeLabel: 'Recompetes', newCount: null });
+  });
+});
+
+describe('pursuit key for recompete favorites', () => {
+  it('uses the PIID (suffix stripped), not the contract_id', () => {
+    const item = toSavedMapItem({ notice_id: 'CONT_AWD_N0018926F0012_9700', source: 'recompete_map', title: 'Base ops', opportunity_data: { entityType: 'recompete', solicitationNumber: 'N0018926F0012 (+3 more)' } })!;
+    expect(item.kind).toBe('recompete');
+    expect(item.pursuitNoticeId).toBe('N0018926F0012');
+    expect(pursuitBodyFor(item, 'a@b.co').notice_id).toBe('N0018926F0012');
+  });
+  it('offers no Start pursuit for a recompete without a PIID', () => {
+    const item = toSavedMapItem({ notice_id: 'CONT_AWD_X', source: 'recompete_map', opportunity_data: { entityType: 'recompete' } })!;
+    expect(item.canStartPursuit).toBe(false);
+  });
+  it('keeps the notice id for opportunities', () => {
+    const item = toSavedMapItem({ notice_id: '006d77f604a74dd0a16c99d041e6c032', title: 'Roofs' })!;
+    expect(item.pursuitNoticeId).toBe('006d77f604a74dd0a16c99d041e6c032');
+    expect(item.canStartPursuit).toBe(true);
   });
 });

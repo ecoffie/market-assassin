@@ -63,3 +63,14 @@ describe('Saved page record links match the shared helpers, per kind', () => {
     expect(SRC).not.toContain(`href="/opportunity-map?opp='+encodeURIComponent(o.nid)`);
   });
 });
+
+describe('Saved page Start Pursuit keys a recompete on its PIID', () => {
+  it('replaces the contract_id with the cleaned solicitationNumber before POST /api/pipeline', () => {
+    const a = SRC.indexOf('window.startPursuit=function(btn){');
+    expect(a).toBeGreaterThan(0);
+    const block = SRC.slice(a, SRC.indexOf("fetch('/api/pipeline'", a));
+    expect(block).toContain("recordKind(r)==='recompete'");
+    expect(block).toContain('_od.solicitationNumber');
+    expect(block).toContain('notice_id: _pnid');
+  });
+});

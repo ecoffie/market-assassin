@@ -634,9 +634,14 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     btn.disabled=true; btn.querySelector('span').textContent='Starting\\u2026';
     var vr=(r.intel_value_range&&typeof r.intel_value_range==='object')?r.intel_value_range:null;
     var val=(vr&&typeof vr.median==='number'&&vr.median>0)?String(vr.median):(r.estimated_value!=null?String(r.estimated_value):'');
+    // A recompete favorite is saved under its contract_id (CONT_AWD_...), which the pipeline writer
+    // rejects as a notice id: the pursuit would get no notice_id and no duplicate protection. Key it
+    // on the PIID instead, the same id the map's "Track this recompete" uses.
+    var _pnid=nid;
+    try{ if(typeof recordKind==='function'&&recordKind(r)==='recompete'){ var _od=r.opportunity_data||{}; var _piid=String(_od.solicitationNumber||'').replace(/\\s*\\(\\+\\d+ more\\)\\s*$/i,'').trim(); if(_piid)_pnid=_piid; } }catch(e){}
     var body={
       user_email: em,
-      notice_id: nid,
+      notice_id: _pnid,
       title: realTitle(r)||o.sol||('Saved opportunity '+nid),
       agency: r.agency||'',
       naics_code: o.naics||'',

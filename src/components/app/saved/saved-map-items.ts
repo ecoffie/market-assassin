@@ -58,6 +58,19 @@ export interface SavedMapItem {
   mapHref: string | null;
   /** Only opportunity-like rows can become a pursuit (companies and buyers are not bids). */
   canStartPursuit: boolean;
+  /**
+   * The id a pursuit is keyed on. Opportunities: the notice id. Recompetes: the PIID
+   * (opportunity_data.solicitationNumber), NOT the contract_id the favorite is saved under. The
+   * pipeline writer drops ids that fail isValidSamNoticeId, and a CONT_AWD_… contract_id fails it,
+   * which would leave the pursuit with no notice_id and no duplicate protection. Same key the
+   * map's "Track this recompete" uses.
+   */
+  pursuitNoticeId: string | null;
+}
+
+/** "N0018926F0012 (+3 more)" → "N0018926F0012" (the vehicle rollup's suffix). */
+function cleanPiid(v: unknown): string {
+  return str(v).replace(/\s*\(\+\d+ more\)\s*$/i, '').trim();
 }
 
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
@@ -112,7 +125,13 @@ export function toSavedMapItem(row: SavedOppRow): SavedMapItem | null {
     savedAt: str(row.created_at) || null,
     source: str(row.source) || null,
     mapHref: savedRowMapLink(row, kind),
-    canStartPursuit: kind === 'opportunity' || kind === 'forecast' || kind === 'recompete',
+    ...(() => {
+      const pursuitNoticeId = kind === 'recompete' ? cleanPiid(row.opportunity_data?.solicitationNumber) || null : recordId;
+      return {
+        pursuitNoticeId,
+        canStartPursuit: (kind === 'opportunity' || kind === 'forecast' || kind === 'recompete') && !!pursuitNoticeId,
+      };
+    })(),
   };
 }
 
@@ -134,7 +153,7 @@ export function pursuitBodyFor(item: SavedMapItem, email: string): Record<string
   return {
     user_email: email,
     title: item.title,
-    notice_id: item.recordId,
+    notice_id: item.pursuitNoticeId || item.recordId,
     agency: item.agency || undefined,
     response_deadline: item.deadline || undefined,
     source: 'opportunity_map',
