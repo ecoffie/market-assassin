@@ -55,17 +55,43 @@ jobs:
           name: mindy-android-PREVIEW-apk
           path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
 
+  # iOS simulator builds. No Apple account needed: upload the zip to appetize.io to run the
+  # app in a browser (works from an iPhone), or drag App.app onto a Mac's Simulator.
   ios:
     runs-on: macos-15
+    strategy:
+      matrix:
+        target: [prod, preview]
     defaults: { run: { working-directory: mobile } }
     steps:
       - uses: actions/checkout@v4
+        if: matrix.target == 'prod' || github.event_name == 'pull_request'
       - uses: actions/setup-node@v4
+        if: matrix.target == 'prod' || github.event_name == 'pull_request'
         with: { node-version: 22 }
       - run: npm ci
+        if: matrix.target == 'prod' || github.event_name == 'pull_request'
+      - name: Point the app at this PR's Vercel preview
+        if: matrix.target == 'preview' && github.event_name == 'pull_request'
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          SLUG=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g')
+          node scripts/set-server-url.mjs "https://market-assassin-git-${SLUG}-eric-coffies-projects.vercel.app"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Mindy Preview" ios/App/App/Info.plist
       - run: npx cap sync ios
-      - run: |
+        if: matrix.target == 'prod' || github.event_name == 'pull_request'
+      - name: Build for iOS Simulator
+        if: matrix.target == 'prod' || github.event_name == 'pull_request'
+        run: |
           xcodebuild -project ios/App/App.xcodeproj -scheme App \
             -sdk iphonesimulator -configuration Debug \
             -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO build
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+          ditto -c -k --sequesterRsrc --keepParent \
+            build/Build/Products/Debug-iphonesimulator/App.app mindy-ios-simulator.zip
+      - uses: actions/upload-artifact@v4
+        if: matrix.target == 'prod' || github.event_name == 'pull_request'
+        with:
+          name: mindy-ios-simulator-${{ matrix.target == 'preview' && 'PREVIEW' || 'prod' }}
+          path: mobile/mindy-ios-simulator.zip

@@ -39,6 +39,11 @@ node scripts/set-server-url.mjs --reset   # never commit a preview URL
 Social sign-in on a preview only works if Supabase → Auth → URL Configuration allows
 `https://*-eric-coffies-projects.vercel.app/**` as a redirect URL.
 
+## Test on iPhone without a Mac or Apple account
+CI uploads **mindy-ios-simulator-prod** and (on PRs) **mindy-ios-simulator-PREVIEW**. Unzip the GitHub
+download once to get `mindy-ios-simulator.zip`, upload that to **appetize.io** (free tier), and run
+the app in any browser, including Safari on your iPhone. No push notifications in a simulator.
+
 ## Regenerate icons / splash
 Replace `resources/icon-only.png` (1024²) or `resources/splash.png` (2732²), then `npm run assets && npx cap sync`.
 
