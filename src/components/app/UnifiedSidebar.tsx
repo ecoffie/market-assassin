@@ -332,7 +332,7 @@ export default function UnifiedSidebar({
                   w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
                   transition-all duration-150
                   ${isActive
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    ? 'bg-purple-500/15 text-purple-300 border border-purple-500/30'
                     : !locked
                       ? 'text-ink-soft hover:bg-surface hover:text-white'
                       : 'text-faint hover:bg-purple-500/10 hover:text-purple-300 cursor-pointer'
