@@ -1303,14 +1303,16 @@ const ZLAYOUT_CSS = '<style>'
   // ============================================================================
   // MOBILE (phone ≤640px) — the map + list can't sit side-by-side on a phone, so
   // this collapses the 3-column desktop grid into a Zillow-style single surface:
-  //   • LIST default (full-width results), MAP as a full-screen overlay behind it
-  //   • a floating "Map"/"List" toggle (#mToggle) flips body.m-map
+  //   • MAP default (full screen, Zillow 2026-11-06); the LIST sits behind it
+  //   • #mToggle is a bottom bar on the map ("N opportunities … · List") and a floating
+  //     "Map" pill on the list; it flips body.m-list
+  //   • tapping a pin shows its card as a bottom card (#mCard) instead of a map popup
   //   • the fixed icon rail is hidden → a hamburger (#mHam) opens a drawer (#mDrawer)
   //   • the top nav links collapse (they live in the drawer); only logo + hamburger stay
   // Desktop is untouched — every rule is inside this one media query. Mobile-only
   // elements (#mHam/#mToggle/#mDrawer) render on every viewport but are display:none
   // above 640px (see the base rules just below, gated by the same breakpoint).
-  + '#mHam,#mToggle,#mDrawer,#mScrim{display:none}'
+  + '#mHam,#mToggle,#mDrawer,#mScrim,#mCard{display:none}'
   + '@media(max-width:640px){'
   // 1) Grid → single column. zmap + zcards share ONE cell (row 3); we toggle which is
   //    visible. Header row stays; the ztop (search+filters) row stays full-width.
@@ -1337,26 +1339,65 @@ const ZLAYOUT_CSS = '<style>'
   // 4) Search/filters row. ⚠️ NEVER overflow:auto/hidden/scroll on .ztop — absolute dropdowns
   //    (Horizons, Sort, search suggestions, sheets) nest under it and get CLIPPED (same permanent
   //    rule as .fscroll). Pills shrink via nowrap + min-width:0; search absorbs the squeeze.
-  +   '.ztop{padding:8px 12px!important;gap:6px!important;overflow:visible!important}'
-  +   '.zsearch{max-width:none!important;flex:1 1 auto!important;min-width:120px!important}'
-  // 5) The two content layers share row 3 (grid-area:zcards). LIST is the default —
-  //    full-width, scrolls. MAP is positioned to fill the same cell but hidden until
-  //    body.m-map. Using grid-area (not fixed) so it respects the header/ztop rows.
+  +   '.ztop{padding:8px 12px!important;gap:8px!important;overflow:visible!important;flex-wrap:wrap!important}'
+  +   '.zsearch{max-width:none!important;flex:1 1 100%!important;min-width:0!important;height:44px!important;border-radius:999px!important}'
+  // Filter chips: compact and WRAPPED onto as many rows as they need. Before this they were one
+  // nowrap row and every chip past the screen edge (Agency, Industry, Filters, Save search) was
+  // unreachable on a phone. Wrapping, not a sideways scroller: .fscroll must never carry a
+  // clipping overflow (filter-bar-overflow.unit.test.ts — it broke the dropdowns three times).
+  +   '.ztop .fbar{flex:1 1 100%!important;min-width:0!important;width:100%!important}'
+  +   '.ztop .fbar .fscroll{flex-wrap:wrap!important;row-gap:6px!important;column-gap:6px!important}'
+  +   '.ztop .fbar .fscroll .fsel{height:34px!important;padding-top:0!important;padding-bottom:0!important;font-size:13.5px!important}'
+  +   '.ztop .fbar .fscroll button.fsel{padding-left:11px!important;padding-right:11px!important;gap:5px!important}'
+  +   '.ztop .fbar .fscroll button.fsel-mode{padding-right:27px!important;background-position:right 9px center!important}'
+  +   '.ztop .fbar .fscroll select.fsel{padding-left:11px!important;padding-right:28px!important;background-position:right 9px center!important}'
+  // Save search floats on the map's top-right (Zillow) so the chips fit in two rows.
+  +   '#saveSearchBtn{position:fixed!important;right:12px;top:calc(var(--m-top,200px) + 10px);z-index:1200;height:36px!important;'
+  +     'padding:0 14px!important;border-radius:999px!important;box-shadow:0 2px 10px rgba(16,24,40,.2)!important}'
+  +   'body.m-list #saveSearchBtn{position:static!important;box-shadow:none!important}'
+  // 5) The two content layers share row 3 (grid-area:zcards). MAP is the default (Zillow,
+  //    2026-11-06); the LIST fills the same cell but stays hidden until body.m-list. Using
+  //    grid-area (not fixed) so it respects the header/ztop rows.
   +   '.panel{grid-area:zcards!important;border-left:0!important;border-top:1px solid var(--line)!important;'
-  +     'width:100%!important;min-width:0!important;z-index:2}'
-  +   '.mapwrap{grid-area:zcards!important;border-top:1px solid var(--line);z-index:1;'
-  +     'visibility:hidden;pointer-events:none}'
+  +     'width:100%!important;min-width:0!important;z-index:2;visibility:hidden;pointer-events:none}'
+  +   '.mapwrap{grid-area:zcards!important;border-top:1px solid var(--line);z-index:3}'
   // Feed padding trims for phone width.
   +   '.feed{padding:12px 12px 90px!important}'
-  //    body.m-map: show MAP, hide LIST.
-  +   'body.m-map .mapwrap{visibility:visible!important;pointer-events:auto!important;z-index:3!important}'
-  +   'body.m-map .panel{visibility:hidden!important;pointer-events:none!important}'
-  // 6) Floating Map/List toggle — bottom-center pill (Zillow). Above the map, below the drawer.
-  +   '#mToggle{display:inline-flex!important;align-items:center;gap:7px;position:fixed;left:50%;'
-  +     'bottom:20px;transform:translateX(-50%);z-index:1400;border:0;cursor:pointer;'
-  +     'background:#111c26;color:#fff;font:700 14px Inter,system-ui,sans-serif;padding:12px 20px;'
-  +     'border-radius:22px;box-shadow:0 6px 20px rgba(16,24,40,.28)}'
-  +   '#mToggle svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}'
+  //    body.m-list: show LIST, hide MAP.
+  +   'body.m-list .panel{visibility:visible!important;pointer-events:auto!important;z-index:3!important}'
+  +   'body.m-list .mapwrap{visibility:hidden!important;pointer-events:none!important}'
+  // Map controls (zoom, legend, attribution) sit above the bottom bar.
+  +   '.mapwrap .leaflet-bottom{bottom:86px!important}'
+  // The map's count pill is mirrored into the bottom bar (#mToggleCount, same words, including
+  // "N not shown on map"), so it is hidden here rather than shown twice.
+  +   '#mapCount{display:none!important}'
+  // Pin popups render as a bottom card (#mCard) on phones; MOBILE_JS moves the popup's own content
+  // into it, so the in-map bubble is hidden (it was clipped under the header on a 390px screen).
+  +   '.mapwrap .leaflet-popup{visibility:hidden!important}'
+  +   '#mCard{display:block!important;position:fixed;left:10px;right:10px;bottom:96px;z-index:1300;max-height:min(50vh,440px);'
+  +     'overflow-y:auto;background:#fff;border-radius:16px;box-shadow:0 12px 32px rgba(16,24,40,.28);'
+  +     'transform:translateY(calc(100% + 120px));transition:transform .22s cubic-bezier(.4,0,.2,1);-webkit-overflow-scrolling:touch}'
+  +   'body.m-card #mCard{transform:none}'
+  +   'body.m-list #mCard{display:none!important}'
+  +   '#mCardBody{padding:4px 2px 6px}'
+  +   '#mCardBody .leaflet-popup-content{margin:0!important;width:auto!important}'
+  +   '#mCardX{position:sticky;top:8px;float:right;margin:8px 8px 0 0;z-index:2;width:34px;height:34px;border:0;border-radius:50%;'
+  +     'background:#fff;box-shadow:0 1px 4px rgba(16,24,40,.2);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center}'
+  +   '#mCardX svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round}'
+  // 6) The toggle. On the MAP it is a bottom bar (Zillow's results sheet): a handle, the map's
+  //    count, and "List". On the LIST it is a floating "Map" pill, bottom-center.
+  +   '#mToggle{display:flex!important;align-items:center;gap:10px;position:fixed;left:0;right:0;bottom:0;'
+  +     'z-index:1400;border:0;cursor:pointer;background:#fff;color:var(--ink);text-align:left;'
+  +     'font:700 14px Inter,system-ui,sans-serif;padding:22px 18px calc(16px + env(safe-area-inset-bottom,0px));'
+  +     'border-radius:18px 18px 0 0;box-shadow:0 -6px 20px rgba(16,24,40,.14)}'
+  +   '#mToggle::before{content:"";position:absolute;top:8px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:99px;background:#d5dbe2}'
+  +   '#mToggleCount{flex:1;min-width:0;font:700 15px/1.3 Inter,system-ui,sans-serif;color:var(--ink)}'
+  +   '#mToggleLbl{color:var(--jan,#2563eb)}'
+  +   '#mToggle svg{width:17px;height:17px;flex:none;color:var(--jan,#2563eb);stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}'
+  +   'body.m-list #mToggle{left:50%;right:auto;bottom:20px;transform:translateX(-50%);gap:7px;padding:12px 20px;'
+  +     'background:#111c26;color:#fff;border-radius:22px;box-shadow:0 6px 20px rgba(16,24,40,.28)}'
+  +   'body.m-list #mToggle::before,body.m-list #mToggleCount{display:none}'
+  +   'body.m-list #mToggleLbl,body.m-list #mToggle svg{color:#fff}'
   // 7) Slide-in drawer (the rail, as a menu) + scrim.
   +   '#mScrim{display:block!important;position:fixed;inset:0;background:rgba(16,24,40,.42);'
   +     'z-index:1500;opacity:0;pointer-events:none;transition:opacity .2s}'
@@ -1569,8 +1610,13 @@ const LEGEND_HTML = '';
 // routes; the two map-mode links call setMapMode (already defined by VIEWPORT_JS).
 const MOBILE_HTML = ''
   + '<button id="mToggle" onclick="window.__mToggle&&window.__mToggle()">'
-  +   '<svg id="mToggleIcon" viewBox="0 0 24 24"><path d="M9 3L4 5v16l5-2 6 2 5-2V3l-5 2-6-2z"/><path d="M9 3v16M15 5v16"/></svg>'
-  +   '<span id="mToggleLbl">Map</span></button>'
+  +   '<span id="mToggleCount">Opportunities in this area</span>'
+  +   '<svg id="mToggleIcon" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>'
+  +   '<span id="mToggleLbl">List</span></button>'
+  // Bottom card for a tapped pin (phones). MOBILE_JS fills #mCardBody with the pin popup's content.
+  + '<div id="mCard" role="dialog" aria-label="Opportunity"><button id="mCardX" type="button" aria-label="Close"'
+  +   ' onclick="window.__mCloseCard&&window.__mCloseCard()"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>'
+  +   '<div id="mCardBody"></div></div>'
   + '<div id="mScrim" onclick="window.__mDrawer&&window.__mDrawer(false)"></div>'
   + '<nav id="mDrawer" aria-label="Navigation">'
   +   '<div class="md-brand"><img src="/brand/mindy-logo-icon.png" alt=""/><b>Mindy</b></div>'
@@ -1594,39 +1640,54 @@ const MOBILE_HTML = ''
 // paints correctly after being visibility:hidden); body.m-drawer = drawer open. Both no-ops on
 // desktop (the elements are display:none). Guarded so a missing `map` never throws.
 const MOBILE_JS = '<script>(function(){'
+  // Same breakpoint as the mobile CSS. (Not offsetParent: #mToggle is position:fixed, and a fixed
+  // element's offsetParent is always null, so that test was never true.)
+  + 'function phone(){try{return window.matchMedia("(max-width:640px)").matches;}catch(e){return false;}}'
   + 'window.__mToggle=function(){'
-  +   'var on=document.body.classList.toggle("m-map");'
-  +   'var lbl=document.getElementById("mToggleLbl");if(lbl)lbl.textContent=on?"List":"Map";'
+  +   'var list=document.body.classList.toggle("m-list");'
+  +   'var lbl=document.getElementById("mToggleLbl");if(lbl)lbl.textContent=list?"Map":"List";'
   +   'var ic=document.getElementById("mToggleIcon");'
-  +   'if(ic)ic.innerHTML=on'
-  +     '?\'<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/>\''  // list icon
-  +     ':\'<path d="M9 3L4 5v16l5-2 6 2 5-2V3l-5 2-6-2z"/><path d="M9 3v16M15 5v16"/>\';'  // map icon
-  +   'if(on){try{setTimeout(function(){try{map.invalidateSize();fitView&&fitView();}catch(e){}},60);}catch(e){}}'
+  +   'if(ic)ic.innerHTML=list'
+  +     '?\'<path d="M9 3L4 5v16l5-2 6 2 5-2V3l-5 2-6-2z"/><path d="M9 3v16M15 5v16"/>\''  // map icon
+  +     ':\'<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/>\';'  // list icon
+  +   'if(list){try{window.__mCloseCard();}catch(e){}}'
+  +   'else{try{setTimeout(function(){try{map.invalidateSize();}catch(e){}},60);}catch(e){}}'
   + '};'
   + 'window.__mDrawer=function(open){document.body.classList.toggle("m-drawer",!!open);};'
-  // EMAIL ARRIVALS LAND ON THE MAP, NOT THE LIST (2026-08-19).
-  // MEASURED on a real iPhone viewport: "Open Today's Map" in the daily alert landed on
-  // the LIST with no map visible — the email promises a map, the destination showed rows.
-  // Mission Control: 1,141 alert opens -> 49 reached the map (4.3%), and email opens skew
-  // to phones. Scoped to ?src=alert ONLY, so a normal mobile visit keeps its deliberate
-  // list-first default. Desktop is unaffected (the mobile chrome is display:none there).
-  // ⚠️ THIS MUST LIVE HERE, in the same IIFE that DEFINES __mToggle. Earlier attempts put
-  // it in the boot script and in a self-arming interval; both failed silently — this route
-  // emits several <script> IIFEs and there are TWO boot paths (finishBoot, and one that
-  // calls releaseFit()+__mapRefetch() directly). Defining it beside its only dependency
-  // removes both failure modes. (See the cross-script-block class in route.ts:1671.)
-  // Gate on the MOBILE TOGGLE BUTTON being visible (offsetParent!==null): that button is
-  // display:none on desktop, so this is the honest "am I on the mobile chrome?" test and
-  // desktop never gets the class at all. (Setting it there was inert — the chrome is hidden
-  // and desktop rendered fine — but a no-op class on a surface I said I would not touch is
-  // still a lie in the diff.)
-  + 'if(/[?&]src=alert/.test(location.search)){'
-  +   'setTimeout(function(){try{'
-  +     'var tb=document.getElementById("mToggleLbl");'
-  +     'if(!tb||tb.offsetParent===null)return;'
-  +     'if(!document.body.classList.contains("m-map"))window.__mToggle();'
-  +   '}catch(e){}},400);'
-  + '}'
+  // The MAP is the phone default since 2026-11-06 (Zillow), so email arrivals (?src=alert) land on
+  // the map with no special case — the old list-first default and its ?src=alert override are gone.
+  //
+  // Bottom bar count: the same words as the map's count pill (#mapCount, hidden on phones), so the
+  // map-truth line ("N not shown on map") still reaches the user. Polled lightly: #mapCount is
+  // rewritten by several render paths and is created after this script runs.
+  + 'var _lastTop=0;setInterval(function(){try{if(!phone())return;var zt=document.querySelector(".ztop");if(!zt)return;'
+  +   'var b=Math.round(zt.getBoundingClientRect().bottom);if(b!==_lastTop){_lastTop=b;document.documentElement.style.setProperty("--m-top",b+"px");}'
+  + '}catch(e){}},400);'
+  + 'var _lastCt=null;setInterval(function(){try{'
+  +   'var mc=document.getElementById("mapCount"),out=document.getElementById("mToggleCount");if(!out)return;'
+  +   'var t=(mc&&!mc.hidden&&mc.textContent.trim())||"Opportunities in this area";'
+  +   'if(t!==_lastCt){_lastCt=t;out.textContent=t;}'
+  + '}catch(e){}},400);'
+  // Pin tap → bottom card. The popup still opens (its telemetry and CTA wiring run first); a tick
+  // later its content nodes are MOVED into #mCard (moved, not copied, so listeners come along) and
+  // the in-map bubble stays hidden by CSS. Leaflet rebuilds the popup content on every open.
+  + 'window.__mCloseCard=function(){document.body.classList.remove("m-card");try{map.closePopup();}catch(e){}'
+  +   'var bd=document.getElementById("mCardBody");if(bd)bd.innerHTML="";};'
+  + 'var _wired=false;var _wt=setInterval(function(){'
+  +   'if(_wired){clearInterval(_wt);return;}'
+  +   'if(typeof map==="undefined"||!map||!map.on||typeof L==="undefined")return;'
+  +   '_wired=true;clearInterval(_wt);'
+  +   'if(phone()){try{L.Popup.prototype.options.autoPan=false;}catch(e){}}'
+  +   'map.on("popupopen",function(ev){if(!phone())return;setTimeout(function(){try{'
+  +     'var src=ev.popup&&ev.popup._contentNode;var bd=document.getElementById("mCardBody");if(!src||!bd)return;'
+  +     'bd.innerHTML="";var wrap=document.createElement("div");wrap.className="leaflet-popup-content";'
+  +     'while(src.firstChild)wrap.appendChild(src.firstChild);bd.appendChild(wrap);'
+  +     'var card=document.getElementById("mCard");if(card)card.scrollTop=0;'
+  +     'document.body.classList.add("m-card");'
+  +   '}catch(e){}},0);});'
+  +   'map.on("popupclose",function(){if(!phone())return;document.body.classList.remove("m-card");'
+  +     'var bd=document.getElementById("mCardBody");if(bd)bd.innerHTML="";});'
+  + '},300);'
   // Close the drawer on Escape / back-gesture safety.
   + 'document.addEventListener("keydown",function(e){if(e.key==="Escape")window.__mDrawer(false);});'
   + '})();</script>';
