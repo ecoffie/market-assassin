@@ -130,7 +130,8 @@ export const SITE_NAV_CSS = [
   // Phone menu (☰). Hidden above 620px.
   '.mp-burger,.mp-menu{display:none}',
   '@media(max-width:620px){'
-    + '.mp-head .mp-anon:not(.mp-su){display:none}'
+    // Logged out, the bar is just logo + menu button (Zoom); Sign in / Sign up free live in the menu.
+    + '.mp-head .mp-anon{display:none!important}'
     + '.mp-burger{display:flex;align-items:center;justify-content:center;width:44px;height:44px;margin-right:-8px;border:0;background:none;color:var(--mp-ink);cursor:pointer;border-radius:10px;flex:none}'
     + '.mp-burger svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}'
     + '.mp-burger-close{display:none}html.mp-menu-open .mp-burger-open{display:none}html.mp-menu-open .mp-burger-close{display:block}'
