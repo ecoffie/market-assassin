@@ -41,6 +41,7 @@ import { fetchPursuitDocsAuto } from '@/lib/grants/fetch-grant-docs';
 import { isValidSamNoticeId } from '@/lib/sam/utils';
 import { isCleanValueEstimate } from '@/lib/pipeline/value-estimate';
 import { lookupSamOpportunityForPipeline } from '@/lib/pipeline/sam-opportunity-lookup';
+import { RECOMPETE_PURSUIT_SOURCE } from '@/lib/recompete/pursuit-key';
 import { computeNextAction } from '@/lib/pipeline/next-action';
 import { resolveDiscoveredAt } from '@/lib/pipeline/discovered-at';
 import { familyAttachmentForNotice } from '@/lib/sam/solicitation-family';
@@ -180,7 +181,11 @@ export async function createCanonicalPursuit(
   // user_pipeline has no notice_type column.
   delete body.notice_type;
 
-  const samMatch = await lookupSamOpportunityForPipeline(db, {
+  // A recompete pursuit is keyed on its contract's PIID. The SAM lookup resolves a PIID that
+  // equals some notice's solicitation number to THAT notice, which would swap in an unrelated
+  // notice id and backfill its bid deadline onto a contract whose expiry is not a deadline.
+  const isRecompete = body.source === RECOMPETE_PURSUIT_SOURCE;
+  const samMatch = isRecompete ? null : await lookupSamOpportunityForPipeline(db, {
     noticeId: body.notice_id as string | undefined,
     title: body.title as string,
     agency: body.agency as string | undefined,
@@ -207,7 +212,7 @@ export async function createCanonicalPursuit(
   // Backfill response_deadline from the SAM cache when the caller didn't supply
   // one. Several save paths hand us an opportunity whose deadline was empty in
   // their feed, so the pursuit lands with "No deadline" though SAM has the date.
-  if (!body.response_deadline && body.notice_id && isValidSamNoticeId(body.notice_id as string)) {
+  if (!isRecompete && !body.response_deadline && body.notice_id && isValidSamNoticeId(body.notice_id as string)) {
     try {
       const { data: samRow } = await db
         .from('sam_opportunities')

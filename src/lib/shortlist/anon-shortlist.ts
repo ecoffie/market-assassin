@@ -383,5 +383,24 @@ export async function claimAnonShortlist(
   }
 
   const copy = await copyClaimedToSavedList(db, email, toCopy);
+  if (copy.copyFailed > 0 && toCopy.length > 0) {
+    // The copy failed, but the rows are already marked claimed, and the next claim only reads
+    // UNCLAIMED rows: the saves would stay stranded for good. Hand them back (only the ones THIS
+    // call claimed for THIS account) so the next sign-in claims and copies them again. Re-copying
+    // every claimed row on each claim instead would resurrect saves the user later removed.
+    const claimedIds = shortlist.filter((r) => toCopy.includes(r.notice_id)).map((r) => r.id);
+    const { error: undoErr } = await db
+      .from('anonymous_shortlist')
+      .update({ claimed_at: null, claimed_by: null })
+      .in('id', claimedIds)
+      .eq('owner_anon_id', owner)
+      .eq('claimed_by', email);
+    if (undoErr) {
+      console.error(`[anon-shortlist] could not release ${claimedIds.length} claim(s) for retry: ${undoErr.message}`);
+      return { ok: true, attached, failed, ...copy };
+    }
+    // Released: report them as not transferred this time (left for retry), not as attached.
+    return { ok: true, attached: Math.max(0, attached - claimedIds.length), failed: failed + claimedIds.length, ...copy };
+  }
   return { ok: true, attached, failed, ...copy };
 }

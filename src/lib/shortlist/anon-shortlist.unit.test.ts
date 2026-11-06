@@ -42,6 +42,7 @@ function mkDb(opts: {
 } = {}) {
   const seen: string[] = [];
   const upserts: { table: string; rows: Record<string, unknown>[]; opts: Record<string, unknown> }[] = [];
+  const updates: Record<string, unknown>[] = [];
   let listReads = 0;
   const make = (table: string) => {
     seen.push(table);
@@ -49,14 +50,15 @@ function mkDb(opts: {
     const chain = () => q;
     q.select = chain; q.eq = chain; q.is = chain; q.in = chain; q.not = chain;
     q.order = chain; q.limit = chain;
-    q.update = () => {
+    q.update = (patch: Record<string, unknown>) => {
+      updates.push(patch);
       const res = {
         count: opts.updateErr ? null : (opts.updateCount === undefined ? 1 : opts.updateCount),
         error: opts.updateErr ?? null,
         data: null,
       };
       const upd: Record<string, unknown> = {};
-      upd.eq = () => upd; upd.is = () => upd;
+      upd.eq = () => upd; upd.is = () => upd; upd.in = () => upd;
       upd.then = (r: (v: unknown) => unknown) => Promise.resolve(res).then(r);
       return upd;
     };
@@ -82,7 +84,7 @@ function mkDb(opts: {
     };
     return q;
   };
-  return { db: { from: (t: string) => make(t) } as never, seen, upserts };
+  return { db: { from: (t: string) => make(t) } as never, seen, upserts, updates };
 }
 
 describe('the browser cannot manufacture an opportunity', () => {
@@ -344,10 +346,13 @@ describe('a claimed save lands in the Saved list', () => {
     expect(upserts[0].rows[0]).toMatchObject({ notice_id: 'n1', user_email: 'buyer@example.com' });
   });
 
-  it('a copy failure is REPORTED and does not undo the proven claim', async () => {
-    const { db } = mkDb({ rows: [{ id: 'sl-1', notice_id: 'n1' }], upsertErr: { message: 'boom' } });
+  it('a copy failure is REPORTED and the claim is RELEASED so the next sign-in retries it', async () => {
+    const { db, updates } = mkDb({ rows: [{ id: 'sl-1', notice_id: 'n1' }], upsertErr: { message: 'boom' } });
     const r = await claimAnonShortlist(db, ANON, { verifiedEmail: 'buyer@example.com' });
-    expect(r).toEqual({ ok: true, attached: 1, failed: 0, copied: 0, copyFailed: 1 });
+    // Not stranded: the claim marker is cleared, so the row is unclaimed again and the next claim
+    // copies it. Reported as left for retry, not as attached.
+    expect(updates[updates.length - 1]).toEqual({ claimed_at: null, claimed_by: null });
+    expect(r).toEqual({ ok: true, attached: 0, failed: 1, copied: 0, copyFailed: 1 });
   });
 
   it('the route reports copyFailed rather than hiding it', () => {

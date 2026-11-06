@@ -19,39 +19,47 @@ type LoadState =
   | { status: 'error'; message: string }
   | { status: 'ready'; items: SavedSearchItem[] };
 
+/** One load of the saved-search list + new-match badge, resolved to a display state (never throws). */
+async function fetchSavedSearches(email: string | null): Promise<LoadState> {
+  if (!email) return { status: 'error', message: 'Sign in to see your saved searches.' };
+  const q = encodeURIComponent(email);
+  try {
+    const [listRes, badge] = await Promise.all([
+      authedFetch(`/api/app/saved-searches?email=${q}`, email),
+      authedFetch(`/api/app/saved-searches?badge=1&email=${q}`, email)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null),
+    ]);
+    const list = await listRes.json().catch(() => null);
+    // `unavailable` = the read failed upstream; never show that as "no saved searches".
+    if (!listRes.ok || !list || list.success !== true || list.unavailable === true) {
+      return {
+        status: 'error',
+        message: (list && typeof list.error === 'string' && list.error) || `Could not load saved searches (HTTP ${listRes.status}).`,
+      };
+    }
+    return { status: 'ready', items: toSavedSearchItems(list.searches, badge?.success ? badge.perSearch : undefined) };
+  } catch {
+    return { status: 'error', message: 'Could not load saved searches (network error).' };
+  }
+}
+
 export default function SavedSearchesList({ email }: { email: string | null }) {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
 
-  const load = useCallback(async () => {
-    if (!email) {
-      setState({ status: 'error', message: 'Sign in to see your saved searches.' });
-      return;
-    }
-    setState({ status: 'loading' });
-    const q = encodeURIComponent(email);
-    try {
-      const [listRes, badge] = await Promise.all([
-        authedFetch(`/api/app/saved-searches?email=${q}`, email),
-        authedFetch(`/api/app/saved-searches?badge=1&email=${q}`, email)
-          .then((r) => (r.ok ? r.json() : null))
-          .catch(() => null),
-      ]);
-      const list = await listRes.json().catch(() => null);
-      // `unavailable` = the read failed upstream; never show that as "no saved searches".
-      if (!listRes.ok || !list || list.success !== true || list.unavailable === true) {
-        setState({
-          status: 'error',
-          message: (list && typeof list.error === 'string' && list.error) || `Could not load saved searches (HTTP ${listRes.status}).`,
-        });
-        return;
-      }
-      setState({ status: 'ready', items: toSavedSearchItems(list.searches, badge?.success ? badge.perSearch : undefined) });
-    } catch {
-      setState({ status: 'error', message: 'Could not load saved searches (network error).' });
-    }
+  // Initial load: state is set only from the async result (never synchronously inside the effect),
+  // and a stale response after an email change or unmount is dropped.
+  useEffect(() => {
+    let live = true;
+    fetchSavedSearches(email).then((next) => { if (live) setState(next); });
+    return () => { live = false; };
   }, [email]);
 
-  useEffect(() => { load(); }, [load]);
+  // Manual refresh (an event handler, so the loading state may be set first).
+  const load = useCallback(() => {
+    setState({ status: 'loading' });
+    fetchSavedSearches(email).then(setState);
+  }, [email]);
 
   return (
     <section className="space-y-3">

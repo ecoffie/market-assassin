@@ -15,6 +15,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { isValidSamNoticeId } from '@/lib/sam/utils';
 
+
 const MAP = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 
 function slice(start: string, end: string) {

@@ -6343,6 +6343,7 @@ const DRAWER_JS = `<script>
   function recompetePursuitReq(a){
     if(!CUR||CUR.kind!=='recompete')return null;
     // A vehicle rollup carries "PIID (+N more)" — the same suffix usaspendingUrlForRecompete strips.
+    // Same regex as src/lib/recompete/pursuit-key.ts (pinned by recompete-pursuit-key-parity.unit.test.ts).
     var piid=String(CUR.solicitation||'').replace(/\\s*\\(\\+\\d+\\s*more\\)\\s*$/i,'').trim();
     if(!piid)return null;
     var inc=String(CUR.title||'').trim()||'Awarded contract';

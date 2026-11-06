@@ -15,6 +15,7 @@
  *
  * "Open on the map" links are RECORD links built by src/lib/maps/map-links.ts — id only.
  */
+import { cleanRecompetePiid, RECOMPETE_PURSUIT_SOURCE, recompetePursuitTitle } from '@/lib/recompete/pursuit-key';
 import {
   mapLinkForBuyer,
   mapLinkForCompany,
@@ -68,10 +69,7 @@ export interface SavedMapItem {
   pursuitNoticeId: string | null;
 }
 
-/** "N0018926F0012 (+3 more)" → "N0018926F0012" (the vehicle rollup's suffix). */
-function cleanPiid(v: unknown): string {
-  return str(v).replace(/\s*\(\+\d+ more\)\s*$/i, '').trim();
-}
+const cleanPiid = cleanRecompetePiid;
 
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
@@ -152,11 +150,13 @@ export function toSavedMapItems(rows: unknown, kinds?: readonly SavedMapKind[]):
 export function pursuitBodyFor(item: SavedMapItem, email: string): Record<string, unknown> {
   return {
     user_email: email,
-    title: item.title,
+    // Recompetes: same title and source as the map's "Track this recompete" (pursuit-key.ts).
+    title: item.kind === 'recompete' && item.pursuitNoticeId ? recompetePursuitTitle(item.title, item.pursuitNoticeId) : item.title,
     notice_id: item.pursuitNoticeId || item.recordId,
     agency: item.agency || undefined,
-    response_deadline: item.deadline || undefined,
-    source: 'opportunity_map',
+    // A contract's expiry is not a bid deadline: never send it as response_deadline.
+    response_deadline: item.kind === 'recompete' ? undefined : item.deadline || undefined,
+    source: item.kind === 'recompete' ? RECOMPETE_PURSUIT_SOURCE : 'opportunity_map',
   };
 }
 

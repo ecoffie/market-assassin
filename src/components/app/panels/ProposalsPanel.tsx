@@ -11,6 +11,7 @@ import ProposalChat from './ProposalChat';
 import DocManifest from './DocManifest';
 import BidDecisionGate from './BidDecisionGate';
 import { mapLinkForOpportunity } from '@/lib/maps/map-links';
+import { samNoticeIdFrom } from '@/components/app/mapRecordIds';
 import { PROPOSAL_ACTION_TARGETS, parseProposalAction } from '@/lib/app/deep-link-params';
 import { useScrollToAnchor } from '../useScrollToAnchor';
 import { alignRequirement, priorityOf, type ReqPriority } from '@/lib/proposal/section-alignment';
@@ -1495,8 +1496,11 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const actionAnchorId = (() => {
     if (!contextAction || !actionPursuitMatches || !actionDocsSettled || driveMode !== 'auto') return null;
     if (contextAction === 'compliance') return showComplianceMatrix ? 'proposal-compliance-section' : 'proposal-response-template';
-    // The independent referee is not offered for LOI responses or RFQs — land on the final review.
-    if (contextAction === 'review' && (isLoiResponseMode || isRfqMode)) return 'proposal-final-review-section';
+    // RFQs have no Review & Export section at all (it renders only when !isRfqMode), so review,
+    // export and submit all land on the RFQ's response-template block, which holds its export.
+    if (isRfqMode) return showComplianceMatrix ? 'proposal-compliance-section' : 'proposal-response-template';
+    // The independent referee is not offered for LOI responses — land on the final review.
+    if (contextAction === 'review' && isLoiResponseMode) return 'proposal-final-review-section';
     return PROPOSAL_ACTION_TARGETS[contextAction].anchorId;
   })();
   const actionScroll = useScrollToAnchor(actionAnchorId);
@@ -1749,9 +1753,11 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              {mapLinkForOpportunity(activePursuit.notice_id) && (
+              {/* Only a real 32-hex SAM notice id becomes a record link: a pursuit can carry a PIID
+                  (recompete) or a solicitation number, which ?opp= would resolve to some OTHER notice. */}
+              {mapLinkForOpportunity(samNoticeIdFrom(activePursuit.notice_id)) && (
                 <a
-                  href={mapLinkForOpportunity(activePursuit.notice_id) as string}
+                  href={mapLinkForOpportunity(samNoticeIdFrom(activePursuit.notice_id)) as string}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-xs font-medium text-emerald-300 hover:bg-emerald-500/20"
                   title="Open this opportunity on the Opportunity Map"
                 >

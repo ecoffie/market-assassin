@@ -637,23 +637,27 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     // A recompete favorite is saved under its contract_id (CONT_AWD_...), which the pipeline writer
     // rejects as a notice id: the pursuit would get no notice_id and no duplicate protection. Key it
     // on the PIID instead, the same id the map's "Track this recompete" uses.
-    var _pnid=nid;
-    try{ if(typeof recordKind==='function'&&recordKind(r)==='recompete'){ var _od=r.opportunity_data||{}; var _piid=String(_od.solicitationNumber||'').replace(/\\s*\\(\\+\\d+ more\\)\\s*$/i,'').trim(); if(_piid)_pnid=_piid; } }catch(e){}
+    var _pnid=nid, _rec='';
+    try{ if(typeof recordKind==='function'&&recordKind(r)==='recompete'){ var _od=r.opportunity_data||{}; var _piid=String(_od.solicitationNumber||'').replace(/\\s*\\(\\+\\d+\\s*more\\)\\s*$/i,'').trim(); if(_piid){ _pnid=_piid; _rec=_piid; } } }catch(e){}
     var body={
       user_email: em,
       notice_id: _pnid,
-      title: realTitle(r)||o.sol||('Saved opportunity '+nid),
+      // Recompetes get the same title and source as the map's "Track this recompete"
+      // (src/lib/recompete/pursuit-key.ts), whichever surface creates the row first.
+      title: _rec ? ('Recompete: '+(realTitle(r)||'Awarded contract')+' \\u00b7 '+_rec) : (realTitle(r)||o.sol||('Saved opportunity '+nid)),
       agency: r.agency||'',
       naics_code: o.naics||'',
       set_aside: o.set||'',
       response_deadline: r.response_deadline||null,  // unknown = null, never '' (#1705: '' 500s the TIMESTAMPTZ insert)
       value_estimate: val,
       notice_type: r.notice_type||'',
-      source: 'saved_inbox'
+      source: _rec ? 'recompete_map' : 'saved_inbox'
     };
     // 1) CREATE the pursuit. 2) ONLY on 2xx, DELETE the favorite. Never remove-first.
     fetch('/api/pipeline',{method:'POST',headers:hdrs(),body:JSON.stringify(body)})
-      .then(function(res){ if(!res.ok)throw new Error('pipeline '+res.status); return res.json(); })
+      // 409 = already in My Pursuits (e.g. "Track this recompete" created it). The pursuit
+      // exists, so finish the MOVE: drop the favorite instead of showing an error.
+      .then(function(res){ if(res.status===409)return {}; if(!res.ok)throw new Error('pipeline '+res.status); return res.json(); })
       .then(function(){
         // GROUNDED: the Saved->Pursuit funnel hop, emitted only after the pipeline POST succeeded.
         track('start_pursuit_clicked', { notice_id:nid, journey_id:journeyId(nid) });
