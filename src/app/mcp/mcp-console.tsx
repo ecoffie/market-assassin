@@ -17,7 +17,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
 import { Catalog, MCP_URL, EXAMPLES, exampleCost } from './catalog-ui';
-import { McpPublicNav, PublicAppCluster } from './public-ui';
+import { McpPublicNav } from './public-ui';
+import { Container } from '@/components/public-site/ui';
 
 type ClientId = 'claude-desktop' | 'claude-code' | 'cursor' | 'other';
 const CLIENTS: { id: ClientId; name: string }[] = [
@@ -49,7 +50,7 @@ function connectFor(client: ClientId): ConnectInfo {
       return {
         lead: <>Add Mindy as an MCP server in Cursor — it signs you in in the browser.</>,
         steps: [
-          <>Copy the endpoint URL above.</>,
+          <>Copy the link above.</>,
           <>Cursor → Settings → MCP → <span className="text-(--mp-body)">Add new server</span> → paste the URL.</>,
           <>Click <span className="text-(--mp-body)">Connect</span> → sign in with Mindy → Allow.</>,
         ],
@@ -58,7 +59,7 @@ function connectFor(client: ClientId): ConnectInfo {
       return {
         lead: <>Any MCP client with connector support — Windsurf, Cline, or your own.</>,
         steps: [
-          <>Copy the endpoint URL above.</>,
+          <>Copy the link above.</>,
           <>Add it as a remote / custom MCP server in your client.</>,
           <>Connect → sign in with Mindy → Allow.</>,
         ],
@@ -67,7 +68,7 @@ function connectFor(client: ClientId): ConnectInfo {
       return {
         lead: <>Add a connector, sign in, done — no key to paste.</>,
         steps: [
-          <>Copy the endpoint URL above.</>,
+          <>Copy the link above.</>,
           <>Claude Desktop → Settings → Connectors → <span className="text-(--mp-body)">Add custom connector</span> → paste the URL.</>,
           <>Click <span className="text-(--mp-body)">Connect</span> → sign in with Mindy → Allow. Then ask Claude to use Mindy.</>,
         ],
@@ -130,87 +131,86 @@ export default function McpConsole() {
 
   // ---- Shared: keyless connect card (client tabs rewrite the steps) ----------
   const connectCard = (
-    <section className="mt-12 rounded-none border border-(--mp-line) bg-(--mp-surface) p-5 sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-(--mp-muted)">Connect</p>
-          <h2 className="mt-0.5 text-[15px] font-semibold text-(--mp-ink)">Plug Mindy into your AI agent</h2>
-        </div>
-        <div className="inline-flex rounded-none border border-(--mp-line) bg-(--mp-wash) p-1">
-          {CLIENTS.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setClient(c.id)}
-              className={`rounded-none px-3 py-1 text-[12px] font-medium transition ${client === c.id ? 'bg-(--mp-navy) text-white' : 'text-(--mp-muted) hover:text-(--mp-ink)'}`}
-            >
-              {c.name}
-            </button>
-          ))}
-        </div>
-      </div>
+    <section id="connect" className="mx-auto mt-24 max-w-5xl scroll-mt-24">
+      <h2 className="text-balance text-center font-(family-name:--mp-font-serif) text-[34px] font-normal leading-[1.15] tracking-[-0.015em] sm:text-[46px]">Connect in under a minute</h2>
+      <p className="mx-auto mt-3 max-w-xl text-center text-[17px] text-(--mp-body)">Pick your AI. You add one link, sign in, and Mindy is ready. No key to paste.</p>
 
-      {/* Endpoint URL */}
-      <div className="mt-4 flex items-center gap-2 rounded-none border border-(--mp-line) bg-(--mp-wash) px-3 py-2">
-        <span className="text-[11px] uppercase tracking-wide text-(--mp-muted)">Endpoint</span>
-        <code className="min-w-0 flex-1 truncate font-(family-name:--mp-font-mono) text-[13px] text-(--mp-navy)">{MCP_URL}</code>
-        <button onClick={() => copy(MCP_URL, 'url')} className="shrink-0 rounded-none border border-(--mp-line) bg-(--mp-surface) px-2 py-1 text-[11px] text-(--mp-body) hover:bg-(--mp-wash)">{copied === 'url' ? 'Copied' : 'Copy'}</button>
-      </div>
-
-      {/* Steps */}
-      <ol className="mt-4 grid gap-2 sm:grid-cols-3">
-        {conn.steps.map((s, i) => (
-          <li key={i} className="flex items-start gap-2.5 rounded-none border border-(--mp-line) bg-(--mp-surface) px-3 py-2.5 text-[13px] text-(--mp-body)">
-            <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-(--mp-surface) text-[11px] font-semibold text-(--mp-body)">{i + 1}</span>
-            <span>{s}</span>
-          </li>
+      <div className="mt-8 flex flex-wrap justify-center gap-2" role="tablist" aria-label="Your AI">
+        {CLIENTS.map((c) => (
+          <button
+            key={c.id}
+            role="tab"
+            aria-selected={client === c.id}
+            onClick={() => setClient(c.id)}
+            className={`rounded-full border px-5 py-2.5 text-[15px] font-medium transition ${client === c.id ? 'border-(--mp-navy) bg-(--mp-surface) text-(--mp-navy) shadow-[0_0_0_1px_var(--mp-navy)]' : 'border-transparent text-(--mp-body) hover:text-(--mp-navy)'}`}
+          >
+            {c.name}
+          </button>
         ))}
-      </ol>
+      </div>
 
-      {/* Lead + optional command (Claude Code) */}
-      <p className="mt-4 text-sm text-(--mp-muted)">{conn.lead}</p>
-      {conn.code && (
-        <div className="relative mt-2">
-          <pre className="overflow-x-auto rounded-none border border-(--mp-line) bg-(--mp-wash) p-3.5 font-(family-name:--mp-font-mono) text-[12px] leading-relaxed text-(--mp-body)">{conn.code}</pre>
-          <button onClick={() => copy(conn.code!, 'snippet')} className="absolute right-2.5 top-2.5 rounded-none border border-(--mp-line) bg-(--mp-surface) px-2 py-1 text-[11px] text-(--mp-body) hover:bg-(--mp-wash)">{copied === 'snippet' ? 'Copied' : 'Copy'}</button>
+      <div className="mt-6 rounded-3xl border border-(--mp-line) bg-(--mp-surface) p-5 shadow-[0_24px_60px_rgba(27,58,107,0.10)] sm:p-8">
+        {/* Endpoint URL */}
+        <div className="flex items-center gap-3 rounded-2xl border border-(--mp-line) bg-(--mp-wash) px-4 py-3">
+          <span className="hidden text-[12px] font-semibold uppercase tracking-[0.08em] text-(--mp-navy) sm:inline">Link</span>
+          <code className="min-w-0 flex-1 truncate font-(family-name:--mp-font-mono) text-[15px] text-(--mp-ink)">{MCP_URL}</code>
+          <button onClick={() => copy(MCP_URL, 'url')} className="shrink-0 rounded-full bg-(--mp-navy) px-4 py-1.5 text-[13px] font-semibold text-white hover:bg-(--mp-navy-hover)">{copied === 'url' ? 'Copied' : 'Copy'}</button>
         </div>
-      )}
-      <Link
-        href="/mcp/setup"
-        className="mt-4 flex items-center justify-between gap-3 rounded-none border border-(--mp-navy) bg-(--mp-navy-wash) px-4 py-3 transition hover:border-(--mp-navy) hover:bg-(--mp-surface)"
-      >
-        <span className="text-[13px] text-(--mp-body)">
-          <span className="font-semibold text-(--mp-navy)">Not sure where those menus are?</span>{' '}
-          Every click, with screenshots, for <span className="text-(--mp-ink)">Claude</span> and <span className="text-(--mp-ink)">ChatGPT</span>.
-        </span>
-        <span className="shrink-0 text-[13px] font-semibold text-(--mp-navy)">Open guide →</span>
-      </Link>
-      <p className="mt-2 text-[12px] text-(--mp-muted)">No API key needed — you sign in through your browser. Headless / CI? Grab a key in <Link href="/mcp/account?section=keys" className="text-(--mp-muted) underline underline-offset-2 hover:text-(--mp-body)">Account → API keys</Link>.</p>
+
+        {/* Steps */}
+        <ol className="mt-5 grid gap-3 sm:grid-cols-3">
+          {conn.steps.map((st, i) => (
+            <li key={i} className="flex items-start gap-3 rounded-2xl border border-(--mp-line) bg-(--mp-surface) p-4 text-[15px] leading-relaxed text-(--mp-body)">
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-(--mp-navy) text-[13px] font-bold text-white">{i + 1}</span>
+              <span>{st}</span>
+            </li>
+          ))}
+        </ol>
+
+        {/* Lead + optional command (Claude Code) */}
+        <p className="mt-5 text-[15px] text-(--mp-body)">{conn.lead}</p>
+        {conn.code && (
+          <div className="relative mt-3">
+            <pre className="overflow-x-auto rounded-2xl border border-(--mp-line) bg-(--mp-wash) p-4 pr-24 font-(family-name:--mp-font-mono) text-[13px] leading-relaxed text-(--mp-ink)">{conn.code}</pre>
+            <button onClick={() => copy(conn.code!, 'snippet')} className="absolute right-3 top-3 rounded-full border border-(--mp-line) bg-(--mp-surface) px-3 py-1 text-[12px] font-semibold text-(--mp-navy) hover:border-(--mp-navy)">{copied === 'snippet' ? 'Copied' : 'Copy'}</button>
+          </div>
+        )}
+        <Link
+          href="/mcp/setup"
+          className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-(--mp-navy-wash) px-5 py-4 transition hover:bg-(--mp-wash)"
+        >
+          <span className="text-[15px] text-(--mp-body)">
+            <span className="font-semibold text-(--mp-navy)">Not sure where those menus are?</span>{' '}
+            Every click, with screenshots, for Claude and ChatGPT.
+          </span>
+          <span className="shrink-0 text-[15px] font-semibold text-(--mp-navy)">Open the guide →</span>
+        </Link>
+        <p className="mt-4 text-[13px] text-(--mp-muted)">No API key needed: you sign in through your browser. Running it headless or in CI? Get a key in <Link href="/mcp/account?section=keys" className="underline underline-offset-2 hover:text-(--mp-body)">Account → API keys</Link>.</p>
+      </div>
     </section>
   );
 
-  // ---- Shared: "What you can do with credits" — 2 columns, room for text -----
+  // ---- Shared: "What you can do with credits" -------------------------------
   const examplesSection = displayTools.length > 0 && (
-    <section className="mt-16">
-      <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-(--mp-muted)">What you can do with credits</h2>
-      <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-(--mp-muted)">Each call is priced on its own — chain a few and you&apos;ve run a real BD task.</p>
-      <div className="mx-auto mt-8 grid max-w-4xl grid-cols-1 gap-4 sm:grid-cols-2">
+    <section className="mx-auto mt-24 max-w-5xl">
+      <h2 className="text-balance text-center font-(family-name:--mp-font-serif) text-[34px] font-normal leading-[1.15] tracking-[-0.015em] sm:text-[46px]">What you can ask</h2>
+      <p className="mx-auto mt-3 max-w-xl text-center text-[17px] text-(--mp-body)">Each answer costs a few credits. Chain a few and you&apos;ve done a real BD task.</p>
+      <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
         {EXAMPLES.map((ex) => {
           const cost = exampleCost(displayTools, ex.tools);
           return (
-            <div key={ex.title} className="rounded-none border border-(--mp-line) bg-(--mp-surface) p-4 sm:p-5">
+            <div key={ex.title} className="rounded-3xl border border-(--mp-line) bg-(--mp-surface) p-6">
               <div className="flex items-start justify-between gap-3">
-                <div className="text-[15px] font-semibold text-(--mp-ink)">{ex.title}</div>
-                <span className="shrink-0 rounded-[6px] border border-(--mp-navy) bg-(--mp-navy-wash) px-2 py-0.5 text-[11px] font-semibold tabular-nums text-(--mp-navy)">{cost} cr</span>
+                <div className="text-[19px] font-semibold leading-snug text-(--mp-ink)">{ex.title}</div>
+                <span className="shrink-0 rounded-full bg-(--mp-navy-wash) px-3 py-1 text-[12px] font-semibold tabular-nums text-(--mp-navy)">{cost} credits</span>
               </div>
-              <div className="mt-1.5 text-[13px] leading-relaxed text-(--mp-muted)">{ex.desc}</div>
-              {/* The actual call chain — the concrete thing the credits buy. Names come
-                  from EXAMPLES (which price off the live catalog), so a renamed tool
-                  shows up here rather than hiding behind a stock graphic. */}
-              <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-(--mp-line) pt-3">
+              <div className="mt-2 text-[15px] leading-relaxed text-(--mp-body)">{ex.desc}</div>
+              {/* The actual call chain — names come from EXAMPLES, priced off the live catalog. */}
+              <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t border-(--mp-line) pt-4">
                 {ex.tools.map((t, i) => (
                   <span key={`${t}-${i}`} className="flex items-center gap-1.5">
                     {i > 0 && <span className="text-(--mp-muted)">→</span>}
-                    <code className="rounded bg-(--mp-surface) px-1.5 py-0.5 font-(family-name:--mp-font-mono) text-[11.5px] text-(--mp-body)">{t}</code>
+                    <code className="rounded-md bg-(--mp-wash) px-2 py-0.5 font-(family-name:--mp-font-mono) text-[12px] text-(--mp-body)">{t}</code>
                   </span>
                 ))}
               </div>
@@ -218,83 +218,127 @@ export default function McpConsole() {
           );
         })}
       </div>
-      <p className="mx-auto mt-10 text-center text-[13px] text-(--mp-muted)">
-        {displayTools.length > 0 ? `${displayTools.length} tools` : 'Every tool'} across discovery, competitive intel,
-        pricing, agency intel, contacts and proposals —{' '}
-        <Link href="/mcp/tools" className="text-(--mp-navy) underline underline-offset-2 hover:text-(--mp-navy-hover)">see the full reference →</Link>
-      </p>
-      <p className="mx-auto mt-2 text-center text-[13px] text-(--mp-muted)">
-        Or see the cost breakdown on the <Link href="/mcp/pricing" className="text-(--mp-navy) underline underline-offset-2 hover:text-(--mp-navy-hover)">pricing page →</Link>
+      <p className="mx-auto mt-10 text-center text-[15px] text-(--mp-body)">
+        {displayTools.length > 0 ? `${displayTools.length} tools` : 'Every tool'} across finding work, competitors,
+        pricing, agencies, contacts and proposals.{' '}
+        <Link href="/mcp/tools" className="font-semibold text-(--mp-navy) underline underline-offset-2 hover:text-(--mp-navy-hover)">See every tool →</Link>
       </p>
       {/*
-        The repo link. Until now the link ran ONE WAY: github.com/getmindy/mindy-mcp
-        sets its homepage to this page, but nothing here pointed back — so developers
-        already on the product (the traffic we actually have) had no path to the docs
-        and examples. rel="noopener" only, never noreferrer: stripping the referrer
-        also strips the attribution that tells us the site is what drives repo traffic.
+        The repo link. github.com/getmindy/mindy-mcp sets its homepage to this page; this points
+        back. rel="noopener" only, never noreferrer: the referrer is the attribution.
       */}
-      <p className="mx-auto mt-2 text-center text-[13px] text-(--mp-muted)">
-        Docs, quickstarts and example agents live on{' '}
-        <a
-          href="https://github.com/getmindy/mindy-mcp"
-          target="_blank"
-          rel="noopener"
-          className="text-(--mp-navy) underline underline-offset-2 hover:text-(--mp-navy-hover)"
-        >
-          GitHub →
-        </a>
+      <p className="mx-auto mt-2 text-center text-[15px] text-(--mp-body)">
+        Docs, quickstarts and example agents are on{' '}
+        <a href="https://github.com/getmindy/mindy-mcp" target="_blank" rel="noopener" className="font-semibold text-(--mp-navy) underline underline-offset-2 hover:text-(--mp-navy-hover)">GitHub →</a>
       </p>
     </section>
   );
 
   const signedIn = authState === 'in';
 
+  const pill = 'inline-flex items-center justify-center rounded-full px-7 py-3.5 text-[17px] font-semibold transition';
+  const primary = `${pill} bg-(--mp-navy) text-white shadow-[0_10px_24px_rgba(27,58,107,0.28)] hover:-translate-y-0.5 hover:bg-(--mp-navy-hover)`;
+  const ghost = `${pill} border border-(--mp-line) bg-(--mp-surface) text-(--mp-ink) hover:-translate-y-0.5 hover:border-(--mp-navy) hover:text-(--mp-navy)`;
+  const connectHref = '/app?intent=mcp&next=%2Fmcp';
+
   return (
-    <main className="min-h-dvh bg-(--mp-paper) text-(--mp-ink)">
-      <div className="mx-auto max-w-4xl px-5 py-8 sm:px-6">
-        <McpPublicNav active="connect" signedIn={signedIn} balance={signedIn ? balance : undefined} />
+    <main className="min-h-dvh bg-(--mp-surface) text-(--mp-ink)">
+      <div className="py-4">
+        <Container width="wide">
+          <McpPublicNav active="connect" signedIn={signedIn} balance={signedIn ? balance : undefined} />
+        </Container>
+      </div>
 
-        {/* Hero */}
-        <section className="mt-12 text-center">
-          <div className="mb-7"><PublicAppCluster /></div>
-          <h1 className="mx-auto max-w-2xl text-balance text-3xl font-bold leading-[1.1] sm:text-5xl font-(family-name:--mp-font-serif)">Mindy MCP for any AI agent</h1>
-          <p className="mx-auto mt-4 max-w-xl text-balance text-sm text-(--mp-muted) sm:text-[15px]">
-            SAM opportunities, incumbent financials, GSA pricing, and win playbooks — piped straight into your agent. Connect keyless in under a minute.
-          </p>
-          <p className="mx-auto mt-3 text-[12px] text-(--mp-muted)">
-            Plug into <span className="text-(--mp-muted)">Claude · Claude Code · ChatGPT · Cursor · Copilot</span> — any MCP client.
-          </p>
-          {signedIn ? (
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-              <Link href="/mcp/account" className="inline-flex items-center justify-center rounded-none bg-(--mp-navy) px-5 py-2.5 text-sm font-semibold text-white hover:bg-(--mp-navy-hover)">
-                {typeof balance === 'number' ? `${balance.toLocaleString()} credits · Your account` : 'Your account'}
-              </Link>
-              <Link href="/mcp/pricing" className="inline-flex items-center justify-center rounded-none border border-(--mp-line) px-5 py-2.5 text-sm font-semibold text-(--mp-ink) hover:bg-(--mp-wash)">See pricing</Link>
+      {/* Hero — split like the homepage: words left, an example right */}
+      <section className="bg-(--mp-navy-wash)/60">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-14 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:py-20">
+          <div>
+            <p className="text-[13px] font-bold uppercase tracking-[0.08em] text-(--mp-navy)">Mindy in your AI</p>
+            <h1 className="mt-4 text-balance text-[44px] font-bold leading-[1.04] tracking-[-0.03em] sm:text-[60px]">Federal contract data, right inside your AI.</h1>
+            <p className="mt-5 max-w-xl text-[19px] leading-relaxed text-(--mp-body)">
+              Ask Claude, ChatGPT or Cursor about open bids, incumbents, pricing and buyers. Mindy answers with real federal data, not guesses.
+            </p>
+            {signedIn ? (
+              <div className="mt-8 flex flex-wrap gap-3.5">
+                <Link href="/mcp/account" className={primary}>
+                  {typeof balance === 'number' ? `${balance.toLocaleString()} credits · Your account` : 'Your account'}
+                </Link>
+                <a href="#connect" className={ghost}>How to connect</a>
+              </div>
+            ) : (
+              <>
+                <div className="mt-8 flex flex-wrap gap-3.5">
+                  <a href={connectHref} className={primary}>Connect free</a>
+                  <Link href="/mcp/pricing" className={ghost}>See pricing</Link>
+                </div>
+                <p className="mt-4 text-[15px] text-(--mp-muted)">{trial} free credits when you connect · No credit card</p>
+              </>
+            )}
+            {authState === 'loading' && <p className="mt-3 text-[13px] text-(--mp-muted)">Checking your session…</p>}
+          </div>
+
+          {/* Example conversation. Illustrative, labelled as an example. */}
+          <div className="rounded-3xl border border-(--mp-line) bg-(--mp-surface) p-5 shadow-[0_24px_60px_rgba(27,58,107,0.14)] sm:p-6" aria-label="Example conversation">
+            <div className="flex items-center justify-between text-[12px] font-semibold uppercase tracking-[0.08em] text-(--mp-muted)">
+              <span>Example</span><span>Your AI + Mindy</span>
             </div>
-          ) : (
-            <>
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                <a href="/app?intent=mcp&next=%2Fmcp" className="inline-flex items-center justify-center rounded-none bg-(--mp-navy) px-5 py-2.5 text-sm font-semibold text-white hover:bg-(--mp-navy-hover)">Sign in to connect</a>
-                <Link href="/mcp/pricing" className="inline-flex items-center justify-center rounded-none border border-(--mp-line) px-5 py-2.5 text-sm font-semibold text-(--mp-ink) hover:bg-(--mp-wash)">See pricing</Link>
+            <div className="mt-4 ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-(--mp-navy) px-4 py-3 text-[15px] leading-snug text-white">
+              Find roofing work at the VA in Texas.
+            </div>
+            <div className="mt-4 flex items-start gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element -- brand mark, same file as the site header */}
+              <img src="/brand/mindy-logo-icon.png" alt="" className="mt-0.5 h-7 w-7 shrink-0" />
+              <div className="min-w-0 flex-1 text-[15px] leading-relaxed text-(--mp-body)">
+                <p>Here&apos;s what&apos;s open now and what&apos;s coming back:</p>
+                <div className="mt-3 space-y-2.5">
+                  {[
+                    ['Open now', 'Roof replacement, medical center', 'Due in 14 days'],
+                    ['Coming back', 'Roofing maintenance contract', 'Ends in 7 months'],
+                  ].map(([tag, title, when]) => (
+                    <div key={title} className="rounded-2xl border border-(--mp-line) px-4 py-3">
+                      <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-(--mp-navy)">{tag}</div>
+                      <div className="mt-1 text-[15px] font-semibold text-(--mp-ink)">{title}</div>
+                      <div className="text-[13px] text-(--mp-muted)">{when}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="mt-4 inline-flex items-center gap-2 rounded-[6px] border border-(--mp-navy) bg-(--mp-navy-wash) px-3.5 py-1.5 text-[13px] text-(--mp-navy)">
-                {trial} free credits on your first connect — no card required
-              </div>
-            </>
-          )}
-          {authState === 'loading' && <p className="mt-3 text-[12px] text-(--mp-muted)">Checking your session…</p>}
-        </section>
+            </div>
+          </div>
+        </div>
+      </section>
 
+      {/* Works with */}
+      <section className="mx-auto max-w-6xl px-4 py-10 text-center sm:px-6">
+        <p className="text-[15px] font-medium text-(--mp-body)">Works with the AI you already use</p>
+        <div className="mt-4 flex flex-wrap justify-center gap-2.5">
+          {['Claude', 'ChatGPT', 'Claude Code', 'Cursor', 'Copilot', 'Windsurf'].map((n) => (
+            <span key={n} className="rounded-full border border-(--mp-line) bg-(--mp-surface) px-4 py-2 text-[15px] font-semibold text-(--mp-ink)">{n}</span>
+          ))}
+        </div>
+      </section>
+
+      <div className="px-4 sm:px-6">
         {connectCard}
         {examplesSection}
-
-        {signedIn && (
-          <footer className="mt-12 flex flex-wrap items-center justify-between gap-2 border-t border-(--mp-line) pt-5 text-[12px] text-(--mp-muted)">
-            <span>Signed in as <span className="text-(--mp-muted)">{email}</span> · <Link href="/mcp/account?section=settings" className="underline underline-offset-2 hover:text-(--mp-body)">Account settings</Link></span>
-            <span>endpoint <code className="font-(family-name:--mp-font-mono) text-(--mp-muted)">{MCP_URL}</code></span>
-          </footer>
-        )}
       </div>
+
+      {/* Closing band, like the homepage */}
+      <section className="mt-24 bg-(--mp-navy) px-4 py-20 text-center text-white sm:px-6">
+        <h2 className="mx-auto max-w-3xl text-balance text-[34px] font-bold leading-tight tracking-[-0.02em] sm:text-[44px]">Ask your AI about federal contracts today.</h2>
+        <p className="mx-auto mt-4 max-w-xl text-[17px] leading-relaxed text-white/85">{trial} free credits when you connect. No credit card needed.</p>
+        <div className="mt-8 flex flex-wrap justify-center gap-3.5">
+          <a href={signedIn ? '#connect' : connectHref} className={`${pill} bg-(--mp-surface) text-(--mp-navy) hover:-translate-y-0.5`}>{signedIn ? 'How to connect' : 'Connect free'}</a>
+          <Link href="/mcp/pricing" className={`${pill} border border-white/50 text-white hover:-translate-y-0.5 hover:border-white`}>See pricing</Link>
+        </div>
+      </section>
+
+      {signedIn && (
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-5 text-[13px] text-(--mp-muted) sm:px-6">
+          <span>Signed in as {email} · <Link href="/mcp/account?section=settings" className="underline underline-offset-2 hover:text-(--mp-body)">Account settings</Link></span>
+          <span>Link <code className="font-(family-name:--mp-font-mono)">{MCP_URL}</code></span>
+        </div>
+      )}
     </main>
   );
 }
