@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   description: 'A bulk API into the recorded diff of every federal contract — what slipped, what grew, who lost — joined to financials. For funds, lenders, PE, and surety.',
 };
 
-const CONTACT = 'mailto:hello@getmindy.ai?subject=Mindy%20Enterprise%20%2F%20API%20feed%20inquiry';
+const CONTACT = '/contact-sales';
 
 const BUYERS: { who: string; q: string }[] = [
   { who: 'Funds & traders', q: 'Which of my watchlist’s federal revenue is at risk — before the 8-K?' },
