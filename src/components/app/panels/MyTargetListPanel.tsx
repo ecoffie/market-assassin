@@ -19,6 +19,7 @@ import { getActiveWorkspace, getActiveWorkspaceName } from '../activeWorkspace';
 import { useToast } from '../Toast';
 import { useAppTracker } from '../track';
 import SaveContactButton from '../contacts/SaveContactButton';
+import SavedOnMapList from '../saved/SavedOnMapList';
 import { normalizeOfficeName } from '@/lib/gov-contacts/office-name';
 
 interface TargetRow {
@@ -977,6 +978,17 @@ export default function MyTargetListPanel({
           </div>
         </>
       )}
+
+      {/* Companies and buyers hearted on the Opportunity Map ("Add to targets" / "Add to CRM").
+          They live in user_saved_opportunities, a separate list from user_target_list; shown here
+          as-is (no merge, no migration) so a map save is never invisible in /app. */}
+      <SavedOnMapList
+        email={email}
+        kinds={['company', 'buyer']}
+        title="Saved from the map"
+        description="Companies and government buyers you saved on the Opportunity Map."
+        emptyText="No companies or buyers saved on the map yet."
+      />
     </div>
   );
 }
