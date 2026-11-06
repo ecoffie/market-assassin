@@ -44,7 +44,38 @@ export function siteTopHtml(): string {
     + `<nav class="mp-head-left" aria-label="Product">${left}</nav>`
     + `<nav class="mp-head-right" aria-label="Account">${right}`
     + `<a class="mp-anon mp-su" href="${esc(MP_HEADER_SIGNUP_LINK.href)}">${esc(MP_HEADER_SIGNUP_LINK.label)}</a>`
-    + `${ACCOUNT_MENU_HTML}</nav></header></div>`;
+    + `${ACCOUNT_MENU_HTML}`
+    + `<button type="button" class="mp-burger" aria-label="Menu" aria-expanded="false" aria-controls="mp-menu" onclick="${MENU_TOGGLE}">`
+    + `<svg class="mp-burger-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`
+    + `<svg class="mp-burger-close" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`
+    + `</nav></header>${siteMenuHtml()}</div>`;
+}
+
+/** Toggles the phone menu (html.mp-menu-open). Inline so raw-HTML pages need no extra script. */
+const MENU_TOGGLE = "var o=document.documentElement.classList.toggle('mp-menu-open');this.setAttribute('aria-expanded',o?'true':'false');";
+
+const CHEVRON = '<svg class="mp-menu-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
+
+/** The phone menu panel (Zoom-style): search, the main links, then Contact sales, Sign in, Sign up free. */
+function siteMenuHtml(): string {
+  const items: MpChromeLink[] = [
+    { href: '/opportunity-map', label: 'Opportunity Map' },
+    ...MP_HEADER_PRODUCT_LINKS,
+    { href: '/pricing', label: 'Plans & Pricing' },
+    { href: '/bid', label: 'Bid with confidence' },
+  ];
+  const [signIn, sales] = MP_HEADER_ACCOUNT_LINKS;
+  return `<div class="mp-menu" id="mp-menu">`
+    + `<form class="mp-menu-search" action="/opportunity-map" method="get" role="search">`
+    + `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>`
+    + `<input type="search" name="q" placeholder="Search opportunities…" aria-label="Search opportunities" autocomplete="off"></form>`
+    + `<nav class="mp-menu-links" aria-label="Menu">`
+    + items.map((l) => `<a href="${esc(l.href)}">${esc(l.label)}${CHEVRON}</a>`).join('')
+    + `</nav><div class="mp-menu-foot">`
+    + `<a class="mp-menu-sales" href="${esc(sales.href)}">${esc(sales.label)}</a>`
+    + `<a class="mp-menu-signin mp-anon" href="${esc(signIn.href)}">${esc(signIn.label)}</a>`
+    + `<a class="mp-menu-su mp-anon" href="${esc(MP_HEADER_SIGNUP_LINK.href)}">${esc(MP_HEADER_SIGNUP_LINK.label)}</a>`
+    + `</div></div>`;
 }
 
 /** Rules for the top bar. Tokens only (the public design lint scans this file). */
@@ -96,5 +127,27 @@ export const SITE_NAV_CSS = [
     + '.mp-evb-l{display:none}.mp-evb-s{display:inline}.mp-evb-t{font-size:15.5px;line-height:1.45}'
     + '.mp-evb-c{padding:9px 20px;font-size:15px}.mp-evb-x{right:6px;top:14px;transform:none;width:32px;height:32px}'
     + '.mp-logo span{font-size:20px}.mp-logo img{width:28px;height:28px}.mp-head .mp-su{padding:9px 14px;font-size:14px}}',
+  // Phone menu (☰). Hidden above 620px.
+  '.mp-burger,.mp-menu{display:none}',
+  '@media(max-width:620px){'
+    + '.mp-head .mp-anon:not(.mp-su){display:none}'
+    + '.mp-burger{display:flex;align-items:center;justify-content:center;width:44px;height:44px;margin-right:-8px;border:0;background:none;color:var(--mp-ink);cursor:pointer;border-radius:10px;flex:none}'
+    + '.mp-burger svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}'
+    + '.mp-burger-close{display:none}html.mp-menu-open .mp-burger-open{display:none}html.mp-menu-open .mp-burger-close{display:block}'
+    + 'html.mp-menu-open{overflow:hidden}'
+    + 'html.mp-menu-open .mp-menu{display:flex}'
+    + '.mp-menu{position:fixed;left:0;right:0;top:60px;bottom:0;z-index:60;flex-direction:column;overflow-y:auto;background:var(--mp-surface);'
+    + 'border-top:1px solid var(--mp-hair);padding:16px max(16px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}'
+    + '.mp-menu-search{display:flex;align-items:center;gap:10px;height:52px;padding:0 16px;border-radius:14px;background:var(--mp-navy-wash);margin:0 0 14px}'
+    + '.mp-menu-search svg{width:20px;height:20px;flex:none;fill:none;stroke:var(--mp-ink);stroke-width:2.2;stroke-linecap:round}'
+    + '.mp-menu-search input{flex:1;min-width:0;border:0;outline:0;background:none;font:400 17px var(--mp-font-sans);color:var(--mp-ink)}'
+    + '.mp-menu-links{display:flex;flex-direction:column}'
+    + '.mp-menu-links a{display:flex;align-items:center;justify-content:space-between;min-height:56px;padding:0 8px;font:600 19px var(--mp-font-sans);color:var(--mp-ink);text-decoration:none}'
+    + '.mp-menu-chev{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}'
+    + '.mp-menu-foot{margin-top:auto;padding-top:28px;display:flex;flex-direction:column;gap:10px}'
+    + '.mp-menu-sales,.mp-menu-signin{padding:10px 8px;font:600 17px var(--mp-font-sans);color:var(--mp-ink);text-decoration:none}'
+    + '.mp-menu-su{display:flex;align-items:center;justify-content:center;height:52px;margin-top:6px;border-radius:12px;background:var(--mp-navy);color:var(--mp-surface);font:700 17px var(--mp-font-sans);text-decoration:none}'
+    + 'html:has(.mindy-acct-ini,.mindy-acct-btn img) .mp-menu .mp-anon{display:none}'
+    + '}',
   '@media (prefers-reduced-motion: reduce){.mp-evb{transition:none}}',
 ].join('');
