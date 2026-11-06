@@ -20,7 +20,7 @@ export const MP_HEADER_PRODUCT_LINKS: readonly MpChromeLink[] = [
  */
 export const MP_HEADER_ACCOUNT_LINKS: readonly MpChromeLink[] = [
   { href: '/app', label: 'Sign in' },
-  { href: 'mailto:hello@getmindy.ai?subject=Mindy%20sales%20question', label: 'Contact sales' },
+  { href: '/contact-sales', label: 'Contact sales' },
   { href: '/pricing', label: 'Plans & Pricing' },
 ];
 

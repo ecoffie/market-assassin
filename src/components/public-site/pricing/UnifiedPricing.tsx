@@ -39,8 +39,8 @@ export interface UnifiedPricingProps {
 const SIGNUP_URL = '/signup';
 const PRO_CHECKOUT_MONTHLY = 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C'; // $149/mo
 const PRO_CHECKOUT_ANNUAL = 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D'; // $1,490/yr
-const TEAMS_CONTACT_URL = 'mailto:hello@getmindy.ai?subject=Mindy%20Teams%20Inquiry';
-const ENTERPRISE_MAILTO = 'mailto:hello@getmindy.ai?subject=Mindy%20Enterprise%20%2F%20API%20inquiry';
+const TEAMS_CONTACT_URL = '/contact-sales';
+const ENTERPRISE_CONTACT_URL = '/contact-sales';
 const MCP_TRIAL_URL = '/app';
 const REFERRALS_URL = '/mcp/account?section=referrals';
 const GOVWIN_URL = '/compare/govwin';
@@ -342,7 +342,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
             </div>
             <p className="fine">
               <b>Every plan includes Mindy&apos;s MCP server</b> — use her tools in Claude, Cursor, or any AI agent. Changes take effect immediately and are pro-rated.<br />
-              Need more than 5 seats, SSO or API access? <a href="mailto:hello@getmindy.ai">Email us for a custom quote</a> · <a href={GOVWIN_URL}>See the full GovWin comparison ↗</a>
+              Need more than 5 seats, SSO or API access? <a href="/contact-sales">Ask us for a custom quote</a> · <a href={GOVWIN_URL}>See the full GovWin comparison ↗</a>
             </p>
           </>
         ) : (
@@ -350,7 +350,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
             <div className="strip">
               <div><h3>Enterprise / API</h3><p>For primes, agencies, funds, lenders &amp; partners who need the <b>data as a feed or high-volume API</b> — not a seat. Custom credit pool. Volume pricing · annual invoicing.</p></div>
               <ul><li>High-volume programmatic API access</li><li>SSO / SAML · dedicated success manager · SLA</li><li>Custom integrations · data / feed license</li></ul>
-              <a className="cta" href={ENTERPRISE_MAILTO}>Contact sales</a>
+              <a className="cta" href={ENTERPRISE_CONTACT_URL}>Contact sales</a>
             </div>
             <div className="strip topup">
               <div className="amt">${fmt(topup.usd)}</div>
@@ -408,7 +408,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
                     <div className="pname"><h3>Enterprise</h3><span className="badge">Custom pool</span></div>
                     <div className="tagline">You&apos;re past {fmt(plans[plans.length - 1]?.creditsPerMonth ?? 10000)} credits/mo — let&apos;s size a pooled plan.</div>
                     <div className="price"><span className="now">Let&apos;s talk</span></div>
-                    <a className="cta" href={ENTERPRISE_MAILTO}>Contact sales</a>
+                    <a className="cta" href={ENTERPRISE_CONTACT_URL}>Contact sales</a>
                   </div>
                 </div>
               )}

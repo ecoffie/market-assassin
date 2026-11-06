@@ -243,9 +243,11 @@ export default function McpConsole() {
 
   return (
     <main className="min-h-dvh bg-(--mp-surface) text-(--mp-ink)">
-      <Container width="wide" className="pt-6">
-        <McpPublicNav active="connect" signedIn={signedIn} balance={signedIn ? balance : undefined} />
-      </Container>
+      <div className="py-4">
+        <Container width="wide">
+          <McpPublicNav active="connect" signedIn={signedIn} balance={signedIn ? balance : undefined} />
+        </Container>
+      </div>
 
       {/* Hero — split like the homepage: words left, an example right */}
       <section className="bg-(--mp-navy-wash)/60">
