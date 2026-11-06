@@ -20,6 +20,7 @@ import { isGatedMindyApi, skipAuthRecovery } from '@/lib/app/auth-recovery';
 import { sendAppEngagement } from '@/components/app/track';
 import { getStoredPartnerRef } from '@/lib/mindy/partner-referral-client';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
+import { parseAppDeepLink } from '@/lib/app/deep-link-params';
 
 const TWO_FACTOR_SESSION_MS = 12 * 60 * 60 * 1000;
 const TWO_FACTOR_TOKEN_KEY = 'mi_beta_2fa_token';
@@ -953,6 +954,15 @@ function AppDashboard() {
     const noticeParam = searchParams.get('notice')?.trim();
     if (noticeParam) {
       setPanelContext((prev) => ({ ...(prev || {}), notice_id: noticeParam }));
+    }
+
+    // Panel-specific deep-link context the map carries (pursuit_id + action for Proposals, agency
+    // for Contacts, section for Vault/Settings). Parsed + validated in ONE place; an unknown or
+    // malformed value is dropped so the panel opens on its normal default.
+    const validPanel = panelParam && KNOWN_PANELS.has(panelParam as AppPanel) ? panelParam : null;
+    const deepLink = parseAppDeepLink(validPanel, searchParams);
+    if (Object.keys(deepLink).length > 0) {
+      setPanelContext((prev) => ({ ...(prev || {}), ...deepLink }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

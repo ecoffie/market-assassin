@@ -122,10 +122,10 @@ describe('the recompete drawer uses the same workspace', () => {
   });
 
   it('routes through the PIPELINE save, not the saved-opportunities one', () => {
-    // saveCurrentRecompete posts to /api/opportunities/save, which creates NO pursuit row — and the
-    // workspace keys on ?pursuit=<id>. openProposalWorkspace uses saveCurrentOpp (/api/pipeline)
-    // instead, so the draft has something to attach to. "Track this recompete" is untouched.
-    expect(map).toContain("fetch('/api/opportunities/save'");        // still there for the Track button
+    // The workspace keys on ?pursuit=<id>. openProposalWorkspace uses saveCurrentOpp, which for a
+    // recompete posts recompetePursuitReq (/api/pipeline), so the draft has something to attach to.
+    // "Track this recompete" writes the Favorites snapshot AND that pursuit (recompete-track test).
+    expect(map).toContain("fetch('/api/opportunities/save'");        // still there for the Favorites heart
     const opener = assignedFnBody(map, 'window.openProposalWorkspace');
     expect(opener).toContain('saveCurrentOpp(btn,function(ok,pid)');
   });

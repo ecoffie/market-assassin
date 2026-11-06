@@ -5803,79 +5803,9 @@ const SAVE_JS = `<script>
   // Run AFTER both helpers exist (the documented cross-block ordering trap).
   try{ window.__loadAnonShortlist(); }catch(e){}
 
-  window.savePursuit=function(btn){
-    if(btn.dataset.saved==='1')return;
-    // ── ANONYMOUS VISITORS CAN KEEP A LISTING ────────────────────────────────
-    // Map funnel, 30 days: 2,021 users opened a listing and 53 started a pursuit
-    // (2.6%). The listing already explains WHY (the Why-chips, Should-I-bid, the
-    // M-Estimate) — what stopped them was this requireSignIn call, because 96%
-    // of map users (8,254 of 8,583) are not signed in. A permission failure, not
-    // a comprehension one.
-    //
-    // Signed out -> save to an anonymous shortlist keyed on the SAME stable
-    // localStorage id the telemetry already uses. It becomes a real pursuit when
-    // an identity claims it; the signed-in path below is untouched.
-    var _tk=tok();
-    if(!_tk || !_signedInEmail()){
-      var _aid2=_anonKey();
-      var _sol2=btn.dataset.sol, _o2=null;
-      try{ _o2=(OPPS||[]).find(function(x){return x.sol===_sol2;}); }catch(e){}
-      // ⚠️ nid IS NOT sol. map-data sets id = sam_opportunities.notice_id and
-      // sol = solicitation_number, and the Map preserves nid=p.id, sol=p.sol||p.id.
-      // Measured on production: 10,824 of 10,932 open SAM rows (99.0%) have
-      // nid != sol, and solicitation_number is not even unique (8,549 distinct
-      // for 10,824 rows, worst collision 18). The shortlist API matches on
-      // notice_id and the table's FK references notice_id, so sending sol
-      // returned "unknown noticeId" for effectively the whole corpus.
-      //
-      // Only a SAM listing has a canonical notice id. DLA / forecast / grants /
-      // recompete / contact pins carry their own id in that field, so they are
-      // NOT eligible — and we never substitute a solicitation number for a
-      // notice id. Ineligible rows fall through to the normal sign-in path,
-      // exactly as they behaved before this feature existed.
-      var _nid2=(_o2&&_o2.src==='SAM')?String(_o2.nid||''):'';
-      var _canon2=/^[a-f0-9]{32}$/i.test(_nid2);
-      if(_aid2&&_o2&&_canon2){
-        btn.textContent='Saving\u2026'; btn.disabled=true;
-        // ONLY the notice id. The browser must not be able to manufacture
-        // opportunity metadata that could later become a real pursuit — the
-        // server resolves title/agency/NAICS/deadline from sam_opportunities.
-        fetch('/api/app/shortlist',{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({anonId:_aid2,noticeId:_nid2})})
-          .then(function(r){return r.json();}).then(function(d){
-            btn.disabled=false;
-            if(d&&d.success){
-              btn.dataset.saved='1';
-              btn.textContent=d.duplicate?'\u2713 Already saved':'\u2713 Saved';
-              try{ window.__anonSaved[_nid2]=1; }catch(e){}
-              // Only count a NEW save, so a repeat click cannot inflate the funnel.
-              // The CANONICAL notice id, so this joins back to sam_opportunities.
-              try{ if(window.__track && !d.duplicate) window.__track('tool_use','shortlist_saved',
-                {anonymous:true,notice_id:_nid2,agency:String(_o2.agency||'')}); }catch(e){}
-            } else btn.textContent='Couldn\\'t save';
-          }).catch(function(){ btn.disabled=false; btn.textContent='Couldn\\'t save'; });
-        return;
-      }
-    }
-    var a=window.requireSignIn('save this to your pursuits', function(){ window.savePursuit(btn); }); if(!a)return;
-    var t=a.t, em=a.em;
-    var sol=btn.dataset.sol, o=null;
-    try{ o=(OPPS||[]).find(function(x){return x.sol===sol;}); }catch(e){}
-    if(!o)return;
-    btn.textContent='Saving\\u2026'; btn.disabled=true;
-    fetch('/api/pipeline',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
-      body:JSON.stringify({user_email:em,title:o.title,notice_id:o.sol,agency:o.agency,naics_code:o.naics,response_deadline:o.close,source:'opportunity_map'})})
-    // Verdict by HTTP status (409 = already tracked), never by body shape: a non-JSON 5xx
-    // parses to {} and must not read as a save. (Same rule as DRAWER_JS postSave.)
-    .then(function(r){return r.json().catch(function(){return {};}).then(function(d){ return {r:r,d:d||{}}; });}).then(function(x){
-      var dup=x.r.status===409;
-      if(x.r.ok||dup){ btn.textContent=dup?'\\u2713 In pursuits':'\\u2713 Saved'; btn.classList.add('saved'); btn.dataset.saved='1';
-        // FUNNEL: pursuit_started — a real save to My Pursuits (the fifth funnel step). Only on a
-        // genuine save (dup counts too — the intent happened). notice_id in metadata for join-back.
-        try{ if(window.__track && !dup) window.__track('tool_use','pursuit_started',{notice_id:String(o.sol),agency:String(o.agency||'')}); }catch(e){} }
-      else { btn.textContent='Try again'; btn.disabled=false; }
-    }).catch(function(){ btn.textContent='Try again'; btn.disabled=false; });
-  };
+  // window.savePursuit was DELETED 2026-11-06: it had ZERO call sites (its only reference was its
+  // own sign-in retry callback — see the note in saveCurrentOpp). The anonymous shortlist lives in
+  // saveCurrentOpp, the function every live Save / Start-pursuit button calls.
   // 1-click Favorites heart on the popup card → toggles /api/opportunities/save (POST/DELETE).
   var _favs={};
   window.toggleFav=function(btn){
@@ -6400,14 +6330,36 @@ const DRAWER_JS = `<script>
     return {url:'/api/pipeline',body:{user_email:a.em,title:CUR.title,notice_id:CUR.id,agency:CUR.department,naics_code:CUR.naics,response_deadline:CUR.deadline,source:'opportunity_map'}};
   }
   function saveOutcome(r){ if(r&&r.ok)return 'saved'; if(r&&r.status===409)return 'dup'; return 'fail'; }
+  // A recompete PURSUIT (My Pursuits = user_pipeline), via the same /api/pipeline ->
+  // createCanonicalPursuit writer every other pursuit uses. saveReq() above keeps writing the
+  // Favorites snapshot for a recompete (the map's Saved page reads it); this is the SECOND write
+  // "Track this recompete" makes, because its label says "Tracked" and its sign-in prompt says
+  // "save this to your pursuits" — and before 2026-11-06 it never reached user_pipeline at all.
+  // notice_id = the PIID, the same key the app's Recompetes panel already tracks a contract under,
+  // so the two surfaces dedupe on user_pipeline UNIQUE(user_email, notice_id). NOT the contract_id
+  // (CONT_AWD_..._9700_-NONE-): its underscores fail isValidSamNoticeId, the writer nulls it, and
+  // every re-click would then insert a duplicate. No PIID -> null (no pursuit we could dedupe).
+  // response_deadline is deliberately absent: the contract's EXPIRY is not a bid deadline.
+  function recompetePursuitReq(a){
+    if(!CUR||CUR.kind!=='recompete')return null;
+    // A vehicle rollup carries "PIID (+N more)" — the same suffix usaspendingUrlForRecompete strips.
+    // Same regex as src/lib/recompete/pursuit-key.ts (pinned by recompete-pursuit-key-parity.unit.test.ts).
+    var piid=String(CUR.solicitation||'').replace(/\\s*\\(\\+\\d+\\s*more\\)\\s*$/i,'').trim();
+    if(!piid)return null;
+    var inc=String(CUR.title||'').trim()||'Awarded contract';
+    return {url:'/api/pipeline',body:{user_email:a.em,title:'Recompete: '+inc+' \\u00b7 '+piid,notice_id:piid,
+      agency:CUR.department,naics_code:CUR.naics,external_url:CUR.uiLink||undefined,source:'recompete_map'}};
+  }
   // Resolves {state:'saved'|'dup'|'fail', d:<parsed body or {}>, pipeline:boolean}. Never rejects.
-  function postSave(a){
-    var q=saveReq(a);
+  function postSave(a){ return postReq(a,saveReq(a)); }
+  function postReq(a,q){
     return fetch(q.url,{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},body:JSON.stringify(q.body)})
       .then(function(r){ return r.json().catch(function(){return {};}).then(function(d){ return {state:saveOutcome(r),d:d||{},pipeline:q.url==='/api/pipeline'}; }); },
             function(){ return {state:'fail',d:{},pipeline:q.url==='/api/pipeline'}; });
   }
   window.__mapPostSave=postSave;
+  window.__mapRecompetePursuitReq=recompetePursuitReq;
+  window.__mapPostReq=postReq;
   var _save=document.getElementById('oppSave');
   if(_save)_save.onclick=function(){ if(!CUR)return; if(_save.dataset.busy==='1'||_save.classList.contains('done'))return;
     var a=_auth(); if(!a.t||!a.em){ if(window.openSignInModal){window.openSignInModal('save this',function(){location.reload();});}else{location.href='/app?next=%2Fopportunity-map';} return; }
@@ -6814,7 +6766,7 @@ const DRAWER_JS = `<script>
   window.saveCurrentOpp=function(btn,done){
     if(!CUR||btn.dataset.saved==='1'){ if(typeof done==='function')done(btn.dataset.saved==='1',btn.dataset.pursuitId||''); return; }
     // ── ANONYMOUS VISITORS CAN KEEP A LISTING — the REACHABLE path ───────────
-    // #1601 shipped the anonymous shortlist on window.savePursuit, which has ZERO
+    // #1601 shipped the anonymous shortlist on window.savePursuit (deleted 2026-11-06), which had ZERO
     // call sites. Measured on the SERVING production page 2026-09-21: "savePursuit"
     // appears exactly twice (its own definition and its own sign-in retry callback),
     // while "saveCurrentOpp" appears 13 times — every live Save / Start-pursuit /
@@ -6868,7 +6820,11 @@ const DRAWER_JS = `<script>
     var t=a.t, em=a.em;
     setBtnLabel(btn,'Saving\\u2026');
     // Same body builder + status verdict as the action bar (postSave): a non-2xx is never a save.
-    postSave({t:t,em:em}).then(function(res){
+    // A RECOMPETE goes to the pursuit request instead: saveReq() files a recompete as a Favorite,
+    // which has no pursuit row id — and "Draft capture strategy" (openProposalWorkspace) needs one
+    // for ?pursuit=<id>. Drafting against something IS working it.
+    var _rq=recompetePursuitReq({t:t,em:em});
+    (_rq?postReq({t:t,em:em},_rq):postSave({t:t,em:em})).then(function(res){
       var d=res.d, dup=res.state==='dup';
       if(res.state==='saved'||dup){ setBtnLabel(btn,dup?'\\u2713 In pursuits':'\\u2713 Tracked'); btn.classList.add('saved'); btn.dataset.saved='1';
         // The pursuit ROW id — returned on a fresh save AND (since 2026-08-13) alongside the 409 for
@@ -7958,9 +7914,10 @@ const DRAWER_JS = `<script>
   // Zillow-parity activity row for the Awarded/Recompete drawer — dataset-appropriate: this is an
   // AWARD, not a live notice, so "posted"/"closes" don't apply; the real activity signal is how
   // soon it EXPIRES (real field: o.exp, the USASpending period_of_performance_current_end). A
-  // per-contract tracking count is NOT reliably groundable today — "Track this recompete" saves
-  // via /api/opportunities/save?source=recompete_map, and a live count check found ZERO rows on
-  // that source (2026-07-26) — so no fabricated "N tracking this" here (ground-in-real-data). If a
+  // per-contract tracking count is NOT reliably groundable today — "Track this recompete" saved
+  // via /api/opportunities/save?source=recompete_map (and, since 2026-11-06, also a user_pipeline
+  // row with source=recompete_map), and a live count check found ZERO rows on that source
+  // (2026-07-26) — so no fabricated "N tracking this" here (ground-in-real-data). If a
   // real join is ever added, thread it in as extra.trackingCount and this will show it (>=2 only),
   // matching the open-opp drawer's rule exactly.
   function recompeteActivitySec(o,extra){
@@ -8127,27 +8084,40 @@ const DRAWER_JS = `<script>
   function recompeteActions(o){
     return '<div class="oact">'
       + '<button class="b pri" onclick="saveCurrentRecompete(this)">Track this recompete</button>'
-      // Map-native workspace, same as "Generate proposal" (Eric 2026-08-13). NOTE this deliberately
-      // uses the PIPELINE path (openProposalWorkspace -> saveCurrentOpp), not saveCurrentRecompete:
-      // that one posts to /api/opportunities/save (saved opportunities), which produces no pursuit
-      // row — and the workspace keys on ?pursuit=<id>. Drafting against something IS working it, so
-      // it belongs in pursuits. "Track this recompete" beside it keeps its own meaning untouched.
+      // Map-native workspace, same as "Generate proposal" (Eric 2026-08-13). It uses the PIPELINE
+      // path (openProposalWorkspace -> saveCurrentOpp -> recompetePursuitReq), because the workspace
+      // keys on ?pursuit=<id>. Drafting against something IS working it, so it belongs in pursuits.
+      // "Track this recompete" beside it now ALSO creates the pursuit (plus its Favorites snapshot).
       + '<button class="b" onclick="openProposalWorkspace(this)" data-act="draft a capture strategy">Draft capture strategy</button>'
       + '<a class="b" href="'+esc(usaspendingUrlForRecompete(o))+'" target="_blank" rel="noopener">View on USASpending \\u2197</a>'
       + '</div>';
   }
-  // "Track this recompete" — the in-body Save (gap 4). Mirrors saveCurrentCompany/saveCurrentBuyer:
-  // saves the recompete via /api/opportunities/save (source=recompete_map, PIID as noticeId) with a
-  // snapshot so the Favorites page renders it without a sam_opportunities hydration hit (a recompete
-  // has NO sam_opportunities row). Idempotent + optimistic label.
+  // "Track this recompete" — the in-body Save (gap 4). TWO writes, both idempotent:
+  //   1. the Favorites snapshot via /api/opportunities/save (source=recompete_map, contract id as
+  //      noticeId) so the Saved page renders it without a sam_opportunities hydration hit (a
+  //      recompete has NO sam_opportunities row) — unchanged;
+  //   2. a PURSUIT via /api/pipeline (recompetePursuitReq), so "Tracked" is true: the recompete is
+  //      in My Pursuits. It used to stop at (1) — "Tracked" with no user_pipeline row anywhere.
+  // Label truth (HTTP status only, never body shape): "Tracked"/"In pursuits" ONLY when the pursuit
+  // write succeeded; a Favorites-only success says "Saved" and leaves the button retryable.
   window.saveCurrentRecompete=function(btn){
     if(!CUR||CUR.kind!=='recompete'||btn.dataset.saved==='1')return;
     var a=window.requireSignIn('save this to your pursuits'); if(!a)return;
     btn.textContent='Saving\\u2026';
-    // Shared body builder + HTTP-status verdict (postSave) — a non-JSON 500 is not a save.
-    postSave(a).then(function(res){
-      var dup=res.state==='dup';
-      if(res.state==='saved'||dup){ btn.textContent=dup?'\\u2713 Tracked':'\\u2713 Tracked'; btn.classList.add('saved'); btn.dataset.saved='1'; }
+    var rec=CUR, pq=recompetePursuitReq(a);
+    Promise.all([postSave(a), pq?postReq(a,pq):Promise.resolve(null)]).then(function(rs){
+      var fav=rs[0], pur=rs[1];
+      var favOk=fav.state==='saved'||fav.state==='dup';
+      var purOk=!!pur&&(pur.state==='saved'||pur.state==='dup');
+      if(purOk){
+        btn.textContent=(pur.state==='dup')?'\\u2713 In pursuits':'\\u2713 Tracked'; btn.classList.add('saved'); btn.dataset.saved='1';
+        var _pid=(pur.d&&pur.d.opportunity&&pur.d.opportunity.id)?String(pur.d.opportunity.id):'';
+        if(_pid)btn.dataset.pursuitId=_pid;
+        // FUNNEL: pursuit_started — only a NEW pursuit counts (mirrors saveCurrentOpp).
+        try{ if(window.__track && pur.state==='saved') window.__track('tool_use','pursuit_started',{notice_id:String(rec.id),kind:'recompete',agency:String(rec.department||'')}); }catch(e){}
+      }
+      else if(favOk&&!pq){ btn.textContent='\\u2713 Saved'; btn.classList.add('saved'); btn.dataset.saved='1'; } // no PIID: nothing a pursuit could key on
+      else if(favOk) btn.textContent='Saved \\u00b7 retry pursuit';
       else btn.textContent='Try again';
     });
   };

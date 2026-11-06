@@ -312,3 +312,24 @@ describe('behaviour carried over from /api/pipeline', () => {
   });
 });
 
+
+// ── 8. A RECOMPETE PURSUIT KEEPS ITS PIID ───────────────────────────────────
+
+describe('recompete pursuits are not re-keyed to a SAM notice', () => {
+  it('source recompete_map skips the SAM lookup: no swapped notice id, no borrowed deadline', async () => {
+    const { lookupSamOpportunityForPipeline } = await import('@/lib/pipeline/sam-opportunity-lookup');
+    (lookupSamOpportunityForPipeline as unknown as { mockClear: () => void }).mockClear();
+    const a = recordingDb();
+    const r = await createCanonicalPursuit(CTX(a.db), {
+      notice_id: 'N0018926F0012',
+      title: 'Recompete: Acme Corp · N0018926F0012',
+      agency: 'DEPARTMENT OF THE NAVY',
+      source: 'recompete_map',
+    });
+    expect(r.kind).toBe('created');
+    expect(lookupSamOpportunityForPipeline).not.toHaveBeenCalled();
+    const row = a.inserts[a.inserts.length - 1];
+    expect(row.notice_id).toBe('N0018926F0012');
+    expect(row.response_deadline ?? null).toBeNull();
+  });
+});

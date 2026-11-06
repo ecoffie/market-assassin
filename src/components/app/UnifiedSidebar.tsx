@@ -30,11 +30,13 @@ import {
   ChevronUp,
   RefreshCw,
   Search,
+  Map as MapIcon,
 } from 'lucide-react';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
 import { UpgradeModal } from './UpgradeModal';
 import { useAppTracker } from './track';
+import { mapHomeLink } from '@/lib/maps/map-links';
 
 // Panel types for the unified MI platform
 export type AppPanel =
@@ -43,6 +45,7 @@ export type AppPanel =
   | 'my-market'      // Market Dossier — the one-shot assembled market
   | 'alerts'         // Daily Alerts - opportunity list
   | 'market-intel'   // /app/market-intel — full-bleed dashboard route (not a panel)
+  | 'opportunity-map' // /opportunity-map — the map, a separate route (not a panel)
   | 'research'       // Market Research (Federal Market Assassin)
   | 'forecasts'      // 33,000+ upcoming procurements
   | 'recompetes'     // Expiring contracts
@@ -92,6 +95,9 @@ interface NavItem {
   // switching the active panel. Used for full-bleed pages like
   // /app/market-intel that aren't part of the panel container.
   href?: string;
+  // The href is served by a route handler, not a Next page (/opportunity-map), so it must be a
+  // real document navigation (<a>), never a client-side <Link> transition.
+  hardNav?: boolean;
 }
 
 interface NavSection {
@@ -119,6 +125,16 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Intelligence',
     items: [
+      {
+        // The Opportunity Map — free for everyone, a real navigation to the map route.
+        id: 'opportunity-map',
+        label: 'Opportunity Map',
+        icon: MapIcon,
+        description: 'Open, recompete and forecast on one map',
+        tier: ['free', 'pro', 'team', 'enterprise'],
+        href: mapHomeLink(),
+        hardNav: true,
+      },
       {
         // Mindy Chat — flagship v2 entry, top of the sidebar per Eric's
         // call (decision logged 2026-05-27 in PRD-mindy-chat-v1.md).
@@ -660,6 +676,25 @@ export default function UnifiedSidebar({
                 // Route-based items render as <Link>. Tier-gated routes
                 // still respect canAccess by falling through to the
                 // disabled <button> branch below.
+                if (item.href && canAccess && item.hardNav) {
+                  return (
+                    <a
+                      key={item.id}
+                      data-tour={`nav-${item.id}`}
+                      href={item.href}
+                      onClick={() => {
+                        track('link_click', 'sidebar', { action: 'open_map', feature: item.id, tier: userTier });
+                        onMobileClose?.();
+                      }}
+                      onMouseEnter={(e) => { setHoveredItem(item.id); showTooltip(e, display.label, item.badge, !canAccess); }}
+                      onMouseLeave={() => { setHoveredItem(null); setTooltip(null); }}
+                      className={sharedClassName}
+                    >
+                      {innerContent}
+                    </a>
+                  );
+                }
+
                 if (item.href && canAccess) {
                   return (
                     <Link

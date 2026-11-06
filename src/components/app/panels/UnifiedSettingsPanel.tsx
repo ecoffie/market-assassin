@@ -20,10 +20,14 @@ import { getPsc } from '@/lib/codes/lookup';
 import { commitNaicsFromTypedInput } from '@/lib/codes/validate-market-codes';
 import TargetingCard from './TargetingCard';
 import { pscStatus } from '@/lib/codes/psc-status';
+import { SETTINGS_SECTION_ANCHORS, type SettingsSection } from '@/lib/app/deep-link-params';
+import { useScrollToAnchor } from '../useScrollToAnchor';
 
 interface UnifiedSettingsPanelProps {
   email: string | null;
   tier: AppTier;
+  /** Deep link (/app?panel=settings&section=…) — scroll to that card once it renders. */
+  initialSection?: SettingsSection;
 }
 
 interface SettingsForm {
@@ -45,7 +49,8 @@ interface SettingsForm {
   alert_mode: AlertMode;
 }
 
-export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPanelProps) {
+export default function UnifiedSettingsPanel({ email, tier, initialSection }: UnifiedSettingsPanelProps) {
+  useScrollToAnchor(initialSection ? SETTINGS_SECTION_ANCHORS[initialSection] : null);
   const [form, setForm] = useState<SettingsForm>({
     company_name: '',
     display_name: '',
@@ -726,7 +731,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
               {/* SMS alerts — time-sensitive pursuit changes (amendments,
                   deadline moves, cancels). Double opt-in: verify the number by
                   code before it's ever texted (TCPA/CTIA + carrier A2P). */}
-              <div className="md:col-span-2 rounded-lg border border-hairline bg-surface/40 p-4">
+              <div id="settings-notifications" className="scroll-mt-24 md:col-span-2 rounded-lg border border-hairline bg-surface/40 p-4">
                 <div className="flex items-start gap-3">
                   <MessageSquare className="mt-0.5 h-5 w-5 shrink-0 text-muted" strokeWidth={2} />
                   <div className="min-w-0 flex-1">
@@ -1130,11 +1135,31 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
         </div>
 
         <div className="space-y-4">
-          <BillingCard email={email} tier={tier} getAuthHeaders={getAuthHeaders} />
+          <div id="settings-billing" className="scroll-mt-24">
+            <BillingCard email={email} tier={tier} getAuthHeaders={getAuthHeaders} />
+          </div>
 
           {/* Solo -> Team upgrade. Shown to paid (pro) solo users; free users
               upgrade to Pro first via the Billing card above. */}
-          {tier === 'pro' && <TeamUpgradeCard email={email} getAuthHeaders={getAuthHeaders} />}
+          <div id="settings-team" className="scroll-mt-24 space-y-4">
+            {tier === 'pro' && <TeamUpgradeCard email={email} getAuthHeaders={getAuthHeaders} />}
+            {/* Arrived from the map's "Team & workspace" link. Members and invites are managed in
+                the Team panel, not here — say so rather than landing on an unrelated card. */}
+            {initialSection === 'team' && (
+              <div className="bg-ground border border-surface rounded-xl p-5">
+                <h2 className="font-semibold text-white mb-1">Team &amp; workspace</h2>
+                <p className="text-sm text-muted">
+                  Teammates, invites and workspace access are managed in Team Access.
+                </p>
+                <a
+                  href="/app?panel=team"
+                  className="mt-3 inline-flex items-center justify-center w-full px-3 py-2 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors"
+                >
+                  Open Team Access
+                </a>
+              </div>
+            )}
+          </div>
 
           <div className="bg-ground border border-surface rounded-xl p-5">
             <h2 className="font-semibold text-white">Getting started</h2>
@@ -1164,7 +1189,8 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
             </div>
           </div>
 
-          <div className="bg-ground border border-surface rounded-xl p-5">
+          {/* Security: session, change email and change password sit together — anchor the group. */}
+          <div id="settings-security" className="scroll-mt-24 bg-ground border border-surface rounded-xl p-5">
             <h2 className="font-semibold text-white mb-2">Session</h2>
             <p className="text-sm text-muted">
               Your session is protected by a signed two-factor token and expires after 30 days.

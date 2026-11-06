@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Star, Contact, Check, Plus } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
+import { mapLinkForBuyer } from '@/lib/maps/map-links';
 
 interface Props {
   email: string | null;
@@ -453,6 +454,15 @@ export default function GovDecisionMakersPanel({ email }: Props) {
                     ) : c.contact_phone ? (
                       <span className="text-muted">{c.contact_phone}</span>
                     ) : <span className="text-slate-600">—</span>}
+                    {/* ?buyer=<federal_contacts.id> — this row's id comes from the
+                        government-buyer-scoped directory query, the same key the map's
+                        buyer drawer reads. */}
+                    {(() => {
+                      const mapHref = mapLinkForBuyer(c.id);
+                      return mapHref ? (
+                        <a href={mapHref} className="block mt-1 text-[11px] text-emerald-400 hover:underline">Open on the map</a>
+                      ) : null;
+                    })()}
                   </td>
                 </tr>
               ))}

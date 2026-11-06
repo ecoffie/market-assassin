@@ -8,6 +8,15 @@ import { NaicsAutocompleteInput } from '../../codes/NaicsAutocompleteInput';
 import { useAppTracker } from '../track';
 import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
+import { mapLinkForForecast } from '@/lib/maps/map-links';
+
+// The map's ?forecast= record address: the forecast pin id (`fc-<agency_forecasts.id>`). DoD early
+// signals (`sam:<solicitation number>`) are not forecasts and carry no notice id, so they get no link.
+function forecastMapHref(forecast: { id: string; signalType?: string }): string | null {
+  const id = String(forecast.id || '').trim();
+  if (!id || forecast.signalType === 'dod_early_signal' || id.startsWith('sam:')) return null;
+  return mapLinkForForecast(id.startsWith('fc-') ? id : `fc-${id}`);
+}
 
 interface ForecastsPanelProps {
   email: string | null;
@@ -766,6 +775,14 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                           email={email || ''}
                           variant="small"
                         />
+                        {(() => {
+                          const mapHref = forecastMapHref(forecast);
+                          return mapHref ? (
+                            <a href={mapHref} className="text-[11px] text-amber-400 hover:text-amber-300">
+                              Open on the map →
+                            </a>
+                          ) : null;
+                        })()}
                       </div>
                     </div>
                   </div>

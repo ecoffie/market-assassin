@@ -22,6 +22,8 @@ import type { Agency, SimplifiedAcquisitionReport } from '@/types/federal-market
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 import { getProductVendorHint } from '@/lib/lookup-intent';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
+import { mapLinkForOpportunity } from '@/lib/maps/map-links';
+import { samNoticeIdFrom } from '../mapRecordIds';
 
 interface MarketResearchPanelProps {
   email: string | null;
@@ -2805,6 +2807,14 @@ function RecommendedOpportunityCard({
             </a>
           )}
         </div>
+        {(() => {
+          const mapHref = mapLinkForOpportunity(samNoticeIdFrom(opportunity.id, opportunity.url));
+          return mapHref ? (
+            <a href={mapHref} className="mt-2 block text-center text-xs text-emerald-400 hover:text-emerald-300">
+              Open on the map →
+            </a>
+          ) : null;
+        })()}
       </div>
     </article>
   );
@@ -2957,6 +2967,14 @@ function RecommendedOpportunityDrawer({
               Open on SAM.gov
             </a>
           )}
+          {(() => {
+            const mapHref = mapLinkForOpportunity(samNoticeIdFrom(opportunity.id, opportunity.url));
+            return mapHref ? (
+              <a href={mapHref} className="mt-3 block text-center text-sm text-emerald-400 hover:text-emerald-300">
+                Open on the map →
+              </a>
+            ) : null;
+          })()}
         </div>
       </aside>
     </div>
@@ -5757,16 +5775,26 @@ function LiveOpportunityFallback({
                   {dueDate && <span className="rounded bg-input/70 px-2 py-1">Due {dueDate}</span>}
                 </div>
               </div>
-              {samUrl && (
-                <a
-                  href={samUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
-                >
-                  SAM.gov
-                </a>
-              )}
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                {samUrl && (
+                  <a
+                    href={samUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
+                  >
+                    SAM.gov
+                  </a>
+                )}
+                {(() => {
+                  const mapHref = mapLinkForOpportunity(samNoticeIdFrom(opportunity.id, opportunity.url));
+                  return mapHref ? (
+                    <a href={mapHref} className="text-xs text-emerald-400 hover:text-emerald-300">
+                      Open on the map →
+                    </a>
+                  ) : null;
+                })()}
+              </div>
             </div>
           </div>
         );
