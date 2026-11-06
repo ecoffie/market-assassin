@@ -71,6 +71,12 @@ export const MP_COMPONENTS_CSS = [
 
   // Header: see site-nav.ts (SITE_NAV_CSS, appended after the account CSS below).
 
+  // Swipe indicator (SwipeDots.tsx): dots under every horizontal scroller; the current one is a pill.
+  '.mp-dots{display:flex;justify-content:center;align-items:center;gap:8px;margin:14px 0 4px}',
+  '.mp-dots[hidden]{display:none}',
+  '.mp-dot{width:10px;height:10px;padding:0;border:0;border-radius:99px;background:var(--mp-line);cursor:pointer;transition:width .2s,background .2s}',
+  '.mp-dot.on{width:28px;background:var(--mp-navy)}',
+
   // Footer: the homepage's .sfoot.
   '.mp-foot{border-top:1px solid var(--mp-line);margin-top:72px;padding:34px var(--mp-gutter) 48px}',
   '.mp-foot-g{display:grid;gap:26px 34px;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));max-width:1100px;margin:0 auto}',
