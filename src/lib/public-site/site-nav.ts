@@ -29,7 +29,7 @@ export function siteEventBannerHtml(now: Date = new Date()): string {
   if (lazyBlueprintIsOver(now)) return '';
   return `<div class="mp-evb-band" id="mp-evb"><div class="mp-evb">`
     + `<p class="mp-evb-t"><span class="mp-evb-l">Join <b>${esc(LCB.title)}</b> live on <b>${esc(LCB.shortDate)}</b> — show up and get $50 in free Mindy credits</span>`
-    + `<span class="mp-evb-s"><b>Free live event ${esc(LCB.shortDate)}</b> · get $50 in credits</span></p>`
+    + `<span class="mp-evb-s">Join <b>${esc(LCB.title)}</b>, free and live on <b>${esc(LCB.shortDate)}</b></span></p>`
     + `<a class="mp-evb-c" href="${esc(LCB.path)}">Register free</a>`
     + `<button type="button" class="mp-evb-x" aria-label="Close banner" onclick="document.getElementById('mp-evb').hidden=true">`
     + `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div></div>`;
@@ -86,13 +86,15 @@ export const SITE_NAV_CSS = [
   '.mp-evb-x:hover{background:rgba(27,58,107,.1)}',
   '.mp-evb-x svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}',
   '.mp-evb-s{display:none}',
-  // Phones: the banner is one short line and scrolls away; only the nav row stays pinned
-  // (display:contents lifts .mp-head out of .mp-top so its sticky range is the whole page).
-  '@media(max-width:620px){.mp-top{display:contents}.mp-head{position:sticky;top:0;z-index:40;height:56px}'
-    + '.mp-evb-band{padding:6px max(10px,env(safe-area-inset-right,0px)) 6px max(10px,env(safe-area-inset-left,0px))}'
-    + '.mp-evb{flex-wrap:nowrap;justify-content:space-between;gap:10px;padding:6px 36px 6px 12px;text-align:left}'
-    + '.mp-evb-l{display:none}.mp-evb-s{display:inline}.mp-evb-t{font-size:13.5px;line-height:1.3}'
-    + '.mp-evb-c{padding:6px 12px;font-size:13px}.mp-evb-x{right:2px;width:30px;height:30px}'
-    + '.mp-logo span{font-size:18px}.mp-logo img{width:26px;height:26px}.mp-head .mp-su{padding:9px 14px;font-size:14px}}',
+  // Phones (Zoom-style): the nav row comes first and stays pinned; the banner is a centred card
+  // UNDER it that scrolls away. display:contents lifts both out of .mp-top so they become items of
+  // the .mp-site flex column, where `order` puts the nav (-2) above the banner (-1) and the page.
+  '@media(max-width:620px){.mp-top{display:contents}.mp-site>.mp-skip{order:-3}'
+    + '.mp-head{order:-2;position:sticky;top:0;z-index:40;height:60px}'
+    + '.mp-evb-band{order:-1;border-bottom:0;padding:10px max(14px,env(safe-area-inset-right,0px)) 6px max(14px,env(safe-area-inset-left,0px))}'
+    + '.mp-evb{flex-direction:column;gap:12px;padding:16px 44px 16px;border-radius:16px;text-align:center}'
+    + '.mp-evb-l{display:none}.mp-evb-s{display:inline}.mp-evb-t{font-size:15.5px;line-height:1.45}'
+    + '.mp-evb-c{padding:9px 20px;font-size:15px}.mp-evb-x{right:6px;top:14px;transform:none;width:32px;height:32px}'
+    + '.mp-logo span{font-size:20px}.mp-logo img{width:28px;height:28px}.mp-head .mp-su{padding:9px 14px;font-size:14px}}',
   '@media (prefers-reduced-motion: reduce){.mp-evb{transition:none}}',
 ].join('');
