@@ -89,7 +89,9 @@ export async function GET(request: NextRequest) {
   const listed = await listSavedSearches(email);
   if (!listed.ok) {
     if (listed.code === 'scheduler_unavailable') {
-      return NextResponse.json({ success: true, searches: [] });
+      // The read FAILED: this is unknown, not "no saved searches". Older callers only check
+      // `searches` and keep working; callers that can show an error read `unavailable`.
+      return NextResponse.json({ success: true, searches: [], unavailable: true, error: 'Saved searches could not be loaded right now.' });
     }
     return NextResponse.json({ success: false, error: listed.message }, { status: 500 });
   }

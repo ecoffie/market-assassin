@@ -37,7 +37,8 @@ export default function SavedSearchesList({ email }: { email: string | null }) {
           .catch(() => null),
       ]);
       const list = await listRes.json().catch(() => null);
-      if (!listRes.ok || !list || list.success !== true) {
+      // `unavailable` = the read failed upstream; never show that as "no saved searches".
+      if (!listRes.ok || !list || list.success !== true || list.unavailable === true) {
         setState({
           status: 'error',
           message: (list && typeof list.error === 'string' && list.error) || `Could not load saved searches (HTTP ${listRes.status}).`,
