@@ -32,9 +32,16 @@ function mkDb(opts: {
   updateErr?: { message: string } | null;
   updateCount?: number | null;
   /** What a read-back shows after a 0-row update. */
-  readBack?: { claimed_at: string | null } | null;
+  readBack?: { claimed_at: string | null; claimed_by?: string | null } | null;
+  /** Canonical rows the Saved-list copy reads (the second list read). */
+  samRows?: Record<string, unknown>[];
+  /** Error on the Saved-list snapshot lookup. */
+  samErr?: { message: string } | null;
+  /** Error on the Saved-list copy. */
+  upsertErr?: { message: string } | null;
 } = {}) {
   const seen: string[] = [];
+  const upserts: { table: string; rows: Record<string, unknown>[]; opts: Record<string, unknown> }[] = [];
   let listReads = 0;
   const make = (table: string) => {
     seen.push(table);
@@ -59,15 +66,23 @@ function mkDb(opts: {
       return { data: opts.readBack ?? null, error: null };
     };
     q.insert = async () => ({ error: table === 'anonymous_shortlist' ? (opts.insertErr ?? null) : null });
+    q.upsert = async (rows: Record<string, unknown>[], o: Record<string, unknown>) => {
+      upserts.push({ table, rows, opts: o });
+      return { error: opts.upsertErr ?? null };
+    };
     q.then = (r: (v: unknown) => unknown) => {
       if (opts.readErr) return Promise.resolve({ data: null, count: null, error: opts.readErr }).then(r);
+      if (table === 'sam_opportunities') {
+        if (opts.samErr) return Promise.resolve({ data: null, error: opts.samErr }).then(r);
+        return Promise.resolve({ data: opts.samRows ?? [], error: null }).then(r);
+      }
       // First list read = the anon rows to attach; the account read uses its own set.
       const data = opts.accountRows ?? (listReads++ === 0 ? (opts.rows ?? []) : []);
       return Promise.resolve({ data, count: data.length, error: null }).then(r);
     };
     return q;
   };
-  return { db: { from: (t: string) => make(t) } as never, seen };
+  return { db: { from: (t: string) => make(t) } as never, seen, upserts };
 }
 
 describe('the browser cannot manufacture an opportunity', () => {
@@ -94,11 +109,13 @@ describe('the browser cannot manufacture an opportunity', () => {
   it('the Map sends ONLY the notice id', () => {
     // Assert the exact anonymous-save payload anywhere in the file, rather than
     // slicing on a keyword that also occurs in prose.
-    // The CANONICAL notice id (_nid2), never the solicitation number. Review
-    // round 3: 99.0% of open SAM rows have nid != sol, so _o2.sol here meant
-    // the save failed the notice_id lookup and the FK for the whole corpus.
-    expect(MAP).toMatch(/body:JSON\.stringify\(\{anonId:_aid2,noticeId:_nid2\}\)/);
-    expect(MAP).not.toMatch(/noticeId:_o2\.sol/);
+    // The CANONICAL notice id (_nid = CUR.id in saveCurrentOpp, the live save
+    // path; the dead window.savePursuit copy was deleted 2026-11-06), never the
+    // solicitation number. Review round 3: 99.0% of open SAM rows have
+    // nid != sol, so a sol here meant the save failed the notice_id lookup and
+    // the FK for the whole corpus.
+    expect(MAP).toMatch(/body:JSON\.stringify\(\{anonId:_aid,noticeId:_nid\}\)/);
+    expect(MAP).not.toMatch(/noticeId:[\w.]*\bsol\b/);
     // No client-supplied opportunity metadata may be posted to the shortlist.
     const call = MAP.slice(MAP.indexOf("fetch('/api/app/shortlist',{method:'POST',headers:{'Content-Type':'application/json'},"));
     const payload = call.slice(0, call.indexOf('})})') + 4);
@@ -136,7 +153,7 @@ describe('a caller cannot write into someone else\'s space', () => {
   });
 
   it('the Map never sends an email on claim', () => {
-    const helper = MAP.slice(MAP.indexOf('window.__claimAnonShortlist=function'), MAP.indexOf('window.savePursuit=function'));
+    const helper = MAP.slice(MAP.indexOf('window.__claimAnonShortlist=function'), MAP.indexOf('window.toggleFav=function'));
     expect(helper).toMatch(/action:'claim',anonId:aid/);
     expect(helper).not.toMatch(/email:/);
   });
@@ -155,22 +172,25 @@ describe('a save is not a pursuit', () => {
     expect(code).not.toMatch(/createCanonicalPursuit/);
   });
 
-  it('claiming writes ONLY to anonymous_shortlist', async () => {
+  it('claiming touches the shortlist and the SAVED list — never user_pipeline', async () => {
     const { db, seen } = mkDb({ rows: [{ id: 'sl-1', notice_id: 'n1' }] });
     await claimAnonShortlist(db, ANON, { verifiedEmail: 'buyer@example.com' });
-    expect(new Set(seen)).toEqual(new Set(['anonymous_shortlist']));
+    // sam_opportunities is READ for the snapshot; the only writes are the claim
+    // and the Saved-list copy.
+    expect(new Set(seen)).toEqual(new Set(['anonymous_shortlist', 'sam_opportunities', 'user_saved_opportunities']));
+    expect(seen).not.toContain('user_pipeline');
   });
 
   it('the claim result counts ATTACHED saves — there is no promoted counter', async () => {
     const { db } = mkDb({ rows: [{ id: 'sl-1', notice_id: 'n1' }] });
     const r = await claimAnonShortlist(db, ANON, { verifiedEmail: 'buyer@example.com' });
-    expect(r).toEqual({ ok: true, attached: 1, failed: 0 });
+    expect(r).toEqual({ ok: true, attached: 1, failed: 0, copied: 1, copyFailed: 0 });
     expect(r).not.toHaveProperty('promoted');
     expect(r).not.toHaveProperty('alreadyTracked');
   });
 
   it('the Map reports saves attached, never a pursuit', () => {
-    const helper = MAP.slice(MAP.indexOf('window.__claimAnonShortlist=function'), MAP.indexOf('window.savePursuit=function'));
+    const helper = MAP.slice(MAP.indexOf('window.__claimAnonShortlist=function'), MAP.indexOf('window.toggleFav=function'));
     expect(helper).toMatch(/shortlist_attached/);
     expect(helper).not.toMatch(/pursuit_started/);
     expect(helper).not.toMatch(/promoted/);
@@ -225,7 +245,7 @@ describe('attaching a save is proven, never assumed', () => {
   it('a database error counts as failed, never attached', async () => {
     const { db } = mkDb({ rows: [{ id: 'sl-1', notice_id: 'n1' }], updateErr: { message: 'connection reset' } });
     const r = await claimAnonShortlist(db, ANON, { verifiedEmail: 'buyer@example.com' });
-    expect(r).toEqual({ ok: true, attached: 0, failed: 1 });
+    expect(r).toEqual({ ok: true, attached: 0, failed: 1, copied: 0, copyFailed: 0 });
   });
 
   it('a NULL count is UNKNOWN, never attached', async () => {
@@ -252,10 +272,85 @@ describe('attaching a save is proven, never assumed', () => {
   it('an empty shortlist is not an error', async () => {
     const { db } = mkDb();
     expect(await claimAnonShortlist(db, ANON, { verifiedEmail: 'a@b.com' }))
-      .toEqual({ ok: true, attached: 0, failed: 0 });
+      .toEqual({ ok: true, attached: 0, failed: 0, copied: 0, copyFailed: 0 });
   });
 
   it('the route reports `failed` rather than hiding a partial failure', () => {
     expect(ROUTE).toMatch(/failed: r\.failed/);
+  });
+});
+
+// ── A claimed save must land in the account's Saved list ────────────────────
+// The claim used to set claimed_by and nothing else, so a claimed save showed up
+// nowhere but the map's "✓ Saved" badge. Each proven transfer is now copied into
+// user_saved_opportunities — idempotently, never overwriting the user's own row.
+describe('a claimed save lands in the Saved list', () => {
+  const SAM = {
+    notice_id: 'n1', solicitation_number: 'N0017426R1003', title: 'Base Ops Support',
+    department: 'DEPT OF DEFENSE', naics_code: '561210', set_aside_description: 'Total Small Business',
+    response_deadline: '2026-12-01T17:00:00Z', posted_date: '2026-10-01T00:00:00Z',
+  };
+
+  it('copies each attached save with the same shape /api/opportunities/save writes', async () => {
+    const { db, upserts } = mkDb({ rows: [{ id: 'sl-1', notice_id: 'n1' }], samRows: [SAM] });
+    const r = await claimAnonShortlist(db, ANON, { verifiedEmail: 'Buyer@Example.com' });
+    expect(r.copied).toBe(1);
+    expect(upserts).toHaveLength(1);
+    expect(upserts[0].table).toBe('user_saved_opportunities');
+    expect(upserts[0].rows).toEqual([expect.objectContaining({
+      user_email: 'buyer@example.com', notice_id: 'n1', solicitation_number: 'N0017426R1003',
+      title: 'Base Ops Support', agency: 'DEPT OF DEFENSE', naics_code: '561210',
+      set_aside: 'Total Small Business', response_deadline: '2026-12-01T17:00:00Z',
+      pursuit_brief_requested: false, status: 'watching',
+      opportunity_data: expect.objectContaining({ noticeId: 'n1', title: 'Base Ops Support', department: 'DEPT OF DEFENSE' }),
+    })]);
+  });
+
+  it('is idempotent and never clobbers an existing save', async () => {
+    const { db, upserts } = mkDb({ rows: [{ id: 'sl-1', notice_id: 'n1' }], samRows: [SAM] });
+    await claimAnonShortlist(db, ANON, { verifiedEmail: 'buyer@example.com' });
+    // ON CONFLICT (user_email, notice_id) DO NOTHING — an existing row keeps the
+    // user's status/notes/source, and a repeat claim inserts no duplicate.
+    expect(upserts[0].opts).toEqual({ onConflict: 'user_email,notice_id', ignoreDuplicates: true });
+    expect(LIB).toMatch(/ignoreDuplicates: true/);
+  });
+
+  it('two shortlist rows for the same notice copy ONE Saved row', async () => {
+    const { db, upserts } = mkDb({ rows: [{ id: 'sl-1', notice_id: 'n1' }, { id: 'sl-2', notice_id: 'n1' }], samRows: [SAM] });
+    const r = await claimAnonShortlist(db, ANON, { verifiedEmail: 'buyer@example.com' });
+    expect(r.attached).toBe(2);
+    expect(upserts[0].rows).toHaveLength(1);
+  });
+
+  it('a failed transfer is not copied', async () => {
+    const { db, upserts } = mkDb({ rows: [{ id: 'sl-1', notice_id: 'n1' }], updateErr: { message: 'reset' } });
+    await claimAnonShortlist(db, ANON, { verifiedEmail: 'buyer@example.com' });
+    expect(upserts).toHaveLength(0);
+  });
+
+  it('a concurrent claim copies only when it was for THIS account', async () => {
+    const mine = mkDb({ rows: [{ id: 'sl-1', notice_id: 'n1' }], updateCount: 0, readBack: { claimed_at: 'x', claimed_by: 'buyer@example.com' } });
+    expect((await claimAnonShortlist(mine.db, ANON, { verifiedEmail: 'buyer@example.com' })).copied).toBe(1);
+    const theirs = mkDb({ rows: [{ id: 'sl-1', notice_id: 'n1' }], updateCount: 0, readBack: { claimed_at: 'x', claimed_by: 'other@example.com' } });
+    const r = await claimAnonShortlist(theirs.db, ANON, { verifiedEmail: 'buyer@example.com' });
+    expect(r.attached).toBe(1);
+    expect(theirs.upserts).toHaveLength(0);
+  });
+
+  it('a snapshot lookup failure still files the save (the Saved list hydrates on read)', async () => {
+    const { db, upserts } = mkDb({ rows: [{ id: 'sl-1', notice_id: 'n1' }], samErr: { message: 'timeout' } });
+    const r = await claimAnonShortlist(db, ANON, { verifiedEmail: 'buyer@example.com' });
+    expect(r.copied).toBe(1);
+    expect(upserts[0].rows[0]).toMatchObject({ notice_id: 'n1', user_email: 'buyer@example.com' });
+  });
+
+  it('a copy failure is REPORTED and does not undo the proven claim', async () => {
+    const { db } = mkDb({ rows: [{ id: 'sl-1', notice_id: 'n1' }], upsertErr: { message: 'boom' } });
+    const r = await claimAnonShortlist(db, ANON, { verifiedEmail: 'buyer@example.com' });
+    expect(r).toEqual({ ok: true, attached: 1, failed: 0, copied: 0, copyFailed: 1 });
+  });
+
+  it('the route reports copyFailed rather than hiding it', () => {
+    expect(ROUTE).toMatch(/copyFailed: r\.copyFailed/);
   });
 });

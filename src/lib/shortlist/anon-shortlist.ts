@@ -144,7 +144,117 @@ export interface ClaimResult {
   attached: number;
   /** Rows that could not be transferred this time. Left for retry. */
   failed: number;
+  /**
+   * Attached saves now present in the account's Saved list
+   * (`user_saved_opportunities`) — newly copied or already there. A copy
+   * failure does NOT undo the claim (the transfer is proven separately); it is
+   * reported in `copyFailed` instead of being hidden.
+   */
+  copied: number;
+  /** Attached saves that could not be copied into the Saved list this time. */
+  copyFailed: number;
   error?: string;
+}
+
+/** The columns the Saved-list copy reads from the canonical corpus. */
+const SAVED_COPY_SELECT =
+  'notice_id, solicitation_number, title, department, naics_code, set_aside_description, response_deadline, posted_date';
+
+interface SamCopyRow {
+  notice_id: string;
+  solicitation_number: string | null;
+  title: string | null;
+  department: string | null;
+  naics_code: string | null;
+  set_aside_description: string | null;
+  response_deadline: string | null;
+  posted_date: string | null;
+}
+
+/**
+ * Copy attached saves into the account's Saved list (`user_saved_opportunities`).
+ *
+ * ── WHY ────────────────────────────────────────────────────────────────────
+ * A claim used to set `claimed_by` and nothing else, so a claimed save showed
+ * up NOWHERE except the "✓ Saved" badge on the map: not on the Saved page, not
+ * in the app. The visitor's work was stranded at the moment they signed up.
+ *
+ * ── THE SHAPE ──────────────────────────────────────────────────────────────
+ * The same row `/api/opportunities/save` writes for a SAM opportunity (the map
+ * heart): notice id + a snapshot of title/agency/NAICS/set-aside/deadline.
+ * The snapshot is read from `sam_opportunities` — never from the browser — and
+ * is only a fallback: the Saved list hydrates live values on read. If the
+ * lookup fails the row is still written with the notice id alone, which the
+ * read side hydrates the same way.
+ *
+ * ── IDEMPOTENT, AND NEVER CLOBBERS ─────────────────────────────────────────
+ * `ignoreDuplicates` on the (user_email, notice_id) unique key: a notice the
+ * account already saved is left exactly as it is (its status, notes and source
+ * are the user's), and a repeated claim adds nothing.
+ *
+ * Still NOT a pursuit: this writes the Saved list, never `user_pipeline`.
+ */
+async function copyClaimedToSavedList(
+  db: SupabaseClient,
+  email: string,
+  noticeIds: string[],
+): Promise<{ copied: number; copyFailed: number }> {
+  const ids = Array.from(new Set(noticeIds.filter(Boolean)));
+  if (ids.length === 0) return { copied: 0, copyFailed: 0 };
+
+  const byId = new Map<string, SamCopyRow>();
+  const { data: opps, error: lookupErr } = await db
+    .from('sam_opportunities')
+    .select(SAVED_COPY_SELECT)
+    .in('notice_id', ids)
+    .limit(MAX_ANON_SHORTLIST);
+  if (lookupErr) {
+    // Non-fatal: the Saved list hydrates from sam_opportunities on read.
+    console.error(`[anon-shortlist] saved-list snapshot lookup failed: ${lookupErr.message}`);
+  } else {
+    for (const o of (opps ?? []) as SamCopyRow[]) byId.set(o.notice_id, o);
+  }
+
+  const rows = ids.map((noticeId) => {
+    const o = byId.get(noticeId);
+    const opportunityData = o
+      ? {
+          noticeId,
+          solicitationNumber: o.solicitation_number,
+          title: o.title,
+          department: o.department,
+          naicsCode: o.naics_code,
+          responseDeadline: o.response_deadline,
+          setAside: o.set_aside_description,
+          claimedFrom: 'anonymous_shortlist',
+        }
+      : { noticeId, claimedFrom: 'anonymous_shortlist' };
+    return {
+      user_email: email,
+      notice_id: noticeId,
+      solicitation_number: o?.solicitation_number ?? null,
+      opportunity_data: opportunityData,
+      title: o?.title ?? null,
+      agency: o?.department ?? null,
+      naics_code: o?.naics_code ?? null,
+      set_aside: o?.set_aside_description ?? null,
+      response_deadline: o?.response_deadline ?? null,
+      posted_date: o?.posted_date ?? null,
+      source: 'opportunity_map',
+      pursuit_brief_requested: false,
+      status: 'watching',
+    };
+  });
+
+  const { error: copyErr } = await db
+    .from('user_saved_opportunities')
+    .upsert(rows, { onConflict: 'user_email,notice_id', ignoreDuplicates: true });
+  if (copyErr) {
+    console.error(`[anon-shortlist] copy into Saved list failed: ${copyErr.message}`);
+    return { copied: 0, copyFailed: ids.length };
+  }
+  // No error: every id is now in the Saved list (inserted, or already there).
+  return { copied: ids.length, copyFailed: 0 };
 }
 
 /** The verified account a claim attaches saves to. */
@@ -179,6 +289,10 @@ export interface ClaimContext {
  * The row keeps its `owner_anon_id` (the table's CHECK requires an `anon:`
  * shape) and records the account in `claimed_by`. `listAccountShortlist` reads
  * it back, so the save survives sign-in and still renders "✓ Saved".
+ *
+ * Each proven transfer is ALSO copied into the account's Saved list
+ * (`user_saved_opportunities`, see `copyClaimedToSavedList`) so the save is
+ * visible on the Saved page and in the app, not only as a badge on the map.
  */
 export async function claimAnonShortlist(
   db: SupabaseClient,
@@ -187,9 +301,10 @@ export async function claimAnonShortlist(
 ): Promise<ClaimResult> {
   const owner = anonId?.trim().toLowerCase();
   const email = ctx.verifiedEmail?.trim().toLowerCase();
-  if (!isAnonId(owner)) return { ok: false, attached: 0, failed: 0, error: 'invalid anon id' };
+  const none = { copied: 0, copyFailed: 0 };
+  if (!isAnonId(owner)) return { ok: false, attached: 0, failed: 0, ...none, error: 'invalid anon id' };
   if (!email || !email.includes('@') || isAnonId(email)) {
-    return { ok: false, attached: 0, failed: 0, error: 'a verified account email is required' };
+    return { ok: false, attached: 0, failed: 0, ...none, error: 'a verified account email is required' };
   }
 
   const { data: rows, error: readErr } = await db
@@ -198,12 +313,15 @@ export async function claimAnonShortlist(
     .eq('owner_anon_id', owner)
     .is('claimed_at', null)
     .limit(MAX_ANON_SHORTLIST);
-  if (readErr) return { ok: false, attached: 0, failed: 0, error: readErr.message };
+  if (readErr) return { ok: false, attached: 0, failed: 0, ...none, error: readErr.message };
   const shortlist = (rows ?? []) as { id: string; notice_id: string }[];
-  if (shortlist.length === 0) return { ok: true, attached: 0, failed: 0 };
+  if (shortlist.length === 0) return { ok: true, attached: 0, failed: 0, ...none };
 
   let attached = 0;
   let failed = 0;
+  // Notices whose transfer to THIS account is proven — the only ones copied
+  // into the account's Saved list.
+  const toCopy: string[] = [];
 
   for (const row of shortlist) {
     // ⚠️ The write is PROVEN, not assumed. An earlier version logged the error
@@ -232,7 +350,7 @@ export async function claimAnonShortlist(
       console.error(`[anon-shortlist] attach count returned NULL for ${row.notice_id} — unknown, not zero`);
       continue;
     }
-    if (count === 1) { attached += 1; continue; }
+    if (count === 1) { attached += 1; toCopy.push(row.notice_id); continue; }
     if (count === 0) {
       // Either a concurrent claim already transferred it, or the row is not
       // where we think it is. Different facts — read back and decide on
@@ -240,7 +358,7 @@ export async function claimAnonShortlist(
       const { data, error: readBackErr } = await db
         .from('anonymous_shortlist')
         // unranged-ok: single row by primary key.
-        .select('id,claimed_at')
+        .select('id,claimed_at,claimed_by')
         .eq('id', row.id)
         .maybeSingle();
       if (readBackErr) {
@@ -248,8 +366,12 @@ export async function claimAnonShortlist(
         console.error(`[anon-shortlist] 0 rows attached; read-back failed for ${row.notice_id}: ${readBackErr.message}`);
         continue;
       }
-      if (data && (data as { claimed_at: string | null }).claimed_at) {
+      const back = data as { claimed_at: string | null; claimed_by?: string | null } | null;
+      if (back && back.claimed_at) {
         attached += 1;  // provably transferred concurrently
+        // Copy only when the concurrent claim was for THIS account; a save
+        // another account claimed is not this user's to file.
+        if ((back.claimed_by || '').toLowerCase() === email) toCopy.push(row.notice_id);
         continue;
       }
       failed += 1;
@@ -260,5 +382,6 @@ export async function claimAnonShortlist(
     console.error(`[anon-shortlist] expected to attach exactly 1 row for ${row.notice_id}, affected ${count}`);
   }
 
-  return { ok: true, attached, failed };
+  const copy = await copyClaimedToSavedList(db, email, toCopy);
+  return { ok: true, attached, failed, ...copy };
 }

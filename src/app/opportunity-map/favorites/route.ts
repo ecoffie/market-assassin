@@ -510,6 +510,34 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     bar.querySelectorAll('.fchip').forEach(function(b){ b.onclick=function(){ FILTER=b.getAttribute('data-f'); filters(); render(); }; });
   }
 
+  // ── RECORD LINK per saved kind (docs/engineering/record-links-vs-market-links.md) ──
+  // The Saved list holds more than SAM notices: the company / buyer / recompete drawers save here
+  // too (source company_map / buyer_map / recompete_map, opportunity_data.entityType), keyed on a
+  // UEI, a federal_contacts id or a recompete contract_id. Every card used to link ?opp=<id>, which
+  // asks the map's opportunity-detail endpoint for a notice that does not exist. Each kind needs its
+  // own record param. MIRRORS src/lib/maps/map-links.ts (mapLinkForOpportunity / ForCompany /
+  // ForBuyer / ForRecompete) — favorites-map-links.unit.test.ts pins both to the same output.
+  function recordKind(r){
+    var od=(r&&r.opportunity_data&&typeof r.opportunity_data==='object')?r.opportunity_data:{};
+    var et=String(od.entityType||'').toLowerCase();
+    if(et==='company'||et==='buyer'||et==='recompete')return et;
+    var src=String((r&&r.source)||'').toLowerCase();
+    if(src==='company_map')return 'company';
+    if(src==='buyer_map')return 'buyer';
+    if(src==='recompete_map')return 'recompete';
+    return 'opp';
+  }
+  function mapLinkFor(r){
+    var id=String((r&&r.notice_id)||'').trim(); if(!id)return null;
+    var k=recordKind(r), p;
+    if(k==='company'){ p='company'; id=id.toUpperCase(); }
+    else if(k==='buyer')p='buyer';
+    else if(k==='recompete')p='recompete';
+    else p=/^fc-/i.test(id)?'forecast':'opp';
+    return '/opportunity-map?'+p+'='+encodeURIComponent(id);
+  }
+  // end record link
+
   function cardHTML(r){
     var o=toO(r), col=srcColor(o), grp=groupOf(r);
     var reasons = grp==='attn' ? reasonsFor(r) : [];
@@ -535,7 +563,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var noteLine=unavailable?('<div class="cnote">Details unavailable \\u2014 this notice may have been archived or removed.</div>'):'';
     var closedCls=(grp==='closed')?' closedcard':'';
     return '<div class="dcard'+closedCls+'" data-nid="'+h(o.nid)+'">'
-      + '<a class="viewlink" href="/opportunity-map?opp='+encodeURIComponent(o.nid)+'">'
+      + '<a class="viewlink" href="'+h(mapLinkFor(r)||'/opportunity-map')+'">'
       +   lcHeader(o)
       +   '<div class="cstrip" style="background:'+col+'"></div>'
       +   '<div class="cbody">'
