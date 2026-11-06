@@ -7,6 +7,7 @@
  * Relationships panel.
  */
 
+import MindyLoader from '@/components/app/MindyLoader';
 import { useState, useEffect, useCallback } from 'react';
 import { Star, Contact, Check, Plus } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
@@ -484,9 +485,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       )}
 
       {loading && (
-        <div className="space-y-2">
-          {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-12 bg-surface/40 rounded animate-pulse" />)}
-        </div>
+<MindyLoader variant="section" title="Finding government contacts" steps={["Buying offices", "People named on notices"]} />
       )}
 
       <p className="text-xs text-slate-600">

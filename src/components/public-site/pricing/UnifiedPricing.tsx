@@ -15,6 +15,7 @@
  * is the failure tier-credits.unit.test.ts exists to stop.
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { UPGRADE_OFFER_LABEL, UPGRADE_OFFER_PARAM, withUpgradePromo } from '@/lib/billing/upgrade-offer';
 import Link from 'next/link';
 import type { Catalog, Pkg, SubPlan, Tool } from '@/app/mcp/catalog-ui';
 import { exampleCost, toolCr, workupCostFrom, workups } from '@/app/mcp/catalog-ui';
@@ -84,6 +85,8 @@ interface CardModel {
   per: string;
   href: string;
   cta: string;
+  /** The signed-in user's plan: shows a "Your plan" badge and a non-link "Current plan" button. */
+  current?: boolean;
   pill?: string;
   note?: string;
   credits: [string, string, string];
@@ -100,16 +103,18 @@ const Cross = () => (
 
 function PlanCard({ p, compact }: { p: CardModel; compact?: boolean }) {
   return (
-    <div className={`plan ${p.color || ''}`}>
+    <div className={`plan ${p.color || ''} ${p.current ? 'is-current' : ''}`}>
       <div className="plan-top">
-        <div className="pname"><h3>{p.name}</h3>{p.badge && <span className="badge">{p.badge}</span>}</div>
+        <div className="pname"><h3>{p.name}</h3>{p.current ? <span className="badge badge-current">Your plan</span> : p.badge && <span className="badge">{p.badge}</span>}</div>
         <div className="tagline">{p.tag}</div>
         <div className="price">
           {p.was !== undefined && <span className="was">${fmt(p.was)}</span>}
           <span className="now">${fmt(p.price)}</span>
           <span className="per">{p.per}</span>
         </div>
-        <a className="cta" href={p.href}>{p.cta}{p.pill && <span className="pill">{p.pill}</span>}</a>
+        {p.current
+          ? <span className="cta cta-current" aria-current="true">Current plan</span>
+          : <a className="cta" href={p.href}>{p.cta}{p.pill && <span className="pill">{p.pill}</span>}</a>}
         {p.note && <div className="subnote">{p.note}</div>}
       </div>
       <div className="credits">
@@ -145,6 +150,19 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
       })
       .catch(() => { /* static fallback */ });
   }, [signupCredits, proCredits]);
+
+  // Signed in (Eric 2026-11-06): "show what plan I'm currently on and the upgrade". The token is the
+  // same one every Mindy page sends; /api/app/me verifies it server-side and returns plan + credits.
+  const [me, setMe] = useState<{ plan: 'free' | 'pro' | 'team' | 'enterprise' | null; credits: number | null } | null>(null);
+  useEffect(() => {
+    let t: string | null = null;
+    try { t = localStorage.getItem('mi_beta_auth_token'); } catch { /* private mode */ }
+    if (!t) return;
+    fetch('/api/app/me', { headers: { 'x-mi-auth-token': t }, credentials: 'same-origin' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.email) setMe({ plan: d.plan ?? null, credits: typeof d.credits === 'number' ? d.credits : null }); })
+      .catch(() => { /* stays the public page */ });
+  }, []);
 
   const tools: Tool[] = cat?.tools ?? [];
   // Plans shown publicly. Agency is hidden from the pricing page (the Stripe plan and its
@@ -228,6 +246,28 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
       ],
     };
   };
+  const CURRENT_CARD: Record<string, string> = { free: 'Free', pro: 'Pro', team: 'Teams' };
+  if (me?.plan && CURRENT_CARD[me.plan]) {
+    for (const c of appCards) if (c.name === CURRENT_CARD[me.plan]) c.current = true;
+  }
+  // What "Upgrade" means from each plan: Free → Pro checkout, Pro → Teams, Team/Enterprise → add credits.
+  // Upgrading members get 25% off the first month (src/lib/billing/upgrade-offer.ts) — monthly Pro
+  // checkout carries the promo code; the Teams upgrade goes to sales with the offer attached.
+  const upgrade = !me?.plan ? null
+    : me.plan === 'free' ? { label: 'Upgrade to Pro', href: withUpgradePromo(PRO_CHECKOUT_MONTHLY), offer: true }
+    : me.plan === 'pro' ? { label: 'Upgrade to Teams', href: `${TEAMS_CONTACT_URL}?offer=${UPGRADE_OFFER_PARAM}`, offer: true }
+    : { label: 'Add credits', href: '/mcp/account?section=billing', offer: false };
+  // Annual stays the normal annual offer (its own 17% discount); the first-month deal is monthly.
+  if (me?.plan === 'free' && !annual) {
+    const pro = appCards.find((c) => c.name === 'Pro');
+    if (pro) { pro.href = withUpgradePromo(PRO_CHECKOUT_MONTHLY); pro.cta = 'Upgrade to Pro'; pro.pill = UPGRADE_OFFER_LABEL; pro.note = 'Billed monthly. 25% off applies to your first month.'; }
+  }
+  if (me?.plan === 'pro') {
+    const team = appCards.find((c) => c.name === 'Teams');
+    if (team) { team.href = `${TEAMS_CONTACT_URL}?offer=${UPGRADE_OFFER_PARAM}`; team.cta = 'Upgrade to Teams'; team.pill = UPGRADE_OFFER_LABEL; }
+  }
+  const PLAN_NAME: Record<string, string> = { free: 'Free', pro: 'Pro', team: 'Teams', enterprise: 'Enterprise' };
+
   const mcpCards = plans.map(mcpCard);
 
   // ---- Finder ----
@@ -314,6 +354,19 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
             <a className="chip" href={REFERRALS_URL}>♥ Refer a friend — you both get 100 credits →</a>
           </div>
         </section>
+
+        {me?.plan && upgrade && (
+          <section className="current-plan" aria-label="Your plan">
+            <div>
+              <div className="cp-k">Your plan</div>
+              <div className="cp-v">{PLAN_NAME[me.plan]}{typeof me.credits === 'number' && <span className="cp-c"> · {fmt(me.credits)} credits left</span>}</div>
+            </div>
+            <div className="cp-actions">
+              <Link className="cp-sec" href="/mcp/account?section=billing">Billing &amp; credits</Link>
+              <a className="cp-up" href={upgrade.href}>{upgrade.label}{upgrade.offer && <span className="cp-off">{UPGRADE_OFFER_LABEL}</span>}</a>
+            </div>
+          </section>
+        )}
 
         <div className="plans-head" id="plans">
           <div>
@@ -531,6 +584,17 @@ const CSS = `
 .up .price .now{font-size:48px;font-weight:700;line-height:1;color:var(--mp-ink)}
 .up .price .was{font-size:28px;font-weight:700;line-height:1;color:var(--mp-faint);text-decoration:line-through;text-decoration-thickness:2px}
 .up .price .per{font-size:14px;color:var(--mp-muted)}
+.up .current-plan{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;margin:0 0 28px;padding:20px 24px;border:1px solid var(--mp-line);border-radius:20px;background:var(--mp-surface);box-shadow:0 10px 30px rgba(27,58,107,.08)}
+.up .cp-k{font:700 12px var(--mp-font-sans);letter-spacing:.08em;text-transform:uppercase;color:var(--mp-navy)}
+.up .cp-v{margin-top:4px;font:700 22px var(--mp-font-sans);color:var(--mp-ink)}
+.up .cp-c{font-weight:500;color:var(--mp-body)}
+.up .cp-actions{display:flex;flex-wrap:wrap;gap:10px}
+.up .cp-sec,.up .cp-up{display:inline-flex;align-items:center;padding:12px 22px;border-radius:999px;font:600 15px var(--mp-font-sans);text-decoration:none}
+.up .cp-sec{border:1px solid var(--mp-line);color:var(--mp-ink)}
+.up .cp-up{gap:10px;background:var(--mp-navy);color:#fff}
+.up .cp-off{padding:3px 10px;border-radius:999px;background:#fff;color:var(--mp-navy);font-size:12.5px;font-weight:700}
+.up .plan.is-current{box-shadow:0 0 0 2px var(--mp-navy)}
+.up .cta.cta-current{cursor:default;background:var(--mp-wash);color:var(--mp-body);border-color:var(--mp-line)}
 .up .cta{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;border-radius:8px;background:var(--mp-wash);color:var(--mp-ink);font-weight:600;font-size:15px;border:1px solid var(--mp-line);transition:background .15s;white-space:nowrap}
 .up .cta:hover{background:var(--mp-hair)}
 .up .plan.navy .cta{background:var(--mp-navy);color:#fff;border-color:var(--mp-navy);font-weight:700}

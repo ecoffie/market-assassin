@@ -22,6 +22,8 @@ export interface ContactSalesInput {
   phone?: string;
   message: string;
   page?: string;
+  /** e.g. 'upgrade25' — an existing member upgrading (25% off the first month). */
+  offer?: string;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -42,6 +44,7 @@ export function parseContactSales(body: unknown): { ok: true; input: ContactSale
     phone: clean(b.phone, 40) || undefined,
     message: clean(typeof b.message === 'string' ? b.message.replace(/\r/g, '') : '', 3000),
     page: clean(b.page, 200) || undefined,
+    offer: clean(b.offer, 40) || undefined,
   };
   const errors: string[] = [];
   if (!input.name) errors.push('name');
@@ -72,6 +75,7 @@ export function contactSalesBlocks(i: ContactSalesInput): { text: string; blocks
   const blocks = [
     { type: 'header', text: { type: 'plain_text', text: `💼 ${text}`.slice(0, 150), emoji: true } },
     { type: 'section', fields: fields.map((t) => ({ type: 'mrkdwn', text: t })) },
+    ...(i.offer === 'upgrade25' ? [{ type: 'section', text: { type: 'mrkdwn', text: '*Upgrade offer:* existing member upgrading. Give 25% off the first month.' } }] : []),
     { type: 'section', text: { type: 'mrkdwn', text: `*What they need*\n${e(i.message).slice(0, 2800)}` } },
     { type: 'context', elements: [{ type: 'mrkdwn', text: `Contact sales form · getmindy.ai${i.page ? ` · from ${e(i.page)}` : ''} · reply to them by email` }] },
   ];

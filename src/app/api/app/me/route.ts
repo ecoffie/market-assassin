@@ -1,3 +1,4 @@
+import { resolvePlan, readCreditBalance } from '@/lib/access/current-plan';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserSession } from '@/lib/api-auth';
@@ -104,10 +105,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const profile = await resolveProfile(email);
+  const [profile, plan, credits] = await Promise.all([
+    resolveProfile(email),
+    resolvePlan(email).catch(() => null),
+    readCreditBalance(email),
+  ]);
 
+  // plan/credits power the signed-in header chip ("1,240 credits · Upgrade") and the pricing
+  // page's "current plan". null = could not be read; the client shows nothing rather than 0.
   return NextResponse.json(
-    { email, name: profile.name, picture: profile.picture },
+    { email, name: profile.name, picture: profile.picture, plan, credits },
     { headers: { 'cache-control': 'no-store' } }
   );
 }

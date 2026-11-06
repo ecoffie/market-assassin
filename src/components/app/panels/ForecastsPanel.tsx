@@ -9,6 +9,7 @@ import { useAppTracker } from '../track';
 import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 import { mapLinkForForecast } from '@/lib/maps/map-links';
+import MindyLoader from '@/components/app/MindyLoader';
 
 // The map's ?forecast= record address: the forecast pin id (`fc-<agency_forecasts.id>`). DoD early
 // signals (`sam:<solicitation number>`) are not forecasts and carry no notice id, so they get no link.
@@ -381,18 +382,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
   const agencyCoverageLabel = `${agencyCoverageCount.toLocaleString()} ${agencyCoverageCount === 1 ? 'Agency' : 'Agencies'}`;
 
   if (loading) {
-    return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-surface rounded w-48" />
-          <div className="grid grid-cols-3 gap-4">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-24 bg-surface rounded-xl" />
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    return <MindyLoader title="Loading upcoming buys" steps={["Agency forecasts", "Matching your market", "Expected dates and values"]} />;
   }
 
   return (

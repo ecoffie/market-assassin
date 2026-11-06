@@ -22,6 +22,7 @@ import TargetingCard from './TargetingCard';
 import { pscStatus } from '@/lib/codes/psc-status';
 import { SETTINGS_SECTION_ANCHORS, type SettingsSection } from '@/lib/app/deep-link-params';
 import { useScrollToAnchor } from '../useScrollToAnchor';
+import MindyLoader from '@/components/app/MindyLoader';
 
 interface UnifiedSettingsPanelProps {
   email: string | null;
@@ -633,14 +634,7 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
   }, []);
 
   if (loading) {
-    return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-surface rounded w-64" />
-          <div className="h-96 bg-surface rounded-xl" />
-        </div>
-      </div>
-    );
+    return <MindyLoader title="Loading your settings" steps={["Your profile", "Codes and keywords", "Alert settings"]} />;
   }
 
   return (

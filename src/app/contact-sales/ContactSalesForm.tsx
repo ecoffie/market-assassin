@@ -25,7 +25,7 @@ export default function ContactSalesForm() {
       const res = await fetch('/api/contact-sales', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...body, page: document.referrer ? new URL(document.referrer).pathname : '' }),
+        body: JSON.stringify({ ...body, page: document.referrer ? new URL(document.referrer).pathname : '', offer: new URLSearchParams(location.search).get('offer') || '' }),
       });
       const j = await res.json().catch(() => ({}));
       if (res.ok && j.success) { setStatus('sent'); return; }
