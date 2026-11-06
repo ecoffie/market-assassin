@@ -6,7 +6,11 @@
     "url": "https://getmindy.ai/app",
     "cleartext": false,
     "errorPath": "offline.html",
-    "allowNavigation": ["getmindy.ai", "*.getmindy.ai", "mi.govcongiants.com"]
+    "allowNavigation": [
+      "getmindy.ai",
+      "*.getmindy.ai",
+      "mi.govcongiants.com"
+    ]
   },
   "appendUserAgent": "MindyApp",
   "backgroundColor": "#1e3a8a",
@@ -24,7 +28,16 @@
       "showSpinner": false,
       "androidScaleType": "CENTER_CROP"
     },
-    "StatusBar": { "style": "DARK", "backgroundColor": "#1e3a8a" },
-    "PushNotifications": { "presentationOptions": ["badge", "sound", "alert"] }
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#1e3a8a"
+    },
+    "PushNotifications": {
+      "presentationOptions": [
+        "badge",
+        "sound",
+        "alert"
+      ]
+    }
   }
 }

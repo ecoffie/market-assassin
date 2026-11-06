@@ -28,6 +28,17 @@ cd mobile && npm ci && npx cap sync android && npx cap open android
 Add `android/app/google-services.json` from Firebase (for push) → Build ▸ Generate Signed Bundle (AAB)
 → upload to Play Console (Internal testing first, then Production).
 
+## Test against a PR preview (before merging)
+Every PR also builds **mindy-android-PREVIEW-apk**, labelled "Mindy Preview", which loads that PR's
+Vercel preview instead of getmindy.ai. On a Mac for iPhone:
+```bash
+node scripts/set-server-url.mjs https://market-assassin-git-<branch>-eric-coffies-projects.vercel.app
+npx cap sync ios && npx cap open ios      # run it, then:
+node scripts/set-server-url.mjs --reset   # never commit a preview URL
+```
+Social sign-in on a preview only works if Supabase → Auth → URL Configuration allows
+`https://*-eric-coffies-projects.vercel.app/**` as a redirect URL.
+
 ## Regenerate icons / splash
 Replace `resources/icon-only.png` (1024²) or `resources/splash.png` (2732²), then `npm run assets && npx cap sync`.
 
