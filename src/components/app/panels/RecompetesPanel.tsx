@@ -19,6 +19,7 @@ import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import { useDodaacNames } from '@/components/app/useDodaacNames';
 import StaleDataBanner from '@/components/app/StaleDataBanner';
 import { resolveEligibleSetAsides } from '@/lib/vault/certifications';
+import { mapLinkForRecompete } from '@/lib/maps/map-links';
 
 interface RecompetesPanelProps {
   email: string | null;
@@ -27,6 +28,9 @@ interface RecompetesPanelProps {
 
 interface ExpiringContract {
   piid: string;
+  // recompete_opportunities.contract_id — the map's ?recompete= record address. Distinct from
+  // the PIID (the map falls back to PIID, but contract_id is the exact key).
+  contractId?: string;
   title: string;
   incumbent: { name: string; uei: string };
   agency: string;
@@ -211,6 +215,7 @@ function mapRecompeteContract(contract: RecompeteApiContract): ExpiringContract 
 
   return {
     piid,
+    contractId: contract.contract_id || undefined,
     title: contract.description || contract.naics_description || `${incumbentName} recompete`,
     incumbent: {
       name: incumbentName,
@@ -1304,6 +1309,14 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                           email={email || ''}
                           variant="small"
                         />
+                        {(() => {
+                          const mapHref = mapLinkForRecompete(contract.contractId);
+                          return mapHref ? (
+                            <a href={mapHref} className="text-[11px] text-amber-400 hover:text-amber-300">
+                              Open on the map →
+                            </a>
+                          ) : null;
+                        })()}
                       </div>
                     </div>
                   </div>
