@@ -22,18 +22,22 @@
  * Inject all three into a page: CSS in <head>, HTML + JS before </body>.
  */
 
+import { mpFontFaceCss } from '@/lib/public-site/fonts';
+
+// Serif faces for the headings, so this pop-up matches the /signup page.
 export const LOGIN_MODAL_CSS =
-    '.lgm-ov{position:fixed;inset:0;background:rgba(8,15,26,.5);z-index:3200;display:none;align-items:center;justify-content:center;padding:24px}'
+    mpFontFaceCss({ includeInter: false })
+  + '.lgm-ov{position:fixed;inset:0;background:rgba(8,15,26,.5);z-index:3200;display:none;align-items:center;justify-content:center;padding:24px}'
   + '.lgm-ov.show{display:flex}'
-  + '.lgm{width:100%;max-width:392px;background:#fff;border-radius:14px;position:relative;box-shadow:0 24px 60px -14px rgba(8,15,26,.42),0 0 0 1px rgba(8,15,26,.05);animation:lgmpop .2s cubic-bezier(.2,.9,.3,1.2)}'
+  + '.lgm{width:100%;max-width:440px;max-height:calc(100dvh - 32px);overflow-y:auto;background:#fff;border-radius:24px;position:relative;box-shadow:0 24px 60px rgba(27,58,107,.18);border:1px solid #e6eaef;animation:lgmpop .2s cubic-bezier(.2,.9,.3,1.2)}'
   + '@keyframes lgmpop{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}'
   + '.lgm-x{position:absolute;top:12px;right:13px;width:32px;height:32px;border:0;background:transparent;color:#8894a2;font-size:21px;line-height:1;border-radius:8px;cursor:pointer}'
   + '.lgm-x:hover{background:#f6f8fb}'
-  + '.lgm-in{padding:30px 30px 26px}'
-  + '.lgm-brand{display:flex;align-items:center;gap:8px;font:800 19px Inter,system-ui,sans-serif;color:#0b1220;margin-bottom:20px}'
-  + '.lgm-brand b{width:24px;height:19px;border-radius:4px;background:linear-gradient(135deg,#4f46e5,#7c3aed);display:inline-block}'
-  + '.lgm h2{font:800 21px Inter,system-ui,sans-serif;letter-spacing:-.02em;margin:0 0 4px;color:#1a2530}'
-  + '.lgm-fly{margin:0 0 20px;color:#6b7787;font:500 13.5px/1.5 Inter,system-ui,sans-serif}.lgm-fly b{color:#1a2530;font-weight:700}'
+  + '.lgm-in{padding:36px 32px 28px}'
+  + '.lgm-brand{display:flex;align-items:center;justify-content:center;gap:8px;font:700 20px Inter,system-ui,sans-serif;letter-spacing:-.02em;color:#12100e;margin-bottom:22px}'
+  + '.lgm-brand img{width:28px;height:28px;display:block}'
+  + '.lgm h2{font:400 30px/1.15 "Libre Baskerville",Georgia,serif;letter-spacing:-.015em;margin:0 0 8px;color:#12100e;text-align:center}'
+  + '.lgm-fly{margin:0 0 22px;color:#3f4650;font:400 15px/1.5 Inter,system-ui,sans-serif;text-align:center}.lgm-fly b{color:#12100e;font-weight:600}'
   // ── PLAYERS UNLOCK PANEL — the FIRST PAYWALL MOMENT. Aspirational, not restrictive: it shows
   // what is behind the wall (blurred, so the value is SEEN not described) rather than refusing.
   + '.pu-h{margin:0 0 6px;font:800 21px/1.25 Inter,system-ui,sans-serif;color:#0f1e2e;letter-spacing:-.01em}'
@@ -56,10 +60,10 @@ export const LOGIN_MODAL_CSS =
   + '.pu-foot{margin:14px 0 0;color:#8b98a8;font:500 12.5px/1.5 Inter,system-ui,sans-serif;text-align:center}'
   + '.lgm label{display:block;font:700 12.5px Inter,system-ui,sans-serif;color:#3a4a58;margin:0 0 7px 1px}'
   + '.lgm input{width:100%;height:48px;border:1.5px solid #e3e8ee;border-radius:11px;padding:0 14px;font:500 15px Inter,system-ui,sans-serif;color:#1a2530;outline:none;transition:border-color .12s,box-shadow .12s}'
-  + '.lgm input:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.14)}'
-  + '.lgm-cta{width:100%;height:48px;margin-top:16px;border:0;border-radius:11px;background:#2563eb;color:#fff;font:800 15px Inter,system-ui,sans-serif;cursor:pointer;box-shadow:0 3px 10px -3px rgba(37,99,235,.5);transition:filter .12s}'
-  + '.lgm-cta:hover{filter:brightness(1.07)}.lgm-cta:disabled{opacity:.6;cursor:default}'
-  + '.lgm-create{margin:16px 0 0;font:500 13.5px Inter,system-ui,sans-serif;color:#6b7787}.lgm-create a{color:#2563eb;font-weight:700;text-decoration:none;cursor:pointer}'
+  + '.lgm input:focus{border-color:#1b3a6b;box-shadow:0 0 0 3px rgba(27,58,107,.15)}'
+  + '.lgm-cta{width:100%;height:48px;margin-top:16px;border:0;border-radius:12px;background:#1b3a6b;color:#fff;font:700 16px Inter,system-ui,sans-serif;cursor:pointer;transition:background .15s}'
+  + '.lgm-cta:hover{background:#14294a}.lgm-cta:disabled{opacity:.6;cursor:default}'
+  + '.lgm-create{margin:16px 0 0;text-align:center;font:400 14.5px Inter,system-ui,sans-serif;color:#3f4650}.lgm-create a{color:#1b3a6b;text-decoration:underline!important;font-weight:700;text-decoration:none;cursor:pointer}'
   + '.lgm-div{display:flex;align-items:center;gap:12px;margin:22px 0;color:#9aa7b4;font:700 11px Inter,system-ui,sans-serif;letter-spacing:.08em}'
   + '.lgm-div::before,.lgm-div::after{content:"";flex:1;height:1px;background:#e3e8ee}'
   + '.lgm-oauth{display:flex;flex-direction:column;gap:10px}'
@@ -68,7 +72,7 @@ export const LOGIN_MODAL_CSS =
   + '.lgm-fine{margin:20px 0 0;text-align:center;color:#9aa7b4;font:500 11.5px/1.5 Inter,system-ui,sans-serif}.lgm-fine a{color:#7b8794;text-decoration:underline}'
   + '.lgm-back{display:flex;align-items:center;gap:8px;margin:0 0 16px;color:#6b7787;font:600 13px Inter,system-ui,sans-serif;cursor:pointer}.lgm-back svg{width:15px;height:15px}'
   + '.lgm-chip{font:600 13px Inter,system-ui,sans-serif;color:#1a2530}'
-  + '.lgm-forgot{display:block;margin:12px 1px 0;font:700 12.5px Inter,system-ui,sans-serif;color:#2563eb;text-decoration:none;cursor:pointer}'
+  + '.lgm-forgot{display:block;margin:12px 1px 0;font:700 12.5px Inter,system-ui,sans-serif;color:#1b3a6b;text-decoration:none;cursor:pointer}'
   + '.lgm-err{margin:12px 0 0;color:#c0392b;font:600 13px Inter,system-ui,sans-serif}'
   + '.lgm-step2{display:none}'
   + '.lgm-ok{width:52px;height:52px;margin:2px auto 14px;border-radius:50%;background:#eafaf1;color:#15a34a;display:flex;align-items:center;justify-content:center}.lgm-ok svg{width:26px;height:26px}';
@@ -77,7 +81,7 @@ export const LOGIN_MODAL_HTML =
     '<div class="lgm-ov" id="lgmOv"><div class="lgm" role="dialog" aria-modal="true" aria-label="Sign in">'
   +   '<button class="lgm-x" id="lgmX" aria-label="Close">&times;</button>'
   +   '<div class="lgm-in">'
-  +     '<div class="lgm-brand"><b></b>Mindy</div>'
+  +     '<div class="lgm-brand"><img src="/brand/mindy-logo-icon.png" alt="">Mindy</div>'
         // STEP 1 — email-first
   +     '<div class="lgm-step1" id="lgmStep1">'
   +       '<div id="lgmUnlock"></div>'   // Players fills this; empty (and invisible) for every other gated action
@@ -110,8 +114,8 @@ export const LOGIN_MODAL_HTML =
         // STEP 3 — create a free account (name + email; password is set via the emailed setup link)
   +     '<div class="lgm-step3" id="lgmStep3" style="display:none">'
   +       '<div class="lgm-back" id="lgmBack3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>Back</div>'
-  +       '<h2>Create your free account</h2>'
-  +       '<p class="lgm-fly"><b>Free forever.</b> Daily opportunities, market research, and saved searches &mdash; no card required.</p>'
+  +       '<h2>Sign up for free</h2>'
+  +       '<p class="lgm-fly">No credit card required</p>'
   +       '<label for="lgmSuName">Name</label>'
   +       '<input type="text" id="lgmSuName" placeholder="Jane Contractor" autocomplete="name">'
   +       '<label for="lgmSuEmail" style="margin-top:14px">Work email</label>'
