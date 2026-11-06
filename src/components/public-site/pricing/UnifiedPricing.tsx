@@ -430,12 +430,13 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
           <button type="button" role="tab" aria-selected={cmpTab === 'app'} className={cmpTab === 'app' ? 'on' : ''} onClick={() => setCmpTab('app')}>Mindy App</button>
           <button type="button" role="tab" aria-selected={cmpTab === 'mcp'} className={cmpTab === 'mcp' ? 'on' : ''} onClick={() => setCmpTab('mcp')}>MCP Credits</button>
         </div>
+        <p className="tbl-hint">Swipe to compare every plan →</p>
         <div className="tbl-wrap">
           <table>
             <thead><tr><th>Feature</th>{c.cols.map((x, i) => <th key={x} className={i === c.hl ? 'hl' : ''}>{x}</th>)}</tr></thead>
             <tbody>
               {c.rows.map((r) => r.length === 1
-                ? <tr className="grp" key={r[0]}><td colSpan={c.cols.length + 1}>{r[0]}</td></tr>
+                ? <tr className="grp" key={r[0]}><td colSpan={c.cols.length + 1}><span>{r[0]}</span></td></tr>
                 : <tr key={r[0]}><td>{r[0]}</td>{r.slice(1).map((v, i) => <td key={i} className={i === c.hl ? 'hl' : ''}>{v}</td>)}</tr>)}
             </tbody>
           </table>
@@ -624,6 +625,16 @@ const CSS = `
 
 /* Compare table — the old matrix styling */
 .up .tbl-wrap{overflow-x:auto;border:1px solid var(--mp-line);border-radius:8px;background:var(--mp-surface)}
+.up .tbl-hint{display:none}
+@media(max-width:700px){
+  .up .tbl-hint{display:block;text-align:center;font-size:13px;font-weight:600;color:var(--mp-muted);margin:0 0 10px}
+  .up .tbl-wrap{-webkit-overflow-scrolling:touch}
+  .up table{min-width:560px;font-size:13px}
+  .up th,.up td{padding:11px 12px}
+  .up th:first-child,.up td:first-child{position:sticky;left:0;z-index:1;background:var(--mp-surface);width:150px;min-width:150px;box-shadow:1px 0 0 var(--mp-hair)}
+  .up tr.grp td:first-child{position:static;width:auto;box-shadow:none;background:var(--mp-wash)}
+  .up tr.grp td span{position:sticky;left:12px}
+}
 .up table{width:100%;border-collapse:collapse;font-size:14px;min-width:640px}
 .up th,.up td{padding:12px 18px;text-align:center;border-top:1px solid var(--mp-hair)}
 .up thead th{border-top:0;padding:16px 18px;font-weight:700;color:var(--mp-body);background:var(--mp-surface)}

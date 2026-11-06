@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { MP_HEADER_ACCOUNT_LINKS } from '@/lib/public-site/chrome';
+import { MP_HEADER_PRODUCT_LINKS } from '@/lib/public-site/chrome';
 import { ACCOUNT_MENU_HTML } from './account-menu';
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
@@ -24,9 +24,9 @@ describe('desktop: Learn in the right cluster, second', () => {
   it.each([...SUBPAGES, 'src/app/today/route.ts'])('%s', (p) => {
     expect(read(p)).toContain('<a href="/bid">Bid with confidence</a>\n    <a href="/learn">Learn</a>\n    <a href="/pricing">Pricing</a>');
   });
-  it('the shared public header (/learn, /bid, /gov, React public pages)', () => {
-    expect(MP_HEADER_ACCOUNT_LINKS.map((l) => l.href)).toEqual(['/bid', '/learn', '/pricing']);
-    expect(MP_HEADER_ACCOUNT_LINKS[1].label).toBe('Learn');
+  it('the shared public top bar (homepage nav: Mindy in your AI · Learn, left)', () => {
+    expect(MP_HEADER_PRODUCT_LINKS.map((l) => l.href)).toEqual(['/mcp/about', '/learn']);
+    expect(MP_HEADER_PRODUCT_LINKS[1].label).toBe('Learn');
   });
   it('exactly one Learn item per header (no duplicate entry points)', () => {
     for (const p of ['src/app/opportunity-map/route.ts', ...SUBPAGES, 'src/app/today/route.ts']) {

@@ -6,6 +6,7 @@
  * tokens.ts; `scripts/audit-public-design.mjs` enforces that for every opted-in file.
  */
 import { ACCOUNT_MENU_CSS } from '@/app/opportunity-map/account-menu';
+import { SITE_NAV_CSS } from './site-nav';
 import { MP_COLORS, MP_FONT_STACKS, MP_LAYOUT, MP_RADIUS } from './tokens';
 import { mpFontFaceCss } from './fonts';
 
@@ -31,7 +32,7 @@ export function mpTokenDeclarations(): string {
  */
 export const MP_ROOT_PAINT_CSS =
   `html{background-color:${MP_COLORS.paper};color-scheme:light}`
-  + `html body{background-color:${MP_COLORS.paper};color:${MP_COLORS.ink}}`
+  + `html body{background-color:${MP_COLORS.paper};color:${MP_COLORS.ink};margin:0}`
   + `::-webkit-scrollbar-track{background:${MP_COLORS.wash}}`
   + `::-webkit-scrollbar-thumb{background:${MP_COLORS.line}}`
   + `::-webkit-scrollbar-thumb:hover{background:${MP_COLORS.faint}}`;
@@ -68,21 +69,7 @@ export const MP_COMPONENTS_CSS = [
     + 'padding:10px 16px;font:600 14px var(--mp-font-sans);text-decoration:none}',
   '.mp-skip:focus{top:8px}',
 
-  // Header: the homepage's .zhead, without the signed-in rail.
-  '.mp-head{position:sticky;top:0;height:var(--mp-header-height);display:flex;align-items:center;'
-    + 'justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--mp-line);'
-    + 'background:var(--mp-surface);z-index:40}',
-  '.mp-head-left,.mp-head-right{display:flex;align-items:center;gap:22px}',
-  '.mp-head-left a{font:700 16px var(--mp-font-sans);color:var(--mp-ink);text-decoration:none;white-space:nowrap;letter-spacing:-.01em}',
-  '.mp-head-right>a{font:700 15px var(--mp-font-sans);color:var(--mp-ink);text-decoration:none;white-space:nowrap;letter-spacing:-.01em}',
-  '.mp-head-left a:hover,.mp-head-right>a:hover{color:var(--mp-navy)}',
-  '.mp-head a[aria-current="page"]{color:var(--mp-navy)}',
-  '.mp-logo{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;text-decoration:none}',
-  '.mp-logo img{height:25px;width:auto;display:block}',
-  '.mp-logo span{font:700 19px var(--mp-font-sans);color:var(--mp-ink);letter-spacing:-.02em}',
-  '@media(max-width:1000px){.mp-head-left,.mp-head-right{gap:14px}.mp-head-left a:nth-child(n+3),.mp-head-right>a:first-child{display:none}}',
-  '@media(max-width:640px){.mp-head{padding:0 14px;gap:10px}.mp-logo{position:static;transform:none;order:-1;flex:0 0 auto}'
-    + '.mp-head-left{display:none}.mp-head-right{gap:12px;margin-left:auto}.mp-head-right>a{display:none}}',
+  // Header: see site-nav.ts (SITE_NAV_CSS, appended after the account CSS below).
 
   // Footer: the homepage's .sfoot.
   '.mp-foot{border-top:1px solid var(--mp-line);margin-top:72px;padding:34px var(--mp-gutter) 48px}',
@@ -205,6 +192,7 @@ export const MP_SITE_CSS =
   + MP_COMPONENTS_CSS
   + ACCOUNT_MENU_CSS
   + MP_ACCOUNT_OVERRIDES_CSS
+  + SITE_NAV_CSS
   + mpA11yCss('.mp-site');
 
 /**
@@ -217,4 +205,5 @@ export const MP_RAW_SITE_CSS =
   + MP_COMPONENTS_CSS
   + ACCOUNT_MENU_CSS
   + MP_ACCOUNT_OVERRIDES_CSS
+  + SITE_NAV_CSS
   + mpA11yCss('.mp-site');
