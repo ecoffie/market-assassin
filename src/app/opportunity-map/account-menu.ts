@@ -60,6 +60,11 @@ export const ACCOUNT_MENU_CSS =
   // Logged-out chrome (html.mindy-anon, set by paintSignedOut). The left workspace rail is for
   // signed-in work (Watchlist / Saved / Pursuits), so a visitor never sees it — the content takes
   // the rail's column instead. Desktop only: phones already hide the rail behind the hamburger.
+  + '.mindy-cred{font:600 14px Inter,system-ui,sans-serif;color:var(--ink,#111c26);text-decoration:none;white-space:nowrap;padding:7px 12px;border:1px solid var(--line,#e6eaef);border-radius:999px;background:#fff}'
+  + '.mindy-cred:hover{border-color:#1b3a6b;color:#1b3a6b}'
+  + '.mindy-upg{font:700 14px Inter,system-ui,sans-serif;color:#fff!important;text-decoration:none;white-space:nowrap;padding:8px 16px;border-radius:999px;background:#1b3a6b}'
+  + '.mindy-upg:hover{background:#14294a}'
+  + '@media(max-width:640px){.mindy-cred{display:none}}'
   + '.mindy-anon-link{font:600 14px Inter,system-ui,sans-serif;color:var(--ink,#111c26);text-decoration:none;white-space:nowrap;cursor:pointer}'
   + '.mindy-anon-link:hover{text-decoration:underline;text-underline-offset:3px}'
   + '@media(max-width:640px){.mindy-anon-link{display:none!important}}'
@@ -169,10 +174,15 @@ export const ACCOUNT_MENU_JS = '<script>'
   + 'function renderHeader(name){var hd=document.getElementById("mindyAcctHd");if(!hd)return;var nmEl=document.getElementById("mindyAcctNm"),emEl=document.getElementById("mindyAcctEm");if(name){nmEl.textContent=name;emEl.textContent=em;}else{nmEl.textContent=em;emEl.textContent="";}hd.style.display="block";}'
   // Logged OUT: labelled "Log In", no dropdown, no /me fetch. Gate on the TOKEN, not the
   // decoded email (Eric 2026-08-04: treating missing email as signed-out logged real users out).
+  // Signed in (Eric 2026-11-06): "we don't need to see Pricing — show the credits available and an
+  // Upgrade next to it". Hides this header's /pricing links and puts "<n> credits" (→ billing) and
+  // Upgrade (→ /pricing, which shows the current plan) before the avatar. Team/Enterprise get "Add
+  // credits" instead of Upgrade. credits:null (unreadable) shows no number — never a fake 0.
+  + 'function paintPlan(d){if(document.getElementById("mindyCred"))return;var p=wrap.parentNode;if(!p)return;var scope=wrap.closest("header")||p;scope.querySelectorAll(\'a[href="/pricing"]\').forEach(function(a){if(!a.closest("#mindyAcctMenu"))a.style.display="none";});var top=d.plan==="team"||d.plan==="enterprise";if(typeof d.credits==="number"){var c=document.createElement("a");c.id="mindyCred";c.className="mindy-cred";c.href="/mcp/account?section=billing";c.title="Your Mindy credits";c.textContent=Number(d.credits).toLocaleString()+" credits";p.insertBefore(c,wrap);}var u=document.createElement("a");u.id="mindyUpg";u.className="mindy-upg";u.href=top?"/mcp/account?section=billing":"/pricing";u.textContent=top?"Add credits":"Upgrade";p.insertBefore(u,wrap);}'
   + 'if(!t||tokExpired(t)){paintSignedOut();return;}'
   + 'if(em){paintInitial("",em);renderHeader("");}'
   + 'var meHdrs={"x-mi-auth-token":t};if(em)meHdrs["x-user-email"]=em;'
-  + 'fetch("/api/app/me"+(em?("?email="+encodeURIComponent(em)):""),{credentials:"same-origin",headers:meHdrs}).then(function(r){if(r.status===401){paintSignedOut();return null;}return r.ok?r.json():null;}).then(function(d){if(!d||!d.email)return;announce("valid");em=d.email;renderAvatar(d.name||"",d.picture||"");renderHeader(d.name||"");}).catch(function(){});'
+  + 'fetch("/api/app/me"+(em?("?email="+encodeURIComponent(em)):""),{credentials:"same-origin",headers:meHdrs}).then(function(r){if(r.status===401){paintSignedOut();return null;}return r.ok?r.json():null;}).then(function(d){if(!d||!d.email)return;announce("valid");em=d.email;renderAvatar(d.name||"",d.picture||"");renderHeader(d.name||"");paintPlan(d);}).catch(function(){});'
   // Usage-gated Proposals entry: reveal it only when the signed-in user isPro OR has
   // drafted before (approved display rule). One cheap probe (exact count + Pro resolve).
   // Fails silent — the entry just stays hidden, never a broken/dead link.
@@ -194,6 +204,9 @@ export const ACCOUNT_MENU_JS = '<script>'
   // server decides identity and eligibility. Cleared only on a terminal server answer. No `$`
   // anywhere in this string (the map injects it via String.replace).
   + '(function(){try{var K="mindy_partner_ref",T="mindy_partner_ref_claim_at";var code=null;try{code=localStorage.getItem(K);}catch(e){}if(!code){var m=document.cookie.match(/(?:^|; )mindy_partner_ref=([^;]*)/);code=m?decodeURIComponent(m[1]):null;}if(!code)return;var t=null;try{t=localStorage.getItem("mi_beta_auth_token");}catch(e){}if(!t)return;try{var last=Number(sessionStorage.getItem(T)||0);if(last&&Date.now()-last<20000)return;sessionStorage.setItem(T,String(Date.now()));}catch(e){}fetch("/api/app/partner-referral/claim",{method:"POST",headers:{"content-type":"application/json","x-mi-auth-token":t},body:JSON.stringify({code:String(code).trim().toUpperCase()})}).then(function(r){return r.json().catch(function(){return null;});}).then(function(j){if(j&&j.clearPending===true){try{localStorage.removeItem(K);}catch(e){}document.cookie="mindy_partner_ref=; path=/; max-age=0; SameSite=Lax";}}).catch(function(){});}catch(e){}})();'
+  // One-time Nov 28 event pop-up on the server-rendered pages (React pages load it from the root
+  // layout). The script guards itself (window.__lcbPop + localStorage), so loading it twice is harmless.
+  + '(function(){try{if(window.__lcbPopLoad)return;window.__lcbPopLoad=1;var s=document.createElement("script");s.src="/event-popup.js";s.defer=true;document.head.appendChild(s);}catch(e){}})();'
   + '</script>'
   // Deploy identity so `verify:maps-account --live --expect-sha` can tell THIS
   // release from whichever production build is currently serving. Hex-only; the

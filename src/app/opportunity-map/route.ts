@@ -1124,6 +1124,15 @@ const ZLAYOUT_CSS = '<style>'
   // Narrow: hide the Explore eyebrow + Pursuits/Ask-Mindy, keep the two MAP links (the leading
   // .zh-explore <span> is child 1, so the two map <a>s are children 2-3 and Pursuits/Ask are 4+).
   + '@media(max-width:1000px){.zh-left,.zh-right{gap:14px}.zh-explore{display:none}.zh-left a:nth-child(n+4),.zh-right a:first-child{display:none}}'
+  // Not full screen (Eric 2026-11-06): the logo is absolutely centred, so between ~1000px and full
+  // width it slid UNDER "Bid with confidence" ("the options on the top blend together"). Below 1680px
+  // the logo joins the flex row (its own space, never on top of a link) and the lowest-priority links
+  // drop off in steps (checked at 1024–1920px: no link overlaps the logo or another link).
+  + '.zhead{gap:18px}.zh-left,.zh-right{min-width:0}'
+  + '@media(max-width:1680px){.zh-logo{position:static;transform:none;flex:none}}'
+  + '@media(max-width:1480px){.zh-right a[href="/bid"]{display:none}}'
+  + '@media(max-width:1280px){.zh-explore{display:none}.zh-right a[href="/learn"]{display:none}}'
+  + '@media(max-width:1140px){#mindyAnonSales{display:none!important}.zh-left a:nth-child(n+5){display:none}}'
   // far-left icon rail — PINNED (position:fixed) so grid/overflow can never push it off-screen.
   // The 50px grid column stays as its reserved space (kept empty; the fixed rail sits over it).
   + '.zrail{position:fixed;left:0;top:52px;width:64px;height:calc(100vh - 52px);height:calc(100dvh - 52px);'

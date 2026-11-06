@@ -1,5 +1,6 @@
 'use client';
 
+import MindyLoader from '@/components/app/MindyLoader';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Target, RefreshCw, Check, Lock, Flame, Zap, Star, Users, MapPin, Landmark, Plus, ClipboardList, AlertTriangle, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
@@ -1386,11 +1387,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
 
       {/* Loading State */}
       {isLoading && (
-        <div className="space-y-3">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="h-24 bg-surface rounded-xl animate-pulse" />
-          ))}
-        </div>
+<MindyLoader variant="section" title="Loading your matches" steps={["Open opportunities", "Matching your codes and keywords", "Deadlines"]} />
       )}
 
       {/* Alert List — bucketed into Urgent / Recently Posted / All so the

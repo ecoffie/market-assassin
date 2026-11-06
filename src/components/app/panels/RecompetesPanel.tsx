@@ -20,6 +20,7 @@ import { useDodaacNames } from '@/components/app/useDodaacNames';
 import StaleDataBanner from '@/components/app/StaleDataBanner';
 import { resolveEligibleSetAsides } from '@/lib/vault/certifications';
 import { mapLinkForRecompete } from '@/lib/maps/map-links';
+import MindyLoader from '@/components/app/MindyLoader';
 
 interface RecompetesPanelProps {
   email: string | null;
@@ -667,18 +668,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
   const hasMoreThanShown = matchTotal !== null && (matchCapped || matchTotal > shownContractsCount);
 
   if (loading) {
-    return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-surface rounded w-48" />
-          <div className="grid grid-cols-3 gap-4">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-24 bg-surface rounded-xl" />
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    return <MindyLoader title="Loading expiring contracts" steps={["Contracts ending soon", "Current holders", "Contract values"]} />;
   }
 
   return (

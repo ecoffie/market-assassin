@@ -9,6 +9,7 @@ import ContractorProfileView from '../contractors/ContractorProfileView';
 import { authedFetch } from '../authHeaders';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 import { mapLinkForCompany } from '@/lib/maps/map-links';
+import MindyLoader from '@/components/app/MindyLoader';
 
 const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
 
@@ -301,23 +302,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
   }
 
   if (loading) {
-    return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-surface rounded w-48" />
-          <div className="grid grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-20 bg-surface rounded-xl" />
-            ))}
-          </div>
-          <div className="space-y-3">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-28 bg-surface rounded-xl" />
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    return <MindyLoader title="Finding the players" steps={["Companies winning in your market", "Award history", "Contacts"]} />;
   }
 
   return (

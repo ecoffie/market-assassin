@@ -1,5 +1,6 @@
 'use client';
 
+import MindyLoader from '@/components/app/MindyLoader';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { BarChart3, MapPin, Check, Plus } from 'lucide-react';
 import Link from 'next/link';
@@ -1337,16 +1338,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
       </div>
 
       {isLoading ? (
-        <div className="p-8">
-          <div className="animate-pulse grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
-            <div className="h-96 bg-ground border border-surface" />
-            <div className="space-y-4">
-              <div className="h-10 bg-ground border border-surface" />
-              <div className="h-48 bg-ground border border-surface" />
-              <div className="h-48 bg-ground border border-surface" />
-            </div>
-          </div>
-        </div>
+<MindyLoader variant="section" title="Loading today’s intel" steps={["New opportunities for you", "What changed since yesterday", "Your briefings"]} />
       ) : briefings.length === 0 ? (
         <div className="p-8">
           <div className="border border-surface bg-ground p-8 text-center">

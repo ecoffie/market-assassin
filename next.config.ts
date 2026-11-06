@@ -508,6 +508,13 @@ const nextConfig: NextConfig = {
       // 301 (permanent) so any stale link lands on the real flow, no dead form, no lost
       // work. The page.tsx files were deleted alongside this.
       // tasks/smart-profile-dead-table-findings.md.
+      // /today (Today's Intel) retired as a destination 2026-11-06 — every visit goes to the homepage.
+      // Temporary (307) so it can be brought back; MAPS_HOME_PATH in src/lib/mindy/maps-home.ts is '/'.
+      {
+        source: '/today',
+        destination: '/',
+        permanent: false,
+      },
       {
         source: '/profile/setup',
         destination: '/app/onboarding',

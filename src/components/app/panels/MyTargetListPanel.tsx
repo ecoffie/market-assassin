@@ -11,6 +11,7 @@
  * Outreach log per target (Slice 3D) will hang off a row-expand or
  * a per-target detail page — left as a follow-up.
  */
+import MindyLoader from '@/components/app/MindyLoader';
 import { useState, useEffect, useCallback } from 'react';
 import { Search, Target, Sparkles, Handshake, MapPin, Star, Lightbulb, AlertTriangle, Mic, FileText, Laptop, Ticket, Calendar, type LucideIcon } from 'lucide-react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
@@ -514,35 +515,7 @@ export default function MyTargetListPanel({
   const isFree = tier === 'free';
 
   if (loading) {
-    return (
-      <div className="p-6 space-y-6">
-        {/* Keep the real header visible so the page doesn't look blank/broken
-            while loading (Eric: "add the moving thing so users know it's
-            loading"). */}
-        <div>
-          <h1 className="text-2xl font-bold text-white">My Target List</h1>
-          <div className="flex items-center gap-2 mt-2 text-sm text-muted">
-            <span className="inline-block w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
-            Loading your target list…
-          </div>
-        </div>
-        {/* Pulsing skeleton rows that mirror the real target cards, so the
-            structure is visible and it clearly reads as "working." */}
-        <div className="space-y-3">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="border border-surface rounded-lg p-4 bg-ground/40 animate-pulse">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 w-1/3 bg-surface rounded" />
-                  <div className="h-3 w-1/2 bg-surface/70 rounded" />
-                </div>
-                <div className="h-8 w-20 bg-surface rounded" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+    return <MindyLoader title="Loading your target list" steps={["Your saved agencies and offices", "Open work at each office", "Contacts"]} />;
   }
 
   return (

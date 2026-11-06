@@ -16,6 +16,7 @@ import PursuitAssignment from './PursuitAssignment';
 import PursuitComments from './PursuitComments';
 import SavedOnMapList from '../saved/SavedOnMapList';
 import SavedSearchesList from '../saved/SavedSearchesList';
+import MindyLoader from '@/components/app/MindyLoader';
 
 interface PipelinePanelProps {
   email: string | null;
@@ -841,18 +842,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
   }
 
   if (loading) {
-    return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-surface rounded w-48" />
-          <div className="grid grid-cols-6 gap-4">
-            {[1, 2, 3, 4, 5, 6].map(i => (
-              <div key={i} className="h-64 bg-surface rounded-xl" />
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    return <MindyLoader title="Loading your pursuits" steps={["Your pursuits", "Deadlines and changes", "Team notes"]} />;
   }
 
   // Urgency computation. Only ACTIVE pursuits can be urgent/overdue — a

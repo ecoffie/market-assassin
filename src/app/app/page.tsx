@@ -1,5 +1,6 @@
 'use client';
 
+import MindyLoader from '@/components/app/MindyLoader';
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { WELCOME_PATH } from '@/lib/mindy/post-signup-destination';
 import { encodePendingNext, oauthOnboardingRedirect, onboardingRedirectPath, PENDING_NEXT_KEY, readPendingNext, signInReturnPath } from '@/lib/mindy/sign-in-return';
@@ -39,12 +40,7 @@ function clearStoredAppAuth() {
 // Loading fallback
 function DashboardLoading() {
   return (
-    <div className="min-h-screen bg-ground-deep flex items-center justify-center">
-      <div className="text-center">
-        <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-gray-400">Loading Mindy...</p>
-      </div>
-    </div>
+    <MindyLoader variant="screen" title="Loading Mindy" steps={['Your account', 'Your market', 'Today\u2019s intel']} />
   );
 }
 
