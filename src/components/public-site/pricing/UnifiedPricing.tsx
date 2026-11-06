@@ -431,7 +431,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
           <button type="button" role="tab" aria-selected={cmpTab === 'mcp'} className={cmpTab === 'mcp' ? 'on' : ''} onClick={() => setCmpTab('mcp')}>MCP Credits</button>
         </div>
         <p className="tbl-hint">Swipe to compare every plan →</p>
-        <div className="tbl-wrap">
+        <div className="tbl-wrap" data-swipe="">
           <table>
             <thead><tr><th>Feature</th>{c.cols.map((x, i) => <th key={x} className={i === c.hl ? 'hl' : ''}>{x}</th>)}</tr></thead>
             <tbody>

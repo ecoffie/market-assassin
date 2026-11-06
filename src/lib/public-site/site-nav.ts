@@ -29,7 +29,7 @@ export function siteEventBannerHtml(now: Date = new Date()): string {
   if (lazyBlueprintIsOver(now)) return '';
   return `<div class="mp-evb-band" id="mp-evb"><div class="mp-evb">`
     + `<p class="mp-evb-t"><span class="mp-evb-l">Join <b>${esc(LCB.title)}</b> live on <b>${esc(LCB.shortDate)}</b> — show up and get $50 in free Mindy credits</span>`
-    + `<span class="mp-evb-s"><b>Free live event ${esc(LCB.shortDate)}</b> · get $50 in credits</span></p>`
+    + `<span class="mp-evb-s">Join <b>${esc(LCB.title)}</b>, free and live on <b>${esc(LCB.shortDate)}</b></span></p>`
     + `<a class="mp-evb-c" href="${esc(LCB.path)}">Register free</a>`
     + `<button type="button" class="mp-evb-x" aria-label="Close banner" onclick="document.getElementById('mp-evb').hidden=true">`
     + `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div></div>`;
@@ -44,7 +44,38 @@ export function siteTopHtml(): string {
     + `<nav class="mp-head-left" aria-label="Product">${left}</nav>`
     + `<nav class="mp-head-right" aria-label="Account">${right}`
     + `<a class="mp-anon mp-su" href="${esc(MP_HEADER_SIGNUP_LINK.href)}">${esc(MP_HEADER_SIGNUP_LINK.label)}</a>`
-    + `${ACCOUNT_MENU_HTML}</nav></header></div>`;
+    + `${ACCOUNT_MENU_HTML}`
+    + `<button type="button" class="mp-burger" aria-label="Menu" aria-expanded="false" aria-controls="mp-menu" onclick="${MENU_TOGGLE}">`
+    + `<svg class="mp-burger-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`
+    + `<svg class="mp-burger-close" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`
+    + `</nav></header>${siteMenuHtml()}</div>`;
+}
+
+/** Toggles the phone menu (html.mp-menu-open). Inline so raw-HTML pages need no extra script. */
+const MENU_TOGGLE = "var o=document.documentElement.classList.toggle('mp-menu-open');this.setAttribute('aria-expanded',o?'true':'false');";
+
+const CHEVRON = '<svg class="mp-menu-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
+
+/** The phone menu panel (Zoom-style): search, the main links, then Contact sales, Sign in, Sign up free. */
+function siteMenuHtml(): string {
+  const items: MpChromeLink[] = [
+    { href: '/opportunity-map', label: 'Opportunity Map' },
+    ...MP_HEADER_PRODUCT_LINKS,
+    { href: '/pricing', label: 'Plans & Pricing' },
+    { href: '/bid', label: 'Bid with confidence' },
+  ];
+  const [signIn, sales] = MP_HEADER_ACCOUNT_LINKS;
+  return `<div class="mp-menu" id="mp-menu">`
+    + `<form class="mp-menu-search" action="/opportunity-map" method="get" role="search">`
+    + `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>`
+    + `<input type="search" name="q" placeholder="Search opportunities…" aria-label="Search opportunities" autocomplete="off"></form>`
+    + `<nav class="mp-menu-links" aria-label="Menu">`
+    + items.map((l) => `<a href="${esc(l.href)}">${esc(l.label)}${CHEVRON}</a>`).join('')
+    + `</nav><div class="mp-menu-foot">`
+    + `<a class="mp-menu-sales" href="${esc(sales.href)}">${esc(sales.label)}</a>`
+    + `<a class="mp-menu-signin mp-anon" href="${esc(signIn.href)}">${esc(signIn.label)}</a>`
+    + `<a class="mp-menu-su mp-anon" href="${esc(MP_HEADER_SIGNUP_LINK.href)}">${esc(MP_HEADER_SIGNUP_LINK.label)}</a>`
+    + `</div></div>`;
 }
 
 /** Rules for the top bar. Tokens only (the public design lint scans this file). */
@@ -86,13 +117,38 @@ export const SITE_NAV_CSS = [
   '.mp-evb-x:hover{background:rgba(27,58,107,.1)}',
   '.mp-evb-x svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}',
   '.mp-evb-s{display:none}',
-  // Phones: the banner is one short line and scrolls away; only the nav row stays pinned
-  // (display:contents lifts .mp-head out of .mp-top so its sticky range is the whole page).
-  '@media(max-width:620px){.mp-top{display:contents}.mp-head{position:sticky;top:0;z-index:40;height:56px}'
-    + '.mp-evb-band{padding:6px max(10px,env(safe-area-inset-right,0px)) 6px max(10px,env(safe-area-inset-left,0px))}'
-    + '.mp-evb{flex-wrap:nowrap;justify-content:space-between;gap:10px;padding:6px 36px 6px 12px;text-align:left}'
-    + '.mp-evb-l{display:none}.mp-evb-s{display:inline}.mp-evb-t{font-size:13.5px;line-height:1.3}'
-    + '.mp-evb-c{padding:6px 12px;font-size:13px}.mp-evb-x{right:2px;width:30px;height:30px}'
-    + '.mp-logo span{font-size:18px}.mp-logo img{width:26px;height:26px}.mp-head .mp-su{padding:9px 14px;font-size:14px}}',
+  // Phones (Zoom-style): the nav row comes first and stays pinned; the banner is a centred card
+  // UNDER it that scrolls away. display:contents lifts both out of .mp-top so they become items of
+  // the .mp-site flex column, where `order` puts the nav (-2) above the banner (-1) and the page.
+  '@media(max-width:620px){.mp-top{display:contents}.mp-site>.mp-skip{order:-3}'
+    + '.mp-head{order:-2;position:sticky;top:0;z-index:40;height:60px}'
+    + '.mp-evb-band{order:-1;border-bottom:0;padding:10px max(14px,env(safe-area-inset-right,0px)) 6px max(14px,env(safe-area-inset-left,0px))}'
+    + '.mp-evb{flex-direction:column;gap:12px;padding:16px 44px 16px;border-radius:16px;text-align:center}'
+    + '.mp-evb-l{display:none}.mp-evb-s{display:inline}.mp-evb-t{font-size:15.5px;line-height:1.45}'
+    + '.mp-evb-c{padding:9px 20px;font-size:15px}.mp-evb-x{right:6px;top:14px;transform:none;width:32px;height:32px}'
+    + '.mp-logo span{font-size:20px}.mp-logo img{width:28px;height:28px}.mp-head .mp-su{padding:9px 14px;font-size:14px}}',
+  // Phone menu (☰). Hidden above 620px.
+  '.mp-burger,.mp-menu{display:none}',
+  '@media(max-width:620px){'
+    // Logged out, the bar is just logo + menu button (Zoom); Sign in / Sign up free live in the menu.
+    + '.mp-head .mp-anon{display:none!important}'
+    + '.mp-burger{display:flex;align-items:center;justify-content:center;width:44px;height:44px;margin-right:-8px;border:0;background:none;color:var(--mp-ink);cursor:pointer;border-radius:10px;flex:none}'
+    + '.mp-burger svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}'
+    + '.mp-burger-close{display:none}html.mp-menu-open .mp-burger-open{display:none}html.mp-menu-open .mp-burger-close{display:block}'
+    + 'html.mp-menu-open{overflow:hidden}'
+    + 'html.mp-menu-open .mp-menu{display:flex}'
+    + '.mp-menu{position:fixed;left:0;right:0;top:60px;bottom:0;z-index:60;flex-direction:column;overflow-y:auto;background:var(--mp-surface);'
+    + 'border-top:1px solid var(--mp-hair);padding:16px max(16px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}'
+    + '.mp-menu-search{display:flex;align-items:center;gap:10px;height:52px;padding:0 16px;border-radius:14px;background:var(--mp-navy-wash);margin:0 0 14px}'
+    + '.mp-menu-search svg{width:20px;height:20px;flex:none;fill:none;stroke:var(--mp-ink);stroke-width:2.2;stroke-linecap:round}'
+    + '.mp-menu-search input{flex:1;min-width:0;border:0;outline:0;background:none;font:400 17px var(--mp-font-sans);color:var(--mp-ink)}'
+    + '.mp-menu-links{display:flex;flex-direction:column}'
+    + '.mp-menu-links a{display:flex;align-items:center;justify-content:space-between;min-height:56px;padding:0 8px;font:600 19px var(--mp-font-sans);color:var(--mp-ink);text-decoration:none}'
+    + '.mp-menu-chev{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}'
+    + '.mp-menu-foot{margin-top:auto;padding-top:28px;display:flex;flex-direction:column;gap:10px}'
+    + '.mp-menu-sales,.mp-menu-signin{padding:10px 8px;font:600 17px var(--mp-font-sans);color:var(--mp-ink);text-decoration:none}'
+    + '.mp-menu-su{display:flex;align-items:center;justify-content:center;height:52px;margin-top:6px;border-radius:12px;background:var(--mp-navy);color:var(--mp-surface);font:700 17px var(--mp-font-sans);text-decoration:none}'
+    + 'html:has(.mindy-acct-ini,.mindy-acct-btn img) .mp-menu .mp-anon{display:none}'
+    + '}',
   '@media (prefers-reduced-motion: reduce){.mp-evb{transition:none}}',
 ].join('');
