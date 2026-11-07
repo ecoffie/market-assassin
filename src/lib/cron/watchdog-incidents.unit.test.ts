@@ -72,6 +72,27 @@ describe('classification', () => {
     expect(classifyObservation(SAVED_SEARCH('unexpected_schedule_error=4,recipient_suppressed=9')).signature).toBe(c.signature);
   });
 
+  it('invalid_saved_naics is a config action item: not processing, not suppression', () => {
+    const c = classifyObservation({ key: 'k', kind: 'failing', status: 'error', error: 'invalid_saved_naics=2,recipient_suppressed=3' });
+    expect(c.processing).toEqual({});
+    expect(c.suppression).toEqual({ recipient_suppressed: 3 });
+    expect(c.configAction).toEqual({ invalid_saved_naics: 2 });
+    expect(c.actionItemsOnly).toBe(true);
+    expect(c.suppressionOnly).toBe(false);
+    expect(c.signature).toBe('error|action-items-only');
+    expect(c.label).toBe('per-search action items only');
+  });
+  it('a real class beside the action items is still processing, with its own signature', () => {
+    const c = classifyObservation({ key: 'k', kind: 'failing', status: 'error', error: 'invalid_saved_naics=2,recipient_suppressed=3,opportunity_query_failed=1' });
+    expect(c.processing).toEqual({ opportunity_query_failed: 1 });
+    expect(c.actionItemsOnly).toBe(false);
+    expect(c.signature).toBe('error|opportunity_query_failed');
+  });
+  it('invalid_saved_filters stays a processing failure (the write path should have refused it)', () => {
+    const c = classifyObservation({ key: 'k', kind: 'failing', status: 'error', error: 'invalid_saved_filters=1' });
+    expect(c.processing).toEqual({ invalid_saved_filters: 1 });
+    expect(c.actionItemsOnly).toBe(false);
+  });
   it('suppression-only is not a processing failure', () => {
     const c = classifyObservation(SAVED_SEARCH('recipient_suppressed=3'));
     expect(c.suppressionOnly).toBe(true);
@@ -131,6 +152,43 @@ describe('incident notifications (captured Slack messages)', () => {
     await pass(store, [SAVED_SEARCH('unexpected_schedule_error=2,recipient_suppressed=9')], '2026-10-01T21:00:00Z', send);
     expect(sent.map((m) => m.subject)).toEqual(['Cron watchdog: 1 opened', 'Cron watchdog: 1 worsened']);
     expect(sent[1].text).toContain('📈 WORSENED saved-search-alerts — unexpected_schedule_error 1→3');
+  });
+
+  it('action items only: one calm notice with separate lines, and a growing count does not re-page', async () => {
+    const store = memoryStore(); const { sent, send } = capture();
+    await pass(store, [SAVED_SEARCH('invalid_saved_naics=2,recipient_suppressed=3')], '2026-11-07T12:00:00Z', send);
+    await pass(store, [SAVED_SEARCH('invalid_saved_naics=4,recipient_suppressed=9')], '2026-11-07T15:00:00Z', send);
+    expect(sent.map((m) => m.subject)).toEqual(['Cron watchdog: 1 suppression opened']);
+    const t = sent[0].text;
+    expect(t).toContain('🧾 ACTION ITEMS saved-search-alerts — no processing failure');
+    expect(t).not.toContain('blocked sends');
+    expect(t).toContain('🛡️ Recipient suppression (not an outage): 3 email(s)');
+    expect(t).toContain('(recipient_suppressed=3)');
+    expect(t).toContain('🧾 Customer search config (not an outage): 2 saved search(es) not evaluated (invalid_saved_naics=2)');
+  });
+
+  it('a real failure on top of action items pages as CHANGED, then clears back to action items', async () => {
+    const store = memoryStore(); const { sent, send } = capture();
+    await pass(store, [SAVED_SEARCH('invalid_saved_naics=2,recipient_suppressed=3')], '2026-11-05T12:00:00Z', send);
+    await pass(store, [SAVED_SEARCH('invalid_saved_naics=2,recipient_suppressed=3,opportunity_query_failed=1')], '2026-11-06T12:00:00Z', send);
+    await pass(store, [SAVED_SEARCH('invalid_saved_naics=2,recipient_suppressed=3')], '2026-11-07T12:00:00Z', send);
+    expect(sent[1].text).toContain('🔁 CHANGED saved-search-alerts — was [action-items-only], now processing failures: opportunity_query_failed=1');
+    expect(sent[2].text).toContain('🔁 CHANGED saved-search-alerts — was [opportunity_query_failed], now processing failures cleared; only per-search action items remain');
+  });
+
+  it('the live incident at deploy (old signature with invalid_saved_naics as processing) announces once, then is silent', async () => {
+    const store = memoryStore(); const { sent, send } = capture();
+    await pass(store, [SAVED_SEARCH('invalid_saved_naics=2,recipient_suppressed=3')], '2026-11-07T12:00:00Z', send);
+    const row = store.rows.get('saved-search-alerts') ?? [...store.rows.values()][0];
+    row.signature = 'error|invalid_saved_naics';
+    row.processing_counts = { invalid_saved_naics: 2 };
+    row.notified_counts = { invalid_saved_naics: 2 };
+    row.suppression_counts = { recipient_suppressed: 3 };
+    sent.length = 0;
+    await pass(store, [SAVED_SEARCH('invalid_saved_naics=2,recipient_suppressed=3')], '2026-11-07T15:00:00Z', send);
+    await pass(store, [SAVED_SEARCH('invalid_saved_naics=2,recipient_suppressed=3')], '2026-11-07T18:00:00Z', send);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].text).toContain('was [invalid_saved_naics], now processing failures cleared; only per-search action items remain');
   });
 
   it('(d) recovery → exactly one message; re-failure reopens', async () => {

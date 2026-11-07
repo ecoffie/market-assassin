@@ -4,6 +4,7 @@ import { Search, Pin, CheckCircle2, Circle, Download, FileText } from 'lucide-re
 import type { AppPanel } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 import { setActiveWorkspace, clearActiveWorkspace, getActiveWorkspace } from '../activeWorkspace';
+import MindyLoader from '@/components/app/MindyLoader';
 
 // The current calendar quarter as "YYYY-Qn" — the default for the funder-report export.
 function defaultQuarter(): string {
@@ -309,11 +310,7 @@ export default function CoachPanel({
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[40vh] text-muted text-sm">
-        Loading clients…
-      </div>
-    );
+    return <MindyLoader title="Loading your clients" steps={["Your clients", "Their markets", "Recent activity"]} />;
   }
 
   if (!isCoach) {

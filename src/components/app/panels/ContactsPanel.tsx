@@ -8,6 +8,7 @@ import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
 import { getNaics } from '@/lib/codes/lookup';
 import { NaicsAutocompleteInput } from '../../codes/NaicsAutocompleteInput';
+import MindyLoader from '@/components/app/MindyLoader';
 
 interface ContactsPanelProps {
   email: string | null;
@@ -377,19 +378,7 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
   };
 
   if (loading) {
-    return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-surface rounded w-48" />
-          <div className="grid grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-24 bg-surface rounded-xl" />
-            ))}
-          </div>
-          <div className="h-64 bg-surface rounded-xl" />
-        </div>
-      </div>
-    );
+    return <MindyLoader title="Loading your contacts" steps={["Your saved contacts", "Agencies and offices", "Recent outreach"]} />;
   }
 
   return (

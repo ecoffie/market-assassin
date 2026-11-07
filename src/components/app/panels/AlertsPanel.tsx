@@ -1,5 +1,6 @@
 'use client';
 
+import MindyLoader from '@/components/app/MindyLoader';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Target, RefreshCw, Check, Lock, Flame, Zap, Star, Users, MapPin, Landmark, Plus, ClipboardList, AlertTriangle, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
@@ -19,6 +20,8 @@ import CollapsibleOpportunityDescription from '@/components/app/CollapsibleOppor
 import OpportunityDetailStrip from '@/components/app/OpportunityDetailStrip';
 import { computeNextAction, nextActionButton } from '@/lib/pipeline/next-action';
 import { computeWhyFit } from '@/lib/opportunities/why-fit';
+import { mapLinkForOpportunity } from '@/lib/maps/map-links';
+import { samNoticeIdFrom } from '../mapRecordIds';
 
 interface AlertsPanelProps {
   email: string | null;
@@ -1384,11 +1387,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
 
       {/* Loading State */}
       {isLoading && (
-        <div className="space-y-3">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="h-24 bg-surface rounded-xl animate-pulse" />
-          ))}
-        </div>
+<MindyLoader variant="section" title="Loading your matches" steps={["Open opportunities", "Matching your codes and keywords", "Deadlines"]} />
       )}
 
       {/* Alert List — bucketed into Urgent / Recently Posted / All so the
@@ -1684,6 +1683,19 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                     >
                       SAM.gov →
                     </a>
+                    {(() => {
+                      const mapHref = mapLinkForOpportunity(samNoticeIdFrom(alert.id, alert.url));
+                      return mapHref ? (
+                        <a
+                          href={mapHref}
+                          onClick={(event) => event.stopPropagation()}
+                          onMouseDown={() => trackAlertEvent('link_click', alert, 'open_on_map')}
+                          className="text-xs text-emerald-400 hover:text-emerald-300 px-3 py-2 md:px-2 md:py-1 hover:bg-emerald-500/10 rounded min-h-[44px] md:min-h-0 inline-flex items-center"
+                        >
+                          Open on the map →
+                        </a>
+                      ) : null;
+                    })()}
                     <button
                       type="button"
                       onClick={(event) => {
@@ -2145,6 +2157,18 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                 >
                   Open on SAM.gov
                 </a>
+                {(() => {
+                  const mapHref = mapLinkForOpportunity(samNoticeIdFrom(selectedAlert.id, selectedAlert.url));
+                  return mapHref ? (
+                    <a
+                      href={mapHref}
+                      onClick={() => trackAlertEvent('link_click', selectedAlert, 'open_on_map')}
+                      className="px-4 py-3 text-sm font-medium text-emerald-400 hover:text-emerald-300 text-center"
+                    >
+                      Open on the map →
+                    </a>
+                  ) : null;
+                })()}
                 <button
                   onClick={() => dismissAlert(selectedAlert)}
                   className="px-4 py-3 bg-surface hover:bg-input text-ink-soft rounded-lg transition-colors"

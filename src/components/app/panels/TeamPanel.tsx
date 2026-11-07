@@ -6,6 +6,7 @@ import Card from '@/components/ui/Card';
 import { NaicsAutocompleteInput } from '../../codes/NaicsAutocompleteInput';
 import type { AppTier } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
+import MindyLoader from '@/components/app/MindyLoader';
 
 interface TeamPanelProps {
   email: string | null;
@@ -218,17 +219,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
   };
 
   if (loading) {
-    return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-surface rounded w-56" />
-          <div className="grid grid-cols-3 gap-4">
-            {[1, 2, 3].map(i => <div key={i} className="h-24 bg-surface rounded-xl" />)}
-          </div>
-          <div className="h-72 bg-surface rounded-xl" />
-        </div>
-      </div>
-    );
+    return <MindyLoader title="Loading your team" steps={["Team members", "Shared pursuits", "Credits"]} />;
   }
 
   return (

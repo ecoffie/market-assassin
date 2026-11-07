@@ -112,6 +112,8 @@ export default function RootLayout({
             Property: "Mindy — Web", stream getmindy.ai (SEPARATE from the
             GovCon Giants property, which only streams govcongiants.com — keeps the
             product's numbers out of the marketing site's). */}
+        {/* One-time pop-up for the Nov 28 live event (src/lib/events/event-popup.ts). */}
+        <Script src="/event-popup.js" strategy="lazyOnload" />
         {GTAG_LOADER_ID && (
           <>
             <Script

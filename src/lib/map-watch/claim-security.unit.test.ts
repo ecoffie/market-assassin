@@ -97,13 +97,13 @@ describe('value still comes before sign-in', () => {
   });
 
   it('the client never sends an email on claim', () => {
-    const helper = MAP.slice(MAP.indexOf('window.__claimAnonWatches=function()'), MAP.indexOf('window.savePursuit=function'));
+    const helper = MAP.slice(MAP.indexOf('window.__claimAnonWatches=function()'), MAP.indexOf('window.toggleFav=function'));
     expect(helper).toMatch(/action:'claim',anonId:aid/);
     expect(helper).not.toMatch(/email:_?em2?/);
   });
 
   it('only a verified claim emits watch_claimed', () => {
-    const helper = MAP.slice(MAP.indexOf('window.__claimAnonWatches=function()'), MAP.indexOf('window.savePursuit=function'));
+    const helper = MAP.slice(MAP.indexOf('window.__claimAnonWatches=function()'), MAP.indexOf('window.toggleFav=function'));
     expect(helper).toMatch(/c\.claimed>0[\s\S]{0,120}watch_claimed/);
   });
 });

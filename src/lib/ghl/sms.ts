@@ -118,3 +118,30 @@ export async function sendViaGHL(phone: string, body: string): Promise<GhlSmsRes
     messageId: data?.messageId || data?.conversationId || data?.id,
   };
 }
+
+/**
+ * Send an SMS to a contact we already have the id for (no phone upsert, so it can
+ * never land on a different contact that shares the number). Same opt-out handling
+ * as sendViaGHL.
+ */
+export async function sendSmsToContact(
+  contactId: string,
+  body: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<GhlSmsResult> {
+  const token = process.env.GHL_API_KEY;
+  if (!token) return { success: false, error: 'GHL not configured (GHL_API_KEY)' };
+  const res = await fetchImpl(`${GHL_BASE}/conversations/messages`, {
+    method: 'POST',
+    headers: ghlHeaders(token),
+    body: JSON.stringify({ type: 'SMS', contactId, message: body }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const optedOut =
+      data?.canonicalCode === 'CONVERSATIONS_MSG_UNSUBSCRIBED_SMS' ||
+      /unsubscribed/i.test(String(data?.message || ''));
+    return { success: false, contactId, optedOut, error: data?.message || `message send failed (${res.status})` };
+  }
+  return { success: true, contactId, messageId: data?.messageId || data?.conversationId || data?.id };
+}

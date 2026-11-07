@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Contact, Search } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
+import MindyLoader from '@/components/app/MindyLoader';
 
 interface RelationshipsPanelProps {
   email: string | null;
@@ -419,17 +420,7 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
   const activeTabConfig = TABS.find(tab => tab.id === activeTab) || TABS[0];
 
   if (loading) {
-    return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-surface rounded w-56" />
-          <div className="grid grid-cols-4 gap-3">
-            {[1, 2, 3, 4].map(i => <div key={i} className="h-20 bg-surface rounded-xl" />)}
-          </div>
-          <div className="h-80 bg-surface rounded-xl" />
-        </div>
-      </div>
-    );
+    return <MindyLoader title="Loading your relationships" steps={["People you work with", "Agencies", "Recent activity"]} />;
   }
 
   return (
