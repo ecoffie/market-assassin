@@ -1,5 +1,6 @@
 {
-  "lastUpdated": "2026-04-05",
+  "lastUpdated": "2026-11-07",
+  "lastFullReview": "2026-04-05",
   "eventSources": {
     "apex_accelerators": {
       "name": "APEX Accelerators (formerly PTAC)",
@@ -157,7 +158,7 @@
     },
     "va_osdbu": {
       "name": "VA OSDBU Events",
-      "url": "https://www.va.gov/osdbu/",
+      "url": "https://vetbiz.va.gov/events/",
       "type": "official",
       "frequency": "monthly",
       "categories": ["industry_day", "training", "certification"],
@@ -407,6 +408,24 @@
   },
   "majorAnnualConferences": [
     {
+      "name": "National Veterans Small Business Engagement (NVSBE)",
+      "typical_month": "Varies",
+      "location": "2026: Cleveland, OH",
+      "audience": "Veteran-owned and other small businesses",
+      "registration_cost": "See official registration page",
+      "value": "VA OSDBU's national engagement for Veteran-owned and other small businesses",
+      "url": "https://www.va.gov/osdbu/nvsbe/",
+      "agencies": ["VA", "Department of Veterans Affairs"],
+      "next_occurrence": {
+        "start": "2026-12-08",
+        "end": "2026-12-09",
+        "location": "Huntington Convention Center, Cleveland, OH",
+        "registration_url": "https://portal.vetbiz.va.gov/nvsbe/2026/reg-fees/",
+        "verified_at": "2026-11-07",
+        "source_url": "https://www.va.gov/osdbu/nvsbe/"
+      }
+    },
+    {
       "name": "AFCEA TechNet Cyber",
       "typical_month": "May",
       "location": "Baltimore, MD",
@@ -425,13 +444,13 @@
       "url": "https://events.afcea.org/AFCEAWest"
     },
     {
-      "name": "SAME Federal Small Business Conference",
+      "name": "SAME Federal Small Business Conference for the A/E/C Industry",
       "typical_month": "November",
       "location": "Various",
       "audience": "A/E, Construction, Environmental",
       "registration_cost": "$200-$500",
       "value": "Very High - USACE, NAVFAC matchmaking",
-      "url": "https://www.same.org/fsbc"
+      "url": "https://www.same.org/sbc"
     },
     {
       "name": "SAME JETC (Joint Engineer Training Conference)",
