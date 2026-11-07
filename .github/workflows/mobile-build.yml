@@ -1,0 +1,97 @@
+name: mobile-build
+# Builds the Capacitor shell (mobile/) on every change to it.
+# Android: debug APK artifact (installable on any phone for testing).
+# iOS: unsigned simulator build (proves the Xcode project compiles).
+# Store-signed builds (AAB / IPA) need signing secrets — see mobile/README.md.
+on:
+  pull_request:
+    paths: ['mobile/**', '.github/workflows/mobile-build.yml']
+  push:
+    branches: [main]
+    paths: ['mobile/**']
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: mobile } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - run: npm ci
+      - run: npx cap sync android
+      - run: cd android && ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mindy-android-debug-apk
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+
+  # PRs only: a second APK ("Mindy Preview") that loads this PR's Vercel preview instead of
+  # getmindy.ai, so web-side changes (e.g. native sign-in) can be tested before merging.
+  android-preview:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: mobile } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - run: npm ci
+      - name: Point the app at this PR's Vercel preview
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          SLUG=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g')
+          node scripts/set-server-url.mjs "https://market-assassin-git-${SLUG}-eric-coffies-projects.vercel.app"
+      - run: npx cap sync android
+      - run: cd android && ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mindy-android-PREVIEW-apk
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+
+  # iOS simulator builds. No Apple account needed: upload the zip to appetize.io to run the
+  # app in a browser (works from an iPhone), or drag App.app onto a Mac's Simulator.
+  ios:
+    runs-on: macos-15
+    strategy:
+      matrix:
+        target: [prod, preview]
+    defaults: { run: { working-directory: mobile } }
+    steps:
+      - uses: actions/checkout@v4
+        if: matrix.target == 'prod' || github.event_name == 'pull_request'
+      - uses: actions/setup-node@v4
+        if: matrix.target == 'prod' || github.event_name == 'pull_request'
+        with: { node-version: 22 }
+      - run: npm ci
+        if: matrix.target == 'prod' || github.event_name == 'pull_request'
+      - name: Point the app at this PR's Vercel preview
+        if: matrix.target == 'preview' && github.event_name == 'pull_request'
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          SLUG=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g')
+          node scripts/set-server-url.mjs "https://market-assassin-git-${SLUG}-eric-coffies-projects.vercel.app"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Mindy Preview" ios/App/App/Info.plist
+      - run: npx cap sync ios
+        if: matrix.target == 'prod' || github.event_name == 'pull_request'
+      - name: Build for iOS Simulator
+        if: matrix.target == 'prod' || github.event_name == 'pull_request'
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App \
+            -sdk iphonesimulator -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+          ditto -c -k --sequesterRsrc --keepParent \
+            build/Build/Products/Debug-iphonesimulator/App.app mindy-ios-simulator.zip
+      - uses: actions/upload-artifact@v4
+        if: matrix.target == 'prod' || github.event_name == 'pull_request'
+        with:
+          name: mindy-ios-simulator-${{ matrix.target == 'preview' && 'PREVIEW' || 'prod' }}
+          path: mobile/mindy-ios-simulator.zip
