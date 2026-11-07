@@ -50,11 +50,14 @@ describe('a WAF block is reported as a block', () => {
   });
 });
 
-describe('routing is unchanged — this is a diagnosis fix, not a behaviour change', () => {
-  it('ingestDibbs still falls through to Apify when direct throws', () => {
-    // Cost control must never become data loss. If this catch disappeared, making direct
-    // throw would turn a blocked run into a failed run.
-    expect(INGEST).toContain('cost-guard direct fetch failed, falling back to Apify');
+describe('a thrown direct path is recorded, then the run FAILS CLOSED', () => {
+  it('ingestDibbs catches a direct throw and stops instead of billing the actor', () => {
+    // Superseded 2026-11-02: a WAF throw used to fall through to the paid actor, which is
+    // how the actor billed $12-$36/day. The catch stays (the throw is the diagnosis); the
+    // paid fallback does not.
+    expect(INGEST).toContain('[dibbs] direct fetch failed:');
+    expect(INGEST).toContain('FAIL-CLOSED');
+    expect(INGEST).not.toContain('falling back to Apify');
     expect(INGEST).toMatch(/outcome: 'threw'/);
   });
 
