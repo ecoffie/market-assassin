@@ -212,3 +212,24 @@ export async function changeContactTags(
   });
   if (!res.ok) throw new Error(`GHL tag ${op} ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
 }
+
+/** The GHL contact that owns this email (exact match), or null. */
+export async function findContactByEmail(email: string, fetchImpl: typeof fetch = fetch): Promise<TaggedContact | null> {
+  const { token, locationId } = ghlEnv();
+  const res = await fetchImpl(
+    `${GHL_BASE}/contacts/search/duplicate?locationId=${encodeURIComponent(locationId)}&email=${encodeURIComponent(email.toLowerCase().trim())}`,
+    { method: 'GET', headers: headers(token) },
+  );
+  if (!res.ok) throw new Error(`GHL lookup ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
+  const c = (await res.json().catch(() => ({})))?.contact;
+  if (!c?.id) return null;
+  return {
+    id: String(c.id),
+    email: String(c.email || '').toLowerCase(),
+    firstName: String(c.firstName || ''),
+    lastName: String(c.lastName || ''),
+    phone: String(c.phone || ''),
+    tags: (c.tags as string[]) || [],
+    customFields: (c.customFields as Array<{ id: string; value: unknown }>) || [],
+  };
+}

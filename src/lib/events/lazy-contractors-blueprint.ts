@@ -22,14 +22,14 @@ export const LAZY_CONTRACTORS_BLUEPRINT = {
   ghlTag: 'MD Lazy Contractors Blueprint',
   /** Extra tag when the registrant checks the SMS consent box. */
   smsOptInTag: 'sms-opt-in',
-  /** Interest form for the New Year program (shown after the Mindy sign-up). */
-  programPath: '/lazy-contractors-blueprint/program',
-  programName: 'Lazy Contractor First Contract Program',
-  programStartLabel: 'January 2027',
-  /** Everyone who fills in the interest form. */
-  programInterestTag: 'MD LCB Program Interest',
-  /** Added when they say they are ready to start in January. */
-  programHotTag: 'MD LCB Program Hot',
+  /** Live-only form: registered attendees claim extra Mindy credits, granted on submit. */
+  claimPath: '/lazy-contractors-blueprint/claim',
+  claimCredits: 250,
+  /** Claim window: Sat Nov 28, 11:00 AM – 3:00 PM ET (EST, UTC-5). */
+  claimOpensAt: '2026-11-28T16:00:00Z',
+  claimClosesAt: '2026-11-28T20:00:00Z',
+  /** Tag written on a successful claim (the dashboard's "Claimed $50" step reads it). */
+  claimTag: 'mindy-day-bonus-claimed',
   /** GHL contact field that holds each registrant's personal Zoom link ({{contact.zoom_join_link}}). */
   ghlZoomFieldId: 'Gis0uE1EkzuqDwcl2Gdo',
   ghlZoomFieldKey: 'zoom_join_link',
@@ -59,4 +59,12 @@ export function lazyBlueprintZoomEvent(): { kind: 'webinar' | 'meeting'; id: str
 export function lazyBlueprintIsOver(now: Date = new Date()): boolean {
   // Midnight ET at the end of Nov 28 = 2026-11-29T05:00Z (EST, UTC-5).
   return now.getTime() >= Date.parse('2026-11-29T05:00:00Z');
+}
+
+/** 'before' | 'open' | 'after' for the live credit claim. */
+export function lazyBlueprintClaimState(now: Date = new Date()): 'before' | 'open' | 'after' {
+  const t = now.getTime();
+  if (t < Date.parse(LAZY_CONTRACTORS_BLUEPRINT.claimOpensAt)) return 'before';
+  if (t >= Date.parse(LAZY_CONTRACTORS_BLUEPRINT.claimClosesAt)) return 'after';
+  return 'open';
 }
