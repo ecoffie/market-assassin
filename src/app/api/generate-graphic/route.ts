@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { callLLM } from '@/lib/llm/call-llm';
+import { authorizeContentAiRequest, contentInputTooLarge } from '@/lib/content-reaper/ai-route-auth';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -53,6 +54,11 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
+  // Verified Mindy session + Content Reaper entitlement + daily per-user limit, checked
+  // BEFORE the body is parsed or any model is called. Rejections cost nothing.
+  const auth = await authorizeContentAiRequest(request, 'graphic', corsHeaders);
+  if (!auth.ok) return auth.response;
+
   try {
     const { postContent, type } = await request.json();
 
@@ -62,6 +68,9 @@ export async function POST(request: NextRequest) {
         error: 'Post content is required'
       }, { status: 400, headers: corsHeaders });
     }
+
+    const tooLarge = contentInputTooLarge(postContent, corsHeaders);
+    if (tooLarge) return tooLarge;
 
     const graphicType = (type || 'quote') as GraphicType;
     if (!prompts[graphicType]) {
