@@ -39,6 +39,12 @@ import { PRO_AMOUNTS, TEAM_AMOUNTS } from '@/lib/mcp/app-tier-subscription';
 export type AppTier = 'pro' | 'team';
 
 /**
+ * Which profile flags a just-ended subscription paid for. A Pro subscription never
+ * clears access_team: Team may come from someone else's pool or a separate purchase.
+ */
+const CLEARS_TEAM_FLAG: Record<AppTier, boolean> = { pro: false, team: true };
+
+/**
  * Statuses of ANOTHER subscription that HOLD a revocation. This is a conservative
  * safeguard for the cancellation repair, NOT an entitlement rule: an unpaid, paused or
  * incomplete subscription does not qualify anyone for Pro. It only means "don't cut
@@ -210,7 +216,7 @@ export async function applyRevoke(sb: SupabaseClient, email: string, tier: AppTi
   // 2) Profile flags: the fallback hasBriefingsAccess falls through to (+ Team tier).
   try {
     const patch: Record<string, unknown> = { access_briefings: false, briefings_expires_at: null, updated_at: now };
-    if (tier === 'team') patch.access_team = false;
+    if (CLEARS_TEAM_FLAG[tier]) patch.access_team = false;
     const { error } = await sb.from('user_profiles').update(patch).eq('email', email);
     if (error) failures.push(`user_profiles: ${error.message}`);
   } catch (e) {

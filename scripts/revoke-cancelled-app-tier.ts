@@ -125,13 +125,17 @@ async function stripeState(email: string): Promise<StripeState> {
 }
 
 // ---------- raw store reads (no resolver cache) ----------
+// One account's rows. More than one profile row is already "ambiguous ownership", so a
+// small bound loses nothing; hitting it is reported as incomplete, never truncated silently.
+const PER_ACCOUNT_ROW_LIMIT = 25;
 async function readStores(email: string) {
   let kvValue: unknown = undefined; let kvOk = true;
   try { kvValue = await kv.get(`briefings:${email}`); } catch { kvOk = false; }
-  const prof = await sb.from('user_profiles').select('*').ilike('email', email.replace(/[\\%_]/g, (c) => `\\${c}`));
-  const notif = await sb.from('user_notification_settings').select('user_email, briefings_enabled, paid_status, updated_at').eq('user_email', email);
-  const cls = await sb.from('customer_classifications').select('email, briefings_access, has_active_subscription, updated_at').eq('email', email);
-  const ok = kvOk && !prof.error && !notif.error && !cls.error;
+  const prof = await sb.from('user_profiles').select('*').ilike('email', email.replace(/[\\%_]/g, (c) => `\\${c}`)).limit(PER_ACCOUNT_ROW_LIMIT);
+  const notif = await sb.from('user_notification_settings').select('user_email, briefings_enabled, paid_status, updated_at').eq('user_email', email).limit(PER_ACCOUNT_ROW_LIMIT);
+  const cls = await sb.from('customer_classifications').select('email, briefings_access, has_active_subscription, updated_at').eq('email', email).limit(PER_ACCOUNT_ROW_LIMIT);
+  const capped = [prof.data, notif.data, cls.data].some((d) => (d?.length ?? 0) >= PER_ACCOUNT_ROW_LIMIT);
+  const ok = kvOk && !prof.error && !notif.error && !cls.error && !capped;
   const profiles = (prof.data ?? []) as Array<Record<string, unknown>>;
   return {
     ok,
@@ -140,7 +144,7 @@ async function readStores(email: string) {
     profiles,
     notif: notif.data ?? [],
     classification: cls.data ?? [],
-    errors: [!kvOk && 'kv', prof.error?.message, notif.error?.message, cls.error?.message].filter(Boolean),
+    errors: [!kvOk && 'kv', capped && 'row_limit_reached', prof.error?.message, notif.error?.message, cls.error?.message].filter(Boolean),
   };
 }
 

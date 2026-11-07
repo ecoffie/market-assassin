@@ -571,6 +571,7 @@ async function refreshCustomerClassification(supabase: any, customerId: string) 
   // Get all charges for this customer
   const { data: charges } = await supabase
     .from('stripe_charges')
+    // truncation-ok: one customer's own charges (filtered by customer_id below), not a population; no customer approaches 1,000 charges
     .select('*')
     .eq('customer_id', customerId)
     .eq('livemode', true)
