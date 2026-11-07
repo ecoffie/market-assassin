@@ -68,3 +68,36 @@ export function lazyBlueprintClaimState(now: Date = new Date()): 'before' | 'ope
   if (t >= Date.parse(LAZY_CONTRACTORS_BLUEPRINT.claimClosesAt)) return 'after';
   return 'open';
 }
+
+/**
+ * Claim-form questions. Option values for revenue and support are EXACTLY the picklist values
+ * of the existing GHL contact fields (ids below), so the answers land in those fields.
+ */
+export const LCB_CLAIM_QUESTIONS = {
+  years: ['Not started yet', 'Less than 1 year', '1–3 years', '3–10 years', '10+ years'],
+  revenue: ['$0 - $249k', '$250k - $499k', '$500k - $999k', '$1M - $5M', '$5M+'],
+  certifications: ['8(a)', 'WOSB / EDWOSB', 'SDVOSB / VOSB', 'HUBZone', 'None yet', 'Not sure'],
+  sam: ['Yes', 'No', 'Not sure'],
+  bids: ['Never', '1–2', '3–10', 'More than 10'],
+  challenge: [
+    'Finding the right opportunities',
+    'Getting registered (SAM.gov, certifications)',
+    'Writing proposals',
+    'Pricing my bid',
+    'Knowing who to talk to at the agency',
+    'Finding teaming partners',
+  ],
+  support: [
+    { value: 'Self Paced: Do it yourself ($0 - $1k)', label: 'Do it myself with the right tools' },
+    { value: 'Technical Support: Done with you ($2k - $5k)', label: 'Done with me: guidance as I go' },
+    { value: 'Business Development: Done for you ($8k+', label: 'Done for me: a team that wins contracts for me' },
+  ],
+  call: ['Yes', 'No'],
+} as const;
+
+/** Existing GHL contact fields the claim answers fill. */
+export const LCB_GHL_FIELDS = {
+  industry: 'KkcWt0NPAzlbF1BtTIzV',
+  revenue: 'ksuw8aXHyIEALTtVHeu2',
+  support: 'woFckg0BhEIEK20DqJL8',
+} as const;

@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Button, ButtonLink } from '@/components/public-site/ui';
+import { useEffect, useState, type FormEvent } from 'react';
+import { Button, ButtonLink, Field, Input, Select, Textarea } from '@/components/public-site/ui';
 import { getMIApiHeaders, storedMIEmail } from '@/components/app/authHeaders';
+import { LCB_CLAIM_QUESTIONS as Q } from '@/lib/events/lazy-contractors-blueprint';
 
 type State = 'before' | 'open' | 'after';
 
@@ -35,7 +36,9 @@ export default function ClaimForm({ initialState, credits }: { initialState: Sta
     );
   }
 
-  async function claim() {
+  async function claim(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
     setStatus('sending');
     setError('');
     setNeedsSignIn(false);
@@ -43,7 +46,13 @@ export default function ClaimForm({ initialState, credits }: { initialState: Sta
       const res = await fetch('/api/events/lazy-contractors-blueprint/claim', {
         method: 'POST',
         headers: getMIApiHeaders(signedInAs, { 'Content-Type': 'application/json' }),
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          name: fd.get('name'), company: fd.get('company'), sells: fd.get('sells'),
+          years: fd.get('years'), revenue: fd.get('revenue'), sam: fd.get('sam'),
+          certifications: fd.getAll('certifications'), bids: fd.get('bids'),
+          challenge: fd.get('challenge'), support: fd.get('support'), call: fd.get('call'),
+          website: fd.get('website'),
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
@@ -87,15 +96,66 @@ export default function ClaimForm({ initialState, credits }: { initialState: Sta
     );
   }
 
+  const choose = (name: string, label: string, options: readonly string[], required = false) => (
+    <Field label={label} htmlFor={`claim-${name}`}>
+      <Select id={`claim-${name}`} name={name} defaultValue="" required={required}>
+        <option value="" disabled>Choose one</option>
+        {options.map((o) => <option key={o} value={o}>{o}</option>)}
+      </Select>
+    </Field>
+  );
+
   return (
-    <div className="mp-panel" style={{ display: 'grid', gap: 14 }}>
-      <p className="mp-meta">Signed in as <strong>{signedInAs}</strong></p>
+    <form className="mp-panel" onSubmit={claim} style={{ display: 'grid', gap: 18 }}>
+      <p className="mp-label">A few questions, then your {credits} credits</p>
+      <Field label="Email" htmlFor="claim-email" help="From your Mindy account. The credits go here.">
+        <Input id="claim-email" name="email" type="email" value={signedInAs} readOnly />
+      </Field>
+      <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+        <Field label="Your name" htmlFor="claim-name">
+          <Input id="claim-name" name="name" autoComplete="name" required maxLength={120} />
+        </Field>
+        <Field label="Company name" htmlFor="claim-company">
+          <Input id="claim-company" name="company" autoComplete="organization" maxLength={160} />
+        </Field>
+      </div>
+      <Field label="What does your business sell?" htmlFor="claim-sells" help="e.g. janitorial services, IT support, roofing">
+        <Textarea id="claim-sells" name="sells" rows={2} required maxLength={300} />
+      </Field>
+      <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+        {choose('years', 'How long have you been in business?', Q.years, true)}
+        {choose('revenue', 'Annual revenue', Q.revenue)}
+      </div>
+      <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+        {choose('sam', 'Registered in SAM.gov?', Q.sam)}
+        {choose('bids', 'Federal bids submitted so far', Q.bids, true)}
+      </div>
+      <fieldset style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: 8 }}>
+        <legend className="mp-field-label" style={{ marginBottom: 8 }}>Certifications (choose all that apply)</legend>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 18px' }}>
+          {Q.certifications.map((c) => (
+            <label key={c} className="mp-meta" style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+              <input type="checkbox" name="certifications" value={c} /> {c}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      {choose('challenge', 'What is your biggest challenge with government contracts?', Q.challenge)}
+      <Field label="What kind of help do you want?" htmlFor="claim-support">
+        <Select id="claim-support" name="support" defaultValue="">
+          <option value="" disabled>Choose one</option>
+          {Q.support.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </Select>
+      </Field>
+      {choose('call', 'Would you like a free call with our team?', Q.call)}
+      <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true"
+        style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }} />
       {error && <p className="mp-meta" role="alert" style={{ color: 'var(--mp-crit)' }}>{error}</p>}
-      <Button type="button" onClick={claim} disabled={status === 'sending'}>
+      <Button type="submit" disabled={status === 'sending'}>
         {status === 'sending' ? 'Adding your credits…' : `Claim ${credits} credits`}
       </Button>
       {needsSignIn && <a className="mp-link" href={SIGN_IN_HREF}>Sign in with a different email</a>}
       <p className="mp-meta">One claim per registered email.</p>
-    </div>
+    </form>
   );
 }

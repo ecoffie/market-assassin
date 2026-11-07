@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { LAZY_CONTRACTORS_BLUEPRINT as EVENT, lazyBlueprintClaimState } from '@/lib/events/lazy-contractors-blueprint';
-import { changeContactTags, findContactByEmail } from '@/lib/ghl/event-registration';
+import { LAZY_CONTRACTORS_BLUEPRINT as EVENT, LCB_CLAIM_QUESTIONS as Q, LCB_GHL_FIELDS, lazyBlueprintClaimState } from '@/lib/events/lazy-contractors-blueprint';
+import { addContactNote, changeContactTags, findContactByEmail, updateContactFields } from '@/lib/ghl/event-registration';
 import { applyCreditOnce } from '@/lib/mcp/credits';
 import { resolveMcpEmail } from '@/lib/mcp/session-identity';
 
@@ -45,8 +45,53 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const str = (v: unknown, max = 200) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+    const one = (v: unknown, allowed: readonly string[]) => (allowed.includes(str(v)) ? str(v) : '');
+    const fullName = str(body.name, 120);
+    const company = str(body.company, 160);
+    const sells = str(body.sells, 300);
+    const years = one(body.years, Q.years);
+    const revenue = one(body.revenue, Q.revenue);
+    const sam = one(body.sam, Q.sam);
+    const bids = one(body.bids, Q.bids);
+    const challenge = one(body.challenge, Q.challenge);
+    const support = one(body.support, Q.support.map((o) => o.value));
+    const call = one(body.call, Q.call);
+    const certs = (Array.isArray(body.certifications) ? body.certifications : [])
+      .map((c) => str(c, 40))
+      .filter((c) => (Q.certifications as readonly string[]).includes(c));
+    if (!fullName) return NextResponse.json({ success: false, error: 'Please enter your name.' }, { status: 400 });
+    if (!sells) return NextResponse.json({ success: false, error: 'Please tell us what your business sells.' }, { status: 400 });
+    if (!years || !bids) return NextResponse.json({ success: false, error: 'Please answer how long you have been in business and how many federal bids you have submitted.' }, { status: 400 });
+
     const result = await applyCreditOnce(`lcb-2026-claim:${email}`, email, EVENT.claimCredits, 'event_bonus');
     if (result.applied) {
+      const supportLabel = Q.support.find((o) => o.value === support)?.label || '';
+      const note = [
+        `Claimed ${EVENT.claimCredits} live-event credits (${EVENT.title})`,
+        `Name: ${fullName}`,
+        company ? `Company: ${company}` : '',
+        `Sells: ${sells}`,
+        `In business: ${years}`,
+        revenue ? `Annual revenue: ${revenue}` : '',
+        sam ? `Registered in SAM.gov: ${sam}` : '',
+        certs.length ? `Certifications: ${certs.join(', ')}` : '',
+        `Federal bids submitted: ${bids}`,
+        challenge ? `Biggest challenge: ${challenge}` : '',
+        supportLabel ? `Support wanted: ${supportLabel}` : '',
+        call ? `Wants a call: ${call}` : '',
+      ].filter(Boolean).join('\n');
+      const fields = [
+        { id: LCB_GHL_FIELDS.industry, field_value: sells },
+        ...(revenue ? [{ id: LCB_GHL_FIELDS.revenue, field_value: revenue }] : []),
+        ...(support ? [{ id: LCB_GHL_FIELDS.support, field_value: support }] : []),
+      ];
+      await updateContactFields(contact.id, fields).catch((err) =>
+        console.error('[lazy-blueprint-claim] fields failed', err instanceof Error ? err.message : err),
+      );
+      await addContactNote(contact.id, note).catch((err) =>
+        console.error('[lazy-blueprint-claim] note failed', err instanceof Error ? err.message : err),
+      );
       await changeContactTags(contact.id, [EVENT.claimTag], 'add').catch((err) =>
         console.error('[lazy-blueprint-claim] tag failed', err instanceof Error ? err.message : err),
       );

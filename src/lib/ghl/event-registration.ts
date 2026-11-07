@@ -233,3 +233,14 @@ export async function findContactByEmail(email: string, fetchImpl: typeof fetch 
     customFields: (c.customFields as Array<{ id: string; value: unknown }>) || [],
   };
 }
+
+/** Add a note to a contact. */
+export async function addContactNote(contactId: string, body: string, fetchImpl: typeof fetch = fetch): Promise<void> {
+  const { token } = ghlEnv();
+  const res = await fetchImpl(`${GHL_BASE}/contacts/${contactId}/notes`, {
+    method: 'POST',
+    headers: headers(token),
+    body: JSON.stringify({ body }),
+  });
+  if (!res.ok) throw new Error(`GHL note ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
+}
