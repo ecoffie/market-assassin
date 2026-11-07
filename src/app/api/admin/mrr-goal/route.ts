@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getReadClient, getCountClient } from '@/lib/supabase/server-clients';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 import { fetchUpgradeEngagementRows } from '@/lib/mindy/upgrade-intent';
+import { monthlyRecurring, type RecurringBasis } from '@/lib/stripe/recurring-normalize';
 
 /**
  * GET /api/admin/mrr-goal?password=...
@@ -10,7 +11,8 @@ import { fetchUpgradeEngagementRows } from '@/lib/mindy/upgrade-intent';
  * subscriptions from stripe_subscriptions (the cache synced from Stripe) and
  * computes:
  *   - activeSubs   → count of status='active' recurring subscriptions
- *   - mrr          → monthly recurring revenue (annual plans normalized /12)
+ *   - mrr          → monthly recurring revenue, normalized by interval AND interval count
+ *   - mrrBasis     → how many subscriptions were measured exactly vs estimated
  *   - byPlan       → breakdown by plan_amount (we sell $99 / $149 / $249 etc.)
  *   - goal math    → $100K target, subs-at-$149 needed (671), gap from here
  *
@@ -29,6 +31,7 @@ interface SubRow {
   status: string | null;
   plan_amount: number | null; // cents (Stripe convention)
   plan_interval?: string | null;
+  plan_interval_count?: number | null;
 }
 
 export async function GET(request: NextRequest) {
@@ -79,10 +82,11 @@ export async function GET(request: NextRequest) {
     for (let from = 0; from < 60000; from += 1000) {
       const { data, error } = await supabase
         .from('stripe_subscriptions')
-        .select('customer_id, status, plan_amount, plan_interval')
+        .select('customer_id, status, plan_amount, plan_interval, plan_interval_count')
         .in('status', PAYING)
         .range(from, from + 999);
-      if (error) break;
+      // A partial read would report a lower MRR as if it were the real one. Fail instead.
+      if (error) throw new Error(`stripe_subscriptions read failed: ${error.message}`);
       subs.push(...((data || []) as SubRow[]));
       if (!data || data.length < 1000) break;
     }
@@ -123,16 +127,16 @@ export async function GET(request: NextRequest) {
 
     const payingSubs = subs.filter((s) => !(s.customer_id && excludedCustomerIds.has(s.customer_id)));
 
-    // plan_amount is in cents. Annual plans bill once a year → normalize to /12
-    // for MRR. We infer annual from the interval field or a large amount.
+    // plan_amount is in cents. See recurring-normalize.ts: a price bills every N intervals.
     const planCounts = new Map<number, number>(); // monthly-dollar price → count
+    const mrrBasis: Record<RecurringBasis, number> = { exact: 0, count_unknown: 0, unmeasurable: 0 };
     let mrr = 0;
     for (const s of payingSubs) {
-      const cents = s.plan_amount || 0;
-      if (cents <= 0) continue;
-      const dollars = cents / 100;
-      const isAnnual = (s.plan_interval === 'year') || dollars >= 1000; // $1,490/yr etc.
-      const monthly = isAnnual ? dollars / 12 : dollars;
+      if ((s.plan_amount || 0) <= 0) continue;
+      const { monthlyCents, basis } = monthlyRecurring(s);
+      mrrBasis[basis]++;
+      if (monthlyCents === null) continue;
+      const monthly = monthlyCents / 100;
       mrr += monthly;
       const bucket = Math.round(monthly);
       planCounts.set(bucket, (planCounts.get(bucket) || 0) + 1);
@@ -149,29 +153,49 @@ export async function GET(request: NextRequest) {
     // Lifetime + bundle sales are CASH, not MRR — but they fund the business and
     // convert leads who'd never subscribe monthly. Report them as a separate line
     // so the goal story is honest (MRR is recurring; lifetime is cash-in).
-    let oneTimeCash30d = 0;
-    let oneTimeCount30d = 0;
+    // null = could not be read. It selected a column that does not exist (`invoice`) until
+    // 2026-11-07, so PostgREST failed the query and this line reported $0 and was hidden.
+    let oneTimeCash30d: number | null = 0;
+    let oneTimeCount30d: number | null = 0;
+    // The newest mirrored charge, so a frozen mirror cannot pass as a quiet month.
+    let chargesThrough: string | null = null;
     try {
       const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      const charges: Array<{ amount?: number; status?: string; invoice?: string | null; created_at?: string }> = [];
+      const charges: Array<{ amount?: number; status?: string; invoice_id?: string | null; created_at?: string }> = [];
       for (let from = 0; from < 60000; from += 1000) {
         const { data, error } = await supabase
           .from('stripe_charges')
-          .select('amount, status, invoice, created_at')
+          .select('amount, status, invoice_id, created_at')
           .gte('created_at', since)
           .range(from, from + 999);
-        if (error) break;
+        if (error) throw new Error(error.message);
         charges.push(...(data || []));
         if (!data || data.length < 1000) break;
       }
+      let cash = 0;
+      let count = 0;
       for (const c of charges) {
         if (c.status !== 'succeeded') continue;
         // No invoice → one-time charge (subscription renewals carry an invoice id).
-        if (c.invoice) continue;
-        oneTimeCash30d += (c.amount || 0) / 100;
-        oneTimeCount30d++;
+        if (c.invoice_id) continue;
+        cash += (c.amount || 0) / 100;
+        count++;
       }
-    } catch { /* charges table optional */ }
+      oneTimeCash30d = cash;
+      oneTimeCount30d = count;
+
+      const { data: latest, error: latestErr } = await supabase
+        .from('stripe_charges')
+        .select('created_at')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (latestErr) throw new Error(latestErr.message);
+      chargesThrough = (latest?.[0]?.created_at as string | undefined) ?? null;
+    } catch (e) {
+      console.error('[mrr-goal] stripe_charges read failed:', (e as Error).message);
+      oneTimeCash30d = null;
+      oneTimeCount30d = null;
+    }
 
     // --- Upgrade-modal intent (last 30 days) from user_engagement ---
     let upgradeModalShown = 0;
@@ -256,6 +280,7 @@ export async function GET(request: NextRequest) {
       cacheUpdatedAt,  // ISO timestamp of the last Stripe→cache sync (or null)
       activeSubs,
       mrr: Math.round(mrr),
+      mrrBasis,
       arpu: Math.round(arpu),
       pctToGoal,
       byPlan,
@@ -263,8 +288,9 @@ export async function GET(request: NextRequest) {
       subsRemainingAt149,
       subsRemainingAtArpu,
       mrrGap: Math.round(mrrGap),
-      oneTimeCash30d: Math.round(oneTimeCash30d),
+      oneTimeCash30d: oneTimeCash30d === null ? null : Math.round(oneTimeCash30d),
       oneTimeCount30d,
+      chargesThrough,
       lifetimeScenarios,
       // Free→paid funnel — upgrade-modal intent (last 30 days)
       upgradeModalShown,

@@ -45,6 +45,7 @@ export function subscriptionMirrorRow(sub: Stripe.Subscription): Record<string, 
     plan_id: plan?.id ?? null,
     plan_amount: plan?.amount ?? plan?.unit_amount ?? null,
     plan_interval: plan?.interval ?? plan?.recurring?.interval ?? null,
+    plan_interval_count: plan?.interval_count ?? plan?.recurring?.interval_count ?? null,
   };
 }
 
