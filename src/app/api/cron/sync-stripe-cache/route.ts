@@ -100,13 +100,19 @@ export async function GET(request: NextRequest) {
     failures.push(`subscriptions: ${message}`);
   }
 
-  // Runs even when subscriptions failed: the two are independent.
-  const charges = await syncChargesIncremental({ deadlineMs: startedAt + CHARGE_DEADLINE_MS });
-  results.charges = charges;
-  if (!charges.ok) {
-    failures.push(`charges: ${charges.error ?? charges.reason}`);
-  } else if (!charges.complete && charges.upserted === 0) {
-    failures.push(`charges: ${charges.reason} with no progress`);
+  // Off unless STRIPE_CHARGE_SYNC_ENABLED is exactly 'true': the first run backfills months of
+  // charges, so a merge or deploy alone must never start it.
+  if (process.env.STRIPE_CHARGE_SYNC_ENABLED === 'true') {
+    // Runs even when subscriptions failed: the two are independent.
+    const charges = await syncChargesIncremental({ deadlineMs: startedAt + CHARGE_DEADLINE_MS });
+    results.charges = charges;
+    if (!charges.ok) {
+      failures.push(`charges: ${charges.error ?? charges.reason}`);
+    } else if (!charges.complete && charges.upserted === 0) {
+      failures.push(`charges: ${charges.reason} with no progress`);
+    }
+  } else {
+    results.charges = { skipped: 'charge_sync_disabled' };
   }
 
   return NextResponse.json(

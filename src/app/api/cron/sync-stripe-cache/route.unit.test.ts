@@ -17,6 +17,19 @@ const call = () => GET(new NextRequest('https://x.test/api/cron/sync-stripe-cach
 beforeEach(() => {
   sync.mockReset();
   vi.stubGlobal('fetch', vi.fn(async () => subsOk));
+  vi.stubEnv('STRIPE_CHARGE_SYNC_ENABLED', 'true');
+});
+
+describe('sync-stripe-cache charge switch', () => {
+  it.each([[undefined], [''], ['false'], ['1'], ['TRUE']])('%s: charges do not run, subscriptions still sync', async (value) => {
+    vi.stubEnv('STRIPE_CHARGE_SYNC_ENABLED', value as string);
+    const res = await call();
+    const j = await res.json();
+    expect(sync).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(j.synced.charges).toEqual({ skipped: 'charge_sync_disabled' });
+    expect(j.synced.subscriptions.fetched).toBe(5);
+  });
 });
 
 describe('sync-stripe-cache fast path', () => {
