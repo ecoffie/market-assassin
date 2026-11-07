@@ -38,6 +38,8 @@ export interface ExpiringContractsToolInput {
    */
   eligible_set_asides?: string[];
   limit?: number;
+  /** Keyword evidence: contract description must contain one of these phrases (see query.ts). */
+  description_terms?: string[];
 }
 
 export interface ExpiringContractsToolResult {
@@ -87,6 +89,7 @@ export async function expiringContracts(
     likelihood: input.likelihood,
     eligibleSetAsides: input.eligible_set_asides,
     limit: input.limit,
+    descriptionTerms: input.description_terms,
   });
   // B2 — orders under a vehicle are rolled up, not listed as recompetes. The parent's ordering
   // end is looked up (shared award-detail fetch, cached); failures stay UNKNOWN.

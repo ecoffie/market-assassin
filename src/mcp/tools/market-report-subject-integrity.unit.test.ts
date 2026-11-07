@@ -12,7 +12,13 @@
  */
 import { describe, it, expect } from 'vitest';
 
-/** The subject boundary applied to keyword-axis recompetes (market-report.ts). */
+/**
+ * SUPERSEDED 2026-11-07 for the KEYWORD axis: recompetes are now selected on the contract
+ * description naming the keyword (planRecompetes in market-report.ts, tested in
+ * market-report-section-scope.unit.test.ts), because the coverage set was itself off-subject
+ * (all of IT for "risk management framework"). This mirror still pins the NAICS-axis rule and the
+ * RC-2 outcome: never an unfiltered query.
+ */
 function subjectNaicsFor(naicsCodes: string[], coverageAllNaics: { code: string }[]): string[] {
   return naicsCodes.length ? naicsCodes : coverageAllNaics.map((n) => n.code).filter(Boolean);
 }

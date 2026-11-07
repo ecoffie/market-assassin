@@ -27,6 +27,7 @@ import { detectUndercount } from '@/lib/market/undercount-signal';
 import { resolveMarketScope, filtersForScope, fetchSpendingCategory, buildSpendingFilters } from '@/lib/market/spend-query';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
 import { queryFederalContacts } from '@/lib/gov-contacts/contact-roster';
+import { keywordEvidenceTerms, keywordContacts } from '@/lib/market/keyword-evidence';
 import { displayContactName } from '@/lib/gov-contacts/contact-quality';
 import { agencyForecasts } from '@/mcp/tools/forecasts';
 import { getAgencySpendingDetailTool } from '@/mcp/tools/agency-spending-detail';
@@ -224,10 +225,21 @@ export interface MarketReportContacts {
   /** The buying office the roster is anchored on, when one is identifiable. */
   office: string | null;
   /** A few real, emailable POCs (CO / small-business / specialists). */
-  people: Array<{ name: string; role: string; email: string; office: string | null }>;
+  people: Array<{ name: string; role: string; email: string; office: string | null; notices?: number }>;
   /** Total matched (before the display cap) so truncation is explicit. */
   total: number;
+  /**
+   * How the people were chosen. 'keyword_notices' = listed as POCs on SAM notices whose text
+   * names the keyword (people[].notices says how many). 'agency_roster' = the agency's roster.
+   */
+  basis?: { kind: 'keyword_notices'; terms: string[]; notices_scanned: number } | { kind: 'agency_roster' };
 }
+
+/** How the recompete rows were selected, so the page can say it. */
+export type RecompeteBasis =
+  | { kind: 'description_terms'; terms: string[] }
+  | { kind: 'naics'; codes: string[] }
+  | { kind: 'none' };
 
 /**
  * How to reconcile this report against a NAICS-anchored tool (HigherGov, SweetSpot…).
@@ -283,7 +295,7 @@ export interface MarketReportResult {
      *  when nothing was cut. */
     top_agencies_total: number;
     competition: { contractors: unknown[]; count: number };
-    recompetes: { contracts: unknown[]; count: number };
+    recompetes: { contracts: unknown[]; count: number; basis?: RecompeteBasis };
     forecasts: { forecasts: unknown[]; count: number };
     /** Who to call — the market's #1 buyer's office + a few real contacts. */
     contacts: MarketReportContacts | null;
@@ -400,6 +412,43 @@ async function unionSpendingCategory(
     .slice(0, limit);
 }
 
+/**
+ * Which recompetes a report may show, and why. One place so the route and its tests agree.
+ *
+ * KEYWORD axis (no explicit NAICS): a recompete qualifies only when its own description names
+ * the keyword (literal phrase or a curated term of art). The keyword's NAICS coverage set is NOT
+ * evidence: for "risk management framework" it is all of IT services, and the section listed the
+ * 15 soonest-expiring IT contracts of 19,067 (CAD warranty maintenance, a tax-return viewer).
+ * Before that, with no filter at all, it listed dental equipment and bullion (RC-2). No usable
+ * phrase or no explicit NAICS → withhold, never query the broader population.
+ * NAICS axis: unchanged, the explicit code list. Agency and state always apply.
+ */
+export function planRecompetes(input: {
+  keyword?: string;
+  naicsCodes: string[];
+  primaryNaics?: string;
+  evidenceTerms: string[];
+  agency?: string;
+  state?: string;
+}): {
+  basis: RecompeteBasis;
+  query: Parameters<typeof expiringContracts>[0] | null;
+  withheld: 'no_subject_terms' | 'no_subject_naics' | null;
+} {
+  const base = { agency: input.agency || undefined, state: input.state, limit: 15 };
+  if (input.keyword && !input.naicsCodes.length) {
+    if (!input.evidenceTerms.length) return { basis: { kind: 'none' }, query: null, withheld: 'no_subject_terms' };
+    return { basis: { kind: 'description_terms', terms: input.evidenceTerms }, query: { ...base, description_terms: input.evidenceTerms }, withheld: null };
+  }
+  if (input.naicsCodes.length) {
+    return { basis: { kind: 'naics', codes: input.naicsCodes }, query: { ...base, naicsCodes: input.naicsCodes }, withheld: null };
+  }
+  if (input.primaryNaics) {
+    return { basis: { kind: 'naics', codes: [input.primaryNaics] }, query: { ...base, naics: input.primaryNaics }, withheld: null };
+  }
+  return { basis: { kind: 'none' }, query: null, withheld: 'no_subject_naics' };
+}
+
 export async function generateMarketReport(input: MarketReportInput): Promise<MarketReportResult> {
   const keyword = (input.keyword || '').trim();
   const naicsIn = (input.naics || '').trim();
@@ -503,6 +552,11 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   })();
   const isUnion = scopedFilterSets.length > 1;
 
+  // Phrases a recompete or contact must itself contain to count as this keyword market.
+  const evidenceTerms = keyword ? keywordEvidenceTerms(keyword) : [];
+  const recompetePlan = planRecompetes({ keyword, naicsCodes, primaryNaics, evidenceTerms, agency: agency || undefined, state });
+  const recompeteBasis = recompetePlan.basis;
+
   // Fan out the remaining sections in parallel — each independently guarded.
   const [agenciesR, competitionR, recompetesR, forecastsR, agencyDetailR, sbaR] = await Promise.all([
     scopedFilterSets.length
@@ -533,38 +587,14 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     // measured buying NAICS (`coverage.allNaics` — the same set the coverage
     // banner reports). When neither axis yields one, we return NO recompetes
     // rather than unrelated ones.
-    (() => {
-      const subjectNaics = naicsCodes.length
-        ? naicsCodes
-        // Use the ~90% COVERAGE SET, not the full measured tail. The tail of a
-        // multi-trade family carries long-tail noise — a construction family
-        // measures 187 NAICS, of which 314910 textiles (0.004%) and 339112/339113
-        // surgical (0.002%/0.007%) are rounding error. Filtering recompetes on
-        // the whole tail put those back on the page, which is exactly the
-        // off-subject defect the P0 lock exists to prevent. coverageCodes is the
-        // smallest set covering ~90% of the measured market — 14 clean
-        // construction codes here — so it is the defensible subject boundary.
-        : (coverage?.coverageCodes?.length
-            ? coverage.coverageCodes
-            : (coverage?.allNaics ?? []).map((n) => n.code)
-          ).filter(Boolean);
-      if (!subjectNaics.length && !primaryNaics) {
-        // No defensible subject filter exists → withhold the section.
-        return Promise.resolve({
-          value: { contracts: [] as Array<Record<string, unknown>>, count: 0, withheld_reason: 'no_subject_naics', _meta: { total: 0 } },
+    recompetePlan.query
+      ? guard(expiringContracts(recompetePlan.query), (v) => (v.contracts?.length ?? 0) > 0)
+      : Promise.resolve({
+          value: { contracts: [] as Array<Record<string, unknown>>, count: 0, withheld_reason: recompetePlan.withheld, _meta: { total: 0 } },
           degraded: false,
           status: 'withheld_no_subject' as SectionStatus,
           outcome: { status: 'withheld_no_subject' as SectionStatus, value: null },
-        });
-      }
-      return guard(expiringContracts({
-        naicsCodes: subjectNaics.length ? subjectNaics : undefined,
-        naics: subjectNaics.length ? undefined : primaryNaics,
-        agency: agency || undefined,
-        state,
-        limit: 15,
-      }), (v) => (v.contracts?.length ?? 0) > 0);
-    })(),
+        }),
     // Forecasts honor the FULL NAICS UNION (queryForecasts splits a comma list), NOT one code —
     // a DOD-IT search of 4 codes was reading only the first (541511) and missing 541519's 2,668
     // rows. And NO toptier agency filter: agency_forecasts.source_agency is stored as SHORT CODES
@@ -613,7 +643,21 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   const contactAgency = agency || topAgencies[0]?.name || '';
   const CONTACTS_CAP = 6;
   let contactsSection: MarketReportContacts | null = null;
-  if (contactAgency) {
+  if (keyword && !naicsCodes.length) {
+    // KEYWORD axis: people listed on SAM notices that name the keyword, honoring agency/state.
+    // The top agency's whole roster is NOT evidence ("6 of 6,551" Navy contracting staff on an
+    // RMF report). Nobody found → no section, never the broad roster.
+    const kc = (await guard(keywordContacts({ terms: evidenceTerms, agency: agency || undefined, state, limit: CONTACTS_CAP }))).value;
+    if (kc && kc.people.length) {
+      contactsSection = {
+        agency: agency || 'notices that mention this keyword',
+        office: null,
+        people: kc.people.map((p) => ({ name: p.name, role: p.role, email: p.email, office: p.office, notices: p.notices })),
+        total: kc.total,
+        basis: { kind: 'keyword_notices', terms: kc.terms, notices_scanned: kc.notices_scanned },
+      };
+    }
+  } else if (contactAgency) {
     const roster = (await guard(queryFederalContacts({ agency: contactAgency, limit: CONTACTS_CAP * 3 }))).value;
     const people = (roster?.contacts ?? [])
       .filter((c) => (c.contact_email || '').includes('@'))
@@ -635,6 +679,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
         office: people[0].office,
         people,
         total: roster?.total ?? people.length,
+        basis: { kind: 'agency_roster' },
       };
     }
   }
@@ -831,7 +876,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     top_agencies: topAgencies,
     top_agencies_total: agenciesWithSpend.length,
     competition: { contractors, count: contractors.length },
-    recompetes: { contracts, count: contracts.length },
+    recompetes: { contracts, count: contracts.length, basis: recompeteBasis },
     forecasts: { forecasts, count: forecasts.length },
     contacts: contactsSection,
     agency_detail: agencyDetailR.value ?? null,
