@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildSearchOr, queryWords, rankSearchResults } from './search';
+import { buildSearchOr, queryWords, querySegments, rankSearchResults } from './search';
 
 /**
  * The multi-word search fix (Andre @ CypherIntel, 2026-08-02): a query like
@@ -25,13 +25,14 @@ describe('queryWords — tokenize a free-text query', () => {
   });
 });
 
-describe('buildSearchOr — multi-word ORs every term (was: one literal phrase)', () => {
-  it('a multi-word query ORs each word across the columns (not the literal phrase)', () => {
-    const or = buildSearchOr('cyber cloud');
-    // The OLD bug: `title.ilike.%cyber cloud%` (the whole phrase). The FIX: each word separately.
-    expect(or).toContain('title.ilike.%cyber%');
-    expect(or).toContain('title.ilike.%cloud%');
+describe('buildSearchOr — a long word list ORs every term (was: one literal phrase)', () => {
+  it('a 4+ word query ORs each word across the columns (not the literal phrase)', () => {
+    const or = buildSearchOr('cyber cloud compliance network server');
+    // The OLD bug: `title.ilike.%cyber cloud …%` (the whole phrase). The FIX: each word separately.
+    expect(or.split(',')).toContain('title.ilike.%cyber%');
+    expect(or.split(',')).toContain('title.ilike.%server%');
     expect(or).not.toContain('%cyber cloud%'); // never the literal-phrase clause
+    expect(or).not.toContain('and(');
   });
   it('a single word still searches that word across the columns', () => {
     const or = buildSearchOr('roofing');
@@ -42,6 +43,91 @@ describe('buildSearchOr — multi-word ORs every term (was: one literal phrase)'
     const or = buildSearchOr('R408');
     expect(or).toContain('imatch'); // regex path, not ILIKE
     expect(or).toContain('R'); // the code token is present
+  });
+});
+
+/**
+ * Multi-word CONCEPTS (2026-11-07). Any-word OR made "active directory" match 766 open notices,
+ * including a building generator job, when the true phrase matched none. These run the generated
+ * Postgres regex against real-world text (Postgres \m / \M word boundaries → JS \b).
+ */
+function clausesFor(q: string, col = 'description'): RegExp[] {
+  return buildSearchOr(q)
+    .split(/,(?![^(]*\))/)
+    .filter((c) => c.startsWith(`${col}.imatch.`))
+    .map((c) => new RegExp(c.slice(`${col}.imatch.`.length).replace(/\\[mM]/g, '\\b'), 'i'));
+}
+const matches = (q: string, text: string) => clausesFor(q).some((re) => re.test(text));
+
+describe('buildSearchOr — a 2–3 word query is a concept, not a word list', () => {
+  it('matches the words in order, including one word between or punctuation between', () => {
+    expect(matches('active directory', 'Administer Active Directory and Group Policy')).toBe(true);
+    expect(matches('fiber optic installation', 'fiber optic cable installation at Bldg 5')).toBe(true);
+    expect(matches('nashville tennessee', 'Place of performance: Nashville, Tennessee')).toBe(true);
+    expect(matches('risk management framework', 'supports the Risk Management Framework (RMF)')).toBe(true);
+  });
+  it('does not match the words scattered across a document', () => {
+    expect(matches('active directory', 'active duty personnel will use the building directory signage')).toBe(false);
+    expect(matches('risk management framework', 'risk of delay; program management; a framework agreement')).toBe(false);
+  });
+  it('emits no standalone any-word clause for a concept', () => {
+    const top = buildSearchOr('active directory').split(/,(?![^(]*\))/);
+    expect(top).not.toContain('title.ilike.%active%');
+    expect(top).not.toContain('description.ilike.%directory%');
+  });
+  it('also matches when every word is in the title', () => {
+    expect(buildSearchOr('active directory')).toContain('and(title.ilike.%active%,title.ilike.%directory%)');
+  });
+  it('a 4+ word query is unchanged (any word, then ranked)', () => {
+    expect(buildSearchOr('janitorial custodial grounds turf').split(',')).toContain('title.ilike.%turf%');
+  });
+});
+
+describe('buildSearchOr — acronyms match whole words; ordinary words stay substrings', () => {
+  it('lowercase "roof" still finds "roofing" (not an acronym)', () => {
+    expect(matches('roof', 'roofing repairs')).toBe(false); // no regex clause at all for "roof"
+    expect(buildSearchOr('roof')).toContain('title.ilike.%roof%');
+  });
+  it('a 3-letter word is whole-word even in lowercase ("dai" ≠ "daily")', () => {
+    expect(matches('dai', 'daily status report')).toBe(false);
+    expect(matches('dai', 'DAI program support')).toBe(true);
+  });
+  it('STIG does not match inside "investigation" but matches STIG and STIGs', () => {
+    expect(matches('STIG', 'site investigation report')).toBe(false);
+    expect(matches('STIG', 'apply DISA STIGs to all servers')).toBe(true);
+    expect(matches('STIG', 'STIG compliance')).toBe(true);
+  });
+});
+
+describe('querySegments + list syntax', () => {
+  it('quotes are an exact phrase; commas, semicolons and OR start a new segment', () => {
+    expect(querySegments('"active directory", azure; cloud OR vmware')).toEqual([
+      { text: 'active directory', phrase: true },
+      { text: 'azure', phrase: false },
+      { text: 'cloud', phrase: false },
+      { text: 'vmware', phrase: false },
+    ]);
+  });
+  it('a quoted phrase searches that literal phrase', () => {
+    expect(buildSearchOr('"active directory"')).toContain('title.ilike.%active directory%');
+  });
+  it('comma-separated concepts are ORed, each kept as a concept', () => {
+    const or = buildSearchOr('active directory, azure');
+    expect(or).toContain('and(title.ilike.%active%,title.ilike.%directory%)');
+    expect(or.split(/,(?![^(]*\))/)).toContain('title.ilike.%azure%');
+  });
+  it('chat filler is dropped ("Show me SBA opportunities" searches SBA)', () => {
+    expect(queryWords('Show me SBA opportunities')).toEqual(['sba']);
+  });
+  it('every clause is PostgREST-safe: balanced parentheses, no comma inside a regex', () => {
+    for (const q of ['active directory', 'risk management framework', 'STIG', 'women\'s health', 'e-learning design', 'a (b), c']) {
+      const s = buildSearchOr(q);
+      let depth = 0;
+      for (const ch of s) { depth += ch === '(' ? 1 : ch === ')' ? -1 : 0; expect(depth).toBeGreaterThanOrEqual(0); }
+      expect(depth).toBe(0);
+      // A regex value runs to the next comma or ')' — it must never contain '(' itself.
+      expect(s).not.toMatch(/\.imatch\.[^,)]*\(/);
+    }
   });
 });
 
