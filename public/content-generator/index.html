@@ -1693,6 +1693,33 @@
             window.gcgAuthInitComplete = true;
         });
 
+        // ========== AI HELPER AUTH ==========
+        // The AI helper routes (quote graphics, carousels) verify a signed-in Mindy session on the
+        // server. Page access stays email-gated (KV); only these AI calls need sign-in.
+        function contentAiHeaders() {
+            const headers = { 'Content-Type': 'application/json' };
+            try {
+                const token = localStorage.getItem('mi_beta_auth_token');
+                if (token) headers['x-mi-auth-token'] = token;
+            } catch (e) { /* storage blocked: the server will answer 401 */ }
+            return headers;
+        }
+        function contentAiSignInUrl() {
+            return '/app?next=' + encodeURIComponent(location.pathname + location.search);
+        }
+        let contentAiNoticeShown = false;
+        // True when the AI call was refused for auth/access, so the caller uses its local fallback.
+        function noteContentAiRefusal(res) {
+            if (res.status !== 401 && res.status !== 403) return false;
+            if (!contentAiNoticeShown) {
+                contentAiNoticeShown = true;
+                showWarningToast(res.status === 401
+                    ? 'Sign in to Mindy to turn on AI quote graphics. Using the first line of each post for now.'
+                    : 'AI graphics need Content Reaper access on your Mindy account. Using the first line of each post for now.');
+            }
+            return true;
+        }
+
         // ========== PAYWALL / ACCESS VERIFICATION ==========
         let hasContentGeneratorAccess = false;
 
@@ -3251,12 +3278,14 @@
                     try {
                         const res = await fetch('/api/generate-graphic', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: contentAiHeaders(),
                             body: JSON.stringify({ postContent: post.content })
                         });
                         if (res.ok) {
                             const data = await res.json();
                             quote = data.quote || data.text || '';
+                        } else {
+                            noteContentAiRefusal(res);
                         }
                     } catch (e) {
                         // Fallback silently
@@ -3850,9 +3879,10 @@
                 try {
                     const response = await fetch('/api/generate-graphic', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: contentAiHeaders(),
                         body: JSON.stringify({ postContent: cleanContent, type: apiType })
                     });
+                    noteContentAiRefusal(response);
                     const result = await response.json();
                     if (result.success) {
                         graphicData = result.data;
@@ -4555,7 +4585,7 @@
                 // Call API to convert post to carousel slides
                 const response = await fetch('/api/convert-post-to-carousel', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: contentAiHeaders(),
                     body: JSON.stringify({
                         postContent: carouselSourcePost.content,
                         postTitle: carouselSourcePost.title,
@@ -4564,6 +4594,14 @@
                         companyName
                     })
                 });
+
+                if (response.status === 401) {
+                    closeCarouselProgressModal();
+                    if (confirm('AI carousels need you to be signed in to Mindy. Sign in now? You will come right back here.')) {
+                        location.href = contentAiSignInUrl();
+                    }
+                    return;
+                }
 
                 const result = await response.json();
 

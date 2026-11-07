@@ -18,6 +18,7 @@
  *   2. classifyBillingOutcome() — AFTER execution, BEFORE the debit. Reads a
  *      structured terminal state from `_meta`, never customer-facing prose.
  */
+import { describeUnrecognized, type UnrecognizedParam } from './unknown-params';
 
 export type BillingOutcome =
   | 'billable_success'
@@ -118,7 +119,32 @@ export function classifyBillingOutcome(result: unknown): BillingOutcome {
  */
 export const REQUIRED_ONE_OF: Readonly<Record<string, readonly string[]>> = {
   build_pursuit_dossier: ['solicitation_number', 'notice_id'],
+  // Measured 2026-11-07, each with no identifier: returned in 0-1 ms having done no work, and
+  // classified billable. Optional-filter tools that do real work unfiltered are deliberately
+  // absent (search_federal_contacts, get_expiring_contracts, search_contractors...).
+  get_contractor_award_history: ['company', 'uei'],
+  get_award_detail: ['piid', 'id'],
+  find_predecessor_award: ['naics_code', 'agency_name', 'title'],
+  get_solicitation_incumbent: ['solicitation_number', 'notice_id'],
+  lookup_sam_entity: ['uei', 'name'],
+  match_company_to_pathways: ['uei', 'company_name', 'cage', 'cai'],
+  understand_customer: ['notice_id', 'agency'],
+  derive_company_keywords: ['description', 'past_performance', 'capabilities', 'code_titles'],
+  extract_compliance_matrix: ['notice_id', 'rfp_text'],
+  extract_statement_of_work: ['notice_id', 'rfp_text'],
+  draft_proposal: ['notice_id', 'rfp_text'],
+  search_agency_opps_by_office: ['agency', 'dodaac'],
+  get_current_acquisition_intelligence: [
+    'agency', 'office', 'dodaac', 'capability', 'keywords', 'naics', 'psc', 'notice_ids', 'contract_ids', 'piids',
+  ],
 };
+
+/** A supplied value that can identify something: non-blank text, a non-empty list or object. */
+function hasValue(v: unknown): boolean {
+  if (typeof v === 'string') return v.trim().length > 0;
+  if (Array.isArray(v)) return v.length > 0;
+  return !!v && typeof v === 'object' && Object.keys(v).length > 0;
+}
 
 export interface InputRejection {
   code: 'invalid_input';
@@ -126,18 +152,19 @@ export interface InputRejection {
 }
 
 /** Null when the call has enough input to attempt the paid job. */
-export function preflightPaidInput(name: string, args: Record<string, unknown>): InputRejection | null {
+export function preflightPaidInput(
+  name: string,
+  args: Record<string, unknown>,
+  unrecognized: readonly UnrecognizedParam[] = [],
+): InputRejection | null {
   const oneOf = REQUIRED_ONE_OF[name];
   if (!oneOf) return null;
-  const present = oneOf.some((k) => {
-    const v = args?.[k];
-    return typeof v === 'string' && v.trim().length > 0;
-  });
-  if (present) return null;
+  if (oneOf.some((k) => hasValue(args?.[k]))) return null;
+  const named = unrecognized.length ? `${describeUnrecognized(unrecognized)} ` : '';
   return {
     code: 'invalid_input',
     message:
-      `${name} needs one of: ${oneOf.join(', ')} (a non-empty string). ` +
+      `${named}${name} needs one of: ${oneOf.join(', ')} (a non-empty value). ` +
       'None was provided — argument names outside the tool schema are ignored. ' +
       'The tool did not run and nothing was charged.',
   };
