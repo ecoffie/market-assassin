@@ -57,10 +57,11 @@ describe('SR-002 — the postmortem trail reaches the postmortem', () => {
 
 describe('the operator is sent to the right system', () => {
   it('does not say "check Apify billing" when Apify was never reached', () => {
-    // At maxItems=2500 the cost guard routes to the free direct fetcher, so billing cannot be
-    // the cause. The old message said CHECK BILLING FIRST unconditionally.
+    // Fail-closed: the live path never calls the actor, so billing cannot be the cause.
+    // A 'skipped' actor attempt must not count as reached.
     expect(ROUTE).toContain('apifyWasReached');
-    expect(ROUTE).toContain('APIFY WAS NOT REACHED');
+    expect(ROUTE).toMatch(/a\.path === 'apify' && a\.outcome !== 'skipped'/);
+    expect(ROUTE).toContain('NOTHING WAS SPENT');
     expect(ROUTE).not.toMatch(/CHECK BILLING FIRST:<\/b>/);
   });
 
@@ -82,9 +83,11 @@ describe('a weekend pass is "not expected", not "healthy"', () => {
 });
 
 describe('fetch behaviour is unchanged — this is observability only', () => {
-  it('keeps the cost-guard threshold and its direct-first routing', () => {
-    expect(INGEST).toContain('APIFY_MAX_ITEMS_BEFORE_DIRECT');
-    expect(INGEST).toContain('const useDirectFirst = overBudget');
+  it('is fail-closed: direct first, the paid actor only on explicit allowApify', () => {
+    // The size-threshold "cost guard" was replaced 2026-11-02 — it routed to a free path
+    // and then re-billed the same request on the actor when that path failed.
+    expect(INGEST).not.toContain('APIFY_MAX_ITEMS_BEFORE_DIRECT');
+    expect(INGEST).toContain('const paidAllowed = opts?.allowApify === true;');
   });
 
   it('keeps the pinned vendor build', () => {
