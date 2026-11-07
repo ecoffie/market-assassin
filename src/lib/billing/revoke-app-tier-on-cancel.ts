@@ -42,7 +42,7 @@ export type AppTier = 'pro' | 'team';
  * Which profile flags a just-ended subscription paid for. A Pro subscription never
  * clears access_team: Team may come from someone else's pool or a separate purchase.
  */
-const CLEARS_TEAM_FLAG: Record<AppTier, boolean> = { pro: false, team: true };
+export const CLEARS_TEAM_FLAG: Record<AppTier, boolean> = { pro: false, team: true };
 
 /**
  * Statuses of ANOTHER subscription that HOLD a revocation. This is a conservative

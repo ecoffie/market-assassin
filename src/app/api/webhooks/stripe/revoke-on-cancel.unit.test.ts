@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { appTierOfSubscription, revokeBlockReason, HOLD_REVOKE_STATUSES, type RevokeGuardFacts } from '@/lib/billing/revoke-app-tier-on-cancel';
+import { appTierOfSubscription, revokeBlockReason, HOLD_REVOKE_STATUSES, CLEARS_TEAM_FLAG, type RevokeGuardFacts } from '@/lib/billing/revoke-app-tier-on-cancel';
 
 // The revoke runs inside a webhook that needs a signed Stripe event, so the store
 // writes are asserted on the source; the guard decision is asserted directly.
@@ -34,8 +34,9 @@ describe('subscription.deleted revokes entitlement', () => {
     expect(body).toMatch(/paid_status:\s*false/);
   });
 
-  it('clears access_team for a Team subscription', () => {
-    expect(body).toMatch(/tier === 'team'[\s\S]{0,40}access_team = false/);
+  it('clears access_team for a Team subscription, never for Pro', () => {
+    expect(CLEARS_TEAM_FLAG).toEqual({ pro: false, team: true });
+    expect(body).toMatch(/CLEARS_TEAM_FLAG\[tier\]\) patch\.access_team = false/);
   });
 
   it('fails soft — one store failing never aborts the others', () => {
