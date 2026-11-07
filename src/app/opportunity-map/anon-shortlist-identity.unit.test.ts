@@ -28,10 +28,16 @@ const NID = '313550655dcd4916a7700cb5c8f0ab68';   // sam_opportunities.notice_id
 const SOL = 'FA670326Q0015';                       // solicitation_number
 const ANON = 'anon:57b9d751-9451-40c8-9f3e-2b1c4d5e6f70';
 
-/** The anonymous branch of savePursuit, extracted and made runnable. */
+/**
+ * The anonymous branch of saveCurrentOpp — the LIVE save path every drawer Save /
+ * Start-pursuit button calls — extracted and made runnable. (This file used to
+ * drive window.savePursuit, a copy with ZERO call sites, deleted 2026-11-06.)
+ */
+const SAVE_HEAD = 'window.saveCurrentOpp=function(btn,done){';
+const SIGN_IN = "var a=window.requireSignIn('save this to your pursuits'); if(!a)return;";
 function anonSaveBranch() {
-  const src = MAP.slice(MAP.indexOf('window.savePursuit=function'));
-  const body = src.slice(0, src.indexOf('var a=window.requireSignIn('));
+  const src = MAP.slice(MAP.indexOf(SAVE_HEAD));
+  const body = src.slice(0, src.indexOf(SIGN_IN));
   // This code lives inside a TS template literal, so backslashes are DOUBLED in
   // the file ( \\u2026 , Couldn\\'t ). Undo that to get the text the browser
   // actually runs — otherwise the extract is a syntax error and the test would
@@ -42,34 +48,34 @@ function anonSaveBranch() {
 /**
  * Execute the real anonymous-save source against a fake DOM/fetch, so this
  * tests BEHAVIOUR (what goes on the wire) and not just the file's text.
+ * `cur` is the drawer's CUR — the record the visitor is looking at.
  */
-function runAnonSave(opp: Record<string, unknown>) {
+function runAnonSave(cur: Record<string, unknown>) {
   const sent: { url: string; body: Record<string, unknown> }[] = [];
   const tracked: { event: string; props: Record<string, unknown> }[] = [];
-  const btn: Record<string, unknown> = { dataset: { sol: opp.sol }, textContent: '', disabled: false };
+  const btn: Record<string, unknown> = { dataset: {}, textContent: '', disabled: false };
   let signInCalled = false;
 
-  const src = anonSaveBranch()
-    .replace('window.savePursuit=function(btn){', 'function __run(btn){')
-    + '  __signIn(); }\n';
+  const src = anonSaveBranch().replace(SAVE_HEAD, 'function __run(btn,done){') + '  __signIn(); }\n';
 
   const fn = new Function(
-    'btn', 'OPPS', 'tok', '_signedInEmail', '_anonKey', 'fetch', 'window', '__signIn',
+    'btn', 'CUR', 'tok', 'email', 'setBtnLabel', 'fetch', 'window', '__signIn',
     src + '; return __run(btn);',
   );
 
   const win: Record<string, unknown> = {
     __anonSaved: Object.create(null),
+    __anonId: () => ANON,
     __track: (event: string, name: string, props: Record<string, unknown>) =>
       tracked.push({ event: name, props }),
   };
 
   fn(
     btn,
-    [opp],
+    cur,
     () => null,                 // tok() → signed out
-    () => '',                   // _signedInEmail() → signed out
-    () => ANON,                 // _anonKey()
+    () => '',                   // email() → signed out
+    (b: Record<string, unknown>, t: string) => { b.textContent = t; },
     (url: string, init: { body: string }) => {
       sent.push({ url, body: JSON.parse(init.body) });
       return Promise.resolve({ json: () => Promise.resolve({ success: true, saved: true, duplicate: false }) });
@@ -80,7 +86,8 @@ function runAnonSave(opp: Record<string, unknown>) {
   return { sent, tracked, btn, win, signInCalled };
 }
 
-const SAM_OPP = { src: 'SAM', nid: NID, sol: SOL, agency: 'DEPT OF THE AIR FORCE', title: 'Cable Fiber Install' };
+// The SAM listing drawer's CUR: id = notice_id, solicitation = solicitation_number.
+const SAM_OPP = { id: NID, solicitation: SOL, department: 'DEPT OF THE AIR FORCE', title: 'Cable Fiber Install' };
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -119,14 +126,21 @@ describe('only entities with a canonical SAM notice id are eligible', () => {
     // map-data builds DLA rows as { id: sol }, so nid === sol and there is no
     // sam_opportunities row. Substituting it into a notice_id field is exactly
     // what this round forbids.
-    const { sent, signInCalled } = runAnonSave({ src: 'DLA', nid: SOL, sol: SOL, agency: 'DLA' });
+    const { sent, signInCalled } = runAnonSave({ isDla: true, id: SOL, solicitation: SOL, department: 'DLA' });
     await new Promise((r) => setTimeout(r, 0));
     expect(sent).toHaveLength(0);
     expect(signInCalled).toBe(true);   // falls through, as before the feature existed
   });
 
   it('a FORECAST row is NOT shortlisted', async () => {
-    const { sent, signInCalled } = runAnonSave({ src: 'FORECAST', nid: 'fc-123', sol: 'fc-123' });
+    const { sent, signInCalled } = runAnonSave({ kind: 'forecast', id: 'fc-123', solicitation: 'fc-123' });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(sent).toHaveLength(0);
+    expect(signInCalled).toBe(true);
+  });
+
+  it('a RECOMPETE (contract id) is NOT shortlisted', async () => {
+    const { sent, signInCalled } = runAnonSave({ kind: 'recompete', id: 'CONT_AWD_W912_9700', solicitation: 'W912PL19C0015' });
     await new Promise((r) => setTimeout(r, 0));
     expect(sent).toHaveLength(0);
     expect(signInCalled).toBe(true);
@@ -135,7 +149,7 @@ describe('only entities with a canonical SAM notice id are eligible', () => {
   it('a SAM row whose nid is not a canonical 32-hex id is NOT shortlisted', async () => {
     // Measured: 10,932 of 10,932 open SAM notice_ids are 32-hex, so anything
     // else is not a canonical id and must fail honestly rather than be coerced.
-    const { sent, signInCalled } = runAnonSave({ src: 'SAM', nid: 'not-a-notice-id', sol: SOL });
+    const { sent, signInCalled } = runAnonSave({ id: 'not-a-notice-id', solicitation: SOL });
     await new Promise((r) => setTimeout(r, 0));
     expect(sent).toHaveLength(0);
     expect(signInCalled).toBe(true);
@@ -187,7 +201,7 @@ describe('the SAVE_JS block cannot see the viewport block helpers', () => {
     // block and therefore throws — reported separately, deliberately NOT
     // changed here because #1600 is closed.
     const start = MAP.indexOf('function _anonKey()');
-    const end = MAP.indexOf('window.savePursuit=function');
+    const end = MAP.indexOf('window.toggleFav=function');
     const code = MAP.slice(start, end).replace(/^\s*\/\/.*$/gm, '');
     expect(code).toContain('window.__anonId');
     // A bare call to either viewport-block helper is a ReferenceError here.
@@ -196,12 +210,17 @@ describe('the SAVE_JS block cannot see the viewport block helpers', () => {
   });
 
   it('the anonymous SAVE branch is scope-safe too', () => {
-    const src = MAP.slice(MAP.indexOf('window.savePursuit=function'));
-    const branch = src.slice(0, src.indexOf('var a=window.requireSignIn('))
-      .replace(/^\s*\/\/.*$/gm, '');
+    // saveCurrentOpp lives in the drawer block: it reaches the anon id through
+    // window.__anonId and its own block-local tok()/email().
+    const branch = anonSaveBranch().replace(/^\s*\/\/.*$/gm, '');
     expect(branch).not.toMatch(/[^.\w]_uemail\(\)/);
     expect(branch).not.toMatch(/[^.\w]_anonId\(\)/);
-    expect(branch).toContain('_anonKey()');
-    expect(branch).toContain('_signedInEmail()');
+    expect(branch).toContain('window.__anonId()');
+    expect(branch).toContain('tok()');
+  });
+
+  it('the dead window.savePursuit copy is gone', () => {
+    expect(MAP).not.toContain('window.savePursuit=function');
+    expect(MAP).not.toMatch(/window\.savePursuit\(/);
   });
 });

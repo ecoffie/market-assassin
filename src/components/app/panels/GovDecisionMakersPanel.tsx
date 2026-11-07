@@ -7,10 +7,12 @@
  * Relationships panel.
  */
 
+import MindyLoader from '@/components/app/MindyLoader';
 import { useState, useEffect, useCallback } from 'react';
 import { Star, Contact, Check, Plus } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
+import { mapLinkForBuyer } from '@/lib/maps/map-links';
 
 interface Props {
   email: string | null;
@@ -453,6 +455,15 @@ export default function GovDecisionMakersPanel({ email }: Props) {
                     ) : c.contact_phone ? (
                       <span className="text-muted">{c.contact_phone}</span>
                     ) : <span className="text-slate-600">—</span>}
+                    {/* ?buyer=<federal_contacts.id> — this row's id comes from the
+                        government-buyer-scoped directory query, the same key the map's
+                        buyer drawer reads. */}
+                    {(() => {
+                      const mapHref = mapLinkForBuyer(c.id);
+                      return mapHref ? (
+                        <a href={mapHref} className="block mt-1 text-[11px] text-emerald-400 hover:underline">Open on the map</a>
+                      ) : null;
+                    })()}
                   </td>
                 </tr>
               ))}
@@ -474,9 +485,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       )}
 
       {loading && (
-        <div className="space-y-2">
-          {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-12 bg-surface/40 rounded animate-pulse" />)}
-        </div>
+<MindyLoader variant="section" title="Finding government contacts" steps={["Buying offices", "People named on notices"]} />
       )}
 
       <p className="text-xs text-slate-600">

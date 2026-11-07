@@ -19,7 +19,7 @@ import { getWriteClient } from '@/lib/supabase/server-clients';
 import { SUBSCRIPTION_PLANS, CREDIT_PACKAGES } from './packages';
 import { insufficientCreditsLead } from './commercial-refusal';
 
-/** Stripe payment links, mirroring src/app/mcp/pricing/page.tsx. */
+/** Stripe payment links, mirroring src/components/public-site/pricing/UnifiedPricing.tsx. */
 const CHECKOUT_ENTRY = 'https://buy.stripe.com/bJe5kEff8erw20R0CsfnO0Y';
 
 /** Where a refused user lands: the offer page, carrying the attempt so it can be resumed. */

@@ -510,6 +510,34 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     bar.querySelectorAll('.fchip').forEach(function(b){ b.onclick=function(){ FILTER=b.getAttribute('data-f'); filters(); render(); }; });
   }
 
+  // ── RECORD LINK per saved kind (docs/engineering/record-links-vs-market-links.md) ──
+  // The Saved list holds more than SAM notices: the company / buyer / recompete drawers save here
+  // too (source company_map / buyer_map / recompete_map, opportunity_data.entityType), keyed on a
+  // UEI, a federal_contacts id or a recompete contract_id. Every card used to link ?opp=<id>, which
+  // asks the map's opportunity-detail endpoint for a notice that does not exist. Each kind needs its
+  // own record param. MIRRORS src/lib/maps/map-links.ts (mapLinkForOpportunity / ForCompany /
+  // ForBuyer / ForRecompete) — favorites-map-links.unit.test.ts pins both to the same output.
+  function recordKind(r){
+    var od=(r&&r.opportunity_data&&typeof r.opportunity_data==='object')?r.opportunity_data:{};
+    var et=String(od.entityType||'').toLowerCase();
+    if(et==='company'||et==='buyer'||et==='recompete')return et;
+    var src=String((r&&r.source)||'').toLowerCase();
+    if(src==='company_map')return 'company';
+    if(src==='buyer_map')return 'buyer';
+    if(src==='recompete_map')return 'recompete';
+    return 'opp';
+  }
+  function mapLinkFor(r){
+    var id=String((r&&r.notice_id)||'').trim(); if(!id)return null;
+    var k=recordKind(r), p;
+    if(k==='company'){ p='company'; id=id.toUpperCase(); }
+    else if(k==='buyer')p='buyer';
+    else if(k==='recompete')p='recompete';
+    else p=/^fc-/i.test(id)?'forecast':'opp';
+    return '/opportunity-map?'+p+'='+encodeURIComponent(id);
+  }
+  // end record link
+
   function cardHTML(r){
     var o=toO(r), col=srcColor(o), grp=groupOf(r);
     var reasons = grp==='attn' ? reasonsFor(r) : [];
@@ -535,7 +563,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var noteLine=unavailable?('<div class="cnote">Details unavailable \\u2014 this notice may have been archived or removed.</div>'):'';
     var closedCls=(grp==='closed')?' closedcard':'';
     return '<div class="dcard'+closedCls+'" data-nid="'+h(o.nid)+'">'
-      + '<a class="viewlink" href="/opportunity-map?opp='+encodeURIComponent(o.nid)+'">'
+      + '<a class="viewlink" href="'+h(mapLinkFor(r)||'/opportunity-map')+'">'
       +   lcHeader(o)
       +   '<div class="cstrip" style="background:'+col+'"></div>'
       +   '<div class="cbody">'
@@ -606,21 +634,30 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     btn.disabled=true; btn.querySelector('span').textContent='Starting\\u2026';
     var vr=(r.intel_value_range&&typeof r.intel_value_range==='object')?r.intel_value_range:null;
     var val=(vr&&typeof vr.median==='number'&&vr.median>0)?String(vr.median):(r.estimated_value!=null?String(r.estimated_value):'');
+    // A recompete favorite is saved under its contract_id (CONT_AWD_...), which the pipeline writer
+    // rejects as a notice id: the pursuit would get no notice_id and no duplicate protection. Key it
+    // on the PIID instead, the same id the map's "Track this recompete" uses.
+    var _pnid=nid, _rec='';
+    try{ if(typeof recordKind==='function'&&recordKind(r)==='recompete'){ var _od=r.opportunity_data||{}; var _piid=String(_od.solicitationNumber||'').replace(/\\s*\\(\\+\\d+\\s*more\\)\\s*$/i,'').trim(); if(_piid){ _pnid=_piid; _rec=_piid; } } }catch(e){}
     var body={
       user_email: em,
-      notice_id: nid,
-      title: realTitle(r)||o.sol||('Saved opportunity '+nid),
+      notice_id: _pnid,
+      // Recompetes get the same title and source as the map's "Track this recompete"
+      // (src/lib/recompete/pursuit-key.ts), whichever surface creates the row first.
+      title: _rec ? ('Recompete: '+(realTitle(r)||'Awarded contract')+' \\u00b7 '+_rec) : (realTitle(r)||o.sol||('Saved opportunity '+nid)),
       agency: r.agency||'',
       naics_code: o.naics||'',
       set_aside: o.set||'',
       response_deadline: r.response_deadline||null,  // unknown = null, never '' (#1705: '' 500s the TIMESTAMPTZ insert)
       value_estimate: val,
       notice_type: r.notice_type||'',
-      source: 'saved_inbox'
+      source: _rec ? 'recompete_map' : 'saved_inbox'
     };
     // 1) CREATE the pursuit. 2) ONLY on 2xx, DELETE the favorite. Never remove-first.
     fetch('/api/pipeline',{method:'POST',headers:hdrs(),body:JSON.stringify(body)})
-      .then(function(res){ if(!res.ok)throw new Error('pipeline '+res.status); return res.json(); })
+      // 409 = already in My Pursuits (e.g. "Track this recompete" created it). The pursuit
+      // exists, so finish the MOVE: drop the favorite instead of showing an error.
+      .then(function(res){ if(res.status===409)return {}; if(!res.ok)throw new Error('pipeline '+res.status); return res.json(); })
       .then(function(){
         // GROUNDED: the Saved->Pursuit funnel hop, emitted only after the pipeline POST succeeded.
         track('start_pursuit_clicked', { notice_id:nid, journey_id:journeyId(nid) });

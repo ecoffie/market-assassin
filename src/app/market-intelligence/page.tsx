@@ -557,7 +557,7 @@ function MarketIntelligenceContent() {
                 </td>
                 <td className="py-4 px-3 text-center bg-(--mp-wash)">
                   <a
-                    href="mailto:hello@getmindy.ai?subject=MI%20Enterprise%20Inquiry"
+                    href="/contact-sales"
                     className="inline-block px-4 py-2 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-semibold transition-colors text-xs"
                   >
                     Contact Sales

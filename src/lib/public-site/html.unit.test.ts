@@ -12,11 +12,11 @@ const doc = (html: string) => new JSDOM(`<!doctype html><body>${html}</body>`).w
 const hrefs = (root: ParentNode) => [...root.querySelectorAll('a[href]')].map((a) => a.getAttribute('href'));
 
 describe('raw-HTML public shell', () => {
-  it('renders the same header links, in the same order, as PublicHeader', () => {
+  it('renders the homepage top bar links, in order', () => {
     const d = doc(mpRawHeaderHtml());
-    const header = d.querySelector('header.mp-head[data-mp-chrome]')!;
+    const header = d.querySelector('[data-mp-chrome] header.mp-head')!;
     expect(header).toBeTruthy();
-    const expected = [...MP_HEADER_PRODUCT_LINKS.map((l) => l.href), '/', ...MP_HEADER_ACCOUNT_LINKS.map((l) => l.href)];
+    const expected = ['/', ...MP_HEADER_PRODUCT_LINKS.map((l) => l.href), ...MP_HEADER_ACCOUNT_LINKS.map((l) => l.href), '/signup'];
     expect(hrefs(header).slice(0, expected.length)).toEqual(expected);
     expect(header.querySelector('.mp-logo img')?.getAttribute('src')).toBe('/brand/mindy-logo-icon.png');
   });

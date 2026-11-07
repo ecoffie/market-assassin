@@ -68,7 +68,8 @@ describe('tracking a buy actually saves', () => {
     expect(mapCode).not.toContain('solicitation_number');
     // notice_id IS the key and must survive.
     expect(map).toContain('notice_id:CUR.id');
-    expect(map).toContain('notice_id:o.sol');
+    // The popup save that posted notice_id:o.sol was window.savePursuit, which had ZERO call
+    // sites and was deleted 2026-11-06 — every live save goes through saveReq (notice_id:CUR.id).
   });
 
   it('the API drops an unknown column instead of 500ing the save', () => {

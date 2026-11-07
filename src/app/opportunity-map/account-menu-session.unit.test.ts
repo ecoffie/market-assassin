@@ -42,9 +42,9 @@ async function mount(opts: { token?: string | null; meStatus?: number; path?: st
 const DAY = 24 * 60 * 60 * 1000;
 
 describe('account chip reflects a LIVE session, not a present token', () => {
-  it('no token → Log In, no /me call', async () => {
+  it('no token → Sign up free, no /me call', async () => {
     const { btn, fetchMock } = await mount({ token: null });
-    expect(btn.textContent).toBe('Log In');
+    expect(btn.textContent).toBe('Sign up free');
     expect(fetchMock.mock.calls.some((c) => String(c[0]).startsWith('/api/app/me'))).toBe(false);
   });
 
@@ -54,16 +54,16 @@ describe('account chip reflects a LIVE session, not a present token', () => {
     expect(btn.classList.contains('mindy-acct-signin')).toBe(false);
   });
 
-  it('expired token → Log In (was: initials), and it never asks /me', async () => {
+  it('expired token → Sign up free (was: initials), and it never asks /me', async () => {
     const { btn, fetchMock } = await mount({ token: token({ email: 'jb@example.com', exp: Date.now() - 1000 }) });
-    expect(btn.textContent).toBe('Log In');
+    expect(btn.textContent).toBe('Sign up free');
     expect(btn.classList.contains('mindy-acct-signin')).toBe(true);
     expect(fetchMock.mock.calls.some((c) => String(c[0]).startsWith('/api/app/me'))).toBe(false);
   });
 
-  it('unexpired token the server rejects (/me 401) → Log In', async () => {
+  it('unexpired token the server rejects (/me 401) → Sign up free', async () => {
     const { btn, w } = await mount({ token: token({ email: 'jb@example.com', exp: Date.now() + DAY }), meStatus: 401 });
-    expect(btn.textContent).toBe('Log In');
+    expect(btn.textContent).toBe('Sign up free');
     expect(w.document.getElementById('mindyAcctHd')!.style.display).toBe('none');
   });
 
@@ -84,7 +84,7 @@ describe('account chip reflects a LIVE session, not a present token', () => {
     expect(btn.classList.contains('mindy-acct-signin')).toBe(false);
   });
 
-  it('Log In from an expired session is the sign-in action (menu stays closed), returning here via ?next=', async () => {
+  it('Sign up free from an expired session opens the sign-in pop-up (menu stays closed), returning here via ?next=', async () => {
     const { btn, w } = await mount({ token: token({ email: 'jb@example.com', exp: Date.now() - 1000 }), path: '/learn/find-your-buyers' });
     let opened = '';
     (w as unknown as { openSignInModal: (t: string) => void }).openSignInModal = (t) => { opened = t; };
@@ -93,5 +93,48 @@ describe('account chip reflects a LIVE session, not a present token', () => {
     expect(w.document.getElementById('mindyAcctMenu')!.classList.contains('open')).toBe(false);
     // Without a modal on the page (e.g. /learn) it navigates to /app with this page as next.
     expect(ACCOUNT_MENU_JS).toContain('location.href="/app?next="+encodeURIComponent(location.pathname+location.search)');
+  });
+});
+
+describe('logged-out top bar (Zoom-style)', () => {
+  it('no token → html.mindy-anon (rail hidden) + Contact sales · Sign in · Sign up free, in that order', async () => {
+    const { w } = await mount({ token: null });
+    expect(w.document.documentElement.classList.contains('mindy-anon')).toBe(true);
+    const wrap = w.document.getElementById('mindyAcct')!;
+    const signIn = w.document.getElementById('mindyAnonSignIn')!;
+    const sales = w.document.getElementById('mindyAnonSales')!;
+    expect(signIn.textContent).toBe('Sign in');
+    expect(sales.textContent).toBe('Contact sales');
+    expect(sales.nextElementSibling).toBe(signIn);
+    expect(signIn.nextElementSibling).toBe(wrap);
+  });
+
+  it('a valid session never gets the anon chrome', async () => {
+    const { w } = await mount({ token: token({ email: 'jb@example.com', exp: Date.now() + DAY }) });
+    expect(w.document.documentElement.classList.contains('mindy-anon')).toBe(false);
+    expect(w.document.getElementById('mindyAnonSignIn')).toBeNull();
+  });
+
+  it('Sign in opens the same pop-up; Sign up free opens it on the create-account step', async () => {
+    const { btn, w } = await mount({ token: null });
+    let opened = '';
+    let created = 0;
+    (w as unknown as { openSignInModal: (t: string) => void }).openSignInModal = (t) => { opened = t; };
+    const create = w.document.createElement('a');
+    create.id = 'lgmCreate';
+    create.addEventListener('click', () => { created += 1; });
+    w.document.body.appendChild(create);
+    (w.document.getElementById('mindyAnonSignIn') as HTMLAnchorElement).click();
+    expect(opened).toBe('Log in to Mindy');
+    expect(created).toBe(0);
+    opened = '';
+    btn.click();
+    expect(opened).toBe('Log in to Mindy');
+    expect(created).toBe(1);
+  });
+
+  it('a 401 after paint adds the links only once', async () => {
+    const { w } = await mount({ token: token({ email: 'jb@example.com', exp: Date.now() + DAY }), meStatus: 401 });
+    expect(w.document.querySelectorAll('#mindyAnonSignIn').length).toBe(1);
   });
 });

@@ -50,9 +50,12 @@ export type {
   SavedSearchJobStatus,
 } from './delivery-readiness';
 export {
+  alertDeliveryOutcome,
   composeSearchAlertStatus,
   probeFilterReach,
   readRecipientEvidence,
+  readRecipientSuppression,
+  searchAlertBlock,
 } from './search-delivery-status';
 export type {
   AlertHeadline,

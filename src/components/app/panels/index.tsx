@@ -2,6 +2,7 @@
 
 import { Suspense, lazy } from 'react';
 import type { AppPanel, AppTier } from '../UnifiedSidebar';
+import { parseSettingsSection, parseVaultSection } from '@/lib/app/deep-link-params';
 
 // Lazy load panels for better performance
 const MindyChatPanel = lazy(() => import('./MindyChatPanel'));
@@ -99,7 +100,13 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
       case 'team':
         return <TeamPanel email={email} tier={tier} />;
       case 'settings':
-        return <UnifiedSettingsPanel email={email} tier={tier} />;
+        return (
+          <UnifiedSettingsPanel
+            email={email}
+            tier={tier}
+            initialSection={parseSettingsSection(typeof panelContext?.section === 'string' ? panelContext.section : null)}
+          />
+        );
       case 'proposals':
         return <ProposalsPanel email={email} tier={tier} panelContext={panelContext} />;
       case 'pricing':
@@ -123,7 +130,13 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
       case 'micc-mrr':
         return <MiccMrrPanel email={email || ''} />;
       case 'vault':
-        return <VaultPanel email={email} tier={tier} />;
+        return (
+          <VaultPanel
+            email={email}
+            tier={tier}
+            initialSection={parseVaultSection(typeof panelContext?.section === 'string' ? panelContext.section : null)}
+          />
+        );
       case 'library':
         // Library folded into Vault's "Generated" tab — old deep links land there.
         return <VaultPanel email={email} tier={tier} initialSection="generated" />;

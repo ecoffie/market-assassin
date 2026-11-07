@@ -4,6 +4,7 @@ import { MP_ROOT_PAINT_CSS, MP_SITE_CSS } from '@/lib/public-site/css';
 import { mpFontPreloadHrefs } from '@/lib/public-site/fonts';
 import PublicHeader from './PublicHeader';
 import PublicFooter from './PublicFooter';
+import SwipeDots from './SwipeDots';
 
 /**
  * The frame for every public, indexable React page: cream canvas, homepage header and footer,
@@ -45,6 +46,7 @@ export default function PublicShell({
         </Content>
         {chrome && <PublicFooter />}
       </div>
+      <SwipeDots />
     </>
   );
 }

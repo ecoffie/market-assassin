@@ -223,7 +223,12 @@ const nextConfig: NextConfig = {
               value: 'getmindy.ai',
             },
           ],
-          destination: '/today',
+          // 2026-11-05: the apex now serves the Zoom-style marketing homepage (/home).
+          // Today's Intel stays live at /today and is still MAPS_HOME_PATH, so the Maps
+          // logo and post-signout keep landing signed-in users in the product.
+          // ROLLBACK to the product-as-homepage = set this back to '/today' and
+          // MAPS_HOME_PATH back to '/'.
+          destination: '/home',
         },
       {
         source: '/signin',
@@ -503,6 +508,13 @@ const nextConfig: NextConfig = {
       // 301 (permanent) so any stale link lands on the real flow, no dead form, no lost
       // work. The page.tsx files were deleted alongside this.
       // tasks/smart-profile-dead-table-findings.md.
+      // /today (Today's Intel) retired as a destination 2026-11-06 — every visit goes to the homepage.
+      // Temporary (307) so it can be brought back; MAPS_HOME_PATH in src/lib/mindy/maps-home.ts is '/'.
+      {
+        source: '/today',
+        destination: '/',
+        permanent: false,
+      },
       {
         source: '/profile/setup',
         destination: '/app/onboarding',
