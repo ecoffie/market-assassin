@@ -470,7 +470,10 @@ export function makeTier2Tools(email: string) {
         dataset: totalsScope === 'single_uei' ? 'recipients' : 'recipients_rollup',
         measure: 'total_obligated',
         scope: totalsScope,
-        // Recipient last action — NOT warehouse max and NOT ingest freshness.
+        // How current the data is, then this recipient's own last action: never one date for both.
+        data_current_through: coverageTs.warehouse_max_action_date,
+        recipient_last_action_date: profile.last_action_date ?? null,
+        // Recipient last action — NOT warehouse max and NOT ingest freshness. Kept for existing readers.
         as_of: profile.last_action_date ?? null,
         as_of_meaning: coverageTs.last_recipient_action_meaning,
         warehouse_max_action_date: coverageTs.warehouse_max_action_date,

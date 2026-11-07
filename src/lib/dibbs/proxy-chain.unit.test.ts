@@ -9,7 +9,8 @@ import { join } from 'node:path';
  * The invariants that keep this a cost change and not a coverage change:
  *   1. flag OFF is today's path, byte for byte
  *   2. a later path runs only for files the earlier one did not RESOLVE
- *   3. the paid actor is still reached when both free paths fail (data loss is worse than $)
+ *   3. FAIL-CLOSED (2026-11-02): when both free paths fail the run STOPS — the paid actor
+ *      runs only with an explicit allowApify (it billed $1,537 in four cycles as a fallback)
  *   4. a confirmed-missing window never pays the actor
  *   5. dry-run writes nothing and never bills the actor by accident
  */
@@ -116,12 +117,27 @@ describe('flag ON — proxy → direct → actor, per file', () => {
     expect(r.files?.find((f) => f.file === 'in261008.txt')).toMatchObject({ outcome: 'data', via: 'proxy' });
   });
 
-  it('DATA LOSS IS WORSE THAN COST: both free paths blocked → the existing actor still runs', async () => {
+  it('FAIL-CLOSED: both free paths blocked → stop and report, the actor is NOT called', async () => {
     const d = await import('./direct');
     vi.mocked(d.fetchDibbsDirectReport).mockResolvedValue(report('proxy', { 'in261008.txt': 'blocked', 'in261007.txt': 'blocked' }) as never);
     const actor = stubActor(rfqs('SPEACT', 2500));
     const { ingestDibbs } = await import('./ingest');
     const r = await ingestDibbs(supabaseSpy().client, { maxItems: 2500, daysBack: 2 });
+    expect(actor).not.toHaveBeenCalled();
+    expect(r.fetched).toBe(0);
+    expect(r.source).toBeNull();
+    expect(r.estimatedCostUsd).toBe(0);
+    expect(r.attempts.at(-1)).toMatchObject({ path: 'apify', outcome: 'skipped' });
+    expect(r.attempts.at(-1)!.reason).toMatch(/fail-closed/);
+    expect(r.attempts.at(-1)!.reason).toContain('in261008.txt,in261007.txt');
+  });
+
+  it('the actor still runs when a caller EXPLICITLY passes allowApify', async () => {
+    const d = await import('./direct');
+    vi.mocked(d.fetchDibbsDirectReport).mockResolvedValue(report('proxy', { 'in261008.txt': 'blocked', 'in261007.txt': 'blocked' }) as never);
+    const actor = stubActor(rfqs('SPEACT', 2500));
+    const { ingestDibbs } = await import('./ingest');
+    const r = await ingestDibbs(supabaseSpy().client, { maxItems: 2500, daysBack: 2, allowApify: true });
     expect(actor).toHaveBeenCalledTimes(1);
     const url = String(actor.mock.calls[0][0]);
     expect(url).toContain('build=1.0.40'); // same pinned build
@@ -225,7 +241,8 @@ describe('dry-run — no production writes, no accidental actor bill', () => {
 
 describe('the cron route: dry-run branch writes nothing', () => {
   const ROUTE = readFileSync(join(process.cwd(), 'src/app/api/cron/sync-dibbs/route.ts'), 'utf8');
-  const dryBranch = ROUTE.slice(ROUTE.indexOf('if (dryRun) {'), ROUTE.indexOf('const result = await ingestDibbs(supabase, { maxItems, daysBack, forceApify });'));
+  const LIVE_CALL = 'const result = await ingestDibbs(supabase, { maxItems, daysBack });';
+  const dryBranch = ROUTE.slice(ROUTE.indexOf('if (dryRun) {'), ROUTE.indexOf(LIVE_CALL));
 
   it('returns before any cron outcome, alert, or upsert', () => {
     expect(dryBranch.length).toBeGreaterThan(100);
@@ -239,8 +256,10 @@ describe('the cron route: dry-run branch writes nothing', () => {
   it('only lets a DRY run override the flag or opt into the actor', () => {
     expect(dryBranch).toContain('proxyMode');
     expect(dryBranch).toContain('allowApify');
-    const liveCall = ROUTE.slice(ROUTE.indexOf('const result = await ingestDibbs(supabase, { maxItems, daysBack, forceApify });'));
-    expect(liveCall.split('\n')[0]).not.toMatch(/proxyMode|allowApify|only/);
+    expect(ROUTE).toContain(LIVE_CALL);
+    const liveCall = ROUTE.slice(ROUTE.indexOf(LIVE_CALL));
+    // The LIVE call can never opt into the paid actor, by either flag.
+    expect(liveCall.split('\n')[0]).not.toMatch(/proxyMode|allowApify|forceApify|only/);
   });
 
   it('judges truncation by the actor, never by a whole file', () => {

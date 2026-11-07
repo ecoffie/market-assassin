@@ -186,9 +186,9 @@ export default function AuthorizePage() {
   }, [params, email]);
 
   return (
-    <main className="grid min-h-dvh place-items-center bg-[#0a0f1e] px-6 text-slate-100 [color-scheme:dark]">
+    <main className="grid min-h-dvh place-items-center bg-ground px-6 text-slate-100">
       <div className="w-full max-w-md rounded-2xl border border-white/[0.08] bg-white/[0.02] p-6 text-center">
-        <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-emerald-400 text-lg font-bold text-[#0a0f1e]">M</div>
+        <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-emerald-400 text-lg font-bold text-white">M</div>
 
         {stage === 'loading' && <p className="text-sm text-slate-400">Loading…</p>}
 
@@ -218,7 +218,7 @@ export default function AuthorizePage() {
               href="/app?signup=1"
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400"
+              className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-400"
             >
               Create a free account ↗
             </a>
@@ -268,7 +268,7 @@ export default function AuthorizePage() {
             </button>
             <div className="mt-5 grid grid-cols-2 gap-3">
               <button onClick={deny} className="rounded-xl border border-white/[0.12] px-4 py-2.5 text-sm font-medium text-slate-300 hover:bg-white/[0.04]">Deny</button>
-              <button onClick={allow} className="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">Allow</button>
+              <button onClick={allow} className="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-400">Allow</button>
             </div>
           </>
         )}

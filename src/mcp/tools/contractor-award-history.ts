@@ -23,6 +23,7 @@ import { resolveAwardCorpusByName, type AwardNameCandidate } from '@/lib/contrac
 import { buildCountingBases } from '@/lib/contractor/award-history-shape';
 import { isWellFormedUei } from '@/lib/sam/resolve-uei';
 import { mcpFlags } from '@/lib/mcp/flags';
+import type { BillingOutcome } from '@/lib/mcp/credit-integrity';
 
 export interface ContractorAwardHistoryToolInput {
   company?: string;
@@ -52,12 +53,20 @@ export interface ContractorAwardHistoryToolResult {
       dataset: string;
       measure: string;
       scope: string;
+      data_current_through?: string | null;
+      recipient_last_action_date?: string | null;
       as_of: string | null;
       not_equivalent_to?: string;
     };
     source?: string | null;
+    /** Latest action_date across the whole awards warehouse. null = not attached (unknown). */
+    data_current_through?: string | null;
+    /** This recipient's own most recent action. A quiet recipient is not a stale dataset. */
+    recipient_last_action_date?: string | null;
+    /** Same value as recipient_last_action_date; kept for existing readers. */
     asOf?: string | null;
     as_of_meaning?: string;
+    billing_outcome?: BillingOutcome;
     aggregates_cover?: string | null;
     cache?: string;
     enrichment_status?: 'complete' | 'budget_limited';
@@ -113,6 +122,7 @@ async function byUei(
         award_count: 0,
         total_obligations: 0,
         resolution: 'malformed',
+        billing_outcome: 'nonbillable_invalid_input',
         note: 'UEI must be exactly 12 alphanumeric characters',
       },
     };
@@ -152,9 +162,13 @@ async function byUei(
       resolution: r.resolution,
       match_status: matchStatus,
       source: r.source,
+      data_current_through:
+        (history as { coverage_timestamp?: { warehouse_max_action_date?: string | null } } | null)
+          ?.coverage_timestamp?.warehouse_max_action_date ?? null,
+      recipient_last_action_date: r.asOf,
       asOf: r.asOf,
       as_of_meaning:
-        'Recipient last action_date in the warehouse profile — not the ingest run date.',
+        'Recipient last action_date in the warehouse profile — not the ingest run date. For how current the data is, read data_current_through.',
       aggregates_cover: r.aggregates_cover,
       cache: r.cache,
       ...(history && 'counting_bases' in history
@@ -204,6 +218,8 @@ function withNameResolution(
         dataset: 'recipients',
         measure: 'total_obligated',
         scope: 'single_uei',
+        data_current_through: via._meta.data_current_through ?? null,
+        recipient_last_action_date: via._meta.asOf ?? null,
         as_of: via._meta.asOf ?? null,
         not_equivalent_to: 'recipients_rollup.total_obligated',
       },
@@ -380,6 +396,7 @@ export async function contractorAwardHistory(
         award_count: 0,
         total_obligations: 0,
         resolution: 'malformed',
+        billing_outcome: 'nonbillable_invalid_input',
         note: 'Either company or uei is required',
       },
     };

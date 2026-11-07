@@ -69,8 +69,8 @@ export const MCP_URL = 'https://mcp.getmindy.ai/mcp';
  * action at once, none of them carry meaning. Data viz uses the neutral ramp; status uses
  * its own semantic colours.
  */
-export const SURFACE_1 = 'border border-white/[0.07] bg-[#101728]';
-export const SURFACE_2 = 'border border-white/[0.06] bg-[#0b1120]';
+export const SURFACE_1 = 'border border-white/[0.07] bg-surface';
+export const SURFACE_2 = 'border border-white/[0.06] bg-ground';
 export const SURFACE_3 = 'bg-white/[0.045]';
 
 /** Card shell — the default container for a block of content in the console. */
@@ -111,7 +111,7 @@ export function McpNav({ active, signedIn, balance }: { active: 'about' | 'conne
   return (
     <header className="flex items-center justify-between gap-4">
       <Link href="/mcp" className="flex items-center gap-3">
-        <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-400 text-sm font-bold text-[#0a0f1e]">M</div>
+        <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-400 text-sm font-bold text-white">M</div>
         <div className="hidden sm:block">
           <div className="text-[15px] font-semibold leading-tight">Mindy MCP</div>
           <div className="text-xs text-slate-400">Federal contracting intel for any AI agent</div>
@@ -129,7 +129,7 @@ export function McpNav({ active, signedIn, balance }: { active: 'about' | 'conne
             Account
           </Link>
         ) : (
-          <a href="/app" className="ml-1 rounded-lg bg-emerald-500 px-3 py-1.5 font-semibold text-[#06120c] hover:bg-emerald-400">Sign in</a>
+          <a href="/app" className="ml-1 rounded-lg bg-emerald-500 px-3 py-1.5 font-semibold text-white hover:bg-emerald-400">Sign in</a>
         )}
       </nav>
     </header>
@@ -144,7 +144,7 @@ export function AppCluster() {
     list.map((x, i) => (
       <div
         key={side + i}
-        className={`grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br ${x.c} text-lg font-semibold text-[#0a0f1e] ring-4 ring-[#0a0f1e]`}
+        className={`grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br ${x.c} text-lg font-semibold text-white ring-4 ring-ground`}
       >
         {x.t}
       </div>
@@ -159,7 +159,7 @@ export function AppCluster() {
         ],
         'l',
       )}
-      <div className="z-10 grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-emerald-400 text-2xl font-bold text-[#0a0f1e] shadow-lg ring-4 ring-[#0a0f1e]">
+      <div className="z-10 grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-emerald-400 text-2xl font-bold text-white shadow-lg ring-4 ring-ground">
         M
       </div>
       {flank(

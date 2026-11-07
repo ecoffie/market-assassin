@@ -34,6 +34,7 @@ import type { Implementation } from '@modelcontextprotocol/sdk/types.js';
 import { after } from 'next/server';
 import { grantSignupCreditsIfFirst } from '@/lib/mcp/credits';
 import { runMeteredTool } from '@/lib/mcp/metered';
+import { annotateIgnoredParams, looseInputSchema, partitionToolArgs } from '@/lib/mcp/unknown-params';
 import { maybeAutoRecharge } from '@/lib/mcp/autorecharge';
 import { mcpRegistrationList } from '@/lib/mcp/tool-schemas';
 import { verifyApiKey } from '@/lib/mcp/api-keys';
@@ -102,7 +103,8 @@ const baseHandler = createMcpHandler(
           // underscore split — "Get Pricing Intel (GSA CALC)" beats "Get Pricing Intel".
           title: tool.title,
           description: tool.description,
-          inputSchema: tool.inputSchema,
+          // Loose so an undeclared key reaches the handler to be named; only declared keys reach the tool.
+          inputSchema: looseInputSchema(tool.inputSchema),
           // Per-tool annotations (see tool-schemas.ts). NOT a blanket read-only:
           // add_contacts_to_crm writes to the user's CRM and must declare
           // destructiveHint so Claude prompts before running it.
@@ -142,10 +144,15 @@ const baseHandler = createMcpHandler(
           // Metered dispatch: pre-checks the credit balance, runs the tool via the
           // registry, debits its price on success, logs the call. Rejects with
           // insufficient_credits before doing any work.
+          const { known, unrecognized } = partitionToolArgs(args, Object.keys(tool.inputSchema));
           const outcome = await runMeteredTool(
             tool.name,
-            (args ?? {}) as Record<string, unknown>,
-            { userEmail: identity.userEmail, apiKeyId: identity.keyId ?? null },
+            known,
+            {
+              userEmail: identity.userEmail,
+              apiKeyId: identity.keyId ?? null,
+              ...(unrecognized.length ? { unrecognizedParams: unrecognized } : {}),
+            },
           );
           if (!outcome.ok) {
             // Commercial refusals (insufficient credits / requires Pro) MUST NOT set
@@ -159,8 +166,9 @@ const baseHandler = createMcpHandler(
           // (null for free tools like get_balance). Kept as a SEPARATE text block
           // so the first block stays pure JSON for agents that parse it, and
           // mirrored into structuredContent._meta.credits for machine reads.
+          const result = annotateIgnoredParams(outcome.result, unrecognized);
           const content: { type: 'text'; text: string }[] = [
-            { type: 'text', text: JSON.stringify(outcome.result, null, 2) },
+            { type: 'text', text: JSON.stringify(result, null, 2) },
           ];
           // Pooled calls get the TEAM footer (never a personal top-up link). Ownership is
           // only looked up when the pool is low, where the remedy differs by role.
@@ -186,9 +194,9 @@ const baseHandler = createMcpHandler(
           return {
             content,
             structuredContent: {
-              ...outcome.result,
+              ...result,
               _meta: {
-                ...((outcome.result as { _meta?: Record<string, unknown> })._meta ?? {}),
+                ...((result as { _meta?: Record<string, unknown> })._meta ?? {}),
                 credits: { charged: outcome.creditsCharged, remaining: outcome.balance },
               },
             },

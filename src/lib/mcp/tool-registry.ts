@@ -1361,10 +1361,12 @@ const FEDERAL_EVENTS_TOOL_DEF = {
     name: 'search_federal_events',
     description:
       'Upcoming federal-contracting EVENTS for an agency — industry days, matchmaking, sources-sought, and ' +
-      'association conferences. "Where do I show up in person to win this buyer?" Returns dated SAM.gov Special ' +
-      'Notices (source="sam", DoDAAC-office-anchored, trust the date) and, when include_ai_discovery is set, ' +
-      'web-discovered conferences (source="ai", carry a confidence score — verify before attending). Each event ' +
-      'has title, type, date, location, registration URL, and the decoded buying office. grounded=false when no ' +
+      'association conferences. "Where do I show up in person to win this buyer?" Returns dated SAM.gov ' +
+      'notices (source="sam", DoDAAC-office-anchored, trust the date), curated conferences with a date read from ' +
+      'the organizer\'s page (source="catalog"), and, when include_ai_discovery is set, ' +
+      'web-discovered conferences (source="ai", carry a confidence score — verify before attending). Attendable ' +
+      'events are listed first; event_type="rfi" rows are sources-sought notices to respond to, not events to attend. ' +
+      'Each event has title, type, date, location, registration URL, and the decoded buying office. grounded=false when no ' +
       'events match — widen months_ahead or enable AI discovery. Set include_ics to also get a base64 .ics ' +
       'calendar of the dated events — "put a year of federal events on my calendar" in one call.',
     parameters: {
@@ -1373,7 +1375,7 @@ const FEDERAL_EVENTS_TOOL_DEF = {
         agency: { type: 'string', description: 'Agency name, e.g. "Department of Defense", "Navy", "GSA". Messy raw names resolve via normalization.' },
         months_ahead: { type: 'number', description: 'Look-ahead window in months (default 4, max 12).' },
         include_ai_discovery: { type: 'boolean', description: 'Also run a web search for association conferences not in SAM (slower, best-effort). Default false.' },
-        limit: { type: 'number', description: 'Max SAM events to return (default 50, max 100). Local table — a larger set has no per-call cost.' },
+        limit: { type: 'number', description: 'Max SAM rows to return (default 50, max 100). Attendable events fill it first; notices keep at least a fifth of it when they exist. Local table — a larger set has no per-call cost.' },
         include_ics: {
           type: 'boolean',
           description:

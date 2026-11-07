@@ -16,6 +16,8 @@ import { createHash } from 'crypto';
 export interface IcsEventInput {
   /** YYYY-MM-DD. Anything else (null/empty/malformed) → skipped, never invented. */
   date: string | null;
+  /** Inclusive last day of a multi-day event (YYYY-MM-DD). Invalid or before `date` → one-day event. */
+  endDate?: string | null;
   title: string;
   location?: string | null;
   description?: string | null;
@@ -124,7 +126,8 @@ export function buildEventsIcs(events: IcsEventInput[], now: Date = new Date()):
     lines.push(`UID:${eventUid(e, icsDate)}`);
     lines.push(`DTSTAMP:${stamp}`);
     lines.push(`DTSTART;VALUE=DATE:${icsDate}`);
-    lines.push(`DTEND;VALUE=DATE:${nextDay(icsDate)}`);
+    const icsEnd = e.endDate ? toIcsDate(e.endDate.trim()) : null;
+    lines.push(`DTEND;VALUE=DATE:${nextDay(icsEnd && icsEnd >= icsDate ? icsEnd : icsDate)}`);
     lines.push(`SUMMARY:${escapeText(title)}`);
     if (e.location?.trim()) lines.push(`LOCATION:${escapeText(e.location.trim())}`);
     if (descParts.length) lines.push(`DESCRIPTION:${escapeText(descParts.join('\n\n'))}`);

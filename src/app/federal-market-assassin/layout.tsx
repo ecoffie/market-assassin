@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import LightThemeScope from '@/components/theme/LightThemeScope';
 
 export const metadata: Metadata = {
   title: 'Federal Market Assassin | GovCon Giants',
@@ -10,5 +11,5 @@ export default function FederalMarketAssassinLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  return <LightThemeScope>{children}</LightThemeScope>;
 }

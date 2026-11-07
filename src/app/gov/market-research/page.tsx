@@ -345,7 +345,7 @@ export default function GovMarketResearchPage() {
   const activityMeasured = pool.filter((b) => b.lastActionDate).length;
 
   return (
-    <div className="min-h-screen bg-[#070c10] text-slate-200">
+    <div className="min-h-screen bg-ground text-slate-200">
       <div className="mx-auto max-w-6xl px-6 py-10">
         <header className="mb-8">
           <div className="text-[11px] uppercase tracking-[0.2em] text-emerald-400">Mindy for Government</div>
@@ -476,7 +476,7 @@ export default function GovMarketResearchPage() {
                 className="h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3.5 text-[14px] text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30" />
             </label>
             <button onClick={analyze} disabled={loading || !naics || !email}
-              className="h-11 shrink-0 rounded-lg bg-emerald-500 px-6 text-sm font-semibold text-[#06120c] transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40">
+              className="h-11 shrink-0 rounded-lg bg-emerald-500 px-6 text-sm font-semibold text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40">
               {loading ? 'Analyzing market…' : 'Analyze Market'}
             </button>
           </div>
@@ -867,7 +867,7 @@ export default function GovMarketResearchPage() {
                 <div className="mt-5 flex flex-wrap gap-3">
                   <button onClick={() => downloadOutreach(true)}
                     disabled={gap.notInSample === 0}
-                    className="rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40">
+                    className="rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40">
                     Export outreach list — not in sample ({gap.notInSample})
                   </button>
                   <button onClick={() => downloadOutreach(false)}
@@ -894,7 +894,7 @@ export default function GovMarketResearchPage() {
               </p>
               <div className="mt-4 flex flex-wrap gap-3">
                 <button onClick={() => downloadMemo('docx')}
-                  className="rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] transition hover:bg-emerald-400">
+                  className="rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-400">
                   Download memo (.docx)
                 </button>
                 <button onClick={() => downloadMemo('pdf')}

@@ -339,6 +339,7 @@ describe('describeCoverageTimestamp', () => {
     expect(d.coverage_completeness).toBe('not_established');
     expect(d.coverage_complete_established_meaning).toMatch(/Always false|do NOT establish/i);
     expect(d.freshness_note).toMatch(/Three clocks/i);
+    expect(d.freshness_note).toMatch(/^Data current through 2026-09-18; this recipient's last action is /);
     expect(d.freshness_note).toMatch(/freshness_evidence_available=true/i);
     expect(d.freshness_note).toMatch(/coverage_completeness=not_established/i);
   });

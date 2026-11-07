@@ -40,6 +40,60 @@ beforeEach(() => {
 });
 
 describe('contractorAwardHistory — UEI path', () => {
+  it('leads with how current the DATA is and labels the recipient\'s own last action separately', async () => {
+    mockShared.mockResolvedValue({
+      uei: 'FCJCDUZV7RM3',
+      resolution: 'found',
+      name: 'EXCELL',
+      history: {
+        contractor: { company: 'EXCELL' },
+        summary: { awardCount: 3, totalObligations: 10 },
+        recentAwards: [],
+        coverage_timestamp: { warehouse_max_action_date: '2026-10-30' },
+      },
+      source: 'bigquery_normalized',
+      asOf: '2026-08-13',
+      aggregates_cover: 'bq_ingest',
+      degraded: false,
+      cache: 'warm',
+    });
+    const { contractorAwardHistory } = await load();
+    const r = await contractorAwardHistory({ uei: 'FCJCDUZV7RM3' });
+    expect(r._meta.data_current_through).toBe('2026-10-30');
+    expect(r._meta.recipient_last_action_date).toBe('2026-08-13');
+    expect(r._meta.asOf).toBe('2026-08-13'); // kept for existing readers
+    const keys = Object.keys(r._meta);
+    expect(keys.indexOf('data_current_through')).toBeLessThan(keys.indexOf('asOf'));
+  });
+
+  it('an unattached warehouse date is unknown, never the recipient date standing in for it', async () => {
+    mockShared.mockResolvedValue({
+      uei: 'FCJCDUZV7RM3',
+      resolution: 'found',
+      name: 'EXCELL',
+      history: { contractor: { company: 'EXCELL' }, summary: { awardCount: 1, totalObligations: 1 }, recentAwards: [] },
+      source: 'bigquery_normalized',
+      asOf: '2026-08-13',
+      aggregates_cover: 'bq_ingest',
+      degraded: false,
+      cache: 'warm',
+    });
+    const { contractorAwardHistory } = await load();
+    const r = await contractorAwardHistory({ uei: 'FCJCDUZV7RM3' });
+    expect(r._meta.data_current_through).toBeNull();
+    expect(r._meta.recipient_last_action_date).toBe('2026-08-13');
+  });
+
+  it('a malformed UEI and a call with no identifier are never billable', async () => {
+    const { contractorAwardHistory } = await load();
+    const { classifyBillingOutcome } = await import('@/lib/mcp/credit-integrity');
+    for (const input of [{ uei: 'short' }, {}]) {
+      const r = await contractorAwardHistory(input);
+      expect(r._meta.resolution).toBe('malformed');
+      expect(classifyBillingOutcome(r)).toBe('nonbillable_invalid_input');
+    }
+  });
+
   it('uses shared getContractorHistoryByUei with budgeted cold policy + actor', async () => {
     mockShared.mockResolvedValue({
       uei: 'FCJCDUZV7RM3',
