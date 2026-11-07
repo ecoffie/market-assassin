@@ -14,6 +14,8 @@
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { NextRequest } from 'next/server';
+// Scheduled job routes authorize only the CRON_SECRET bearer the dispatcher sends.
+process.env.CRON_SECRET = 'test-cron-secret';
 
 type Row = Record<string, unknown>;
 
@@ -179,7 +181,7 @@ beforeAll(async () => {
     clock = day;
     vi.setSystemTime(new Date(day));
     if (day.startsWith('2026-10-04')) ss.open.push({ notice_id: 'N-NEW-2', title: 'Network support', department: 'DEPT OF X', naics_code: '541511', posted_date: '2026-10-04T00:00:00Z' });
-    await savedSearchAlerts(new NextRequest('https://x/api/cron/saved-search-alerts?limit=50', { headers: { 'x-cron-dispatch': '1' } }));
+    await savedSearchAlerts(new NextRequest('https://x/api/cron/saved-search-alerts?limit=50', { headers: { authorization: 'Bearer test-cron-secret', 'x-cron-dispatch': '1' } }));
   }
   out.runs = (tables.cron_job_runs || []).filter((r) => r.job_name === 'saved-search-alerts');
 

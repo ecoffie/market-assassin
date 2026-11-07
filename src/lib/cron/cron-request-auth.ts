@@ -53,3 +53,38 @@ export async function authorizeCronRequest(
 
   return { ok: false, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
 }
+
+/** True only when ADMIN_PASSWORD is set AND `?password=` matches it (constant-time). */
+export function hasValidAdminPassword(request: Pick<NextRequest, 'url'>): boolean {
+  const expected = process.env.ADMIN_PASSWORD;
+  if (!expected) return false;
+  const given = new URL(request.url).searchParams.get('password') ?? '';
+  return given.length > 0 && constantTimeEqual(given, expected);
+}
+
+/**
+ * Server-side authorization for scheduled job routes (2026-11-07).
+ *
+ * Accepts ONLY a server-held secret: the CRON_SECRET bearer (what /api/cron/dispatch and Vercel
+ * cron send) or, for routes that already support manual runs, `?password=ADMIN_PASSWORD`.
+ * Request headers such as `x-cron-dispatch` and `x-vercel-cron` are set by the caller and are
+ * never authorization; a route may still read them as a hint AFTER this check passes.
+ * Fails closed when the secrets are unset. No non-production bypass.
+ */
+export function isAuthorizedJobRequest(
+  request: Pick<NextRequest, 'headers' | 'url'>,
+  opts: { allowAdminPassword?: boolean } = {},
+): boolean {
+  if (hasValidCronSecret(request)) return true;
+  return opts.allowAdminPassword !== false && hasValidAdminPassword(request);
+}
+
+/** null when authorized, else a bare 401 to return before any work, write, email or paid call. */
+export function requireJobAuth(
+  request: Pick<NextRequest, 'headers' | 'url'>,
+  opts: { allowAdminPassword?: boolean } = {},
+): NextResponse | null {
+  return isAuthorizedJobRequest(request, opts)
+    ? null
+    : NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+}

@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { isDue, isMissed } from '@/lib/cron/cron-expr';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
   const tick = searchParams.get('tick') || 'manual';
   const dryRun = searchParams.get('dry_run') === 'true';
 
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const authorized =
     password === ADMIN_PASSWORD ||
     (process.env.CRON_SECRET && cronSecret === process.env.CRON_SECRET) ||

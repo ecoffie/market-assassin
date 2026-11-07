@@ -10,6 +10,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { SUPPRESSION_CLASSES } from '@/lib/cron/watchdog-incidents';
+// Scheduled job routes authorize only the CRON_SECRET bearer the dispatcher sends.
+process.env.CRON_SECRET = 'test-cron-secret';
 
 type Row = Record<string, unknown>;
 
@@ -133,7 +135,7 @@ async function cronThenWatchdog(searches: Row[], blockReason: string | null) {
   for (const day of ['2026-10-03T11:00:27Z', '2026-10-04T11:00:28Z']) {
     clock = day;
     vi.setSystemTime(new Date(day));
-    await savedSearchAlerts(new NextRequest('https://x/api/cron/saved-search-alerts?limit=50', { headers: { 'x-cron-dispatch': '1' } }));
+    await savedSearchAlerts(new NextRequest('https://x/api/cron/saved-search-alerts?limit=50', { headers: { authorization: 'Bearer test-cron-secret', 'x-cron-dispatch': '1' } }));
   }
   const runs = (tables.cron_job_runs || []).filter((r) => r.job_name === 'saved-search-alerts');
   vi.setSystemTime(new Date('2026-10-05T06:00:29Z'));

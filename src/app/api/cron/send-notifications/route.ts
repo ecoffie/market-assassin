@@ -43,6 +43,7 @@ import agencySatData from '@/data/agency-sat-friendliness.json';
 import { persistSentAlert } from '@/lib/alerts/delivery-log';
 import { shouldShowAlertSetupNudges } from '@/lib/alerts/profile-setup';
 import { MINDY_APP_URL, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 // SAT Badge helper
 /**
@@ -545,7 +546,7 @@ export async function GET(request: NextRequest) {
     return runNotificationJob({ testEmail: email, skipTimezoneCheck: true });
   }
 
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const authHeader = request.headers.get('authorization');
   const hasCronSecret = authHeader === `Bearer ${process.env.CRON_SECRET}`;
 

@@ -28,6 +28,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getReadClient, getWriteClient } from '@/lib/supabase/server-clients';
 import { parseMapFilters, applyMapFilters } from '@/lib/opportunities/map-filters';
 import { normalizeStateCode } from '@/lib/utils/us-states';
+import { requireJobAuth } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -50,6 +51,8 @@ interface OpenRow {
 }
 
 export async function GET(request: NextRequest) {
+  const denied = requireJobAuth(request);
+  if (denied) return denied;
   const read = getReadClient();
   const write = getWriteClient();
   const url = new URL(request.url);

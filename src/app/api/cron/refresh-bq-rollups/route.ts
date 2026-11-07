@@ -20,6 +20,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -126,7 +127,7 @@ const STATEMENTS: Array<{ label: string; sql: string }> = [
 ];
 
 function authorized(request: NextRequest): boolean {
-  if (request.headers.get('x-vercel-cron') === '1') return true;
+  if (hasValidCronSecret(request)) return true;
   const auth = request.headers.get('authorization');
   if (auth && auth === `Bearer ${process.env.CRON_SECRET}`) return true;
   const pw = request.nextUrl.searchParams.get('password');

@@ -37,6 +37,7 @@ import {
   listPooledOrgsBySubscription, replenishPool, routeSubscriptionGrants, isPoolSchemaMissing,
   type PooledOrg,
 } from '@/lib/mcp/team-pools';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -171,7 +172,7 @@ async function buildTargets(month: string): Promise<{
 }
 
 export async function GET(request: NextRequest) {
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const hasSecret = request.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET}`;
   const isAdmin = request.nextUrl.searchParams.get('password') === process.env.ADMIN_PASSWORD;
   if (!isVercelCron && !hasSecret && !isAdmin) {

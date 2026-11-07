@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { sendEmail } from '@/lib/send-email';
 import { MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -31,7 +32,7 @@ function normalizeEmail(email: string) {
 }
 
 function isAuthorized(request: NextRequest) {
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const authHeader = request.headers.get('authorization');
   const hasCronSecret = authHeader === `Bearer ${process.env.CRON_SECRET}`;
   const hasPassword = request.nextUrl.searchParams.get('password') === ADMIN_PASSWORD;

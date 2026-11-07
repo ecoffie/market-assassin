@@ -48,6 +48,7 @@ import { sendOpsAlert } from '@/lib/ops-alert';
 import { isMissed } from '@/lib/cron/cron-expr';
 import { runWatchdogIncidents, type WatchdogObservation } from '@/lib/cron/watchdog-incidents';
 import { createSupabaseIncidentStore } from '@/lib/cron/watchdog-incident-store';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 const INCIDENT_SOURCE = 'dispatcher-watchdog';
 
@@ -115,7 +116,7 @@ export async function GET(request: NextRequest) {
   const password = searchParams.get('password');
   const cronSecret = request.headers.get('authorization')?.replace('Bearer ', '');
   const dryRun = searchParams.get('dry_run') === 'true';
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
 
   const authorized =
     password === ADMIN_PASSWORD ||

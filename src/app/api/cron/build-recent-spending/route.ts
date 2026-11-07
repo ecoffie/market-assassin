@@ -13,9 +13,10 @@
  * Every row is a real transaction (real amount, real generated_internal_id →
  * usaspending.gov/award/<id> proof) — grounded.
  */
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { getWriteClient } from '@/lib/supabase/server-clients';
+import { requireJobAuth } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -37,7 +38,9 @@ interface TxnRow {
   generated_internal_id: string | null;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const denied = requireJobAuth(request);
+  if (denied) return denied;
   const end = new Date();
   const start = new Date(end.getTime() - WINDOW_DAYS * 86400_000);
   const day = (d: Date) => d.toISOString().slice(0, 10);

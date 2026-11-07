@@ -25,6 +25,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendOpsAlert } from '@/lib/ops-alert';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -121,7 +122,7 @@ interface TypeReport {
 }
 
 export async function GET(request: NextRequest) {
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const passwordOk = request.nextUrl.searchParams.get('password') === process.env.ADMIN_PASSWORD;
   // The cron dispatcher fires this route with a Bearer CRON_SECRET header
   // (see /api/cron/dispatch). Without this it returned 401 every night and the

@@ -26,6 +26,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -48,7 +49,7 @@ function getSupabase() {
 function authed(request: NextRequest): boolean {
   const pw = request.nextUrl.searchParams.get('password');
   const bearer = request.headers.get('authorization')?.replace('Bearer ', '');
-  const isCron = request.headers.get('x-cron-dispatch') === '1'
+  const isCron = hasValidCronSecret(request)
     || (!!process.env.CRON_SECRET && bearer === process.env.CRON_SECRET);
   return (!!pw && pw === process.env.ADMIN_PASSWORD) || isCron;
 }

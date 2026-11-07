@@ -40,6 +40,7 @@ import {
   getExecutivesForRecipient,
   recipientSlug,
 } from '@/lib/bigquery/recipients';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -55,7 +56,7 @@ const BATCH_SIZE = 200;
 const CURSOR_KEY = 'cron:warm-contractor-pages:cursor';
 
 function authorized(request: NextRequest): boolean {
-  if (request.headers.get('x-vercel-cron') === '1') return true;
+  if (hasValidCronSecret(request)) return true;
   const auth = request.headers.get('authorization');
   if (auth && auth === `Bearer ${process.env.CRON_SECRET}`) return true;
   const pw = request.nextUrl.searchParams.get('password');

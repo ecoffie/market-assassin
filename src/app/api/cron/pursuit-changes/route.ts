@@ -32,6 +32,7 @@ import {
   indexFamiliesByNoticeId,
   type FamilyNoticeRow,
 } from '@/lib/sam/solicitation-family';
+import { requireJobAuth } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -99,6 +100,8 @@ const BATCH_SIZE = parseInt(process.env.PURSUIT_CHANGES_BATCH_SIZE || '100', 10)
 const TIME_BUDGET_MS = 45_000; // stay well under the 60s function cap
 
 export async function GET(request: NextRequest) {
+  const denied = requireJobAuth(request);
+  if (denied) return denied;
   const startedAt = Date.now();
   const supabase = sb();
   const testEmail = request.nextUrl.searchParams.get('email');

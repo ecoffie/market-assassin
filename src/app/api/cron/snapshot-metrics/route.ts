@@ -23,6 +23,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getReadClient, getWriteClient, getCountClient } from '@/lib/supabase/server-clients';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
+import { requireJobAuth } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -58,6 +59,8 @@ async function fetchAll<T>(q: (from: number, to: number) => PromiseLike<{ data: 
 }
 
 export async function GET(request: NextRequest) {
+  const denied = requireJobAuth(request);
+  if (denied) return denied;
   const supabase = sbRead();
   const url = new URL(request.url);
 

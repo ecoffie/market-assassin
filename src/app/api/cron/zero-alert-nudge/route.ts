@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendZeroAlertNudge } from '@/lib/mindy/account-setup';
 import { isCampaignExcludedEmail } from '@/lib/mindy/campaign-exclusions';
+import { requireJobAuth } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -58,6 +59,8 @@ async function fetchAll<T>(q: (from: number, to: number) => PromiseLike<{ data: 
 }
 
 export async function GET(request: NextRequest) {
+  const denied = requireJobAuth(request);
+  if (denied) return denied;
   const url = new URL(request.url);
   const execute = url.searchParams.get('mode') === 'execute';
   const limit = Math.max(1, Math.min(200, Number(url.searchParams.get('limit') || 50)));
