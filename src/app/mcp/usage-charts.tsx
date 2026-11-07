@@ -8,7 +8,7 @@
  * identity charts — so every bar is ONE brand hue (emerald), values are direct-labeled,
  * and names wear slate ink. No per-tool rainbow (that would be cycling categorical color
  * across 15+ tools). Lightweight CSS/SVG bars — no chart lib, no hydration cost — with
- * native hover tooltips. Dark surface only (the whole /mcp page is [color-scheme:dark]).
+ * native hover tooltips. Dark surface only (the whole /mcp page is).
  */
 
 import { CARD, SURFACE_1, SURFACE_2 } from './catalog-ui';
@@ -166,7 +166,7 @@ export function UsageOverTime({ byDay, chartDays = 7 }: { byDay: DaySpend[]; cha
                   />
                   {/* value on hover only — no permanent label clutter */}
                   {d.credits > 0 && (
-                    <span className="pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 rounded bg-[#0b1120] px-1.5 py-0.5 text-[10px] tabular-nums text-slate-200 opacity-0 shadow-sm ring-1 ring-white/10 transition-opacity group-hover:opacity-100">
+                    <span className="pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 rounded bg-ground px-1.5 py-0.5 text-[10px] tabular-nums text-slate-200 opacity-0 shadow-sm ring-1 ring-white/10 transition-opacity group-hover:opacity-100">
                       {d.credits.toLocaleString()}
                     </span>
                   )}
