@@ -21,6 +21,7 @@ export const PLAN_LABEL: Record<PlanId, string> = {
 export async function resolvePlan(email: string): Promise<PlanId> {
   const [access, resolved] = await Promise.all([verifyMIAccess(email, true), resolveAccess(email)]);
   let tier = access.tier;
+  // tier-display-ok: label for the header chip and pricing page; team and enterprise keep their own label.
   if (resolved.level === 'pro' && tier !== 'team' && tier !== 'enterprise') tier = 'pro';
   return tier === 'none' ? 'free' : tier;
 }
