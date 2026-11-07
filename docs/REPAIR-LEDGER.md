@@ -42,6 +42,7 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
 |---|---|---|---|---|---|
+| 2026-11-02 | Slack events webhook | `/api/slack/events` verifies Slack's request signature (HMAC-SHA256 over `v0:{ts}:{raw body}`, constant-time compare, 5-minute timestamp window) over the raw body before parsing or any work; fails closed when `SLACK_SIGNING_SECRET` is unset. **Deploy prerequisite: set `SLACK_SIGNING_SECRET` in Vercel first.** | `verifySlackSignature(` → `src/app/api/slack/events/route.ts` | verifier 5/5 + route 8/8 (6 red against main); tsc clean. | PR OPEN |
 | 2026-10-27 | MCP credits / admin endpoint | `POST /api/admin/mcp-credits` sent every amount through `grantCredits` → `mcp_grant_credits`, which treats `p_amount <= 0` as a no-op and returns the current balance. A `-1000` reversal of a goodwill grant (raffagibbard@braveone.net) returned `success:true, balance:1000` with no ledger row. Fix: a negative amount debits `|amount|` atomically via `debitCredits` (reason `admin_debit`) and returns 409 when the balance can't cover it; zero and fractional amounts are 400. Positive grants unchanged. | `admin_debit` → `src/app/api/admin/mcp-credits/route.ts` | `route.unit.test.ts` 4/4 (3 red against main); tsc clean. | PR OPEN |
 
 ## 2026-10-27 — Mindy sender isolation: Resend only, no govcongiants.com path
