@@ -1,5 +1,6 @@
 'use client';
 
+import MindyLoader from '@/components/app/MindyLoader';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { BarChart3, MapPin, Check, Plus } from 'lucide-react';
 import Link from 'next/link';
@@ -21,6 +22,8 @@ import HiddenWorkNudge from './HiddenWorkNudge';
 import { getNaics } from '@/lib/codes/lookup';
 import ShareButton from '@/components/briefings/ShareButton';
 import SamAttachmentLinks from '@/components/app/SamAttachmentLinks';
+import { mapLinkForOpportunity } from '@/lib/maps/map-links';
+import { samNoticeIdFrom } from '../mapRecordIds';
 
 interface DashboardPanelProps {
   email: string | null;
@@ -52,6 +55,9 @@ interface BriefingItem {
   location?: string;
   actionUrl?: string;
   actionLabel?: string;
+  // "Open on the map" RECORD link (?opp=<notice_id> only). Absent when the item carries no
+  // real SAM notice id (a solicitation number is not one).
+  mapUrl?: string;
   signals: string[];
   // Contractor / prime names. When present, rendered as clickable
   // ContractorLink to open the YoY award-history drawer. Separate
@@ -443,6 +449,7 @@ function collectGeneratedItems(content: Record<string, unknown>): BriefingItem[]
         location: getLocationFromRecord(item),
         actionUrl: text(item.actionUrl),
         actionLabel: text(item.actionLabel, 'View details'),
+        mapUrl: mapLinkForOpportunity(samNoticeIdFrom(item.samNoticeId, item.noticeId, item.notice_id, item.actionUrl, item.samLink)) ?? undefined,
         noticeType: noticeType || undefined,
         signals: signals.length > 0 ? signals : [noticeType].filter(Boolean),
       };
@@ -470,6 +477,7 @@ function collectGreenItems(content: Record<string, unknown>): BriefingItem[] {
       location: getLocationFromRecord(item),
       actionUrl: text(item.samLink),
       actionLabel: 'View on SAM.gov',
+      mapUrl: mapLinkForOpportunity(samNoticeIdFrom(item.samNoticeId, item.noticeId, item.samLink)) ?? undefined,
       noticeType: text(item.noticeType) || undefined,
       signals: [
         text(item.noticeType),
@@ -525,6 +533,7 @@ function collectGreenItems(content: Record<string, unknown>): BriefingItem[] {
       location: getLocationFromRecord(item),
       actionUrl: text(item.samLink),
       actionLabel: 'View on SAM.gov',
+      mapUrl: mapLinkForOpportunity(samNoticeIdFrom(item.samNoticeId, item.noticeId, item.samLink)) ?? undefined,
       noticeType: noticeType || undefined,
       signals: [
         noticeType,
@@ -557,6 +566,7 @@ function collectLegacyItems(content: Record<string, unknown>): BriefingItem[] {
       location: getLocationFromRecord(item),
       actionUrl: text(item.samLink),
       actionLabel: text(item.samLink) ? 'View on SAM.gov' : 'View details',
+      mapUrl: mapLinkForOpportunity(samNoticeIdFrom(item.samNoticeId, item.noticeId, item.samLink)) ?? undefined,
       noticeType: text(item.noticeType) || undefined,
       signals: [text(item.noticeType), text(item.setAside)].filter(Boolean),
       // Surface incumbent as a structured field too so the renderer
@@ -623,7 +633,7 @@ function collectPursuitItems(content: Record<string, unknown>): BriefingItem[] {
       parentAgency: text(content.agency) || undefined,
       amount: value || undefined,
       deadline: formatDeadline(text(nextMove.deadline)),
-      actionUrl: noticeId ? `/opportunity-map?opp=${encodeURIComponent(noticeId)}` : undefined,
+      actionUrl: mapLinkForOpportunity(noticeId) ?? undefined,
       actionLabel: noticeId ? 'Open opportunity' : undefined,
       signals: [
         typeof score === 'number' ? `Score ${score}` : '',
@@ -1328,16 +1338,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
       </div>
 
       {isLoading ? (
-        <div className="p-8">
-          <div className="animate-pulse grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
-            <div className="h-96 bg-ground border border-surface" />
-            <div className="space-y-4">
-              <div className="h-10 bg-ground border border-surface" />
-              <div className="h-48 bg-ground border border-surface" />
-              <div className="h-48 bg-ground border border-surface" />
-            </div>
-          </div>
-        </div>
+<MindyLoader variant="section" title="Loading today’s intel" steps={["New opportunities for you", "What changed since yesterday", "Your briefings"]} />
       ) : briefings.length === 0 ? (
         <div className="p-8">
           <div className="border border-surface bg-ground p-8 text-center">
@@ -1667,6 +1668,18 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                               className="px-4 py-2 text-sm font-medium text-ink-soft bg-surface hover:bg-input rounded-lg transition-colors"
                             >
                               {item.actionLabel || 'View on SAM.gov'} →
+                            </a>
+                          )}
+                          {item.mapUrl && item.mapUrl !== item.actionUrl && (
+                            <a
+                              href={item.mapUrl}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                trackItemEvent('link_click', item, 'open_on_map');
+                              }}
+                              className="text-sm font-medium text-emerald-400 hover:text-emerald-300"
+                            >
+                              Open on the map →
                             </a>
                           )}
                         </div>

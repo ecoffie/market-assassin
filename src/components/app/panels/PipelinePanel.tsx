@@ -14,6 +14,9 @@ import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import { useDodaacNames } from '@/components/app/useDodaacNames';
 import PursuitAssignment from './PursuitAssignment';
 import PursuitComments from './PursuitComments';
+import SavedOnMapList from '../saved/SavedOnMapList';
+import SavedSearchesList from '../saved/SavedSearchesList';
+import MindyLoader from '@/components/app/MindyLoader';
 
 interface PipelinePanelProps {
   email: string | null;
@@ -224,6 +227,9 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
   // returns to the full board.
   const [activeView, setActiveView] = useState<string | null>(null);
   const [voiceOpen, setVoiceOpen] = useState(false);          // Voice capture modal (#119)
+  // Which view of My Pursuits: the pursuits themselves, things saved on the Opportunity Map
+  // (user_saved_opportunities), or the map's saved searches (saved_searches).
+  const [section, setSection] = useState<'pursuits' | 'saved' | 'searches'>('pursuits');
   const [sortField, setSortField] = useState<'deadline' | 'value' | 'stage' | 'priority' | 'title'>('deadline');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedOpportunity, setSelectedOpportunity] = useState<PipelineOpportunity | null>(null);
@@ -795,19 +801,48 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
     }
   };
 
-  if (loading) {
+  const sectionTabs = (
+    <div className="flex flex-wrap gap-1 bg-surface rounded-lg p-1 w-fit" role="tablist" aria-label="My Pursuits views">
+      {([
+        ['pursuits', 'Pursuits'],
+        ['saved', 'Saved on the map'],
+        ['searches', 'Saved searches'],
+      ] as const).map(([id, label]) => (
+        <button
+          key={id}
+          type="button"
+          role="tab"
+          aria-selected={section === id}
+          onClick={() => setSection(id)}
+          className={`px-3 py-1 text-sm rounded-md transition-colors ${section === id ? 'bg-input text-white' : 'text-muted hover:text-ink-soft'}`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (section !== 'pursuits') {
     return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-surface rounded w-48" />
-          <div className="grid grid-cols-6 gap-4">
-            {[1, 2, 3, 4, 5, 6].map(i => (
-              <div key={i} className="h-64 bg-surface rounded-xl" />
-            ))}
-          </div>
-        </div>
+      <div className="p-3 md:p-6 space-y-4 md:space-y-6 overflow-x-hidden">
+        <h1 className="text-2xl font-bold text-white">My Pursuits</h1>
+        {sectionTabs}
+        {section === 'saved' ? (
+          <SavedOnMapList
+            email={email}
+            description="Opportunities, recompetes, companies and buyers you hearted or tracked on the Opportunity Map. Saving is not pursuing: start a pursuit when you decide to work one."
+            allowStartPursuit
+            onPursuitCreated={loadPipeline}
+          />
+        ) : (
+          <SavedSearchesList email={email} />
+        )}
       </div>
     );
+  }
+
+  if (loading) {
+    return <MindyLoader title="Loading your pursuits" steps={["Your pursuits", "Deadlines and changes", "Team notes"]} />;
   }
 
   // Urgency computation. Only ACTIVE pursuits can be urgent/overdue — a
@@ -895,6 +930,8 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
           </button>
         </div>
       </div>
+
+      {sectionTabs}
 
       {email && (
         <VoiceCaptureModal

@@ -8,6 +8,16 @@ import { NaicsAutocompleteInput } from '../../codes/NaicsAutocompleteInput';
 import { useAppTracker } from '../track';
 import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
+import { mapLinkForForecast } from '@/lib/maps/map-links';
+import MindyLoader from '@/components/app/MindyLoader';
+
+// The map's ?forecast= record address: the forecast pin id (`fc-<agency_forecasts.id>`). DoD early
+// signals (`sam:<solicitation number>`) are not forecasts and carry no notice id, so they get no link.
+function forecastMapHref(forecast: { id: string; signalType?: string }): string | null {
+  const id = String(forecast.id || '').trim();
+  if (!id || forecast.signalType === 'dod_early_signal' || id.startsWith('sam:')) return null;
+  return mapLinkForForecast(id.startsWith('fc-') ? id : `fc-${id}`);
+}
 
 interface ForecastsPanelProps {
   email: string | null;
@@ -372,18 +382,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
   const agencyCoverageLabel = `${agencyCoverageCount.toLocaleString()} ${agencyCoverageCount === 1 ? 'Agency' : 'Agencies'}`;
 
   if (loading) {
-    return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-surface rounded w-48" />
-          <div className="grid grid-cols-3 gap-4">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-24 bg-surface rounded-xl" />
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    return <MindyLoader title="Loading upcoming buys" steps={["Agency forecasts", "Matching your market", "Expected dates and values"]} />;
   }
 
   return (
@@ -766,6 +765,14 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                           email={email || ''}
                           variant="small"
                         />
+                        {(() => {
+                          const mapHref = forecastMapHref(forecast);
+                          return mapHref ? (
+                            <a href={mapHref} className="text-[11px] text-amber-400 hover:text-amber-300">
+                              Open on the map →
+                            </a>
+                          ) : null;
+                        })()}
                       </div>
                     </div>
                   </div>

@@ -46,6 +46,7 @@ import { NextResponse } from 'next/server';
 import { LOGIN_MODAL_CSS, LOGIN_MODAL_HTML, LOGIN_MODAL_JS } from '../login-modal';
 import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../account-menu';
+import { PURSUIT_COLLAB_CSS, PURSUIT_COLLAB_JS } from '../pursuit-collab';
 
 export const dynamic = 'force-dynamic';
 
@@ -228,6 +229,8 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .teamrow .tnm{font:600 12.5px Inter,sans-serif;color:var(--ink)}
   .teamrow .tct{font:600 11px Inter,sans-serif;color:var(--faint);margin-left:auto}
   .rempty{font:500 12.5px Inter,sans-serif;color:var(--sub);line-height:1.5;padding:4px 0}
+  ${PURSUIT_COLLAB_CSS}
+  .rcard-bd .pc-collab{margin-top:0}
   .rempty a,.rempty button{color:var(--jan);font-weight:700;background:none;border:0;cursor:pointer;padding:0;text-decoration:none}
   .rnote{font:600 11.5px Inter,sans-serif;color:var(--con);padding:4px 0}
   /* ── Bottom action bar ── */
@@ -318,6 +321,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
 <div class="main" id="wsroot">
   <div class="signin" id="gate">Loading&hellip;</div>
 </div>
+<script>${PURSUIT_COLLAB_JS}</script>
 <script>
 (function(){
   function tok(){ try{return localStorage.getItem('mi_beta_auth_token');}catch(e){return null;} }
@@ -787,7 +791,14 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     }
     var teamHd='<div class="rcard"><div class="rcard-hd"><span class="t">'+IC.users+'Team'+(team.length?' <span class="dmeta" style="color:var(--faint);font-weight:700">'+team.length+' member'+(team.length===1?'':'s')+'</span>':'')+'</span><button class="act" onclick="window.__wsSelect(\\'compliance\\')">Manage</button></div>'+teamBd+'</div>';
 
-    el.innerHTML = det + docHd + sugHd + teamHd;
+    // Team activity made in /app — comments, bid decision, owner (read-only; edit in the app).
+    // Only for a resolved pursuit row: an empty shell has nothing to summarise.
+    var collabHd='';
+    if(p.id && window.__pursuitCollab){
+      collabHd='<div class="rcard"><div class="rcard-hd"><span class="t">'+IC.users+'Team activity</span></div><div class="rcard-bd">'+window.__pursuitCollab.slot(p)+'</div></div>';
+    }
+
+    el.innerHTML = det + collabHd + docHd + sugHd + teamHd;
   }
 
   function renderActionBar(){
@@ -829,6 +840,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
         // Management / Submit Proposal, because nothing repainted it. A unit test on the
         // source could never catch this; only the browser did.
         renderHero(); renderRight(); renderRail(); renderCenter(); renderActionBar();
+        if(row && row.id && window.__pursuitCollab){ window.__pursuitCollab.load(row,{email:em,headers:hdrs()}); }
         loadMwin();          // M-Win needs the opp facts
       }).catch(function(){ S.pursuit=S.pursuit||{}; var el=document.getElementById('hero'); });
   }

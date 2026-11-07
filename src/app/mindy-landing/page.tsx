@@ -612,7 +612,7 @@ export default function MindyLandingPage() {
               </ul>
 
               <Link
-                href="mailto:hello@getmindy.ai?subject=Mindy%20Teams%20Inquiry"
+                href="/contact-sales"
                 className="block w-full py-3 bg-input hover:bg-slate-600 text-white font-semibold rounded-xl text-center transition-colors"
               >
                 Contact Sales

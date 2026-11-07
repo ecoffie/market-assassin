@@ -10,6 +10,10 @@ import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import ProposalChat from './ProposalChat';
 import DocManifest from './DocManifest';
 import BidDecisionGate from './BidDecisionGate';
+import { mapLinkForOpportunity } from '@/lib/maps/map-links';
+import { samNoticeIdFrom } from '@/components/app/mapRecordIds';
+import { PROPOSAL_ACTION_TARGETS, parseProposalAction } from '@/lib/app/deep-link-params';
+import { useScrollToAnchor } from '../useScrollToAnchor';
 import { alignRequirement, priorityOf, type ReqPriority } from '@/lib/proposal/section-alignment';
 import { Zap, Gauge, PenLine, Search, FileText, ClipboardList, AlertTriangle, Sparkles, CheckCircle2, X, FolderArchive, BookOpen, Scale, Check, Circle } from 'lucide-react';
 
@@ -1477,6 +1481,29 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   // when the cache has what they need.
   const [autoLoadStatus, setAutoLoadStatus] = useState<'idle' | 'loading' | 'loaded' | 'no-docs' | 'error'>('idle');
   const [autoLoadMessage, setAutoLoadMessage] = useState<string | null>(null);
+
+  // ?action=compliance|review|export|submit from the map's proposal workspace. page.tsx parses
+  // and validates it; re-checked here so a stray value from another caller is ignored. It only
+  // applies to the pursuit the link named, and only once that pursuit's documents have settled
+  // (the target sections render after the auto-load), so we never scroll a different pursuit.
+  const contextAction = parseProposalAction(typeof panelContext?.proposal_action === 'string' ? panelContext.proposal_action : null);
+  const actionPursuitMatches = Boolean(contextAction && activePursuitId && activePursuitId === resolvedContextPursuitId);
+  const actionDocsSettled = autoLoadStatus === 'loaded' || autoLoadStatus === 'no-docs' || autoLoadStatus === 'error';
+  // Simple (LOI / Sources Sought) responses keep the matrix behind "More options" — open it.
+  useEffect(() => {
+    if (actionPursuitMatches && contextAction === 'compliance') setShowAdvancedOutputs(true);
+  }, [actionPursuitMatches, contextAction]);
+  const actionAnchorId = (() => {
+    if (!contextAction || !actionPursuitMatches || !actionDocsSettled || driveMode !== 'auto') return null;
+    if (contextAction === 'compliance') return showComplianceMatrix ? 'proposal-compliance-section' : 'proposal-response-template';
+    // RFQs have no Review & Export section at all (it renders only when !isRfqMode), so review,
+    // export and submit all land on the RFQ's response-template block, which holds its export.
+    if (isRfqMode) return showComplianceMatrix ? 'proposal-compliance-section' : 'proposal-response-template';
+    // The independent referee is not offered for LOI responses — land on the final review.
+    if (contextAction === 'review' && isLoiResponseMode) return 'proposal-final-review-section';
+    return PROPOSAL_ACTION_TARGETS[contextAction].anchorId;
+  })();
+  const actionScroll = useScrollToAnchor(actionAnchorId);
   // detectedNoticeType moved up near currentSectionTabs declaration
   // so we can derive the simple-response workflow before consumers need it.
   //
@@ -1726,6 +1753,17 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              {/* Only a real 32-hex SAM notice id becomes a record link: a pursuit can carry a PIID
+                  (recompete) or a solicitation number, which ?opp= would resolve to some OTHER notice. */}
+              {mapLinkForOpportunity(samNoticeIdFrom(activePursuit.notice_id)) && (
+                <a
+                  href={mapLinkForOpportunity(samNoticeIdFrom(activePursuit.notice_id)) as string}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-xs font-medium text-emerald-300 hover:bg-emerald-500/20"
+                  title="Open this opportunity on the Opportunity Map"
+                >
+                  Open on the map
+                </a>
+              )}
               {activePursuit?.notice_id && (
                 <a
                   href={`https://sam.gov/opp/${activePursuit.notice_id}/view`}
@@ -1752,6 +1790,22 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             </div>
           </div>
         </section>
+      )}
+
+      {contextAction && actionPursuitMatches && (
+        <div
+          className="rounded-lg border border-purple-500/30 bg-purple-500/10 p-3 text-sm text-purple-100"
+          role="status"
+        >
+          Opened from the map: <span className="font-semibold">{PROPOSAL_ACTION_TARGETS[contextAction].label}</span>.
+          {contextAction === 'submit' && (
+            <> Mindy doesn&apos;t submit for you — walk the final checklist, export the package, then submit on the agency&apos;s portal.</>
+          )}
+          {(!actionDocsSettled || actionScroll === 'waiting') && <> Loading this pursuit&hellip;</>}
+          {actionScroll === 'missing' && (
+            <> That step isn&apos;t available yet for this pursuit — add the solicitation documents below, then it appears.</>
+          )}
+        </div>
       )}
 
       {staleContextPursuit && (
@@ -3307,7 +3361,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
 
       {/* Output · Review Checklist + Export */}
       {responseOutputsReady && !isRfqMode && driveMode === 'auto' && (
-        <section className="bg-ground border border-surface rounded-xl p-5">
+        <section id="proposal-final-review-section" className="scroll-mt-24 bg-ground border border-surface rounded-xl p-5">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
               <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Output · Review &amp; Export</p>
@@ -3332,7 +3386,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
 
           {/* Compliance Referee — independent Claude check (Eric's vision). */}
           {!isLoiResponseMode && (
-            <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/5 p-4 mb-4">
+            <div id="proposal-referee-section" className="scroll-mt-24 rounded-xl border border-indigo-500/30 bg-indigo-500/5 p-4 mb-4">
               <div className="flex items-center justify-between gap-3 mb-2">
                 <div>
                   <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-white"><Scale className="h-4 w-4 shrink-0" strokeWidth={2} /> Independent Compliance Check</h3>
@@ -3407,7 +3461,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             </ul>
           )}
 
-          <div className="border-t border-surface pt-4 mt-4">
+          <div id="proposal-export-section" className="scroll-mt-24 border-t border-surface pt-4 mt-4">
             <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
               <div className="text-sm text-muted">
                 <p className="text-ink-soft font-medium mb-1">Package will include:</p>

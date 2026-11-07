@@ -223,7 +223,7 @@ describe('mixed run: successful send + malformed search + suppressed recipient +
   it('A (valid, sent): delivering, provider-accepted not inbox, other failures named as not affecting it', () => {
     const s = out.status['IT services'];
     expect(s.headline).toBe('delivering');
-    expect(s.summary).toMatch(/^Alerts for this search have been sent; our email provider last accepted one for this account at 2026-10-04 11:00 UTC \(inbox delivery is not tracked\)/);
+    expect(s.summary).toMatch(/^Alerts for this search have been sent\. Our email provider last accepted one for this account at 2026-10-04 11:00 UTC; delivery to the receiving mail server is not confirmed yet \(inbox placement is not tracked\)/);
     expect(s.summary).toContain('Saved-search alerts: the latest run had failures in other saved searches; this one is not affected.');
   });
 

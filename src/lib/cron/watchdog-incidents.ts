@@ -25,8 +25,14 @@
  *   invalid_recipient_address = synthetic address → processing incident
  *   email_send_rejected       = legacy/unknown block reason → processing incident (it no longer
  *                               proves suppression)
- * A processing failure alongside a suppression (e.g. a malformed customer search) still opens
- * an incident, and the suppression line rides along.
+ *   invalid_saved_naics       = a customer's search stores only codes that do not exist → a
+ *                               per-search CONFIG action item, also non-outage. The job did its
+ *                               work; only that owner can say which code they meant. Before
+ *                               2026-11-07 this counted as processing, so the job read red every
+ *                               day from 2026-09-30 and a real opportunity_query_failed on 11-06
+ *                               looked like one more line in a permanent failure.
+ * A processing failure alongside action items (e.g. a malformed customer search) still opens
+ * an incident, and the action-item lines ride along.
  *
  * DELIVERY GUARANTEES AND RESIDUAL RISK — NOT exactly-once.
  * A notification is sent only by the run that CLAIMED it: INSERT ... ON CONFLICT DO NOTHING
@@ -109,6 +115,12 @@ export interface IncidentStore {
  * is a processing failure.
  */
 export const SUPPRESSION_CLASSES = new Set(['recipient_suppressed']);
+/**
+ * Per-search configuration only its owner can correct: reported, never an outage. Deliberately NOT
+ * invalid_saved_filters: that class means a value the write path should have refused reached the
+ * cron, which is a defect for Mindy to investigate, not a customer choice.
+ */
+export const CONFIG_ACTION_CLASSES = new Set(['invalid_saved_naics']);
 /** Volatile metrics carried in summaries but excluded from identity and impact. */
 const VOLATILE_CLASSES = new Set(['backlog']);
 /** UTC hour from which the first watchdog pass posts the daily summary. */
@@ -125,8 +137,12 @@ export type Classified = {
   signature: string;
   processing: Counts;
   suppression: Counts;
+  /** Per-search config action items (CONFIG_ACTION_CLASSES). Never mixed into `suppression`. */
+  configAction: Counts;
   /** True when the only failures are recipient suppressions. */
   suppressionOnly: boolean;
+  /** True when every failure is an action item (suppression and/or config): no processing failure. */
+  actionItemsOnly: boolean;
   label: string;
 };
 
@@ -147,29 +163,37 @@ export function normalizeErrorMessage(msg: string): string {
 
 export function classifyObservation(o: WatchdogObservation): Classified {
   if (o.kind !== 'failing') {
-    return { signature: o.kind, processing: {}, suppression: {}, suppressionOnly: false, label: o.kind };
+    return { signature: o.kind, processing: {}, suppression: {}, configAction: {}, suppressionOnly: false, actionItemsOnly: false, label: o.kind };
   }
   const status = (o.status || 'error').toLowerCase();
   const err = (o.error || '').trim();
   if (err && CLASS_LIST.test(err)) {
     const processing: Counts = {};
     const suppression: Counts = {};
+    const configAction: Counts = {};
     for (const part of err.split(',')) {
       const [rawName, rawN] = part.split('=');
       const name = rawName.trim();
       const n = Number(rawN);
       if (VOLATILE_CLASSES.has(name)) continue;
       if (SUPPRESSION_CLASSES.has(name)) suppression[name] = n;
+      else if (CONFIG_ACTION_CLASSES.has(name)) configAction[name] = n;
       else processing[name] = n;
     }
     const procNames = Object.keys(processing).sort();
-    const suppressionOnly = procNames.length === 0 && Object.keys(suppression).length > 0;
+    const hasConfig = Object.keys(configAction).length > 0;
+    const suppressionOnly = procNames.length === 0 && !hasConfig && Object.keys(suppression).length > 0;
+    const actionItemsOnly = procNames.length === 0 && (hasConfig || Object.keys(suppression).length > 0);
     return {
-      signature: `${status}|${suppressionOnly ? 'suppression-only' : procNames.join(',')}`,
+      signature: `${status}|${suppressionOnly ? 'suppression-only' : actionItemsOnly ? 'action-items-only' : procNames.join(',')}`,
       processing,
       suppression,
+      configAction,
       suppressionOnly,
-      label: procNames.length ? procNames.map((k) => `${k}=${processing[k]}`).join(', ') : 'recipient suppression only',
+      actionItemsOnly,
+      label: procNames.length
+        ? procNames.map((k) => `${k}=${processing[k]}`).join(', ')
+        : suppressionOnly ? 'recipient suppression only' : 'per-search action items only',
     };
   }
   const norm = err ? normalizeErrorMessage(err) : '(no error text)';
@@ -177,7 +201,9 @@ export function classifyObservation(o: WatchdogObservation): Classified {
     signature: `${status}|msg:${norm}`,
     processing: {},
     suppression: {},
+    configAction: {},
     suppressionOnly: false,
+    actionItemsOnly: false,
     label: `${status}: ${err || '(no error text)'}`.slice(0, 200),
   };
 }
@@ -224,7 +250,8 @@ export function decideIncident(
     status: 'open' as const,
     signature: c.signature,
     processing_counts: c.processing,
-    suppression_counts: c.suppression,
+    // Holds every non-outage count; the renderer splits them by class. Same jsonb column, no migration.
+    suppression_counts: { ...c.suppression, ...c.configAction },
     last_detail: obs.detail ?? null,
     last_seen_at: nowIso,
     resolved_at: null,
@@ -232,7 +259,7 @@ export function decideIncident(
 
   if (!prev || prev.status !== 'open') {
     return {
-      event: c.suppressionOnly ? 'suppression_opened' : 'opened',
+      event: c.actionItemsOnly ? 'suppression_opened' : 'opened',
       next: {
         ...base,
         notified_counts: c.processing,
@@ -278,10 +305,20 @@ function subject(row: { kind: string; job_name: string | null; incident_key: str
   return row.job_name || row.incident_key;
 }
 
-function suppressionLine(s: Counts): string | null {
-  const n = Object.values(s).reduce((a, b) => a + b, 0);
-  if (!n) return null;
-  return `🛡️ Recipient suppression (not an outage): ${n} email(s) not sent to CONFIRMED-suppressed recipient(s) (${counts(s)}). Action: review email_suppressions for this job's recipients.`;
+/** The non-outage lines for a row's stored counts: recipient suppression and per-search config, kept apart. */
+function actionItemLines(stored: Counts): string[] {
+  const pick = (cls: Set<string>) => Object.fromEntries(Object.entries(stored).filter(([k]) => cls.has(k)));
+  const total = (c: Counts) => Object.values(c).reduce((a, b) => a + b, 0);
+  const lines: string[] = [];
+  const config = pick(CONFIG_ACTION_CLASSES);
+  const sup = Object.fromEntries(Object.entries(stored).filter(([k]) => !CONFIG_ACTION_CLASSES.has(k)));
+  if (total(sup)) {
+    lines.push(`🛡️ Recipient suppression (not an outage): ${total(sup)} email(s) not sent to CONFIRMED-suppressed recipient(s) (${counts(sup)}). Action: review email_suppressions for this job's recipients.`);
+  }
+  if (total(config)) {
+    lines.push(`🧾 Customer search config (not an outage): ${total(config)} saved search(es) not evaluated (${counts(config)}). Action: the owner must correct the stored filters; ids are in the run's failedSearches.`);
+  }
+  return lines;
 }
 
 function hoursBetween(a: string, b: string): number {
@@ -299,25 +336,29 @@ export function renderEventLines(e: ClaimedEvent, nowIso: string): string[] {
   const r = e.row;
   const who = subject(r);
   const detail = r.last_detail ? ` — ${r.last_detail}` : '';
-  const sup = suppressionLine(r.suppression_counts || {});
+  const sup = actionItemLines(r.suppression_counts || {});
   const procText = r.signature?.endsWith('|suppression-only')
     ? 'processing failures cleared; only recipient suppression remains'
+    : r.signature?.endsWith('|action-items-only')
+    ? 'processing failures cleared; only per-search action items remain'
     : r.kind === 'failing' && Object.keys(r.processing_counts || {}).length
       ? `processing failures: ${counts(r.processing_counts)}`
       : (r.signature?.includes('|msg:') ? r.signature.split('|msg:')[1] : KIND_LABEL[r.kind] || r.kind);
   switch (e.event) {
     case 'opened':
-      return [`🔴 OPENED ${who} — ${procText}${detail}`, ...(sup ? [sup] : [])];
+      return [`🔴 OPENED ${who} — ${procText}${detail}`, ...sup];
     case 'suppression_opened':
-      return [`🛡️ SUPPRESSION ${who} — no processing failure; the job's only errors are blocked sends${detail}`, ...(sup ? [sup] : [])];
+      return r.signature?.endsWith('|action-items-only')
+        ? [`🧾 ACTION ITEMS ${who} — no processing failure; the job's only errors are per-search items an owner must resolve${detail}`, ...sup]
+        : [`🛡️ SUPPRESSION ${who} — no processing failure; the job's only errors are blocked sends${detail}`, ...sup];
     case 'changed': {
       const was = e.prev?.signature?.split('|').slice(1).join('|') || 'unknown';
-      return [`🔁 CHANGED ${who} — was [${was}], now ${procText}${detail}`, ...(sup ? [sup] : [])];
+      return [`🔁 CHANGED ${who} — was [${was}], now ${procText}${detail}`, ...sup];
     }
     case 'worsened': {
       const prevN = e.prev?.notified_counts || {};
       const up = worsenedClasses(prevN, r.processing_counts || {}).map((k) => `${k} ${prevN[k] ?? 0}→${r.processing_counts[k]}`);
-      return [`📈 WORSENED ${who} — ${up.join(', ')}${detail}`, ...(sup ? [sup] : [])];
+      return [`📈 WORSENED ${who} — ${up.join(', ')}${detail}`, ...sup];
     }
     case 'recovered':
       return [`✅ RECOVERED ${who} — cleared after ${r.observations} watchdog pass(es) over ${hoursBetween(r.opened_at, nowIso)}h (opened ${r.opened_at.slice(0, 16)}Z)`];
@@ -357,11 +398,11 @@ export function renderDailySummary(
     .map((r) => {
       const proc = r.kind === 'failing' && Object.keys(r.processing_counts || {}).length
         ? counts(r.processing_counts)
-        : (r.signature?.includes('|msg:') ? r.signature.split('|msg:')[1] : r.signature === 'error|suppression-only' ? 'recipient suppression only' : KIND_LABEL[r.kind] || r.kind);
-      const sup = suppressionLine(r.suppression_counts || {});
+        : (r.signature?.includes('|msg:') ? r.signature.split('|msg:')[1] : r.signature === 'error|suppression-only' ? 'recipient suppression only' : r.signature === 'error|action-items-only' ? 'per-search action items only' : KIND_LABEL[r.kind] || r.kind);
+      const sup = actionItemLines(r.suppression_counts || {});
       const ab = abandonedEvent(r);
       const undelivered = ab ? ` — ⚠️ "${ab}" notification undelivered after ${MAX_NOTIFY_ATTEMPTS} attempts` : '';
-      return `• ${subject(r)} — open ${hoursBetween(r.opened_at, nowIso)}h, ${r.observations} pass(es), ${proc}${r.last_detail ? ` — ${r.last_detail}` : ''}${undelivered}${sup ? `\n   ${sup}` : ''}`;
+      return `• ${subject(r)} — open ${hoursBetween(r.opened_at, nowIso)}h, ${r.observations} pass(es), ${proc}${r.last_detail ? ` — ${r.last_detail}` : ''}${undelivered}${sup.map((l) => `\n   ${l}`).join('')}`;
     });
   for (const r of undeliveredResolved) {
     lines.push(`• ⚠️ ${subject(r)} — RECOVERED${r.resolved_at ? ` at ${r.resolved_at.slice(0, 16)}Z` : ''}, but the recovery notification was undelivered after ${MAX_NOTIFY_ATTEMPTS} attempts`);
@@ -371,7 +412,7 @@ export function renderDailySummary(
   if (undeliveredResolved.length) parts.push(`${undeliveredResolved.length} undelivered recovery notice(s)`);
   return {
     subject: `Cron watchdog daily summary: ${parts.join('; ')}`,
-    html: lines.map((l) => `<p>${l.replace('\n', '<br/>')}</p>`).join('') + `<p style="color:#888">Unchanged since last notified. Run history: cron_job_runs. ${nowIso}.</p>`,
+    html: lines.map((l) => `<p>${l.replace(/\n/g, '<br/>')}</p>`).join('') + `<p style="color:#888">Unchanged since last notified. Run history: cron_job_runs. ${nowIso}.</p>`,
     text: lines.join('\n'),
   };
 }
@@ -561,7 +602,7 @@ export async function runWatchdogIncidents(opts: {
         const fresh = persistent.map((r) => {
           const o = obsByKey.get(r.incident_key)!;
           const c = classifyObservation(o);
-          return { ...r, processing_counts: c.processing, suppression_counts: c.suppression, last_detail: o.detail ?? r.last_detail, observations: r.observations + 1 };
+          return { ...r, processing_counts: c.processing, suppression_counts: { ...c.suppression, ...c.configAction }, last_detail: o.detail ?? r.last_detail, observations: r.observations + 1 };
         });
         const msg = renderDailySummary(fresh, nowIso, undeliveredResolved);
         result.messages.push({ subject: msg.subject, text: msg.text });

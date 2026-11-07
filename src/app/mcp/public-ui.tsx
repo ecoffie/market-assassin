@@ -7,34 +7,31 @@
  */
 import React from 'react';
 import Link from 'next/link';
-import { ButtonLink } from '@/components/public-site/ui';
+import { Chip } from '@/components/public-site/ui';
 
 export function McpPublicNav({ active, signedIn, balance }: { active: 'about' | 'connect' | 'pricing' | 'account'; signedIn?: boolean; balance?: number | null }) {
-  const link = 'px-3 py-1.5 font-medium transition-colors';
-  const on = 'bg-(--mp-wash) text-(--mp-navy) font-semibold';
+  const link = 'rounded-full px-4 py-2 font-medium transition-colors';
+  const on = 'bg-(--mp-navy-wash) text-(--mp-navy) font-semibold';
   const off = 'text-(--mp-body) hover:text-(--mp-navy)';
+  // Section tabs only: Sign in / Sign up live in the site top bar above, so they are not repeated here.
   return (
-    <header className="flex items-center justify-between gap-4">
-      <Link href="/mcp" className="flex items-center gap-3">
-        <div className="grid h-9 w-9 place-items-center bg-(--mp-navy) text-sm font-bold text-white">M</div>
-        <div className="hidden sm:block">
-          <div className="text-[15px] font-semibold leading-tight text-(--mp-ink)">Mindy MCP</div>
-          <div className="text-xs text-(--mp-muted)">Federal contracting intel for any AI agent</div>
-        </div>
+    <header className="flex flex-wrap items-center justify-between gap-3">
+      <Link href="/mcp" className="flex items-center gap-2.5">
+        {/* eslint-disable-next-line @next/next/no-img-element -- brand mark, same file as the site header */}
+        <img src="/brand/mindy-logo-icon.png" alt="" className="h-7 w-7" />
+        <span className="text-[17px] font-semibold text-(--mp-ink)">Mindy MCP</span>
       </Link>
-      <nav className="flex items-center gap-1 text-[13px]">
+      <nav className="flex items-center gap-1 overflow-x-auto text-[15px]" aria-label="Mindy MCP">
         <Link href="/mcp/about" className={`${link} ${active === 'about' ? on : off}`}>Overview</Link>
         <Link href="/mcp" className={`${link} ${active === 'connect' ? on : off}`}>Connect</Link>
         <Link href="/mcp/pricing" className={`${link} ${active === 'pricing' ? on : off}`}>Pricing</Link>
-        {signedIn ? (
-          <Link href="/mcp/account" className={`ml-1 flex items-center gap-2 px-3 py-1.5 font-medium ${active === 'account' ? on : off}`}>
+        {signedIn && (
+          <Link href="/mcp/account" className={`flex items-center gap-2 ${link} ${active === 'account' ? on : off}`}>
             {typeof balance === 'number' && (
-              <span className="rounded-[6px] border border-(--mp-line) bg-(--mp-wash) px-2 py-0.5 text-[11px] font-semibold tabular-nums text-(--mp-ink)">{balance.toLocaleString()} cr</span>
+              <Chip className="tabular-nums">{balance.toLocaleString()} credits</Chip>
             )}
             Account
           </Link>
-        ) : (
-          <ButtonLink href="/app" size="sm" className="ml-1">Sign in</ButtonLink>
         )}
       </nav>
     </header>

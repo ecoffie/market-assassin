@@ -1,10 +1,12 @@
 'use client';
 
+import MindyLoader from '@/components/app/MindyLoader';
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { WELCOME_PATH } from '@/lib/mindy/post-signup-destination';
 import { encodePendingNext, oauthOnboardingRedirect, onboardingRedirectPath, PENDING_NEXT_KEY, readPendingNext, signInReturnPath } from '@/lib/mindy/sign-in-return';
 import { useSearchParams } from 'next/navigation';
 import UnifiedSidebar, { type AppPanel, type AppTier } from '@/components/app/UnifiedSidebar';
+import AppNavTabs from '@/components/app/AppNavTabs';
 import GlobalLookup from '@/components/app/GlobalLookup';
 import ProductTour from '@/components/app/ProductTour';
 import PanelContainer from '@/components/app/panels';
@@ -20,6 +22,7 @@ import { isGatedMindyApi, skipAuthRecovery } from '@/lib/app/auth-recovery';
 import { sendAppEngagement } from '@/components/app/track';
 import { getStoredPartnerRef } from '@/lib/mindy/partner-referral-client';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
+import { parseAppDeepLink } from '@/lib/app/deep-link-params';
 
 const TWO_FACTOR_SESSION_MS = 12 * 60 * 60 * 1000;
 const TWO_FACTOR_TOKEN_KEY = 'mi_beta_2fa_token';
@@ -37,12 +40,7 @@ function clearStoredAppAuth() {
 // Loading fallback
 function DashboardLoading() {
   return (
-    <div className="min-h-screen bg-ground-deep flex items-center justify-center">
-      <div className="text-center">
-        <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-gray-400">Loading Mindy...</p>
-      </div>
-    </div>
+    <MindyLoader variant="screen" title="Loading Mindy" steps={['Your account', 'Your market', 'Today\u2019s intel']} />
   );
 }
 
@@ -954,6 +952,15 @@ function AppDashboard() {
     if (noticeParam) {
       setPanelContext((prev) => ({ ...(prev || {}), notice_id: noticeParam }));
     }
+
+    // Panel-specific deep-link context the map carries (pursuit_id + action for Proposals, agency
+    // for Contacts, section for Vault/Settings). Parsed + validated in ONE place; an unknown or
+    // malformed value is dropped so the panel opens on its normal default.
+    const validPanel = panelParam && KNOWN_PANELS.has(panelParam as AppPanel) ? panelParam : null;
+    const deepLink = parseAppDeepLink(validPanel, searchParams);
+    if (Object.keys(deepLink).length > 0) {
+      setPanelContext((prev) => ({ ...(prev || {}), ...deepLink }));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1565,6 +1572,17 @@ function AppDashboard() {
         {/* Thin-profile nudge: users on generic-only codes get a one-line describe
             prompt → real keywords + sharper matches (reuses onboarding's describe path). */}
         <CapabilityNudge email={email} />
+
+        {/* Tabs for the active sidebar group (nav-groups.ts) — only when it has 2+ pages.
+            Tab clicks use the same handlePanelChange as the sidebar. */}
+        <AppNavTabs
+          activePanel={activePanel}
+          onPanelChange={handlePanelChange}
+          userTier={tier}
+          coachModeAllowed={coachModeAllowed}
+          canSeePrototypes={canSeePrototypes}
+          userEmail={email}
+        />
 
         {/* Panel Content */}
         <PanelContainer
