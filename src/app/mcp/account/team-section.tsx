@@ -133,17 +133,17 @@ export function TeamSection({ email }: { email: string | null }) {
           </div>
 
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-white/10 bg-[#0a0f1e] p-4">
+            <div className="rounded-xl border border-white/10 bg-ground p-4">
               <div className="text-[11px] uppercase tracking-wide text-slate-500">Shared credits</div>
               <div className="mt-1 text-2xl font-semibold text-emerald-300">
                 {t.poolBalance === null ? 'Not set up yet' : nf(t.poolBalance)}
               </div>
             </div>
-            <div className="rounded-xl border border-white/10 bg-[#0a0f1e] p-4">
+            <div className="rounded-xl border border-white/10 bg-ground p-4">
               <div className="text-[11px] uppercase tracking-wide text-slate-500">Monthly allowance</div>
               <div className="mt-1 text-2xl font-semibold text-slate-100">{nf(t.monthlyCredits)}</div>
             </div>
-            <div className="rounded-xl border border-white/10 bg-[#0a0f1e] p-4">
+            <div className="rounded-xl border border-white/10 bg-ground p-4">
               <div className="text-[11px] uppercase tracking-wide text-slate-500">Seats used</div>
               <div className="mt-1 text-2xl font-semibold text-slate-100">{t.seats.used} / {t.seatLimit}</div>
               {t.seats.pending > 0 && <div className="text-[11px] text-slate-500">{t.seats.pending} invite{t.seats.pending === 1 ? '' : 's'} pending</div>}
@@ -189,11 +189,11 @@ export function TeamSection({ email }: { email: string | null }) {
                 type="email" placeholder="name@company.com" value={invite[t.orgId] ?? ''}
                 onChange={(e) => setInvite((s) => ({ ...s, [t.orgId]: e.target.value }))}
                 disabled={t.seats.used >= t.seatLimit}
-                className="min-w-0 flex-1 rounded-lg border border-white/15 bg-[#0a0f1e] px-3 py-2 text-[13px] text-slate-200 disabled:opacity-50"
+                className="min-w-0 flex-1 rounded-lg border border-white/15 bg-ground px-3 py-2 text-[13px] text-slate-200 disabled:opacity-50"
               />
               <button type="button" onClick={() => sendInvite(t.orgId)}
                 disabled={busy === `invite:${t.orgId}` || t.seats.used >= t.seatLimit || !(invite[t.orgId] || '').trim()}
-                className="shrink-0 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-[#062a1e] hover:bg-emerald-400 disabled:opacity-50">
+                className="shrink-0 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-400 disabled:opacity-50">
                 {t.seats.used >= t.seatLimit ? 'All seats in use' : busy === `invite:${t.orgId}` ? 'Sending…' : 'Invite member'}
               </button>
             </div>

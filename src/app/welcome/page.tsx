@@ -74,11 +74,11 @@ export default async function WelcomePage({
   const carry = raw ? `?next=${encodeURIComponent(safeNext(raw, '/opportunity-map'))}` : '';
 
   return (
-    <main className="min-h-dvh bg-[#0b1020] px-6 py-16 text-white">
+    <main className="min-h-dvh bg-(--mp-navy-wash)/50 px-6 pb-16 pt-6 text-(--mp-ink)">
       <div className="mx-auto max-w-3xl">
-        <p className="text-sm font-semibold uppercase tracking-widest text-emerald-400">Welcome to Mindy</p>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">What would you like to do first?</h1>
-        <p className="mt-3 text-base text-slate-300">
+        <p className="text-[13px] font-bold uppercase tracking-[0.08em] text-(--mp-navy)">Welcome to Mindy</p>
+        <h1 className="mt-3 font-(family-name:--mp-font-serif) text-[34px] font-normal leading-[1.15] tracking-[-0.015em] sm:text-[46px]">What would you like to do first?</h1>
+        <p className="mt-3 text-base text-(--mp-body)">
           You can do any of these now, and the rest whenever you like.
         </p>
 
@@ -95,15 +95,15 @@ export default async function WelcomePage({
                   : c.href
                 }
                 className={[
-                  'block rounded-2xl border p-6 transition',
+                  'block rounded-3xl border p-6 transition sm:p-7',
                   c.primary
-                    ? 'border-emerald-500/60 bg-emerald-500/10 hover:border-emerald-400'
-                    : 'border-white/10 bg-white/[0.04] hover:border-white/25',
+                    ? 'border-(--mp-navy) bg-(--mp-surface) shadow-[0_10px_30px_rgba(27,58,107,0.12)] ring-1 ring-(--mp-navy)'
+                    : 'border-(--mp-line) bg-(--mp-surface) hover:border-(--mp-navy) hover:shadow-[0_10px_30px_rgba(27,58,107,0.10)]',
                 ].join(' ')}
               >
                 <span className="text-lg font-semibold">{c.eyebrow}</span>
-                <span className="mt-1 block text-sm text-slate-300">{c.body}</span>
-                <span className={['mt-4 inline-block text-sm font-semibold', c.primary ? 'text-emerald-300' : 'text-slate-200'].join(' ')}>
+                <span className="mt-1 block text-sm text-(--mp-body)">{c.body}</span>
+                <span className={['mt-4 inline-block text-sm font-semibold', c.primary ? 'text-(--mp-navy)' : 'text-(--mp-ink)'].join(' ')}>
                   {c.cta} →
                 </span>
               </ChoiceLink>
@@ -112,8 +112,8 @@ export default async function WelcomePage({
         </ul>
 
         {/* Skippable by construction — nothing here gates the product. */}
-        <p className="mt-10 text-sm text-slate-400">
-          Not sure yet? <Link href={mapHref} className="text-emerald-300 underline underline-offset-4">Just show me the map</Link>.
+        <p className="mt-10 text-sm text-(--mp-muted)">
+          Not sure yet? <Link href={mapHref} className="font-semibold text-(--mp-navy) underline underline-offset-4">Just show me the map</Link>.
         </p>
       </div>
     </main>

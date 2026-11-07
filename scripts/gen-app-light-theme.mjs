@@ -47,6 +47,10 @@ out.push(`.mi-light :is(${strong.join(',')}){--color-white:#ffffff}`);
 const tint = [];
 for (const h of [...HUES,'purple','violet','indigo']) for (const s of ['500','600','700']) tint.push(...word(`bg-${h}-${s}/`));
 out.push(`.mi-light :is(${tint.join(',')}){--color-white:#12100e}`);
+// A strong button that turns LIGHT when disabled (disabled:bg-input / disabled:bg-slate-700 …) kept
+// its white text → white-on-near-white, unreadable ("Set me up" on onboarding, 2026-11-07). When the
+// disabled background swap is in play, the text goes back to muted ink.
+out.push(`.mi-light [class*="disabled:bg-"]:disabled{--color-white:#5b6470;box-shadow:inset 0 0 0 1px #cfd5dc;cursor:not-allowed}`);
 // bg-white in the dark UI = a light chip/button with dark text: keep it white with ink text
 out.push(`.mi-light :is([class^="bg-white "],[class*=" bg-white "],[class$=" bg-white"],[class="bg-white"]){background-color:#ffffff;border:1px solid #e3e7ec;--color-slate-900:#12100e;--color-gray-900:#12100e;--color-slate-800:#1f2937;--color-gray-800:#1f2937;--color-slate-700:#374151;--color-gray-700:#374151;--color-slate-600:#4b5563;--color-gray-600:#4b5563}`);
 // Page titles: serif like the homepage
