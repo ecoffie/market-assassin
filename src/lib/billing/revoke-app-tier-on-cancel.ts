@@ -38,8 +38,13 @@ import { PRO_AMOUNTS, TEAM_AMOUNTS } from '@/lib/mcp/app-tier-subscription';
 
 export type AppTier = 'pro' | 'team';
 
-/** Statuses where a subscription is still paying for (or recovering) access. */
-const LIVE_STATUSES = new Set(['active', 'trialing', 'past_due']);
+/**
+ * Statuses where another subscription may still be paying for (or recovering, or about
+ * to start) access. Deliberately wide: unpaid/paused can recover, and incomplete is a new
+ * checkout awaiting its first payment (3DS). Revoking under any of these is the
+ * cut-off-a-payer error. Same set as scripts/revoke-cancelled-app-tier.ts.
+ */
+export const LIVE_STATUSES = new Set(['active', 'trialing', 'past_due', 'unpaid', 'incomplete', 'paused']);
 
 /** Which app tier a subscription pays for, from its price amount (same rule as the credit grant). */
 export function appTierOfSubscription(sub: Pick<Stripe.Subscription, 'items'>): AppTier | null {
@@ -96,11 +101,20 @@ async function resolveEmail(stripe: Stripe, sub: Stripe.Subscription): Promise<s
 /** Any OTHER live Pro/Team subscription on any Stripe customer with this email. */
 async function hasOtherLiveAppSub(stripe: Stripe, email: string, endedSubId: string | null): Promise<boolean | null> {
   try {
-    // Search, not list: customers.list({ email }) is a case-SENSITIVE exact match and
-    // would miss a customer created as "Name@Domain.com".
-    const customers = await stripe.customers.search({ query: `email:'${email.replace(/'/g, "\\'")}'`, limit: 100 });
-    for (const c of customers.data) {
+    // Union of two lookups, because each misses something the other catches:
+    //   - customers.list({ email }) is strongly consistent but case-SENSITIVE, so it misses
+    //     a customer created as "Name@Domain.com";
+    //   - customers.search is case-insensitive but EVENTUALLY consistent (up to ~1 min), so
+    //     it can miss a customer created by a re-subscribe moments before this cancel.
+    const [listed, searched] = await Promise.all([
+      stripe.customers.list({ email, limit: 100 }),
+      stripe.customers.search({ query: `email:'${email.replace(/'/g, "\\'")}'`, limit: 100 }),
+    ]);
+    if (listed.has_more || searched.has_more) return null; // can't see them all → unknown
+    const byId = new Map([...listed.data, ...searched.data].map((c) => [c.id, c]));
+    for (const c of byId.values()) {
       const subs = await stripe.subscriptions.list({ customer: c.id, status: 'all', limit: 100 });
+      if (subs.has_more) return null;
       for (const s of subs.data) {
         if (s.id === endedSubId) continue;
         if (LIVE_STATUSES.has(s.status) && appTierOfSubscription(s)) return true;

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { appTierOfSubscription, revokeBlockReason, type RevokeGuardFacts } from '@/lib/billing/revoke-app-tier-on-cancel';
+import { appTierOfSubscription, revokeBlockReason, LIVE_STATUSES, type RevokeGuardFacts } from '@/lib/billing/revoke-app-tier-on-cancel';
 
 // The revoke runs inside a webhook that needs a signed Stripe event, so the store
 // writes are asserted on the source; the guard decision is asserted directly.
@@ -63,12 +63,32 @@ describe('the LIVE webhook actually calls it (the 2026-11 bug)', () => {
     );
   });
 
+  it('a guard it could not establish returns 503 so Stripe retries (never a silent 200)', () => {
+    expect(liveWebhook).toMatch(/reason\.startsWith\('guard_unknown'\)[\s\S]{0,200}status: retry \? 503 : 200/);
+  });
+
   it('the legacy handler uses the same shared path', () => {
     expect(legacyWebhook).toContain('revokeAppTierOnCancel(');
   });
 });
 
 const sub = (amount: number) => ({ items: { data: [{ price: { unit_amount: amount } }] } }) as never;
+
+describe('other-subscription check', () => {
+  it('treats recovering / pending subscriptions as live (never revoke under them)', () => {
+    for (const st of ['active', 'trialing', 'past_due', 'unpaid', 'incomplete', 'paused']) expect(LIVE_STATUSES.has(st)).toBe(true);
+    for (const st of ['canceled', 'incomplete_expired']) expect(LIVE_STATUSES.has(st)).toBe(false);
+  });
+
+  it('unions the consistent exact-email list with the case-insensitive search', () => {
+    expect(lib).toMatch(/customers\.list\(\{ email[\s\S]{0,200}customers\.search\(/);
+  });
+
+  it('a truncated customer or subscription page is unknown, not "none"', () => {
+    expect(lib).toMatch(/listed\.has_more \|\| searched\.has_more\) return null/);
+    expect(lib).toMatch(/subs\.has_more\) return null/);
+  });
+});
 
 describe('appTierOfSubscription', () => {
   it('maps Pro and Team prices', () => {

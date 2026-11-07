@@ -836,7 +836,15 @@ export async function POST(request: NextRequest) {
       const { revokeAppTierOnCancel } = await import('@/lib/billing/revoke-app-tier-on-cancel');
       const outcome = await revokeAppTierOnCancel(supabase, stripe, subscription);
       if (outcome.handled) {
-        return NextResponse.json({ received: true, action: 'app_tier_cancel', ...outcome });
+        // A guard that could not be established (e.g. Stripe errored) means we neither
+        // revoked nor proved we shouldn't. Return 503 so Stripe RETRIES (up to 3 days);
+        // a 200 here would make the miss permanent, which is the original bug for that
+        // customer. Every step is idempotent, so a retry is safe.
+        const retry = !outcome.revoked && outcome.reason.startsWith('guard_unknown');
+        return NextResponse.json(
+          { received: true, action: 'app_tier_cancel', ...outcome },
+          { status: retry ? 503 : 200 },
+        );
       }
     }
 

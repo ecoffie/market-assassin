@@ -50,7 +50,7 @@ import Stripe from 'stripe';
 import { kv } from '@vercel/kv';
 import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess } from '@/lib/api-auth';
-import { appTierOfSubscription, applyRevoke, gatherGuardFacts, revokeBlockReason } from '@/lib/billing/revoke-app-tier-on-cancel';
+import { appTierOfSubscription, applyRevoke, gatherGuardFacts, revokeBlockReason, LIVE_STATUSES } from '@/lib/billing/revoke-app-tier-on-cancel';
 
 // ---------- args ----------
 const argv = process.argv.slice(2);
@@ -70,7 +70,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 const norm = (e: string | null | undefined) => (e || '').toLowerCase().trim();
 const excluded = new Set(EXCLUDE_FILE ? fs.readFileSync(EXCLUDE_FILE, 'utf8').split('\n').map(norm).filter(Boolean) : []);
 
-const LIVE = new Set(['active', 'trialing', 'past_due', 'unpaid', 'incomplete', 'paused']);
+const LIVE = LIVE_STATUSES; // one definition, shared with the webhook
 
 interface StripeState {
   complete: boolean;
@@ -84,8 +84,14 @@ interface StripeState {
 async function stripeState(email: string): Promise<StripeState> {
   const empty: StripeState = { complete: false, customerIds: [], appSubs: [], verdict: 'unknown', endedTier: null };
   try {
-    const customers = await stripe.customers.search({ query: `email:'${email.replace(/'/g, "\\'")}'`, limit: 100 });
-    if (customers.has_more) return empty;
+    // Same union as the webhook: exact list (consistent, case-sensitive) + search
+    // (case-insensitive, eventually consistent).
+    const [listed, searched] = await Promise.all([
+      stripe.customers.list({ email, limit: 100 }),
+      stripe.customers.search({ query: `email:'${email.replace(/'/g, "\\'")}'`, limit: 100 }),
+    ]);
+    if (listed.has_more || searched.has_more) return empty;
+    const customers = { data: [...new Map([...listed.data, ...searched.data].map((c) => [c.id, c])).values()] };
     const appSubs: StripeState['appSubs'] = [];
     for (const c of customers.data) {
       for await (const s of stripe.subscriptions.list({ customer: c.id, status: 'all', limit: 100 })) {
