@@ -30,6 +30,11 @@
 /** Where the logo, "back to home", and post-signout landings go. Relative, for in-app links. */
 // Typed as `string`, not the literal: the whole point is that this value CHANGES at cutover,
 // and a narrowed literal type makes `MAPS_HOME_PATH === '/'` a compile error today.
+// 2026-11-05: back to '/today' — getmindy.ai/ now serves the marketing homepage (/home),
+// so the product's own front door is /today again and /today self-canonicals.
+// 2026-11-06 (Eric): "always send them to the homepage instead of /today". The logo, post-signout,
+// post-signin and onboarding-finish links all land on the homepage; /today itself redirects to /
+// (next.config.ts). ROLLBACK = set this back to '/today' and remove that redirect.
 export const MAPS_HOME_PATH: string = '/';
 
 /** Absolute origin of the site. Used for canonical/og:url, which must be absolute. */

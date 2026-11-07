@@ -115,6 +115,11 @@ const SECTIONS: { id: VaultSection; label: string; icon: LucideIcon; blurb: stri
 
 export default function VaultPanel({ email, tier, initialSection }: Props) {
   const [section, setSection] = useState<VaultSection>(initialSection || 'identity');
+  // A deep link (e.g. the map's /app?panel=vault&section=documents) can arrive after mount —
+  // follow it when it changes, but never override the user's own tab clicks otherwise.
+  useEffect(() => {
+    if (initialSection) setSection(initialSection);
+  }, [initialSection]);
   const [identity, setIdentity] = useState<IdentityProfile | null>(null);
   const [pastPerf, setPastPerf] = useState<PastPerf[]>([]);
   const [capabilities, setCapabilities] = useState<Capability[]>([]);

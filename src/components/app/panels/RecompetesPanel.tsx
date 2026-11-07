@@ -19,6 +19,8 @@ import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import { useDodaacNames } from '@/components/app/useDodaacNames';
 import StaleDataBanner from '@/components/app/StaleDataBanner';
 import { resolveEligibleSetAsides } from '@/lib/vault/certifications';
+import { mapLinkForRecompete } from '@/lib/maps/map-links';
+import MindyLoader from '@/components/app/MindyLoader';
 
 interface RecompetesPanelProps {
   email: string | null;
@@ -27,6 +29,9 @@ interface RecompetesPanelProps {
 
 interface ExpiringContract {
   piid: string;
+  // recompete_opportunities.contract_id — the map's ?recompete= record address. Distinct from
+  // the PIID (the map falls back to PIID, but contract_id is the exact key).
+  contractId?: string;
   title: string;
   incumbent: { name: string; uei: string };
   agency: string;
@@ -211,6 +216,7 @@ function mapRecompeteContract(contract: RecompeteApiContract): ExpiringContract 
 
   return {
     piid,
+    contractId: contract.contract_id || undefined,
     title: contract.description || contract.naics_description || `${incumbentName} recompete`,
     incumbent: {
       name: incumbentName,
@@ -662,18 +668,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
   const hasMoreThanShown = matchTotal !== null && (matchCapped || matchTotal > shownContractsCount);
 
   if (loading) {
-    return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-surface rounded w-48" />
-          <div className="grid grid-cols-3 gap-4">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-24 bg-surface rounded-xl" />
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    return <MindyLoader title="Loading expiring contracts" steps={["Contracts ending soon", "Current holders", "Contract values"]} />;
   }
 
   return (
@@ -1304,6 +1299,14 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                           email={email || ''}
                           variant="small"
                         />
+                        {(() => {
+                          const mapHref = mapLinkForRecompete(contract.contractId);
+                          return mapHref ? (
+                            <a href={mapHref} className="text-[11px] text-amber-400 hover:text-amber-300">
+                              Open on the map →
+                            </a>
+                          ) : null;
+                        })()}
                       </div>
                     </div>
                   </div>

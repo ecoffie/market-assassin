@@ -12,6 +12,7 @@ import { STATE_CENTROIDS } from '@/lib/geo/state-centroids';
 import { US_STATE_NAMES } from '@/lib/utils/us-states';
 import { INDUSTRY_PRESETS } from '@/lib/industry-presets';
 import { decodeFSC } from '@/lib/codes/fsc';
+import { DIBBS_MAP_ENABLED } from '@/lib/dibbs/availability';
 import { OPPORTUNITY_MAP_TEMPLATE } from './template-html';
 import { buildOppShareMeta, fetchOppShareRow, isNoticeId, renderOppShareHead } from '@/lib/opportunities/share-metadata';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from './account-menu';
@@ -362,7 +363,8 @@ const SERVER_FILTERS =
   // (User-facing name is "Players"; the value stays "companies" so no mode wiring changes.)
   +   '<option value="companies">Players</option>'
   // DLA — the 3rd top-level map (the "bid" client: price NSN parts, quote on DIBBS).
-  +   '<option value="dla">DLA Supply Bids</option>'
+  // Parked 2026-11-07 (DIBBS_MAP_ENABLED): no sustainable source, so the mode is not offered.
+  +   (DIBBS_MAP_ENABLED ? '<option value="dla">DLA Supply Bids</option>' : '')
   + '</select>'
   // HORIZONS multi-select dropdown — Zillow's "Home Type ▾" pattern (one control on the bar, opens
   // to colored checkboxes for the 4 categories, each with its REAL count). Replaces the loose pills
@@ -1124,6 +1126,15 @@ const ZLAYOUT_CSS = '<style>'
   // Narrow: hide the Explore eyebrow + Pursuits/Ask-Mindy, keep the two MAP links (the leading
   // .zh-explore <span> is child 1, so the two map <a>s are children 2-3 and Pursuits/Ask are 4+).
   + '@media(max-width:1000px){.zh-left,.zh-right{gap:14px}.zh-explore{display:none}.zh-left a:nth-child(n+4),.zh-right a:first-child{display:none}}'
+  // Not full screen (Eric 2026-11-06): the logo is absolutely centred, so between ~1000px and full
+  // width it slid UNDER "Bid with confidence" ("the options on the top blend together"). Below 1680px
+  // the logo joins the flex row (its own space, never on top of a link) and the lowest-priority links
+  // drop off in steps (checked at 1024–1920px: no link overlaps the logo or another link).
+  + '.zhead{gap:18px}.zh-left,.zh-right{min-width:0}'
+  + '@media(max-width:1680px){.zh-logo{position:static;transform:none;flex:none}}'
+  + '@media(max-width:1480px){.zh-right a[href="/bid"]{display:none}}'
+  + '@media(max-width:1280px){.zh-explore{display:none}.zh-right a[href="/learn"]{display:none}}'
+  + '@media(max-width:1140px){#mindyAnonSales{display:none!important}.zh-left a:nth-child(n+5){display:none}}'
   // far-left icon rail — PINNED (position:fixed) so grid/overflow can never push it off-screen.
   // The 50px grid column stays as its reserved space (kept empty; the fixed rail sits over it).
   + '.zrail{position:fixed;left:0;top:52px;width:64px;height:calc(100vh - 52px);height:calc(100dvh - 52px);'
@@ -1303,14 +1314,16 @@ const ZLAYOUT_CSS = '<style>'
   // ============================================================================
   // MOBILE (phone ≤640px) — the map + list can't sit side-by-side on a phone, so
   // this collapses the 3-column desktop grid into a Zillow-style single surface:
-  //   • LIST default (full-width results), MAP as a full-screen overlay behind it
-  //   • a floating "Map"/"List" toggle (#mToggle) flips body.m-map
+  //   • MAP default (full screen, Zillow 2026-11-06); the LIST sits behind it
+  //   • #mToggle is a bottom bar on the map ("N opportunities … · List") and a floating
+  //     "Map" pill on the list; it flips body.m-list
+  //   • tapping a pin shows its card as a bottom card (#mCard) instead of a map popup
   //   • the fixed icon rail is hidden → a hamburger (#mHam) opens a drawer (#mDrawer)
   //   • the top nav links collapse (they live in the drawer); only logo + hamburger stay
   // Desktop is untouched — every rule is inside this one media query. Mobile-only
   // elements (#mHam/#mToggle/#mDrawer) render on every viewport but are display:none
   // above 640px (see the base rules just below, gated by the same breakpoint).
-  + '#mHam,#mToggle,#mDrawer,#mScrim{display:none}'
+  + '#mHam,#mToggle,#mDrawer,#mScrim,#mCard{display:none}'
   + '@media(max-width:640px){'
   // 1) Grid → single column. zmap + zcards share ONE cell (row 3); we toggle which is
   //    visible. Header row stays; the ztop (search+filters) row stays full-width.
@@ -1337,26 +1350,65 @@ const ZLAYOUT_CSS = '<style>'
   // 4) Search/filters row. ⚠️ NEVER overflow:auto/hidden/scroll on .ztop — absolute dropdowns
   //    (Horizons, Sort, search suggestions, sheets) nest under it and get CLIPPED (same permanent
   //    rule as .fscroll). Pills shrink via nowrap + min-width:0; search absorbs the squeeze.
-  +   '.ztop{padding:8px 12px!important;gap:6px!important;overflow:visible!important}'
-  +   '.zsearch{max-width:none!important;flex:1 1 auto!important;min-width:120px!important}'
-  // 5) The two content layers share row 3 (grid-area:zcards). LIST is the default —
-  //    full-width, scrolls. MAP is positioned to fill the same cell but hidden until
-  //    body.m-map. Using grid-area (not fixed) so it respects the header/ztop rows.
+  +   '.ztop{padding:8px 12px!important;gap:8px!important;overflow:visible!important;flex-wrap:wrap!important}'
+  +   '.zsearch{max-width:none!important;flex:1 1 100%!important;min-width:0!important;height:44px!important;border-radius:999px!important}'
+  // Filter chips: compact and WRAPPED onto as many rows as they need. Before this they were one
+  // nowrap row and every chip past the screen edge (Agency, Industry, Filters, Save search) was
+  // unreachable on a phone. Wrapping, not a sideways scroller: .fscroll must never carry a
+  // clipping overflow (filter-bar-overflow.unit.test.ts — it broke the dropdowns three times).
+  +   '.ztop .fbar{flex:1 1 100%!important;min-width:0!important;width:100%!important}'
+  +   '.ztop .fbar .fscroll{flex-wrap:wrap!important;row-gap:6px!important;column-gap:6px!important}'
+  +   '.ztop .fbar .fscroll .fsel{height:34px!important;padding-top:0!important;padding-bottom:0!important;font-size:13.5px!important}'
+  +   '.ztop .fbar .fscroll button.fsel{padding-left:11px!important;padding-right:11px!important;gap:5px!important}'
+  +   '.ztop .fbar .fscroll button.fsel-mode{padding-right:27px!important;background-position:right 9px center!important}'
+  +   '.ztop .fbar .fscroll select.fsel{padding-left:11px!important;padding-right:28px!important;background-position:right 9px center!important}'
+  // Save search floats on the map's top-right (Zillow) so the chips fit in two rows.
+  +   '#saveSearchBtn{position:fixed!important;right:12px;top:calc(var(--m-top,200px) + 10px);z-index:1200;height:36px!important;'
+  +     'padding:0 14px!important;border-radius:999px!important;box-shadow:0 2px 10px rgba(16,24,40,.2)!important}'
+  +   'body.m-list #saveSearchBtn{position:static!important;box-shadow:none!important}'
+  // 5) The two content layers share row 3 (grid-area:zcards). MAP is the default (Zillow,
+  //    2026-11-06); the LIST fills the same cell but stays hidden until body.m-list. Using
+  //    grid-area (not fixed) so it respects the header/ztop rows.
   +   '.panel{grid-area:zcards!important;border-left:0!important;border-top:1px solid var(--line)!important;'
-  +     'width:100%!important;min-width:0!important;z-index:2}'
-  +   '.mapwrap{grid-area:zcards!important;border-top:1px solid var(--line);z-index:1;'
-  +     'visibility:hidden;pointer-events:none}'
+  +     'width:100%!important;min-width:0!important;z-index:2;visibility:hidden;pointer-events:none}'
+  +   '.mapwrap{grid-area:zcards!important;border-top:1px solid var(--line);z-index:3}'
   // Feed padding trims for phone width.
   +   '.feed{padding:12px 12px 90px!important}'
-  //    body.m-map: show MAP, hide LIST.
-  +   'body.m-map .mapwrap{visibility:visible!important;pointer-events:auto!important;z-index:3!important}'
-  +   'body.m-map .panel{visibility:hidden!important;pointer-events:none!important}'
-  // 6) Floating Map/List toggle — bottom-center pill (Zillow). Above the map, below the drawer.
-  +   '#mToggle{display:inline-flex!important;align-items:center;gap:7px;position:fixed;left:50%;'
-  +     'bottom:20px;transform:translateX(-50%);z-index:1400;border:0;cursor:pointer;'
-  +     'background:#111c26;color:#fff;font:700 14px Inter,system-ui,sans-serif;padding:12px 20px;'
-  +     'border-radius:22px;box-shadow:0 6px 20px rgba(16,24,40,.28)}'
-  +   '#mToggle svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}'
+  //    body.m-list: show LIST, hide MAP.
+  +   'body.m-list .panel{visibility:visible!important;pointer-events:auto!important;z-index:3!important}'
+  +   'body.m-list .mapwrap{visibility:hidden!important;pointer-events:none!important}'
+  // Map controls (zoom, legend, attribution) sit above the bottom bar.
+  +   '.mapwrap .leaflet-bottom{bottom:86px!important}'
+  // The map's count pill is mirrored into the bottom bar (#mToggleCount, same words, including
+  // "N not shown on map"), so it is hidden here rather than shown twice.
+  +   '#mapCount{display:none!important}'
+  // Pin popups render as a bottom card (#mCard) on phones; MOBILE_JS moves the popup's own content
+  // into it, so the in-map bubble is hidden (it was clipped under the header on a 390px screen).
+  +   '.mapwrap .leaflet-popup{visibility:hidden!important}'
+  +   '#mCard{display:block!important;position:fixed;left:10px;right:10px;bottom:96px;z-index:1300;max-height:min(50vh,440px);'
+  +     'overflow-y:auto;background:#fff;border-radius:16px;box-shadow:0 12px 32px rgba(16,24,40,.28);'
+  +     'transform:translateY(calc(100% + 120px));transition:transform .22s cubic-bezier(.4,0,.2,1);-webkit-overflow-scrolling:touch}'
+  +   'body.m-card #mCard{transform:none}'
+  +   'body.m-list #mCard{display:none!important}'
+  +   '#mCardBody{padding:4px 2px 6px}'
+  +   '#mCardBody .leaflet-popup-content{margin:0!important;width:auto!important}'
+  +   '#mCardX{position:sticky;top:8px;float:right;margin:8px 8px 0 0;z-index:2;width:34px;height:34px;border:0;border-radius:50%;'
+  +     'background:#fff;box-shadow:0 1px 4px rgba(16,24,40,.2);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center}'
+  +   '#mCardX svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round}'
+  // 6) The toggle. On the MAP it is a bottom bar (Zillow's results sheet): a handle, the map's
+  //    count, and "List". On the LIST it is a floating "Map" pill, bottom-center.
+  +   '#mToggle{display:flex!important;align-items:center;gap:10px;position:fixed;left:0;right:0;bottom:0;'
+  +     'z-index:1400;border:0;cursor:pointer;background:#fff;color:var(--ink);text-align:left;'
+  +     'font:700 14px Inter,system-ui,sans-serif;padding:22px 18px calc(16px + env(safe-area-inset-bottom,0px));'
+  +     'border-radius:18px 18px 0 0;box-shadow:0 -6px 20px rgba(16,24,40,.14)}'
+  +   '#mToggle::before{content:"";position:absolute;top:8px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:99px;background:#d5dbe2}'
+  +   '#mToggleCount{flex:1;min-width:0;font:700 15px/1.3 Inter,system-ui,sans-serif;color:var(--ink)}'
+  +   '#mToggleLbl{color:var(--jan,#2563eb)}'
+  +   '#mToggle svg{width:17px;height:17px;flex:none;color:var(--jan,#2563eb);stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}'
+  +   'body.m-list #mToggle{left:50%;right:auto;bottom:20px;transform:translateX(-50%);gap:7px;padding:12px 20px;'
+  +     'background:#111c26;color:#fff;border-radius:22px;box-shadow:0 6px 20px rgba(16,24,40,.28)}'
+  +   'body.m-list #mToggle::before,body.m-list #mToggleCount{display:none}'
+  +   'body.m-list #mToggleLbl,body.m-list #mToggle svg{color:#fff}'
   // 7) Slide-in drawer (the rail, as a menu) + scrim.
   +   '#mScrim{display:block!important;position:fixed;inset:0;background:rgba(16,24,40,.42);'
   +     'z-index:1500;opacity:0;pointer-events:none;transition:opacity .2s}'
@@ -1537,7 +1589,10 @@ const ZHEAD_HTML = '<header class="zhead">'
   // code (ASK_MINDY_JS / window.openAskMindy) is left intact but has NO entry point, so nothing opens
   // it — re-add this <a class="zh-ask"> link + the search-panel zsp-ask rows to bring it back.
   + '</nav>'
-  + '<a href="${MAPS_HOME_PATH}" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>'
+  // Logo → MAPS_HOME_PATH (the product front door). A backtick template on purpose: this used to
+  // be '…href="${MAPS_HOME_PATH}"…' in SINGLE quotes, so the browser got the literal text and the
+  // click went nowhere. Guarded by logo-link.unit.test.ts.
+  + `<a href="${MAPS_HOME_PATH}" title="Mindy home" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>`
   + '<nav class="zh-right">'
   // Ask Mindy now lives in the LEFT nav (after Pursuits, per the approved mockup) — the redundant
   // right-side purple pill was removed 2026-08-02 so there's ONE header doorway (nav) + the map's
@@ -1569,8 +1624,13 @@ const LEGEND_HTML = '';
 // routes; the two map-mode links call setMapMode (already defined by VIEWPORT_JS).
 const MOBILE_HTML = ''
   + '<button id="mToggle" onclick="window.__mToggle&&window.__mToggle()">'
-  +   '<svg id="mToggleIcon" viewBox="0 0 24 24"><path d="M9 3L4 5v16l5-2 6 2 5-2V3l-5 2-6-2z"/><path d="M9 3v16M15 5v16"/></svg>'
-  +   '<span id="mToggleLbl">Map</span></button>'
+  +   '<span id="mToggleCount">Opportunities in this area</span>'
+  +   '<svg id="mToggleIcon" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>'
+  +   '<span id="mToggleLbl">List</span></button>'
+  // Bottom card for a tapped pin (phones). MOBILE_JS fills #mCardBody with the pin popup's content.
+  + '<div id="mCard" role="dialog" aria-label="Opportunity"><button id="mCardX" type="button" aria-label="Close"'
+  +   ' onclick="window.__mCloseCard&&window.__mCloseCard()"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>'
+  +   '<div id="mCardBody"></div></div>'
   + '<div id="mScrim" onclick="window.__mDrawer&&window.__mDrawer(false)"></div>'
   + '<nav id="mDrawer" aria-label="Navigation">'
   +   '<div class="md-brand"><img src="/brand/mindy-logo-icon.png" alt=""/><b>Mindy</b></div>'
@@ -1594,39 +1654,54 @@ const MOBILE_HTML = ''
 // paints correctly after being visibility:hidden); body.m-drawer = drawer open. Both no-ops on
 // desktop (the elements are display:none). Guarded so a missing `map` never throws.
 const MOBILE_JS = '<script>(function(){'
+  // Same breakpoint as the mobile CSS. (Not offsetParent: #mToggle is position:fixed, and a fixed
+  // element's offsetParent is always null, so that test was never true.)
+  + 'function phone(){try{return window.matchMedia("(max-width:640px)").matches;}catch(e){return false;}}'
   + 'window.__mToggle=function(){'
-  +   'var on=document.body.classList.toggle("m-map");'
-  +   'var lbl=document.getElementById("mToggleLbl");if(lbl)lbl.textContent=on?"List":"Map";'
+  +   'var list=document.body.classList.toggle("m-list");'
+  +   'var lbl=document.getElementById("mToggleLbl");if(lbl)lbl.textContent=list?"Map":"List";'
   +   'var ic=document.getElementById("mToggleIcon");'
-  +   'if(ic)ic.innerHTML=on'
-  +     '?\'<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/>\''  // list icon
-  +     ':\'<path d="M9 3L4 5v16l5-2 6 2 5-2V3l-5 2-6-2z"/><path d="M9 3v16M15 5v16"/>\';'  // map icon
-  +   'if(on){try{setTimeout(function(){try{map.invalidateSize();fitView&&fitView();}catch(e){}},60);}catch(e){}}'
+  +   'if(ic)ic.innerHTML=list'
+  +     '?\'<path d="M9 3L4 5v16l5-2 6 2 5-2V3l-5 2-6-2z"/><path d="M9 3v16M15 5v16"/>\''  // map icon
+  +     ':\'<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/>\';'  // list icon
+  +   'if(list){try{window.__mCloseCard();}catch(e){}}'
+  +   'else{try{setTimeout(function(){try{map.invalidateSize();}catch(e){}},60);}catch(e){}}'
   + '};'
   + 'window.__mDrawer=function(open){document.body.classList.toggle("m-drawer",!!open);};'
-  // EMAIL ARRIVALS LAND ON THE MAP, NOT THE LIST (2026-08-19).
-  // MEASURED on a real iPhone viewport: "Open Today's Map" in the daily alert landed on
-  // the LIST with no map visible — the email promises a map, the destination showed rows.
-  // Mission Control: 1,141 alert opens -> 49 reached the map (4.3%), and email opens skew
-  // to phones. Scoped to ?src=alert ONLY, so a normal mobile visit keeps its deliberate
-  // list-first default. Desktop is unaffected (the mobile chrome is display:none there).
-  // ⚠️ THIS MUST LIVE HERE, in the same IIFE that DEFINES __mToggle. Earlier attempts put
-  // it in the boot script and in a self-arming interval; both failed silently — this route
-  // emits several <script> IIFEs and there are TWO boot paths (finishBoot, and one that
-  // calls releaseFit()+__mapRefetch() directly). Defining it beside its only dependency
-  // removes both failure modes. (See the cross-script-block class in route.ts:1671.)
-  // Gate on the MOBILE TOGGLE BUTTON being visible (offsetParent!==null): that button is
-  // display:none on desktop, so this is the honest "am I on the mobile chrome?" test and
-  // desktop never gets the class at all. (Setting it there was inert — the chrome is hidden
-  // and desktop rendered fine — but a no-op class on a surface I said I would not touch is
-  // still a lie in the diff.)
-  + 'if(/[?&]src=alert/.test(location.search)){'
-  +   'setTimeout(function(){try{'
-  +     'var tb=document.getElementById("mToggleLbl");'
-  +     'if(!tb||tb.offsetParent===null)return;'
-  +     'if(!document.body.classList.contains("m-map"))window.__mToggle();'
-  +   '}catch(e){}},400);'
-  + '}'
+  // The MAP is the phone default since 2026-11-06 (Zillow), so email arrivals (?src=alert) land on
+  // the map with no special case — the old list-first default and its ?src=alert override are gone.
+  //
+  // Bottom bar count: the same words as the map's count pill (#mapCount, hidden on phones), so the
+  // map-truth line ("N not shown on map") still reaches the user. Polled lightly: #mapCount is
+  // rewritten by several render paths and is created after this script runs.
+  + 'var _lastTop=0;setInterval(function(){try{if(!phone())return;var zt=document.querySelector(".ztop");if(!zt)return;'
+  +   'var b=Math.round(zt.getBoundingClientRect().bottom);if(b!==_lastTop){_lastTop=b;document.documentElement.style.setProperty("--m-top",b+"px");}'
+  + '}catch(e){}},400);'
+  + 'var _lastCt=null;setInterval(function(){try{'
+  +   'var mc=document.getElementById("mapCount"),out=document.getElementById("mToggleCount");if(!out)return;'
+  +   'var t=(mc&&!mc.hidden&&mc.textContent.trim())||"Opportunities in this area";'
+  +   'if(t!==_lastCt){_lastCt=t;out.textContent=t;}'
+  + '}catch(e){}},400);'
+  // Pin tap → bottom card. The popup still opens (its telemetry and CTA wiring run first); a tick
+  // later its content nodes are MOVED into #mCard (moved, not copied, so listeners come along) and
+  // the in-map bubble stays hidden by CSS. Leaflet rebuilds the popup content on every open.
+  + 'window.__mCloseCard=function(){document.body.classList.remove("m-card");try{map.closePopup();}catch(e){}'
+  +   'var bd=document.getElementById("mCardBody");if(bd)bd.innerHTML="";};'
+  + 'var _wired=false;var _wt=setInterval(function(){'
+  +   'if(_wired){clearInterval(_wt);return;}'
+  +   'if(typeof map==="undefined"||!map||!map.on||typeof L==="undefined")return;'
+  +   '_wired=true;clearInterval(_wt);'
+  +   'if(phone()){try{L.Popup.prototype.options.autoPan=false;}catch(e){}}'
+  +   'map.on("popupopen",function(ev){if(!phone())return;setTimeout(function(){try{'
+  +     'var src=ev.popup&&ev.popup._contentNode;var bd=document.getElementById("mCardBody");if(!src||!bd)return;'
+  +     'bd.innerHTML="";var wrap=document.createElement("div");wrap.className="leaflet-popup-content";'
+  +     'while(src.firstChild)wrap.appendChild(src.firstChild);bd.appendChild(wrap);'
+  +     'var card=document.getElementById("mCard");if(card)card.scrollTop=0;'
+  +     'document.body.classList.add("m-card");'
+  +   '}catch(e){}},0);});'
+  +   'map.on("popupclose",function(){if(!phone())return;document.body.classList.remove("m-card");'
+  +     'var bd=document.getElementById("mCardBody");if(bd)bd.innerHTML="";});'
+  + '},300);'
   // Close the drawer on Escape / back-gesture safety.
   + 'document.addEventListener("keydown",function(e){if(e.key==="Escape")window.__mDrawer(false);});'
   + '})();</script>';
@@ -1641,6 +1716,9 @@ const MOBILE_JS = '<script>(function(){'
 // <script>, loaded before VIEWPORT_JS (which calls it), so no template interpolation sits inside
 // the statically syntax-checked viewport script.
 const PLAYERS_COPY_JS = '<script>window.__playersHeaderText=' + PLAYERS_HEADER_TEXT_JS + ';</script>';
+// DIBBS map switch (src/lib/dibbs/availability.ts). Same reason as above: its own <script>,
+// loaded before VIEWPORT_JS, so the syntax-checked viewport script has no interpolation.
+const DIBBS_FLAG_JS = '<script>window.__DIBBS_MAP_ENABLED=' + String(DIBBS_MAP_ENABLED) + ';</script>';
 // What a signed-in Save search can watch (F1). Defined before VIEWPORT_JS, whose handler calls it.
 const WATCH_SCOPE_SCRIPT = '<script>' + WATCH_SCOPE_JS + '</script>';
 const VIEWPORT_JS = `<script>
@@ -1668,6 +1746,9 @@ const VIEWPORT_JS = `<script>
     // NAICS). Removing the old Source dropdown that used to mix DLA into Open. (Eric 2026-07-31.)
     dla:{ ep:'/api/app/opportunity-map', dla:true, title:'DLA Supply Bids', unit:'DLA supply RFQs' }
   };
+  // DIBBS parked (DIBBS_MAP_ENABLED): drop the mode so setMapMode('dla') from a saved search or
+  // an old link is a no-op and the map stays on Opportunities.
+  if(!window.__DIBBS_MAP_ENABLED){ delete MODES.dla; }
   var MODE='open'; window.__mapMode='open';
   function isContactMode(m){ return m==='companies'||m==='buyers'; }
   // Dataset-level color (Eric 2026-07-26): a COMPANY (a contractor you compete/team with) and a
@@ -5742,79 +5823,9 @@ const SAVE_JS = `<script>
   // Run AFTER both helpers exist (the documented cross-block ordering trap).
   try{ window.__loadAnonShortlist(); }catch(e){}
 
-  window.savePursuit=function(btn){
-    if(btn.dataset.saved==='1')return;
-    // ── ANONYMOUS VISITORS CAN KEEP A LISTING ────────────────────────────────
-    // Map funnel, 30 days: 2,021 users opened a listing and 53 started a pursuit
-    // (2.6%). The listing already explains WHY (the Why-chips, Should-I-bid, the
-    // M-Estimate) — what stopped them was this requireSignIn call, because 96%
-    // of map users (8,254 of 8,583) are not signed in. A permission failure, not
-    // a comprehension one.
-    //
-    // Signed out -> save to an anonymous shortlist keyed on the SAME stable
-    // localStorage id the telemetry already uses. It becomes a real pursuit when
-    // an identity claims it; the signed-in path below is untouched.
-    var _tk=tok();
-    if(!_tk || !_signedInEmail()){
-      var _aid2=_anonKey();
-      var _sol2=btn.dataset.sol, _o2=null;
-      try{ _o2=(OPPS||[]).find(function(x){return x.sol===_sol2;}); }catch(e){}
-      // ⚠️ nid IS NOT sol. map-data sets id = sam_opportunities.notice_id and
-      // sol = solicitation_number, and the Map preserves nid=p.id, sol=p.sol||p.id.
-      // Measured on production: 10,824 of 10,932 open SAM rows (99.0%) have
-      // nid != sol, and solicitation_number is not even unique (8,549 distinct
-      // for 10,824 rows, worst collision 18). The shortlist API matches on
-      // notice_id and the table's FK references notice_id, so sending sol
-      // returned "unknown noticeId" for effectively the whole corpus.
-      //
-      // Only a SAM listing has a canonical notice id. DLA / forecast / grants /
-      // recompete / contact pins carry their own id in that field, so they are
-      // NOT eligible — and we never substitute a solicitation number for a
-      // notice id. Ineligible rows fall through to the normal sign-in path,
-      // exactly as they behaved before this feature existed.
-      var _nid2=(_o2&&_o2.src==='SAM')?String(_o2.nid||''):'';
-      var _canon2=/^[a-f0-9]{32}$/i.test(_nid2);
-      if(_aid2&&_o2&&_canon2){
-        btn.textContent='Saving\u2026'; btn.disabled=true;
-        // ONLY the notice id. The browser must not be able to manufacture
-        // opportunity metadata that could later become a real pursuit — the
-        // server resolves title/agency/NAICS/deadline from sam_opportunities.
-        fetch('/api/app/shortlist',{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({anonId:_aid2,noticeId:_nid2})})
-          .then(function(r){return r.json();}).then(function(d){
-            btn.disabled=false;
-            if(d&&d.success){
-              btn.dataset.saved='1';
-              btn.textContent=d.duplicate?'\u2713 Already saved':'\u2713 Saved';
-              try{ window.__anonSaved[_nid2]=1; }catch(e){}
-              // Only count a NEW save, so a repeat click cannot inflate the funnel.
-              // The CANONICAL notice id, so this joins back to sam_opportunities.
-              try{ if(window.__track && !d.duplicate) window.__track('tool_use','shortlist_saved',
-                {anonymous:true,notice_id:_nid2,agency:String(_o2.agency||'')}); }catch(e){}
-            } else btn.textContent='Couldn\\'t save';
-          }).catch(function(){ btn.disabled=false; btn.textContent='Couldn\\'t save'; });
-        return;
-      }
-    }
-    var a=window.requireSignIn('save this to your pursuits', function(){ window.savePursuit(btn); }); if(!a)return;
-    var t=a.t, em=a.em;
-    var sol=btn.dataset.sol, o=null;
-    try{ o=(OPPS||[]).find(function(x){return x.sol===sol;}); }catch(e){}
-    if(!o)return;
-    btn.textContent='Saving\\u2026'; btn.disabled=true;
-    fetch('/api/pipeline',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
-      body:JSON.stringify({user_email:em,title:o.title,notice_id:o.sol,agency:o.agency,naics_code:o.naics,response_deadline:o.close,source:'opportunity_map'})})
-    // Verdict by HTTP status (409 = already tracked), never by body shape: a non-JSON 5xx
-    // parses to {} and must not read as a save. (Same rule as DRAWER_JS postSave.)
-    .then(function(r){return r.json().catch(function(){return {};}).then(function(d){ return {r:r,d:d||{}}; });}).then(function(x){
-      var dup=x.r.status===409;
-      if(x.r.ok||dup){ btn.textContent=dup?'\\u2713 In pursuits':'\\u2713 Saved'; btn.classList.add('saved'); btn.dataset.saved='1';
-        // FUNNEL: pursuit_started — a real save to My Pursuits (the fifth funnel step). Only on a
-        // genuine save (dup counts too — the intent happened). notice_id in metadata for join-back.
-        try{ if(window.__track && !dup) window.__track('tool_use','pursuit_started',{notice_id:String(o.sol),agency:String(o.agency||'')}); }catch(e){} }
-      else { btn.textContent='Try again'; btn.disabled=false; }
-    }).catch(function(){ btn.textContent='Try again'; btn.disabled=false; });
-  };
+  // window.savePursuit was DELETED 2026-11-06: it had ZERO call sites (its only reference was its
+  // own sign-in retry callback — see the note in saveCurrentOpp). The anonymous shortlist lives in
+  // saveCurrentOpp, the function every live Save / Start-pursuit button calls.
   // 1-click Favorites heart on the popup card → toggles /api/opportunities/save (POST/DELETE).
   var _favs={};
   window.toggleFav=function(btn){
@@ -6339,14 +6350,36 @@ const DRAWER_JS = `<script>
     return {url:'/api/pipeline',body:{user_email:a.em,title:CUR.title,notice_id:CUR.id,agency:CUR.department,naics_code:CUR.naics,response_deadline:CUR.deadline,source:'opportunity_map'}};
   }
   function saveOutcome(r){ if(r&&r.ok)return 'saved'; if(r&&r.status===409)return 'dup'; return 'fail'; }
+  // A recompete PURSUIT (My Pursuits = user_pipeline), via the same /api/pipeline ->
+  // createCanonicalPursuit writer every other pursuit uses. saveReq() above keeps writing the
+  // Favorites snapshot for a recompete (the map's Saved page reads it); this is the SECOND write
+  // "Track this recompete" makes, because its label says "Tracked" and its sign-in prompt says
+  // "save this to your pursuits" — and before 2026-11-06 it never reached user_pipeline at all.
+  // notice_id = the PIID, the same key the app's Recompetes panel already tracks a contract under,
+  // so the two surfaces dedupe on user_pipeline UNIQUE(user_email, notice_id). NOT the contract_id
+  // (CONT_AWD_..._9700_-NONE-): its underscores fail isValidSamNoticeId, the writer nulls it, and
+  // every re-click would then insert a duplicate. No PIID -> null (no pursuit we could dedupe).
+  // response_deadline is deliberately absent: the contract's EXPIRY is not a bid deadline.
+  function recompetePursuitReq(a){
+    if(!CUR||CUR.kind!=='recompete')return null;
+    // A vehicle rollup carries "PIID (+N more)" — the same suffix usaspendingUrlForRecompete strips.
+    // Same regex as src/lib/recompete/pursuit-key.ts (pinned by recompete-pursuit-key-parity.unit.test.ts).
+    var piid=String(CUR.solicitation||'').replace(/\\s*\\(\\+\\d+\\s*more\\)\\s*$/i,'').trim();
+    if(!piid)return null;
+    var inc=String(CUR.title||'').trim()||'Awarded contract';
+    return {url:'/api/pipeline',body:{user_email:a.em,title:'Recompete: '+inc+' \\u00b7 '+piid,notice_id:piid,
+      agency:CUR.department,naics_code:CUR.naics,external_url:CUR.uiLink||undefined,source:'recompete_map'}};
+  }
   // Resolves {state:'saved'|'dup'|'fail', d:<parsed body or {}>, pipeline:boolean}. Never rejects.
-  function postSave(a){
-    var q=saveReq(a);
+  function postSave(a){ return postReq(a,saveReq(a)); }
+  function postReq(a,q){
     return fetch(q.url,{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},body:JSON.stringify(q.body)})
       .then(function(r){ return r.json().catch(function(){return {};}).then(function(d){ return {state:saveOutcome(r),d:d||{},pipeline:q.url==='/api/pipeline'}; }); },
             function(){ return {state:'fail',d:{},pipeline:q.url==='/api/pipeline'}; });
   }
   window.__mapPostSave=postSave;
+  window.__mapRecompetePursuitReq=recompetePursuitReq;
+  window.__mapPostReq=postReq;
   var _save=document.getElementById('oppSave');
   if(_save)_save.onclick=function(){ if(!CUR)return; if(_save.dataset.busy==='1'||_save.classList.contains('done'))return;
     var a=_auth(); if(!a.t||!a.em){ if(window.openSignInModal){window.openSignInModal('save this',function(){location.reload();});}else{location.href='/app?next=%2Fopportunity-map';} return; }
@@ -6753,7 +6786,7 @@ const DRAWER_JS = `<script>
   window.saveCurrentOpp=function(btn,done){
     if(!CUR||btn.dataset.saved==='1'){ if(typeof done==='function')done(btn.dataset.saved==='1',btn.dataset.pursuitId||''); return; }
     // ── ANONYMOUS VISITORS CAN KEEP A LISTING — the REACHABLE path ───────────
-    // #1601 shipped the anonymous shortlist on window.savePursuit, which has ZERO
+    // #1601 shipped the anonymous shortlist on window.savePursuit (deleted 2026-11-06), which had ZERO
     // call sites. Measured on the SERVING production page 2026-09-21: "savePursuit"
     // appears exactly twice (its own definition and its own sign-in retry callback),
     // while "saveCurrentOpp" appears 13 times — every live Save / Start-pursuit /
@@ -6807,7 +6840,11 @@ const DRAWER_JS = `<script>
     var t=a.t, em=a.em;
     setBtnLabel(btn,'Saving\\u2026');
     // Same body builder + status verdict as the action bar (postSave): a non-2xx is never a save.
-    postSave({t:t,em:em}).then(function(res){
+    // A RECOMPETE goes to the pursuit request instead: saveReq() files a recompete as a Favorite,
+    // which has no pursuit row id — and "Draft capture strategy" (openProposalWorkspace) needs one
+    // for ?pursuit=<id>. Drafting against something IS working it.
+    var _rq=recompetePursuitReq({t:t,em:em});
+    (_rq?postReq({t:t,em:em},_rq):postSave({t:t,em:em})).then(function(res){
       var d=res.d, dup=res.state==='dup';
       if(res.state==='saved'||dup){ setBtnLabel(btn,dup?'\\u2713 In pursuits':'\\u2713 Tracked'); btn.classList.add('saved'); btn.dataset.saved='1';
         // The pursuit ROW id — returned on a fresh save AND (since 2026-08-13) alongside the 409 for
@@ -7897,9 +7934,10 @@ const DRAWER_JS = `<script>
   // Zillow-parity activity row for the Awarded/Recompete drawer — dataset-appropriate: this is an
   // AWARD, not a live notice, so "posted"/"closes" don't apply; the real activity signal is how
   // soon it EXPIRES (real field: o.exp, the USASpending period_of_performance_current_end). A
-  // per-contract tracking count is NOT reliably groundable today — "Track this recompete" saves
-  // via /api/opportunities/save?source=recompete_map, and a live count check found ZERO rows on
-  // that source (2026-07-26) — so no fabricated "N tracking this" here (ground-in-real-data). If a
+  // per-contract tracking count is NOT reliably groundable today — "Track this recompete" saved
+  // via /api/opportunities/save?source=recompete_map (and, since 2026-11-06, also a user_pipeline
+  // row with source=recompete_map), and a live count check found ZERO rows on that source
+  // (2026-07-26) — so no fabricated "N tracking this" here (ground-in-real-data). If a
   // real join is ever added, thread it in as extra.trackingCount and this will show it (>=2 only),
   // matching the open-opp drawer's rule exactly.
   function recompeteActivitySec(o,extra){
@@ -8066,27 +8104,40 @@ const DRAWER_JS = `<script>
   function recompeteActions(o){
     return '<div class="oact">'
       + '<button class="b pri" onclick="saveCurrentRecompete(this)">Track this recompete</button>'
-      // Map-native workspace, same as "Generate proposal" (Eric 2026-08-13). NOTE this deliberately
-      // uses the PIPELINE path (openProposalWorkspace -> saveCurrentOpp), not saveCurrentRecompete:
-      // that one posts to /api/opportunities/save (saved opportunities), which produces no pursuit
-      // row — and the workspace keys on ?pursuit=<id>. Drafting against something IS working it, so
-      // it belongs in pursuits. "Track this recompete" beside it keeps its own meaning untouched.
+      // Map-native workspace, same as "Generate proposal" (Eric 2026-08-13). It uses the PIPELINE
+      // path (openProposalWorkspace -> saveCurrentOpp -> recompetePursuitReq), because the workspace
+      // keys on ?pursuit=<id>. Drafting against something IS working it, so it belongs in pursuits.
+      // "Track this recompete" beside it now ALSO creates the pursuit (plus its Favorites snapshot).
       + '<button class="b" onclick="openProposalWorkspace(this)" data-act="draft a capture strategy">Draft capture strategy</button>'
       + '<a class="b" href="'+esc(usaspendingUrlForRecompete(o))+'" target="_blank" rel="noopener">View on USASpending \\u2197</a>'
       + '</div>';
   }
-  // "Track this recompete" — the in-body Save (gap 4). Mirrors saveCurrentCompany/saveCurrentBuyer:
-  // saves the recompete via /api/opportunities/save (source=recompete_map, PIID as noticeId) with a
-  // snapshot so the Favorites page renders it without a sam_opportunities hydration hit (a recompete
-  // has NO sam_opportunities row). Idempotent + optimistic label.
+  // "Track this recompete" — the in-body Save (gap 4). TWO writes, both idempotent:
+  //   1. the Favorites snapshot via /api/opportunities/save (source=recompete_map, contract id as
+  //      noticeId) so the Saved page renders it without a sam_opportunities hydration hit (a
+  //      recompete has NO sam_opportunities row) — unchanged;
+  //   2. a PURSUIT via /api/pipeline (recompetePursuitReq), so "Tracked" is true: the recompete is
+  //      in My Pursuits. It used to stop at (1) — "Tracked" with no user_pipeline row anywhere.
+  // Label truth (HTTP status only, never body shape): "Tracked"/"In pursuits" ONLY when the pursuit
+  // write succeeded; a Favorites-only success says "Saved" and leaves the button retryable.
   window.saveCurrentRecompete=function(btn){
     if(!CUR||CUR.kind!=='recompete'||btn.dataset.saved==='1')return;
     var a=window.requireSignIn('save this to your pursuits'); if(!a)return;
     btn.textContent='Saving\\u2026';
-    // Shared body builder + HTTP-status verdict (postSave) — a non-JSON 500 is not a save.
-    postSave(a).then(function(res){
-      var dup=res.state==='dup';
-      if(res.state==='saved'||dup){ btn.textContent=dup?'\\u2713 Tracked':'\\u2713 Tracked'; btn.classList.add('saved'); btn.dataset.saved='1'; }
+    var rec=CUR, pq=recompetePursuitReq(a);
+    Promise.all([postSave(a), pq?postReq(a,pq):Promise.resolve(null)]).then(function(rs){
+      var fav=rs[0], pur=rs[1];
+      var favOk=fav.state==='saved'||fav.state==='dup';
+      var purOk=!!pur&&(pur.state==='saved'||pur.state==='dup');
+      if(purOk){
+        btn.textContent=(pur.state==='dup')?'\\u2713 In pursuits':'\\u2713 Tracked'; btn.classList.add('saved'); btn.dataset.saved='1';
+        var _pid=(pur.d&&pur.d.opportunity&&pur.d.opportunity.id)?String(pur.d.opportunity.id):'';
+        if(_pid)btn.dataset.pursuitId=_pid;
+        // FUNNEL: pursuit_started — only a NEW pursuit counts (mirrors saveCurrentOpp).
+        try{ if(window.__track && pur.state==='saved') window.__track('tool_use','pursuit_started',{notice_id:String(rec.id),kind:'recompete',agency:String(rec.department||'')}); }catch(e){}
+      }
+      else if(favOk&&!pq){ btn.textContent='\\u2713 Saved'; btn.classList.add('saved'); btn.dataset.saved='1'; } // no PIID: nothing a pursuit could key on
+      else if(favOk) btn.textContent='Saved \\u00b7 retry pursuit';
       else btn.textContent='Try again';
     });
   };
@@ -11194,7 +11245,7 @@ export async function GET(request: NextRequest) {
     // LOGIN_MODAL_HTML has a latent unclosed <div>, so blocks parsed after it can nest inside a
     // hidden overlay. Its own HTML is div-balanced; the JS goes at the end with the other scripts.
     // MARKET_FEEDBACK_JS precedes VIEWPORT_JS so window.__mf exists before the first fetch round reports to it.
-    const bodyInject = MOBILE_HTML + SETTINGS_DRAWER_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + WATCH_SCOPE_SCRIPT + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + SETTINGS_DRAWER_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
+    const bodyInject = MOBILE_HTML + SETTINGS_DRAWER_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + DIBBS_FLAG_JS + WATCH_SCOPE_SCRIPT + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + SETTINGS_DRAWER_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Code→name for the State picker (50 states + DC). Already a shared constant — the Filters

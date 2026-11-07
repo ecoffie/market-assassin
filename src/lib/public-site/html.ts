@@ -11,10 +11,10 @@
  *   `<head>…${mpRawHeadHtml()}<style>page rules</style></head><body>`
  *   + mpRawBodyOpen() + pageHtml + mpRawBodyClose() + `</body>`
  */
-import { ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '@/app/opportunity-map/account-menu';
-import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
+import { ACCOUNT_MENU_JS } from '@/app/opportunity-map/account-menu';
 import { SITE_LINK_GROUPS } from '@/lib/seo/site-links';
-import { MP_FOOTER_TAGLINE, MP_HEADER_ACCOUNT_LINKS, MP_HEADER_PRODUCT_LINKS, MP_LOGO_SRC, type MpChromeLink } from './chrome';
+import { MP_FOOTER_TAGLINE } from './chrome';
+import { siteTopHtml } from './site-nav';
 import { MP_RAW_SITE_CSS, MP_ROOT_PAINT_CSS } from './css';
 import { mpFontPreloadLinksHtml } from './fonts';
 
@@ -22,18 +22,14 @@ function esc(v: string): string {
   return v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-const links = (list: readonly MpChromeLink[]) => list.map((l) => `<a href="${esc(l.href)}">${esc(l.label)}</a>`).join('');
-
 /** Font preloads plus the shared stylesheet. Put it in <head> BEFORE any page-specific <style>. */
 export function mpRawHeadHtml(): string {
   return `${mpFontPreloadLinksHtml({ includeInter: true })}<style>${MP_ROOT_PAINT_CSS}${MP_RAW_SITE_CSS}</style>`;
 }
 
-/** The homepage header, as markup. */
+/** The site top bar (event banner + homepage nav), as markup. */
 export function mpRawHeaderHtml(): string {
-  return `<header class="mp-head" data-mp-chrome=""><nav class="mp-head-left" aria-label="Product">${links(MP_HEADER_PRODUCT_LINKS)}</nav>`
-    + `<a href="${esc(MAPS_HOME_PATH)}" title="Mindy" class="mp-logo"><img src="${MP_LOGO_SRC}" alt=""><span>Mindy</span></a>`
-    + `<nav class="mp-head-right" aria-label="Account">${links(MP_HEADER_ACCOUNT_LINKS)}${ACCOUNT_MENU_HTML}</nav></header>`;
+  return siteTopHtml();
 }
 
 /** The homepage footer, as markup (same groups as PublicFooter). */

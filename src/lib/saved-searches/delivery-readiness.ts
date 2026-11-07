@@ -8,12 +8,13 @@ import { classifyObservation } from '@/lib/cron/watchdog-incidents';
  * Failure classes come from the job's own self-report (`cron_job_runs.error`, e.g.
  * "unexpected_schedule_error=1,recipient_suppressed=3") and are split by the SAME classifier the
  * watchdog uses (`classifyObservation` in src/lib/cron/watchdog-incidents.ts) so the two can never
- * drift: `recipient_suppressed` is the only non-outage class; `suppression_lookup_failed`,
+ * drift: `recipient_suppressed` and `invalid_saved_naics` are the non-outage classes (action items
+ * for that recipient / that search's owner); `suppression_lookup_failed`,
  * `invalid_recipient_address`, legacy `email_send_rejected` etc. are processing failures.
  *
  * Reporting rules:
  *   healthy          the run in today's window finished with no processing failure. Confirmed
- *                    suppressions are listed as action items, not failures.
+ *                    suppressions and invalid saved NAICS are listed as action items, not failures.
  *   partial_failure  some searches failed (per-search classes, or a capacity backlog) and the job
  *                    otherwise ran: it evaluated searches or the provider accepted alerts.
  *   job_failure      CONFIRMED: storage missing, job missing/disabled/unschedulable, no run in today's
@@ -60,7 +61,7 @@ export type SavedSearchDeliveryReadiness = {
   last_run_at: string | null;
   last_run_status: string | null;
   /**
-   * Last run with NO processing failure (confirmed suppression is not one). A JOB-RUN time, NOT the
+   * Last run with NO processing failure (action items are not failures). A JOB-RUN time, NOT the
    * last alert email: one failing search marks a whole run `error`. Never present it as "last
    * successful send" (it once read Sept 29 while alerts were going out daily).
    */
@@ -78,6 +79,8 @@ export type SavedSearchDeliveryReadiness = {
   latest_run_processing_failures: Record<string, number>;
   /** Confirmed recipient suppressions: an ACTION ITEM for those recipients, never an outage. */
   suppression_action_items: Record<string, number>;
+  /** Per-search config only the owner can correct (invalid saved NAICS): an ACTION ITEM, never an outage. */
+  config_action_items: Record<string, number>;
   /** Alerts the provider accepted during that run. null = unreadable / not measured (never 0). */
   latest_run_alerts_provider_accepted: number | null;
   /** Searches the run evaluated (stamped). null = unreadable / not measured (never 0). */
@@ -127,7 +130,9 @@ export function classifyRunFailures(status: string | null | undefined, error: st
   return {
     processing: c.processing,
     suppression: c.suppression,
+    configAction: c.configAction,
     suppressionOnly: c.suppressionOnly,
+    actionItemsOnly: c.actionItemsOnly,
     /** Free-text error that is not a class list — cannot be attributed to individual searches. */
     unclassified: !!(error && error.trim()) && c.signature.includes('|msg:'),
   };
@@ -173,11 +178,11 @@ function non2xx(run: CronRunRow): boolean {
   return typeof run.http_status === 'number' && (run.http_status < 200 || run.http_status >= 300);
 }
 
-/** A run with no processing failure: success, or failures that are ONLY confirmed suppressions. */
+/** A run with no processing failure: success, or failures that are ONLY action items. */
 function isCleanRun(run: CronRunRow): boolean {
   if (non2xx(run)) return false;
   if (run.status === 'success') return true;
-  return run.status === 'error' && classifyRunFailures(run.status, run.error).suppressionOnly;
+  return run.status === 'error' && classifyRunFailures(run.status, run.error).actionItemsOnly;
 }
 
 function runWindow(run: CronRunRow): { start: string; end: string } | null {
@@ -256,6 +261,7 @@ const NO_RUN_EVIDENCE = {
   latest_run_failures: null,
   latest_run_processing_failures: {},
   suppression_action_items: {},
+  config_action_items: {},
   latest_run_alerts_provider_accepted: null,
   latest_run_searches_evaluated: null,
 };
@@ -394,6 +400,7 @@ export async function getSavedSearchDeliveryReadiness(
     latest_run_failures: judged.error || null,
     latest_run_processing_failures: cls.processing,
     suppression_action_items: cls.suppression,
+    config_action_items: cls.configAction,
     latest_run_alerts_provider_accepted: sent,
     latest_run_searches_evaluated: evaluated,
   };
@@ -403,12 +410,13 @@ export async function getSavedSearchDeliveryReadiness(
     // A clean run checked every due search without a processing failure. Zero emails then means no
     // checked search had a new match (or it was taking its first-check baseline): nothing was owed.
     const sup = Object.keys(cls.suppression).length ? `; action item: ${counts(cls.suppression)} (confirmed suppressed recipients)` : '';
+    const cfg = Object.keys(cls.configAction).length ? `; action item: ${counts(cls.configAction)} (saved searches their owner must correct)` : '';
     const none = sent === 0 ? '; no alert email was required (no checked search had a new match)' : '';
-    return finish('healthy', 'recent_success', `latest run completed (${ran})${none}${sup}`, evidence);
+    return finish('healthy', 'recent_success', `latest run completed (${ran})${none}${sup}${cfg}`, evidence);
   }
 
   const runLevel = Object.keys(cls.processing).filter((k) => RUN_LEVEL_CLASSES.has(k));
-  const unattributed = judged.status === 'error' && !Object.keys(cls.processing).length && !Object.keys(cls.suppression).length;
+  const unattributed = judged.status === 'error' && !Object.keys(cls.processing).length && !cls.actionItemsOnly;
   if (non2xx(judged) || judged.status === 'timeout' || judged.status === 'failed' || cls.unclassified || unattributed || runLevel.length) {
     const why = runLevel.length ? counts(Object.fromEntries(runLevel.map((k) => [k, cls.processing[k]])))
       : cls.unclassified ? (judged.error || '').slice(0, 120) : unattributed ? 'run error with no failure detail' : `run ${judged.status}${judged.http_status ? ` (HTTP ${judged.http_status})` : ''}`;

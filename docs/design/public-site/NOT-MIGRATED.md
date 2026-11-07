@@ -7,6 +7,7 @@ When a route changes category (retired, migrated, made public), update this file
 ## Deliberate exclusions (decided in review)
 | route | reason |
 |---|---|
+| `/home` | The getmindy.ai homepage since 2026-11-05 (Zoom-style, approved as a reviewed design). Its top bar and event banner are the shared site top bar (`src/lib/public-site/site-nav.ts`); its body uses gradients and partner logos the public design-system lint does not allow; tokens still come from PublicShell. |
 | `/mindy-landing` | Rollback snapshot of the pre-cutover homepage (`next.config.ts` rollback target). Restyling it would change the rollback. |
 | `/home-redesign` | Obsolete GovCon Giants homepage experiment. To be retired or redirected, not restyled. |
 | `/start` | Signup funnel experience, not a marketing surface. |
@@ -47,7 +48,7 @@ These keep the product's own design system. PR 1's map-chrome check guards that 
 ## Not served on getmindy.ai
 | route | note |
 |---|---|
-| `/` (`src/app/page.tsx`) | On getmindy.ai, `/` is rewritten by host to `/today` (migrated), and `mi.govcongiants.com/` 308s to getmindy.ai. This legacy page renders only on other hosts (deployment URLs, localhost) and carries the Supabase auth-recovery redirect. It is the same frozen-rollback class as `/mindy-landing`. |
+| `/` (`src/app/page.tsx`) | On getmindy.ai, `/` is rewritten by host to `/home` (since 2026-11-05; Today's Intel stays at `/today`), and `mi.govcongiants.com/` 308s to getmindy.ai. This legacy page renders only on other hosts (deployment URLs, localhost) and carries the Supabase auth-recovery redirect. It is the same frozen-rollback class as `/mindy-landing`. |
 
 ## Not pages
 | route | note |

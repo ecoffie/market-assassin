@@ -22,6 +22,7 @@ import { NextResponse } from 'next/server';
 import { LOGIN_MODAL_CSS, LOGIN_MODAL_HTML, LOGIN_MODAL_JS } from '../login-modal';
 import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../account-menu';
+import { PURSUIT_COLLAB_CSS, PURSUIT_COLLAB_JS } from '../pursuit-collab';
 
 export const dynamic = 'force-dynamic';
 
@@ -229,6 +230,10 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   /* when expanded, let the action wrap fully (no truncation) so all detail is legible */
   .prow.expanded .row-action{white-space:normal;overflow:visible}
   .prow.expanded .row-nawrap{flex-wrap:wrap}
+  /* Read-only team activity (comments · bid decision · owner) — revealed on expand, fetched lazily */
+  .prow .pc-collab{display:none}
+  .prow.expanded .pc-collab{display:block}
+  ${PURSUIT_COLLAB_CSS}
   .row-kebab{width:28px;height:28px;border:0;background:none;color:var(--faint);cursor:pointer;border-radius:7px;display:grid;place-items:center}
   .row-kebab:hover{background:var(--hair);color:var(--sub)}
   .row-kebab[aria-expanded="true"]{background:var(--hair);color:var(--ink)}
@@ -439,6 +444,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     </div>
   </div>
 </div>
+<script>${PURSUIT_COLLAB_JS}</script>
 <script>
 (function(){
   // ── Auth helpers (verbatim from favorites/route.ts) ──
@@ -851,7 +857,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var ut=p.updated_at?relTime(p.updated_at):'';
     if(ut) parts.push('<span class="updated">Updated '+esc(ut)+'</span>');
     var meta = parts.length ? ('<div class="row-meta">'+parts.join('<span class="dot"></span>')+'</div>') : '';
-    return '<div class="row-main">'+title+nawrap+meta+'</div>';
+    // Team activity made in /app (comments / bid decision / owner). Read-only; fetched on expand.
+    var collab=(window.__pursuitCollab&&p.id)?window.__pursuitCollab.slot(p):'';
+    return '<div class="row-main">'+title+nawrap+meta+collab+'</div>';
   }
   function actionRowHtml(p, ic, healthHr){
     // No stageCell: its labels (Research/Capture/Proposal/Submitted) are the SAME words as the work
@@ -1023,6 +1031,12 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       row.addEventListener('click',function(e){
         if(e.target.closest && e.target.closest('button,a,.row-kmenu,.km-pop')) return;
         row.classList.toggle('expanded');
+        // First expand of a row -> load its comment summary (once per page load, cached).
+        var slotEl=row.querySelector('[data-pc-id]');
+        if(row.classList.contains('expanded') && slotEl && window.__pursuitCollab){
+          var cp=pursuitById(slotEl.getAttribute('data-pc-id'));
+          if(cp) window.__pursuitCollab.load(cp,{email:em,headers:hdrs()});
+        }
       });
     });
   }

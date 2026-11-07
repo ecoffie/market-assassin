@@ -2,8 +2,9 @@
  * PERMANENT GUARD for the opportunity-map MOBILE layout (phone ≤640px).
  *
  * On a phone the desktop 3-column grid (rail · map · cards) collapses into a Zillow-style
- * single surface: the LIST is the default, a floating "Map"/"List" toggle flips to a
- * full-screen map, and the fixed icon rail is replaced by a hamburger drawer. Before this,
+ * single surface: the MAP is the default (since 2026-11-06), a bottom bar flips to the list
+ * and a floating "Map" pill flips back, a tapped pin shows a bottom card, and the fixed icon
+ * rail is replaced by a hamburger drawer. Before this,
  * the page rendered desktop-only at 390px — the rail ate 64px, the cards panel was clipped
  * off the right edge, and the map computed to width:0 (invisible).
  *
@@ -20,6 +21,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const routeSrc = readFileSync(join(__dirname, 'route.ts'), 'utf8');
+/** The route's CSS with its string concatenations joined, so a rule split across lines reads as one. */
+const joined = routeSrc.replace(/'\s*\n\s*\+\s*'/g, '');
 
 describe('opportunity-map mobile responsive invariants', () => {
   it('has a phone breakpoint that collapses the grid to one column', () => {
@@ -41,10 +44,21 @@ describe('opportunity-map mobile responsive invariants', () => {
     expect(routeSrc.includes('window.__mDrawer'), '__mDrawer wiring must exist').toBe(true);
   });
 
-  it('body.m-map flips map ↔ list (the Zillow toggle contract)', () => {
-    // Map layer shows only under body.m-map; list hides under it.
-    expect(/body\.m-map \.mapwrap\{[^}']*visibility:visible/.test(routeSrc), 'body.m-map must reveal the map').toBe(true);
-    expect(/body\.m-map \.panel\{[^}']*visibility:hidden/.test(routeSrc), 'body.m-map must hide the list').toBe(true);
+  it('map is the default; body.m-list flips to the list (the Zillow toggle contract)', () => {
+    expect(/\.panel\{grid-area:zcards[^}']*visibility:hidden/.test(joined), 'the list must be hidden by default').toBe(true);
+    expect(/body\.m-list \.panel\{[^}']*visibility:visible/.test(routeSrc), 'body.m-list must reveal the list').toBe(true);
+    expect(/body\.m-list \.mapwrap\{[^}']*visibility:hidden/.test(routeSrc), 'body.m-list must hide the map').toBe(true);
+    expect(routeSrc.includes('<span id="mToggleLbl">List</span>'), 'the toggle starts on the map, offering the list').toBe(true);
+  });
+
+  it('the bottom bar keeps the map-truth count (mirrors #mapCount, which is hidden on phones)', () => {
+    expect(routeSrc.includes('id="mToggleCount"'), 'bottom bar count slot must exist').toBe(true);
+    expect(/getElementById\("mapCount"\)[^']*mToggleCount|mToggleCount[^']*getElementById\("mapCount"\)/.test(joined), 'the bar must copy #mapCount').toBe(true);
+  });
+
+  it('a tapped pin shows a bottom card on phones', () => {
+    expect(routeSrc.includes('id="mCard"'), '#mCard must exist').toBe(true);
+    expect(routeSrc.includes('map.on("popupopen"'), 'popup content must be moved into the card on open').toBe(true);
   });
 
   it('mobile .ztop must NOT overflow-clip filter/sort menus', () => {
@@ -55,7 +69,7 @@ describe('opportunity-map mobile responsive invariants', () => {
     expect(mobileBlock, '≤640px mobile CSS block must exist').toBeTruthy();
     const block = mobileBlock![0];
     expect(block.includes("overflow:visible!important"), '.ztop must overflow:visible on mobile').toBe(true);
-    expect(block.includes('overflow-x:auto'), '.ztop must NOT use overflow-x:auto on mobile').toBe(false);
+    expect(/\.ztop\{[^}]*overflow-x:auto/.test(block), '.ztop must NOT use overflow-x:auto on mobile').toBe(false);
   });
 
   it('mobile header keeps the account avatar (inside .zh-right) reachable', () => {

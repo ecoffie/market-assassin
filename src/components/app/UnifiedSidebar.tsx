@@ -2,26 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
-  type LucideIcon,
-  MessageSquare,
-  LineChart,
-  Bell,
-  Compass,
-  TrendingUp,
-  Target,
-  UsersRound,
-  DollarSign,
-  FileText,
-  Telescope,
-  Clock,
-  Banknote,
-  Building2,
-  Landmark,
-  BookOpen,
-  FolderKanban,
-  Library,
-  Settings,
   Lock,
   PanelLeftClose,
   PanelLeftOpen,
@@ -29,12 +11,27 @@ import {
   CircleUser,
   ChevronUp,
   RefreshCw,
-  Search,
+  Settings,
+  Map as MapIcon,
 } from 'lucide-react';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
 import { UpgradeModal } from './UpgradeModal';
 import { useAppTracker } from './track';
+import { mapHomeLink } from '@/lib/maps/map-links';
+import {
+  NAV_GROUPS,
+  type NavGroup,
+  type NavAccessContext,
+  clickActionFor,
+  groupForPanel,
+  groupSummary,
+  isGroupLocked,
+  isGroupVisible,
+  panelDef,
+  primaryMember,
+  visibleMembers,
+} from './nav-groups';
 
 // Panel types for the unified MI platform
 export type AppPanel =
@@ -43,6 +40,7 @@ export type AppPanel =
   | 'my-market'      // Market Dossier — the one-shot assembled market
   | 'alerts'         // Daily Alerts - opportunity list
   | 'market-intel'   // /app/market-intel — full-bleed dashboard route (not a panel)
+  | 'opportunity-map' // /opportunity-map — the map, a separate route (not a panel)
   | 'research'       // Market Research (Federal Market Assassin)
   | 'forecasts'      // 33,000+ upcoming procurements
   | 'recompetes'     // Expiring contracts
@@ -69,291 +67,18 @@ export type AppPanel =
 // Tier definitions
 export type AppTier = 'free' | 'pro' | 'team' | 'enterprise';
 
-interface NavItem {
-  id: AppPanel;
-  label: string;
-  // Lucide icon component (was emoji string until 2026-05-27). Rendered
-  // inline as <item.icon ... />. The line-icon system reads as "real
-  // SaaS" vs the vibe-coded-emoji-in-nav tell. Emoji is still fine in
-  // user-generated content (chat bubbles, briefing insights), just not
-  // in system chrome. Pattern: Slack / Notion / Vercel / Linear.
-  icon: LucideIcon;
-  description: string;
-  tier: AppTier[];
-  badge?: string;
-  // prototypeOnly: hide this item entirely unless the user is on the prototype
-  // allowlist (MINDY_PROTOTYPE_EMAILS → canSeePrototypes). Used for demo / case-study
-  // prototypes (Vehicle Expiry Watch, SMB Market Research, Market Research Report)
-  // that confused normal Pro/Team users (Eric QC 2026-06-17). Gated on an EXPLICIT
-  // allowlist, NOT the broad staff flag — so company accounts (govcongiants.com /
-  // getmindy.ai) and demo accounts see the clean Pro-member view by default.
-  prototypeOnly?: boolean;
-  // When set, clicking this item navigates to a route instead of
-  // switching the active panel. Used for full-bleed pages like
-  // /app/market-intel that aren't part of the panel container.
-  href?: string;
-}
+// The Opportunity Map — free for everyone, a real document navigation to the map route
+// (served by a route handler, not a Next page, so never a client-side <Link> transition).
+const OPPORTUNITY_MAP_LINK = {
+  id: 'opportunity-map' as const,
+  label: 'Opportunity Map',
+  icon: MapIcon,
+  description: 'Open, recompete and forecast on one map',
+};
 
-interface NavSection {
-  title: string;
-  items: NavItem[];
-}
-
-// Sidebar order reorganized 2026-05-25 per Eric: pipeline/execution
-// at the top, research at the bottom. The old "Intelligence → Research
-// → Pipeline → Estimating → Account" order optimized for first-time
-// onboarding (~5% of sessions). The new order optimizes for returning
-// users (~95% of sessions) who land in the app to work pursuits, not
-// to rediscover their market.
-//
-// Daily-use flow (top to bottom):
-//   1. Intelligence — what's hot today (every session)
-//   2. Pipeline — what I'm working on (daily/weekly)
-//   3. Estimating — what should I bid (per-opp work)
-//   4. Research — discovery / occasional (mostly first-time)
-//   5. Account — settings
-//
-// Mirrors Slack (Inbox/Threads top), Linear (Inbox/Active top),
-// Salesforce (My Opps/My Tasks top) — execution before discovery.
-const NAV_SECTIONS: NavSection[] = [
-  {
-    title: 'Intelligence',
-    items: [
-      {
-        // Mindy Chat — flagship v2 entry, top of the sidebar per Eric's
-        // call (decision logged 2026-05-27 in PRD-mindy-chat-v1.md).
-        id: 'chat',
-        label: 'Mindy Chat',
-        icon: MessageSquare,
-        description: 'Ask anything, cited sources',
-        // Pro-only: Mindy Chat retrieves from the proprietary knowledge base, so it's
-        // not given away on Free. Free users see it locked → upgrade prompt.
-        tier: ['pro', 'team', 'enterprise'],
-        badge: 'BETA',
-      },
-      {
-        id: 'dashboard',
-        label: "Today's Intel",
-        icon: LineChart,
-        description: 'AI-prioritized opportunities',
-        tier: ['pro', 'team', 'enterprise'],
-        badge: 'AI',
-      },
-      // 'my-market' removed from the sidebar (Eric, Jun 25): it was a parallel
-      // aggregated destination that duplicated data the real surfaces already
-      // hold in-context. The Dossier panel now serves as the one-time "receipt"
-      // after Auto-setup ("Set up my Mindy"), reached from onboarding + the
-      // Today's Intel empty state — not a nav item to manage.
-      {
-        id: 'alerts',
-        label: 'Source Feed',
-        icon: Bell,
-        description: 'Raw SAM.gov matches',
-        tier: ['free', 'pro', 'team', 'enterprise'],
-      },
-      {
-        id: 'market-intel',
-        label: 'Market Dashboard',
-        icon: Compass,
-        description: 'Charts, full SAM, CSV export',
-        tier: ['free', 'pro', 'team', 'enterprise'],
-        href: '/app/market-intel',
-      },
-    ],
-  },
-  {
-    title: 'Pipeline',
-    items: [
-      {
-        id: 'pipeline',
-        label: 'My Pursuits',
-        icon: TrendingUp,
-        description: 'Track opportunities',
-        tier: ['pro', 'team', 'enterprise'],
-      },
-      {
-        // Slice 3 of the Target Market Research roadmap. Saved BD
-        // targets sourced from the Market Research drawer. Sits with
-        // Pipeline because it's the "what am I working on?" mental
-        // mode — opps you're chasing + offices you're courting.
-        id: 'target-list',
-        label: 'My Target List',
-        icon: Target,
-        description: 'Saved offices to work',
-        tier: ['pro', 'team', 'enterprise'],
-      },
-      // Partner Finder REMOVED from the sidebar (Eric 2026-08-04: "not tested").
-      // The panel component + the 'partner-finder' route case are kept so existing
-      // deep links don't 404, but it's no longer surfaced in the nav until it's QA'd.
-      // Relationships ("My Network") REMOVED from the sidebar (Eric: research
-      // proved Gov Buyers = Decision Makers, Find Partners = Contractors — only
-      // OSBP was distinct). Contacts now live INLINE under My Target List per
-      // agency card. The panel still exists for any deep links.
-    ],
-  },
-  {
-    // Estimating = the "what should I bid?" mental mode. Sits right
-    // after Pipeline so the daily flow is: Pursuits → Estimating →
-    // submit. Research lives below since pricing happens on opps
-    // you're already chasing, not discovering.
-    title: 'Estimating',
-    items: [
-      {
-        id: 'pricing',
-        label: 'Pricing Intel',
-        icon: DollarSign,
-        description: 'Labor rates, GSA/SCA wages',
-        tier: ['pro', 'team', 'enterprise'],
-      },
-      {
-        id: 'proposals',
-        label: 'Proposal Assist',
-        icon: FileText,
-        description: 'AI proposal help — a starting draft, not a final submission',
-        tier: ['pro', 'team', 'enterprise'],
-        badge: 'BETA',
-      },
-    ],
-  },
-  {
-    title: 'Research',
-    items: [
-      {
-        id: 'research',
-        label: 'Market Research',
-        // Compass already used in Intelligence/market-intel — reuse here intentionally:
-        // both are "navigate the market" surfaces, just different views.
-        icon: Compass,
-        description: 'Your market map',
-        tier: ['free', 'pro', 'team', 'enterprise'],
-      },
-      {
-        id: 'forecasts',
-        label: 'Upcoming Buys',
-        icon: Telescope,
-        description: '33,000+ planned',
-        tier: ['pro', 'team', 'enterprise'],
-      },
-      {
-        id: 'recompetes',
-        label: 'Expiring Contracts',
-        icon: Clock,
-        description: 'Recompete targets',
-        tier: ['pro', 'team', 'enterprise'],
-      },
-      {
-        // DISA prototype (Jun 2026): automate IDIQ/IDV expiry tracking +
-        // incumbent notification (replaces their manual spreadsheet). Pro-tier
-        // like its neighbors; it's a focused demo surface for the DISA meeting.
-        id: 'disa-watch',
-        label: 'Vehicle Expiry Watch',
-        icon: Bell,
-        description: 'Auto-notify on expiry',
-        tier: ['pro', 'team', 'enterprise'],
-        prototypeOnly: true,   // demo/case-study — MINDY_PROTOTYPE_EMAILS allowlist only
-      },
-      {
-        // Navy OSBP prototype (Jun 2026): find certified small/minority
-        // businesses by NAICS + cert + state from SAM, exportable. Demo surface.
-        id: 'osbp-smb',
-        label: 'SMB Market Research',
-        icon: Search,
-        description: 'Certified small-biz sourcing',
-        tier: ['pro', 'team', 'enterprise'],
-        prototypeOnly: true,   // demo/case-study — MINDY_PROTOTYPE_EMAILS allowlist only
-      },
-      {
-        // Government-buyer workspace: dedicated authenticated route using the
-        // sourced Phase 1 MRR engine (separate from contractor Market Research).
-        id: 'micc-mrr',
-        label: 'KO Research Workspace',
-        icon: FileText,
-        description: 'Sourced Phase 1 MRR',
-        tier: ['pro', 'team', 'enterprise'],
-        prototypeOnly: true,   // demo/case-study — MINDY_PROTOTYPE_EMAILS allowlist only
-        href: '/app/market-research',
-      },
-      {
-        // Moved from its own "Opportunities" section (May 21, 2026).
-        // Per Command Center "Where Time Goes" data, Research +
-        // Dashboard dominate user time and Grants barely registers.
-        // A standalone "Opportunities" section containing only Grants
-        // wasn't a meaningful category — it was a single-item parking
-        // lot. Grants is intelligence about funding (same mental
-        // category as Forecasts + Recompetes), so it lives here now.
-        id: 'grants',
-        label: 'Federal Grants',
-        icon: Banknote,
-        description: 'Grants.gov search',
-        tier: ['pro', 'team', 'enterprise'],
-      },
-      // DIBBS (DLA small-buy RFQs) hidden for now — pilot paused. Panel, API,
-      // and sync remain in place; re-add this nav item to restore it.
-      {
-        id: 'contractors',
-        label: 'Contractors',
-        icon: Building2,
-        description: 'Prime contractor DB',
-        tier: ['pro', 'team', 'enterprise'],
-      },
-      {
-        id: 'decision-makers',
-        label: 'Decision Makers',
-        icon: Landmark,
-        description: 'Gov contacts by agency',
-        tier: ['pro', 'team', 'enterprise'],
-      },
-      // Knowledge Base intentionally NOT in the sidebar (Eric: it's reference,
-      // surfaced via Mindy Chat citations — not a daily-use tab). The panel still
-      // exists; chat "view source" links open it via onPanelChange. A "Sources"
-      // link inside Mindy Chat is its entry point.
-    ],
-  },
-  {
-    title: 'Account',
-    items: [
-      {
-        id: 'vault',
-        label: 'My Vault',
-        icon: FolderKanban,
-        description: 'Your past perf, capabilities, team',
-        tier: ['free', 'pro', 'team', 'enterprise'],
-      },
-      // 'library' removed from the sidebar (Eric, Jun 25): folded into My Vault
-      // as the "Generated" tab — Mindy's outputs live with the rest of "your
-      // stuff" instead of a separate nav item. The 'library' panel route still
-      // exists and redirects into Vault for old deep links.
-      {
-        // Account-level team management (seats + roles) — moved here from
-        // Pipeline (Eric 2026-06-05): Pipeline is the DEAL board; team admin is
-        // account stuff, so it belongs with Vault / Library / Settings.
-        id: 'team',
-        label: 'Team Access',
-        icon: UsersRound,
-        description: 'Seats + roles',
-        tier: ['team', 'enterprise'],
-        badge: 'Teams',
-      },
-      {
-        // Coach Mode — manage multiple client businesses (APEX counselor or solo
-        // consultant). Each client = its own workspace; switch between them.
-        id: 'coach',
-        label: 'My Clients',
-        icon: BookOpen,
-        description: 'Manage multiple businesses',
-        tier: ['team', 'enterprise'],
-        badge: 'Teams',
-      },
-      {
-        id: 'settings',
-        label: 'Settings',
-        icon: Settings,
-        description: 'Profile, NAICS, security',
-        tier: ['free', 'pro', 'team', 'enterprise'],
-      },
-    ],
-  },
-];
+// Sidebar = one row per NAV GROUP (src/components/app/nav-groups.ts). Each group's old pages
+// render as tabs across the top of the main area (AppNavTabs). History of the per-panel order
+// (execution before discovery — Slack / Linear / Salesforce) is preserved in the group order.
 
 interface UnifiedSidebarProps {
   activePanel: AppPanel;
@@ -408,7 +133,8 @@ export default function UnifiedSidebar({
   // intent conversion moment). Holds the clicked item id so the modal can name it.
   const [upgradeFeature, setUpgradeFeature] = useState<string | null>(null);
   const track = useAppTracker(userEmail);
-  const [hoveredItem, setHoveredItem] = useState<AppPanel | null>(null);
+  const router = useRouter();
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   // Collapsed-state tooltip rendered with position:fixed so the nav's
   // overflow-y-auto scroll clip can't eat it. Captured from the hovered
   // row's bounding rect on mouse-enter.
@@ -421,70 +147,33 @@ export default function UnifiedSidebar({
     setTooltip({ label, badge, locked, top: r.top + r.height / 2, left: r.right + 12 });
   }
 
-  const hasAccess = (itemTier: AppTier[]) => {
-    return itemTier.includes(userTier);
-  };
+  const navCtx: NavAccessContext = { userTier, coachModeAllowed, canSeePrototypes };
+  const activeGroup = groupForPanel(activePanel);
 
-  // Panels that render a free-tier "data behind glass" preview instead of a blank
-  // upgrade wall (enterprise-SaaS pattern). A free click ROUTES to the panel (which
-  // shows their own data read-only, or a real count + blurred rows) rather than
-  // popping the upgrade modal. The 🔒 badge still shows — it IS a Pro feature — but
-  // the click leads to the preview, where the upgrade CTA lives.
-  const FREE_PREVIEW_PANELS: ReadonlySet<AppPanel> = new Set<AppPanel>([
-    'pipeline', 'recompetes', 'forecasts', 'contractors', 'decision-makers',
-  ]);
-
-  const canAccessItem = (item: NavItem) => {
-    if (item.id === 'coach') {
-      return hasAccess(item.tier) || coachModeAllowed;
+  // A group row opens its first ACCESSIBLE member. When everything in the group is locked,
+  // the first visible member gets the old per-panel locked behaviour: free users go to the
+  // "data behind glass" preview where one exists, otherwise the upgrade modal opens.
+  const handleGroupClick = (group: NavGroup) => {
+    const member = primaryMember(group, navCtx);
+    if (!member) return;
+    const def = panelDef(member.panel);
+    const action = clickActionFor(member.panel, navCtx);
+    if (action === 'open') {
+      if (def?.href) {
+        router.push(def.href);
+      } else {
+        onPanelChange(member.panel);
+      }
+      // Auto-close the mobile drawer — the chosen panel should take focus.
+      onMobileClose?.();
+    } else if (action === 'free_preview') {
+      onPanelChange(member.panel);
+      onMobileClose?.();
+      track('link_click', 'sidebar', { action: 'free_preview_shown', feature: member.panel, tier: userTier });
+    } else {
+      setUpgradeFeature(member.panel);
+      track('link_click', 'sidebar', { action: 'upgrade_modal_shown', feature: member.panel, tier: userTier });
     }
-    // prototypeOnly demo surfaces: gated on the explicit prototype allowlist
-    // (canSeePrototypes), NOT staff and NOT tier/coach-mode — so company accounts
-    // and demo accounts stay on the clean Pro-member view by default.
-    if (item.prototypeOnly) return canSeePrototypes;
-    return hasAccess(item.tier);
-  };
-
-  // prototypeOnly items are HIDDEN (not just locked) from everyone but allowlisted
-  // accounts, so normal accounts never see the demo/case-study prototypes.
-  const isItemVisible = (item: NavItem) => !item.prototypeOnly || canSeePrototypes;
-
-  const getItemDisplay = (item: NavItem) => {
-    if (userTier !== 'free') {
-      const paidLabels: Partial<Record<AppPanel, { label: string; description: string }>> = {
-        dashboard: {
-          label: "Today's Intel",
-          description: 'Best matches + next steps',
-        },
-        alerts: {
-          label: 'Source Feed',
-          description: 'Raw SAM.gov matches',
-        },
-        forecasts: {
-          label: 'Upcoming Buys',
-          description: 'Future procurement signals',
-        },
-        recompetes: {
-          label: 'Expiring Contracts',
-          description: 'Recompete opportunities',
-        },
-        pipeline: {
-          label: 'My Pursuits',
-          description: 'Tracked opportunities',
-        },
-        contacts: {
-          label: 'Relationships',
-          description: 'Buyers + partners',
-        },
-      };
-
-      if (paidLabels[item.id]) return paidLabels[item.id]!;
-    }
-
-    return {
-      label: item.label,
-      description: item.description,
-    };
   };
 
   const tierColors: Record<AppTier, string> = {
@@ -587,131 +276,95 @@ export default function UnifiedSidebar({
           — fixed elements escape a scrolling ancestor's clip. This gives us BOTH
           the footer AND the tooltips, instead of trading one for the other. */}
       <nav className="flex-1 py-4 overflow-y-auto">
-        {NAV_SECTIONS.map((section) => {
-          // SaaS-standard ordering (Linear / Notion pattern): items the
-          // current user can actually use come first, locked items after.
-          // Prevents the "I land on Mindy and my #1 nav item is locked"
-          // confusion that free users hit when Today's Intel sits above
-          // Source Feed.
-          const orderedItems = [...section.items]
-            .filter(isItemVisible)   // hide prototype demo tabs from non-allowlisted accounts
-            .sort((a, b) => {
-              const aAccess = canAccessItem(a) ? 0 : 1;
-              const bAccess = canAccessItem(b) ? 0 : 1;
-              return aAccess - bAccess;
-            });
-          return (
-          <div key={section.title} className="mb-6">
-            {!isCollapsed && (
-              <div className="px-4 mb-2 text-xs font-medium text-faint uppercase tracking-wider">
-                {section.title}
-              </div>
-            )}
-            <div className="space-y-1 px-2">
-              {orderedItems.map((item) => {
-                const isActive = activePanel === item.id;
-                const canAccess = canAccessItem(item);
-                const isHovered = hoveredItem === item.id;
-                const display = getItemDisplay(item);
-                const sharedClassName = `
+        <div className="space-y-1 px-2">
+          {/* Opportunity Map — a real document navigation to the map route. */}
+          {(() => {
+            const MapItemIcon = OPPORTUNITY_MAP_LINK.icon;
+            const isHovered = hoveredItem === OPPORTUNITY_MAP_LINK.id;
+            return (
+              <a
+                data-tour={`nav-${OPPORTUNITY_MAP_LINK.id}`}
+                href={mapHomeLink()}
+                onClick={() => {
+                  track('link_click', 'sidebar', { action: 'open_map', feature: OPPORTUNITY_MAP_LINK.id, tier: userTier });
+                  onMobileClose?.();
+                }}
+                onMouseEnter={(e) => { setHoveredItem(OPPORTUNITY_MAP_LINK.id); showTooltip(e, OPPORTUNITY_MAP_LINK.label, undefined, false); }}
+                onMouseLeave={() => { setHoveredItem(null); setTooltip(null); }}
+                className={`group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 text-ink-soft hover:bg-surface hover:text-white ${isCollapsed ? 'justify-center' : ''}`}
+              >
+                <MapItemIcon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
+                {!isCollapsed && (
+                  <div className="flex-1 min-w-0 text-left">
+                    <span className="text-sm font-medium">{OPPORTUNITY_MAP_LINK.label}</span>
+                    {isHovered && (
+                      <div className="text-xs text-faint mt-0.5 truncate">{OPPORTUNITY_MAP_LINK.description}</div>
+                    )}
+                  </div>
+                )}
+              </a>
+            );
+          })()}
+
+          {NAV_GROUPS.filter((g) => isGroupVisible(g, navCtx)).map((group) => {
+            const isActive = activeGroup?.id === group.id;
+            const locked = isGroupLocked(group, navCtx);
+            const isHovered = hoveredItem === group.id;
+            const members = visibleMembers(group, navCtx);
+            // A single-member group carries that panel's badge (e.g. Mindy Chat BETA).
+            const badge = members.length === 1 ? panelDef(members[0].panel)?.badge : undefined;
+            const summary = groupSummary(group, navCtx);
+            const Icon = group.icon;
+            return (
+              <button
+                key={group.id}
+                // nav-group-<id> for the group row; a single-member group also keeps the old
+                // per-panel hook (nav-research) the product tour spotlights. Multi-member
+                // panels' nav-<panel> hooks now live on their TABS (AppNavTabs).
+                data-tour={members.length === 1 ? `nav-${members[0].panel}` : `nav-group-${group.id}`}
+                aria-current={isActive ? 'page' : undefined}
+                title={!isCollapsed ? summary : undefined}
+                onClick={() => handleGroupClick(group)}
+                onMouseEnter={(e) => { setHoveredItem(group.id); showTooltip(e, group.label, badge, locked); }}
+                onMouseLeave={() => { setHoveredItem(null); setTooltip(null); }}
+                className={`
                   group relative
                   w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
                   transition-all duration-150
                   ${isActive
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : canAccess
+                    ? 'bg-purple-500/15 text-purple-300 border border-purple-500/30'
+                    : !locked
                       ? 'text-ink-soft hover:bg-surface hover:text-white'
                       : 'text-faint hover:bg-purple-500/10 hover:text-purple-300 cursor-pointer'
                   }
                   ${isCollapsed ? 'justify-center' : ''}
-                `;
-                const Icon = item.icon;
-                const innerContent = (
+                `}
+              >
+                <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
+                {!isCollapsed && (
                   <>
-                    <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
-                    {!isCollapsed && (
-                      <>
-                        <div className="flex-1 text-left">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">{display.label}</span>
-                            {item.badge && (
-                              <span className="px-1.5 py-0.5 text-[10px] bg-purple-500/20 text-purple-400 rounded">
-                                {item.badge}
-                              </span>
-                            )}
-                          </div>
-                          {(isHovered || isActive) && (
-                            <div className="text-xs text-faint mt-0.5">
-                              {display.description}
-                            </div>
-                          )}
-                        </div>
-                        {!canAccess && (
-                          <Lock className="w-3 h-3 text-slate-600 shrink-0" strokeWidth={1.75} />
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{group.label}</span>
+                        {badge && (
+                          <span className="px-1.5 py-0.5 text-[10px] bg-purple-500/20 text-purple-400 rounded">
+                            {badge}
+                          </span>
                         )}
-                      </>
+                      </div>
+                      {(isHovered || isActive) && summary && (
+                        <div className="text-xs text-faint mt-0.5 truncate">{summary}</div>
+                      )}
+                    </div>
+                    {locked && (
+                      <Lock className="w-3 h-3 text-slate-600 shrink-0" strokeWidth={1.75} />
                     )}
-                    {/* Tooltip is rendered ONCE at the sidebar root with
-                        position:fixed (see below) so the nav's scroll clip
-                        can't eat it — not per-item here anymore. */}
                   </>
-                );
-
-                // Route-based items render as <Link>. Tier-gated routes
-                // still respect canAccess by falling through to the
-                // disabled <button> branch below.
-                if (item.href && canAccess) {
-                  return (
-                    <Link
-                      key={item.id}
-                      data-tour={`nav-${item.id}`}
-                      href={item.href}
-                      onClick={() => onMobileClose?.()}
-                      onMouseEnter={(e) => { setHoveredItem(item.id); showTooltip(e, display.label, item.badge, !canAccess); }}
-                      onMouseLeave={() => { setHoveredItem(null); setTooltip(null); }}
-                      className={sharedClassName}
-                    >
-                      {innerContent}
-                    </Link>
-                  );
-                }
-
-                return (
-                  <button
-                    key={item.id}
-                    data-tour={`nav-${item.id}`}
-                    onClick={() => {
-                      if (canAccess) {
-                        onPanelChange(item.id);
-                        // Auto-close the mobile drawer when user taps
-                        // a panel — they expect the chosen panel to
-                        // take focus, not stare at the menu.
-                        onMobileClose?.();
-                      } else if (userTier === 'free' && FREE_PREVIEW_PANELS.has(item.id)) {
-                        // Locked, but this panel has a free "data behind glass"
-                        // preview — route to it (the upgrade CTA lives inside).
-                        onPanelChange(item.id);
-                        onMobileClose?.();
-                        track('link_click', 'sidebar', { action: 'free_preview_shown', feature: item.id, tier: userTier });
-                      } else {
-                        // Locked feature — open upgrade modal (Pro for most panels,
-                        // Teams for My Clients).
-                        setUpgradeFeature(item.id);
-                        track('link_click', 'sidebar', { action: 'upgrade_modal_shown', feature: item.id, tier: userTier });
-                      }
-                    }}
-                    onMouseEnter={(e) => { setHoveredItem(item.id); showTooltip(e, display.label, item.badge, !canAccess); }}
-                    onMouseLeave={() => { setHoveredItem(null); setTooltip(null); }}
-                    className={sharedClassName}
-                  >
-                    {innerContent}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          );
-        })}
+                )}
+              </button>
+            );
+          })}
+        </div>
       </nav>
 
       {/* Footer — shrink-0 so it never gets squeezed out by the scrolling nav;

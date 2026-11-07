@@ -81,7 +81,8 @@
     "src/app/market-assassin-locked",
     "src/app/legal/referral-terms",
     "src/app/ncmbc",
-    "src/app/mdeat"
+    "src/app/mdeat",
+    "src/app/lazy-contractors-blueprint"
   ],
   "runtimeRoutes": [
     "/today",
@@ -164,7 +165,9 @@
     "/market-assassin-locked",
     "/legal/referral-terms",
     "/ncmbc",
-    "/mdeat"
+    "/mdeat",
+    "/lazy-contractors-blueprint",
+    "/lazy-contractors-blueprint/program"
   ],
   "parityRoutes": [
     "/today",

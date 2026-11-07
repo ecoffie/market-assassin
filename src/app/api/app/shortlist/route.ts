@@ -60,15 +60,17 @@ export async function POST(request: NextRequest) {
     }
 
     // A SAVE IS NOT A PURSUIT. Signing in transfers the saved listings to the
-    // account and nothing more — no workspace resolution, no pursuit write, no
-    // background work. A user_pipeline row is created only by an explicit
+    // account — and files them in the account's Saved list
+    // (user_saved_opportunities) so they are visible beyond the map badge — and
+    // nothing more: no workspace resolution, no pursuit write, no background work. A user_pipeline row is created only by an explicit
     // Start Pursuit through /api/pipeline.
     const r = await claimAnonShortlist(db(), anonId, { verifiedEmail });
     if (!r.ok) return NextResponse.json({ success: false, error: r.error }, { status: 400 });
 
     // `failed` is reported, not hidden: those rows were NOT transferred and the
-    // next claim retries them.
-    return NextResponse.json({ success: true, attached: r.attached, failed: r.failed });
+    // next claim retries them. `copyFailed` likewise: transferred, but not yet
+    // in the Saved list.
+    return NextResponse.json({ success: true, attached: r.attached, failed: r.failed, copied: r.copied, copyFailed: r.copyFailed });
   }
 
   // ── Abuse control on an unauthenticated write ────────────────────────────
