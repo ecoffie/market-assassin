@@ -346,7 +346,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const response = await fetch(testUrl);
+    // The briefing cron routes accept test mode only with admin auth (the email param is a
+    // filter, not authorization). Sent as a header so the password never lands in testUrl,
+    // which this route echoes back in its response.
+    const response = await fetch(testUrl, { headers: { 'x-admin-password': ADMIN_PASSWORD || '' } });
     const result = await response.json();
 
     return NextResponse.json({
