@@ -18,6 +18,7 @@ import { createClient } from '@supabase/supabase-js';
 import { normalizeAgencyKey, isValidDodaac } from '@/lib/gov-contacts/agency-key';
 import { displayContactName } from '@/lib/gov-contacts/contact-quality';
 import { searchEventsViaAI } from '@/lib/events/ai-event-discovery';
+import { catalogOccurrencesForAgency } from '@/lib/events/catalog-occurrences';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -31,16 +32,27 @@ export interface FederalEventsInput {
   monthsAhead?: number;
   /** Run the paid AI web discovery pass (Serper + Groq). Default false. */
   includeAiDiscovery?: boolean;
+  /**
+   * Also return dated occurrences from the curated catalog (source="catalog"). Default false:
+   * callers that report SAM evidence (acquisition context, Current Acquisition Intelligence) must
+   * not count a curated row as a SAM event.
+   */
+  includeCatalog?: boolean;
   /** Current year, passed in for the AI year-biasing (e.g. "AFCEA 2026"). */
   currentYear: number;
   limit?: number;
 }
 
 export interface FederalEvent {
-  source: 'sam' | 'ai';
+  source: 'sam' | 'ai' | 'catalog';
   title: string;
   event_type: string;
   event_date: string | null; // YYYY-MM-DD; null for undated AI-discovered series
+  /** Inclusive last day of a multi-day event. Catalog rows only. */
+  event_end_date?: string | null;
+  /** Official page the catalog date was read from, and when. Catalog rows only. */
+  source_url?: string | null;
+  verified_at?: string | null;
   location: string | null;
   url: string | null;
   description: string | null;
@@ -52,9 +64,42 @@ export interface FederalEventsResult {
   events: FederalEvent[];
   samCount: number;
   aiCount: number;
+  catalogCount: number;
+  /** Exact SAM rows in the window, before the limit. null = unreadable, never 0. */
+  samAttendableTotal: number | null;
+  samNoticeTotal: number | null;
   /** off = not requested; ran = executed; unavailable = requested but Serper/Groq not configured. */
   aiDiscovery: 'off' | 'ran' | 'unavailable';
   degraded: boolean; // the grounded SAM read hard-failed
+}
+
+type SamEventRow = {
+  title: string;
+  event_type: string | null;
+  event_date: string | null;
+  event_location: string | null;
+  description: string | null;
+  registration_url: string | null;
+  source: string | null;
+  confidence: number | null;
+  inferred_office: string | null;
+  inferred_subagency: string | null;
+  agency: string | null;
+};
+
+export function isAttendableType(type: string | null | undefined): boolean {
+  return ATTENDABLE_TYPES.includes(type || '');
+}
+
+/**
+ * Split `limit` between attendable events and notices. Sources-sought notices outnumber attendable
+ * events several to one, so a single date-ordered read lets them fill the limit and hide every
+ * industry day. Attendable rows go first, but notices keep up to a fifth of a full page so a busy
+ * agency's result still shows them.
+ */
+export function allocateEventSlots(attendable: number, notices: number, limit: number): { attendable: number; notices: number } {
+  const noticeSlots = Math.min(notices, Math.max(limit - attendable, Math.floor(limit / 5)));
+  return { attendable: Math.min(attendable, limit - noticeSlots), notices: noticeSlots };
 }
 
 export async function queryFederalEvents(input: FederalEventsInput): Promise<FederalEventsResult> {
@@ -79,42 +124,88 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
   let degraded = false;
   const events: FederalEvent[] = [];
   const seen = new Set<string>();
+  let samAttendableTotal: number | null = null;
+  let samNoticeTotal: number | null = null;
 
   // ── Source 1: sam_events (grounded, dated) ────────────────────────────────
   if (term) {
-    const { data, error } = await supabase
-      .from('sam_events')
-      .select(COLUMNS)
-      .gte('event_date', todayStr)
-      .lte('event_date', horizonStr)
-      .or(`agency.ilike.%${term}%,inferred_office.ilike.%${term}%,inferred_subagency.ilike.%${term}%`)
-      .order('event_date', { ascending: true })
-      .limit(limit);
+    const scoped = (q: ReturnType<ReturnType<typeof supabase.from>['select']>) =>
+      q
+        .gte('event_date', todayStr)
+        .lte('event_date', horizonStr)
+        .or(`agency.ilike.%${term}%,inferred_office.ilike.%${term}%,inferred_subagency.ilike.%${term}%`)
+        .order('event_date', { ascending: true })
+        .limit(limit);
+    const typeList = `(${ATTENDABLE_TYPES.join(',')})`;
+    const [attendableRes, noticeRes] = await Promise.all([
+      scoped(supabase.from('sam_events').select(COLUMNS, { count: 'exact' })).in('event_type', ATTENDABLE_TYPES),
+      scoped(supabase.from('sam_events').select(COLUMNS, { count: 'exact' })).or(`event_type.is.null,event_type.not.in.${typeList}`),
+    ]);
 
-    if (error) {
-      console.error('[events:query] sam_events read failed:', error.message);
+    if (attendableRes.error || noticeRes.error) {
+      console.error('[events:query] sam_events read failed:', attendableRes.error?.message || noticeRes.error?.message);
       degraded = true;
-    } else {
-      for (const row of data || []) {
-        const isAi = row.source === 'ai_web_search'; // AI rows already backfilled into the table
+    }
+    samAttendableTotal = attendableRes.error ? null : attendableRes.count ?? null;
+    samNoticeTotal = noticeRes.error ? null : noticeRes.count ?? null;
+
+    // Dedup BEFORE allocating, so a repeated title cannot use up a slot.
+    const dedup = (rows: unknown) => {
+      const unique: SamEventRow[] = [];
+      for (const row of (rows || []) as SamEventRow[]) {
         const dedupKey = (row.title || '').toLowerCase().slice(0, 60);
         if (seen.has(dedupKey)) continue;
         seen.add(dedupKey);
-        events.push({
-          source: isAi ? 'ai' : 'sam',
-          title: row.title,
-          event_type: row.event_type || 'event',
-          event_date: row.event_date,
-          location: row.event_location ?? null,
-          url: row.registration_url ?? null,
-          description: row.description ?? null,
-          matched_office: row.inferred_office || row.inferred_subagency || row.agency || null,
-          confidence: isAi && typeof row.confidence === 'number' ? row.confidence : null,
-        });
+        unique.push(row);
       }
+      return unique;
+    };
+    const attendable = dedup(attendableRes.data);
+    const notices = dedup(noticeRes.data);
+    const slots = allocateEventSlots(attendable.length, notices.length, limit);
+    for (const row of [...attendable.slice(0, slots.attendable), ...notices.slice(0, slots.notices)]) {
+      const isAi = row.source === 'ai_web_search'; // AI rows already backfilled into the table
+      events.push({
+        source: isAi ? 'ai' : 'sam',
+        title: row.title,
+        event_type: row.event_type || 'event',
+        event_date: row.event_date,
+        location: row.event_location ?? null,
+        url: row.registration_url ?? null,
+        description: row.description ?? null,
+        matched_office: row.inferred_office || row.inferred_subagency || row.agency || null,
+        confidence: isAi && typeof row.confidence === 'number' ? row.confidence : null,
+      });
     }
   }
   const samCount = events.length;
+
+  // ── Source 1b: curated catalog occurrences with a verified date in the window ──
+  // Placed among the attendable rows by date. A SAM row with the same title stays and the catalog
+  // row is dropped, so one event never appears twice.
+  let catalogCount = 0;
+  if (input.includeCatalog) {
+    const rows = catalogOccurrencesForAgency(agency, todayStr, horizonStr).filter((o) => !seen.has(o.title.toLowerCase().slice(0, 60)));
+    for (const o of rows) {
+      seen.add(o.title.toLowerCase().slice(0, 60));
+      const at = events.findIndex((e) => !isAttendableType(e.event_type) || (e.event_date || '') > o.event_date);
+      events.splice(at === -1 ? events.length : at, 0, {
+        source: 'catalog',
+        title: o.title,
+        event_type: 'conference',
+        event_date: o.event_date,
+        event_end_date: o.event_end_date,
+        location: o.location,
+        url: o.url,
+        description: o.description,
+        matched_office: null,
+        confidence: null,
+        source_url: o.source_url,
+        verified_at: o.verified_at,
+      });
+    }
+    catalogCount = rows.length;
+  }
 
   // ── Source 2: on-demand AI web discovery (optional, paid) ─────────────────
   let aiDiscovery: FederalEventsResult['aiDiscovery'] = 'off';
@@ -146,9 +237,9 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
       }
     }
   }
-  const aiCount = events.length - samCount;
+  const aiCount = events.length - samCount - catalogCount;
 
-  return { events, samCount, aiCount, aiDiscovery, degraded };
+  return { events, samCount, aiCount, catalogCount, samAttendableTotal, samNoticeTotal, aiDiscovery, degraded };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -173,7 +264,7 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
 // events count inheriting the whole-DoD number, 2026-06-29). So agency matches are
 // returned but LABELLED `agency` (and for a department-level agency, flagged
 // `broad:true`) so the UI can say "department-wide" instead of implying relevance.
-const ATTENDABLE_TYPES = ['industry_day', 'forecast', 'webinar', 'conference'];
+export const ATTENDABLE_TYPES = ['industry_day', 'forecast', 'webinar', 'conference'];
 
 /** Department-level agency strings whose event set is too broad to imply relevance. */
 const DEPT_LEVEL = /\b(DEPT OF DEFENSE|DEFENSE, DEPARTMENT OF|DEPARTMENT OF DEFENSE)\b/i;

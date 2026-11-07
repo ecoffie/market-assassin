@@ -1128,8 +1128,9 @@ server.registerTool(
     annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Upcoming federal-contracting events for an agency — industry days, matchmaking, sources-sought, association ' +
-      'conferences. "Where do I show up to win this buyer?" Dated SAM.gov Special Notices (source="sam") + optional ' +
-      'web-discovered conferences (source="ai", verify before attending). grounded=false when none match. ' +
+      'conferences. "Where do I show up to win this buyer?" Dated SAM.gov notices (source="sam") + curated conferences ' +
+      'dated from the organizer\'s page (source="catalog") + optional web-discovered conferences (source="ai", verify ' +
+      'before attending). Attendable events first; event_type="rfi" is a notice, not an event. grounded=false when none match. ' +
       'include_ics also returns a base64 .ics calendar of the dated events.',
     inputSchema: {
       agency: z.string().describe('Agency name, e.g. "Department of Defense", "Navy", "GSA".'),
