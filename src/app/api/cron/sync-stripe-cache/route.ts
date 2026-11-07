@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { syncChargesIncremental } from '@/lib/stripe/charge-sync';
 
 /**
  * GET /api/cron/sync-stripe-cache
@@ -9,8 +10,14 @@ import { NextRequest, NextResponse } from 'next/server';
  * customer row for any subscription whose customer isn't cached yet). This drops
  * the slow full-customers walk (~11 pages × 1s sleep) that was tipping the job
  * over the dispatcher's 290s budget → `last_status: timeout`. ~365 subs ≈ a few
- * seconds now. Charges are still skipped (the dashboard reads 30-day revenue
- * live from Stripe).
+ * seconds now.
+ *
+ * Charges sync here too, incrementally (src/lib/stripe/charge-sync.ts): skipping them froze
+ * stripe_charges at 2026-06-11 while mrr-goal, list-purchases and classify-customers-v2 kept
+ * reading it. They run under CHARGE_DEADLINE_MS so they cannot push the job back over budget.
+ * Either half failing returns non-2xx, because the dispatcher only sees the status code.
+ * Running out of budget while still advancing is progress, not failure: the next run continues
+ * from the watermark. Running out with nothing written is a failure, or it would never recover.
  *
  * `?full=1` runs the old customers-then-subscriptions path (a periodic deep sync
  * to catch customers with no active subscription).
@@ -29,6 +36,8 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+/** Measured from the start of the request; the dispatcher's budget is ~290s. */
+const CHARGE_DEADLINE_MS = 200_000;
 
 function internalBaseUrl(request: NextRequest): string {
   // Use the request's own host so server→server calls hit the same deployment
@@ -39,6 +48,7 @@ function internalBaseUrl(request: NextRequest): string {
 }
 
 export async function GET(request: NextRequest) {
+  const startedAt = Date.now();
   // Accept either the dispatcher's bearer OR an explicit password.
   const password = request.nextUrl.searchParams.get('password');
   const bearer = request.headers.get('authorization')?.replace('Bearer ', '');
@@ -74,15 +84,39 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, mode: 'full', synced: results });
   }
 
-  // Default fast path: subscriptions only, FK self-healed inline, no sleeps.
+  // Default fast path: subscriptions (FK self-healed inline, no sleeps), then charges.
+  const failures: string[] = [];
   try {
     const sRes = await fetch(`${base}/api/admin/backfill-stripe?password=${pw}&mode=backfill&type=subscriptions-fast`, { cache: 'no-store' });
     const j = await sRes.json();
     results.subscriptions = j?.stats?.subscriptions ?? { error: sRes.status };
     if (j?.totalErrors) results.errors = j.errors;
+    if (!sRes.ok || j?.success === false || j?.totalErrors) {
+      failures.push(`subscriptions: ${j?.totalErrors ? `${j.totalErrors} errors` : `HTTP ${sRes.status}`}`);
+    }
   } catch (err) {
-    results.subscriptions = { error: err instanceof Error ? err.message : 'failed' };
+    const message = err instanceof Error ? err.message : 'failed';
+    results.subscriptions = { error: message };
+    failures.push(`subscriptions: ${message}`);
   }
 
-  return NextResponse.json({ success: true, mode: 'fast', synced: results });
+  // Off unless STRIPE_CHARGE_SYNC_ENABLED is exactly 'true': the first run backfills months of
+  // charges, so a merge or deploy alone must never start it.
+  if (process.env.STRIPE_CHARGE_SYNC_ENABLED === 'true') {
+    // Runs even when subscriptions failed: the two are independent.
+    const charges = await syncChargesIncremental({ deadlineMs: startedAt + CHARGE_DEADLINE_MS });
+    results.charges = charges;
+    if (!charges.ok) {
+      failures.push(`charges: ${charges.error ?? charges.reason}`);
+    } else if (!charges.complete && charges.upserted === 0) {
+      failures.push(`charges: ${charges.reason} with no progress`);
+    }
+  } else {
+    results.charges = { skipped: 'charge_sync_disabled' };
+  }
+
+  return NextResponse.json(
+    { success: failures.length === 0, mode: 'fast', synced: results, ...(failures.length ? { failures } : {}) },
+    { status: failures.length ? 500 : 200 },
+  );
 }
