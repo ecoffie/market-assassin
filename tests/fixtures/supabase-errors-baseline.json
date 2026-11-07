@@ -24,7 +24,6 @@
     "src/app/api/admin/backfill-client-alert-recipients/route.ts:76 (user_notification_settings)",
     "src/app/api/admin/backfill-flash-sale/route.ts:150 (user_notification_settings)",
     "src/app/api/admin/backfill-pipeline-deadlines/route.ts:56 (sam_opportunities)",
-    "src/app/api/admin/backfill-stripe/route.ts:534 (stripe_customers)",
     "src/app/api/admin/briefing-dead-letter/route.ts:153 (briefing_dead_letter)",
     "src/app/api/admin/briefing-dead-letter/route.ts:66 (briefing_dead_letter)",
     "src/app/api/admin/check-access/route.ts:127 (purchases)",

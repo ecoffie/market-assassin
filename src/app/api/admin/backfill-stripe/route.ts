@@ -479,7 +479,7 @@ async function backfillSubscriptionsFast(supabase: any, stats: any, errors: stri
 
 async function computeAllClassifications(supabase: any, stats: any, errors: string[]) {
   // Get all customers with email
-  const { data: customers } = await supabase
+  const { data: customers, error: customersErr } = await supabase
     .from('stripe_customers')
     .select('id, email')
     .eq('livemode', true)
@@ -487,6 +487,10 @@ async function computeAllClassifications(supabase: any, stats: any, errors: stri
     .not('email', 'is', null)
     .not('email', 'eq', '');
 
+  if (customersErr) {
+    errors.push(`Classification customers read: ${customersErr.message}`);
+    return;
+  }
   if (!customers) return;
 
   for (const customer of customers) {
