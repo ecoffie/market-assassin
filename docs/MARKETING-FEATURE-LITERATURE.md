@@ -7494,6 +7494,27 @@ through the SAM Federal Hierarchy path, 19 open, versus 0 before. Unit test
 
 ---
 
+## Federal events you can actually attend come first (2026-11-07)
+
+**What.** Asking Mindy about an agency's events now lists the ones you can attend (industry days,
+webinars, conferences) ahead of sources-sought notices, and tells you how many of each it found. The
+National Veterans Small Business Engagement (Cleveland, December 8-9, 2026) is now in the catalog with
+its date and registration link, and searching for it by name works.
+
+**Why it matters.** "Where do I show up to win this buyer?" needs a place and a date. Notices are worth
+answering, but they are not events, and they were crowding the real events out of the results.
+
+**Honest scope.** Curated dates are shown only where we read them from the organizer's own page, and each
+says where and when it was read. Most catalog entries still hold a typical month, not a date, and the
+catalog shows when it was last fully reviewed. SAM.gov event labels come from notice text and some are
+imperfect.
+
+**SEO.** National Veterans Small Business Engagement 2026 / NVSBE Cleveland / VA small business events /
+federal industry days for small business.
+
+**Proof.** VA OSDBU NVSBE page (va.gov/osdbu/nvsbe, read 2026-11-07) for date, venue and registration.
+Live `sam_events` query for VA, 3 months: the conference and both labelled industry days appear ahead of
+the notices. Test: `federal-events-ranking.unit.test.ts`.
 ## Saved-search alerts tell you when they can't reach you (2026-11-07)
 
 **What.** If a saved search can't send email, its owner now sees why on that search: an invalid NAICS code, or an account email on the do-not-send list after a bounce, complaint or unsubscribe. Connected AI agents also see how far the latest alert got: accepted by the email provider, then taken by the receiving mail server.

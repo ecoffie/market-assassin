@@ -26,6 +26,11 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-07 — Federal events: NVSBE in the catalog, attendable events survive the limit, honest catalog date
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-07 | MCP events / `search_federal_events` + `get_federal_event_series` | A query for NVSBE returned 0 and a VA search returned only sources-sought notices. Three causes: (1) NVSBE had no entry, only a mention in a note, and `query` matched the whole string as one substring. Added the entry with a dated `next_occurrence` read from va.gov, and token matching with a threshold and ranking. (2) One date-ordered read with a limit let notices fill the result, so a later industry day never arrived. Attendable and notice rows are now read separately, attendable first, notices keeping a fifth of a full page; `_meta` gains returned and exact window counts (null when unreadable). (3) `catalog_updated` would have read as fresh after a one-entry edit, so `catalog_last_full_review` stays 2026-04-05. Catalog rows are opt-in (`includeCatalog`) so callers reporting SAM evidence keep SAM-only counts. SAM down with only a catalog row left stays ungrounded and unbilled. Multi-day .ics. Also corrected from official pages: SAME conference name and URL (old URL 404s), VA OSDBU events URL. | `allocateEventSlots` -> `src/lib/events/query.ts` · `catalogOccurrencesForAgency` -> `src/lib/events/catalog-occurrences.ts` · `seriesQueryScore` -> `src/mcp/tools/event-series.ts` | `federal-events-ranking.unit.test.ts` (22), 8 mutations each caught. Live DB, VA 3 months: NVSBE returned (2026-12-08, source=catalog) with 3 attendable + 46 notices; before, all notices. Series query that returned 0 now returns NVSBE first. | PR OPEN |
 ## 2026-11-07 — Saved-search alerts: action items stop reading as an outage; owners and delivery evidence surfaced
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

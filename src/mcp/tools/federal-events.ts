@@ -4,10 +4,10 @@
  * buyer?" — the 6th market-scan question.
  *
  * Wraps src/lib/events/query.ts: grounded `sam_events` (DoDAAC-office-anchored) +
- * an OPTIONAL paid AI web-discovery pass (association conferences not in SAM).
+ * dated curated-catalog occurrences + an OPTIONAL paid AI web-discovery pass (association conferences not in SAM).
  * credits: 5. `_meta` always ships; `_ai_hint` OFF by default.
  */
-import { queryFederalEvents, type FederalEvent } from '@/lib/events/query';
+import { isAttendableType, queryFederalEvents, type FederalEvent } from '@/lib/events/query';
 import { buildEventsIcs } from '@/lib/events/ics';
 import { mcpFlags } from '@/lib/mcp/flags';
 
@@ -32,6 +32,15 @@ export interface FederalEventsToolResult {
     count: number;
     sam_count: number;
     ai_count: number;
+    /** Dated rows from the curated catalog, each read from the organizer's page. */
+    catalog_count: number;
+    /** Returned events a person attends (industry day, webinar, conference, forecast event). */
+    attendable_count: number;
+    /** Returned notices (sources sought / RFI) that are not events to attend. */
+    notice_count: number;
+    /** Exact SAM rows in the window before the limit. null = unreadable, never 0. */
+    sam_attendable_total: number | null;
+    sam_notice_total: number | null;
     ai_discovery: 'off' | 'ran' | 'unavailable';
     /** VEVENTs written. Only present when include_ics ran. */
     ics_events?: number;
@@ -48,11 +57,16 @@ export async function searchFederalEvents(input: FederalEventsToolInput): Promis
     agency,
     monthsAhead: months,
     includeAiDiscovery: input.include_ai_discovery === true,
+    includeCatalog: true,
     currentYear: new Date().getFullYear(),
     limit: input.limit,
   });
 
-  const grounded = res.events.length > 0;
+  // A failed SAM read with only curated rows left is still a failed search: return the rows, but do
+  // not report (or bill) it as a completed lookup.
+  const onlyCatalogAfterFailure = res.degraded && res.samCount === 0 && res.aiCount === 0;
+  const grounded = res.events.length > 0 && !onlyCatalogAfterFailure;
+  const attendableCount = res.events.filter((e) => isAttendableType(e.event_type)).length;
   const result: FederalEventsToolResult = {
     queried: { agency, months_ahead: months },
     events: res.events,
@@ -62,6 +76,11 @@ export async function searchFederalEvents(input: FederalEventsToolInput): Promis
       count: res.events.length,
       sam_count: res.samCount,
       ai_count: res.aiCount,
+      catalog_count: res.catalogCount,
+      attendable_count: attendableCount,
+      notice_count: res.events.length - attendableCount,
+      sam_attendable_total: res.samAttendableTotal,
+      sam_notice_total: res.samNoticeTotal,
       ai_discovery: res.aiDiscovery,
     },
   };
@@ -70,6 +89,7 @@ export async function searchFederalEvents(input: FederalEventsToolInput): Promis
     const cal = buildEventsIcs(
       res.events.map((e) => ({
         date: e.event_date,
+        endDate: e.event_end_date,
         title: e.title,
         location: e.location,
         description: e.description,
@@ -87,10 +107,10 @@ export async function searchFederalEvents(input: FederalEventsToolInput): Promis
       summary: res.degraded
         ? 'Event lookup errored — retry; do not state there are no events.'
         : grounded
-        ? `${res.events.length} event(s) for "${agency}" in the next ${months} month(s) (${res.samCount} from SAM.gov, ${res.aiCount} AI-discovered), soonest first. Top: ${top.title}${top.event_date ? ` on ${top.event_date}` : ' (date TBD)'}${top.location ? ` — ${top.location}` : ''}.`
+        ? `${res.events.length} event(s) for "${agency}" in the next ${months} month(s) (${res.samCount} from SAM.gov, ${res.catalogCount} from the curated catalog, ${res.aiCount} AI-discovered), attendable events first, then notices, each soonest first. Top: ${top.title}${top.event_date ? ` on ${top.event_date}` : ' (date TBD)'}${top.location ? ` — ${top.location}` : ''}.`
         : `No upcoming events found for "${agency}" in the next ${months} month(s). Widen months_ahead${res.aiDiscovery === 'off' ? ', or set include_ai_discovery to search the web for association conferences' : ''}.`,
       how_to_use: grounded
-        ? `source="sam" events are grounded SAM.gov Special Notices (trust the date). source="ai" events are web-discovered — treat confidence as a verify-before-attending signal, and confirm the date/registration on the linked page. matched_office is the decoded buying office. registration_url is where to sign up.${
+        ? `source="sam" events are grounded SAM.gov notices (trust the date). event_type="rfi" is a sources-sought notice to respond to, not an event to attend. source="catalog" events are curated, with the date read from the organizer's page (see source_url, verified_at). source="ai" events are web-discovered — treat confidence as a verify-before-attending signal, and confirm the date/registration on the linked page. matched_office is the decoded buying office. registration_url is where to sign up.${
             result.ics
               ? ' `ics` is a base64 .ics — decode it to a file the user imports into Google/Outlook/Apple Calendar to add every dated event at once.'
               : ''
