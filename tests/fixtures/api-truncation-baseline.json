@@ -24,7 +24,6 @@
     "src/app/api/cron/snapshot-recompetes/route.ts:77",
     "src/app/api/forecasts/route.ts:126",
     "src/app/api/planner/weekly-digest/route.ts:107",
-    "src/app/api/verify-access/route.ts:91",
-    "src/app/api/webhooks/stripe/route.ts:628"
+    "src/app/api/verify-access/route.ts:91"
   ]
 }

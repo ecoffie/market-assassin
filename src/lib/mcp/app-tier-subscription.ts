@@ -37,8 +37,8 @@ import { PRO_MONTHLY_CREDITS, TEAM_MONTHLY_CREDITS } from './packages';
 import { getStripe } from '@/lib/stripe';
 
 /** App-tier price amounts (cents). Mirrors grant-mcp-pro-credits so the two agree. */
-const PRO_AMOUNTS = new Set([14900, 149000, 4900]);   // Pro $149/mo · $1,490/yr · $49 grandfathered
-const TEAM_AMOUNTS = new Set([49900, 499000]);        // Team $499/mo · $4,990/yr
+export const PRO_AMOUNTS = new Set([14900, 149000, 4900]);   // Pro $149/mo · $1,490/yr · $49 grandfathered
+export const TEAM_AMOUNTS = new Set([49900, 499000]);        // Team $499/mo · $4,990/yr
 
 export interface AppTierInvoiceOutcome {
   handled: boolean;   // false => not an app-tier subscription invoice

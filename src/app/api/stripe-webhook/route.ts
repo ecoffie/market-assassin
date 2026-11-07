@@ -828,6 +828,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true, action: 'ignored' });
     }
 
+    // Mindy Pro / Team ended → revoke the entitlement it paid for. Only on the
+    // DELETED event (the subscription is over); never past_due, which is dunning.
+    // Until 2026-11-07 this branch ignored every non-FHC/AlertPro subscription,
+    // so cancelled MI Pro subscribers kept Pro indefinitely.
+    if (event.type === 'customer.subscription.deleted' && supabase) {
+      const { revokeAppTierOnCancel } = await import('@/lib/billing/revoke-app-tier-on-cancel');
+      const outcome = await revokeAppTierOnCancel(supabase, stripe, subscription);
+      if (outcome.handled) {
+        // A guard that could not be established (e.g. Stripe errored) means we neither
+        // revoked nor proved we shouldn't. Return 503 so Stripe RETRIES (up to 3 days);
+        // a 200 here would make the miss permanent, which is the original bug for that
+        // customer. Every step is idempotent, so a retry is safe.
+        const retry = !outcome.revoked && outcome.reason.startsWith('guard_unknown');
+        return NextResponse.json(
+          { received: true, action: 'app_tier_cancel', ...outcome },
+          { status: retry ? 503 : 200 },
+        );
+      }
+    }
+
     // Check if this is an FHC subscription by looking at product metadata
     const items = subscription.items.data;
     let isFHCSubscription = false;
