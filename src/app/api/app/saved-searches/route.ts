@@ -13,6 +13,8 @@ import {
   getSavedSearch,
   listSavedSearches,
   updateSavedSearch,
+  readRecipientSuppression,
+  searchAlertBlock,
   LAST_SEEN_NOTICE_IDS_CAP,
 } from '@/lib/saved-searches';
 
@@ -95,7 +97,16 @@ export async function GET(request: NextRequest) {
     }
     return NextResponse.json({ success: false, error: listed.message }, { status: 500 });
   }
-  return NextResponse.json({ success: true, searches: listed.data.searches });
+  // A blocked search looks identical to a quiet market unless its owner is told. Read once per
+  // account; a failed lookup withholds the recipient notice rather than guessing (NAICS still shows).
+  const suppressed = listed.data.searches.length ? await readRecipientSuppression(email) : null;
+  return NextResponse.json({
+    success: true,
+    searches: listed.data.searches.map((s) => ({
+      ...s,
+      alert_block: searchAlertBlock(s, suppressed)?.ownerMessage ?? null,
+    })),
+  });
 }
 
 export async function POST(request: NextRequest) {

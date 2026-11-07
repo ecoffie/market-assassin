@@ -128,6 +128,41 @@ describe('job status — the named saved-search alerts job', () => {
     expect(r.job_status_reason).toMatch(/action item: recipient_suppressed=3/);
   });
 
+  it('today\'s real run (only recipient_suppressed + invalid_saved_naics) → healthy, clean, and the two lists stay apart', async () => {
+    const at = '2026-08-30T11:01:00Z';
+    setup({ cron: [cron], runs: [run('error', 'invalid_saved_naics=2,recipient_suppressed=3', at)], acceptedDuringRun: 12, evaluatedDuringRun: 134 });
+    const r = await getSavedSearchDeliveryReadiness(NOW);
+    expect(r.job_status).toBe('healthy');
+    expect(r.last_clean_run_at).toBe(at);
+    expect(r.latest_run_processing_failures).toEqual({});
+    expect(r.suppression_action_items).toEqual({ recipient_suppressed: 3 });
+    expect(r.config_action_items).toEqual({ invalid_saved_naics: 2 });
+    expect(r.job_status_reason).toMatch(/invalid_saved_naics=2 \(saved searches their owner must correct\)/);
+  });
+
+  it('a real failure beside the action items is still partial, and that run is NOT the last clean run (the 11-06 run)', async () => {
+    const clean = '2026-08-29T11:01:00Z';
+    setup({
+      cron: [cron],
+      runs: [run('error', 'invalid_saved_naics=2,recipient_suppressed=3,opportunity_query_failed=1'), run('error', 'invalid_saved_naics=2,recipient_suppressed=3', clean)],
+      acceptedDuringRun: 12,
+      evaluatedDuringRun: 134,
+    });
+    const r = await getSavedSearchDeliveryReadiness(NOW);
+    expect(r.job_status).toBe('partial_failure');
+    expect(r.latest_run_processing_failures).toEqual({ opportunity_query_failed: 1 });
+    expect(r.config_action_items).toEqual({ invalid_saved_naics: 2 });
+    expect(r.last_clean_run_at).toBe(clean);
+  });
+
+  it('a capacity backlog beside the action items is still partial, never clean', async () => {
+    setup({ cron: [cron], runs: [run('error', 'invalid_saved_naics=2,recipient_suppressed=3,capacity_exhausted=1,backlog=6')], acceptedDuringRun: 12, evaluatedDuringRun: 134 });
+    const r = await getSavedSearchDeliveryReadiness(NOW);
+    expect(r.job_status).toBe('partial_failure');
+    expect(r.latest_run_processing_failures).toEqual({ capacity_exhausted: 1 });
+    expect(r.last_clean_run_at).toBeNull();
+  });
+
   it('failed suppression LOOKUP is a processing error → partial failure, never suppression', async () => {
     setup({ cron: [cron], runs: [run('error', 'suppression_lookup_failed=1')], acceptedDuringRun: 4, evaluatedDuringRun: 9 });
     const r = await getSavedSearchDeliveryReadiness(NOW);

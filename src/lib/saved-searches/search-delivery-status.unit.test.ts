@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('@/lib/app/workspace', () => ({ getAppSupabase: () => ({}) }));
 
-import { composeSearchAlertStatus, type FilterReachResult } from './search-delivery-status';
+import { alertDeliveryOutcome, composeSearchAlertStatus, searchAlertBlock, type FilterReachResult } from './search-delivery-status';
 import type { SavedSearchDeliveryReadiness } from './delivery-readiness';
 import type { SavedSearchRow } from './types';
 
@@ -27,6 +27,7 @@ const job = (over: Partial<SavedSearchDeliveryReadiness> = {}): SavedSearchDeliv
   latest_run_failures: 'unexpected_schedule_error=1,recipient_suppressed=3',
   latest_run_processing_failures: { unexpected_schedule_error: 1 },
   suppression_action_items: { recipient_suppressed: 3 },
+  config_action_items: {},
   latest_run_alerts_provider_accepted: 48,
   latest_run_searches_evaluated: 134,
   job_status_reason: 'saved-search alerts: partial failure: unexpected_schedule_error=1 failed; the rest ran (evaluated 134 searches, 48 alerts accepted by the email provider)',
@@ -138,7 +139,7 @@ describe('composeSearchAlertStatus — this search first, the job labelled', () 
       job(), { suppressed: null, lastAlertAt: '2026-10-05T11:00:41Z' }, reach('matches_open_now'), NOW,
     );
     expect(r.headline).toBe('delivering');
-    expect(r.summary).toMatch(/our email provider last accepted one for this account at 2026-10-05 11:00 UTC \(inbox delivery is not tracked\)/);
+    expect(r.summary).toMatch(/Our email provider last accepted one for this account at 2026-10-05 11:00 UTC; delivery to the receiving mail server is not confirmed yet \(inbox placement is not tracked\)/);
     expect(r.summary).toContain('this one is not affected');
   });
 
@@ -154,5 +155,79 @@ describe('composeSearchAlertStatus — this search first, the job labelled', () 
     const r = composeSearchAlertStatus(search({ alerts_enabled: false }), job({ job_status: 'job_failure' }), clean, reach('matches_open_now'), NOW);
     expect(r.headline).toBe('paused');
     expect(r.next_evaluation_at).toBeNull();
+  });
+});
+
+describe('delivery evidence — exactly as far as the provider events go (fix list item 4)', () => {
+  const sent = search({ total_alerts_sent: 4, last_alerted_at: '2026-10-05T11:01:00Z', created_at: '2026-09-01T00:00:00Z' });
+  const accepted = '2026-10-05T11:01:41Z';
+  const status = (lastDeliveryEvent: { type: string; at: string } | null | undefined) =>
+    composeSearchAlertStatus(sent, job({ job_status: 'healthy', job_status_reason: 'x' }), { suppressed: null, lastAlertAt: accepted, lastDeliveryEvent }, reach('matches_open_now'), NOW);
+
+  it('delivery event for the latest send → delivered with its time; inbox placement still not claimed', () => {
+    const r = status({ type: 'email.delivered', at: '2026-10-05T11:01:44Z' });
+    expect(r.recipient_last_alert_outcome).toBe('delivered');
+    expect(r.recipient_last_alert_delivered_at).toBe('2026-10-05T11:01:44Z');
+    expect(r.inbox_delivery).toBe('not_observable');
+    expect(r.summary).toContain('reached the receiving mail server at 2026-10-05 11:01 UTC');
+    expect(r.summary).toContain('inbox or spam is not tracked');
+    expect(r.summary).not.toMatch(/delivered to your inbox|arrived/i);
+  });
+
+  it("an older delivery event belongs to an earlier alert: the latest is unconfirmed, never 'delivered'", () => {
+    const r = status({ type: 'email.delivered', at: '2026-10-04T11:01:44Z' });
+    expect(r.recipient_last_alert_outcome).toBe('unconfirmed');
+    expect(r.recipient_last_alert_delivered_at).toBeNull();
+    expect(r.summary).toContain('not confirmed yet');
+  });
+
+  it('no delivery event at all → unconfirmed; unreadable events → unknown (null), never a verdict', () => {
+    expect(status(null).recipient_last_alert_outcome).toBe('unconfirmed');
+    expect(status(undefined).recipient_last_alert_outcome).toBeNull();
+    expect(status(undefined).recipient_last_alert_delivered_at).toBeNull();
+  });
+
+  it('a bounce newer than the last accepted send is reported as a bounce', () => {
+    const r = status({ type: 'email.bounced', at: '2026-10-05T11:02:00Z' });
+    expect(r.recipient_last_alert_outcome).toBe('bounced');
+    expect(r.recipient_last_alert_delivered_at).toBeNull();
+    expect(r.summary).toContain('reported the latest alert for this account as bounced');
+  });
+
+  it('no alert ever sent → null outcome, not "unconfirmed"', () => {
+    expect(alertDeliveryOutcome({ suppressed: null, lastAlertAt: null, lastDeliveryEvent: null }).outcome).toBeNull();
+  });
+});
+
+describe('searchAlertBlock — the owner notice and the MCP status share one rule (fix list item 1)', () => {
+  it('every stored NAICS unknown → blocked; names the code, never proposes a replacement', () => {
+    const b = searchAlertBlock(search({ filters: { naics: '541510' } }), null);
+    expect(b?.kind).toBe('invalid_filters');
+    expect(b?.ownerMessage).toContain('NAICS 541510 is not a valid code');
+    expect(b?.ownerMessage).not.toMatch(/541511|541512|541519/);
+  });
+  it('a mix of valid and unknown codes still alerts on the valid one → no block', () => {
+    expect(searchAlertBlock(search({ filters: { naics: '541510,541611' } }), null)).toBeNull();
+  });
+  it('confirmed suppression → on hold; failed lookup (undefined) → no claim', () => {
+    expect(searchAlertBlock(search(), 'hard_bounce')?.kind).toBe('recipient_suppressed');
+    expect(searchAlertBlock(search(), undefined)).toBeNull();
+    expect(searchAlertBlock(search(), null)).toBeNull();
+  });
+  it('a paused search is the owner choice: no notice, even with a bad code or suppression', () => {
+    expect(searchAlertBlock(search({ alerts_enabled: false, filters: { naics: '541510' } }), 'hard_bounce')).toBeNull();
+    expect(searchAlertBlock(search({ alert_frequency: 'paused', filters: { naics: '541510' } }), null)).toBeNull();
+  });
+  it('owner copy carries no em dash and no internal reason code', () => {
+    for (const b of [searchAlertBlock(search({ filters: { naics: '541510' } }), null), searchAlertBlock(search(), 'hard_bounce'), searchAlertBlock(search({ user_email: 'a@clients.getmindy.ai' }), null), searchAlertBlock(search({ filters: { sapBuyer: true } }), null)]) {
+      expect(b?.ownerMessage).toBeTruthy();
+      expect(b?.ownerMessage).not.toMatch(/\u2014|hard_bounce|sapBuyer/);
+    }
+  });
+  it('compose reports the same reason the notice is built from', () => {
+    const s = search({ filters: { naics: '541510' } });
+    const r = composeSearchAlertStatus(s, job(), clean, reach('unknown'), NOW);
+    expect(r.search_delivery).toBe('blocked_invalid_filters');
+    expect(r.search_delivery_reason).toBe(searchAlertBlock(s, null)?.reason);
   });
 });

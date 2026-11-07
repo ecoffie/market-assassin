@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-07 — Saved-search alerts: action items stop reading as an outage; owners and delivery evidence surfaced
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-07 | Saved-search alerts / watchdog / owner UI | The job read `error` every day from 2026-09-30 because `invalid_saved_naics` (one customer's two searches on 541510) counted as a processing failure beside 3 suppressed searches on the internal hello@govconedu.com. The permanent red hid a real `opportunity_query_failed=1` on 11-06. `invalid_saved_naics` is now a per-search CONFIG action item (`CONFIG_ACTION_CLASSES`, `config_action_items`, MCP `delivery_config_action_items`), separate from suppression; any real class still gives partial failure and a CHANGED watchdog post. Owners now see a notice on the blocked search in both the /app list and the Watchlist page, from one rule (`searchAlertBlock`) shared with the MCP status. Per-search status reports the provider's delivery event (`recipient_last_alert_delivered_at`) from `email_provider_events`, because `email_provider_sends.status` regresses when a late `email.sent` arrives. Inbox placement stays not_observable. Save-time NAICS validation audited: already covers both insert paths, no change. | `CONFIG_ACTION_CLASSES` -> `src/lib/cron/watchdog-incidents.ts` · `searchAlertBlock` -> `src/lib/saved-searches/search-delivery-status.ts` | Unit + 5 mutations each red; read-only against prod: job_status healthy, last_clean_run_at 2026-11-07 (was 09-29), processing {}, recipient_suppressed=3, invalid_saved_naics=2. | PR open |
+
 ## 2026-11-05 — getmindy.ai/ serves the Zoom-style marketing homepage; Today's Intel back at /today
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

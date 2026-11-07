@@ -233,6 +233,8 @@ export interface SavedSearchItem {
   mapHref: string | null;
   /** Unseen matches from ?badge=1. null = not counted (never shown as 0). */
   newCount: number | null;
+  /** Owner-facing reason this search cannot email (from the list API), or null. */
+  alertBlock: string | null;
 }
 
 export function toSavedSearchItems(
@@ -259,6 +261,7 @@ export function toSavedSearchItems(
       createdAt: str(s.created_at) || null,
       mapHref: mapLinkForSavedSearch(id),
       newCount: counts.has(id) ? (counts.get(id) as number) : null,
+      alertBlock: str(s.alert_block) || null,
     });
   }
   return out;
