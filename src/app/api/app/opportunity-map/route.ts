@@ -16,6 +16,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { DIBBS_MAP_ENABLED } from '@/lib/dibbs/availability';
 import { getMapOpportunities, getDibbsMapPins, getDibbsViewportPins, SET_GROUPS, mapSetAside, SET_LABEL, naicsCategory } from '@/lib/opportunities/map-data';
 import { getSbirMapPins } from '@/lib/sbir/sbir-map-pins';
 import { sapBuyerTier } from '@/lib/opportunities/sap-friendly-agencies';
@@ -44,6 +45,7 @@ function sb() {
  *  omitting it keeps the exact SAM-only payload existing callers depend on. Shared by
  *  BOTH response modes so legacy and viewport can never disagree about what was asked for. */
 function wantDlaSources(raw: string | null): boolean {
+  if (!DIBBS_MAP_ENABLED) return false; // parked: never query or return DIBBS pins
   const s = (raw || 'sam').toLowerCase();
   return s.includes('dla') || s.includes('dibbs') || s === 'all';
 }
