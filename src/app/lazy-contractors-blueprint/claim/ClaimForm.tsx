@@ -1,14 +1,22 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
-import { Button, ButtonLink, Field, Input } from '@/components/public-site/ui';
+import { useEffect, useState } from 'react';
+import { Button, ButtonLink } from '@/components/public-site/ui';
+import { getMIApiHeaders, storedMIEmail } from '@/components/app/authHeaders';
 
 type State = 'before' | 'open' | 'after';
 
+const SIGN_IN_HREF = `/app?next=${encodeURIComponent('/lazy-contractors-blueprint/claim')}`;
+
 export default function ClaimForm({ initialState, credits }: { initialState: State; credits: number }) {
+  // Read the browser's Mindy session after mount (localStorage), so server and client render the same first frame.
+  const [signedInAs, setSignedInAs] = useState<string | null | undefined>(undefined);
   const [status, setStatus] = useState<'idle' | 'sending' | 'done'>('idle');
   const [error, setError] = useState('');
+  const [needsSignIn, setNeedsSignIn] = useState(false);
   const [result, setResult] = useState<{ alreadyClaimed: boolean; balance: number; email: string } | null>(null);
+
+  useEffect(() => { setSignedInAs(storedMIEmail()); }, []);
 
   if (initialState === 'before') {
     return (
@@ -27,25 +35,24 @@ export default function ClaimForm({ initialState, credits }: { initialState: Sta
     );
   }
 
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    const email = String(fd.get('email') || '');
+  async function claim() {
     setStatus('sending');
     setError('');
+    setNeedsSignIn(false);
     try {
       const res = await fetch('/api/events/lazy-contractors-blueprint/claim', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, website: fd.get('website') }),
+        headers: getMIApiHeaders(signedInAs, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({}),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
+        setNeedsSignIn(!!data.signIn || !!data.notRegistered);
         setError(data.error || 'Something went wrong. Please try again.');
         setStatus('idle');
         return;
       }
-      setResult({ alreadyClaimed: !!data.alreadyClaimed, balance: Number(data.balance) || 0, email });
+      setResult({ alreadyClaimed: !!data.alreadyClaimed, balance: Number(data.balance) || 0, email: data.email || signedInAs || '' });
       setStatus('done');
     } catch {
       setError('Network error. Please try again.');
@@ -58,28 +65,37 @@ export default function ClaimForm({ initialState, credits }: { initialState: Sta
       <div className="mp-panel" role="status" style={{ display: 'grid', gap: 12 }}>
         <p className="mp-eyebrow mp-eyebrow--accent">{result.alreadyClaimed ? 'Already claimed' : 'Done'}</p>
         <h2 className="mp-title">
-          {result.alreadyClaimed ? `You already claimed your ${credits} credits.` : `${credits} credits added.`}
+          {result.alreadyClaimed ? `You already claimed your ${credits} credits.` : `${credits} credits added to your account.`}
         </h2>
-        <p className="mp-standfirst">
-          Your Mindy balance is now {result.balance.toLocaleString('en-US')} credits. Sign in to Mindy with {result.email} to use them.
-        </p>
-        <div><ButtonLink href="/mcp">Open Mindy</ButtonLink></div>
+        <p className="mp-standfirst">Your Mindy balance is now {result.balance.toLocaleString('en-US')} credits ({result.email}).</p>
+        <div><ButtonLink href="/mcp/account">See my credits</ButtonLink></div>
+      </div>
+    );
+  }
+
+  if (signedInAs === undefined) {
+    return <div className="mp-panel"><p className="mp-meta">Checking your sign-in…</p></div>;
+  }
+
+  if (!signedInAs) {
+    return (
+      <div className="mp-panel" style={{ display: 'grid', gap: 14 }}>
+        <p className="mp-label">Sign in to claim</p>
+        <p className="mp-standfirst">Sign in to Mindy (or create your free account) with the email you registered with. You&apos;ll come right back here.</p>
+        <div><ButtonLink href={SIGN_IN_HREF}>Sign in to claim {credits} credits</ButtonLink></div>
       </div>
     );
   }
 
   return (
-    <form className="mp-panel" onSubmit={onSubmit} style={{ display: 'grid', gap: 16 }}>
-      <Field label="The email you registered with" htmlFor="claim-email">
-        <Input id="claim-email" name="email" type="email" autoComplete="email" required maxLength={254} />
-      </Field>
-      <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true"
-        style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }} />
+    <div className="mp-panel" style={{ display: 'grid', gap: 14 }}>
+      <p className="mp-meta">Signed in as <strong>{signedInAs}</strong></p>
       {error && <p className="mp-meta" role="alert" style={{ color: 'var(--mp-crit)' }}>{error}</p>}
-      <Button type="submit" disabled={status === 'sending'}>
+      <Button type="button" onClick={claim} disabled={status === 'sending'}>
         {status === 'sending' ? 'Adding your credits…' : `Claim ${credits} credits`}
       </Button>
+      {needsSignIn && <a className="mp-link" href={SIGN_IN_HREF}>Sign in with a different email</a>}
       <p className="mp-meta">One claim per registered email.</p>
-    </form>
+    </div>
   );
 }

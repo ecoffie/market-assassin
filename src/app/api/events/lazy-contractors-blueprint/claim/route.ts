@@ -2,15 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { LAZY_CONTRACTORS_BLUEPRINT as EVENT, lazyBlueprintClaimState } from '@/lib/events/lazy-contractors-blueprint';
 import { changeContactTags, findContactByEmail } from '@/lib/ghl/event-registration';
 import { applyCreditOnce } from '@/lib/mcp/credits';
+import { resolveMcpEmail } from '@/lib/mcp/session-identity';
 
 export const dynamic = 'force-dynamic';
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 /**
  * POST /api/events/lazy-contractors-blueprint/claim
- * Live attendees claim 100 extra Mindy credits, added to their balance on submit.
- * Only during the live window, only for emails registered for the event in GHL,
+ * Live attendees claim $50 (250) in Mindy credits, added to their balance on submit.
+ * Requires a signed-in Mindy session: the email comes from the verified session, never
+ * from the request body. Only during the live window, only for emails registered for
+ * the event in GHL,
  * once per email (the credit key `lcb-2026-claim:<email>` is idempotent in Postgres).
  */
 export async function POST(req: NextRequest) {
@@ -30,14 +31,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: 'This bonus was for live attendees only, and the live event has ended.' }, { status: 403 });
   }
 
-  const email = (typeof body.email === 'string' ? body.email : '').trim().toLowerCase().slice(0, 254);
-  if (!EMAIL_RE.test(email)) return NextResponse.json({ success: false, error: 'Please enter a valid email.' }, { status: 400 });
+  const email = await resolveMcpEmail(req);
+  if (!email) {
+    return NextResponse.json({ success: false, signIn: true, error: 'Please sign in to Mindy to claim your credits.' }, { status: 401 });
+  }
 
   try {
     const contact = await findContactByEmail(email);
     if (!contact || !contact.tags.includes(EVENT.ghlTag.toLowerCase())) {
       return NextResponse.json(
-        { success: false, error: "We couldn't find a registration with that email. Use the email you registered with." },
+        { success: false, notRegistered: true, email, error: `${email} isn't registered for the event. Sign in with the email you registered with.` },
         { status: 404 },
       );
     }
@@ -53,6 +56,7 @@ export async function POST(req: NextRequest) {
       alreadyClaimed: !result.applied,
       credits: EVENT.claimCredits,
       balance: result.newBalance,
+      email,
     });
   } catch (err) {
     console.error('[lazy-blueprint-claim] failed', err instanceof Error ? err.message : err);

@@ -20,8 +20,8 @@ export default function ClaimPage() {
           <Eyebrow accent>{EVENT.title} · Live attendees only</Eyebrow>
           <Heading as="h1" variant="display">Claim your $50 in free Mindy credits</Heading>
           <Standfirst style={{ marginTop: 18 }}>
-            Thanks for being here live. Enter the email you registered with and we&apos;ll add {EVENT.claimCredits} credits
-            ($50 worth) to your Mindy account right away.
+            Thanks for being here live. Sign in to Mindy with the email you registered with and we&apos;ll add{' '}
+            {EVENT.claimCredits} credits ($50 worth) to your account right away.
           </Standfirst>
           <div style={{ marginTop: 28 }}>
             <ClaimForm initialState={state} credits={EVENT.claimCredits} />
