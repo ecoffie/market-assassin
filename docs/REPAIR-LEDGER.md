@@ -26,6 +26,11 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-07 — MCP: no charge for a call that could not run; wrong parameter names are named; data date separated from recipient date
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-07 | MCP billing / parameter errors / award-history dates | Three calls to `get_contractor_award_history` with `company_name` each returned `resolution: malformed` and cost 10 credits, because the SDK's zod parse stripped the unknown key and the tool had no preflight. Measured every tool with no required parameter by calling it empty: 12 more returned in 0-1 ms, did no work and classified billable (`get_solicitation_incumbent` even as `billable_success`). Added all 13 to `REQUIRED_ONE_OF`; optional-filter tools and self-guarded tools stay out, and a test fails on any new unclassified optional-only tool. Both edges now register a loose schema, split raw arguments, pass the tool only declared keys, name the wrong key and closest valid one in a refusal, and report keys dropped from a call that still ran in `_meta.ignored_parameters`. Award history and contractor profile now carry `data_current_through` (warehouse max action date, null when unattached) and `recipient_last_action_date`; `asOf`/`as_of` stay for existing readers, and `freshness_note` leads with the data date. Side effect: `tools/list` schemas now emit `additionalProperties: {}` (equivalent to the previous absent value). | `get_contractor_award_history: ['company', 'uei']` -> `src/lib/mcp/credit-integrity.ts` · `looseInputSchema` -> `src/lib/mcp/unknown-params.ts` · `data_current_through` -> `src/mcp/tools/contractor-award-history.ts` | Real MCP requests through the real SDK and real `runMeteredTool` on `/mcp` and `/chatgpt/mcp` (`route.unknown-params.unit.test.ts`); 11 mutations each went red; tsc 0; full production build. | PR open, not deployed |
 ## 2026-11-07 — Federal events: NVSBE in the catalog, attendable events survive the limit, honest catalog date
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
