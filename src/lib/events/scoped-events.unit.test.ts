@@ -134,16 +134,20 @@ describe('event_location is display-guarded (the extractor is unreliable)', () =
     return readFileSync(require('node:path').join(__dirname, 'query.ts'), 'utf8');
   })();
 
-  it('drops truncation artifacts rather than rendering them', () => {
+  it('drops truncation artifacts rather than rendering them', async () => {
     // MEASURED 2026-08-14: 57 of 68 upcoming events carry a truncated fragment instead of a place
     // (e.g. "ion Number: N6134027R1002" — the tail of "Solicitation Number:"), caught in the live
     // drawer. Showing that is worse than showing nothing.
-    expect(src).toMatch(/const cleanLocation/);
+    expect(src).toMatch(/const cleanLocation = cleanEventLocation;/);
     expect(src).toMatch(/location: cleanLocation\(r\.event_location\)/);
-    // the three rejection rules
-    expect(src).toMatch(/s\.length > 60/);
-    expect(src).toMatch(/number\\s\*:/i);
-    expect(src).toMatch(/\^\[a-z\]/);
+    // The three original rejection rules still hold, now as behaviour of the shared guard
+    // (event-quality.ts, which also requires the shape of a place — 2026-11-07).
+    const { cleanEventLocation } = await import('./event-quality');
+    expect(cleanEventLocation('x'.repeat(61) + ', FL')).toBeNull();             // too long
+    expect(cleanEventLocation('ion Number: N6134027R1002')).toBeNull();         // label tail
+    expect(cleanEventLocation('ion, an')).toBeNull();                           // starts mid-word
+    expect(cleanEventLocation('Orlando, FL 32801')).toBe('Orlando, FL 32801');
+    expect(cleanEventLocation('MALMSTROM AIR FORCE BASE, MO')).toBeNull();  // cut-off MONTANA
   });
 });
 

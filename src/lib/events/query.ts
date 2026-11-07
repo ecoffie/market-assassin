@@ -19,6 +19,7 @@ import { normalizeAgencyKey, isValidDodaac } from '@/lib/gov-contacts/agency-key
 import { displayContactName } from '@/lib/gov-contacts/contact-quality';
 import { searchEventsViaAI } from '@/lib/events/ai-event-discovery';
 import { catalogOccurrencesForAgency } from '@/lib/events/catalog-occurrences';
+import { cleanEventLocation, eventAgencyOrClause, resolveEventAgencyScope } from '@/lib/events/event-quality';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -115,11 +116,11 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
   const todayStr = today.toISOString().slice(0, 10);
   const horizonStr = horizon.toISOString().slice(0, 10);
 
-  // Match term: the normalized agency key ("Department of Defense" → "DEFENSE")
-  // catches the messy raw values; fall back to the raw string if normalization
-  // strips everything (all-stopword input).
-  const key = normalizeAgencyKey(agency) || agency;
-  const term = key.replace(/[%_,]/g, ' ').trim();
+  // Agency scope: aliases resolved ("VA" → Veterans Affairs), a department matches the department
+  // column only (so "Department of Energy" never pulls DLA ENERGY), anything else on word boundaries
+  // (so "VA" never matches NAVAL / SAVANNAH). event-quality.ts.
+  const agencyClause = eventAgencyOrClause(resolveEventAgencyScope(agency));
+  const term = agencyClause;
 
   let degraded = false;
   const events: FederalEvent[] = [];
@@ -133,7 +134,7 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
       q
         .gte('event_date', todayStr)
         .lte('event_date', horizonStr)
-        .or(`agency.ilike.%${term}%,inferred_office.ilike.%${term}%,inferred_subagency.ilike.%${term}%`)
+        .or(agencyClause)
         .order('event_date', { ascending: true })
         .limit(limit);
     const typeList = `(${ATTENDABLE_TYPES.join(',')})`;
@@ -170,7 +171,7 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
         title: row.title,
         event_type: row.event_type || 'event',
         event_date: row.event_date,
-        location: row.event_location ?? null,
+        location: cleanEventLocation(row.event_location),
         url: row.registration_url ?? null,
         description: row.description ?? null,
         matched_office: row.inferred_office || row.inferred_subagency || row.agency || null,
@@ -329,18 +330,9 @@ export async function queryScopedEvents(input: {
       .order('event_date', { ascending: true })
       .limit(limit);
 
-  // The extractor's event_location is UNRELIABLE: measured 2026-08-14, 57 of 68 upcoming events
-  // carry a truncated fragment rather than a place ("ion Number: N6134027R1002" — the tail of
-  // "Solicitation Number:"). Showing that is worse than showing nothing, so anything that does not
-  // look like a place is dropped to null. NOT a data fix — the column stays as-is; this is display
-  // honesty until the extractor is corrected.
-  const cleanLocation = (v: unknown): string | null => {
-    const s = String(v ?? '').trim();
-    if (!s || s.length > 60) return null;
-    if (/number\s*:/i.test(s)) return null;          // "…ion Number: N6134027R1002"
-    if (/^[a-z]/.test(s)) return null;               // starts mid-word = a truncation
-    return s;
-  };
+  // The extractor's event_location is UNRELIABLE (measured 2026-11-07: 4,985 of 6,208 start
+  // mid-word). Only a recognisable place is shown; see cleanEventLocation in event-quality.ts.
+  const cleanLocation = cleanEventLocation;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const toEvent = (r: any, tier: EventMatchTier): ScopedEvent => ({

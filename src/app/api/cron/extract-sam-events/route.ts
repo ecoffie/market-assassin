@@ -13,6 +13,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { resolveEventOffice } from '@/lib/gov-contacts/event-office';
 import { classifyEventRadarRun } from '@/lib/data-core/event-radar-advancement';
+// Classifier + location extractor live in event-quality.ts (whole-word keywords, RFI titles win,
+// no bare "at" capture). Measured 2026-11-07: 4,985 of 6,208 stored locations were fragments.
+import { classifyEventText, extractEventLocation } from '@/lib/events/event-quality';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -28,21 +31,6 @@ function getSupabase() {
   return _supabase;
 }
 
-// Keywords that indicate events
-const EVENT_KEYWORDS = {
-  industry_day: [
-    'industry day',
-    'vendor day',
-    'industry conference',
-    'vendor outreach',
-    'market research event',
-    'industry engagement',
-  ],
-  webinar: ['webinar', 'virtual event', 'online session', 'video conference', 'zoom meeting'],
-  rfi: ['request for information', 'rfi', 'sources sought', 'market survey'],
-  forecast: ['forecast', 'projection', 'upcoming procurement', 'planned acquisition'],
-};
-
 interface SamOpportunity {
   notice_id: string;
   title: string;
@@ -55,20 +43,6 @@ interface SamOpportunity {
   solicitation_number: string | null;
   office: string | null;
   sub_tier: string | null;
-}
-
-function classifyEvent(title: string, description: string | null): string | null {
-  const text = `${title} ${description || ''}`.toLowerCase();
-
-  for (const [eventType, keywords] of Object.entries(EVENT_KEYWORDS)) {
-    for (const keyword of keywords) {
-      if (text.includes(keyword)) {
-        return eventType;
-      }
-    }
-  }
-
-  return null;
 }
 
 function extractEventDate(text: string): Date | null {
@@ -93,23 +67,6 @@ function extractEventDate(text: string): Date | null {
       } catch {
         continue;
       }
-    }
-  }
-
-  return null;
-}
-
-function extractLocation(text: string): string | null {
-  // Look for common location patterns
-  const patterns = [
-    /(?:at|location:|venue:)\s*([^,.\n]+(?:,\s*[A-Z]{2})?)/i,
-    /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,\s*[A-Z]{2}\s*\d{5})/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match) {
-      return match[1].trim();
     }
   }
 
@@ -187,12 +144,12 @@ export async function GET(request: NextRequest) {
       // result is partly a judgement on incomplete text — and must say so.
       if (!notice.description || !notice.description.trim()) evaluatedWithoutDescription++;
     }
-    const eventType = classifyEvent(notice.title, notice.description);
+    const eventType = classifyEventText(notice.title, notice.description);
 
     if (eventType) {
       const fullText = `${notice.title} ${notice.description || ''}`;
       const eventDate = extractEventDate(fullText);
-      const location = extractLocation(fullText);
+      const location = extractEventLocation(fullText);
       // Resolve the buying office: DoD via the solicitation-number DoDAAC, civilian
       // via SAM's own office/sub_tier columns — so events scope to the real command
       // (GSA/VA/HHS included), not just "DEPT OF DEFENSE" (cached lookup).
