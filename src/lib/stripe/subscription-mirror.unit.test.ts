@@ -33,6 +33,25 @@ const SUB = {
 
 beforeEach(() => { upserts.length = 0; failTable.name = ''; stripe.retrieve.mockReset(); });
 
+describe('subscriptionMirrorRow interval count', () => {
+  const withPlan = (plan: Record<string, unknown>) => ({ ...SUB, items: { data: [{ ...SUB.items.data[0], plan: undefined, price: undefined, ...plan }] } }) as never;
+
+  it('stores the count from a plan: $799 every 6 months is not monthly', () => {
+    const row = subscriptionMirrorRow(withPlan({ plan: { id: 'p', amount: 79900, interval: 'month', interval_count: 6 } }));
+    expect(row.plan_interval).toBe('month');
+    expect(row.plan_interval_count).toBe(6);
+  });
+
+  it('stores the count from a price', () => {
+    const row = subscriptionMirrorRow(withPlan({ price: { id: 'p', unit_amount: 79900, recurring: { interval: 'month', interval_count: 6 } } }));
+    expect(row.plan_interval_count).toBe(6);
+  });
+
+  it('absent stays null, never an assumed 1', () => {
+    expect(subscriptionMirrorRow(SUB as never).plan_interval_count).toBeNull();
+  });
+});
+
 describe('mirrorSubscription', () => {
   it('re-reads Stripe and upserts customer then subscription, keyed on id', async () => {
     stripe.retrieve.mockResolvedValue(SUB);

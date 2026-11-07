@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import { getStripe } from '@/lib/stripe';
+import { chargeMirrorRow, enrichChargeMetadata } from '@/lib/stripe/charge-sync';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -280,26 +281,7 @@ async function backfillCharges(supabase: any, stats: any, errors: string[]) {
       stats.charges.fetched++;
       const enrichedMetadata = await enrichChargeMetadata(charge);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const chargeAny = charge as any;
-      const { error } = await supabase.from('stripe_charges').upsert({
-        id: charge.id,
-        customer_id: typeof charge.customer === 'string' ? charge.customer : charge.customer?.id,
-        amount: charge.amount,
-        currency: charge.currency,
-        status: charge.status,
-        description: charge.description,
-        receipt_email: charge.receipt_email,
-        invoice_id: typeof chargeAny.invoice === 'string' ? chargeAny.invoice : chargeAny.invoice?.id,
-        payment_intent_id: typeof charge.payment_intent === 'string'
-          ? charge.payment_intent
-          : charge.payment_intent?.id,
-        metadata: enrichedMetadata,
-        created_at: new Date(charge.created * 1000).toISOString(),
-        livemode: charge.livemode,
-        refunded: charge.refunded,
-        amount_refunded: charge.amount_refunded,
-      });
+      const { error } = await supabase.from('stripe_charges').upsert(chargeMirrorRow(charge, enrichedMetadata));
 
       if (error) {
         stats.charges.errors++;
@@ -317,42 +299,6 @@ async function backfillCharges(supabase: any, stats: any, errors: string[]) {
     // Rate limiting
     if (hasMore) await sleep(DELAY_BETWEEN_BATCHES);
   }
-}
-
-async function enrichChargeMetadata(charge: Stripe.Charge): Promise<Record<string, unknown>> {
-  const metadata: Record<string, unknown> = { ...(charge.metadata || {}) };
-  if (metadata.product_name || metadata.product_id) return metadata;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chargeAny = charge as any;
-  const invoiceId = typeof chargeAny.invoice === 'string' ? chargeAny.invoice : chargeAny.invoice?.id;
-  if (!invoiceId) return metadata;
-
-  try {
-    const invoice: any = await getStripe().invoices.retrieve(invoiceId, {
-      expand: ['lines.data.price.product'],
-    });
-    const line = invoice.lines?.data?.find((item: any) => item.price?.product) || invoice.lines?.data?.[0];
-    const product = line?.price?.product;
-
-    if (product) {
-      metadata.product_id = typeof product === 'string' ? product : product.id;
-      metadata.product_name = typeof product === 'string' ? line?.description : product.name;
-    } else if (line?.description || invoice.description || charge.description) {
-      metadata.product_name = line?.description || invoice.description || charge.description;
-    }
-
-    if (line?.price?.id) metadata.price_id = line.price.id;
-    if (invoice.subscription) {
-      metadata.subscription_id = typeof invoice.subscription === 'string'
-        ? invoice.subscription
-        : invoice.subscription.id;
-    }
-  } catch (error) {
-    console.warn(`Unable to enrich charge ${charge.id} from invoice ${invoiceId}:`, error);
-  }
-
-  return metadata;
 }
 
 async function backfillSubscriptions(supabase: any, stats: any, errors: string[]) {
@@ -407,6 +353,7 @@ async function backfillSubscriptions(supabase: any, stats: any, errors: string[]
         plan_id: plan?.id,
         plan_amount: plan?.amount,
         plan_interval: plan?.interval,
+        plan_interval_count: plan?.interval_count ?? null,
       });
 
       if (error) {
@@ -497,6 +444,7 @@ async function backfillSubscriptionsFast(supabase: any, stats: any, errors: stri
         plan_id: plan?.id,
         plan_amount: plan?.amount,
         plan_interval: plan?.interval,
+        plan_interval_count: plan?.interval_count ?? null,
       });
     }
 
