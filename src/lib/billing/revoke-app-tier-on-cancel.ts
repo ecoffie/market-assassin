@@ -39,12 +39,15 @@ import { PRO_AMOUNTS, TEAM_AMOUNTS } from '@/lib/mcp/app-tier-subscription';
 export type AppTier = 'pro' | 'team';
 
 /**
- * Statuses where another subscription may still be paying for (or recovering, or about
- * to start) access. Deliberately wide: unpaid/paused can recover, and incomplete is a new
- * checkout awaiting its first payment (3DS). Revoking under any of these is the
- * cut-off-a-payer error. Same set as scripts/revoke-cancelled-app-tier.ts.
+ * Statuses of ANOTHER subscription that HOLD a revocation. This is a conservative
+ * safeguard for the cancellation repair, NOT an entitlement rule: an unpaid, paused or
+ * incomplete subscription does not qualify anyone for Pro. It only means "don't cut
+ * this person off on the strength of a different subscription ending" — unpaid/paused
+ * can recover, and incomplete is a new checkout awaiting its first payment (3DS).
+ * Do not reuse this set to decide who HAS access. Shared with
+ * scripts/revoke-cancelled-app-tier.ts.
  */
-export const LIVE_STATUSES = new Set(['active', 'trialing', 'past_due', 'unpaid', 'incomplete', 'paused']);
+export const HOLD_REVOKE_STATUSES = new Set(['active', 'trialing', 'past_due', 'unpaid', 'incomplete', 'paused']);
 
 /** Which app tier a subscription pays for, from its price amount (same rule as the credit grant). */
 export function appTierOfSubscription(sub: Pick<Stripe.Subscription, 'items'>): AppTier | null {
@@ -117,7 +120,7 @@ async function hasOtherLiveAppSub(stripe: Stripe, email: string, endedSubId: str
       if (subs.has_more) return null;
       for (const s of subs.data) {
         if (s.id === endedSubId) continue;
-        if (LIVE_STATUSES.has(s.status) && appTierOfSubscription(s)) return true;
+        if (HOLD_REVOKE_STATUSES.has(s.status) && appTierOfSubscription(s)) return true;
       }
     }
     return false;

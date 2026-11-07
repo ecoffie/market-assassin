@@ -50,7 +50,7 @@ import Stripe from 'stripe';
 import { kv } from '@vercel/kv';
 import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess } from '@/lib/api-auth';
-import { appTierOfSubscription, applyRevoke, gatherGuardFacts, revokeBlockReason, LIVE_STATUSES } from '@/lib/billing/revoke-app-tier-on-cancel';
+import { appTierOfSubscription, applyRevoke, gatherGuardFacts, revokeBlockReason, HOLD_REVOKE_STATUSES } from '@/lib/billing/revoke-app-tier-on-cancel';
 
 // ---------- args ----------
 const argv = process.argv.slice(2);
@@ -70,7 +70,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 const norm = (e: string | null | undefined) => (e || '').toLowerCase().trim();
 const excluded = new Set(EXCLUDE_FILE ? fs.readFileSync(EXCLUDE_FILE, 'utf8').split('\n').map(norm).filter(Boolean) : []);
 
-const LIVE = LIVE_STATUSES; // one definition, shared with the webhook
+const LIVE = HOLD_REVOKE_STATUSES; // HOLD set shared with the webhook: these block removal, they never grant Pro
 
 interface StripeState {
   complete: boolean;
