@@ -675,6 +675,7 @@ export function describeCoverageTimestamp(opts: {
   let freshnessNote: string;
   if (warehouse && ingestAttached && freshness) {
     freshnessNote =
+      `Data current through ${warehouse}; this recipient's last action is ${last ?? 'unknown'}. ` +
       `Three clocks: recipient last action ${last ?? 'unknown'}; warehouse awards reach ` +
       `action_date ${warehouse}; ingest freshness=${freshness.status}. ` +
       `freshness_evidence_available=${freshnessEvidenceAvailable}. ` +
@@ -683,6 +684,7 @@ export function describeCoverageTimestamp(opts: {
       `A contractor's quieter last_action_date does not mean the dataset is stale.`;
   } else if (warehouse) {
     freshnessNote =
+      `Data current through ${warehouse}; this recipient's last action is ${last ?? 'unknown'}. ` +
       `Warehouse awards currently reach action_date ${warehouse}. Ingest clocks were not ` +
       `attached — freshness_evidence_available=false; coverage_completeness=not_established. ` +
       `A contractor's quieter last_action_date does not mean the dataset is stale.`;

@@ -313,6 +313,8 @@ export const CHATGPT_META_ALLOW: ReadonlySet<string> = new Set([
   // grounding (every tool)
   'grounded', 'degraded', 'degraded_reason', 'validation_error', 'confidence', 'as_of', 'source_count',
   'note', 'source_note',
+  // argument names the host sent that the tool does not declare (not commerce, not diagnostics)
+  'ignored_parameters',
   // capability_market_match: grounded | candidate | empty | degraded (2026-10-04)
   'result_tier',
   // section / coverage accounting

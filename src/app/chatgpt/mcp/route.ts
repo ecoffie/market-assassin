@@ -32,6 +32,7 @@
 import { createMcpHandler, withMcpAuth } from 'mcp-handler';
 import type { Implementation } from '@modelcontextprotocol/sdk/types.js';
 import { runMeteredTool } from '@/lib/mcp/metered';
+import { annotateIgnoredParams, looseInputSchema, partitionToolArgs } from '@/lib/mcp/unknown-params';
 import { creditsFor } from '@/lib/mcp/tool-registry';
 import { verifyAccessToken } from '@/lib/mcp/oauth/tokens';
 import {
@@ -58,7 +59,7 @@ const baseHandler = createMcpHandler(
         {
           title: tool.title,
           description: tool.description,
-          inputSchema: tool.inputSchema,
+          inputSchema: looseInputSchema(tool.inputSchema),
           annotations: tool.annotations,
         },
         async (args: Record<string, unknown>, extra) => {
@@ -69,10 +70,16 @@ const baseHandler = createMcpHandler(
 
           // NO grantSignupCreditsIfFirst here (owner decision 3). A ChatGPT call may spend
           // an existing balance; it never creates one.
+          const { known, unrecognized } = partitionToolArgs(args, Object.keys(tool.inputSchema));
           const outcome = await runMeteredTool(
             tool.name,
-            (args ?? {}) as Record<string, unknown>,
-            { userEmail: identity.userEmail, apiKeyId: null, channel: 'chatgpt' },
+            known,
+            {
+              userEmail: identity.userEmail,
+              apiKeyId: null,
+              channel: 'chatgpt',
+              ...(unrecognized.length ? { unrecognizedParams: unrecognized } : {}),
+            },
           );
           if (!outcome.ok) {
             return chatgptToolResultFromMeteredError(tool.name, outcome.error, {
@@ -84,7 +91,7 @@ const baseHandler = createMcpHandler(
           // One projection, applied identically to the text block and structuredContent.
           // No footer, no `_meta.credits`, and — deliberately — no maybeAutoRecharge():
           // outcome.needsRecharge is ignored on this path (owner decision 4).
-          const projected = projectChatgptResult(tool.name, outcome.result);
+          const projected = projectChatgptResult(tool.name, annotateIgnoredParams(outcome.result, unrecognized));
           return {
             content: [{ type: 'text', text: JSON.stringify(projected, null, 2) }],
             structuredContent: projected,

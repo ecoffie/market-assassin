@@ -18,6 +18,7 @@ import { mcpFlags } from './flags';
 import { isProTool, isProForMcp } from './entitlements';
 import { evaluateExtractionGuard } from './extraction-guard';
 import { classifyBillingOutcome, creditsForOutcome, isBillable, preflightPaidInput } from './credit-integrity';
+import type { UnrecognizedParam } from './unknown-params';
 import { blockedOutcome, classifyCallOutcome, errorOutcome } from './call-outcome';
 import { recordPaywallAttempt, paywallMessage, RESUME_BASE } from './paywall';
 import {
@@ -39,6 +40,8 @@ export interface MeteredContext extends McpToolContext {
    * continue_url. Owner decision 2, tasks/chatgpt-plugin-path-a.md.
    */
   channel?: 'chatgpt';
+  /** Argument names the transport received that the tool does not declare (never passed to it). */
+  unrecognizedParams?: readonly UnrecognizedParam[];
 }
 
 export type MeteredError = {
@@ -74,7 +77,7 @@ export async function runMeteredTool(
 
   // Credit integrity — refuse a call that cannot perform its paid job BEFORE anything
   // else (tier gate, paywall capture, payer lookup): an invalid request is not a sale.
-  const rejection = preflightPaidInput(name, args);
+  const rejection = preflightPaidInput(name, args, ctx.unrecognizedParams);
   if (rejection) {
     await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'rejected_invalid_input', creditsCharged: 0, apiKeyId: ctx.apiKeyId, channel: ctx.channel, outcome: blockedOutcome('invalid_input') });
     return { ok: false, error: { code: rejection.code, message: rejection.message }, creditsCharged: 0 };

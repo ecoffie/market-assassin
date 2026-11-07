@@ -287,6 +287,9 @@ describe('get_contractor_profile — recent awards + set-aside honesty', () => {
       };
       coverage: {
         warehouse_max_action_date: string | null;
+        data_current_through: string | null;
+        recipient_last_action_date: string | null;
+        as_of: string | null;
         freshness_evidence_available: boolean;
         coverage_completeness: string;
         coverage_complete_established: boolean;
@@ -311,6 +314,8 @@ describe('get_contractor_profile — recent awards + set-aside honesty', () => {
     expect(res.historical_set_asides.deprecated.last_fy_by_label.status).toBe('deprecated');
     expect(res.historical_set_asides).not.toHaveProperty('award_origin_fy_by_label');
     expect(res.coverage.warehouse_max_action_date).toBe('2026-09-18');
+    expect(res.coverage.data_current_through).toBe('2026-09-18');
+    expect(res.coverage.recipient_last_action_date).toBe(res.coverage.as_of);
     expect(res.coverage.freshness_evidence_available).toBe(true);
     expect(res.coverage.coverage_complete_established).toBe(false);
     expect(res.coverage.coverage_completeness).toBe('not_established');
