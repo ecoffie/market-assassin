@@ -118,6 +118,34 @@ export interface ExpiringContractsInput {
    * so an anchored row still had to satisfy NAICS, window and eligibility on its own.
    */
   anchorPiidPrefixes?: string[];
+  /**
+   * Keyword evidence: keep only contracts whose DESCRIPTION contains one of these phrases
+   * (case-insensitive, OR across phrases). A keyword market report used to filter recompetes on
+   * the keyword's whole NAICS coverage set, so "risk management framework" listed every IT
+   * contract expiring soonest (19,067 rows: CAD warranty maintenance, a tax-return viewer). The
+   * description is the only stored field that says what the contract is FOR.
+   * Pass terms through descriptionTermsOrExpression's sanitizer (it drops unsafe ones).
+   */
+  descriptionTerms?: string[];
+}
+
+/**
+ * Phrases safe to interpolate into a PostgREST `.or()` ilike: PostgREST/LIKE metacharacters and
+ * quotes stripped, whitespace collapsed, at least 4 characters (a short acronym like "RMF" or "IT"
+ * is a substring of unrelated words and is not evidence). Deduped, order preserved.
+ */
+export function sanitizeDescriptionTerms(terms?: string[] | null): string[] {
+  const out: string[] = [];
+  for (const t of terms || []) {
+    const v = String(t ?? '').replace(/[,()%*_\\"':;]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+    if (v.length >= 4 && !out.includes(v)) out.push(v);
+  }
+  return out;
+}
+
+/** `.or()` expression matching any sanitized phrase in `description`; '' when none survive. */
+export function descriptionTermsOrExpression(terms?: string[] | null): string {
+  return sanitizeDescriptionTerms(terms).map((t) => `description.ilike.%${t}%`).join(',');
 }
 
 export interface ExpiringContract {
@@ -243,6 +271,12 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
     if (state) q = q.eq('place_of_performance_state', state);
     if (Number.isFinite(input.minValue)) q = q.gte('total_obligation', Number(input.minValue));
     if (Number.isFinite(input.maxValue)) q = q.lte('total_obligation', Number(input.maxValue));
+    if (input.descriptionTerms) {
+      // Asked for keyword evidence but no phrase survived sanitizing → match nothing rather than
+      // silently dropping the filter (that would return the unscoped market as the keyword's).
+      const expr = descriptionTermsOrExpression(input.descriptionTerms);
+      q = expr ? q.or(expr) : q.eq('contract_id', '__no_keyword_evidence__');
+    }
     if (input.likelihood && ['high', 'medium', 'low'].includes(input.likelihood)) {
       q = q.eq('recompete_likelihood', input.likelihood);
     }
