@@ -15,6 +15,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { authorizeCronRequest } from '@/lib/cron/cron-request-auth';
 import { expandNaicsForBriefing as expandNaicsCodes } from '@/lib/briefings/naics-briefing-expansion';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/send-email';
@@ -90,29 +91,12 @@ export async function GET(request: NextRequest) {
   const testEmail = request.nextUrl.searchParams.get('email');
   const isTest = request.nextUrl.searchParams.get('test') === 'true';
 
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
-  const authHeader = request.headers.get('authorization');
-  const hasCronSecret = authHeader === `Bearer ${process.env.CRON_SECRET}`;
 
-  if (!isVercelCron && !hasCronSecret && !(testEmail && isTest)) {
-    if (process.env.NODE_ENV === 'production') {
-      return NextResponse.json({
-        message: 'Weekly Deep Dive Cron Job (FREE FOR EVERYONE)',
-        usage: {
-          test: 'GET ?email=xxx&test=true to send test deep dive',
-          manual: 'Triggered by Vercel cron or CRON_SECRET',
-        },
-        schedule: 'Every Sunday at 10 AM UTC',
-        features: [
-          'FREE for all users (no paywall)',
-          'Full competitive landscape analysis',
-          'Teaming play recommendations',
-          'Key dates calendar',
-          'Market signals & news',
-        ],
-      });
-    }
-  }
+  // AUTH: the CRON_SECRET bearer (sent by /api/cron/dispatch) for any run; ?test=true also
+  // accepts verified admin auth. ?email= is only a test FILTER, never authorization, and
+  // x-vercel-cron is client-supplied, so it is not trusted. Rejected before any LLM call or send.
+  const cronAuth = await authorizeCronRequest(request, { isTest });
+  if (!cronAuth.ok) return cronAuth.response;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;

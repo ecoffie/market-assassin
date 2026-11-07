@@ -17,6 +17,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { authorizeCronRequest } from '@/lib/cron/cron-request-auth';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunitiesFromCache, fetchSamOpportunityNoticeSummaryFromCache } from '@/lib/briefings/pipelines/sam-gov';
 import { buildSamGreenBriefing, generateSamGreenEmailHtml } from '@/lib/briefings/delivery/sam-green-email-template';
@@ -65,21 +66,11 @@ export async function GET(request: NextRequest) {
   const testEmail = request.nextUrl.searchParams.get('email');
   const isTest = request.nextUrl.searchParams.get('test') === 'true';
 
-  // Verify cron secret
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
-  const authHeader = request.headers.get('authorization');
-  const hasCronSecret = authHeader === `Bearer ${process.env.CRON_SECRET}`;
-
-  if (!isVercelCron && !hasCronSecret && !(testEmail && isTest)) {
-    if (process.env.NODE_ENV === 'production') {
-      return NextResponse.json({
-        message: 'Send Briefings (Fast) - GREEN SAM.gov Format',
-        description: 'Fetches SAM.gov cache, sends GREEN active solicitations email',
-        schedule: '7 AM UTC daily',
-        capacity: '500+ users per run',
-      });
-    }
-  }
+  // AUTH: the CRON_SECRET bearer (sent by /api/cron/dispatch) for any run; ?test=true also
+  // accepts verified admin auth. ?email= is only a test FILTER, never authorization, and
+  // x-vercel-cron is client-supplied, so it is not trusted. Rejected before any LLM call or send.
+  const cronAuth = await authorizeCronRequest(request, { isTest });
+  if (!cronAuth.ok) return cronAuth.response;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let _supabase: any = null;
