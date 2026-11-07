@@ -12,6 +12,7 @@ import { STATE_CENTROIDS } from '@/lib/geo/state-centroids';
 import { US_STATE_NAMES } from '@/lib/utils/us-states';
 import { INDUSTRY_PRESETS } from '@/lib/industry-presets';
 import { decodeFSC } from '@/lib/codes/fsc';
+import { DIBBS_MAP_ENABLED } from '@/lib/dibbs/availability';
 import { OPPORTUNITY_MAP_TEMPLATE } from './template-html';
 import { buildOppShareMeta, fetchOppShareRow, isNoticeId, renderOppShareHead } from '@/lib/opportunities/share-metadata';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from './account-menu';
@@ -362,7 +363,8 @@ const SERVER_FILTERS =
   // (User-facing name is "Players"; the value stays "companies" so no mode wiring changes.)
   +   '<option value="companies">Players</option>'
   // DLA — the 3rd top-level map (the "bid" client: price NSN parts, quote on DIBBS).
-  +   '<option value="dla">DLA Supply Bids</option>'
+  // Parked 2026-11-07 (DIBBS_MAP_ENABLED): no sustainable source, so the mode is not offered.
+  +   (DIBBS_MAP_ENABLED ? '<option value="dla">DLA Supply Bids</option>' : '')
   + '</select>'
   // HORIZONS multi-select dropdown — Zillow's "Home Type ▾" pattern (one control on the bar, opens
   // to colored checkboxes for the 4 categories, each with its REAL count). Replaces the loose pills
@@ -1714,6 +1716,9 @@ const MOBILE_JS = '<script>(function(){'
 // <script>, loaded before VIEWPORT_JS (which calls it), so no template interpolation sits inside
 // the statically syntax-checked viewport script.
 const PLAYERS_COPY_JS = '<script>window.__playersHeaderText=' + PLAYERS_HEADER_TEXT_JS + ';</script>';
+// DIBBS map switch (src/lib/dibbs/availability.ts). Same reason as above: its own <script>,
+// loaded before VIEWPORT_JS, so the syntax-checked viewport script has no interpolation.
+const DIBBS_FLAG_JS = '<script>window.__DIBBS_MAP_ENABLED=' + String(DIBBS_MAP_ENABLED) + ';</script>';
 // What a signed-in Save search can watch (F1). Defined before VIEWPORT_JS, whose handler calls it.
 const WATCH_SCOPE_SCRIPT = '<script>' + WATCH_SCOPE_JS + '</script>';
 const VIEWPORT_JS = `<script>
@@ -1741,6 +1746,9 @@ const VIEWPORT_JS = `<script>
     // NAICS). Removing the old Source dropdown that used to mix DLA into Open. (Eric 2026-07-31.)
     dla:{ ep:'/api/app/opportunity-map', dla:true, title:'DLA Supply Bids', unit:'DLA supply RFQs' }
   };
+  // DIBBS parked (DIBBS_MAP_ENABLED): drop the mode so setMapMode('dla') from a saved search or
+  // an old link is a no-op and the map stays on Opportunities.
+  if(!window.__DIBBS_MAP_ENABLED){ delete MODES.dla; }
   var MODE='open'; window.__mapMode='open';
   function isContactMode(m){ return m==='companies'||m==='buyers'; }
   // Dataset-level color (Eric 2026-07-26): a COMPANY (a contractor you compete/team with) and a
@@ -11237,7 +11245,7 @@ export async function GET(request: NextRequest) {
     // LOGIN_MODAL_HTML has a latent unclosed <div>, so blocks parsed after it can nest inside a
     // hidden overlay. Its own HTML is div-balanced; the JS goes at the end with the other scripts.
     // MARKET_FEEDBACK_JS precedes VIEWPORT_JS so window.__mf exists before the first fetch round reports to it.
-    const bodyInject = MOBILE_HTML + SETTINGS_DRAWER_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + WATCH_SCOPE_SCRIPT + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + SETTINGS_DRAWER_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
+    const bodyInject = MOBILE_HTML + SETTINGS_DRAWER_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + DIBBS_FLAG_JS + WATCH_SCOPE_SCRIPT + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + SETTINGS_DRAWER_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Code→name for the State picker (50 states + DC). Already a shared constant — the Filters

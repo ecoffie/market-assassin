@@ -17,7 +17,8 @@
  *     (baseline vs no-new-match is not recorded, so it is stated as unknown), or skipped.
  *   - No future alert is promised: it depends on the schedule, a new match, and a successful send.
  *   - Another customer's failure never becomes this search's status.
- *   - Provider acceptance is not inbox delivery; Mindy never claims the latter.
+ *   - Provider acceptance is not delivery. The provider's delivery event (the receiving mail server
+ *     took it) is the furthest evidence Mindy has; inbox placement stays not_observable.
  *   - Unreadable evidence is `unknown`, never "fine" and never "failed".
  */
 import { getAppSupabase } from '@/lib/app/workspace';
@@ -100,6 +101,13 @@ export type SavedSearchAlertStatus = {
   alerts_sent: number;
   /** Last saved-search alert the email PROVIDER accepted for this account. Not inbox delivery. */
   recipient_last_alert_provider_accepted_at: string | null;
+  /**
+   * What the provider last reported about alerts to this account (account-level; a send is not tied
+   * to one search). `unconfirmed` = accepted, no delivery event yet. null = no alert, or unreadable.
+   */
+  recipient_last_alert_outcome: AlertDeliveryOutcome | null;
+  /** When the receiving mail server took the latest alert. Not inbox placement. */
+  recipient_last_alert_delivered_at: string | null;
   inbox_delivery: 'not_observable';
   next_evaluation_at: string | null;
   job: 'saved-search-alerts';
@@ -110,10 +118,42 @@ export type SavedSearchAlertStatus = {
   summary: string;
 };
 
+export type AlertDeliveryOutcome = 'delivered' | 'unconfirmed' | 'delayed' | 'bounced' | 'complained' | 'suppressed';
+
 export type RecipientEvidence = {
   suppressed: string | null | undefined; // reason; null = not suppressed; undefined = lookup failed
   lastAlertAt: string | null | undefined; // undefined = unreadable
+  /** Newest provider delivery event for this account's alerts. null = none; undefined = unreadable. */
+  lastDeliveryEvent?: { type: string; at: string } | null;
 };
+
+/** Provider webhook events that report what happened to a send (email.sent only repeats acceptance). */
+const DELIVERY_EVENT_OUTCOME: Record<string, AlertDeliveryOutcome> = {
+  'email.delivered': 'delivered',
+  'email.delivery_delayed': 'delayed',
+  'email.bounced': 'bounced',
+  'email.complained': 'complained',
+  'email.suppressed': 'suppressed',
+};
+
+/**
+ * Reads the EVENT log, not email_provider_sends.status: that column is overwritten in webhook arrival
+ * order, so a late email.sent turns a delivered row back to `sent` (measured 2026-11-07, 30 days: 1,864
+ * delivered events, yet 185 of those rows read `sent`).
+ *
+ * A delivery event older than the latest accepted send belongs to an earlier alert, so the latest is
+ * `unconfirmed`. Bad outcomes also leave the accepted set, which is why the comparison is >=.
+ */
+export function alertDeliveryOutcome(recipient: RecipientEvidence): { outcome: AlertDeliveryOutcome | null; deliveredAt: string | null } {
+  const ev = recipient.lastDeliveryEvent;
+  if (ev === undefined) return { outcome: null, deliveredAt: null };
+  const accepted = recipient.lastAlertAt ? Date.parse(recipient.lastAlertAt) : null;
+  const known = ev ? DELIVERY_EVENT_OUTCOME[ev.type] : undefined;
+  if (!ev || !known || (accepted !== null && Date.parse(ev.at) < accepted)) {
+    return { outcome: recipient.lastAlertAt ? 'unconfirmed' : null, deliveredAt: null };
+  }
+  return { outcome: known, deliveredAt: known === 'delivered' ? ev.at : null };
+}
 
 const RUN_EVAL_SLACK_MS = 5 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -123,7 +163,7 @@ const WEEKLY_STALE_MS = 8 * DAY_MS;
 export async function readRecipientEvidence(userEmail: string): Promise<RecipientEvidence> {
   const supabase = getAppSupabase();
   const email = userEmail.toLowerCase().trim();
-  const [supp, sends] = await Promise.all([
+  const [supp, sends, events] = await Promise.all([
     supabase.from('email_suppressions').select('reason').eq('user_email', email).maybeSingle(),
     supabase
       .from('email_provider_sends')
@@ -133,11 +173,87 @@ export async function readRecipientEvidence(userEmail: string): Promise<Recipien
       .in('status', ['sent', 'delivered'])
       .order('sent_at', { ascending: false })
       .limit(1),
+    supabase
+      .from('email_provider_events')
+      .select('event_type, occurred_at')
+      .eq('user_email', email)
+      .eq('email_type', 'saved_search_alert')
+      .in('event_type', Object.keys(DELIVERY_EVENT_OUTCOME))
+      .order('occurred_at', { ascending: false })
+      .limit(1),
   ]);
+  const ev = events.data?.[0] as { event_type?: string; occurred_at?: string } | undefined;
   return {
     suppressed: supp.error ? undefined : ((supp.data as { reason?: string } | null)?.reason ?? null),
     lastAlertAt: sends.error ? undefined : ((sends.data?.[0] as { sent_at?: string } | undefined)?.sent_at ?? null),
+    lastDeliveryEvent: events.error ? undefined : (ev?.event_type && ev.occurred_at ? { type: ev.event_type, at: ev.occurred_at } : null),
   };
+}
+
+/** Is THIS account's address on the suppression list? reason, null = no, undefined = lookup failed. */
+export async function readRecipientSuppression(userEmail: string): Promise<string | null | undefined> {
+  try {
+    const { data, error } = await getAppSupabase()
+      .from('email_suppressions')
+      .select('reason')
+      .eq('user_email', userEmail.toLowerCase().trim())
+      .maybeSingle();
+    return error ? undefined : ((data as { reason?: string } | null)?.reason ?? null);
+  } catch {
+    return undefined;
+  }
+}
+
+export type SearchAlertBlock = {
+  kind: 'invalid_filters' | 'recipient_address' | 'recipient_suppressed';
+  /** Operator / agent wording. */
+  reason: string;
+  /** Shown to the search's owner in the app: what is wrong and what to do. */
+  ownerMessage: string;
+};
+
+/**
+ * Why this search cannot alert, or null. The one rule behind both the MCP status and the app's notice,
+ * so they cannot disagree. A paused search has no block (its owner chose that), and a failed suppression
+ * lookup (undefined) is not a block: unknown is never reported as "on hold".
+ */
+export function searchAlertBlock(
+  search: Pick<SavedSearchRow, 'user_email' | 'filters' | 'alerts_enabled' | 'alert_frequency'>,
+  suppressed: string | null | undefined,
+): SearchAlertBlock | null {
+  if (!search.alerts_enabled || search.alert_frequency === 'paused') return null;
+  const filters = (search.filters || {}) as Record<string, unknown>;
+  const shapeErr = valueShapeError(filters);
+  if (shapeErr) {
+    return {
+      kind: 'invalid_filters',
+      reason: `its stored filters cannot be evaluated (${shapeErr})`,
+      ownerMessage: "Email alerts are blocked: this search's saved filters can't be read. Open it on the map and save it again.",
+    };
+  }
+  const { stored, invalid } = storedNaicsValidity(filters);
+  if (stored.length > 0 && invalid.length === stored.length) {
+    return {
+      kind: 'invalid_filters',
+      reason: `none of its NAICS codes exist (${invalid.join(', ')})`,
+      ownerMessage: `Email alerts are blocked: NAICS ${invalid.join(', ')} ${invalid.length > 1 ? 'are not valid codes' : 'is not a valid code'}, so this search can't match anything. Open it on the map, choose the correct code, and save it again.`,
+    };
+  }
+  if (search.user_email.toLowerCase().endsWith('@clients.getmindy.ai')) {
+    return {
+      kind: 'recipient_address',
+      reason: 'the account has no deliverable email address on file',
+      ownerMessage: 'Email alerts are on hold: this account has no deliverable email address on file. Contact support@getmindy.ai to fix it.',
+    };
+  }
+  if (suppressed) {
+    return {
+      kind: 'recipient_suppressed',
+      reason: `the account email is on the suppression list (${suppressed})`,
+      ownerMessage: 'Email alerts are on hold: your account email is on our do-not-send list after a bounce, complaint or unsubscribe. Contact support@getmindy.ai to fix it.',
+    };
+  }
+  return null;
 }
 
 function filterGetter(filters: Record<string, unknown>) {
@@ -249,6 +365,23 @@ function jobNote(job: SavedSearchDeliveryReadiness, thisSearchAffected: boolean)
   }
 }
 
+/** Exactly as far as the evidence goes: accepted, then handed to the receiving server. Never "in the inbox". */
+function deliverySentence(s: Omit<SavedSearchAlertStatus, 'summary'>): string {
+  const accepted = utc(s.recipient_last_alert_provider_accepted_at);
+  switch (s.recipient_last_alert_outcome) {
+    case 'delivered':
+      return `The latest one for this account reached the receiving mail server at ${utc(s.recipient_last_alert_delivered_at)} (whether it landed in the inbox or spam is not tracked).`;
+    case 'bounced':
+    case 'complained':
+    case 'suppressed':
+      return `Our email provider reported the latest alert for this account as ${s.recipient_last_alert_outcome}; the last one it accepted was at ${accepted}.`;
+    case 'delayed':
+      return `Our email provider reported a delay on the latest alert for this account; the last one it accepted was at ${accepted}.`;
+    default:
+      return `Our email provider last accepted one for this account at ${accepted}; delivery to the receiving mail server is not confirmed yet (inbox placement is not tracked).`;
+  }
+}
+
 function summarize(s: Omit<SavedSearchAlertStatus, 'summary'>, job: SavedSearchDeliveryReadiness): string {
   const first = s.next_evaluation_at ? ` Next scheduled check: ${utc(s.next_evaluation_at)}.` : '';
   const reach = s.filter_reach === 'matched_historically'
@@ -287,7 +420,7 @@ function summarize(s: Omit<SavedSearchAlertStatus, 'summary'>, job: SavedSearchD
       lead = 'This saved search has been checked, but no alert has been sent for it yet. Mindy records that it was checked, not whether that was only its first check (which records current matches without emailing) or a later check that found no new match.';
       break;
     case 'delivering':
-      lead = `Alerts for this search have been sent; our email provider last accepted one for this account at ${utc(s.recipient_last_alert_provider_accepted_at)} (inbox delivery is not tracked).`;
+      lead = `Alerts for this search have been sent. ${deliverySentence(s)}`;
       break;
     default:
       lead = `This saved search is saved and valid. Its delivery status could not be checked (${s.search_delivery_reason ?? 'evidence unreadable'}).`;
@@ -308,10 +441,10 @@ export function composeSearchAlertStatus(
   const filters = (search.filters || {}) as Record<string, unknown>;
   const baseline: SearchBaseline = search.last_alerted_at ? 'established' : 'pending';
   const paused = !search.alerts_enabled || search.alert_frequency === 'paused';
-  const synthetic = search.user_email.toLowerCase().endsWith('@clients.getmindy.ai');
-  const shapeErr = valueShapeError(filters);
   const { stored, invalid } = storedNaicsValidity(filters);
   const allNaicsInvalid = stored.length > 0 && invalid.length === stored.length;
+  const block = searchAlertBlock(search, recipient.suppressed);
+  const delivery = alertDeliveryOutcome(recipient);
 
   const horizons = alertHorizons(search);
   const limitations = hierarchyFilterLimitations(filters, horizons);
@@ -323,15 +456,10 @@ export function composeSearchAlertStatus(
   let reason: string | null = null;
   if (paused) {
     search_delivery = 'paused';
-  } else if (shapeErr || allNaicsInvalid) {
-    search_delivery = 'blocked_invalid_filters';
-    reason = shapeErr ? `its stored filters cannot be evaluated (${shapeErr})` : `none of its NAICS codes exist (${invalid.join(', ')})`;
-  } else if (synthetic) {
-    search_delivery = 'blocked_recipient_address';
-    reason = 'the account has no deliverable email address on file';
-  } else if (recipient.suppressed) {
-    search_delivery = 'blocked_recipient_suppressed';
-    reason = `the account email is on the suppression list (${recipient.suppressed})`;
+  } else if (block) {
+    search_delivery = block.kind === 'invalid_filters' ? 'blocked_invalid_filters'
+      : block.kind === 'recipient_address' ? 'blocked_recipient_address' : 'blocked_recipient_suppressed';
+    reason = block.reason;
   } else if (missedLatestRun(search, job, now)) {
     search_delivery = 'failing';
     reason = 'not evaluated by the latest run';
@@ -372,6 +500,8 @@ export function composeSearchAlertStatus(
     last_evaluated_at: search.last_alerted_at,
     alerts_sent: search.total_alerts_sent || 0,
     recipient_last_alert_provider_accepted_at: recipient.lastAlertAt ?? null,
+    recipient_last_alert_outcome: delivery.outcome,
+    recipient_last_alert_delivered_at: delivery.deliveredAt,
     inbox_delivery: 'not_observable',
     next_evaluation_at: paused || search_delivery === 'blocked_invalid_filters' ? null : nextEvaluation(search, job.cron_expr, now),
     job: 'saved-search-alerts',

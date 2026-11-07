@@ -371,6 +371,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       +   '<div class="rname">'+h(cleanName(r.name,agg))
       +     (nc>0?'<span class="badge" title="'+nc+' new since you last looked">'+(nc>99?'99+':nc)+' new</span>':'')+'</div>'
       +   '<div class="rmeta">'+metaFor(r,agg)+'</div>'
+      +   (r.alert_block?'<div class="rptwarn" role="status">\\u26a0 '+h(r.alert_block)+'</div>':'')
       +   valLine(agg)
       +   storyHtml(agg)
       +   '<div class="rcta"><a class="view" href="'+h(href)+'">'+ctaTxt+' <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>'

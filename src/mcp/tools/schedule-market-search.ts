@@ -58,6 +58,7 @@ export type ScheduleDeliveryMeta = {
   delivery_latest_run_failures?: string | null;
   /** Confirmed recipient suppressions in the latest run: an action item, not an outage. */
   delivery_suppression_action_items?: Record<string, number>;
+  delivery_config_action_items?: Record<string, number>;
   idempotent: boolean;
   bbox_omitted?: boolean;
   bbox_restored?: boolean;
@@ -111,6 +112,7 @@ function deliveryMeta(delivery: SavedSearchDeliveryReadiness) {
     inbox_delivery: delivery.inbox_delivery,
     delivery_latest_run_failures: delivery.latest_run_failures,
     delivery_suppression_action_items: delivery.suppression_action_items,
+    delivery_config_action_items: delivery.config_action_items,
   };
 }
 
@@ -259,6 +261,7 @@ export type ListMarketSchedulesResult = {
     inbox_delivery: 'not_observable';
     delivery_latest_run_failures: string | null;
     delivery_suppression_action_items: Record<string, number>;
+    delivery_config_action_items: Record<string, number>;
     count: number;
   };
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string };
@@ -346,6 +349,7 @@ export type UpdateMarketScheduleResult = {
     inbox_delivery: 'not_observable';
     delivery_latest_run_failures: string | null;
     delivery_suppression_action_items: Record<string, number>;
+    delivery_config_action_items: Record<string, number>;
     noop?: boolean;
   };
 };
@@ -478,7 +482,8 @@ function buildScheduleHint(r: ScheduleMarketSearchResult): NonNullable<ScheduleM
       'Relay alert_status.summary; do not restate system status as this search failing. ' +
       'Describe THIS search first (alert_status.summary). Job-level fields are about the "saved-search alerts" job only — never generalize them to all Mindy email. ' +
       'delivery_last_clean_run_at is the last job run with no processing failure — never call it "last successful send"; ' +
-      'delivery_last_alert_provider_accepted_at is the last alert accepted by the email provider (inbox delivery is not observable). ' +
+      'delivery_last_alert_provider_accepted_at is the last alert accepted by the email provider; alert_status.recipient_last_alert_delivered_at is when the receiving mail server took it. Inbox placement is not observable either way. ' +
+      'delivery_config_action_items are other searches their owners must correct, never an outage. ' +
       (r._meta.bbox_omitted ? 'bbox was omitted — viewport is NOT restored.' : ''),
   };
 }
