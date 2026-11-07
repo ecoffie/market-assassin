@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { tagCtaBatch } from '@/lib/cta/tagger';
+import { requireJobAuth } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,6 +23,8 @@ function getSupabase() {
 }
 
 export async function GET(request: NextRequest) {
+  const denied = requireJobAuth(request);
+  if (denied) return denied;
   const supabase = getSupabase();
   if (!supabase) {
     return NextResponse.json({ success: false, error: 'Supabase not configured' }, { status: 500 });

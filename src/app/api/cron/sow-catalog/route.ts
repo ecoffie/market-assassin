@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { attachmentUrls, scanAttachmentsForSow } from '@/lib/sam/sow-detect';
 import { getSowDrainKeys, hasDedicatedSowKeys } from '@/lib/sam/utils';
+import { requireJobAuth } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -35,6 +36,8 @@ const BATCH_SIZE = parseInt(process.env.SOW_CATALOG_BATCH_SIZE || '25', 10);
 const SOFT_BUDGET_MS = 90_000;       // leave headroom under maxDuration
 
 export async function GET(request: NextRequest) {
+  const denied = requireJobAuth(request);
+  if (denied) return denied;
   const startedAt = Date.now();
   const supabase = sb();
   // DEDICATED DRAIN KEYS — this job must not touch the shared rotation.

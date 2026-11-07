@@ -34,6 +34,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { findBriefingsDrift, type DriftRow } from '@/lib/supabase/briefings-entitlement';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -91,7 +92,7 @@ function todayUtcDate(): string {
 }
 
 export async function GET(request: NextRequest) {
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const passwordOk = request.nextUrl.searchParams.get('password') === process.env.ADMIN_PASSWORD;
   const hasCronSecret =
     !!process.env.CRON_SECRET &&

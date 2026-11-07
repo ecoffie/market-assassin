@@ -6,6 +6,7 @@ import { shouldSendAlert, fingerprint } from '@/lib/ops-alert-dedup';
 import { findEntitlementGaps, formatEntitlementGap } from '@/lib/briefings/entitlement-gap';
 import { findExpiringEntitlements, formatExpiryFindings, LAPSE_HORIZON_DAYS } from '@/lib/briefings/expiry-watch';
 import { findUnonboardedPayers, formatUnonboarded } from '@/lib/onboarding/unonboarded-payers';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 type HealthStatus = 'healthy' | 'warning' | 'critical';
 
@@ -31,7 +32,7 @@ function computeStatus(params: {
 }
 
 export async function GET(request: NextRequest) {
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const authHeader = request.headers.get('authorization');
   const hasCronSecret = authHeader === `Bearer ${process.env.CRON_SECRET}`;
   const shouldEmail = request.nextUrl.searchParams.get('email') === 'true';

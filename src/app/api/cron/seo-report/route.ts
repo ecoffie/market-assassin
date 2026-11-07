@@ -15,6 +15,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { buildReport, toSlackBlocks } from '@/lib/gsc/report';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -22,7 +23,7 @@ export const maxDuration = 60;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 function authorized(req: NextRequest): boolean {
-  if (req.headers.get('x-vercel-cron') === '1') return true;
+  if (hasValidCronSecret(req)) return true;
   const auth = req.headers.get('authorization')?.replace('Bearer ', '');
   if (process.env.CRON_SECRET && auth === process.env.CRON_SECRET) return true;
   const password = new URL(req.url).searchParams.get('password');

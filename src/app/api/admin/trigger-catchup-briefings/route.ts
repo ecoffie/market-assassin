@@ -16,6 +16,7 @@ import { generateDailyBriefFromSam, generateSamGreenEmailHtml } from '@/lib/brie
 import { resolveBriefingAudience } from '@/lib/briefings/delivery/rollout';
 import { sendEmail } from '@/lib/send-email';
 import { DEFAULT_NAICS_CODES } from '@/lib/config/defaults';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const BATCH_SIZE = 10; // Reduced to fit within 60s Vercel timeout (~6s/user)
@@ -25,14 +26,14 @@ const BATCH_SIZE = 10; // Reduced to fit within 60s Vercel timeout (~6s/user)
 function authed(request: NextRequest): boolean {
   const pw = new URL(request.url).searchParams.get('password');
   const bearer = request.headers.get('authorization')?.replace('Bearer ', '');
-  const isCron = request.headers.get('x-cron-dispatch') === '1'
+  const isCron = hasValidCronSecret(request)
     || (!!process.env.CRON_SECRET && bearer === process.env.CRON_SECRET);
   return (!!pw && pw === ADMIN_PASSWORD) || isCron;
 }
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const isCron = request.headers.get('x-cron-dispatch') === '1';
+  const isCron = hasValidCronSecret(request);
   // Dispatcher fires GET → execute so users missed by the main window still get sent.
   const mode = isCron ? 'execute' : (searchParams.get('mode') || 'preview');
   const batches = parseInt(searchParams.get('batch') || '1');

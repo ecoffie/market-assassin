@@ -18,12 +18,15 @@ import { revalidatePath } from 'next/cache';
 import { LISTICLES } from '@/data/top-listicles';
 import { fetchTopForListicle } from '@/lib/bigquery/listicle-fetch';
 import { writeLeaderboardSnapshot } from '@/lib/leaderboards/snapshots';
+import { requireJobAuth } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
 export async function GET(request: NextRequest) {
+  const denied = requireJobAuth(request);
+  if (denied) return denied;
   const only = new URL(request.url).searchParams.get('slug');
   // A ranking snapshot is a point-in-time of CURRENT rankings, so "today" (UTC) is
   // correct here — unlike day-summary crons that must look back at the closed day.

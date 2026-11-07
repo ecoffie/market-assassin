@@ -4,6 +4,7 @@ import { FORECAST_SOURCE_POLICY, type ForecastSourcePolicy } from '@/lib/forecas
 import { rollupForecastDomain } from '@/lib/forecasts/domain-health';
 import { readPhysicalPairs, readInstances, readPairBindings } from '@/lib/forecasts/domain-health-read';
 import { sendOpsAlert } from '@/lib/ops-alert';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 type HealthStatus = 'healthy' | 'warning' | 'critical';
 
@@ -143,7 +144,7 @@ function overallStatus(params: {
 }
 
 export async function GET(request: NextRequest) {
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const authHeader = request.headers.get('authorization');
   const hasCronSecret = authHeader === `Bearer ${process.env.CRON_SECRET}`;
   const shouldEmail = request.nextUrl.searchParams.get('email') === 'true';

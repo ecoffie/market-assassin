@@ -12,6 +12,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -20,7 +21,7 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 function authed(request: NextRequest): boolean {
   const pw = new URL(request.url).searchParams.get('password');
   const bearer = request.headers.get('authorization')?.replace('Bearer ', '');
-  const isCron = request.headers.get('x-cron-dispatch') === '1'
+  const isCron = hasValidCronSecret(request)
     || (!!process.env.CRON_SECRET && bearer === process.env.CRON_SECRET);
   return (!!pw && pw === ADMIN_PASSWORD) || isCron;
 }

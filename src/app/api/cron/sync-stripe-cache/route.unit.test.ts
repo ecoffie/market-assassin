@@ -9,10 +9,12 @@ const sync = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/stripe/charge-sync', () => ({ syncChargesIncremental: sync }));
 
 import { GET } from './route';
+// Scheduled job routes authorize only the CRON_SECRET bearer the dispatcher sends.
+process.env.CRON_SECRET = 'test-cron-secret';
 
 const subsOk = { ok: true, status: 200, json: async () => ({ success: true, stats: { subscriptions: { fetched: 5 } }, totalErrors: 0 }) };
 const chargesOk = { ok: true, complete: true, upserted: 3, listed: 3, remaining: 0 };
-const call = () => GET(new NextRequest('https://x.test/api/cron/sync-stripe-cache', { headers: { 'x-cron-dispatch': '1' } }));
+const call = () => GET(new NextRequest('https://x.test/api/cron/sync-stripe-cache', { headers: { authorization: 'Bearer test-cron-secret', 'x-cron-dispatch': '1' } }));
 
 beforeEach(() => {
   sync.mockReset();

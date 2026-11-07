@@ -31,6 +31,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { cleanPscLabel, composeCapabilitySummary, type SpecialtyTier } from '@/lib/capability/psc-label';
 import { buildCapabilityBlob, blobHash, embedBatch, type EmbeddableProfile } from '@/lib/capability/embed';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const password = url.searchParams.get('password');
   const bearer = request.headers.get('authorization')?.replace('Bearer ', '');
-  const isDispatch = request.headers.get('x-cron-dispatch') === '1';
+  const isDispatch = hasValidCronSecret(request);
   const authed =
     password === ADMIN_PASSWORD ||
     (process.env.CRON_SECRET && bearer === process.env.CRON_SECRET) ||

@@ -15,6 +15,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
+// Scheduled job routes authorize only the CRON_SECRET bearer the dispatcher sends.
+process.env.CRON_SECRET = 'test-cron-secret';
 
 type Row = Record<string, unknown>;
 type Op = [string, unknown[]];
@@ -82,7 +84,7 @@ vi.mock('@/lib/send-email', () => ({
 }));
 
 const { GET } = await import('./route');
-const dispatch = async () => (await GET(new NextRequest('https://x/api/cron/saved-search-alerts?limit=50', { headers: { 'x-cron-dispatch': '1' } }))).json();
+const dispatch = async () => (await GET(new NextRequest('https://x/api/cron/saved-search-alerts?limit=50', { headers: { authorization: 'Bearer test-cron-secret', 'x-cron-dispatch': '1' } }))).json();
 
 const ID = 'bcfb5381-2e9d-4da6-b531-23306c918145';
 // The production row's exact filter shape.

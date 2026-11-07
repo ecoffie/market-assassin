@@ -19,6 +19,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { distinctiveKeywords } from '@/lib/market/keyword-sanitize';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -28,7 +29,7 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const DEPLOY_ISO = '2026-07-14T00:00:00Z';
 
 function authorized(req: NextRequest): boolean {
-  if (req.headers.get('x-vercel-cron') === '1') return true;
+  if (hasValidCronSecret(req)) return true;
   const auth = req.headers.get('authorization')?.replace('Bearer ', '');
   if (process.env.CRON_SECRET && auth === process.env.CRON_SECRET) return true;
   return new URL(req.url).searchParams.get('password') === ADMIN_PASSWORD;

@@ -6,6 +6,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { applyForecastOps, type FakeForecastRow } from '@/lib/saved-searches/__fixtures__/fake-forecast-db';
+// Scheduled job routes authorize only the CRON_SECRET bearer the dispatcher sends.
+process.env.CRON_SECRET = 'test-cron-secret';
 
 type Row = Record<string, unknown>;
 type Op = [string, unknown[]];
@@ -127,7 +129,7 @@ const search = (filters: Row, extra: Row = {}): Row => ({
   forecast_seen_through: W, forecast_gap_since: null, forecast_pending: null, ...extra,
 });
 const run = async (qs = '') => {
-  const res = await GET(new NextRequest(`http://localhost/api/cron/saved-search-alerts${qs}`));
+  const res = await GET(new NextRequest(`http://localhost/api/cron/saved-search-alerts${qs}`, { headers: { authorization: 'Bearer test-cron-secret' } }));
   return { status: res.status, body: await res.json() };
 };
 /** Apply the recorded update to the search, as the database would. */

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendOpsAlert } from '@/lib/ops-alert';
+import { requireJobAuth } from '@/lib/cron/cron-request-auth';
 
 /**
  * Briefing Watchdog - Automated Failsafe System
@@ -67,6 +68,8 @@ interface RetryCandidate {
 }
 
 export async function GET(request: NextRequest) {
+  const denied = requireJobAuth(request);
+  if (denied) return denied;
   const startTime = Date.now();
   const results = {
     healthChecks: [] as HealthMetrics[],

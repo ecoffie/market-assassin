@@ -19,6 +19,7 @@ import { reportCronOutcome } from '@/lib/cron-self-report';
 import { createClient } from '@supabase/supabase-js';
 import { buildOppIntel } from '@/lib/opportunities/opp-intel';
 import { extractSowCardFacts, sowCardFactsHasContent } from '@/lib/opportunities/sow-card-facts';
+import { requireJobAuth } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,6 +30,8 @@ function sb() {
 }
 
 export async function GET(request: NextRequest) {
+  const denied = requireJobAuth(request);
+  if (denied) return denied;
   const limit = Math.min(100, Math.max(1, parseInt(request.nextUrl.searchParams.get('limit') || '40', 10) || 40));
   const concurrency = 4;
   const db = sb();

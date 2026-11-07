@@ -9,11 +9,12 @@
  * Cost: one description scan (~17-20 GB, capped by maximumBytesBilled) per MONTH ≈ pennies.
  * Never run per page-load. See tasks/bigquery-cost-spike-2026-06.md.
  */
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
 import { getWriteClient } from '@/lib/supabase/server-clients';
 import { WEIRD_TERMS } from '@/lib/discover/weird-awards';
+import { requireJobAuth } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -39,7 +40,9 @@ function categorize(description: string | null): string | null {
   return null;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const denied = requireJobAuth(request);
+  if (denied) return denied;
   // Weird = small-ish and specific; a $2B award is not "weird", it's just big. Recent-ish
   // so it feels current. One OR-clause per curated term.
   const likeClause = WEIRD_TERMS.map((_, i) => `UPPER(description) LIKE @t${i}`).join(' OR ');

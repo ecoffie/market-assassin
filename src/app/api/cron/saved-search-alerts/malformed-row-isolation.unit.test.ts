@@ -9,6 +9,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
+// Scheduled job routes authorize only the CRON_SECRET bearer the dispatcher sends.
+process.env.CRON_SECRET = 'test-cron-secret';
 
 type Row = Record<string, unknown>;
 const state = {
@@ -104,7 +106,7 @@ beforeEach(() => {
 
 describe('saved-search-alerts — one malformed stored search', () => {
   it('is reported individually and never blocks a valid search in the same run', async () => {
-    const res = await GET(new NextRequest('https://x/api/cron/saved-search-alerts?limit=50', { headers: { 'x-cron-dispatch': '1' } }));
+    const res = await GET(new NextRequest('https://x/api/cron/saved-search-alerts?limit=50', { headers: { authorization: 'Bearer test-cron-secret', 'x-cron-dispatch': '1' } }));
     const body = await res.json();
 
     // Reported by id + a specific class, not an anonymous unexpected_schedule_error.
@@ -124,7 +126,7 @@ describe('saved-search-alerts — one malformed stored search', () => {
   });
 });
 
-const dispatch = () => GET(new NextRequest('https://x/api/cron/saved-search-alerts?limit=50', { headers: { 'x-cron-dispatch': '1' } }));
+const dispatch = () => GET(new NextRequest('https://x/api/cron/saved-search-alerts?limit=50', { headers: { authorization: 'Bearer test-cron-secret', 'x-cron-dispatch': '1' } }));
 const validOnly = () => { state.searches = state.searches.filter((r) => r.id === VALID_ID); };
 
 describe('send-guard blocks are classified by REASON, not collapsed into one "rejected"', () => {

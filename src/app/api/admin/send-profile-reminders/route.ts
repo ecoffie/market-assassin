@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
 import { sendEmail } from '@/lib/send-email';
 import { createSecureAccessUrl } from '@/lib/access-links';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const REMINDER_COOLDOWN_DAYS = 14;
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const bearer = request.headers.get('authorization')?.replace('Bearer ', '');
   const password = searchParams.get('password');
-  const isCron = request.headers.get('x-cron-dispatch') === '1'
+  const isCron = hasValidCronSecret(request)
     || (!!process.env.CRON_SECRET && bearer === process.env.CRON_SECRET);
   // Dispatcher fires (GET→POST) → execute. Cap the cron batch so an automated
   // run can never blast the whole list; the cursor + 14-day cooldown drain the

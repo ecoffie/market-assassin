@@ -76,6 +76,7 @@ import {
 } from '@/lib/saved-searches/alert-drain';
 import { dueSavedSearchFrequenciesAt, isSavedSearchDueAt } from '@/lib/saved-searches';
 import { storedNaicsValidity } from '@/lib/saved-searches/stored-naics';
+import { requireJobAuth } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -537,6 +538,8 @@ async function evaluateCanonicalForecast(
 // buildEmail (the Target-card email) lives in a lib so it's testable + offline-previewable.
 
 export async function GET(request: NextRequest) {
+  const denied = requireJobAuth(request);
+  if (denied) return denied;
   const preview = request.nextUrl.searchParams.get('mode') === 'preview';
   const dispatcherRun = request.headers.get('x-cron-dispatch') === '1';
   const batchSize = Math.min(

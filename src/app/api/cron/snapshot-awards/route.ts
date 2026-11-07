@@ -16,6 +16,7 @@ import {
   assembleAwardsForUser,
   type ContractAward,
 } from '@/lib/briefings/pipelines/contract-awards';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 // NAICS-deduped run needs headroom under Vercel's ceiling.
 export const maxDuration = 300;
@@ -41,7 +42,7 @@ interface BriefingUser {
 
 export async function GET(request: NextRequest) {
   // Verify cron authorization (Vercel cron header OR Bearer token)
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const authHeader = request.headers.get('authorization');
   const hasCronSecret = authHeader === `Bearer ${CRON_SECRET}`;
 

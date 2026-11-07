@@ -36,6 +36,7 @@ import { encodeGaoClocks, classifyGaoFreshness, type GaoClocks } from '@/lib/ins
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { shouldSendAlert, fingerprint } from '@/lib/ops-alert-dedup';
 import CODES from '@/data/agency-toptier-codes.json';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -61,7 +62,7 @@ async function dispatchAlerts(db: ReturnType<typeof sb>, alerts: GaoAlertCandida
 }
 
 export async function GET(request: NextRequest) {
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const authHeader = request.headers.get('authorization');
   const hasSecret = Boolean(process.env.CRON_SECRET) && authHeader === `Bearer ${process.env.CRON_SECRET}`;
   const { searchParams } = new URL(request.url);

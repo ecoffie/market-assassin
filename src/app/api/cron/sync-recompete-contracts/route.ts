@@ -38,6 +38,7 @@ import { fetchExpiringForNaics, type SyncedContract } from '@/lib/recompete/usas
 import { diffContracts, TRACKED_FIELDS, type ExistingRow } from '@/lib/recompete/change-log';
 import { findFollowOnAward, type FollowOnParent } from '@/lib/recompete/find-followon';
 import { preserveRicherEnrichment, type EnrichmentFields } from '@/lib/recompete/preserve-enrichment';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -135,7 +136,7 @@ async function upsertContracts(supabase: ReturnType<typeof sb>, contracts: Synce
 }
 
 export async function GET(request: NextRequest) {
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const authHeader = request.headers.get('authorization');
   const hasSecret = Boolean(process.env.CRON_SECRET) && authHeader === `Bearer ${process.env.CRON_SECRET}`;
   if (!isVercelCron && !hasSecret) {

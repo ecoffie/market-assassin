@@ -16,6 +16,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { listRechargeCandidates, maybeAutoRecharge } from '@/lib/mcp/autorecharge';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,7 +25,7 @@ export const maxDuration = 300;
 const BATCH = Math.max(1, Number(process.env.MCP_AUTORECHARGE_BATCH ?? '100') || 100);
 
 export async function GET(request: NextRequest) {
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const hasSecret = request.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET}`;
   const isAdmin = request.nextUrl.searchParams.get('password') === process.env.ADMIN_PASSWORD;
   if (!isVercelCron && !hasSecret && !isAdmin) {

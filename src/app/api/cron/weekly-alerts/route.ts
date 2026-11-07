@@ -22,6 +22,7 @@ import {
   renderKeywordSetupNudgeHtml,
   renderMindyV10PromoHtml,
 } from '@/lib/alerts/email-promo';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -673,7 +674,7 @@ export async function GET(request: NextRequest) {
   const force = request.nextUrl.searchParams.get('force') === 'true' || isCatchup;
 
   // Check if this is a Vercel cron request
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const authHeader = request.headers.get('authorization');
   const hasCronSecret = authHeader === `Bearer ${process.env.CRON_SECRET}`;
   const adminPassword = request.nextUrl.searchParams.get('password');

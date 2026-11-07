@@ -58,6 +58,7 @@ import { loadVaultEligibility, type VaultEligibilityMap } from '@/lib/market/vau
 import { MINDY_APP_URL, MINDY_SITE_URL, mindyDashboardUrlFor } from '@/lib/mindy/email-branding';
 import { computeTodaysLens, type TodaysLens } from '@/lib/dashboard/todays-lens';
 import { renderTodaysLensEmailBlock } from '@/lib/alerts/todays-lens-email';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const maxDuration = 300;
 
@@ -1351,7 +1352,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Check if this is a Vercel cron request
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const authHeader = request.headers.get('authorization');
   const hasCronSecret = authHeader === `Bearer ${process.env.CRON_SECRET}`;
 

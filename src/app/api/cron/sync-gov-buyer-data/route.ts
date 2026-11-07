@@ -52,6 +52,7 @@ const CRON_JOB_NAME = 'sync-decision-makers';
 import { createClient } from '@supabase/supabase-js';
 import { searchEntities } from '@/lib/sam/entity-api';
 import { runDecisionMakersSync } from '@/lib/gov-contacts/buyer-contact-run';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 // The contacts drain runs under a soft wall-clock budget (budgetMs, default 210s). Without an
 // explicit ceiling the platform default would kill the run BEFORE the checkpoint write at the
@@ -260,7 +261,7 @@ export async function GET(request: NextRequest) {
   // (2026-09-15T02:00:27Z) — registered, enabled, firing on time, and unable to authenticate.
   // Matches the shape used by every other dispatcher-run job (see fco-roster-watch).
   const auth = request.headers.get('authorization');
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const isDispatcher = Boolean(process.env.CRON_SECRET) && auth === `Bearer ${process.env.CRON_SECRET}`;
   const password = searchParams.get('password');
   if (!isVercelCron && !isDispatcher && password !== ADMIN_PASSWORD) {
