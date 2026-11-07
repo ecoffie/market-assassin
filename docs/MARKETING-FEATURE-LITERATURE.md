@@ -7492,3 +7492,20 @@ included. Recompete and forecast views still use their own agency fields.
 through the SAM Federal Hierarchy path, 19 open, versus 0 before. Unit test
 `hierarchy-sub-agency.unit.test.ts` checks real Marine Corps and non-Marine Navy notices.
 
+## Mindy does not charge for a request it could not run (2026-11-07)
+
+**What:** A Mindy MCP tool call that is missing the company, solicitation or other identifier the
+tool needs is now refused before it runs and costs nothing. If the request used a wrong parameter
+name, the reply names it and suggests the right one: "Unrecognized parameter company_name. Did you
+mean company?" If a call still runs without a misspelled optional filter, the result lists the
+ignored parameter. Contractor award history and profiles now state how current the data is
+separately from the company's own last contract action.
+
+**Why:** Developers and AI agents guess parameter names. They should not pay for that guess, and a
+quiet company should not make a current report look three months old.
+
+**SEO:** government contracting API, federal contract data MCP server, contractor award history API.
+
+**Proof:** 13 tools measured by calling them with no identifier: each did no work and was billable
+before this change. Source: `REQUIRED_ONE_OF` in `src/lib/mcp/credit-integrity.ts`, and
+`route.unknown-params.unit.test.ts` for real requests on both MCP endpoints.
