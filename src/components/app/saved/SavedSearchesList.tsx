@@ -116,7 +116,7 @@ export default function SavedSearchesList({ email }: { email: string | null }) {
                       {s.newCount.toLocaleString()} new
                     </span>
                   )}
-                  {s.alertsOn && (
+                  {s.alertsOn && !s.alertBlock && (
                     <span className="inline-flex shrink-0 items-center gap-0.5 text-[11px] text-faint" title="Email alerts are on">
                       <Bell className="h-3 w-3" strokeWidth={2} /> alerts on
                     </span>
@@ -125,6 +125,11 @@ export default function SavedSearchesList({ email }: { email: string | null }) {
                 <div className="mt-0.5 text-xs text-faint truncate">
                   {[s.modeLabel, s.summary || 'No filters'].filter(Boolean).join(' · ')}
                 </div>
+                {s.alertBlock && (
+                  <p role="status" className="mt-1.5 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs text-amber-300">
+                    {s.alertBlock}
+                  </p>
+                )}
               </div>
               {s.mapHref && (
                 <a

@@ -117,3 +117,16 @@ describe('pursuit key for recompete favorites', () => {
     expect(item.canStartPursuit).toBe(true);
   });
 });
+
+describe('toSavedSearchItems alert block', () => {
+  it('carries the API notice to the item, and absent or blank is null', () => {
+    const [a, b, c] = toSavedSearchItems([
+      { id: '1', name: 'A', mode: 'open', filters: {}, alerts_enabled: true, alert_block: 'Email alerts are blocked.' },
+      { id: '2', name: 'B', mode: 'open', filters: {}, alerts_enabled: true },
+      { id: '3', name: 'C', mode: 'open', filters: {}, alerts_enabled: true, alert_block: '   ' },
+    ]);
+    expect(a.alertBlock).toBe('Email alerts are blocked.');
+    expect(b.alertBlock).toBeNull();
+    expect(c.alertBlock).toBeNull();
+  });
+});
