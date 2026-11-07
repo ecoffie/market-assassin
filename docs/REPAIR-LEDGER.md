@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-07 — Cancelled MI Pro subscribers kept Pro: the live webhook ignored the cancel
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-07 | Billing / entitlement revoke | Stripe sends `customer.subscription.deleted` only to `getmindy.ai/api/stripe-webhook`, which acted on FHC + Alert Pro and returned `ignored` for MI Pro. The August revoke fix lived in `/api/webhooks/stripe`, whose Stripe endpoint (tools.govcongiants.org) is DISABLED, so it never ran. Found when Adam Sokolowski cancelled 2026-11-02 and kept Pro; 14 more cancelled $149/mo subscribers (ended 08-17 to 11-06) still held Pro. Fix: shared `revokeAppTierOnCancel` (KV, then profile [+access_team], notification settings, classification) called by the live webhook on DELETED only (never past_due) and by the legacy handler. Refuses to revoke when Pro is held another way: another live Pro/Team sub, lifetime purchase/classification, legacy bundle, live prepaid entitlement, advocate, staff, or any guard it cannot establish. | `revokeAppTierOnCancel(supabase, stripe, subscription)` → `src/app/api/stripe-webhook/route.ts` | `revoke-on-cancel.unit.test.ts` 20/20 (the live-webhook test is red against main); tsc clean; 731 related tests pass; supabase-errors + rank-then-filter gates OK | PR OPEN |
+
 ## 2026-11-07 — Saved-search alerts: action items stop reading as an outage; owners and delivery evidence surfaced
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
