@@ -7,7 +7,6 @@
  */
 import { verifyMIAccess } from '@/lib/api-auth';
 import { resolveAccess } from '@/lib/access/resolve-access';
-import { tierAtLeast } from '@/lib/access/tier-rank';
 import { getWriteClient } from '@/lib/supabase/server-clients';
 
 export type PlanId = 'free' | 'pro' | 'team' | 'enterprise';
@@ -22,7 +21,8 @@ export const PLAN_LABEL: Record<PlanId, string> = {
 export async function resolvePlan(email: string): Promise<PlanId> {
   const [access, resolved] = await Promise.all([verifyMIAccess(email, true), resolveAccess(email)]);
   let tier = access.tier;
-  if (resolved.level === 'pro' && !tierAtLeast(tier, 'team')) tier = 'pro';
+  // tier-display-ok: plan chip + pricing label only, not a gate; promotes to Pro and never lowers Team/Enterprise.
+  if (resolved.level === 'pro' && tier !== 'team' && tier !== 'enterprise') tier = 'pro';
   return tier === 'none' ? 'free' : tier;
 }
 

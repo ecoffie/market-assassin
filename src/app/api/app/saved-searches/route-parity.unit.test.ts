@@ -121,6 +121,21 @@ describe('saved-searches API route adapter parity', () => {
     expect(mockList).toHaveBeenCalledWith('user@example.com');
   });
 
+  it('GET list tells the owner a search is blocked; a failed suppression lookup never fails the list', async () => {
+    mockList.mockResolvedValue({
+      ok: true,
+      data: { searches: [
+        { ...sampleRow, id: 'bad', user_email: 'user@example.com', alerts_enabled: true, alert_frequency: 'daily', filters: { naics: '541510' } },
+        { ...sampleRow, id: 'good', user_email: 'user@example.com', alerts_enabled: true, alert_frequency: 'daily', filters: { naics: '541611' } },
+      ] },
+    });
+    const res = await GET(new NextRequest('http://localhost/api/app/saved-searches?email=user@example.com'));
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.searches[0].alert_block).toContain('NAICS 541510 is not a valid code');
+    expect(body.searches[1].alert_block).toBeNull();
+  });
+
   it('PATCH update delegates with ownership email', async () => {
     mockUpdate.mockResolvedValue({ ok: true, data: { search: { ...sampleRow, alerts_enabled: false }, noop: false } });
 

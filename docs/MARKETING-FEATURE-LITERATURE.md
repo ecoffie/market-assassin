@@ -7509,3 +7509,17 @@ quiet company should not make a current report look three months old.
 **Proof:** 13 tools measured by calling them with no identifier: each did no work and was billable
 before this change. Source: `REQUIRED_ONE_OF` in `src/lib/mcp/credit-integrity.ts`, and
 `route.unknown-params.unit.test.ts` for real requests on both MCP endpoints.
+---
+
+## Saved-search alerts tell you when they can't reach you (2026-11-07)
+
+**What.** If a saved search can't send email, its owner now sees why on that search: an invalid NAICS code, or an account email on the do-not-send list after a bounce, complaint or unsubscribe. Connected AI agents also see how far the latest alert got: accepted by the email provider, then taken by the receiving mail server.
+
+**Why it matters.** A blocked search used to look exactly like a quiet market. Someone could wait weeks for an alert that was never going to come. Now the problem is visible where they manage the search, with the step that fixes it.
+
+**Honest scope.** Mindy can see that the receiving mail server took an alert. It cannot see whether the message landed in the inbox or in spam, and it says so. Delivery evidence is per account, because a send isn't tied to one search. The notice appears in the app; Mindy doesn't email the owner about it.
+
+**SEO.** Federal opportunity alerts / saved search email alerts for government contracts / SAM.gov alert delivery.
+
+**Proof.** Live data, 2026-11-07, read-only: `email_provider_events` holds 1,864 delivery events for 1,864 saved-search alerts over 30 days. Latest `cron_job_runs` row: 142 searches evaluated, 78 alerts accepted, 5 searches blocked and now named to their owners.
+
