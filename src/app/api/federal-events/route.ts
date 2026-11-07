@@ -44,6 +44,7 @@ interface AnnualConference {
 
 interface EventSourcesData {
   lastUpdated: string;
+  lastFullReview?: string;
   eventSources: Record<string, EventSource>;
   eventCategories: Record<string, EventCategory>;
   majorAnnualConferences: AnnualConference[];
@@ -247,6 +248,7 @@ export async function GET(request: NextRequest) {
       count: Object.keys(data.eventSources).length,
       sources: data.eventSources,
       lastUpdated: data.lastUpdated,
+      lastFullReview: data.lastFullReview,
     });
   }
 
@@ -276,6 +278,7 @@ export async function GET(request: NextRequest) {
       majorAnnualConferences: data.majorAnnualConferences,
       recommendations: data.recommendations,
       lastUpdated: data.lastUpdated,
+      lastFullReview: data.lastFullReview,
     });
   }
 
@@ -415,5 +418,6 @@ export async function GET(request: NextRequest) {
       everything: '/api/federal-events?all=true',
     },
     lastUpdated: data.lastUpdated,
+      lastFullReview: data.lastFullReview,
   });
 }
