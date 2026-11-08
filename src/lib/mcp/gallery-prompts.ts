@@ -38,4 +38,14 @@ export const GALLERY_PROMPTS: Record<string, string> = {
     'Draft Volume I, the technical approach, for this solicitation using my company profile and past performance. Follow the page limits in Section L. [paste the solicitation number]',
   'market-report':
     'Build me a market report on federal drone spending that I can send to a client: total market, top buying agencies, top winners, the set-aside mix, and where a small business should start. Give me the share link.',
+  'event-action-plan':
+    'I am attending the NAVFAC Southeast industry day next week. Build me an action plan: who will be there, what they are buying, which primes and buyers I should meet, what to ask each one, and how to follow up.',
+  'go-to-market':
+    'I run a small janitorial company in Florida and I am new to federal contracting. Build me a go-to-market strategy: which buyer to start with and why, which set-aside gives me an edge, which contract vehicle to get on later, and a 90-day plan. [paste your UEI if you have one]',
+  'whos-winning-near-me':
+    'Who is winning federal contracts within 50 miles of Tampa, Florida? Show the top companies, how much each won in the last 12 months, and which agencies they won it from.',
+  'teaming-plan':
+    'How should my company team with Ridgeline Defense on the upcoming Robins AFB recompete? Tell me what gap I fill for them, what role and share of work to ask for, who to contact, and how to open the conversation. [paste your UEI]',
+  'elevator-pitch':
+    'Write me a 30-second elevator pitch for the VA facilities chief in Florida, built from the VA priorities and my past work. End with a clear ask. [paste your UEI]',
 };
