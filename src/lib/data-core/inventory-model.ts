@@ -196,6 +196,8 @@ export const UPSTREAM_PUBLISHERS: Record<string, { name: string; kind: 'external
   gsa_calc: { name: 'GSA CALC+', kind: 'external' },
   sec_edgar: { name: 'SEC EDGAR', kind: 'external' },
   federal_register: { name: 'Federal Register', kind: 'external' },
+  jsearch: { name: 'JSearch (RapidAPI) — aggregated private-sector job postings', kind: 'external' },
+  usajobs: { name: 'USAJobs (OPM) — federal job postings', kind: 'external' },
   govcon_giants: { name: 'GovCon Giants (internal teaching, podcast, proposal corpus)', kind: 'internal' },
 };
 
