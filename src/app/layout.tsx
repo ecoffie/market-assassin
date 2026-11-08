@@ -3,6 +3,7 @@ import Script from "next/script";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import AttributionTracker from "@/components/AttributionTracker";
+import NativeBridge from "@/components/NativeBridge";
 import PartnerReferralClaimer from "@/components/mindy/PartnerReferralClaimer";
 import RefCapture from "@/components/RefCapture";
 import ChunkReloadGuard from "@/components/ChunkReloadGuard";
@@ -133,6 +134,7 @@ export default function RootLayout({
         )}
         <ChunkReloadGuard />
         <AttributionTracker />
+        <NativeBridge />
         <PartnerReferralClaimer />
         <RefCapture />
         {children}

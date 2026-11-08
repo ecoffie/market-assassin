@@ -11,3 +11,6 @@ node_modules
 .next
 tsconfig.tsbuildinfo
 .tmp-probe/
+
+# Capacitor iOS/Android shell — built in Xcode / Android Studio, not by Vercel.
+mobile/

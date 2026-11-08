@@ -7,8 +7,24 @@ import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
  * Preserve OAuth callback URLs while letting the browser Supabase client
  * exchange the code and persist the session.
  */
+/**
+ * Mindy iOS/Android app: OAuth ran in the SYSTEM browser (Google blocks WebView sign-in),
+ * so the session must be handed back to the app instead of landing in Safari/Chrome.
+ * `native=1` is added by src/lib/supabase/auth.ts only inside the app. We send the browser
+ * to /app/auth/native-return, which deep-links `ai.getmindy.app://auth?to=<dest>#<tokens>`.
+ * The #access_token fragment survives each 302 (browsers carry it across redirects).
+ */
+function finish(request: NextRequest, native: boolean, dest: URL): NextResponse {
+  if (!native) return NextResponse.redirect(dest);
+  dest.searchParams.delete('native');
+  const bounce = new URL('/app/auth/native-return', request.url);
+  bounce.searchParams.set('to', `${dest.pathname}${dest.search}`);
+  return NextResponse.redirect(bounce);
+}
+
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
+  const native = requestUrl.searchParams.get('native') === '1';
 
   // ── ENTERPRISE OAUTH FAILURE DETECTION ──────────────────────────────────────────────
   // Entra/Google append ?error=&error_description= to THIS redirect URI on a denial. The
@@ -49,7 +65,7 @@ export async function GET(request: NextRequest) {
     dest.searchParams.set('reason', failure.kind);
     dest.searchParams.set('provider', failure.provider);
     if (failure.code) dest.searchParams.set('code', failure.code);
-    return NextResponse.redirect(dest);
+    return finish(request, native, dest);
   }
   // ⚠️ THIS LINE IS THE REPORTED BUG (2026-08-25). It read:
   //     searchParams.get('next') || '/app/onboarding'
@@ -68,10 +84,10 @@ export async function GET(request: NextRequest) {
   const redirectUrl = new URL(next, request.url);
 
   requestUrl.searchParams.forEach((value, key) => {
-    if (key !== 'next') {
+    if (key !== 'next' && key !== 'native') {
       redirectUrl.searchParams.set(key, value);
     }
   });
 
-  return NextResponse.redirect(redirectUrl);
+  return finish(request, native, redirectUrl);
 }

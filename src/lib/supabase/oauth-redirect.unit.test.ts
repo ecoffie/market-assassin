@@ -34,13 +34,17 @@ describe('OAuth redirectTo', () => {
     }
   });
 
+  // The default is held in `baseRedirect` so the native app (2026-11-06) can add `native=1`
+  // to the SAME callback URL; the destination contract is unchanged.
   it('routes every OAuth provider through the resolver callback', () => {
-    const callbacks = CODE.match(/redirectTo: redirectTo \|\| `\$\{window\.location\.origin\}\/app\/auth\/callback`/g) ?? [];
+    const callbacks = CODE.match(/const baseRedirect = redirectTo \|\| `\$\{window\.location\.origin\}\/app\/auth\/callback`/g) ?? [];
     // google + microsoft(azure) + apple
     expect(callbacks.length).toBe(3);
+    const uses = CODE.match(/redirectTo: native \? withNativeFlag\(baseRedirect\) : baseRedirect/g) ?? [];
+    expect(uses.length).toBe(3);
   });
 
   it('still lets an explicit redirectTo win', () => {
-    expect(CODE).toContain('redirectTo: redirectTo ||');
+    expect(CODE).toContain('const baseRedirect = redirectTo ||');
   });
 });
