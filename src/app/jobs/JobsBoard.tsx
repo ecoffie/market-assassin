@@ -99,7 +99,11 @@ export default function JobsBoard({ data, filters, now = new Date() }: { data: J
                   value={fmtCount(t.active)}
                   label={data.source === 'mindy' ? `Open postings (seen in the last ${ACTIVE_DAYS} days)` : 'Open postings right now'}
                 />
-                <Stat value={fmtCount(t.contractor)} label="At contractors" href={href(filters, { source: 'jsearch' })} />
+                <Stat
+                  value={t.contractor == null ? 'Soon' : fmtCount(t.contractor)}
+                  label="At contractors"
+                  href={t.contractor == null ? undefined : href(filters, { source: 'jsearch' })}
+                />
                 <Stat
                   value={t.federal == null ? 'Soon' : fmtCount(t.federal)}
                   label="At federal agencies"
@@ -116,8 +120,10 @@ export default function JobsBoard({ data, filters, now = new Date() }: { data: J
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
                   <Meta style={{ minWidth: 70 }}>Employer</Meta>
                   <FilterLink on={!filters.source} to={href(filters, { source: undefined })}>All</FilterLink>
-                  <FilterLink on={filters.source === 'jsearch'} to={href(filters, { source: 'jsearch' })}>Contractors</FilterLink>
-                  {data.source === 'mindy' && (
+                  {data.totals.contractor != null && (
+                    <FilterLink on={filters.source === 'jsearch'} to={href(filters, { source: 'jsearch' })}>Contractors</FilterLink>
+                  )}
+                  {data.totals.federal != null && (
                     <FilterLink on={filters.source === 'usajobs'} to={href(filters, { source: 'usajobs' })}>Federal agencies</FilterLink>
                   )}
                 </div>
@@ -196,6 +202,7 @@ export default function JobsBoard({ data, filters, now = new Date() }: { data: J
                 </div>
 
                 <aside style={{ display: 'grid', gap: 24, alignContent: 'start', minWidth: 0 }}>
+                  {data.topEmployers.length > 0 && (
                   <Panel>
                     <p className="mp-label">Contractors hiring the most</p>
                     <p className="mp-meta" style={{ marginTop: 4 }}>In the latest {ROLLUP_SAMPLE.toLocaleString('en-US')} postings</p>
@@ -209,10 +216,13 @@ export default function JobsBoard({ data, filters, now = new Date() }: { data: J
                       ))}
                     </ol>
                   </Panel>
-                  {data.source === 'mindy' && (
+                  )}
+                  {data.agenciesHiring.length > 0 && (
                   <Panel>
-                    <p className="mp-label">Agencies hiring contract specialists</p>
-                    <p className="mp-meta" style={{ marginTop: 4 }}>An office adding buyers usually plans to buy more.</p>
+                    <p className="mp-label">{data.source === 'mindy' ? 'Agencies hiring contract specialists' : 'Federal agencies hiring'}</p>
+                    <p className="mp-meta" style={{ marginTop: 4 }}>
+                      {data.source === 'mindy' ? 'An office adding buyers usually plans to buy more.' : 'From the federal jobs on the GovCon Giants board.'}
+                    </p>
                     <ol style={{ margin: '14px 0 0', padding: 0, listStyle: 'none', display: 'grid', gap: 8 }}>
                       {data.agenciesHiring.length === 0 && <li className="mp-meta">No agency postings yet.</li>}
                       {data.agenciesHiring.map((a) => (
@@ -232,7 +242,7 @@ export default function JobsBoard({ data, filters, now = new Date() }: { data: J
               <p className="mp-meta" style={{ marginTop: 20 }}>
                 {data.source === 'mindy'
                   ? 'Sources: JSearch (LinkedIn, Indeed, Glassdoor, ZipRecruiter) and USAJobs.'
-                  : 'Source: the GovCon Giants job board (LinkedIn, Indeed, Glassdoor, ZipRecruiter). Federal agency jobs are coming soon.'}
+                  : 'Source: the GovCon Giants job board (USAJobs, plus LinkedIn, Indeed, Glassdoor and ZipRecruiter when available).'}
                 {data.lastSyncedAt ? ` Last updated ${new Date(data.lastSyncedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.` : ''}
                 {' '}Clearance shows only when the post names one.
               </p>

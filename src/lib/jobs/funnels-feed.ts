@@ -6,13 +6,15 @@
  * them instead and this file is no longer on the path.
  *
  * That feed has contractor (JSearch) jobs only, ten per call, so we ask for the default BD
- * search plus each role category and de-duplicate. There are no federal (USAJobs) postings
- * and no first-seen history, so the page shows those parts as not available, never as zero.
+ * search plus each role category and de-duplicate. Federal (USAJobs) jobs come from the
+ * cards on govcongiants.com/jobs (gcg-page.ts). A part that returns nothing shows as not
+ * available, never as zero.
  */
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import { categorizeJob, JOB_ROLES } from './categories';
 import { detectClearance, detectContingentOnAward } from './signals';
 import { ACTIVE_DAYS, type JobBoardData, type JobBoardFilters, type JobListing } from './read';
+import { fetchGcgFederalJobs } from './gcg-page';
 
 export const FUNNELS_JOBS_URL = 'https://govcongiants.com/api/jobs';
 
@@ -64,24 +66,28 @@ export async function readJobBoardFromFunnels(
   const f = opts.fetchImpl ?? fetch;
   const limit = opts.limit ?? 60;
   const urls = [FUNNELS_JOBS_URL + '?limit=25', ...JOB_ROLES.map((r) => `${FUNNELS_JOBS_URL}?limit=25&category=${r.slug}`)];
-  const results = await Promise.all(
-    urls.map(async (u) => {
-      try {
-        const res = await f(u, { next: { revalidate: 3600 }, signal: AbortSignal.timeout(8000) } as RequestInit);
-        if (!res.ok) return [] as FunnelsJob[];
-        const d = (await res.json()) as { jobs?: FunnelsJob[] };
-        return d.jobs ?? [];
-      } catch {
-        return [] as FunnelsJob[];
-      }
-    }),
-  );
+  const [results, federal] = await Promise.all([
+    Promise.all(
+      urls.map(async (u) => {
+        try {
+          const res = await f(u, { next: { revalidate: 3600 }, signal: AbortSignal.timeout(8000) } as RequestInit);
+          if (!res.ok) return [] as FunnelsJob[];
+          const d = (await res.json()) as { jobs?: FunnelsJob[] };
+          return d.jobs ?? [];
+        } catch {
+          return [] as FunnelsJob[];
+        }
+      }),
+    ),
+    fetchGcgFederalJobs(f),
+  ]);
 
   const byId = new Map<string, JobListing>();
   for (const list of results) for (const j of list) {
     const row = mapFunnelsJob(j);
     if (row && !byId.has(row.id)) byId.set(row.id, row);
   }
+  for (const row of federal) if (!byId.has(row.id)) byId.set(row.id, row);
   const all = [...byId.values()].sort((a, b) => (b.posted_at ?? '').localeCompare(a.posted_at ?? ''));
   const cutoff = Date.now() - 45 * 86_400_000;
   const recent = all.filter((r) => !r.posted_at || Date.parse(r.posted_at) >= cutoff);
@@ -100,34 +106,41 @@ export async function readJobBoardFromFunnels(
   }
 
   const listings = recent
-    .filter((r) => filters.source !== 'usajobs')
+    .filter((r) => !filters.source || r.source === filters.source)
     .filter((r) => !filters.role || r.role === filters.role)
     .filter((r) => !filters.state || r.state === filters.state)
     .filter((r) => filters.clearance !== 'required' || !!r.clearance)
     .filter((r) => filters.clearance !== 'none-stated' || !r.clearance)
     .slice(0, limit);
 
-  const tally = new Map<string, { name: string; count: number }>();
-  for (const r of recent) {
-    const k = r.employer_name.toLowerCase();
-    const t = tally.get(k) ?? { name: r.employer_name, count: 0 };
-    t.count++;
-    tally.set(k, t);
-  }
+  const tallyBy = (rows: JobListing[]) => {
+    const m = new Map<string, { name: string; count: number }>();
+    for (const r of rows) {
+      const k = r.employer_name.toLowerCase();
+      const t = m.get(k) ?? { name: r.employer_name, count: 0 };
+      t.count++;
+      m.set(k, t);
+    }
+    return [...m.values()].sort((a, b) => b.count - a.count).slice(0, 10);
+  };
+  const contractorRows = recent.filter((r) => r.source === 'jsearch');
+  const federalRows = recent.filter((r) => r.source === 'usajobs');
 
   return {
     state: 'ok',
     source: 'govcongiants',
     totals: {
       active: recent.length,
-      contractor: recent.length,
-      federal: null,
+      // A feed that returned nothing is "unknown", not zero: govcongiants.com's contractor feed
+      // can be empty when its JSearch key lapses.
+      contractor: contractorRows.length || null,
+      federal: federalRows.length || null,
       cleared: recent.filter((r) => r.clearance).length,
       contingent: recent.filter((r) => r.contingent_on_award).length,
     },
     listings,
-    topEmployers: [...tally.values()].sort((a, b) => b.count - a.count).slice(0, 10),
-    agenciesHiring: [],
+    topEmployers: tallyBy(contractorRows),
+    agenciesHiring: tallyBy(federalRows).map((a) => ({ ...a, department: null })),
     lastSyncedAt: new Date().toISOString(),
   };
 }
