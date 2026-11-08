@@ -28,7 +28,28 @@ export type GalleryPreview =
   | { kind: 'verdict'; verdict: string; score: number; reasons: Array<{ ok: boolean; text: string }> }
   | { kind: 'matrix'; rows: Array<{ ref: string; req: string; section: string; status: 'ok' | 'gap' }> }
   | { kind: 'doc'; heading: string; paragraphs: string[] }
-  | { kind: 'list'; items: Array<{ title: string; meta: string; tag?: string }> };
+  | { kind: 'list'; items: Array<{ title: string; meta: string; tag?: string }> }
+  | {
+      kind: 'capability';
+      company: string;
+      tagline: string;
+      competencies: string[];
+      differentiators: string[];
+      pastPerformance: Array<{ agency: string; work: string; value: string }>;
+      naics: string[];
+      certs: string[];
+      data: Array<[string, string]>;
+    }
+  | {
+      kind: 'report';
+      headline: string;
+      sub: string;
+      agencies: Array<{ label: string; value: string; pct: number }>;
+      winners: Array<{ label: string; value: string; pct: number }>;
+      setAside: Array<{ label: string; pct: number }>;
+    }
+  | { kind: 'map'; region: string; legend: Array<{ label: string; count: string }>; pins: Array<{ x: number; y: number; s: 0 | 1 | 2 }>; cities: Array<{ x: number; y: number; name: string }> }
+  | { kind: 'landscape'; headline: string; sub: string; shares: Array<{ label: string; pct: number }>; smallPct: number; trend: number[] };
 
 export interface GalleryItem {
   id: string;
@@ -45,8 +66,61 @@ export interface GalleryItem {
 
 export const GALLERY_ITEMS: GalleryItem[] = [
   {
-    id: 'where-the-money-is',
+    id: 'capability-statement',
     featured: true,
+    category: 'win',
+    title: 'A capability statement from your UEI',
+    result: 'A one-page capability statement built from your SAM registration and award history, ready to send.',
+    docTitle: 'Capability statement',
+    preview: {
+      kind: 'capability',
+      company: 'Peachstate Systems',
+      tagline: 'Cybersecurity and IT operations for federal health and defense',
+      competencies: ['Zero-trust network design', 'RMF and ATO support', '24/7 security operations', 'Help desk, Tier 1–3'],
+      differentiators: ['Cleared staff in 4 states', 'CMMC Level 2 certified', 'On-site within 48 hours'],
+      pastPerformance: [
+        { agency: 'VA', work: 'Network modernization', value: '$4.2M' },
+        { agency: 'Army', work: 'SOC support', value: '$2.8M' },
+        { agency: 'DHS', work: 'Help desk', value: '$1.1M' },
+      ],
+      naics: ['541512', '541519', '541513'],
+      certs: ['WOSB', 'HUBZone', 'Small business'],
+      data: [['UEI', 'EXAMPLE12345'], ['CAGE', '7XX12'], ['Location', 'Macon, GA']],
+    },
+  },
+  {
+    id: 'money-map',
+    featured: true,
+    category: 'find',
+    title: 'A map of where the money is',
+    result: 'Open bids, contracts coming back and planned buys for your work, pinned on a map of your area.',
+    docTitle: 'Map · facilities work · Florida',
+    preview: {
+      kind: 'map',
+      region: 'Florida',
+      legend: [
+        { label: 'Open now', count: '38' },
+        { label: 'Coming back', count: '21' },
+        { label: 'Coming soon', count: '9' },
+      ],
+      cities: [
+        { x: 132, y: 52, name: 'Jacksonville' },
+        { x: 112, y: 128, name: 'Orlando' },
+        { x: 70, y: 150, name: 'Tampa' },
+        { x: 152, y: 232, name: 'Miami' },
+        { x: 18, y: 40, name: 'Pensacola' },
+      ],
+      pins: [
+        { x: 136, y: 58, s: 0 }, { x: 128, y: 64, s: 1 }, { x: 140, y: 70, s: 0 }, { x: 116, y: 132, s: 0 },
+        { x: 108, y: 124, s: 2 }, { x: 122, y: 140, s: 1 }, { x: 74, y: 156, s: 0 }, { x: 66, y: 146, s: 1 },
+        { x: 80, y: 162, s: 0 }, { x: 156, y: 226, s: 0 }, { x: 150, y: 238, s: 1 }, { x: 160, y: 214, s: 2 },
+        { x: 22, y: 46, s: 0 }, { x: 30, y: 40, s: 1 }, { x: 96, y: 100, s: 2 }, { x: 144, y: 180, s: 0 },
+        { x: 120, y: 200, s: 1 }, { x: 60, y: 44, s: 0 },
+      ],
+    },
+  },
+  {
+    id: 'where-the-money-is',
     category: 'find',
     title: 'Where the money is for what you sell',
     result: 'Open bids, contracts coming back and planned buys for your work, in one answer.',
@@ -109,7 +183,6 @@ export const GALLERY_ITEMS: GalleryItem[] = [
   },
   {
     id: 'who-holds-it',
-    featured: true,
     category: 'compete',
     title: 'Who holds this contract now',
     result: 'The likely incumbent, what the contract is worth, when it ends and how it was awarded.',
@@ -129,20 +202,24 @@ export const GALLERY_ITEMS: GalleryItem[] = [
   },
   {
     id: 'who-wins',
+    featured: true,
     category: 'compete',
-    title: 'Who wins in your market',
-    result: 'The companies taking the most federal money for your kind of work, ranked.',
-    docTitle: 'Top winners · roofing',
+    title: 'Who wins your market',
+    result: 'Every company taking federal money for your kind of work, its share, and how much goes to small businesses.',
+    docTitle: 'Competitive landscape · roofing',
     preview: {
-      kind: 'bars',
+      kind: 'landscape',
       headline: '$1.3B',
-      sub: 'roofing awards, last 3 years',
-      bars: [
-        { label: 'Cardinal Roofing', value: '$84M', pct: 100 },
-        { label: 'Apex Envelope', value: '$61M', pct: 73 },
-        { label: 'Gulf Coast Roof Co', value: '$47M', pct: 56 },
-        { label: 'Summit Builders', value: '$33M', pct: 39 },
+      sub: 'federal roofing awards, last 3 fiscal years',
+      shares: [
+        { label: 'Cardinal Roofing', pct: 22 },
+        { label: 'Apex Envelope', pct: 16 },
+        { label: 'Gulf Coast Roof Co', pct: 12 },
+        { label: 'Summit Builders', pct: 9 },
+        { label: '412 other firms', pct: 41 },
       ],
+      smallPct: 63,
+      trend: [38, 41, 44, 40, 47, 52, 49, 58, 61, 57, 66, 72],
     },
   },
   {
@@ -228,7 +305,6 @@ export const GALLERY_ITEMS: GalleryItem[] = [
   },
   {
     id: 'bid-no-bid',
-    featured: true,
     category: 'win',
     title: 'Should you bid on this?',
     result: 'A bid or no-bid call with the reasons, before you spend a week on a proposal.',
@@ -280,17 +356,29 @@ export const GALLERY_ITEMS: GalleryItem[] = [
     featured: true,
     category: 'win',
     title: 'A market report you can send a client',
-    result: 'A branded report with a share link: market size, top buyers, top winners and what to do next.',
+    result: 'A branded report with a share link: market size, who buys, who wins and how much is set aside.',
     docTitle: 'Market report · drones',
     preview: {
-      kind: 'bars',
+      kind: 'report',
       headline: '$243M',
-      sub: 'spent on drones across 42 NAICS codes',
-      bars: [
-        { label: 'Army', value: '$71M', pct: 100 },
-        { label: 'Air Force', value: '$52M', pct: 73 },
-        { label: 'Navy', value: '$38M', pct: 54 },
-        { label: 'DHS', value: '$21M', pct: 30 },
+      sub: 'spent on drones across 42 NAICS codes, FY24',
+      agencies: [
+        { label: 'Army', value: '$71M', pct: 29 },
+        { label: 'Air Force', value: '$52M', pct: 21 },
+        { label: 'Navy', value: '$38M', pct: 16 },
+        { label: 'DHS', value: '$21M', pct: 9 },
+        { label: 'Other', value: '$61M', pct: 25 },
+      ],
+      winners: [
+        { label: 'Skyline UAS', value: '$31M', pct: 100 },
+        { label: 'Vector Aerial', value: '$22M', pct: 71 },
+        { label: 'Northwind Robotics', value: '$14M', pct: 45 },
+      ],
+      setAside: [
+        { label: 'Small business', pct: 34 },
+        { label: '8(a)', pct: 11 },
+        { label: 'SDVOSB', pct: 7 },
+        { label: 'Full & open', pct: 48 },
       ],
     },
   },

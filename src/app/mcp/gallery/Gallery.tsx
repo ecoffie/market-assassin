@@ -360,6 +360,172 @@ function Body({ p }: { p: GalleryPreview }) {
           ))}
         </span>
       );
+    case 'capability':
+      return (
+        <span className="cs">
+          <span className="cs-head">
+            <span className="cs-logo" aria-hidden="true">{p.company.slice(0, 1)}</span>
+            <span className="cs-id">
+              <b>{p.company}</b>
+              <span>{p.tagline}</span>
+            </span>
+          </span>
+          <span className="cs-grid">
+            <span className="cs-col">
+              <span className="cs-h">Core competencies</span>
+              {p.competencies.map((c) => (
+                <span key={c} className="cs-li">{c}</span>
+              ))}
+              <span className="cs-h">Differentiators</span>
+              {p.differentiators.map((c) => (
+                <span key={c} className="cs-li cs-li--ok">{c}</span>
+              ))}
+            </span>
+            <span className="cs-col">
+              <span className="cs-h">Past performance</span>
+              {p.pastPerformance.map((x, i) => (
+                <span key={x.work} className="cs-pp">
+                  <span className={`cs-ag cs-ag--${i}`}>{x.agency}</span>
+                  <span className="cs-pp-w">{x.work}</span>
+                  <b>{x.value}</b>
+                </span>
+              ))}
+              <span className="cs-h">NAICS</span>
+              <span className="cs-chips">
+                {p.naics.map((n) => (
+                  <span key={n} className="cs-naics">{n}</span>
+                ))}
+              </span>
+              <span className="cs-h">Certifications</span>
+              <span className="cs-chips">
+                {p.certs.map((n) => (
+                  <span key={n} className="cs-cert">{n}</span>
+                ))}
+              </span>
+            </span>
+          </span>
+          <span className="cs-foot">
+            {p.data.map(([k, v]) => (
+              <span key={k}>
+                {k} <b>{v}</b>
+              </span>
+            ))}
+          </span>
+        </span>
+      );
+    case 'report':
+      return (
+        <span className="rp">
+          <span className="rp-top">
+            <span>
+              <b className="pv-big">{p.headline}</b>
+              <span className="pv-k">{p.sub}</span>
+            </span>
+          </span>
+          <span className="rp-grid">
+            <span className="rp-donut">
+              <Donut parts={p.agencies.map((a) => a.pct)} />
+              <span className="rp-legend">
+                {p.agencies.map((a, i) => (
+                  <span key={a.label}>
+                    <i className={`sw sw--${i}`} />
+                    {a.label} <b>{a.value}</b>
+                  </span>
+                ))}
+              </span>
+            </span>
+            <span className="rp-win">
+              <span className="cs-h">Top winners</span>
+              {p.winners.map((w, i) => (
+                <span key={w.label} className="rp-bar">
+                  <span className="rp-bar-l">{w.label}</span>
+                  <span className="pv-bar-t">
+                    <i className={`fill--${i}`} style={{ width: `${w.pct}%` }} />
+                  </span>
+                  <b>{w.value}</b>
+                </span>
+              ))}
+            </span>
+          </span>
+          <span className="cs-h">Set-aside mix</span>
+          <span className="stack">
+            {p.setAside.map((x, i) => (
+              <i key={x.label} className={`fill--${i}`} style={{ width: `${x.pct}%` }} title={`${x.label} ${x.pct}%`} />
+            ))}
+          </span>
+          <span className="rp-legend rp-legend--row">
+            {p.setAside.map((x, i) => (
+              <span key={x.label}>
+                <i className={`sw sw--${i}`} />
+                {x.label} {x.pct}%
+              </span>
+            ))}
+          </span>
+        </span>
+      );
+    case 'map':
+      return (
+        <span className="mp-map">
+          <svg viewBox="0 0 200 260" className="mp-map-svg" role="img" aria-label={`Map of ${p.region} with opportunity pins`}>
+            <rect x="0" y="0" width="200" height="260" className="mp-water" />
+            <path
+              d="M0,30 L118,30 L124,20 L150,22 L156,40 L150,60 L158,90 L172,140 L182,190 L180,230 L168,252 L150,250 L138,236 L124,214 L108,196 L92,180 L80,168 L66,150 L60,120 L72,96 L86,78 L70,62 L46,58 L20,56 L0,52 Z"
+              className="mp-land"
+            />
+            {p.pins.map((pin, i) => (
+              <circle key={i} cx={pin.x} cy={pin.y} r="4.2" className={`pin pin--${pin.s}`} />
+            ))}
+            {p.cities.map((c) => (
+              <text key={c.name} x={c.x + 7} y={c.y - 6} className="mp-city">
+                {c.name}
+              </text>
+            ))}
+          </svg>
+          <span className="mp-map-legend">
+            {p.legend.map((l, i) => (
+              <span key={l.label} className="mp-map-chip">
+                <i className={`dot dot--${i}`} />
+                <span>{l.label}</span>
+                <b>{l.count}</b>
+              </span>
+            ))}
+          </span>
+        </span>
+      );
+    case 'landscape':
+      return (
+        <span className="ls">
+          <span className="ls-top">
+            <span>
+              <b className="pv-big">{p.headline}</b>
+              <span className="pv-k">{p.sub}</span>
+            </span>
+            <span className="ls-ring">
+              <Donut parts={[p.smallPct, 100 - p.smallPct]} two />
+              <span className="ls-ring-l">
+                <b>{p.smallPct}%</b>
+                <span className="pv-k">to small business</span>
+              </span>
+            </span>
+          </span>
+          <span className="cs-h">Market share</span>
+          <span className="stack stack--tall">
+            {p.shares.map((x, i) => (
+              <i key={x.label} className={`fill--${i}`} style={{ width: `${x.pct}%` }} />
+            ))}
+          </span>
+          <span className="rp-legend">
+            {p.shares.map((x, i) => (
+              <span key={x.label}>
+                <i className={`sw sw--${i}`} />
+                {x.label} <b>{x.pct}%</b>
+              </span>
+            ))}
+          </span>
+          <span className="cs-h">Awards per quarter</span>
+          <Spark values={p.trend} />
+        </span>
+      );
     case 'list':
       return (
         <span className="pv-stack">
@@ -375,6 +541,45 @@ function Body({ p }: { p: GalleryPreview }) {
         </span>
       );
   }
+}
+
+/** SVG donut (no CSS gradients). Segment colours come from the .seg--N classes. */
+function Donut({ parts, two = false }: { parts: number[]; two?: boolean }) {
+  const r = 15.915;
+  let offset = 25;
+  return (
+    <svg viewBox="0 0 42 42" className="donut" aria-hidden="true">
+      <circle cx="21" cy="21" r={r} className="donut-track" />
+      {parts.map((pct, i) => {
+        const el = (
+          <circle
+            key={i}
+            cx="21"
+            cy="21"
+            r={r}
+            className={two ? (i === 0 ? 'seg seg--ok' : 'seg seg--rest') : `seg seg--${i}`}
+            strokeDasharray={`${pct} ${100 - pct}`}
+            strokeDashoffset={offset}
+          />
+        );
+        offset -= pct;
+        return el;
+      })}
+    </svg>
+  );
+}
+
+function Spark({ values }: { values: number[] }) {
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const pts = values.map((v, i) => `${(i / (values.length - 1)) * 200},${46 - ((v - min) / (max - min || 1)) * 40}`);
+  return (
+    <svg viewBox="0 0 200 50" className="spark" preserveAspectRatio="none" aria-hidden="true">
+      <polygon points={`0,50 ${pts.join(' ')} 200,50`} className="spark-area" />
+      <polyline points={pts.join(' ')} className="spark-line" />
+      <circle cx="200" cy={pts[pts.length - 1].split(',')[1]} r="3" className="spark-dot" />
+    </svg>
+  );
 }
 
 /* Public design system only: --mp-* tokens, no new colours, weights at or below 700. */
@@ -428,7 +633,7 @@ const CSS = `
 .pv-bars{display:grid;gap:7px}
 .pv-bar{display:grid;grid-template-columns:minmax(0,1.2fr) 1.5fr auto;gap:10px;align-items:center}
 .pv-bar-l{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pv-bar-t{height:9px;background:var(--mp-wash)}
+.pv-bar-t{height:12px;background:var(--mp-wash)}
 .pv-bar-t i{display:block;height:100%;background:var(--mp-navy)}
 .pv-bar-v{font:600 1em var(--mp-font-mono);font-variant-numeric:tabular-nums}
 .pv-chip{justify-self:start;display:inline-block;font:600 11px var(--mp-font-sans);color:var(--mp-ok);background:var(--mp-ok-bg);border:1px solid var(--mp-ok-line);border-radius:var(--mp-radius-chip);padding:2px 8px;white-space:nowrap}
@@ -469,5 +674,83 @@ const CSS = `
 .mg-blur{display:grid;gap:8px}
 .mg-blur i{display:block;height:10px;background:var(--mp-wash)}
 .mg-x{position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:50%;border:1px solid var(--mp-line);background:var(--mp-surface);color:var(--mp-ink);font-size:20px;line-height:1;cursor:pointer;z-index:1}
+/* chart palette: hex values from src/lib/public-site/tokens.ts only */
+.mg{--c0:#1B3A6B;--c1:#027A48;--c2:#B54708;--c3:#8C2F1E;--c4:#9A9384;--c5:#B91C1C;--tint0:#EFF5FF;--tint1:#ECFDF3;--tint2:#FFFAEB}
+.fill--0,.sw--0{background:var(--c0)}.fill--1,.sw--1{background:var(--c1)}.fill--2,.sw--2{background:var(--c2)}.fill--3,.sw--3{background:var(--c3)}.fill--4,.sw--4{background:var(--c4)}
+.sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;flex:none}
+.cs-h{display:block;font:700 9.5px var(--mp-font-sans);letter-spacing:.14em;text-transform:uppercase;color:var(--mp-muted);margin-top:6px}
+/* capability statement */
+.cs{display:grid;gap:8px}
+.cs-head{display:flex;gap:10px;align-items:center;background:var(--c0);color:var(--mp-surface);padding:10px 12px;margin:-14px -14px 0}
+.mg-doc--lg .cs-head{margin:-20px -20px 0;padding:14px 20px}
+.cs-logo{width:32px;height:32px;display:grid;place-items:center;background:var(--mp-surface);color:var(--c0);font:700 18px var(--mp-font-serif);flex:none}
+.cs-id b{display:block;font:700 1.15em var(--mp-font-serif)}
+.cs-id span{display:block;font-size:.85em;opacity:.85}
+.cs-grid{display:grid;grid-template-columns:1fr 1.2fr;gap:12px}
+.cs-col{display:grid;gap:4px;align-content:start;min-width:0}
+.cs-li{display:block;padding-left:12px;position:relative}
+.cs-li::before{content:"";position:absolute;left:0;top:.45em;width:6px;height:6px;background:var(--c0)}
+.cs-li--ok::before{background:var(--c1)}
+.cs-pp{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:6px;align-items:center}
+.cs-pp-w{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cs-pp b{font-family:var(--mp-font-mono)}
+.cs-ag{font:700 10px var(--mp-font-sans);color:var(--mp-surface);padding:2px 6px}
+.cs-ag--0{background:var(--c0)}.cs-ag--1{background:var(--c1)}.cs-ag--2{background:var(--c2)}
+.cs-chips{display:flex;flex-wrap:wrap;gap:4px}
+.cs-naics{font:500 10.5px var(--mp-font-mono);background:var(--tint0);color:var(--c0);border:1px solid var(--c0);padding:1px 6px}
+.cs-cert{font:600 10.5px var(--mp-font-sans);background:var(--tint1);color:var(--c1);border:1px solid var(--mp-ok-line);padding:1px 6px}
+.cs-foot{display:flex;flex-wrap:wrap;gap:4px 14px;border-top:1px solid var(--mp-hair);padding-top:6px;color:var(--mp-muted);font-size:.85em}
+.cs-foot b{color:var(--mp-ink);font-family:var(--mp-font-mono)}
+/* market report */
+.rp{display:grid;gap:6px}
+.rp-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:12px;align-items:start}
+.rp-donut{display:flex;gap:10px;align-items:center;min-width:0}
+.donut{width:78px;height:78px;flex:none;transform:rotate(0deg)}
+.mg-doc--lg .donut{width:110px;height:110px}
+.donut-track{fill:none;stroke:var(--mp-wash);stroke-width:6}
+.seg{fill:none;stroke-width:6}
+.seg--0{stroke:var(--c0)}.seg--1{stroke:var(--c1)}.seg--2{stroke:var(--c2)}.seg--3{stroke:var(--c3)}.seg--4{stroke:var(--c4)}
+.seg--ok{stroke:var(--c1)}.seg--rest{stroke:var(--mp-wash)}
+.rp-legend{display:grid;gap:3px;font-size:.88em;min-width:0}
+.rp-legend span{display:flex;align-items:center;gap:0;white-space:nowrap}
+.rp-legend b{margin-left:4px;font-family:var(--mp-font-mono)}
+.rp-legend--row{display:flex;flex-wrap:wrap;gap:4px 12px}
+.rp-win{display:grid;gap:5px;min-width:0}
+.rp-bar{display:grid;grid-template-columns:minmax(0,1fr) 60px auto;gap:6px;align-items:center}
+.rp-bar-l{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rp-bar b{font-family:var(--mp-font-mono)}
+.pv-bar-t i[class*=fill]{display:block;height:100%}
+.stack{display:flex;height:16px;overflow:hidden;background:var(--mp-wash)}
+.stack i{display:block;height:100%}
+.stack i+i{border-left:2px solid var(--mp-surface)}
+.stack--tall{height:26px}
+/* map */
+.mp-map{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;height:100%}
+.mp-map-svg{width:100%;height:auto;max-height:330px;display:block}
+.mg-doc--lg .mp-map-svg{max-height:380px}
+.mp-water{fill:var(--tint0)}
+.mp-land{fill:var(--mp-wash);stroke:var(--mp-line);stroke-width:1.2}
+.pin{stroke:var(--mp-surface);stroke-width:1.6}
+.pin--0{fill:var(--c1)}.pin--1{fill:var(--c2)}.pin--2{fill:var(--c0)}
+.mp-city{font:600 7.5px var(--mp-font-sans);fill:var(--mp-body)}
+.mp-map-legend{display:grid;gap:8px}
+.mp-map-chip{display:grid;grid-template-columns:auto 1fr;gap:0 8px;align-items:center;background:var(--mp-surface);border:1px solid var(--mp-hair);padding:7px 10px}
+.mp-map-chip b{grid-column:2;font:700 1.5em/1 var(--mp-font-mono)}
+.mp-map-chip span{font-size:.85em;color:var(--mp-muted)}
+.dot{width:10px;height:10px;border-radius:50%;grid-row:span 2}
+.dot--0{background:var(--c1)}.dot--1{background:var(--c2)}.dot--2{background:var(--c0)}
+/* landscape */
+.ls{display:grid;gap:6px}
+.ls-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.ls-ring{display:flex;gap:8px;align-items:center}
+.ls-ring .donut{width:58px;height:58px}
+.ls-ring-l b{display:block;font:700 1.4em/1 var(--mp-font-mono);color:var(--c1)}
+.ls .rp-legend{grid-template-columns:repeat(2,minmax(0,1fr))}
+.spark{width:100%;height:70px;display:block}
+.spark-area{fill:var(--tint0)}
+.spark-line{fill:none;stroke:var(--c0);stroke-width:2;vector-effect:non-scaling-stroke}
+.spark-dot{fill:var(--c3)}
+.mg-feat .mg-stage{aspect-ratio:auto;height:440px}
+@media(max-width:860px){.mg-feat .mg-stage{height:auto;padding-bottom:0}}
 @media (prefers-reduced-motion:reduce){.mg-fcard{transition:none}}
 `;
