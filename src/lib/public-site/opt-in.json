@@ -83,7 +83,8 @@
     "src/app/legal/referral-terms",
     "src/app/ncmbc",
     "src/app/mdeat",
-    "src/app/lazy-contractors-blueprint"
+    "src/app/lazy-contractors-blueprint",
+    "src/app/jobs"
   ],
   "runtimeRoutes": [
     "/today",
