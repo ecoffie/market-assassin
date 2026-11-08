@@ -41,6 +41,7 @@ export const GRANT_REASONS: Record<string, GrantReasonEntry> = {
   sponsor_monthly: { class: 'no_reset', why: 'sponsored top-up with no recorded payment: the only entitlement (Encore Funding, 2026-09-15) is an owner-approved arrangement; no Stripe customer exists for the sponsor contact or the beneficiary, so it is not a paid funding event. Reclassify only when the sponsorship carries a recorded payment', source: 'cron/grant-mcp-pro-credits → mcp_topup_to_ceiling' },
   pro_monthly_supplement: { class: 'no_reset', why: 'one-time 250 -> 1,500 transition write (scripts/pro-supplement-2026-09.mts, 2026-09-08): not a renewal, and its audience was every Sept pro_monthly 250 recipient, which included comp advocates (5 of 40). Never produced again', source: 'scripts/pro-supplement-2026-09.mts (historical, one run)' },
   signup_grant: { class: 'no_reset', why: 'free signup/welcome credits (promotional)', source: 'mcp_grant_signup_credits (fixed reason)' },
+  event_bonus: { class: 'no_reset', why: 'live-event bonus credits (promotional, one per registrant per event)', source: 'api/events/lazy-contractors-blueprint/claim' },
   referral: { class: 'no_reset', why: 'referral bonus (promotional)', source: 'referrals.ts' },
   admin_grant: { class: 'no_reset', why: 'admin/debug grant', source: 'api/admin/mcp-credits, acceptance scripts' },
   comp_reset: { class: 'no_reset', why: 'comp account reset (correction)', source: 'scripts/reset-comp-credits.ts' },
