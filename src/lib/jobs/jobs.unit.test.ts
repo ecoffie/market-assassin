@@ -214,3 +214,33 @@ describe('govcongiants.com interim feed', () => {
     expect(d.totals.active).toBeNull();
   });
 });
+
+describe('govcongiants.com/jobs federal cards', () => {
+  it('parses the rendered USAJobs cards (real page fixture)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const { parseGcgFederalJobs } = await import('./gcg-page');
+    const html = readFileSync(join(__dirname, '__fixtures__/govcongiants-jobs-federal.html'), 'utf8');
+    const now = new Date('2026-11-08T12:00:00Z');
+    const rows = parseGcgFederalJobs(html, now);
+    expect(rows).toHaveLength(3);
+    const first = rows[0];
+    expect(first.id).toBe('usajobs:892128200');
+    expect(first.source).toBe('usajobs');
+    expect(first.title).toBe('Social Worker (Program Coordinator)- CC&ICM');
+    expect(first.employer_name).toBe('Veterans Health Administration');
+    expect(first.city).toBe('Phoenix');
+    expect(first.state).toBe('AZ');
+    expect(first.salary_min).toBe(107000);
+    expect(first.salary_max).toBe(139000);
+    expect(first.clearance).toBeNull();
+    expect(first.apply_url).toBe('https://www.usajobs.gov/job/892128200');
+    expect(first.posted_at).toBe('2026-11-06T12:00:00.000Z');
+    expect(rows[1].remote).toBe(true);
+  });
+
+  it('returns nothing (not a crash) when the markup has no cards', async () => {
+    const { parseGcgFederalJobs } = await import('./gcg-page');
+    expect(parseGcgFederalJobs('<html><body>No jobs</body></html>')).toEqual([]);
+  });
+});
