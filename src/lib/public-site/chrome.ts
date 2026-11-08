@@ -10,7 +10,7 @@ export interface MpChromeLink {
 
 /** Left of the top bar, after the logo. Hidden at <=980px. */
 export const MP_HEADER_PRODUCT_LINKS: readonly MpChromeLink[] = [
-  { href: '/mcp/about', label: 'Mindy in your AI' },
+  { href: '/mcp/gallery', label: 'Mindy in your AI' },
   { href: '/learn', label: 'Learn' },
 ];
 
