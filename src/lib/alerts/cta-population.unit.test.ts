@@ -26,22 +26,25 @@ const LENS = read('src/lib/dashboard/todays-lens.ts');
 
 describe('the destination population is computed, not assumed', () => {
   it('counts the strategy slice with the SAME predicate the map uses', () => {
-    // .contains() here must mirror map-filters.ts:273. If one becomes .overlaps() and the
-    // other stays .contains(), the two populations silently diverge again.
-    expect(LENS).toMatch(/base\(\)\.contains\('opportunity_dna_keys', lensStrategyKeys\)/);
+    // Since 2026-10-25 the lens does not re-express the map's predicate at all: it calls the
+    // Map API's own market counter over the link's exact params, so it cannot diverge.
+    expect(LENS).toMatch(/countOpenMarketForMapParams\(sb\(\), new URL\(path, 'https:\/\/getmindy\.ai'\)\.searchParams\)\)\.market/);
+    expect(LENS).not.toMatch(/\.contains\('opportunity_dna_keys', lensStrategyKeys\)/);
   });
 
   it('derives it from the same keys that build the link', () => {
     // One definition produces the message AND the destination — the ?ss= lesson, applied to
     // a count instead of a filter.
     expect(LENS).toContain('lensStrategy: lensStrategyKeys.join(\',\')');
-    expect(LENS).toMatch(/lensCount = lcErr \? null : \(lc \?\? 0\)/);
+    expect(LENS).toContain("todaysLensMapPath({ lensStrategy: lensStrategyKeys.join(','), lensNaics: codes6, lensCount: null }, { src: 'alert' })");
+    expect(LENS).toContain('lensNaics: codes6');
   });
 
   it('returns null on a failed count, never 0', () => {
     // "0 recommended" would read as "nothing matches your strategy today" — a false zero of
     // exactly the kind this codebase has been removing all day.
     expect(LENS).toMatch(/lensCount: number \| null/);
+    expect(LENS).toMatch(/catch \(e\) \{[\s\S]{0,200}lensCount = null;/);
   });
 });
 

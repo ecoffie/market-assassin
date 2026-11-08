@@ -27,7 +27,10 @@ const clientSrc = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 describe('every horizon reports what it cannot draw', () => {
   it('Open reports unmappedForFilters', () => {
     expect(openSrc).toContain('unmappedForFilters');
-    expect(openSrc).toContain("is('map_lat', null)");
+    // Since 2026-10-25 Open tallies mapped vs locationless LISTINGS in one walk (open-market-count.ts).
+    const lib = readFileSync(join(__dirname, '../../lib/opportunities/open-market-count.ts'), 'utf8');
+    expect(lib).toContain('if (r.map_lat != null) mapped.add(key);');
+    expect(lib).toContain('unmapped: all.size - mapped.size');
   });
   it('Awarded reports unmappedForFilters (33,127 rows were invisible)', () => {
     expect(recompeteSrc).toContain('unmappedForFilters');

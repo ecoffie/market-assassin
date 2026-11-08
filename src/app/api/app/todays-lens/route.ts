@@ -38,6 +38,8 @@ export async function GET(request: NextRequest) {
       totalOpen: lens.totalOpen,
       strands: lens.strands,               // [{key,label,icon,count}] — the "why today matters" lines
       lensStrategy: lens.lensStrategy,     // → /opportunity-map?strategy=<this> (the CTA target)
+      lensNaics: lens.lensNaics,           // the exact codes the counts used — the CTA link carries them
+      lensCount: lens.lensCount,           // rows the CTA link lands on (null = could not count)
       note: lens.grounded
         ? 'Real strand counts over your profile-scoped open corpus (opportunity_dna_keys). Not an LLM guess.'
         : 'No open opportunities match your profile codes right now — an honest empty, not a broken pipe.',

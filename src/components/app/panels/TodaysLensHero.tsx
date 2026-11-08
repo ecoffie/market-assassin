@@ -16,14 +16,21 @@
 import { useEffect, useState, useCallback } from 'react';
 import { getMIApiHeaders } from '../authHeaders';
 import { useAppTracker } from '../track';
+import { todaysLensMapPath } from '@/lib/dashboard/todays-lens-link';
 
 interface LensStrand { key: string; label: string; icon: string; count: number }
 interface LensData {
   ok: boolean; grounded: boolean; usingFallback: boolean;
   totalOpen: number; strands: LensStrand[]; lensStrategy: string;
+  lensNaics?: string[]; lensCount?: number | null;
 }
 
 const nf = new Intl.NumberFormat('en-US');
+
+// The "Close This Week" chip counts closes_soon OR last_chance (closing in 0-7 days). The map's
+// closes_soon strand is only the 4-7 day band (genome.ts: last_chance owns 0-3), so the focus line
+// names what the map will actually filter, not the chip.
+const MAP_FOCUS_LABEL: Record<string, string> = { closes_soon: 'Closes Soon (4–7 days)' };
 
 export default function TodaysLensHero({ email }: { email: string }) {
   const [data, setData] = useState<LensData | null>(null);
@@ -66,8 +73,13 @@ export default function TodaysLensHero({ email }: { email: string }) {
 
   if (!data) return null;
 
+  // Same builder as the daily alert email: strands + the exact NAICS the counts used, so the map
+  // opens the population this hero counted — not the same strands across every NAICS.
   const mapHref = data.lensStrategy
-    ? `/opportunity-map?strategy=${encodeURIComponent(data.lensStrategy)}`
+    ? todaysLensMapPath(
+        { lensStrategy: data.lensStrategy, lensNaics: data.lensNaics || [], lensCount: data.lensCount ?? null },
+        { src: 'todays_intel' },
+      )
     : '/opportunity-map';
 
   // Quiet day (no open opps in the user's codes) â honest, not a fabricated pep talk. Still offer the map.
@@ -119,7 +131,7 @@ export default function TodaysLensHero({ email }: { email: string }) {
       </a>
       {data.lensStrategy && (
         <p className="text-white/60 text-xs mt-2">
-          Opens the map already focused on {present.slice(0, 3).map((s) => s.label).join(' Â· ')}.
+          Opens the map already focused on {present.slice(0, 3).map((s) => MAP_FOCUS_LABEL[s.key] || s.label).join(' Â· ')}.
         </p>
       )}
     </div>
