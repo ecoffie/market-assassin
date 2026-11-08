@@ -383,3 +383,19 @@ export const GALLERY_ITEMS: GalleryItem[] = [
     },
   },
 ];
+
+/**
+ * The openings typed into the bottom prompt bar. Deliberately only the first few words: the
+ * full prompts stay signed-in only (gallery-prompts.ts).
+ */
+export const GALLERY_STARTERS = [
+  'Build a capability statement for my company from',
+  'Where is the money right now for a janitorial company in',
+  'Show me on a map where the federal facilities work is',
+  'Who wins federal roofing work, and how much goes to',
+  'Build me a market report on drone spending that I can',
+  'Who holds this contract now, and when does it',
+  'Should my company bid on this solicitation? Give me',
+  'Find HUBZone small businesses in Georgia that have already',
+  'Who at the Army Corps LA District actually buys',
+];
