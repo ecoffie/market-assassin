@@ -50,6 +50,7 @@
     "src/app/mcp/tools",
     "src/app/mcp/setup",
     "src/app/mcp/continue",
+    "src/app/mcp/gallery",
     "src/components/ProductPageAppSumo.tsx",
     "src/components/BundleProductPage.tsx",
     "src/components/lifetime/FoundersSeats.tsx",
@@ -143,6 +144,7 @@
     "/mcp/tools",
     "/mcp/setup",
     "/mcp/continue",
+    "/mcp/gallery",
     "/action-plan-2026",
     "/ai-prompts",
     "/december-spend",
@@ -168,7 +170,7 @@
     "/ncmbc",
     "/mdeat",
     "/lazy-contractors-blueprint",
-    "/lazy-contractors-blueprint/program"
+    "/lazy-contractors-blueprint/claim"
   ],
   "parityRoutes": [
     "/today",

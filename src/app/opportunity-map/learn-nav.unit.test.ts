@@ -25,7 +25,7 @@ describe('desktop: Learn in the right cluster, second', () => {
     expect(read(p)).toContain('<a href="/bid">Bid with confidence</a>\n    <a href="/learn">Learn</a>\n    <a href="/pricing">Pricing</a>');
   });
   it('the shared public top bar (homepage nav: Mindy in your AI · Learn, left)', () => {
-    expect(MP_HEADER_PRODUCT_LINKS.map((l) => l.href)).toEqual(['/mcp/about', '/learn']);
+    expect(MP_HEADER_PRODUCT_LINKS.map((l) => l.href)).toEqual(['/mcp/gallery', '/learn']);
     expect(MP_HEADER_PRODUCT_LINKS[1].label).toBe('Learn');
   });
   it('exactly one Learn item per header (no duplicate entry points)', () => {
