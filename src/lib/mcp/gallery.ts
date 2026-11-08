@@ -382,6 +382,93 @@ export const GALLERY_ITEMS: GalleryItem[] = [
       ],
     },
   },
+  {
+    id: 'event-action-plan',
+    category: 'buyer',
+    title: 'An action plan before you attend an event',
+    result: 'Who will be in the room, what they are buying, who to meet and what to ask, before you walk in.',
+    docTitle: 'Action plan · NAVFAC SE industry day',
+    preview: {
+      kind: 'list',
+      items: [
+        { title: 'Meet the small business specialist first', meta: 'Bring your capability statement', tag: 'Before' },
+        { title: 'Ask about the base operations recompete', meta: 'Current contract ends Jun 2027', tag: 'In the room' },
+        { title: 'Introduce yourself to Ridgeline Defense', meta: 'Likely prime, needs an 8(a) sub', tag: 'In the room' },
+        { title: 'Send a 3-line follow-up within 48 hours', meta: 'Reference the question you asked', tag: 'After' },
+      ],
+    },
+  },
+  {
+    id: 'go-to-market',
+    category: 'find',
+    title: 'A go-to-market strategy: where to start',
+    result: 'The buyer, contract type and set-aside where a company like yours has the best first shot, and why.',
+    docTitle: 'Go-to-market · janitorial · Florida',
+    preview: {
+      kind: 'dossier',
+      badge: 'Start here',
+      fields: [
+        ['First buyer', 'VA Sunshine Healthcare'],
+        ['Why', '14 small buys a year, under $250K'],
+        ['Your edge', 'SDVOSB set-aside'],
+        ['Vehicle to get on', 'VA FSS 36 (later)'],
+        ['90-day goal', '2 bids, 1 capability brief'],
+      ],
+      note: 'Skip DoD for now: most of its spend here is bundled into large base contracts.',
+    },
+  },
+  {
+    id: 'whos-winning-near-me',
+    category: 'compete',
+    title: "Who's winning around you",
+    result: 'The companies winning federal work near you, how much, and from which agencies.',
+    docTitle: 'Situational awareness · 50 mi of Tampa',
+    preview: {
+      kind: 'bars',
+      headline: '$412M',
+      sub: 'awarded within 50 miles of Tampa, last 12 months',
+      bars: [
+        { label: 'Bay Area Facility Svcs', value: '$38M', pct: 100 },
+        { label: 'Gulfline Construction', value: '$27M', pct: 71 },
+        { label: 'Suncoast IT Group', value: '$19M', pct: 50 },
+        { label: 'Harbor Point Services', value: '$12M', pct: 32 },
+      ],
+    },
+  },
+  {
+    id: 'teaming-plan',
+    category: 'compete',
+    title: 'How to team with a specific firm',
+    result: 'Why they would want you, the role you should ask for, and how to open the conversation.',
+    docTitle: 'Teaming plan · Ridgeline Defense',
+    preview: {
+      kind: 'dossier',
+      badge: 'Good fit',
+      fields: [
+        ['Their gap', 'No 8(a) on the recompete team'],
+        ['Your role', 'Sub for custodial + grounds'],
+        ['Ask for', '30% of the work, named in the bid'],
+        ['Who to contact', 'Capture manager, Air Force'],
+        ['Open with', 'Your Robins AFB past work'],
+      ],
+      note: 'They won the last two task orders with large-business subs only.',
+    },
+  },
+  {
+    id: 'elevator-pitch',
+    category: 'buyer',
+    title: 'Your elevator pitch for a customer',
+    result: 'What to say to a contracting officer or program manager in 30 seconds, built from their priorities.',
+    docTitle: 'Elevator pitch · VA facilities',
+    preview: {
+      kind: 'doc',
+      heading: '30 seconds with the facilities chief',
+      paragraphs: [
+        'We keep VA clinics inspection-ready. Our crews already cover three VA sites in Florida with zero missed walkthroughs this year.',
+        "With your maintenance backlog on the GAO list, I'd like to show how we cut work-order time by a third at Orlando. Can I send you a one-page summary?",
+      ],
+    },
+  },
 ];
 
 /**
@@ -398,4 +485,9 @@ export const GALLERY_STARTERS = [
   'Should my company bid on this solicitation? Give me',
   'Find HUBZone small businesses in Georgia that have already',
   'Who at the Army Corps LA District actually buys',
+  'Build me an action plan for the NAVFAC industry day:',
+  'Where should a small janitorial company in Florida start',
+  "Who's winning federal work within 50 miles of",
+  'How do I team with Ridgeline Defense on the',
+  'Write me a 30-second elevator pitch for the VA',
 ];
