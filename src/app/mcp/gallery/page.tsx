@@ -6,7 +6,6 @@
  * /api/mcp/gallery/prompts). Credits are not shown.
  */
 import type { Metadata } from 'next';
-import PublicShell from '@/components/public-site/PublicShell';
 import { GALLERY_ITEMS } from '@/lib/mcp/gallery';
 import Gallery from './Gallery';
 
@@ -18,9 +17,5 @@ export const metadata: Metadata = {
 };
 
 export default function McpGalleryPage() {
-  return (
-    <PublicShell>
-      <Gallery items={GALLERY_ITEMS} />
-    </PublicShell>
-  );
+  return <Gallery items={GALLERY_ITEMS} />;
 }
