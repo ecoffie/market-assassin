@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     const sam = one(body.sam, Q.sam);
     const bids = one(body.bids, Q.bids);
     const challenge = one(body.challenge, Q.challenge);
-    const support = one(body.support, Q.support.map((o) => o.value));
+    const stage = Q.stage.find((o) => o.value === str(body.stage, 20)) || null;
     const call = one(body.call, Q.call);
     const certs = (Array.isArray(body.certifications) ? body.certifications : [])
       .map((c) => str(c, 40))
@@ -66,7 +66,6 @@ export async function POST(req: NextRequest) {
 
     const result = await applyCreditOnce(`lcb-2026-claim:${email}`, email, EVENT.claimCredits, 'event_bonus');
     if (result.applied) {
-      const supportLabel = Q.support.find((o) => o.value === support)?.label || '';
       const note = [
         `Claimed ${EVENT.claimCredits} live-event credits (${EVENT.title})`,
         `Name: ${fullName}`,
@@ -78,13 +77,14 @@ export async function POST(req: NextRequest) {
         certs.length ? `Certifications: ${certs.join(', ')}` : '',
         `Federal bids submitted: ${bids}`,
         challenge ? `Biggest challenge: ${challenge}` : '',
-        supportLabel ? `Support wanted: ${supportLabel}` : '',
+        stage ? `Sounds most like: "${stage.label}"` : '',
+        stage ? `Likely monthly budget: ${stage.budget}` : '',
         call ? `Wants a call: ${call}` : '',
       ].filter(Boolean).join('\n');
       const fields = [
         { id: LCB_GHL_FIELDS.industry, field_value: sells },
         ...(revenue ? [{ id: LCB_GHL_FIELDS.revenue, field_value: revenue }] : []),
-        ...(support ? [{ id: LCB_GHL_FIELDS.support, field_value: support }] : []),
+        ...(stage ? [{ id: LCB_GHL_FIELDS.support, field_value: stage.support }] : []),
       ];
       await updateContactFields(contact.id, fields).catch((err) =>
         console.error('[lazy-blueprint-claim] fields failed', err instanceof Error ? err.message : err),

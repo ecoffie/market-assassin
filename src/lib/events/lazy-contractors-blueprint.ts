@@ -87,10 +87,16 @@ export const LCB_CLAIM_QUESTIONS = {
     'Knowing who to talk to at the agency',
     'Finding teaming partners',
   ],
-  support: [
-    { value: 'Self Paced: Do it yourself ($0 - $1k)', label: 'Do it myself with the right tools' },
-    { value: 'Technical Support: Done with you ($2k - $5k)', label: 'Done with me: guidance as I go' },
-    { value: 'Business Development: Done for you ($8k+', label: 'Done for me: a team that wins contracts for me' },
+  /**
+   * "Which of these sounds most like you?" Reads as a self-description; each answer carries a
+   * monthly budget band (shown in the GHL note) and maps to the existing GHL support field.
+   */
+  stage: [
+    { value: 'testing', label: "I'm testing the waters and want to keep costs close to zero", budget: '$0 (free tools only)', support: 'Self Paced: Do it yourself ($0 - $1k)' },
+    { value: 'tool', label: "I'd pay for a good tool that saves me hours each week", budget: 'Under $150/month', support: 'Self Paced: Do it yourself ($0 - $1k)' },
+    { value: 'coaching', label: "I'd invest in training or coaching so I get it right the first time", budget: '$150–$500/month', support: 'Technical Support: Done with you ($2k - $5k)' },
+    { value: 'handson', label: "I'd invest in hands-on help to win my first contract faster", budget: '$500–$2,000/month', support: 'Technical Support: Done with you ($2k - $5k)' },
+    { value: 'team', label: "I want a team doing this for me, and I'll budget for it", budget: '$2,000+/month', support: 'Business Development: Done for you ($8k+' },
   ],
   call: ['Yes', 'No'],
 } as const;

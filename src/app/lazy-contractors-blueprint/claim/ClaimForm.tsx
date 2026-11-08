@@ -50,7 +50,7 @@ export default function ClaimForm({ initialState, credits }: { initialState: Sta
           name: fd.get('name'), company: fd.get('company'), sells: fd.get('sells'),
           years: fd.get('years'), revenue: fd.get('revenue'), sam: fd.get('sam'),
           certifications: fd.getAll('certifications'), bids: fd.get('bids'),
-          challenge: fd.get('challenge'), support: fd.get('support'), call: fd.get('call'),
+          challenge: fd.get('challenge'), stage: fd.get('stage'), call: fd.get('call'),
           website: fd.get('website'),
         }),
       });
@@ -141,12 +141,14 @@ export default function ClaimForm({ initialState, credits }: { initialState: Sta
         </div>
       </fieldset>
       {choose('challenge', 'What is your biggest challenge with government contracts?', Q.challenge)}
-      <Field label="What kind of help do you want?" htmlFor="claim-support">
-        <Select id="claim-support" name="support" defaultValue="">
-          <option value="" disabled>Choose one</option>
-          {Q.support.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </Select>
-      </Field>
+      <fieldset style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: 8 }}>
+        <legend className="mp-field-label" style={{ marginBottom: 8 }}>Which of these sounds most like you right now?</legend>
+        {Q.stage.map((o) => (
+          <label key={o.value} className="mp-meta" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', lineHeight: 1.5 }}>
+            <input type="radio" name="stage" value={o.value} style={{ marginTop: 4 }} /> <span>{o.label}</span>
+          </label>
+        ))}
+      </fieldset>
       {choose('call', 'Would you like a free call with our team?', Q.call)}
       <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true"
         style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }} />
