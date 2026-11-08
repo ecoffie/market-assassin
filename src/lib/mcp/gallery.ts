@@ -38,12 +38,15 @@ export interface GalleryItem {
   result: string;
   /** Shown on the card face. */
   docTitle: string;
+  /** Shown large at the top of the page; the rest are listed below. */
+  featured?: boolean;
   preview: GalleryPreview;
 }
 
 export const GALLERY_ITEMS: GalleryItem[] = [
   {
     id: 'where-the-money-is',
+    featured: true,
     category: 'find',
     title: 'Where the money is for what you sell',
     result: 'Open bids, contracts coming back and planned buys for your work, in one answer.',
@@ -106,6 +109,7 @@ export const GALLERY_ITEMS: GalleryItem[] = [
   },
   {
     id: 'who-holds-it',
+    featured: true,
     category: 'compete',
     title: 'Who holds this contract now',
     result: 'The likely incumbent, what the contract is worth, when it ends and how it was awarded.',
@@ -224,6 +228,7 @@ export const GALLERY_ITEMS: GalleryItem[] = [
   },
   {
     id: 'bid-no-bid',
+    featured: true,
     category: 'win',
     title: 'Should you bid on this?',
     result: 'A bid or no-bid call with the reasons, before you spend a week on a proposal.',
@@ -272,6 +277,7 @@ export const GALLERY_ITEMS: GalleryItem[] = [
   },
   {
     id: 'market-report',
+    featured: true,
     category: 'win',
     title: 'A market report you can send a client',
     result: 'A branded report with a share link: market size, top buyers, top winners and what to do next.',

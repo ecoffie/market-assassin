@@ -14,7 +14,6 @@ When a route changes category (retired, migrated, made public), update this file
 | `/dsbs-scorer` | Signed-out tool experience, not a marketing surface. |
 | `/reports/[id]` | Customer deliverable (the market report a user sends a client). Different presentation purpose from site chrome. |
 | `/gov/market-research` | Signed-out tool demo that does not use the government shell. |
-| `/mcp/gallery` | "Mindy in your AI" results gallery (2026-11-08). A deliberately dark, Higgsfield-style wall of finished results inside PublicShell's header and footer; the dark body and lime accent are outside the light public design-system lint. Prompts are signed-in only (`/api/mcp/gallery/prompts`). |
 
 ## Transactional, signup and account flows
 Public, but part of product flows (checkout, signup, auth). Out by decision.
