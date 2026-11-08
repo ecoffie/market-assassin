@@ -100,7 +100,7 @@ describe('jobsSyncConfig', () => {
   it('uses defaults and caps overrides', () => {
     const d = jobsSyncConfig({} as NodeJS.ProcessEnv);
     expect(d.queries).toEqual([...DEFAULT_JSEARCH_QUERIES]);
-    expect(d.pagesPerQuery).toBe(2);
+    expect(d.pagesPerQuery).toBe(1);
     expect(d.usajobsSeries).toEqual(['1102']);
     const o = jobsSyncConfig({ JOBS_SYNC_QUERIES: 'a | b', JOBS_SYNC_PAGES: '99', JOBS_SYNC_USAJOBS_SERIES: '1102,1101' } as unknown as NodeJS.ProcessEnv);
     expect(o.queries).toEqual(['a', 'b']);

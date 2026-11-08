@@ -10,14 +10,25 @@
  */
 import { fetchJSearch, fetchUSAJobs, jsearchKey, usajobsKey, type JobPostingRow } from './sources';
 
-/** Default JSearch queries: postings that name federal-contract work. Override with JOBS_SYNC_QUERIES ("a|b|c"). */
+/**
+ * Default JSearch queries. The first eight are the govcongiants.com /jobs board's BD queries
+ * (govcon-funnels src/lib/jsearch.ts GOVCON_BD_QUERIES), so the same jobs land here; the rest
+ * catch hiring signals (cleared roles, "contingent upon contract award").
+ * Override with JOBS_SYNC_QUERIES ("a|b|c").
+ */
 export const DEFAULT_JSEARCH_QUERIES = [
-  'government contractor',
-  'federal contractor security clearance',
+  'capture manager government contractor',
+  'proposal manager federal contractor',
+  'business development manager government contracts',
+  'BD director federal',
+  'capture director defense contractor',
+  'proposal coordinator government',
+  'pricing analyst federal contracts',
+  'contracts manager government contractor',
   'contingent upon contract award',
+  'federal contractor security clearance',
   'defense contractor',
-  'DoD contractor',
-  'federal government contract support',
+  'government contractor',
 ] as const;
 
 /** Default USAJobs series: 1102 Contracting. Override with JOBS_SYNC_USAJOBS_SERIES ("1102,1101"). */
@@ -41,7 +52,7 @@ export function jobsSyncConfig(env: NodeJS.ProcessEnv = process.env): JobsSyncCo
   };
   return {
     queries: list(env.JOBS_SYNC_QUERIES, '|', DEFAULT_JSEARCH_QUERIES),
-    pagesPerQuery: int(env.JOBS_SYNC_PAGES, 2, 10),
+    pagesPerQuery: int(env.JOBS_SYNC_PAGES, 1, 10),
     usajobsSeries: list(env.JOBS_SYNC_USAJOBS_SERIES, ',', DEFAULT_USAJOBS_SERIES),
     usajobsDays: int(env.JOBS_SYNC_USAJOBS_DAYS, 3, 60),
   };

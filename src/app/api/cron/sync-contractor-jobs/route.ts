@@ -6,7 +6,7 @@
  * Deploy this route first, set JSEARCH_API_KEY + USAJOBS_API_KEY in Vercel, curl it 200 with
  * rows, THEN apply the schedule migration.
  *
- * JSearch is paid per request: default 6 queries × 2 pages per day. Tune with JOBS_SYNC_QUERIES /
+ * JSearch is paid per request: default 12 queries × 1 page per day. Tune with JOBS_SYNC_QUERIES /
  * JOBS_SYNC_PAGES (see src/lib/jobs/sync.ts).
  *
  * Outcomes: nothing written → 500 'error' (a key missing, both sources down, or the table write
