@@ -95,9 +95,16 @@ export default function JobsBoard({ data, filters, now = new Date() }: { data: J
           <Section>
             <Container>
               <StatRow>
-                <Stat value={fmtCount(t.active)} label={`Open postings (seen in the last ${ACTIVE_DAYS} days)`} />
+                <Stat
+                  value={fmtCount(t.active)}
+                  label={data.source === 'mindy' ? `Open postings (seen in the last ${ACTIVE_DAYS} days)` : 'Open postings right now'}
+                />
                 <Stat value={fmtCount(t.contractor)} label="At contractors" href={href(filters, { source: 'jsearch' })} />
-                <Stat value={fmtCount(t.federal)} label="At federal agencies" href={href(filters, { source: 'usajobs' })} />
+                <Stat
+                  value={t.federal == null ? 'Soon' : fmtCount(t.federal)}
+                  label="At federal agencies"
+                  href={t.federal == null ? undefined : href(filters, { source: 'usajobs' })}
+                />
                 <Stat value={fmtCount(t.contingent)} label="Waiting on a contract win" />
               </StatRow>
             </Container>
@@ -110,7 +117,9 @@ export default function JobsBoard({ data, filters, now = new Date() }: { data: J
                   <Meta style={{ minWidth: 70 }}>Employer</Meta>
                   <FilterLink on={!filters.source} to={href(filters, { source: undefined })}>All</FilterLink>
                   <FilterLink on={filters.source === 'jsearch'} to={href(filters, { source: 'jsearch' })}>Contractors</FilterLink>
-                  <FilterLink on={filters.source === 'usajobs'} to={href(filters, { source: 'usajobs' })}>Federal agencies</FilterLink>
+                  {data.source === 'mindy' && (
+                    <FilterLink on={filters.source === 'usajobs'} to={href(filters, { source: 'usajobs' })}>Federal agencies</FilterLink>
+                  )}
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
                   <Meta style={{ minWidth: 70 }}>Role</Meta>
@@ -200,6 +209,7 @@ export default function JobsBoard({ data, filters, now = new Date() }: { data: J
                       ))}
                     </ol>
                   </Panel>
+                  {data.source === 'mindy' && (
                   <Panel>
                     <p className="mp-label">Agencies hiring contract specialists</p>
                     <p className="mp-meta" style={{ marginTop: 4 }}>An office adding buyers usually plans to buy more.</p>
@@ -216,10 +226,13 @@ export default function JobsBoard({ data, filters, now = new Date() }: { data: J
                       ))}
                     </ol>
                   </Panel>
+                  )}
                 </aside>
               </div>
               <p className="mp-meta" style={{ marginTop: 20 }}>
-                Sources: JSearch (LinkedIn, Indeed, Glassdoor, ZipRecruiter) and USAJobs.
+                {data.source === 'mindy'
+                  ? 'Sources: JSearch (LinkedIn, Indeed, Glassdoor, ZipRecruiter) and USAJobs.'
+                  : 'Source: the GovCon Giants job board (LinkedIn, Indeed, Glassdoor, ZipRecruiter). Federal agency jobs are coming soon.'}
                 {data.lastSyncedAt ? ` Last updated ${new Date(data.lastSyncedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.` : ''}
                 {' '}Clearance shows only when the post names one.
               </p>

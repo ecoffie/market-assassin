@@ -1,6 +1,7 @@
 /**
  * /jobs — GovCon jobs on getmindy.ai, read from the stored contractor_job_postings table
- * (filled daily by /api/cron/sync-contractor-jobs). No job API is called on page load.
+ * (filled daily by /api/cron/sync-contractor-jobs). While that table is empty, it shows the
+ * govcongiants.com job board's feed instead (src/lib/jobs/funnels-feed.ts).
  *
  * noindex for now: govcongiants.com/jobs already ranks for these searches, and a second copy
  * on another domain would compete with it. Flip once there's a decision on which site owns them.
@@ -10,6 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 import PublicShell from '@/components/public-site/PublicShell';
 import { JOB_ROLES } from '@/lib/jobs/categories';
 import { readJobBoard, type JobBoardData, type JobBoardFilters } from '@/lib/jobs/read';
+import { readJobBoardFromFunnels } from '@/lib/jobs/funnels-feed';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import JobsBoard from './JobsBoard';
 
@@ -24,6 +26,7 @@ export const metadata: Metadata = {
 
 const UNAVAILABLE: JobBoardData = {
   state: 'unavailable',
+  source: 'mindy',
   error: 'Supabase not configured',
   totals: { active: null, contractor: null, federal: null, cleared: null, contingent: null },
   listings: [],
@@ -52,10 +55,13 @@ export default async function JobsPage({ searchParams }: { searchParams: SP }) {
   const filters = parseFilters(await searchParams);
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const data =
+  const stored =
     url && key
       ? await readJobBoard(createClient(url, key, { auth: { persistSession: false } }), filters)
       : UNAVAILABLE;
+  // Until Mindy's own daily sync has postings (API keys not set yet), show the govcongiants.com
+  // job board's feed. A stored table with rows always wins.
+  const data = stored.state === 'ok' && (stored.totals.active ?? 0) > 0 ? stored : await readJobBoardFromFunnels(filters);
 
   return (
     <PublicShell contentElement="div">

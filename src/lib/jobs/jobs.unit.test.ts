@@ -176,3 +176,41 @@ describe('syncContractorJobs', () => {
     expect(r.errors.some((e) => e.includes('jsearch "q1": JSearch 429'))).toBe(true);
   });
 });
+
+describe('govcongiants.com interim feed', () => {
+  it('maps a board job and keeps hourly pay out of salary', async () => {
+    const { mapFunnelsJob } = await import('./funnels-feed');
+    const r = mapFunnelsJob({
+      id: 'x1', title: 'Capture Manager', company: 'Leidos', locationCity: 'Reston', locationState: 'VA',
+      salary_min: 55, salary_max: 70, clearance: null, remote: false, posted_date: '2026-11-07T00:00:00.000Z',
+      apply_url: 'https://example.com', description: 'Active TS/SCI required. Contingent upon contract award.',
+    })!;
+    expect(r.id).toBe('jsearch:x1');
+    expect(r.state).toBe('VA');
+    expect(r.role).toBe('capture-manager');
+    expect(r.clearance).toBe('TS/SCI');
+    expect(r.contingent_on_award).toBe(true);
+    expect(r.salary_min).toBeNull();
+  });
+
+  it('de-duplicates across category calls and never reports federal as zero', async () => {
+    const { readJobBoardFromFunnels } = await import('./funnels-feed');
+    const job = (id: string, title: string) => ({ id, title, company: 'Acme', salary_min: null, salary_max: null, clearance: null, remote: true, posted_date: new Date().toISOString(), apply_url: 'u' });
+    const fetchImpl = (async (url: string) =>
+      new Response(JSON.stringify({ jobs: url.includes('category=') ? [job('a', 'Proposal Manager')] : [job('a', 'Proposal Manager'), job('b', 'BD Manager')] }), { status: 200 })) as unknown as typeof fetch;
+    const d = await readJobBoardFromFunnels({}, { fetchImpl });
+    expect(d.state).toBe('ok');
+    expect(d.source).toBe('govcongiants');
+    expect(d.totals.active).toBe(2);
+    expect(d.totals.federal).toBeNull();
+    expect(d.topEmployers[0]).toEqual({ name: 'Acme', count: 2 });
+  });
+
+  it('reports unavailable, not zero jobs, when the feed is empty or down', async () => {
+    const { readJobBoardFromFunnels } = await import('./funnels-feed');
+    const fetchImpl = (async () => new Response('err', { status: 500 })) as unknown as typeof fetch;
+    const d = await readJobBoardFromFunnels({}, { fetchImpl });
+    expect(d.state).toBe('unavailable');
+    expect(d.totals.active).toBeNull();
+  });
+});

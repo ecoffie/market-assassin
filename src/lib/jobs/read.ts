@@ -34,6 +34,8 @@ export interface JobBoardFilters {
 
 export interface JobBoardData {
   state: 'ok' | 'unavailable';
+  /** Where the listings came from: Mindy's stored postings, or the interim govcongiants.com feed. */
+  source: 'mindy' | 'govcongiants';
   error?: string;
   /** Postings seen by a sync in the last `activeDays` days. */
   totals: { active: number | null; contractor: number | null; federal: number | null; cleared: number | null; contingent: number | null };
@@ -58,6 +60,7 @@ export async function readJobBoard(sb: Sb, filters: JobBoardFilters = {}, opts: 
   const since = new Date((opts.now ?? new Date()).getTime() - ACTIVE_DAYS * 86_400_000).toISOString();
   const empty: JobBoardData = {
     state: 'unavailable',
+    source: 'mindy',
     totals: { active: null, contractor: null, federal: null, cleared: null, contingent: null },
     listings: [],
     topEmployers: [],
@@ -118,6 +121,7 @@ export async function readJobBoard(sb: Sb, filters: JobBoardFilters = {}, opts: 
 
     return {
       state: 'ok',
+      source: 'mindy',
       totals: { active: all, contractor, federal, cleared, contingent },
       listings,
       topEmployers: ranked.filter((t) => t.source === 'jsearch').slice(0, 10).map(({ name, count }) => ({ name, count })),
