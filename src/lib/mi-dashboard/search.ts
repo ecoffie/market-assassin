@@ -31,32 +31,111 @@ export function buildSearchOr(search: string): string {
     return cols.map((c) => `${c}.imatch.${pattern}`).join(',');
   }
 
-  // MULTI-WORD query → tokenize + OR each word (the industry standard: Google / Postgres
-  // FTS / Elasticsearch all default to OR-across-terms, then RANK — never a single literal
-  // substring). A user typing "cyber cloud compliance network server" (Andre @ CypherIntel,
-  // 2026-08-02) wants opps touching ANY of those; the old code matched the WHOLE phrase as
-  // one substring → 0 results (no notice has that literal string). Now: split on whitespace/
-  // commas, drop stop-words + tiny tokens, and for EACH word OR its clauses (+ that word's
-  // term-of-art aliases). Relevance ranking — sorting the multi-term matches to the top so a
-  // valve notice mentioning "server" once sinks — is applied AFTER the fetch by
-  // rankSearchResults() (PostgREST .or() can't rank; the code layer does).
-  const esc = (s: string) => s.replace(/[%,()]/g, ' ').trim();
-  const words = queryWords(term);
-  // Each word expands to itself + its term-of-art aliases; all metachar-stripped so an alias
-  // can't inject a stray .or() clause.
-  const expanded: string[] = [];
-  const seen = new Set<string>();
-  for (const w of words) {
-    for (const t of [w, ...(termOfArtSynonyms(w) || [])]) {
-      const e = esc(t);
-      if (e && !seen.has(e.toLowerCase())) { seen.add(e.toLowerCase()); expanded.push(e); }
+  // FREE TEXT. The query is split into SEGMENTS (commas, semicolons, a standalone OR, or a
+  // "quoted phrase" each start one), and the segments are ORed. Inside a segment:
+  //   "quoted"     → that exact phrase.
+  //   1 word       → that word (+ its term-of-art aliases).
+  //   2–3 words    → a CONCEPT, not a list: "active directory", "risk management framework",
+  //                  "fiber optic installation". The words must appear in order, at most one word
+  //                  apart, anywhere ("fiber optic cable installation", "Nashville, Tennessee"),
+  //                  OR all of them must appear in the title. Any-word OR made "active directory"
+  //                  match 766 open notices including a building generator job; requiring the words
+  //                  anywhere in the text (AND) still returned 20, every one unrelated, because a long
+  //                  SOW contains both words in different sentences. Measured 2026-11-07.
+  //   4+ words     → ANY word (OR), then rankSearchResults() orders by relevance. Long entries
+  //                  are word lists: Andre @ CypherIntel's "cyber cloud compliance network
+  //                  server" (2026-08-02) and saved searches like "janitorial custodial grounds
+  //                  turf waste removal". AND across five words returns nothing.
+  // An ACRONYM matches as a whole word, optionally plural: a word of 2–3 letters, or 2–5 letters
+  // typed in capitals (STIG, PQC, DAI, and aliases like UAS). As a substring it hits other words:
+  // "stig" is inside "investigation", "dai" inside "daily". Lowercase 4–5 letter words ("roof",
+  // "mold") stay substrings so "roof" still finds "roofing".
+  const caps = new Set((term.match(/\b[A-Z]{2,5}\b/g) || []).map((w) => w.toLowerCase()));
+  const segments = querySegments(term);
+  const parts: string[] = [];
+  for (const seg of segments) {
+    if (seg.phrase) {
+      const p = esc(seg.text);
+      if (p) parts.push(...cols.map((c) => `${c}.ilike.%${p}%`));
+      continue;
+    }
+    const words = queryWords(seg.text);
+    if (words.length === 0) {
+      const raw = esc(seg.text);
+      if (raw) parts.push(...cols.map((c) => `${c}.ilike.%${raw}%`));
+    } else if (words.length === 1) {
+      parts.push(...wordClauses(words[0], cols, caps));
+    } else if (words.length <= ALL_WORDS_MAX) {
+      parts.push(...conceptClauses(words, cols, caps));
+    } else {
+      for (const w of words) parts.push(...wordClauses(w, cols, caps));
     }
   }
-  // Fall back to the raw (esc'd) term if tokenizing left nothing (e.g. an all-stopword query).
-  const finalTerms = expanded.length ? expanded : [esc(term)].filter(Boolean);
-  const clauses: string[] = [];
-  for (const t of finalTerms) for (const c of cols) clauses.push(`${c}.ilike.%${t}%`);
-  return clauses.join(',');
+  return [...new Set(parts)].join(',');
+}
+
+/** A segment of 2..ALL_WORDS_MAX meaningful words must match ALL of them; longer segments match ANY. */
+export const ALL_WORDS_MAX = 3;
+
+// Metacharacters stripped from a value so it cannot inject a stray .or() clause.
+const esc = (s: string) => s.replace(/[%,()"]/g, ' ').replace(/\s+/g, ' ').trim();
+
+/** OR clauses across the columns for one word plus its term-of-art aliases. */
+function wordClauses(word: string, cols: string[], caps: Set<string>): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const t of [word, ...(termOfArtSynonyms(word) || [])]) {
+    const e = esc(t);
+    const key = e.toLowerCase();
+    if (!e || seen.has(key)) continue;
+    seen.add(key);
+    if (isAcronym(e, caps)) {
+      for (const c of cols) out.push(`${c}.imatch.\\m${e}s?\\M`);
+    } else {
+      for (const c of cols) out.push(`${c}.ilike.%${e}%`);
+    }
+  }
+  return out;
+}
+
+/** A whole-word token: 2–3 letters, or 2–5 letters typed in capitals (in the query or an alias). */
+function isAcronym(t: string, caps: Set<string>): boolean {
+  if (/^[a-z]{2,3}$/i.test(t)) return true;
+  return /^[a-z]{2,5}$/i.test(t) && (caps.has(t.toLowerCase()) || t === t.toUpperCase());
+}
+const reEscape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * A 2..ALL_WORDS_MAX word concept: the words in order with at most one word between them, in any
+ * column (a PostgREST-safe regex: no commas or parentheses), OR every word in the title.
+ */
+function conceptClauses(words: string[], cols: string[], caps: Set<string>): string[] {
+  const toks = words.map(esc).filter(Boolean);
+  const gap = '\\W+\\w*\\W*';
+  const pattern = '\\m' + toks.map((t, i) => {
+    const r = reEscape(t);
+    if (isAcronym(t, caps)) return `${r}s?`;
+    return i < toks.length - 1 ? `${r}\\w*` : r;
+  }).join(gap) + (isAcronym(toks[toks.length - 1], caps) ? '\\M' : '');
+  const near = cols.map((c) => `${c}.imatch.${pattern}`);
+  const inTitle = `and(${toks.map((t) => (isAcronym(t, caps) ? `title.imatch.\\m${t}s?\\M` : `title.ilike.%${t}%`)).join(',')})`;
+  return [...near, inTitle];
+}
+
+/**
+ * Split a free-text query into OR'd segments: each "quoted phrase" is one exact-phrase segment;
+ * the rest splits on commas, semicolons and a standalone OR. Exported for tests.
+ */
+export function querySegments(search: string): Array<{ text: string; phrase: boolean }> {
+  const out: Array<{ text: string; phrase: boolean }> = [];
+  const rest = (search || '').replace(/"([^"]+)"/g, (_m, p: string) => {
+    if (p.trim()) out.push({ text: p.trim(), phrase: true });
+    return ',';
+  });
+  for (const s of rest.split(/[,;]|\s+OR\s+/)) {
+    if (s.trim()) out.push({ text: s.trim(), phrase: false });
+  }
+  return out;
 }
 
 // Common English stop-words + GovCon filler that add noise, not signal, to a search.
@@ -65,6 +144,8 @@ const STOP_WORDS = new Set([
   'the', 'and', 'or', 'a', 'an', 'of', 'for', 'to', 'in', 'on', 'with', 'is', 'are',
   'that', 'this', 'have', 'has', 'requirements', 'requirement', 'services', 'service',
   'support', 'related', 'other', 'all', 'any', 'available', 'opportunities', 'opportunity',
+  // Chat-style filler stored in real saved searches ("Show me SBA opportunities").
+  'show', 'me',
 ]);
 
 /**
