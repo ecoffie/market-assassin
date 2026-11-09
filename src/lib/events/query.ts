@@ -277,7 +277,10 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
 /** How recently an undated attendable event's notice must have been re-read to still be listed. */
 export const UNDATED_EVENT_DAYS = 30;
 
-export const ATTENDABLE_TYPES = ['industry_day', 'forecast', 'webinar', 'conference'];
+// `forecast` is NOT attendable: measured 2026-11-09, 19 of 20 upcoming forecast rows were
+// procurement forecasts, projection/RPOW lists or weather notices ("NWS Forecast Office"),
+// not something to attend. They stay in sam_events and list as notices.
+export const ATTENDABLE_TYPES = ['industry_day', 'webinar', 'conference'];
 
 /** Department-level agency strings whose event set is too broad to imply relevance. */
 const DEPT_LEVEL = /\b(DEPT OF DEFENSE|DEFENSE, DEPARTMENT OF|DEPARTMENT OF DEFENSE)\b/i;
