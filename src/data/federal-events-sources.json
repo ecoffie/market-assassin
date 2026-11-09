@@ -1,39 +1,57 @@
 {
-  "lastUpdated": "2026-11-07",
-  "lastFullReview": "2026-04-05",
+  "lastUpdated": "2026-11-09",
+  "lastFullReview": "2026-11-09",
   "eventSources": {
     "apex_accelerators": {
       "name": "APEX Accelerators (formerly PTAC)",
-      "url": "https://www.apexaccelerators.us/events",
+      "url": "https://www.apexaccelerators.us/",
       "type": "official",
       "frequency": "daily",
       "categories": ["training", "counseling", "matchmaking"],
       "agencies": ["DOD", "Multi-Agency"],
       "notes": "Free procurement training, SAM registration help, capability statement reviews. Nationwide network of 90+ offices.",
       "cost": "Free",
-      "value": "high"
+      "value": "high",
+      "verification": {
+        "status": "link_ok",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.apexaccelerators.us/",
+        "note": "Old /events path returns 404; events are found from the home page."
+      }
     },
     "afcea_events": {
       "name": "AFCEA International Events",
-      "url": "https://www.afcea.org/site/Events",
+      "url": "https://www.afcea.org/events",
       "type": "industry_association",
       "frequency": "weekly",
       "categories": ["conference", "industry_day", "networking"],
       "agencies": ["DOD", "DHS", "Intelligence"],
       "notes": "Premier IT/cyber/comms events. TechNet Cyber, TechNet Augusta, West/AFCEA conferences. Must-attend for IT contractors.",
       "cost": "$200-$800",
-      "value": "very_high"
+      "value": "very_high",
+      "verification": {
+        "status": "verified_upcoming",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.afcea.org/events",
+        "note": "Lists upcoming dated events (e.g. RMCS27, Feb 8-11, 2027). Old /site/Events path returned 404."
+      }
     },
     "same_events": {
       "name": "SAME (Society of American Military Engineers)",
-      "url": "https://www.same.org/events",
+      "url": "https://www.same.org/event/",
       "type": "industry_association",
       "frequency": "weekly",
       "categories": ["conference", "industry_day", "networking", "small_business"],
       "agencies": ["USACE", "NAVFAC", "Air Force CE", "DOD"],
       "notes": "Essential for A/E, construction, environmental contractors. Federal Small Business Conference, regional events, JETC.",
       "cost": "$100-$600",
-      "value": "very_high"
+      "value": "very_high",
+      "verification": {
+        "status": "link_ok",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.same.org/event/",
+        "note": "Old /events path redirected to one post's page."
+      }
     },
     "carahsoft_events": {
       "name": "Carahsoft Technology Forums",
@@ -44,18 +62,29 @@
       "agencies": ["Multi-Agency"],
       "notes": "Free tech briefings, vendor showcases, government IT trends. Great for learning what agencies are buying.",
       "cost": "Free",
-      "value": "high"
+      "value": "high",
+      "verification": {
+        "status": "link_ok",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.carahsoft.com/events"
+      }
     },
     "gsa_interact": {
       "name": "GSA Interact Events",
-      "url": "https://interact.gsa.gov/events",
+      "url": "https://buy.gsa.gov/interact/",
       "type": "official",
       "frequency": "daily",
       "categories": ["industry_day", "conference", "training"],
       "agencies": ["GSA"],
       "notes": "Primary source for GSA Schedule holder events, buyer days, reverse industry days.",
       "cost": "Free-$300",
-      "value": "high"
+      "value": "high",
+      "verification": {
+        "status": "unverifiable",
+        "checked_at": "2026-11-09",
+        "source_url": "https://buy.gsa.gov/interact/",
+        "note": "interact.gsa.gov/events now redirects to a \"legacy\" page; the new site renders client-side so its listing could not be read."
+      }
     },
     "sba_events": {
       "name": "SBA Events Calendar",
@@ -66,7 +95,13 @@
       "agencies": ["SBA"],
       "notes": "8(a), HUBZone, WOSB certification workshops, matchmaking, National Small Business Week.",
       "cost": "Free",
-      "value": "high"
+      "value": "high",
+      "verification": {
+        "status": "link_ok",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.sba.gov/events",
+        "note": "SBA redirects this to legacy.sba.gov/events, which still carries 2026 events."
+      }
     },
     "sam_gov_events": {
       "name": "SAM.gov Industry Days",
@@ -77,7 +112,13 @@
       "agencies": ["Multi-Agency"],
       "notes": "Pre-solicitation conferences, industry days announced via SAM. Search notice type 'Special Notice'.",
       "cost": "Usually Free",
-      "value": "very_high"
+      "value": "very_high",
+      "verification": {
+        "status": "link_ok",
+        "checked_at": "2026-11-09",
+        "source_url": "https://sam.gov",
+        "note": "Dated SAM notices come from search_federal_events, not this link."
+      }
     },
     "govevents": {
       "name": "GovEvents Calendar",
@@ -88,7 +129,13 @@
       "agencies": ["Multi-Agency"],
       "notes": "Comprehensive aggregator of government events. Searchable by agency, topic, location.",
       "cost": "Free to browse",
-      "value": "high"
+      "value": "high",
+      "verification": {
+        "status": "link_ok",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.govevents.com",
+        "note": "Third-party aggregator; never proof of a date."
+      }
     },
     "ndia_events": {
       "name": "NDIA (National Defense Industrial Association)",
@@ -99,7 +146,13 @@
       "agencies": ["DOD", "Army", "Navy", "Air Force"],
       "notes": "Defense industry conferences, chapter events. Ground Vehicle Systems, Armament Systems, Expeditionary Warfare.",
       "cost": "$300-$1000",
-      "value": "high"
+      "value": "high",
+      "verification": {
+        "status": "link_ok",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.ndia.org/events",
+        "note": "Page renders client-side; listing not read."
+      }
     },
     "ncma_events": {
       "name": "NCMA (National Contract Management Association)",
@@ -110,7 +163,13 @@
       "agencies": ["Multi-Agency"],
       "notes": "Contract management training, World Congress, regional events. Great for meeting contracting officers.",
       "cost": "$100-$800",
-      "value": "high"
+      "value": "high",
+      "verification": {
+        "status": "verified_upcoming",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.ncmahq.org/events",
+        "note": "Lists Nov 12, 2026; Feb 21-23, 2027; Jul 25-28, 2027."
+      }
     },
     "act_iac": {
       "name": "ACT-IAC Events",
@@ -121,7 +180,13 @@
       "agencies": ["Multi-Agency"],
       "notes": "American Council for Technology - Industry Advisory Council. IT modernization, shared services, acquisition innovation.",
       "cost": "$100-$500",
-      "value": "high"
+      "value": "high",
+      "verification": {
+        "status": "unverifiable",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.actiac.org/events",
+        "note": "Official site refuses automated reads (HTTP 403); not checked by hand."
+      }
     },
     "psc_events": {
       "name": "PSC (Professional Services Council)",
@@ -132,7 +197,13 @@
       "agencies": ["Multi-Agency"],
       "notes": "Professional services industry events. Vision Federal Market Forecast, acquisition policy discussions.",
       "cost": "$200-$600",
-      "value": "high"
+      "value": "high",
+      "verification": {
+        "status": "verified_upcoming",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.pscouncil.org/events",
+        "note": "Lists Vision Conference Dec 8-9, 2026."
+      }
     },
     "dla_events": {
       "name": "DLA Industry Engagement",
@@ -143,18 +214,30 @@
       "agencies": ["DLA", "DOD"],
       "notes": "Defense Logistics Agency events, commodity-specific industry days.",
       "cost": "Free",
-      "value": "medium"
+      "value": "medium",
+      "verification": {
+        "status": "unverifiable",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.dla.mil/SmallBusiness/",
+        "note": "Official site refuses automated reads (HTTP 403); not checked by hand."
+      }
     },
     "gsa_osdbu": {
       "name": "GSA OSDBU Events",
-      "url": "https://www.gsa.gov/about-us/organization/office-of-small-disadvantaged-business-utilization",
+      "url": "https://www.gsa.gov/small-business",
       "type": "official",
       "frequency": "weekly",
       "categories": ["matchmaking", "training", "certification"],
       "agencies": ["GSA"],
       "notes": "Small business programs, mentor-protege, Forecast of Opportunities briefings.",
       "cost": "Free",
-      "value": "high"
+      "value": "high",
+      "verification": {
+        "status": "link_ok",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.gsa.gov/small-business",
+        "note": "Old OSDBU URL returns 404. Dated GSA small-business events: https://www.gsa.gov/about-gsa/gsa-events"
+      }
     },
     "va_osdbu": {
       "name": "VA OSDBU Events",
@@ -165,29 +248,46 @@
       "agencies": ["VA"],
       "notes": "SDVOSB verification, VA-specific programs, National Veterans Small Business Engagement.",
       "cost": "Free",
-      "value": "high"
+      "value": "high",
+      "verification": {
+        "status": "link_ok",
+        "checked_at": "2026-11-09",
+        "source_url": "https://vetbiz.va.gov/events/"
+      }
     },
     "dod_osbp": {
       "name": "DOD OSBP Events",
-      "url": "https://business.defense.gov/Events/",
+      "url": "https://business.defense.gov/Engage/Events-Calendar/index.html",
       "type": "official",
       "frequency": "monthly",
       "categories": ["industry_day", "training", "matchmaking"],
       "agencies": ["DOD"],
       "notes": "DoD-wide small business programs, Mentor-Protege events, Defense Manufacturing Conference.",
       "cost": "Free-$200",
-      "value": "high"
+      "value": "high",
+      "verification": {
+        "status": "unverifiable",
+        "checked_at": "2026-11-09",
+        "source_url": "https://business.defense.gov/Engage/Events-Calendar/index.html",
+        "note": "Old /Events/ path returned 404 to a plain client; DoD OSBP's calendar is now /Engage/Events-Calendar/ (per its own indexed pages). Site refuses automated reads (HTTP 403)."
+      }
     },
     "navy_osbp": {
       "name": "Navy OSBP Events",
-      "url": "https://www.secnav.navy.mil/smallbusiness/",
+      "url": "https://www.secnav.navy.mil/osbp/",
       "type": "official",
       "frequency": "monthly",
       "categories": ["industry_day", "matchmaking"],
       "agencies": ["Navy", "DOD"],
       "notes": "Navy-specific industry days, SeaPort events, Navy Gold Coast.",
       "cost": "Free-$300",
-      "value": "high"
+      "value": "high",
+      "verification": {
+        "status": "link_ok",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.secnav.navy.mil/osbp/",
+        "note": "Old /smallbusiness/ URL redirected to the SECNAV home page."
+      }
     },
     "army_osbp": {
       "name": "Army OSBP Events",
@@ -198,7 +298,13 @@
       "agencies": ["Army", "DOD"],
       "notes": "Army OSBP events, market research days, Army Small Business Forum.",
       "cost": "Free",
-      "value": "high"
+      "value": "high",
+      "verification": {
+        "status": "unverifiable",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.army.mil/osbp",
+        "note": "Official site refuses automated reads (HTTP 403); not checked by hand."
+      }
     },
     "air_force_osbp": {
       "name": "Air Force OSBP Events",
@@ -209,18 +315,30 @@
       "agencies": ["Air Force", "DOD"],
       "notes": "USAF small business events, AFWERX challenges, SpaceWERX.",
       "cost": "Free",
-      "value": "high"
+      "value": "high",
+      "verification": {
+        "status": "unverifiable",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.airforcesmallbiz.af.mil/",
+        "note": "Official site refuses automated reads (HTTP 403); not checked by hand."
+      }
     },
     "afwerx": {
       "name": "AFWERX Innovation Events",
-      "url": "https://www.afwerx.com/events",
+      "url": "https://afwerx.com/afwerx-events/",
       "type": "official",
       "frequency": "weekly",
       "categories": ["innovation", "sbir_sttr", "pitch_day"],
       "agencies": ["Air Force", "Space Force"],
       "notes": "SBIR/STTR open topics, Spark Tank, innovation challenges. Fast-track contracts.",
       "cost": "Free",
-      "value": "very_high"
+      "value": "very_high",
+      "verification": {
+        "status": "link_ok",
+        "checked_at": "2026-11-09",
+        "source_url": "https://afwerx.com/afwerx-events/",
+        "note": "Old /events path returns 404."
+      }
     },
     "hhs_osdbu": {
       "name": "HHS OSDBU Events",
@@ -231,7 +349,13 @@
       "agencies": ["HHS"],
       "notes": "NIH, CDC, FDA procurement events. HHS Small Business Expo.",
       "cost": "Free",
-      "value": "high"
+      "value": "high",
+      "verification": {
+        "status": "unverifiable",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.hhs.gov/about/agencies/asfr/ogapa/osdbu/",
+        "note": "Official site refuses automated reads (HTTP 403); not checked by hand."
+      }
     },
     "nasa_osbp": {
       "name": "NASA OSBP Events",
@@ -242,29 +366,46 @@
       "agencies": ["NASA"],
       "notes": "SBIR outreach, NASA industry days, Small Business Industry Day.",
       "cost": "Free",
-      "value": "high"
+      "value": "high",
+      "verification": {
+        "status": "link_ok",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.nasa.gov/osbp"
+      }
     },
     "dhs_osdbu": {
       "name": "DHS OSDBU Events",
-      "url": "https://www.dhs.gov/small-business",
+      "url": "https://www.dhs.gov/osdbu",
       "type": "official",
       "frequency": "monthly",
       "categories": ["industry_day", "training"],
       "agencies": ["DHS"],
       "notes": "CBP, FEMA, Coast Guard events, DHS Industry Day.",
       "cost": "Free",
-      "value": "high"
+      "value": "high",
+      "verification": {
+        "status": "paused",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.dhs.gov/archive/small-business-vendor-outreach-sessions",
+        "note": "DHS: \"Effective October 1, 2025, Vendor Outreach Sessions (VOS) outreach activities are paused.\" Old /small-business URL returns 404."
+      }
     },
     "doe_osdbu": {
       "name": "DOE OSDBU Events",
-      "url": "https://www.energy.gov/osdbu",
+      "url": "https://www.energy.gov/osbp/events",
       "type": "official",
       "frequency": "monthly",
       "categories": ["industry_day", "sbir_sttr"],
       "agencies": ["DOE"],
       "notes": "National Labs events, clean energy initiatives, DOE Small Business Forum.",
       "cost": "Free",
-      "value": "high"
+      "value": "high",
+      "verification": {
+        "status": "verified_upcoming",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.energy.gov/osbp/events",
+        "note": "Lists INL Industry Days Nov 11-12, 2026."
+      }
     },
     "immixgroup": {
       "name": "immixGroup Events",
@@ -275,7 +416,13 @@
       "agencies": ["Multi-Agency"],
       "notes": "IT reseller events, vendor showcases, government market education.",
       "cost": "Free",
-      "value": "medium"
+      "value": "medium",
+      "verification": {
+        "status": "unverifiable",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.immixgroup.com/events",
+        "note": "Official site refuses automated reads (HTTP 403); not checked by hand."
+      }
     },
     "meritalk": {
       "name": "MeriTalk Events",
@@ -286,7 +433,12 @@
       "agencies": ["Multi-Agency"],
       "notes": "Government IT media events, cyber summits, cloud computing conferences.",
       "cost": "Free-$200",
-      "value": "medium"
+      "value": "medium",
+      "verification": {
+        "status": "link_ok",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.meritalk.com/events"
+      }
     },
     "govconwire": {
       "name": "GovConWire Events",
@@ -297,7 +449,13 @@
       "agencies": ["Multi-Agency"],
       "notes": "GovCon industry news events, executive spotlights, M&A discussions.",
       "cost": "$100-$400",
-      "value": "medium"
+      "value": "medium",
+      "verification": {
+        "status": "unverifiable",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.govconwire.com/events",
+        "note": "Official site refuses automated reads (HTTP 403); not checked by hand."
+      }
     },
     "wipp": {
       "name": "WIPP (Women Impacting Public Policy)",
@@ -308,7 +466,13 @@
       "agencies": ["Multi-Agency"],
       "notes": "Women-owned business advocacy, annual summit, policy updates.",
       "cost": "$100-$500",
-      "value": "medium"
+      "value": "medium",
+      "verification": {
+        "status": "unverifiable",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.wipp.org/events",
+        "note": "Official site refuses automated reads (HTTP 403); not checked by hand."
+      }
     },
     "wbenc": {
       "name": "WBENC Events",
@@ -319,7 +483,12 @@
       "agencies": ["Multi-Agency"],
       "notes": "Women's Business Enterprise certification, National Conference, matchmaking.",
       "cost": "$200-$800",
-      "value": "high"
+      "value": "high",
+      "verification": {
+        "status": "link_ok",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.wbenc.org/events"
+      }
     },
     "nmsdc": {
       "name": "NMSDC Events",
@@ -330,7 +499,13 @@
       "agencies": ["Multi-Agency"],
       "notes": "Minority Business Enterprise certification, annual conference, corporate matchmaking.",
       "cost": "$200-$1000",
-      "value": "high"
+      "value": "high",
+      "verification": {
+        "status": "no_next_announced",
+        "checked_at": "2026-11-09",
+        "source_url": "https://nmsdc.org/events",
+        "note": "No upcoming events listed."
+      }
     }
   },
   "eventCategories": {
@@ -423,6 +598,12 @@
         "registration_url": "https://portal.vetbiz.va.gov/nvsbe/2026/reg-fees/",
         "verified_at": "2026-11-07",
         "source_url": "https://www.va.gov/osdbu/nvsbe/"
+      },
+      "verification": {
+        "status": "verified_upcoming",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.va.gov/osdbu/nvsbe/",
+        "note": "Dec 8-9, 2026, Huntington Convention Center, Cleveland, OH. Pricing rises Nov 22 (VA lists Nov 22 in both the Regular and Late ranges)."
       }
     },
     {
@@ -432,7 +613,21 @@
       "audience": "IT/Cyber/Comms contractors",
       "registration_cost": "$400-$800",
       "value": "Very High - Premier cyber event, DOD/DHS/IC buyers",
-      "url": "https://events.afcea.org/TechNetCyber"
+      "url": "https://events.afcea.org/afceacyber27/",
+      "next_occurrence": {
+        "start": "2027-05-11",
+        "end": "2027-05-13",
+        "location": "Baltimore Convention Center, Baltimore, MD",
+        "registration_url": "https://events.afcea.org/afceacyber27/",
+        "verified_at": "2026-11-09",
+        "source_url": "https://events.afcea.org/afceacyber27/public/Content.aspx?ID=125260&sortMenu=101001"
+      },
+      "verification": {
+        "status": "verified_upcoming",
+        "checked_at": "2026-11-09",
+        "source_url": "https://events.afcea.org/afceacyber27/public/Content.aspx?ID=125260&sortMenu=101001",
+        "note": "Old events.afcea.org/TechNetCyber URL returns 404."
+      }
     },
     {
       "name": "AFCEA West",
@@ -441,7 +636,21 @@
       "audience": "Navy/Marine Corps IT contractors",
       "registration_cost": "$400-$800",
       "value": "Very High - Navy/USMC focus, SeaPort opportunities",
-      "url": "https://events.afcea.org/AFCEAWest"
+      "url": "https://www.westconference.org/WEST27/",
+      "next_occurrence": {
+        "start": "2027-02-16",
+        "end": "2027-02-18",
+        "location": "San Diego Convention Center, San Diego, CA",
+        "registration_url": "https://www.westconference.org/WEST27/",
+        "verified_at": "2026-11-09",
+        "source_url": "https://www.westconference.org/West27/Public/Content.aspx?ID=123773&sortMenu=101001"
+      },
+      "verification": {
+        "status": "verified_upcoming",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.westconference.org/West27/Public/Content.aspx?ID=123773&sortMenu=101001",
+        "note": "Old events.afcea.org/AFCEAWest URL returns 404."
+      }
     },
     {
       "name": "SAME Federal Small Business Conference for the A/E/C Industry",
@@ -450,7 +659,13 @@
       "audience": "A/E, Construction, Environmental",
       "registration_cost": "$200-$500",
       "value": "Very High - USACE, NAVFAC matchmaking",
-      "url": "https://www.same.org/sbc"
+      "url": "https://www.same.org/event/sbc/",
+      "verification": {
+        "status": "no_next_announced",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.samesbc.org/",
+        "note": "2026 edition (Nov 4-6, 2026) has passed; 2027 dates not yet posted. Re-check in January."
+      }
     },
     {
       "name": "SAME JETC (Joint Engineer Training Conference)",
@@ -459,7 +674,13 @@
       "audience": "Engineering contractors",
       "registration_cost": "$400-$800",
       "value": "High - Military engineering community",
-      "url": "https://www.same.org/jetc"
+      "url": "https://www.same.org/event/jetc/",
+      "verification": {
+        "status": "no_next_announced",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.samejetc.org/",
+        "note": "2027 page says only \"Registration Opens in January\". Re-check in January."
+      }
     },
     {
       "name": "GSA Expo",
@@ -468,7 +689,13 @@
       "audience": "GSA Schedule holders",
       "registration_cost": "$300-$600",
       "value": "Very High - GSA buyer access, Schedule updates",
-      "url": "https://www.gsa.gov/events"
+      "url": "https://www.gsa.gov/events",
+      "verification": {
+        "status": "not_found",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.gsa.gov/about-gsa/gsa-events",
+        "note": "Not listed on GSA's official events page; no current edition found. Kept for history, not deleted."
+      }
     },
     {
       "name": "NDIA Annual Conference",
@@ -477,16 +704,36 @@
       "audience": "Defense contractors",
       "registration_cost": "$500-$1000",
       "value": "High - Defense industry wide",
-      "url": "https://www.ndia.org/events"
+      "url": "https://www.ndia.org/events",
+      "verification": {
+        "status": "not_found",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.ndia.org/events",
+        "note": "No NDIA event by this name found. NDIA runs many named events (e.g. I/ITSEC). Kept for history, not deleted."
+      }
     },
     {
       "name": "PSC Vision Federal Market Forecast",
-      "typical_month": "October",
-      "location": "Washington DC",
+      "typical_month": "December",
+      "location": "Arlington, VA (Crystal City)",
       "audience": "Professional services contractors",
       "registration_cost": "$400-$800",
       "value": "High - Budget forecasts, agency priorities",
-      "url": "https://www.pscouncil.org/vision"
+      "url": "https://vision.pscouncil.org/",
+      "next_occurrence": {
+        "start": "2026-12-08",
+        "end": "2026-12-09",
+        "location": "Hyatt Regency Crystal City, Arlington, VA (also virtual)",
+        "registration_url": "https://www.pscouncil.org/Shared_Content/Events/Event_Display_with_Program_Items?EventKey=26VISION",
+        "verified_at": "2026-11-09",
+        "source_url": "https://www.pscouncil.org/Shared_Content/Events/Event_Display_with_Program_Items?EventKey=26VISION"
+      },
+      "verification": {
+        "status": "verified_upcoming",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.pscouncil.org/Shared_Content/Events/Event_Display_with_Program_Items?EventKey=26VISION",
+        "note": "Was listed as October / Washington DC. Old pscouncil.org/vision URL now hits a sign-in page."
+      }
     },
     {
       "name": "Navy Gold Coast",
@@ -495,25 +742,58 @@
       "audience": "Navy small business contractors",
       "registration_cost": "$200-$400",
       "value": "Very High - Direct Navy buyer access, matchmaking",
-      "url": "https://www.navygoldcoast.org"
+      "url": "https://www.navygoldcoast.org",
+      "verification": {
+        "status": "no_next_announced",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.navygoldcoast.org/",
+        "note": "Site still shows Aug 17-20, 2026 (passed); next dates not posted. Re-check in spring."
+      }
     },
     {
       "name": "ACT-IAC Imagine Nation ELC",
-      "typical_month": "October",
-      "location": "Hershey, PA",
+      "typical_month": "December",
+      "location": "Oxon Hill, MD",
       "audience": "IT modernization contractors",
       "registration_cost": "$400-$800",
       "value": "High - Cross-agency IT leaders",
-      "url": "https://www.actiac.org/events"
+      "url": "https://www.actiac.org/upcoming-major-events",
+      "next_occurrence": {
+        "start": "2026-12-10",
+        "end": "2026-12-11",
+        "location": "Gaylord National Resort & Convention Center, Oxon Hill, MD",
+        "registration_url": null,
+        "verified_at": "2026-11-09",
+        "source_url": "https://www.actiac.org/upcoming-major-events"
+      },
+      "verification": {
+        "status": "verified_upcoming",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.actiac.org/upcoming-major-events",
+        "note": "Was listed as October / Hershey, PA. ACT-IAC lists \"10 Dec, Imagine Nation ELC 2026, Oxon Hill, MD\"; its Fellows calendar gives Dec 10-11, 2026 at Gaylord National. Site refuses automated reads; read from indexed official pages."
+      }
     },
     {
       "name": "NCMA World Congress",
       "typical_month": "July",
-      "location": "Various",
+      "location": "Aurora, CO (2027)",
       "audience": "Contract management professionals",
       "registration_cost": "$600-$1200",
       "value": "High - Meet contracting officers",
-      "url": "https://www.ncmahq.org/events"
+      "url": "https://www.ncmahq.org/events",
+      "next_occurrence": {
+        "start": "2027-07-25",
+        "end": "2027-07-28",
+        "location": "Gaylord Rockies, Aurora, CO",
+        "registration_url": null,
+        "verified_at": "2026-11-09",
+        "source_url": "https://www.ncmahq.org/events"
+      },
+      "verification": {
+        "status": "verified_upcoming",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.ncmahq.org/events"
+      }
     },
     {
       "name": "DHS Industry Day",
@@ -522,60 +802,252 @@
       "audience": "Homeland security contractors",
       "registration_cost": "Free-$200",
       "value": "Very High - DHS component buyers",
-      "url": "https://www.dhs.gov/small-business"
+      "url": "https://www.dhs.gov/osdbu",
+      "verification": {
+        "status": "unverified",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.dhs.gov/osdbu",
+        "note": "No dated DHS industry day found. DHS paused Vendor Outreach Sessions effective Oct 1, 2025. Old /small-business URL returns 404. Kept, not deleted."
+      }
     },
     {
       "name": "WBENC National Conference",
       "typical_month": "June",
-      "location": "Various",
+      "location": "Gaylord Palms Resort, FL (2027)",
       "audience": "Women-owned businesses",
       "registration_cost": "$500-$1000",
       "value": "High - Corporate and government matchmaking",
-      "url": "https://www.wbenc.org/events"
+      "url": "https://www.wbenc.org/conference/",
+      "next_occurrence": {
+        "start": "2027-06-14",
+        "end": "2027-06-17",
+        "location": "Gaylord Palms Resort, FL",
+        "registration_url": null,
+        "verified_at": "2026-11-09",
+        "source_url": "https://www.wbenc.org/conference/"
+      },
+      "verification": {
+        "status": "verified_upcoming",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.wbenc.org/conference/"
+      }
+    },
+    {
+      "name": "U.S. DOT Veteran-Owned Small Business Summit",
+      "typical_month": "November",
+      "location": "Washington, DC",
+      "audience": "Veteran-owned small businesses; open to all small businesses",
+      "registration_cost": "Free",
+      "value": "DOT OSDBU summit with SBA and DoW: sessions plus one-on-one matchmaking with agency representatives. Registration closes Nov 12, 2026.",
+      "url": "https://www.transportation.gov/mission/administrations/office-small-and-disadvantaged-business-utilization/VOSB%20Summit",
+      "agencies": ["DOT", "Department of Transportation"],
+      "one_off": true,
+      "next_occurrence": {
+        "start": "2026-11-19",
+        "end": "2026-11-19",
+        "location": "U.S. DOT Headquarters, 1200 New Jersey Ave SE, Washington, DC",
+        "registration_url": "https://www.transportation.gov/mission/administrations/office-small-and-disadvantaged-business-utilization/VOSB%20Summit",
+        "verified_at": "2026-11-09",
+        "source_url": "https://www.transportation.gov/mission/administrations/office-small-and-disadvantaged-business-utilization/VOSB%20Summit"
+      },
+      "verification": {
+        "status": "verified_upcoming",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.transportation.gov/mission/administrations/office-small-and-disadvantaged-business-utilization/VOSB%20Summit"
+      }
+    },
+    {
+      "name": "GSA: How to do business with GSA and find opportunities",
+      "typical_month": "November",
+      "location": "Online",
+      "audience": "Small businesses new to GSA",
+      "registration_cost": "Free",
+      "value": "GSA Office of Small Business webinar.",
+      "url": "https://www.gsa.gov/events/how-to-do-business-with-gsa-and-find-opportunities",
+      "agencies": ["GSA", "General Services Administration"],
+      "one_off": true,
+      "next_occurrence": {
+        "start": "2026-11-17",
+        "end": "2026-11-17",
+        "location": "Online (1:00-2:00 PM ET)",
+        "registration_url": "https://www.gsa.gov/events/how-to-do-business-with-gsa-and-find-opportunities",
+        "verified_at": "2026-11-09",
+        "source_url": "https://www.gsa.gov/about-gsa/gsa-events"
+      },
+      "verification": {
+        "status": "verified_upcoming",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.gsa.gov/about-gsa/gsa-events"
+      }
+    },
+    {
+      "name": "GSA Monthly OSB National Training (MONT): Small Business Resources Overview, Part 2",
+      "typical_month": "November",
+      "location": "Online",
+      "audience": "Small businesses",
+      "registration_cost": "Free",
+      "value": "GSA Office of Small Business monthly national training.",
+      "url": "https://www.gsa.gov/events/monthly-osb-national-training-mont-series-small-business-resources-overview-part-2",
+      "agencies": ["GSA", "General Services Administration"],
+      "one_off": true,
+      "next_occurrence": {
+        "start": "2026-11-19",
+        "end": "2026-11-19",
+        "location": "Online (1:00-2:00 PM ET)",
+        "registration_url": "https://www.gsa.gov/events/monthly-osb-national-training-mont-series-small-business-resources-overview-part-2",
+        "verified_at": "2026-11-09",
+        "source_url": "https://www.gsa.gov/about-gsa/gsa-events"
+      },
+      "verification": {
+        "status": "verified_upcoming",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.gsa.gov/about-gsa/gsa-events"
+      }
+    },
+    {
+      "name": "GSA: How to get a Cloud Small Business on the GSA Multiple Award Schedule",
+      "typical_month": "December",
+      "location": "Online",
+      "audience": "Cloud small businesses",
+      "registration_cost": "Free",
+      "value": "GSA small-business webinar on getting onto MAS.",
+      "url": "https://www.gsa.gov/events/how-to-get-a-cloud-small-business-on-the-gsa-multiple-award-schedule",
+      "agencies": ["GSA", "General Services Administration"],
+      "one_off": true,
+      "next_occurrence": {
+        "start": "2026-12-15",
+        "end": "2026-12-15",
+        "location": "Online (1:00-1:45 PM ET)",
+        "registration_url": "https://www.gsa.gov/events/how-to-get-a-cloud-small-business-on-the-gsa-multiple-award-schedule",
+        "verified_at": "2026-11-09",
+        "source_url": "https://www.gsa.gov/about-gsa/gsa-events"
+      },
+      "verification": {
+        "status": "verified_upcoming",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.gsa.gov/about-gsa/gsa-events"
+      }
+    },
+    {
+      "name": "Idaho National Laboratory (INL) Industry Days",
+      "typical_month": "November",
+      "location": "Idaho Falls, ID",
+      "audience": "DOE/INL suppliers and small businesses",
+      "registration_cost": "See organizer",
+      "value": "Listed by DOE Office of Small Business Programs.",
+      "url": "https://www.energy.gov/osbp/events",
+      "agencies": ["DOE", "Department of Energy"],
+      "next_occurrence": {
+        "start": "2026-11-11",
+        "end": "2026-11-12",
+        "location": "Idaho Falls, ID",
+        "registration_url": null,
+        "verified_at": "2026-11-09",
+        "source_url": "https://www.energy.gov/osbp/events"
+      },
+      "verification": {
+        "status": "verified_upcoming",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.energy.gov/osbp/events"
+      }
+    },
+    {
+      "name": "NCMA Warfighter Acquisition Forum",
+      "typical_month": "November",
+      "location": "Washington, DC",
+      "audience": "Defense acquisition and contracting professionals",
+      "registration_cost": "See organizer",
+      "value": "NCMA forum on defense acquisition.",
+      "url": "https://www.ncmahq.org/events",
+      "next_occurrence": {
+        "start": "2026-11-12",
+        "end": "2026-11-12",
+        "location": "Ronald Reagan Building, 1300 Pennsylvania Ave NW, Washington, DC",
+        "registration_url": null,
+        "verified_at": "2026-11-09",
+        "source_url": "https://www.ncmahq.org/events"
+      },
+      "verification": {
+        "status": "verified_upcoming",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.ncmahq.org/events"
+      }
+    },
+    {
+      "name": "I/ITSEC (Interservice/Industry Training, Simulation and Education Conference)",
+      "typical_month": "November/December",
+      "location": "Orlando, FL",
+      "audience": "DoD training & simulation buyers, primes and small businesses",
+      "registration_cost": "See organizer",
+      "value": "World's largest modeling, simulation and training event; organized by NTSA, an NDIA affiliate.",
+      "url": "https://www.iitsec.org/",
+      "agencies": ["DOD", "Department of Defense"],
+      "next_occurrence": {
+        "start": "2026-11-30",
+        "end": "2026-12-03",
+        "location": "Orange County Convention Center (South Concourse), Orlando, FL",
+        "registration_url": "https://www.iitsec.org/",
+        "verified_at": "2026-11-09",
+        "source_url": "https://www.iitsec.org/-/media/sites/iitsec/agenda/2026/iitsec2026program102826.pdf"
+      },
+      "verification": {
+        "status": "verified_upcoming",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.iitsec.org/-/media/sites/iitsec/agenda/2026/iitsec2026program102826.pdf"
+      }
+    },
+    {
+      "name": "AFCEA Rocky Mountain Cyberspace Symposium (RMCS)",
+      "typical_month": "February",
+      "location": "Colorado Springs, CO",
+      "audience": "Cyber, Space Force/Air Force and small-business attendees",
+      "registration_cost": "See organizer",
+      "value": "AFCEA symposium; AFCEA tags it Small Business.",
+      "url": "https://events.afcea.org/RMCS27/",
+      "agencies": ["DOD", "Department of Defense"],
+      "next_occurrence": {
+        "start": "2027-02-08",
+        "end": "2027-02-11",
+        "location": "The Broadmoor Hotel, Colorado Springs, CO",
+        "registration_url": "https://events.afcea.org/RMCS27/",
+        "verified_at": "2026-11-09",
+        "source_url": "https://www.afcea.org/events"
+      },
+      "verification": {
+        "status": "verified_upcoming",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.afcea.org/events"
+      }
+    },
+    {
+      "name": "NCMA Nexus",
+      "typical_month": "February",
+      "location": "San Antonio, TX",
+      "audience": "Contracting professionals",
+      "registration_cost": "See organizer",
+      "value": "NCMA conference.",
+      "url": "https://www.ncmahq.org/events",
+      "next_occurrence": {
+        "start": "2027-02-21",
+        "end": "2027-02-23",
+        "location": "Grand Hyatt San Antonio River Walk, San Antonio, TX",
+        "registration_url": null,
+        "verified_at": "2026-11-09",
+        "source_url": "https://www.ncmahq.org/events"
+      },
+      "verification": {
+        "status": "verified_upcoming",
+        "checked_at": "2026-11-09",
+        "source_url": "https://www.ncmahq.org/events"
+      }
     }
   ],
   "recommendations": {
-    "new_contractor": [
-      "Start with FREE APEX Accelerator training (formerly PTAC) - find yours at apexaccelerators.us",
-      "Attend SBA matchmaking events in your region",
-      "Don't pay for expensive conferences until you have a polished capability statement",
-      "Focus on Industry Days announced on SAM.gov for your target agencies",
-      "Carahsoft events are free and teach you what agencies are buying"
-    ],
-    "established_contractor": [
-      "AFCEA TechNet events are essential for IT/cyber contractors",
-      "SAME events are must-attend for A/E, construction, environmental",
-      "Prioritize Industry Days for recompete opportunities",
-      "GSA Expo is essential if you have a Schedule",
-      "Navy Gold Coast has excellent matchmaking for Navy work",
-      "Set up SAM.gov alerts for Industry Day notices in your NAICS"
-    ],
-    "defense_contractor": [
-      "AFCEA is the premier IT/cyber/comms networking organization",
-      "SAME is essential for engineering and construction",
-      "NDIA for weapons systems and defense platforms",
-      "AFWERX/SpaceWERX for innovation and rapid contracting",
-      "Service-specific OSBP events for targeted matchmaking"
-    ],
-    "certification_seeking": [
-      "VA OSDBU for SDVOSB verification events and requirements",
-      "SBA for 8(a) and HUBZone certification workshops",
-      "WBENC for women-owned business certification",
-      "NMSDC for minority business enterprise certification",
-      "APEX Accelerators offer free certification guidance"
-    ],
-    "it_contractor": [
-      "AFCEA TechNet Cyber (May) - premier cyber event",
-      "AFCEA West (February) - Navy/USMC IT focus",
-      "ACT-IAC events for IT modernization trends",
-      "Carahsoft/immixGroup for free technology briefings",
-      "MeriTalk for cyber and cloud computing events"
-    ],
-    "construction_contractor": [
-      "SAME Federal Small Business Conference - matchmaking with USACE/NAVFAC",
-      "SAME JETC for military engineering community",
-      "GSA PBS events for civilian construction",
-      "APEX Accelerators for bonding and compliance training"
-    ]
+    "new_contractor": ["Start with FREE APEX Accelerator training (formerly PTAC) - find yours at apexaccelerators.us", "Attend SBA matchmaking events in your region", "Don't pay for expensive conferences until you have a polished capability statement", "Focus on Industry Days announced on SAM.gov for your target agencies", "Carahsoft events are free and teach you what agencies are buying"],
+    "established_contractor": ["AFCEA TechNet events are essential for IT/cyber contractors", "SAME events are must-attend for A/E, construction, environmental", "Prioritize Industry Days for recompete opportunities", "GSA Expo is essential if you have a Schedule", "Navy Gold Coast has excellent matchmaking for Navy work", "Set up SAM.gov alerts for Industry Day notices in your NAICS"],
+    "defense_contractor": ["AFCEA is the premier IT/cyber/comms networking organization", "SAME is essential for engineering and construction", "NDIA for weapons systems and defense platforms", "AFWERX/SpaceWERX for innovation and rapid contracting", "Service-specific OSBP events for targeted matchmaking"],
+    "certification_seeking": ["VA OSDBU for SDVOSB verification events and requirements", "SBA for 8(a) and HUBZone certification workshops", "WBENC for women-owned business certification", "NMSDC for minority business enterprise certification", "APEX Accelerators offer free certification guidance"],
+    "it_contractor": ["AFCEA TechNet Cyber (May) - premier cyber event", "AFCEA West (February) - Navy/USMC IT focus", "ACT-IAC events for IT modernization trends", "Carahsoft/immixGroup for free technology briefings", "MeriTalk for cyber and cloud computing events"],
+    "construction_contractor": ["SAME Federal Small Business Conference - matchmaking with USACE/NAVFAC", "SAME JETC for military engineering community", "GSA PBS events for civilian construction", "APEX Accelerators for bonding and compliance training"]
   }
 }

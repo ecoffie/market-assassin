@@ -155,10 +155,13 @@ describe('get_federal_event_series', () => {
     vi.setSystemTime(new Date('2026-12-10T12:00:00Z'));
     expect(getFederalEventSeries({ query: 'NVSBE' }).series[0].next_occurrence).toBeNull();
   });
-  it('a one-entry edit does not read as a full review', () => {
+  it('a full review is dated, but currency is per entry, not per file', () => {
+    // 2026-11-09: every entry re-checked against its organizer (catalog-integrity.unit.test.ts).
+    // A file-level review date says nothing about whether an entry is current — catalog_verification does.
     const { _meta } = getFederalEventSeries({});
-    expect(_meta.catalog_updated).toBe('2026-11-07');
-    expect(_meta.catalog_last_full_review).toBe('2026-04-05');
+    expect(_meta.catalog_updated).toBe('2026-11-09');
+    expect(_meta.catalog_last_full_review).toBe('2026-11-09');
+    expect(_meta.catalog_verification.verified_upcoming).toBeLessThan(_meta.total_in_catalog);
   });
   it('generic queries do not flood', () => {
     const total = getFederalEventSeries({})._meta.total_in_catalog;
