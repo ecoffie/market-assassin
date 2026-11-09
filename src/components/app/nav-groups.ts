@@ -314,13 +314,13 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Account',
     icon: CircleUser,
     members: [
-      { panel: 'settings', tab: 'Settings' },
       { panel: 'vault', tab: 'My Vault' },
       { panel: 'team', tab: 'Team' },
       { panel: 'coach', tab: 'Clients' },
     ],
-    // My Library was folded into My Vault's "Generated" tab.
-    aliases: ['library'],
+    // My Library was folded into My Vault's "Generated" tab. Settings is reached ONLY from the
+    // top-right account avatar (one way in, Eric 2026-11-09), so it is an alias, not a tab.
+    aliases: ['library', 'settings'],
   },
   {
     // Shown only where its (prototype-only) members are visible — same rule as before.

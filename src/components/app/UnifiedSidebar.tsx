@@ -7,11 +7,6 @@ import {
   Lock,
   PanelLeftClose,
   PanelLeftOpen,
-  LogOut,
-  CircleUser,
-  ChevronUp,
-  RefreshCw,
-  Settings,
   Map as MapIcon,
 } from 'lucide-react';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
@@ -103,11 +98,6 @@ interface UnifiedSidebarProps {
   // hidden below md breakpoint. Desktop ignores this flag.
   isMobileOpen?: boolean;
   onMobileClose?: () => void;
-  // Account actions — surfaced in a bottom-of-sidebar user menu (Slack/Linear/
-  // Vercel convention) so they're reachable on MOBILE too (the header sign-out
-  // was desktop-only / hidden md:, which stranded mobile users).
-  onSignOut?: () => void;
-  onSwitchAccount?: () => void;
 }
 
 export default function UnifiedSidebar({
@@ -124,11 +114,8 @@ export default function UnifiedSidebar({
   onToggleCollapse,
   isMobileOpen = false,
   onMobileClose,
-  onSignOut,
-  onSwitchAccount,
 }: UnifiedSidebarProps) {
   // Bottom-of-sidebar account menu open state.
-  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   // Free user clicked a Pro-locked feature → open the upgrade modal (highest-
   // intent conversion moment). Holds the clicked item id so the modal can name it.
   const [upgradeFeature, setUpgradeFeature] = useState<string | null>(null);
@@ -378,21 +365,9 @@ export default function UnifiedSidebar({
             Upgrade to Pro
           </Link>
         )}
-        {/* Settings — persistent footer affordance (Linear/Notion convention) so
-            the codes/keywords + profile editor is ALWAYS one obvious click, not
-            buried in the nav scroll or behind the click-to-open account menu
-            (Eric QC 2026-06-15: users couldn't find how to reset their codes). */}
-        <button
-          onClick={() => { onPanelChange('settings'); onMobileClose?.(); }}
-          className={`w-full flex items-center rounded-lg px-3 py-2 text-sm transition-colors ${
-            activePanel === 'settings' ? 'bg-surface text-white' : 'text-muted hover:bg-surface hover:text-white'
-          } ${isCollapsed ? 'justify-center' : 'gap-2'}`}
-          title="Settings — codes, keywords, profile"
-          aria-label="Settings"
-        >
-          <Settings className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
-          {!isCollapsed && <span>Settings</span>}
-        </button>
+        {/* Settings and sign-out live in ONE place: the top-right account avatar (the same menu the
+            map and every public page use). No sidebar Settings button, no bottom account menu
+            (Eric, 2026-11-09: "one way to get to Settings"). */}
         {/* Collapse / expand control — pinned at the bottom of the sidebar
             (SaaS standard: Firecrawl, Gamma, Linear). The header arrow was
             easy to miss when collapsed, so surface an obvious, labeled toggle
@@ -409,57 +384,6 @@ export default function UnifiedSidebar({
               : <PanelLeftClose className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />}
             {!isCollapsed && <span>Collapse</span>}
           </button>
-        )}
-        {/* ACCOUNT MENU — bottom-of-sidebar user block (Slack/Linear/Vercel
-            convention): avatar + email → up-menu with Settings, Switch Account,
-            Sign out. Reachable on mobile via the hamburger drawer. */}
-        {(onSignOut || onSwitchAccount) && (
-          <div className="relative">
-            {accountMenuOpen && (
-              <>
-                {/* click-away */}
-                <div className="fixed inset-0 z-40" onClick={() => setAccountMenuOpen(false)} />
-                <div className="absolute bottom-full left-0 right-0 z-50 mb-2 rounded-lg border border-hairline bg-ground p-1 shadow-2xl shadow-black/40">
-                  <button
-                    onClick={() => { onPanelChange('settings'); setAccountMenuOpen(false); onMobileClose?.(); }}
-                    className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm text-ink-soft hover:bg-surface hover:text-white transition-colors"
-                  >
-                    <Settings className="w-4 h-4 shrink-0" strokeWidth={1.75} /> Settings
-                  </button>
-                  {onSwitchAccount && (
-                    <button
-                      onClick={() => { onSwitchAccount(); setAccountMenuOpen(false); onMobileClose?.(); }}
-                      className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm text-ink-soft hover:bg-surface hover:text-white transition-colors"
-                    >
-                      <RefreshCw className="w-4 h-4 shrink-0" strokeWidth={1.75} /> Switch account
-                    </button>
-                  )}
-                  {onSignOut && (
-                    <button
-                      onClick={() => { onSignOut(); setAccountMenuOpen(false); onMobileClose?.(); }}
-                      className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors"
-                    >
-                      <LogOut className="w-4 h-4 shrink-0" strokeWidth={1.75} /> Sign out
-                    </button>
-                  )}
-                </div>
-              </>
-            )}
-            <button
-              onClick={() => setAccountMenuOpen((v) => !v)}
-              className={`w-full flex items-center rounded-lg px-2 py-2 text-sm text-ink-soft hover:bg-surface transition-colors ${isCollapsed ? 'justify-center' : 'gap-2'}`}
-              title={userEmail || 'Account'}
-              aria-label="Account menu"
-            >
-              <CircleUser className="w-[22px] h-[22px] shrink-0 text-muted" strokeWidth={1.5} />
-              {!isCollapsed && (
-                <>
-                  <span className="flex-1 truncate text-left text-xs text-ink-soft">{userEmail || 'Account'}</span>
-                  <ChevronUp className={`w-4 h-4 shrink-0 text-faint transition-transform ${accountMenuOpen ? '' : 'rotate-180'}`} strokeWidth={1.75} />
-                </>
-              )}
-            </button>
-          </div>
         )}
       </div>
 

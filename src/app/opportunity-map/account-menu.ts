@@ -122,8 +122,8 @@ export function accountMenuHtml(identity?: { email?: string | null; name?: strin
   // Mindy Learn (2026-10-10): the GovCon Action Plan tutorials. Public page; signed-in progress comes later.
   + '<a href="/learn" role="menuitem"><svg viewBox="0 0 24 24"><path d="M2 7l10-4 10 4-10 4z"/><path d="M6 9v5c0 1.7 2.7 3 6 3s6-1.3 6-3V9"/><path d="M22 7v6"/></svg>Your Action Plan</a>'
   + '<div class="sep"></div>'
-  // Settings opens the map-native essentials drawer (window.openSettingsDrawer) — no page leave —
-  // and falls back to /app only where the drawer isn't present (favorites/saved don't inject it).
+  // ONE Settings everywhere (Eric, 2026-11-09): this link always goes to the app's Settings panel.
+  // Inside /app it switches panels in place via window.__mindyOpenSettings; elsewhere it navigates.
   + '<a href="/app?panel=settings" id="mindyAcctSettings" role="menuitem"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Settings</a>'
   + '<a href="/mcp/gallery" role="menuitem"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/><path d="M12 16v-4M12 8h.01"/></svg>Use Mindy in your AI</a>'
   + '<a href="/mcp/account" role="menuitem"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>Credits &amp; Usage</a>'
@@ -187,9 +187,9 @@ export const ACCOUNT_MENU_JS = '<script>'
   // drafted before (approved display rule). One cheap probe (exact count + Pro resolve).
   // Fails silent — the entry just stays hidden, never a broken/dead link.
   + 'fetch("/api/app/proposal/drafts?probe=1&email="+encodeURIComponent(em),{headers:{"x-mi-auth-token":t,"x-user-email":em}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d)return;var show=d.isPro||d.hasDrafts===true;if(!show)return;var a=document.getElementById("mindyAcctProp");if(!a)return;a.style.display="flex";var n=Number(d.draftCount||0);if(n>0){var ct=document.getElementById("mindyAcctPropCt");if(ct){ct.textContent=n+(n===1?" draft":" drafts");ct.style.display="inline-block";}}}).catch(function(){});'
-  // Settings → open the map-native drawer in place (no page leave) when it's present on this page.
-  // Favorites/saved don't inject it, so their link keeps the /app fallback href.
-  + 'var setLink=document.getElementById("mindyAcctSettings");if(setLink)setLink.addEventListener("click",function(e){if(typeof window.openSettingsDrawer==="function"){e.preventDefault();setOpen(false);window.openSettingsDrawer();}});'
+  // Settings → inside /app, switch to the Settings panel in place (window.__mindyOpenSettings, set by
+  // /app). Everywhere else the href takes you to /app?panel=settings. There is no second Settings.
+  + 'var setLink=document.getElementById("mindyAcctSettings");if(setLink)setLink.addEventListener("click",function(e){if(typeof window.__mindyOpenSettings==="function"){e.preventDefault();setOpen(false);window.__mindyOpenSettings();}});'
   // Dropdown open/close + click-away + Esc.
   + 'function setOpen(o){menu.classList.toggle("open",o);btn.setAttribute("aria-expanded",o?"true":"false");}'
   + 'btn.onclick=function(e){e.stopPropagation();setOpen(!menu.classList.contains("open"));};'
@@ -197,7 +197,7 @@ export const ACCOUNT_MENU_JS = '<script>'
   + 'document.addEventListener("keydown",function(e){if(e.key==="Escape")setOpen(false);});'
   // Sign out: clear the same MI localStorage keys /app clears, then hand off to
   // /app which finishes the Supabase session sign-out and shows the sign-in form.
-  + 'var MAPS_HOME="' + MAPS_HOME_PATH + '";var out=document.getElementById("mindyAcctOut");if(out)out.onclick=function(){try{["mi_beta_auth_token","mi_beta_2fa_token","mi_beta_email","mi_beta_authenticated_at","mi_beta_2fa_verified_at","briefings_access_email"].forEach(function(k){localStorage.removeItem(k);});}catch(e){}fetch("/api/auth/maps-signout",{method:"POST",credentials:"same-origin"}).catch(function(){}).then(function(){location.href=MAPS_HOME;});};'
+  + 'var MAPS_HOME="' + MAPS_HOME_PATH + '";var out=document.getElementById("mindyAcctOut");if(out)out.onclick=function(){var host=window.__mindySignOut;if(typeof host==="function"&&!out.__hostDone){out.__hostDone=1;Promise.resolve().then(host).catch(function(){}).then(function(){out.onclick();});return;}try{["mi_beta_auth_token","mi_beta_2fa_token","mi_beta_email","mi_beta_authenticated_at","mi_beta_2fa_verified_at","briefings_access_email"].forEach(function(k){localStorage.removeItem(k);});}catch(e){}fetch("/api/auth/maps-signout",{method:"POST",credentials:"same-origin"}).catch(function(){}).then(function(){location.href=MAPS_HOME;});};'
   + '})();'
   // SEC-5d partner-referral handoff for the server-rendered Map/Today pages (React pages use
   // <PartnerReferralClaimer/>): a pending code + a verified session token → POST the claim; the

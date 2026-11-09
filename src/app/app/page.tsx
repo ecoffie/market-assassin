@@ -11,6 +11,8 @@ import GlobalLookup from '@/components/app/GlobalLookup';
 import ProductTour from '@/components/app/ProductTour';
 import PanelContainer from '@/components/app/panels';
 import ClientWorkspaceBanner from '@/components/app/ClientWorkspaceBanner';
+import PublicAccountMenu from '@/components/public-site/PublicAccountMenu';
+import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_JS, accountMenuHtml } from '@/app/opportunity-map/account-menu';
 import CapabilityNudge from '@/components/app/CapabilityNudge';
 import { reconcileActiveWorkspace, getActiveWorkspace } from '@/components/app/activeWorkspace';
 import VoiceCaptureModal from '@/components/app/voice/VoiceCaptureModal';
@@ -23,6 +25,9 @@ import { sendAppEngagement } from '@/components/app/track';
 import { getStoredPartnerRef } from '@/lib/mindy/partner-referral-client';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
 import { parseAppDeepLink } from '@/lib/app/deep-link-params';
+
+/** The shared account-menu script (map + public pages) without its <script> wrapper. */
+const ACCOUNT_MENU_SCRIPT = ACCOUNT_MENU_JS.replace(/^<script>/, '').replace(/<\/script>[\s\S]*$/, '');
 
 const TWO_FACTOR_SESSION_MS = 12 * 60 * 60 * 1000;
 const TWO_FACTOR_TOKEN_KEY = 'mi_beta_2fa_token';
@@ -564,16 +569,6 @@ function AppDashboard() {
     }
   }, []);
 
-  // Switch Account = sign out, but land the user directly on the sign-in
-  // form with a clear message, rather than silently doing the exact same
-  // thing as "Sign out" (which read as "it just logged me out"). Runs
-  // handleSignOut, then surfaces a switch-account prompt.
-  const handleSwitchAccount = useCallback(async () => {
-    await handleSignOut();
-    setAuthStep('credentials');
-    setIsSignUpMode(false);
-    setAuthMessage('Signed out. Enter a different account to switch.');
-  }, [handleSignOut]);
 
   useEffect(() => {
     activePanelRef.current = activePanel;
@@ -674,6 +669,16 @@ function AppDashboard() {
     syncAppUrl(nextPanel, context);
     trackEngagement('page_view', { panel: nextPanel, tier });
   }, [flushPanelTime, tier, trackEngagement, syncAppUrl]);
+
+  // The top-right account avatar (shared with the map and public pages) is the ONE way to reach
+  // Settings and Sign out. Inside /app its Settings link switches panels in place and its Sign out
+  // runs the app's own sign-out first (Supabase session + stored auth).
+  useEffect(() => {
+    const w = window as unknown as { __mindyOpenSettings?: () => void; __mindySignOut?: () => Promise<void> };
+    w.__mindyOpenSettings = () => handlePanelChange('settings');
+    w.__mindySignOut = () => handleSignOut();
+    return () => { delete w.__mindyOpenSettings; delete w.__mindySignOut; };
+  }, [handlePanelChange, handleSignOut]);
 
   const loginWithPassword = useCallback(async (userEmail: string, password: string) => {
     const normalizedEmail = userEmail.toLowerCase().trim();
@@ -1517,8 +1522,6 @@ function AppDashboard() {
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         isMobileOpen={isMobileSidebarOpen}
         onMobileClose={() => setIsMobileSidebarOpen(false)}
-        onSignOut={handleSignOut}
-        onSwitchAccount={handleSwitchAccount}
       />
 
 
@@ -1546,18 +1549,10 @@ function AppDashboard() {
               <GlobalLookup email={email} />
             </div>
             <div className="flex items-center gap-2 md:gap-3 shrink-0">
-              <span className={`
-                hidden sm:inline px-2 py-1 text-xs rounded
-                ${tier === 'free' ? 'bg-input text-ink-soft' : 'bg-emerald-500/20 text-emerald-400'}
-              `}>
-                {tier === 'free' ? 'Free' : tier === 'team' ? 'Team' : tier === 'enterprise' ? 'Enterprise' : 'Pro'} Plan
-              </span>
-              {/* Settings lives in ONE place — the sidebar footer 'Settings'
-                  (UnifiedSettingsPanel). The old top-right gear opened a SECOND,
-                  legacy settings slide-out (briefings/SettingsPanel) — two settings
-                  surfaces confused users, so the header gear was removed (Eric,
-                  2026-07-11). Switch Account + Sign out live in the sidebar account
-                  menu (Slack/Linear/Vercel convention). */}
+              {/* ONE way to Settings + Sign out: the shared top-right account avatar (same menu as the
+                  map and every public page). It also shows credits + Upgrade for the plan. */}
+              <style>{ACCOUNT_MENU_CSS}</style>
+              <PublicAccountMenu html={accountMenuHtml({ email })} script={ACCOUNT_MENU_SCRIPT} />
             </div>
           </div>
         </header>

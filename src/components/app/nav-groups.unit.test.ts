@@ -21,11 +21,11 @@ const PREVIOUSLY_EXPOSED: AppPanel[] = [
   'pricing', 'proposals',
   'research', 'forecasts', 'recompetes', 'disa-watch', 'osbp-smb', 'micc-mrr', 'grants',
   'contractors', 'decision-makers',
-  'vault', 'team', 'coach', 'settings',
+  'vault', 'team', 'coach',
 ];
 
 // Panels that exist (PanelContainer renders them, deep links reach them) but were NOT sidebar rows.
-const HIDDEN_PANELS: AppPanel[] = ['my-market', 'contacts', 'library', 'knowledge-base', 'partner-finder', 'dibbs'];
+const HIDDEN_PANELS: AppPanel[] = ['my-market', 'contacts', 'library', 'knowledge-base', 'partner-finder', 'dibbs', 'settings'];
 
 const free = { userTier: 'free' as const };
 const pro = { userTier: 'pro' as const };
@@ -70,7 +70,7 @@ describe('nav groups', () => {
     expect(tabs.pursuits).toEqual(['pipeline:Opportunities', 'target-list:Offices']);
     expect(tabs.win).toEqual(['pricing:Pricing', 'proposals:Proposals']);
     expect(tabs.players).toEqual(['contractors:Companies', 'decision-makers:Government contacts']);
-    expect(tabs.account).toEqual(['settings:Settings', 'vault:My Vault', 'team:Team', 'coach:Clients']);
+    expect(tabs.account).toEqual(['vault:My Vault', 'team:Team', 'coach:Clients']);
     expect(tabs.government).toEqual(['osbp-smb:SMB market research', 'micc-mrr:KO research workspace']);
   });
 
