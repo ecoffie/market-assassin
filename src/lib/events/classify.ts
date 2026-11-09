@@ -98,6 +98,25 @@ function precedingClause(text: string, index: number): string {
 const LIST_CUE = /^[^\n.]{0,60}?\b(on the (following )?dates? (listed )?below|on the following dates?|dates? listed below|event dates?\s*:|schedule\s*:)/i;
 const LIST_WINDOW = 1200;
 
+/**
+ * An explicitly LABELED event or session date (2026-11-09). USCG "Doing Business with the USCG":
+ * "Upcoming Session Details … Date: November 18, 2026 … Format: Virtual Webinar", followed by a
+ * "Tentative Future Schedule" of later quarterly sessions. Proximity picked a later session; the
+ * label names the one that is next. The label must be the WHOLE clause before the date (so
+ * "Response Date:" or "Award Date:" never qualify — those are also removed by the deadline and
+ * milestone cues), and THIS event type's own phrase must sit within DATE_WINDOW of it ("Format:
+ * Virtual Webinar"). A session header alone is not enough: USCG's body opens with "Office of Small
+ * Business and Industry Engagement", and a header-only rule typed the webinar an industry day.
+ */
+const SESSION_LABEL = /^\s*(?:(?:event|session|meeting|webinar|conference)\s+)?dates?(?:\s*(?:and|&)\s*times?)?\s*:\s*(?:(?:mon|tues|wednes|thurs|fri|satur|sun)day,?\s*)?$/i;
+
+/**
+ * A date the notice itself says was replaced (2026-11-09). TSA Domestic Aviation Design Industry Day:
+ * "Date : Tuesday, November 17, 2026 9:00 AM EDT (Amendment 1 updated this date to November 18,
+ * 2026)". The struck date is never the event; the replacement date is found on its own.
+ */
+const SUPERSEDED_AFTER = /^[^\n]{0,60}?\b(updated|changed|moved|rescheduled|postponed|revised)\b[^\n]{0,40}?\bto\b/i;
+
 interface FoundDate { iso: string; index: number }
 
 /** Every parseable date in `text` that is today or later (UTC) and not cued as a deadline or milestone. */
@@ -116,6 +135,7 @@ export function findEventDates(text: string, today: Date = new Date()): FoundDat
       if (iso < todayIso) continue;
       if (DEADLINE_CUE.test(text.slice(Math.max(0, m.index - 60), m.index))) continue;
       if (MILESTONE_CUE.test(precedingClause(text, m.index))) continue;
+      if (SUPERSEDED_AFTER.test(text.slice(m.index + m[0].length, m.index + m[0].length + 120))) continue;
       out.push({ iso, index: m.index });
     }
   }
@@ -148,6 +168,12 @@ function phraseIndexes(text: string, phrases: string[]): number[] {
 function nearestDate(text: string, phrases: string[], today: Date): string | null {
   const dates = findEventDates(text, today);
   const at = phraseIndexes(text, phrases);
+  // A labeled session date wins over proximity; past dates were already dropped, so the first
+  // labeled date in reading order is the next session.
+  for (const d of dates) {
+    if (!SESSION_LABEL.test(precedingClause(text, d.index))) continue;
+    if (at.some((i) => Math.abs(i - d.index) <= DATE_WINDOW)) return d.iso;
+  }
   let best: { iso: string; dist: number } | null = null;
   for (const d of dates) {
     for (const i of at) {
