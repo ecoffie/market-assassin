@@ -50,7 +50,7 @@ interface AutoRecharge {
   paused: boolean; lastRechargeAt: string | null; thresholdMin: number; thresholdMax: number;
 }
 interface ApiKeyRow { id: string; key_prefix: string; label: string | null; created_at: string; last_used_at: string | null; revoked_at: string | null }
-interface BillingRow { id: string; date: string; label: string; credits: number; balanceAfter: number; free: boolean }
+interface BillingRow { id: string; date: string; label: string; credits: number; balanceAfter: number; free: boolean; kind?: 'grant' | 'adjustment' }
 
 // Refill packs, derived from CREDIT_PACKAGES so the label can never drift from what the
 // pack actually grants (it once read "500 credits" after the pack became 1,000).
@@ -407,13 +407,15 @@ export default function McpAccountPage() {
         <button type="button" onClick={startCardSetup} disabled={arBusy} className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[12px] text-slate-300 hover:bg-white/10 disabled:opacity-60">{autoRecharge?.hasCard ? 'Update card' : 'Add card'}</button>
       </div>
 
-      {/* Billing history — every credit addition (top-ups, auto-recharge, Pro, grants). */}
+      {/* Billing history — every credit addition AND administrative adjustment, so the rows
+          reconcile with the balance. Tool-call spend is under Activity. */}
       <div className="rounded-xl border border-white/[0.07] bg-surface p-4">
         <p className="text-[13px] font-semibold text-slate-100">Billing history</p>
+
         {billing === null ? (
           <p className="mt-2 text-[12px] text-slate-500">Loading…</p>
         ) : billing.length === 0 ? (
-          <p className="mt-2 text-[12px] text-slate-500">No credits added yet. Top-ups, auto-recharges, and grants show up here as dated receipts.</p>
+          <p className="mt-2 text-[12px] text-slate-500">No credits added yet. Top-ups, auto-recharges, grants and adjustments show up here as dated receipts. Tool-call spend is under Activity.</p>
         ) : (
           <div className="mt-2 overflow-x-auto">
             <table className="w-full min-w-[360px] text-left text-[13px]">
@@ -433,7 +435,7 @@ export default function McpAccountPage() {
                       {b.label}
                       {b.free && <span className="ml-2 rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-slate-500">free</span>}
                     </td>
-                    <td className="py-2 pr-4 text-right tabular-nums text-emerald-300">+{b.credits.toLocaleString()}</td>
+                    <td className={`py-2 pr-4 text-right tabular-nums ${b.credits < 0 ? 'text-slate-400' : 'text-emerald-300'}`}>{b.credits < 0 ? `−${Math.abs(b.credits).toLocaleString()}` : `+${b.credits.toLocaleString()}`}</td>
                     <td className="py-2 text-right tabular-nums text-slate-500">{b.balanceAfter.toLocaleString()}</td>
                   </tr>
                 ))}

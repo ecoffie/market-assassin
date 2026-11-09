@@ -26,6 +26,8 @@ type Data = {
   plan: 'free' | 'pro' | 'team' | 'enterprise' | null;
   planLabel: string | null;
   subscriptions: Sub[] | null;
+  /** Pro plans only: does this access carry a recurring monthly MCP allowance? */
+  monthlyMcpCredits?: 'included' | 'not_included' | 'unknown' | null;
 };
 
 const fmt = (iso: string | null) =>
@@ -52,7 +54,7 @@ export default function SubscriptionsCard({ email, upgradeHref = '/pricing' }: {
         const r = await authedFetch(`/api/app/billing/subscriptions?email=${encodeURIComponent(email)}`, email);
         const j = await r.json();
         if (off) return;
-        if (r.ok && j?.success) setData({ plan: j.plan, planLabel: j.planLabel, subscriptions: j.subscriptions });
+        if (r.ok && j?.success) setData({ plan: j.plan, planLabel: j.planLabel, subscriptions: j.subscriptions, monthlyMcpCredits: j.monthlyMcpCredits ?? null });
         else setFailed(true);
       } catch {
         if (!off) setFailed(true);
@@ -99,6 +101,12 @@ export default function SubscriptionsCard({ email, upgradeHref = '/pricing' }: {
             <div>
               <p className="text-[11px] uppercase tracking-[0.08em] text-slate-500">Mindy plan</p>
               <p className="text-[14px] font-semibold text-slate-100">{data?.planLabel ?? 'Unknown'}</p>
+              {/* Only when it is ESTABLISHED as absent; 'unknown' renders nothing. */}
+              {data?.plan === 'pro' && data.monthlyMcpCredits === 'not_included' && (
+                <p className="mt-0.5 text-[12px] text-slate-400" data-testid="monthly-mcp-credits-not-included">
+                  Monthly MCP credits: not included with this access.
+                </p>
+              )}
             </div>
             {data?.plan === 'free' && (
               <a href={upgradeHref} className="rounded-lg bg-emerald-500 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-emerald-400">Upgrade</a>

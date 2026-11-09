@@ -5,6 +5,11 @@
  * every live Stripe subscription they hold across their linked emails: Mindy Pro/Team and
  * MCP credit plans alike. Read-only; cancel/change goes through ./portal (billedTo picks the
  * customer). Auth: standard /app verifyUserOwnsEmail gate.
+ *
+ * `monthlyMcpCredits` ('included' | 'not_included' | 'unknown' | null) is set for a Pro plan
+ * only, so the card can say plainly when Pro access (e.g. a beta-preview grant) carries no
+ * recurring MCP allowance. Derived from what the grant paths wrote; display only.
+ * See src/lib/mcp/recurring-credit-status.ts.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
@@ -12,6 +17,7 @@ import { getStripe } from '@/lib/stripe';
 import { getLinkedEmails } from '@/lib/mindy/linked-emails';
 import { listLiveSubscriptions } from '@/lib/billing/subscription-list';
 import { resolvePlan, PLAN_LABEL } from '@/lib/access/current-plan';
+import { recurringMonthlyCreditStatus } from '@/lib/mcp/recurring-credit-status';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,11 +46,13 @@ export async function GET(request: NextRequest) {
   if (subsResult.status === 'rejected') console.error('[billing/subscriptions] stripe lookup failed:', subsResult.reason);
 
   const plan = planResult.status === 'fulfilled' ? planResult.value : null;
+  const monthlyMcpCredits = plan === 'pro' ? await recurringMonthlyCreditStatus(userEmail) : null;
   return NextResponse.json({
     success: true,
     email: userEmail,
     plan,
     planLabel: plan ? PLAN_LABEL[plan] : null,
     subscriptions: subsResult.status === 'fulfilled' ? subsResult.value : null,
+    monthlyMcpCredits,
   });
 }
