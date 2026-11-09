@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-09 — SAM certification truth: unknown is never "not certified"
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-09 | lookup_sam_entity / SAM certifications | **False "not certified".** Prod answered AMS Consulting and Design (TH2ZULPHFJS8) has8a:false, hasHUBZone:false while SBA shows 8(a)/HUBZone/WOSB/EDWOSB active: live SAM sent four all-null sbaBusinessTypeList entries and the mapper read the empty remainder as "no". New certification-status module gives each program active/inactive/not_listed/not_established with SAM dates and reasons; unknown flags are omitted. SAM's lone null entry is its "none" placeholder (28,181 of 31,664 cached firms) and stays a negative, cross-checked read-only against the stored extract; 2+ nulls or a null beside a real entry become not_established. Exit then later entry is a re-entry (Jordon N4BAZDMM7DV7 HUBZone). Conflicting extract columns become not_established. Tool cross-check lives in reconcileCertsWithExtract (src/mcp/tools/sam-entity.ts). | `sam_returned_blank_certification_entries` → `src/lib/sam/certification-status.ts` | Red-to-green: 9 transformEntity + 6 tool-level tests failed on main, pass now (real SAM fixtures for TH2Z/GHFY/Jordon, both Claude JSON and ChatGPT projection); pre-push gate 917 files / 10,830 tests | IN REVIEW (PR) |
+
 ## 2026-11-07 — Stripe mirror truth: MRR honors interval count; charges sync daily; one-time cash read a nonexistent column
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

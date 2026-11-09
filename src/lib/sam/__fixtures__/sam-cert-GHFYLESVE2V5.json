@@ -1,0 +1,107 @@
+{
+  "captured_at": "2026-11-09T12:24:36.338Z",
+  "captured_from": "SAM Entity API v3 live (includeSections=entityRegistration,coreData)",
+  "http_status": 200,
+  "entity": {
+    "entityRegistration": {
+      "samRegistered": "Yes",
+      "ueiSAM": "GHFYLESVE2V5",
+      "entityEFTIndicator": null,
+      "cageCode": "8R6Q6",
+      "dodaac": null,
+      "legalBusinessName": "AMS CONSULTING AND DESIGN INC",
+      "dbaName": null,
+      "purposeOfRegistrationCode": "Z2",
+      "purposeOfRegistrationDesc": "All Awards",
+      "registrationStatus": "Active",
+      "evsSource": "E&Y",
+      "registrationDate": "2020-09-28",
+      "lastUpdateDate": "2026-07-03",
+      "registrationExpirationDate": "2027-07-01",
+      "activationDate": "2026-07-03",
+      "ueiStatus": "Active",
+      "ueiExpirationDate": null,
+      "ueiCreationDate": "2020-10-01",
+      "publicDisplayFlag": "Y",
+      "exclusionStatusFlag": "N",
+      "exclusionURL": null,
+      "dnbOpenData": null
+    },
+    "coreData": {
+      "entityInformation": {
+        "entityURL": "www.amsdesign.net",
+        "entityDivisionName": null,
+        "entityDivisionNumber": null,
+        "entityStartDate": "2019-07-29",
+        "fiscalYearEndCloseDate": "12/31",
+        "submissionDate": "2026-07-01"
+      },
+      "businessTypes": {
+        "businessTypeList": [
+          {
+            "businessTypeCode": "23",
+            "businessTypeDesc": "Minority-Owned Business"
+          },
+          {
+            "businessTypeCode": "27",
+            "businessTypeDesc": "Self Certified Small Disadvantaged Business"
+          },
+          {
+            "businessTypeCode": "2X",
+            "businessTypeDesc": "For Profit Organization"
+          },
+          {
+            "businessTypeCode": "8W",
+            "businessTypeDesc": "Women-Owned Small Business"
+          },
+          {
+            "businessTypeCode": "A2",
+            "businessTypeDesc": "Women-Owned Business"
+          },
+          {
+            "businessTypeCode": "F",
+            "businessTypeDesc": "Business or Organization"
+          },
+          {
+            "businessTypeCode": "HQ",
+            "businessTypeDesc": "DOT Certified DBE"
+          },
+          {
+            "businessTypeCode": "PI",
+            "businessTypeDesc": "Hispanic American Owned"
+          },
+          {
+            "businessTypeCode": "XS",
+            "businessTypeDesc": "Subchapter S Corporation"
+          }
+        ],
+        "sbaBusinessTypeList": [
+          {
+            "sbaBusinessTypeCode": "A0",
+            "sbaBusinessTypeDesc": "SBA-Certified Economically Disadvantaged Women-Owned Small Business",
+            "certificationEntryDate": "2022-03-04",
+            "certificationExitDate": null
+          },
+          {
+            "sbaBusinessTypeCode": "A6",
+            "sbaBusinessTypeDesc": "SBA Certified 8(a) Program Participant",
+            "certificationEntryDate": "2022-06-03",
+            "certificationExitDate": "2031-06-02"
+          },
+          {
+            "sbaBusinessTypeCode": "A9",
+            "sbaBusinessTypeDesc": "SBA-Certified Women-Owned Small Business",
+            "certificationEntryDate": "2022-03-04",
+            "certificationExitDate": null
+          },
+          {
+            "sbaBusinessTypeCode": "XX",
+            "sbaBusinessTypeDesc": "SBA Certified HUBZone Firm",
+            "certificationEntryDate": "2020-10-07",
+            "certificationExitDate": null
+          }
+        ]
+      }
+    }
+  }
+}

@@ -14,6 +14,7 @@ import {
   makeSAMRequest, getAllDistinctSAMKeys} from './utils';
 import { fromEntityApiNaicsList, type NaicsSbMap } from './naics-small-business';
 import { filterBlankPscList } from '@/lib/contractor/award-history-shape';
+import { interpretSbaCertifications, certFlag, type CertificationRecord } from './certification-status';
 
 // Types
 export interface SAMEntity {
@@ -51,6 +52,8 @@ export interface SAMEntity {
     pscDescription?: string;
   }>;
   certifications?: {
+    /** Normalized labels of every entry SAM LISTED, whatever its dates say. Status lives in
+     *  `certificationStatus` — read that, not this, to decide whether a firm is certified. */
     sbaBusinessTypes?: string[];
     /** P0-3: per-NAICS small-business representation, {"561720":"Y"}. Absent key = SAM did not say. */
     naicsSmallBusiness?: NaicsSbMap;
@@ -66,9 +69,16 @@ export interface SAMEntity {
     email?: string;
     type?: string; // 'Government', 'Electronic', 'Alternate'
   }>;
+  /**
+   * Per-program SBA certification status (8(a) / HUBZone / WOSB / EDWOSB) with SAM's entry and
+   * exit dates and every uncertainty. `not_established` = unknown, NEVER "not certified".
+   * See lib/sam/certification-status.ts.
+   */
+  certificationStatus?: CertificationRecord[];
   // Computed fields
   isActive: boolean;
   daysUntilExpiration?: number;
+  /** Tri-state like the other has* flags: ABSENT means unknown, `false` means SAM's negative. */
   has8a?: boolean;
   hasSDVOSB?: boolean;
   hasWOSB?: boolean;
@@ -181,11 +191,14 @@ export function transformEntity(raw: Record<string, unknown>): SAMEntity {
   // as fallbacks in case the shape varies by entity.
   const goodsServices = (assertions.goodsAndServices as Record<string, unknown>) || {};
   const businessTypes = (core.businessTypes as Record<string, unknown>) || {};
-  const sbaTypesArr =
-    (businessTypes.sbaBusinessTypeList as Array<Record<string, unknown>>) ||
-    (goodsServices.sbaBusinessTypeList as Array<Record<string, unknown>>) ||
-    (raw.sbaBusinessTypes as unknown as Array<Record<string, unknown>>) ||
-    [];
+  // `undefined` here means SAM sent NO list — kept distinct from an empty one, because only a
+  // list SAM actually returned can support "not certified" (certification-status.ts).
+  const sbaTypesSource =
+    (businessTypes.sbaBusinessTypeList as Array<Record<string, unknown>> | undefined) ||
+    (goodsServices.sbaBusinessTypeList as Array<Record<string, unknown>> | undefined) ||
+    (raw.sbaBusinessTypes as unknown as Array<Record<string, unknown>> | undefined);
+  const sbaTypesArr = sbaTypesSource || [];
+  const certificationStatus = interpretSbaCertifications(sbaTypesSource);
   // Normalize each SBA entry to a clean label: prefer the description
   // text (self-describing), fall back to the code map, then the raw code.
   // De-dupe (8(a) + 8(a) JV both normalize to '8(a)').
@@ -205,11 +218,24 @@ export function transformEntity(raw: Record<string, unknown>): SAMEntity {
 
   // Self-identified types live on businessTypeList (not sbaBusinessTypeList).
   // Map ONLY the verified set-aside codes — never SBA_TYPE_MAP (2X ≠ 8(a)).
-  const businessTypeList =
-    (businessTypes.businessTypeList as unknown[]) || [];
+  const businessTypeListRaw = businessTypes.businessTypeList as unknown[] | undefined;
+  const hasSelfIdList = Array.isArray(businessTypeListRaw);
+  const businessTypeList = businessTypeListRaw || [];
   const selfIdTypes: string[] = Array.isArray(businessTypeList)
     ? Array.from(new Set(businessTypeList.map(selfCertLabel).filter((t): t is string => Boolean(t))))
     : [];
+
+  // Tri-state flags. `undefined` → the key is OMITTED below, so no serializer can emit `false`.
+  const has8a = certFlag(certificationStatus, '8(a)');
+  const hasHUBZone = certFlag(certificationStatus, 'HUBZone');
+  const sbaWomenOwned = certFlag(certificationStatus, 'WOSB', 'EDWOSB');
+  const hasWOSB = sbaWomenOwned === true || selfIdTypes.includes('WOSB')
+    ? true
+    : sbaWomenOwned === false && hasSelfIdList ? false : undefined;
+  const hasSDVOSB = selfIdTypes.includes('SDVOSB') ? true : hasSelfIdList ? false : undefined;
+  const certificationExpirations = certificationStatus
+    .filter((r) => r.status === 'active' && r.exit_date)
+    .map((r) => ({ type: r.program, expirationDate: r.exit_date as string }));
 
   // NAICS list lives under assertions.goodsAndServices.naicsList
   const primaryNaicsRaw = goodsServices.primaryNaics ?? raw.primaryNaics;
@@ -296,15 +322,16 @@ export function transformEntity(raw: Record<string, unknown>): SAMEntity {
       // sbaTypes already holds normalized labels (8(a)/HUBZone/...).
       sbaBusinessTypes: sbaTypes,
       naicsSmallBusiness,
-      certificationExpirations: [],
+      certificationExpirations,
     },
+    certificationStatus,
     pointsOfContact,
     isActive: status === 'Active',
     daysUntilExpiration,
-    has8a: sbaTypes.some(t => /8\(a\)/i.test(t)),
-    hasSDVOSB: selfIdTypes.includes('SDVOSB'),
-    hasWOSB: sbaTypes.some(t => /WOSB|Women/i.test(t)) || selfIdTypes.includes('WOSB'),
-    hasHUBZone: sbaTypes.some(t => /HUBZone/i.test(t)),
+    ...(has8a !== undefined ? { has8a } : {}),
+    ...(hasSDVOSB !== undefined ? { hasSDVOSB } : {}),
+    ...(hasWOSB !== undefined ? { hasWOSB } : {}),
+    ...(hasHUBZone !== undefined ? { hasHUBZone } : {}),
   };
 }
 

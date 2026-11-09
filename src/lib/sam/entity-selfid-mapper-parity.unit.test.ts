@@ -194,7 +194,13 @@ describe('A — TRAINING CENTER PROS INC / NB2RPSSAB614', () => {
     expect(e.hasSDVOSB).toBe(true);
     expect(e.businessTypes).toEqual(expect.arrayContaining(['VOSB', 'SDVOSB']));
     expect(e.businessTypes).not.toEqual(expect.arrayContaining(['8(a)']));
+    // TCP's sbaBusinessTypeList is ONE all-null entry — SAM's "none" placeholder (28,181 of
+    // 31,664 cached firms, measured 2026-11-09), so this stays SAM's negative. Several blank
+    // entries are a different thing: withheld certifications (certification-status.unit.test.ts).
     expect(e.has8a).toBe(false);
+    expect(e.certificationStatus?.find((r) => r.program === '8(a)')).toMatchObject({
+      status: 'not_listed', reasons: ['sam_placeholder_entry'],
+    });
     expect(e.primaryNaics).toBe('332999');
     expect(e.naicsList?.find((n) => n.naicsCode === '332999')?.isPrimary).toBe(true);
     expect(e.registrationExpirationDate).toBe('2027-08-24');

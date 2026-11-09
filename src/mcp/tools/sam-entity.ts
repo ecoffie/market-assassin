@@ -15,6 +15,75 @@ import { lookupLocalEntitiesByName, lookupLocalEntityByUEI } from '@/lib/sam/ent
 import { classifyNameHits } from '@/lib/contractor/name-resolution';
 import { filterBlankPscList } from '@/lib/contractor/award-history-shape';
 import { mcpFlags } from '@/lib/mcp/flags';
+import {
+  certFlag, downgradeOnExtractConflict, downgradeUncheckedPlaceholderNegatives, unestablishedPrograms,
+  type CertProgram, type CertificationRecord,
+} from '@/lib/sam/certification-status';
+
+type CertCrossCheck = 'not_needed' | 'checked' | 'unavailable';
+
+/**
+ * A live `not_listed` that rests only on SAM's single-blank placeholder is checked against the
+ * stored SAM extract. If the extract shows the program, the negative becomes not_established
+ * (certification-status.ts `downgradeOnExtractConflict`). Measured 2026-11-09: ≈201 of 28,181
+ * placeholder firms carry a current 8(a) in the extract — without this they read "not 8(a)".
+ * Only ever weakens a negative. An unreachable extract also weakens it (fail safe).
+ */
+async function reconcileCertsWithExtract(entity: SAMEntity): Promise<{ entity: SAMEntity; crossCheck: CertCrossCheck }> {
+  const recs = entity.certificationStatus;
+  if (!recs?.some((r) => r.status === 'not_listed' && r.reasons.includes('sam_placeholder_entry'))) {
+    return { entity, crossCheck: 'not_needed' };
+  }
+  // FAIL SAFE: if the check cannot run, the placeholder negatives become not_established —
+  // never a silent `false` (ChatGPT's projection drops _meta.certification_cross_check, so a
+  // _meta marker alone would not reach that host).
+  const unchecked = () => ({ entity: withRecords(entity, downgradeUncheckedPlaceholderNegatives(recs)), crossCheck: 'unavailable' as const });
+  let shows: Partial<Record<CertProgram, boolean | 'conflicting'>> = {};
+  try {
+    const looked = await lookupLocalEntityByUEI(entity.ueiSAM);
+    if (looked.status === 'unavailable') return unchecked();
+    if (looked.status === 'found') {
+      // active → the extract shows it. conflicting_extract_fields → the extract contradicts
+      // itself about it (Jordon pattern); that is contradiction, not agreement with SAM's
+      // placeholder, so it weakens the negative as well. Neither becomes a positive.
+      shows = Object.fromEntries(
+        (looked.hit.entity.certificationStatus || []).map((r) => [
+          r.program,
+          r.status === 'active' ? true : r.reasons.includes('conflicting_extract_fields') ? 'conflicting' : false,
+        ]),
+      ) as Partial<Record<CertProgram, boolean | 'conflicting'>>;
+    }
+  } catch (err) {
+    console.warn('[mcp:lookup_sam_entity] extract cross-check unavailable:', err);
+    return unchecked();
+  }
+  const { records, downgraded } = downgradeOnExtractConflict(recs, shows);
+  if (!downgraded.length) return { entity, crossCheck: 'checked' };
+  return { entity: withRecords(entity, records), crossCheck: 'checked' };
+}
+
+/** Replace the status records and recompute the tri-state flags from them (absent = unknown). */
+function withRecords(entity: SAMEntity, records: CertificationRecord[]): SAMEntity {
+  const next: SAMEntity = { ...entity, certificationStatus: records };
+  const setFlag = (key: 'has8a' | 'hasHUBZone' | 'hasWOSB', v: boolean | undefined) => {
+    if (v === undefined) delete next[key]; else next[key] = v;
+  };
+  setFlag('has8a', certFlag(records, '8(a)'));
+  setFlag('hasHUBZone', certFlag(records, 'HUBZone'));
+  const sbaWomen = certFlag(records, 'WOSB', 'EDWOSB');
+  if (sbaWomen === true || entity.businessTypes?.includes('WOSB')) setFlag('hasWOSB', true);
+  else if (sbaWomen === undefined) setFlag('hasWOSB', undefined);
+  return next;
+}
+
+/** The assistant-facing sentence: an unknown certification must never read as "not certified". */
+function certificationNote(records: CertificationRecord[] | undefined): string | undefined {
+  const unknown = unestablishedPrograms(records || []);
+  if (!unknown.length) return undefined;
+  return `SAM.gov did not establish ${unknown.join(', ')} for this firm (see certification_status reasons). `
+    + 'That is UNKNOWN, not "not certified" — do not say the firm lacks these certifications. '
+    + 'Confirm against the SBA certification record before stating set-aside eligibility.';
+}
 
 export interface SamEntityInput {
   /** 12-char SAM UEI for an exact lookup. */
@@ -51,6 +120,14 @@ export interface SamEntityResult {
    * SBA VetCert status. Only present on a UEI lookup with a found entity.
    */
   cert_provenance?: Array<{ cert: string; source: 'sba' | 'self'; source_label: string; authoritative: boolean }>;
+  /**
+   * Per-program SBA certification status for `entity` (8(a)/HUBZone/WOSB/EDWOSB): active /
+   * inactive / not_listed / not_established, SAM entry + exit dates, basis and reasons.
+   * not_established is UNKNOWN — never "not certified". Mirrors entity.certificationStatus.
+   */
+  certification_status?: CertificationRecord[];
+  /** Present only when some program is not_established — the sentence to repeat, not override. */
+  certification_note?: string;
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
   _meta: {
     grounded: boolean;
@@ -63,6 +140,11 @@ export interface SamEntityResult {
     /** When the local row was last refreshed from SAM. Present only for source='local_registry'. */
     as_of?: string | null;
     source_note?: string;
+    /**
+     * Whether a live placeholder negative was checked against the stored SAM extract.
+     * `unavailable` = the check could not run, so placeholder negatives were made not_established.
+     */
+    certification_cross_check?: CertCrossCheck;
     /**
      * found = unique entity. ambiguous = several hits, none selected.
      * not_found = both live and local agreed there is no row.
@@ -268,6 +350,19 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
     }
   }
 
+  // Certification truth (2026-11-09): a live answer resting on SAM's placeholder is checked
+  // against the stored extract. A local-registry answer IS the extract — nothing to check.
+  let certCrossCheck: CertCrossCheck = 'not_needed';
+  if (entity && !usedLocal) {
+    const reconciled = await reconcileCertsWithExtract(entity);
+    certCrossCheck = reconciled.crossCheck;
+    if (reconciled.entity !== entity) {
+      const before = entity;
+      entity = reconciled.entity;
+      matches = matches.map((m) => (m === before ? reconciled.entity : m));
+    }
+  }
+
   // Name search sets `entity` to the top match's full registration AND keeps every
   // hit in `matches`. Counting the detail record made _meta.match_count 1 while
   // matches held 18 (Tanaq family, 2026-09-16). UEI mode is one record or none.
@@ -290,10 +385,15 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
         authoritative: source === 'sba',
       });
     };
+    const statusOf = (p: CertProgram) => entity!.certificationStatus?.find((r) => r.program === p)?.status;
     add('8(a)', entity.has8a, 'sba');       // SAM code A6 = SBA Certified 8(a)
     add('HUBZone', entity.hasHUBZone, 'sba'); // SAM code XX = SBA Certified HUBZone
     add('SDVOSB', entity.hasSDVOSB, 'self'); // SAM self-identified — NOT authoritative VetCert
-    add('WOSB', entity.hasWOSB, 'self');     // SAM self-identified
+    // WOSB is SBA-certified when SAM's SBA list carries it (A9 WOSB / A0 EDWOSB — measured on
+    // GHFYLESVE2V5); otherwise the flag came from SAM's self-identified field.
+    const sbaWomen = statusOf('WOSB') === 'active' || statusOf('EDWOSB') === 'active';
+    add('WOSB', entity.hasWOSB, sbaWomen ? 'sba' : 'self');
+    add('EDWOSB', statusOf('EDWOSB') === 'active', 'sba');
   }
 
   const reconciliation: SamEntityReconciliation | undefined =
@@ -326,6 +426,8 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
       pscList: filterBlankPscList(m.pscList),
     })),
     ...(certProvenance.length ? { cert_provenance: certProvenance } : {}),
+    ...(entity?.certificationStatus ? { certification_status: entity.certificationStatus } : {}),
+    ...(certificationNote(entity?.certificationStatus) ? { certification_note: certificationNote(entity?.certificationStatus) } : {}),
     _meta: {
       grounded, degraded, match_count: matchCount, mode,
       // Where the answer came from. A consumer must not present a cached row as a live SAM
@@ -334,6 +436,7 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
       lookup_status: lookupStatus,
       // Shared vocabulary with get_contractor_profile (resolution) and award history (match_status).
       match_status: lookupStatus === 'found' ? 'unique' : lookupStatus,
+      ...(entity ? { certification_cross_check: certCrossCheck } : {}),
       ...(usedLocal ? { as_of: localAsOf, source_note: 'Live SAM was unavailable; served from Mindy\'s local SAM mirror. Registration details are as of the date shown, not re-verified just now.' } : {}),
       ...(reconciliation ? { reconciliation } : {}),
     },
@@ -359,7 +462,8 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
         : 'No grounded entity; say the vendor is not found in current SAM/mirror sources rather than assuming they are unregistered forever.',
       key_caveats: [
         'Set-aside eligibility depends on the CURRENT registration status + certifications shown — not on past awards.',
-        'SDVOSB and WOSB here are SAM SELF-IDENTIFIED, not the authoritative SBA VetCert determination — a firm may be VetCert-certified while SAM shows self-cert false, or vice-versa. 8(a) and HUBZone come from SBA-certified SAM codes and are authoritative. See cert_provenance.',
+        'SDVOSB is SAM SELF-IDENTIFIED, not the authoritative SBA VetCert determination. 8(a), HUBZone, and WOSB/EDWOSB when cert_provenance says "sba" come from SBA certifications listed in SAM.gov. See cert_provenance.',
+        'certification_status "not_established" means UNKNOWN — never say the firm is not certified. An absent has8a/hasHUBZone/hasWOSB flag means the same. Repeat certification_note when present.',
         ...(reconciliation
           ? ['See _meta.reconciliation for the legal / DBA / local hit counts that established this miss.']
           : []),
