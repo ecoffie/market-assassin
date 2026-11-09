@@ -48,4 +48,34 @@ export const GALLERY_PROMPTS: Record<string, string> = {
     'How should my company team with Ridgeline Defense on the upcoming Robins AFB recompete? Tell me what gap I fill for them, what role and share of work to ask for, who to contact, and how to open the conversation. [paste your UEI]',
   'elevator-pitch':
     'Write me a 30-second elevator pitch for the VA facilities chief in Florida, built from the VA priorities and my past work. End with a clear ask. [paste your UEI]',
+  'competitor-dossier':
+    "Build me a dossier on Gulfline Construction: what federal work it has won in the last three years, from which agencies, which of its contracts end in the next 12 months, and its finances if it is a public company.",
+  'prime-outreach':
+    "Who is the small business liaison at the large primes that do federal facilities work in the Southeast? Give me each contact and a short introduction email I can send them. [paste your UEI]",
+  'agency-one-pager':
+    "Give me a one-page brief on VA Sunshine Healthcare: what it buys most, what it is struggling with, how much goes to small businesses, what is open right now, and who I should call first.",
+  'past-performance':
+    "Write proposal-ready past performance summaries from my federal award history: the agency, the work, the value and the result for each contract. [paste your UEI]",
+  'price-to-win':
+    "What does the government pay per hour on GSA schedules for a site manager, HVAC technician, custodial lead and grounds worker? Give me low, typical and high rates so I can price to win.",
+  'capture-plan':
+    "Build me a capture plan for the Robins AFB grounds maintenance recompete: who holds it now, what it is worth, who else is likely to bid, and my next steps. [paste your UEI]",
+  'rfi-response':
+    "Draft my response to this sources sought notice using my company profile and past work, and recommend the right set-aside. [paste the notice number and your UEI]",
+  'prime-sub-split':
+    "On this large base operations contract, who does the prime pay as subcontractors, for what work and how much? Where could a small business fit in? [paste the contract number]",
+  'weekly-pipeline':
+    "Every Monday, send me new janitorial and grounds maintenance opportunities in Florida and Georgia, plus any changes to the ones I am already watching.",
+  'event-calendar':
+    "List the Navy industry days, outreach events and conferences in the Southeast for the next 12 months and give me a calendar file I can import.",
+  'grant-finder':
+    "Find open federal grants for workforce training and apprenticeship programs. Show the agency, the maximum award and the deadline for each.",
+  'path-to-contract':
+    "What is the best way into federal contracts for my company: GSA Schedule, SBIR, set-asides or subcontracting? Show the evidence for each. [paste your UEI]",
+  'set-aside-goals':
+    "Which federal agencies are behind on their women-owned small business contracting goal? Show each agency's share against the 5% goal.",
+  'market-research-memo':
+    "I am a contracting officer. How many capable small businesses exist for custodial services in the Tampa area? Is there enough for a small business set-aside? Cite the sources.",
+  'lessons-from-winners':
+    "I am trying to win my first federal contract. What advice have GovCon Giants podcast guests given about getting the first win? Quote the guests.",
 };
