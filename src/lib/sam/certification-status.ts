@@ -263,22 +263,32 @@ export function interpretSbaCertifications(list: unknown, asOf?: string): Certif
  * contradicted when Mindy's stored SAM extract shows that program for the same UEI. Neither
  * source wins: the negative becomes not_established. This can only WEAKEN a negative — it never
  * turns the extract into a positive claim (the extract's HUBZone dates are known-unreliable).
- * `extractShows[p] === true` means the extract lists program p as certified.
+ * `extractShows[p] === true` means the extract lists program p as certified. `'conflicting'`
+ * means the extract's own two columns disagree about p (listed in `certifications` while
+ * certification_records says expired — the Jordon pattern, where SBA showed HUBZone ACTIVE).
+ * That is contradictory evidence, not agreement with SAM's placeholder, so it weakens the
+ * negative too (measured 2026-11-09: 97 8(a) + 4 HUBZone placeholder firms). It never
+ * becomes a positive.
  */
 export function downgradeOnExtractConflict(
   records: CertificationRecord[],
-  extractShows: Partial<Record<CertProgram, boolean | undefined>>,
+  extractShows: Partial<Record<CertProgram, boolean | 'conflicting' | undefined>>,
 ): { records: CertificationRecord[]; downgraded: CertProgram[] } {
   const downgraded: CertProgram[] = [];
   const out = records.map((r) => {
     if (r.status !== 'not_listed' || !r.reasons.includes('sam_placeholder_entry')) return r;
-    if (extractShows[r.program] !== true) return r;
+    const shown = extractShows[r.program];
+    if (shown !== true && shown !== 'conflicting') return r;
     downgraded.push(r.program);
     return {
       ...r,
       status: 'not_established' as const,
-      source_label: 'SAM.gov listed no certification, but Mindy\'s stored SAM extract shows one',
-      reasons: [...r.reasons, 'conflicts_with_stored_sam_extract'],
+      source_label: shown === 'conflicting'
+        ? 'SAM.gov listed no certification, and Mindy\'s stored SAM extract holds contradictory records for it'
+        : 'SAM.gov listed no certification, but Mindy\'s stored SAM extract shows one',
+      reasons: shown === 'conflicting'
+        ? [...r.reasons, 'conflicts_with_stored_sam_extract', 'stored_extract_fields_conflict']
+        : [...r.reasons, 'conflicts_with_stored_sam_extract'],
     };
   });
   return { records: out, downgraded };

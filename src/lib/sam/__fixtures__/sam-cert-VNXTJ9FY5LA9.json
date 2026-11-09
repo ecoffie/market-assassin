@@ -1,0 +1,80 @@
+{
+ "captured_at": "2026-11-04T18:12:15.261Z",
+ "captured_from": "sam_api_cache (SAM Entity API v3 response)",
+ "entity": {
+  "entityRegistration": {
+   "dodaac": null,
+   "ueiSAM": "VNXTJ9FY5LA9",
+   "dbaName": null,
+   "cageCode": "4V4T3",
+   "evsSource": "E&Y",
+   "ueiStatus": "Active",
+   "dnbOpenData": null,
+   "exclusionURL": null,
+   "samRegistered": "Yes",
+   "activationDate": "2026-03-26",
+   "lastUpdateDate": "2026-03-26",
+   "ueiCreationDate": "2020-05-01",
+   "registrationDate": "2007-09-02",
+   "legalBusinessName": "CNR RESTORATIONS GROUP LLC",
+   "publicDisplayFlag": "Y",
+   "ueiExpirationDate": null,
+   "entityEFTIndicator": null,
+   "registrationStatus": "Active",
+   "exclusionStatusFlag": "N",
+   "purposeOfRegistrationCode": "Z2",
+   "purposeOfRegistrationDesc": "All Awards",
+   "registrationExpirationDate": "2027-03-25"
+  },
+  "coreData": {
+   "entityInformation": {
+    "entityURL": "www.cnrrestorations.net",
+    "submissionDate": "2026-03-25",
+    "entityStartDate": "2007-01-23",
+    "entityDivisionName": "CNR Restorations Group LLC",
+    "entityDivisionNumber": "01",
+    "fiscalYearEndCloseDate": "12/01"
+   },
+   "businessTypes": {
+    "businessTypeList": [
+     {
+      "businessTypeCode": "23",
+      "businessTypeDesc": "Minority-Owned Business"
+     },
+     {
+      "businessTypeCode": "27",
+      "businessTypeDesc": "Self Certified Small Disadvantaged Business"
+     },
+     {
+      "businessTypeCode": "2X",
+      "businessTypeDesc": "For Profit Organization"
+     },
+     {
+      "businessTypeCode": "F",
+      "businessTypeDesc": "Business or Organization"
+     },
+     {
+      "businessTypeCode": "HQ",
+      "businessTypeDesc": "DOT Certified DBE"
+     },
+     {
+      "businessTypeCode": "LJ",
+      "businessTypeDesc": "Limited Liability Company"
+     },
+     {
+      "businessTypeCode": "OY",
+      "businessTypeDesc": "Black American Owned"
+     }
+    ],
+    "sbaBusinessTypeList": [
+     {
+      "sbaBusinessTypeCode": "XX",
+      "sbaBusinessTypeDesc": "SBA Certified HUBZone Firm",
+      "certificationExitDate": null,
+      "certificationEntryDate": "2024-07-09"
+     }
+    ]
+   }
+  }
+ }
+}

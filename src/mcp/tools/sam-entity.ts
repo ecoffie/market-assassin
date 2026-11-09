@@ -38,14 +38,20 @@ async function reconcileCertsWithExtract(entity: SAMEntity): Promise<{ entity: S
   // never a silent `false` (ChatGPT's projection drops _meta.certification_cross_check, so a
   // _meta marker alone would not reach that host).
   const unchecked = () => ({ entity: withRecords(entity, downgradeUncheckedPlaceholderNegatives(recs)), crossCheck: 'unavailable' as const });
-  let shows: Partial<Record<CertProgram, boolean>> = {};
+  let shows: Partial<Record<CertProgram, boolean | 'conflicting'>> = {};
   try {
     const looked = await lookupLocalEntityByUEI(entity.ueiSAM);
     if (looked.status === 'unavailable') return unchecked();
     if (looked.status === 'found') {
+      // active → the extract shows it. conflicting_extract_fields → the extract contradicts
+      // itself about it (Jordon pattern); that is contradiction, not agreement with SAM's
+      // placeholder, so it weakens the negative as well. Neither becomes a positive.
       shows = Object.fromEntries(
-        (looked.hit.entity.certificationStatus || []).map((r) => [r.program, r.status === 'active']),
-      ) as Partial<Record<CertProgram, boolean>>;
+        (looked.hit.entity.certificationStatus || []).map((r) => [
+          r.program,
+          r.status === 'active' ? true : r.reasons.includes('conflicting_extract_fields') ? 'conflicting' : false,
+        ]),
+      ) as Partial<Record<CertProgram, boolean | 'conflicting'>>;
     }
   } catch (err) {
     console.warn('[mcp:lookup_sam_entity] extract cross-check unavailable:', err);
