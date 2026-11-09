@@ -1,0 +1,80 @@
+{
+  "captured_at": "2026-10-21T15:41:34.168Z",
+  "captured_from": "sam_api_cache (SAM Entity API v3 response)",
+  "entity": {
+    "entityRegistration": {
+      "dodaac": null,
+      "ueiSAM": "N4BAZDMM7DV7",
+      "dbaName": null,
+      "cageCode": "6DUD8",
+      "evsSource": "E&Y",
+      "ueiStatus": "Active",
+      "dnbOpenData": null,
+      "exclusionURL": null,
+      "samRegistered": "Yes",
+      "activationDate": "2026-02-18",
+      "lastUpdateDate": "2026-02-18",
+      "ueiCreationDate": "2020-05-01",
+      "registrationDate": "2012-08-20",
+      "legalBusinessName": "JORDON CONSTRUCTION COMPANY L.L.C",
+      "publicDisplayFlag": "Y",
+      "ueiExpirationDate": null,
+      "entityEFTIndicator": null,
+      "registrationStatus": "Active",
+      "exclusionStatusFlag": "N",
+      "purposeOfRegistrationCode": "Z2",
+      "purposeOfRegistrationDesc": "All Awards",
+      "registrationExpirationDate": "2027-02-16"
+    },
+    "coreData": {
+      "entityInformation": {
+        "entityURL": "www.JCCcontractors.com",
+        "submissionDate": "2026-02-16",
+        "entityStartDate": "2012-07-01",
+        "entityDivisionName": "Jordon Construction Company",
+        "entityDivisionNumber": "1",
+        "fiscalYearEndCloseDate": "12/31"
+      },
+      "businessTypes": {
+        "businessTypeList": [
+          {
+            "businessTypeCode": "23",
+            "businessTypeDesc": "Minority-Owned Business"
+          },
+          {
+            "businessTypeCode": "27",
+            "businessTypeDesc": "Self Certified Small Disadvantaged Business"
+          },
+          {
+            "businessTypeCode": "2X",
+            "businessTypeDesc": "For Profit Organization"
+          },
+          {
+            "businessTypeCode": "F",
+            "businessTypeDesc": "Business or Organization"
+          },
+          {
+            "businessTypeCode": "HQ",
+            "businessTypeDesc": "DOT Certified DBE"
+          },
+          {
+            "businessTypeCode": "OY",
+            "businessTypeDesc": "Black American Owned"
+          },
+          {
+            "businessTypeCode": "XS",
+            "businessTypeDesc": "Subchapter S Corporation"
+          }
+        ],
+        "sbaBusinessTypeList": [
+          {
+            "sbaBusinessTypeCode": "XX",
+            "sbaBusinessTypeDesc": "SBA Certified HUBZone Firm",
+            "certificationExitDate": "2024-03-18",
+            "certificationEntryDate": "2024-04-05"
+          }
+        ]
+      }
+    }
+  }
+}

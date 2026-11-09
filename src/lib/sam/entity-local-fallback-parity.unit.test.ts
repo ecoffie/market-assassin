@@ -100,6 +100,22 @@ describe('NS-1 — identity contract parity (North Star fixture)', () => {
       expect(e.has8a).toBe(false);               // measured lapse — a claim we can defend
     });
 
+    it('CONFLICTING extract columns are not_established, never a claim either way (Jordon N4BAZDMM7DV7)', async () => {
+      // The real stored row (Aug-02 extract): `certifications` lists HUBZone while
+      // certification_records says it expired 2024-03-18. Live SAM shows a 2024-04-05 re-entry
+      // and SBA shows HUBZone active — the extract cannot settle it, so it must not answer.
+      stubRow({ ...NORTH_STAR_ROW, uei: 'N4BAZDMM7DV7', certifications: ['HUBZone'],
+        certification_records: [{ source_code: 'XX20240318', certification_type: 'HUBZone',
+          certification_status: 'expired', certification_expires_on: '2024-03-18' }] });
+      const e = (await localEntityByUEI('N4BAZDMM7DV7'))!.entity;
+      expect('hasHUBZone' in e).toBe(false);   // was true (list won); neither column is believed
+      expect(e.certificationStatus?.find((r) => r.program === 'HUBZone')).toMatchObject({
+        status: 'not_established', basis: 'sam_extract', reasons: ['conflicting_extract_fields'],
+      });
+      expect(e.certificationStatus?.find((r) => r.program === '8(a)')?.status).toBe('not_established');
+      expect('has8a' in e).toBe(false);        // extract silent on 8(a) → unknown, not false
+    });
+
     it('a missing registration_status does not become "Active"', async () => {
       stubRow({ ...NORTH_STAR_ROW, registration_status: null });
       const e = (await localEntityByUEI('X'))!.entity as never as Record<string, unknown>;

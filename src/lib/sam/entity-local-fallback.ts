@@ -32,6 +32,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { legalNameIlikePattern } from '@/lib/contractor/legal-name-stem';
 import type { SAMEntity } from './entity-api';
+import { CERT_PROGRAMS, certFlag, type CertProgram, type CertificationRecord } from './certification-status';
 
 export interface LocalEntityHit {
   entity: SAMEntity;
@@ -93,13 +94,35 @@ function toSamEntity(r: Record<string, unknown>): SAMEntity {
    * Tri-state per program. `true` = the mirror asserts it, `false` = the mirror holds an
    * expired record for it, `undefined` = we do not know. Only the first two are claims.
    */
+  // Same CertificationRecord shape as the live path. ⚠️ The two extract columns can DISAGREE:
+  // Jordon (N4BAZDMM7DV7) has `certifications` ["HUBZone"] while certification_records says
+  // HUBZone expired 2024-03-18 — and live SAM shows a 2024-04-05 re-entry. When the columns
+  // disagree neither is believed: not_established (2026-11-09 audit).
+  const extractRecord = (program: CertProgram): CertificationRecord => {
+    const rec = records.find((x) => x.certification_type === program);
+    const inList = certs.includes(program);
+    const st = rec ? String(rec.certification_status ?? '') : '';
+    const exp = rec && typeof rec.certification_expires_on === 'string' ? rec.certification_expires_on.slice(0, 10) : null;
+    const base = {
+      program, basis: 'sam_extract' as const,
+      source_label: 'Mindy\'s stored SAM extract (not a live check)',
+      sam_codes: rec && typeof rec.source_code === 'string' ? [rec.source_code] : [],
+      entry_date: null,
+    };
+    if (inList && st === 'expired') return { ...base, status: 'not_established', exit_date: exp, reasons: ['conflicting_extract_fields'] };
+    if (inList || st === 'current') return { ...base, status: 'active', exit_date: exp, reasons: exp ? [] : ['dates_not_provided'] };
+    if (st === 'expired') return { ...base, status: 'inactive', exit_date: exp, reasons: ['exit_date_passed'] };
+    // Not in either column, or a status the extract could not read: the mirror is silent.
+    // Silence is NOT a negative claim — the caller must be able to tell "unknown" from "no".
+    return { ...base, status: 'not_established', exit_date: null, reasons: [rec ? 'extract_status_unknown' : 'extract_silent'] };
+  };
+  const certificationStatus = CERT_PROGRAMS.map(extractRecord);
+
+  /** Tri-state per program. `undefined` = we do not know — the key is then left ABSENT. */
   const certState = (label: string): boolean | undefined => {
-    if (certs.includes(label)) return true;
-    const rec = records.find((x) => x.certification_type === label);
-    if (rec) return rec.certification_status === 'current';
-    // Not in either list: the mirror is silent. Silence is NOT a negative claim, so the
-    // field stays undefined and the caller can tell "unknown" from "no".
-    return undefined;
+    if (label === 'SDVOSB') return certs.includes('SDVOSB') ? true : undefined;
+    if (label === 'WOSB') return certFlag(certificationStatus, 'WOSB', 'EDWOSB');
+    return certFlag(certificationStatus, label as CertProgram);
   };
 
   const naics = arr(r.naics_codes);
@@ -130,6 +153,7 @@ function toSamEntity(r: Record<string, unknown>): SAMEntity {
     ...(certState('SDVOSB') !== undefined ? { hasSDVOSB: certState('SDVOSB') } : {}),
     ...(certState('WOSB') !== undefined ? { hasWOSB: certState('WOSB') } : {}),
     ...(certs.length ? { businessTypes: certs } : {}),
+    certificationStatus,
     ...(str(r.sam_url) ? { samUrl: str(r.sam_url) } : {}),
   } as SAMEntity;
 }
