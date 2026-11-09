@@ -34,7 +34,8 @@ export interface FederalEventsToolResult {
     ai_count: number;
     /** Dated rows from the curated catalog, each read from the organizer's page. */
     catalog_count: number;
-    /** Returned events a person attends (industry day, webinar, conference, forecast event). */
+    /** Returned events a person attends (industry day, webinar, conference). Forecast notices are not
+     *  attendable; they are counted in notice_count. */
     attendable_count: number;
     /** Returned notices (sources sought / RFI) that are not events to attend. */
     notice_count: number;
