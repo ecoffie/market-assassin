@@ -1,5 +1,6 @@
 'use client';
 
+import SubscriptionsCard from '@/components/billing/SubscriptionsCard';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MessageSquare, Check, Plus, Compass } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
@@ -1130,7 +1131,13 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
 
         <div className="space-y-4">
           <div id="settings-billing" className="scroll-mt-24">
-            <BillingCard email={email} tier={tier} getAuthHeaders={getAuthHeaders} />
+            {/* Same "Your subscriptions" card as the account page: every plan (Mindy Pro/Team,
+                MCP credits plan) with Manage / cancel for each. */}
+            <div className="bg-ground border border-surface rounded-xl p-5 space-y-3">
+              <h2 className="font-semibold text-white">Billing</h2>
+              <SubscriptionsCard email={email} upgradeHref="/pricing" />
+              <LinkEmailControl email={email} getAuthHeaders={getAuthHeaders} />
+            </div>
           </div>
 
           {/* Solo -> Team upgrade. Shown to paid (pro) solo users; free users
@@ -1276,21 +1283,6 @@ function SectionTitle({ title }: { title: string }) {
   return <h2 className="text-sm font-semibold uppercase tracking-wider text-faint">{title}</h2>;
 }
 
-interface BillingState {
-  hasSubscription: boolean;
-  /** Which email the plan was actually found on — differs from the signed-in address when it
-   *  came from a verified linked email. */
-  resolvedVia?: string;
-  subscription?: {
-    status: string;
-    planName: string;
-    amount: number | null;
-    currency: string;
-    interval: string | null;
-    currentPeriodEnd: string | null;
-    cancelAtPeriodEnd: boolean;
-  };
-}
 
 
 /**
@@ -1430,193 +1422,6 @@ function LinkEmailControl({
 
       {msg && <p className="text-[11px] text-emerald-300">{msg}</p>}
       {err && <p className="text-[11px] text-red-300">{err}</p>}
-    </div>
-  );
-}
-
-// Billing card — current plan + a single "Manage Billing" button that opens
-// Stripe's hosted Billing Portal (change plan, cancel, update card, download
-// invoices, payment history). All subscription mutations + PCI handled by
-// Stripe; we only read the current state for display.
-function BillingCard({
-  email,
-  tier,
-  getAuthHeaders,
-}: {
-  email: string | null;
-  tier: AppTier;
-  getAuthHeaders: (init?: HeadersInit) => HeadersInit;
-}) {
-  const [state, setState] = useState<BillingState | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [opening, setOpening] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!email) { setLoading(false); return; }
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await authedFetch(`/api/app/billing?email=${encodeURIComponent(email)}`, email);
-        const data = await res.json();
-        if (!cancelled && data?.success) {
-          setState({ hasSubscription: !!data.hasSubscription, subscription: data.subscription, resolvedVia: data.resolvedVia });
-        }
-      } catch { /* non-fatal — card shows the upgrade fallback */ }
-      finally { if (!cancelled) setLoading(false); }
-    })();
-    return () => { cancelled = true; };
-  }, [email, getAuthHeaders]);
-
-  const openPortal = useCallback(async () => {
-    if (!email) return;
-    setOpening(true);
-    setErr(null);
-    try {
-      const res = await authedFetch('/api/app/billing/portal', email, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, returnUrl: window.location.href }),
-      });
-      const data = await res.json();
-      if (data?.success && data.url) {
-        window.location.href = data.url;
-        return;
-      }
-      setErr(data?.error || 'Could not open billing.');
-    } catch {
-      setErr('Could not open billing.');
-    } finally {
-      setOpening(false);
-    }
-  }, [email, getAuthHeaders]);
-
-  const sub = state?.subscription;
-  const renews = sub?.currentPeriodEnd
-    ? new Date(sub.currentPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    : null;
-  const priceLabel = sub && sub.amount != null
-    ? `$${sub.amount}${sub.interval ? `/${sub.interval}` : ''}`
-    : null;
-
-  return (
-    <div className="bg-ground border border-surface rounded-xl p-5">
-      <h2 className="font-semibold text-white mb-3">Billing</h2>
-
-      {loading ? (
-        <div className="h-12 rounded-lg bg-surface/60 animate-pulse" />
-      ) : (tier !== 'free' && !(state?.hasSubscription && sub)) ? (
-        // Already Pro+ but NO personal Stripe subscription — show the plan, NOT an
-        // "Upgrade to Pro" CTA. Pro access is a UNION (bundle / comp / team / access
-        // flag), so a real Pro user can have zero personal Stripe sub. The old code
-        // only special-cased team/enterprise and fell a bundle/comp Pro through to
-        // the free "Upgrade to Pro" button (Candice / Whitty-CAP: sidebar "Pro Plan"
-        // + green "Upgrade to Pro", Jul 8 2026). Manage-billing needs a Stripe sub,
-        // so we don't offer it here — there's nothing to manage.
-        //
-        // …but "nothing to manage" is not the same as "nowhere to go" (Eric, 2026-07-29:
-        // "is there a cancellation option in settings"). This branch is the ONLY thing a
-        // team member, comped account, bundle grant or legacy-flag user ever sees, and it
-        // used to end in a description with no action — so a user wanting to cancel or
-        // change plan had no next step from inside the product. Every path now names WHO
-        // owns the billing and offers a way to reach a human.
-        <div className="rounded-lg border border-emerald-700/40 bg-emerald-900/15 p-3">
-          <span className="text-sm font-medium text-emerald-200">{tierLabel(tier)}</span>
-          <p className="text-xs text-muted mt-1">
-            {tier === 'team'
-              ? 'You have full Pro access through your team. Billing and cancellation are handled by the team owner.'
-              : tier === 'enterprise'
-                ? 'Enterprise — full access. Billing is handled through your enterprise agreement.'
-                : 'You have full Pro access with no personal subscription attached, so there is nothing to cancel here. Your access came from a bundle, a comped grant, or a plan billed elsewhere.'}
-          </p>
-          <a
-            href={`mailto:support@getmindy.ai?subject=${encodeURIComponent(`Billing question — ${tierLabel(tier)}`)}&body=${encodeURIComponent(`Account: ${email || ''}\nPlan shown: ${tierLabel(tier)}\n\nWhat I need help with:\n`)}`}
-            className="mt-2 inline-block text-xs font-medium text-emerald-300 underline underline-offset-2 hover:text-emerald-200"
-          >
-            Need to change or cancel? Contact support →
-          </a>
-        </div>
-      ) : state?.hasSubscription && sub ? (
-        <div className="space-y-3">
-          <div className="rounded-lg border border-surface bg-surface/40 p-3">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium text-white">{sub.planName}</span>
-              {priceLabel && <span className="text-sm text-ink-soft">{priceLabel}</span>}
-            </div>
-            <div className="mt-1 flex items-center gap-2 text-xs">
-              <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-medium ${
-                sub.status === 'active' || sub.status === 'trialing'
-                  ? 'bg-emerald-500/15 text-emerald-300'
-                  : 'bg-amber-500/15 text-amber-300'
-              }`}>
-                {sub.status === 'trialing' ? 'Trial' : sub.status === 'past_due' ? 'Past due' : sub.status === 'active' ? 'Active' : sub.status}
-              </span>
-              {renews && (
-                <span className="text-faint">
-                  {sub.cancelAtPeriodEnd ? `Cancels ${renews}` : `Renews ${renews}`}
-                </span>
-              )}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={openPortal}
-            disabled={opening}
-            className="w-full px-3 py-2 text-sm font-medium text-white bg-surface hover:bg-input border border-hairline rounded-lg transition-colors disabled:opacity-50"
-          >
-            {opening ? 'Opening…' : 'Manage billing'}
-          </button>
-          <p className="text-[11px] text-faint">
-            Change plan, update your card, cancel, or download invoices — handled securely by Stripe.
-          </p>
-          {/* Buying with one email and signing in with another is NORMAL user behaviour
-              (Eric, 2026-07-29: "our users do this all the time... this is a standard, not a
-              bug"). /api/app/billing now fans out over VERIFIED linked addresses, so if the
-              plan below was found on a different address we say so — and if the user's plan is
-              still missing, they can connect that address themselves rather than emailing
-              support. Alisha Martin's case: signed in on an old $99 coaching sub while her live
-              $149 Mindy sub sat on another address, no cancel button anywhere. */}
-          {state?.resolvedVia && email && state.resolvedVia !== email.toLowerCase() && (
-            <p className="text-[11px] text-amber-300/90">
-              This plan is billed to <span className="font-medium">{state.resolvedVia}</span>, a
-              connected email.
-            </p>
-          )}
-          <LinkEmailControl email={email} getAuthHeaders={getAuthHeaders} />
-        </div>
-      ) : (
-        // No active subscription — free user. Show plan + upgrade CTA.
-        <div className="space-y-3">
-          <div className="rounded-lg border border-surface bg-surface/40 p-3">
-            <span className="text-sm font-medium text-white">{tierLabel(tier)}</span>
-            <p className="text-xs text-faint mt-1">No active paid subscription.</p>
-          </div>
-          <a
-            href="/market-intelligence"
-            className="block w-full px-3 py-2 text-center text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors"
-          >
-            Upgrade to Pro
-          </a>
-          {/* The one genuinely dangerous case: a user who DID pay but whose subscription
-              didn't resolve (wrong Stripe customer record, checkout email ≠ login email,
-              webhook lag). Without this they are told "no active subscription" and shown a
-              button to buy what they already own, with no way to reach a human. Measured
-              2026-07-29: 13% of live emails have 2+ Stripe customer records, so the lookup
-              CAN miss a real subscriber — that is exactly what /api/app/billing's
-              duplicate-safe resolver was added to reduce. */}
-          <p className="text-[11px] text-faint">
-            Already subscribed?{' '}
-            <a
-              href={`mailto:support@getmindy.ai?subject=${encodeURIComponent('I subscribed but Mindy shows no plan')}&body=${encodeURIComponent(`Account: ${email || ''}\nIf you checked out with a different email, please tell us which one.\n\n`)}`}
-              className="underline underline-offset-2 hover:text-ink-soft"
-            >
-              Tell us — you may have checked out with a different email.
-            </a>
-          </p>
-        </div>
-      )}
-
-      {err && <p className="mt-2 text-xs text-red-300">{err}</p>}
     </div>
   );
 }
