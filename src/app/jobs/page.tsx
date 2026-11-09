@@ -11,6 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 import PublicShell from '@/components/public-site/PublicShell';
 import { JOB_ROLES } from '@/lib/jobs/categories';
 import { readJobBoard, type JobBoardData, type JobBoardFilters } from '@/lib/jobs/read';
+import { readJobBoardFromUsaJobs } from '@/lib/jobs/usajobs-direct';
 import { readJobBoardFromFunnels } from '@/lib/jobs/funnels-feed';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import JobsBoard from './JobsBoard';
@@ -59,9 +60,15 @@ export default async function JobsPage({ searchParams }: { searchParams: SP }) {
     url && key
       ? await readJobBoard(createClient(url, key, { auth: { persistSession: false } }), filters)
       : UNAVAILABLE;
-  // Until Mindy's own daily sync has postings (API keys not set yet), show the govcongiants.com
-  // job board's feed. A stored table with rows always wins.
-  const data = stored.state === 'ok' && (stored.totals.active ?? 0) > 0 ? stored : await readJobBoardFromFunnels(filters);
+  // Order: Mindy's stored postings (once the daily sync has rows) → USAJobs read directly
+  // (federal contract-specialist jobs, cached 6h) → the govcongiants.com feed as a last resort.
+  const direct = stored.state === 'ok' && (stored.totals.active ?? 0) > 0 ? null : await readJobBoardFromUsaJobs(filters);
+  const data =
+    stored.state === 'ok' && (stored.totals.active ?? 0) > 0
+      ? stored
+      : direct?.state === 'ok'
+        ? direct
+        : await readJobBoardFromFunnels(filters);
 
   return (
     <PublicShell contentElement="div">

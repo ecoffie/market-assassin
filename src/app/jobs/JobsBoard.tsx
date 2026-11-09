@@ -97,7 +97,7 @@ export default function JobsBoard({ data, filters, now = new Date() }: { data: J
               <StatRow>
                 <Stat
                   value={fmtCount(t.active)}
-                  label={data.source === 'mindy' ? `Open postings (seen in the last ${ACTIVE_DAYS} days)` : 'Open postings right now'}
+                  label={data.source === 'mindy' ? `Open postings (seen in the last ${ACTIVE_DAYS} days)` : data.source === 'usajobs' ? 'Posted in the last 30 days' : 'Open postings right now'}
                 />
                 <Stat
                   value={t.contractor == null ? 'Soon' : fmtCount(t.contractor)}
@@ -109,7 +109,7 @@ export default function JobsBoard({ data, filters, now = new Date() }: { data: J
                   label="At federal agencies"
                   href={t.federal == null ? undefined : href(filters, { source: 'usajobs' })}
                 />
-                <Stat value={fmtCount(t.contingent)} label="Waiting on a contract win" />
+                {t.contingent != null && <Stat value={fmtCount(t.contingent)} label="Waiting on a contract win" />}
               </StatRow>
             </Container>
           </Section>
@@ -127,6 +127,8 @@ export default function JobsBoard({ data, filters, now = new Date() }: { data: J
                     <FilterLink on={filters.source === 'usajobs'} to={href(filters, { source: 'usajobs' })}>Federal agencies</FilterLink>
                   )}
                 </div>
+                {/* Role chips are contractor BD roles; the USAJobs-only view is all contract specialists. */}
+                {data.source !== 'usajobs' && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
                   <Meta style={{ minWidth: 70 }}>Role</Meta>
                   <FilterLink on={!filters.role} to={href(filters, { role: undefined })}>All roles</FilterLink>
@@ -136,6 +138,7 @@ export default function JobsBoard({ data, filters, now = new Date() }: { data: J
                     </FilterLink>
                   ))}
                 </div>
+                )}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
                   <Meta style={{ minWidth: 70 }}>Clearance</Meta>
                   <FilterLink on={!filters.clearance || filters.clearance === 'any'} to={href(filters, { clearance: undefined })}>Any</FilterLink>
@@ -219,9 +222,9 @@ export default function JobsBoard({ data, filters, now = new Date() }: { data: J
                   )}
                   {data.agenciesHiring.length > 0 && (
                   <Panel>
-                    <p className="mp-label">{data.source === 'mindy' ? 'Agencies hiring contract specialists' : 'Federal agencies hiring'}</p>
+                    <p className="mp-label">{data.source === 'govcongiants' ? 'Federal agencies hiring' : 'Agencies hiring contract specialists'}</p>
                     <p className="mp-meta" style={{ marginTop: 4 }}>
-                      {data.source === 'mindy' ? 'An office adding buyers usually plans to buy more.' : 'From the federal jobs on the GovCon Giants board.'}
+                      {data.source === 'govcongiants' ? 'From the federal jobs on the GovCon Giants board.' : 'An office adding buyers usually plans to buy more.'}
                     </p>
                     <ol style={{ margin: '14px 0 0', padding: 0, listStyle: 'none', display: 'grid', gap: 8 }}>
                       {data.agenciesHiring.length === 0 && <li className="mp-meta">No agency postings yet.</li>}
@@ -242,7 +245,9 @@ export default function JobsBoard({ data, filters, now = new Date() }: { data: J
               <p className="mp-meta" style={{ marginTop: 20 }}>
                 {data.source === 'mindy'
                   ? 'Sources: JSearch (LinkedIn, Indeed, Glassdoor, ZipRecruiter) and USAJobs.'
-                  : 'Source: the GovCon Giants job board (USAJobs, plus LinkedIn, Indeed, Glassdoor and ZipRecruiter when available).'}
+                  : data.source === 'usajobs'
+                    ? 'Source: USAJobs, contracting jobs (series 1102) at federal agencies. Contractor jobs are coming soon.'
+                    : 'Source: the GovCon Giants job board (USAJobs, plus LinkedIn, Indeed, Glassdoor and ZipRecruiter when available).'}
                 {data.lastSyncedAt ? ` Last updated ${new Date(data.lastSyncedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.` : ''}
                 {' '}Clearance shows only when the post names one.
               </p>

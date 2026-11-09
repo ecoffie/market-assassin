@@ -34,8 +34,8 @@ export interface JobBoardFilters {
 
 export interface JobBoardData {
   state: 'ok' | 'unavailable';
-  /** Where the listings came from: Mindy's stored postings, or the interim govcongiants.com feed. */
-  source: 'mindy' | 'govcongiants';
+  /** Where the listings came from: Mindy's stored postings, USAJobs read directly, or the interim govcongiants.com feed. */
+  source: 'mindy' | 'usajobs' | 'govcongiants';
   error?: string;
   /** Postings seen by a sync in the last `activeDays` days. */
   totals: { active: number | null; contractor: number | null; federal: number | null; cleared: number | null; contingent: number | null };
