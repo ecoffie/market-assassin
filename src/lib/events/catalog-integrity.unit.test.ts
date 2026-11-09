@@ -64,6 +64,7 @@ describe('federal events catalog integrity', () => {
       'https://www.afwerx.com/events',
       'https://www.secnav.navy.mil/smallbusiness/',
       'https://www.gsa.gov/about-us/organization/office-of-small-disadvantaged-business-utilization',
+      'https://business.defense.gov/Events/',
     ]) expect(urls, dead).not.toContain(dead);
   });
 

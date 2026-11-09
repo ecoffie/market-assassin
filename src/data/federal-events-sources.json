@@ -257,7 +257,7 @@
     },
     "dod_osbp": {
       "name": "DOD OSBP Events",
-      "url": "https://business.defense.gov/Events/",
+      "url": "https://business.defense.gov/Engage/Events-Calendar/index.html",
       "type": "official",
       "frequency": "monthly",
       "categories": ["industry_day", "training", "matchmaking"],
@@ -268,8 +268,8 @@
       "verification": {
         "status": "unverifiable",
         "checked_at": "2026-11-09",
-        "source_url": "https://business.defense.gov/Events/",
-        "note": "Official site refuses automated reads (HTTP 403); not checked by hand."
+        "source_url": "https://business.defense.gov/Engage/Events-Calendar/index.html",
+        "note": "Old /Events/ path returned 404 to a plain client; DoD OSBP's calendar is now /Engage/Events-Calendar/ (per its own indexed pages). Site refuses automated reads (HTTP 403)."
       }
     },
     "navy_osbp": {
