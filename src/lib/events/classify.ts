@@ -73,9 +73,34 @@ const DATE_PATTERNS: { re: RegExp; parts: (m: RegExpExecArray) => [number, numbe
 /** Words that, just before a date, make it a deadline rather than the event. */
 const DEADLINE_CUE = /\b(due|respon[sd]\w*|submi\w*|deadline|no later than|closing|closes|close of business|rsvp|register by|registration closes)\b[^.]{0,40}$/i;
 
+/**
+ * Acquisition MILESTONES, not events (2026-11-09). NASA KSC SIMO lists "Contract award: On or about
+ * February 11, 2027 · Contract start: April 1, 2027" and the old extractor stored April 1, 2027 as
+ * an industry-day date. Tested against the clause right before the date (see precedingClause), so
+ * "approx." inside "Contract phase-in (approx. 45 days):" does not hide the cue.
+ */
+const MILESTONE_CUE = /\b(contract (start|award|begin\w*|commence\w*|phase[- ]in)|award date|anticipated award|phase[- ]in|period of performance|performance (start|period|begin\w*)|commence\w*|(draft )?(rfp|rfq|rfi|solicitation|draft solicitation) (release|issuance)|release date|solicitation issuance|issu(e|es|ing|ance of) the solicitation|bid opening)\b[^\n]{0,50}$/i;
+
+/** A sentence break: newline, or terminal punctuation followed by a capital letter. */
+const SENTENCE_BREAK = /\n|[.!?;]\s+(?=[A-Z])/;
+
+/** The text between the start of the date's own clause and the date. */
+function precedingClause(text: string, index: number): string {
+  const before = text.slice(Math.max(0, index - 80), index);
+  const parts = before.split(SENTENCE_BREAK);
+  return parts[parts.length - 1];
+}
+
+/**
+ * Phrases that point at a list of dates further down ("JPL will host three webinars on the dates
+ * listed below", then three dated lines ~330 characters later — outside DATE_WINDOW).
+ */
+const LIST_CUE = /^[^\n.]{0,60}?\b(on the (following )?dates? (listed )?below|on the following dates?|dates? listed below|event dates?\s*:|schedule\s*:)/i;
+const LIST_WINDOW = 1200;
+
 interface FoundDate { iso: string; index: number }
 
-/** Every parseable date in `text` that is today or later (UTC) and not cued as a deadline. */
+/** Every parseable date in `text` that is today or later (UTC) and not cued as a deadline or milestone. */
 export function findEventDates(text: string, today: Date = new Date()): FoundDate[] {
   const todayIso = today.toISOString().slice(0, 10);
   const out: FoundDate[] = [];
@@ -90,6 +115,7 @@ export function findEventDates(text: string, today: Date = new Date()): FoundDat
       const iso = dt.toISOString().slice(0, 10);
       if (iso < todayIso) continue;
       if (DEADLINE_CUE.test(text.slice(Math.max(0, m.index - 60), m.index))) continue;
+      if (MILESTONE_CUE.test(precedingClause(text, m.index))) continue;
       out.push({ iso, index: m.index });
     }
   }
@@ -105,7 +131,20 @@ function phraseIndexes(text: string, phrases: string[]): number[] {
   return idx;
 }
 
-/** The date nearest an event phrase, within DATE_WINDOW characters; null when none qualifies. */
+/**
+ * The date nearest an event phrase, within DATE_WINDOW characters; null when none qualifies.
+ *
+ * A date AFTER the phrase may sit anywhere in the window. A date BEFORE the phrase counts only in
+ * the phrase's own paragraph (no line break between): SIMO's "SECTION 6: INDUSTRY ENGAGEMENT"
+ * heading follows a milestone list, and the date above a heading belongs to the previous section.
+ * Paragraph, not sentence: Navy RCO "The Disruptor Days event will occur starting the Week of
+ * November 30, 2026 … The event will … brief their products in a traditional industry day format"
+ * puts a genuine event's date in the sentence before the phrase. Milestone dates in the same
+ * paragraph ("bid opening", "issuing the solicitation") are removed by MILESTONE_CUE instead.
+ *
+ * When no date qualifies and the phrase points at a list ("on the dates listed below"), the first
+ * qualifying date within LIST_WINDOW after the cue is the event's date.
+ */
 function nearestDate(text: string, phrases: string[], today: Date): string | null {
   const dates = findEventDates(text, today);
   const at = phraseIndexes(text, phrases);
@@ -113,10 +152,20 @@ function nearestDate(text: string, phrases: string[], today: Date): string | nul
   for (const d of dates) {
     for (const i of at) {
       const dist = Math.abs(d.index - i);
-      if (dist <= DATE_WINDOW && (!best || dist < best.dist)) best = { iso: d.iso, dist };
+      if (dist > DATE_WINDOW || (best && dist >= best.dist)) continue;
+      if (d.index < i && text.slice(d.index, i).includes('\n')) continue;
+      best = { iso: d.iso, dist };
     }
   }
-  return best?.iso ?? null;
+  if (best) return best.iso;
+  for (const i of at) {
+    const cue = LIST_CUE.exec(text.slice(i));
+    if (!cue) continue;
+    const from = i + cue.index + cue[0].length;
+    const listed = dates.find((d) => d.index >= from && d.index <= from + LIST_WINDOW);
+    if (listed) return listed.iso;
+  }
+  return null;
 }
 
 export function classifyEvent(title: string, description: string | null, today: Date = new Date()): EventClassification | null {
