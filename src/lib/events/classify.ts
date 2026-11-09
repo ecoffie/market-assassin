@@ -31,6 +31,11 @@ const ATTENDABLE_PHRASES: Record<'industry_day' | 'webinar', string[]> = {
     'preproposal conference',
     'pre-bid conference',
     'prebid conference',
+    // A genuine event that was typed `forecast`: "Small Business Event - Acquisition Executive
+    // Small Business Forum". Forecasts are not attendable, so it needs its own phrase.
+    'small business event',
+    'small business forum',
+    'matchmaking',
   ],
   webinar: ['webinar', 'virtual event', 'online session', 'video conference', 'zoom meeting'],
 };

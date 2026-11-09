@@ -101,7 +101,7 @@ describe('the source contract: best-match, RFI-free, honest-empty', () => {
   }
 
   it('RFIs can never surface as events (they are opportunities)', () => {
-    expect(src).toMatch(/ATTENDABLE_TYPES\s*=\s*\['industry_day',\s*'forecast',\s*'webinar',\s*'conference'\]/);
+    expect(src).toMatch(/ATTENDABLE_TYPES\s*=\s*\['industry_day',\s*'webinar',\s*'conference'\]/);
     expect(src).toMatch(/\.in\('event_type',\s*ATTENDABLE_TYPES\)/);
   });
 

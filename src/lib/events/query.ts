@@ -277,7 +277,10 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
 /** How recently an undated attendable event's notice must have been re-read to still be listed. */
 export const UNDATED_EVENT_DAYS = 30;
 
-export const ATTENDABLE_TYPES = ['industry_day', 'forecast', 'webinar', 'conference'];
+// `forecast` is NOT attendable: measured 2026-11-09, 19 of 20 upcoming forecast rows were
+// procurement forecasts, projection/RPOW lists or weather notices ("NWS Forecast Office"),
+// not something to attend. They stay in sam_events and list as notices.
+export const ATTENDABLE_TYPES = ['industry_day', 'webinar', 'conference'];
 
 /** Department-level agency strings whose event set is too broad to imply relevance. */
 const DEPT_LEVEL = /\b(DEPT OF DEFENSE|DEFENSE, DEPARTMENT OF|DEPARTMENT OF DEFENSE)\b/i;
@@ -437,9 +440,12 @@ export function eventsSummary(r: ScopedEventsResult): { headline: string; sub: s
  * MEASURED (past 12 months, attendable only) before naming any signal, so a badge is
  * never asserted without its own evidence:
  *   · industry_day — 326 events across 54 offices  → "Runs Industry Days" is well-grounded
- *   · forecast     —  21 events across  3 offices  → "Forecasts Frequently" is REAL but RARE;
- *                                                     it earns a badge for those 3, and is
- *                                                     simply ABSENT elsewhere (never inferred)
+ *   · forecast     —  RETIRED 2026-11-09. "Forecasts Frequently — N forecast sessions" was
+ *                     withdrawn: re-measured, 0 of 45 forecast-typed rows in the past year were
+ *                     sessions (weather/NWS buys, sole-source notices, published forecast
+ *                     DOCUMENTS such as USTRANSCOM/MARFORSOC). Forecasts are no longer attendable
+ *                     (ATTENDABLE_TYPES), so this query cannot see them anyway. Do NOT add a
+ *                     replacement badge without a source that actually records forecast sessions.
  *   · small-business flavored — 26 events          → the weakest: a title/description KEYWORD
  *                                                     match, not a structured field, so it is
  *                                                     labeled as outreach *mentioned*, never a
@@ -449,7 +455,7 @@ export function eventsSummary(r: ScopedEventsResult): { headline: string; sub: s
  */
 export interface BuyerEventDna {
   /** Named signals, strongest evidence first. Empty array → the surface renders nothing. */
-  signals: Array<{ key: 'runs_industry_days' | 'forecasts_frequently' | 'small_business_outreach'; label: string; detail: string; count: number }>;
+  signals: Array<{ key: 'runs_industry_days' | 'small_business_outreach'; label: string; detail: string; count: number }>;
   pastYear: number;
   lastHeld: string | null;
 }
@@ -488,7 +494,6 @@ export async function queryBuyerEventDna(input: {
 
   const rows = data as Array<{ event_date: string; event_type: string; title: string | null; description: string | null }>;
   const industryDays = rows.filter((r) => r.event_type === 'industry_day').length;
-  const forecasts = rows.filter((r) => r.event_type === 'forecast').length;
   const SB = /small business|8\(a\)|sdvosb|hubzone|\bwosb\b|small-business/i;
   const smallBiz = rows.filter((r) => SB.test(`${r.title || ''} ${r.description || ''}`)).length;
 
@@ -499,14 +504,6 @@ export async function queryBuyerEventDna(input: {
       label: 'Runs Industry Days',
       detail: `${industryDays} in the past year`,
       count: industryDays,
-    });
-  }
-  if (forecasts >= 2) {
-    signals.push({
-      key: 'forecasts_frequently',
-      label: 'Forecasts Frequently',
-      detail: `${forecasts} forecast sessions in the past year`,
-      count: forecasts,
     });
   }
   if (smallBiz >= 2) {
