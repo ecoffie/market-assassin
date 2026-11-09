@@ -246,7 +246,12 @@ export function interpretSbaCertifications(list: unknown, asOf?: string): Certif
     }
     return {
       program, status: 'not_listed' as const, basis: 'none' as const,
-      source_label: 'Not in the SBA certification list SAM.gov returned',
+      // ⚠️ The placeholder reading is an EMPIRICAL rule, not documented SAM semantics: GSA's
+      // Entity API docs say nothing about what an uncertified firm's list looks like. So the
+      // label says what SAM showed, never "not certified".
+      source_label: placeholderOnly
+        ? 'SAM.gov returned only its empty placeholder entry: no SBA certification listed in SAM (not an SBA determination of non-certification)'
+        : 'Not listed in the SBA certifications SAM.gov returned (not an SBA determination of non-certification)',
       sam_codes: [], entry_date: null, exit_date: null,
       reasons: placeholderOnly ? ['sam_placeholder_entry'] : [],
     };
@@ -277,6 +282,24 @@ export function downgradeOnExtractConflict(
     };
   });
   return { records: out, downgraded };
+}
+
+/**
+ * FAIL SAFE: when the extract cross-check could not run, a negative that rests only on SAM's
+ * placeholder has nothing behind it but an empirical rule — so it becomes not_established.
+ * Negatives from a complete readable list or a passed exit date are untouched.
+ */
+export function downgradeUncheckedPlaceholderNegatives(records: CertificationRecord[]): CertificationRecord[] {
+  return records.map((r) =>
+    r.status === 'not_listed' && r.reasons.includes('sam_placeholder_entry')
+      ? {
+          ...r,
+          status: 'not_established' as const,
+          source_label: 'SAM.gov listed no certification, and the stored-extract cross-check could not run',
+          reasons: [...r.reasons, 'extract_cross_check_unavailable'],
+        }
+      : r,
+  );
 }
 
 /** Tri-state flag: true / false / undefined (= unknown — callers must leave the field ABSENT). */

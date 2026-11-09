@@ -16,7 +16,7 @@ import { classifyNameHits } from '@/lib/contractor/name-resolution';
 import { filterBlankPscList } from '@/lib/contractor/award-history-shape';
 import { mcpFlags } from '@/lib/mcp/flags';
 import {
-  certFlag, downgradeOnExtractConflict, unestablishedPrograms,
+  certFlag, downgradeOnExtractConflict, downgradeUncheckedPlaceholderNegatives, unestablishedPrograms,
   type CertProgram, type CertificationRecord,
 } from '@/lib/sam/certification-status';
 
@@ -27,17 +27,21 @@ type CertCrossCheck = 'not_needed' | 'checked' | 'unavailable';
  * stored SAM extract. If the extract shows the program, the negative becomes not_established
  * (certification-status.ts `downgradeOnExtractConflict`). Measured 2026-11-09: ≈201 of 28,181
  * placeholder firms carry a current 8(a) in the extract — without this they read "not 8(a)".
- * Only ever weakens a negative; an unreachable extract leaves SAM's answer and says so.
+ * Only ever weakens a negative. An unreachable extract also weakens it (fail safe).
  */
 async function reconcileCertsWithExtract(entity: SAMEntity): Promise<{ entity: SAMEntity; crossCheck: CertCrossCheck }> {
   const recs = entity.certificationStatus;
   if (!recs?.some((r) => r.status === 'not_listed' && r.reasons.includes('sam_placeholder_entry'))) {
     return { entity, crossCheck: 'not_needed' };
   }
+  // FAIL SAFE: if the check cannot run, the placeholder negatives become not_established —
+  // never a silent `false` (ChatGPT's projection drops _meta.certification_cross_check, so a
+  // _meta marker alone would not reach that host).
+  const unchecked = () => ({ entity: withRecords(entity, downgradeUncheckedPlaceholderNegatives(recs)), crossCheck: 'unavailable' as const });
   let shows: Partial<Record<CertProgram, boolean>> = {};
   try {
     const looked = await lookupLocalEntityByUEI(entity.ueiSAM);
-    if (looked.status === 'unavailable') return { entity, crossCheck: 'unavailable' };
+    if (looked.status === 'unavailable') return unchecked();
     if (looked.status === 'found') {
       shows = Object.fromEntries(
         (looked.hit.entity.certificationStatus || []).map((r) => [r.program, r.status === 'active']),
@@ -45,11 +49,15 @@ async function reconcileCertsWithExtract(entity: SAMEntity): Promise<{ entity: S
     }
   } catch (err) {
     console.warn('[mcp:lookup_sam_entity] extract cross-check unavailable:', err);
-    return { entity, crossCheck: 'unavailable' };
+    return unchecked();
   }
   const { records, downgraded } = downgradeOnExtractConflict(recs, shows);
   if (!downgraded.length) return { entity, crossCheck: 'checked' };
+  return { entity: withRecords(entity, records), crossCheck: 'checked' };
+}
 
+/** Replace the status records and recompute the tri-state flags from them (absent = unknown). */
+function withRecords(entity: SAMEntity, records: CertificationRecord[]): SAMEntity {
   const next: SAMEntity = { ...entity, certificationStatus: records };
   const setFlag = (key: 'has8a' | 'hasHUBZone' | 'hasWOSB', v: boolean | undefined) => {
     if (v === undefined) delete next[key]; else next[key] = v;
@@ -59,7 +67,7 @@ async function reconcileCertsWithExtract(entity: SAMEntity): Promise<{ entity: S
   const sbaWomen = certFlag(records, 'WOSB', 'EDWOSB');
   if (sbaWomen === true || entity.businessTypes?.includes('WOSB')) setFlag('hasWOSB', true);
   else if (sbaWomen === undefined) setFlag('hasWOSB', undefined);
-  return { entity: next, crossCheck: 'checked' };
+  return next;
 }
 
 /** The assistant-facing sentence: an unknown certification must never read as "not certified". */
@@ -128,7 +136,7 @@ export interface SamEntityResult {
     source_note?: string;
     /**
      * Whether a live placeholder negative was checked against the stored SAM extract.
-     * `unavailable` = the check could not run, so a not_listed rests on SAM's placeholder alone.
+     * `unavailable` = the check could not run, so placeholder negatives were made not_established.
      */
     certification_cross_check?: CertCrossCheck;
     /**

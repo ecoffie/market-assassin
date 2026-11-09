@@ -141,13 +141,53 @@ describe('placeholder negatives vs the stored SAM extract (conflicting / stale e
     expect(r._meta.certification_cross_check).toBe('checked');
   });
 
-  it('extract unreachable → SAM\'s negative stands, and the response SAYS the check did not run', async () => {
+  it('extract unreachable → FAIL SAFE: placeholder negatives become not_established on BOTH hosts', async () => {
     mockByUei.mockResolvedValue(placeholderFirm());
     mockLocalUei.mockRejectedValue(new Error('db down'));
     const r = await lookupSamEntity({ uei: 'PLACEHOLDER01' });
-    expect(r.entity?.has8a).toBe(false);
+    const { claude, chatgpt, text } = shipped(r);
+    expect(text).not.toMatch(/"has(8a|HUBZone)":false/);
+    for (const out of [claude, chatgpt]) {
+      expect(out.entity.has8a).toBeUndefined();
+      expect(out.entity.hasHUBZone).toBeUndefined();
+      expect(out.certification_status.find((c: { program: string }) => c.program === '8(a)').reasons)
+        .toContain('extract_cross_check_unavailable');
+      expect(out.certification_note).toMatch(/UNKNOWN/);
+    }
     expect(r._meta.certification_cross_check).toBe('unavailable');
     expect(r._meta.degraded).toBe(false); // registration lookup itself succeeded
+  });
+
+  it('the fail-safe never weakens a negative from a COMPLETE list (Jordon 8(a)) even if the check cannot run', async () => {
+    mockByUei.mockResolvedValue(live(jordon));
+    mockLocalUei.mockRejectedValue(new Error('db down'));
+    const r = await lookupSamEntity({ uei: 'N4BAZDMM7DV7' });
+    expect(r.entity?.has8a).toBe(false);
+    expect(r._meta.certification_cross_check).toBe('not_needed');
+  });
+
+  it('cross-check covers every program the extract knows: HUBZone and WOSB, not just 8(a)', async () => {
+    mockByUei.mockResolvedValue(placeholderFirm());
+    mockLocalUei.mockResolvedValue({
+      asOf: '2026-08-25',
+      entity: { ueiSAM: 'PLACEHOLDER01', certificationStatus: [
+        { program: 'HUBZone', status: 'active', basis: 'sam_extract', reasons: [] },
+        { program: 'WOSB', status: 'active', basis: 'sam_extract', reasons: [] },
+      ] },
+    });
+    const r = await lookupSamEntity({ uei: 'PLACEHOLDER01' });
+    expect(r.entity?.hasHUBZone).toBeUndefined();
+    expect(r.entity?.hasWOSB).toBeUndefined();
+    expect(r.entity?.has8a).toBe(false);
+  });
+
+  it('a placeholder negative is labelled as SAM evidence, never as non-certification', async () => {
+    mockByUei.mockResolvedValue(placeholderFirm());
+    const r = await lookupSamEntity({ uei: 'PLACEHOLDER01' });
+    for (const c of r.certification_status!) {
+      expect(c.status).toBe('not_listed');
+      expect(c.source_label).toMatch(/not an SBA determination of non-certification/);
+    }
   });
 });
 
