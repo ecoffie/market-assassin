@@ -130,17 +130,25 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
 
   // ── Source 1: sam_events (grounded, dated) ────────────────────────────────
   if (term) {
-    const scoped = (q: ReturnType<ReturnType<typeof supabase.from>['select']>) =>
+    const byAgency = (q: ReturnType<ReturnType<typeof supabase.from>['select']>) =>
       q
-        .gte('event_date', todayStr)
-        .lte('event_date', horizonStr)
         .or(`agency.ilike.%${term}%,inferred_office.ilike.%${term}%,inferred_subagency.ilike.%${term}%`)
-        .order('event_date', { ascending: true })
+        .order('event_date', { ascending: true, nullsFirst: false })
         .limit(limit);
+    // An attendable event whose notice states no date keeps event_date NULL (the extractor no
+    // longer substitutes the response deadline). Those are returned as "date unknown" when the
+    // notice was re-read recently, so an industry day is not hidden just because its date is.
+    const undatedSince = new Date(today);
+    undatedSince.setDate(undatedSince.getDate() - UNDATED_EVENT_DAYS);
     const typeList = `(${ATTENDABLE_TYPES.join(',')})`;
     const [attendableRes, noticeRes] = await Promise.all([
-      scoped(supabase.from('sam_events').select(COLUMNS, { count: 'exact' })).in('event_type', ATTENDABLE_TYPES),
-      scoped(supabase.from('sam_events').select(COLUMNS, { count: 'exact' })).or(`event_type.is.null,event_type.not.in.${typeList}`),
+      byAgency(supabase.from('sam_events').select(COLUMNS, { count: 'exact' }))
+        .in('event_type', ATTENDABLE_TYPES)
+        .or(`and(event_date.gte.${todayStr},event_date.lte.${horizonStr}),and(event_date.is.null,extracted_at.gte.${undatedSince.toISOString().slice(0, 10)})`),
+      byAgency(supabase.from('sam_events').select(COLUMNS, { count: 'exact' }))
+        .gte('event_date', todayStr)
+        .lte('event_date', horizonStr)
+        .or(`event_type.is.null,event_type.not.in.${typeList}`),
     ]);
 
     if (attendableRes.error || noticeRes.error) {
@@ -189,7 +197,8 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
     const rows = catalogOccurrencesForAgency(agency, todayStr, horizonStr).filter((o) => !seen.has(o.title.toLowerCase().slice(0, 60)));
     for (const o of rows) {
       seen.add(o.title.toLowerCase().slice(0, 60));
-      const at = events.findIndex((e) => !isAttendableType(e.event_type) || (e.event_date || '') > o.event_date);
+      // Undated events sort after every dated one.
+      const at = events.findIndex((e) => !isAttendableType(e.event_type) || (e.event_date ?? '9999-12-31') > o.event_date);
       events.splice(at === -1 ? events.length : at, 0, {
         source: 'catalog',
         title: o.title,
@@ -265,6 +274,9 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
 // events count inheriting the whole-DoD number, 2026-06-29). So agency matches are
 // returned but LABELLED `agency` (and for a department-level agency, flagged
 // `broad:true`) so the UI can say "department-wide" instead of implying relevance.
+/** How recently an undated attendable event's notice must have been re-read to still be listed. */
+export const UNDATED_EVENT_DAYS = 30;
+
 export const ATTENDABLE_TYPES = ['industry_day', 'forecast', 'webinar', 'conference'];
 
 /** Department-level agency strings whose event set is too broad to imply relevance. */
