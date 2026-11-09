@@ -138,12 +138,11 @@ describe('event_location is display-guarded (the extractor is unreliable)', () =
     // MEASURED 2026-08-14: 57 of 68 upcoming events carry a truncated fragment instead of a place
     // (e.g. "ion Number: N6134027R1002" — the tail of "Solicitation Number:"), caught in the live
     // drawer. Showing that is worse than showing nothing.
-    expect(src).toMatch(/const cleanLocation/);
-    expect(src).toMatch(/location: cleanLocation\(r\.event_location\)/);
-    // the three rejection rules
-    expect(src).toMatch(/s\.length > 60/);
-    expect(src).toMatch(/number\\s\*:/i);
-    expect(src).toMatch(/\^\[a-z\]/);
+    // The rules now live in ./location.ts (behaviour tested in location.unit.test.ts); both query
+    // paths must go through them.
+    expect(src).toMatch(/location: cleanEventLocation\(r\.event_location\)/);
+    expect(src).toMatch(/location: cleanEventLocation\(row\.event_location\)/);
+    expect(src).not.toMatch(/location: row\.event_location/);
   });
 });
 

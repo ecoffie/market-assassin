@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { resolveEventOffice } from '@/lib/gov-contacts/event-office';
 import { classifyEventRadarRun } from '@/lib/data-core/event-radar-advancement';
+import { extractLocation } from '@/lib/events/location';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -93,23 +94,6 @@ function extractEventDate(text: string): Date | null {
       } catch {
         continue;
       }
-    }
-  }
-
-  return null;
-}
-
-function extractLocation(text: string): string | null {
-  // Look for common location patterns
-  const patterns = [
-    /(?:at|location:|venue:)\s*([^,.\n]+(?:,\s*[A-Z]{2})?)/i,
-    /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,\s*[A-Z]{2}\s*\d{5})/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match) {
-      return match[1].trim();
     }
   }
 
