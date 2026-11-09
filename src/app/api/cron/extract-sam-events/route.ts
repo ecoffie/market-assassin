@@ -14,6 +14,7 @@ import { createClient } from '@supabase/supabase-js';
 import { resolveEventOffice } from '@/lib/gov-contacts/event-office';
 import { classifyEventRadarRun } from '@/lib/data-core/event-radar-advancement';
 import { extractLocation } from '@/lib/events/location';
+import { classifyEvent, extractEventDate } from '@/lib/events/classify';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -29,21 +30,6 @@ function getSupabase() {
   return _supabase;
 }
 
-// Keywords that indicate events
-const EVENT_KEYWORDS = {
-  industry_day: [
-    'industry day',
-    'vendor day',
-    'industry conference',
-    'vendor outreach',
-    'market research event',
-    'industry engagement',
-  ],
-  webinar: ['webinar', 'virtual event', 'online session', 'video conference', 'zoom meeting'],
-  rfi: ['request for information', 'rfi', 'sources sought', 'market survey'],
-  forecast: ['forecast', 'projection', 'upcoming procurement', 'planned acquisition'],
-};
-
 interface SamOpportunity {
   notice_id: string;
   title: string;
@@ -56,48 +42,6 @@ interface SamOpportunity {
   solicitation_number: string | null;
   office: string | null;
   sub_tier: string | null;
-}
-
-function classifyEvent(title: string, description: string | null): string | null {
-  const text = `${title} ${description || ''}`.toLowerCase();
-
-  for (const [eventType, keywords] of Object.entries(EVENT_KEYWORDS)) {
-    for (const keyword of keywords) {
-      if (text.includes(keyword)) {
-        return eventType;
-      }
-    }
-  }
-
-  return null;
-}
-
-function extractEventDate(text: string): Date | null {
-  // Common date patterns in event notices
-  const patterns = [
-    // "April 15, 2026"
-    /(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2},?\s+\d{4}/gi,
-    // "15 April 2026"
-    /\d{1,2}\s+(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4}/gi,
-    // "04/15/2026" or "4/15/26"
-    /\d{1,2}\/\d{1,2}\/\d{2,4}/g,
-  ];
-
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match) {
-      try {
-        const date = new Date(match[0]);
-        if (!isNaN(date.getTime()) && date > new Date()) {
-          return date;
-        }
-      } catch {
-        continue;
-      }
-    }
-  }
-
-  return null;
 }
 
 export async function GET(request: NextRequest) {
@@ -171,11 +115,12 @@ export async function GET(request: NextRequest) {
       // result is partly a judgement on incomplete text — and must say so.
       if (!notice.description || !notice.description.trim()) evaluatedWithoutDescription++;
     }
-    const eventType = classifyEvent(notice.title, notice.description);
+    const classification = classifyEvent(notice.title, notice.description);
 
-    if (eventType) {
+    if (classification) {
+      const eventType = classification.type;
       const fullText = `${notice.title} ${notice.description || ''}`;
-      const eventDate = extractEventDate(fullText);
+      const eventDate = extractEventDate(notice.title, notice.description, classification, notice.response_deadline);
       const location = extractLocation(fullText);
       // Resolve the buying office: DoD via the solicitation-number DoDAAC, civilian
       // via SAM's own office/sub_tier columns — so events scope to the real command
@@ -187,7 +132,7 @@ export async function GET(request: NextRequest) {
         title: notice.title,
         event_type: eventType,
         agency: notice.department,
-        event_date: eventDate?.toISOString().split('T')[0] || notice.response_deadline?.split('T')[0] || null,
+        event_date: eventDate,
         event_location: location,
         description: notice.description?.substring(0, 2000) || null,
         source_notice_type: notice.notice_type,
