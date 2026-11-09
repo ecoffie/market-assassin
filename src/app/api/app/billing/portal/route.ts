@@ -31,7 +31,7 @@ function getStripe(): Stripe | null {
 }
 
 export async function POST(request: NextRequest) {
-  let body: { email?: string; returnUrl?: string } = {};
+  let body: { email?: string; returnUrl?: string; billedTo?: string } = {};
   try { body = await request.json(); } catch { /* empty body ok */ }
 
   const email = String(body.email || request.nextUrl.searchParams.get('email') || '')
@@ -65,7 +65,11 @@ export async function POST(request: NextRequest) {
     // the subscription. Without this, a user who bought under another address (normal
     // behaviour per Eric, 2026-07-29) opened a portal scoped to the wrong customer and had no
     // cancel button — exactly Alisha Martin's case. Signed-in address is tried FIRST.
-    const candidates = await getLinkedEmails(userEmail);
+    const linked = await getLinkedEmails(userEmail);
+    // "Your subscriptions" lists each plan with the email it is billed to; Manage on that row
+    // opens the portal on THAT customer. Only an address already linked to this user is honoured.
+    const billedTo = String(body.billedTo || '').trim().toLowerCase();
+    const candidates = billedTo && linked.includes(billedTo) ? [billedTo] : linked;
     let customer: Awaited<ReturnType<typeof resolveStripeCustomerByEmail>>['customer'] = null;
     for (const candidate of candidates) {
       const r = await resolveStripeCustomerByEmail(stripe, candidate);

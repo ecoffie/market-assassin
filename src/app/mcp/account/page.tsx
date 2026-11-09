@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
+import SubscriptionsCard from '@/components/billing/SubscriptionsCard';
 import { McpNav, MCP_URL } from '../catalog-ui';
 import {
   UsageKpis, UsageOverTime, SpendByTool, ActivityLog,
@@ -316,6 +317,7 @@ export default function McpAccountPage() {
           <Link href="/mcp/pricing" className="rounded-lg bg-emerald-500 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-emerald-400">Top up</Link>
         </div>
       </div>
+      <SubscriptionsCard email={email} upgradeHref="/mcp/pricing" />
       {usage && usage.totalCalls > 0 ? (
         <>
           <UsageKpis usage={usage} />
@@ -339,6 +341,9 @@ export default function McpAccountPage() {
 
   const billingBody = (
     <div className="space-y-5">
+      {/* Every plan they're on (Mindy Pro/Team, MCP credits plan) + Manage / cancel for each. */}
+      <SubscriptionsCard email={email} upgradeHref="/mcp/pricing" />
+
       {/* Balance + top up */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-surface px-4 py-3.5">
         <div className="flex items-baseline gap-2.5">
@@ -346,12 +351,6 @@ export default function McpAccountPage() {
           <span className="text-[13px] text-slate-400">credits remaining</span>
         </div>
         <Link href="/mcp/pricing" className="rounded-lg bg-emerald-500 px-3.5 py-2 text-[13px] font-semibold text-white hover:bg-emerald-400">Top up credits</Link>
-      </div>
-
-      {/* Plan */}
-      <div className="rounded-xl border border-white/[0.07] bg-surface px-4 py-3.5">
-        <p className="text-[13px] font-semibold text-slate-100">Plan</p>
-        <p className="mt-1 text-[13px] text-slate-400">Pay-as-you-go credits. Go <span className="text-slate-200">MCP Pro</span> for a monthly credit allowance and Pro-only tools. <Link href="/mcp/pricing" className="text-emerald-300 underline underline-offset-2 hover:text-emerald-200">See plans →</Link></p>
       </div>
 
       {/* Auto-recharge — full controls */}
