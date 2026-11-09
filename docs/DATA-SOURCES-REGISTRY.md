@@ -209,7 +209,22 @@ so a stamp could be checked against the artifact it claims to describe.
 ### Needs attention (flagged for acquisition cleanup)
 - **Stale snapshots:** `december-hit-list.json`, `december-spend-forecast.json` — refresh or remove.
 - **Opinion-based:** `agency-sat-friendliness.json` — re-derive statistically from USASpending or remove.
-- **Manual-drift risk:** `federal-events-sources.json`, `agency-procurement-sources.json` (URLs break) — quarterly verify.
+- **Manual-drift risk:** `agency-procurement-sources.json` (URLs break) — quarterly verify. (`federal-events-sources.json` is now monitored — see below.)
+
+### Federal events catalog (`federal_events_catalog`, monthly)
+`src/data/federal-events-sources.json` — curated event series + dated conferences, hand-verified
+against **organizer** sites (never a third-party listing).
+- **Per-entry truth:** every entry carries `verification {status, checked_at, source_url, note}`.
+  Only `verified_upcoming` entries may carry a `next_occurrence`, and every date records
+  `verified_at` + `source_url` (enforced by `catalog-integrity.unit.test.ts`). Editing the file
+  never makes an entry current.
+- **Monitor:** `check-data-freshness` (daily 13:05 UTC) reads review age from the file's own
+  `lastFullReview` (no separate stamp), flags dated occurrences that have ended, and on Mondays
+  (or `?links=1`) GETs every catalog URL — 404/410 or a deep link now landing on a home page is
+  flagged; 403/5xx/timeouts are counted as inconclusive, never as broken. Findings go to the same
+  ops alert. None of this runs in CI, so an organizer outage cannot block a deploy.
+- **Review procedure:** re-check entries on organizer sites, update `next_occurrence` and
+  `verification`, then bump `lastFullReview` (that date IS the stamp).
 - **Not yet built:** Phase 3-4 forecast scrapers (HHS/Treasury/EPA/USDA/DOD); 20+ DOE-lab multisite scrapers.
 - **Validate:** OpenGov IQ enrichment — run `validate-opengov-idiq-against-usaspending.js` monthly.
 
