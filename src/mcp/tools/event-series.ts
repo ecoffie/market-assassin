@@ -37,6 +37,21 @@ export interface EventSeriesRow {
   notes: string | null;
   /** The next dated instance, only when read from the organizer's page and not yet over. */
   next_occurrence: CatalogOccurrence | null;
+  /** Per-entry check against the organizer's own site. null = never checked. */
+  verification: CatalogVerification | null;
+}
+
+/**
+ * verified_upcoming = the organizer's site shows a dated upcoming event (or listing) · link_ok = the
+ * link resolves to the organizer's page but no date was read · no_next_announced · unverifiable =
+ * the site refuses automated reads · paused / not_found / unverified = see note. Editing the file
+ * does not make an entry current — only this status does.
+ */
+export interface CatalogVerification {
+  status: 'verified_upcoming' | 'link_ok' | 'no_next_announced' | 'unverifiable' | 'paused' | 'not_found' | 'unverified';
+  checked_at: string;
+  source_url: string;
+  note?: string;
 }
 
 export interface EventSeriesResult {
@@ -54,6 +69,8 @@ export interface EventSeriesResult {
     catalog_updated: string | null;
     /** Last time every entry was reviewed. */
     catalog_last_full_review: string | null;
+    /** Entries per verification status across the whole catalog (not just the returned rows). */
+    catalog_verification: Record<string, number>;
   };
 }
 
@@ -67,6 +84,7 @@ type EventSourceEntry = {
   notes?: string;
   cost?: string;
   value?: string;
+  verification?: CatalogVerification;
 };
 type AnnualConference = {
   name?: string;
@@ -78,6 +96,9 @@ type AnnualConference = {
   url?: string;
   agencies?: string[];
   next_occurrence?: CatalogOccurrence;
+  /** A single dated event rather than an annual series. */
+  one_off?: boolean;
+  verification?: CatalogVerification;
 };
 
 const data = eventsStaticData as {
@@ -105,6 +126,7 @@ function allSeries(todayStr: string): EventSeriesRow[] {
       value: s.value || null,
       notes: s.notes || null,
       next_occurrence: null,
+      verification: s.verification || null,
     });
   }
   (data.majorAnnualConferences || []).forEach((c, i) => {
@@ -112,7 +134,7 @@ function allSeries(todayStr: string): EventSeriesRow[] {
       id: `conf_${i}_${(c.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 24)}`,
       name: c.name || `Conference ${i + 1}`,
       kind: 'annual_conference',
-      cadence: c.typical_month ? `annual · ${c.typical_month}` : 'annual',
+      cadence: c.one_off ? `dated event · ${c.typical_month || 'see date'}` : c.typical_month ? `annual · ${c.typical_month}` : 'annual',
       url: c.url || null,
       categories: ['conference'],
       agencies: c.agencies || [],
@@ -122,6 +144,7 @@ function allSeries(todayStr: string): EventSeriesRow[] {
       value: c.value || null,
       notes: null,
       next_occurrence: currentOccurrence(c.next_occurrence, todayStr),
+      verification: c.verification || null,
     });
   });
   return rows;
@@ -209,6 +232,11 @@ export function getFederalEventSeries(input: EventSeriesInput): EventSeriesResul
       filtered_by: filteredBy,
       catalog_updated: data.lastUpdated || null,
       catalog_last_full_review: data.lastFullReview || null,
+      catalog_verification: catalog.reduce<Record<string, number>>((acc, r) => {
+        const k = r.verification?.status || 'never_checked';
+        acc[k] = (acc[k] || 0) + 1;
+        return acc;
+      }, {}),
     },
   };
 

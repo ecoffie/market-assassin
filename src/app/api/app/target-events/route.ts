@@ -88,6 +88,7 @@ interface StaticConference {
   url?: string;
   registration_cost?: string;
   value?: string;
+  one_off?: boolean;
 }
 
 // --- Agency-name variant builder ---------------------------------
@@ -346,7 +347,7 @@ export async function GET(request: NextRequest) {
           location: conf.location,
           url: conf.url || null,
           description: [
-            `${conf.typical_month} (annual)`,
+            `${conf.typical_month} (${conf.one_off ? 'dated event' : 'annual'})`,
             conf.value,
             conf.registration_cost ? `Reg: ${conf.registration_cost}` : null,
           ].filter(Boolean).join(' · '),
