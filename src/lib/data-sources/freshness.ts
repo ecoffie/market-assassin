@@ -1,5 +1,6 @@
 const STALE_DAYS_BY_CADENCE: Readonly<Record<string, number>> = {
   weekly: 10,
+  monthly: 35,
   quarterly: 100,
   annual: 380,
   'as-published': 120,

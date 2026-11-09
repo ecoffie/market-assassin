@@ -24,10 +24,12 @@ import {
   type AwardsFreshness,
 } from '@/lib/awards-ingest';
 import { staleDaysForCadence } from '@/lib/data-sources/freshness';
+import eventsCatalog from '@/data/federal-events-sources.json';
+import { CATALOG_KEY, catalogDateFindings, catalogLinkFindings, type EventCatalog } from '@/lib/events/catalog-freshness';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 30;
+export const maxDuration = 60; // the weekly catalog link check adds up to ~45s of time-boxed GETs
 
 export async function GET(request: NextRequest) {
   const auth = request.headers.get('authorization') || '';
@@ -64,6 +66,8 @@ export async function GET(request: NextRequest) {
     classification?: AwardsFreshness['status'];
   }> = [];
   for (const s of data || []) {
+    // Checked below from the catalog file itself, never from a stamped last_built.
+    if (s.key === CATALOG_KEY) continue;
     if (s.key === 'bq_awards') {
       const freshness = classifyFreshness({
         clocks: resolveAwardsIngestClocks({ notes: s.notes, lastBuilt: s.last_built }),
@@ -88,6 +92,32 @@ export async function GET(request: NextRequest) {
       const refreshWith = REFRESH_SCRIPTS[s.key] || s.built_from || 'see DATA-SOURCES-REGISTRY.md';
       stale.push({ key: s.key, name: s.name, cadence: s.refresh_cadence, ageDays, refreshWith });
     }
+  }
+
+  // Curated event catalog. Review age and passed dates come from the file (no network, daily); the
+  // link check makes one time-boxed GET per catalog URL and runs weekly (Mondays) or on ?links=1.
+  // Any finding joins the same ops alert. A blocked or slow organizer site is never a finding.
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const catalogFindings = catalogDateFindings(eventsCatalog as EventCatalog, todayStr);
+  let catalogLinks: { checked: number; inconclusive: number } | null = null;
+  if (new Date().getUTCDay() === 1 || request.nextUrl.searchParams.get('links') === '1') {
+    try {
+      const r = await catalogLinkFindings(eventsCatalog as EventCatalog);
+      catalogFindings.push(...r.findings);
+      catalogLinks = { checked: r.checked, inconclusive: r.inconclusive };
+    } catch (e) {
+      console.error('[check-data-freshness] catalog link check failed:', e);
+    }
+  }
+  if (catalogFindings.length > 0) {
+    const review = (eventsCatalog as EventCatalog).lastFullReview;
+    stale.push({
+      key: CATALOG_KEY,
+      name: `Federal events catalog — ${catalogFindings.length} item(s): ${catalogFindings.slice(0, 6).map((f) => (f.entry ? `${f.entry}: ` : '') + f.detail).join('; ')}${catalogFindings.length > 6 ? '; …' : ''}`,
+      cadence: 'monthly',
+      ageDays: review ? Math.round((Date.parse(todayStr) - Date.parse(review)) / 86400_000) : -1,
+      refreshWith: REFRESH_SCRIPTS[CATALOG_KEY],
+    });
   }
 
   // Live-sync freshness (not curated scrapers — these are crons that must keep
@@ -158,6 +188,7 @@ export async function GET(request: NextRequest) {
     totalSources: (data || []).length,
     staleCount: stale.length,
     stale,
+    eventsCatalog: { lastFullReview: (eventsCatalog as EventCatalog).lastFullReview ?? null, findings: catalogFindings, links: catalogLinks },
     notified,
     message: notifyFailed
       ? 'Freshness issues found, but the ops alert failed to deliver.'
@@ -202,4 +233,8 @@ const REFRESH_SCRIPTS: Record<string, string> = {
   dod_command_osbp: 'refresh director names vs agency OSBP pages (structure is stable)',
   agency_pain_points: 'scripts/merge-agency-intelligence.js + ~/Bootcamp/scan-ndaa-sections.py (new GAO/NDAA)',
   forecast_intelligence: 'scripts/import-forecasts.js (+ gsa/nsf/ssa variants)',
+  [CATALOG_KEY]:
+    'MANUAL monthly review of src/data/federal-events-sources.json: re-check each entry on the ORGANIZER site '
+    + '(never a third-party listing), update next_occurrence + per-entry verification, then bump lastFullReview '
+    + '(that date IS the stamp). See docs/DATA-SOURCES-REGISTRY.md §Federal events catalog.',
 };
