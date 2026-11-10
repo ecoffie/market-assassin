@@ -26,6 +26,7 @@ import { SETTINGS_SECTION_ANCHORS, type SettingsSection } from '@/lib/app/deep-l
 import CreditsConsole from '@/components/account/CreditsConsole';
 import { useScrollToAnchor } from '../useScrollToAnchor';
 import MindyLoader from '@/components/app/MindyLoader';
+import { tierAtLeast } from '@/lib/access/tier-rank';
 
 interface UnifiedSettingsPanelProps {
   email: string | null;
@@ -1172,7 +1173,7 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
               <a href="/app?panel=vault" className="block rounded-lg border border-surface px-3 py-2 text-sm text-white hover:bg-surface">
                 My Vault <span className="block text-xs text-muted">Past performance, capabilities, documents</span>
               </a>
-              {(tier === 'team' || tier === 'enterprise') && (
+              {tierAtLeast(tier, 'team') && (
                 <>
                   <a href="/app?panel=team" className="block rounded-lg border border-surface px-3 py-2 text-sm text-white hover:bg-surface">
                     Team <span className="block text-xs text-muted">Seats and roles</span>
