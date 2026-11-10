@@ -84,7 +84,8 @@
     "src/app/ncmbc",
     "src/app/mdeat",
     "src/app/lazy-contractors-blueprint",
-    "src/app/jobs"
+    "src/app/jobs",
+    "src/app/course"
   ],
   "runtimeRoutes": [
     "/today",
