@@ -43,10 +43,11 @@ const P = (s: string) =>
 /**
  * Each phase does a DIFFERENT job so the sequence never repeats itself:
  *   deal       — the offer + the math (here's what we showed you)
- *   lastcall   — kill the risk objection (30-day money-back + try it free now)
+ *   lastcall   — kill the risk objection (try it free now, before buying)
  *   extension  — permission + "pays for itself in ~20 months, then free forever"
  *   finalclose — short loss-framing (after tonight it's monthly only)
- * Only verifiable facts: $149/mo, 4997÷149≈34 months, 30-day money-back, free trial.
+ * Only verifiable facts: $149/mo, 4997÷149≈34 months, free trial. NO refund promise: sales
+ * are final per /terms (Eric, 2026-11-10).
  */
 const PHASE_COPY: Record<LifetimePhase, {
   subject: (n: string) => string;
@@ -75,7 +76,7 @@ const PHASE_COPY: Record<LifetimePhase, {
     intro: (n) =>
       P(`${n} &mdash; if you&rsquo;re on the fence about the Founders Lifetime, it&rsquo;s almost always the same worry: &ldquo;will it actually work for <em>my</em> business?&rdquo;`) +
       P(`So let&rsquo;s take the risk off the table completely:`) +
-      P(`&bull;&nbsp; <strong style="color:#0f172a;">30-day money-back guarantee.</strong> Claim your seat, use Mindy on your real pipeline, and if it&rsquo;s not for you, email us inside 30 days for a full refund.`) +
+      P(`&bull;&nbsp; <strong style="color:#0f172a;">Try it free first.</strong> Mindy is free at getmindy.ai, so you can run it on your real pipeline before you claim your seat.`) +
       P(`&bull;&nbsp; <strong style="color:#0f172a;">Try it free right now.</strong> Mindy&rsquo;s live at getmindy.ai &mdash; run your own NAICS or a contract you care about before you decide.`),
     outro:
       P(`You can&rsquo;t really lose here: try it free, claim it risk-free, and keep it for life. But the Founders price goes at midnight.`),
@@ -88,7 +89,7 @@ const PHASE_COPY: Record<LifetimePhase, {
       P(`${n} &mdash; thanks again for being part of Mindy Day. As promised, here&rsquo;s the full deck from Saturday &mdash; every slide, yours to keep:`) +
       slidesCardHtml +
       P(`<br>And one more thing: a few of you asked for more time on the Founders Lifetime &mdash; $4,997 once is a real decision. So we extended it through tonight.`) +
-      P(`The math makes it easy: at <strong style="color:#0f172a;">$149/month</strong> you&rsquo;d cross $4,997 in about <strong style="color:#0f172a;">34 months</strong> &mdash; then keep paying, forever. Pay once now and everything after is free, for life. It&rsquo;s also 30-day money-back, and Mindy&rsquo;s free to try at getmindy.ai if you want to kick the tires first.`),
+      P(`The math makes it easy: at <strong style="color:#0f172a;">$149/month</strong> you&rsquo;d cross $4,997 in about <strong style="color:#0f172a;">34 months</strong> &mdash; then keep paying, forever. Pay once now and everything after is free, for life. Mindy&rsquo;s free to try at getmindy.ai if you want to kick the tires first.`),
     outro:
       P(`This is a genuine extension &mdash; and the last one. When the final seats go, the lifetime price goes with them.`),
   },
@@ -100,7 +101,7 @@ const PHASE_COPY: Record<LifetimePhase, {
       P(`${n} &mdash; last call, for real this time.`) +
       P(`After tonight, lifetime goes away and Mindy is monthly only. At $149/mo you&rsquo;d pass $4,997 in about 34 months &mdash; and never stop paying. Lock it in once, tonight, and you&rsquo;re done:`),
     outro:
-      P(`Still 30-day money-back, so the only real risk is letting the price close. After midnight, it&rsquo;s gone.`),
+      P(`You can still try Mindy free first, so the only real risk is letting the price close. After midnight, it&rsquo;s gone.`),
   },
 };
 

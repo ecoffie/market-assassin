@@ -59,7 +59,7 @@ export default function BundleProductPage({
   accessSummary,
   accessBadgeLabel = 'Lifetime Access',
   includedProductsSubtitle,
-  guaranteeText = '30-day money-back guarantee. Lifetime access. No subscriptions.',
+  guaranteeText = 'Lifetime access. No subscriptions. All sales final.',
 }: BundleProductPageProps) {
   const savings = originalPrice - price;
   const savingsPercent = Math.round((savings / originalPrice) * 100);

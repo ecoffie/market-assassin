@@ -75,7 +75,7 @@ const faqs: Array<{ q: string; a: string }> = [
   },
   {
     q: 'What about refunds?',
-    a: '30-day money-back guarantee. Email hello@getmindy.ai within 30 days if Mindy is not earning her keep.',
+    a: 'All sales are final. If a technical problem stops you from using Mindy, email hello@getmindy.ai within 7 days of purchase. Mindy is free to try first, so you can test it on your own pipeline before you buy.',
   },
 ];
 
@@ -178,7 +178,7 @@ export default function LifetimePage() {
               ? `Claim your lifetime seat — $${fmt(livePrice)} →`
               : `Become a Founding Member — $${fmt(FOUNDERS_LIFETIME_PRICE)} →`}
           </Link>
-          <p className="text-(--mp-muted) text-sm mt-4">30-day money back · One-time payment</p>
+          <p className="text-(--mp-muted) text-sm mt-4">One-time payment · All sales final</p>
         </div>
       </section>
 

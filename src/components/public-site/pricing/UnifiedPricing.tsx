@@ -350,7 +350,6 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
           <div className="row">
             <span className="chip">✦ {fmt(signupCredits)} free MCP credits on signup</span>
             <span className="chip">↺ Cancel anytime</span>
-            <span className="chip">$ 30-day money back on Pro</span>
             <a className="chip" href={REFERRALS_URL}>♥ Refer a friend — you both get 100 credits →</a>
           </div>
         </section>

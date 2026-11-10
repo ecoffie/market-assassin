@@ -13,7 +13,7 @@ export default function UltimateBundlePage() {
       accessSummary="One-time payment. Lifetime access to every included tool, including Market Intelligence."
       accessBadgeLabel="Lifetime MI Included"
       includedProductsSubtitle="Get lifetime access to every premium product, including Market Intelligence"
-      guaranteeText="30-day money-back guarantee. Lifetime access to the full Ultimate bundle, including Market Intelligence."
+      guaranteeText="All sales final. Lifetime access to the full Ultimate bundle, including Market Intelligence."
       includedProducts={[
         {
           name: 'Market Intelligence - Lifetime Access',
