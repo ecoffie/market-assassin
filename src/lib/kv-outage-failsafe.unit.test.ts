@@ -137,3 +137,79 @@ describe('KV ops signal', () => {
     expect(opsMock.sendOpsAlert).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * Revocation across instances. Each Vercel instance has its OWN in-memory stale store, so
+ * "instance" = a separate module load (vi.resetModules). KV itself is one shared map.
+ *
+ * Guarantees pinned here:
+ *   - a revocation that an instance OBSERVES (healthy miss) is never resurrected by a later outage;
+ *   - a COLD instance (nothing observed) never invents access during an outage;
+ *   - a revocation made while KV is healthy is seen by every instance on its next healthy read.
+ * Known, documented bound (pinned so it cannot silently widen):
+ *   - a WARM instance that last saw the grant BEFORE the revocation and then hits a KV outage before
+ *     its next healthy read keeps serving the grant until its 24h stale entry expires or the instance
+ *     recycles. It can never exceed 24h from that instance's last healthy read.
+ */
+describe('revocation across warm and cold instances', () => {
+  const store = new Map<string, string>();
+  let kvDown = false;
+  const loadInstance = async () => {
+    vi.resetModules();
+    return (await import('./kv-resilience')).hasBriefingsAccessResilient;
+  };
+  beforeEach(() => {
+    store.clear();
+    kvDown = false;
+    kvMock.get.mockImplementation(async (k: string) => {
+      if (kvDown) throw new Error('ERR max requests limit exceeded');
+      return store.has(k) ? store.get(k)! : null;
+    });
+  });
+
+  it('revoked while KV healthy → every instance (warm A, warm B, cold C) denies on its next read', async () => {
+    store.set('briefings:u@x.com', 'true');
+    const A = await loadInstance();
+    const B = await loadInstance();
+    expect(await A('u@x.com')).toBe(true);
+    expect(await B('u@x.com')).toBe(true);
+
+    store.delete('briefings:u@x.com'); // revocation (webhook / admin)
+    vi.advanceTimersByTime(31_000); // past the pre-existing 30s access cache
+    expect(await A('u@x.com')).toBe(false);
+    expect(await B('u@x.com')).toBe(false);
+    const C = await loadInstance();
+    expect(await C('u@x.com')).toBe(false);
+
+    // A later outage resurrects nothing on any instance that observed the revocation, nor on a cold one.
+    kvDown = true;
+    vi.advanceTimersByTime(31_000);
+    expect(await A('u@x.com')).toBe(false);
+    expect(await B('u@x.com')).toBe(false);
+    expect(await (await loadInstance())('u@x.com')).toBe(false);
+  });
+
+  it('cold instance during an outage never grants, even for a key that exists in KV', async () => {
+    store.set('briefings:paid@x.com', 'true');
+    kvDown = true;
+    const cold = await loadInstance();
+    expect(await cold('paid@x.com')).toBe(false); // resilient path is KV-only; nothing observed → deny
+  });
+
+  it('DOCUMENTED BOUND: warm instance that never observed the revocation serves the stale grant during an outage, at most 24h from its last healthy read', async () => {
+    store.set('briefings:late@x.com', 'true');
+    const A = await loadInstance();
+    expect(await A('late@x.com')).toBe(true); // last healthy read at t0
+
+    store.delete('briefings:late@x.com'); // revoked in KV
+    kvDown = true; // outage begins before A reads again
+    vi.advanceTimersByTime(31_000);
+    expect(await A('late@x.com')).toBe(true); // the bound: A cannot see the revocation
+
+    vi.advanceTimersByTime(24 * 3600 * 1000); // > 24h since A's last healthy read
+    expect(await A('late@x.com')).toBe(false); // bound enforced
+
+    kvDown = false; // and once KV is healthy, the revocation applies immediately
+    expect(await A('late@x.com')).toBe(false);
+  });
+});
