@@ -47,10 +47,12 @@ describe('account menu destinations', () => {
     // are NOT item 6's work:
     //   • /app?panel=settings — the deliberate Bucket B `_blank` bridge (billing/security/
     //     team live only in /app today; a tab is tolerable until those are rebuilt).
+    //     Credits & Usage is part of that same Settings page (Eric, 2026-11-10), so its link
+    //     /app?panel=settings&section=credits is the same bridge (the header credits chip adds &tab=billing).
     //   • /app?next= — the sign-in button's FALLBACK, used only if openSignInModal is absent.
     //     The modal is the primary path; this is the defensive branch, not a destination.
     const appLinks = (menu().match(/href="\/app[^"]*"/g) || []).sort();
-    expect(appLinks).toEqual(['href="/app?next="', 'href="/app?panel=settings"']);
+    expect(appLinks).toEqual(['href="/app?next="', 'href="/app?panel=settings"', 'href="/app?panel=settings&section=credits"', 'href="/app?panel=settings&section=credits&tab=billing"']);
   });
 
   it('no menu item points at the legacy pipeline or proposals panels', () => {

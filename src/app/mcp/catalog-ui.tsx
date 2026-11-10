@@ -122,7 +122,7 @@ export function McpNav({ active, signedIn, balance }: { active: 'about' | 'conne
         <Link href="/mcp" className={`${link} ${active === 'connect' ? on : off}`}>Connect</Link>
         <Link href="/mcp/pricing" className={`${link} ${active === 'pricing' ? on : off}`}>Pricing</Link>
         {signedIn ? (
-          <Link href="/mcp/account" className={`ml-1 flex items-center gap-2 rounded-lg px-3 py-1.5 font-medium ${active === 'account' ? on : off}`}>
+          <Link href="/app?panel=settings&section=credits" className={`ml-1 flex items-center gap-2 rounded-lg px-3 py-1.5 font-medium ${active === 'account' ? on : off}`}>
             {typeof balance === 'number' && (
               <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-emerald-300">{balance.toLocaleString()} cr</span>
             )}

@@ -275,7 +275,7 @@ export default function ContinuePage() {
                     </a>
                   ) : null}
                   {buyErrorKind === 'done' ? (
-                    <a href="/mcp/account" className="mt-2 inline-block font-semibold underline">
+                    <a href="/app?panel=settings&section=credits" className="mt-2 inline-block font-semibold underline">
                       View your credits and results →
                     </a>
                   ) : null}

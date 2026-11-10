@@ -21,7 +21,7 @@ export type ProposalAction = (typeof PROPOSAL_ACTIONS)[number];
 export const VAULT_SECTIONS = ['identity', 'past_performance', 'capabilities', 'team', 'documents', 'generated'] as const;
 export type VaultDeepLinkSection = (typeof VAULT_SECTIONS)[number];
 
-export const SETTINGS_SECTIONS = ['billing', 'security', 'notifications', 'team'] as const;
+export const SETTINGS_SECTIONS = ['billing', 'credits', 'security', 'notifications', 'team'] as const;
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 
 export interface AppDeepLinkContext {
@@ -114,6 +114,7 @@ export const PROPOSAL_ACTION_TARGETS: Record<ProposalAction, { label: string; an
 
 export const SETTINGS_SECTION_ANCHORS: Record<SettingsSection, string> = {
   billing: 'settings-billing',
+  credits: 'settings-credits',
   security: 'settings-security',
   notifications: 'settings-notifications',
   team: 'settings-team',

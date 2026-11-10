@@ -77,7 +77,7 @@ export default function ClaimForm({ initialState, credits }: { initialState: Sta
           {result.alreadyClaimed ? `You already claimed your ${credits} credits.` : `${credits} credits added to your account.`}
         </h2>
         <p className="mp-standfirst">Your Mindy balance is now {result.balance.toLocaleString('en-US')} credits ({result.email}).</p>
-        <div><ButtonLink href="/mcp/account">See my credits</ButtonLink></div>
+        <div><ButtonLink href="/app?panel=settings&section=credits">See my credits</ButtonLink></div>
       </div>
     );
   }

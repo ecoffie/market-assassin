@@ -185,7 +185,7 @@ export default function McpConsole() {
           </span>
           <span className="shrink-0 text-[15px] font-semibold text-(--mp-navy)">Open the guide →</span>
         </Link>
-        <p className="mt-4 text-[13px] text-(--mp-muted)">No API key needed: you sign in through your browser. Running it headless or in CI? Get a key in <Link href="/mcp/account?section=keys" className="underline underline-offset-2 hover:text-(--mp-body)">Account → API keys</Link>.</p>
+        <p className="mt-4 text-[13px] text-(--mp-muted)">No API key needed: you sign in through your browser. Running it headless or in CI? Get a key in <Link href="/app?panel=settings&section=credits&tab=keys" className="underline underline-offset-2 hover:text-(--mp-body)">Account → API keys</Link>.</p>
       </div>
     </section>
   );
@@ -260,7 +260,7 @@ export default function McpConsole() {
             </p>
             {signedIn ? (
               <div className="mt-8 flex flex-wrap gap-3.5">
-                <Link href="/mcp/account" className={primary}>
+                <Link href="/app?panel=settings&section=credits" className={primary}>
                   {typeof balance === 'number' ? `${balance.toLocaleString()} credits · Your account` : 'Your account'}
                 </Link>
                 <a href="#connect" className={ghost}>How to connect</a>
@@ -335,7 +335,7 @@ export default function McpConsole() {
 
       {signedIn && (
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-5 text-[13px] text-(--mp-muted) sm:px-6">
-          <span>Signed in as {email} · <Link href="/mcp/account?section=settings" className="underline underline-offset-2 hover:text-(--mp-body)">Account settings</Link></span>
+          <span>Signed in as {email} · <Link href="/app?panel=settings" className="underline underline-offset-2 hover:text-(--mp-body)">Account settings</Link></span>
           <span>Link <code className="font-(family-name:--mp-font-mono)">{MCP_URL}</code></span>
         </div>
       )}

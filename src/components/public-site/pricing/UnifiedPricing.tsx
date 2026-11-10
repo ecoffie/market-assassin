@@ -44,7 +44,7 @@ const PRO_CHECKOUT_ANNUAL = 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D'; //
 const TEAMS_CONTACT_URL = '/contact-sales';
 const ENTERPRISE_CONTACT_URL = '/contact-sales';
 const MCP_TRIAL_URL = '/app';
-const REFERRALS_URL = '/mcp/account?section=referrals';
+const REFERRALS_URL = '/app?panel=settings&section=credits&tab=referrals';
 const GOVWIN_URL = '/compare/govwin';
 
 const PLANS_FALLBACK: SubPlan[] = [
@@ -261,7 +261,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
   const upgrade = !me?.plan ? null
     : me.plan === 'free' ? { label: 'Upgrade to Pro', href: withUpgradePromo(PRO_CHECKOUT_MONTHLY), offer: true }
     : me.plan === 'pro' ? { label: 'Upgrade to Teams', href: `${TEAMS_CONTACT_URL}?offer=${UPGRADE_OFFER_PARAM}`, offer: true }
-    : { label: 'Add credits', href: '/mcp/account?section=billing', offer: false };
+    : { label: 'Add credits', href: '/app?panel=settings&section=credits&tab=billing', offer: false };
   // Annual stays the normal annual offer (its own 17% discount); the first-month deal is monthly.
   if (me?.plan === 'free' && !annual) {
     const pro = appCards.find((c) => c.name === 'Pro');
@@ -366,7 +366,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
               <div className="cp-v">{PLAN_NAME[me.plan]}{typeof me.credits === 'number' && <span className="cp-c"> · {fmt(me.credits)} credits left</span>}</div>
             </div>
             <div className="cp-actions">
-              <Link className="cp-sec" href="/mcp/account?section=billing">Billing &amp; credits</Link>
+              <Link className="cp-sec" href="/app?panel=settings&section=credits&tab=billing">Billing &amp; credits</Link>
               <a className="cp-up" href={upgrade.href}>{upgrade.label}{upgrade.offer && <span className="cp-off">{UPGRADE_OFFER_LABEL}</span>}</a>
             </div>
           </section>

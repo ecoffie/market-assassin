@@ -23,6 +23,7 @@ import { commitNaicsFromTypedInput } from '@/lib/codes/validate-market-codes';
 import TargetingCard from './TargetingCard';
 import { pscStatus } from '@/lib/codes/psc-status';
 import { SETTINGS_SECTION_ANCHORS, type SettingsSection } from '@/lib/app/deep-link-params';
+import CreditsConsole from '@/components/account/CreditsConsole';
 import { useScrollToAnchor } from '../useScrollToAnchor';
 import MindyLoader from '@/components/app/MindyLoader';
 
@@ -1276,6 +1277,14 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
           </div>
         </div>
       </div>
+
+      {/* Credits & usage — the console that used to be its own page at /mcp/account (which now
+          redirects here). One Settings page for everything (Eric, 2026-11-10). */}
+      <section id="settings-credits" className="scroll-mt-24 bg-ground border border-surface rounded-xl p-6">
+        <h2 className="font-semibold text-white">Credits &amp; usage</h2>
+        <p className="text-sm text-muted mt-1">Your balance, what you spent, top-ups, auto-recharge, team credits and API keys.</p>
+        <CreditsConsole embedded />
+      </section>
     </div>
   );
 }
