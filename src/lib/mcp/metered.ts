@@ -314,7 +314,15 @@ export async function runMeteredTool(
   // `cost` except for a `billable_candidate` outcome, which bills the tool's reduced price
   // (CANDIDATE_CREDITS — e.g. capability_market_match 10 instead of 50).
   const charge = creditsForOutcome(name, billingOutcome, cost);
-  const debit = await debitResolvedPayer(
+  // A failed DEBIT must not discard a result that already exists. If the RPC errors
+  // (timeout, connection reset) the result is delivered, nothing is claimed as charged,
+  // and the row is logged `uncharged` + error_code `debit_failed` so it can be
+  // reconciled against mcp_credit_ledger (the RPC may have committed before the error;
+  // the ledger is the source of truth for that). Without this the exception escaped,
+  // the customer lost the finished result, and a retry re-ran the upstream work.
+  let debit: Awaited<ReturnType<typeof debitResolvedPayer>>;
+  try {
+    debit = await debitResolvedPayer(
     ctx.userEmail, charge,
     // ChatGPT-originated personal debits are ATTRIBUTED (p_channel) so auto-recharge can
     // exclude them: a balance ChatGPT drained must never charge the user's card. Only the
@@ -327,6 +335,11 @@ export async function runMeteredTool(
     },
     payer,
   );
+  } catch (err) {
+    console.error('[mcp/metered] debit failed after tool success:', name, err instanceof Error ? err.message : err);
+    await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'uncharged', creditsCharged: 0, latencyMs, apiKeyId: ctx.apiKeyId, channel: ctx.channel, outcome: { ...telemetry, errorCode: 'debit_failed' } });
+    return { ok: true, result, creditsCharged: 0, balance: null, needsRecharge: false, funding: poolFunding(payer) };
+  }
   // Auto-recharge is a PERSONAL card mandate. A low POOL must never trigger it: that
   // would charge an individual's card for their employer's shared allowance.
   const recharge = (bal: number) => debit.payer === 'personal' && bal < AUTORECHARGE_SIGNAL_FLOOR;
