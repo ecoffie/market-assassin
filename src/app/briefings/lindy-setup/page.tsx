@@ -129,8 +129,8 @@ export default function LindySetupPage() {
         <section className="border-t border-gray-800 pt-8">
           <p className="text-gray-400">
             Need help setting this up? Email{' '}
-            <a href="mailto:hello@getmindy.ai" className="text-amber-400 hover:underline">
-              hello@getmindy.ai
+            <a href="mailto:admin@getmindy.ai" className="text-amber-400 hover:underline">
+              admin@getmindy.ai
             </a>{' '}
             and we&apos;ll walk you through it.
           </p>

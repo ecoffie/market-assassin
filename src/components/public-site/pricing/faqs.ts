@@ -36,7 +36,7 @@ export function pricingFaqs(c: { signupCredits: number; proCredits: number; team
     },
     {
       q: 'What is your refund policy?',
-      a: "Payments are final and we don't refund partial months. You can cancel anytime in Settings and keep Pro until the end of the period you paid for. If a technical problem stops you from using what you bought, email hello@getmindy.ai within 7 days of purchase. Try the Free plan first to see if Mindy fits.",
+      a: "Payments are final and we don't refund partial months. You can cancel anytime in Settings and keep Pro until the end of the period you paid for. If a technical problem stops you from using what you bought, email admin@getmindy.ai within 7 days of purchase. Try the Free plan first to see if Mindy fits.",
     },
     {
       q: 'What happens to my data if I cancel?',

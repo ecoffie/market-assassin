@@ -213,7 +213,7 @@ export async function POST(request: NextRequest) {
     if (tools.length === 0) {
       return NextResponse.json({
         success: false,
-        error: 'No purchases found for this email. Please check the email you used during checkout, or contact support@getmindy.ai',
+        error: 'No purchases found for this email. Please check the email you used during checkout, or contact admin@getmindy.ai',
         tools: [],
       });
     }
@@ -257,7 +257,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Activation error:', error);
     return NextResponse.json(
-      { error: 'Failed to activate. Please try again or contact support@getmindy.ai', success: false, tools: [] },
+      { error: 'Failed to activate. Please try again or contact admin@getmindy.ai', success: false, tools: [] },
       { status: 500 }
     );
   }

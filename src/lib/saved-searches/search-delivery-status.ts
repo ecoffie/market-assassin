@@ -243,14 +243,14 @@ export function searchAlertBlock(
     return {
       kind: 'recipient_address',
       reason: 'the account has no deliverable email address on file',
-      ownerMessage: 'Email alerts are on hold: this account has no deliverable email address on file. Contact support@getmindy.ai to fix it.',
+      ownerMessage: 'Email alerts are on hold: this account has no deliverable email address on file. Contact admin@getmindy.ai to fix it.',
     };
   }
   if (suppressed) {
     return {
       kind: 'recipient_suppressed',
       reason: `the account email is on the suppression list (${suppressed})`,
-      ownerMessage: 'Email alerts are on hold: your account email is on our do-not-send list after a bounce, complaint or unsubscribe. Contact support@getmindy.ai to fix it.',
+      ownerMessage: 'Email alerts are on hold: your account email is on our do-not-send list after a bounce, complaint or unsubscribe. Contact admin@getmindy.ai to fix it.',
     };
   }
   return null;

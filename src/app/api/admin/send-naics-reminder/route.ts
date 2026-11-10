@@ -127,7 +127,7 @@ async function generateReminderEmail(email: string): Promise<{ subject: string; 
 
     <div style="text-align: center; color: #64748b; font-size: 12px;">
       <p style="margin: 0 0 5px 0;"><span style="font-weight: 700; color: #1d4ed8;">GovCon</span><span style="font-weight: 700; color: #f59e0b;">Giants</span> - Your AI-Powered GovCon Intel</p>
-      <p style="margin: 0;">Questions? Reply to this email or contact hello@getmindy.ai</p>
+      <p style="margin: 0;">Questions? Reply to this email or contact admin@getmindy.ai</p>
       <p style="margin: 10px 0 0 0;">
         <a href="https://getmindy.ai/api/alerts/unsubscribe?email=${encodeURIComponent(email)}" style="color: #94a3b8;">Unsubscribe</a>
       </p>
@@ -163,7 +163,7 @@ This takes less than 30 seconds and dramatically improves your results.
 
 ---
 GovCon Giants - Your AI-Powered GovCon Intel
-Questions? Reply to this email or contact hello@getmindy.ai
+Questions? Reply to this email or contact admin@getmindy.ai
 `;
 
   return { subject, html, text };

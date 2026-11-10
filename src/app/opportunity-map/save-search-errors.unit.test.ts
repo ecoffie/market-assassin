@@ -196,8 +196,8 @@ describe('a failed save says what to do — never a bare "Couldn\'t save"', () =
     ['invalid mode', { status: 400, body: { success: false, code: 'invalid_mode', error: 'x' } }, /Switch to Opportunities/, /works on the Opportunities map/],
     ['missing name', { status: 400, body: { success: false, error: 'email and name are required' } }, /Name the search/, /Give this search a name/],
     ['scheduler down (503)', { status: 503, body: { success: false, code: 'scheduler_unavailable', error: 'x' } }, /Try again shortly/, /temporarily unavailable/],
-    ['unexpected 500 with a message', { status: 500, body: { success: false, error: 'boom' } }, /Couldn.t save/, /Nothing was saved: boom.*support@getmindy\.ai/],
-    ['non-JSON error page (502)', { status: 502, nonJson: true }, /Couldn.t save/, /Nothing was saved\..*support@getmindy\.ai/],
+    ['unexpected 500 with a message', { status: 500, body: { success: false, error: 'boom' } }, /Couldn.t save/, /Nothing was saved: boom.*admin@getmindy\.ai/],
+    ['non-JSON error page (502)', { status: 502, nonJson: true }, /Couldn.t save/, /Nothing was saved\..*admin@getmindy\.ai/],
     ['no connection', { reject: true }, /No connection/, /Check your connection/],
   ])('%s', async (_n, reply, short, detail) => {
     const r = run({ horizons: H, reply });

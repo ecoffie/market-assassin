@@ -30,10 +30,10 @@ export default function ContactSalesForm() {
       const j = await res.json().catch(() => ({}));
       if (res.ok && j.success) { setStatus('sent'); return; }
       setBad(Array.isArray(j.errors) ? j.errors : []);
-      setMessage(j.message || 'Something went wrong. Please email hello@getmindy.ai.');
+      setMessage(j.message || 'Something went wrong. Please email admin@getmindy.ai.');
       setStatus('error');
     } catch {
-      setMessage('Something went wrong. Please email hello@getmindy.ai.');
+      setMessage('Something went wrong. Please email admin@getmindy.ai.');
       setStatus('error');
     }
   }
@@ -61,7 +61,7 @@ export default function ContactSalesForm() {
               </li>
             ))}
           </ul>
-          <p className="mt-8 text-[15px] text-(--mp-muted)">Prefer email? <a href="mailto:hello@getmindy.ai" className="font-semibold text-(--mp-navy) underline underline-offset-2">hello@getmindy.ai</a></p>
+          <p className="mt-8 text-[15px] text-(--mp-muted)">Prefer email? <a href="mailto:admin@getmindy.ai" className="font-semibold text-(--mp-navy) underline underline-offset-2">admin@getmindy.ai</a></p>
         </div>
 
         <div className="rounded-3xl border border-(--mp-line) bg-(--mp-surface) p-6 shadow-[0_24px_60px_rgba(27,58,107,0.14)] sm:p-8">

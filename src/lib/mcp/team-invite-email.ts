@@ -23,7 +23,7 @@ export function renderTeamInviteEmail(p: { orgName: string; inviterEmail: string
       <p style="margin:0 0 20px"><a href="${p.acceptUrl}" style="display:inline-block;background:#7c3aed;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold">Accept invite</a></p>
       <p style="font-size:13px;color:#6b7280;margin:0">Sign in with this email address to accept. The link expires in ${INVITE_TTL_DAYS} days. If you weren't expecting this, you can ignore it.</p>
     </td></tr>
-    <tr><td style="padding:16px 28px;font-size:12px;color:#9ca3af;border-top:1px solid #eee">GovCon Giants AI · support@getmindy.ai</td></tr>
+    <tr><td style="padding:16px 28px;font-size:12px;color:#9ca3af;border-top:1px solid #eee">GovCon Giants AI · admin@getmindy.ai</td></tr>
   </table></td></tr></table></body></html>`;
 }
 

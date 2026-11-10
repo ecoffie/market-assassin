@@ -51,6 +51,6 @@ export const WATCH_SCOPE_JS = `
     if(code==='invalid_frequency')return {short:'Pick daily or weekly',detail:'Alerts can be daily or weekly. Choose one, then save again.'};
     if(code==='invalid_name'||(status===400&&/name.*required/i.test(msg)))return {short:'Name the search',detail:'Give this search a name, then save again.'};
     if(code==='scheduler_unavailable'||status===503)return {short:'Try again shortly',detail:'Saved searches are temporarily unavailable, so nothing was saved. Try again in a few minutes.'};
-    return {short:'Couldn\u2019t save',detail:'Nothing was saved'+(msg?': '+msg:'.')+' Try again, or email support@getmindy.ai if it keeps happening.'};
+    return {short:'Couldn\u2019t save',detail:'Nothing was saved'+(msg?': '+msg:'.')+' Try again, or email admin@getmindy.ai if it keeps happening.'};
   };
 `;

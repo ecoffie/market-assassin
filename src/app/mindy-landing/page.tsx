@@ -44,7 +44,7 @@ export default function MindyLandingPage() {
         url: 'https://getmindy.ai',
         logo: 'https://getmindy.ai/icon.png',
         description: 'AI-powered federal market intelligence for small business contractors.',
-        email: 'hello@getmindy.ai',
+        email: 'admin@getmindy.ai',
         sameAs: ['https://govcongiants.com'],
       },
       {
@@ -718,7 +718,7 @@ export default function MindyLandingPage() {
           <p className="text-faint text-sm mb-4">
             <a href="tel:5082906692" className="text-muted hover:text-white transition">508-290-6692</a>
             <span className="mx-4">•</span>
-            <a href="mailto:hello@getmindy.ai" className="text-muted hover:text-white transition">hello@getmindy.ai</a>
+            <a href="mailto:admin@getmindy.ai" className="text-muted hover:text-white transition">admin@getmindy.ai</a>
             <span className="mx-4">•</span>
             <Link href="/research" className="text-muted hover:text-white transition">Research</Link>
             <span className="mx-4">•</span>

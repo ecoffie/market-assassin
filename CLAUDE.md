@@ -2572,11 +2572,12 @@ repo sends TRANSACTIONAL email only; marketing/bulk is GHL (`send.getmindy.ai`).
 
 - **From address:** `Mindy <alerts@mail.getmindy.ai>` — set via `EMAIL_FROM` (the primary Resend
   path default). Do NOT send from `*@govcongiants.com`.
-- **Reply-to:** `support@getmindy.ai` — `sendEmail` defaults `replyTo` to this (`EMAIL_REPLY_TO`
+- **Reply-to:** `admin@getmindy.ai` — `sendEmail` defaults `replyTo` to this (`EMAIL_REPLY_TO`
   override) unless a caller sets an explicit reply-to.
-- **Support / contact in email bodies + pages:** `support@getmindy.ai` (bugs / account) ·
-  `hello@getmindy.ai` (general inquiries). All old `service@`/`support@`/`hello@govcongiants.com`
-  references were migrated 2026-07-16.
+- **Support / refunds / contact in email bodies + pages:** `admin@getmindy.ai` — ONE address for
+  everything customer-facing (Eric, 2026-11-10; replaced `support@`/`hello@getmindy.ai`). API
+  User-Agent contact strings (SEC, Federal Register, USAJOBS, Institute) and the internal
+  alert-health recipient were deliberately left as they were.
 - **Logo:** 3D Mindy logo header — hosted PNG `getmindy.ai/brand/mindy-logo-3d.png` (SVG isn't
   rendered in Gmail/Outlook email).
 - **Footer branding:** "GovCon Giants AI" (the operating entity behind the Mindy product).

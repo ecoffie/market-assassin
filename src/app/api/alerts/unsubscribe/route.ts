@@ -230,7 +230,7 @@ async function getUnsubscribePage(status: 'success' | 'error' | 'none', rawMessa
       </p>
     ` : `
       <p>${message}</p>
-      <p>Please contact <a href="mailto:hello@getmindy.ai">hello@getmindy.ai</a> for help.</p>
+      <p>Please contact <a href="mailto:admin@getmindy.ai">admin@getmindy.ai</a> for help.</p>
     `}
     <a href="https://shop.govcongiants.com" class="btn">Return to GovCon Giants</a>
   </div>

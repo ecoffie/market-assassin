@@ -169,10 +169,10 @@ export default function TrustPage() {
         <p className="mt-8 text-sm text-slate-600">
           Questions about how your data is handled? Email{' '}
           <a
-            href="mailto:support@getmindy.ai"
+            href="mailto:admin@getmindy.ai"
             className="text-muted underline underline-offset-2 hover:text-ink-soft"
           >
-            support@getmindy.ai
+            admin@getmindy.ai
           </a>
           .
         </p>

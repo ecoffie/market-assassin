@@ -90,7 +90,7 @@ export default function SetAsidesIndexPage() {
         logo: 'https://getmindy.ai/icon.png',
         description:
           'AI-powered federal market intelligence for small business contractors.',
-        email: 'hello@getmindy.ai',
+        email: 'admin@getmindy.ai',
         sameAs: ['https://govcongiants.org'],
       },
       {

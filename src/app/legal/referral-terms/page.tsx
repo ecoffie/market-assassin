@@ -33,7 +33,7 @@ export default function ReferralTerms() {
         </dl>
 
         <p className="mt-10 text-[12px] text-(--mp-muted)">
-          Questions? <a href="mailto:support@getmindy.ai" className="underline underline-offset-2 hover:text-(--mp-muted)">support@getmindy.ai</a>
+          Questions? <a href="mailto:admin@getmindy.ai" className="underline underline-offset-2 hover:text-(--mp-muted)">admin@getmindy.ai</a>
         </p>
       </div>
     </main>

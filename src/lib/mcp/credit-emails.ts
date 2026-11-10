@@ -14,7 +14,7 @@
 import { sendEmail } from '@/lib/send-email';
 
 const ACCOUNT_URL = 'https://getmindy.ai/mcp/account';
-const SUPPORT_EMAIL = 'support@getmindy.ai';
+const SUPPORT_EMAIL = 'admin@getmindy.ai';
 // Hosted 3D Mindy logo (PNG — SVG isn't rendered by Gmail/Outlook in email).
 const LOGO_URL = 'https://getmindy.ai/brand/mindy-logo-3d.png';
 

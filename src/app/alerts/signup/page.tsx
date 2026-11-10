@@ -425,7 +425,7 @@ function AlertSignupContent() {
 
             <p className="text-slate-500 text-sm">
               Your first briefing will arrive tomorrow morning. Questions?{' '}
-              <a href="mailto:hello@getmindy.ai" className="text-emerald-400 hover:text-emerald-300">
+              <a href="mailto:admin@getmindy.ai" className="text-emerald-400 hover:text-emerald-300">
                 Reply to any email
               </a>
             </p>
@@ -677,8 +677,8 @@ function AlertSignupContent() {
           <div className="mt-12 text-center">
             <p className="text-slate-500 text-sm">
               Questions?{' '}
-              <a href="mailto:hello@getmindy.ai" className="text-purple-400 hover:text-purple-300">
-                hello@getmindy.ai
+              <a href="mailto:admin@getmindy.ai" className="text-purple-400 hover:text-purple-300">
+                admin@getmindy.ai
               </a>
             </p>
           </div>

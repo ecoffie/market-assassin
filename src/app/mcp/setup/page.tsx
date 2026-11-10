@@ -183,7 +183,7 @@ export default function McpSetupPage() {
           <span>·</span>
           <Link href="/mcp/pricing" className="text-(--mp-muted) underline underline-offset-2 hover:text-(--mp-body)">See pricing</Link>
           <span>·</span>
-          <span>Questions? support@getmindy.ai</span>
+          <span>Questions? admin@getmindy.ai</span>
         </div>
       </div>
     </main>

@@ -192,10 +192,10 @@ export default function BlogIndexPage() {
             </Link>
             <span className="mx-3">·</span>
             <a
-              href="mailto:hello@getmindy.ai"
+              href="mailto:admin@getmindy.ai"
               className="text-(--mp-muted) hover:text-(--mp-ink) transition"
             >
-              hello@getmindy.ai
+              admin@getmindy.ai
             </a>
           </p>
           <p className="text-(--mp-body) text-xs mt-2 italic">

@@ -119,8 +119,8 @@ export default function ActivatePage() {
         <div className="mt-8 pt-6 border-t border-gray-700 text-center">
           <p className="text-sm text-gray-500">
             Need help?{' '}
-            <a href="mailto:support@getmindy.ai" className="text-indigo-400 hover:underline">
-              support@getmindy.ai
+            <a href="mailto:admin@getmindy.ai" className="text-indigo-400 hover:underline">
+              admin@getmindy.ai
             </a>
           </p>
         </div>

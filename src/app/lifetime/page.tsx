@@ -75,7 +75,7 @@ const faqs: Array<{ q: string; a: string }> = [
   },
   {
     q: 'What about refunds?',
-    a: 'All sales are final. If a technical problem stops you from using Mindy, email hello@getmindy.ai within 7 days of purchase. Mindy is free to try first, so you can test it on your own pipeline before you buy.',
+    a: 'All sales are final. If a technical problem stops you from using Mindy, email admin@getmindy.ai within 7 days of purchase. Mindy is free to try first, so you can test it on your own pipeline before you buy.',
   },
 ];
 

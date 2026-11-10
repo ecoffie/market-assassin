@@ -63,7 +63,7 @@ export default function TermsPage() {
           <h3 className="text-lg font-semibold text-(--mp-ink)">Refund Policy</h3>
           <p>
             Due to the digital nature of our products, all sales are final. However, if you experience
-            technical issues preventing access to your purchase, please contact us at hello@getmindy.ai
+            technical issues preventing access to your purchase, please contact us at admin@getmindy.ai
             within 7 days of purchase.
           </p>
 
@@ -145,7 +145,7 @@ export default function TermsPage() {
             <li>Message and data rates may apply depending on your mobile carrier</li>
             <li>SMS is not required to purchase any products or services</li>
             <li>You can opt out at any time by replying STOP to any message</li>
-            <li>For help, reply HELP or contact hello@getmindy.ai</li>
+            <li>For help, reply HELP or contact admin@getmindy.ai</li>
           </ul>
           <p>
             We will not share your phone number with third parties for marketing purposes. See our{' '}
@@ -224,7 +224,7 @@ export default function TermsPage() {
             <li>
               <strong className="text-(--mp-ink)">GovConEdu LLC</strong>
             </li>
-            <li>Email: hello@getmindy.ai</li>
+            <li>Email: admin@getmindy.ai</li>
           </ul>
         </div>
 

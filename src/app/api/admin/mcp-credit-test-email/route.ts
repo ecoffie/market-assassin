@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
   // Echo the sender identity this runtime will actually use (reads the live prod env),
   // so a caller can verify the Mindy from/reply-to without inspecting an inbox.
   const resolvedFrom = `${process.env.MINDY_FROM_NAME || 'Mindy'} <${process.env.EMAIL_FROM || 'alerts@mail.getmindy.ai'}>`;
-  const resolvedReplyTo = process.env.EMAIL_REPLY_TO || 'support@getmindy.ai';
+  const resolvedReplyTo = process.env.EMAIL_REPLY_TO || 'admin@getmindy.ai';
 
   if (!doSend) {
     return NextResponse.json({

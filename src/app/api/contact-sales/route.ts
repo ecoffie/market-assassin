@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   const ip = getClientIP(request);
   const rl = await checkRateLimit(`contact-sales:${ip}`, 5, 3600);
   if (!rl.allowed) {
-    return NextResponse.json({ success: false, message: 'Too many requests. Please email hello@getmindy.ai.' }, { status: 429 });
+    return NextResponse.json({ success: false, message: 'Too many requests. Please email admin@getmindy.ai.' }, { status: 429 });
   }
 
   const body = await request.json().catch(() => null);
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   if (!sent.ok) {
     console.error('[contact-sales] not delivered:', sent.error, parsed.input.email);
     return NextResponse.json(
-      { success: false, message: 'We could not send your request right now. Please email hello@getmindy.ai and we will reply quickly.' },
+      { success: false, message: 'We could not send your request right now. Please email admin@getmindy.ai and we will reply quickly.' },
       { status: 502 },
     );
   }

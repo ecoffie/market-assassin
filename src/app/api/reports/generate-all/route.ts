@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
     // Check if user is blocked for abuse
     if (email && await isUserBlocked(email)) {
       return NextResponse.json(
-        { success: false, error: 'Account suspended due to unusual activity. Contact support at hello@getmindy.ai' },
+        { success: false, error: 'Account suspended due to unusual activity. Contact support at admin@getmindy.ai' },
         { status: 403 }
       );
     }

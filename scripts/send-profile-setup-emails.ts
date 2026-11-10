@@ -268,7 +268,7 @@ function generateEmailHtml(email: string) {
 
       <p style="color: #9ca3af; font-size: 12px; text-align: center;">
         GovCon Giants • Helping small businesses win federal contracts<br>
-        <a href="mailto:service@govcongiants.com" style="color: #7c3aed;">service@govcongiants.com</a> • 508-290-6692
+        <a href="mailto:admin@getmindy.ai" style="color: #7c3aed;">admin@getmindy.ai</a> • 508-290-6692
       </p>
     </div>
   </div>

@@ -93,7 +93,7 @@ export default function SubscriptionsCard({ email, upgradeHref = '/pricing' }: {
       {!data && !failed ? (
         <div className="mt-3 h-14 animate-pulse rounded-lg bg-white/[0.04]" />
       ) : failed ? (
-        <p className="mt-2 text-[12px] text-amber-300">Your subscriptions couldn&apos;t load. Refresh the page, or email support@getmindy.ai.</p>
+        <p className="mt-2 text-[12px] text-amber-300">Your subscriptions couldn&apos;t load. Refresh the page, or email admin@getmindy.ai.</p>
       ) : (
         <div className="mt-3 space-y-2.5">
           {/* The Mindy plan, however it was granted. */}
@@ -158,7 +158,7 @@ export default function SubscriptionsCard({ email, upgradeHref = '/pricing' }: {
           {hasPaidPlanWithoutSub && (
             <p className="text-[12px] text-slate-500">
               Your {data?.planLabel} access isn&apos;t a personal subscription here (it comes from a team, bundle or grant), so there&apos;s nothing to cancel.{' '}
-              <a href="mailto:support@getmindy.ai" className="text-emerald-300 underline underline-offset-2">Questions? Contact support</a>
+              <a href="mailto:admin@getmindy.ai" className="text-emerald-300 underline underline-offset-2">Questions? Contact support</a>
             </p>
           )}
           <p className="text-[11px] text-slate-500">Cancel, change plan, update your card or download invoices on Stripe&apos;s secure page.</p>
