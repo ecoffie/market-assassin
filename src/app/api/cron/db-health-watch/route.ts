@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
 import { sendOpsAlert } from '@/lib/ops-alert';
+import { runLaunchSignals, type SignalOutcome, type StoredState } from '@/lib/ops/launch-signals';
 
 /**
  * DB Health Watch — Layer 2 early warning (the "hear it first, not from users").
@@ -203,12 +204,30 @@ export async function GET(request: NextRequest) {
     try { await kv.set(STATE_KEY, status); } catch { /* ignore */ }
   }
 
+  // Launch signals (src/lib/ops/launch-signals.ts) — daily-alert pending, MCP billing errors,
+  // daily-alerts tool errors. Runs AFTER the db-health logic and is fully isolated: a failure
+  // here never changes the DB status above. Skipped when the DB is down (each check would only
+  // report UNKNOWN for a cause we've already alerted on).
+  let launchSignals: SignalOutcome[] | { error: string } | 'skipped_db_down' = 'skipped_db_down';
+  if (status !== 'down') {
+    try {
+      launchSignals = await runLaunchSignals(sb, {
+        kvGet: async (k) => (await kv.get<StoredState>(k)) ?? null,
+        kvSet: async (k, v) => { await kv.set(k, v, { ex: 3 * 24 * 60 * 60 }); },
+        send: (m) => sendOpsAlert({ to: ALERT_TO, subject: m.subject, html: m.html }),
+      });
+    } catch (err) {
+      launchSignals = { error: (err as Error).message };
+    }
+  }
+
   return NextResponse.json({
     status,
     prev,
     transitioned,
     alerted,
     probes,
+    launchSignals,
     checkedAt: new Date().toISOString(),
   });
 }
