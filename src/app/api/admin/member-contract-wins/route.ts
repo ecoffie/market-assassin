@@ -74,7 +74,9 @@ export async function GET(req: NextRequest) {
           GROUP BY recipient_uei, award_id
         `,
         params: { ueis: ueis.slice(i, i + BQ_CHUNK) },
-        ...bqJobOptions({ feature: 'admin_member_contract_wins', tool: 'admin_api', queryFamily: 'awards_by_uei' }),
+        // Admin-only and run on demand: scanning ~113 member UEIs with names + agencies measured 5.5 GB,
+        // just over the 5 GB runtime default. 10 GB keeps a hard ceiling while letting it run.
+        ...bqJobOptions({ feature: 'admin_member_contract_wins', tool: 'admin_api', queryFamily: 'awards_by_uei', maximumBytesBilled: 10 * 1024 * 1024 * 1024 }),
       });
       awards.push(...rows);
     }
