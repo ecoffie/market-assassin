@@ -16,6 +16,8 @@ import { classifyEventRadarRun } from '@/lib/data-core/event-radar-advancement';
 import { extractLocation } from '@/lib/events/location';
 import { extractEvent, adoptCurrentVersionDates, CANDIDATE_NOTICE_TYPES, ATTENDABLE_EVENT_TYPES, type ExtractedEvent } from '@/lib/events/refresh';
 import { upsertInChunks } from '@/lib/sam/sync-upsert';
+import { planRefresh, selectWrites, summarize, refreshMode, parseApplyCategories, parseNoticeAllowlist, type StoredEvent, type PlannedChange } from '@/lib/events/refresh-plan';
+import { VERIFIED_BY_NOTICE } from '@/lib/events/verified-corrections';
 
 /** Page size and ceiling for the candidate read (6,407 active candidates measured 2026-11-09). */
 const PAGE = 1000;
@@ -65,6 +67,18 @@ export async function GET(request: NextRequest) {
   }
 
   const startTime = Date.now();
+
+  // ── WRITE CONTROL (PR #1960 revision) ───────────────────────────────────
+  // Report-only unless SAM_EVENTS_REFRESH=apply, and even then only the reviewed categories in
+  // SAM_EVENTS_REFRESH_APPLY or the notice ids in SAM_EVENTS_REFRESH_NOTICES. ?dry_run=true can only
+  // narrow this (force report), never widen it. See src/lib/events/refresh-plan.ts.
+  const envMode = refreshMode(process.env.SAM_EVENTS_REFRESH);
+  if (envMode === 'off') {
+    return NextResponse.json({ success: true, skipped: true, mode: 'off' });
+  }
+  const mode = dryRun ? 'report' : envMode;
+  const applyCategories = parseApplyCategories(process.env.SAM_EVENTS_REFRESH_APPLY);
+  const applyNotices = parseNoticeAllowlist(process.env.SAM_EVENTS_REFRESH_NOTICES);
 
   // ── ADVANCEMENT EVIDENCE (Phase II) ─────────────────────────────────────
   // Read the destination's watermark BEFORE the run. Without a prior value an
@@ -158,22 +172,20 @@ export async function GET(request: NextRequest) {
   }
   const { events: dated, adopted } = adoptCurrentVersionDates(extracted, byId, familyNotices, today);
 
-  // Compare with what is stored, so every run reports what it changed (and dry runs preview it).
-  const stored = new Map<string, { event_type: string; event_date: string | null }>();
+  // Compare with what is stored and classify every proposed change (with its evidence).
+  const stored = new Map<string, StoredEvent>();
   const datedIds = dated.map((e) => e.notice_id);
   for (let i = 0; i < datedIds.length; i += 200) {
     const { data, error: storedError } = await getSupabase().from('sam_events').select('notice_id, event_type, event_date').in('notice_id', datedIds.slice(i, i + 200));
     if (storedError) return NextResponse.json({ error: storedError.message }, { status: 500 });
-    for (const r of (data || []) as Array<{ notice_id: string; event_type: string; event_date: string | null }>) stored.set(r.notice_id, r);
+    for (const r of (data || []) as Array<{ notice_id: string; event_type: string; event_date: string | null }>) stored.set(r.notice_id, { event_type: r.event_type, event_date: r.event_date });
   }
-  const changes = { newRows: 0, typeChanged: 0, dateChanged: 0, unchanged: 0 };
-  for (const e of dated) {
-    const s = stored.get(e.notice_id);
-    if (!s) changes.newRows++;
-    else if (s.event_type !== e.event_type) changes.typeChanged++;
-    else if (s.event_date !== e.event_date) changes.dateChanged++;
-    else changes.unchanged++;
-  }
+  const plan = planRefresh({ events: dated, stored, noticesById: byId, familyNotices, verified: VERIFIED_BY_NOTICE, today });
+  const writes = selectWrites(plan, mode, applyCategories, applyNotices);
+  const writeIds = new Set(writes.map((c) => c.notice_id));
+  const noLongerQualifying = ((upcomingRows || []) as Array<{ notice_id: string; event_type: string }>)
+    .filter((r) => byId.has(r.notice_id) && !extractedIds.has(r.notice_id))
+    .map((r) => ({ notice_id: r.notice_id, stored_type: r.event_type, reason: 'notice_no_longer_qualifies' as const, title: byId.get(r.notice_id)?.title?.slice(0, 120) ?? null }));
 
   const runAt = new Date().toISOString();
   const events: {
@@ -192,6 +204,7 @@ export async function GET(request: NextRequest) {
     extracted_at: string;
   }[] = [];
   for (const e of dated) {
+    if (!writeIds.has(e.notice_id)) continue; // report-only or not in a reviewed batch
     const notice = byId.get(e.notice_id)!;
     // Resolve the buying office: DoD via the solicitation-number DoDAAC, civilian
     // via SAM's own office/sub_tier columns — so events scope to the real command
@@ -218,7 +231,7 @@ export async function GET(request: NextRequest) {
 
   // Upsert events — bounded statements (the R1 helper), each a few hundred rows at most.
   let upsertedCount = 0;
-  if (!dryRun && events.length > 0) {
+  if (mode === 'apply' && events.length > 0) {
     const res = await upsertInChunks(events, (rows) => getSupabase()
       .from('sam_events')
       .upsert(rows, { onConflict: 'notice_id', ignoreDuplicates: false }), { chunk: 200, minChunk: 20 });
@@ -244,8 +257,8 @@ export async function GET(request: NextRequest) {
     noticesScanned: notices.length,
     newestCandidatePosted,
     newCandidates,
-    qualified: events.length,
-    upserted: dryRun ? null : upsertedCount,
+    qualified: dated.length,
+    upserted: mode === 'apply' ? upsertedCount : null,
     priorIngestAt,
     currentIngestAt,
     evaluatedWithoutDescription,
@@ -254,16 +267,34 @@ export async function GET(request: NextRequest) {
   const duration = Math.round((Date.now() - startTime) / 1000);
 
   // Get event type breakdown
-  const eventsByType = events.reduce((acc, e) => {
+  const eventsByType = dated.reduce((acc, e) => {
     acc[e.event_type] = (acc[e.event_type] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
-  console.log(`[extract-sam-events] Found ${events.length} events, upserted ${upsertedCount}`);
+  const summary = summarize(plan);
+  console.log(`[extract-sam-events] mode=${mode} found ${dated.length} events, wrote ${upsertedCount}; proposed ${JSON.stringify(summary)}`);
+  // Full lists for every UPCOMING change and every uncertain record; other categories capped.
+  const show = (c: PlannedChange) => ({
+    notice_id: c.notice_id, category: c.category, underlying: c.underlying, upcoming: c.upcoming,
+    title: byId.get(c.notice_id)?.title?.slice(0, 120) ?? null,
+    stored: c.stored, proposed: c.proposed, adopted_from: c.adopted_from, evidence: c.evidence,
+    uncertain_reason: c.uncertain_reason ?? null, verified: c.verified ?? null, written: writeIds.has(c.notice_id),
+  });
+  const list = (cat: PlannedChange['category'], cap = 200) => {
+    const all = plan.filter((c) => c.category === cat).sort((a, b) => Number(b.upcoming) - Number(a.upcoming));
+    const upcoming = all.filter((c) => c.upcoming);
+    const rest = all.filter((c) => !c.upcoming).slice(0, cap);
+    return { total: all.length, items: [...upcoming, ...rest].map(show), truncated: all.length > upcoming.length + rest.length };
+  };
 
   return NextResponse.json({
     success: true,
     dryRun,
+    mode,
+    applyCategories: [...applyCategories],
+    applyNotices: [...applyNotices],
+    written: upsertedCount,
     // The four states are now distinguishable AFTER the fact, which is the whole
     // point of this change: "success" alone never was evidence of advancement.
     status: advancement.status,
@@ -284,19 +315,26 @@ export async function GET(request: NextRequest) {
       upcomingNoLongerQualifying,
       familyNoticesRead: familyNotices.length,
       adoptedFromCurrentVersion: adopted.length,
-      changes,
+      proposed: summary,
       newCandidates,
       evaluatedWithoutDescription,
-      eventsFound: events.length,
+      eventsFound: dated.length,
       eventsUpserted: upsertedCount,
       durationSeconds: duration,
     },
     eventsByType,
-    adoptions: adopted.slice(0, 20),
-    sampleEvents: events.slice(0, 5).map((e) => ({
-      title: e.title.substring(0, 80),
+    adoptions: adopted,
+    report: {
+      date: list('date'),
+      type: list('type'),
+      new: list('new'),
+      adoption: list('adoption'),
+      uncertain: { ...list('uncertain', 1000), noLongerQualifying },
+    },
+    sampleEvents: dated.slice(0, 5).map((e) => ({
+      title: (byId.get(e.notice_id)?.title || '').substring(0, 80),
       type: e.event_type,
-      agency: e.agency,
+      agency: byId.get(e.notice_id)?.department ?? null,
       date: e.event_date,
     })),
   });

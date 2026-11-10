@@ -14,7 +14,7 @@
  *   R4  extracted_at is written on every upsert — it now means "last re-read", which is what
  *       queryFederalEvents' undated window and the data-inventory freshness line already assume.
  */
-import { classifyEvent, extractEventDate } from './classify';
+import { classifyEvent, extractEventDate, findEventDates, type EventEvidence } from './classify';
 import { familyIdentityKey } from '@/lib/sam/solicitation-family';
 import { selectCanonicalVersion } from '@/lib/sam/resolve-solicitation';
 
@@ -38,13 +38,33 @@ export interface ExtractedEvent {
   event_date: string | null;
   /** Set when the date came from the solicitation's current version (R3). */
   adopted_from: string | null;
+  /** Why the extractor typed it, and the source text around the date it chose (review evidence). */
+  evidence?: { classified_by: EventEvidence; date_source: 'text' | 'response_deadline' | 'none'; snippet: string | null };
+}
+
+/** The source text around `iso` in the notice — the phrase the extractor read the date from. */
+export function dateSnippet(n: RefreshNotice, iso: string | null, today: Date = new Date()): string | null {
+  if (!iso) return null;
+  const text = `${n.title}\n${n.description || ''}`;
+  const hit = findEventDates(text, today).find((d) => d.iso === iso);
+  if (!hit) return null;
+  return text.slice(Math.max(0, hit.index - 120), hit.index + 60).replace(/\s+/g, ' ').trim();
 }
 
 /** The deployed extractor, for one notice. Null = not an event or notice. */
 export function extractEvent(n: RefreshNotice, today: Date = new Date()): ExtractedEvent | null {
   const c = classifyEvent(n.title, n.description, today);
   if (!c) return null;
-  return { notice_id: n.notice_id, event_type: c.type, event_date: extractEventDate(n.title, n.description, c, n.response_deadline, today), adopted_from: null };
+  const event_date = extractEventDate(n.title, n.description, c, n.response_deadline, today);
+  const notice = c.type === 'rfi' || c.type === 'forecast';
+  return {
+    notice_id: n.notice_id, event_type: c.type, event_date, adopted_from: null,
+    evidence: {
+      classified_by: c.evidence,
+      date_source: !event_date ? 'none' : notice ? 'response_deadline' : 'text',
+      snippet: notice ? null : dateSnippet(n, event_date, today),
+    },
+  };
 }
 
 /**
@@ -84,7 +104,7 @@ export function adoptCurrentVersionDates(
     if (!cur.ev || cur.ev.event_type !== ev.event_type || !cur.ev.event_date) return ev; // not repeated ≠ cancelled
     if (cur.ev.event_date === ev.event_date) return ev;
     adopted.push({ notice_id: ev.notice_id, from: ev.event_date, to: cur.ev.event_date, current_notice_id: cur.notice_id });
-    return { ...ev, event_date: cur.ev.event_date, adopted_from: cur.notice_id };
+    return { ...ev, event_date: cur.ev.event_date, adopted_from: cur.notice_id, evidence: cur.ev.evidence };
   });
   return { events: out, adopted };
 }
