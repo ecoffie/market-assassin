@@ -382,7 +382,7 @@ export async function sendEmail({
   // Replies to transactional email route to the support Google Group unless the caller
   // set an explicit reply-to (e.g. event follow-ups reply to the user). Marketing/bulk
   // (reply-to hello@getmindy.ai) is sent via GHL, not this path.
-  const replyToAddress = replyTo || process.env.EMAIL_REPLY_TO || 'support@getmindy.ai';
+  const replyToAddress = replyTo || process.env.EMAIL_REPLY_TO || 'admin@getmindy.ai';
 
   // Sender isolation: refuse any From outside the verified Mindy domain BEFORE any provider
   // call. Definite non-send, so a plain error (never "outcome unknown").
@@ -664,7 +664,7 @@ export async function sendAccessCodeEmail({
     </div>
 
     <p style="text-align: center; color: #64748b;">
-      Questions? Reply to this email or contact us at hello@getmindy.ai
+      Questions? Reply to this email or contact us at admin@getmindy.ai
     </p>
 
     <div class="footer">
@@ -994,7 +994,7 @@ export async function sendLicenseKeyEmail({
 
     <p style="color: #6b7280; font-size: 12px; text-align: center;">
       <strong>Keep this email safe!</strong> Your license key is your proof of purchase.<br>
-      Questions? Reply to this email or contact support@getmindy.ai
+      Questions? Reply to this email or contact admin@getmindy.ai
     </p>
 
     <p style="text-align: center; color: #9ca3af; font-size: 12px;">
@@ -1026,7 +1026,7 @@ How to Activate:
 ${accessLink ? `Direct Access Link: ${accessLink}` : ''}
 
 Keep this email safe! Your license key is your proof of purchase.
-Questions? Reply to this email or contact support@getmindy.ai
+Questions? Reply to this email or contact admin@getmindy.ai
 
 - GovCon Giants Team`,
     emailType: 'license_key',
@@ -1794,7 +1794,7 @@ export async function sendAlertProWelcomeEmail({
 
   <div style="background: #f1f5f9; padding: 18px; border-radius: 0 0 12px 12px; text-align: center;">
     <p style="color: #64748b; font-size: 12px; margin: 0;">
-      Questions? Reply to this email or contact <a href="mailto:hello@getmindy.ai" style="color: #059669;">hello@getmindy.ai</a>
+      Questions? Reply to this email or contact <a href="mailto:admin@getmindy.ai" style="color: #059669;">admin@getmindy.ai</a>
     </p>
     <p style="color: #94a3b8; font-size: 11px; margin: 8px 0 0 0;">
       © ${new Date().getFullYear()} GovCon Giants • getmindy.ai
@@ -1829,7 +1829,7 @@ ${maLink}
 Your email: ${to}
 Subscription: $19/month • Cancel anytime
 
-Questions? Reply to this email or contact hello@getmindy.ai
+Questions? Reply to this email or contact admin@getmindy.ai
 
 - GovCon Giants Team`,
     emailType: 'alert_pro_welcome',

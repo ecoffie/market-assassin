@@ -100,7 +100,7 @@ export default function PrivacyPolicyPage() {
           <ul className="list-disc pl-6 space-y-1">
             <li>Replying STOP to any message you receive from us</li>
             <li>Updating your preferences in your account settings</li>
-            <li>Contacting us at hello@getmindy.ai</li>
+            <li>Contacting us at admin@getmindy.ai</li>
           </ul>
           <p>
             After opting out, you will receive one final confirmation message. You will no longer receive
@@ -180,7 +180,7 @@ export default function PrivacyPolicyPage() {
           </ul>
           <p>
             <strong className="text-(--mp-ink)">Deletion.</strong> You can ask us to delete your account and its
-            data at any time by emailing hello@getmindy.ai. We action deletion requests within 30 days.
+            data at any time by emailing admin@getmindy.ai. We action deletion requests within 30 days.
             Deleting your account removes your saved work and activity records. We may retain a minimal
             record of a transaction where tax, accounting, or legal obligations require it, and we may keep
             anonymized, aggregated statistics that cannot identify you.
@@ -252,7 +252,7 @@ export default function PrivacyPolicyPage() {
             <li>Opt out of marketing communications</li>
             <li>Opt out of SMS communications</li>
           </ul>
-          <p>To exercise these rights, contact us at hello@getmindy.ai.</p>
+          <p>To exercise these rights, contact us at admin@getmindy.ai.</p>
 
           <h2 className="text-2xl font-semibold text-(--mp-ink) pt-6 font-(family-name:--mp-font-serif)">11. Children&apos;s Privacy</h2>
           <p>
@@ -272,7 +272,7 @@ export default function PrivacyPolicyPage() {
             <li>
               <strong className="text-(--mp-ink)">GovConEdu LLC</strong>
             </li>
-            <li>Email: hello@getmindy.ai</li>
+            <li>Email: admin@getmindy.ai</li>
           </ul>
         </div>
 

@@ -85,7 +85,7 @@ export default function Enterprise() {
           <h2 className="text-balance text-2xl font-bold sm:text-3xl font-(family-name:--mp-font-serif)">Point your models at the change, not the state.</h2>
           <p className="mx-auto mt-3 max-w-lg text-[15px] text-(--mp-muted)">Pricing is bespoke — volume, freshness, SLA, and integration. Tell us your book and how you ingest.</p>
           <a href={CONTACT} className="mt-6 inline-flex items-center justify-center rounded-none bg-(--mp-navy) px-6 py-3 text-[15px] font-semibold text-white hover:bg-(--mp-navy-hover)">Contact sales</a>
-          <p className="mt-4 font-(family-name:--mp-font-mono) text-[12px] text-(--mp-muted)">hello@getmindy.ai · typically replies within a business day</p>
+          <p className="mt-4 font-(family-name:--mp-font-mono) text-[12px] text-(--mp-muted)">admin@getmindy.ai · typically replies within a business day</p>
         </section>
 
         <footer className="mt-24 border-t border-(--mp-line) pt-6 font-(family-name:--mp-font-mono) text-[11px] leading-relaxed text-(--mp-muted)">

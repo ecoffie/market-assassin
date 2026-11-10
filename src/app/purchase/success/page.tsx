@@ -155,8 +155,8 @@ function SuccessContent() {
             )}
             <p className="text-sm text-gray-500">
               Need help? Contact us at{' '}
-              <a href="mailto:support@getmindy.ai" className="text-blue-600 hover:underline">
-                support@getmindy.ai
+              <a href="mailto:admin@getmindy.ai" className="text-blue-600 hover:underline">
+                admin@getmindy.ai
               </a>
             </p>
           </div>

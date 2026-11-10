@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { PRO_MONTHLY_CREDITS } from '@/lib/mcp/packages';
 import RoadmapFlow from './RoadmapFlow';
 
 export const metadata: Metadata = {
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 export default function RoadmapPage() {
   return (
     <main>
-      <RoadmapFlow />
+      <RoadmapFlow proCredits={PRO_MONTHLY_CREDITS} />
     </main>
   );
 }

@@ -148,7 +148,7 @@ export async function evaluateExtractionGuard(
         code: 'rate_limited',
         message:
           `You've reached the proprietary-tool limit (${which}). This protects Mindy's curated ` +
-          'intelligence from bulk export. It resets on a rolling window; contact hello@getmindy.ai for higher limits.',
+          'intelligence from bulk export. It resets on a rolling window; contact admin@getmindy.ai for higher limits.',
       };
     }
 

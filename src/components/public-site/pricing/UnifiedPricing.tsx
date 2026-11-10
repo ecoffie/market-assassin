@@ -501,7 +501,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
 
         {/* FAQ */}
         <h2 className="section-title">Pricing questions, answered</h2>
-        <p className="section-sub">Still stuck? Email <a href="mailto:hello@getmindy.ai" className="mail">hello@getmindy.ai</a> — reply within one business day.</p>
+        <p className="section-sub">Still stuck? Email <a href="mailto:admin@getmindy.ai" className="mail">admin@getmindy.ai</a> — reply within one business day.</p>
         <div className="faq">
           {faqs.map((f, i) => (
             <div key={f.q} className={`qa ${openFaq.has(i) ? 'open' : ''}`}>

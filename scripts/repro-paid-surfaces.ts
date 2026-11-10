@@ -391,7 +391,7 @@ async function main() {
       paidLedgerReasonsNow: [...PAID_LEDGER_REASONS],
     },
     unknown: [
-      'support@getmindy.ai mailbox not readable from this environment',
+      'admin@getmindy.ai mailbox not readable from this environment',
       'historical matcher version on Sep 13 alert_log not stored',
       'whether unsubscribe GET persisted before the Sep 12 save overwrote it',
     ],

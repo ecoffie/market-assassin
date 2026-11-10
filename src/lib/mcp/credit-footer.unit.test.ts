@@ -19,7 +19,7 @@ describe('creditFooter — pooled calls never sell personal credits', () => {
   });
 
   it('a low pool tells the owner the real remedy (monthly refill, support for a bigger allowance)', () => {
-    expect(creditFooter(5, 0, owner)).toMatch(/refills at the start of next month.*support@getmindy\.ai/);
+    expect(creditFooter(5, 0, owner)).toMatch(/refills at the start of next month.*admin@getmindy\.ai/);
   });
 
   it('a healthy pool just reports the team balance', () => {

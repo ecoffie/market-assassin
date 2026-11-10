@@ -27,7 +27,7 @@ export function creditFooter(charged: number, balance: number | null, pool?: Poo
   if (pool) {
     const team = pool.orgName ? ` (${pool.orgName})` : '';
     const remedy = pool.isOwner
-      ? 'The pool refills at the start of next month. To raise your team\'s allowance, contact support@getmindy.ai.'
+      ? 'The pool refills at the start of next month. To raise your team\'s allowance, contact admin@getmindy.ai.'
       : 'Ask your team owner about adding credits. The pool refills at the start of next month.';
     if (balance <= 0) return `⚠️ Team credits${team}: 0 left${used}. ${remedy}`;
     if (balance <= LOW_BALANCE_THRESHOLD) return `⚠️ Team pool is low${team}: ${balance} left${used}. ${remedy}`;

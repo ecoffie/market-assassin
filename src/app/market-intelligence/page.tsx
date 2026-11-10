@@ -654,7 +654,7 @@ function MarketIntelligenceContent() {
               View Dashboard
             </Link>
             <span className="mx-4">•</span>
-            <a href="mailto:hello@getmindy.ai" className="text-(--mp-muted) hover:text-(--mp-ink)">
+            <a href="mailto:admin@getmindy.ai" className="text-(--mp-muted) hover:text-(--mp-ink)">
               Support
             </a>
           </p>

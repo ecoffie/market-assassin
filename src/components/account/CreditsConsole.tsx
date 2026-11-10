@@ -524,7 +524,7 @@ export default function CreditsConsole({ embedded = false }: { embedded?: boolea
       </div>
       <div className="rounded-xl border border-white/[0.07] bg-surface px-4 py-3.5">
         <p className="text-[13px] font-semibold text-slate-100">Support</p>
-        <p className="mt-0.5 text-[13px] text-slate-400">Questions or higher limits? <a href="mailto:support@getmindy.ai" className="text-emerald-300 underline underline-offset-2 hover:text-emerald-200">support@getmindy.ai</a></p>
+        <p className="mt-0.5 text-[13px] text-slate-400">Questions or higher limits? <a href="mailto:admin@getmindy.ai" className="text-emerald-300 underline underline-offset-2 hover:text-emerald-200">admin@getmindy.ai</a></p>
       </div>
       <button onClick={switchAccount} className="rounded-lg border border-white/10 px-3.5 py-2 text-[13px] text-slate-300 hover:bg-white/10">Sign out / switch account</button>
     </div>

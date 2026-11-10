@@ -45,7 +45,7 @@ const BETA_FROM = 'Mindy <hello@mail.getmindy.ai>';
 // mail.getmindy.ai SENDS (Resend) but has no inbox. Replies route to the real
 // hello@getmindy.ai Google Group (shared inbox, Annelle monitors). So a recipient
 // who hits "reply" reaches a mailbox we actually read.
-const BETA_REPLY_TO = 'hello@getmindy.ai';
+const BETA_REPLY_TO = 'admin@getmindy.ai';
 
 // Subject per email # (matches docs/email-series-beta-v1-nurture.md, approved)
 const SUBJECTS: Record<number, string> = {

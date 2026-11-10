@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     'same-email': "That's the email you're already signed in with.",
     throttled: 'A code was just sent to that address — check the inbox, or try again in a minute.',
     limit: `You can connect up to ${MAX_LINKED_EMAILS} email addresses.`,
-    taken: 'That email is already connected to another Mindy account. Contact support@getmindy.ai and we can sort it out.',
+    taken: 'That email is already connected to another Mindy account. Contact admin@getmindy.ai and we can sort it out.',
     table: 'Email linking is not available yet — please contact support.',
     error: r.error || 'Could not send the verification code.',
   };

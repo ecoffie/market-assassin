@@ -400,7 +400,7 @@ const BODY = `
       .catch(function(err){
         btn.disabled=false; btn.textContent='Introduce a buying organization \u2192';
         ok.hidden=false; ok.style.borderColor='var(--mp-warn)';
-        ok.textContent='That did not send \u2014 '+err.message+'. Email hello@getmindy.ai and we will pick it up from there.';
+        ok.textContent='That did not send \u2014 '+err.message+'. Email admin@getmindy.ai and we will pick it up from there.';
       });
   });
 })();

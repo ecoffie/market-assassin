@@ -74,11 +74,11 @@ describe('sender domain', () => {
     expect(senderDomain('not an address')).toBeNull();
   });
 
-  it('default From is Mindy on mail.getmindy.ai, reply-to support@getmindy.ai', async () => {
+  it('default From is Mindy on mail.getmindy.ai, reply-to admin@getmindy.ai', async () => {
     expect(await sendEmail({ ...base, emailType: 'daily_alert' })).toBe(true);
     const call = h.resendSend.mock.calls[0][0];
     expect(call.from).toBe('Mindy <alerts@mail.getmindy.ai>');
-    expect(call.replyTo).toBe('support@getmindy.ai');
+    expect(call.replyTo).toBe('admin@getmindy.ai');
   });
 
   it('a caller override on mail.getmindy.ai is allowed (launch/FHC senders)', async () => {
