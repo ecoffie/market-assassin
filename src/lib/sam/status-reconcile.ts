@@ -196,7 +196,7 @@ export interface ReconcileDeps {
   /** Insert one audit row per decision (sam_status_decisions). */
   writeAudit(rows: Array<Record<string, unknown>>): PromiseLike<{ error: { message: string } | null }>;
   /** CAS flip: active=true AND not re-synced since runStartIso → false. Returns ids actually flipped. */
-  flipChunk(ids: string[], runStartIso: string): PromiseLike<{ flipped: string[] | null; error: { message: string } | null }>;
+  flipChunk(ids: string[], runStartIso: string): PromiseLike<{ flipped: string[] | null; count: number | null; error: { message: string } | null }>;
   /** Mark the audit rows of flipped ids applied=true (the rollback record). */
   markApplied(runId: string, ids: string[]): PromiseLike<{ error: { message: string } | null }>;
 }
@@ -236,9 +236,9 @@ export async function executeStatusReconcile(
   let flipped = 0;
   const ids = plan.deactivate.map((d) => d.opp_id);
   for (let i = 0; i < ids.length; i += STATUS_FLIP_CHUNK) {
-    const { flipped: got, error } = await deps.flipChunk(ids.slice(i, i + STATUS_FLIP_CHUNK), runStartIso);
-    if (error || got == null) { out.errors.push(`flip failed after ${flipped} rows: ${error?.message ?? 'unknown result'}`); out.deactivated = null; return out; }
-    flipped += got.length;
+    const { flipped: got, count, error } = await deps.flipChunk(ids.slice(i, i + STATUS_FLIP_CHUNK), runStartIso);
+    if (error || got == null || count == null) { out.errors.push(`flip failed after ${flipped} rows: ${error?.message ?? 'unknown result'}`); out.deactivated = null; return out; }
+    flipped += count; // exact affected-row count, never the returned payload length
     if (got.length) {
       const { error: markErr } = await deps.markApplied(runId!, got);
       if (markErr) out.errors.push(`rollback mark failed for ${got.length} rows: ${markErr.message} (restore by decision='deactivate' for this run)`);

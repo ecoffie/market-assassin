@@ -132,8 +132,10 @@ function fakeDeps(o: { auditError?: string; flipError?: string; flipNull?: boole
   const calls = { audit: 0, auditRows: 0, flips: [] as string[][], marked: [] as string[] };
   const deps: ReconcileDeps = {
     writeAudit: async (rows) => { calls.audit++; calls.auditRows += rows.length; return { error: o.auditError ? { message: o.auditError } : null }; },
-    flipChunk: async (ids) => { calls.flips.push(ids); if (o.flipError) return { flipped: null, error: { message: o.flipError } };
-      return { flipped: o.flipNull ? null : ids.slice(0, ids.length - 1 >= 0 && ids.length > 1 ? ids.length - 1 : ids.length), error: null }; },
+    // The CAS changes all but the last id of a multi-id chunk (that one was re-synced / already inactive).
+    flipChunk: async (ids) => { calls.flips.push(ids); if (o.flipError) return { flipped: null, count: null, error: { message: o.flipError } };
+      const got = ids.length > 1 ? ids.slice(0, -1) : ids;
+      return { flipped: got, count: o.flipNull ? null : got.length, error: null }; },
     markApplied: async (_run, ids) => { calls.marked.push(...ids); return { error: null }; },
   };
   return { deps, calls };

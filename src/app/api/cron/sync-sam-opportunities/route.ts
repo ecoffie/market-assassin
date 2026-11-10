@@ -804,11 +804,13 @@ export async function GET(request: NextRequest) {
         reconcileOutcome = await executeStatusReconcile(plan, reconcileMode, syncRunId, runStartIso, {
           writeAudit: (auditRows) => getSupabase().from('sam_status_decisions').insert(auditRows),
           flipChunk: async (ids, since) => {
-            const { data, error } = await getSupabase().from('sam_opportunities')
-              .update({ active: false })
+            // count:'exact' is the write total; the returned ids (<= STATUS_FLIP_CHUNK=500 per call, under
+            // the 1,000-row payload cap) only mark the rollback record.
+            const { data, count, error } = await getSupabase().from('sam_opportunities')
+              .update({ active: false }, { count: 'exact' })
               .in('id', ids).eq('active', true).lt('synced_at', since) // CAS: never a row this run re-synced
-              .select('id');
-            return { flipped: error ? null : (data ?? []).map((r: { id: string }) => r.id), error };
+              .select('id'); // truncation-ok: ids is one 500-row chunk
+            return { flipped: error ? null : (data ?? []).map((r: { id: string }) => r.id), count: error ? null : (count ?? null), error };
           },
           markApplied: (runId, ids) => getSupabase().from('sam_status_decisions')
             .update({ applied: true }).eq('run_id', runId).in('opp_id', ids),
