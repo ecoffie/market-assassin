@@ -21,13 +21,21 @@ import { sendCreditWelcomeEmail } from './credit-emails';
  */
 export const SIGNUP_CREDITS = Math.max(0, Number(process.env.MCP_SIGNUP_CREDITS ?? '100') || 0);
 
-/** Live balance for a user (0 if they have no balance row yet). */
+/**
+ * Live balance for a user. 0 when they have no balance row yet (a real, known state).
+ *
+ * THROWS on a read error. It used to ignore `error` and return 0, so a database
+ * blip showed a paying customer the "buy credits" paywall and logged a
+ * rejected_no_credits attempt built from an outage (Bug Prevention Rule #11:
+ * unknown is never zero). Mirrors getPoolBalance (payer.ts).
+ */
 export async function getBalance(userEmail: string): Promise<number> {
-  const { data } = await getWriteClient()
+  const { data, error } = await getWriteClient()
     .from('mcp_credit_balance')
     .select('balance')
     .eq('user_email', userEmail.toLowerCase())
     .maybeSingle();
+  if (error) throw new Error(`getBalance failed: ${error.message}`);
   return data?.balance ?? 0;
 }
 

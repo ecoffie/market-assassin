@@ -31,8 +31,14 @@ export async function GET(request: NextRequest) {
   }
 
   const sinceIso = new Date(Date.now() - WINDOW_DAYS * 86_400_000).toISOString();
+  // A balance read error is surfaced as 503, never rendered as a 0-credit balance.
+  let balanceReadFailed = false;
   const [balance, callsRes] = await Promise.all([
-    getBalance(email),
+    getBalance(email).catch((err: unknown) => {
+      console.error('[mcp/account] balance read failed:', err instanceof Error ? err.message : err);
+      balanceReadFailed = true;
+      return null;
+    }),
     getWriteClient()
       .from('mcp_call_log')
       .select('tool_name, status, credits_charged, created_at')
@@ -41,6 +47,13 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(ROW_CAP),
   ]);
+
+  if (balanceReadFailed) {
+    return NextResponse.json(
+      { success: false, error: 'Your credit balance is temporarily unavailable. Please refresh in a moment.' },
+      { status: 503 },
+    );
+  }
 
   const allRows = (callsRes.data ?? []) as CallRow[];
   // Drop the guard's shadow audit rows — they're not user-facing calls.
