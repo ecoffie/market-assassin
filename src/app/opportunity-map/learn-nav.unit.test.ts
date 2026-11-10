@@ -24,8 +24,8 @@ describe('desktop: Learn in the right cluster, second', () => {
   it.each([...SUBPAGES, 'src/app/today/route.ts'])('%s', (p) => {
     expect(read(p)).toContain('<a href="/bid">Bid with confidence</a>\n    <a href="/learn">Learn</a>\n    <a href="/pricing">Pricing</a>');
   });
-  it('the shared public top bar (homepage nav: Mindy in your AI · Learn, left)', () => {
-    expect(MP_HEADER_PRODUCT_LINKS.map((l) => l.href)).toEqual(['/mcp/gallery', '/learn']);
+  it('the shared public top bar (homepage nav: Mindy in your AI · Learn · Jobs, left)', () => {
+    expect(MP_HEADER_PRODUCT_LINKS.map((l) => l.href)).toEqual(['/mcp/gallery', '/learn', '/jobs']);
     expect(MP_HEADER_PRODUCT_LINKS[1].label).toBe('Learn');
   });
   it('exactly one Learn item per header (no duplicate entry points)', () => {
