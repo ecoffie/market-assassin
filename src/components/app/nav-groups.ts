@@ -239,6 +239,8 @@ export interface NavGroup {
   /** Panels that are NOT in the sidebar (no tab) but are still reachable by deep link or
    *  in-panel navigation. When one is active, this group's sidebar row is highlighted. */
   aliases?: AppPanel[];
+  /** Kept as a group (deep links, tab bar, highlighting) but NOT shown as a sidebar row. */
+  sidebarHidden?: boolean;
 }
 
 // The approved grouping (labels are exact — do not reword without sign-off).
@@ -321,6 +323,9 @@ export const NAV_GROUPS: NavGroup[] = [
     // My Library was folded into My Vault's "Generated" tab. Settings is reached ONLY from the
     // top-right account avatar (one way in, Eric 2026-11-09), so it is an alias, not a tab.
     aliases: ['library', 'settings'],
+    // Not in the sidebar (Eric, 2026-11-10). Its pages open from Settings → Workspace and the
+    // top-right account menu; the group still owns them so deep links show the right tabs.
+    sidebarHidden: true,
   },
   {
     // Shown only where its (prototype-only) members are visible — same rule as before.
@@ -378,9 +383,14 @@ export function visibleMembers(group: NavGroup, ctx: NavAccessContext): NavGroup
   return group.members.filter((m) => isPanelVisible(m.panel, ctx));
 }
 
-/** A group is shown in the sidebar when at least one of its members is visible. */
+/** A group has something to show when at least one of its members is visible. */
 export function isGroupVisible(group: NavGroup, ctx: NavAccessContext): boolean {
   return visibleMembers(group, ctx).length > 0;
+}
+
+/** A group gets a sidebar row when it is visible and not marked `sidebarHidden`. */
+export function isGroupInSidebar(group: NavGroup, ctx: NavAccessContext): boolean {
+  return !group.sidebarHidden && isGroupVisible(group, ctx);
 }
 
 /** True when none of the group's visible members is accessible (the row shows a lock). */

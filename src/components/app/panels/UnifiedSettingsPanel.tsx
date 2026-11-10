@@ -1164,6 +1164,27 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
             )}
           </div>
 
+          {/* Workspace — My Vault, Team and Clients used to be the sidebar's "Account" group,
+              which is no longer in the sidebar (Eric, 2026-11-10). */}
+          <div className="bg-ground border border-surface rounded-xl p-5">
+            <h2 className="font-semibold text-white">Workspace</h2>
+            <div className="mt-3 space-y-2">
+              <a href="/app?panel=vault" className="block rounded-lg border border-surface px-3 py-2 text-sm text-white hover:bg-surface">
+                My Vault <span className="block text-xs text-muted">Past performance, capabilities, documents</span>
+              </a>
+              {(tier === 'team' || tier === 'enterprise') && (
+                <>
+                  <a href="/app?panel=team" className="block rounded-lg border border-surface px-3 py-2 text-sm text-white hover:bg-surface">
+                    Team <span className="block text-xs text-muted">Seats and roles</span>
+                  </a>
+                  <a href="/app?panel=coach" className="block rounded-lg border border-surface px-3 py-2 text-sm text-white hover:bg-surface">
+                    Clients <span className="block text-xs text-muted">Manage multiple businesses</span>
+                  </a>
+                </>
+              )}
+            </div>
+          </div>
+
           <div className="bg-ground border border-surface rounded-xl p-5">
             <h2 className="font-semibold text-white">Getting started</h2>
             {/* The guided product tour is NEW-USER onboarding — hide it in Coach

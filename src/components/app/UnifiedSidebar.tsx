@@ -22,7 +22,7 @@ import {
   groupForPanel,
   groupSummary,
   isGroupLocked,
-  isGroupVisible,
+  isGroupInSidebar,
   panelDef,
   primaryMember,
   visibleMembers,
@@ -293,7 +293,7 @@ export default function UnifiedSidebar({
             );
           })()}
 
-          {NAV_GROUPS.filter((g) => isGroupVisible(g, navCtx)).map((group) => {
+          {NAV_GROUPS.filter((g) => isGroupInSidebar(g, navCtx)).map((group) => {
             const isActive = activeGroup?.id === group.id;
             const locked = isGroupLocked(group, navCtx);
             const isHovered = hoveredItem === group.id;

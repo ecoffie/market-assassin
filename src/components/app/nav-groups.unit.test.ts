@@ -9,6 +9,7 @@ import {
   groupSummary,
   isGroupLocked,
   isGroupVisible,
+  isGroupInSidebar,
   primaryMember,
   visibleMembers,
 } from './nav-groups';
@@ -72,6 +73,14 @@ describe('nav groups', () => {
     expect(tabs.players).toEqual(['contractors:Companies', 'decision-makers:Government contacts']);
     expect(tabs.account).toEqual(['vault:My Vault', 'team:Team', 'coach:Clients']);
     expect(tabs.government).toEqual(['osbp-smb:SMB market research', 'micc-mrr:KO research workspace']);
+  });
+
+  it('the Account group is not a sidebar row, but still owns its pages', () => {
+    const account = NAV_GROUPS.find((g) => g.id === 'account')!;
+    expect(isGroupInSidebar(account, pro)).toBe(false);
+    expect(groupForPanel('vault')?.id).toBe('account');
+    const opps = NAV_GROUPS.find((g) => g.id === 'opportunities')!;
+    expect(isGroupInSidebar(opps, pro)).toBe(true);
   });
 
   it('deep links resolve to the group containing the panel', () => {
