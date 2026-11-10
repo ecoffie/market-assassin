@@ -33,6 +33,12 @@ vi.mock('@vercel/kv', () => ({
 type Row = Record<string, unknown>;
 const tables: Record<string, Row[]> = {};
 const brokenTables = new Set<string>();
+/** Tables whose reads never resolve (a slow-but-up DB). */
+const hangingTables = new Set<string>();
+/** Fake-clock milliseconds a db-health PROBE read "takes" (advances the Date-only fake clock). */
+let probeCostMs = 0;
+/** Fake-clock milliseconds the pg-stats RPC probe "takes". */
+let rpcCostMs = 0;
 
 function builder(table: string) {
   const filters: ((r: Row) => boolean)[] = [];
@@ -42,6 +48,8 @@ function builder(table: string) {
   let limit: number | null = null;
 
   const exec = async () => {
+    if (hangingTables.has(table)) return new Promise<never>(() => {});
+    if (table === 'sam_opportunities' && probeCostMs) vi.setSystemTime(Date.now() + probeCostMs);
     if (brokenTables.has(table)) {
       return { data: null, count: null, error: { message: `relation "${table}" is unavailable` } };
     }
@@ -72,7 +80,7 @@ function builder(table: string) {
 vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({
     from: (t: string) => builder(t),
-    rpc: async () => ({ data: null, error: { message: 'function db_health_stats() does not exist' } }),
+    rpc: async () => { if (rpcCostMs) vi.setSystemTime(Date.now() + rpcCostMs); return { data: null, error: { message: 'function db_health_stats() does not exist' } }; },
   }),
 }));
 
@@ -133,6 +141,9 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
   sent.length = 0;
   sendThrows = false;
+  hangingTables.clear();
+  probeCostMs = 0;
+  rpcCostMs = 0;
   kvStore.clear();
   brokenTables.clear();
   for (const k of Object.keys(tables)) delete tables[k];
@@ -225,4 +236,33 @@ describe('db-health-watch route → launch signals', () => {
     // A failed announcement is not persisted, so it retries next hour.
     expect([...kvStore.keys()].some((k) => k.startsWith('launchsignal:'))).toBe(false);
   });
+
+  it('slow probes leave too little of maxDuration → launch block is skipped, db-health still answers', async () => {
+    seedHealthy();
+    // slow-but-UP DB: both hard probes under the 8s "down" line (→ degraded), slow pg-stats → 27s used
+    probeCostMs = 7_000;
+    rpcCostMs = 13_000;
+    const body = await run();
+    expect(body.status).toBe('degraded');
+    expect(body.launchSignals).toBe('skipped_no_time');
+    // The only alert is the EXISTING healthy→degraded transition — no launch-signal alert ran.
+    expect(body.alerted).toBe(true);
+    expect(sent).toHaveLength(1);
+    expect([...kvStore.keys()].some((k) => k.startsWith('launchsignal:'))).toBe(false);
+  });
+
+  it('hanging launch-signal queries are cut off at the remaining budget instead of outliving maxDuration', async () => {
+    seedHealthy();
+    probeCostMs = 7_000; // 7 + 7 + 9.5 = 23.5s used → 2.5s real budget for the launch block
+    rpcCostMs = 9_500;
+    hangingTables.add('user_notification_settings');
+    hangingTables.add('mcp_call_log');
+    hangingTables.add('tool_errors');
+    const t0 = performance.now();
+    const body = await run();
+    const waited = performance.now() - t0;
+    expect(waited).toBeLessThan(6_000);
+    expect(body.status).toBe('degraded');
+    expect(body.launchSignals).toEqual({ error: expect.stringMatching(/launch signals timed out/) });
+  }, 15_000);
 });

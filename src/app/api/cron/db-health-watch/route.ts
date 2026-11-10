@@ -86,7 +86,19 @@ async function withTimeout<T>(p: PromiseLike<T>, ms: number, label: string): Pro
   ]);
 }
 
+/**
+ * Time left for the launch signals, so they can never push this route past maxDuration —
+ * a Vercel kill would drop the whole db-health response, not just the launch block.
+ * Below the minimum, the block is skipped (reported as such) rather than started.
+ */
+export const LAUNCH_SIGNAL_HEADROOM_MS = 4_000;
+export const LAUNCH_SIGNAL_MIN_MS = 2_000;
+export function launchSignalBudgetMs(elapsedMs: number): number {
+  return maxDuration * 1000 - elapsedMs - LAUNCH_SIGNAL_HEADROOM_MS;
+}
+
 export async function GET(request: NextRequest) {
+  const routeStartedAt = Date.now();
   if (!isAuthed(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -208,16 +220,27 @@ export async function GET(request: NextRequest) {
   // daily-alerts tool errors. Runs AFTER the db-health logic and is fully isolated: a failure
   // here never changes the DB status above. Skipped when the DB is down (each check would only
   // report UNKNOWN for a cause we've already alerted on).
-  let launchSignals: SignalOutcome[] | { error: string } | 'skipped_db_down' = 'skipped_db_down';
+  // Bounded by the remaining maxDuration budget: on a slow-but-up DB the launch block is cut
+  // off (reported as an error = unknown) instead of letting Vercel kill the whole response.
+  let launchSignals: SignalOutcome[] | { error: string } | 'skipped_db_down' | 'skipped_no_time' = 'skipped_db_down';
   if (status !== 'down') {
-    try {
-      launchSignals = await runLaunchSignals(sb, {
-        kvGet: async (k) => (await kv.get<StoredState>(k)) ?? null,
-        kvSet: async (k, v) => { await kv.set(k, v, { ex: 3 * 24 * 60 * 60 }); },
-        send: (m) => sendOpsAlert({ to: ALERT_TO, subject: m.subject, html: m.html }),
-      });
-    } catch (err) {
-      launchSignals = { error: (err as Error).message };
+    const budgetMs = launchSignalBudgetMs(Date.now() - routeStartedAt);
+    if (budgetMs < LAUNCH_SIGNAL_MIN_MS) {
+      launchSignals = 'skipped_no_time';
+    } else {
+      try {
+        launchSignals = await withTimeout(
+          runLaunchSignals(sb, {
+            kvGet: async (k) => (await kv.get<StoredState>(k)) ?? null,
+            kvSet: async (k, v) => { await kv.set(k, v, { ex: 3 * 24 * 60 * 60 }); },
+            send: (m) => sendOpsAlert({ to: ALERT_TO, subject: m.subject, html: m.html }),
+          }),
+          budgetMs,
+          'launch signals',
+        );
+      } catch (err) {
+        launchSignals = { error: (err as Error).message };
+      }
     }
   }
 
