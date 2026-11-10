@@ -176,6 +176,7 @@ export async function GET(request: NextRequest) {
   const stored = new Map<string, StoredEvent>();
   const datedIds = dated.map((e) => e.notice_id);
   for (let i = 0; i < datedIds.length; i += 200) {
+    // truncation-ok: at most 200 ids per call and notice_id is unique in sam_events, so ≤200 rows.
     const { data, error: storedError } = await getSupabase().from('sam_events').select('notice_id, event_type, event_date').in('notice_id', datedIds.slice(i, i + 200));
     if (storedError) return NextResponse.json({ error: storedError.message }, { status: 500 });
     for (const r of (data || []) as Array<{ notice_id: string; event_type: string; event_date: string | null }>) stored.set(r.notice_id, { event_type: r.event_type, event_date: r.event_date });
