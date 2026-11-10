@@ -74,7 +74,7 @@ export default function ConnectionKeyCard() {
       <p className="text-gray-300 mb-3">
         Signed in as <span className="text-white">{email}</span>. The key reads only your own briefings. It
         cannot use Mindy tools or credits, and you can revoke it any time in{' '}
-        <a href="/mcp/account?section=keys" className="text-amber-400 underline">your account</a>.
+        <a href="/app?panel=settings&section=credits&tab=keys" className="text-amber-400 underline">your account</a>.
       </p>
       {!key && (
         <button

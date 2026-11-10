@@ -26,7 +26,7 @@ export function McpPublicNav({ active, signedIn, balance }: { active: 'about' | 
         <Link href="/mcp" className={`${link} ${active === 'connect' ? on : off}`}>Connect</Link>
         <Link href="/mcp/pricing" className={`${link} ${active === 'pricing' ? on : off}`}>Pricing</Link>
         {signedIn && (
-          <Link href="/mcp/account" className={`flex items-center gap-2 ${link} ${active === 'account' ? on : off}`}>
+          <Link href="/app?panel=settings&section=credits" className={`flex items-center gap-2 ${link} ${active === 'account' ? on : off}`}>
             {typeof balance === 'number' && (
               <Chip className="tabular-nums">{balance.toLocaleString()} credits</Chip>
             )}
