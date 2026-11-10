@@ -12,6 +12,7 @@
 
 import { kv } from '@vercel/kv';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { isKvQuotaError, signalKvFailure } from '@/lib/kv-ops-signal';
 
 // ============================================
 // LRU Cache Implementation
@@ -88,6 +89,17 @@ export const accessCache = new LRUCache<unknown>(2000, 30); // Access checks: 30
 export const rateLimitCache = new LRUCache<number>(5000, 5); // Rate limits: 5s TTL
 export const abuseCache = new LRUCache<unknown>(1000, 60); // Abuse flags: 60s TTL
 
+// Stale-if-error store for ACCESS values (2026-11-10). Holds the last value a
+// HEALTHY KV returned for each access key, for 24h per instance. Consulted ONLY
+// when the KV read ERRORS (outage / quota / open circuit) — never on a miss — so
+// it can keep a paying user on their tier through an outage but can never grant
+// access that a healthy KV just revoked (a healthy miss deletes the entry).
+export const ACCESS_STALE_TTL_SECONDS = 24 * 3600;
+export const accessStaleStore = new LRUCache<unknown>(5000, ACCESS_STALE_TTL_SECONDS);
+
+/** Sentinel: the KV call failed (error or open circuit) — distinct from a miss (null). */
+const KV_FAILED: unique symbol = Symbol('kv-failed');
+
 // Cache metrics for monitoring
 const cacheMetrics = {
   hits: 0,
@@ -132,6 +144,7 @@ class CircuitBreaker {
       } else {
         // Circuit is open, use fallback
         cacheMetrics.circuitOpen = true;
+        signalKvFailure('circuit_open', `KV circuit open; last error: ${cacheMetrics.lastError ?? 'unknown'}`);
         return fallback();
       }
     }
@@ -166,6 +179,9 @@ class CircuitBreaker {
     this.lastFailureTime = Date.now();
     cacheMetrics.kvErrors++;
     cacheMetrics.lastError = error instanceof Error ? error.message : String(error);
+    if (isKvQuotaError(error)) {
+      signalKvFailure('quota_exceeded', cacheMetrics.lastError);
+    }
 
     if (this.state === 'half-open') {
       this.state = 'open';
@@ -175,6 +191,7 @@ class CircuitBreaker {
       this.state = 'open';
       cacheMetrics.circuitOpen = true;
       console.warn(`[CircuitBreaker] Circuit opened after ${this.failures} failures`);
+      signalKvFailure('circuit_open', `KV circuit opened after ${this.failures} failures: ${cacheMetrics.lastError}`);
     }
   }
 
@@ -378,9 +395,16 @@ export async function resilientGet<T>(
     cache?: LRUCache<unknown>;
     cacheTTL?: number;
     fallback?: () => T | null | Promise<T | null>;
+    /**
+     * Stale-if-error store. Defaults to `accessStaleStore` when `cache` is the
+     * access cache; pass `null` to disable.
+     */
+    staleStore?: LRUCache<unknown> | null;
   } = {}
 ): Promise<T | null> {
   const { cache = accessCache, cacheTTL, fallback } = options;
+  const staleStore =
+    options.staleStore !== undefined ? options.staleStore : cache === accessCache ? accessStaleStore : null;
 
   // Check local cache first
   const cached = cache.get(key) as T | undefined;
@@ -391,19 +415,37 @@ export async function resilientGet<T>(
   cacheMetrics.misses++;
 
   // Use circuit breaker for KV call
-  const result = await kvCircuitBreaker.execute<T | null>(
+  const raw = await kvCircuitBreaker.execute<T | null | typeof KV_FAILED>(
     async () => {
       cacheMetrics.kvCalls++;
       const value = await kv.get<T>(key);
-      if (value !== null) {
+      if (value !== null && value !== undefined) {
         cache.set(key, value, cacheTTL);
+        staleStore?.set(key, value);
+      } else {
+        // Healthy MISS: the grant is gone — forget any last-known value so a
+        // later outage can never resurrect it.
+        staleStore?.delete(key);
       }
-      return value;
+      return value ?? null;
     },
-    () => null
+    () => KV_FAILED
   );
 
-  // If KV failed and we have a fallback, try it
+  let result: T | null;
+  if (raw === KV_FAILED) {
+    // KV ERRORED (not a miss): serve the last value a healthy KV returned, if any.
+    const stale = staleStore?.get(key) as T | undefined;
+    if (stale !== undefined) {
+      console.warn(`[kv-resilience] KV failed for ${key.split(':')[0]}:*; serving last-known value (stale-if-error)`);
+      return stale;
+    }
+    result = null;
+  } else {
+    result = raw;
+  }
+
+  // On a miss or an un-covered KV failure, try the fallback (behavior unchanged)
   if (result === null && fallback) {
     const fallbackResult = await fallback();
     if (fallbackResult !== null) {
@@ -430,6 +472,10 @@ export async function resilientSet<T>(
 
   // Update local cache immediately
   cache.set(key, value, exSeconds);
+  if (cache === accessCache) {
+    // a time-limited grant must not outlive its KV TTL in the stale store
+    accessStaleStore.set(key, value, exSeconds ? Math.min(exSeconds, ACCESS_STALE_TTL_SECONDS) : undefined);
+  }
 
   // Use circuit breaker for KV call
   return kvCircuitBreaker.execute(
@@ -459,6 +505,7 @@ export async function resilientDel(
 
   // Invalidate local cache immediately
   cache.delete(key);
+  if (cache === accessCache) accessStaleStore.delete(key);
 
   return kvCircuitBreaker.execute(
     async () => {
