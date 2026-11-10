@@ -21,7 +21,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyAdminPassword } from '@/lib/admin-auth';
 import { bqQuery, bqJobOptions, BQ_TABLES } from '@/lib/bigquery/client';
-import { memberUeis, sinceJoining, tallyWins, type AwardRow, type ProfileRow, type SettingsRow } from '@/lib/admin/member-wins';
+import { memberUeis, recentWinners, sinceJoining, tallyWins, type AwardRow, type ProfileRow, type SettingsRow } from '@/lib/admin/member-wins';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -66,7 +66,9 @@ export async function GET(req: NextRequest) {
         query: `
           SELECT recipient_uei, award_id,
                  CAST(MIN(action_date) AS STRING) AS first_action,
-                 SUM(obligation_amount) AS amount
+                 SUM(obligation_amount) AS amount,
+                 ANY_VALUE(recipient_name) AS recipient_name,
+                 ANY_VALUE(awarding_agency) AS awarding_agency
           FROM ${BQ_TABLES.awards}
           WHERE recipient_uei IN UNNEST(@ueis)
           GROUP BY recipient_uei, award_id
@@ -78,6 +80,21 @@ export async function GET(req: NextRequest) {
     }
 
     const sinceRows = sinceJoining(awards, ueiJoined);
+
+    // ?recentMonths=N → which members won a NEW award (first action) in the last N months.
+    const recentMonths = Number(req.nextUrl.searchParams.get('recentMonths') || 0);
+    let recent: ReturnType<typeof recentWinners> | undefined;
+    if (Number.isFinite(recentMonths) && recentMonths > 0) {
+      const emailsByUei = new Map<string, string[]>();
+      for (const p of profiles) {
+        const uei = (p.uei || '').trim().toUpperCase();
+        if (!ueiJoined.has(uei)) continue;
+        const list = emailsByUei.get(uei) ?? [];
+        if (p.user_email && !list.includes(p.user_email.toLowerCase())) list.push(p.user_email.toLowerCase());
+        emailsByUei.set(uei, list);
+      }
+      recent = recentWinners(awards, emailsByUei, recentMonths);
+    }
     const unknownJoin = ueis.filter((u) => !Number.isFinite(ueiJoined.get(u) as number)).length;
 
     return NextResponse.json({
@@ -91,6 +108,7 @@ export async function GET(req: NextRequest) {
       },
       lifetime: tallyWins(awards),
       sinceJoining: tallyWins(sinceRows),
+      ...(recent ? { recentWinners: { months: recentMonths, ...recent } } : {}),
       definitions: {
         contract: 'A distinct award (award_id) with positive net obligation.',
         dollars: 'Sum of each award\'s net obligated dollars (USASpending via BigQuery).',
