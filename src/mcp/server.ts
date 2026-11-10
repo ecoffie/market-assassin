@@ -30,6 +30,7 @@ import { searchContractors } from './tools/search-contractors';
 import { getAgencyIntel } from './tools/agency-intel';
 import { getLegislationStatus } from './tools/legislation-status';
 import { grantsSearch } from './tools/grants';
+import { govconJobsSearch } from './tools/govcon-jobs';
 import { agencyForecasts } from './tools/forecasts';
 import { sbirSearch } from './tools/sbir';
 import { expiringContracts } from './tools/expiring-contracts';
@@ -1201,6 +1202,32 @@ server.registerTool(
   },
   async ({ gates, ratings }) => {
     const result = evaluateBidDecisionTool({ gates, ratings });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'search_govcon_jobs',
+  {
+    title: 'Search GovCon Jobs (USAJobs)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    description:
+      'Federal contracting job openings from USAJobs (default series 1102 Contracting) posted in the last N days, ' +
+      'plus which agencies are hiring buyers. Federal jobs only. grounded=false when nothing matches; ' +
+      'degraded=true when USAJobs could not be reached.',
+    inputSchema: {
+      keyword: z.string().optional().describe('Word in the title or summary.'),
+      agency: z.string().optional().describe('Agency or department name contains, e.g. "Air Force".'),
+      state: z.string().optional().describe('State name or 2-letter code.'),
+      clearance: z.enum(['required', 'none-stated']).optional().describe('Jobs that list a clearance, or list none.'),
+      remote_only: z.boolean().optional().describe('Only remote-eligible jobs.'),
+      days: z.number().int().min(1).max(60).optional().describe('Posted within the last N days (default 30).'),
+      series: z.string().optional().describe('OPM occupational series (default "1102").'),
+      limit: z.number().int().min(1).max(100).optional().describe('Max jobs (default 25).'),
+    },
+  },
+  async (args) => {
+    const result = await govconJobsSearch(args);
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );

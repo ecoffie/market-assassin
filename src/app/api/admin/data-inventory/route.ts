@@ -784,6 +784,13 @@ export async function GET(request: NextRequest) {
       upstreams: ['usaspending'], provenance: 'Live USASpending search API. Distinct from the persisted award warehouse above; keyword coverage is a derived MEASUREMENT computed per call, not a held dataset.',
     },
     {
+      key: 'usajobs_live', label: 'USAJobs federal job openings (live)', kind: 'passthrough', stored: null, unit: '—',
+      headlineContribution: null,
+      freshness: { state: 'PASSTHROUGH', asOf: null, basis: 'fetched live per call; 6h response cache (mcp_external_cache / Next data cache)' },
+      surface: { state: 'passthrough', tools: ['search_govcon_jobs'], app: ['/jobs'] },
+      upstreams: ['usajobs'], provenance: 'Live USAJobs search API, occupational series 1102 (Contracting) by default. Nothing persisted beyond a short-TTL response cache.',
+    },
+    {
       key: 'pricing_intel', label: 'GSA CALC+ labor rates', kind: 'passthrough', stored: null, unit: '—',
       headlineContribution: null,
       freshness: { state: 'PASSTHROUGH', asOf: null, basis: 'fetched live per call; 12h response cache (mcp_external_cache)' },

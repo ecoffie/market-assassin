@@ -16,7 +16,7 @@ const USEFUL_OR_SELF_GUARDED = new Set([
   'get_pricing_intel', 'get_regulatory_demand', // validation_error → not billed
   'capability_market_match', // nonbillable_no_market
   'generate_market_report', // measurement_failure → not billed
-  'search_contractors', 'search_grants', 'get_agency_forecasts', 'search_sbir',
+  'search_contractors', 'search_grants', 'search_govcon_jobs', 'get_agency_forecasts', 'search_sbir',
   'get_expiring_contracts', 'search_idv_contracts', 'search_past_contracts',
   'search_federal_contacts', 'get_federal_event_series',
   'get_balance', 'list_market_schedules', 'verify_m_scale',

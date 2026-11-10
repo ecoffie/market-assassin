@@ -7,9 +7,25 @@ accurately from this file.
 
 Authoritative counts (never trust a grep — tools register via two paths: explicit
 `*_TOOL_DEF` consts in `src/lib/mcp/tool-registry.ts` AND the TIER1/TIER2 chat defs):
-- **Internal registry, `listMcpTools()` = 64.** Mindy Chat and tool-to-tool composition use it.
-- **Public catalog, `listPublicMcpTools()` = 53.** What the hosted HTTP edge lists and accepts.
+- **Internal registry, `listMcpTools()` = 65.** Mindy Chat and tool-to-tool composition use it.
+- **Public catalog, `listPublicMcpTools()` = 54.** What the hosted HTTP edge lists and accepts.
   The difference is the hidden set in `src/lib/mcp/public-catalog-config.ts`.
+
+---
+
+## November 2026 — search_govcon_jobs (public 53 → 54, internal 64 → 65)
+
+**`search_govcon_jobs`** (5 credits) — federal contracting job openings from USAJobs (default OPM
+series 1102 Contracting) posted in the last N days, filterable by keyword, agency, state, clearance
+and remote. Returns each job (title, agency, location, pay, clearance, posted/closing dates, apply
+link) plus `agencies_hiring`: the offices adding buyers, a signal they plan to buy more. Federal
+jobs only; private-sector contractor jobs are not included. Live USAJobs read, 6h response cache.
+`degraded=true` when USAJobs cannot be reached, never an empty "nobody is hiring". Same source as
+getmindy.ai/jobs.
+
+### Docs kept in sync
+
+- Capabilities artifact (`31ec6de1-1dcf-4a04-aa43-30289bfc6c7c`) — 54 tools.
 
 ---
 
@@ -37,7 +53,7 @@ Source: `tasks/mcp-tool-portfolio-audit-2026-10-02.md` (Phase 0 + Phase 1).
 
 ### Docs kept in sync
 
-- Capabilities artifact (`31ec6de1-1dcf-4a04-aa43-30289bfc6c7c`) — 53 tools.
+- Capabilities artifact (`31ec6de1-1dcf-4a04-aa43-30289bfc6c7c`) — 54 tools.
 
 ---
 

@@ -60,6 +60,7 @@ export const PUBLIC_MCP_TOOLS: readonly string[] = [
   'search_federal_contacts',
   'search_federal_events',
   'search_grants',
+  'search_govcon_jobs',
   'search_idv_contracts',
   'search_past_contracts',
   'search_podcast_lessons',
