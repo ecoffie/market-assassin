@@ -42,6 +42,7 @@ import {
 } from '@/lib/alerts/coming-back-to-market';
 import { prioritiesFromAggregated } from '@/lib/alerts/naics-priorities';
 import { knownNaicsForMatch } from '@/lib/codes/validate-market-codes';
+import { planDailyBatch, shouldFailForPending, NO_TARGETING_REASON, FINAL_RUN_UTC_HOUR, FINAL_RUN_UTC_MINUTE } from '@/lib/alerts/daily-pending';
 import { userInRollout } from '@/lib/intelligence/feature-flag';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 import { generateEmailToken } from '@/lib/api-auth';
@@ -514,23 +515,58 @@ async function runDailyAlertJob(options?: {
     // shortfall (see BATCH_SIZE + the cron schedule for that) — it stops the shortfall
     // always landing on the same inboxes, which is the part that reads as "Mindy
     // stopped sending me alerts" to one specific user while looking fine in aggregate.
-    const pending = (users as AlertUser[]).filter(u => !alreadyProcessedEmails.has(u.user_email));
+    //
+    // PARTITION BEFORE BATCHING (2026-11-10, src/lib/alerts/daily-pending.ts). Users not
+    // due today and users with no targeting used to be sliced INTO the batch and then
+    // dropped by a bare `continue` with no alert_log row — so they stayed "pending" all
+    // day, were re-selected by every run and ate batch slots (~38 real users/run of 70).
+    // Now only due + targeted users compete for slots.
     const dayOfYear = Math.floor(
       (Date.parse(today) - Date.parse(`${new Date(today).getUTCFullYear()}-01-01`)) / 86_400_000
     );
-    // Offset is a fraction of the FULL audience so the start point sweeps the whole
-    // alphabet over a cycle, then wraps. Slice from the offset and wrap around so a
-    // short batch still takes a contiguous, deterministic window (no gaps, no repeats).
-    const rotateBy = pending.length > 0 ? (dayOfYear * BATCH_SIZE) % pending.length : 0;
-    const rotated = rotateBy === 0
-      ? pending
-      : [...pending.slice(rotateBy), ...pending.slice(0, rotateBy)];
-    const usersToProcess = rotated.slice(0, BATCH_SIZE);
+    // Offset is a fraction of the pending list so the start point sweeps the whole
+    // alphabet over a cycle, then wraps (contiguous window, no gaps, no repeats).
+    const plan = planDailyBatch({
+      users: users as AlertUser[],
+      processed: alreadyProcessedEmails,
+      utcDay: new Date().getUTCDay(),
+      batchSize: BATCH_SIZE,
+      dayOfYear,
+      skipDayCheck: !!options?.testEmail,
+    });
+    const usersToProcess = plan.batch;
 
-    const remainingAfterFilter = (users as AlertUser[]).filter(u => !alreadyProcessedEmails.has(u.user_email)).length;
+    // No-targeting users: one VISIBLE 'skipped' row per user per day. The row is what
+    // takes them out of every later run's pending set. A write failure is non-fatal —
+    // they are excluded from the batch either way, so they can never eat slots.
+    let noTargetingRecorded = 0;
+    if (plan.noTargeting.length > 0) {
+      const rows = plan.noTargeting.map((u) => ({
+        user_email: u.user_email,
+        alert_date: today,
+        alert_type: 'daily',
+        opportunities_count: 0,
+        opportunities_data: [],
+        delivery_status: 'skipped',
+        error_message: NO_TARGETING_REASON,
+        retry_count: 0,
+      }));
+      for (let k = 0; k < rows.length; k += 200) {
+        const chunk = rows.slice(k, k + 200);
+        try {
+          await upsertAlertLog(getSupabase(), chunk);
+          noTargetingRecorded += chunk.length;
+        } catch (e) {
+          console.error('[Daily Alerts] Failed to record no_targeting skipped rows:', e);
+        }
+      }
+      console.log(`[Daily Alerts] ${plan.noTargeting.length} due user(s) have no NAICS and no keywords — recorded skipped '${NO_TARGETING_REASON}' (${noTargetingRecorded} written)`);
+    }
+
+    const remainingAfterFilter = plan.pending.length;
     const remainingAfterBatch = remainingAfterFilter - usersToProcess.length;
 
-    console.log(`[Daily Alerts] Batching: ${alreadyProcessedCount} already processed today, processing ${usersToProcess.length} of ${remainingAfterFilter} remaining (${remainingAfterBatch} for next run)`);
+    console.log(`[Daily Alerts] Batching: ${alreadyProcessedCount} already processed today, ${plan.notDueToday.length} not due today, ${plan.noTargeting.length} no targeting, processing ${usersToProcess.length} of ${remainingAfterFilter} due+targeted remaining (${remainingAfterBatch} for next run)`);
 
     if (usersToProcess.length === 0) {
       console.log('[Daily Alerts] All users already processed today');
@@ -540,6 +576,9 @@ async function runDailyAlertJob(options?: {
         sent: 0,
         alreadyProcessed: alreadyProcessedCount,
         totalEligible,
+        notDueToday: plan.notDueToday.length,
+        noTargeting: plan.noTargeting.length,
+        pendingAfterRun: 0,
         retryResults
       });
     }
@@ -554,7 +593,7 @@ async function runDailyAlertJob(options?: {
       skipped: 0,
       failed: 0,
       noNaics: 0,
-      noTargeting: 0, // no NAICS AND no keywords → skipped, not given a default profile
+      noTargeting: plan.noTargeting.length, // no NAICS AND no keywords → recorded skipped 'no_targeting', never batched
       noOpps: 0,
       openSearchFailed: 0, // the Open query errored — recorded failed + retryable, never counted as noOpps
       openUnavailablePartial: 0, // final attempt still failing; other useful sections sent with the 'could not be checked' line (also counted in sent)
@@ -564,6 +603,9 @@ async function runDailyAlertJob(options?: {
       errors: [] as string[],
     };
 
+    // Users this run actually started (a guardrail break stops early). pendingAfterRun is
+    // derived from it so an interrupted run reports the users it never reached.
+    let attempted = 0;
     for (const user of usersToProcess) {
       // Check guardrails before processing each user
       const guardrailCheck = guardrails.check();
@@ -584,6 +626,7 @@ async function runDailyAlertJob(options?: {
         break; // Stop processing more users
       }
 
+      attempted++;
       try {
         // DISABLED: Timezone filtering removed Apr 17, 2026
         // All daily-frequency users receive alerts in same batch (not staggered by timezone)
@@ -592,18 +635,8 @@ async function runDailyAlertJob(options?: {
         //   continue;
         // }
 
-        // Day-of-week skip for partial-week frequencies.
-        // 0 = Sun, 1 = Mon, 2 = Tue, ... 6 = Sat.
-        if (!options?.testEmail) {
-          const dayOfWeek = new Date().getUTCDay();
-          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-          const isMWF = dayOfWeek === 1 || dayOfWeek === 3 || dayOfWeek === 5;
-          const isTTh = dayOfWeek === 2 || dayOfWeek === 4;
-          if (user.alert_frequency === 'weekdays' && isWeekend) continue;
-          if (user.alert_frequency === 'weekends' && !isWeekend) continue;
-          if (user.alert_frequency === 'mwf' && !isMWF) continue;
-          if (user.alert_frequency === 'tth' && !isTTh) continue;
-        }
+        // Day-of-week gating now happens BEFORE batching (planDailyBatch → notDueToday),
+        // so a not-due user never occupies a batch slot.
 
         // Note: This route ONLY processes users where alert_frequency='daily' (line 327 query filter)
         // Users with alert_frequency='weekly' go through weekly-alerts route instead.
@@ -654,8 +687,12 @@ async function runDailyAlertJob(options?: {
         const hasKeywords = (user.keywords || []).length > 0;
 
         if (userNaics.length === 0 && !hasKeywords) {
+          // Unreachable in normal runs: planDailyBatch removes these before batching
+          // (same knownNaicsForMatch + keywords test). Kept as a guard — and it records
+          // the row, so it can never become an invisible re-selected user again.
           results.noTargeting++;
           console.log(`[Daily Alerts] SKIP ${user.user_email}: no NAICS and no keywords — nothing to match on (was: generic default profile)`);
+          await saveSkippedAlert(user.user_email, NO_TARGETING_REASON).catch(() => {});
           continue;
         }
 
@@ -1255,20 +1292,40 @@ async function runDailyAlertJob(options?: {
       duration: metrics.getSnapshot().duration_ms,
     });
 
+    // Due, targeted users still unprocessed after this run. On the FINAL run of the send
+    // window that is a delivery failure: return non-2xx so cron_job_runs.http_status shows
+    // it, and log to tool_errors. Nothing about what was sent changes.
+    const pendingAfterRun = Math.max(0, plan.pending.length - attempted);
+    const failForPending = !options?.testEmail && shouldFailForPending(new Date(), pendingAfterRun);
+    if (failForPending) {
+      const msg = `Daily alert window ended with ${pendingAfterRun} due, targeted recipient(s) unprocessed (final run >= ${FINAL_RUN_UTC_HOUR}:${String(FINAL_RUN_UTC_MINUTE).padStart(2, '0')} UTC, batch ${BATCH_SIZE}, eligible ${totalEligible}, processed today ${alreadyProcessedCount + attempted}).`;
+      console.error(`[Daily Alerts] ${msg}`);
+      await logToolError({
+        tool: ToolNames.ALERTS,
+        errorType: ErrorTypes.INTERNAL,
+        errorMessage: msg,
+        requestPath: '/api/cron/daily-alerts',
+      }).catch(() => {});
+    }
+
     return NextResponse.json({
-      success: true,
+      success: !failForPending,
       results,
       batching: {
         batchSize: BATCH_SIZE,
         totalEligible,
         alreadyProcessedToday: alreadyProcessedCount,
+        notDueToday: plan.notDueToday.length,
+        noTargeting: plan.noTargeting.length,
+        noTargetingRecorded,
         processedThisRun: usersToProcess.length,
         remainingForNextRun: remainingAfterBatch,
       },
+      pendingAfterRun,
       retryResults,
       metrics: metrics.getSnapshot(),
       guardrailStats: guardrails.getStats(),
-    });
+    }, { status: failForPending ? 500 : 200 });
   } catch (error: any) {
     console.error('[Daily Alerts] Error:', error);
 
