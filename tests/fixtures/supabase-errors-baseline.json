@@ -103,8 +103,8 @@
     "src/lib/seo/facets.ts:116 (sam_opportunities) [count-null]",
     "src/lib/seo/facets.ts:133 (sam_opportunities) [count-null]",
     "src/lib/seo/facets.ts:145 (sam_opportunities)",
-    "src/lib/seo/opportunities.ts:143 (sam_opportunities)",
-    "src/lib/seo/opportunities.ts:173 (sam_opportunities)",
+    "src/lib/seo/opportunities.ts:221 (sam_opportunities)",
+    "src/lib/seo/opportunities.ts:251 (sam_opportunities)",
     "src/lib/supabase/purchases.ts:193 (purchases)",
     "src/lib/supabase/user-profiles.ts:283 (purchases)"
   ]

@@ -10,6 +10,7 @@
  *
  * Source: sam_opportunities (Supabase). Read-only, service-role.
  */
+import { cache } from 'react';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 const MIN_BODY = 200; // chars of real description/SOW required to be indexable
@@ -83,32 +84,109 @@ export function isIndexableOpp(o: { title?: string | null; description?: string 
   return body.length >= MIN_BODY;
 }
 
-/** Resolve a slug → the full opportunity, or null if not found / thin. */
-export async function getOpportunityBySlug(slug: string): Promise<SeoOpportunity | null> {
+const SLUG_LOOKUP_COLUMNS =
+  'notice_id, solicitation_number, title, description, sow_text, naics_code, psc_code, department, sub_tier, office, notice_type, set_aside_description, posted_date, response_deadline, pop_state, pop_city, ui_link, active, seo_summary';
+
+interface SlugLookupRow {
+  notice_id: string;
+  solicitation_number: string | null;
+  title: string | null;
+  description: string | null;
+  sow_text: string | null;
+  naics_code: string | null;
+  psc_code: string | null;
+  department: string | null;
+  sub_tier: string | null;
+  office: string | null;
+  notice_type: string | null;
+  set_aside_description: string | null;
+  posted_date: string | null;
+  response_deadline: string | null;
+  pop_state: string | null;
+  pop_city: string | null;
+  ui_link: string | null;
+  active: boolean | null;
+  seo_summary: string | null;
+}
+
+/**
+ * A `title ILIKE` pattern derived from the slug's title words, or null when the
+ * slug carries no usable title (placeholder base 'opportunity', or no base).
+ *
+ * opportunitySlug() lowercases the title and turns every run of [^a-z0-9] into a
+ * single '-', so the slug base is exactly the title's [a-z0-9] runs, in order
+ * (the last one possibly cut by the 80-char slice). '%w1%w2%…%wn%' therefore
+ * matches every title that can produce this slug — a strict SUPERSET filter, and
+ * the words contain no LIKE/PostgREST metacharacters. Its only job is to let
+ * Postgres use the title trigram index (idx_sam_opps_title_trgm) instead of
+ * seq-scanning for the leading-wildcard notice_id suffix.
+ */
+export function slugTitlePattern(slug: string): string | null {
+  const tail = noticeTailFromSlug(slug);
+  if (!tail || slug.length <= tail.length + 1) return null;
+  const base = slug.slice(0, slug.length - tail.length - 1);
+  if (base === 'opportunity') return null; // placeholder — the title may be null
+  const words = base.split('-').filter(Boolean);
+  if (!words.length || words.some((w) => !/^[a-z0-9]+$/.test(w))) return null;
+  return `%${words.join('%')}%`;
+}
+
+/**
+ * Resolve a slug → the full opportunity, or null if not found / thin.
+ *
+ * Wrapped in React cache(): /opportunity/[slug] calls this from BOTH
+ * generateMetadata and the page; Next documents cache() as the way to share one
+ * fetch between them within a render (metadata-and-og-images.md, "Memoizing data
+ * requests"). Outside a React server render cache() is a passthrough.
+ */
+export const getOpportunityBySlug = cache(async function getOpportunityBySlug(
+  slug: string,
+): Promise<SeoOpportunity | null> {
   const client = sb();
   if (!client) return null;
   const tail = noticeTailFromSlug(slug);
   if (!tail || tail.length < 6) return null;
 
-  // Match on the notice_id ending in the slug tail. ilike on a suffix is
-  // exact enough (8 hex chars); we re-verify the full slug below.
-  const { data, error } = await client
-    .from('sam_opportunities')
-    .select(
-      'notice_id, solicitation_number, title, description, sow_text, naics_code, psc_code, department, sub_tier, office, notice_type, set_aside_description, posted_date, response_deadline, pop_state, pop_city, ui_link, active, seo_summary',
-    )
-    .ilike('notice_id', `%${tail}`)
-    .limit(5);
-  if (error || !data?.length) return null;
-
-  // Pick the row whose generated slug matches the requested slug exactly.
-  const row = data.find((r) => opportunitySlug(r.title, r.notice_id) === slug) || null;
+  // Candidates = notice_id ending in the slug tail (8 alnum chars); the exact
+  // slug is re-verified in JS below.
+  //
+  // 1) Index-assisted: AND a title predicate from the slug words, so the title
+  //    trigram index narrows the scan (the notice_id suffix ILIKE alone can't
+  //    use the btree and seq-scanned the whole table — 14% of prod DB time).
+  // 2) Fallback: the ORIGINAL notice_id-only query, unchanged, when (1) yields
+  //    no exact match (placeholder title, Unicode case-folding edge cases), so the
+  //    set of slugs that resolve is identical to before. Cost note: a slug that
+  //    matches NOTHING (404 / stale links) still pays the original seq scan via
+  //    this fallback. Measure that share in pg_stat_statements: calls of the
+  //    notice_id-only shape vs calls of the title+notice_id shape.
+  const pattern = slugTitlePattern(slug);
+  let row: SlugLookupRow | null = null;
+  if (pattern) {
+    const { data, error } = await client
+      .from('sam_opportunities')
+      .select(SLUG_LOOKUP_COLUMNS)
+      .ilike('title', pattern)
+      .ilike('notice_id', `%${tail}`)
+      .limit(5);
+    if (!error && data?.length) {
+      row = (data as unknown as SlugLookupRow[]).find((r) => opportunitySlug(r.title, r.notice_id) === slug) || null;
+    }
+  }
+  if (!row) {
+    const { data, error } = await client
+      .from('sam_opportunities')
+      .select(SLUG_LOOKUP_COLUMNS)
+      .ilike('notice_id', `%${tail}`)
+      .limit(5);
+    if (error || !data?.length) return null;
+    row = (data as unknown as SlugLookupRow[]).find((r) => opportunitySlug(r.title, r.notice_id) === slug) || null;
+  }
   if (!row || !isIndexableOpp(row)) return null;
 
   return {
     noticeId: row.notice_id,
     slug,
-    title: row.title,
+    title: row.title as string, // isIndexableOpp guarantees a title
     solicitationNumber: row.solicitation_number || null,
     description: row.description || '',
     sowText: row.sow_text || null,
@@ -127,7 +205,7 @@ export async function getOpportunityBySlug(slug: string): Promise<SeoOpportunity
     active: !!row.active,
     seoSummary: row.seo_summary || null,
   };
-}
+});
 
 /**
  * "Similar Active Opportunities" — the internal-link web (SEO juice + dwell).
