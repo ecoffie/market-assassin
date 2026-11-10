@@ -13,7 +13,7 @@ export default function ProBundlePage() {
       accessSummary="One-time payment. Lifetime access to the core tools, plus 1 year of Market Intelligence included."
       accessBadgeLabel="Lifetime Core Tools + 1 Year MI"
       includedProductsSubtitle="Lifetime access to core tools, plus 1 year of Market Intelligence briefings"
-      guaranteeText="All sales final. Core tools are lifetime access; Market Intelligence is included for 1 year."
+      guaranteeText="All sales final · No refunds. Core tools are lifetime access; Market Intelligence is included for 1 year."
       includedProducts={[
         {
           name: 'Market Intelligence - 1 Year Access',

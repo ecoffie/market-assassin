@@ -1,5 +1,6 @@
 'use client';
 
+import NoRefundNote from '@/components/NoRefundNote';
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { X, Check, Sparkles } from 'lucide-react';
@@ -128,6 +129,7 @@ export function UpgradeModal({
               Go Pro — unlock everything →
             </Link>
           )}
+          <NoRefundNote className="text-muted" />
           <Link
             href="/market-intelligence"
             onClick={() => onCtaClick?.('pricing')}

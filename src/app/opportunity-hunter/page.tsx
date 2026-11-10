@@ -30,6 +30,7 @@
 
 'use client';
 
+import NoRefundNote from '@/components/NoRefundNote';
 import React, { useState, FormEvent, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { explicitBusinessTypeField } from '@/lib/alerts/save-profile-patch';
@@ -1096,6 +1097,7 @@ export default function OpportunityHunterPage() {
                           >
                             One-Time - $99
                           </a>
+                          <NoRefundNote />
                         </div>
                       </div>
                     </div>

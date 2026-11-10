@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import NoRefundNote from '@/components/NoRefundNote';
 import type { Metadata } from 'next';
 import { MindySignupForm } from '@/components/mindy/MindySignupForm';
 import { MindyDayBar } from '@/components/mindy/MindyDayBar';
@@ -581,6 +582,7 @@ export default function MindyLandingPage() {
               >
                 Get Mindy Pro
               </Link>
+              <NoRefundNote className="text-muted" />
             </div>
 
             {/* Teams */}
@@ -634,6 +636,7 @@ export default function MindyLandingPage() {
             >
               Get Annual Plan
             </Link>
+            <NoRefundNote className="text-muted" />
           </div>
         </div>
       </section>

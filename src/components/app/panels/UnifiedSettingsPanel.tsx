@@ -1,5 +1,6 @@
 'use client';
 
+import NoRefundNote from '@/components/NoRefundNote';
 import SubscriptionsCard from '@/components/billing/SubscriptionsCard';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MessageSquare, Check, Plus, Compass } from 'lucide-react';
@@ -1522,7 +1523,9 @@ function TeamUpgradeCard({
         >
           Upgrade to Team
         </a>
-      ) : (
+      ) : null}
+      {checkoutUrl && !provisioning && <NoRefundNote className="text-muted" />}
+      {provisioning || checkoutUrl ? null : (
         <div className="w-full px-3 py-2 text-center text-sm text-muted bg-surface rounded-lg">
           {configured ? 'Team upgrade unavailable right now.' : 'Team plan coming soon — contact us to get set up.'}
         </div>

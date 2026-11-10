@@ -178,7 +178,7 @@ export default function LifetimePage() {
               ? `Claim your lifetime seat — $${fmt(livePrice)} →`
               : `Become a Founding Member — $${fmt(FOUNDERS_LIFETIME_PRICE)} →`}
           </Link>
-          <p className="text-(--mp-muted) text-sm mt-4">One-time payment · All sales final</p>
+          <p className="text-(--mp-muted) text-sm mt-4">One-time payment · All sales final · No refunds</p>
         </div>
       </section>
 

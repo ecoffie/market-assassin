@@ -1,5 +1,6 @@
 'use client';
 
+import NoRefundNote from '@/components/NoRefundNote';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
@@ -579,6 +580,7 @@ export default function ProductPageAppSumo({
                 {currentPrice === 'FREE' ? 'Get Free Access' : 'Buy now'}
               </a>
             )}
+            {currentPrice !== 'FREE' && <NoRefundNote style={{ margin: '-14px 0 18px' }} />}
 
             {/* Trust Badges */}
             <div className="space-y-3 mb-6">
@@ -627,6 +629,7 @@ export default function ProductPageAppSumo({
                   >
                     Upgrade to {upgradeProduct.title}
                   </a>
+                  <NoRefundNote style={{ margin: '0 0 8px' }} />
                   <Link
                     href={upgradeProduct.linkUrl}
                     className="block w-full text-center py-2 text-sm font-medium text-(--mp-navy) hover:text-(--mp-navy-hover) hover:underline transition-colors"
