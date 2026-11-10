@@ -17,6 +17,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { UPGRADE_OFFER_LABEL, UPGRADE_OFFER_PARAM, withUpgradePromo } from '@/lib/billing/upgrade-offer';
 import Link from 'next/link';
+import NoRefundNote from '@/components/NoRefundNote';
 import type { Catalog, Pkg, SubPlan, Tool } from '@/app/mcp/catalog-ui';
 import { exampleCost, toolCr, workupCostFrom, workups } from '@/app/mcp/catalog-ui';
 
@@ -101,6 +102,9 @@ const Cross = () => (
   <svg width="14" height="14" viewBox="0 0 14 14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M3 3l8 8M11 3l-8 8" /></svg>
 );
 
+/** A button that goes straight to payment (Stripe or our /checkout redirect). */
+const isSaleHref = (href: string) => /buy\.stripe\.com|\/checkout\//.test(href);
+
 function PlanCard({ p, compact }: { p: CardModel; compact?: boolean }) {
   return (
     <div className={`plan ${p.color || ''} ${p.current ? 'is-current' : ''}`}>
@@ -115,6 +119,7 @@ function PlanCard({ p, compact }: { p: CardModel; compact?: boolean }) {
         {p.current
           ? <span className="cta cta-current" aria-current="true">Current plan</span>
           : <a className="cta" href={p.href}>{p.cta}{p.pill && <span className="pill">{p.pill}</span>}</a>}
+        {!p.current && isSaleHref(p.href) && <NoRefundNote />}
         {p.note && <div className="subnote">{p.note}</div>}
       </div>
       <div className="credits">
@@ -407,7 +412,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
             <div className="strip topup">
               <div className="amt">${fmt(topup.usd)}</div>
               <div><b>One-time top-up · {fmt(topup.credits)} credits</b><p>Ran out mid-month? Refill without changing your plan. Powers auto-recharge. Never expires, carries over at renewal.</p></div>
-              <a className="cta" href={topup.checkoutUrl ?? TOPUP_FALLBACK.checkoutUrl}>Buy top-up</a>
+              <div><a className="cta" href={topup.checkoutUrl ?? TOPUP_FALLBACK.checkoutUrl}>Buy top-up</a><NoRefundNote /></div>
             </div>
             <p className="fine">
               Every tool is open on every plan — tiers differ only by monthly allowance. You&apos;re charged per successful call; refused requests and failures on our side are free.<br />

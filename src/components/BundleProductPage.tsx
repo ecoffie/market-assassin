@@ -1,5 +1,6 @@
 'use client';
 
+import NoRefundNote from '@/components/NoRefundNote';
 import Link from 'next/link';
 
 interface IncludedProduct {
@@ -59,7 +60,7 @@ export default function BundleProductPage({
   accessSummary,
   accessBadgeLabel = 'Lifetime Access',
   includedProductsSubtitle,
-  guaranteeText = 'Lifetime access. No subscriptions. All sales final.',
+  guaranteeText = 'Lifetime access. No subscriptions. All sales final · No refunds.',
 }: BundleProductPageProps) {
   const savings = originalPrice - price;
   const savingsPercent = Math.round((savings / originalPrice) * 100);
@@ -123,6 +124,7 @@ export default function BundleProductPage({
               >
                 Get {title} Now
               </a>
+              <NoRefundNote />
             </div>
 
             {/* Right - Included Products Preview */}

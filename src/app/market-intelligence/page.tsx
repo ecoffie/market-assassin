@@ -1,5 +1,6 @@
 'use client';
 
+import NoRefundNote from '@/components/NoRefundNote';
 import { useRef, useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -410,7 +411,7 @@ function MarketIntelligenceContent() {
               : (billingPeriod === 'monthly' ? 'Start Team — Monthly →' : 'Start Team — Annual →')}
           </a>
           <p className="text-center text-xs text-(--mp-muted) mt-2">
-            Secure checkout via Stripe · Cancel anytime
+            Secure checkout via Stripe · Cancel anytime · All sales final · No refunds
           </p>
         </div>
 
@@ -546,6 +547,7 @@ function MarketIntelligenceContent() {
                   >
                     Get Pro →
                   </a>
+                  <NoRefundNote />
                 </td>
                 <td className="py-4 px-3 text-center bg-(--mp-navy-wash)">
                   <a
@@ -554,6 +556,7 @@ function MarketIntelligenceContent() {
                   >
                     Start Team →
                   </a>
+                  <NoRefundNote />
                 </td>
                 <td className="py-4 px-3 text-center bg-(--mp-wash)">
                   <a

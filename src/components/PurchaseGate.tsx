@@ -172,7 +172,7 @@ export default function PurchaseGate({
             Buy Now - {salePrice} (Lifetime Access)
           </a>
           <p className="text-center text-sm text-gray-500 mt-4">
-            Secure checkout powered by Stripe. Instant access after purchase.
+            Secure checkout powered by Stripe. Instant access after purchase. All sales final · No refunds.
           </p>
         </div>
 

@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
 import SubscriptionsCard from '@/components/billing/SubscriptionsCard';
+import NoRefundNote from '@/components/NoRefundNote';
 import { McpNav, MCP_URL } from '../catalog-ui';
 import {
   UsageKpis, UsageOverTime, SpendByTool, ActivityLog,
@@ -371,7 +372,10 @@ export default function McpAccountPage() {
           )}
         </div>
         {!autoRecharge?.hasCard ? (
-          <button type="button" onClick={startCardSetup} disabled={arBusy} className="mt-3 rounded-lg bg-emerald-500 px-3.5 py-2 text-[13px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-60">{arBusy ? 'Starting…' : 'Add a card to enable'}</button>
+          <>
+            <button type="button" onClick={startCardSetup} disabled={arBusy} className="mt-3 rounded-lg bg-emerald-500 px-3.5 py-2 text-[13px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-60">{arBusy ? 'Starting…' : 'Add a card to enable'}</button>
+            <NoRefundNote align="left" />
+          </>
         ) : (
           <>
             {autoRecharge.paused && (
