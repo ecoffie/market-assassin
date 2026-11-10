@@ -35,8 +35,8 @@ export function pricingFaqs(c: { signupCredits: number; proCredits: number; team
       a: 'Yes — two months free on every paid plan. Pro is $1,490/yr instead of $1,788. MCP annual plans also include bonus credits upfront.',
     },
     {
-      q: 'Is there a money-back guarantee?',
-      a: "If Mindy doesn't deliver value in your first 30 days on Pro, email hello@getmindy.ai and we'll refund the month. No retention gauntlet.",
+      q: 'What is your refund policy?',
+      a: "Payments are final and we don't refund partial months. You can cancel anytime in Settings and keep Pro until the end of the period you paid for. If a technical problem stops you from using what you bought, email hello@getmindy.ai within 7 days of purchase. Try the Free plan first to see if Mindy fits.",
     },
     {
       q: 'What happens to my data if I cancel?',

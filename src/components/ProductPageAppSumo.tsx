@@ -587,12 +587,12 @@ export default function ProductPageAppSumo({
                 <span className="text-(--mp-body)">Lifetime access</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
-                <span className="text-lg text-(--mp-navy)">↩</span>
-                <span className="text-(--mp-body)">Refundable up to 30 days</span>
+                <span className="text-lg text-(--mp-navy)">⚡</span>
+                <span className="text-(--mp-body)">Instant access after checkout</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
-                <span className="text-lg text-(--mp-accent)">♥</span>
-                <span className="text-(--mp-body)">Money-back guarantee</span>
+                <span className="text-lg text-(--mp-accent)">🔒</span>
+                <span className="text-(--mp-body)">Secure checkout through Stripe</span>
               </div>
             </div>
 
