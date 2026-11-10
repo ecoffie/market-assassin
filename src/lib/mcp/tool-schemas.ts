@@ -167,6 +167,7 @@ const TOOL_META: Readonly<Record<string, ToolMeta>> = {
   search_federal_contacts: { title: 'Search Federal Contacts' },
   search_federal_events: { title: 'Search Federal Events' },
   search_grants: { title: 'Search Grants' },
+  search_govcon_jobs: { title: 'Search GovCon Jobs' },
   search_idv_contracts: { title: 'Search IDV Contracts' },
   search_past_contracts: { title: 'Search Past Contracts' },
   search_podcast_lessons: { title: 'Search Podcast Lessons' },

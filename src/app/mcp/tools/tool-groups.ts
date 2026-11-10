@@ -45,6 +45,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
       'get_agency_forecasts',
       'get_expiring_contracts',
       'search_grants',
+      'search_govcon_jobs',
       'search_idv_contracts',
       'search_past_contracts',
       'match_recompete_sow',

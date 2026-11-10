@@ -32,6 +32,7 @@ const LINE: Record<string, string> = {
   get_agency_forecasts: 'Planned buys 6 to 18 months before a solicitation posts',
   get_expiring_contracts: 'Recompete targets: contracts about to expire, with the incumbent',
   search_grants: 'Federal grants from Grants.gov, a separate lane from contracts',
+  search_govcon_jobs: 'Federal contracting job openings from USAJobs, and which offices are hiring buyers',
   search_idv_contracts: 'IDIQ, GWAC and BPA vehicles and the task orders flowing through them',
   search_past_contracts: 'Awarded contracts by place of performance, recipient HQ, NAICS or agency',
   match_recompete_sow: 'Find the open solicitation that is likely a recompete, by SOW similarity',

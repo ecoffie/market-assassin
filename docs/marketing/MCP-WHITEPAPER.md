@@ -31,7 +31,7 @@ Wrapping a public API is the price of entry. The moat is the intelligence that t
 
 ---
 
-## What Mindy MCP gives an agent — 53 tools across four layers
+## What Mindy MCP gives an agent — 54 tools across four layers
 Among them: `get_current_acquisition_intelligence` (8 credits) — what changed about how a buyer is buying for a capability, and what to do differently (LIVE compose only). `match_company_to_pathways` (8 credits) — which of those doors a company’s public record can support (two-sided PATHWAY FIT; `no_proven_door` is success).
 
 
@@ -46,6 +46,7 @@ The hosted server exposes **40 credit-metered tools** (plus a free `get_balance`
 | `get_market_vocabulary` | The real terms buyers use for a market |
 | `get_keyword_coverage` | Measured FY description-match market $ + NAICS/PSC distribution (shares are not market identity; does not set company NAICS, forecast/recompete scope, or opportunity eligibility) |
 | `search_grants` | Federal grant (assistance) opportunities |
+| `search_govcon_jobs` | Federal contracting job openings (USAJobs) and which agencies are hiring buyers |
 | `get_agency_forecasts` | Planned procurements 6–18 months before solicitation |
 | `get_current_acquisition_intelligence` | What changed about how a buyer is buying + what to do differently (LIVE) |
 | `match_company_to_pathways` | Which CAI doors a company’s public record can support (PATHWAY FIT) |
@@ -185,7 +186,7 @@ Public data is labeled public; curated intelligence is labeled curated; an hones
 
 ## The bottom line
 
-Mindy MCP is not "an API wrapper for federal contracting." It's a grounded intelligence layer for AI agents — **53 tools** spanning the public data any agent needs, a full proposal pipeline, and the proprietary intelligence no competitor can copy, all under a contract that returns real data or honestly returns nothing.
+Mindy MCP is not "an API wrapper for federal contracting." It's a grounded intelligence layer for AI agents — **54 tools** spanning the public data any agent needs, a full proposal pipeline, and the proprietary intelligence no competitor can copy, all under a contract that returns real data or honestly returns nothing.
 
 - **Commodity done right** — the public-data tools are fast, cached, and useful on call one.
 - **Moat where it counts** — winning playbooks, office-level buying contacts, SBLO teaming, and podcast lessons that took eight years to build.

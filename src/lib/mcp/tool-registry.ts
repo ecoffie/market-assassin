@@ -31,6 +31,7 @@ import { searchContractors } from '@/mcp/tools/search-contractors';
 import { getAgencyIntel } from '@/mcp/tools/agency-intel';
 import { getLegislationStatus } from '@/mcp/tools/legislation-status';
 import { grantsSearch } from '@/mcp/tools/grants';
+import { govconJobsSearch } from '@/mcp/tools/govcon-jobs';
 import { agencyForecasts } from '@/mcp/tools/forecasts';
 import { sbirSearch } from '@/mcp/tools/sbir';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
@@ -116,6 +117,8 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   // 8 — PATHWAY FIT: two-sided match of CAI doors to company public record.
   match_company_to_pathways: 8,
   search_grants: 5,
+  // 5 — USAJobs read (cached 6h): federal contracting openings + which offices are adding buyers.
+  search_govcon_jobs: 5,
   search_sbir: 5,
   search_idv_contracts: 5,
   search_past_contracts: 5,
@@ -512,6 +515,33 @@ const GRANTS_TOOL_DEF = {
         category: { type: 'string', description: 'Grants.gov funding category code, e.g. "HL" (health), "ST" (science).' },
         status: { type: 'string', enum: ['posted', 'forecasted', 'closed', 'archived'], description: 'Opportunity status (default posted).' },
         limit: { type: 'number', description: 'Max results (default 25, max 100).' },
+      },
+    },
+  },
+};
+
+const GOVCON_JOBS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'search_govcon_jobs',
+    description:
+      'Federal CONTRACTING job openings from USAJobs (default occupational series 1102 Contracting: contract ' +
+      'specialists, contracting officers, procurement analysts) posted in the last N days. Filter by keyword, ' +
+      'agency, state, clearance, remote. Returns title, agency, location, pay, clearance, posted/closing dates, ' +
+      'apply link, plus agencies_hiring (offices adding buyers usually plan to buy more). Federal jobs only, ' +
+      'not private-sector contractor jobs. grounded=false when nothing matches; degraded=true when USAJobs ' +
+      'could not be reached (never read that as "nobody is hiring").',
+    parameters: {
+      type: 'object',
+      properties: {
+        keyword: { type: 'string', description: 'Word in the title or summary, e.g. "contracting officer" or "construction".' },
+        agency: { type: 'string', description: 'Agency or department name contains, e.g. "Air Force", "Veterans".' },
+        state: { type: 'string', description: 'State name or 2-letter code, e.g. "VA" or "Virginia".' },
+        clearance: { type: 'string', enum: ['required', 'none-stated'], description: 'Only jobs that list a clearance, or only jobs that list none.' },
+        remote_only: { type: 'boolean', description: 'Only remote-eligible jobs.' },
+        days: { type: 'number', description: 'Posted within the last N days (default 30, max 60).' },
+        series: { type: 'string', description: 'OPM occupational series (default "1102" Contracting; e.g. "1101" Business).' },
+        limit: { type: 'number', description: 'Max jobs returned (default 25, max 100).' },
       },
     },
   },
@@ -1939,6 +1969,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     SEARCH_CONTRACTORS_TOOL_DEF,
     AGENCY_INTEL_TOOL_DEF,
     GRANTS_TOOL_DEF,
+    GOVCON_JOBS_TOOL_DEF,
     FORECASTS_TOOL_DEF,
     SBIR_TOOL_DEF,
     FIND_OPPORTUNITIES_TOOL_DEF,
@@ -2008,6 +2039,7 @@ export function isMcpTool(name: string): boolean {
     name === 'search_contractors' ||
     name === 'get_agency_intel' ||
     name === 'search_grants' ||
+    name === 'search_govcon_jobs' ||
     name === 'get_agency_forecasts' ||
     name === 'search_sbir' ||
     name === 'find_opportunities' ||
@@ -2204,6 +2236,20 @@ export async function runMcpTool(
       agency: typeof args.agency === 'string' ? args.agency : undefined,
       category: typeof args.category === 'string' ? args.category : undefined,
       status: args.status === 'posted' || args.status === 'forecasted' || args.status === 'closed' || args.status === 'archived' ? args.status : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'search_govcon_jobs') {
+    const result = (await govconJobsSearch({
+      keyword: typeof args.keyword === 'string' ? args.keyword : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      state: typeof args.state === 'string' ? args.state : undefined,
+      clearance: args.clearance === 'required' || args.clearance === 'none-stated' ? args.clearance : undefined,
+      remote_only: args.remote_only === true,
+      days: typeof args.days === 'number' ? args.days : undefined,
+      series: typeof args.series === 'string' ? args.series : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
