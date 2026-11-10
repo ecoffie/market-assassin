@@ -33,6 +33,10 @@ import { isRepeatBuyer } from '@/lib/opportunities/repeat-buyer';
 import { dodaacFromSolicitation } from '@/lib/opportunities/early-signal-pins';
 import { loadDodaacEarlySignal } from '@/lib/gov-contacts/dodaac-directory';
 import { upsertInChunks, staleCleanupOrFilters, staleCleanupMode } from '@/lib/sam/sync-upsert';
+import {
+  samActiveFlag, statusReconcileMode, coveredWindow, planStatusReconcile, summarizePlan, executeStatusReconcile,
+  type ActiveRow, type ReturnedNotice, type ReconcileOutcome,
+} from '@/lib/sam/status-reconcile';
 
 // The DoDAAC early-signal band map, loaded ONCE per sync run (an async precomputed lookup — same as
 // the map decorate). mapToDbRecord stays a pure sync fn by reading this run-scoped closure rather
@@ -298,7 +302,7 @@ function mapToDbRecord(opp: SamOpportunity) {
     set_aside_code: opp.typeOfSetAside || null,
     set_aside_description: opp.typeOfSetAsideDescription || null,
     notice_type: opp.type || null,
-    active: opp.active === true || opp.active === 'Yes',
+    active: samActiveFlag(opp.active), // R1 of status reconciliation: SAM's own active=No deactivates
     pop_city: opp.placeOfPerformance?.city?.name || null,
     pop_state: opp.placeOfPerformance?.state?.code || null,
     pop_zip: opp.placeOfPerformance?.zip || null,
@@ -500,6 +504,19 @@ export async function GET(request: NextRequest) {
   const newFailedOffsets: number[] = [...failedOffsets];
   let upsertStatements = 0;
   let upsertSplits = 0;
+  // Every notice SAM returned in THIS run — the evidence base for "absent" (status reconciliation).
+  // ~19k small entries on a 30-day full sync.
+  const runStartIso = new Date(startTime).toISOString();
+  const returned = new Map<string, ReturnedNotice>();
+  const trackReturned = (rows: Array<Record<string, unknown>>) => {
+    for (const r of rows) {
+      const id = r.notice_id as string | undefined;
+      if (id) returned.set(id, {
+        notice_id: id, solicitation_number: (r.solicitation_number as string | null) ?? null,
+        posted_date: (r.posted_date as string | null) ?? null, active: r.active === true,
+      });
+    }
+  };
 
   try {
     console.log(`[sync-sam] Starting ${syncType} sync, page: ${page}, max: ${maxRecords}, dry: ${dryRun}`);
@@ -534,6 +551,7 @@ export async function GET(request: NextRequest) {
     // Process first page
     const firstBatch = firstPage.opportunities.map(mapToDbRecord);
     totalFetched += firstBatch.length;
+    trackReturned(firstBatch);
 
     if (!dryRun && firstBatch.length > 0) {
       // Bounded statements — see src/lib/sam/sync-upsert.ts (one 1,000-row upsert exceeded the
@@ -601,6 +619,7 @@ export async function GET(request: NextRequest) {
 
         const batch = pageResult.opportunities.map(mapToDbRecord);
         totalFetched += batch.length;
+        trackReturned(batch);
 
         if (!dryRun && batch.length > 0) {
           const res = await upsertInChunks(batch, (rows) => getSupabase()
@@ -747,6 +766,66 @@ export async function GET(request: NextRequest) {
       console.log('[sync-sam] Skipping stale cleanup due to incomplete sync');
     }
 
+    // ── STATUS RECONCILIATION (src/lib/sam/status-reconcile.ts) ─────────────────────────────────────
+    // Deactivate only on authoritative SAM evidence: R2 absent from this COMPLETE covering run + archive
+    // passed; R3 absent + a newer version of the same confirmed solicitation returned this run.
+    // Everything else is held and reported. Default SAM_STATUS_RECONCILE unset = report only.
+    const reconcileMode = statusReconcileMode(process.env.SAM_STATUS_RECONCILE);
+    let reconcileSummary: ReturnType<typeof summarizePlan> | null = null;
+    let reconcileOutcome: ReconcileOutcome | null = null;
+    if (!dryRun && reconcileMode !== 'off' && syncType === 'full') {
+      try {
+        const window = coveredWindow(new Date(startTime), lookbackDays);
+        const complete = isFullSuccess && !limitParam && totalAvailable > 0 && totalFetched >= totalAvailable;
+        const rows: ActiveRow[] = [];
+        let loadError: string | null = null;
+        if (complete) {
+          // Keyset over the primary key: active rows posted inside the covered window.
+          const toExclusive = new Date(Date.parse(window.to + 'T00:00:00Z') + 86_400_000).toISOString();
+          let cursor: string | null = null;
+          for (let guard = 0; guard < 200; guard++) {
+            let q = getSupabase().from('sam_opportunities')
+              .select('id, notice_id, solicitation_number, posted_date, archive_date, response_deadline')
+              .eq('active', true).gte('posted_date', window.from + 'T00:00:00Z').lt('posted_date', toExclusive)
+              .order('id', { ascending: true }).limit(1000);
+            if (cursor) q = q.gt('id', cursor);
+            const { data, error } = await q;
+            if (error) { loadError = error.message; break; }
+            if (!data || data.length === 0) break;
+            rows.push(...(data as ActiveRow[]));
+            cursor = data[data.length - 1].id;
+            if (data.length < 1000) break;
+          }
+        }
+        const plan = loadError
+          ? { skipped: `could not load active rows: ${loadError}`, deactivate: [], held: [], samInactiveReturned: 0, capExceeded: false }
+          : planStatusReconcile(rows, { runId: syncRunId, syncType, complete, window, returned }, new Date());
+        reconcileSummary = summarizePlan(plan, reconcileMode);
+        reconcileOutcome = await executeStatusReconcile(plan, reconcileMode, syncRunId, runStartIso, {
+          writeAudit: (auditRows) => getSupabase().from('sam_status_decisions').insert(auditRows),
+          flipChunk: async (ids, since) => {
+            const { data, error } = await getSupabase().from('sam_opportunities')
+              .update({ active: false })
+              .in('id', ids).eq('active', true).lt('synced_at', since) // CAS: never a row this run re-synced
+              .select('id');
+            return { flipped: error ? null : (data ?? []).map((r: { id: string }) => r.id), error };
+          },
+          markApplied: (runId, ids) => getSupabase().from('sam_status_decisions')
+            .update({ applied: true }).eq('run_id', runId).in('opp_id', ids),
+        });
+        if (reconcileOutcome.errors.length) errors.push(...reconcileOutcome.errors.map((e) => `status reconcile: ${e}`));
+        console.log(`[sync-sam] Status reconcile ${reconcileMode.toUpperCase()}: ${reconcileSummary.skipped ? 'skipped — ' + reconcileSummary.skipped
+          : `${reconcileSummary.wouldDeactivate} eligible (${Object.entries(reconcileSummary.byRule).map(([k, v]) => `${k}=${v.count}`).join(', ') || 'none'}), ${reconcileSummary.held} held, deactivated=${reconcileOutcome.deactivated ?? 'unknown'}${reconcileOutcome.applyBlocked ? ' — ' + reconcileOutcome.applyBlocked : ''}`}`);
+        if (syncRunId) {
+          const { error: sumErr } = await getSupabase().from('sam_sync_runs')
+            .update({ status_reconcile: { ...reconcileSummary, outcome: reconcileOutcome } }).eq('id', syncRunId);
+          if (sumErr) console.warn('[sync-sam] status_reconcile summary not persisted:', sumErr.message);
+        }
+      } catch (e) {
+        errors.push(`status reconcile crashed: ${(e as Error)?.message}`);
+      }
+    }
+
     // CHAINED: kick the SB-ENTITY half of the gov-buyer sync only (`pull=entities`).
     //
     // ⚠️ This used to send `pull=both`, which made an UNAWAITED fetch the only production
@@ -793,6 +872,7 @@ export async function GET(request: NextRequest) {
         staleCleanupMode: staleMode,
         staleEligible,
       },
+      statusReconcile: reconcileSummary ? { ...reconcileSummary, outcome: reconcileOutcome } : { mode: reconcileMode, skipped: dryRun ? 'dry run' : `sync type ${syncType}` },
       errors: errors.slice(0, 10),
       syncRunId,
       resumable: !isFullSuccess && totalFetched > 0,
