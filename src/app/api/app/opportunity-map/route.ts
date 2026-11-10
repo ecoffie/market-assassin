@@ -29,6 +29,7 @@ import { isRepeatBuyer } from '@/lib/opportunities/repeat-buyer';
 import { loadDodaacEarlySignal } from '@/lib/gov-contacts/dodaac-directory';
 import { normalizeStateCode, US_STATE_NAMES } from '@/lib/utils/us-states';
 import { wantsMarketCounts } from '@/lib/opportunities/map-counts-mode';
+import { fetchRemainingOffsetPages } from '@/lib/opportunities/map-count-pages';
 
 export const dynamic = 'force-dynamic';
 
@@ -230,7 +231,8 @@ export async function GET(request: NextRequest) {
     // pan, so this route gated the whole interaction.
     //
     // The first page carries `count: 'exact'` for the filtered set, so ONE round-trip tells us how
-    // many pages exist; the rest are fetched concurrently. Same rows, same order, same key.
+    // many pages exist; the rest are fetched concurrently, at most MAP_COUNT_PAGE_CONCURRENCY in
+    // flight (map-count-pages.ts). Same rows, same order, same key.
     //
     // ⚠️ Deliberately still PostgREST + applyFilters (the canonical-plan adapter) + countDistinctListings,
     // NOT a hand-written SQL RPC. The same adapter builds the viewport query; re-expressing those
@@ -270,14 +272,15 @@ export async function GET(request: NextRequest) {
 
       if (keyRows.length >= count) return countDistinctListings(keyRows);
 
-      const offsets: number[] = [];
-      for (let from = PAGE; from < count; from += PAGE) offsets.push(from);
-      const pages = await Promise.all(offsets.map(async (from) => {
+      // Remaining pages: concurrent but CAPPED (MAP_COUNT_PAGE_CONCURRENCY), reassembled in
+      // OFFSET order; any page error rejects the whole count (no partial number). Unbounded,
+      // a status=all/closed filter fired ~200 concurrent OFFSET queries from one pan/zoom.
+      const rest = await fetchRemainingOffsetPages<(typeof keyRows)[number]>(count, async (from) => {
         const { data: page, error: pErr } = await pageQuery(from, false);
         if (pErr) throw pErr;
         return (page ?? []) as typeof keyRows;
-      }));
-      for (const page of pages) keyRows.push(...page);
+      }, { pageSize: PAGE });
+      keyRows.push(...rest);
       return countDistinctListings(keyRows);
     }
     /**
