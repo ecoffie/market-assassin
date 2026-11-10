@@ -32,6 +32,7 @@ import { sapBuyerTier } from '@/lib/opportunities/sap-friendly-agencies';
 import { isRepeatBuyer } from '@/lib/opportunities/repeat-buyer';
 import { dodaacFromSolicitation } from '@/lib/opportunities/early-signal-pins';
 import { loadDodaacEarlySignal } from '@/lib/gov-contacts/dodaac-directory';
+import { upsertInChunks, staleCleanupOrFilters, staleCleanupMode } from '@/lib/sam/sync-upsert';
 
 // The DoDAAC early-signal band map, loaded ONCE per sync run (an async precomputed lookup — same as
 // the map decorate). mapToDbRecord stays a pure sync fn by reading this run-scoped closure rather
@@ -497,6 +498,8 @@ export async function GET(request: NextRequest) {
   let lastSuccessfulPage = page;
   const errors: string[] = [];
   const newFailedOffsets: number[] = [...failedOffsets];
+  let upsertStatements = 0;
+  let upsertSplits = 0;
 
   try {
     console.log(`[sync-sam] Starting ${syncType} sync, page: ${page}, max: ${maxRecords}, dry: ${dryRun}`);
@@ -533,14 +536,17 @@ export async function GET(request: NextRequest) {
     totalFetched += firstBatch.length;
 
     if (!dryRun && firstBatch.length > 0) {
-      const { error: upsertError } = await getSupabase()
+      // Bounded statements — see src/lib/sam/sync-upsert.ts (one 1,000-row upsert exceeded the
+      // 8s PostgREST statement timeout on the newest pages every night from 2026-10-25).
+      const res = await upsertInChunks(firstBatch, (rows) => getSupabase()
         .from('sam_opportunities')
-        .upsert(firstBatch, { onConflict: 'notice_id', ignoreDuplicates: false });
+        .upsert(rows, { onConflict: 'notice_id', ignoreDuplicates: false }));
+      upsertStatements += res.statements; upsertSplits += res.splits;
 
-      if (upsertError) {
-        errors.push(`Upsert error at page ${page}: ${upsertError.message}`);
+      if (!res.ok) {
+        errors.push(`Upsert error at page ${page} after ${res.written} rows: ${res.error}`);
         newFailedOffsets.push(page);
-        console.error('[sync-sam] Upsert error:', upsertError);
+        console.error('[sync-sam] Upsert error:', res.error);
       } else {
         newRecords += firstBatch.length;
         lastSuccessfulPage = page + 1;
@@ -597,12 +603,13 @@ export async function GET(request: NextRequest) {
         totalFetched += batch.length;
 
         if (!dryRun && batch.length > 0) {
-          const { error: upsertError } = await getSupabase()
+          const res = await upsertInChunks(batch, (rows) => getSupabase()
             .from('sam_opportunities')
-            .upsert(batch, { onConflict: 'notice_id', ignoreDuplicates: false });
+            .upsert(rows, { onConflict: 'notice_id', ignoreDuplicates: false }));
+          upsertStatements += res.statements; upsertSplits += res.splits;
 
-          if (upsertError) {
-            errors.push(`Batch page ${page}: ${upsertError.message}`);
+          if (!res.ok) {
+            errors.push(`Batch page ${page} after ${res.written} rows: ${res.error}`);
             newFailedOffsets.push(page);
           } else {
             updatedRecords += batch.length;
@@ -654,6 +661,11 @@ export async function GET(request: NextRequest) {
     // STALE RECORD CLEANUP: Only run after successful FULL sync
     // This prevents SAM.gov outages from accidentally hiding valid opportunities
     let staleRecordsMarked = 0;
+    // Review gate (R1, 2026-11-09): the first successful full sync after months of failures would
+    // deactivate ~8,600 rows in one night. Default 'report' counts what WOULD be deactivated and
+    // writes nothing; 'apply' must be set deliberately (SAM_STALE_CLEANUP=apply); 'off' skips.
+    const staleMode = staleCleanupMode(process.env.SAM_STALE_CLEANUP);
+    let staleEligible: number | null = null;
     if (!dryRun && isFullSuccess && syncType === 'full') {
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -677,15 +689,34 @@ export async function GET(request: NextRequest) {
       const STALE_CHUNK = 500;
       const STALE_MAX_CHUNKS = 60; // 30k rows/run ceiling — a backstop, not a target
       const cutoff = sevenDaysAgo.toISOString();
+      // Absent from a 30-day POSTED window is not "closed": a notice posted 31+ days ago that is
+      // still open never re-syncs. Only deactivate when SAM's own dates are over (deadline AND
+      // archive date absent or past) — src/lib/sam/sync-upsert.ts.
+      const [deadlineOver, archiveOver] = staleCleanupOrFilters(new Date());
       let staleChunks = 0;
       let staleError: { message: string } | null = null;
 
-      for (; staleChunks < STALE_MAX_CHUNKS; staleChunks++) {
+      if (staleMode === 'report') {
+        const { count, error: countError } = await getSupabase()
+          .from('sam_opportunities')
+          .select('id', { count: 'exact', head: true })
+          .eq('active', true)
+          .lt('synced_at', cutoff)
+          .or(deadlineOver)
+          .or(archiveOver);
+        if (countError) errors.push(`Stale cleanup report failed: ${countError.message}`);
+        else staleEligible = count ?? null; // null = unknown, never 0
+        console.log(`[sync-sam] Stale cleanup REPORT: ${staleEligible ?? 'unknown'} rows would be deactivated (SAM_STALE_CLEANUP=apply to act)`);
+      }
+
+      for (; staleMode === 'apply' && staleChunks < STALE_MAX_CHUNKS; staleChunks++) {
         const { data: batch, error: pickError } = await getSupabase()
           .from('sam_opportunities')
           .select('id')
           .eq('active', true)
           .lt('synced_at', cutoff)
+          .or(deadlineOver)
+          .or(archiveOver)
           .limit(STALE_CHUNK);
 
         if (pickError) { staleError = pickError; break; }
@@ -706,7 +737,7 @@ export async function GET(request: NextRequest) {
         // an error" is a different situation from "marked nothing".
         errors.push(`Stale cleanup error after ${staleRecordsMarked} rows: ${staleError.message}`);
         console.error('[sync-sam] Stale cleanup error:', staleError);
-      } else {
+      } else if (staleMode === 'apply') {
         console.log(`[sync-sam] Marked ${staleRecordsMarked} stale records as inactive in ${staleChunks} chunk(s)`);
         if (staleChunks >= STALE_MAX_CHUNKS) {
           console.warn(`[sync-sam] Stale cleanup hit the ${STALE_MAX_CHUNKS}-chunk ceiling — more remain for the next run`);
@@ -757,6 +788,10 @@ export async function GET(request: NextRequest) {
         lastSuccessfulPage,
         failedOffsetsCount: newFailedOffsets.length,
         isFullSuccess,
+        upsertStatements,
+        upsertSplits,
+        staleCleanupMode: staleMode,
+        staleEligible,
       },
       errors: errors.slice(0, 10),
       syncRunId,
