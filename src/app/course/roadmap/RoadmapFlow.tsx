@@ -8,6 +8,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { Button, Field, Input } from '@/components/public-site/ui';
+import NoRefundNote from '@/components/NoRefundNote';
 import {
   QUIZ, ROADMAP_STAGES, stageByNumber, stageFromAnswers, stageSteps,
   type QuizAnswers, type StageNumber,
@@ -40,13 +41,18 @@ ol.rm-steps{list-style:decimal}
 .rm-btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
 .rm-link{display:inline-flex;align-items:center;padding:12px 18px;border-radius:999px;border:1px solid var(--mp-line);background:var(--mp-surface);color:var(--mp-ink);font:600 14px var(--mp-font-sans);text-decoration:none;cursor:pointer}
 .rm-link--primary{background:var(--mp-navy);border-color:var(--mp-navy);color:#FFFFFF}
+.rm-skip{background:none;border:0;padding:8px;font:500 15px var(--mp-font-sans);color:var(--mp-muted);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.rm-skip:hover{color:var(--mp-ink)}
 @media print{.rm-noprint{display:none !important}.rm-wrap{padding:0}}
 `;
 
-type Saved = { email: string; firstName: string; stage?: StageNumber };
+type Saved = { email: string; firstName: string; stage?: StageNumber; offerSeen?: boolean };
 
-export default function RoadmapFlow() {
-  const [step, setStep] = useState<'contact' | 'quiz' | 'result'>('contact');
+/** Mindy Pro checkout (records purchase attribution, then redirects to the $149/mo Stripe link). */
+const PRO_CHECKOUT = '/checkout/mindy-pro-monthly';
+
+export default function RoadmapFlow({ proCredits }: { proCredits: number }) {
+  const [step, setStep] = useState<'contact' | 'offer' | 'quiz' | 'result'>('contact');
   const [saved, setSaved] = useState<Saved | null>(null);
   const [answers, setAnswers] = useState<QuizAnswers>({});
   const [qi, setQi] = useState(0);
@@ -60,7 +66,7 @@ export default function RoadmapFlow() {
       const s = raw ? (JSON.parse(raw) as Saved) : null;
       if (s?.email) {
         setSaved(s);
-        setStep(typeof s.stage === 'number' ? 'result' : 'quiz');
+        setStep(typeof s.stage === 'number' ? 'result' : s.offerSeen ? 'quiz' : 'offer');
       }
     } catch { /* storage unavailable: start fresh */ }
   }, []);
@@ -96,7 +102,7 @@ export default function RoadmapFlow() {
         return;
       }
       remember({ email: String(fd.get('email') || '').trim().toLowerCase(), firstName: String(fd.get('firstName') || '').trim() });
-      setStep('quiz');
+      setStep('offer');
     } catch {
       setError('Network error. Please try again.');
     } finally {
@@ -130,10 +136,16 @@ export default function RoadmapFlow() {
     } catch { /* the roadmap still shows */ }
   }
 
+  function skipOffer() {
+    if (saved) remember({ ...saved, offerSeen: true });
+    setStep('quiz');
+    window.scrollTo(0, 0);
+  }
+
   function retake() {
     setAnswers({});
     setQi(0);
-    if (saved) remember({ email: saved.email, firstName: saved.firstName });
+    if (saved) remember({ email: saved.email, firstName: saved.firstName, offerSeen: true });
     setStep('quiz');
   }
 
@@ -170,6 +182,8 @@ export default function RoadmapFlow() {
             </form>
           </>
         )}
+
+        {step === 'offer' && <ProOffer proCredits={proCredits} firstName={saved?.firstName ?? ''} onSkip={skipOffer} />}
 
         {step === 'quiz' && (
           <>
@@ -226,6 +240,54 @@ function RoadmapResult({ stage: n, firstName, onRetake }: { stage: StageNumber; 
         <Link className="rm-link rm-link--primary" href={`/course/${stage.slug}`}>Watch the Stage {stage.n} lesson →</Link>
         <button type="button" className="rm-link" onClick={() => window.print()}>Save as PDF</button>
         <button type="button" className="rm-link" onClick={onRetake}>Retake the quiz</button>
+      </div>
+    </>
+  );
+}
+
+const PRO_POINTS: ReadonlyArray<[string, string]> = [
+  ['Contracts that fit, every morning', 'AI-matched daily briefings for your business, with unlimited NAICS codes and target agencies.'],
+  ['See bids before they post', 'Agency forecasts and recompete alerts 12 months before a contract comes back up.'],
+  ['Know who you are up against', 'Who holds the contract now, what they won, and what each agency spends.'],
+  ['Track and win your pursuits', 'Your pipeline, contacts and proposal tools in one place.'],
+];
+
+function ProOffer({ proCredits, firstName, onSkip }: { proCredits: number; firstName: string; onSkip: () => void }) {
+  return (
+    <>
+      <p className="mp-eyebrow mp-eyebrow--accent">{firstName ? `You’re in, ${firstName}.` : 'You’re in.'} Before your roadmap…</p>
+      <h1 className="mp-display" style={{ marginTop: 10 }}>Want Mindy to do the searching for you?</h1>
+      <p className="mp-standfirst" style={{ marginTop: 12 }}>
+        The course shows you what to do. Mindy Pro does the hard part every day: it finds the contracts that fit
+        your business, tells you who holds them now, and shows you what agencies plan to buy next.
+      </p>
+
+      <div className="mp-panel" style={{ marginTop: 28 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+          <p className="mp-title" style={{ fontSize: 24 }}>Mindy Pro</p>
+          <p><span className="mp-display" style={{ fontSize: 40 }}>$149</span><span className="mp-meta"> / month</span></p>
+        </div>
+        <ul style={{ listStyle: 'none', margin: '18px 0 0', padding: 0, display: 'grid', gap: 14 }}>
+          {PRO_POINTS.map(([t, b]) => (
+            <li key={t} style={{ display: 'flex', gap: 12 }}>
+              <span aria-hidden="true" style={{ color: 'var(--mp-ok)', fontWeight: 700 }}>✓</span>
+              <span><b style={{ color: 'var(--mp-ink)' }}>{t}.</b> <span className="mp-prose">{b}</span></span>
+            </li>
+          ))}
+          <li style={{ display: 'flex', gap: 12 }}>
+            <span aria-hidden="true" style={{ color: 'var(--mp-ok)', fontWeight: 700 }}>✓</span>
+            <span><b style={{ color: 'var(--mp-ink)' }}>{proCredits.toLocaleString()} credits a month.</b> <span className="mp-prose">Use Mindy inside Claude and other AI tools.</span></span>
+          </li>
+        </ul>
+        <a className="rm-link rm-link--primary" href={PRO_CHECKOUT} style={{ marginTop: 24, width: '100%', justifyContent: 'center', fontSize: 16 }}>
+          Yes, get Mindy Pro for $149/mo
+        </a>
+        <p className="mp-meta" style={{ marginTop: 8, textAlign: 'center' }}>Cancel anytime.</p>
+        <NoRefundNote />
+      </div>
+
+      <div style={{ marginTop: 22, textAlign: 'center' }}>
+        <button type="button" onClick={onSkip} className="rm-skip">No thanks, take me to the free course →</button>
       </div>
     </>
   );
