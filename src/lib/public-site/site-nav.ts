@@ -1,6 +1,6 @@
 /**
  * The site top bar: the Nov 28 event banner plus the homepage nav (logo · Mindy in your AI ·
- * Learn ··· Sign in · Contact sales · Plans & Pricing · Sign up free). One string, rendered by
+ * Learn · Jobs ··· Sign in · Contact sales · Plans & Pricing · Sign up free). One string, rendered by
  * the homepage, every React public page (PublicHeader) and every raw-HTML public page (html.ts),
  * so they cannot drift. The Maps product keeps its own bar.
  *

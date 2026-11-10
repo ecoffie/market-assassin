@@ -12,6 +12,7 @@ export interface MpChromeLink {
 export const MP_HEADER_PRODUCT_LINKS: readonly MpChromeLink[] = [
   { href: '/mcp/gallery', label: 'Mindy in your AI' },
   { href: '/learn', label: 'Learn' },
+  { href: '/jobs', label: 'Jobs' },
 ];
 
 /**
