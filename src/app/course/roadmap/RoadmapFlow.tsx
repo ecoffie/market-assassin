@@ -43,7 +43,8 @@ ol.rm-steps{list-style:decimal}
 .rm-link--primary{background:var(--mp-navy);border-color:var(--mp-navy);color:#FFFFFF}
 .rm-skip{background:none;border:0;padding:8px;font:500 15px var(--mp-font-sans);color:var(--mp-muted);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .rm-skip:hover{color:var(--mp-ink)}
-@media print{.rm-noprint{display:none !important}.rm-wrap{padding:0}}
+@page{margin:0.6in}
+@media print{.rm-noprint{display:none !important}.rm-wrap{padding:0;max-width:none}.rm-ladder{gap:3px;margin-top:10px}.rm-ladder li{padding:5px 12px;font-size:12px}.rm-wrap .mp-display{font-size:30px}.rm-wrap .mp-standfirst{font-size:14px;margin-top:6px !important}.rm-wrap .mp-panel{padding:14px 18px;margin-top:14px !important;break-inside:avoid}.rm-wrap .mp-prose{font-size:12.5px;line-height:1.45}.rm-steps{gap:2px;margin-top:6px}.rm-wrap .mp-label{margin-top:10px !important}}
 `;
 
 type Saved = { email: string; firstName: string; stage?: StageNumber; offerSeen?: boolean };

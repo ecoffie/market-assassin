@@ -163,7 +163,7 @@ export function FreeBonusLesson() {
           <div className="crs-fact">
             <p style={{ fontWeight: 600, color: 'var(--mp-ink)' }}>The 2026 Federal Contracting Action Plan</p>
             <p className="mp-prose" style={{ marginTop: 4 }}>All 27 steps across 5 phases, on one page you can print.</p>
-            <a href="/resources/action-plan-2026.html" className="crs-next" style={{ marginTop: 10 }}>Open the action plan →</a>
+            <a href="/course/2026-Federal-Contracting-Action-Plan.pdf" download className="crs-next" style={{ marginTop: 10 }}>Download the action plan (PDF) →</a>
           </div>
           <div className="crs-fact">
             <p style={{ fontWeight: 600, color: 'var(--mp-ink)' }}>A free Mindy account</p>
