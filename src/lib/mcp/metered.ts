@@ -186,9 +186,27 @@ export async function runMeteredTool(
   if (cost > 0) {
     // Gate on the RESOLVED payer's balance. With no pools this is getBalance(), the
     // exact call this line made before.
-    const balance = payer.kind === 'pool'
-      ? await getPoolBalance(payer.poolId!)
-      : await getBalance(ctx.userEmail);
+    //
+    // A balance READ failure is not a zero balance: refuse with billing_unavailable
+    // (retryable, nothing run, nothing charged, no paywall attempt) instead of showing a
+    // paying customer the "buy credits" refusal.
+    let balance: number;
+    try {
+      balance = payer.kind === 'pool'
+        ? await getPoolBalance(payer.poolId!)
+        : await getBalance(ctx.userEmail);
+    } catch (err) {
+      console.error('[mcp/metered] balance read failed:', err instanceof Error ? err.message : err);
+      await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'failed', creditsCharged: 0, apiKeyId: ctx.apiKeyId, channel: ctx.channel, outcome: blockedOutcome('billing_unavailable') });
+      return {
+        ok: false,
+        error: {
+          code: 'billing_unavailable',
+          message: 'We could not check your credit balance just now, so this request did not run. Nothing was charged. Please try again in a moment.',
+        },
+        creditsCharged: 0,
+      };
+    }
     if (balance < cost && payer.kind === 'pool') {
       // A pooled member's calls bill the TEAM pool, and nothing ever falls back to their
       // personal balance. So the personal paywall (buy credits for yourself) would sell
@@ -305,7 +323,13 @@ export async function runMeteredTool(
     await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'uncharged', creditsCharged: 0, latencyMs, apiKeyId: ctx.apiKeyId, channel: ctx.channel, outcome: telemetry });
     // Report the balance of the payer that WOULD have paid — a pooled member's personal
     // balance is not the number that governs their calls.
-    const payerBalance = payer.kind === 'pool' ? await getPoolBalance(payer.poolId!) : await getBalance(ctx.userEmail);
+    // The result is already produced; a failed balance re-read must not discard it.
+    // null = unknown (the transport omits the credit footer), never a fabricated 0.
+    const payerBalance = await (payer.kind === 'pool' ? getPoolBalance(payer.poolId!) : getBalance(ctx.userEmail))
+      .catch((err: unknown) => {
+        console.error('[mcp/metered] post-call balance read failed:', err instanceof Error ? err.message : err);
+        return null;
+      });
     return { ok: true, result, creditsCharged: 0, balance: payerBalance, needsRecharge: false, funding: poolFunding(payer) };
   }
 
