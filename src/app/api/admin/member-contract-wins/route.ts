@@ -21,7 +21,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyAdminPassword } from '@/lib/admin-auth';
 import { bqQuery, bqJobOptions, BQ_TABLES } from '@/lib/bigquery/client';
-import { memberUeis, recentWinners, sinceJoining, tallyWins, type AwardRow, type ProfileRow, type SettingsRow } from '@/lib/admin/member-wins';
+import { companyBreakdown, memberUeis, recentWinners, sinceJoining, tallyWins, type CompanyBreakdown, type AwardRow, type ProfileRow, type SettingsRow } from '@/lib/admin/member-wins';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -81,23 +81,23 @@ export async function GET(req: NextRequest) {
 
     const sinceRows = sinceJoining(awards, ueiJoined);
 
-    // ?recentMonths=N → which members won a NEW award (first action) in the last N months.
-    const recentMonths = Number(req.nextUrl.searchParams.get('recentMonths') || 0);
-    let recent: ReturnType<typeof recentWinners> | undefined;
-    if (Number.isFinite(recentMonths) && recentMonths > 0) {
-      const emailsByUei = new Map<string, string[]>();
-      for (const p of profiles) {
-        const uei = (p.uei || '').trim().toUpperCase();
-        if (!ueiJoined.has(uei)) continue;
-        const list = emailsByUei.get(uei) ?? [];
-        if (p.user_email && !list.includes(p.user_email.toLowerCase())) list.push(p.user_email.toLowerCase());
-        emailsByUei.set(uei, list);
-      }
-      recent = recentWinners(awards, emailsByUei, recentMonths);
+    const emailsByUei = new Map<string, string[]>();
+    for (const p of profiles) {
+      const uei = (p.uei || '').trim().toUpperCase();
+      if (!ueiJoined.has(uei) || !p.user_email) continue;
+      const list = emailsByUei.get(uei) ?? [];
+      if (!list.includes(p.user_email.toLowerCase())) list.push(p.user_email.toLowerCase());
+      emailsByUei.set(uei, list);
     }
+    const breakdown = companyBreakdown(awards, emailsByUei, ueiJoined);
+
+    // ?recentMonths=N -> which members won a NEW award (first action) in the last N months.
+    const recentMonths = Number(req.nextUrl.searchParams.get('recentMonths') || 0);
+    const recent = Number.isFinite(recentMonths) && recentMonths > 0 ? recentWinners(awards, emailsByUei, recentMonths) : undefined;
+    const last12 = recentWinners(awards, emailsByUei, 12);
     const unknownJoin = ueis.filter((u) => !Number.isFinite(ueiJoined.get(u) as number)).length;
 
-    return NextResponse.json({
+    const report = {
       success: true,
       coverage: {
         vaultProfiles: profiles.length,
@@ -107,13 +107,21 @@ export async function GET(req: NextRequest) {
         note: 'Only members who saved a valid SAM UEI in their Company Vault can be counted.',
       },
       lifetime: tallyWins(awards),
+      last12Months: { companiesWithWins: last12.companiesWithWins, contracts: last12.contracts, dollars: last12.dollars },
       sinceJoining: tallyWins(sinceRows),
       ...(recent ? { recentWinners: { months: recentMonths, ...recent } } : {}),
+      breakdown,
       definitions: {
         contract: 'A distinct award (award_id) with positive net obligation.',
-        dollars: 'Sum of each award\'s net obligated dollars (USASpending via BigQuery).',
-        sinceJoining: 'Award first action on/after the member\'s earliest Mindy record.',
+        dollars: "Sum of each award's net obligated dollars (USASpending via BigQuery).",
+        sinceJoining: "Award first action on/after the member's earliest Mindy record.",
+        last12Months: 'Award first action in the last 12 months.',
       },
+    };
+    // A browser gets a readable page; ?format=json gets the raw data.
+    if (req.nextUrl.searchParams.get('format') === 'json') return NextResponse.json(report);
+    return new NextResponse(renderHtml(report), {
+      headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
     });
   } catch (err) {
     console.error('[member-contract-wins]', err);
@@ -122,4 +130,50 @@ export async function GET(req: NextRequest) {
       { status: 502 },
     );
   }
+}
+
+const ESC: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };
+const esc = (v: unknown) => String(v ?? '').replace(/[&<>"]/g, (c) => ESC[c]);
+const usd = (n: number) =>
+  n >= 1e9 ? `$${(n / 1e9).toFixed(2)}B` : n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}K` : `$${n}`;
+
+type Totals = { companiesWithWins: number; contracts: number; dollars: number };
+
+function renderHtml(r: {
+  coverage: { distinctCompanies: number; profilesWithValidUei: number; vaultProfiles: number };
+  lifetime: Totals; sinceJoining: Totals; last12Months: Totals; breakdown: CompanyBreakdown[];
+}) {
+  const top = r.breakdown[0];
+  const topShare = top && r.lifetime.dollars ? Math.round((top.lifetime.dollars / r.lifetime.dollars) * 100) : 0;
+  const card = (label: string, t: Totals) =>
+    `<div class="card"><div class="l">${label}</div><div class="v">${usd(t.dollars)}</div>`
+    + `<div class="s">${t.contracts.toLocaleString()} contracts &middot; ${t.companiesWithWins} companies</div></div>`;
+  const cell = (t: { contracts: number; dollars: number }) =>
+    t.contracts ? `${usd(t.dollars)}<div class="m">${t.contracts}</div>` : '&mdash;';
+  const rows = r.breakdown.map((c, i) => `<tr>
+    <td>${i + 1}</td><td><b>${esc(c.company || c.uei)}</b><div class="m">${esc(c.uei)}</div></td>
+    <td>${c.emails.map(esc).join('<br>')}</td><td>${esc(c.joined ?? '')}</td>
+    <td class="n">${cell(c.lifetime)}</td><td class="n">${cell(c.last12Months)}</td><td class="n">${cell(c.sinceJoining)}</td>
+    <td>${esc(c.latestAward ?? '')}</td><td>${c.agencies.map(esc).join('<br>')}</td></tr>`).join('');
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Member contract wins</title>
+<style>body{font:14px/1.45 Inter,system-ui,sans-serif;color:#12100E;background:#FBFAF7;margin:0;padding:28px}
+h1{font:600 24px Georgia,serif;margin:0 0 4px}.sub{color:#6B6459;margin:0 0 20px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:18px}
+.card{background:#fff;border:1px solid #DCD8CF;border-radius:12px;padding:14px 16px}
+.l{color:#6B6459;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.v{font:600 26px Georgia,serif;margin-top:4px}.s{color:#6B6459;font-size:13px}
+.note{background:#FFFAEB;border:1px solid #FEDF89;border-radius:10px;padding:10px 14px;margin-bottom:18px;color:#3A352E}
+.wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #DCD8CF}
+th,td{padding:9px 10px;border-bottom:1px solid #EDEAE3;text-align:left;vertical-align:top}
+th{background:#F3F0E9;font-size:12px;color:#3A352E}.n{text-align:right;white-space:nowrap}.m{color:#7A7266;font-size:12px}</style>
+</head><body>
+<h1>Federal contracts won by Mindy members</h1>
+<p class="sub">Based on ${r.coverage.distinctCompanies} member companies with a SAM ID (${r.coverage.profilesWithValidUei} of ${r.coverage.vaultProfiles} Vault profiles). Source: USASpending.</p>
+<div class="cards">${card('Lifetime', r.lifetime)}${card('Last 12 months', r.last12Months)}${card('Since joining Mindy', r.sinceJoining)}</div>
+${top ? `<div class="note"><b>${esc(top.company || top.uei)}</b> is ${topShare}% of the lifetime total. Check that before quoting the lifetime number.</div>` : ''}
+<div class="wrap"><table><thead><tr><th>#</th><th>Company</th><th>Member email</th><th>Joined Mindy</th><th>Lifetime</th><th>Last 12 months</th><th>Since joining</th><th>Latest award</th><th>Top agencies</th></tr></thead>
+<tbody>${rows || '<tr><td colspan="9">No member company has a federal award yet.</td></tr>'}</tbody></table></div>
+<p class="sub" style="margin-top:14px">Each dollar cell shows total dollars, with the number of contracts underneath. Add <code>&amp;format=json</code> for the raw data.</p>
+</body></html>`;
 }

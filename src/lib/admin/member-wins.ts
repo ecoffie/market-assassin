@@ -74,3 +74,47 @@ export function recentWinners(rows: AwardRow[], emailsByUei: Map<string, string[
     .sort((a, b) => b.dollars - a.dollars);
   return { since: cutoff.toISOString().slice(0, 10), ...tallyWins(recent), members };
 }
+
+export type CompanyBreakdown = {
+  company: string; uei: string; emails: string[]; joined: string | null;
+  lifetime: { contracts: number; dollars: number };
+  last12Months: { contracts: number; dollars: number };
+  sinceJoining: { contracts: number; dollars: number };
+  latestAward: string | null; agencies: string[];
+};
+
+/** One row per member company that has ANY positive award, biggest lifetime dollars first. */
+export function companyBreakdown(
+  rows: AwardRow[], emailsByUei: Map<string, string[]>, joined: Map<string, number>, now = Date.now(),
+): CompanyBreakdown[] {
+  const cutoff = new Date(now);
+  cutoff.setUTCMonth(cutoff.getUTCMonth() - 12);
+  const out = new Map<string, CompanyBreakdown & { _ag: Map<string, number> }>();
+  for (const r of rows) {
+    const amt = Number(r.amount);
+    if (!(amt > 0)) continue;
+    const j = joined.get(r.recipient_uei);
+    const c = out.get(r.recipient_uei) ?? {
+      company: r.recipient_name || '', uei: r.recipient_uei, emails: emailsByUei.get(r.recipient_uei) ?? [],
+      joined: j !== undefined && Number.isFinite(j) ? new Date(j).toISOString().slice(0, 10) : null,
+      lifetime: { contracts: 0, dollars: 0 }, last12Months: { contracts: 0, dollars: 0 }, sinceJoining: { contracts: 0, dollars: 0 },
+      latestAward: null, agencies: [], _ag: new Map<string, number>(),
+    };
+    if (!c.company && r.recipient_name) c.company = r.recipient_name;
+    const t = Date.parse(r.first_action);
+    c.lifetime.contracts += 1; c.lifetime.dollars += amt;
+    if (t >= cutoff.getTime()) { c.last12Months.contracts += 1; c.last12Months.dollars += amt; }
+    if (j !== undefined && Number.isFinite(j) && t >= j) { c.sinceJoining.contracts += 1; c.sinceJoining.dollars += amt; }
+    if (!c.latestAward || r.first_action > c.latestAward) c.latestAward = r.first_action;
+    if (r.awarding_agency) c._ag.set(r.awarding_agency, (c._ag.get(r.awarding_agency) ?? 0) + amt);
+    out.set(r.recipient_uei, c);
+  }
+  const round = (x: { contracts: number; dollars: number }) => ({ contracts: x.contracts, dollars: Math.round(x.dollars) });
+  return [...out.values()]
+    .map(({ _ag, ...c }) => ({
+      ...c, lifetime: round(c.lifetime), last12Months: round(c.last12Months), sinceJoining: round(c.sinceJoining),
+      latestAward: c.latestAward ? c.latestAward.slice(0, 10) : null,
+      agencies: [..._ag.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([a]) => a),
+    }))
+    .sort((a, b) => b.lifetime.dollars - a.lifetime.dollars);
+}
