@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Capacitor phone-app shell: generated native projects + its own toolchain.
+    "mobile/**",
   ]),
 ]);
 

@@ -1,0 +1,41 @@
+name: mobile-android
+
+# Builds a test APK of the Mindy phone app (mobile/) so it can be downloaded
+# from the run's Artifacts and installed on an Android phone.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/mobile-android.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npx cap sync android
+      - run: chmod +x android/gradlew && cd android && ./gradlew assembleDebug --no-daemon
+      - run: cp android/app/build/outputs/apk/debug/app-debug.apk Mindy-test.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Mindy-android-test
+          path: mobile/Mindy-test.apk
+          retention-days: 30
