@@ -21,7 +21,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyAdminPassword } from '@/lib/admin-auth';
 import { bqQuery, bqJobOptions, BQ_TABLES } from '@/lib/bigquery/client';
-import { companyBreakdown, memberUeis, recentWinners, sinceJoining, tallyWins, type CompanyBreakdown, type AwardRow, type ProfileRow, type SettingsRow } from '@/lib/admin/member-wins';
+import { companyBreakdown, isSampleAccount, memberUeis, recentWinners, sinceJoining, tallyWins, type CompanyBreakdown, type AwardRow, type ProfileRow, type SettingsRow } from '@/lib/admin/member-wins';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -54,7 +54,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const profiles = await readAll<ProfileRow>('user_identity_profile', 'user_email, uei, created_at');
+    const allProfiles = await readAll<ProfileRow>('user_identity_profile', 'user_email, uei, created_at');
+    // Real companies only: staff/demo accounts hold sample companies.
+    const profiles = allProfiles.filter((p) => !isSampleAccount(p.user_email));
+    const sampleProfilesExcluded = allProfiles.length - profiles.length;
     // Join date = earliest known record of the member. Alert settings usually predate the Vault.
     const settings = await readAll<SettingsRow>('user_notification_settings', 'user_email, created_at');
     const { joined: ueiJoined, withUei } = memberUeis(profiles, settings);
@@ -103,10 +106,11 @@ export async function GET(req: NextRequest) {
       success: true,
       coverage: {
         vaultProfiles: profiles.length,
+        sampleProfilesExcluded,
         profilesWithValidUei: withUei,
         distinctCompanies: ueis.length,
         companiesWithUnknownJoinDate: unknownJoin,
-        note: 'Only members who saved a valid SAM UEI in their Company Vault can be counted.',
+        note: 'Only members who saved a valid SAM UEI in their Company Vault can be counted. Staff and demo accounts (getmindy.ai, govcongiants.com) are excluded.',
       },
       lifetime: tallyWins(awards),
       last12Months: { companiesWithWins: last12.companiesWithWins, contracts: last12.contracts, dollars: last12.dollars },
@@ -171,7 +175,7 @@ th,td{padding:9px 10px;border-bottom:1px solid #EDEAE3;text-align:left;vertical-
 th{background:#F3F0E9;font-size:12px;color:#3A352E}.n{text-align:right;white-space:nowrap}.m{color:#7A7266;font-size:12px}</style>
 </head><body>
 <h1>Federal contracts won by Mindy members</h1>
-<p class="sub">Based on ${r.coverage.distinctCompanies} member companies with a SAM ID (${r.coverage.profilesWithValidUei} of ${r.coverage.vaultProfiles} Vault profiles). Source: USASpending.</p>
+<p class="sub">Based on ${r.coverage.distinctCompanies} member companies with a SAM ID (${r.coverage.profilesWithValidUei} of ${r.coverage.vaultProfiles} Vault profiles; staff and demo accounts excluded). Source: USASpending.</p>
 <div class="cards">${card('Lifetime', r.lifetime)}${card('Last 12 months', r.last12Months)}${card('Since joining Mindy', r.sinceJoining)}</div>
 ${top ? `<div class="note"><b>${esc(top.company || top.uei)}</b> is ${topShare}% of the lifetime total. Check that before quoting the lifetime number.</div>` : ''}
 <div class="wrap"><table><thead><tr><th>#</th><th>Company</th><th>Member email</th><th>Joined Mindy</th><th>Lifetime</th><th>Last 12 months</th><th>Since joining</th><th>Latest award</th><th>Top agencies</th></tr></thead>
