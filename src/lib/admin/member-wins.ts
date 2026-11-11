@@ -4,6 +4,14 @@
  */
 export const UEI_RE = /^[A-Z0-9]{12}$/;
 
+/** Staff, demo and reviewer accounts. Their Vault holds sample companies (e.g. the demo account's
+ *  SIKICH FEDERAL INC), so they must never count as a member's win. */
+const SAMPLE_DOMAINS = ['getmindy.ai', 'govcongiants.com'];
+export function isSampleAccount(email: string | null | undefined): boolean {
+  const domain = (email || '').trim().toLowerCase().split('@')[1] || '';
+  return SAMPLE_DOMAINS.some((d) => domain === d || domain.endsWith(`.${d}`));
+}
+
 export type ProfileRow = { user_email: string; uei: string | null; created_at: string | null };
 export type SettingsRow = { user_email: string; created_at: string | null };
 export type AwardRow = {

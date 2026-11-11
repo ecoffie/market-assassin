@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { companyBreakdown, memberUeis, recentWinners, sinceJoining, tallyWins } from './member-wins';
+import { companyBreakdown, isSampleAccount, memberUeis, recentWinners, sinceJoining, tallyWins } from './member-wins';
 
 describe('member contract wins', () => {
+  it('treats staff and demo emails as sample accounts', () => {
+    expect(isSampleAccount('demo@getmindy.ai')).toBe(true);
+    expect(isSampleAccount('Demo@GovConGiants.com')).toBe(true);
+    expect(isSampleAccount('owner@acme.com')).toBe(false);
+    expect(isSampleAccount('me@notgetmindy.ai')).toBe(false);
+    expect(isSampleAccount(null)).toBe(false);
+  });
+
   it('keeps only valid UEIs and uses the earliest join date', () => {
     const { joined, withUei } = memberUeis(
       [
