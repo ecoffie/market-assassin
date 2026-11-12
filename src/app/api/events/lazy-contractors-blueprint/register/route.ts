@@ -37,9 +37,38 @@ export async function POST(req: NextRequest) {
 
   if (!firstName) return NextResponse.json({ success: false, error: 'Please enter your first name.' }, { status: 400 });
   if (!EMAIL_RE.test(email)) return NextResponse.json({ success: false, error: 'Please enter a valid email.' }, { status: 400 });
-  if (!phoneRaw) return NextResponse.json({ success: false, error: 'Please enter your phone number.' }, { status: 400 });
-  if (!normalizePhoneNumber(phoneRaw)) {
+  // Phone is optional (2026-11-12: name + email is the whole first step); validate only when given.
+  if (phoneRaw && !normalizePhoneNumber(phoneRaw)) {
     return NextResponse.json({ success: false, error: 'Please enter a valid phone number.' }, { status: 400 });
+  }
+
+  // Step 2 (optional, after the seat is saved): phone, text consent and the two questions.
+  // Updates the same contact by email; no new Zoom link and no second confirmation email.
+  if (body.step === 'details') {
+    const tags = [EVENT.ghlTag, ...(smsConsent && phoneRaw ? [EVENT.smsOptInTag] : [])];
+    const note = [
+      `${EVENT.title}: follow-up details`,
+      ownsBusiness ? `Owns a business: ${ownsBusiness}` : '',
+      samRegistered ? `Registered in SAM.gov: ${samRegistered}` : '',
+      `SMS consent: ${smsConsent && phoneRaw ? 'yes' : 'no'}`,
+    ].filter(Boolean).join('\n');
+    const r = await registerContactForEvent(
+      { firstName, lastName, email, phone: phoneRaw, smsConsent, ownsBusiness, samRegistered },
+      { tags, source: EVENT.title, note },
+    );
+    if (!r.ok) {
+      console.error('[lazy-blueprint-register] details failed', r.error);
+      return NextResponse.json({ success: false, error: 'We could not save that. Your seat is still saved.' }, { status: 502 });
+    }
+    if (smsConsent && phoneRaw && r.contactId) {
+      try {
+        const sms = await sendSmsToContact(r.contactId, lazyBlueprintWelcomeSms(firstName));
+        if (sms.success) await changeContactTags(r.contactId, [EVENT.smsWelcomeTag], 'add').catch(() => {});
+      } catch (err) {
+        console.error('[lazy-blueprint-register] welcome SMS error', err instanceof Error ? err.message : err);
+      }
+    }
+    return NextResponse.json({ success: true });
   }
 
   const attr = normalizeAttribution(body.attribution);
@@ -84,6 +113,9 @@ export async function POST(req: NextRequest) {
       { status: 502 },
     );
   }
+
+  // Registered now: clear the "started but didn't finish" nudge tag.
+  if (result.contactId) await changeContactTags(result.contactId, [EVENT.startedTag], 'remove').catch(() => {});
 
   // Confirmation email. The seat is already saved in GHL, so an email failure is logged,
   // not returned as a failed registration (a retry would create no new seat, only noise).
