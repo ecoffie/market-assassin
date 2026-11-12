@@ -86,7 +86,8 @@
     "src/app/lazy-contractors-blueprint",
     "src/app/jobs",
     "src/app/course",
-    "src/app/features"
+    "src/app/features",
+    "src/app/ambassadors"
   ],
   "runtimeRoutes": [
     "/today",
@@ -179,7 +180,8 @@
     "/features/forecasts",
     "/features/players",
     "/features/market-research",
-    "/features/bid-with-confidence"
+    "/features/bid-with-confidence",
+    "/ambassadors"
   ],
   "parityRoutes": [
     "/today",
