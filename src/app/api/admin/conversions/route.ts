@@ -57,6 +57,31 @@ async function trialStarts(sinceSec: number): Promise<number> {
   return n;
 }
 
+/** Mindy subscription products (Stripe). App = Pro/Team; credits = MCP credit plans. */
+const APP_PRODUCTS = new Set(['prod_UI5RXVGKsdywuf']);
+const CREDIT_PRODUCTS = new Set(['prod_UumkGov5iWq6yV', 'prod_UumkgIa3mxdZeA', 'prod_VGXw6X6F4tSZvz']);
+type PaidCount = { app: number; credits: number };
+
+/** Paid Mindy subscriptions created since `sinceSec`, by UTC day and month (abandoned checkouts excluded). */
+async function paidSignups(sinceSec: number): Promise<{ byDay: Record<string, PaidCount>; byMonth: Record<string, PaidCount> }> {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error('Stripe not configured');
+  const stripe = new Stripe(key);
+  const byDay: Record<string, PaidCount> = {};
+  const byMonth: Record<string, PaidCount> = {};
+  for await (const s of stripe.subscriptions.list({ created: { gte: sinceSec }, status: 'all', limit: 100 })) {
+    if (s.status === 'incomplete_expired') continue;
+    const product = s.items.data[0]?.price?.product;
+    const pid = typeof product === 'string' ? product : product?.id;
+    const kind = pid && APP_PRODUCTS.has(pid) ? 'app' : pid && CREDIT_PRODUCTS.has(pid) ? 'credits' : null;
+    if (!kind) continue;
+    const day = new Date(s.created * 1000).toISOString().slice(0, 10);
+    (byDay[day] ??= { app: 0, credits: 0 })[kind]++;
+    (byMonth[day.slice(0, 7)] ??= { app: 0, credits: 0 })[kind]++;
+  }
+  return { byDay, byMonth };
+}
+
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   if (!verifyAdminPassword(sp.get('password'))) {
@@ -67,11 +92,14 @@ export async function GET(req: NextRequest) {
   const since = new Date(sinceMs).toISOString();
 
   const paths = ['/', '/pricing', ...LEAD_MAGNETS.map((m) => m.path)];
-  const [visitors, fromHome, accounts, trials, ...magnetRegs] = await Promise.all([
+  const paidDays = Math.min(Math.max(Number(sp.get('paidDays')) || 60, 1), 365);
+  const paidSince = Math.floor((Date.now() - paidDays * 86400_000) / 1000);
+  const [visitors, fromHome, accounts, trials, paid, ...magnetRegs] = await Promise.all([
     attempt(() => pageVisitors(paths, days)),
     attempt(() => visitorsFromHomepage('/pricing', days)),
     attempt(() => newAccounts(since)),
     attempt(() => trialStarts(Math.floor(sinceMs / 1000))),
+    attempt(() => paidSignups(paidSince)),
     ...LEAD_MAGNETS.map((m) => attempt(() => countContactsByTag(m.tag))),
   ]);
   const v = val(visitors);
@@ -91,9 +119,11 @@ export async function GET(req: NextRequest) {
     homepage: {
       visitors: visit('/'), toPricing: val(fromHome), rate: rate(val(fromHome), visit('/')),
     },
+    paidSignups: { days: paidDays, ...(val(paid) ?? { byDay: null, byMonth: null }) },
     errors: {
       ga4: visitors.ok ? undefined : visitors.error, ga4Referrer: fromHome.ok ? undefined : fromHome.error,
       accounts: accounts.ok ? undefined : accounts.error, stripe: trials.ok ? undefined : trials.error,
+      paidSignups: paid.ok ? undefined : paid.error,
       ghl: magnetRegs.some((m) => !m.ok) ? magnetRegs.map((m) => (m.ok ? 'ok' : m.error)) : undefined,
     },
     notes: [
@@ -101,12 +131,23 @@ export async function GET(req: NextRequest) {
       'Lead-magnet registrations = every GHL contact with that tag (all-time), so the rate is most accurate when the window covers the whole campaign.',
       'New accounts = alert-settings rows created in the window (every new account gets one).',
       'Trials started = completed Stripe checkouts on the four 14-day trial links.',
+      'Paid sign-ups = new Stripe subscriptions to Mindy (App = Pro/Team, Credits = MCP credit plans), by UTC date; abandoned checkouts excluded, one-time purchases not counted.',
     ],
   };
   if (sp.get('format') === 'json') return NextResponse.json(report);
 
   const n = (x: number | null) => (x === null ? '<span class="na">unavailable</span>' : x.toLocaleString('en-US'));
   const row = (label: string, a: string, b: string, r: string) => `<tr><td>${label}</td><td class="n">${a}</td><td class="n">${b}</td><td class="n r">${r}</td></tr>`;
+  const paidTable = (title: string, data: Record<string, PaidCount> | null, empty: string) => {
+    const head = `<h2>${title}</h2><table><thead><tr><th>Date</th><th class="n">App (Pro/Team)</th><th class="n">Credit plans</th><th class="n">Total</th></tr></thead><tbody>`;
+    if (!data) return `${head}<tr><td colspan="4" class="na">unavailable</td></tr></tbody></table>`;
+    const keys = Object.keys(data).sort().reverse();
+    if (!keys.length) return `${head}<tr><td colspan="4">${empty}</td></tr></tbody></table>`;
+    const t = keys.reduce((a, k) => ({ app: a.app + data[k].app, credits: a.credits + data[k].credits }), { app: 0, credits: 0 });
+    return head + keys.map((k) => row(k, String(data[k].app), String(data[k].credits), String(data[k].app + data[k].credits))).join('')
+      + row('<b>Total</b>', String(t.app), String(t.credits), String(t.app + t.credits)) + '</tbody></table>';
+  };
+  const pd = val(paid);
   const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Conversions</title>
 <style>body{font:14px/1.45 Inter,system-ui,sans-serif;color:#12100E;background:#FBFAF7;margin:0;padding:28px}h1{font:600 24px Georgia,serif;margin:0 0 4px}h2{font:600 17px Georgia,serif;margin:26px 0 8px}.sub{color:#6B6459;margin:0 0 6px}
 table{width:100%;max-width:820px;border-collapse:collapse;background:#fff;border:1px solid #DCD8CF}th,td{padding:9px 12px;border-bottom:1px solid #EDEAE3;text-align:left}th{background:#F3F0E9;font-size:12px}.n{text-align:right}.r{font-weight:700}.na{color:#B42318}</style></head><body>
@@ -118,6 +159,8 @@ ${row('New accounts', n(report.pricing.visitors), n(report.pricing.newAccounts),
 ${row('14-day trials started', n(report.pricing.visitors), n(report.pricing.trialsStarted), report.pricing.trialRate)}</tbody></table>
 <h2>Homepage → pricing page</h2><table><thead><tr><th>Step</th><th class="n">Homepage visitors</th><th class="n">Went to pricing</th><th class="n">Rate</th></tr></thead><tbody>
 ${row('Clicked through to /pricing', n(report.homepage.visitors), n(report.homepage.toPricing), report.homepage.rate)}</tbody></table>
+${paidTable(`Paid sign-ups by month (last ${paidDays} days)`, pd?.byMonth ?? null, 'No paid sign-ups.')}
+${paidTable(`Paid sign-ups by day (last ${paidDays} days, days with sign-ups)`, pd?.byDay ?? null, 'No paid sign-ups.')}
 <p class="sub" style="margin-top:18px">${report.notes.join('<br>')}</p></body></html>`;
   return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }
