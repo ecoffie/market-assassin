@@ -42,9 +42,9 @@ async function mount(opts: { token?: string | null; meStatus?: number; path?: st
 const DAY = 24 * 60 * 60 * 1000;
 
 describe('account chip reflects a LIVE session, not a present token', () => {
-  it('no token → Start free trial, no /me call', async () => {
+  it('no token → Start for free, no /me call', async () => {
     const { btn, fetchMock } = await mount({ token: null });
-    expect(btn.textContent).toBe('Start free trial');
+    expect(btn.textContent).toBe('Start for free');
     expect(fetchMock.mock.calls.some((c) => String(c[0]).startsWith('/api/app/me'))).toBe(false);
   });
 
@@ -54,16 +54,16 @@ describe('account chip reflects a LIVE session, not a present token', () => {
     expect(btn.classList.contains('mindy-acct-signin')).toBe(false);
   });
 
-  it('expired token → Start free trial (was: initials), and it never asks /me', async () => {
+  it('expired token → Start for free (was: initials), and it never asks /me', async () => {
     const { btn, fetchMock } = await mount({ token: token({ email: 'jb@example.com', exp: Date.now() - 1000 }) });
-    expect(btn.textContent).toBe('Start free trial');
+    expect(btn.textContent).toBe('Start for free');
     expect(btn.classList.contains('mindy-acct-signin')).toBe(true);
     expect(fetchMock.mock.calls.some((c) => String(c[0]).startsWith('/api/app/me'))).toBe(false);
   });
 
-  it('unexpired token the server rejects (/me 401) → Start free trial', async () => {
+  it('unexpired token the server rejects (/me 401) → Start for free', async () => {
     const { btn, w } = await mount({ token: token({ email: 'jb@example.com', exp: Date.now() + DAY }), meStatus: 401 });
-    expect(btn.textContent).toBe('Start free trial');
+    expect(btn.textContent).toBe('Start for free');
     expect(w.document.getElementById('mindyAcctHd')!.style.display).toBe('none');
   });
 
@@ -84,7 +84,7 @@ describe('account chip reflects a LIVE session, not a present token', () => {
     expect(btn.classList.contains('mindy-acct-signin')).toBe(false);
   });
 
-  it('Start free trial from an expired session goes to /pricing, not the sign-in pop-up (menu stays closed)', async () => {
+  it('Start for free from an expired session goes to /pricing, not the sign-in pop-up (menu stays closed)', async () => {
     const { btn, w } = await mount({ token: token({ email: 'jb@example.com', exp: Date.now() - 1000 }), path: '/learn/find-your-buyers' });
     let opened = '';
     (w as unknown as { openSignInModal: (t: string) => void }).openSignInModal = (t) => { opened = t; };
@@ -98,7 +98,7 @@ describe('account chip reflects a LIVE session, not a present token', () => {
 });
 
 describe('logged-out top bar (Zoom-style)', () => {
-  it('no token → html.mindy-anon (rail hidden) + Contact sales · Sign in · Start free trial, in that order', async () => {
+  it('no token → html.mindy-anon (rail hidden) + Contact sales · Sign in · Start for free, in that order', async () => {
     const { w } = await mount({ token: null });
     expect(w.document.documentElement.classList.contains('mindy-anon')).toBe(true);
     const wrap = w.document.getElementById('mindyAcct')!;
@@ -116,7 +116,7 @@ describe('logged-out top bar (Zoom-style)', () => {
     expect(w.document.getElementById('mindyAnonSignIn')).toBeNull();
   });
 
-  it('Sign in opens the same pop-up; Start free trial never opens the create-account step', async () => {
+  it('Sign in opens the same pop-up; Start for free never opens the create-account step', async () => {
     const { btn, w } = await mount({ token: null });
     let opened = '';
     let created = 0;

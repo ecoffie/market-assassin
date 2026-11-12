@@ -26,10 +26,10 @@ describe('login modal — in-modal signup keeps the visitor on the map', () => {
     }
   });
 
-  it('"Start a 14-day free trial" links to /pricing (no free plan for new users), NOT the in-modal free signup', () => {
+  it('"Start for free" links to /pricing (no free plan for new users), NOT the in-modal free signup', () => {
     // The old behavior was toApp('&signup=1') (page leave). It must stay gone.
     expect(route).not.toContain("toApp('&signup=1')");
-    expect(route).toContain('<a id="lgmCreate" href="/pricing">Start a 14-day free trial</a>');
+    expect(route).toContain('<a id="lgmCreate" href="/pricing">Start for free</a>');
     expect(route).not.toMatch(/lgmCreate.*addEventListener[\s\S]*?step\(3\)/);
     expect(route).not.toContain('Create a free account');
   });

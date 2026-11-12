@@ -1102,7 +1102,7 @@ function AppDashboard() {
                     href="/pricing"
                     className="flex-1 py-2 px-4 rounded-md text-sm font-medium text-center transition-colors text-gray-400 hover:text-white"
                   >
-                    Start free trial
+                    Start for free
                   </a>
                 )}
               </div>

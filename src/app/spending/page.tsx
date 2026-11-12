@@ -132,7 +132,7 @@ export default async function SpendingPage() {
             Track every contract, know the incumbent, and get the ones that fit your business. Try it free for 14 days.
           </p>
           <Link href="/pricing" className="inline-flex rounded-lg bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover)">
-            Start 14-day free trial →
+            Start for free →
           </Link>
         </div>
       </section>

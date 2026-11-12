@@ -16,7 +16,7 @@ export const MP_HEADER_PRODUCT_LINKS: readonly MpChromeLink[] = [
 ];
 
 /**
- * Right of the top bar, before the "Start free trial" button. Sign in and Contact sales are for
+ * Right of the top bar, before the "Start for free" button. Sign in and Contact sales are for
  * signed-out visitors only (hidden once the account avatar paints).
  */
 export const MP_HEADER_ACCOUNT_LINKS: readonly MpChromeLink[] = [
@@ -26,7 +26,7 @@ export const MP_HEADER_ACCOUNT_LINKS: readonly MpChromeLink[] = [
 ];
 
 /** No free plan for new users (2026-11): the signup CTA is the 14-day trial, chosen on /pricing. */
-export const MP_HEADER_SIGNUP_LINK: MpChromeLink = { href: '/pricing', label: 'Start free trial' };
+export const MP_HEADER_SIGNUP_LINK: MpChromeLink = { href: '/pricing', label: 'Start for free' };
 
 export const MP_LOGO_SRC = '/brand/mindy-logo-icon.png';
 

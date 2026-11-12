@@ -251,7 +251,7 @@ export default function SamGovComparePage() {
             href="/pricing"
             className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
-            Start 14-day free trial
+            Start for free
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">First briefing lands tomorrow morning.</p>
         </div>
@@ -523,7 +523,7 @@ export default function SamGovComparePage() {
             href="/pricing"
             className="inline-block px-10 py-4 bg-white hover:bg-(--mp-wash) text-(--mp-navy) rounded-lg font-bold text-lg transition-colors"
           >
-            Start 14-day free trial
+            Start for free
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">
             You&apos;ll still use SAM.gov. You just won&apos;t live there anymore.

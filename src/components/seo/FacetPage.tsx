@@ -134,7 +134,7 @@ export default function FacetPage({
           <div className="mt-4">
             <MemberAwareCta appearance="public" memberHref="/app" memberLabel="Open Mindy →">
               <Link href="/pricing" className="inline-block bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-lg px-5 py-2.5 text-sm">
-                Start 14-day free trial →
+                Start for free →
               </Link>
             </MemberAwareCta>
           </div>

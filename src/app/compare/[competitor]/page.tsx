@@ -86,7 +86,7 @@ export default async function ComparePage({ params }: { params: Promise<{ compet
           </h1>
           <p className="text-(--mp-body) mt-4 text-lg">{c.wedge}</p>
           <div className="mt-6 flex gap-3 justify-center flex-wrap">
-            <Link href="/pricing" className="bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-lg px-6 py-3">Start 14-day free trial →</Link>
+            <Link href="/pricing" className="bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-lg px-6 py-3">Start for free →</Link>
             <Link href="/pricing" className="border border-(--mp-line) hover:border-(--mp-line) rounded-lg px-6 py-3">See pricing</Link>
           </div>
           <p className="text-xs text-(--mp-muted) mt-3">{c.name}: {c.pricing} · Mindy: $149/mo with a 14-day free trial, no sales call</p>
@@ -138,7 +138,7 @@ export default async function ComparePage({ params }: { params: Promise<{ compet
         <div className="mt-12 text-center border border-(--mp-line) rounded-lg p-8 bg-(--mp-wash)">
           <h2 className="text-2xl font-bold font-(family-name:--mp-font-serif)">Try Mindy free for 14 days — no sales call</h2>
           <p className="text-(--mp-body) mt-2">Daily federal opportunity alerts, grounded in real government data. 14-day free trial. Cancel anytime.</p>
-          <Link href="/pricing" className="inline-block mt-5 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-lg px-7 py-3">Start 14-day free trial →</Link>
+          <Link href="/pricing" className="inline-block mt-5 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-lg px-7 py-3">Start for free →</Link>
         </div>
 
         {/* Cross-links to other compare pages */}

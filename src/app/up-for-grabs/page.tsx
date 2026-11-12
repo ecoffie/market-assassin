@@ -172,7 +172,7 @@ export default async function UpForGrabsPage() {
             the whole history. Try it free for 14 days.
           </p>
           <Link href="/pricing" className="inline-flex rounded-none bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover)">
-            Start 14-day free trial →
+            Start for free →
           </Link>
         </div>
       </section>

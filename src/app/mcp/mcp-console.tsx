@@ -269,7 +269,7 @@ export default function McpConsole() {
             ) : (
               <>
                 <div className="mt-8 flex flex-wrap gap-3.5">
-                  <Link href="/pricing" className={primary}>Start 14-day free trial</Link>
+                  <Link href="/pricing" className={primary}>Start for free</Link>
                   <Link href="/mcp/pricing" className={ghost}>See pricing</Link>
                 </div>
                 <p className="mt-4 text-[15px] text-(--mp-muted)">14-day free trial · Already have an account? <a href={connectHref} className="underline underline-offset-2 hover:text-(--mp-body)">Sign in to connect</a></p>
@@ -329,7 +329,7 @@ export default function McpConsole() {
         <h2 className="mx-auto max-w-3xl text-balance text-[34px] font-bold leading-tight tracking-[-0.02em] sm:text-[44px]">Ask your AI about federal contracts today.</h2>
         <p className="mx-auto mt-4 max-w-xl text-[17px] leading-relaxed text-white/85">Start a 14-day free trial of Pro or Team, then connect Mindy to your AI.</p>
         <div className="mt-8 flex flex-wrap justify-center gap-3.5">
-          <a href={signedIn ? '#connect' : '/pricing'} className={`${pill} bg-(--mp-surface) text-(--mp-navy) hover:-translate-y-0.5`}>{signedIn ? 'How to connect' : 'Start 14-day free trial'}</a>
+          <a href={signedIn ? '#connect' : '/pricing'} className={`${pill} bg-(--mp-surface) text-(--mp-navy) hover:-translate-y-0.5`}>{signedIn ? 'How to connect' : 'Start for free'}</a>
           <Link href="/mcp/pricing" className={`${pill} border border-white/50 text-white hover:-translate-y-0.5 hover:border-white`}>See pricing</Link>
         </div>
       </section>

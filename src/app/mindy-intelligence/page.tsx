@@ -80,7 +80,7 @@ export default function MindyIntelligencePage() {
               href={TRIAL_URL}
               className="px-6 py-3 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-none font-semibold transition-colors"
             >
-              Start 14-day free trial
+              Start for free
             </Link>
             <Link
               href={DASHBOARD_URL}
@@ -437,7 +437,7 @@ export default function MindyIntelligencePage() {
               href={TRIAL_URL}
               className="px-6 py-3 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-none font-semibold transition-colors"
             >
-              Start 14-day free trial
+              Start for free
             </Link>
             <Link
               href={DASHBOARD_URL}

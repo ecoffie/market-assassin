@@ -210,7 +210,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
       name: 'Pro', badge: '✦ Most popular', color: 'navy', tag: 'The $150K capture manager in your pocket.',
       price: annual ? 124 : 149, was: annual ? 149 : undefined, per: annual ? '/mo billed yearly' : '/mo',
       href: PRO_TRIAL ? (annual ? PRO_TRIAL_ANNUAL : PRO_TRIAL_MONTHLY) : (annual ? PRO_CHECKOUT_ANNUAL : PRO_CHECKOUT_MONTHLY),
-      cta: PRO_TRIAL ? 'Start 14-day free trial' : 'Get Pro', pill: annual ? '-17% · Save $298' : undefined,
+      cta: PRO_TRIAL ? 'Start for free' : 'Get Pro', pill: annual ? '-17% · Save $298' : undefined,
       note: PRO_TRIAL
         ? `14 days free, then ${annual ? '$1,490/yr' : '$149/mo'}. We remind you before you're charged. Cancel anytime.`
         : (annual ? '$1,490/yr · 2 months free' : 'Cancel anytime.'),
@@ -227,7 +227,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
       per: annual ? '/mo billed yearly' : '/mo',
       pill: annual ? `-${TEAM_ANNUAL_PCT}% · Save $${fmt(499 * 12 - TEAM_ANNUAL_USD)}` : undefined,
       href: (annual ? TEAM_TRIAL_ANNUAL : TEAM_TRIAL_MONTHLY) || TEAMS_CONTACT_URL,
-      cta: (annual ? TEAM_TRIAL_ANNUAL : TEAM_TRIAL_MONTHLY) ? 'Start 14-day free trial' : 'Contact Sales',
+      cta: (annual ? TEAM_TRIAL_ANNUAL : TEAM_TRIAL_MONTHLY) ? 'Start for free' : 'Contact Sales',
       note: (annual ? TEAM_TRIAL_ANNUAL : TEAM_TRIAL_MONTHLY)
         ? `14 days free, then ${annual ? `$${fmt(TEAM_ANNUAL_USD)}/yr` : '$499/mo'}. We remind you before you're charged.`
         : (annual ? `$${fmt(TEAM_ANNUAL_USD)}/yr · Reply within one business day.` : 'Reply within one business day.'),
@@ -297,7 +297,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
         cap: trial,
         card: {
           name: '14-day free trial', tag: 'Start with a 14-day free trial of Pro or Team.', badge: '✦ Recommended', color: 'navy',
-          price: 0, per: 'for 14 days', href: '/pricing', cta: 'Start 14-day free trial', note: 'Card required. No charge for 14 days. Cancel anytime.',
+          price: 0, per: 'for 14 days', href: '/pricing', cta: 'Start for free', note: 'Card required. No charge for 14 days. Cancel anytime.',
           credits: [fmt(proCr), 'MCP credits', '/ month on Pro'], tree: [['14', 'days free'], ['All', 'tools included']], secs: [],
         },
       };
@@ -536,7 +536,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
           <h2>Start your 14-day free trial.<br />See your first briefing tomorrow.</h2>
           <p>Pick Pro or Team. Card required, no charge for 14 days. Cancel anytime.</p>
           <div className="btns">
-            <a className="cta light" href="/pricing">Start 14-day free trial</a>
+            <a className="cta light" href="/pricing">Start for free</a>
             <Link className="cta" href="/mcp">Connect Mindy to your AI →</Link>
           </div>
           <p className="quote">&ldquo;The big contractors have armies. You have Mindy.&rdquo;</p>

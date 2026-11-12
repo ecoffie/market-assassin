@@ -1328,7 +1328,7 @@ function BriefingsDashboardContent() {
           <p className="text-gray-500 text-sm mt-6 text-center">
             New here?{' '}
             <Link href="/pricing" className="text-emerald-400 hover:underline font-medium">
-              Start 14-day free trial
+              Start for free
             </Link>
             {' · '}
             <Link href="/market-intelligence" className="text-purple-400 hover:underline">
@@ -1376,7 +1376,7 @@ function BriefingsDashboardContent() {
               href="/pricing"
               className="block text-emerald-400 text-sm hover:text-emerald-300 font-medium"
             >
-              Start 14-day free trial →
+              Start for free →
             </Link>
             <button
               onClick={() => { setStatus('gate'); setError(''); }}

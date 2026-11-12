@@ -198,7 +198,7 @@ export default function AuthorizePage() {
               rel="noopener noreferrer"
               className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-400"
             >
-              Start 14-day free trial ↗
+              Start for free ↗
             </a>
             <a
               href="/app"

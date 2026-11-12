@@ -103,7 +103,7 @@ export function BlogPostLayout({
       </article>
 
       {/* Final CTA card — same offer on every post. Goal: convert the
-          reader who finished the article. "Start 14-day free trial"
+          reader who finished the article. "Start for free"
           is the wording the homepage uses, so we stay consistent. */}
       <section className="max-w-3xl mx-auto px-4 pb-16">
         <div className="rounded-lg border border-(--mp-line) p-8 md:p-10 text-center bg-(--mp-wash)">
@@ -118,7 +118,7 @@ export function BlogPostLayout({
             href="/pricing"
             className="inline-block px-8 py-3 bg-white hover:bg-(--mp-wash) text-(--mp-navy) font-bold rounded-lg transition-colors"
           >
-            Start 14-day free trial
+            Start for free
           </Link>
           <p className="text-xs text-(--mp-muted) mt-4">
             Pro ($149/mo) or Team. No charge for 14 days. Cancel anytime.

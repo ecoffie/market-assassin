@@ -657,7 +657,7 @@ export default async function ContractorPage({ params }: PageProps) {
               href="/pricing"
               className="inline-flex rounded-lg bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover)"
             >
-              Start 14-day free trial →
+              Start for free →
             </Link>
           </MemberAwareCta>
         </div>

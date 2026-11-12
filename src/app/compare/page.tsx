@@ -45,7 +45,7 @@ export default function CompareHub() {
           ))}
         </div>
         <div className="mt-10 text-center">
-          <Link href="/pricing" className="inline-block bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-lg px-7 py-3">Start 14-day free trial →</Link>
+          <Link href="/pricing" className="inline-block bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-lg px-7 py-3">Start for free →</Link>
         </div>
       </div>
     </main>

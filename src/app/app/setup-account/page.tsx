@@ -81,7 +81,7 @@ export default function MISetupAccountRequestPage() {
               We couldn&apos;t find Mindy access for that email.
             </div>
             <Link href="/pricing" className="font-medium text-emerald-400 hover:text-emerald-300">
-              Start 14-day free trial
+              Start for free
             </Link>
           </div>
         ) : (

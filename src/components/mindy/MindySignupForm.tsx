@@ -140,7 +140,7 @@ export function MindySignupForm() {
           href="/pricing"
           className="flex-1 py-2 rounded-md text-sm font-semibold text-center transition-colors text-slate-300 hover:text-white"
         >
-          Start free trial
+          Start for free
         </a>
       </div>
       <div className="space-y-3">

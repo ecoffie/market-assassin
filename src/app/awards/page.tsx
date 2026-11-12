@@ -181,7 +181,7 @@ export default async function AwardsLanding() {
             href="/pricing"
             className="mt-6 inline-flex rounded-lg bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover)"
           >
-            Start 14-day free trial
+            Start for free
           </Link>
         </div>
       </section>

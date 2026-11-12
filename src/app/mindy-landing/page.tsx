@@ -143,7 +143,7 @@ export default function MindyLandingPage() {
               href={TRIAL_URL}
               className="rounded-lg bg-purple-600 hover:bg-purple-500 px-4 py-2 text-sm font-semibold text-white transition-colors"
             >
-              Start free trial
+              Start for free
             </Link>
           </div>
         </nav>
@@ -169,7 +169,7 @@ export default function MindyLandingPage() {
               href={TRIAL_URL}
               className="px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-purple-900/40 transition-all"
             >
-              Start 14-day free trial
+              Start for free
             </Link>
             <a
               href="#product"
@@ -669,7 +669,7 @@ export default function MindyLandingPage() {
             href={TRIAL_URL}
             className="inline-block px-10 py-4 bg-white hover:bg-slate-100 text-purple-700 rounded-xl font-bold text-lg shadow-xl transition-all hover:scale-105"
           >
-            Meet Mindy — Start 14-day free trial
+            Meet Mindy — Start for free
           </Link>
         </div>
       </section>
