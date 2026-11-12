@@ -9,10 +9,13 @@ export function isHomepageReferrer(ref: string): boolean {
   return /^https?:\/\/(www\.)?getmindy\.ai\/?(\?.*)?(#.*)?$/i.test(ref.trim());
 }
 
+/** A GA4 date window: YYYY-MM-DD dates (inclusive), or GA4 relative dates like '29daysAgo' / 'today'. */
+export type Ga4Dates = { startDate: string; endDate: string };
+
 /** Visitors per page path for the window. Paths not returned by GA4 are absent (never 0-filled). */
-export async function pageVisitors(paths: string[], days: number): Promise<Record<string, number>> {
+export async function pageVisitors(paths: string[], dates: Ga4Dates): Promise<Record<string, number>> {
   const resp = await runGa4Report({
-    dateRanges: [{ startDate: `${days - 1}daysAgo`, endDate: 'today' }],
+    dateRanges: [dates],
     dimensions: [{ name: 'pagePath' }],
     metrics: [{ name: 'activeUsers' }],
     dimensionFilter: { filter: { fieldName: 'pagePath', inListFilter: { values: paths } } },
@@ -28,9 +31,9 @@ export async function pageVisitors(paths: string[], days: number): Promise<Recor
 }
 
 /** Visitors who reached `path` straight from the homepage (by GA4 pageReferrer). */
-export async function visitorsFromHomepage(path: string, days: number): Promise<number> {
+export async function visitorsFromHomepage(path: string, dates: Ga4Dates): Promise<number> {
   const resp = await runGa4Report({
-    dateRanges: [{ startDate: `${days - 1}daysAgo`, endDate: 'today' }],
+    dateRanges: [dates],
     dimensions: [{ name: 'pageReferrer' }],
     metrics: [{ name: 'activeUsers' }],
     dimensionFilter: { filter: { fieldName: 'pagePath', stringFilter: { matchType: 'EXACT', value: path } } },

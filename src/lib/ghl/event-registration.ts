@@ -146,12 +146,19 @@ function ghlEnv(): { token: string; locationId: string } {
 }
 
 /** How many contacts carry `tag` (GHL's `total` for the tag search). Throws on a GHL error. */
-export async function countContactsByTag(tag: string, fetchImpl: typeof fetch = fetch): Promise<number> {
+export async function countContactsByTag(
+  tag: string,
+  fetchImpl: typeof fetch = fetch,
+  /** Only contacts added in this window (ISO timestamps, inclusive). Omit for all-time. */
+  added?: { gte: string; lte: string },
+): Promise<number> {
   const { token, locationId } = ghlEnv();
+  const filters: Record<string, unknown>[] = [{ field: 'tags', operator: 'contains', value: tag.toLowerCase() }];
+  if (added) filters.push({ field: 'dateAdded', operator: 'range', value: added });
   const res = await fetchImpl(`${GHL_BASE}/contacts/search`, {
     method: 'POST',
     headers: headers(token),
-    body: JSON.stringify({ locationId, pageLimit: 1, filters: [{ field: 'tags', operator: 'contains', value: tag.toLowerCase() }] }),
+    body: JSON.stringify({ locationId, pageLimit: 1, filters }),
   });
   if (!res.ok) throw new Error(`GHL search ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
   const data = await res.json();
