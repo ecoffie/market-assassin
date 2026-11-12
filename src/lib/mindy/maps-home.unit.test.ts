@@ -13,7 +13,6 @@ import { MAPS_HOME_PATH, MAPS_HOME_URL, MINDY_ORIGIN, MAPS_HOME_IS_APEX } from '
 
 const MAPS_SURFACES = [
   'src/app/today/route.ts',
-  'src/app/opportunity-map/route.ts',
   'src/app/opportunity-map/pursuits/route.ts',
   'src/app/opportunity-map/saved/route.ts',
   'src/app/opportunity-map/favorites/route.ts',
@@ -62,6 +61,15 @@ describe('no Maps surface links its logo to the legacy /app', () => {
       expect(c).not.toContain('href="/app"');
     });
   }
+});
+
+describe('the Map header is the homepage top bar', () => {
+  it('opportunity-map/route.ts renders siteTopHtml() and never links its logo to /app', () => {
+    // Since 2026-11-12 the Map uses the homepage bar, whose logo links to "/" (the homepage).
+    const c = code(read('src/app/opportunity-map/route.ts'));
+    expect(c).toContain('+ siteTopHtml()');
+    expect(c).not.toContain('href="/app"');
+  });
 });
 
 describe('apex canonical ownership', () => {

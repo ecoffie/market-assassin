@@ -17,9 +17,10 @@ const SUBPAGES = ['favorites', 'forecasts', 'market', 'proposal', 'pursuits', 'r
   .map((p) => `src/app/opportunity-map/${p}/route.ts`);
 
 describe('desktop: Learn in the right cluster, second', () => {
-  it('the Map', () => {
+  it('the Map uses the homepage top bar (Learn comes from MP_HEADER_PRODUCT_LINKS)', () => {
     const s = read('src/app/opportunity-map/route.ts');
-    expect(s).toMatch(/'<a href="\/bid">Bid with confidence<\/a>'\n(?:\s*\/\/[^\n]*\n)*\s*\+ '<a href="\/learn">Learn<\/a>'\n\s*\+ '<a href="\/pricing">Pricing<\/a>'/);
+    expect(s).toContain('+ siteTopHtml()');
+    expect(s).not.toMatch(/<a href="\/learn">Learn<\/a>/);
   });
   it.each([...SUBPAGES, 'src/app/today/route.ts'])('%s', (p) => {
     expect(read(p)).toContain('<a href="/bid">Bid with confidence</a>\n    <a href="/learn">Learn</a>\n    <a href="/pricing">Pricing</a>');
@@ -29,7 +30,7 @@ describe('desktop: Learn in the right cluster, second', () => {
     expect(MP_HEADER_PRODUCT_LINKS[1].label).toBe('Learn');
   });
   it('exactly one Learn item per header (no duplicate entry points)', () => {
-    for (const p of ['src/app/opportunity-map/route.ts', ...SUBPAGES, 'src/app/today/route.ts']) {
+    for (const p of [...SUBPAGES, 'src/app/today/route.ts']) {
       const s = read(p);
       const desktop = (s.match(/<a href="\/learn">Learn<\/a>/g) || []).length;
       expect(desktop, p).toBe(1);
