@@ -5,7 +5,6 @@
  * is rebuilt.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
 import { PLAYERS_HEADER_TEXT_JS, PROVEN_PLAYERS_LABEL, PROVEN_PLAYERS_DESCRIPTION } from '@/lib/players/copy';
 import { getMapOpportunities, SET_GROUPS } from '@/lib/opportunities/map-data';
 import { STATE_CENTROIDS } from '@/lib/geo/state-centroids';
@@ -15,7 +14,9 @@ import { decodeFSC } from '@/lib/codes/fsc';
 import { DIBBS_MAP_ENABLED } from '@/lib/dibbs/availability';
 import { OPPORTUNITY_MAP_TEMPLATE } from './template-html';
 import { buildOppShareMeta, fetchOppShareRow, isNoticeId, renderOppShareHead } from '@/lib/opportunities/share-metadata';
-import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from './account-menu';
+import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_JS } from './account-menu';
+import { siteTopHtml, SITE_NAV_CSS } from '@/lib/public-site/site-nav';
+import { MP_ACCOUNT_OVERRIDES_CSS, mpTokenDeclarations } from '@/lib/public-site/css';
 import { MARKET_FEEDBACK_CSS, MARKET_BOOT_HTML, MARKET_BOOT_APP_OPEN, MARKET_FEEDBACK_MAP_HTML, MARKET_FEEDBACK_JS } from './market-feedback';
 import { LAYOUT_MOVE_JS } from './layout-move';
 import { HIERARCHY_HORIZON_LIMIT_JS } from '@/lib/opportunities/hierarchy-sub-agency';
@@ -1090,7 +1091,7 @@ const ZLAYOUT_CSS = '<style>'
   // Grid gains a full-width top HEADER row for the Mindy logo, above the search/filter row.
   // znote = the saved-search notice row (#ssNotice) under the toolbar. It is IN THE FLOW (an auto
   // row, 0 px when absent), so it can never cover pins, the map count or result cards.
-  + '.app{grid-template-columns:64px minmax(0,1fr) 400px!important;grid-template-rows:52px auto auto minmax(0,1fr)!important;'
+  + '.app{grid-template-columns:64px minmax(0,1fr) 400px!important;grid-template-rows:auto auto auto minmax(0,1fr)!important;'
   + 'grid-template-areas:"zhead zhead zhead" "zrail ztop ztop" "zrail znote znote" "zrail zmap zcards"!important;transition:none!important}'
   + '.app.collapsed{grid-template-columns:64px minmax(0,1fr) 0px!important}'
   // Cards = a SINGLE wide column (real Zillow): one card per row, full-width, room to breathe.
@@ -1098,9 +1099,10 @@ const ZLAYOUT_CSS = '<style>'
   + '.feed{display:flex!important;flex-direction:column!important;gap:12px!important;padding:14px 16px 28px!important}'
   + '.feed .card{flex:none!important;margin-bottom:0!important}'
   // Mindy header bar
-  + '.zhead{grid-area:zhead;position:relative;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--line);background:#fff;z-index:20}'
-  + '.zh-left,.zh-right{display:flex;align-items:center;gap:22px}'
-  + '.zh-right a{font:700 15px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}'
+  + '.zhead{grid-area:zhead;position:relative;display:flex;flex-direction:column;background:#fff;z-index:20;' + mpTokenDeclarations() + '}'
+  // The map row under the homepage bar: the map's own links (Opportunities · Players · Pursuits · Markets).
+  + '.zh-maprow{display:flex;align-items:center;gap:14px;height:44px;padding:0 22px;border-bottom:1px solid var(--line);background:#fff}'
+  + '.zh-left{display:flex;align-items:center;gap:22px}'
   // Left nav = the dataset nouns → bigger + bolder like Zillow\'s Buy/Rent/Sell header.
   + '.zh-left{display:flex;align-items:center;gap:20px}'
   + '.zh-left a{font:700 16px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}'
@@ -1117,26 +1119,13 @@ const ZLAYOUT_CSS = '<style>'
   + '.zh-ask{display:inline-flex;align-items:center;gap:6px;font:700 16px "Inter",system-ui,sans-serif;color:var(--jan,#2563eb);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}'
   + '.zh-ask svg{width:16px;height:16px;flex:none}.zh-ask:hover{filter:brightness(1.1)}'
   // Highlight top-nav items ONLY on hover — the blue must NOT persist on a clicked item.
-  + '.zh-left a:hover,.zh-right a:hover{color:var(--jan)}'
-  + '.zh-acct{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);color:var(--sub)}'
-  + '.zh-logo{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;text-decoration:none}'
-  + '.zh-logo img{height:25px;width:auto;display:block}'
-  + '.zh-logo span{font:700 19px "Inter",system-ui,sans-serif;color:var(--ink);letter-spacing:-.02em}'
+  + '.zh-left a:hover{color:var(--jan)}'
   // Narrow: hide the Explore eyebrow + Pursuits/Ask-Mindy, keep the two MAP links (the leading
   // .zh-explore <span> is child 1, so the two map <a>s are children 2-3 and Pursuits/Ask are 4+).
-  + '@media(max-width:1000px){.zh-left,.zh-right{gap:14px}.zh-explore{display:none}.zh-left a:nth-child(n+4),.zh-right a:first-child{display:none}}'
-  // Not full screen (Eric 2026-11-06): the logo is absolutely centred, so between ~1000px and full
-  // width it slid UNDER "Bid with confidence" ("the options on the top blend together"). Below 1680px
-  // the logo joins the flex row (its own space, never on top of a link) and the lowest-priority links
-  // drop off in steps (checked at 1024–1920px: no link overlaps the logo or another link).
-  + '.zhead{gap:18px}.zh-left,.zh-right{min-width:0}'
-  + '@media(max-width:1680px){.zh-logo{position:static;transform:none;flex:none}}'
-  + '@media(max-width:1480px){.zh-right a[href="/bid"]{display:none}}'
-  + '@media(max-width:1280px){.zh-explore{display:none}.zh-right a[href="/learn"]{display:none}}'
-  + '@media(max-width:1140px){.zh-left a:nth-child(n+5){display:none}}'
+  + '@media(max-width:1000px){.zh-left{gap:14px}.zh-explore{display:none}}'
   // far-left icon rail — PINNED (position:fixed) so grid/overflow can never push it off-screen.
   // The 50px grid column stays as its reserved space (kept empty; the fixed rail sits over it).
-  + '.zrail{position:fixed;left:0;top:52px;width:64px;height:calc(100vh - 52px);height:calc(100dvh - 52px);'
+  + '.zrail{position:fixed;left:0;top:var(--zh-h,52px);width:64px;height:calc(100vh - var(--zh-h,52px));height:calc(100dvh - var(--zh-h,52px));'
   + 'background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:2px;padding:14px 0;z-index:30;overflow:hidden}'
   + '.zrail a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--sub);text-decoration:none;padding:8px 2px;border-radius:11px;width:56px;min-height:48px}'
   + '.zrail a:hover{background:var(--wash);color:var(--ink)}.zrail a.on{color:var(--jan);background:#eff5ff}'
@@ -1326,22 +1315,15 @@ const ZLAYOUT_CSS = '<style>'
   + '@media(max-width:640px){'
   // 1) Grid → single column. zmap + zcards share ONE cell (row 3); we toggle which is
   //    visible. Header row stays; the ztop (search+filters) row stays full-width.
-  +   '.app{grid-template-columns:1fr!important;grid-template-rows:52px auto auto minmax(0,1fr)!important;'
+  +   '.app{grid-template-columns:1fr!important;grid-template-rows:auto auto auto minmax(0,1fr)!important;'
   +     'grid-template-areas:"zhead" "ztop" "znote" "zcards"!important}'
   +   '.app.collapsed{grid-template-columns:1fr!important}'
   // 2) Kill the fixed left rail (moves into the hamburger drawer).
   +   '.zrail{display:none!important}'
-  // 3) Top header: hide the desktop nav LINKS + centered logo shift; show hamburger.
-  //    Keep the logo inline-left next to the ham. Do NOT hide all of .zh-right — the account
-  //    avatar (.mindy-acct) lives inside it; hide only the text links (Pricing / Bid), which
-  //    already live in #mDrawer.
-  +   '.zhead{padding:0 12px!important;z-index:1100!important}'
+  // 3) Top header: the homepage bar on top handles its own phone layout (logo + ☰ menu + account).
+  //    The map row keeps only the map hamburger (#mHam → #mDrawer), which holds the map links.
+  +   '.zhead{z-index:1100!important}.zh-maprow{padding:0 12px;height:40px}'
   +   '.zh-left{display:none!important}'
-  +   '.zh-right{display:flex!important;align-items:center;gap:0;margin-left:auto!important}'
-  +   '.zh-right > a{display:none!important}'
-  +   '.mindy-acct{display:inline-flex!important}'
-  +   '.zh-logo{position:static!important;left:auto!important;transform:none!important;margin:0 auto 0 8px!important}'
-  +   '.zh-logo img{height:22px!important}.zh-logo span{font-size:17px!important}'
   +   '#mHam{display:inline-flex!important;align-items:center;justify-content:center;width:38px;height:38px;'
   +     'flex:none;border:0;background:none;cursor:pointer;color:var(--ink);border-radius:9px}'
   +   '#mHam:active{background:var(--wash)}'
@@ -1550,25 +1532,17 @@ const SORT_MENU_HTML =
 
 // Mindy brand header bar (top, full width) — the wordmark + product name, Zillow-style.
 // Zillow-style top nav: left nav links · CENTER logo · right nav + account.
-const ZHEAD_HTML = '<header class="zhead">'
-  // Mobile hamburger (≤640px only via CSS) — opens the #mDrawer rail menu. Leads the header
-  // so the logo can center between it and the account avatar on phones.
+// Top of the map = the SAME top bar as the homepage (Eric 2026-11-12: "when opening the maps page i want
+// the same top bar as the homepage"), from siteTopHtml() so it cannot drift from the homepage. Under it, a
+// slim map row keeps the map's own links (Opportunities · Players · Pursuits · Markets) — Markets is only
+// reachable from here. The homepage bar carries the logo, Learn, Plans & Pricing and the account menu.
+// A function, not a const: the homepage bar drops its event banner once the event is over, so it is
+// rendered per request rather than frozen when the module loads.
+const zheadHtml = (): string => '<header class="zhead">'
+  + siteTopHtml()
+  + '<div class="zh-maprow">'
+  // Mobile hamburger (≤640px only via CSS) — opens the #mDrawer rail menu (map tools).
   + '<button id="mHam" aria-label="Menu" onclick="window.__mDrawer&&window.__mDrawer(true)"><svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>'
-  // Top nav = the plain noun for each corpus (Open · Vehicles · Contacts). The dropdown pill
-  // says the same (Active · Vehicles · Contacts). Nav word and dropdown state are the same flow
-  // (like Zillow's Buy → "For Sale"): each nav item drives setMapMode + syncs the pill.
-  // "Recompetes" = active, in-performance contracts you learn about from the award record. NOT
-  // "past" (the work is being done now) and NOT "vehicles" (jargon) — the tab names the ACTION:
-  //  - an EXPIRING prime award → get ahead of the recompete (bid next cycle); OR
-  //  - a running TASK ORDER under a live IDIQ → subcontract to the incumbent today.
-  // (Eric 2026-07-27: "Awarded" sounded finished; "active but you learn about it from the past.")
-  // TWO NETWORKS nav (Eric 2026-08-03, memory two_networks_opp_vs_network_map): the map is TWO
-  // separate products under one "Explore" — Opportunity Map (THINGS / Zillow: "where's the work")
-  // and NETWORK map (PEOPLE+ORGS / LinkedIn: "who's in the market" — contractors, incumbents,
-  // agencies, buyers, SBLOs). NEVER merged. "Opportunities" defaults to Open (Recompetes/Forecast
-  // are its dropdown sub-layers); "Players" defaults to
-  // Companies (Gov Buyers is its dropdown sub-layer). "Pursuits" is the kanban board (links to /app).
-  // "Explore" is a quiet eyebrow that groups the two maps (both are exploration) — not a link.
   + '<nav class="zh-left">'
   + '<span class="zh-explore">Explore</span>'
   + '<a class="zh-mode on" data-map="opportunities" data-mode="open" onclick="setMapMode(\'open\')">Opportunities</a>'
@@ -1588,26 +1562,15 @@ const ZHEAD_HTML = '<header class="zhead">'
   // code (ASK_MINDY_JS / window.openAskMindy) is left intact but has NO entry point, so nothing opens
   // it — re-add this <a class="zh-ask"> link + the search-panel zsp-ask rows to bring it back.
   + '</nav>'
-  // Logo → MAPS_HOME_PATH (the product front door). A backtick template on purpose: this used to
-  // be '…href="${MAPS_HOME_PATH}"…' in SINGLE quotes, so the browser got the literal text and the
-  // click went nowhere. Guarded by logo-link.unit.test.ts.
-  + `<a href="${MAPS_HOME_PATH}" title="Mindy home" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>`
-  + '<nav class="zh-right">'
-  // Ask Mindy now lives in the LEFT nav (after Pursuits, per the approved mockup) — the redundant
-  // right-side purple pill was removed 2026-08-02 so there's ONE header doorway (nav) + the map's
-  // floating button, not two competing entries. window.openAskMindy is defined by ASK_MINDY_JS.
-  // "Bid with confidence" moved to the RIGHT of the Mindy logo (Eric 2026-08-01), out of the left nav.
-  + '<a href="/bid">Bid with confidence</a>'
-  // Mindy Learn (2026-10-10). SECOND, not first: at <=1000px `.zh-right a:first-child` is hidden, and Learn
-  // must stay visible at every width the desktop cluster shows.
-  + '<a href="/learn">Learn</a>'
-  + '<a href="/pricing">Pricing</a>'
-  // "My Pursuits" moved to the LEFT primary nav as "Pursuits" (the two-map + board split,
-  // 2026-07-30) — dropped here to avoid the duplicate. Still reachable in the account menu.
-  // Profile avatar + account dropdown (Zillow-style) — shared verbatim with the
-  // favorites + saved pages via ./account-menu. Replaces the old plain /app link.
-  + ACCOUNT_MENU_HTML
-  + '</nav></header>';
+  + '</div></header>';
+
+// Publishes the header's real height as --zh-h, so the fixed rail and the listing drawer start under the
+// homepage bar + map row (its height changes when the event banner is closed or the window narrows).
+// On a change the map is resized too, because Leaflet only watches window resizes.
+const ZHEAD_HEIGHT_JS = '<script>(function(){var h=document.querySelector(".zhead");if(!h)return;var last=-1;'
+  + 'function s(){var v=h.offsetHeight;if(v===last)return;last=v;document.documentElement.style.setProperty("--zh-h",v+"px");'
+  + 'try{if(window.map)setTimeout(function(){try{map.invalidateSize();}catch(e){}},60);}catch(e){}}'
+  + 's();if(window.ResizeObserver)new ResizeObserver(s).observe(h);window.addEventListener("resize",s);})();</script>';
 
 // Set-aside color legend REMOVED (Eric, Jul 26): Open pins are now all ONE color (green) — the value-
 // TAG number is the signal, not the color, so a 6-swatch set-aside legend was misleading clutter ("too
@@ -5860,9 +5823,9 @@ const DRAWER_CSS = '<style>'
   + '.viewdet{color:var(--sub);font-weight:600;font-size:12px}'
   // Drawer fills the MAP area (between the 50px icon rail and the 404px cards column) and slides
   // in from the left — so the card list stays visible and clicking another card updates it.
-  + '.oppbd{position:fixed;top:52px;left:64px;right:400px;bottom:0;background:rgba(17,28,38,.06);z-index:1400;opacity:0;pointer-events:none;transition:opacity .2s}'
+  + '.oppbd{position:fixed;top:var(--zh-h,52px);left:64px;right:400px;bottom:0;background:rgba(17,28,38,.06);z-index:1400;opacity:0;pointer-events:none;transition:opacity .2s}'
   + '.oppbd.show{opacity:1}'
-  + '.oppdrawer{position:fixed;top:52px;left:64px;right:400px;height:calc(100vh - 52px);height:calc(100dvh - 52px);background:#fff;z-index:1500;'
+  + '.oppdrawer{position:fixed;top:var(--zh-h,52px);left:64px;right:400px;height:calc(100vh - var(--zh-h,52px));height:calc(100dvh - var(--zh-h,52px));background:#fff;z-index:1500;'
   + 'box-shadow:8px 0 40px rgba(0,0,0,.14);transform:translateX(-104%);transition:transform .28s cubic-bezier(.4,0,.2,1);'
   + 'overflow-y:auto;display:flex;flex-direction:column;'
   // Closed = fully hidden so nothing (esp. the sticky ✕ close button) bleeds over the
@@ -11082,7 +11045,7 @@ export async function GET(request: NextRequest) {
   } else {
     // (Removed the "← Back to Mindy" link — the top nav + icon rail already have Home/Dashboard,
     // so it was leftover noise in the right-panel header. Zillow's header is title · count · sort.)
-    html = repl(html, '</head>', PAGE_CSS + ZLAYOUT_CSS + DRAWER_CSS + VTAG_CSS + '<style>' + ACCOUNT_MENU_CSS + ASK_MINDY_CSS + LOGIN_MODAL_CSS + MARKET_FEEDBACK_CSS + '</style>' + '</head>');
+    html = repl(html, '</head>', PAGE_CSS + ZLAYOUT_CSS + DRAWER_CSS + VTAG_CSS + '<style>' + ACCOUNT_MENU_CSS + MP_ACCOUNT_OVERRIDES_CSS + SITE_NAV_CSS + ASK_MINDY_CSS + LOGIN_MODAL_CSS + MARKET_FEEDBACK_CSS + '</style>' + '</head>');
     // ROOT-CAUSE fix: neutralize the TEMPLATE's own `.fscroll{overflow-x:auto}` at the source
     // (not just override it) so the clip origin is gone entirely — dropdowns are never clipped.
     // (See filter-bar-overflow.unit.test.ts for the permanent invariant.)
@@ -11093,7 +11056,7 @@ export async function GET(request: NextRequest) {
     // MARKET_BOOT_HTML (market-feedback.ts): "Building your market" for the first market of this page load.
     // In the HTML with .app already marked mfb-booting — no script runs first. A CSS animation reveals it after
     // MF_TIMING.BOOT_REVEAL, so a fast entry never sees it and a slow parse cannot delay it.
-    html = repl(html, '<div class="app">', MARKET_BOOT_APP_OPEN + ZHEAD_HTML + ZRAIL_HTML + ZTOP_HTML + MARKET_BOOT_HTML);
+    html = repl(html, '<div class="app">', MARKET_BOOT_APP_OPEN + zheadHtml() + ZRAIL_HTML + ZTOP_HTML + MARKET_BOOT_HTML);
     // Load setColorFor right after leaflet.js (before the template's map script).
     html = repl(html, '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>',
       '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>' + EARLY_INJECT + PIN_JS);
@@ -11241,7 +11204,7 @@ export async function GET(request: NextRequest) {
     // <div>, so anything after it gets parsed INTO that hidden .lgm-ov (display:none) and the
     // fixed FAB/drawer compute to 0×0. Leading the body keeps the mobile chrome a direct <body> child.
     // MARKET_FEEDBACK_JS precedes VIEWPORT_JS so window.__mf exists before the first fetch round reports to it.
-    const bodyInject = MOBILE_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + DIBBS_FLAG_JS + WATCH_SCOPE_SCRIPT + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
+    const bodyInject = MOBILE_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + DIBBS_FLAG_JS + WATCH_SCOPE_SCRIPT + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + ACCOUNT_MENU_JS + ZHEAD_HEIGHT_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Code→name for the State picker (50 states + DC). Already a shared constant — the Filters

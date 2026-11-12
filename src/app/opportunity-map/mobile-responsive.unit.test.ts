@@ -72,14 +72,12 @@ describe('opportunity-map mobile responsive invariants', () => {
     expect(/\.ztop\{[^}]*overflow-x:auto/.test(block), '.ztop must NOT use overflow-x:auto on mobile').toBe(false);
   });
 
-  it('mobile header keeps the account avatar (inside .zh-right) reachable', () => {
-    // Hiding ALL of .zh-right also hid .mindy-acct. We hide .zh-left + .zh-right > a only.
-    expect(routeSrc.includes(".zh-right > a{display:none!important}"), 'text links in zh-right must hide').toBe(true);
-    expect(routeSrc.includes(".mindy-acct{display:inline-flex!important}"), 'account avatar must stay visible').toBe(true);
-    expect(
-      /\.zh-left,\.zh-right\{display:none!important\}/.test(routeSrc),
-      'must NOT hide all of .zh-right (that buries the account menu)',
-    ).toBe(false);
+  it('mobile header: the homepage bar owns the account menu; the map row only hides its links', () => {
+    // Since 2026-11-12 the account menu lives in the homepage bar (siteTopHtml), whose own phone
+    // CSS shows it once signed in. The map must not force it visible (that showed it signed out).
+    expect(routeSrc.includes('+ siteTopHtml()'), 'map header must render the homepage bar').toBe(true);
+    expect(routeSrc.includes("'.zh-left{display:none!important}'"), 'map links hide on phones (they live in #mDrawer)').toBe(true);
+    expect(routeSrc.includes('.mindy-acct{display:inline-flex!important}'), 'must not force the account menu visible').toBe(false);
   });
 
   it('Agency/Industry/Horizons popovers escape overflow via position:fixed + __placeHznPop', () => {

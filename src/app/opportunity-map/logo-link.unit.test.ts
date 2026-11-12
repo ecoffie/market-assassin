@@ -8,8 +8,10 @@ import { describe, expect, it } from 'vitest';
 // broken line also contained — this test checks it is actually interpolated.
 describe('map header logo', () => {
   const src = readFileSync(join(__dirname, 'route.ts'), 'utf8');
-  it('interpolates MAPS_HOME_PATH in a template literal (a real link, not the literal text)', () => {
-    expect(src).toContain('+ `<a href="${MAPS_HOME_PATH}" title="Mindy home" class="zh-logo">');
+  it('the map header is the homepage top bar (its logo links home), not a hand-built copy', () => {
+    // Since 2026-11-12 the map renders siteTopHtml(), whose logo is a real href="/" link.
+    expect(src).toContain('+ siteTopHtml()');
+    expect(src).not.toContain('class="zh-logo"');
   });
   it('never ships an uninterpolated ${...} in an href inside a quoted string', () => {
     const bad = src.split('\n').filter((l) => /^\s*\+?\s*'[^`]*href="\$\{/.test(l));
