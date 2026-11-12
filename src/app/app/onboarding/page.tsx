@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import SampleOpportunitiesPicker from '@/components/briefings/SampleOpportunitiesPicker';
 import MarketDataMap from '@/components/app/market/MarketDataMap';
 import OnboardingScan, { type RevealData } from '@/components/app/onboarding/OnboardingScan';
+import InvitePartnerStep from '@/components/app/onboarding/InvitePartnerStep';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import { getSupabase } from '@/lib/supabase/client';
 import { useAppTracker } from '@/components/app/track';
@@ -327,6 +328,8 @@ function inferProfileSuggestions(description: string): ProfileSuggestions | null
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
+  // Set when onboarding saves: show the invite-a-partner step, then go here.
+  const [finishTo, setFinishTo] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   // Tracker: fires onboarding_step on each goToStep + a final
   // onboarding_step with completed=true on successful save. Critical
@@ -758,7 +761,7 @@ export default function OnboardingPage() {
       // origin still lands somewhere that completes their profile — but it is now a Maps
       // destination, not /app.
       const rawNext = new URLSearchParams(window.location.search).get('next');
-      router.push(safeNext(rawNext, `${MAPS_HOME_PATH}?onboarded=1`));
+      setFinishTo(safeNext(rawNext, `${MAPS_HOME_PATH}?onboarded=1`));
     } catch {
       setError('Failed to save your profile. Please try again.');
     } finally { setSaving(false); }
@@ -1069,7 +1072,7 @@ export default function OnboardingPage() {
       // would have left one path still ending in the legacy product. Explicit safe `next`
       // wins; otherwise the Maps front door.
       await ensureMIToken();
-      router.push(safeNext(
+      setFinishTo(safeNext(
         new URLSearchParams(window.location.search).get('next'),
         `${MAPS_HOME_PATH}?onboarded=1`,
       ));
@@ -1426,6 +1429,10 @@ export default function OnboardingPage() {
         </div>
       </main>
     );
+  }
+
+  if (finishTo) {
+    return <InvitePartnerStep onDone={() => router.push(finishTo)} track={(m) => track('onboarding_step', 'onboarding', { step: 'invite_partner', ...m })} />;
   }
 
   return (

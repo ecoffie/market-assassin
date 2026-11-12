@@ -15,6 +15,7 @@
  * is the failure tier-credits.unit.test.ts exists to stop.
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import MemberProof from '@/components/public-site/MemberProof';
 import { UPGRADE_OFFER_LABEL, UPGRADE_OFFER_PARAM, withUpgradePromo } from '@/lib/billing/upgrade-offer';
 import Link from 'next/link';
 import NoRefundNote from '@/components/NoRefundNote';
@@ -42,6 +43,19 @@ const SIGNUP_URL = '/signup';
 const PRO_CHECKOUT_MONTHLY = 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C'; // $149/mo
 const PRO_CHECKOUT_ANNUAL = 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D'; // $1,490/yr
 const TEAMS_CONTACT_URL = '/contact-sales';
+// 14-day trial payment links (created 2026-11-12; each carries metadata.tier for the webhook,
+// because a trial checkout completes at $0 and amount/price fallbacks cannot identify it).
+// Env vars override. The trial copy shows only when a link is set.
+const PRO_TRIAL_MONTHLY = process.env.NEXT_PUBLIC_PRO_TRIAL_CHECKOUT_MONTHLY || 'https://buy.stripe.com/7sYcN64Au4QWcFv70QfnO18';
+const PRO_TRIAL_ANNUAL = process.env.NEXT_PUBLIC_PRO_TRIAL_CHECKOUT_ANNUAL || 'https://buy.stripe.com/fZudRaff82IO48Z5WMfnO19';
+const PRO_TRIAL = !!(PRO_TRIAL_MONTHLY && PRO_TRIAL_ANNUAL);
+// Team annual: $4,027/yr = $335.58/mo, 33% off $499 x 12 ($5,988). Team checkout links (14-day
+// trial) come from env; until they are set, Team stays "Contact Sales".
+const TEAM_TRIAL_MONTHLY = process.env.NEXT_PUBLIC_TEAM_TRIAL_CHECKOUT_MONTHLY || 'https://buy.stripe.com/eVq28s8QK3MS34VdpefnO1a';
+const TEAM_TRIAL_ANNUAL = process.env.NEXT_PUBLIC_TEAM_TRIAL_CHECKOUT_ANNUAL || 'https://buy.stripe.com/3cI9AU2sm5V020R2KAfnO1b';
+const TEAM_ANNUAL_USD = 4027;
+const TEAM_ANNUAL_PER_MONTH = 335.58;
+const TEAM_ANNUAL_PCT = Math.round((1 - TEAM_ANNUAL_USD / (499 * 12)) * 100); // 33
 const ENTERPRISE_CONTACT_URL = '/contact-sales';
 const MCP_TRIAL_URL = '/app';
 const REFERRALS_URL = '/app?panel=settings&section=credits&tab=referrals';
@@ -205,8 +219,11 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
     {
       name: 'Pro', badge: '✦ Most popular', color: 'navy', tag: 'The $150K capture manager in your pocket.',
       price: annual ? 124 : 149, was: annual ? 149 : undefined, per: annual ? '/mo billed yearly' : '/mo',
-      href: annual ? PRO_CHECKOUT_ANNUAL : PRO_CHECKOUT_MONTHLY, cta: 'Get Pro', pill: annual ? '-17% · Save $298' : undefined,
-      note: annual ? '$1,490/yr · 2 months free' : 'Cancel anytime.',
+      href: PRO_TRIAL ? (annual ? PRO_TRIAL_ANNUAL : PRO_TRIAL_MONTHLY) : (annual ? PRO_CHECKOUT_ANNUAL : PRO_CHECKOUT_MONTHLY),
+      cta: PRO_TRIAL ? 'Start 14-day free trial' : 'Get Pro', pill: annual ? '-17% · Save $298' : undefined,
+      note: PRO_TRIAL
+        ? `14 days free, then ${annual ? '$1,490/yr' : '$149/mo'}. We remind you before you're charged. Cancel anytime.`
+        : (annual ? '$1,490/yr · 2 months free' : 'Cancel anytime.'),
       credits: [fmt(proCr), 'MCP credits', '/ month'], tree: [['Unlimited', 'NAICS codes'], ['AI-matched', 'daily briefings']],
       secs: [
         ['Daily intelligence', [['Daily opportunity digest', 1], ['AI-matched briefings', 2], ['Unlimited NAICS codes', 2], ['Target agency filtering', 1]]],
@@ -216,8 +233,14 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
     },
     {
       name: 'Teams', badge: 'For BD teams', color: 'ink', tag: 'For growing contractors with a BD team.',
-      price: 499, per: annual ? '/mo · billed monthly' : '/mo', href: TEAMS_CONTACT_URL, cta: 'Contact Sales',
-      note: 'Reply within one business day.',
+      price: annual ? TEAM_ANNUAL_PER_MONTH : 499, was: annual ? 499 : undefined,
+      per: annual ? '/mo billed yearly' : '/mo',
+      pill: annual ? `-${TEAM_ANNUAL_PCT}% · Save $${fmt(499 * 12 - TEAM_ANNUAL_USD)}` : undefined,
+      href: (annual ? TEAM_TRIAL_ANNUAL : TEAM_TRIAL_MONTHLY) || TEAMS_CONTACT_URL,
+      cta: (annual ? TEAM_TRIAL_ANNUAL : TEAM_TRIAL_MONTHLY) ? 'Start 14-day free trial' : 'Contact Sales',
+      note: (annual ? TEAM_TRIAL_ANNUAL : TEAM_TRIAL_MONTHLY)
+        ? `14 days free, then ${annual ? `$${fmt(TEAM_ANNUAL_USD)}/yr` : '$499/mo'}. We remind you before you're charged.`
+        : (annual ? `$${fmt(TEAM_ANNUAL_USD)}/yr · Reply within one business day.` : 'Reply within one business day.'),
       credits: [fmt(teamCr), 'MCP credits', '/ month'], tree: [['5 users', 'included'], ['Shared', 'pipeline & pursuits']],
       secs: [
         ['Everything in Pro, plus', [['Up to 5 users included', 2], ['Shared pipeline & pursuits', 2], ['Team dashboard', 1], ['Role-based access', 1]]],
@@ -352,6 +375,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
         <section className="promo">
           <h1><span className="l1">GovWin-grade intel for $149, not $15,000.</span><br /><span className="l2">Start free. No card. No sales call.</span></h1>
           <p>Daily opportunity digest, recompete alerts, competitor tracking — and Mindy&apos;s tools inside Claude, Cursor, or any AI agent.</p>
+          <MemberProof />
           <div className="row">
             <span className="chip">✦ {fmt(signupCredits)} free MCP credits on signup</span>
             <span className="chip">↺ Cancel anytime</span>
@@ -382,7 +406,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
               <button type="button" role="tab" aria-selected={tab === 'app'} className={tab === 'app' ? 'on' : ''} onClick={() => setTab('app')}>Mindy App</button>
               <button type="button" role="tab" aria-selected={tab === 'mcp'} className={tab === 'mcp' ? 'on' : ''} onClick={() => setTab('mcp')}>MCP Credits</button>
             </div>
-            <BillingToggle saveLabel="Save up to 17%" />
+            <BillingToggle saveLabel={`Save up to ${TEAM_ANNUAL_PCT}%`} />
           </div>
         </div>
 
@@ -396,6 +420,11 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
               <div className="amt">Need more?</div>
               <div><b>Running agents heavier than {fmt(proCr)} credits/mo?</b><p>Credit-only plans start at ${plans[0]?.monthly.usd ?? 99} for {fmt(plans[0]?.creditsPerMonth ?? 500)}/mo — no app subscription needed, and they work on the same account.</p></div>
               <button type="button" className="cta" onClick={() => goTab('mcp')}>See credit plans →</button>
+            </div>
+            <div className="strip">
+              <div><h3>Partners · 10+ users</h3><p>For <b>APEX Accelerators, SBDCs, primes and associations</b> who want to give Mindy to all their clients, subs or members. Volume pricing, one invoice.</p></div>
+              <ul><li>Roll out to every client or sub at once</li><li>Shared opportunity lists and pipelines</li><li>Usage reporting for your program</li></ul>
+              <a className="cta" href="/contact-sales">Get a volume quote</a>
             </div>
             <p className="fine">
               <b>Every plan includes Mindy&apos;s MCP server</b> — use her tools in Claude, Cursor, or any AI agent. Changes take effect immediately and are pro-rated.<br />

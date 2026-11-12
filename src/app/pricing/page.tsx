@@ -7,9 +7,9 @@
  * $149/mo because we built for the 1-25 person small business that
  * never could afford enterprise market intel.
  *
- * Server component shell (metadata + JSON-LD). The visible page is the
- * shared UnifiedPricing surface — the same one /mcp/pricing renders, with
- * the "Mindy App" tab selected first here.
+ * Server component shell (metadata + JSON-LD). The visible page is SimplePricing:
+ * Pro / Team / Enterprise, 14-day trial, no Free plan (Nov 2026). The credit-only
+ * MCP plans keep the UnifiedPricing surface at /mcp/pricing.
  *
  * Schema: Organization @id is shared with the Mindy landing page so
  * Google consolidates brand entity. SoftwareApplication offers
@@ -18,24 +18,23 @@
  * penalty risk and we don't have real ones yet.
  */
 import type { Metadata } from 'next';
-import UnifiedPricing from '@/components/public-site/pricing/UnifiedPricing';
-import { pricingFaqs } from '@/components/public-site/pricing/faqs';
+import SimplePricing from '@/components/public-site/pricing/SimplePricing';
+import { appPricingFaqs } from '@/components/public-site/pricing/faqs';
 // Server component, so the credit constants are imported directly — the same values
 // /api/mcp/catalog serves as `tierCredits` and the grant cron actually pays out.
 import { PRO_MONTHLY_CREDITS, TEAM_MONTHLY_CREDITS } from '@/lib/mcp/packages';
-import { SIGNUP_CREDITS } from '@/lib/mcp/credits';
 // Corpus counts come from ONE place — see the file header for why (they were hand-typed
 // in 32 spots and every one understated the real table by 4.3x).
 import { forecastsLabel } from '@/lib/marketing-stats';
 
-// Checkout links live in UnifiedPricing (unchanged from the old page).
+// Checkout links live in src/components/public-site/pricing/app-plan-links.ts.
 // FAQ is mirrored in JSON-LD below — same list the page renders.
-const faqs = pricingFaqs({ signupCredits: SIGNUP_CREDITS, proCredits: PRO_MONTHLY_CREDITS, teamCredits: TEAM_MONTHLY_CREDITS });
+const faqs = appPricingFaqs({ proCredits: PRO_MONTHLY_CREDITS, teamCredits: TEAM_MONTHLY_CREDITS });
 
 export const metadata: Metadata = {
-  title: 'Pricing — Federal Market Intelligence from $0 | Mindy',
+  title: 'Pricing — Pro, Team and Enterprise | Mindy',
   description:
-    'Free daily opportunity digest. Pro at $149/mo. Teams at $499/mo. Cancel anytime. 100x cheaper than GovWin, no sales call required.',
+    'Pro at $149/mo, Team at $499/mo, both with a 14-day free trial. Save up to 33% billed annually. 100x cheaper than GovWin.',
   alternates: {
     canonical: 'https://getmindy.ai/pricing',
   },
@@ -47,7 +46,7 @@ export const metadata: Metadata = {
     'small business federal contracting tools',
   ],
   openGraph: {
-    title: 'Mindy Pricing — From $0 to $499/mo. No Enterprise Contracts.',
+    title: 'Mindy Pricing — Pro, Team and Enterprise. 14-day free trial.',
     description:
       'Same federal market intelligence as the $15K/yr enterprise tools, at a price small business can actually pay.',
     type: 'website',
@@ -58,7 +57,7 @@ export const metadata: Metadata = {
 export default function PricingPage() {
   // JSON-LD graph. Organization @id matches the landing + comparison
   // pages so Google consolidates brand entity. SoftwareApplication
-  // offers mirror the visible price cards (Free, Pro monthly, Teams).
+  // offers mirror the visible price cards (Pro, Team; Enterprise is quote-only).
   // FAQPage mirrors the visible FAQ. No aggregateRating — penalty risk.
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -83,7 +82,6 @@ export default function PricingPage() {
         description:
           `Federal market intelligence platform for small business contractors. Daily opportunity briefings, recompete alerts, competitor tracking, and ${forecastsLabel} agency forecasts.`,
         offers: [
-          { '@type': 'Offer', name: 'Free', price: '0', priceCurrency: 'USD' },
           {
             '@type': 'Offer',
             name: 'Pro',
@@ -98,7 +96,7 @@ export default function PricingPage() {
           },
           {
             '@type': 'Offer',
-            name: 'Teams',
+            name: 'Team',
             price: '499',
             priceCurrency: 'USD',
             priceSpecification: {
@@ -128,14 +126,7 @@ export default function PricingPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <UnifiedPricing
-        initialTab="app"
-        proCredits={PRO_MONTHLY_CREDITS}
-        teamCredits={TEAM_MONTHLY_CREDITS}
-        signupCredits={SIGNUP_CREDITS}
-        forecastsLabel={forecastsLabel}
-        faqs={faqs}
-      />
+      <SimplePricing proCredits={PRO_MONTHLY_CREDITS} teamCredits={TEAM_MONTHLY_CREDITS} forecastsLabel={forecastsLabel} faqs={faqs} />
     </>
   );
 }

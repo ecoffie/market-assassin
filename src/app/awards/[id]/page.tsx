@@ -24,7 +24,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getAwardById } from '@/lib/bigquery/awards';
+import { getAwardLookup } from '@/lib/bigquery/awards';
 import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney, formatMoneyFull as fmtFullMoney } from '@/lib/format-money';
 import { recipientSlug } from '@/lib/bigquery/recipients';
@@ -51,7 +51,10 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
-  const award = await getAwardById(decodeURIComponent(id));
+  const lookup = await getAwardLookup(decodeURIComponent(id));
+  // Not looked up today (cold budget spent) is NOT "not found": say so, and keep it out of the index.
+  if (lookup.state === 'unavailable') return { title: 'Federal Contract Award | Mindy', robots: { index: false, follow: true } };
+  const award = lookup.award;
   if (!award) return { title: 'Award Not Found | Mindy' };
 
   const recipient = fmtCompanyName(award.recipient_name);
@@ -85,7 +88,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function AwardDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const award = await getAwardById(decodeURIComponent(id));
+  const lookup = await getAwardLookup(decodeURIComponent(id));
+  if (lookup.state === 'unavailable') return <AwardTemporarilyUnavailable id={decodeURIComponent(id)} />;
+  const award = lookup.award;
   if (!award) notFound();
 
   const recipient = fmtCompanyName(award.recipient_name);
@@ -271,5 +276,17 @@ function Pill({ children, mono, accent }: { children: React.ReactNode; mono?: bo
     <span className={`inline-flex items-center text-[11.5px] font-bold px-2.5 py-1 rounded-[14px] border ${cls} ${mono ? 'font-(family-name:--mp-font-mono)' : ''}`}>
       {children}
     </span>
+  );
+}
+
+function AwardTemporarilyUnavailable({ id }: { id: string }) {
+  return (
+    <main style={{ maxWidth: 640, margin: '64px auto', padding: '0 16px', fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <h1 style={{ fontSize: 24, fontWeight: 600, margin: '0 0 8px' }}>This contract&apos;s details are loading</h1>
+      <p style={{ color: 'var(--mp-muted)', margin: '0 0 20px' }}>
+        We couldn&apos;t load award <code>{id}</code> right now. Please try again in a little while, or search federal contracts in Mindy.
+      </p>
+      <Link href="/awards" style={{ color: 'var(--mp-navy)', fontWeight: 600 }}>Browse federal contract awards →</Link>
+    </main>
   );
 }

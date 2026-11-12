@@ -9,8 +9,10 @@
  *     URL (these are the awards search engines actually rank for)
  */
 import { BQ_TABLES } from './client';
-import { queryCached } from './cache';
+import { cache } from 'react';
+import { bqUnavailable, queryCached } from './cache';
 import { seoLiveBqEnabled } from '@/lib/seo/live-bq';
+import { allowAwardColdLookup } from '@/lib/seo/award-cold-budget';
 
 export interface AwardListRow {
   award_id: string;
@@ -117,27 +119,28 @@ export async function getLargestAwards(limit = 50): Promise<AwardListRow[]> {
   });
 }
 
+export type AwardLookup =
+  | { state: 'hit'; award: AwardDetailRow }
+  | { state: 'missing'; award: null }       // BigQuery answered: no such award
+  | { state: 'unavailable'; award: null };  // not cached and not looked up — NOT "not found"
+
 /**
- * One award detail by award_id.
- * Powers /awards/[id] page.
+ * One award detail by award_id. Powers /awards/[id].
+ *
+ * Warm KV first (free). On a cold miss, look it up live when ENABLE_SEO_LIVE_BQ is on OR the
+ * daily cold budget (src/lib/seo/award-cold-budget.ts) has room — the lookup is partition-
+ * pruned (~10 MB billed) and caches 90 days, positive or negative. Before 2026-11-12 a cold
+ * miss returned null and the page said "Award Not Found" for real contracts (25K visitors/28d).
+ *
+ * React cache() collapses generateMetadata + the page body into ONE lookup per request.
+ * `allowCold:false` (OG image) never spends budget.
  */
-export async function getAwardById(awardId: string): Promise<AwardDetailRow | null> {
-  if (!isValidAwardId(awardId)) return null;
-  const rows = await queryCached<AwardDetailRow>({
-    cacheKey: `awards:detail:${awardId}`,
-    // Opt INTO live BQ on a cold miss (same reasoning as getAwardIdByPiid) —
-    // BUT ONLY when the SEO live-BQ switch is on. Crawler cold-scans of the
-    // award long tail (×3 per page: metadata + body + OG image) drained the BQ
-    // daily quota, so this is gated OFF by default (seoLiveBqEnabled()===false):
-    // a cold award 404s instead of scanning. Warmed awards still serve from KV.
-    // isValidAwardId() guards bot garbage, the bucket filter + 100 MiB cap bound
-    // the cold read, and the result caches 90d. Re-enable with ENABLE_SEO_LIVE_BQ=1.
-    cacheOnly: !seoLiveBqEnabled(),
-    // Reads the hash-partitioned award_detail_lookup table. The
-    // `bucket = MOD(...)` filter prunes to ONE of 1024 partitions so a cold
-    // lookup scans ~10-25 MB (measured 10 MB billed) instead of the ~27 GB an
-    // unpartitioned scan cost. BQ computes the hash from @id, so JS never has
-    // to reproduce FARM_FINGERPRINT. 100 MiB cap is a generous hard ceiling.
+export const getAwardLookup = cache(async (awardId: string, allowCold = true): Promise<AwardLookup> => {
+  if (!isValidAwardId(awardId)) return { state: 'missing', award: null };
+  const cacheKey = `awards:detail:${awardId}`;
+  const run = (cacheOnly: boolean) => queryCached<AwardDetailRow>({
+    cacheKey,
+    cacheOnly,
     maximumBytesBilled: String(100 * 1024 * 1024),
     query: `
       SELECT
@@ -177,7 +180,20 @@ export async function getAwardById(awardId: string): Promise<AwardDetailRow | nu
     `,
     params: { id: awardId },
   });
-  return rows[0] ?? null;
+  let rows = await run(true);
+  if (rows.length) return { state: 'hit', award: rows[0] };
+  if (!bqUnavailable(cacheKey, 0)) return { state: 'missing', award: null }; // cached negative
+  if (allowCold && (seoLiveBqEnabled() || (await allowAwardColdLookup()))) {
+    rows = await run(false);
+    if (rows.length) return { state: 'hit', award: rows[0] };
+    if (!bqUnavailable(cacheKey, 0)) return { state: 'missing', award: null };
+  }
+  return { state: 'unavailable', award: null };
+});
+
+/** Back-compat: the award, or null when missing OR unknown. Prefer getAwardLookup. */
+export async function getAwardById(awardId: string, allowCold = true): Promise<AwardDetailRow | null> {
+  return (await getAwardLookup(awardId, allowCold)).award;
 }
 
 /**

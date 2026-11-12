@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyAdminPassword } from '@/lib/admin-auth';
+import { saveMemberProof } from '@/lib/admin/member-wins-snapshot';
 import { bqQuery, bqJobOptions, BQ_TABLES } from '@/lib/bigquery/client';
 import { companyBreakdown, isSampleAccount, memberUeis, recentWinners, sinceJoining, tallyWins, type CompanyBreakdown, type AwardRow, type ProfileRow, type SettingsRow } from '@/lib/admin/member-wins';
 
@@ -124,6 +125,14 @@ export async function GET(req: NextRequest) {
         last12Months: 'Award first action in the last 12 months.',
       },
     };
+    // Feeds the public "members have won $X" line (src/components/public-site/MemberProof.tsx).
+    const realMembers = new Set(
+      settings.map((s) => (s.user_email || '').toLowerCase()).filter((e) => e && !isSampleAccount(e)),
+    ).size;
+    await saveMemberProof({
+      lifetimeDollars: report.lifetime.dollars, companiesWithWins: report.lifetime.companiesWithWins,
+      contracts: report.lifetime.contracts, members: realMembers, computedAt: new Date().toISOString(),
+    });
     // A browser gets a readable page; ?format=json gets the raw data.
     if (req.nextUrl.searchParams.get('format') === 'json') return NextResponse.json(report);
     return new NextResponse(renderHtml(report), {

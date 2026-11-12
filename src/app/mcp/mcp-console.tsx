@@ -14,6 +14,7 @@
  * shared.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import MemberProof from '@/components/public-site/MemberProof';
 import Link from 'next/link';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
 import { Catalog, MCP_URL, EXAMPLES, exampleCost } from './catalog-ui';
@@ -258,6 +259,7 @@ export default function McpConsole() {
             <p className="mt-5 max-w-xl text-[19px] leading-relaxed text-(--mp-body)">
               Ask Claude, ChatGPT or Cursor about open bids, incumbents, pricing and buyers. Mindy answers with real federal data, not guesses.
             </p>
+            <MemberProof align="left" />
             {signedIn ? (
               <div className="mt-8 flex flex-wrap gap-3.5">
                 <Link href="/app?panel=settings&section=credits" className={primary}>
