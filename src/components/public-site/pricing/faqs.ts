@@ -48,3 +48,34 @@ export function pricingFaqs(c: { signupCredits: number; proCredits: number; team
     },
   ];
 }
+
+/** The /pricing FAQ (Pro / Team / Enterprise, 14-day trial). /pricing mirrors it into FAQPage JSON-LD. */
+export function appPricingFaqs(c: { proCredits: number; teamCredits: number }): { q: string; a: string }[] {
+  const n = (x: number) => x.toLocaleString('en-US');
+  return [
+    {
+      q: 'How does the 14-day free trial work?',
+      a: "Pick Pro or Team and add a card. You get full access for 14 days and pay nothing. Mindy emails you 3 days before the trial ends. Cancel before then and you're never charged.",
+    },
+    {
+      q: 'Can I switch plans later?',
+      a: 'Yes, anytime. Move from Pro to Team when your second BD person joins. Changes take effect immediately and we pro-rate the difference.',
+    },
+    {
+      q: 'What are credits?',
+      a: `Credits pay for Mindy's research tools, in the app and inside Claude, ChatGPT or Cursor. Pro includes ${n(c.proCredits)} a month and Team includes ${n(c.teamCredits)} a month for the team. Need more? Add a top-up or a credit plan anytime.`,
+    },
+    {
+      q: 'How much do I save with annual billing?',
+      a: 'Pro is $1,490 a year instead of $1,788 (17% off). Team is $4,027 a year instead of $5,988 (33% off).',
+    },
+    {
+      q: 'What is your refund policy?',
+      a: "You're not charged during the 14-day trial. After that, payments are final and we don't refund partial months. Cancel anytime in Settings and keep access until the end of the period you paid for.",
+    },
+    {
+      q: 'How do you compare to GovWin or Bloomberg Government?',
+      a: "Same public federal data — SAM.gov, USASpending, agency forecasts — matched to your business every day. We skip the enterprise sales process, which is why Pro is $149/mo instead of $15,000+/yr.",
+    },
+  ];
+}
