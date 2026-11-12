@@ -16,12 +16,11 @@ export const MP_HEADER_PRODUCT_LINKS: readonly MpChromeLink[] = [
 ];
 
 /**
- * Right of the top bar, before the "Start for free" button. Sign in and Contact sales are for
- * signed-out visitors only (hidden once the account avatar paints).
+ * Right of the top bar, before the "Start for free" button. Sign in is for signed-out visitors
+ * only (hidden once the account avatar paints). Contact sales was removed from the bar (2026-11-12).
  */
 export const MP_HEADER_ACCOUNT_LINKS: readonly MpChromeLink[] = [
   { href: '/app', label: 'Sign in' },
-  { href: '/contact-sales', label: 'Contact sales' },
   { href: '/pricing', label: 'Plans & Pricing' },
 ];
 
