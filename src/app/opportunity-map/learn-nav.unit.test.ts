@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { MP_HEADER_PRODUCT_LINKS } from '@/lib/public-site/chrome';
+import { MP_HEADER_PRODUCT_LINKS, MP_HOW_IT_WORKS } from '@/lib/public-site/chrome';
 import { ACCOUNT_MENU_HTML } from './account-menu';
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
@@ -17,7 +17,7 @@ const SUBPAGES = ['favorites', 'forecasts', 'market', 'proposal', 'pursuits', 'r
   .map((p) => `src/app/opportunity-map/${p}/route.ts`);
 
 describe('desktop: Learn in the right cluster, second', () => {
-  it('the Map uses the homepage top bar (Learn comes from MP_HEADER_PRODUCT_LINKS)', () => {
+  it('the Map uses the homepage top bar (no Learn link of its own)', () => {
     const s = read('src/app/opportunity-map/route.ts');
     expect(s).toContain('+ siteTopHtml()');
     expect(s).not.toMatch(/<a href="\/learn">Learn<\/a>/);
@@ -25,9 +25,10 @@ describe('desktop: Learn in the right cluster, second', () => {
   it.each([...SUBPAGES, 'src/app/today/route.ts'])('%s', (p) => {
     expect(read(p)).toContain('<a href="/bid">Bid with confidence</a>\n    <a href="/learn">Learn</a>\n    <a href="/pricing">Pricing</a>');
   });
-  it('the shared public top bar (homepage nav: Mindy in your AI · Learn · Jobs, left)', () => {
-    expect(MP_HEADER_PRODUCT_LINKS.map((l) => l.href)).toEqual(['/mcp/gallery', '/learn', '/jobs']);
-    expect(MP_HEADER_PRODUCT_LINKS[1].label).toBe('Learn');
+  it('the shared public top bar has no Learn tab: How it works replaced it (2026-11-12)', () => {
+    expect(MP_HEADER_PRODUCT_LINKS.map((l) => l.href)).toEqual(['/mcp/gallery', '/jobs']);
+    expect(MP_HOW_IT_WORKS.length).toBeGreaterThan(0);
+    expect(MP_HOW_IT_WORKS.some((i) => i.href === '/learn')).toBe(false);
   });
   it('exactly one Learn item per header (no duplicate entry points)', () => {
     for (const p of [...SUBPAGES, 'src/app/today/route.ts']) {
