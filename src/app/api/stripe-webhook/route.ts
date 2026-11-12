@@ -806,6 +806,37 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true, action: 'invoice_paid' });
   }
 
+  // Trial ends in 3 days → Mindy sends the reminder itself (not Stripe), via sendEmail().
+  // A send failure returns 500 so Stripe retries; a repeat delivery is deduped in KV.
+  if (event.type === 'customer.subscription.trial_will_end') {
+    const subscription = event.data.object as Stripe.Subscription;
+    if (!subscription.trial_end || subscription.status !== 'trialing') {
+      return NextResponse.json({ received: true, action: 'trial_reminder_skipped' });
+    }
+    const customer = await stripe.customers.retrieve(subscription.customer as string);
+    const email = !customer.deleted ? customer.email : null;
+    const item = subscription.items.data[0];
+    const amount = (item?.price?.unit_amount ?? 0) / 100;
+    if (!email || !(amount > 0)) {
+      console.error('[stripe-webhook] trial_will_end: no email or price on', subscription.id);
+      return NextResponse.json({ received: true, action: 'trial_reminder_missing_data' });
+    }
+    const { sendTrialReminderEmail, trialPlanLabel } = await import('@/lib/billing/trial-reminder-email');
+    try {
+      const result = await sendTrialReminderEmail(subscription.id, {
+        email,
+        planLabel: trialPlanLabel(item?.price?.id, subscription.metadata?.tier),
+        amountUsd: amount,
+        interval: item?.price?.recurring?.interval === 'year' ? 'year' : 'month',
+        trialEnd: new Date(subscription.trial_end * 1000),
+      });
+      return NextResponse.json({ received: true, action: `trial_reminder_${result}` });
+    } catch (err) {
+      console.error('[stripe-webhook] trial reminder send failed:', err);
+      return NextResponse.json({ error: 'trial reminder send failed' }, { status: 500 });
+    }
+  }
+
   // Handle subscription cancellation - revoke FHC access
   if (event.type === 'customer.subscription.deleted' ||
       event.type === 'customer.subscription.updated') {
