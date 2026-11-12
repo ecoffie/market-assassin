@@ -22,7 +22,7 @@ export default function MemberProof({ align = 'center' }: { align?: 'center' | '
   return (
     <p
       style={{
-        margin: '12px 0 0', fontSize: 14, lineHeight: 1.5, color: 'var(--mp-muted)',
+        margin: align === 'center' ? '12px auto 0' : '12px 0 0', fontSize: 14, lineHeight: 1.5, color: 'var(--mp-muted)',
         textAlign: align, fontFamily: 'var(--mp-font-sans)',
       }}
     >
