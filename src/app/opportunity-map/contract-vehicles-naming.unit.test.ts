@@ -38,21 +38,17 @@ describe('recompete dataset is named "Coming Back"', () => {
     // The old per-horizon dropdown options are gone.
     expect(route).not.toContain('<option value="recompete">Recompetes</option>');
   });
-  it('the top-left nav is the two-map split (Explore: Opportunities · Players · Pursuits)', () => {
-    // TWO MAPS: the second map is user-facing "Players" (briefly labelled "Network"
-    // 2026-08-03 → 08-15; Eric reverted the LABEL only — the product split is unchanged),
-    // under an "Explore" eyebrow. The internal data-map value stays "players" (no wiring change).
-    expect(route).toContain('<span class="zh-explore">Explore</span>');
-    expect(route).toContain('data-map="opportunities"');
-    expect(route).toContain('>Opportunities</a>');
-    expect(route).toContain('data-map="players"');
-    expect(route).toContain('>Players</a>');
-    // (Was `not.toContain('>Players</a>')` while the label was "Network", 2026-08-03 → 08-15.
-    // Eric reverted the label, so the assertion inverts with it — the line above IS the check.)
+  it('the two maps (Opportunities · Players) and Pursuits stay reachable without the map link row', () => {
+    // The map's link row (Explore · Opportunities · Players · Pursuits · Markets) was removed
+    // 2026-11-12. The two maps are switched from the dataset dropdown; the second map's
+    // user-facing label is still "Players" (the internal value stays "companies").
+    expect(route).not.toContain('<span class="zh-explore">Explore</span>');
+    expect(route).toContain('<option value="open" selected>Opportunities</option>');
+    expect(route).toContain('<option value="companies">Players</option>');
     expect(route).not.toContain('>Network</a>');
     // Pursuits is a MAP SUB-VIEW (not the old /app?panel=pipeline in-app panel). The top nav must
     // point at the sub-view route so it matches the left rail.
-    expect(route).toContain('href="/opportunity-map/pursuits">Pursuits</a>');
+    expect(route).toMatch(/href="\/opportunity-map\/pursuits" title="Pursuits[^"]*">/);
     // Reports was REMOVED from the nav 2026-08-15 (Eric: "it keeps resurfacing"). This assertion
     // used to require its PRESENCE — it guarded a 2026-08-05 regression where the top-nav Reports
     // link had drifted to /opportunity-map/market. That link no longer exists to drift, so the

@@ -1100,29 +1100,8 @@ const ZLAYOUT_CSS = '<style>'
   + '.feed .card{flex:none!important;margin-bottom:0!important}'
   // Mindy header bar
   + '.zhead{grid-area:zhead;position:relative;display:flex;flex-direction:column;background:#fff;z-index:20;' + mpTokenDeclarations() + '}'
-  // The map row under the homepage bar: the map's own links (Opportunities · Players · Pursuits · Markets).
-  + '.zh-maprow{display:flex;align-items:center;gap:14px;height:44px;padding:0 22px;border-bottom:1px solid var(--line);background:#fff}'
-  + '.zh-left{display:flex;align-items:center;gap:22px}'
-  // Left nav = the dataset nouns → bigger + bolder like Zillow\'s Buy/Rent/Sell header.
-  + '.zh-left{display:flex;align-items:center;gap:20px}'
-  + '.zh-left a{font:700 16px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}'
-  // "Explore" eyebrow — a quiet uppercase label that GROUPS the two maps (Opportunities + Network),
-  // both of which are exploration (Eric 2026-08-03, two-networks nav). Muted + smaller so it reads as
-  // a section label, not a clickable tab; a hairline separates it from the map links.
-  + '.zh-explore{font:800 10.5px "Inter",system-ui,sans-serif;color:var(--sub);text-transform:uppercase;letter-spacing:.08em;padding-right:14px;border-right:1px solid var(--line);user-select:none}'
-  // The active MAP gets the persistent blue (data-map on-state), unlike the hover-only right nav.
-  + '.zh-mode.on{color:var(--jan)}'
-  // Ask Mindy — the always-present nav doorway into the chat drawer (approved mockup, after
-  // Pursuits). Transparent, blue text + blue chat icon (NOT the old purple pill — Eric 2026-08-02
-  // "make it transparent not a purple background just like the artifact"). Inherits zh-left <a>
-  // typography; overrides colour + adds the leading icon.
-  + '.zh-ask{display:inline-flex;align-items:center;gap:6px;font:700 16px "Inter",system-ui,sans-serif;color:var(--jan,#2563eb);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}'
-  + '.zh-ask svg{width:16px;height:16px;flex:none}.zh-ask:hover{filter:brightness(1.1)}'
-  // Highlight top-nav items ONLY on hover — the blue must NOT persist on a clicked item.
-  + '.zh-left a:hover{color:var(--jan)}'
-  // Narrow: hide the Explore eyebrow + Pursuits/Ask-Mindy, keep the two MAP links (the leading
-  // .zh-explore <span> is child 1, so the two map <a>s are children 2-3 and Pursuits/Ask are 4+).
-  + '@media(max-width:1000px){.zh-left{gap:14px}.zh-explore{display:none}}'
+  // The phone-only row under the homepage bar that holds the map menu button. Hidden on desktop.
+  + '.zh-maprow{display:none;align-items:center;gap:14px;border-bottom:1px solid var(--line);background:#fff}'
   // far-left icon rail — PINNED (position:fixed) so grid/overflow can never push it off-screen.
   // The 50px grid column stays as its reserved space (kept empty; the fixed rail sits over it).
   + '.zrail{position:fixed;left:0;top:var(--zh-h,52px);width:64px;height:calc(100vh - var(--zh-h,52px));height:calc(100dvh - var(--zh-h,52px));'
@@ -1322,11 +1301,10 @@ const ZLAYOUT_CSS = '<style>'
   +   '.zrail{display:none!important}'
   // 3) Top header: the homepage bar on top handles its own phone layout (logo + ☰ menu + account).
   //    The map row keeps only the map hamburger (#mHam → #mDrawer), which holds the map links.
-  +   '.zhead{z-index:1100!important}.zh-maprow{padding:0 12px;height:40px}'
+  +   '.zhead{z-index:1100!important}.zh-maprow{display:flex;padding:0 12px;height:40px}'
   //    The homepage bar's event banner is hidden on the map on phones (Eric 2026-11-12): as a card it
   //    covered a big part of the map. It still shows on desktop and on every other page.
   +   '.zhead .mp-evb-band{display:none!important}'
-  +   '.zh-left{display:none!important}'
   +   '#mHam{display:inline-flex!important;align-items:center;justify-content:center;width:38px;height:38px;'
   +     'flex:none;border:0;background:none;cursor:pointer;color:var(--ink);border-radius:9px}'
   +   '#mHam:active{background:var(--wash)}'
@@ -1536,35 +1514,21 @@ const SORT_MENU_HTML =
 // Mindy brand header bar (top, full width) — the wordmark + product name, Zillow-style.
 // Zillow-style top nav: left nav links · CENTER logo · right nav + account.
 // Top of the map = the SAME top bar as the homepage (Eric 2026-11-12: "when opening the maps page i want
-// the same top bar as the homepage"), from siteTopHtml() so it cannot drift from the homepage. Under it, a
-// slim map row keeps the map's own links (Opportunities · Players · Pursuits · Markets) — Markets is only
-// reachable from here. The homepage bar carries the logo, Learn, Plans & Pricing and the account menu.
+// the same top bar as the homepage"), from siteTopHtml() so it cannot drift from the homepage.
+// The map's own link row (Explore · Opportunities · Players · Pursuits · Markets) was REMOVED the same day
+// (Eric: "take away the bar in the middle of the nav bar and the filter bar. make sure you can still access
+// everything"). Each destination keeps a way in:
+//   Opportunities / Players -> the "Opportunities ▾" dataset dropdown in the filter bar (Players is gated)
+//   Pursuits -> the left rail + the account menu ("My Pursuits")
+//   Markets  -> the account menu ("Markets") + the phone drawer (#mDrawer)
+// What remains under the homepage bar is the phone-only row holding the map menu button (#mHam).
 // A function, not a const: the homepage bar drops its event banner once the event is over, so it is
 // rendered per request rather than frozen when the module loads.
 const zheadHtml = (): string => '<header class="zhead">'
   + siteTopHtml()
   + '<div class="zh-maprow">'
-  // Mobile hamburger (≤640px only via CSS) — opens the #mDrawer rail menu (map tools).
-  + '<button id="mHam" aria-label="Menu" onclick="window.__mDrawer&&window.__mDrawer(true)"><svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>'
-  + '<nav class="zh-left">'
-  + '<span class="zh-explore">Explore</span>'
-  + '<a class="zh-mode on" data-map="opportunities" data-mode="open" onclick="setMapMode(\'open\')">Opportunities</a>'
-  + '<a class="zh-mode" data-map="players" data-mode="companies" onclick="__playersGate(\'companies\')">Players</a>'
-  // DLA is NOT a top-nav link (Eric 2026-08-01: "leave in dropdown, remove from header"). It's the
-  // 3rd option in the dataset dropdown only — no separate nav pill. The dropdown still drives
-  // setMapMode('dla') and _activeMap='dla' still lights nothing in this nav (which is intended).
-  + '<a href="/opportunity-map/pursuits">Pursuits</a>'
-  // MARKETS = the market-intelligence surface, served by /opportunity-map/reports. It is the ONLY
-  // top-nav item that is deliberately NOT in the left rail (Eric 2026-08-15: "put reports back on
-  // the top bar and rename it to markets"). The rail is the DISCOVERY workspace — the two maps
-  // plus what you accumulate while browsing; Markets is a destination you choose, so it lives in
-  // the nav. The ROUTE stays /reports (a rename would break the Share links and every saved
-  // bookmark); only the LABEL is "Markets". Both facts are pinned by map-rail-inventory.unit.test.ts.
-  + '<a href="/opportunity-map/reports">Markets</a>'
-  // Ask Mindy nav doorway REMOVED for now (Eric 2026-08-03: "remove ask Mindy for now"). The drawer
-  // code (ASK_MINDY_JS / window.openAskMindy) is left intact but has NO entry point, so nothing opens
-  // it — re-add this <a class="zh-ask"> link + the search-panel zsp-ask rows to bring it back.
-  + '</nav>'
+  // Mobile hamburger (≤640px only via CSS) — opens the #mDrawer rail menu (map tools + Markets).
+  + '<button id="mHam" aria-label="Map menu" onclick="window.__mDrawer&&window.__mDrawer(true)"><svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>'
   + '</div></header>';
 
 // Publishes the header's real height as --zh-h, so the fixed rail and the listing drawer start under the

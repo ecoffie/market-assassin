@@ -106,12 +106,28 @@ describe('map rail — Vault and Reports stay OUT (all 9 copies)', () => {
     });
   }
 
-  it('Reports IS in the top nav, labelled "Markets" (the route keeps its /reports path)', () => {
-    // The positive half: this is a REQUIREMENT, not merely tolerated. Renaming the route would
-    // break Share links and saved bookmarks, so only the LABEL changed — pin both facts.
+  it('Markets (the /reports route) is still reachable from the map, labelled "Markets"', () => {
+    // The map's link row was removed 2026-11-12 ("make sure you can still access everything").
+    // Markets now lives in the account menu (desktop) and the phone drawer — never the rail.
+    // Renaming the route would break Share links and saved bookmarks, so only the LABEL is "Markets".
     const src = read('route.ts');
-    expect(src).toContain('<a href="/opportunity-map/reports">Markets</a>');
+    const menu = read('account-menu.ts');
+    expect(menu).toContain('<a href="/opportunity-map/reports" role="menuitem">');
+    expect(menu).toMatch(/<\/svg>Markets<\/a>/);
+    expect(src).toMatch(/<a href="\/opportunity-map\/reports"><svg[^']*<\/svg>Markets<\/a>/);
     expect(src).not.toContain('<a href="/opportunity-map/reports">Reports</a>');
+  });
+
+  it('every destination of the removed map row still has a way in', () => {
+    const src = read('route.ts');
+    const menu = read('account-menu.ts');
+    // Opportunities + Players: the dataset dropdown in the filter bar (Players stays gated).
+    expect(src).toContain('<option value="open" selected>Opportunities</option>');
+    expect(src).toContain('<option value="companies">Players</option>');
+    expect(src).toContain("if((v==='companies'||v==='buyers')&&typeof window.__playersGate==='function')");
+    // Pursuits: the rail + the account menu.
+    expect(railBlock(src)).toContain('href="/opportunity-map/pursuits"');
+    expect(menu).toContain('<a href="/opportunity-map/pursuits" role="menuitem">');
   });
 
   it('sibling top-nav Players links to the canonical companies mode, not buyers', () => {

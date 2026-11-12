@@ -76,7 +76,8 @@ describe('opportunity-map mobile responsive invariants', () => {
     // Since 2026-11-12 the account menu lives in the homepage bar (siteTopHtml), whose own phone
     // CSS shows it once signed in. The map must not force it visible (that showed it signed out).
     expect(routeSrc.includes('+ siteTopHtml()'), 'map header must render the homepage bar').toBe(true);
-    expect(routeSrc.includes("'.zh-left{display:none!important}'"), 'map links hide on phones (they live in #mDrawer)').toBe(true);
+    expect(routeSrc.includes('.zh-maprow{display:flex;padding:0 12px;height:40px}'), 'phone row with the map menu button shows on phones').toBe(true);
+    expect(routeSrc.includes('.zh-maprow{display:none;'), 'the map row is hidden on desktop').toBe(true);
     expect(routeSrc.includes('.mindy-acct{display:inline-flex!important}'), 'must not force the account menu visible').toBe(false);
   });
 

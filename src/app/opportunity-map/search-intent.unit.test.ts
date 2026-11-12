@@ -107,13 +107,12 @@ describe('Natural-language search intent', () => {
     expect(route).toMatch(/else if\(!_wantContact && _isContact\)\{ setMapMode\('open'\)/);
   });
 
-  it('NAV: the second map is user-facing "Players" under an "Explore" eyebrow', () => {
+  it('NAV: the second map is user-facing "Players" in the dataset dropdown', () => {
     // The label was "Network" 2026-08-03 → 08-15, then Eric reverted it: "change network back to
     // players everywhere". The internal data-map value was ALWAYS "players", so this revert is
     // label-only — no wiring changed in either direction. The two-MAPS split itself is untouched.
-    expect(route).toContain('data-map="players" data-mode="companies"');
-    expect(route).toContain('>Players</a>');
-    expect(route).toContain('<span class="zh-explore">Explore</span>');
+    // The map's link row (with its "Explore" eyebrow) was removed 2026-11-12; the dropdown is the switch.
+    expect(route).not.toContain('<span class="zh-explore">Explore</span>');
     // dropdown option + header title also say Players
     expect(route).toContain('<option value="companies">Players</option>');
     expect(route).toContain("?'Players':'Opportunities'");
