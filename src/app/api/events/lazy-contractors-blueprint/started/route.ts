@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   if (attr.utm_source) tags.push(`source-${attr.utm_source.toLowerCase()}`.slice(0, 60));
   try {
     const r = await registerContactForEvent(
-      { firstName, email },
+      { firstName, email, smsConsent: false },
       { tags, source: `${EVENT.title} (started form)`, note: `Started the ${EVENT.title} form on getmindy.ai but has not registered yet.` },
     );
     if (!r.ok) console.error('[lazy-blueprint-started] GHL failed', r.error);
