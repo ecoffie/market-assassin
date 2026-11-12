@@ -8,6 +8,7 @@
  *   3. success → atomic debit; failure → debit 0
  * Every outcome writes a mcp_call_log row. Free tools (get_balance) skip billing.
  */
+import { isApprovedAmbassador } from '@/lib/ambassadors/store';
 import { creditsFor, isMcpTool, isProprietaryTool, PROPRIETARY_TOOLS, runMcpTool, type McpToolContext } from './tool-registry';
 import { getBalance, debitCredits, logCall, type CallStatus } from './credits';
 import { isFreeDocumentContinuation } from './doc-continuation';
@@ -71,9 +72,13 @@ export async function runMeteredTool(
     return { ok: false, error: { code: 'unknown_tool', message: `Unknown tool: ${name}` }, creditsCharged: 0 };
   }
 
-  // Per-call price, decided before anything runs: equal to the tool's credit price except a
-  // verified get_solicitation_documents continuation, which is free (doc-continuation.ts).
-  const cost = isFreeDocumentContinuation(name, args, ctx.userEmail) ? 0 : creditsFor(name);
+  // Per-call price, decided before anything runs: equal to the tool's credit price except
+  //   - a verified get_solicitation_documents continuation, which is free (doc-continuation.ts), and
+  //   - an APPROVED Mindy Ambassador (owner decision 2026-11-12: "free Pro, truly unlimited").
+  //     Their calls run and are logged like anyone's, with 0 credits charged. Approval lives in the
+  //     `ambassadors` table (src/lib/ambassadors/store.ts); a read error bills normally.
+  const ambassador = await isApprovedAmbassador(ctx.userEmail);
+  const cost = ambassador || isFreeDocumentContinuation(name, args, ctx.userEmail) ? 0 : creditsFor(name);
 
   // Credit integrity — refuse a call that cannot perform its paid job BEFORE anything
   // else (tier gate, paywall capture, payer lookup): an invalid request is not a sale.
