@@ -80,6 +80,13 @@ describe('opportunity-map mobile responsive invariants', () => {
     expect(routeSrc.includes('.mindy-acct{display:inline-flex!important}'), 'must not force the account menu visible').toBe(false);
   });
 
+  it('the event banner is hidden on the map on phones only', () => {
+    const mobileBlock = routeSrc.match(/@media\(max-width:640px\)\{[\s\S]*?\n  \+   '\}'/)![0];
+    expect(mobileBlock.includes(".zhead .mp-evb-band{display:none!important}"), 'banner hidden inside the phone block').toBe(true);
+    const outside = routeSrc.replace(mobileBlock, '');
+    expect(outside.includes('.mp-evb-band{display:none'), 'banner must still show on desktop').toBe(false);
+  });
+
   it('Agency/Industry/Horizons popovers escape overflow via position:fixed + __placeHznPop', () => {
     // Absolute .hznpop was clipped by .app{overflow:hidden} (and mobile .ztop overflow). Same
     // escape hatch as .saselpanel: fixed + pin to the trigger rect on open.
