@@ -233,6 +233,11 @@ export async function queryCached<T = Record<string, unknown>>(
     try {
       const cached = await kv.get<T[]>(key);
       if (cached !== null && cached !== undefined) {
+        // A real answer: clear any mark left by an earlier cache-only miss in this instance,
+        // or a cached "no such row" would keep reading as "unknown" (2026-11-12: /awards pages
+        // for nonexistent ids said "loading" forever instead of "not found").
+        UNAVAILABLE.delete(key);
+        DEGRADED.delete(key);
         return cached;
       }
     } catch (err) {
@@ -320,6 +325,7 @@ export async function queryCached<T = Record<string, unknown>>(
   console.log(`[bq-miss] ${key}  (${Date.now() - tBq}ms, ${Array.isArray(rows) ? rows.length : '?'} rows)`);
 
   DEGRADED.delete(key);   // a successful run clears any prior degraded mark
+  UNAVAILABLE.delete(key); // ...and any cache-only miss mark from earlier in this instance
 
   try {
     await kv.set(key, rows, { ex: ttl });
