@@ -19,6 +19,16 @@ import type { NextRequest } from 'next/server';
 export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
+  // No free plan for new users (2026-11-12): /app/signup sends visitors to /pricing to start the
+  // 14-day trial. It stays open for people finishing a trial checkout (?paid=1, the Stripe trial
+  // links' return URL) and for partner/referral sign-ups (?ref= / ?code=).
+  if (pathname === '/app/signup' || pathname === '/signup') {
+    const q = request.nextUrl.searchParams;
+    if (!q.has('paid') && !q.get('ref') && !q.get('code')) {
+      return NextResponse.redirect(new URL('/pricing', request.url));
+    }
+  }
+
   // Protect Federal Contractor Database (HTML version)
   if (pathname === '/database.html') {
     const hasAccess = request.cookies.get('db_access_email')?.value;
@@ -54,5 +64,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/database.html', '/contractor-database', '/federal-market-assassin'],
+  matcher: ['/database.html', '/contractor-database', '/federal-market-assassin', '/app/signup', '/signup'],
 };

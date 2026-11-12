@@ -36,6 +36,7 @@ export default function MindySignupPage() {
 
 function MindySignupContent() {
   const searchParams = useSearchParams();
+  const paidCheckout = searchParams.has('paid');
   const [partnerRef, setPartnerRef] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -166,8 +167,10 @@ function MindySignupContent() {
         <div className="su-card">
           {!submitted ? (
             <>
-              <h1 className="su-h">Sign up for free</h1>
-              <p className="su-sub">No credit card required</p>
+              {/* No free plan for new users: this page is reached after a trial checkout (?paid=1)
+                  or from a partner/referral link; everyone else is sent to /pricing (src/proxy.ts). */}
+              <h1 className="su-h">{paidCheckout ? 'Create your account' : 'Start your 14-day trial'}</h1>
+              <p className="su-sub">{paidCheckout ? 'Use the same email you used at checkout.' : 'Create your account to get started.'}</p>
               <MemberProof />
               {/* The credit grant is the real hook for a stranger — it is what they get the moment
                   they finish signing up (granted automatically at oauth/token by
