@@ -283,10 +283,10 @@ function AwardTemporarilyUnavailable({ id }: { id: string }) {
   return (
     <main style={{ maxWidth: 640, margin: '64px auto', padding: '0 16px', fontFamily: 'Inter, system-ui, sans-serif' }}>
       <h1 style={{ fontSize: 24, fontWeight: 600, margin: '0 0 8px' }}>This contract&apos;s details are loading</h1>
-      <p style={{ color: '#475569', margin: '0 0 20px' }}>
+      <p style={{ color: 'var(--mp-muted)', margin: '0 0 20px' }}>
         We couldn&apos;t load award <code>{id}</code> right now. Please try again in a little while, or search federal contracts in Mindy.
       </p>
-      <Link href="/awards" style={{ color: '#2563eb', fontWeight: 600 }}>Browse federal contract awards →</Link>
+      <Link href="/awards" style={{ color: 'var(--mp-navy)', fontWeight: 600 }}>Browse federal contract awards →</Link>
     </main>
   );
 }
