@@ -21,7 +21,7 @@ const CANDIDATE_SITE_URLS = ['sc-domain:getmindy.ai', 'https://getmindy.ai/'];
 let _auth: GoogleAuth | null = null;
 let _resolvedSiteUrl: string | null = null;
 
-function parseSaJson(raw: string): Record<string, unknown> {
+export function parseSaJson(raw: string): Record<string, unknown> {
   const trimmed = raw.trim();
   if (trimmed.startsWith('{')) {
     try {
