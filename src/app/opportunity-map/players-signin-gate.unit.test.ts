@@ -98,9 +98,9 @@ describe('Players intercepts before the mode changes', () => {
     expect(gate).toMatch(/if\(live\)\{[\s\S]*return;/);
   });
 
-  it('the nav link routes through the gate rather than straight to setMapMode', () => {
-    // A nav link that calls setMapMode directly would bypass everything above.
-    const nav = map.slice(map.indexOf("data-map=\"players\""), map.indexOf("data-map=\"players\"") + 600);
-    expect(nav.length).toBeGreaterThan(0);
+  it('the dataset dropdown routes Players through the gate rather than straight to setMapMode', () => {
+    // The map's link row was removed 2026-11-12, so the dropdown is the desktop way into Players.
+    // A switch that called setMapMode directly would bypass everything above.
+    expect(map).toContain("if((v==='companies'||v==='buyers')&&typeof window.__playersGate==='function'){ window.__playersGate(v); return; }");
   });
 });

@@ -109,6 +109,9 @@ export function accountMenuHtml(identity?: { email?: string | null; name?: strin
   + '<a href="/opportunity-map/favorites" role="menuitem"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg>Favorites</a>'
   + '<a href="/opportunity-map/saved" role="menuitem"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>Updates</a>'
   + '<a href="/opportunity-map/pursuits" role="menuitem"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>My Pursuits</a>'
+  // Markets (market research, /opportunity-map/reports). Its old home, the map's link row, was removed
+  // 2026-11-12, so the account menu is now its way in on desktop (the phone drawer has it too).
+  + '<a href="/opportunity-map/reports" role="menuitem"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg>Markets</a>'
   // Proposals is USAGE-GATED (hidden by default). account-menu.js reveals it when the
   // signed-in user isPro OR has drafts (via /api/app/proposal/drafts?probe=1) and fills
   // the draft-count badge. Free users who never drafted never see a dead Pro link — they
