@@ -1323,6 +1323,9 @@ const ZLAYOUT_CSS = '<style>'
   // 3) Top header: the homepage bar on top handles its own phone layout (logo + ☰ menu + account).
   //    The map row keeps only the map hamburger (#mHam → #mDrawer), which holds the map links.
   +   '.zhead{z-index:1100!important}.zh-maprow{padding:0 12px;height:40px}'
+  //    The homepage bar's event banner is hidden on the map on phones (Eric 2026-11-12): as a card it
+  //    covered a big part of the map. It still shows on desktop and on every other page.
+  +   '.zhead .mp-evb-band{display:none!important}'
   +   '.zh-left{display:none!important}'
   +   '#mHam{display:inline-flex!important;align-items:center;justify-content:center;width:38px;height:38px;'
   +     'flex:none;border:0;background:none;cursor:pointer;color:var(--ink);border-radius:9px}'
