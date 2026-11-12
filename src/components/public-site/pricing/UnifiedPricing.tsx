@@ -49,6 +49,13 @@ const TEAMS_CONTACT_URL = '/contact-sales';
 const PRO_TRIAL_MONTHLY = process.env.NEXT_PUBLIC_PRO_TRIAL_CHECKOUT_MONTHLY || '';
 const PRO_TRIAL_ANNUAL = process.env.NEXT_PUBLIC_PRO_TRIAL_CHECKOUT_ANNUAL || '';
 const PRO_TRIAL = !!(PRO_TRIAL_MONTHLY && PRO_TRIAL_ANNUAL);
+// Team annual: $4,027/yr = $335.58/mo, 33% off $499 x 12 ($5,988). Team checkout links (14-day
+// trial) come from env; until they are set, Team stays "Contact Sales".
+const TEAM_TRIAL_MONTHLY = process.env.NEXT_PUBLIC_TEAM_TRIAL_CHECKOUT_MONTHLY || '';
+const TEAM_TRIAL_ANNUAL = process.env.NEXT_PUBLIC_TEAM_TRIAL_CHECKOUT_ANNUAL || '';
+const TEAM_ANNUAL_USD = 4027;
+const TEAM_ANNUAL_PER_MONTH = 335.58;
+const TEAM_ANNUAL_PCT = Math.round((1 - TEAM_ANNUAL_USD / (499 * 12)) * 100); // 33
 const ENTERPRISE_CONTACT_URL = '/contact-sales';
 const MCP_TRIAL_URL = '/app';
 const REFERRALS_URL = '/app?panel=settings&section=credits&tab=referrals';
@@ -226,8 +233,14 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
     },
     {
       name: 'Teams', badge: 'For BD teams', color: 'ink', tag: 'For growing contractors with a BD team.',
-      price: 499, per: annual ? '/mo · billed monthly' : '/mo', href: TEAMS_CONTACT_URL, cta: 'Contact Sales',
-      note: 'Reply within one business day.',
+      price: annual ? TEAM_ANNUAL_PER_MONTH : 499, was: annual ? 499 : undefined,
+      per: annual ? '/mo billed yearly' : '/mo',
+      pill: annual ? `-${TEAM_ANNUAL_PCT}% · Save $${fmt(499 * 12 - TEAM_ANNUAL_USD)}` : undefined,
+      href: (annual ? TEAM_TRIAL_ANNUAL : TEAM_TRIAL_MONTHLY) || TEAMS_CONTACT_URL,
+      cta: (annual ? TEAM_TRIAL_ANNUAL : TEAM_TRIAL_MONTHLY) ? 'Start 14-day free trial' : 'Contact Sales',
+      note: (annual ? TEAM_TRIAL_ANNUAL : TEAM_TRIAL_MONTHLY)
+        ? `14 days free, then ${annual ? `$${fmt(TEAM_ANNUAL_USD)}/yr` : '$499/mo'}. We remind you before you're charged.`
+        : (annual ? `$${fmt(TEAM_ANNUAL_USD)}/yr · Reply within one business day.` : 'Reply within one business day.'),
       credits: [fmt(teamCr), 'MCP credits', '/ month'], tree: [['5 users', 'included'], ['Shared', 'pipeline & pursuits']],
       secs: [
         ['Everything in Pro, plus', [['Up to 5 users included', 2], ['Shared pipeline & pursuits', 2], ['Team dashboard', 1], ['Role-based access', 1]]],
@@ -393,7 +406,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
               <button type="button" role="tab" aria-selected={tab === 'app'} className={tab === 'app' ? 'on' : ''} onClick={() => setTab('app')}>Mindy App</button>
               <button type="button" role="tab" aria-selected={tab === 'mcp'} className={tab === 'mcp' ? 'on' : ''} onClick={() => setTab('mcp')}>MCP Credits</button>
             </div>
-            <BillingToggle saveLabel="Save up to 17%" />
+            <BillingToggle saveLabel={`Save up to ${TEAM_ANNUAL_PCT}%`} />
           </div>
         </div>
 
