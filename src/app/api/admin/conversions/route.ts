@@ -69,13 +69,19 @@ async function paidSignups(sinceSec: number): Promise<{ byDay: Record<string, Pa
   const stripe = new Stripe(key);
   const byDay: Record<string, PaidCount> = {};
   const byMonth: Record<string, PaidCount> = {};
-  for await (const s of stripe.subscriptions.list({ created: { gte: sinceSec }, status: 'all', limit: 100 })) {
-    if (s.status === 'incomplete_expired') continue;
+  // A trial is not a sale: it counts on the day the card is first charged (trial end), and only if
+  // it didn't cancel first. Look back 30 extra days so trials that convert inside the window are found.
+  const nowSec = Math.floor(Date.now() / 1000);
+  for await (const s of stripe.subscriptions.list({ created: { gte: sinceSec - 30 * 86400 }, status: 'all', limit: 100 })) {
+    if (s.status === 'incomplete_expired' || s.status === 'incomplete' || s.status === 'trialing') continue;
+    const paidAt = s.trial_end ?? s.created;
+    if (paidAt > nowSec || paidAt < sinceSec) continue;
+    if (s.trial_end && s.canceled_at && s.canceled_at <= s.trial_end) continue;
     const product = s.items.data[0]?.price?.product;
     const pid = typeof product === 'string' ? product : product?.id;
     const kind = pid && APP_PRODUCTS.has(pid) ? 'app' : pid && CREDIT_PRODUCTS.has(pid) ? 'credits' : null;
     if (!kind) continue;
-    const day = new Date(s.created * 1000).toISOString().slice(0, 10);
+    const day = new Date(paidAt * 1000).toISOString().slice(0, 10);
     (byDay[day] ??= { app: 0, credits: 0 })[kind]++;
     (byMonth[day.slice(0, 7)] ??= { app: 0, credits: 0 })[kind]++;
   }
@@ -131,7 +137,7 @@ export async function GET(req: NextRequest) {
       'Lead-magnet registrations = every GHL contact with that tag (all-time), so the rate is most accurate when the window covers the whole campaign.',
       'New accounts = alert-settings rows created in the window (every new account gets one).',
       'Trials started = completed Stripe checkouts on the four 14-day trial links.',
-      'Paid sign-ups = new Stripe subscriptions to Mindy (App = Pro/Team, Credits = MCP credit plans), by UTC date; abandoned checkouts excluded, one-time purchases not counted.',
+      'Paid sign-ups = new Stripe subscriptions to Mindy (App = Pro/Team, Credits = MCP credit plans), by UTC date; a free trial counts on the day it is first charged, abandoned checkouts and trials that cancel are excluded, one-time purchases not counted.',
     ],
   };
   if (sp.get('format') === 'json') return NextResponse.json(report);
