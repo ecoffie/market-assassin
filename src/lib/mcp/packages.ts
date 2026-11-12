@@ -140,9 +140,10 @@ export const PRO_MONTHLY_CREDITS = Math.max(
  * ⚠️ Env-overridable: MCP_TEAM_MONTHLY_CREDITS wins over this default if set in
  * Vercel. Not set in production as of 2026-08-02 (verified), so this default applies.
  */
+// 2026-11-12: raised to 7,000 shared (owner decision, with the Fyxer-style pricing page).
 export const TEAM_MONTHLY_CREDITS = Math.max(
   0,
-  Number(process.env.MCP_TEAM_MONTHLY_CREDITS ?? '1000') || 0,
+  Number(process.env.MCP_TEAM_MONTHLY_CREDITS ?? '7000') || 0,
 );
 
 /**

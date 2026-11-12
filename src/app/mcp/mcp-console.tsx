@@ -83,7 +83,7 @@ export default function McpConsole() {
   const [balance, setBalance] = useState<number | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [client, setClient] = useState<ClientId>('claude-desktop');
-  // Public catalog (tool costs + trial size) for the example grid + hero copy.
+  // Public catalog (tool costs) for the example grid.
   const [catalog, setCatalog] = useState<Catalog | null>(null);
 
   // Identity: ask the server who our signed token proves we are. Never trust the
@@ -127,7 +127,6 @@ export default function McpConsole() {
   }, []);
 
   const conn = useMemo(() => connectFor(client), [client]);
-  const trial = catalog?.signupCredits ?? 100;
   const displayTools = catalog?.tools ?? []; // catalog tool costs power the example prices
 
   // ---- Shared: keyless connect card (client tabs rewrite the steps) ----------
@@ -270,10 +269,10 @@ export default function McpConsole() {
             ) : (
               <>
                 <div className="mt-8 flex flex-wrap gap-3.5">
-                  <a href={connectHref} className={primary}>Connect free</a>
+                  <Link href="/pricing" className={primary}>Start for free</Link>
                   <Link href="/mcp/pricing" className={ghost}>See pricing</Link>
                 </div>
-                <p className="mt-4 text-[15px] text-(--mp-muted)">{trial} free credits when you connect · No credit card</p>
+                <p className="mt-4 text-[15px] text-(--mp-muted)">14-day free trial · Already have an account? <a href={connectHref} className="underline underline-offset-2 hover:text-(--mp-body)">Sign in to connect</a></p>
               </>
             )}
             {authState === 'loading' && <p className="mt-3 text-[13px] text-(--mp-muted)">Checking your session…</p>}
@@ -328,9 +327,9 @@ export default function McpConsole() {
       {/* Closing band, like the homepage */}
       <section className="mt-24 bg-(--mp-navy) px-4 py-20 text-center text-white sm:px-6">
         <h2 className="mx-auto max-w-3xl text-balance text-[34px] font-bold leading-tight tracking-[-0.02em] sm:text-[44px]">Ask your AI about federal contracts today.</h2>
-        <p className="mx-auto mt-4 max-w-xl text-[17px] leading-relaxed text-white/85">{trial} free credits when you connect. No credit card needed.</p>
+        <p className="mx-auto mt-4 max-w-xl text-[17px] leading-relaxed text-white/85">Start a 14-day free trial of Pro or Team, then connect Mindy to your AI.</p>
         <div className="mt-8 flex flex-wrap justify-center gap-3.5">
-          <a href={signedIn ? '#connect' : connectHref} className={`${pill} bg-(--mp-surface) text-(--mp-navy) hover:-translate-y-0.5`}>{signedIn ? 'How to connect' : 'Connect free'}</a>
+          <a href={signedIn ? '#connect' : '/pricing'} className={`${pill} bg-(--mp-surface) text-(--mp-navy) hover:-translate-y-0.5`}>{signedIn ? 'How to connect' : 'Start for free'}</a>
           <Link href="/mcp/pricing" className={`${pill} border border-white/50 text-white hover:-translate-y-0.5 hover:border-white`}>See pricing</Link>
         </div>
       </section>

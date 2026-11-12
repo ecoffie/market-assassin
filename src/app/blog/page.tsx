@@ -165,10 +165,10 @@ export default function BlogIndexPage() {
             your NAICS codes — plus tactical playbooks like the ones above.
           </p>
           <Link
-            href="/signup"
+            href="/pricing"
             className="inline-block px-8 py-3 bg-white hover:bg-(--mp-wash) text-(--mp-navy) font-bold rounded-lg transition-colors"
           >
-            Start Free — No Credit Card
+            Start for free
           </Link>
         </div>
       </section>

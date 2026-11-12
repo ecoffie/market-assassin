@@ -337,10 +337,10 @@ export default async function ContractorContractsPage({ params }: PageProps) {
             Mindy monitors active contracts and flags recompetes 12 months out so you can position to compete.
           </p>
           <Link
-            href="/signup"
+            href="/pricing"
             className="mt-5 inline-flex rounded-lg bg-(--mp-navy) px-5 py-2.5 font-semibold text-white hover:bg-(--mp-navy-hover)"
           >
-            Start Free
+            Start for free
           </Link>
         </section>
       </SubpageLayout>

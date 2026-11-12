@@ -103,8 +103,8 @@ export function BlogPostLayout({
       </article>
 
       {/* Final CTA card — same offer on every post. Goal: convert the
-          reader who finished the article. "Start free, no credit card"
-          is the wording the landing page uses, so we stay consistent. */}
+          reader who finished the article. "Start for free"
+          is the wording the homepage uses, so we stay consistent. */}
       <section className="max-w-3xl mx-auto px-4 pb-16">
         <div className="rounded-lg border border-(--mp-line) p-8 md:p-10 text-center bg-(--mp-wash)">
           <h2 className="text-2xl md:text-3xl font-bold text-(--mp-ink) mb-3 font-(family-name:--mp-font-serif)">
@@ -115,13 +115,13 @@ export function BlogPostLayout({
             to your business — every morning, before your first coffee.
           </p>
           <Link
-            href="/signup"
+            href="/pricing"
             className="inline-block px-8 py-3 bg-white hover:bg-(--mp-wash) text-(--mp-navy) font-bold rounded-lg transition-colors"
           >
-            Start Free — No Credit Card
+            Start for free
           </Link>
           <p className="text-xs text-(--mp-muted) mt-4">
-            Free forever plan. Upgrade to Pro ($149/mo) when you&apos;re ready.
+            Pro ($149/mo) or Team. No charge for 14 days. Cancel anytime.
           </p>
         </div>
       </section>

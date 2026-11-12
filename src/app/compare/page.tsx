@@ -9,7 +9,7 @@ import { COMPETITORS } from '@/data/competitors';
 export const metadata: Metadata = {
   title: 'Compare Mindy to GovWin, HigherGov, GovTribe & more — Federal Market Intelligence',
   description:
-    'How Mindy stacks up against GovWin, HigherGov, GovTribe, Bloomberg Government, and SAM.gov for federal market intelligence. Free tier, $149/mo Pro, no sales call.',
+    'How Mindy stacks up against GovWin, HigherGov, GovTribe, Bloomberg Government, and SAM.gov for federal market intelligence. $149/mo Pro with a 14-day free trial, no sales call.',
   alternates: { canonical: 'https://getmindy.ai/compare' },
   keywords: ['federal market intelligence comparison', 'govcon software comparison', 'mindy vs', 'best federal contracting software', 'govwin alternative', 'highergov alternative'],
 };
@@ -30,7 +30,7 @@ export default function CompareHub() {
         <h1 className="text-3xl md:text-4xl font-bold font-(family-name:--mp-font-serif)">How Mindy compares</h1>
         <p className="text-(--mp-body) mt-4 text-lg">
           Honest comparisons of Mindy vs. the other federal market-intelligence tools — including the
-          tradeoffs. Free daily alerts, $149/mo Pro, no enterprise sales call.
+          tradeoffs. $149/mo Pro with a 14-day free trial, no enterprise sales call.
         </p>
         <div className="mt-8 grid sm:grid-cols-2 gap-3">
           {all.map((x) => (
@@ -45,7 +45,7 @@ export default function CompareHub() {
           ))}
         </div>
         <div className="mt-10 text-center">
-          <Link href="/app" className="inline-block bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-lg px-7 py-3">Start free →</Link>
+          <Link href="/pricing" className="inline-block bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-lg px-7 py-3">Start for free →</Link>
         </div>
       </div>
     </main>

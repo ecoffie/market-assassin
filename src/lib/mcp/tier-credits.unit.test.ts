@@ -24,13 +24,12 @@ describe('app-tier credit allowances', () => {
    * Pin BOTH allowances together. They are one coordinated product decision, so a
    * change to either should have to state its intent here rather than drift alone.
    */
-  it('Pro is 1,500/mo and Team is 1,000/mo (Eric, 2026-09-08)', () => {
+  it('Pro is 1,500/mo and Team is 7,000/mo shared (2026-11-12)', () => {
     expect(PRO_MONTHLY_CREDITS).toBe(1500);
-    // ⚠️ Team is INTENTIONALLY still 1,000. The approved long-term target is 6,000
-    // SHARED, and it is blocked on real pooling: `mcp_credit_balance` is keyed by
-    // user_email, so a Team grant today credits only the Stripe billing contact.
-    // Shipping 6,000 on that path would multiply a per-seat grant, not pool it.
-    expect(TEAM_MONTHLY_CREDITS).toBe(1000);
+    // Team: 7,000 a month SHARED by the team (owner decision 2026-11-12). Until pooled team
+    // credits are switched on (tasks/PRD-pooled-team-credits.md), the grant lands on the Stripe
+    // billing contact's balance — one pot, not 7,000 per seat.
+    expect(TEAM_MONTHLY_CREDITS).toBe(7000);
   });
 
   /**

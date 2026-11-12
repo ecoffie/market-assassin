@@ -178,10 +178,10 @@ export default async function AwardsLanding() {
             agencies, and capabilities. Zero scrolling SAM.gov.
           </p>
           <Link
-            href="/signup"
+            href="/pricing"
             className="mt-6 inline-flex rounded-lg bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover)"
           >
-            Start Free
+            Start for free
           </Link>
         </div>
       </section>

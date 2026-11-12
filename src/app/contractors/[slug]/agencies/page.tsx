@@ -194,10 +194,10 @@ export default async function ContractorAgenciesPage({ params }: PageProps) {
             Mindy watches agency spending patterns and surfaces opportunities matching {displayName}&apos;s active customers.
           </p>
           <Link
-            href="/signup"
+            href="/pricing"
             className="mt-5 inline-flex rounded-lg bg-(--mp-navy) px-5 py-2.5 font-semibold text-white hover:bg-(--mp-navy-hover)"
           >
-            Start Free
+            Start for free
           </Link>
         </section>
       </SubpageLayout>

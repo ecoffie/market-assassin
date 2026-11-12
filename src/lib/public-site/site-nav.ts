@@ -1,6 +1,6 @@
 /**
  * The site top bar: the Nov 28 event banner plus the homepage nav (logo · Mindy in your AI ·
- * Learn · Jobs ··· Sign in · Contact sales · Plans & Pricing · Sign up free). One string, rendered by
+ * Learn · Jobs ··· Sign in · Contact sales · Plans & Pricing · Start for free). One string, rendered by
  * the homepage, every React public page (PublicHeader) and every raw-HTML public page (html.ts),
  * so they cannot drift. The Maps product keeps its own bar.
  *
@@ -56,7 +56,7 @@ const MENU_TOGGLE = "var o=document.documentElement.classList.toggle('mp-menu-op
 
 const CHEVRON = '<svg class="mp-menu-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
 
-/** The phone menu panel (Zoom-style): search, the main links, then Contact sales, Sign in, Sign up free. */
+/** The phone menu panel (Zoom-style): search, the main links, then Contact sales, Sign in, Start for free. */
 function siteMenuHtml(): string {
   const items: MpChromeLink[] = [
     { href: '/opportunity-map', label: 'Opportunity Map' },
@@ -130,7 +130,7 @@ export const SITE_NAV_CSS = [
   // Phone menu (☰). Hidden above 620px.
   '.mp-burger,.mp-menu{display:none}',
   '@media(max-width:620px){'
-    // Logged out, the bar is just logo + menu button (Zoom); Sign in / Sign up free live in the menu.
+    // Logged out, the bar is just logo + menu button (Zoom); Sign in / Start for free live in the menu.
     + '.mp-head .mp-anon{display:none!important}'
     + '.mp-burger{display:flex;align-items:center;justify-content:center;width:44px;height:44px;margin-right:-8px;border:0;background:none;color:var(--mp-ink);cursor:pointer;border-radius:10px;flex:none}'
     + '.mp-burger svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}'

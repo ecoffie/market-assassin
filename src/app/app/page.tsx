@@ -184,18 +184,6 @@ function AppDashboard() {
     if (wantsSignup) setIsSignUpMode(true);
   }, [wantsSignup]);
 
-  // Signup grant size for the "free to start" line, from the PUBLIC catalog endpoint
-  // (reads SIGNUP_CREDITS server-side). Fetched, not hardcoded, so the promise can't
-  // drift from the grant. 0 until it loads → the line simply doesn't render, rather
-  // than flashing a possibly-wrong number.
-  const [signupCredits, setSignupCredits] = useState(0);
-  useEffect(() => {
-    fetch('/api/mcp/catalog')
-      .then((r) => r.json())
-      .then((d) => { if (typeof d?.signupCredits === 'number') setSignupCredits(d.signupCredits); })
-      .catch(() => {});
-  }, []);
-
   const getTwoFactorHeaders = useCallback((): Record<string, string> => {
     if (typeof window === 'undefined') return {};
 
@@ -1100,14 +1088,23 @@ function AppDashboard() {
                 >
                   Sign in
                 </button>
-                <button
-                  onClick={() => { setIsSignUpMode(true); setAuthError(null); setAuthMessage(null); }}
-                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                    isSignUpMode ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  Create free account
-                </button>
+                {/* No free plan for new users (Nov 2026): new visitors start the 14-day trial on
+                    /pricing (card required). ?signup=1 still opens the create-account form below. */}
+                {isSignUpMode ? (
+                  <button
+                    type="button"
+                    className="flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors bg-purple-600 text-white"
+                  >
+                    Create account
+                  </button>
+                ) : (
+                  <a
+                    href="/pricing"
+                    className="flex-1 py-2 px-4 rounded-md text-sm font-medium text-center transition-colors text-gray-400 hover:text-white"
+                  >
+                    Start for free
+                  </a>
+                )}
               </div>
             )}
 
@@ -1117,24 +1114,11 @@ function AppDashboard() {
                 : magicLinkSent && !isSignUpMode
                   ? 'Check your email'
                   : isSignUpMode
-                    ? 'Create your free account'
+                    ? 'Create your account'
                     : authStep === 'credentials'
                       ? 'Sign in to Mindy'
                       : 'Enter verification code'}
             </h2>
-
-            {/* Say what they GET. "Create your free account" alone doesn't tell anyone
-                there are credits waiting — that's the actual hook, and it was nowhere in
-                the signup flow (Eric, 2026-07-27). The number is FETCHED from the public
-                /api/mcp/catalog (which reads SIGNUP_CREDITS server-side), not hardcoded:
-                this file is 'use client' and importing credits.ts would drag the
-                service-role Supabase client into the browser bundle. Fetching keeps the
-                promise tied to the grant without crossing that boundary. */}
-            {isSignUpMode && !signUpSent && signupCredits > 0 && (
-              <p className="-mt-2 mb-4 text-center text-sm text-gray-400">
-                Free to start — <span className="font-semibold text-emerald-400">{signupCredits} credits</span> included, no card required.
-              </p>
-            )}
 
             {resetSuccess && authStep === 'credentials' && !isSignUpMode && (
               <div className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-200">
@@ -1147,7 +1131,7 @@ function AppDashboard() {
               </div>
             )}
 
-            {/* OAuth — shown for both Sign in and Create free account modes,
+            {/* OAuth — shown for both Sign in and Create account modes,
                 hidden during 2FA step + after sign-up confirmation. */}
             {!signUpSent && authStep === 'credentials' && (
               <>
@@ -1271,7 +1255,7 @@ function AppDashboard() {
                 className="space-y-4"
               >
                 <div className="text-center text-gray-400 text-sm mb-4">
-                  Get started with a free Mindy account. No credit card required.
+                  Create your Mindy account.
                 </div>
                 <input
                   type="email"
@@ -1286,11 +1270,8 @@ function AppDashboard() {
                   disabled={authLoading}
                   className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:text-gray-400 text-white font-medium rounded-lg transition-colors"
                 >
-                  {authLoading ? 'Creating account...' : 'Create free account'}
+                  {authLoading ? 'Creating account...' : 'Create account'}
                 </button>
-                <div className="text-center text-gray-500 text-xs">
-                  Free includes: Daily alerts, market research (4 reports), opportunity search
-                </div>
               </form>
             ) : authStep === 'credentials' && magicLinkSent && !isSignUpMode ? (
               <div className="text-center space-y-4">

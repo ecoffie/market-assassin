@@ -153,13 +153,13 @@ export default function GlossaryIndexPage() {
           </p>
 
           <Link
-            href="/signup"
+            href="/pricing"
             className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
-            Get Mindy&apos;s Daily Briefing Free
+            Start for free
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">
-            No credit card. First briefing lands tomorrow morning.
+            14-day free trial. Cancel anytime. First briefing lands tomorrow morning.
           </p>
         </div>
       </section>
@@ -235,10 +235,10 @@ export default function GlossaryIndexPage() {
             opportunities, not a glossary.
           </p>
           <Link
-            href="/signup"
+            href="/pricing"
             className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
-            Meet Mindy — Free Daily Briefing
+            Meet Mindy — Start for free
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">
             500+ small businesses already wake up to a Mindy briefing.

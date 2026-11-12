@@ -91,7 +91,7 @@ export const LOGIN_MODAL_HTML =
   +       '<input type="email" id="lgmEmail" placeholder="you@company.com" autocomplete="email">'
   +       '<div class="lgm-err" id="lgmErr1" style="display:none"></div>'
   +       '<button class="lgm-cta" id="lgmCont">Continue</button>'
-  +       '<p class="lgm-create">New to Mindy? <a id="lgmCreate">Create a free account</a></p>'
+  +       '<p class="lgm-create">New to Mindy? <a id="lgmCreate" href="/pricing">Start for free</a></p>'
   +       '<div class="lgm-div">OR</div>'
   +       '<div class="lgm-oauth">'
   +         '<button id="lgmGoogle"><svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.46 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06L5.84 9.9C6.71 7.31 9.14 5.38 12 5.38z"/></svg>Continue with Google</button>'
@@ -111,11 +111,11 @@ export const LOGIN_MODAL_HTML =
   +       '<button class="lgm-cta" id="lgmSignin">Sign in</button>'
   +       '<p class="lgm-create" style="text-align:center;margin-top:18px" id="lgmSetupRow">No password yet? <a id="lgmSetup">Set up my account</a></p>'
   +     '</div>'
-        // STEP 3 — create a free account (name + email; password is set via the emailed setup link)
+        // STEP 3 — create an account (name + email; password is set via the emailed setup link). Not
+        // opened from "New to Mindy?" any more — that is a link to /pricing (14-day trial, Nov 2026).
   +     '<div class="lgm-step3" id="lgmStep3" style="display:none">'
   +       '<div class="lgm-back" id="lgmBack3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>Back</div>'
-  +       '<h2>Sign up for free</h2>'
-  +       '<p class="lgm-fly">No credit card required</p>'
+  +       '<h2>Create your account</h2>'
   +       '<label for="lgmSuName">Name</label>'
   +       '<input type="text" id="lgmSuName" placeholder="Jane Contractor" autocomplete="name">'
   +       '<label for="lgmSuEmail" style="margin-top:14px">Work email</label>'
@@ -212,15 +212,13 @@ export const LOGIN_MODAL_JS = `<script>(function(){
   function toApp(extra){ var n=encodeURIComponent(location.pathname+location.search); location.href='/app?next='+n+(extra||''); }
   var g=document.getElementById('lgmGoogle'); g&&g.addEventListener('click',function(){ toApp('&oauth=google'); });
   var ms=document.getElementById('lgmMs'); ms&&ms.addEventListener('click',function(){ toApp('&oauth=microsoft'); });
-  // "Create a free account" now stays IN the modal (Step 3) — no page leave. Prefill the email if typed.
-  var cr=document.getElementById('lgmCreate'); cr&&cr.addEventListener('click',function(){
-    if(suEmail && emailIn && emailIn.value) suEmail.value=emailIn.value;
-    step(3); setTimeout(function(){ var f=(suName&&!suName.value)?suName:suEmail; f&&f.focus(); },60);
-  });
+  // "Start a 14-day free trial" is a plain link to /pricing (Nov 2026: no free plan for new users —
+  // a new visitor picks Pro or Team there, card required, no charge for 14 days). The in-modal
+  // create-account step (Step 3) is no longer opened from here.
   var su=document.getElementById('lgmSetup'); su&&su.addEventListener('click',function(){ toApp('&setup=1&email='+encodeURIComponent((emailIn.value||'').trim().toLowerCase())); });
   var fg=document.getElementById('lgmForgot'); fg&&fg.addEventListener('click',function(){ toApp('&forgot=1&email='+encodeURIComponent((emailIn.value||'').trim().toLowerCase())); });
 
-  // ── Step 3: create a free account (email-first; password set via the emailed setup link).
+  // ── Step 3: create an account (email-first; password set via the emailed setup link).
   // The pending action (Save/Pursuit) is QUEUED to localStorage BEFORE the email round-trip, so it
   // completes automatically when the user returns via the setup link — the intent is never lost.
   function queueIntent(em){

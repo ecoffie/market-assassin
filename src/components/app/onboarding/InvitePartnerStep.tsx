@@ -80,8 +80,8 @@ export default function InvitePartnerStep({
   }
 
   const mailto = ref
-    ? `mailto:?subject=${encodeURIComponent('Try Mindy with me — free federal contract alerts')}&body=${encodeURIComponent(
-      `I'm using Mindy to find federal contracts. It's free to start, and if you sign up with my link we both get ${ref.reward} credits:\n\n${ref.link}`,
+    ? `mailto:?subject=${encodeURIComponent('Try Mindy with me — federal contract alerts')}&body=${encodeURIComponent(
+      `I'm using Mindy to find federal contracts. There's a 14-day free trial, and if you sign up with my link we both get ${ref.reward} credits:\n\n${ref.link}`,
     )}`
     : '';
 

@@ -227,7 +227,7 @@ export default async function AgencyPage({
       <section className="px-4 pb-20">
         <div className="max-w-3xl mx-auto bg-(--mp-navy-wash) border border-(--mp-line) rounded-lg p-8 md:p-12 text-center">
           <h2 className="text-3xl font-bold text-(--mp-ink) mb-4 font-(family-name:--mp-font-serif)">
-            Get {agency.abbreviation || agency.name} opportunity alerts free
+            Get {agency.abbreviation || agency.name} opportunity alerts
           </h2>
           <p className="text-lg text-(--mp-body) mb-8 max-w-xl mx-auto">
             Mindy watches {agency.abbreviation || agency.name} every day —
@@ -235,13 +235,13 @@ export default async function AgencyPage({
             your NAICS codes. No portal-checking. No filler.
           </p>
           <Link
-            href="/signup"
+            href="/pricing"
             className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
-            Start Free — No Credit Card
+            Start for free
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">
-            First briefing lands tomorrow morning.
+            14-day free trial. Cancel anytime. First briefing lands tomorrow morning.
           </p>
         </div>
       </section>
@@ -810,10 +810,10 @@ function InlineCta({ agency }: { agency: AgencySeo }) {
         your business, delivered every morning?
       </p>
       <Link
-        href="/signup"
+        href="/pricing"
         className="inline-block px-6 py-3 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-semibold transition"
       >
-        Get the daily briefing — free
+        Start for free
       </Link>
     </div>
   );

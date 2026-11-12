@@ -5,13 +5,13 @@ import Link from 'next/link';
 
 /**
  * Public-page CTA that adapts to the visitor:
- *  - Anonymous → the acquisition CTA (sign up / try free) — children.
+ *  - Anonymous → the acquisition CTA (start the 14-day free trial) — children.
  *  - Signed-in Mindy member → a member-appropriate action (go to the app), NOT a
- *    "sign up free" nag they've already done.
+ *    "start free trial" nag they've already done.
  *
  * Detects auth from the localStorage Mindy token. Starts in the "member" state
  * (renders nothing of the acquisition CTA) until checked, so a member never sees a
- * flash of "sign up free".
+ * flash of "start free trial".
  */
 export default function MemberAwareCta({
   children,

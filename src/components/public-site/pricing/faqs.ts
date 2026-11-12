@@ -8,7 +8,7 @@ export function pricingFaqs(c: { signupCredits: number; proCredits: number; team
   return [
     {
       q: 'Is there a free trial of Pro?',
-      a: `Better — there's a permanent Free tier: a daily digest across 3 NAICS codes plus ${n(c.signupCredits)} MCP credits. Upgrade to Pro for $149/mo when you want full briefings, unlimited NAICS, competitor tracking and recompete alerts. Cancel anytime.`,
+      a: "Yes. Pro and Team both start with a 14-day free trial. Pick a plan, add a card, and you're not charged until the trial ends. Cancel anytime before then and you pay nothing.",
     },
     {
       q: 'Can I switch plans later?',
@@ -16,7 +16,7 @@ export function pricingFaqs(c: { signupCredits: number; proCredits: number; team
     },
     {
       q: 'Can I use Mindy inside Claude, Cursor, or my own AI agent?',
-      a: `Yes. Every app plan includes credits for Mindy's MCP server: Free gets ${n(c.signupCredits)} one time when you first connect, Pro includes ${n(c.proCredits)} every month, and Teams includes ${n(c.teamCredits)} a month on the billing account. Need more? Credit-only plans start at $99 for 500 credits/mo and work on the same account.`,
+      a: `Yes. Every app plan includes credits for Mindy's MCP server: Pro includes ${n(c.proCredits)} every month, and Teams includes ${n(c.teamCredits)} a month on the billing account. Need more? Credit-only plans start at $99 for 500 credits/mo and work on the same account.`,
     },
     {
       q: 'How do credits work?',

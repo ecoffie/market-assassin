@@ -129,10 +129,10 @@ export default async function SpendingPage() {
         <div className="rounded-lg border border-(--mp-line) p-8 text-center bg-(--mp-wash)">
           <h2 className="text-2xl font-bold font-(family-name:--mp-font-serif)">The government spends $750B a year. Mindy finds the piece you can win.</h2>
           <p className="mt-3 mb-6 max-w-2xl mx-auto text-(--mp-body)">
-            Track every contract, know the incumbent, and get the ones that fit your business. Start free.
+            Track every contract, know the incumbent, and get the ones that fit your business. Try it free for 14 days.
           </p>
-          <Link href="/signup" className="inline-flex rounded-lg bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover)">
-            Start free →
+          <Link href="/pricing" className="inline-flex rounded-lg bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover)">
+            Start for free →
           </Link>
         </div>
       </section>

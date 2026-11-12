@@ -1327,8 +1327,8 @@ function BriefingsDashboardContent() {
 
           <p className="text-gray-500 text-sm mt-6 text-center">
             New here?{' '}
-            <Link href="/alerts/signup" className="text-emerald-400 hover:underline font-medium">
-              Sign up free
+            <Link href="/pricing" className="text-emerald-400 hover:underline font-medium">
+              Start for free
             </Link>
             {' · '}
             <Link href="/market-intelligence" className="text-purple-400 hover:underline">
@@ -1373,10 +1373,10 @@ function BriefingsDashboardContent() {
           </Link>
           <div className="mt-4 space-y-2">
             <Link
-              href="/alerts/signup"
+              href="/pricing"
               className="block text-emerald-400 text-sm hover:text-emerald-300 font-medium"
             >
-              Sign up free for daily alerts →
+              Start for free →
             </Link>
             <button
               onClick={() => { setStatus('gate'); setError(''); }}

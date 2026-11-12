@@ -192,10 +192,10 @@ export default async function ContractorNaicsPage({ params }: PageProps) {
             Mindy scans SAM.gov + agency forecasts daily for opportunities matching the same industry codes.
           </p>
           <Link
-            href="/signup"
+            href="/pricing"
             className="mt-5 inline-flex rounded-lg bg-(--mp-navy) px-5 py-2.5 font-semibold text-white hover:bg-(--mp-navy-hover)"
           >
-            Start Free
+            Start for free
           </Link>
         </section>
       </SubpageLayout>

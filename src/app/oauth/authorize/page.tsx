@@ -73,18 +73,6 @@ export default function AuthorizePage() {
   const [email, setEmail] = useState<string | null>(null);
   const [params, setParams] = useState<AuthzParams | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Signup grant size, from the PUBLIC catalog endpoint (it reads SIGNUP_CREDITS
-  // server-side). Fetched rather than hardcoded so the number shown can't drift from
-  // the number granted. Falls back to 100 only if the request fails.
-  const [signupCredits, setSignupCredits] = useState(100);
-
-  useEffect(() => {
-    fetch('/api/mcp/catalog')
-      .then((r) => r.json())
-      .then((d) => { if (typeof d?.signupCredits === 'number') setSignupCredits(d.signupCredits); })
-      .catch(() => {});
-  }, []);
-
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const p = readParams();
@@ -198,29 +186,19 @@ export default function AuthorizePage() {
             <p className="mt-2 text-sm text-slate-400">
               Connect{params?.client_id ? ' this app' : ''} to your Mindy account. This tab continues automatically once you&apos;re signed in.
             </p>
-            {/* The free-credit promise belongs HERE — this is where a stranger decides
-                whether to bother. It used to say only "Sign in to Mindy", which told a
-                brand-new user to sign in to an account they don't have and never
-                mentioned that signing up is free (Eric's friend, 2026-07-27).
-                The number comes from /api/mcp/catalog (public, no auth), which reads
-                SIGNUP_CREDITS server-side — so the promise can never drift from the
-                grant. Same pattern /mcp and /mcp/pricing already use. */}
-            {/* NOT shown for a ChatGPT connect: the ChatGPT profile grants no signup credits
-                (tasks/chatgpt-plugin-path-a.md, owner decision 3), so the promise would be
-                false there. Every other client sees exactly what it saw before. */}
-            {!isChatgptResource(params?.resource) && (
-              <p className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.07] px-3 py-2.5 text-[13px] text-emerald-200">
-                New here? Creating an account is <strong className="font-semibold">free</strong> — you get{' '}
-                <strong className="font-semibold">{signupCredits} credits</strong> to try it, no card required.
-              </p>
-            )}
+            {/* No free plan for new users (Nov 2026): a brand-new visitor starts the 14-day trial
+                on /pricing (Pro or Team, card required, no charge for 14 days), then comes back
+                here to connect. The old "creating an account is free — N credits" promise is gone. */}
+            <p className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.07] px-3 py-2.5 text-[13px] text-emerald-200">
+              New here? Start a <strong className="font-semibold">14-day free trial</strong> of Pro or Team, then come back to connect.
+            </p>
             <a
-              href="/app?signup=1"
+              href="/pricing"
               target="_blank"
               rel="noopener noreferrer"
               className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-400"
             >
-              Create a free account ↗
+              Start for free ↗
             </a>
             <a
               href="/app"

@@ -292,10 +292,10 @@ export default async function ListiclePage({ params }: PageProps) {
           </p>
           <MemberAwareCta appearance="public" memberHref="/app" memberLabel="Open Mindy →">
             <Link
-              href="/signup"
+              href="/pricing"
               className="inline-flex rounded-none bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover)"
             >
-              Start free →
+              Start for free →
             </Link>
           </MemberAwareCta>
         </div>

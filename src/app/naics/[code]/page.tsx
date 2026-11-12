@@ -659,7 +659,7 @@ export default async function NaicsCodePage({
                     SAM.gov publishes the RFP.
                   </p>
                   <Link
-                    href="/signup"
+                    href="/pricing"
                     className="inline-flex items-center gap-1 mt-4 text-(--mp-navy) hover:text-(--mp-navy-hover) font-semibold transition text-sm"
                   >
                     Set NAICS {entry.code} as your focus area{' '}
@@ -676,16 +676,16 @@ export default async function NaicsCodePage({
               </h2>
               <p className="text-(--mp-body) mb-4">
                 Every new solicitation, sources sought, and forecast update
-                for NAICS {entry.code} — delivered every morning. Free.
+                for NAICS {entry.code} — delivered every morning.
               </p>
               <Link
-                href="/signup"
+                href="/pricing"
                 className="inline-block px-6 py-3 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-semibold transition"
               >
-                Get the free daily briefing
+                Start for free
               </Link>
               <p className="text-(--mp-muted) text-sm mt-3">
-                No credit card. Cancel anytime. First briefing lands tomorrow morning.
+                14-day free trial. Cancel anytime. First briefing lands tomorrow morning.
               </p>
             </div>
           </article>
@@ -779,13 +779,13 @@ export default async function NaicsCodePage({
           <MemberAwareCta appearance="public" memberHref="/app" memberLabel="Open Mindy →">
             <>
               <Link
-                href="/signup"
+                href="/pricing"
                 className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
               >
-                Meet Mindy — Free Daily Briefing
+                Meet Mindy — Start for free
               </Link>
               <p className="text-(--mp-muted) text-sm mt-4">
-                No credit card. First briefing lands tomorrow morning.
+                14-day free trial. Cancel anytime. First briefing lands tomorrow morning.
               </p>
             </>
           </MemberAwareCta>

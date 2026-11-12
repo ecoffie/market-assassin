@@ -22,6 +22,9 @@ export const LAZY_CONTRACTORS_BLUEPRINT = {
   ghlTag: 'MD Lazy Contractors Blueprint',
   /** Extra tag when the registrant checks the SMS consent box. */
   smsOptInTag: 'sms-opt-in',
+  /** Typed a name + email on the form but did not register. A GHL email workflow nudges these
+   *  (email only — no text consent was given); removed when they register. */
+  startedTag: 'lcb-started-not-registered',
   /** Live-only form: registered attendees claim extra Mindy credits, granted on submit. */
   claimPath: '/lazy-contractors-blueprint/claim',
   claimCredits: 250,

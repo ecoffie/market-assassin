@@ -148,10 +148,10 @@ export default function SharedOpportunityClient() {
             <span className="text-(--mp-ink) font-semibold">Mindy</span>
           </Link>
           <Link
-            href={`https://getmindy.ai/?ref=${shareId}`}
+            href={`https://getmindy.ai/pricing?ref=${shareId}`}
             className="text-sm px-4 py-2 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-none transition-colors"
           >
-            Try Mindy free
+            Start for free
           </Link>
         </div>
       </header>
@@ -279,7 +279,7 @@ export default function SharedOpportunityClient() {
               </a>
             )}
             <Link
-              href={`https://getmindy.ai/?ref=${shareId}`}
+              href={`https://getmindy.ai/pricing?ref=${shareId}`}
               className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-medium rounded-none transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -300,16 +300,16 @@ export default function SharedOpportunityClient() {
             Set up your profile in 2 minutes.
           </p>
           <Link
-            href={`https://getmindy.ai/?ref=${shareId}`}
+            href={`https://getmindy.ai/pricing?ref=${shareId}`}
             className="inline-flex items-center gap-2 px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-none transition-colors text-lg"
           >
-            Start Free Daily Briefings
+            Start for free
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>
           </Link>
           <p className="text-xs text-(--mp-muted) mt-4">
-            Free during beta. No credit card required.
+            14-day free trial. Cancel anytime.
           </p>
         </div>
       </main>

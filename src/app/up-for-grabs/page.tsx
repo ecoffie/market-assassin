@@ -169,10 +169,10 @@ export default async function UpForGrabsPage() {
           <h2 className="text-2xl font-bold font-(family-name:--mp-font-serif)">This is a snapshot. Mindy tracks 129,000+ recompetes — and tells you 12 months early.</h2>
           <p className="mt-3 mb-6 max-w-2xl mx-auto text-(--mp-body)">
             Get alerts the moment a contract in your market is about to come up for grabs, with the incumbent and
-            the whole history. Start free.
+            the whole history. Try it free for 14 days.
           </p>
-          <Link href="/signup" className="inline-flex rounded-none bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover)">
-            Start free →
+          <Link href="/pricing" className="inline-flex rounded-none bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover)">
+            Start for free →
           </Link>
         </div>
       </section>

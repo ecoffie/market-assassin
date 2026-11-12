@@ -229,10 +229,10 @@ export default async function GlossaryTermPage({
                 opportunities, not jargon.
               </p>
               <Link
-                href="/signup"
+                href="/pricing"
                 className="inline-block px-6 py-3 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-semibold transition"
               >
-                Get Mindy&apos;s daily briefing free
+                Start for free
               </Link>
             </div>
           </article>
@@ -289,13 +289,13 @@ export default async function GlossaryTermPage({
             wake up to a Mindy briefing.
           </p>
           <Link
-            href="/signup"
+            href="/pricing"
             className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
-            Meet Mindy — Free Daily Briefing
+            Meet Mindy — Start for free
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">
-            No credit card. Cancel anytime. First briefing lands tomorrow morning.
+            14-day free trial. Cancel anytime. First briefing lands tomorrow morning.
           </p>
         </div>
       </section>
