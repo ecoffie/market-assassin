@@ -164,10 +164,10 @@ export default async function DiscoverHub() {
           <h2 className="text-2xl font-bold font-(family-name:--mp-font-serif)">This is the free stuff. The real edge is knowing what <em>you</em> can win.</h2>
           <p className="mt-3 mb-6 max-w-2xl mx-auto text-(--mp-body)">
             Mindy scores every opportunity to your business, tells you the incumbent, and finds the contracts
-            worth bidding. Start free.
+            worth bidding. Try it free for 14 days.
           </p>
-          <Link href="/signup" className="inline-flex rounded-lg bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover)">
-            Start free →
+          <Link href="/pricing" className="inline-flex rounded-lg bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover)">
+            Start 14-day free trial →
           </Link>
         </div>
       </section>

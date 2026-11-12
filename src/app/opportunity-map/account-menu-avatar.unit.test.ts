@@ -49,8 +49,8 @@ describe('Maps account chip is an identity avatar, not help', () => {
     expect(src).toContain('x-mi-auth-token');
   });
 
-  it('signed-out paints Sign up free, not a fake avatar', () => {
-    expect(src).toContain('btn.innerHTML="Sign up free"');
+  it('signed-out paints Start free trial, not a fake avatar', () => {
+    expect(src).toContain('btn.innerHTML="Start free trial"');
     expect(src).toContain('function paintSignedOut()');
   });
 

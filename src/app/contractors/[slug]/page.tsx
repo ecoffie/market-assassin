@@ -654,10 +654,10 @@ export default async function ContractorPage({ params }: PageProps) {
           </p>
           <MemberAwareCta appearance="public" memberHref="/app" memberLabel="Track this company in Mindy →">
             <Link
-              href="/signup"
+              href="/pricing"
               className="inline-flex rounded-lg bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover)"
             >
-              Track this company free →
+              Start 14-day free trial →
             </Link>
           </MemberAwareCta>
         </div>

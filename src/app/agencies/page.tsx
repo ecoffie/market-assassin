@@ -214,13 +214,13 @@ export default function AgenciesIndexPage() {
             briefing — matched to your NAICS codes.
           </p>
           <Link
-            href="/signup"
+            href="/pricing"
             className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
-            Get Free Daily Opportunity Alerts
+            Start 14-day free trial
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">
-            No credit card. First briefing lands tomorrow morning.
+            14-day free trial. Cancel anytime. First briefing lands tomorrow morning.
           </p>
         </div>
       </section>

@@ -20,7 +20,7 @@ import Link from 'next/link';
 export const metadata: Metadata = {
   title: 'SBA Set-Aside Programs — 8(a), HUBZone, SDVOSB, WOSB Contracts | Mindy',
   description:
-    'Daily federal set-aside contract opportunities for 8(a), HUBZone, SDVOSB, and WOSB certified small businesses. Free opportunity alerts from SAM.gov and agency forecasts.',
+    'Daily federal set-aside contract opportunities for 8(a), HUBZone, SDVOSB, and WOSB certified small businesses. Opportunity alerts from SAM.gov and agency forecasts.',
   alternates: {
     canonical: 'https://getmindy.ai/set-asides',
   },
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'SBA Set-Aside Programs — Find Contracts You\'re Certified For',
     description:
-      'Daily federal set-aside opportunities for 8(a), HUBZone, SDVOSB, and WOSB firms. Free alerts from SAM.gov, agency forecasts, and recompetes.',
+      'Daily federal set-aside opportunities for 8(a), HUBZone, SDVOSB, and WOSB firms. Alerts from SAM.gov, agency forecasts, and recompetes.',
     type: 'website',
     url: 'https://getmindy.ai/set-asides',
   },
@@ -148,10 +148,10 @@ export default function SetAsidesIndexPage() {
           </p>
 
           <Link
-            href="/signup"
+            href="/pricing"
             className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
-            Get Free Set-Aside Alerts
+            Start 14-day free trial
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">First briefing lands tomorrow morning.</p>
         </div>
@@ -330,13 +330,13 @@ export default function SetAsidesIndexPage() {
           </h2>
           <p className="text-lg text-(--mp-body) mb-8">
             Pick your program, get a daily briefing of opportunities matched to your
-            certification. Free, no credit card.
+            certification. 14-day free trial. Cancel anytime.
           </p>
           <Link
-            href="/signup"
+            href="/pricing"
             className="inline-block px-10 py-4 bg-white hover:bg-(--mp-wash) text-(--mp-navy) rounded-lg font-bold text-lg transition-colors"
           >
-            Get Free Alerts
+            Start 14-day free trial
           </Link>
         </div>
       </section>

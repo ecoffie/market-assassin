@@ -121,10 +121,10 @@ export default async function WeirdAwardsPage() {
         <div className="rounded-none border border-(--mp-line) p-8 text-center bg-(--mp-wash)">
           <h2 className="text-2xl font-bold font-(family-name:--mp-font-serif)">The government buys everything — from bagpipes to $1.8B IT contracts.</h2>
           <p className="mt-3 mb-6 max-w-2xl mx-auto text-(--mp-body)">
-            Mindy tracks all of it, and finds the contracts you can actually win. Start free.
+            Mindy tracks all of it, and finds the contracts you can actually win. Try it free for 14 days.
           </p>
-          <Link href="/signup" className="inline-flex rounded-none bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover)">
-            Start free →
+          <Link href="/pricing" className="inline-flex rounded-none bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover)">
+            Start 14-day free trial →
           </Link>
         </div>
       </section>

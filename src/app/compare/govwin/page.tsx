@@ -49,7 +49,7 @@ export const metadata: Metadata = {
 const comparisonRows = [
   {
     feature: 'Starting Price',
-    mindy: '$0 (Free) / $149/mo (Pro)',
+    mindy: '$149/mo (Pro), 14-day free trial',
     govwin: '$15,000–$50,000+/yr',
     winner: 'mindy' as const,
   },
@@ -151,11 +151,11 @@ const faqs = [
   },
   {
     q: 'Do I need to talk to sales to sign up?',
-    a: "No. Pick a plan, enter a card (or start free), and your first briefing lands in your inbox the next morning. The whole point of Mindy is removing the enterprise sales friction that keeps small businesses locked out of professional market intelligence.",
+    a: "No. Pick a plan, enter a card (no charge for 14 days), and your first briefing lands in your inbox the next morning. The whole point of Mindy is removing the enterprise sales friction that keeps small businesses locked out of professional market intelligence.",
   },
   {
     q: 'Is there a free trial?',
-    a: 'Better — there\'s a permanent free tier. The Mindy Free plan gives you a daily opportunity digest across 3 NAICS codes. No credit card required. Upgrade to Pro when you want full briefings, unlimited NAICS, competitor tracking, and recompete alerts.',
+    a: 'Yes. Pro and Team both start with a 14-day free trial. Pick a plan on the pricing page and add a card — you are not charged until day 15, and you can cancel anytime before then.',
   },
 ];
 
@@ -188,7 +188,6 @@ export default function GovWinComparePage() {
         description:
           'Federal market intelligence platform for small business contractors. A small business alternative to Deltek GovWin.',
         offers: [
-          { '@type': 'Offer', name: 'Free', price: '0', priceCurrency: 'USD' },
           {
             '@type': 'Offer',
             name: 'Pro',
@@ -271,10 +270,10 @@ export default function GovWinComparePage() {
           </div>
 
           <Link
-            href="/signup"
+            href="/pricing"
             className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
-            Start Free — No Credit Card
+            Start 14-day free trial
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">First briefing lands tomorrow morning.</p>
         </div>
@@ -567,17 +566,17 @@ export default function GovWinComparePage() {
             <span className="text-(--mp-navy)">You have Mindy.</span>
           </h2>
           <p className="text-xl text-(--mp-body) mb-8">
-            Stop overpaying for enterprise intelligence you don&apos;t use. Start free, see your
+            Stop overpaying for enterprise intelligence you don&apos;t use. Try it free for 14 days and see your
             first briefing tomorrow morning.
           </p>
           <Link
-            href="/signup"
+            href="/pricing"
             className="inline-block px-10 py-4 bg-white hover:bg-(--mp-wash) text-(--mp-navy) rounded-lg font-bold text-lg transition-colors"
           >
-            Get Started Free
+            Start 14-day free trial
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">
-            No credit card. No sales call. Cancel anytime.
+            14-day free trial. No sales call. Cancel anytime.
           </p>
         </div>
       </section>

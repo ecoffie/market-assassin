@@ -23,7 +23,7 @@ import Link from 'next/link';
 export const metadata: Metadata = {
   title: 'WOSB Contract Opportunities — Women-Owned Federal Alerts | Mindy',
   description:
-    'Daily WOSB and EDWOSB set-aside opportunities from SAM.gov, agency forecasts, and recompetes. Free alerts for certified women-owned small business firms.',
+    'Daily WOSB and EDWOSB set-aside opportunities from SAM.gov, agency forecasts, and recompetes. Opportunity alerts for certified women-owned small business firms.',
   alternates: {
     canonical: 'https://getmindy.ai/set-asides/wosb',
   },
@@ -161,10 +161,10 @@ export default function WosbPage() {
             you only see work your certification actually unlocks.
           </p>
           <Link
-            href="/signup"
+            href="/pricing"
             className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
-            Get Free WOSB Opportunity Alerts
+            Start 14-day free trial
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">First briefing lands tomorrow morning.</p>
         </div>
@@ -439,13 +439,13 @@ export default function WosbPage() {
           </h2>
           <p className="text-lg text-(--mp-body) mb-8">
             Daily briefings filtered to WOSB and EDWOSB set-asides in your
-            eligible NAICS codes. Free. No credit card.
+            eligible NAICS codes. 14-day free trial. Cancel anytime.
           </p>
           <Link
-            href="/signup"
+            href="/pricing"
             className="inline-block px-10 py-4 bg-white hover:bg-(--mp-wash) text-(--mp-navy) rounded-lg font-bold text-lg transition-colors"
           >
-            Get Free WOSB Alerts
+            Start 14-day free trial
           </Link>
         </div>
       </section>

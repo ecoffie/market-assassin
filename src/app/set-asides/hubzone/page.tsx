@@ -21,7 +21,7 @@ import Link from 'next/link';
 export const metadata: Metadata = {
   title: 'HUBZone Contract Opportunities — Federal Set-Aside Alerts | Mindy',
   description:
-    'Daily HUBZone set-aside opportunities from SAM.gov, agency forecasts, and recompetes. Free alerts for certified HUBZone firms — including 10% price preference intel.',
+    'Daily HUBZone set-aside opportunities from SAM.gov, agency forecasts, and recompetes. Opportunity alerts for certified HUBZone firms — including 10% price preference intel.',
   alternates: {
     canonical: 'https://getmindy.ai/set-asides/hubzone',
   },
@@ -160,10 +160,10 @@ export default function HubzonePage() {
             on full-and-open bids where it kicks in.
           </p>
           <Link
-            href="/signup"
+            href="/pricing"
             className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
-            Get Free HUBZone Opportunity Alerts
+            Start 14-day free trial
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">First briefing lands tomorrow morning.</p>
         </div>
@@ -419,13 +419,13 @@ export default function HubzonePage() {
           </h2>
           <p className="text-lg text-(--mp-body) mb-8">
             Daily briefings filtered to HUBZone set-asides plus full-and-open bids
-            where the 10% price preference applies. Free. No credit card.
+            where the 10% price preference applies. 14-day free trial. Cancel anytime.
           </p>
           <Link
-            href="/signup"
+            href="/pricing"
             className="inline-block px-10 py-4 bg-white hover:bg-(--mp-wash) text-(--mp-navy) rounded-lg font-bold text-lg transition-colors"
           >
-            Get Free HUBZone Alerts
+            Start 14-day free trial
           </Link>
         </div>
       </section>

@@ -24,7 +24,7 @@ import Link from 'next/link';
 export const metadata: Metadata = {
   title: '8(a) Contract Opportunities — Federal Set-Aside Alerts | Mindy',
   description:
-    'Daily 8(a) set-aside opportunities from SAM.gov, agency forecasts, and recompetes. Free alerts for certified 8(a) firms — including sole-source intel.',
+    'Daily 8(a) set-aside opportunities from SAM.gov, agency forecasts, and recompetes. Opportunity alerts for certified 8(a) firms — including sole-source intel.',
   alternates: {
     canonical: 'https://getmindy.ai/set-asides/8a',
   },
@@ -163,10 +163,10 @@ export default function EightAPage() {
             the next sole-source is brewing.
           </p>
           <Link
-            href="/signup"
+            href="/pricing"
             className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
-            Get Free 8(a) Opportunity Alerts
+            Start 14-day free trial
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">First briefing lands tomorrow morning.</p>
         </div>
@@ -444,13 +444,13 @@ export default function EightAPage() {
           </h2>
           <p className="text-lg text-(--mp-body) mb-8">
             Daily briefings filtered to 8(a) set-asides and forecasts where your next
-            sole-source could come from. Free. No credit card.
+            sole-source could come from. 14-day free trial. Cancel anytime.
           </p>
           <Link
-            href="/signup"
+            href="/pricing"
             className="inline-block px-10 py-4 bg-white hover:bg-(--mp-wash) text-(--mp-navy) rounded-lg font-bold text-lg transition-colors"
           >
-            Get Free 8(a) Alerts
+            Start 14-day free trial
           </Link>
         </div>
       </section>

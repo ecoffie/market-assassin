@@ -26,11 +26,12 @@ describe('login modal — in-modal signup keeps the visitor on the map', () => {
     }
   });
 
-  it('"Create a free account" opens the in-modal signup step, NOT a page redirect', () => {
-    // The old behavior was toApp('&signup=1') (page leave). It must be gone.
+  it('"Start a 14-day free trial" links to /pricing (no free plan for new users), NOT the in-modal free signup', () => {
+    // The old behavior was toApp('&signup=1') (page leave). It must stay gone.
     expect(route).not.toContain("toApp('&signup=1')");
-    // The create link now switches to step 3 in-modal.
-    expect(route).toMatch(/lgmCreate.*addEventListener[\s\S]*?step\(3\)/);
+    expect(route).toContain('<a id="lgmCreate" href="/pricing">Start a 14-day free trial</a>');
+    expect(route).not.toMatch(/lgmCreate.*addEventListener[\s\S]*?step\(3\)/);
+    expect(route).not.toContain('Create a free account');
   });
 
   it('signup posts to the real endpoint (mindy-signup), reusing the app contract', () => {

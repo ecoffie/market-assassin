@@ -16,7 +16,7 @@ describe('raw-HTML public shell', () => {
     const d = doc(mpRawHeaderHtml());
     const header = d.querySelector('[data-mp-chrome] header.mp-head')!;
     expect(header).toBeTruthy();
-    const expected = ['/', ...MP_HEADER_PRODUCT_LINKS.map((l) => l.href), ...MP_HEADER_ACCOUNT_LINKS.map((l) => l.href), '/signup'];
+    const expected = ['/', ...MP_HEADER_PRODUCT_LINKS.map((l) => l.href), ...MP_HEADER_ACCOUNT_LINKS.map((l) => l.href), '/pricing'];
     expect(hrefs(header).slice(0, expected.length)).toEqual(expected);
     expect(header.querySelector('.mp-logo img')?.getAttribute('src')).toBe('/brand/mindy-logo-icon.png');
   });

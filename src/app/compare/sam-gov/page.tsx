@@ -50,7 +50,7 @@ const comparisonRows = [
   {
     feature: 'Price',
     samGov: 'Free (government-operated)',
-    mindy: 'Free / $149 Pro / $499 Teams',
+    mindy: '$149 Pro / $499 Teams (14-day free trial)',
   },
   {
     feature: 'Authoritative Source',
@@ -142,7 +142,7 @@ const faqs = [
   },
   {
     q: "Is there a free version of Mindy?",
-    a: "Yes. Mindy Free gives you a daily opportunity digest across 3 NAICS codes — no credit card, forever free. Pro ($149/mo) unlocks unlimited NAICS, full briefings with AI analysis, recompete alerts, competitor tracking, and weekly market deep dives.",
+    a: "There's a 14-day free trial. Pick Pro or Team on the pricing page and add a card — you aren't charged until the trial ends, and you can cancel anytime before then. Pro ($149/mo) unlocks unlimited NAICS, full briefings with AI analysis, recompete alerts, competitor tracking, and weekly market deep dives.",
   },
 ];
 
@@ -173,7 +173,6 @@ export default function SamGovComparePage() {
         description:
           'Intelligence layer on top of SAM.gov, Grants.gov, and federal forecasts. Personalized daily briefings for small business contractors.',
         offers: [
-          { '@type': 'Offer', name: 'Free', price: '0', priceCurrency: 'USD' },
           {
             '@type': 'Offer',
             name: 'Pro',
@@ -249,10 +248,10 @@ export default function SamGovComparePage() {
           </div>
 
           <Link
-            href="/signup"
+            href="/pricing"
             className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
-            Start Free — No Credit Card
+            Start 14-day free trial
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">First briefing lands tomorrow morning.</p>
         </div>
@@ -517,14 +516,14 @@ export default function SamGovComparePage() {
             <span className="text-(--mp-navy)">Let Mindy do it.</span>
           </h2>
           <p className="text-xl text-(--mp-body) mb-8">
-            Your first personalized briefing lands tomorrow morning. No credit card. No sales
+            Your first personalized briefing lands tomorrow morning. 14-day free trial. No sales
             call. Cancel anytime.
           </p>
           <Link
-            href="/signup"
+            href="/pricing"
             className="inline-block px-10 py-4 bg-white hover:bg-(--mp-wash) text-(--mp-navy) rounded-lg font-bold text-lg transition-colors"
           >
-            Get Your First Briefing Free
+            Start 14-day free trial
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">
             You&apos;ll still use SAM.gov. You just won&apos;t live there anymore.
