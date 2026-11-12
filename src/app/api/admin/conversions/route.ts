@@ -1,7 +1,8 @@
 /**
- * GET /api/admin/conversions?password=<ADMIN_PASSWORD>&days=30
- * Funnel conversion rates (2026-11-12):
- *   1. Lead magnets — page visitors (GA4) vs registrations (GHL tag count, all-time for the tag).
+ * GET /api/admin/conversions?password=<ADMIN_PASSWORD>&range=today|yesterday|week|month|year|7d|30d|90d
+ *     (or &range=custom&from=YYYY-MM-DD&to=YYYY-MM-DD). Dates are US Eastern; default last 30 days.
+ * Every number is read live for that window (2026-11-12):
+ *   1. Lead magnets — page visitors (GA4) vs registrations (GHL contacts with the tag, added in the window).
  *   2. Pricing page — visitors (GA4) vs new accounts (alert-settings rows created in the window)
  *      and trials started (completed Stripe checkouts on the four 14-day trial links).
  *   3. Homepage → pricing — homepage visitors vs pricing visitors who came straight from it.
@@ -16,6 +17,7 @@ import { countContactsByTag } from '@/lib/ghl/event-registration';
 import { LAZY_CONTRACTORS_BLUEPRINT as EVENT } from '@/lib/events/lazy-contractors-blueprint';
 import { COURSE_GHL_TAG } from '@/lib/course/govcon-roadmap';
 import { pageVisitors, rate, visitorsFromHomepage } from '@/lib/ga4/conversions';
+import { easternDate, resolveRange, type DateRange } from '@/lib/admin/date-range';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -37,20 +39,20 @@ const attempt = async <T,>(fn: () => Promise<T>): Promise<Maybe<T>> => {
 };
 const val = <T,>(m: Maybe<T>): T | null => (m.ok ? m.value : null);
 
-async function newAccounts(since: string): Promise<number> {
+async function newAccounts(startIso: string, endIso: string): Promise<number> {
   const { count, error } = await getCountClient().from('user_notification_settings')
-    .select('user_email', { count: 'exact', head: true }).gte('created_at', since);
+    .select('user_email', { count: 'exact', head: true }).gte('created_at', startIso).lt('created_at', endIso);
   if (error) throw new Error(error.message);
   if (count === null) throw new Error('count unavailable');
   return count;
 }
 
-async function trialStarts(sinceSec: number): Promise<number> {
+async function trialStarts(startSec: number, endSec: number): Promise<number> {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error('Stripe not configured');
   const stripe = new Stripe(key);
   let n = 0;
-  for await (const s of stripe.checkout.sessions.list({ created: { gte: sinceSec }, status: 'complete', limit: 100 })) {
+  for await (const s of stripe.checkout.sessions.list({ created: { gte: startSec, lt: endSec }, status: 'complete', limit: 100 })) {
     const link = typeof s.payment_link === 'string' ? s.payment_link : s.payment_link?.id;
     if (link && TRIAL_LINK_IDS.has(link)) n++;
   }
@@ -62,8 +64,8 @@ const APP_PRODUCTS = new Set(['prod_UI5RXVGKsdywuf']);
 const CREDIT_PRODUCTS = new Set(['prod_UumkGov5iWq6yV', 'prod_UumkgIa3mxdZeA', 'prod_VGXw6X6F4tSZvz']);
 type PaidCount = { app: number; credits: number };
 
-/** Paid Mindy subscriptions created since `sinceSec`, by UTC day and month (abandoned checkouts excluded). */
-async function paidSignups(sinceSec: number): Promise<{ byDay: Record<string, PaidCount>; byMonth: Record<string, PaidCount> }> {
+/** Paid Mindy subscriptions in [startSec, endSec), by Eastern day and month (abandoned checkouts excluded). */
+async function paidSignups(startSec: number, endSec: number): Promise<{ byDay: Record<string, PaidCount>; byMonth: Record<string, PaidCount> }> {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error('Stripe not configured');
   const stripe = new Stripe(key);
@@ -72,16 +74,16 @@ async function paidSignups(sinceSec: number): Promise<{ byDay: Record<string, Pa
   // A trial is not a sale: it counts on the day the card is first charged (trial end), and only if
   // it didn't cancel first. Look back 30 extra days so trials that convert inside the window are found.
   const nowSec = Math.floor(Date.now() / 1000);
-  for await (const s of stripe.subscriptions.list({ created: { gte: sinceSec - 30 * 86400 }, status: 'all', limit: 100 })) {
+  for await (const s of stripe.subscriptions.list({ created: { gte: startSec - 30 * 86400, lt: endSec }, status: 'all', limit: 100 })) {
     if (s.status === 'incomplete_expired' || s.status === 'incomplete' || s.status === 'trialing') continue;
     const paidAt = s.trial_end ?? s.created;
-    if (paidAt > nowSec || paidAt < sinceSec) continue;
+    if (paidAt > nowSec || paidAt < startSec || paidAt >= endSec) continue;
     if (s.trial_end && s.canceled_at && s.canceled_at <= s.trial_end) continue;
     const product = s.items.data[0]?.price?.product;
     const pid = typeof product === 'string' ? product : product?.id;
     const kind = pid && APP_PRODUCTS.has(pid) ? 'app' : pid && CREDIT_PRODUCTS.has(pid) ? 'credits' : null;
     if (!kind) continue;
-    const day = new Date(paidAt * 1000).toISOString().slice(0, 10);
+    const day = easternDate(paidAt * 1000);
     (byDay[day] ??= { app: 0, credits: 0 })[kind]++;
     (byMonth[day.slice(0, 7)] ??= { app: 0, credits: 0 })[kind]++;
   }
@@ -93,26 +95,27 @@ export async function GET(req: NextRequest) {
   if (!verifyAdminPassword(sp.get('password'))) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
   }
-  const days = Math.min(Math.max(Number(sp.get('days')) || 30, 1), 365);
-  const sinceMs = Date.now() - days * 86400_000;
-  const since = new Date(sinceMs).toISOString();
+  const range = resolveRange({ range: sp.get('range'), from: sp.get('from'), to: sp.get('to') });
+  const startIso = new Date(range.startMs).toISOString();
+  const endIso = new Date(range.endMs).toISOString();
+  const startSec = Math.floor(range.startMs / 1000);
+  const endSec = Math.ceil(range.endMs / 1000);
+  const dates = { startDate: range.from, endDate: range.to };
 
   const paths = ['/', '/pricing', ...LEAD_MAGNETS.map((m) => m.path)];
-  const paidDays = Math.min(Math.max(Number(sp.get('paidDays')) || 60, 1), 365);
-  const paidSince = Math.floor((Date.now() - paidDays * 86400_000) / 1000);
   const [visitors, fromHome, accounts, trials, paid, ...magnetRegs] = await Promise.all([
-    attempt(() => pageVisitors(paths, days)),
-    attempt(() => visitorsFromHomepage('/pricing', days)),
-    attempt(() => newAccounts(since)),
-    attempt(() => trialStarts(Math.floor(sinceMs / 1000))),
-    attempt(() => paidSignups(paidSince)),
-    ...LEAD_MAGNETS.map((m) => attempt(() => countContactsByTag(m.tag))),
+    attempt(() => pageVisitors(paths, dates)),
+    attempt(() => visitorsFromHomepage('/pricing', dates)),
+    attempt(() => newAccounts(startIso, endIso)),
+    attempt(() => trialStarts(startSec, endSec)),
+    attempt(() => paidSignups(startSec, endSec)),
+    ...LEAD_MAGNETS.map((m) => attempt(() => countContactsByTag(m.tag, fetch, { gte: startIso, lte: endIso }))),
   ]);
   const v = val(visitors);
   const visit = (p: string) => (v ? (v[p] ?? null) : null);
 
   const report = {
-    success: true, days, since,
+    success: true, range: { preset: range.preset, from: range.from, to: range.to, label: range.label, start: startIso, end: endIso },
     leadMagnets: LEAD_MAGNETS.map((m, i) => {
       const regs = val(magnetRegs[i]);
       return { name: m.name, path: m.path, visitors: visit(m.path), registrations: regs, rate: rate(regs, visit(m.path)) };
@@ -125,7 +128,7 @@ export async function GET(req: NextRequest) {
     homepage: {
       visitors: visit('/'), toPricing: val(fromHome), rate: rate(val(fromHome), visit('/')),
     },
-    paidSignups: { days: paidDays, ...(val(paid) ?? { byDay: null, byMonth: null }) },
+    paidSignups: val(paid) ?? { byDay: null, byMonth: null },
     errors: {
       ga4: visitors.ok ? undefined : visitors.error, ga4Referrer: fromHome.ok ? undefined : fromHome.error,
       accounts: accounts.ok ? undefined : accounts.error, stripe: trials.ok ? undefined : trials.error,
@@ -133,22 +136,21 @@ export async function GET(req: NextRequest) {
       ghl: magnetRegs.some((m) => !m.ok) ? magnetRegs.map((m) => (m.ok ? 'ok' : m.error)) : undefined,
     },
     notes: [
-      'Visitors = Google Analytics active users who viewed that page in the window.',
-      'Lead-magnet registrations = every GHL contact with that tag (all-time), so the rate is most accurate when the window covers the whole campaign.',
+      'Dates are US Eastern time. Visitors = Google Analytics active users who viewed that page in the window.',
+      'Lead-magnet registrations = GHL contacts with that tag whose contact was created in the window (someone already on your list who registers counts on the day they first joined the list).',
       'New accounts = alert-settings rows created in the window (every new account gets one).',
       'Trials started = completed Stripe checkouts on the four 14-day trial links.',
-      'Paid sign-ups = new Stripe subscriptions to Mindy (App = Pro/Team, Credits = MCP credit plans), by UTC date; a free trial counts on the day it is first charged, abandoned checkouts and trials that cancel are excluded, one-time purchases not counted.',
+      'Paid sign-ups = new Stripe subscriptions to Mindy (App = Pro/Team, Credits = MCP credit plans), by Eastern date; a free trial counts on the day it is first charged, abandoned checkouts and trials that cancel are excluded, one-time purchases not counted.',
     ],
   };
   if (sp.get('format') === 'json') return NextResponse.json(report);
 
-  return new NextResponse(renderHtml(report, val(paid), paidDays), {
+  return new NextResponse(renderHtml(report, val(paid), range, sp.get('password') ?? ''), {
     headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
   });
 }
 
 type Report = {
-  days: number; since: string;
   leadMagnets: { name: string; path: string; visitors: number | null; registrations: number | null; rate: string }[];
   pricing: { visitors: number | null; newAccounts: number | null; accountRate: string; trialsStarted: number | null; trialRate: string };
   homepage: { visitors: number | null; toPricing: number | null; rate: string };
@@ -174,21 +176,30 @@ function bars(steps: { label: string; value: number | null; note?: string }[], c
   }).join('')}</div>`;
 }
 
-function renderHtml(r: Report, paid: Paid, paidDays: number): string {
+const PICKER: [string, string][] = [['today', 'Today'], ['yesterday', 'Yesterday'], ['week', 'This week'], ['month', 'This month'], ['year', 'This year'], ['7d', '7 days'], ['30d', '30 days'], ['90d', '90 days']];
+
+function picker(range: DateRange, password: string): string {
+  const pw = encodeURIComponent(password);
+  const links = PICKER.map(([k, l]) => `<a class="chip"${range.preset === k ? ' aria-current="true"' : ''} href="?password=${pw}&amp;range=${k}">${l}</a>`).join('');
+  return `<nav class="picker" aria-label="Date range">${links}
+<form class="custom" method="get"><input type="hidden" name="password" value="${esc(password)}"><input type="hidden" name="range" value="custom">
+<label>From <input type="date" id="from" name="from" value="${range.from}" required></label><label>To <input type="date" id="to" name="to" value="${range.to}" required></label><button type="submit"${range.preset === 'custom' ? ' aria-current="true"' : ''}>Apply</button></form></nav>`;
+}
+
+function renderHtml(r: Report, paid: Paid, range: DateRange, password: string): string {
   const months = paid ? Object.keys(paid.byMonth).sort() : [];
   const daysList = paid ? Object.keys(paid.byDay).sort().reverse() : [];
   const sum = (o: Record<string, PaidCount>) => Object.values(o).reduce((a, c) => a + c.app + c.credits, 0);
   const paidTotal = paid ? sum(paid.byMonth) : null;
-  const thisMonth = new Date().toISOString().slice(0, 7);
-  const tm = paid?.byMonth[thisMonth];
+  const spanDays = Math.round((Date.UTC(+range.to.slice(0, 4), +range.to.slice(5, 7) - 1, +range.to.slice(8)) - Date.UTC(+range.from.slice(0, 4), +range.from.slice(5, 7) - 1, +range.from.slice(8))) / 86400_000) + 1;
   const appTotal = paid ? Object.values(paid.byMonth).reduce((a, c) => a + c.app, 0) : null;
   const creditTotal = paid ? Object.values(paid.byMonth).reduce((a, c) => a + c.credits, 0) : null;
   const mindyDay = r.leadMagnets[0];
 
   const take = [
-    r.pricing.visitors !== null ? `<b>${fmt(r.pricing.visitors)}</b> people saw the pricing page in the last ${r.days} days` : '',
+    r.pricing.visitors !== null ? `<b>${fmt(r.pricing.visitors)}</b> people saw the pricing page` : '',
     r.pricing.trialsStarted !== null ? `and <b>${fmt(r.pricing.trialsStarted)}</b> started a free trial (${r.pricing.trialRate}).` : '.',
-    paidTotal !== null ? `<b>${paidTotal}</b> paid sign-ups in the last ${paidDays} days.` : '',
+    paidTotal !== null ? `<b>${paidTotal}</b> paid sign-up${paidTotal === 1 ? '' : 's'}.` : '',
   ].filter(Boolean).join(' ');
 
   const monthRows = months.slice().reverse().map((m) => {
@@ -224,9 +235,13 @@ td{padding:8px 10px;border-bottom:1px solid var(--line)}.r{text-align:right}.mut
 .tab[aria-selected=true]{color:var(--fg);border-bottom-color:currentColor;font-weight:600}.pane{display:grid;gap:28px}
 .cols{display:flex;align-items:flex-end;gap:6px;height:150px;padding-top:8px}.col{flex:1;display:grid;gap:4px;justify-items:center;font-size:12px;color:var(--muted);min-width:0}
 .colbar{width:100%;max-width:56px;border-radius:6px 6px 0 0;display:flex;flex-direction:column-reverse;overflow:hidden}
+.picker{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.chip,.custom button{font:inherit;font-size:13px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--fg);text-decoration:none;cursor:pointer}
+.chip[aria-current=true],.custom button[aria-current=true]{background:var(--fg);color:var(--bg);border-color:var(--fg)}.custom{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
+.custom input{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--fg)}
 .legend{display:flex;gap:16px;font-size:13px;color:var(--muted)}.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
 </style></head><body><div class="wrap">
-<header class="head"><h1>Conversions</h1><p>Last ${r.days} days (since ${r.since.slice(0, 10)}) · paid sign-ups: last ${paidDays} days · <code>&amp;days=</code>, <code>&amp;paidDays=</code>, <code>&amp;format=json</code></p><p class="take">${take}</p></header>
+<header class="head"><h1>Conversions</h1><p>${esc(range.label)} · live · Eastern time</p><p class="take">${take}</p></header>
+${picker(range, password)}
 <div class="tabs" role="tablist"><button class="tab" role="tab" data-tab="funnel" aria-selected="true">Funnel</button><button class="tab" role="tab" data-tab="paid" aria-selected="false">Paid sign-ups</button></div>
 
 <div class="pane" id="funnel">
@@ -255,9 +270,9 @@ ${r.leadMagnets.map((m) => `<div class="card"><h3>${esc(m.name)}</h3><p class="n
 
 <div class="pane" id="paid" hidden>
 <section class="sec"><div class="tiles">
-${tile(`Paid sign-ups (${paidDays} days)`, fmt(paidTotal), `${fmt(appTotal)} app · ${fmt(creditTotal)} credit plans`)}
-${tile('This month', paid ? String((tm?.app ?? 0) + (tm?.credits ?? 0)) : fmt(null), monthName(thisMonth))}
-${tile('Days with a sign-up', paid ? String(daysList.length) : fmt(null), `out of ${paidDays}`)}
+${tile('Paid sign-ups', fmt(paidTotal), `${fmt(appTotal)} app · ${fmt(creditTotal)} credit plans`)}
+${tile('Free trials started', fmt(r.pricing.trialsStarted), 'Become paid when first charged')}
+${tile('Days with a sign-up', paid ? String(daysList.length) : fmt(null), `out of ${spanDays}`)}
 </div></section>
 <section class="sec"><h2>Month by month</h2><div class="card">
 <div class="legend"><span><span class="dot" style="background:var(--c1)"></span>App (Pro/Team)</span><span><span class="dot" style="background:var(--c2)"></span>Credit plans</span></div>
