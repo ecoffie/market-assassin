@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import MemberProof from '@/components/public-site/MemberProof';
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
@@ -167,6 +168,7 @@ function MindySignupContent() {
             <>
               <h1 className="su-h">Sign up for free</h1>
               <p className="su-sub">No credit card required</p>
+              <MemberProof />
               {/* The credit grant is the real hook for a stranger — it is what they get the moment
                   they finish signing up (granted automatically at oauth/token by
                   grantSignupCreditsIfFirst, once per email). A live partner referral shows its trial
