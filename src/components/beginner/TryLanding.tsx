@@ -226,7 +226,7 @@ export function TryLanding() {
     }
   }
 
-  const ctaHref = member ? '/app' : '/signup';
+  const ctaHref = member ? '/app' : '/pricing';
   const showCta = member !== null && (view?.outcome === 'results' || view?.outcome === 'empty');
   const reveal = view?.reveal ?? null;
   const showUncovered =

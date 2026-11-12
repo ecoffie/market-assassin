@@ -109,14 +109,14 @@ export default function McpAboutPage() {
             GovCon tools — so the answers come from real federal data, not the model&apos;s imagination.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link href="/mcp" className="rounded-none bg-(--mp-navy) px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-(--mp-navy-hover)">
-              Connect free — 100 credits
+            <Link href="/pricing" className="rounded-none bg-(--mp-navy) px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-(--mp-navy-hover)">
+              Start 14-day free trial
             </Link>
             <Link href="/mcp/pricing" className="rounded-none border border-(--mp-line) bg-(--mp-surface) px-5 py-2.5 text-sm font-medium text-(--mp-ink) transition hover:bg-(--mp-wash)">
               See pricing
             </Link>
           </div>
-          <p className="mx-auto mt-3 text-[12px] text-(--mp-muted)">No API key — you sign in through your browser. No card.</p>
+          <p className="mx-auto mt-3 text-[12px] text-(--mp-muted)">No API key — you sign in through your browser. 14-day free trial.</p>
         </section>
 
         {/* THE PROBLEM — flying blind */}
@@ -215,14 +215,14 @@ export default function McpAboutPage() {
             your agent can run a real BD task — find the opportunity, size the market, vet the incumbent, draft the response.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link href="/mcp" className="rounded-none bg-(--mp-navy) px-6 py-3 text-sm font-semibold text-white transition hover:bg-(--mp-navy-hover)">
-              Connect your agent — free
+            <Link href="/pricing" className="rounded-none bg-(--mp-navy) px-6 py-3 text-sm font-semibold text-white transition hover:bg-(--mp-navy-hover)">
+              Start 14-day free trial
             </Link>
             <Link href="/mcp/pricing" className="rounded-none border border-(--mp-line) bg-(--mp-surface) px-6 py-3 text-sm font-medium text-(--mp-ink) transition hover:bg-(--mp-wash)">
               See pricing
             </Link>
           </div>
-          <p className="mx-auto mt-4 text-[12px] text-(--mp-muted)">100 free credits on your first connect — no card required.</p>
+          <p className="mx-auto mt-4 text-[12px] text-(--mp-muted)">14-day free trial of Pro or Team. Already a member? <Link href="/mcp" className="underline underline-offset-2">Connect your agent</Link>.</p>
           {/*
             Developers vetting a dependency check the source before they adopt it. This
             page is where that vetting happens, so the repo link belongs here as well as

@@ -111,7 +111,8 @@ export const LOGIN_MODAL_HTML =
   +       '<button class="lgm-cta" id="lgmSignin">Sign in</button>'
   +       '<p class="lgm-create" style="text-align:center;margin-top:18px" id="lgmSetupRow">No password yet? <a id="lgmSetup">Set up my account</a></p>'
   +     '</div>'
-        // STEP 3 — create a free account (name + email; password is set via the emailed setup link)
+        // STEP 3 — create an account (name + email; password is set via the emailed setup link). Not
+        // opened from "New to Mindy?" any more — that is a link to /pricing (14-day trial, Nov 2026).
   +     '<div class="lgm-step3" id="lgmStep3" style="display:none">'
   +       '<div class="lgm-back" id="lgmBack3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>Back</div>'
   +       '<h2>Create your account</h2>'
@@ -217,7 +218,7 @@ export const LOGIN_MODAL_JS = `<script>(function(){
   var su=document.getElementById('lgmSetup'); su&&su.addEventListener('click',function(){ toApp('&setup=1&email='+encodeURIComponent((emailIn.value||'').trim().toLowerCase())); });
   var fg=document.getElementById('lgmForgot'); fg&&fg.addEventListener('click',function(){ toApp('&forgot=1&email='+encodeURIComponent((emailIn.value||'').trim().toLowerCase())); });
 
-  // ── Step 3: create a free account (email-first; password set via the emailed setup link).
+  // ── Step 3: create an account (email-first; password set via the emailed setup link).
   // The pending action (Save/Pursuit) is QUEUED to localStorage BEFORE the email round-trip, so it
   // completes automatically when the user returns via the setup link — the intent is never lost.
   function queueIntent(em){

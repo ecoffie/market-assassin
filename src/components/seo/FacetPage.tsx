@@ -128,13 +128,13 @@ export default function FacetPage({
         <div className="mt-8 border border-(--mp-line) rounded-lg p-6 bg-(--mp-wash)">
           <h2 className="text-lg font-bold text-(--mp-ink)">Never miss one — track this market in Mindy</h2>
           <p className="text-sm text-(--mp-muted) mt-1">
-            Free daily alerts the moment a matching opportunity posts, plus who holds the work now and
+            Daily alerts the moment a matching opportunity posts, plus who holds the work now and
             who&apos;s likely to bid — grounded in real government data.
           </p>
           <div className="mt-4">
             <MemberAwareCta appearance="public" memberHref="/app" memberLabel="Open Mindy →">
-              <Link href="/app" className="inline-block bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-lg px-5 py-2.5 text-sm">
-                Get free alerts in Mindy →
+              <Link href="/pricing" className="inline-block bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-lg px-5 py-2.5 text-sm">
+                Start 14-day free trial →
               </Link>
             </MemberAwareCta>
           </div>

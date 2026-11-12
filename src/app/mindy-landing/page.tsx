@@ -9,7 +9,8 @@ import { MindyLogo } from '@/components/mindy/MindyLogo';
 // referrer captured pre-checkout) is joined to the Stripe purchase event.
 const CHECKOUT_MONTHLY = '/checkout/mindy-pro-monthly'; // $149/mo
 const CHECKOUT_ANNUAL = '/checkout/mindy-pro-annual';   // $1,490/yr
-const FREE_SIGNUP_URL = '/signup';
+// No free plan for new users (Nov 2026): signup CTAs go to /pricing for the 14-day trial.
+const TRIAL_URL = '/pricing';
 const DASHBOARD_URL = '/app';
 
 /**
@@ -55,7 +56,6 @@ export default function MindyLandingPage() {
         operatingSystem: 'Web',
         description: 'Your 24/7 federal market intelligence analyst. Scans 24,000+ opportunities daily, tracks competitors, and delivers personalized briefings.',
         offers: [
-          { '@type': 'Offer', name: 'Free', price: '0', priceCurrency: 'USD' },
           { '@type': 'Offer', name: 'Pro', price: '149', priceCurrency: 'USD', priceSpecification: { '@type': 'UnitPriceSpecification', price: '149', priceCurrency: 'USD', unitCode: 'MON' } },
           { '@type': 'Offer', name: 'Teams', price: '499', priceCurrency: 'USD', priceSpecification: { '@type': 'UnitPriceSpecification', price: '499', priceCurrency: 'USD', unitCode: 'MON' } },
         ],
@@ -140,17 +140,17 @@ export default function MindyLandingPage() {
               Sign in
             </Link>
             <Link
-              href={FREE_SIGNUP_URL}
+              href={TRIAL_URL}
               className="rounded-lg bg-purple-600 hover:bg-purple-500 px-4 py-2 text-sm font-semibold text-white transition-colors"
             >
-              Start free
+              Start free trial
             </Link>
           </div>
         </nav>
       </header>
 
       {/* HERO — value proposition + two CTAs + the real product. No login form: that
-          moved to the nav (see above). Primary CTA is "Start free", NOT "Go Pro —
+          moved to the nav (see above). Primary CTA is the 14-day free trial, NOT "Go Pro —
           $149/mo"; HigherGov leads with Demo/Free Trial, and asking a stranger for a
           card before showing value is the wrong order. Paid CTAs live in the pricing
           section further down. */}
@@ -166,10 +166,10 @@ export default function MindyLandingPage() {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
             <Link
-              href={FREE_SIGNUP_URL}
+              href={TRIAL_URL}
               className="px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-purple-900/40 transition-all"
             >
-              Start free
+              Start 14-day free trial
             </Link>
             <a
               href="#product"
@@ -178,7 +178,7 @@ export default function MindyLandingPage() {
               See it in action
             </a>
           </div>
-          <p className="text-sm text-faint mb-12">Free forever · No credit card required</p>
+          <p className="text-sm text-faint mb-12">14-day free trial · Cancel anytime</p>
 
           {/* PRODUCT VISUAL in the hero — the real thing on real federal data. Every
               competitor either shows the product or a concrete data visual; this page
@@ -283,11 +283,11 @@ export default function MindyLandingPage() {
       {/* CREATE ACCOUNT / SIGN IN — the form still has a home, just not in the hero.
           The demo video that used to live here was PROMOTED into the hero (a stranger
           should see the product without scrolling), so this slot became the signup
-          block: nav "Start free" and the hero CTA both anchor here. */}
+          block. */}
       <section id="product" className="max-w-md mx-auto px-4 py-16 scroll-mt-20">
-        <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-3">Get your first briefing free</h2>
+        <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-3">Sign in to Mindy</h2>
         <p className="text-muted text-center mb-8">
-          No credit card. Your first personalized federal briefing lands tomorrow morning.
+          New here? Start a 14-day free trial — your first personalized federal briefing lands the next morning.
         </p>
         <MindySignupForm />
       </section>
@@ -508,39 +508,7 @@ export default function MindyLandingPage() {
             The tagline says it all: The big contractors have armies. You have Mindy.
           </p>
 
-          <div className="grid md:grid-cols-3 gap-6">
-            {/* Free */}
-            <div className="bg-surface border border-hairline rounded-2xl p-8">
-              <h3 className="text-xl font-bold text-white mb-2">Free</h3>
-              <div className="flex items-baseline gap-1 mb-4">
-                <span className="text-4xl font-bold text-white">$0</span>
-                <span className="text-muted">/mo</span>
-              </div>
-              <p className="text-muted text-sm mb-6">Start finding opportunities today</p>
-
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-start gap-2 text-ink-soft text-sm">
-                  <span className="text-emerald-400 mt-0.5">✓</span>
-                  <span>Daily opportunity digest</span>
-                </li>
-                <li className="flex items-start gap-2 text-ink-soft text-sm">
-                  <span className="text-emerald-400 mt-0.5">✓</span>
-                  <span>5 NAICS codes</span>
-                </li>
-                <li className="flex items-start gap-2 text-faint text-sm">
-                  <span className="mt-0.5">—</span>
-                  <span>No AI analysis</span>
-                </li>
-              </ul>
-
-              <Link
-                href={FREE_SIGNUP_URL}
-                className="block w-full py-3 bg-input hover:bg-slate-600 text-white font-semibold rounded-xl text-center transition-colors"
-              >
-                Start Free
-              </Link>
-            </div>
-
+          <div className="grid md:grid-cols-2 gap-6">
             {/* Pro - Most Popular */}
             <div className="bg-gradient-to-br from-purple-900/50 to-slate-800 border-2 border-purple-500 rounded-2xl p-8 relative">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
@@ -698,10 +666,10 @@ export default function MindyLandingPage() {
           </p>
 
           <Link
-            href={FREE_SIGNUP_URL}
+            href={TRIAL_URL}
             className="inline-block px-10 py-4 bg-white hover:bg-slate-100 text-purple-700 rounded-xl font-bold text-lg shadow-xl transition-all hover:scale-105"
           >
-            Meet Mindy — Get Your First Briefing Free
+            Meet Mindy — Start 14-day free trial
           </Link>
         </div>
       </section>

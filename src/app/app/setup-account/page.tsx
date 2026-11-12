@@ -80,8 +80,8 @@ export default function MISetupAccountRequestPage() {
             <div className="rounded-lg border border-amber-500/40 bg-amber-950/40 px-4 py-3 text-sm text-amber-100">
               We couldn&apos;t find Mindy access for that email.
             </div>
-            <Link href="/app" className="font-medium text-emerald-400 hover:text-emerald-300">
-              Create a free account
+            <Link href="/pricing" className="font-medium text-emerald-400 hover:text-emerald-300">
+              Start 14-day free trial
             </Link>
           </div>
         ) : (

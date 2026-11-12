@@ -39,7 +39,6 @@ export interface UnifiedPricingProps {
 }
 
 // ---- Links (unchanged from the previous pages) ----
-const SIGNUP_URL = '/signup';
 const PRO_CHECKOUT_MONTHLY = 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C'; // $149/mo
 const PRO_CHECKOUT_ANNUAL = 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D'; // $1,490/yr
 const TEAMS_CONTACT_URL = '/contact-sales';
@@ -57,7 +56,6 @@ const TEAM_ANNUAL_USD = 4027;
 const TEAM_ANNUAL_PER_MONTH = 335.58;
 const TEAM_ANNUAL_PCT = Math.round((1 - TEAM_ANNUAL_USD / (499 * 12)) * 100); // 33
 const ENTERPRISE_CONTACT_URL = '/contact-sales';
-const MCP_TRIAL_URL = '/app';
 const REFERRALS_URL = '/app?panel=settings&section=credits&tab=referrals';
 const GOVWIN_URL = '/compare/govwin';
 
@@ -206,16 +204,8 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
 
   // ---- App cards ----
   const appCards: CardModel[] = [
-    {
-      name: 'Free', tag: 'For contractors just getting started.', price: 0, per: '/mo forever',
-      href: SIGNUP_URL, cta: 'Start Free', note: 'No credit card required.',
-      credits: [fmt(signupCredits), 'MCP credits', 'one-time'], tree: [['3', 'NAICS codes tracked'], ['Daily', 'opportunity digest']],
-      secs: [
-        ['Daily intelligence', [['Daily opportunity digest', 1], ['AI-matched briefings', 0], ['Unlimited NAICS codes', 0], ['Target agency filtering', 0]]],
-        ['Competitive intelligence', [['Competitor tracking', 0], ['Recompete alerts 12 mo out', 0], ['Incumbent visibility', 0], ['Agency spending analysis', 0]]],
-        ['Forecasts & support', [[`${forecastsLabel} agency forecasts`, 1, 'Browse'], ['Weekly market deep dives', 0], ['Email support', 1], ['Priority response (24hr)', 0]]],
-      ],
-    },
+    // No Free card: there is no free plan for new users (Nov 2026). Pro and Teams carry the
+    // 14-day trial.
     {
       name: 'Pro', badge: '✦ Most popular', color: 'navy', tag: 'The $150K capture manager in your pocket.',
       price: annual ? 124 : 149, was: annual ? 149 : undefined, per: annual ? '/mo billed yearly' : '/mo',
@@ -306,9 +296,9 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
       return {
         cap: trial,
         card: {
-          name: 'Free trial', tag: `Your ${trial} signup credits cover a first month.`, badge: '✦ Recommended', color: 'navy',
-          price: 0, per: 'one-time', href: MCP_TRIAL_URL, cta: 'Start free', note: 'Granted the moment you connect.',
-          credits: [fmt(trial), 'credits', 'one-time'], tree: [['No', 'credit card'], ['All', 'tools included']], secs: [],
+          name: '14-day free trial', tag: 'Start with a 14-day free trial of Pro or Team.', badge: '✦ Recommended', color: 'navy',
+          price: 0, per: 'for 14 days', href: '/pricing', cta: 'Start 14-day free trial', note: 'Card required. No charge for 14 days. Cancel anytime.',
+          credits: [fmt(proCr), 'MCP credits', '/ month on Pro'], tree: [['14', 'days free'], ['All', 'tools included']], secs: [],
         },
       };
     }
@@ -326,19 +316,19 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
   type Row = [string] | [string, ...ReactNode[]];
   const cmp: Record<PricingTab, { cols: string[]; hl: number; rows: Row[] }> = {
     app: {
-      cols: ['Free', 'Pro', 'Teams'], hl: 1, rows: [
+      cols: ['Pro', 'Teams'], hl: 0, rows: [
         ['Daily intelligence'],
-        ['Daily opportunity digest', Y, Y, Y], ['AI-matched briefings', N, Y, Y], ['NAICS codes tracked', '3', 'Unlimited', 'Unlimited'], ['Target agency filtering', N, Y, Y],
+        ['Daily opportunity digest', Y, Y], ['AI-matched briefings', Y, Y], ['NAICS codes tracked', 'Unlimited', 'Unlimited'], ['Target agency filtering', Y, Y],
         ['Competitive intelligence'],
-        ['Competitor tracking', N, Y, Y], ['Recompete alerts (12 mo out)', N, Y, Y], ['Incumbent visibility', N, Y, Y], ['Agency spending analysis', N, Y, Y],
+        ['Competitor tracking', Y, Y], ['Recompete alerts (12 mo out)', Y, Y], ['Incumbent visibility', Y, Y], ['Agency spending analysis', Y, Y],
         ['Forecast & strategy'],
-        [`${forecastsLabel} agency forecasts`, 'Browse', 'Full access', 'Full access'], ['Weekly market deep dives', N, Y, Y],
+        [`${forecastsLabel} agency forecasts`, 'Full access', 'Full access'], ['Weekly market deep dives', Y, Y],
         ['Team & collaboration'],
-        ['Users included', '1', '1', '5 (more on request)'], ['Shared pipeline', N, N, Y], ['Team dashboard', N, N, Y], ['Role-based access', N, N, Y],
+        ['Users included', '1', '5 (more on request)'], ['Shared pipeline', N, Y], ['Team dashboard', N, Y], ['Role-based access', N, Y],
         ['AI agent access (MCP)'],
-        ['Use Mindy in Claude, Cursor, any agent', Y, Y, Y], ['Credits included', `${fmt(signupCredits)} one-time`, `${fmt(proCr)}/mo`, `${fmt(teamCr)}/mo`], ['Tools available', 'All', 'All', 'All'], ['Buy additional credits', Y, Y, Y],
+        ['Use Mindy in Claude, Cursor, any agent', Y, Y], ['Credits included', `${fmt(proCr)}/mo`, `${fmt(teamCr)}/mo`], ['Tools available', 'All', 'All'], ['Buy additional credits', Y, Y],
         ['Support'],
-        ['Email support', Y, Y, Y], ['Priority response (24hr)', N, Y, Y], ['Onboarding call', N, N, Y],
+        ['Email support', Y, Y], ['Priority response (24hr)', Y, Y], ['Onboarding call', N, Y],
       ],
     },
     mcp: {
@@ -373,11 +363,11 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
       <div className="wrap">
         <section className="promo">
-          <h1><span className="l1">GovWin-grade intel for $149, not $15,000.</span><br /><span className="l2">Start free. No card. No sales call.</span></h1>
+          <h1><span className="l1">GovWin-grade intel for $149, not $15,000.</span><br /><span className="l2">14-day free trial. No sales call.</span></h1>
           <p>Daily opportunity digest, recompete alerts, competitor tracking — and Mindy&apos;s tools inside Claude, Cursor, or any AI agent.</p>
           <MemberProof />
           <div className="row">
-            <span className="chip">✦ {fmt(signupCredits)} free MCP credits on signup</span>
+            <span className="chip">✦ 14-day free trial on Pro and Team</span>
             <span className="chip">↺ Cancel anytime</span>
             <a className="chip" href={REFERRALS_URL}>♥ Refer a friend — you both get 100 credits →</a>
           </div>
@@ -543,10 +533,10 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
         </div>
 
         <section className="final">
-          <h2>Start free.<br />See your first briefing tomorrow.</h2>
-          <p>Three NAICS codes, a daily digest, and {fmt(signupCredits)} MCP credits. Upgrade when you&apos;re ready for the full intelligence layer.</p>
+          <h2>Start your 14-day free trial.<br />See your first briefing tomorrow.</h2>
+          <p>Pick Pro or Team. Card required, no charge for 14 days. Cancel anytime.</p>
           <div className="btns">
-            <a className="cta light" href={SIGNUP_URL}>Get Started Free</a>
+            <a className="cta light" href="/pricing">Start 14-day free trial</a>
             <Link className="cta" href="/mcp">Connect Mindy to your AI →</Link>
           </div>
           <p className="quote">&ldquo;The big contractors have armies. You have Mindy.&rdquo;</p>

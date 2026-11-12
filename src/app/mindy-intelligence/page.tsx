@@ -33,7 +33,8 @@ const TOTALS = {
 };
 
 const DASHBOARD_URL = '/app';
-const FREE_SIGNUP_URL = '/signup';
+// No free plan for new users (Nov 2026): the trial is chosen on /pricing.
+const TRIAL_URL = '/pricing';
 
 export default function MindyIntelligencePage() {
   const jsonLd = {
@@ -76,10 +77,10 @@ export default function MindyIntelligencePage() {
           </p>
           <div className="flex flex-wrap gap-3 justify-center">
             <Link
-              href={FREE_SIGNUP_URL}
+              href={TRIAL_URL}
               className="px-6 py-3 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-none font-semibold transition-colors"
             >
-              Try Mindy free
+              Start 14-day free trial
             </Link>
             <Link
               href={DASHBOARD_URL}
@@ -433,10 +434,10 @@ export default function MindyIntelligencePage() {
           </div>
           <div className="flex flex-wrap gap-3 justify-center">
             <Link
-              href={FREE_SIGNUP_URL}
+              href={TRIAL_URL}
               className="px-6 py-3 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-none font-semibold transition-colors"
             >
-              Try Mindy free
+              Start 14-day free trial
             </Link>
             <Link
               href={DASHBOARD_URL}

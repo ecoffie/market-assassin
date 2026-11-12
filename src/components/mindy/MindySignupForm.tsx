@@ -11,8 +11,10 @@ export function MindySignupForm() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [oauthLoading, setOauthLoading] = useState<'google' | 'microsoft' | null>(null);
-  // Sign in vs. create account toggle. Defaults to 'signup' (Create account).
-  const [mode, setMode] = useState<'signup' | 'signin'>('signup');
+  // Sign in vs. create account toggle. Defaults to 'signin': there is no free plan for new users
+  // (Nov 2026), so the second tab is a link to /pricing (14-day trial, card required), not the
+  // free-signup form below.
+  const [mode, setMode] = useState<'signup' | 'signin'>('signin');
   // Inline password sign-in (Eric 2026-07-27: the home widget must show the REAL email+password
   // form when signing in — co-equal with /app — not just a "go to /app" link).
   const [password, setPassword] = useState('');
@@ -134,15 +136,12 @@ export function MindySignupForm() {
         >
           Sign in
         </button>
-        <button
-          type="button"
-          onClick={() => { setMode('signup'); setError(''); }}
-          className={`flex-1 py-2 rounded-md text-sm font-semibold transition-colors ${
-            mode === 'signup' ? 'bg-purple-600 text-white' : 'text-slate-300 hover:text-white'
-          }`}
+        <a
+          href="/pricing"
+          className="flex-1 py-2 rounded-md text-sm font-semibold text-center transition-colors text-slate-300 hover:text-white"
         >
-          Create free account
-        </button>
+          Start free trial
+        </a>
       </div>
       <div className="space-y-3">
         <button
@@ -257,14 +256,11 @@ export function MindySignupForm() {
             disabled={isSubmitting || oauthLoading !== null}
             className="w-full px-5 py-3.5 text-white rounded-xl font-semibold text-base shadow-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-purple-600 hover:bg-purple-500 shadow-purple-500/20"
           >
-            {isSubmitting ? 'Creating your briefing…' : 'Get Your First Briefing Free'}
+            {isSubmitting ? 'Creating your briefing…' : 'Get Your First Briefing'}
           </button>
           {error && (
             <p className="text-red-400 text-sm pt-1">{error}</p>
           )}
-          <p className="text-slate-500 text-xs text-center pt-2">
-            Free forever · No credit card required
-          </p>
         </form>
       )}
     </div>
