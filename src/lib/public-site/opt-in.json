@@ -85,7 +85,8 @@
     "src/app/mdeat",
     "src/app/lazy-contractors-blueprint",
     "src/app/jobs",
-    "src/app/course"
+    "src/app/course",
+    "src/app/features"
   ],
   "runtimeRoutes": [
     "/today",
@@ -171,7 +172,14 @@
     "/ncmbc",
     "/mdeat",
     "/lazy-contractors-blueprint",
-    "/lazy-contractors-blueprint/claim"
+    "/lazy-contractors-blueprint/claim",
+    "/features/opportunity-map",
+    "/features/mindy-in-your-ai",
+    "/features/recompetes",
+    "/features/forecasts",
+    "/features/players",
+    "/features/market-research",
+    "/features/bid-with-confidence"
   ],
   "parityRoutes": [
     "/today",
