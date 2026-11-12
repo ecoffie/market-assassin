@@ -179,6 +179,9 @@ export async function POST(request: NextRequest) {
         tier = 'team_monthly';
       } else if (productId === 'price_1TZxcAK5zyiZ50PBcBg0ZvoV') {
         tier = 'team_annual';
+      } else if (productId === 'price_1Uaz3WK5zyiZ50PBKQY8W1WX') {
+        // Team annual $4,027/yr (33% off), 2026-11-12.
+        tier = 'team_annual';
       } else if (normalizedDescription.includes('team monthly') || normalizedDescription.includes('team annual')) {
         tier = normalizedDescription.includes('annual') ? 'team_annual' : 'team_monthly';
       } else if (
@@ -212,7 +215,7 @@ export async function POST(request: NextRequest) {
       if (!tier && session.amount_total === 49900) {
         tier = 'team_monthly';
       }
-      if (!tier && session.amount_total === 499000) {
+      if (!tier && (session.amount_total === 499000 || session.amount_total === 402700)) {
         tier = 'team_annual';
       }
 

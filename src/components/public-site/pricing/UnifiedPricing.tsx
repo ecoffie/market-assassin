@@ -43,16 +43,16 @@ const SIGNUP_URL = '/signup';
 const PRO_CHECKOUT_MONTHLY = 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C'; // $149/mo
 const PRO_CHECKOUT_ANNUAL = 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D'; // $1,490/yr
 const TEAMS_CONTACT_URL = '/contact-sales';
-// 14-day Pro trial (growth plan): Stripe payment links with a 14-day trial set in the dashboard.
-// The trial copy shows ONLY when both links are configured, so the page never promises a trial
-// the checkout doesn't give.
-const PRO_TRIAL_MONTHLY = process.env.NEXT_PUBLIC_PRO_TRIAL_CHECKOUT_MONTHLY || '';
-const PRO_TRIAL_ANNUAL = process.env.NEXT_PUBLIC_PRO_TRIAL_CHECKOUT_ANNUAL || '';
+// 14-day trial payment links (created 2026-11-12; each carries metadata.tier for the webhook,
+// because a trial checkout completes at $0 and amount/price fallbacks cannot identify it).
+// Env vars override. The trial copy shows only when a link is set.
+const PRO_TRIAL_MONTHLY = process.env.NEXT_PUBLIC_PRO_TRIAL_CHECKOUT_MONTHLY || 'https://buy.stripe.com/7sYcN64Au4QWcFv70QfnO18';
+const PRO_TRIAL_ANNUAL = process.env.NEXT_PUBLIC_PRO_TRIAL_CHECKOUT_ANNUAL || 'https://buy.stripe.com/fZudRaff82IO48Z5WMfnO19';
 const PRO_TRIAL = !!(PRO_TRIAL_MONTHLY && PRO_TRIAL_ANNUAL);
 // Team annual: $4,027/yr = $335.58/mo, 33% off $499 x 12 ($5,988). Team checkout links (14-day
 // trial) come from env; until they are set, Team stays "Contact Sales".
-const TEAM_TRIAL_MONTHLY = process.env.NEXT_PUBLIC_TEAM_TRIAL_CHECKOUT_MONTHLY || '';
-const TEAM_TRIAL_ANNUAL = process.env.NEXT_PUBLIC_TEAM_TRIAL_CHECKOUT_ANNUAL || '';
+const TEAM_TRIAL_MONTHLY = process.env.NEXT_PUBLIC_TEAM_TRIAL_CHECKOUT_MONTHLY || 'https://buy.stripe.com/eVq28s8QK3MS34VdpefnO1a';
+const TEAM_TRIAL_ANNUAL = process.env.NEXT_PUBLIC_TEAM_TRIAL_CHECKOUT_ANNUAL || 'https://buy.stripe.com/3cI9AU2sm5V020R2KAfnO1b';
 const TEAM_ANNUAL_USD = 4027;
 const TEAM_ANNUAL_PER_MONTH = 335.58;
 const TEAM_ANNUAL_PCT = Math.round((1 - TEAM_ANNUAL_USD / (499 * 12)) * 100); // 33
