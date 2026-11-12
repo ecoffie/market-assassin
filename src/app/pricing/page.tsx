@@ -126,7 +126,7 @@ export default function PricingPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <SimplePricing proCredits={PRO_MONTHLY_CREDITS} teamCredits={TEAM_MONTHLY_CREDITS} faqs={faqs} />
+      <SimplePricing proCredits={PRO_MONTHLY_CREDITS} teamCredits={TEAM_MONTHLY_CREDITS} forecastsLabel={forecastsLabel} faqs={faqs} />
     </>
   );
 }
