@@ -98,15 +98,13 @@ describe('account chip reflects a LIVE session, not a present token', () => {
 });
 
 describe('logged-out top bar (Zoom-style)', () => {
-  it('no token → html.mindy-anon (rail hidden) + Contact sales · Sign in · Start for free, in that order', async () => {
+  it('no token → html.mindy-anon (rail hidden) + Sign in · Start for free, in that order (no Contact sales)', async () => {
     const { w } = await mount({ token: null });
     expect(w.document.documentElement.classList.contains('mindy-anon')).toBe(true);
     const wrap = w.document.getElementById('mindyAcct')!;
     const signIn = w.document.getElementById('mindyAnonSignIn')!;
-    const sales = w.document.getElementById('mindyAnonSales')!;
     expect(signIn.textContent).toBe('Sign in');
-    expect(sales.textContent).toBe('Contact sales');
-    expect(sales.nextElementSibling).toBe(signIn);
+    expect(w.document.getElementById('mindyAnonSales')).toBeNull();
     expect(signIn.nextElementSibling).toBe(wrap);
   });
 

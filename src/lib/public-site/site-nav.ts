@@ -1,6 +1,6 @@
 /**
  * The site top bar: the Nov 28 event banner plus the homepage nav (logo · Mindy in your AI ·
- * Learn · Jobs ··· Sign in · Contact sales · Plans & Pricing · Start for free). One string, rendered by
+ * Learn · Jobs ··· Sign in · Plans & Pricing · Start for free). One string, rendered by
  * the homepage, every React public page (PublicHeader) and every raw-HTML public page (html.ts),
  * so they cannot drift. The Maps product keeps its own bar.
  *
@@ -18,9 +18,9 @@ function esc(v: string): string {
   return v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-/** Sign in + Contact sales are signed-out only; Contact sales + Plans & Pricing drop on small screens. */
+/** Sign in is signed-out only; Plans & Pricing drops on small screens. */
 function rightLink(l: MpChromeLink, i: number): string {
-  const cls = [i < 2 ? 'mp-anon' : '', i > 0 ? 'mp-hide-sm' : ''].filter(Boolean).join(' ');
+  const cls = [i === 0 ? 'mp-anon' : '', i > 0 ? 'mp-hide-sm' : ''].filter(Boolean).join(' ');
   return `<a class="${cls}" href="${esc(l.href)}">${esc(l.label)}</a>`;
 }
 
@@ -56,7 +56,7 @@ const MENU_TOGGLE = "var o=document.documentElement.classList.toggle('mp-menu-op
 
 const CHEVRON = '<svg class="mp-menu-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
 
-/** The phone menu panel (Zoom-style): search, the main links, then Contact sales, Sign in, Start for free. */
+/** The phone menu panel (Zoom-style): search, the main links, then Sign in, Start for free. */
 function siteMenuHtml(): string {
   const items: MpChromeLink[] = [
     { href: '/opportunity-map', label: 'Opportunity Map' },
@@ -64,7 +64,7 @@ function siteMenuHtml(): string {
     { href: '/pricing', label: 'Plans & Pricing' },
     { href: '/bid', label: 'Bid with confidence' },
   ];
-  const [signIn, sales] = MP_HEADER_ACCOUNT_LINKS;
+  const [signIn] = MP_HEADER_ACCOUNT_LINKS;
   return `<div class="mp-menu" id="mp-menu">`
     + `<form class="mp-menu-search" action="/opportunity-map" method="get" role="search">`
     + `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>`
@@ -72,7 +72,6 @@ function siteMenuHtml(): string {
     + `<nav class="mp-menu-links" aria-label="Menu">`
     + items.map((l) => `<a href="${esc(l.href)}">${esc(l.label)}${CHEVRON}</a>`).join('')
     + `</nav><div class="mp-menu-foot">`
-    + `<a class="mp-menu-sales" href="${esc(sales.href)}">${esc(sales.label)}</a>`
     + `<a class="mp-menu-signin mp-anon" href="${esc(signIn.href)}">${esc(signIn.label)}</a>`
     + `<a class="mp-menu-su mp-anon" href="${esc(MP_HEADER_SIGNUP_LINK.href)}">${esc(MP_HEADER_SIGNUP_LINK.label)}</a>`
     + `</div></div>`;
@@ -146,7 +145,7 @@ export const SITE_NAV_CSS = [
     + '.mp-menu-links a{display:flex;align-items:center;justify-content:space-between;min-height:56px;padding:0 8px;font:600 19px var(--mp-font-sans);color:var(--mp-ink);text-decoration:none}'
     + '.mp-menu-chev{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}'
     + '.mp-menu-foot{margin-top:auto;padding-top:28px;display:flex;flex-direction:column;gap:10px}'
-    + '.mp-menu-sales,.mp-menu-signin{padding:10px 8px;font:600 17px var(--mp-font-sans);color:var(--mp-ink);text-decoration:none}'
+    + '.mp-menu-signin{padding:10px 8px;font:600 17px var(--mp-font-sans);color:var(--mp-ink);text-decoration:none}'
     + '.mp-menu-su{display:flex;align-items:center;justify-content:center;height:52px;margin-top:6px;border-radius:12px;background:var(--mp-navy);color:var(--mp-surface);font:700 17px var(--mp-font-sans);text-decoration:none}'
     + 'html:has(.mindy-acct-ini,.mindy-acct-btn img) .mp-menu .mp-anon{display:none}'
     + '}',

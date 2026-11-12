@@ -1133,7 +1133,7 @@ const ZLAYOUT_CSS = '<style>'
   + '@media(max-width:1680px){.zh-logo{position:static;transform:none;flex:none}}'
   + '@media(max-width:1480px){.zh-right a[href="/bid"]{display:none}}'
   + '@media(max-width:1280px){.zh-explore{display:none}.zh-right a[href="/learn"]{display:none}}'
-  + '@media(max-width:1140px){#mindyAnonSales{display:none!important}.zh-left a:nth-child(n+5){display:none}}'
+  + '@media(max-width:1140px){.zh-left a:nth-child(n+5){display:none}}'
   // far-left icon rail — PINNED (position:fixed) so grid/overflow can never push it off-screen.
   // The 50px grid column stays as its reserved space (kept empty; the fixed rail sits over it).
   + '.zrail{position:fixed;left:0;top:52px;width:64px;height:calc(100vh - 52px);height:calc(100dvh - 52px);'
