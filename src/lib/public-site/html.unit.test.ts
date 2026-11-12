@@ -5,7 +5,7 @@ import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_JS } from '@/app/opportunity-map/account
 import PublicFooter from '@/components/public-site/PublicFooter';
 import { SITE_LINK_GROUPS } from '@/lib/seo/site-links';
 import { MP_COMPONENTS_CSS, MP_RAW_SITE_CSS, MP_ROOT_PAINT_CSS, MP_SITE_CSS, MP_ACCOUNT_OVERRIDES_CSS } from './css';
-import { MP_HEADER_ACCOUNT_LINKS, MP_HEADER_PRODUCT_LINKS } from './chrome';
+import { MP_HEADER_ACCOUNT_LINKS, MP_HEADER_PRODUCT_LINKS, MP_HOW_IT_WORKS } from './chrome';
 import { mpRawBodyClose, mpRawBodyOpen, mpRawFooterHtml, mpRawHeadHtml, mpRawHeaderHtml } from './html';
 
 const doc = (html: string) => new JSDOM(`<!doctype html><body>${html}</body>`).window.document;
@@ -16,9 +16,16 @@ describe('raw-HTML public shell', () => {
     const d = doc(mpRawHeaderHtml());
     const header = d.querySelector('[data-mp-chrome] header.mp-head')!;
     expect(header).toBeTruthy();
-    const expected = ['/', ...MP_HEADER_PRODUCT_LINKS.map((l) => l.href), ...MP_HEADER_ACCOUNT_LINKS.map((l) => l.href), '/pricing'];
+    const expected = ['/', ...MP_HOW_IT_WORKS.map((l) => l.href), ...MP_HEADER_PRODUCT_LINKS.map((l) => l.href), ...MP_HEADER_ACCOUNT_LINKS.map((l) => l.href), '/pricing'];
     expect(hrefs(header).slice(0, expected.length)).toEqual(expected);
     expect(header.querySelector('.mp-logo img')?.getAttribute('src')).toBe('/brand/mindy-logo-icon.png');
+  });
+
+  it('has a "How it works" menu in place of Learn, one card per way Mindy works', () => {
+    const header = doc(mpRawHeaderHtml()).querySelector('header.mp-head')!;
+    expect(header.querySelector('.mp-hiw-btn')?.textContent).toBe('How it works');
+    expect([...header.querySelectorAll('.mp-hiw-grid a')].map((a) => a.getAttribute('href'))).toEqual(MP_HOW_IT_WORKS.map((i) => i.href));
+    expect([...header.querySelectorAll('a')].some((a) => a.textContent === 'Learn')).toBe(false);
   });
 
   it('renders a footer identical to the React PublicFooter', () => {

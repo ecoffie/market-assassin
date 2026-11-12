@@ -1,6 +1,6 @@
 /**
- * The site top bar: the Nov 28 event banner plus the homepage nav (logo · Mindy in your AI ·
- * Learn · Jobs ··· Sign in · Plans & Pricing · Start for free). One string, rendered by
+ * The site top bar: the Nov 28 event banner plus the homepage nav (logo · How it works ▾ ·
+ * Mindy in your AI · Jobs ··· Sign in · Plans & Pricing · Start for free). One string, rendered by
  * the homepage, every React public page (PublicHeader) and every raw-HTML public page (html.ts),
  * so they cannot drift. The Maps product keeps its own bar.
  *
@@ -10,7 +10,7 @@
  */
 import { ACCOUNT_MENU_HTML } from '@/app/opportunity-map/account-menu';
 import { LAZY_CONTRACTORS_BLUEPRINT as LCB, lazyBlueprintIsOver } from '@/lib/events/lazy-contractors-blueprint';
-import { MP_HEADER_ACCOUNT_LINKS, MP_HEADER_PRODUCT_LINKS, MP_HEADER_SIGNUP_LINK, MP_LOGO_SRC, type MpChromeLink } from './chrome';
+import { MP_HEADER_ACCOUNT_LINKS, MP_HEADER_PRODUCT_LINKS, MP_HEADER_SIGNUP_LINK, MP_HOW_IT_WORKS, MP_LOGO_SRC, type MpChromeLink } from './chrome';
 
 const SITE_HOME_PATH = '/';
 
@@ -37,7 +37,7 @@ export function siteEventBannerHtml(now: Date = new Date()): string {
 
 /** The whole top bar (banner + nav). The account script is shipped separately by each shell. */
 export function siteTopHtml(): string {
-  const left = MP_HEADER_PRODUCT_LINKS.map((l) => `<a href="${esc(l.href)}">${esc(l.label)}</a>`).join('');
+  const left = howItWorksHtml() + MP_HEADER_PRODUCT_LINKS.map((l) => `<a href="${esc(l.href)}">${esc(l.label)}</a>`).join('');
   const right = MP_HEADER_ACCOUNT_LINKS.map(rightLink).join('');
   return `<div class="mp-top" data-mp-chrome="">${siteEventBannerHtml()}`
     + `<header class="mp-head"><a href="${SITE_HOME_PATH}" title="Mindy" class="mp-logo"><img src="${MP_LOGO_SRC}" alt=""><span>Mindy</span></a>`
@@ -51,6 +51,15 @@ export function siteTopHtml(): string {
     + `</nav></header>${siteMenuHtml()}</div>`;
 }
 
+/** The "How it works" menu: opens on hover or keyboard focus (no script), one card per way Mindy works. */
+function howItWorksHtml(): string {
+  const items = MP_HOW_IT_WORKS.map((i) => `<a href="${esc(i.href)}"><svg viewBox="0 0 24 24" aria-hidden="true">${i.icon}</svg>`
+    + `<b>${esc(i.label)}</b><span>${esc(i.desc)}</span></a>`).join('');
+  return `<div class="mp-hiw"><button type="button" class="mp-hiw-btn" aria-haspopup="true">How it works`
+    + `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>`
+    + `<div class="mp-hiw-panel" role="menu"><div class="mp-hiw-box"><p class="mp-hiw-k">Features</p><div class="mp-hiw-grid">${items}</div></div></div></div>`;
+}
+
 /** Toggles the phone menu (html.mp-menu-open). Inline so raw-HTML pages need no extra script. */
 const MENU_TOGGLE = "var o=document.documentElement.classList.toggle('mp-menu-open');this.setAttribute('aria-expanded',o?'true':'false');";
 
@@ -58,18 +67,18 @@ const CHEVRON = '<svg class="mp-menu-chev" viewBox="0 0 24 24" aria-hidden="true
 
 /** The phone menu panel (Zoom-style): search, the main links, then Sign in, Start for free. */
 function siteMenuHtml(): string {
+  // Phone: the "How it works" ways first (they include the map and Bid with confidence), then the rest.
   const items: MpChromeLink[] = [
-    { href: '/opportunity-map', label: 'Opportunity Map' },
-    ...MP_HEADER_PRODUCT_LINKS,
+    ...MP_HOW_IT_WORKS,
+    ...MP_HEADER_PRODUCT_LINKS.filter((l) => !MP_HOW_IT_WORKS.some((h) => h.href === l.href || h.label === l.label)),
     { href: '/pricing', label: 'Plans & Pricing' },
-    { href: '/bid', label: 'Bid with confidence' },
   ];
   const [signIn] = MP_HEADER_ACCOUNT_LINKS;
   return `<div class="mp-menu" id="mp-menu">`
     + `<form class="mp-menu-search" action="/opportunity-map" method="get" role="search">`
     + `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>`
     + `<input type="search" name="q" placeholder="Search opportunities…" aria-label="Search opportunities" autocomplete="off"></form>`
-    + `<nav class="mp-menu-links" aria-label="Menu">`
+    + `<nav class="mp-menu-links" aria-label="Menu"><p class="mp-menu-h">How it works</p>`
     + items.map((l) => `<a href="${esc(l.href)}">${esc(l.label)}${CHEVRON}</a>`).join('')
     + `</nav><div class="mp-menu-foot">`
     + `<a class="mp-menu-signin mp-anon" href="${esc(signIn.href)}">${esc(signIn.label)}</a>`
@@ -89,6 +98,24 @@ export const SITE_NAV_CSS = [
   '.mp-head-left{display:flex;gap:24px;font-weight:600;font-size:15px}',
   '.mp-head-right{margin-left:auto;display:flex;align-items:center;gap:22px;font-weight:600;font-size:15px}',
   '.mp-head-left a:hover,.mp-head-right>a:hover{color:var(--mp-navy)}',
+  // "How it works" menu. The wrapper is the full bar height, so the panel starts at the bar's bottom
+  // edge and the pointer never crosses a gap on its way down.
+  '.mp-head-left{align-items:center}',
+  '.mp-hiw{position:relative;height:64px;display:flex;align-items:center}',
+  '.mp-hiw-btn{display:flex;align-items:center;gap:4px;padding:0;border:0;background:none;cursor:pointer;font:600 15px var(--mp-font-sans);color:var(--mp-ink)}',
+  '.mp-hiw-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .15s}',
+  '.mp-hiw:hover .mp-hiw-btn,.mp-hiw:focus-within .mp-hiw-btn{color:var(--mp-navy)}',
+  '.mp-hiw:hover .mp-hiw-btn svg,.mp-hiw:focus-within .mp-hiw-btn svg{transform:rotate(180deg)}',
+  '.mp-hiw-panel{display:none;position:absolute;top:100%;left:-20px;z-index:50}',
+  '.mp-hiw:hover .mp-hiw-panel,.mp-hiw:focus-within .mp-hiw-panel{display:block}',
+  '.mp-hiw-box{width:560px;padding:16px 14px 12px;background:var(--mp-surface);border:1px solid var(--mp-hair);border-radius:14px;box-shadow:0 18px 40px rgba(18,16,14,.12)}',
+  '.mp-hiw-k{margin:0 0 6px;padding:0 12px;font:600 12px var(--mp-font-sans);color:var(--mp-muted);text-transform:uppercase;letter-spacing:.08em}',
+  '.mp-hiw-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px}',
+  '.mp-head .mp-hiw-grid a{display:grid;grid-template-columns:22px 1fr;column-gap:10px;row-gap:2px;padding:10px 12px;border-radius:10px;white-space:normal;color:var(--mp-ink)}',
+  '.mp-head .mp-hiw-grid a:hover,.mp-head .mp-hiw-grid a:focus-visible{background:var(--mp-navy-wash)}',
+  '.mp-hiw-grid svg{grid-row:span 2;width:20px;height:20px;margin-top:1px;fill:none;stroke:var(--mp-ink);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}',
+  '.mp-hiw-grid b{font:600 15px var(--mp-font-sans);color:var(--mp-ink)}',
+  '.mp-hiw-grid span{font:400 13px/1.4 var(--mp-font-sans);color:var(--mp-muted)}',
   '.mp-head a[aria-current="page"]{color:var(--mp-navy)}',
   '.mp-head .mp-su{background:var(--mp-navy);color:var(--mp-surface);padding:10px 18px;border-radius:10px}',
   '.mp-head .mp-su:hover{background:var(--mp-navy-hover);color:var(--mp-surface)}',
@@ -142,6 +169,7 @@ export const SITE_NAV_CSS = [
     + '.mp-menu-search svg{width:20px;height:20px;flex:none;fill:none;stroke:var(--mp-ink);stroke-width:2.2;stroke-linecap:round}'
     + '.mp-menu-search input{flex:1;min-width:0;border:0;outline:0;background:none;font:400 17px var(--mp-font-sans);color:var(--mp-ink)}'
     + '.mp-menu-links{display:flex;flex-direction:column}'
+    + '.mp-menu-h{margin:0 0 2px;padding:0 8px;font:600 13px var(--mp-font-sans);color:var(--mp-muted);text-transform:uppercase;letter-spacing:.06em}'
     + '.mp-menu-links a{display:flex;align-items:center;justify-content:space-between;min-height:56px;padding:0 8px;font:600 19px var(--mp-font-sans);color:var(--mp-ink);text-decoration:none}'
     + '.mp-menu-chev{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}'
     + '.mp-menu-foot{margin-top:auto;padding-top:28px;display:flex;flex-direction:column;gap:10px}'
