@@ -17,7 +17,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   let amount = '';
   let sub = '';
   try {
-    const award = await getAwardById(decodeURIComponent(id));
+    const award = await getAwardById(decodeURIComponent(id), false);
     if (award) {
       const recipient = fmtCompanyName(award.recipient_name);
       const contractNo = award.piid || award.award_id;
