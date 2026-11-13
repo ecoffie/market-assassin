@@ -1,3 +1,4 @@
+import { resolveAccess } from '@/lib/access/resolve-access';
 import { NextRequest, NextResponse } from 'next/server';
 import { emailActionSigningSecret, emailActionVerificationSecrets, emailLinkToken, verifyEmailLinkSignature } from '@/lib/email-action-secret';
 import { createClient } from '@supabase/supabase-js';
@@ -256,6 +257,24 @@ export async function verifyMIAccess(
       staffRole,
       sources,
     };
+  }
+
+  // An active 14-day trial (trial_ends_at, incl. no-card partner trials) is Pro too. Before
+  // 2026-11-13 this function ignored it, so trial users got 402 on every verifyMIAccess route
+  // while resolveAccess (/api/access/check) told the UI they were Pro.
+  try {
+    const access = await resolveAccess(normalizedEmail);
+    if (access.level === 'pro' && access.source === 'trial') {
+      return {
+        tier: 'pro',
+        email: normalizedEmail,
+        isStaff: staffRole !== 'none',
+        staffRole,
+        sources,
+      };
+    }
+  } catch (err) {
+    console.warn('[verifyMIAccess] trial check failed; treating as free', err);
   }
 
   // Free tier for any email
