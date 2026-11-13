@@ -7580,3 +7580,16 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 **SEO.** Federal market intelligence free trial / GovCon software 14-day trial / Mindy Pro free trial.
 
 **Proof.** `UnifiedPricing.hero.unit.test.tsx` pins the hero order, the CTA's link (the Pro card's own trial link for the selected billing period), the trial terms, and that Pro/Team/Enterprise accounts get no offer.
+
+## See what your AI agent produces before you pick a plan (2026-11-13)
+
+**What.** Mindy's gallery of finished AI agent work is now one click from everywhere a buyer decides. "Mindy in your AI" in the top bar opens a short menu: See examples, Connect your AI, and Pricing for AI agents. The AI agent pricing page opens with a link to the examples, and each activity in the plan finder (find opportunities, vet the incumbent, price the bid, draft a win strategy, build a teaming shortlist, draft the proposal) has a "See example" link to that exact piece of finished work. Every example can be shared by link, and each one ends with a way to connect your AI or see plans.
+
+**Why it matters.** Most contractors have never heard the term MCP. Showing the finished work first (a capture plan, an incumbent check, labor rates, a proposal draft) answers "what would I get?" before asking anyone to estimate credits or pick a plan.
+
+**Honest scope.** Gallery results are samples: company names and figures are illustrative, and the page says so on every example. A real run returns live federal data. Exact prompts stay behind sign-in. Prices, credits and plans are unchanged.
+
+**SEO.** AI agent examples for government contracting / Claude federal contracting examples / MCP server for federal market research.
+
+**Proof.** Examples come from `src/lib/mcp/gallery.ts` (unchanged). The activity-to-example map is `PRICING_TASK_EXAMPLES` in `src/lib/mcp/gallery-links.ts`; `gallery.unit.test.ts` fails if a mapped example or activity stops existing. Headless check: plan finder results identical to the live page.
+

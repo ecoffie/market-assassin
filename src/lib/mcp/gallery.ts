@@ -754,3 +754,8 @@ export const GALLERY_STARTERS = [
   'Every Monday, send me new janitorial work in Florida',
   'Which agencies are behind on their women-owned small business',
 ];
+
+
+// Deep links into the gallery live in gallery-links.ts (kept apart so the pricing page can import
+// them without bundling every example).
+export { GALLERY_EXAMPLE_PARAM, galleryExampleHref, PRICING_TASK_EXAMPLES } from './gallery-links';

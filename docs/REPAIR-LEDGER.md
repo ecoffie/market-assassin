@@ -26,6 +26,14 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-13 — AI agent gallery: discoverable from the nav, pricing and the calculator
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-13 | Public nav / phone menu | **The gallery was missing from the phone menu.** `siteMenuHtml` deduped product links against "How it works", and the features page is also named "Mindy in your AI", so the gallery link was silently dropped on phones. "Mindy in your AI" now has a menu (See examples, Connect your AI, Pricing for AI agents) on desktop and its own section in the phone menu, never deduped. | `Not deduped` → `src/lib/public-site/site-nav.ts` | `html.unit.test.ts` (desktop + phone See examples); headless check at 1440px and 390px | LIVE on merge |
+| 2026-11-13 | Gallery deep links | `/mcp/gallery?example=<id>` opens that example; opening/closing a card keeps the address bar in step; signed-out "Sign in to see the prompt" returns to the same example. | `GALLERY_EXAMPLE_PARAM` → `src/app/mcp/gallery/Gallery.tsx` | `gallery.unit.test.ts`; headless: open, Escape clears param, unknown id opens nothing | LIVE on merge |
+| 2026-11-13 | Pricing calculator | Each of the six activities links to the gallery example of that work (new tab, so picks survive); a slim gallery band sits above the MCP plan cards. Calculator math untouched. | `PRICING_TASK_EXAMPLES` → `src/components/public-site/pricing/UnifiedPricing.tsx` | Default and all-six results identical to live prod (headless, side by side) | LIVE on merge |
+
 ## 2026-11-12 — Mindy Ambassadors: apply, approve by hand, unlimited Mindy, tracked referral link
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

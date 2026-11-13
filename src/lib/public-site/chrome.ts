@@ -8,11 +8,48 @@ import { FEATURE_PAGES } from './features';
 export interface MpChromeLink {
   href: string;
   label: string;
+  /** A small menu under the link (desktop hover/focus; its own section in the phone menu). */
+  sub?: readonly MpAiMenuItem[];
 }
+
+export interface MpAiMenuItem {
+  href: string;
+  label: string;
+  /** One plain sentence under the title. */
+  desc: string;
+  /** Inner markup of a 24x24 stroked icon (paths only). */
+  icon: string;
+}
+
+/**
+ * The menu under "Mindy in your AI" (2026-11-13): the path from seeing what an AI agent produces
+ * with Mindy, to connecting one, to sizing a plan. "See examples" is the gallery the top-level
+ * link already opens; it is named here so visitors know examples exist.
+ */
+export const MP_AI_MENU: readonly MpAiMenuItem[] = [
+  {
+    href: '/mcp/gallery',
+    label: 'See examples',
+    desc: 'Finished work an AI agent hands back with Mindy.',
+    icon: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M10 9l5 3-5 3z"/>',
+  },
+  {
+    href: '/mcp',
+    label: 'Connect your AI',
+    desc: 'Claude, ChatGPT, Cursor or any MCP agent.',
+    icon: '<path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 01-10 0zM12 16v5"/>',
+  },
+  {
+    href: '/mcp/pricing',
+    label: 'Pricing for AI agents',
+    desc: 'Estimate your workload and pick a plan.',
+    icon: '<path d="M12 3v18M17 7.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.6 5 3 5 1.4 5 3.5-2.2 3-5 3-5-1.1-5-3"/>',
+  },
+];
 
 /** Left of the top bar, after the "How it works" menu. Hidden at <=980px. */
 export const MP_HEADER_PRODUCT_LINKS: readonly MpChromeLink[] = [
-  { href: '/mcp/gallery', label: 'Mindy in your AI' },
+  { href: '/mcp/gallery', label: 'Mindy in your AI', sub: MP_AI_MENU },
   { href: '/jobs', label: 'Jobs' },
 ];
 

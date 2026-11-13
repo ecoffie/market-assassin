@@ -16,7 +16,7 @@ describe('raw-HTML public shell', () => {
     const d = doc(mpRawHeaderHtml());
     const header = d.querySelector('[data-mp-chrome] header.mp-head')!;
     expect(header).toBeTruthy();
-    const expected = ['/', ...MP_HOW_IT_WORKS.map((l) => l.href), ...MP_HEADER_PRODUCT_LINKS.map((l) => l.href), ...MP_HEADER_ACCOUNT_LINKS.map((l) => l.href), '/pricing'];
+    const expected = ['/', ...MP_HOW_IT_WORKS.map((l) => l.href), ...MP_HEADER_PRODUCT_LINKS.flatMap((l) => [l.href, ...(l.sub ?? []).map((i) => i.href)]), ...MP_HEADER_ACCOUNT_LINKS.map((l) => l.href), '/pricing'];
     expect(hrefs(header).slice(0, expected.length)).toEqual(expected);
     expect(header.querySelector('.mp-logo img')?.getAttribute('src')).toBe('/brand/mindy-logo-icon.png');
   });
@@ -34,6 +34,18 @@ describe('raw-HTML public shell', () => {
     expect(header.querySelector('.mp-hiw-btn')?.textContent).toBe('How it works');
     expect([...header.querySelectorAll('.mp-hiw-grid a')].map((a) => a.getAttribute('href'))).toEqual(MP_HOW_IT_WORKS.map((i) => i.href));
     expect([...header.querySelectorAll('a')].some((a) => a.textContent === 'Learn')).toBe(false);
+  });
+
+  it('puts a "See examples" link to the gallery under "Mindy in your AI", desktop and phone (2026-11-13)', () => {
+    const d = doc(mpRawHeaderHtml());
+    const sub = d.querySelector('header.mp-head .mp-sub')!;
+    expect(sub.querySelector('.mp-hiw-btn')?.getAttribute('href')).toBe('/mcp/gallery');
+    expect(sub.querySelector('.mp-hiw-btn')?.textContent).toBe('Mindy in your AI');
+    const desk = [...sub.querySelectorAll('.mp-sub-list a')].map((a) => [a.querySelector('b')?.textContent, a.getAttribute('href')]);
+    expect(desk).toContainEqual(['See examples', '/mcp/gallery']);
+    const phone = [...d.querySelectorAll('#mp-menu .mp-menu-links a')].map((a) => [a.textContent, a.getAttribute('href')]);
+    expect(phone).toContainEqual(['See examples', '/mcp/gallery']);
+    expect([...d.querySelectorAll('#mp-menu .mp-menu-h')].map((h) => h.textContent)).toContain('Mindy in your AI');
   });
 
   it('renders a footer identical to the React PublicFooter', () => {

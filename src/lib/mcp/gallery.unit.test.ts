@@ -1,10 +1,27 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { GALLERY_CATEGORIES, GALLERY_ITEMS } from './gallery';
+import { GALLERY_CATEGORIES, GALLERY_ITEMS, PRICING_TASK_EXAMPLES, galleryExampleHref } from './gallery';
 import { GALLERY_PROMPTS } from './gallery-prompts';
 
 describe('Mindy in your AI gallery', () => {
+  it('every pricing-calculator activity link points at a real example and a real activity', () => {
+    const ids = new Set(GALLERY_ITEMS.map((i) => i.id));
+    const pricing = readFileSync(join(__dirname, '../../components/public-site/pricing/UnifiedPricing.tsx'), 'utf8');
+    const taskIds = [...pricing.matchAll(/\{ id: '([a-z]+)', label: '[^']+', note:/g)].map((m) => m[1]);
+    expect(taskIds.length).toBe(6);
+    for (const [task, example] of Object.entries(PRICING_TASK_EXAMPLES)) {
+      expect(ids.has(example), example).toBe(true);
+      expect(taskIds, task).toContain(task);
+    }
+  });
+
+  it('example deep links open one card on the gallery', () => {
+    expect(galleryExampleHref('who-holds-it')).toBe('/mcp/gallery?example=who-holds-it');
+    const client = readFileSync(join(__dirname, '../../app/mcp/gallery/Gallery.tsx'), 'utf8');
+    expect(client).toContain('GALLERY_EXAMPLE_PARAM');
+  });
+
   it('every card has a prompt, and every prompt has a card', () => {
     const ids = GALLERY_ITEMS.map((i) => i.id).sort();
     expect(Object.keys(GALLERY_PROMPTS).sort()).toEqual(ids);

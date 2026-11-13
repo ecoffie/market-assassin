@@ -37,7 +37,7 @@ export function siteEventBannerHtml(now: Date = new Date()): string {
 
 /** The whole top bar (banner + nav). The account script is shipped separately by each shell. */
 export function siteTopHtml(): string {
-  const left = howItWorksHtml() + MP_HEADER_PRODUCT_LINKS.map((l) => `<a href="${esc(l.href)}">${esc(l.label)}</a>`).join('');
+  const left = howItWorksHtml() + MP_HEADER_PRODUCT_LINKS.map(productLinkHtml).join('');
   const right = MP_HEADER_ACCOUNT_LINKS.map(rightLink).join('');
   return `<div class="mp-top" data-mp-chrome="">${siteEventBannerHtml()}`
     + `<header class="mp-head"><a href="${SITE_HOME_PATH}" title="Mindy" class="mp-logo"><img src="${MP_LOGO_SRC}" alt=""><span>Mindy</span></a>`
@@ -60,6 +60,19 @@ function howItWorksHtml(): string {
     + `<div class="mp-hiw-panel" role="menu"><div class="mp-hiw-box"><p class="mp-hiw-k">Features</p><div class="mp-hiw-grid">${items}</div></div></div></div>`;
 }
 
+/**
+ * A top-bar product link. One with a `sub` menu keeps its link (clicking it still goes to its href)
+ * and opens a small menu on hover or keyboard focus, styled like "How it works".
+ */
+function productLinkHtml(l: MpChromeLink): string {
+  if (!l.sub?.length) return `<a href="${esc(l.href)}">${esc(l.label)}</a>`;
+  const items = l.sub.map((i) => `<a href="${esc(i.href)}"><svg viewBox="0 0 24 24" aria-hidden="true">${i.icon}</svg>`
+    + `<b>${esc(i.label)}</b><span>${esc(i.desc)}</span></a>`).join('');
+  return `<div class="mp-hiw mp-sub"><a class="mp-hiw-btn" href="${esc(l.href)}" aria-haspopup="true">${esc(l.label)}`
+    + `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>`
+    + `<div class="mp-hiw-panel" role="menu"><div class="mp-hiw-box mp-sub-box"><p class="mp-hiw-k">${esc(l.label)}</p><div class="mp-sub-list">${items}</div></div></div></div>`;
+}
+
 /** Toggles the phone menu (html.mp-menu-open). Inline so raw-HTML pages need no extra script. */
 const MENU_TOGGLE = "var o=document.documentElement.classList.toggle('mp-menu-open');this.setAttribute('aria-expanded',o?'true':'false');";
 
@@ -68,10 +81,13 @@ const CHEVRON = '<svg class="mp-menu-chev" viewBox="0 0 24 24" aria-hidden="true
 /** The phone menu panel (Zoom-style): search, the main links, then Sign in, Start for free. */
 function siteMenuHtml(): string {
   // Phone: the "How it works" ways first (they include the map and Bid with confidence), then the rest.
-  const items: MpChromeLink[] = [
-    ...MP_HOW_IT_WORKS,
-    ...MP_HEADER_PRODUCT_LINKS.filter((l) => !MP_HOW_IT_WORKS.some((h) => h.href === l.href || h.label === l.label)),
-  ];
+  const extra = MP_HEADER_PRODUCT_LINKS.filter((l) => !MP_HOW_IT_WORKS.some((h) => h.href === l.href || h.label === l.label));
+  const items: MpChromeLink[] = [...MP_HOW_IT_WORKS, ...extra.filter((l) => !l.sub?.length)];
+  // A product link with a sub menu gets its own section, listing its items by name. Not deduped
+  // against "How it works": "Mindy in your AI" is also a feature page there, and the dedupe used to
+  // drop the gallery from the phone menu entirely.
+  const sections = MP_HEADER_PRODUCT_LINKS.filter((l) => l.sub?.length).map((l) => `<p class="mp-menu-h mp-menu-h2">${esc(l.label)}</p>`
+    + l.sub!.map((i) => `<a href="${esc(i.href)}">${esc(i.label)}${CHEVRON}</a>`).join('')).join('');
   const [signIn] = MP_HEADER_ACCOUNT_LINKS;
   return `<div class="mp-menu" id="mp-menu">`
     + `<form class="mp-menu-search" action="/opportunity-map" method="get" role="search">`
@@ -79,6 +95,7 @@ function siteMenuHtml(): string {
     + `<input type="search" name="q" placeholder="Search opportunities…" aria-label="Search opportunities" autocomplete="off"></form>`
     + `<nav class="mp-menu-links" aria-label="Menu"><p class="mp-menu-h">How it works</p>`
     + items.map((l) => `<a href="${esc(l.href)}">${esc(l.label)}${CHEVRON}</a>`).join('')
+    + sections
     + `</nav><div class="mp-menu-foot">`
     + `<a class="mp-menu-signin mp-anon" href="${esc(signIn.href)}">${esc(signIn.label)}</a>`
     + `<a class="mp-menu-su mp-anon" href="${esc(MP_HEADER_SIGNUP_LINK.href)}">${esc(MP_HEADER_SIGNUP_LINK.label)}</a>`
@@ -115,6 +132,14 @@ export const SITE_NAV_CSS = [
   '.mp-hiw-grid svg{grid-row:span 2;width:20px;height:20px;margin-top:1px;fill:none;stroke:var(--mp-ink);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}',
   '.mp-hiw-grid b{font:600 15px var(--mp-font-sans);color:var(--mp-ink)}',
   '.mp-hiw-grid span{font:400 13px/1.4 var(--mp-font-sans);color:var(--mp-muted)}',
+  // The small menu under a product link (Mindy in your AI): one column, same cards as "How it works".
+  '.mp-sub-box{width:340px}',
+  '.mp-sub-list{display:grid;gap:2px}',
+  '.mp-head .mp-sub-list a{display:grid;grid-template-columns:22px 1fr;column-gap:10px;row-gap:2px;padding:10px 12px;border-radius:10px;white-space:normal;color:var(--mp-ink)}',
+  '.mp-head .mp-sub-list a:hover,.mp-head .mp-sub-list a:focus-visible{background:var(--mp-navy-wash)}',
+  '.mp-sub-list svg{grid-row:span 2;width:20px;height:20px;margin-top:1px;fill:none;stroke:var(--mp-ink);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}',
+  '.mp-sub-list b{font:600 15px var(--mp-font-sans);color:var(--mp-ink)}',
+  '.mp-sub-list span{font:400 13px/1.4 var(--mp-font-sans);color:var(--mp-muted)}',
   '.mp-head a[aria-current="page"]{color:var(--mp-navy)}',
   '.mp-head .mp-su{background:var(--mp-navy);color:var(--mp-surface);padding:10px 18px;border-radius:10px}',
   '.mp-head .mp-su:hover{background:var(--mp-navy-hover);color:var(--mp-surface)}',
@@ -170,6 +195,7 @@ export const SITE_NAV_CSS = [
     + '.mp-menu-links{display:flex;flex-direction:column}'
     + '.mp-menu-h{margin:0 0 2px;padding:0 8px;font:600 13px var(--mp-font-sans);color:var(--mp-muted);text-transform:uppercase;letter-spacing:.06em}'
     + '.mp-menu-links a{display:flex;align-items:center;justify-content:space-between;min-height:56px;padding:0 8px;font:600 19px var(--mp-font-sans);color:var(--mp-ink);text-decoration:none}'
+    + '.mp-menu-h2{margin-top:18px}'
     + '.mp-menu-chev{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}'
     + '.mp-menu-foot{margin-top:auto;padding-top:28px;display:flex;flex-direction:column;gap:10px}'
     + '.mp-menu-signin{padding:10px 8px;font:600 17px var(--mp-font-sans);color:var(--mp-ink);text-decoration:none}'
