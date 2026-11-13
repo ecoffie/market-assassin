@@ -93,6 +93,7 @@ export const SITE_LINK_GROUPS: SiteLinkGroup[] = [
     links: [
       { href: '/pricing', label: 'Pricing' },
       { href: '/about', label: 'About' },
+      { href: '/customers', label: 'Customer results' },
       { href: '/ambassadors', label: 'Ambassadors' },
       { href: '/privacy', label: 'Privacy' },
       { href: '/terms', label: 'Terms' },

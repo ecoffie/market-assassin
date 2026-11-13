@@ -22,7 +22,8 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyAdminPassword } from '@/lib/admin-auth';
 import { saveMemberProof } from '@/lib/admin/member-wins-snapshot';
 import { bqQuery, bqJobOptions, BQ_TABLES } from '@/lib/bigquery/client';
-import { companyBreakdown, isSampleAccount, memberUeis, recentWinners, sinceJoining, tallyWins, type CompanyBreakdown, type AwardRow, type ProfileRow, type SettingsRow } from '@/lib/admin/member-wins';
+import { naicsTitle } from '@/lib/naics-catalog';
+import { bucketAwards, companyBreakdown, isSampleAccount, MIN_COMPANIES_PER_BUCKET, winsByFiscalYear, memberUeis, recentWinners, sinceJoining, tallyWins, type CompanyBreakdown, type AwardRow, type ProfileRow, type SettingsRow } from '@/lib/admin/member-wins';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -72,7 +73,8 @@ export async function GET(req: NextRequest) {
                  CAST(MIN(action_date) AS STRING) AS first_action,
                  SUM(obligation_amount) AS amount,
                  ANY_VALUE(recipient_name) AS recipient_name,
-                 ANY_VALUE(awarding_agency) AS awarding_agency
+                 ANY_VALUE(awarding_agency) AS awarding_agency,
+                 ANY_VALUE(naics_code) AS naics_code
           FROM ${BQ_TABLES.awards}
           WHERE recipient_uei IN UNNEST(@ueis)
           GROUP BY recipient_uei, award_id
@@ -129,9 +131,24 @@ export async function GET(req: NextRequest) {
     const realMembers = new Set(
       settings.map((s) => (s.user_email || '').toLowerCase()).filter((e) => e && !isSampleAccount(e)),
     ).size;
+    // Public /customers page: aggregates only. Each agency/NAICS/year bucket holds at least
+    // MIN_COMPANIES_PER_BUCKET companies; smaller ones fold into an unlabelled "Other".
+    // USASpending agency names are usually already title case; only re-case an ALL-CAPS name.
+    const agencyTitle = (k: string) => k !== k.toUpperCase() ? k : k.toLowerCase().replace(/\b([a-z])/g, (c) => c.toUpperCase()).replace(/\b(Of|The|And|For)\b/g, (w) => w.toLowerCase());
     await saveMemberProof({
       lifetimeDollars: report.lifetime.dollars, companiesWithWins: report.lifetime.companiesWithWins,
       contracts: report.lifetime.contracts, members: realMembers, computedAt: new Date().toISOString(),
+      sinceJoining: {
+        dollars: report.sinceJoining.dollars, contracts: report.sinceJoining.contracts,
+        companiesWithWins: report.sinceJoining.companiesWithWins,
+      },
+      companiesWithUei: ueis.length,
+      breakdowns: {
+        agencies: bucketAwards(awards, (r) => r.awarding_agency, agencyTitle),
+        naics: bucketAwards(awards, (r) => r.naics_code, (k) => naicsTitle(k) ?? `NAICS ${k}`),
+        fiscalYears: winsByFiscalYear(awards),
+        minCompaniesPerBucket: MIN_COMPANIES_PER_BUCKET,
+      },
     });
     // A browser gets a readable page; ?format=json gets the raw data.
     if (req.nextUrl.searchParams.get('format') === 'json') return NextResponse.json(report);
