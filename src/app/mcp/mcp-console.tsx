@@ -18,8 +18,6 @@ import MemberProof from '@/components/public-site/MemberProof';
 import Link from 'next/link';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
 import { Catalog, MCP_URL, EXAMPLES, exampleCost } from './catalog-ui';
-import { McpPublicNav } from './public-ui';
-import { Container } from '@/components/public-site/ui';
 
 type ClientId = 'claude-desktop' | 'claude-code' | 'cursor' | 'other';
 const CLIENTS: { id: ClientId; name: string }[] = [
@@ -243,11 +241,6 @@ export default function McpConsole() {
 
   return (
     <main className="min-h-dvh bg-(--mp-surface) text-(--mp-ink)">
-      <div className="py-4">
-        <Container width="wide">
-          <McpPublicNav active="connect" signedIn={signedIn} balance={signedIn ? balance : undefined} />
-        </Container>
-      </div>
 
       {/* Hero — split like the homepage: words left, an example right */}
       <section className="bg-(--mp-navy-wash)/60">

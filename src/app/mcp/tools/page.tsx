@@ -25,7 +25,6 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
 import { Catalog, Tool, MCP_URL } from '../catalog-ui';
-import { McpPublicNav } from '../public-ui';
 import { TOOL_GROUPS, GROUPED_TOOL_NAMES, UNGROUPED_LABEL } from './tool-groups';
 
 /** A group with its tools resolved against the live catalog. */
@@ -128,8 +127,6 @@ export default function McpToolsReference() {
   return (
     <main className="min-h-dvh bg-(--mp-paper) text-(--mp-ink)">
       <div className="mx-auto max-w-4xl px-5 py-8 sm:px-6">
-        <McpPublicNav active="connect" signedIn={signedIn} balance={signedIn ? balance : undefined} />
-
         {/* Header */}
         <header className="mt-10">
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-(--mp-muted)">Reference</p>

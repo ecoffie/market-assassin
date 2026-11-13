@@ -17,7 +17,6 @@ import Link from 'next/link';
 import FirstQuestions from './FirstQuestions';
 import Image from 'next/image';
 import type { Metadata } from 'next';
-import { McpPublicNav } from '../public-ui';
 
 export const metadata: Metadata = {
   title: 'Add Mindy to Claude or ChatGPT — setup guide | Mindy MCP',
@@ -103,8 +102,6 @@ export default function McpSetupPage() {
   return (
     <main className="bg-(--mp-paper) text-(--mp-ink)">
       <div className="mx-auto max-w-3xl px-5 py-8 sm:px-6">
-        <McpPublicNav active="connect" />
-
         <div className="mt-10">
           <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-(--mp-navy)">Setup guide</p>
           <h1 className="mt-2 text-[30px] font-bold leading-tight text-(--mp-ink) sm:text-[36px] font-(family-name:--mp-font-serif)">Put Mindy inside your AI assistant</h1>

@@ -6,36 +6,14 @@
  * signed-in console (/mcp/account) still uses them; public pages import from here.
  */
 import React from 'react';
-import Link from 'next/link';
-import { Chip } from '@/components/public-site/ui';
 
-export function McpPublicNav({ active, signedIn, balance }: { active: 'about' | 'connect' | 'pricing' | 'account'; signedIn?: boolean; balance?: number | null }) {
-  const link = 'rounded-full px-4 py-2 font-medium transition-colors';
-  const on = 'bg-(--mp-navy-wash) text-(--mp-navy) font-semibold';
-  const off = 'text-(--mp-body) hover:text-(--mp-navy)';
-  // Section tabs only: Sign in / Sign up live in the site top bar above, so they are not repeated here.
-  return (
-    <header className="flex flex-wrap items-center justify-between gap-3">
-      <Link href="/mcp" className="flex items-center gap-2.5">
-        {/* eslint-disable-next-line @next/next/no-img-element -- brand mark, same file as the site header */}
-        <img src="/brand/mindy-logo-icon.png" alt="" className="h-7 w-7" />
-        <span className="text-[17px] font-semibold text-(--mp-ink)">Mindy MCP</span>
-      </Link>
-      <nav className="flex items-center gap-1 overflow-x-auto text-[15px]" aria-label="Mindy MCP">
-        <Link href="/mcp/about" className={`${link} ${active === 'about' ? on : off}`}>Overview</Link>
-        <Link href="/mcp" className={`${link} ${active === 'connect' ? on : off}`}>Connect</Link>
-        <Link href="/mcp/pricing" className={`${link} ${active === 'pricing' ? on : off}`}>Pricing</Link>
-        {signedIn && (
-          <Link href="/app?panel=settings&section=credits" className={`flex items-center gap-2 ${link} ${active === 'account' ? on : off}`}>
-            {typeof balance === 'number' && (
-              <Chip className="tabular-nums">{balance.toLocaleString()} credits</Chip>
-            )}
-            Account
-          </Link>
-        )}
-      </nav>
-    </header>
-  );
+// The MCP section sub-bar (Mindy MCP · Overview · Connect · Pricing) was REMOVED 2026-11-13
+// (owner: "i dont want another nav bar under the main nav bar"). Its links live in the site top
+// bar's "Mindy in your AI" menu (MP_AI_MENU); the signed-in Account link lives in the account
+// menu. Kept as a no-op so existing call sites compile; delete the call sites when convenient.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for call-site compatibility
+export function McpPublicNav(_props: { active: 'about' | 'connect' | 'pricing' | 'account'; signedIn?: boolean; balance?: number | null }) {
+  return null;
 }
 
 // Glyph tiles, not real logos (CSP blocks external images and the marks are trademarked).

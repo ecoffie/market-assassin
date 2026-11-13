@@ -34,6 +34,12 @@ export const MP_AI_MENU: readonly MpAiMenuItem[] = [
     icon: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M10 9l5 3-5 3z"/>',
   },
   {
+    href: '/mcp/about',
+    label: 'How Mindy in your AI works',
+    desc: 'What it is, what it can answer, and what it costs.',
+    icon: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+  },
+  {
     href: '/mcp',
     label: 'Connect your AI',
     desc: 'Claude, ChatGPT, Cursor or any MCP agent.',
