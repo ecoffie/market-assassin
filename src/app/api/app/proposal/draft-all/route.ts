@@ -14,6 +14,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { isProEmail, proRequiredResponse } from '@/lib/access/require-pro';
 import { logToolError, ToolNames, AIProviders, classifyError } from '@/lib/tool-errors';
 import { generateAllSections } from '@/lib/proposal/draft-all';
 import { archiveContent } from '@/lib/archive/persist';
@@ -43,6 +44,8 @@ export async function POST(request: NextRequest) {
   }
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
+  // The proposal workspace is a Pro feature (owner decision 2026-11-13).
+  if (!(await isProEmail(authSession.session.email))) return proRequiredResponse();
   shadowEntitlement({ route: 'app/proposal/draft-all POST', capability: 'proposal.build', email: email, identityVerified: true, currentAllow: true });
 
   // Coach Mode: draft as the CLIENT — vault weave + archived output belong to the

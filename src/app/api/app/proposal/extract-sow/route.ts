@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { isProEmail, proRequiredResponse } from '@/lib/access/require-pro';
 import { createClient } from '@supabase/supabase-js';
 import { extractSow, buildClinScope } from '@/lib/proposal/sow-extraction';
 
@@ -46,6 +47,8 @@ export async function POST(request: NextRequest) {
   const email = String(body.email || '').trim();
   const auth = requireMIAuthSession(request, email);
   if (!auth.ok) return auth.response;
+  // The proposal workspace is a Pro feature (owner decision 2026-11-13).
+  if (!(await isProEmail(auth.session.email))) return proRequiredResponse();
 
   let text = String(body.text || '');
   let fileName = String(body.fileName || 'solicitation');

@@ -17,6 +17,7 @@ import {
   TabStopType,
 } from 'docx';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { isProEmail, proRequiredResponse } from '@/lib/access/require-pro';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { createClient } from '@supabase/supabase-js';
 import type { LoiFields } from '@/lib/proposal/loi-fields';
@@ -725,6 +726,8 @@ export async function POST(request: NextRequest) {
 
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
+  // The proposal workspace is a Pro feature (owner decision 2026-11-13).
+  if (!(await isProEmail(authSession.session.email))) return proRequiredResponse();
   shadowEntitlement({ route: 'app/proposal/export POST', capability: 'proposal.export', email: email, identityVerified: true, currentAllow: true });
 
   // Coach Mode: pre-fill the export from the ACTIVE CLIENT's vault/identity, not

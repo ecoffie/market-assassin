@@ -29,12 +29,15 @@ type Harness = {
   simulateAuthCancel: () => void;
   getResumeCallbacks: () => Array<() => void>;
   document: Document;
+  locks: string[];
 };
 
 function makeHarness(opts: {
   token?: string;
   expired?: boolean;
   miEmail?: string;
+  /** The plan __proGate sees after sign-in. Default 'pro' (the pre-2026-11-13 behavior). */
+  plan?: 'pro' | 'free';
 } = {}): Harness {
   const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'https://getmindy.ai/opportunity-map?mode=buyers' });
   const { window } = dom;
@@ -58,6 +61,15 @@ function makeHarness(opts: {
 
   (window as unknown as { __tokenExpired: (t: string) => boolean }).__tokenExpired = () => !!opts.expired;
   (window as unknown as { __playersUnlockHtml: () => string }).__playersUnlockHtml = () => '<div>unlock</div>';
+
+  // __proGate stub: Players is Pro-only (2026-11-13). The real gate is exercised in
+  // pro-gate.unit.test.ts; here it only decides allow vs lock, synchronously.
+  const locks: string[] = [];
+  (window as unknown as { __proGate: (f: string, ok?: () => void, no?: () => void) => void }).__proGate = (f, ok, no) => {
+    if ((opts.plan || 'pro') === 'pro') { if (ok) ok(); return; }
+    locks.push(f);
+    if (no) no();
+  };
 
   const setMapModeFn = (m: string) => {
     setMapModeCalls.push(m);
@@ -97,6 +109,7 @@ function makeHarness(opts: {
     simulateAuthCancel: () => { resumeCallbacks = []; },
     getResumeCallbacks: () => resumeCallbacks,
     document: window.document,
+    locks,
   };
 }
 
@@ -205,6 +218,27 @@ describe('Players gate — simulated auth (no real session)', () => {
     expiredToken.flush();
     expect(expiredToken.phrases[0]).toContain('continue where you left off');
     expect(expiredToken.phrases[0]).not.toContain('meet the buyers behind the opportunities');
+  });
+
+  it('a signed-in FREE user gets the Pro lock and the map never switches to Players', () => {
+    const h = makeHarness({ token: 'payload.sig', plan: 'free' });
+    let resumeRuns = 0;
+    h.gate('companies', () => { resumeRuns += 1; });
+    expect(h.locks).toEqual(['Players']);
+    expect(h.setMapModeCalls).toEqual([]);
+    expect(h.mapMode).toBe('open');
+    expect(resumeRuns).toBe(0);
+  });
+
+  it('signing in as a FREE user rechecks the plan and shows the lock instead of Players', () => {
+    const h = makeHarness({ plan: 'free' });
+    let resumeRuns = 0;
+    h.gate('companies', () => { resumeRuns += 1; });
+    h.flush();
+    h.simulateAuthSuccess();
+    expect(h.locks).toEqual(['Players']);
+    expect(h.setMapModeCalls).toEqual([]);
+    expect(resumeRuns).toBe(0);
   });
 
   it('timeout leaves the map unchanged and shows a recoverable message (never /app)', () => {

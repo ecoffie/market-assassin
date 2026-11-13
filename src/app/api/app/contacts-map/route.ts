@@ -29,7 +29,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { requirePro } from '@/lib/access/require-pro';
 import { geocodeCity, stableSeed, resolveBuyerLocation } from '@/lib/geo/city-geocode';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import { searchRecipients, getSetAsidesForRecipients, SET_ASIDE_BUCKET_LABEL, type RecipientSearchRow, type RecipientSearchResult } from '@/lib/bigquery/recipients';
@@ -525,7 +525,9 @@ export async function GET(request: NextRequest) {
   const p = new URL(request.url).searchParams;
   const email = (p.get('email') || '').trim().toLowerCase();
 
-  const auth = requireMIAuthSession(request, email || null);
+  // Players (Companies + Government Buyers) is a Pro feature (owner decision 2026-11-13):
+  // signed out → 401, signed in but not Pro → 402 pro_required.
+  const auth = await requirePro(request, email || null);
   if (!auth.ok) return auth.response;
 
   const bboxRaw = p.get('bbox');

@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { isProEmail, proRequiredResponse } from '@/lib/access/require-pro';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -53,6 +54,12 @@ export async function POST(request: NextRequest) {
         { error: auth.error || 'Unauthorized' },
         { status: 401 }
       );
+    }
+
+    // Saving a COMPANY or a GOVERNMENT BUYER from the map ("Add to targets" / "Add to CRM") is a
+    // Pro feature (owner decision 2026-11-13). Saving an opportunity stays free for everyone.
+    if ((source === 'company_map' || source === 'buyer_map') && !(await isProEmail(String(email)))) {
+      return proRequiredResponse();
     }
 
     const supabase = getSupabase();
