@@ -57,6 +57,22 @@ describe('raw-HTML public shell', () => {
     expect(SITE_NAV_CSS).toContain('@media(min-width:621px) and (max-width:980px){.mp-menu{position:absolute;top:100%');
   });
 
+  it('the tablet menu stops at the bottom of the screen: opening it records where the bar ends (2026-11-13)', async () => {
+    const { SITE_NAV_CSS } = await import('./site-nav');
+    // The event banner above the bar wraps to 123px at 768px, so a fixed 140px offset ran the menu off-screen.
+    expect(SITE_NAV_CSS).toContain('max-height:calc(100dvh - var(--mp-menu-top,140px))');
+    const dom = new JSDOM(`<!doctype html><body>${mpRawHeaderHtml()}</body>`, { runScripts: 'dangerously' });
+    const doc = dom.window.document;
+    const burger = doc.querySelector<HTMLButtonElement>('.mp-head .mp-burger');
+    expect(burger).not.toBeNull();
+    burger!.click();
+    expect(doc.documentElement.classList.contains('mp-menu-open')).toBe(true);
+    expect(burger!.getAttribute('aria-expanded')).toBe('true');
+    expect(doc.documentElement.style.getPropertyValue('--mp-menu-top')).toMatch(/^\d+px$/);
+    burger!.click();
+    expect(doc.documentElement.classList.contains('mp-menu-open')).toBe(false);
+  });
+
   it('renders a footer identical to the React PublicFooter', () => {
     const raw = doc(mpRawFooterHtml()).querySelector('footer')!;
     const react = doc(renderToStaticMarkup(PublicFooter())).querySelector('footer')!;

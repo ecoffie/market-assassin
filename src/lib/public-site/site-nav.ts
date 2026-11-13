@@ -73,8 +73,12 @@ function productLinkHtml(l: MpChromeLink): string {
     + `<div class="mp-hiw-panel" role="menu"><div class="mp-hiw-box mp-sub-box"><p class="mp-hiw-k">${esc(l.label)}</p><div class="mp-sub-list">${items}</div></div></div></div>`;
 }
 
-/** Toggles the phone menu (html.mp-menu-open). Inline so raw-HTML pages need no extra script. */
-const MENU_TOGGLE = "var o=document.documentElement.classList.toggle('mp-menu-open');this.setAttribute('aria-expanded',o?'true':'false');";
+/**
+ * Toggles the menu (html.mp-menu-open). Inline so raw-HTML pages need no extra script. On open it
+ * records where the top bar ends (--mp-menu-top) so the tablet drop-down never runs past the bottom
+ * of the screen: the event banner above the bar wraps to a different height at each width.
+ */
+const MENU_TOGGLE = "var d=document.documentElement,o=d.classList.toggle('mp-menu-open');this.setAttribute('aria-expanded',o?'true':'false');var h=this.closest('.mp-head');if(o&&h)d.style.setProperty('--mp-menu-top',Math.round(h.getBoundingClientRect().bottom)+'px');";
 
 const CHEVRON = '<svg class="mp-menu-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
 
@@ -208,9 +212,10 @@ export const SITE_NAV_CSS = [
     + '}',
   // Tablet: the bar keeps the banner above it and Sign in / Start for free in it, so the menu drops
   // down from the bottom of the sticky top bar (.mp-top) instead of covering a fixed 60px offset,
-  // and its own Sign in / Start for free footer is left out.
+  // and its own Sign in / Start for free footer is left out. Its height stops at the bottom of the
+  // screen (--mp-menu-top is set by MENU_TOGGLE when the menu opens).
   '@media(min-width:621px) and (max-width:980px){'
-    + '.mp-menu{position:absolute;top:100%;bottom:auto;max-height:calc(100dvh - 140px);border-bottom:1px solid var(--mp-hair);box-shadow:0 18px 40px rgba(18,16,14,.12)}'
+    + '.mp-menu{position:absolute;top:100%;bottom:auto;max-height:calc(100dvh - var(--mp-menu-top,140px));border-bottom:1px solid var(--mp-hair);box-shadow:0 18px 40px rgba(18,16,14,.12)}'
     + '.mp-menu-foot{display:none}'
     + '}',
   '@media (prefers-reduced-motion: reduce){.mp-evb{transition:none}}',
