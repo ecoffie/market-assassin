@@ -25,6 +25,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getAwardLookup } from '@/lib/bigquery/awards';
+import { SeoTemporarilyUnavailableError } from '@/lib/seo/seo-unavailable';
 import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney, formatMoneyFull as fmtFullMoney } from '@/lib/format-money';
 import { recipientSlug } from '@/lib/bigquery/recipients';
@@ -53,7 +54,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { id } = await params;
   const lookup = await getAwardLookup(decodeURIComponent(id));
   // Not looked up today (cold budget spent) is NOT "not found": say so, and keep it out of the index.
-  if (lookup.state === 'unavailable') return { title: 'Federal Contract Award | Mindy', robots: { index: false, follow: true } };
+  // Unavailable (cold budget spent / BigQuery failed): the page body throws a 5xx. No noindex here:
+  // a temporary state must never tell Google to drop a real award (2026-11-12).
+  if (lookup.state === 'unavailable') return { title: 'Federal Contract Award | Mindy' };
   const award = lookup.award;
   if (!award) return { title: 'Award Not Found | Mindy' };
 
@@ -89,7 +92,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function AwardDetailPage({ params }: PageProps) {
   const { id } = await params;
   const lookup = await getAwardLookup(decodeURIComponent(id));
-  if (lookup.state === 'unavailable') return <AwardTemporarilyUnavailable id={decodeURIComponent(id)} />;
+  // Not looked up today is NOT "not found" — and it is not a page either. This used to render a 200
+  // noindex placeholder that ISR cached for 7 days: on 2026-11-12, 6,365 award requests past the
+  // 4,000/day cold budget got it. A 5xx is not cached and Google keeps the URL indexed while it
+  // retries; the budget resets daily (src/lib/seo/award-cold-budget.ts).
+  if (lookup.state === 'unavailable') {
+    throw new SeoTemporarilyUnavailableError(`award ${decodeURIComponent(id)}: cold lookup unavailable`);
+  }
   const award = lookup.award;
   if (!award) notFound();
 
@@ -279,14 +288,4 @@ function Pill({ children, mono, accent }: { children: React.ReactNode; mono?: bo
   );
 }
 
-function AwardTemporarilyUnavailable({ id }: { id: string }) {
-  return (
-    <main style={{ maxWidth: 640, margin: '64px auto', padding: '0 16px', fontFamily: 'Inter, system-ui, sans-serif' }}>
-      <h1 style={{ fontSize: 24, fontWeight: 600, margin: '0 0 8px' }}>This contract&apos;s details are loading</h1>
-      <p style={{ color: 'var(--mp-muted)', margin: '0 0 20px' }}>
-        We couldn&apos;t load award <code>{id}</code> right now. Please try again in a little while, or search federal contracts in Mindy.
-      </p>
-      <Link href="/awards" style={{ color: 'var(--mp-navy)', fontWeight: 600 }}>Browse federal contract awards →</Link>
-    </main>
-  );
-}
+

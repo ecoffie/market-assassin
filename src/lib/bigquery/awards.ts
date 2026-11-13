@@ -9,7 +9,7 @@
  *     URL (these are the awards search engines actually rank for)
  */
 import { BQ_TABLES } from './client';
-import { cache } from 'react';
+import { dedupeInFlight } from '@/lib/seo/dedupe-in-flight';
 import { bqUnavailable, queryCached } from './cache';
 import { seoLiveBqEnabled } from '@/lib/seo/live-bq';
 import { allowAwardColdLookup } from '@/lib/seo/award-cold-budget';
@@ -49,13 +49,23 @@ export interface AwardDetailRow extends AwardListRow {
   fiscal_year: number;
 }
 
+/** queryCached keys for the /awards landing lists — one definition for reader, page and materializer. */
+export const awardListKey = (kind: 'latest' | 'largest', limit: number) => `awards:${kind}:${limit}`;
+
 /**
  * Latest N awards across all agencies, dollar-bearing only.
  * Powers /awards landing page table.
  */
-export async function getLatestAwards(limit = 50): Promise<AwardListRow[]> {
+/**
+ * `opts.liveBq` is for the scheduled materializer (/api/cron/seo-materialize) ONLY: this query
+ * scans ~10-15 GB and must never run from a page request. Pages read cache-only and answer 5xx
+ * when the materialized list is missing.
+ */
+export async function getLatestAwards(limit = 50, opts: { liveBq?: boolean; forceRefresh?: boolean } = {}): Promise<AwardListRow[]> {
   return queryCached<AwardListRow>({
-    cacheKey: `awards:latest:${limit}`,
+    cacheOnly: !opts.liveBq,
+    forceRefresh: opts.forceRefresh,
+    cacheKey: awardListKey('latest', limit),
     // Even with the fiscal_year >= currentYear-1 filter, ORDER BY
     // action_date DESC on dollar-bearing rows scans the recent
     // partitions fully (~10-15 GB). Cache hit cost is zero —
@@ -90,9 +100,12 @@ export async function getLatestAwards(limit = 50): Promise<AwardListRow[]> {
  * generateStaticParams on /awards/[id] (so the top 10K are
  * prerendered/sitemapped).
  */
-export async function getLargestAwards(limit = 50): Promise<AwardListRow[]> {
+/** Same contract as getLatestAwards: ~17 GB scan, materializer-only live reads. */
+export async function getLargestAwards(limit = 50, opts: { liveBq?: boolean; forceRefresh?: boolean } = {}): Promise<AwardListRow[]> {
   return queryCached<AwardListRow>({
-    cacheKey: `awards:largest:${limit}`,
+    cacheOnly: !opts.liveBq,
+    forceRefresh: opts.forceRefresh,
+    cacheKey: awardListKey('largest', limit),
     // Full-table sort by obligation_amount across 63M rows scans
     // ~17 GB. Bumped from default 5 GiB. Cache hit cost is zero,
     // and KV TTL is 7 days so this runs ~weekly.
@@ -132,10 +145,14 @@ export type AwardLookup =
  * pruned (~10 MB billed) and caches 90 days, positive or negative. Before 2026-11-12 a cold
  * miss returned null and the page said "Award Not Found" for real contracts (25K visitors/28d).
  *
- * React cache() collapses generateMetadata + the page body into ONE lookup per request.
+ * generateMetadata + the page body share ONE lookup (and one budget unit) per request through
+ * dedupeInFlight. React cache() was relied on here and was measured NOT to dedupe those two
+ * renders in production (2026-11-12, contractor pages: 2 budget units per cold request).
  * `allowCold:false` (OG image) never spends budget.
  */
-export const getAwardLookup = cache(async (awardId: string, allowCold = true): Promise<AwardLookup> => {
+export const getAwardLookup = dedupeInFlight(
+  (awardId: string, allowCold: boolean = true) => `award:${awardId}:${allowCold !== false}`,
+  async (awardId: string, allowCold: boolean = true): Promise<AwardLookup> => {
   if (!isValidAwardId(awardId)) return { state: 'missing', award: null };
   const cacheKey = `awards:detail:${awardId}`;
   const run = (cacheOnly: boolean) => queryCached<AwardDetailRow>({
@@ -189,7 +206,8 @@ export const getAwardLookup = cache(async (awardId: string, allowCold = true): P
     if (!bqUnavailable(cacheKey, 0)) return { state: 'missing', award: null };
   }
   return { state: 'unavailable', award: null };
-});
+  },
+);
 
 /** Back-compat: the award, or null when missing OR unknown. Prefer getAwardLookup. */
 export async function getAwardById(awardId: string, allowCold = true): Promise<AwardDetailRow | null> {

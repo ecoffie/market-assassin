@@ -24,9 +24,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getForecastSummary, agencySlug } from '@/lib/seo/forecasts-summary';
+import { SeoTemporarilyUnavailableError } from '@/lib/seo/seo-unavailable';
 import { AGENCIES_SEO } from '@/data/agencies-seo';
 
-export const revalidate = 86400; // daily; the upstream forecast files move slowly
+// Rendered per request (one ~7 kB KV read). Not prerendered: a missing summary now throws a 5xx,
+// and a throw during `next build` prerender would fail EVERY deploy while the summary is absent
+// (caught by the full build, 2026-11-12). Per-request rendering turns that into a runtime 5xx.
+export const dynamic = 'force-dynamic';
 
 /*
  * Data comes from a MATERIALIZED summary in KV, built offline by
@@ -55,8 +59,8 @@ export async function generateMetadata(): Promise<Metadata> {
     title,
     description,
     alternates: { canonical: `${SITE_URL}/forecasts` },
-    // An unavailable read must not be indexed as if it were an empty market.
-    robots: s.available ? undefined : { index: false, follow: true },
+    // No noindex for an unavailable summary: the page body throws a 5xx instead (2026-11-12).
+    // A temporary state must never tell Google the page went away.
     openGraph: { title, description, type: 'website', url: `${SITE_URL}/forecasts` },
   };
 }
@@ -72,26 +76,12 @@ function fmtDate(iso: string | null): string | null {
 export default async function ForecastsPage() {
   const s = await getForecastSummary();
 
+  // Missing / stale / truncated summary = the daily materializer (/api/cron/seo-materialize) did
+  // not run or failed. That is temporary, so answer 5xx (not cached by ISR; a background
+  // revalidation keeps the last good page) rather than a 200 noindex that Google reads as gone.
+  // Found 2026-11-12: the summary had expired because nothing rebuilt it, and /forecasts sat noindexed.
   if (!s.available) {
-    return (
-      <main className="bg-(--mp-paper) text-(--mp-ink)">
-        <div className="mx-auto max-w-4xl px-6 py-20">
-          <h1 className="text-3xl font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">Federal Contract Forecasts</h1>
-          <p className="mt-4 text-(--mp-muted)">
-            Forecast data is temporarily unavailable. Rather than show you a zero we cannot prove,
-            we are showing you nothing. Try{' '}
-            <Link href="/agencies" className="text-(--mp-navy) hover:underline">
-              the agency directory
-            </Link>{' '}
-            or{' '}
-            <Link href="/opportunity-hunter" className="text-(--mp-navy) hover:underline">
-              open opportunities
-            </Link>{' '}
-            in the meantime.
-          </p>
-        </div>
-      </main>
-    );
+    throw new SeoTemporarilyUnavailableError(`forecasts summary unavailable: ${s.reason ?? 'unknown'}`);
   }
 
   const synced = fmtDate(s.lastSynced);
