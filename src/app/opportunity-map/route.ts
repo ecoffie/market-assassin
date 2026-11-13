@@ -372,7 +372,7 @@ const SERVER_FILTERS =
   // shows totalForFilters per horizon, never the 1,000 pin cap). Opportunities-map only (mfv-open).
   // All checked by default; uncheck to hide; last-checked sticky. window.__horizons + toggleHorizon.
   + '<div class="hznwrap mfv-open" id="hznWrap">'
-  +   '<button class="fsel fsel-mode" id="hznBtn" type="button" title="Which categories to show" aria-haspopup="true" aria-expanded="false">Horizons</button>'
+  +   '<button class="fsel fsel-mode" id="hznBtn" type="button" title="Which categories to show" aria-haspopup="true" aria-expanded="false">Open now</button>'
   +   '<div class="hznpop" id="hznPop" role="menu" hidden>'
   +     '<button class="hznrow on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')"><i></i><span class="hznlbl">Open Now</span><span class="hznn" data-hzn="open"></span></button>'
   +     '<button class="hznrow on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')"><i></i><span class="hznlbl">Coming Back</span><span class="hznn" data-hzn="recompete"></span></button>'
@@ -3217,7 +3217,13 @@ const VIEWPORT_JS = `<script>
     // Divisor is the ACTUAL horizon count (3 now — Grants removed), never a hardcoded 4 (Eric 2026-08-01).
     // Always just "Horizons" — the N/total count suffix was noise (Eric 2026-08-01). The dropdown
     // rows themselves show which are on (checked) with their live counts.
-    void total; if(btn)btn.textContent='Horizons';
+    // Eric 2026-11-13: "change horizons to open now". The button names what is ON: the first
+    // selected horizon, plus "+N" for the others (all three on → "Open now +2"), so it never
+    // claims Open-only while Coming back / Coming soon pins are showing.
+    var HZN_LABEL={open:'Open now',recompete:'Coming back',forecast:'Coming soon'};
+    var onList=HZ.filter(function(m){return window.__horizons[m]!==false;});
+    void total; void onCount;
+    if(btn)btn.textContent=onList.length?HZN_LABEL[onList[0]]+(onList.length>1?' +'+(onList.length-1):''):'Open now';
   };
   // Open/close the Horizons popover (Zillow Home-Type dropdown). Toggling a row does NOT close it
   // (multi-select — keep it open so you can flip several). Closes on outside click / Esc.
