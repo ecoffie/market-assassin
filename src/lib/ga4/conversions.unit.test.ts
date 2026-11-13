@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('./report', () => ({ runGa4Report: vi.fn() }));
-import { isHomepageReferrer, rate } from './conversions';
+import { formatDuration, isHomepageReferrer, rate } from './conversions';
 
 describe('conversion helpers', () => {
   it('recognises only the homepage as a referrer', () => {
@@ -17,5 +17,11 @@ describe('conversion helpers', () => {
     expect(rate(257, 1483)).toBe('17.3%');
     expect(rate(5, 0)).toBe('—');
     expect(rate(null, 10)).toBe('—');
+  });
+
+  it('formats engaged time', () => {
+    expect(formatDuration(42.4)).toBe('42s');
+    expect(formatDuration(65)).toBe('1m 05s');
+    expect(formatDuration(null)).toBe('—');
   });
 });
