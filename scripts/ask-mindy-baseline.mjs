@@ -27,7 +27,7 @@ const email = arg('email');
 const token = arg('token', process.env.MI_AUTH_TOKEN);
 const outDir = arg('out', join(tmpdir(), `ask-mindy-baseline-${new Date().toISOString().replace(/[:.]/g, '-')}`));
 const only = arg('only') ? new Set(arg('only').split(',')) : null;
-if (!email || !token) {
+if (!arg('regrade') && (!email || !token)) {
   console.error('Required: --email <account> --token <MI auth token> (or MI_AUTH_TOKEN env)');
   process.exit(2);
 }
@@ -48,6 +48,7 @@ async function ask(prompt) {
   let buf = '';
   let answer = '';
   const notices = [];
+  const traces = [];
   let sessionId = null;
   let error = null;
   for (;;) {
@@ -63,11 +64,12 @@ async function ask(prompt) {
         if (e.type === 'token') answer += e.content;
         else if (e.type === 'notice' || e.type === 'truncated') notices.push(e.code || e.type);
         else if (e.type === 'session') sessionId = e.sessionId;
+        else if (e.type === 'trace') traces.push(e);
         else if (e.type === 'error') error = e.message;
       } catch { /* keep-alive */ }
     }
   }
-  return { http: res.status, answer, notices, sessionId, error, ms: Date.now() - started };
+  return { http: res.status, answer, notices, traces, sessionId, error, ms: Date.now() - started };
 }
 
 function check(s, answer) {
@@ -79,14 +81,32 @@ function check(s, answer) {
   return fails;
 }
 
+// --regrade <dir>: re-score saved answers against the current fixture (no LLM calls).
+const regrade = arg('regrade');
+if (regrade) {
+  let ok = 0, n = 0;
+  for (const s of fixture.scenarios) {
+    if (only && !only.has(s.id)) continue;
+    let saved;
+    try { saved = JSON.parse(readFileSync(join(regrade, `${s.id}.json`), 'utf8')); } catch { continue; }
+    n += 1;
+    const fails = saved.error ? [`error: ${saved.error}`] : check(s, saved.answer || '');
+    if (!fails.length) ok += 1;
+    console.log(`${fails.length ? 'FAIL' : 'pass'}  ${s.id}  ${fails.join('; ')}`);
+  }
+  console.log(`\n${ok}/${n} passed (regrade, no LLM calls)`);
+  process.exit(ok === n ? 0 : 1);
+}
+
 const rows = [];
 for (const s of fixture.scenarios) {
   if (only && !only.has(s.id)) continue;
   const r = await ask(s.prompt);
   const fails = r.error ? [`error: ${r.error}`] : check(s, r.answer);
-  rows.push({ id: s.id, pass: fails.length === 0, fails, ms: r.ms, notices: r.notices, sessionId: r.sessionId, manual: s.manual || null });
+  const tools = (r.traces || []).flatMap((t) => (t.tools || []).map((x) => ({ tool: x.tool, status: x.status, error_category: x.error_category, args: x.args, result_chars: x.result_chars })));
+  rows.push({ id: s.id, pass: fails.length === 0, fails, ms: r.ms, notices: r.notices, planner: r.traces?.[0]?.planner || null, tools, sessionId: r.sessionId, manual: s.manual || null });
   writeFileSync(join(outDir, `${s.id}.json`), JSON.stringify({ scenario: s, ...r, fails }, null, 2));
-  console.log(`${fails.length ? 'FAIL' : 'pass'}  ${s.id}  ${(r.ms / 1000).toFixed(1)}s  ${r.notices.join(',')}  ${fails.join('; ')}`);
+  console.log(`${fails.length ? 'FAIL' : 'pass'}  ${s.id}  ${(r.ms / 1000).toFixed(1)}s  tools=[${tools.map((t) => `${t.tool}:${t.status}`).join(' ')}]  ${r.notices.join(',')}  ${fails.join('; ')}`);
 }
 writeFileSync(join(outDir, 'summary.json'), JSON.stringify({ host, at: new Date().toISOString(), rows }, null, 2));
 const passed = rows.filter((r) => r.pass).length;
