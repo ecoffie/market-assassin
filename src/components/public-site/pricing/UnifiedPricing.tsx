@@ -21,6 +21,7 @@ import Link from 'next/link';
 import NoRefundNote from '@/components/NoRefundNote';
 import type { Catalog, Pkg, SubPlan, Tool } from '@/app/mcp/catalog-ui';
 import { exampleCost, toolCr, workupCostFrom, workups } from '@/app/mcp/catalog-ui';
+import { PRICING_TASK_EXAMPLES, galleryExampleHref } from '@/lib/mcp/gallery-links';
 
 export type PricingTab = 'app' | 'mcp';
 
@@ -386,6 +387,16 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
           </section>
         )}
 
+        {tab === 'mcp' && (
+          <Link className="gal-band" href="/mcp/gallery">
+            <span className="gal-t">
+              <b>See what your AI agent can produce with Mindy.</b>
+              <span>Explore examples of federal market research, competitor analysis, capture planning and proposal workflows.</span>
+            </span>
+            <span className="gal-cta">Explore AI agent examples <span aria-hidden="true">→</span></span>
+          </Link>
+        )}
+
         <div className="plans-head" id="plans">
           <div>
             <h2>All plans</h2>
@@ -452,13 +463,22 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
                 <h3>What will your agent do?</h3>
                 <p className="hint">Multiple options can be selected · charged only on success</p>
                 <div className="tasks">
-                  {TASKS.map((t) => (
-                    <button type="button" key={t.id} aria-pressed={picked.has(t.id)} className={`task ${picked.has(t.id) ? 'on' : ''}`}
-                      onClick={() => setPicked((prev) => { const n = new Set(prev); if (n.has(t.id)) n.delete(t.id); else n.add(t.id); return n; })}>
-                      <span className="box"><Check /></span>
-                      <span><b>{t.label}</b><small>{t.note} · {exampleCost(tools, t.tools)} cr</small></span>
-                    </button>
-                  ))}
+                  {TASKS.map((t) => {
+                    const ex = PRICING_TASK_EXAMPLES[t.id];
+                    return (
+                      <div className="task-cell" key={t.id}>
+                        <button type="button" aria-pressed={picked.has(t.id)} className={`task ${picked.has(t.id) ? 'on' : ''}`}
+                          onClick={() => setPicked((prev) => { const n = new Set(prev); if (n.has(t.id)) n.delete(t.id); else n.add(t.id); return n; })}>
+                          <span className="box"><Check /></span>
+                          <span><b>{t.label}</b><small>{t.note} · {exampleCost(tools, t.tools)} cr</small></span>
+                        </button>
+                        {/* A sibling of the toggle, not inside it: a link in a button is invalid and would toggle the task. New tab keeps the calculator's picks. */}
+                        {ex && (
+                          <a className="task-ex" href={galleryExampleHref(ex)} target="_blank" rel="noopener" aria-label={`See an example: ${t.label} (opens in a new tab)`}>See example</a>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -683,6 +703,18 @@ const CSS = `
 .up .step h3{font-family:var(--mp-font-serif);font-size:19px;font-weight:700;margin-top:5px}
 .up .step .hint{color:var(--mp-muted);font-size:14px;margin:4px 0 14px}
 .up .tasks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.up .task-cell{position:relative;display:flex}
+.up .task-cell .task{flex:1;width:100%}
+.up .task-ex{position:absolute;top:10px;right:10px;padding:2px 4px;font-size:12px;font-weight:600;color:var(--mp-navy);text-decoration:none;border-radius:4px}
+.up .task-ex:hover{text-decoration:underline;text-underline-offset:2px}
+.up .task-ex:focus-visible{outline:2px solid var(--mp-navy);outline-offset:1px}
+.up .gal-band{display:flex;align-items:center;justify-content:space-between;gap:12px 24px;flex-wrap:wrap;margin:24px 0 0;padding:16px 20px;border-radius:8px;background:var(--mp-surface);border:1px solid var(--mp-line);color:var(--mp-ink);text-decoration:none;transition:border-color .15s}
+.up .gal-band:hover{border-color:var(--mp-navy)}
+.up .gal-t{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1 1 380px}
+.up .gal-t b{font-size:16px;font-weight:600;color:var(--mp-ink)}
+.up .gal-t span{font-size:14px;color:var(--mp-muted);line-height:1.45}
+.up .gal-cta{flex:none;font-size:14px;font-weight:600;color:var(--mp-navy);white-space:nowrap}
+.up .gal-band:hover .gal-cta{text-decoration:underline;text-underline-offset:2px}
 .up .task{border:1px solid var(--mp-line);border-radius:8px;padding:12px;background:var(--mp-surface);text-align:left;display:flex;flex-direction:column;gap:20px;min-height:110px;transition:.15s}
 .up .task:hover{border-color:var(--mp-navy)}
 .up .task .box{width:18px;height:18px;border-radius:4px;border:1.5px solid var(--mp-faint);display:grid;place-items:center;color:var(--mp-surface);background:var(--mp-surface)}

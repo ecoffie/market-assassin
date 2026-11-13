@@ -12,11 +12,14 @@
  *   which answers only for a server-verified session.
  * - No credit amounts anywhere on this page.
  */
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
+import Link from 'next/link';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
 import {
   GALLERY_CATEGORIES,
+  GALLERY_EXAMPLE_PARAM,
   GALLERY_STARTERS,
+  galleryExampleHref,
   type GalleryCategory,
   type GalleryItem,
   type GalleryPreview,
@@ -24,14 +27,20 @@ import {
 
 type PromptState = { status: 'loading' } | { status: 'signed-out' } | { status: 'ready'; prompts: Record<string, string> };
 
-const SIGN_IN = '/app?next=%2Fmcp%2Fgallery';
+/** Sign in, then come back to the same open example (signInReturnPath accepts the query). */
+const signInFor = (id: string) => `/app?next=${encodeURIComponent(galleryExampleHref(id))}`;
 const catLabel = (c: GalleryCategory) => GALLERY_CATEGORIES.find((x) => x.id === c)?.label ?? '';
 /** Stagger index for an animated element. */
 const si = (i: number) => ({ ['--i' as string]: i }) as CSSProperties;
 
+/** The `?example=` id the page was opened with (null on the server, so the first paint matches). */
+const noSubscribe = () => () => {};
+const readExampleParam = () => new URLSearchParams(window.location.search).get(GALLERY_EXAMPLE_PARAM);
+
 export default function Gallery({ items }: { items: GalleryItem[] }) {
   const [tab, setTab] = useState<GalleryCategory | 'all'>('all');
-  const [open, setOpen] = useState<GalleryItem | null>(null);
+  // undefined = the visitor has not opened or closed a card yet, so the deep link decides.
+  const [picked, setPicked] = useState<GalleryItem | null | undefined>(undefined);
   const [prompts, setPrompts] = useState<PromptState>({ status: 'loading' });
 
   useEffect(() => {
@@ -49,16 +58,33 @@ export default function Gallery({ items }: { items: GalleryItem[] }) {
     };
   }, []);
 
+  // Deep link: /mcp/gallery?example=<id> opens that card (the pricing calculator links here).
+  const deepLinkId = useSyncExternalStore(noSubscribe, readExampleParam, () => null);
+  const open = picked !== undefined ? picked : (items.find((i) => i.id === deepLinkId) ?? null);
+
+  // Keep the address bar in step with the open card, so an open example can be shared.
+  const show = useCallback((item: GalleryItem | null) => {
+    setPicked(item);
+    try {
+      const url = new URL(window.location.href);
+      if (item) url.searchParams.set(GALLERY_EXAMPLE_PARAM, item.id);
+      else url.searchParams.delete(GALLERY_EXAMPLE_PARAM);
+      window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+    } catch {
+      /* the card still opens */
+    }
+  }, []);
+
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(null);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && show(null);
     window.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
     return () => {
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
     };
-  }, [open]);
+  }, [open, show]);
 
   const featured = items.filter((i) => i.featured);
   const wall = useMemo(() => items.filter((i) => !i.featured && (tab === 'all' || i.category === tab)), [items, tab]);
@@ -77,7 +103,7 @@ export default function Gallery({ items }: { items: GalleryItem[] }) {
           <p className="mg-sec">Featured</p>
           <div className="mg-feat">
             {featured.map((item, n) => (
-              <Card key={item.id} item={item} big seed={n} onOpen={() => setOpen(item)} />
+              <Card key={item.id} item={item} big seed={n} onOpen={() => show(item)} />
             ))}
           </div>
 
@@ -96,16 +122,27 @@ export default function Gallery({ items }: { items: GalleryItem[] }) {
           </div>
           <div className="mg-wall">
             {wall.map((item, n) => (
-              <Card key={item.id} item={item} seed={n + 4} onOpen={() => setOpen(item)} />
+              <Card key={item.id} item={item} seed={n + 4} onOpen={() => show(item)} />
             ))}
           </div>
           <p className="mg-fine">Sample results: company names and figures are illustrative. A real answer comes from live federal data.</p>
+
+          <section className="mg-next" aria-label="Run these yourself">
+            <div>
+              <h2 className="mg-next-h">Run these on your own company.</h2>
+              <p className="mg-next-p">Connect Mindy to Claude, ChatGPT, Cursor or any MCP agent in your browser, then pick the plan that fits how much work your agent does.</p>
+            </div>
+            <div className="mg-next-cta">
+              <Link className="mp-btn mp-btn--primary" href="/mcp">Connect your AI</Link>
+              <Link className="mp-btn mp-btn--secondary" href="/mcp/pricing">See plans &amp; pricing</Link>
+            </div>
+          </section>
 
           <Composer />
         </div>
       </section>
 
-      {open && <Detail item={open} prompts={prompts} onClose={() => setOpen(null)} />}
+      {open && <Detail item={open} prompts={prompts} onClose={() => show(null)} />}
     </div>
   );
 }
@@ -260,13 +297,17 @@ function Detail({ item, prompts, onClose }: { item: GalleryItem; prompts: Prompt
               </span>
               <p>{prompts.status === 'loading' ? 'Checking your account…' : 'Sign in to see the exact prompt and copy it into your AI.'}</p>
               {prompts.status === 'signed-out' && (
-                <a className="mp-btn mp-btn--primary mp-btn--sm" href={SIGN_IN}>
+                <a className="mp-btn mp-btn--primary mp-btn--sm" href={signInFor(item.id)}>
                   Sign in to see the prompt
                 </a>
               )}
             </div>
           )}
-          <p className="mg-fine2">Works in Claude, ChatGPT, Cursor or any MCP agent once Mindy is connected.</p>
+          <p className="mg-fine2">Works in Claude, ChatGPT, Cursor or any MCP agent once Mindy is connected. This is a sample result: names and figures are illustrative.</p>
+          <div className="mg-sheet-next">
+            <Link className="mp-link" href="/mcp">Connect your AI ›</Link>
+            <Link className="mp-link" href="/mcp/pricing">See plans &amp; pricing ›</Link>
+          </div>
         </div>
       </div>
     </div>
@@ -687,6 +728,11 @@ const CSS = `
 @media(max-width:1000px){.mg-wall{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.mg-feat,.mg-wall{grid-template-columns:minmax(0,1fr)}}
 .mg-fine{margin:18px 0 0;color:var(--on-mute);font:400 12.5px var(--mp-font-sans)}
+.mg-next{display:flex;justify-content:space-between;align-items:center;gap:20px 32px;flex-wrap:wrap;margin:28px 0 0;padding:26px 28px;background:var(--mp-surface);border:1px solid var(--tile-line)}
+.mg-next-h{margin:0;font:700 1.4rem/1.2 var(--mp-font-serif);color:var(--on)}
+.mg-next-p{margin:8px 0 0;max-width:60ch;color:var(--on-mute);font:400 15px/1.55 var(--mp-font-sans)}
+.mg-next-cta{display:flex;gap:10px;flex-wrap:wrap}
+@media(max-width:620px){.mg-next{padding:22px 18px}.mg-next-cta{width:100%}.mg-next-cta .mp-btn{flex:1 1 auto}}
 /* video card */
 .vid{all:unset;box-sizing:border-box;position:relative;display:block;cursor:pointer;background:var(--tile);border:1px solid var(--tile-line);transition:border-color .15s,transform .2s;overflow:hidden;aspect-ratio:4/4.3}
 .vid--big{aspect-ratio:16/12.5}
@@ -874,6 +920,7 @@ const CSS = `
 .mg-blur{display:grid;gap:8px}
 .mg-blur i{display:block;height:10px;background:var(--mp-wash)}
 .mg-fine2{margin:auto 0 0;color:var(--mp-muted);font:400 13px/1.5 var(--mp-font-sans)}
+.mg-sheet-next{display:flex;gap:8px 20px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--mp-hair);font:600 14px var(--mp-font-sans)}
 .mg-x{position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:50%;border:1px solid var(--mp-line);background:var(--mp-surface);color:var(--mp-ink);font-size:20px;line-height:1;cursor:pointer;z-index:1}
 @media (prefers-reduced-motion:reduce){.mg *{animation:none!important}.vid .ping{display:none}}
 `;
