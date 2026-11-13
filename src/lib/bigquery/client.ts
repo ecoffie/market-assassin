@@ -149,6 +149,32 @@ export const BQ_DATASET = `\`${PROJECT_ID}.${DATASET}\``;
  * "not found" recorded before the table was rebuilt must not outlive the rebuild.
  * Returns null on any failure; callers then fall back to TTL alone.
  */
+/**
+ * Atomically replace `dst` with a copy of `src` (same dataset) — a BigQuery COPY job with
+ * WRITE_TRUNCATE: readers see either the old table or the new one, never a missing table, and copy
+ * jobs are not billed. Partition/cluster specs must match (they do when both come from the same
+ * CREATE). Used by the award lookup rebuild (src/lib/awards-ingest/lookup-rebuild.ts).
+ */
+export async function bqCopyTable(src: string, dst: string): Promise<void> {
+  assertLiveBigQueryAllowed('bigquery copy');
+  const ds = getClient().dataset(DATASET);
+  const [job] = await ds.table(src).createCopyJob(ds.table(dst), { writeDisposition: 'WRITE_TRUNCATE' });
+  await job.promise();
+  const [meta] = await job.getMetadata();
+  if (meta?.status?.errorResult) throw new Error(`copy ${src} -> ${dst} failed: ${meta.status.errorResult.message}`);
+}
+
+/** Row count from table metadata (free), or null when the table does not exist. */
+export async function bqTableRows(table: string): Promise<number | null> {
+  try {
+    const [meta] = await getClient().dataset(DATASET).table(table).getMetadata();
+    return Number(meta?.numRows ?? 0);
+  } catch (err) {
+    if ((err as { code?: number })?.code === 404) return null;
+    throw err;
+  }
+}
+
 export async function getTableLastModified(table: string): Promise<string | null> {
   try {
     const [meta] = await getClient().dataset(DATASET).table(table).getMetadata();
