@@ -23,6 +23,13 @@ import { commitNaicsFromTypedInput } from '@/lib/codes/validate-market-codes';
 import TargetingCard from './TargetingCard';
 import { pscStatus } from '@/lib/codes/psc-status';
 import { SETTINGS_SECTION_ANCHORS, type SettingsSection } from '@/lib/app/deep-link-params';
+import {
+  SETTINGS_TABS,
+  settingsSearchForTab,
+  tabForSection,
+  unsavedTabs,
+  type SettingsTab,
+} from '@/lib/app/settings-tabs';
 import CreditsConsole from '@/components/account/CreditsConsole';
 import { useScrollToAnchor } from '../useScrollToAnchor';
 import MindyLoader from '@/components/app/MindyLoader';
@@ -31,7 +38,7 @@ import { tierAtLeast } from '@/lib/access/tier-rank';
 interface UnifiedSettingsPanelProps {
   email: string | null;
   tier: AppTier;
-  /** Deep link (/app?panel=settings&section=…) — scroll to that card once it renders. */
+  /** Deep link (/app?panel=settings&section=…) — opens the tab holding that card and scrolls to it. */
   initialSection?: SettingsSection;
 }
 
@@ -56,6 +63,25 @@ interface SettingsForm {
 
 export default function UnifiedSettingsPanel({ email, tier, initialSection }: UnifiedSettingsPanelProps) {
   useScrollToAnchor(initialSection ? SETTINGS_SECTION_ANCHORS[initialSection] : null);
+  // Which tab is open. A deep link's ?section= picks it; if the panel is re-rendered with a
+  // different deep link, follow it (render-time sync, no effect).
+  const [tab, setTab] = useState<SettingsTab>(() => tabForSection(initialSection));
+  const [tabFor, setTabFor] = useState(initialSection);
+  if (tabFor !== initialSection) {
+    setTabFor(initialSection);
+    setTab(tabForSection(initialSection));
+  }
+  // Keep the address bar on the open tab (replaceState — no reload, no history entry).
+  const switchTab = useCallback((next: SettingsTab) => {
+    setTab(next);
+    if (typeof window === 'undefined') return;
+    try {
+      const search = settingsSearchForTab(window.location.search, next);
+      window.history.replaceState(null, '', `${window.location.pathname}${search}`);
+    } catch { /* URL sync is a convenience */ }
+  }, []);
+  // Last loaded/saved form — the baseline for the "unsaved changes" dot on the tabs.
+  const [savedForm, setSavedForm] = useState<SettingsForm | null>(null);
   const [form, setForm] = useState<SettingsForm>({
     company_name: '',
     display_name: '',
@@ -196,7 +222,7 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
       // legitimately live on mi_beta_user_settings) from settings.
       const notif = data.profile?.notification || {};
       setWorkspaceName(data.workspace?.name || 'Workspace');
-      setForm({
+      const loaded: SettingsForm = {
         company_name: settings.company_name || notif.company_name || '',
         display_name: settings.display_name || '',
         role_title: settings.role_title || '',
@@ -218,7 +244,9 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
         alert_recipient_email: prefs?.data?.alertRecipientEmail || '',
         naics_priorities: prioritiesFromAggregated(notif.aggregated_profile) || prefs?.data?.naicsPriorities || {},
         alert_mode: prefs?.data?.alertMode || alertModeFromAggregated(notif.aggregated_profile),
-      });
+      };
+      setForm(loaded);
+      setSavedForm(loaded);
       setStoredNaics((notif.naics_codes || []).map(String));
     } catch (err) {
       console.error('Failed to load settings:', err);
@@ -553,6 +581,11 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
       });
 
       setForm(prev => ({ ...prev, onboarding_completed: markComplete }));
+      setSavedForm({
+        ...form,
+        naics_codes: blockedAdds.length > 0 ? naicsPersist.join(', ') : form.naics_codes,
+        onboarding_completed: markComplete,
+      });
       setStoredNaics(naicsPersist);
       setTargetingRefreshKey(prev => prev + 1);
       // Notify any OTHER open surface (the dashboard TargetingCard, the top drawer)
@@ -630,19 +663,25 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
   };
 
   const focusOpportunityMatching = useCallback(() => {
+    switchTab('matching');
     matchingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     window.setTimeout(() => {
       const firstField = matchingSectionRef.current?.querySelector<HTMLElement>('input, textarea, button, select');
       firstField?.focus();
     }, 250);
-  }, []);
+  }, [switchTab]);
+
+  const unsaved = unsavedTabs(
+    form as unknown as Record<string, unknown>,
+    savedForm as unknown as Record<string, unknown> | null,
+  );
 
   if (loading) {
     return <MindyLoader title="Loading your settings" steps={["Your profile", "Codes and keywords", "Alert settings"]} />;
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl">
+    <div className="p-4 sm:p-6 space-y-5 max-w-6xl">
       {/* Styled "Start over?" confirm — replaces the native window.confirm so it
           matches Mindy's dark UI. */}
       {showResetConfirm && (
@@ -695,618 +734,692 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
         <p className="text-muted mt-1">{workspaceName} • {tierLabel(tier)}</p>
       </div>
 
+      {/* Tabs — one group of cards at a time instead of one long page. Every tab stays
+          MOUNTED (inactive ones are display:none), so unsaved Profile / Matching edits survive a
+          tab switch; the dot marks a tab with unsaved edits. Deep links: ?section= → tab
+          (src/lib/app/settings-tabs.ts). */}
+      <div
+        role="tablist"
+        aria-label="Settings sections"
+        className="-mx-4 flex gap-1 overflow-x-auto border-b border-surface px-4 sm:mx-0 sm:px-0 [scrollbar-width:none]"
+      >
+        {SETTINGS_TABS.map((t) => {
+          const on = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              id={`settings-tabbtn-${t.id}`}
+              aria-selected={on}
+              aria-controls={`settings-tab-${t.id}`}
+              onClick={() => switchTab(t.id)}
+              className={`relative -mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                on ? 'border-emerald-500 text-white' : 'border-transparent text-muted hover:text-slate-200'
+              }`}
+            >
+              {t.label}
+              {unsaved.has(t.id) && (
+                <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-amber-400 align-middle" aria-label="unsaved changes" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
       {message && <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-300">{message}</div>}
       {error && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-300">{error}</div>}
 
+      {/* ── Alerts & matching ─────────────────────────────────────────── */}
+      <div role="tabpanel" id="settings-tab-matching" aria-labelledby="settings-tabbtn-matching" className={tab === 'matching' ? 'space-y-5' : 'hidden'}>
       {/* Coverage readout — shows how the codes/keywords below stack up against the
           real USASpending market + flags missing high-value codes. `key` bumps after
           save so the card re-fetches the canonical targeting settings. */}
       <TargetingCard key={`targeting-${targetingRefreshKey}`} email={email} variant="full" surface="settings" onEdit={focusOpportunityMatching} onReset={resetProfile} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
-        <div className="space-y-5">
-          <section className="bg-ground border border-surface rounded-xl p-6 space-y-5">
-            <SectionTitle title="Profile" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label="Display Name" value={form.display_name} onChange={(value) => setForm({ ...form, display_name: value })} placeholder="John Doe" />
-              <Field label="Role / Title" value={form.role_title} onChange={(value) => setForm({ ...form, role_title: value })} placeholder="Founder, BD Lead..." />
-              <Field label="Company" value={form.company_name} onChange={(value) => setForm({ ...form, company_name: value })} placeholder="Company name" />
-              <label className="block">
-                <span className="block text-sm text-muted mb-1">Email Frequency</span>
-                <select
-                  value={form.email_frequency}
-                  onChange={(e) => setForm({ ...form, email_frequency: e.target.value })}
-                  className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white outline-none focus:border-emerald-500"
-                >
-                  <option value="daily">Daily</option>
-                  <option value="mwf">Mon / Wed / Fri</option>
-                  <option value="tth">Tue / Thu</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="paused">Paused</option>
-                </select>
-              </label>
+        <section ref={matchingSectionRef} className="scroll-mt-24 bg-ground border border-surface rounded-xl p-6 space-y-5">
+          <div>
+            <SectionTitle title="Opportunity Matching" />
+            <p className="mt-2 text-sm text-muted">
+              These preferences control what Mindy <span className="text-ink-soft">watches for</span> in alerts,
+              briefings, and forecasts. The company identity Mindy <span className="text-ink-soft">writes into proposals</span>
+              {' '}(legal name, UEI, certifications, past performance, point of contact) lives in
+              {' '}<span className="text-ink-soft">My Vault → Identity</span>.
+            </p>
+          </div>
 
-              {/* SMS alerts — time-sensitive pursuit changes (amendments,
-                  deadline moves, cancels). Double opt-in: verify the number by
-                  code before it's ever texted (TCPA/CTIA + carrier A2P). */}
-              <div id="settings-notifications" className="scroll-mt-24 md:col-span-2 rounded-lg border border-hairline bg-surface/40 p-4">
-                <div className="flex items-start gap-3">
-                  <MessageSquare className="mt-0.5 h-5 w-5 shrink-0 text-muted" strokeWidth={2} />
-                  <div className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium text-white">
-                      Text me when a tracked pursuit changes
-                      {smsVerified && (
-                        <span className="ml-2 inline-flex items-center gap-1 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300 align-middle"><Check className="h-3 w-3 shrink-0" strokeWidth={2.5} /> VERIFIED</span>
-                      )}
-                    </span>
-                    <span className="block text-xs text-muted mt-0.5">
-                      Amendments, deadline moves, cancellations — the time-sensitive stuff. You still get the full email digest.
-                    </span>
+          <div className="rounded-xl border border-hairline bg-ground-deep/30 p-4 space-y-2">
+            <p className="text-sm font-medium text-white">Alert mode</p>
+            <p className="text-xs text-faint">
+              Market Discovery sends your NAICS/PSC Open market and prefers distinctive keywords.
+              Focused omits Open when those keywords have no in-market hits.
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, alert_mode: 'market_discovery' })}
+                className={`rounded-lg border px-3 py-2 text-left text-sm ${
+                  form.alert_mode === 'market_discovery'
+                    ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-100'
+                    : 'border-hairline text-slate-200 hover:bg-input'
+                }`}
+              >
+                Market Discovery
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!canSelectFocused(parseList(form.keywords)).ok) return;
+                  setForm({ ...form, alert_mode: 'focused' });
+                }}
+                className={`rounded-lg border px-3 py-2 text-left text-sm ${
+                  form.alert_mode === 'focused'
+                    ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-100'
+                    : 'border-hairline text-slate-200 hover:bg-input'
+                } ${!canSelectFocused(parseList(form.keywords)).ok ? 'opacity-50' : ''}`}
+              >
+                Focused
+              </button>
+            </div>
+            {!canSelectFocused(parseList(form.keywords)).ok && (
+              <p className="text-xs text-amber-200">{FOCUSED_REQUIRES_DISTINCTIVE}</p>
+            )}
+          </div>
 
-                    {smsVerified ? (
-                      // Verified state — show the number + turn-off.
-                      <div className="mt-3 flex items-center gap-3">
-                        <span className="text-sm text-slate-200">{smsPhone}</span>
-                        <button
-                          type="button"
-                          onClick={disableSms}
-                          disabled={smsBusy}
-                          className="px-3 py-1.5 text-xs rounded-lg border border-slate-600 text-ink-soft hover:bg-surface disabled:opacity-50"
-                        >
-                          {smsBusy ? '…' : 'Turn off'}
-                        </button>
-                      </div>
-                    ) : (
-                      // Not verified — the send-code → enter-code handshake.
-                      <div className="mt-3 space-y-2">
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <input
-                            type="tel"
-                            value={smsPhone}
-                            onChange={(e) => { setSmsPhone(e.target.value); setSmsMsg(null); }}
-                            placeholder="(555) 123-4567"
-                            disabled={smsStage === 'code_sent'}
-                            className="flex-1 px-3 py-2 bg-ground border border-hairline rounded-lg text-white outline-none focus:border-emerald-500 disabled:opacity-60"
-                          />
-                          <button
-                            type="button"
-                            onClick={sendSmsCode}
-                            disabled={smsBusy}
-                            className="px-3 py-2 text-sm rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium disabled:opacity-50 whitespace-nowrap"
-                          >
-                            {smsBusy && smsStage === 'idle' ? 'Sending…' : smsStage === 'code_sent' ? 'Resend code' : 'Send code'}
+          {/* UNIFIED describe → codes. One box; Mindy finds the NAICS + PSC so
+              users never have to know which is which. (Manual fields below.) */}
+          <div className="rounded-xl border border-purple-500/30 bg-purple-500/5 p-4">
+            <label className="block text-sm font-medium text-white mb-1">Not sure of the codes? Describe what you do</label>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                type="text"
+                value={describeText}
+                onChange={(e) => setDescribeText(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); runDescribeSuggest(); } }}
+                placeholder='e.g. "drone repair", "demolition", "IT cybersecurity"'
+                className="h-10 flex-1 rounded-lg border border-hairline bg-ground px-3 text-sm text-white placeholder-faint focus:border-purple-500 focus:outline-none"
+              />
+              <button
+                onClick={runDescribeSuggest}
+                disabled={describing || !describeText.trim()}
+                className="h-10 shrink-0 rounded-lg bg-purple-600 px-5 text-sm font-semibold text-white hover:bg-purple-500 disabled:opacity-50"
+              >
+                {describing ? 'Finding…' : 'Suggest codes'}
+              </button>
+            </div>
+            {(describeNaics.length > 0 || describePsc.length > 0) && (
+              <div className="mt-3 space-y-2">
+                {describeNaics.length > 0 && (
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wide text-faint mb-1">NAICS — tap to add</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {describeNaics.map((s) => {
+                        const added = parseList(form.naics_codes).includes(s.code);
+                        return (
+                          <button key={s.code} onClick={() => toggleNaicsCode(s.code)} title={s.name}
+                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors ${added ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-200' : 'border-slate-600 bg-surface text-slate-200 hover:bg-input'}`}>
+                            {added ? <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} /> : <Plus className="h-3 w-3 shrink-0" strokeWidth={2.5} />} {s.code} <span className="max-w-[150px] truncate opacity-70">{s.name}</span>
                           </button>
-                        </div>
-                        {smsStage === 'code_sent' && (
-                          <div className="flex flex-col sm:flex-row gap-2">
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              maxLength={6}
-                              value={smsCode}
-                              onChange={(e) => { setSmsCode(e.target.value.replace(/\D/g, '')); setSmsMsg(null); }}
-                              placeholder="6-digit code"
-                              className="flex-1 px-3 py-2 bg-ground border border-hairline rounded-lg text-white tracking-widest outline-none focus:border-emerald-500"
-                            />
-                            <button
-                              type="button"
-                              onClick={verifySmsCode}
-                              disabled={smsBusy}
-                              className="px-3 py-2 text-sm rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium disabled:opacity-50 whitespace-nowrap"
-                            >
-                              {smsBusy ? 'Verifying…' : 'Verify'}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {smsMsg && <p className="mt-2 text-xs text-ink-soft">{smsMsg}</p>}
-
-                    {/* TCPA / CTIA consent + carrier disclosure. Required for A2P. */}
-                    <p className="mt-3 text-[11px] leading-4 text-faint">
-                      By verifying your number you agree to receive automated alert texts from Mindy about
-                      pursuits you track. Message frequency varies. Msg &amp; data rates may apply. Reply STOP
-                      to cancel, HELP for help. Consent is not a condition of purchase. See our{' '}
-                      <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-muted underline">Terms</a>{' '}
-                      and{' '}
-                      <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-muted underline">Privacy Policy</a>.
-                    </p>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              </div>
-
-              {isClientProfile && (
-                <label className="block md:col-span-2">
-                  <span className="block text-sm text-muted mb-1">Client Alert Email</span>
-                  <input
-                    type="email"
-                    value={form.alert_recipient_email}
-                    onChange={(e) => setForm({ ...form, alert_recipient_email: e.target.value })}
-                    placeholder="client@company.com"
-                    className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white outline-none focus:border-emerald-500"
-                  />
-                  <span className="block text-xs text-faint mt-1">
-                    Daily/weekly alerts for this client go here. Leave blank and they fall back to your inbox.
-                  </span>
-                </label>
-              )}
-            </div>
-          </section>
-
-          <section ref={matchingSectionRef} className="scroll-mt-24 bg-ground border border-surface rounded-xl p-6 space-y-5">
-            <div>
-              <SectionTitle title="Opportunity Matching" />
-              <p className="mt-2 text-sm text-muted">
-                These preferences control what Mindy <span className="text-ink-soft">watches for</span> in alerts,
-                briefings, and forecasts. The company identity Mindy <span className="text-ink-soft">writes into proposals</span>
-                {' '}(legal name, UEI, certifications, past performance, point of contact) lives in
-                {' '}<span className="text-ink-soft">My Vault → Identity</span>.
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-hairline bg-ground-deep/30 p-4 space-y-2">
-              <p className="text-sm font-medium text-white">Alert mode</p>
-              <p className="text-xs text-faint">
-                Market Discovery sends your NAICS/PSC Open market and prefers distinctive keywords.
-                Focused omits Open when those keywords have no in-market hits.
-              </p>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, alert_mode: 'market_discovery' })}
-                  className={`rounded-lg border px-3 py-2 text-left text-sm ${
-                    form.alert_mode === 'market_discovery'
-                      ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-100'
-                      : 'border-hairline text-slate-200 hover:bg-input'
-                  }`}
-                >
-                  Market Discovery
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!canSelectFocused(parseList(form.keywords)).ok) return;
-                    setForm({ ...form, alert_mode: 'focused' });
-                  }}
-                  className={`rounded-lg border px-3 py-2 text-left text-sm ${
-                    form.alert_mode === 'focused'
-                      ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-100'
-                      : 'border-hairline text-slate-200 hover:bg-input'
-                  } ${!canSelectFocused(parseList(form.keywords)).ok ? 'opacity-50' : ''}`}
-                >
-                  Focused
-                </button>
-              </div>
-              {!canSelectFocused(parseList(form.keywords)).ok && (
-                <p className="text-xs text-amber-200">{FOCUSED_REQUIRES_DISTINCTIVE}</p>
-              )}
-            </div>
-
-            {/* UNIFIED describe → codes. One box; Mindy finds the NAICS + PSC so
-                users never have to know which is which. (Manual fields below.) */}
-            <div className="rounded-xl border border-purple-500/30 bg-purple-500/5 p-4">
-              <label className="block text-sm font-medium text-white mb-1">Not sure of the codes? Describe what you do</label>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <input
-                  type="text"
-                  value={describeText}
-                  onChange={(e) => setDescribeText(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); runDescribeSuggest(); } }}
-                  placeholder='e.g. "drone repair", "demolition", "IT cybersecurity"'
-                  className="h-10 flex-1 rounded-lg border border-hairline bg-ground px-3 text-sm text-white placeholder-faint focus:border-purple-500 focus:outline-none"
-                />
-                <button
-                  onClick={runDescribeSuggest}
-                  disabled={describing || !describeText.trim()}
-                  className="h-10 shrink-0 rounded-lg bg-purple-600 px-5 text-sm font-semibold text-white hover:bg-purple-500 disabled:opacity-50"
-                >
-                  {describing ? 'Finding…' : 'Suggest codes'}
-                </button>
-              </div>
-              {(describeNaics.length > 0 || describePsc.length > 0) && (
-                <div className="mt-3 space-y-2">
-                  {describeNaics.length > 0 && (
-                    <div>
-                      <div className="text-[11px] uppercase tracking-wide text-faint mb-1">NAICS — tap to add</div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {describeNaics.map((s) => {
-                          const added = parseList(form.naics_codes).includes(s.code);
-                          return (
-                            <button key={s.code} onClick={() => toggleNaicsCode(s.code)} title={s.name}
-                              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors ${added ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-200' : 'border-slate-600 bg-surface text-slate-200 hover:bg-input'}`}>
-                              {added ? <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} /> : <Plus className="h-3 w-3 shrink-0" strokeWidth={2.5} />} {s.code} <span className="max-w-[150px] truncate opacity-70">{s.name}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
+                )}
+                {describePsc.length > 0 && (
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wide text-faint mb-1">PSC — what the gov actually buys — tap to add</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {describePsc.map((s) => {
+                        const added = parseList(form.psc_codes).includes(s.code);
+                        return (
+                          <button key={s.code} onClick={() => togglePscSuggestion(s.code)} title={s.name}
+                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors ${added ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-200' : 'border-purple-500/40 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20'}`}>
+                            {added ? <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} /> : <Plus className="h-3 w-3 shrink-0" strokeWidth={2.5} />} {s.code} <span className="max-w-[150px] truncate opacity-70">{s.name}</span>
+                          </button>
+                        );
+                      })}
                     </div>
-                  )}
-                  {describePsc.length > 0 && (
-                    <div>
-                      <div className="text-[11px] uppercase tracking-wide text-faint mb-1">PSC — what the gov actually buys — tap to add</div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {describePsc.map((s) => {
-                          const added = parseList(form.psc_codes).includes(s.code);
-                          return (
-                            <button key={s.code} onClick={() => togglePscSuggestion(s.code)} title={s.name}
-                              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors ${added ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-200' : 'border-purple-500/40 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20'}`}>
-                              {added ? <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} /> : <Plus className="h-3 w-3 shrink-0" strokeWidth={2.5} />} {s.code} <span className="max-w-[150px] truncate opacity-70">{s.name}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* PSC-ADOPTION NUDGE (Eric 2026-07-02). Only 0.4% of users have PSC codes,
-                yet PSC is the most precise targeting signal ("what the gov actually buys").
-                The one-tap PSC picker lived buried inside the collapsed "Fine-tune" section,
-                so nobody found it. Surface a proactive callout when the user has NO PSC but
-                we have suggestions for their market — one tap adds the tightest signal. */}
-            {parseList(form.psc_codes).length === 0 && pscSuggestions.length > 0 && (
-              <div className="rounded-xl border border-purple-500/30 bg-purple-500/5 p-3">
-                <p className="text-sm text-purple-100">
-                  <b>Sharpen your matches with PSC codes.</b> NAICS is your industry; PSC is
-                  exactly <i>what the government buys</i> — the most precise signal Mindy can match on.
-                </p>
-                <div className="mt-2 text-[11px] uppercase tracking-wide text-faint">Top codes for your market — tap to add:</div>
-                <div className="mt-1 flex flex-wrap gap-1.5">
-                  {pscSuggestions.slice(0, 6).map((p) => (
-                    <button
-                      key={p.code}
-                      onClick={() => togglePscSuggestion(p.code)}
-                      title={p.name}
-                      className="inline-flex items-center gap-1 rounded-full border border-purple-500/40 bg-purple-500/10 px-2.5 py-1 text-xs text-purple-200 hover:bg-purple-500/20 transition-colors"
-                    >
-                      + {p.code} <span className="max-w-[150px] truncate opacity-70">{p.name}</span>
-                    </button>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
             )}
+          </div>
 
-            {/* Manual fine-tune — collapsed by default so most users just use the
-                describe box above. Power users expand to paste/edit codes directly. */}
-            {(parseList(form.naics_codes).length > 0 ||
-              suggestedCodesToReview({
+          {/* PSC-ADOPTION NUDGE (Eric 2026-07-02). Only 0.4% of users have PSC codes,
+              yet PSC is the most precise targeting signal ("what the gov actually buys").
+              The one-tap PSC picker lived buried inside the collapsed "Fine-tune" section,
+              so nobody found it. Surface a proactive callout when the user has NO PSC but
+              we have suggestions for their market — one tap adds the tightest signal. */}
+          {parseList(form.psc_codes).length === 0 && pscSuggestions.length > 0 && (
+            <div className="rounded-xl border border-purple-500/30 bg-purple-500/5 p-3">
+              <p className="text-sm text-purple-100">
+                <b>Sharpen your matches with PSC codes.</b> NAICS is your industry; PSC is
+                exactly <i>what the government buys</i> — the most precise signal Mindy can match on.
+              </p>
+              <div className="mt-2 text-[11px] uppercase tracking-wide text-faint">Top codes for your market — tap to add:</div>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {pscSuggestions.slice(0, 6).map((p) => (
+                  <button
+                    key={p.code}
+                    onClick={() => togglePscSuggestion(p.code)}
+                    title={p.name}
+                    className="inline-flex items-center gap-1 rounded-full border border-purple-500/40 bg-purple-500/10 px-2.5 py-1 text-xs text-purple-200 hover:bg-purple-500/20 transition-colors"
+                  >
+                    + {p.code} <span className="max-w-[150px] truncate opacity-70">{p.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Manual fine-tune — collapsed by default so most users just use the
+              describe box above. Power users expand to paste/edit codes directly. */}
+          {(parseList(form.naics_codes).length > 0 ||
+            suggestedCodesToReview({
+              storedNaics: parseList(form.naics_codes),
+              keywords: parseList(form.keywords),
+            }).length > 0) && (
+            <NaicsCodeRoles
+              codes={parseList(form.naics_codes)}
+              priorities={form.naics_priorities}
+              suggestions={suggestedCodesToReview({
                 storedNaics: parseList(form.naics_codes),
                 keywords: parseList(form.keywords),
-              }).length > 0) && (
-              <NaicsCodeRoles
-                codes={parseList(form.naics_codes)}
-                priorities={form.naics_priorities}
-                suggestions={suggestedCodesToReview({
-                  storedNaics: parseList(form.naics_codes),
-                  keywords: parseList(form.keywords),
-                })}
-                onChange={(naics_priorities) => setForm({ ...form, naics_priorities })}
-                onRemove={(code) => {
-                  const next = parseList(form.naics_codes).filter((c) => c !== code);
-                  const priorities = { ...form.naics_priorities };
-                  delete priorities[code];
-                  setForm({ ...form, naics_codes: next.join(', '), naics_priorities: priorities });
-                }}
-                onAddSuggested={(code) => {
-                  const next = [...parseList(form.naics_codes), code];
-                  setForm({ ...form, naics_codes: next.join(', ') });
-                }}
-              />
+              })}
+              onChange={(naics_priorities) => setForm({ ...form, naics_priorities })}
+              onRemove={(code) => {
+                const next = parseList(form.naics_codes).filter((c) => c !== code);
+                const priorities = { ...form.naics_priorities };
+                delete priorities[code];
+                setForm({ ...form, naics_codes: next.join(', '), naics_priorities: priorities });
+              }}
+              onAddSuggested={(code) => {
+                const next = [...parseList(form.naics_codes), code];
+                setForm({ ...form, naics_codes: next.join(', ') });
+              }}
+            />
+          )}
+
+          <button
+            onClick={() => setShowManualCodes((v) => !v)}
+            className="flex items-center gap-1.5 text-sm text-muted hover:text-slate-200"
+          >
+            <span className={`transition-transform ${showManualCodes ? 'rotate-90' : ''}`}>▸</span>
+            Fine-tune codes manually
+            {(parseList(form.naics_codes).length > 0 || parseList(form.psc_codes).length > 0) && (
+              <span className="text-xs text-faint">({parseList(form.naics_codes).length} NAICS · {parseList(form.psc_codes).length} PSC)</span>
             )}
+          </button>
 
-            <button
-              onClick={() => setShowManualCodes((v) => !v)}
-              className="flex items-center gap-1.5 text-sm text-muted hover:text-slate-200"
-            >
-              <span className={`transition-transform ${showManualCodes ? 'rotate-90' : ''}`}>▸</span>
-              Fine-tune codes manually
-              {(parseList(form.naics_codes).length > 0 || parseList(form.psc_codes).length > 0) && (
-                <span className="text-xs text-faint">({parseList(form.naics_codes).length} NAICS · {parseList(form.psc_codes).length} PSC)</span>
-              )}
-            </button>
-
-            {showManualCodes && (
-            <div className="space-y-5 rounded-xl border border-surface bg-ground-deep/30 p-4">
-            <div>
-              <label className="block text-sm font-medium text-ink-soft mb-1">NAICS Codes</label>
-              <NaicsPicker
-                value={parseList(form.naics_codes)}
-                onChange={(codes) => {
-                  const keep = new Set(codes);
-                  const naics_priorities = Object.fromEntries(
-                    Object.entries(form.naics_priorities).filter(([code]) => keep.has(code)),
+          {showManualCodes && (
+          <div className="space-y-5 rounded-xl border border-surface bg-ground-deep/30 p-4">
+          <div>
+            <label className="block text-sm font-medium text-ink-soft mb-1">NAICS Codes</label>
+            <NaicsPicker
+              value={parseList(form.naics_codes)}
+              onChange={(codes) => {
+                const keep = new Set(codes);
+                const naics_priorities = Object.fromEntries(
+                  Object.entries(form.naics_priorities).filter(([code]) => keep.has(code)),
+                );
+                setForm({ ...form, naics_codes: codes.join(', '), naics_priorities });
+              }}
+              placeholder='Search by description (e.g. "consulting") or paste a code'
+            />
+          </div>
+          <div>
+            <Field
+              label="PSC Codes"
+              value={form.psc_codes}
+              onChange={(value) => setForm({ ...form, psc_codes: value })}
+              placeholder="e.g. R425, 1550, P500"
+            />
+            <p className="mt-1 text-xs text-faint">
+              Product/Service codes — <b>what the government actually buys</b> (more precise than NAICS). Comma-separated.
+            </p>
+            {/* Labeled chips for the codes already entered — hover shows the full
+                PSC title (restores the "hover tells you the code" behavior the
+                plain text field lost). Read-only; edit in the field above. */}
+            {parseList(form.psc_codes).length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {parseList(form.psc_codes).map((code) => {
+                  // Say what we actually KNOW. "Unknown PSC" asserted the code
+                  // was not real; what we knew was "not in our reference file"
+                  // — a statement about US. D314 was real, 9% of the user's
+                  // market, and recommended by our own coverage hint (Robert
+                  // Parks, 2026-08-15). He believed the label and swapped in a
+                  // code that added nothing.
+                  const verdict = pscStatus(code);
+                  const entry = verdict.status === 'valid' ? getPsc(code) : null;
+                  const title = `${verdict.code} — ${verdict.label}`;
+                  return (
+                    <span
+                      key={code}
+                      title={title}
+                      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${
+                        verdict.status === 'valid'
+                          ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+                          : verdict.status === 'malformed'
+                            ? 'border-red-500/40 bg-red-500/10 text-red-200'
+                            : 'border-amber-500/40 bg-amber-500/10 text-amber-200'
+                      }`}
+                    >
+                      <span className="font-medium">{entry?.code || verdict.code}</span>
+                      <span className="max-w-[220px] truncate opacity-70">{verdict.label}</span>
+                    </span>
                   );
-                  setForm({ ...form, naics_codes: codes.join(', '), naics_priorities });
-                }}
-                placeholder='Search by description (e.g. "consulting") or paste a code'
-              />
-            </div>
-            <div>
-              <Field
-                label="PSC Codes"
-                value={form.psc_codes}
-                onChange={(value) => setForm({ ...form, psc_codes: value })}
-                placeholder="e.g. R425, 1550, P500"
-              />
-              <p className="mt-1 text-xs text-faint">
-                Product/Service codes — <b>what the government actually buys</b> (more precise than NAICS). Comma-separated.
-              </p>
-              {/* Labeled chips for the codes already entered — hover shows the full
-                  PSC title (restores the "hover tells you the code" behavior the
-                  plain text field lost). Read-only; edit in the field above. */}
-              {parseList(form.psc_codes).length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {parseList(form.psc_codes).map((code) => {
-                    // Say what we actually KNOW. "Unknown PSC" asserted the code
-                    // was not real; what we knew was "not in our reference file"
-                    // — a statement about US. D314 was real, 9% of the user's
-                    // market, and recommended by our own coverage hint (Robert
-                    // Parks, 2026-08-15). He believed the label and swapped in a
-                    // code that added nothing.
-                    const verdict = pscStatus(code);
-                    const entry = verdict.status === 'valid' ? getPsc(code) : null;
-                    const title = `${verdict.code} — ${verdict.label}`;
+                })}
+              </div>
+            )}
+            {pscSuggestions.length > 0 && (
+              <div className="mt-2">
+                <div className="text-[11px] uppercase tracking-wide text-faint mb-1">Top codes for your market — tap to add or remove:</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {pscSuggestions.map((p) => {
+                    const added = parseList(form.psc_codes).includes(p.code);
                     return (
-                      <span
-                        key={code}
-                        title={title}
-                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${
-                          verdict.status === 'valid'
-                            ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
-                            : verdict.status === 'malformed'
-                              ? 'border-red-500/40 bg-red-500/10 text-red-200'
-                              : 'border-amber-500/40 bg-amber-500/10 text-amber-200'
-                        }`}
+                      <button
+                        key={p.code}
+                        onClick={() => togglePscSuggestion(p.code)}
+                        title={added ? `Click to remove ${p.code}` : p.name}
+                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors ${added ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25' : 'border-purple-500/40 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20'}`}
                       >
-                        <span className="font-medium">{entry?.code || verdict.code}</span>
-                        <span className="max-w-[220px] truncate opacity-70">{verdict.label}</span>
-                      </span>
+                        {added ? <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} /> : <Plus className="h-3 w-3 shrink-0" strokeWidth={2.5} />} {p.code} <span className="max-w-[150px] truncate opacity-70">{p.name}</span>
+                      </button>
                     );
                   })}
                 </div>
-              )}
-              {pscSuggestions.length > 0 && (
-                <div className="mt-2">
-                  <div className="text-[11px] uppercase tracking-wide text-faint mb-1">Top codes for your market — tap to add or remove:</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {pscSuggestions.map((p) => {
-                      const added = parseList(form.psc_codes).includes(p.code);
-                      return (
-                        <button
-                          key={p.code}
-                          onClick={() => togglePscSuggestion(p.code)}
-                          title={added ? `Click to remove ${p.code}` : p.name}
-                          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors ${added ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25' : 'border-purple-500/40 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20'}`}
-                        >
-                          {added ? <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} /> : <Plus className="h-3 w-3 shrink-0" strokeWidth={2.5} />} {p.code} <span className="max-w-[150px] truncate opacity-70">{p.name}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div>
-              <Field
-                label="Keywords"
-                value={form.keywords}
-                onChange={(value) => setForm({ ...form, keywords: value })}
-                placeholder="e.g. drone repair, cybersecurity, base operations"
-              />
-              <p className="mt-1 text-xs text-faint">
-                What Mindy can prefer inside your NAICS/PSC market. In Market Discovery they are not required filters.
-                Comma-separated. Tip: run a <span className="text-purple-300">Market Research</span> and click
-                &ldquo;Save this market to my profile&rdquo; to fill these automatically.
-              </p>
-            </div>
-            </div>
+              </div>
             )}
-            <Field label="Target Agencies" value={form.target_agencies} onChange={(value) => setForm({ ...form, target_agencies: value })} placeholder="VA, DHS, Army, GSA" />
-
-            <StatesField
-              value={form.location_states}
-              onChange={(states) => setForm({ ...form, location_states: states })}
+          </div>
+          <div>
+            <Field
+              label="Keywords"
+              value={form.keywords}
+              onChange={(value) => setForm({ ...form, keywords: value })}
+              placeholder="e.g. drone repair, cybersecurity, base operations"
             />
-            {/* "Start over" moved to the top "Your targeting" card header (next to
-                Edit) where it's discoverable — Eric QC 2026-06-17. */}
-          </section>
+            <p className="mt-1 text-xs text-faint">
+              What Mindy can prefer inside your NAICS/PSC market. In Market Discovery they are not required filters.
+              Comma-separated. Tip: run a <span className="text-purple-300">Market Research</span> and click
+              &ldquo;Save this market to my profile&rdquo; to fill these automatically.
+            </p>
+          </div>
+          </div>
+          )}
+          <Field label="Target Agencies" value={form.target_agencies} onChange={(value) => setForm({ ...form, target_agencies: value })} placeholder="VA, DHS, Army, GSA" />
 
-          <div className="flex justify-end gap-3">
-            <button
-              onClick={() => saveSettings(false)}
-              disabled={saving}
-              className="px-5 py-2 bg-surface hover:bg-input disabled:opacity-60 text-slate-200 rounded-lg transition-colors"
-            >
-              {saving ? 'Saving...' : 'Save Settings'}
-            </button>
-            <button
-              onClick={() => saveSettings(true)}
-              disabled={saving}
-              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white rounded-lg font-medium transition-colors"
-            >
-              Mark Onboarding Complete
-            </button>
+          <StatesField
+            value={form.location_states}
+            onChange={(states) => setForm({ ...form, location_states: states })}
+          />
+          {/* "Start over" moved to the top "Your targeting" card header (next to
+              Edit) where it's discoverable — Eric QC 2026-06-17. */}
+        </section>
+
+        <SaveBar
+          saving={saving}
+          unsaved={unsaved.size > 0}
+          onSave={() => saveSettings(false)}
+          onComplete={() => saveSettings(true)}
+        />
+      </div>
+
+      {/* ── Profile ───────────────────────────────────────────────────── */}
+      <div role="tabpanel" id="settings-tab-profile" aria-labelledby="settings-tabbtn-profile" className={tab === 'profile' ? 'space-y-5 max-w-3xl' : 'hidden'}>
+        <section className="bg-ground border border-surface rounded-xl p-6 space-y-5">
+          <SectionTitle title="Profile" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Display Name" value={form.display_name} onChange={(value) => setForm({ ...form, display_name: value })} placeholder="John Doe" />
+            <Field label="Role / Title" value={form.role_title} onChange={(value) => setForm({ ...form, role_title: value })} placeholder="Founder, BD Lead..." />
+            <Field label="Company" value={form.company_name} onChange={(value) => setForm({ ...form, company_name: value })} placeholder="Company name" />
+            <label className="block">
+              <span className="block text-sm text-muted mb-1">Email Frequency</span>
+              <select
+                value={form.email_frequency}
+                onChange={(e) => setForm({ ...form, email_frequency: e.target.value })}
+                className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white outline-none focus:border-emerald-500"
+              >
+                <option value="daily">Daily</option>
+                <option value="mwf">Mon / Wed / Fri</option>
+                <option value="tth">Tue / Thu</option>
+                <option value="weekly">Weekly</option>
+                <option value="paused">Paused</option>
+              </select>
+            </label>
+
+            {/* SMS alerts — time-sensitive pursuit changes (amendments,
+                deadline moves, cancels). Double opt-in: verify the number by
+                code before it's ever texted (TCPA/CTIA + carrier A2P). */}
+            <div id="settings-notifications" className="scroll-mt-24 md:col-span-2 rounded-lg border border-hairline bg-surface/40 p-4">
+              <div className="flex items-start gap-3">
+                <MessageSquare className="mt-0.5 h-5 w-5 shrink-0 text-muted" strokeWidth={2} />
+                <div className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-white">
+                    Text me when a tracked pursuit changes
+                    {smsVerified && (
+                      <span className="ml-2 inline-flex items-center gap-1 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300 align-middle"><Check className="h-3 w-3 shrink-0" strokeWidth={2.5} /> VERIFIED</span>
+                    )}
+                  </span>
+                  <span className="block text-xs text-muted mt-0.5">
+                    Amendments, deadline moves, cancellations — the time-sensitive stuff. You still get the full email digest.
+                  </span>
+
+                  {smsVerified ? (
+                    // Verified state — show the number + turn-off.
+                    <div className="mt-3 flex items-center gap-3">
+                      <span className="text-sm text-slate-200">{smsPhone}</span>
+                      <button
+                        type="button"
+                        onClick={disableSms}
+                        disabled={smsBusy}
+                        className="px-3 py-1.5 text-xs rounded-lg border border-slate-600 text-ink-soft hover:bg-surface disabled:opacity-50"
+                      >
+                        {smsBusy ? '…' : 'Turn off'}
+                      </button>
+                    </div>
+                  ) : (
+                    // Not verified — the send-code → enter-code handshake.
+                    <div className="mt-3 space-y-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                          type="tel"
+                          value={smsPhone}
+                          onChange={(e) => { setSmsPhone(e.target.value); setSmsMsg(null); }}
+                          placeholder="(555) 123-4567"
+                          disabled={smsStage === 'code_sent'}
+                          className="flex-1 px-3 py-2 bg-ground border border-hairline rounded-lg text-white outline-none focus:border-emerald-500 disabled:opacity-60"
+                        />
+                        <button
+                          type="button"
+                          onClick={sendSmsCode}
+                          disabled={smsBusy}
+                          className="px-3 py-2 text-sm rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium disabled:opacity-50 whitespace-nowrap"
+                        >
+                          {smsBusy && smsStage === 'idle' ? 'Sending…' : smsStage === 'code_sent' ? 'Resend code' : 'Send code'}
+                        </button>
+                      </div>
+                      {smsStage === 'code_sent' && (
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={6}
+                            value={smsCode}
+                            onChange={(e) => { setSmsCode(e.target.value.replace(/\D/g, '')); setSmsMsg(null); }}
+                            placeholder="6-digit code"
+                            className="flex-1 px-3 py-2 bg-ground border border-hairline rounded-lg text-white tracking-widest outline-none focus:border-emerald-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={verifySmsCode}
+                            disabled={smsBusy}
+                            className="px-3 py-2 text-sm rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium disabled:opacity-50 whitespace-nowrap"
+                          >
+                            {smsBusy ? 'Verifying…' : 'Verify'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {smsMsg && <p className="mt-2 text-xs text-ink-soft">{smsMsg}</p>}
+
+                  {/* TCPA / CTIA consent + carrier disclosure. Required for A2P. */}
+                  <p className="mt-3 text-[11px] leading-4 text-faint">
+                    By verifying your number you agree to receive automated alert texts from Mindy about
+                    pursuits you track. Message frequency varies. Msg &amp; data rates may apply. Reply STOP
+                    to cancel, HELP for help. Consent is not a condition of purchase. See our{' '}
+                    <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-muted underline">Terms</a>{' '}
+                    and{' '}
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-muted underline">Privacy Policy</a>.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {isClientProfile && (
+              <label className="block md:col-span-2">
+                <span className="block text-sm text-muted mb-1">Client Alert Email</span>
+                <input
+                  type="email"
+                  value={form.alert_recipient_email}
+                  onChange={(e) => setForm({ ...form, alert_recipient_email: e.target.value })}
+                  placeholder="client@company.com"
+                  className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white outline-none focus:border-emerald-500"
+                />
+                <span className="block text-xs text-faint mt-1">
+                  Daily/weekly alerts for this client go here. Leave blank and they fall back to your inbox.
+                </span>
+              </label>
+            )}
+          </div>
+        </section>
+
+        <SaveBar
+          saving={saving}
+          unsaved={unsaved.size > 0}
+          onSave={() => saveSettings(false)}
+        />
+      </div>
+
+      {/* ── Billing & credits ─────────────────────────────────────────── */}
+      <div role="tabpanel" id="settings-tab-billing" aria-labelledby="settings-tabbtn-billing" className={tab === 'billing' ? 'space-y-5' : 'hidden'}>
+        <div id="settings-billing" className="scroll-mt-24">
+          {/* Same "Your subscriptions" card as the account page: every plan (Mindy Pro/Team,
+              MCP credits plan) with Manage / cancel for each. */}
+          <div className="bg-ground border border-surface rounded-xl p-5 space-y-3">
+            <h2 className="font-semibold text-white">Billing</h2>
+            <SubscriptionsCard email={email} upgradeHref="/pricing" />
+            <LinkEmailControl email={email} getAuthHeaders={getAuthHeaders} />
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div id="settings-billing" className="scroll-mt-24">
-            {/* Same "Your subscriptions" card as the account page: every plan (Mindy Pro/Team,
-                MCP credits plan) with Manage / cancel for each. */}
-            <div className="bg-ground border border-surface rounded-xl p-5 space-y-3">
-              <h2 className="font-semibold text-white">Billing</h2>
-              <SubscriptionsCard email={email} upgradeHref="/pricing" />
-              <LinkEmailControl email={email} getAuthHeaders={getAuthHeaders} />
-            </div>
-          </div>
+        {/* Credits & usage — the console that used to be its own page at /mcp/account (which now
+            redirects here). One Settings page for everything (Eric, 2026-11-10). */}
+        <section id="settings-credits" className="scroll-mt-24 bg-ground border border-surface rounded-xl p-6">
+          <h2 className="font-semibold text-white">Credits &amp; usage</h2>
+          <p className="text-sm text-muted mt-1">Your balance, what you spent, top-ups, auto-recharge, team credits and API keys.</p>
+          <CreditsConsole embedded />
+        </section>
+      </div>
 
-          {/* Solo -> Team upgrade. Shown to paid (pro) solo users; free users
-              upgrade to Pro first via the Billing card above. */}
-          <div id="settings-team" className="scroll-mt-24 space-y-4">
-            {tier === 'pro' && <TeamUpgradeCard email={email} getAuthHeaders={getAuthHeaders} />}
-            {/* Arrived from the map's "Team & workspace" link. Members and invites are managed in
-                the Team panel, not here — say so rather than landing on an unrelated card. */}
-            {initialSection === 'team' && (
-              <div className="bg-ground border border-surface rounded-xl p-5">
-                <h2 className="font-semibold text-white mb-1">Team &amp; workspace</h2>
-                <p className="text-sm text-muted">
-                  Teammates, invites and workspace access are managed in Team Access.
-                </p>
-                <a
-                  href="/app?panel=team"
-                  className="mt-3 inline-flex items-center justify-center w-full px-3 py-2 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors"
-                >
-                  Open Team Access
-                </a>
-              </div>
-            )}
-          </div>
+      {/* ── Team ──────────────────────────────────────────────────────── */}
+      <div role="tabpanel" id="settings-tab-team" aria-labelledby="settings-tabbtn-team" className={tab === 'team' ? 'space-y-4 max-w-3xl' : 'hidden'}>
 
-          {/* Workspace — My Vault, Team and Clients used to be the sidebar's "Account" group,
-              which is no longer in the sidebar (Eric, 2026-11-10). */}
-          <div className="bg-ground border border-surface rounded-xl p-5">
-            <h2 className="font-semibold text-white">Workspace</h2>
-            <div className="mt-3 space-y-2">
-              <a href="/app?panel=vault" className="block rounded-lg border border-surface px-3 py-2 text-sm text-white hover:bg-surface">
-                My Vault <span className="block text-xs text-muted">Past performance, capabilities, documents</span>
+        {/* Solo -> Team upgrade. Shown to paid (pro) solo users; free users
+            upgrade to Pro first via the Billing card above. */}
+        <div id="settings-team" className="scroll-mt-24 space-y-4">
+          {tier === 'pro' && <TeamUpgradeCard email={email} getAuthHeaders={getAuthHeaders} />}
+          {/* Arrived from the map's "Team & workspace" link. Members and invites are managed in
+              the Team panel, not here — say so rather than landing on an unrelated card. */}
+          {initialSection === 'team' && (
+            <div className="bg-ground border border-surface rounded-xl p-5">
+              <h2 className="font-semibold text-white mb-1">Team &amp; workspace</h2>
+              <p className="text-sm text-muted">
+                Teammates, invites and workspace access are managed in Team Access.
+              </p>
+              <a
+                href="/app?panel=team"
+                className="mt-3 inline-flex items-center justify-center w-full px-3 py-2 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors"
+              >
+                Open Team Access
               </a>
-              {tierAtLeast(tier, 'team') && (
-                <>
-                  <a href="/app?panel=team" className="block rounded-lg border border-surface px-3 py-2 text-sm text-white hover:bg-surface">
-                    Team <span className="block text-xs text-muted">Seats and roles</span>
-                  </a>
-                  <a href="/app?panel=coach" className="block rounded-lg border border-surface px-3 py-2 text-sm text-white hover:bg-surface">
-                    Clients <span className="block text-xs text-muted">Manage multiple businesses</span>
-                  </a>
-                </>
-              )}
             </div>
-          </div>
+          )}
+        </div>
 
-          <div className="bg-ground border border-surface rounded-xl p-5">
-            <h2 className="font-semibold text-white">Getting started</h2>
-            {/* The guided product tour is NEW-USER onboarding — hide it in Coach
-                Mode (a coach operating inside a client workspace). Eric, Jun 23
-                2026: "coach mode should not require a tour on clients." The setup
-                progress below still helps a coach finish the client's profile. */}
-            {!isClientProfile && (
+        {/* Workspace — My Vault, Team and Clients used to be the sidebar's "Account" group,
+            which is no longer in the sidebar (Eric, 2026-11-10). */}
+        <div className="bg-ground border border-surface rounded-xl p-5">
+          <h2 className="font-semibold text-white">Workspace</h2>
+          <div className="mt-3 space-y-2">
+            <a href="/app?panel=vault" className="block rounded-lg border border-surface px-3 py-2 text-sm text-white hover:bg-surface">
+              My Vault <span className="block text-xs text-muted">Past performance, capabilities, documents</span>
+            </a>
+            {tierAtLeast(tier, 'team') && (
               <>
-                <p className="text-sm text-muted mt-1">New to Mindy? Take the 2-minute guided tour of the core workflow.</p>
-                {/* PRIMARY action: launch the tour (Eric: this card should let you
-                    TAKE the tour, not mark it complete). */}
-                <button
-                  onClick={() => window.dispatchEvent(new Event('mindy:start-tour'))}
-                  className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors"
-                >
-                  <Compass className="h-4 w-4 shrink-0" strokeWidth={2} /> Take the product tour
-                </button>
+                <a href="/app?panel=team" className="block rounded-lg border border-surface px-3 py-2 text-sm text-white hover:bg-surface">
+                  Team <span className="block text-xs text-muted">Seats and roles</span>
+                </a>
+                <a href="/app?panel=coach" className="block rounded-lg border border-surface px-3 py-2 text-sm text-white hover:bg-surface">
+                  Clients <span className="block text-xs text-muted">Manage multiple businesses</span>
+                </a>
               </>
-            )}
-            {/* Quiet setup-progress underneath (informational, not the CTA). */}
-            <div className="mt-4 pt-4 border-t border-surface space-y-2">
-              <p className="text-[11px] uppercase tracking-wider text-faint">Setup progress</p>
-              <ChecklistItem label="Profile saved" done={Boolean(form.display_name || form.company_name)} />
-              <ChecklistItem label="NAICS selected" done={parseList(form.naics_codes).length > 0} />
-              <ChecklistItem label="Agencies selected" done={parseList(form.target_agencies).length > 0 || targetListCount > 0} />
-            </div>
-          </div>
-
-          {/* Security: session, change email and change password sit together — anchor the group. */}
-          <div id="settings-security" className="scroll-mt-24 bg-ground border border-surface rounded-xl p-5">
-            <h2 className="font-semibold text-white mb-2">Session</h2>
-            <p className="text-sm text-muted">
-              Your session is protected by a signed two-factor token and expires after 30 days.
-            </p>
-          </div>
-
-          {/* Change email — moves the whole account (plan, saved work, settings)
-              to a new address. A confirmation link goes to the NEW email; nothing
-              changes until it's clicked, and the current email keeps working. */}
-          <div className="bg-ground border border-surface rounded-xl p-5">
-            <h2 className="font-semibold text-white mb-2">Change email</h2>
-            <p className="text-sm text-muted mb-3">
-              Your current email is <span className="text-white">{email}</span>. We&apos;ll send a
-              confirmation link to your new address — your plan and saved work move with you, and
-              your current email keeps working until you confirm.
-            </p>
-            {changeEmailStage === 'sent' ? (
-              <div className="text-sm text-emerald-400">
-                {changeEmailMsg?.text}
-                <button
-                  onClick={() => { setChangeEmailStage('idle'); setChangeEmailMsg(null); setNewEmail(''); }}
-                  className="ml-2 text-muted underline hover:text-white"
-                >
-                  Use a different email
-                </button>
-              </div>
-            ) : (
-              // STACKED, not sm:flex-row. This card lives in a NARROW right-hand
-              // column, so side-by-side put a whitespace-nowrap button next to a
-              // flex-1 input and the button overflowed the card — "Send confirmatio…"
-              // clipped at the edge (Eric's screenshot, 2026-07-27). The sm: breakpoint
-              // refers to the VIEWPORT, not this column, so it fired even though the
-              // column stayed narrow.
-              <div className="flex flex-col gap-2">
-                <input
-                  type="email"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  placeholder="new@email.com"
-                  className="w-full min-w-0 bg-surface border border-surface rounded-lg px-3 py-2 text-white text-sm placeholder:text-faint focus:outline-none focus:border-accent"
-                />
-                <button
-                  onClick={requestEmailChange}
-                  disabled={changeEmailBusy || !newEmail.trim()}
-                  className="w-full bg-accent text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50"
-                >
-                  {changeEmailBusy ? 'Sending…' : 'Send confirmation'}
-                </button>
-              </div>
-            )}
-            {changeEmailStage === 'idle' && changeEmailMsg && (
-              <p className={`text-sm mt-2 ${changeEmailMsg.kind === 'err' ? 'text-red-400' : 'text-emerald-400'}`}>
-                {changeEmailMsg.text}
-              </p>
-            )}
-          </div>
-
-          {/* Change password — Settings previously had Session + Change email but no
-              password control at all. An account created through Google/Microsoft
-              OAuth has NO password, and the MCP connector flow needs one, so those
-              users had no in-app way to create it (they had to guess at
-              /app/forgot-password). Sends the same reset link that page does. */}
-          <div className="bg-ground border border-surface rounded-xl p-5">
-            <h2 className="font-semibold text-white mb-2">Change password</h2>
-            <p className="text-sm text-muted">
-              We&apos;ll email a secure link to <span className="text-ink-soft">{email}</span> to set a new
-              password. Use this to add a password if you signed up with Google or Microsoft.
-            </p>
-            <button
-              onClick={requestPasswordReset}
-              disabled={pwBusy || !email}
-              className="mt-3 w-full bg-accent text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50"
-            >
-              {pwBusy ? 'Sending…' : 'Email me a password link'}
-            </button>
-            {pwMsg && (
-              <p className={`text-sm mt-2 ${pwMsg.kind === 'err' ? 'text-red-400' : 'text-emerald-400'}`}>
-                {pwMsg.text}
-              </p>
             )}
           </div>
         </div>
       </div>
 
-      {/* Credits & usage — the console that used to be its own page at /mcp/account (which now
-          redirects here). One Settings page for everything (Eric, 2026-11-10). */}
-      <section id="settings-credits" className="scroll-mt-24 bg-ground border border-surface rounded-xl p-6">
-        <h2 className="font-semibold text-white">Credits &amp; usage</h2>
-        <p className="text-sm text-muted mt-1">Your balance, what you spent, top-ups, auto-recharge, team credits and API keys.</p>
-        <CreditsConsole embedded />
-      </section>
+      {/* ── Account ───────────────────────────────────────────────────── */}
+      <div role="tabpanel" id="settings-tab-account" aria-labelledby="settings-tabbtn-account" className={tab === 'account' ? 'grid grid-cols-1 gap-4 md:grid-cols-2 items-start' : 'hidden'}>
+        {/* Security: session, change email and change password sit together — anchor the group. */}
+        <div id="settings-security" className="scroll-mt-24 bg-ground border border-surface rounded-xl p-5">
+          <h2 className="font-semibold text-white mb-2">Session</h2>
+          <p className="text-sm text-muted">
+            Your session is protected by a signed two-factor token and expires after 30 days.
+          </p>
+        </div>
+
+        {/* Change email — moves the whole account (plan, saved work, settings)
+            to a new address. A confirmation link goes to the NEW email; nothing
+            changes until it's clicked, and the current email keeps working. */}
+        <div className="bg-ground border border-surface rounded-xl p-5">
+          <h2 className="font-semibold text-white mb-2">Change email</h2>
+          <p className="text-sm text-muted mb-3">
+            Your current email is <span className="text-white">{email}</span>. We&apos;ll send a
+            confirmation link to your new address — your plan and saved work move with you, and
+            your current email keeps working until you confirm.
+          </p>
+          {changeEmailStage === 'sent' ? (
+            <div className="text-sm text-emerald-400">
+              {changeEmailMsg?.text}
+              <button
+                onClick={() => { setChangeEmailStage('idle'); setChangeEmailMsg(null); setNewEmail(''); }}
+                className="ml-2 text-muted underline hover:text-white"
+              >
+                Use a different email
+              </button>
+            </div>
+          ) : (
+            // STACKED, not sm:flex-row. This card lives in a NARROW right-hand
+            // column, so side-by-side put a whitespace-nowrap button next to a
+            // flex-1 input and the button overflowed the card — "Send confirmatio…"
+            // clipped at the edge (Eric's screenshot, 2026-07-27). The sm: breakpoint
+            // refers to the VIEWPORT, not this column, so it fired even though the
+            // column stayed narrow.
+            <div className="flex flex-col gap-2">
+              <input
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder="new@email.com"
+                className="w-full min-w-0 bg-surface border border-surface rounded-lg px-3 py-2 text-white text-sm placeholder:text-faint focus:outline-none focus:border-accent"
+              />
+              <button
+                onClick={requestEmailChange}
+                disabled={changeEmailBusy || !newEmail.trim()}
+                className="w-full bg-accent text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50"
+              >
+                {changeEmailBusy ? 'Sending…' : 'Send confirmation'}
+              </button>
+            </div>
+          )}
+          {changeEmailStage === 'idle' && changeEmailMsg && (
+            <p className={`text-sm mt-2 ${changeEmailMsg.kind === 'err' ? 'text-red-400' : 'text-emerald-400'}`}>
+              {changeEmailMsg.text}
+            </p>
+          )}
+        </div>
+
+        {/* Change password — Settings previously had Session + Change email but no
+            password control at all. An account created through Google/Microsoft
+            OAuth has NO password, and the MCP connector flow needs one, so those
+            users had no in-app way to create it (they had to guess at
+            /app/forgot-password). Sends the same reset link that page does. */}
+        <div className="bg-ground border border-surface rounded-xl p-5">
+          <h2 className="font-semibold text-white mb-2">Change password</h2>
+          <p className="text-sm text-muted">
+            We&apos;ll email a secure link to <span className="text-ink-soft">{email}</span> to set a new
+            password. Use this to add a password if you signed up with Google or Microsoft.
+          </p>
+          <button
+            onClick={requestPasswordReset}
+            disabled={pwBusy || !email}
+            className="mt-3 w-full bg-accent text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50"
+          >
+            {pwBusy ? 'Sending…' : 'Email me a password link'}
+          </button>
+          {pwMsg && (
+            <p className={`text-sm mt-2 ${pwMsg.kind === 'err' ? 'text-red-400' : 'text-emerald-400'}`}>
+              {pwMsg.text}
+            </p>
+          )}
+        </div>
+
+        <div className="bg-ground border border-surface rounded-xl p-5">
+          <h2 className="font-semibold text-white">Getting started</h2>
+          {/* The guided product tour is NEW-USER onboarding — hide it in Coach
+              Mode (a coach operating inside a client workspace). Eric, Jun 23
+              2026: "coach mode should not require a tour on clients." The setup
+              progress below still helps a coach finish the client's profile. */}
+          {!isClientProfile && (
+            <>
+              <p className="text-sm text-muted mt-1">New to Mindy? Take the 2-minute guided tour of the core workflow.</p>
+              {/* PRIMARY action: launch the tour (Eric: this card should let you
+                  TAKE the tour, not mark it complete). */}
+              <button
+                onClick={() => window.dispatchEvent(new Event('mindy:start-tour'))}
+                className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors"
+              >
+                <Compass className="h-4 w-4 shrink-0" strokeWidth={2} /> Take the product tour
+              </button>
+            </>
+          )}
+          {/* Quiet setup-progress underneath (informational, not the CTA). */}
+          <div className="mt-4 pt-4 border-t border-surface space-y-2">
+            <p className="text-[11px] uppercase tracking-wider text-faint">Setup progress</p>
+            <ChecklistItem label="Profile saved" done={Boolean(form.display_name || form.company_name)} />
+            <ChecklistItem label="NAICS selected" done={parseList(form.naics_codes).length > 0} />
+            <ChecklistItem label="Agencies selected" done={parseList(form.target_agencies).length > 0 || targetListCount > 0} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Save row shown under Profile and under Alerts & matching — both save the whole form. */
+function SaveBar({
+  saving,
+  unsaved,
+  onSave,
+  onComplete,
+}: {
+  saving: boolean;
+  unsaved: boolean;
+  onSave: () => void;
+  onComplete?: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-3">
+      {unsaved && !saving && <span className="text-xs text-amber-300">Unsaved changes</span>}
+      <button
+        onClick={onSave}
+        disabled={saving}
+        className="px-5 py-2 bg-surface hover:bg-input disabled:opacity-60 text-slate-200 rounded-lg transition-colors"
+      >
+        {saving ? 'Saving...' : 'Save Settings'}
+      </button>
+      {onComplete && (
+        <button
+          onClick={onComplete}
+          disabled={saving}
+          className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white rounded-lg font-medium transition-colors"
+        >
+          Mark Onboarding Complete
+        </button>
+      )}
     </div>
   );
 }

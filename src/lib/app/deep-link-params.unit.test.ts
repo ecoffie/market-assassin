@@ -90,8 +90,12 @@ describe('single-value parsers', () => {
     expect(parsePursuitId('3f1c2b9e-0000-4000-8000-000000000000')).toBe('3f1c2b9e-0000-4000-8000-000000000000');
     expect(parsePursuitId('a b')).toBeUndefined();
   });
-  it('every action + settings section has a landing anchor', () => {
+  it('every action + card-level settings section has a landing anchor (tab-level sections open the tab)', () => {
     for (const a of PROPOSAL_ACTIONS) expect(PROPOSAL_ACTION_TARGETS[a].anchorId).toMatch(/^proposal-/);
-    for (const s of SETTINGS_SECTIONS) expect(SETTINGS_SECTION_ANCHORS[s]).toMatch(/^settings-/);
+    const tabs = new Set(['matching', 'alerts', 'profile', 'account']);
+    for (const s of SETTINGS_SECTIONS) {
+      if (tabs.has(s)) expect(SETTINGS_SECTION_ANCHORS[s]).toBeNull();
+      else expect(SETTINGS_SECTION_ANCHORS[s]).toMatch(/^settings-/);
+    }
   });
 });

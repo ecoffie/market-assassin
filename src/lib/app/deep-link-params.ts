@@ -8,6 +8,7 @@
  *   /app?panel=contacts&agency=<agency name>
  *   /app?panel=vault&section=documents
  *   /app?panel=settings&section=billing|security|notifications|team
+ *   (Settings is tabbed — see ./settings-tabs.ts for which tab each section opens)
  *
  * Contract: every value is validated against a closed set (or a strict shape). An unknown or
  * malformed value is DROPPED, never passed through — the panel then opens on its normal
@@ -15,14 +16,18 @@
  * link can never leak into a different meaning.
  */
 
+import { SETTINGS_SECTION_VALUES, anchorForSection, type SettingsSectionValue } from './settings-tabs';
+
 export const PROPOSAL_ACTIONS = ['compliance', 'review', 'export', 'submit'] as const;
 export type ProposalAction = (typeof PROPOSAL_ACTIONS)[number];
 
 export const VAULT_SECTIONS = ['identity', 'past_performance', 'capabilities', 'team', 'documents', 'generated'] as const;
 export type VaultDeepLinkSection = (typeof VAULT_SECTIONS)[number];
 
-export const SETTINGS_SECTIONS = ['billing', 'credits', 'security', 'notifications', 'team'] as const;
-export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
+// Settings `section=` values: one per tab plus the older card-level anchors. The closed set
+// and its tab/anchor mapping live in ./settings-tabs.ts (the panel's tab logic).
+export const SETTINGS_SECTIONS = SETTINGS_SECTION_VALUES;
+export type SettingsSection = SettingsSectionValue;
 
 export interface AppDeepLinkContext {
   pursuit_id?: string;
@@ -112,10 +117,7 @@ export const PROPOSAL_ACTION_TARGETS: Record<ProposalAction, { label: string; an
   submit: { label: 'Final checklist before submitting', anchorId: 'proposal-final-review-section' },
 };
 
-export const SETTINGS_SECTION_ANCHORS: Record<SettingsSection, string> = {
-  billing: 'settings-billing',
-  credits: 'settings-credits',
-  security: 'settings-security',
-  notifications: 'settings-notifications',
-  team: 'settings-team',
-};
+/** DOM anchor inside the Settings tab for each section; `null` = the tab itself (no scroll). */
+export const SETTINGS_SECTION_ANCHORS: Record<SettingsSection, string | null> = Object.fromEntries(
+  SETTINGS_SECTIONS.map((s) => [s, anchorForSection(s)]),
+) as Record<SettingsSection, string | null>;

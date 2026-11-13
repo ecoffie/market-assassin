@@ -328,7 +328,9 @@ export default function CreditsConsole({ embedded = false }: { embedded?: boolea
           <Link href="/mcp/pricing" className="rounded-lg bg-emerald-500 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-emerald-400">Top up</Link>
         </div>
       </div>
-      <SubscriptionsCard email={email} upgradeHref="/mcp/pricing" />
+      {/* Embedded in Settings → Billing & credits, the subscriptions card already sits right above
+          this console — showing it again here put the plan (and its trial-upgrade offer) on screen twice. */}
+      {!embedded && <SubscriptionsCard email={email} upgradeHref="/mcp/pricing" />}
       {usage && usage.totalCalls > 0 ? (
         <>
           <UsageKpis usage={usage} />
@@ -352,8 +354,9 @@ export default function CreditsConsole({ embedded = false }: { embedded?: boolea
 
   const billingBody = (
     <div className="space-y-5">
-      {/* Every plan they're on (Mindy Pro/Team, MCP credits plan) + Manage / cancel for each. */}
-      <SubscriptionsCard email={email} upgradeHref="/mcp/pricing" />
+      {/* Every plan they're on (Mindy Pro/Team, MCP credits plan) + Manage / cancel for each.
+          Not when embedded: Settings shows the same card directly above the console. */}
+      {!embedded && <SubscriptionsCard email={email} upgradeHref="/mcp/pricing" />}
 
       {/* Balance + top up */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-surface px-4 py-3.5">
