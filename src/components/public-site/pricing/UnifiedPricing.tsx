@@ -59,10 +59,10 @@ const ENTERPRISE_CONTACT_URL = '/contact-sales';
 const REFERRALS_URL = '/app?panel=settings&section=credits&tab=referrals';
 const GOVWIN_URL = '/compare/govwin';
 
-const PLANS_FALLBACK: SubPlan[] = [
+export const PLANS_FALLBACK: SubPlan[] = [
   { id: 'entry',  label: 'Entry',  creditsPerMonth: 500,   monthly: { priceId: 'price_1TuxApK5zyiZ50PB8iMg8WqG', usd: 99,  credits: 500,   checkoutUrl: 'https://buy.stripe.com/bJe5kEff8erw20R0CsfnO0Y' }, annual: { priceId: 'price_1TuyGyK5zyiZ50PBUfIkFbvD', usd: 990,  usdPerMonth: 83,  credits: 6000,   checkoutUrl: 'https://buy.stripe.com/9B6eVed70bfkdJz1GwfnO12' } },
-  { id: 'mid',    label: 'Mid',    creditsPerMonth: 2000,  monthly: { priceId: 'price_1TuxApK5zyiZ50PBPV40eCvG', usd: 249, credits: 2000,  checkoutUrl: 'https://buy.stripe.com/8x29AUgjcfvA5d30CsfnO0Z' }, annual: { priceId: 'price_1TuyGyK5zyiZ50PBaBguu8be', usd: 2490, usdPerMonth: 208, credits: 24000,  checkoutUrl: 'https://buy.stripe.com/bJeeVeaYSgzE8pf2KAfnO13' } },
-  { id: 'growth', label: 'Growth', creditsPerMonth: 3500,  monthly: { priceId: 'price_1UG0qlK5zyiZ50PBQLTBrEAV', usd: 399, credits: 3500,  checkoutUrl: 'https://buy.stripe.com/3cI9AU3wq3MS5d3clafnO16' }, annual: { priceId: 'price_1UG0qlK5zyiZ50PBkT40I5mP', usd: 3990, usdPerMonth: 333, credits: 42000,  checkoutUrl: 'https://buy.stripe.com/fZufZiff80AGcFvdpefnO17' } },
+  { id: 'mid',    label: 'Mid',    creditsPerMonth: 3000,  monthly: { priceId: 'price_1TuxApK5zyiZ50PBPV40eCvG', usd: 249, credits: 3000,  checkoutUrl: 'https://buy.stripe.com/8x29AUgjcfvA5d30CsfnO0Z' }, annual: { priceId: 'price_1TuyGyK5zyiZ50PBaBguu8be', usd: 2490, usdPerMonth: 208, credits: 36000,  checkoutUrl: 'https://buy.stripe.com/bJeeVeaYSgzE8pf2KAfnO13' } },
+  { id: 'growth', label: 'Growth', creditsPerMonth: 5000,  monthly: { priceId: 'price_1UG0qlK5zyiZ50PBQLTBrEAV', usd: 399, credits: 5000,  checkoutUrl: 'https://buy.stripe.com/3cI9AU3wq3MS5d3clafnO16' }, annual: { priceId: 'price_1UG0qlK5zyiZ50PBkT40I5mP', usd: 3990, usdPerMonth: 333, credits: 60000,  checkoutUrl: 'https://buy.stripe.com/fZufZiff80AGcFvdpefnO17' } },
   { id: 'agency', label: 'Agency', creditsPerMonth: 10000, monthly: { priceId: 'price_1TuxAqK5zyiZ50PBJUdzoobH', usd: 999, credits: 10000, checkoutUrl: 'https://buy.stripe.com/8x2eVe1oi6Z434VdpefnO10' }, annual: { priceId: 'price_1TuyGzK5zyiZ50PBkxhPLK5J', usd: 9990, usdPerMonth: 833, credits: 120000, checkoutUrl: 'https://buy.stripe.com/4gM00k6IC0AGcFvetifnO14' } },
 ];
 const TOPUP_FALLBACK: Pkg = { id: 'refill', credits: 1000, usd: 119, label: 'Top-up — 1,000 credits', checkoutUrl: 'https://buy.stripe.com/28EfZi5Ey97cgVL3OEfnO15' };
