@@ -1,11 +1,14 @@
 # Mindy phone app (iPhone + Android)
 
-A native app shell around the live Mindy web app (`https://getmindy.ai/app`),
-built with Capacitor 7. Every website deploy shows up in the app right away,
+A native app shell around the Mindy phone screen (`https://getmindy.ai/app/phone`,
+`src/app/app/phone/page.tsx`): sign in, then two tabs — Mindy (today's matches) and Map.
+Other pages (pricing, forgot password, outside sites) open in the phone's browser
+(`PhoneNavPlugin` in `ios/App/App/AppDelegate.swift` and `android/.../PhoneNavPlugin.java`).
+Built with Capacitor 7. Every website deploy shows up in the app right away,
 with no store review needed.
 
 - App ID: `ai.getmindy.app` · Name: **Mindy**
-- `capacitor.config.ts`: start URL, which hosts stay in the app, splash and status bar
+- `capacitor.config.ts`: start URL (`/app/phone`), which hosts stay in the app, splash and status bar
 - `www/`: the offline screen only (shown when the phone has no connection)
 - `assets/`: icon and splash sources; regenerate with `npm run assets`
 - `android/`, `ios/`: generated native projects (commit them; re-run `npx cap sync` after changing the config or plugins)

@@ -1,4 +1,5 @@
 import UIKit
+import WebKit
 import Capacitor
 
 @UIApplicationMain
@@ -73,5 +74,45 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
         _ = ApplicationDelegateProxy.shared.application(UIApplication.shared, continue: userActivity, restorationHandler: { _ in })
+    }
+}
+
+// The phone app is NOT the website: it shows the sign-in + two tabs at /app/phone
+// and the Opportunity Map. Any other page (pricing, forgot password, blog, other
+// sites) opens in Safari. Main.storyboard points at this controller so the guard
+// is registered before the first page loads.
+class MainViewController: CAPBridgeViewController {
+    override open func capacitorDidLoad() {
+        bridge?.registerPluginInstance(PhoneNavPlugin())
+    }
+}
+
+@objc(PhoneNavPlugin)
+public class PhoneNavPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "PhoneNavPlugin"
+    public let jsName = "PhoneNav"
+    public let pluginMethods: [CAPPluginMethod] = []
+
+    static let appHosts: Set<String> = ["getmindy.ai", "www.getmindy.ai"]
+    static let appPaths = ["/app/phone", "/opportunity-map"]
+
+    static func staysInApp(_ url: URL) -> Bool {
+        guard let host = url.host?.lowercased(), appHosts.contains(host) else { return false }
+        let path = url.path.isEmpty ? "/" : url.path
+        return appPaths.contains { path == $0 || path.hasPrefix($0 + "/") }
+    }
+
+    // nil = let Capacitor decide (allow), true = cancel the load.
+    override public func shouldOverrideLoad(_ navigationAction: WKNavigationAction) -> NSNumber? {
+        guard let url = navigationAction.request.url,
+              let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return nil }
+        let newWindow = navigationAction.targetFrame == nil
+        let mainFrame = navigationAction.targetFrame?.isMainFrame == true
+        // Inside the map iframe only a link the person TAPPED counts; background
+        // frames (analytics, embeds) must never pop Safari.
+        if !newWindow && !mainFrame && navigationAction.navigationType != .linkActivated { return nil }
+        if !newWindow && PhoneNavPlugin.staysInApp(url) { return nil }
+        DispatchQueue.main.async { UIApplication.shared.open(url, options: [:], completionHandler: nil) }
+        return true
     }
 }

@@ -7,7 +7,8 @@ const config: CapacitorConfig = {
   appName: 'Mindy',
   webDir: 'www',
   server: {
-    url: 'https://getmindy.ai/app',
+    // The phone screen: sign-in, then a Mindy tab and a Map tab (src/app/app/phone).
+    url: 'https://getmindy.ai/app/phone',
     // Hosts that stay inside the app. Anything else opens in the phone's browser.
     allowNavigation: ['getmindy.ai', '*.getmindy.ai', 'mi.govcongiants.com'],
     errorPath: 'index.html',
