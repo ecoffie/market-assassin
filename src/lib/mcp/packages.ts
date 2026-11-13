@@ -258,18 +258,22 @@ export const SUBSCRIPTION_PLANS: readonly SubscriptionPlan[] = [
     // 1,500 -> 2,000 (Eric, 2026-09-15). At 1,500 Mid had no defensible buyer: app Pro
     // gives the same 1,500 for $149 WITH the whole application, so a $249 credit-only
     // plan at equal capacity was dominated. 2,000 is the smallest quantity that clears it.
-    creditsPerMonth: 2000,
+    // 2,000 -> 3,000 (Eric, 2026-11-13). Price and Stripe price ids UNCHANGED; the grant is
+    // resolved by price id from this file, so this raises renewals for current Mid
+    // subscribers too (an increase, never a cut). The Stripe product description must be
+    // updated to match in the dashboard; it is display-only and grants nothing.
+    creditsPerMonth: 3000,
     monthly: {
       priceId: 'price_1TuxApK5zyiZ50PBPV40eCvG',
       usd: 249,
-      credits: 2000,
+      credits: 3000,
       checkoutUrl: 'https://buy.stripe.com/8x29AUgjcfvA5d30CsfnO0Z',
     },
     annual: {
       priceId: 'price_1TuyGyK5zyiZ50PBaBguu8be',
       usd: 2490, // 2 months free vs $249/mo
       usdPerMonth: 208,
-      credits: 24000, // 12× upfront (2,000/mo)
+      credits: 36000, // 12× upfront (3,000/mo)
       checkoutUrl: 'https://buy.stripe.com/bJeeVeaYSgzE8pf2KAfnO13',
     },
   },
@@ -280,18 +284,19 @@ export const SUBSCRIPTION_PLANS: readonly SubscriptionPlan[] = [
     // for +$150 at both rungs, so upgrading never buys a worse deal.
     id: 'growth',
     label: 'Growth',
-    creditsPerMonth: 3500,
+    // 3,500 -> 5,000 (Eric, 2026-11-13). Price + price ids unchanged; see the Mid note.
+    creditsPerMonth: 5000,
     monthly: {
       priceId: 'price_1UG0qlK5zyiZ50PBQLTBrEAV',
       usd: 399,
-      credits: 3500,
+      credits: 5000,
       checkoutUrl: 'https://buy.stripe.com/3cI9AU3wq3MS5d3clafnO16',
     },
     annual: {
       priceId: 'price_1UG0qlK5zyiZ50PBkT40I5mP',
       usd: 3990, // 2 months free vs $399/mo
       usdPerMonth: 333,
-      credits: 42000, // 12× upfront (3,500/mo)
+      credits: 60000, // 12× upfront (5,000/mo)
       checkoutUrl: 'https://buy.stripe.com/fZufZiff80AGcFvdpefnO17',
     },
   },

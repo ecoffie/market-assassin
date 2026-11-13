@@ -41,6 +41,11 @@ import {
   recipientSlug,
 } from '@/lib/bigquery/recipients';
 import { WARM_QUEUE_KEY } from '@/lib/seo/served-slugs';
+import {
+  WARM_PRIORITY_KEY, WARM_PRIORITY_PER_RUN, WARM_PRIORITY_DAILY_CAP, warmDailyKey, isThinContractor,
+} from '@/lib/seo/warm-priority';
+import { bqResultState } from '@/lib/bigquery/cache';
+import { seoCacheKeys } from '@/lib/bigquery/recipients';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -63,7 +68,8 @@ const CURSOR_KEY = 'cron:warm-contractor-pages:cursor';
 const QUEUE_DRAIN_PER_RUN = 25;
 
 function authorized(request: NextRequest): boolean {
-  if (request.headers.get('x-vercel-cron') === '1') return true;
+  // No `x-vercel-cron` header check: any client can send it. Vercel cron sends
+  // `Authorization: Bearer CRON_SECRET` (set in production), as does the dispatcher.
   const auth = request.headers.get('authorization');
   if (auth && auth === `Bearer ${process.env.CRON_SECRET}`) return true;
   const pw = request.nextUrl.searchParams.get('password');
@@ -88,12 +94,16 @@ async function sitemapSlugs(): Promise<string[]> {
   return slugs;
 }
 
-async function warmSlug(slug: string): Promise<'warmed' | 'skipped'> {
+type WarmResult = 'warmed' | 'skipped' | 'thin' | 'failed';
+
+async function warmSlug(slug: string, opts: { skipThin?: boolean } = {}): Promise<WarmResult> {
   // Warm the slug-resolution key first (the page's 404 gate). liveBq=true
   // is what turns a cache miss into a BQ scan + KV write.
   const rollup = await getRollupOrSingleBySlug(slug, true);
   if (!rollup) return 'skipped'; // slug genuinely doesn't resolve
 
+  // Thin contractors render noindex: their sections buy nothing. Identity is cached either way.
+  if (opts.skipThin && isThinContractor(rollup.total_obligated, rollup.award_count)) return 'thin';
   const ueis = rollup.child_ueis;
   const rollupUei = rollup.rollup_uei;
 
@@ -108,6 +118,10 @@ async function warmSlug(slug: string): Promise<'warmed' | 'skipped'> {
     getRecentAwardsForRecipient(ueis, rollupUei, 25, true),
     getExecutivesForRecipient(ueis, rollupUei, true),
   ]);
+
+  // queryCached swallows BigQuery errors into a 'failed' mark. A failed core section means the
+  // warm did not happen (quota exhausted, most likely): report it so the drain stops.
+  if (bqResultState(seoCacheKeys.recentAwards(rollupUei, 25), 0) === 'failed') return 'failed';
 
   // A previous cold crawl may have cached a 404 via ISR — force
   // regeneration now that the data keys are warm.
@@ -141,22 +155,64 @@ async function handle(request: NextRequest) {
   let skipped = 0;
   const failures: Array<{ slug: string; error: string }> = [];
 
-  // 1. Drain recorded misses first: these are URLs answering 5xx right now.
+  // 1. Drain the PRIORITY queue first (src/lib/seo/warm-priority.ts): highest score first, bounded
+  //    per run and per UTC day, stopping at the first BigQuery failure. Each slug is removed only
+  //    when processed; a failure puts it back at its score, so progress is checkpointed in KV.
+  const priority = { drained: 0, warmed: 0, thin: 0, skipped: 0, stoppedBy: null as string | null, depthAfter: null as number | null };
+  try {
+    const used = Number(await kv.get<number>(warmDailyKey())) || 0;
+    const room = Math.max(0, Math.min(WARM_PRIORITY_PER_RUN, WARM_PRIORITY_DAILY_CAP - used));
+    if (room === 0) priority.stoppedBy = 'daily cap reached';
+    const popped = room ? ((await kv.zpopmax<string>(WARM_PRIORITY_KEY, room)) as unknown[]) : [];
+    // zpopmax returns [member, score, member, score, ...]
+    const items: Array<{ slug: string; score: number }> = [];
+    for (let i = 0; i + 1 < popped.length; i += 2) items.push({ slug: String(popped[i]), score: Number(popped[i + 1]) });
+    for (let i = 0; i < items.length; i++) {
+      const { slug, score } = items[i];
+      let r: WarmResult;
+      try { r = await warmSlug(slug, { skipThin: true }); } catch { r = 'failed'; }
+      priority.drained++;
+      if (r === 'failed') {
+        // Stop: put this and every unprocessed item back at its score.
+        const back = items.slice(i).flatMap((x) => [{ score: x.score, member: x.slug }]);
+        if (back.length) await kv.zadd(WARM_PRIORITY_KEY, back[0], ...back.slice(1));
+        priority.stoppedBy = `BigQuery failure at ${slug}`;
+        failures.push({ slug, error: 'section warm failed (BigQuery)' });
+        break;
+      }
+      if (r === 'warmed') priority.warmed++;
+      if (r === 'thin') priority.thin++;
+      if (r === 'skipped') priority.skipped++;
+      try { await kv.srem(WARM_QUEUE_KEY, slug); } catch { /* the set is the compatibility record */ }
+    }
+    if (priority.warmed) {
+      const n = await kv.incrby(warmDailyKey(), priority.warmed);
+      if (n === priority.warmed) await kv.expire(warmDailyKey(), 26 * 3600);
+    }
+    priority.depthAfter = await kv.zcard(WARM_PRIORITY_KEY);
+  } catch (err) {
+    priority.stoppedBy = `priority queue unavailable: ${err instanceof Error ? err.message : err}`;
+  }
+
+  // 1b. Then recorded misses not yet scored (legacy set), at the old bounded rate.
   let queued: string[] = [];
   let queueDepthAfter: number | null = null;
-  try {
-    const popped = await kv.spop<string[]>(WARM_QUEUE_KEY, QUEUE_DRAIN_PER_RUN);
-    queued = Array.isArray(popped) ? popped : popped ? [popped as unknown as string] : [];
-  } catch (err) {
-    console.warn('[warm-contractor-pages] warm-miss queue unreadable:', err);
+  if (!priority.stoppedBy?.startsWith('BigQuery')) {
+    try {
+      const popped = await kv.spop<string[]>(WARM_QUEUE_KEY, QUEUE_DRAIN_PER_RUN);
+      queued = Array.isArray(popped) ? popped : popped ? [popped as unknown as string] : [];
+    } catch (err) {
+      console.warn('[warm-contractor-pages] warm-miss queue unreadable:', err);
+    }
   }
   let queueWarmed = 0;
   for (const slug of queued) {
     try {
-      if ((await warmSlug(slug)) === 'warmed') queueWarmed++;
+      const r = await warmSlug(slug, { skipThin: true });
+      if (r === 'warmed') queueWarmed++;
+      if (r === 'failed') { await kv.sadd(WARM_QUEUE_KEY, slug); break; }
     } catch (err) {
       failures.push({ slug, error: err instanceof Error ? err.message : String(err) });
-      // Put it back so a transient BQ failure does not lose the URL.
       try { await kv.sadd(WARM_QUEUE_KEY, slug); } catch { /* best effort */ }
     }
   }
@@ -191,6 +247,7 @@ async function handle(request: NextRequest) {
     skipped,
     failed: failures.length,
     failures: failures.slice(0, 20),
+    priority,
     queue: { drained: queued.length, warmed: queueWarmed, depthAfter: queueDepthAfter },
   });
 }
