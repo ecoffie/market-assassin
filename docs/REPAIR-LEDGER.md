@@ -26,6 +26,15 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-14 — Ask Mindy safety release + Phase 0 (Option C, approved 2026-11-13)
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-14 | Ask Mindy / tool policy | **Chat exposed tools hidden from MCP for defects and ran destructive writes on a model-supplied `confirm:true`.** One chat tool policy now decides what may be offered AND executed: `hide_until_fixed` tools blocked (add_contacts_to_crm, one_click_proposal, get_proposal_job, search_sbir, get_agency_budget_trends); delete, CRM writes and generate_market_report (D1) need a server confirmation (Phase 3) and are blocked until then; create/update alert allowed; unclassified write tools fail closed. | `export function chatToolPolicy(name: string, isRegistered: boolean)` → `src/lib/chat/chat-tool-policy.ts` | `chat-tool-policy.unit.test.ts`; mutation check: disabling the execution-time re-check fails 9 executor tests | IN REVIEW |
+| 2026-11-14 | Ask Mindy / executor | **Chat dispatched tools with raw runMcpTool: no log, no preflight, one throwing tool broke the answer, unparseable args ran as `{}` (unfiltered).** Single executor: per-round caps (8 calls, 1 write), arg parse refusal, confirm stripping, policy re-check, MCP input preflight, per-tool error capture, `mcp_call_log` row per call (channel app_chat, redacted args, catalog credit_price, 0 charged). Route has no direct runMcpTool call (source-asserted). | `export function createChatToolExecutor(opts: ChatToolExecutorOptions)` → `src/lib/chat/chat-tool-executor.ts` | `chat-tool-executor.unit.test.ts` (18), `redact-args.unit.test.ts`, `log-call.unit.test.ts` | IN REVIEW |
+| 2026-11-14 | Ask Mindy / planner | **Claude planner failed every turn since 2026-09-26 (unfunded) and fell through to gpt-4o silently.** gpt-4o is the explicit planner; Claude only behind `CHAT_CLAUDE_ENABLED=true`; fallbacks only to compatibility-tested planners (Groq 8B removed from the tool round); every planner/answer failure and fallback writes `tool_errors` (tool `ask_mindy`) + a rate-limited ops alert. | `export function resolvePlannerChain(env: Env, opts: { overBudget: boolean })` → `src/lib/chat/planner-config.ts` | `planner-config.unit.test.ts` | IN REVIEW |
+| 2026-11-14 | Ask Mindy / Phase 0 | Today's date in the planning prompt; "unavailable is not none" rule; notices when tools are unavailable or a lookup fails; answer cap 1024 → 2048 with a `truncated` notice on finish_reason length; tool-round cap 512 → 1024; per-turn trace on `mindy_chat_messages.trace`; Enter sends / Shift+Enter newline. | `TODAY: {today} (US Eastern)` → `src/app/api/app/chat/route.ts` | `planner-config.unit.test.ts` source assertions; full unit suite + build | IN REVIEW |
+
 ## 2026-11-13 — Tablets (621–980px) get the site menu
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

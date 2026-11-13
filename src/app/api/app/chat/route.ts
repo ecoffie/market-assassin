@@ -38,7 +38,11 @@ import { hasProAccess } from '@/lib/access/resolve-access';
 import { loadBidderProfile, formatProfileForPrompt } from '@/lib/proposal/loaders';
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
-import { listMcpTools, isMcpTool, runMcpTool } from '@/lib/mcp/tool-registry';
+// Tools run ONLY through the chat tool executor (policy check at offer AND execution,
+// preflight, per-tool error capture, execution log). Never import runMcpTool here.
+import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/chat-tool-executor';
+import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, type PlannerTarget } from '@/lib/chat/planner-config';
+import { recordProviderEvent } from '@/lib/chat/provider-events';
 import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 export const dynamic = 'force-dynamic';
@@ -53,7 +57,12 @@ export const runtime = 'nodejs';
 // 24h window clears AND metadata extraction is done.
 const GROQ_MODEL = 'llama-3.1-8b-instant';
 const TEMPERATURE = 0.3;          // citation-faithful per #117 spec
-const MAX_TOKENS = 1024;          // chat responses are conversational, not essays
+// Raised 1024 → 2048 (2026-11-13, Ask Mindy Phase 0): 1024 cut long answers mid-sentence
+// with no signal. A cut answer is now also flagged to the user (finish_reason 'length').
+const MAX_TOKENS = 2048;
+// Tool round output cap. Raised 512 → 1024: several parallel tool calls with filters can
+// exceed 512 tokens, and a truncated argument string used to run as {} (an unfiltered query).
+const TOOL_ROUND_MAX_TOKENS = 1024;
 const HISTORY_LIMIT = 6;          // last 3 exchanges (6 messages) for continuity
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -103,6 +112,8 @@ VOICE:
 - NEVER say "I'm an AI" or "as a language model". You're Mindy.
 - Keep responses tight. Most answers are 3-6 sentences or a short numbered list. No essays.
 
+TODAY: {today} (US Eastern). Use this date for every time calculation. When the user asks about a window such as "the next 18 months", compute its end date from today and compare every date you report against it. Never call a date inside the window "outside" it, or the reverse.
+
 GROUNDING:
 - You answer from the live federal DATA CORE (your tools) ONLY. There is NO teaching corpus, curriculum, or podcast library — do not offer to "teach", cite lessons/episodes, or mention any knowledge base. If the user wants to learn a concept, answer it briefly from the data at hand or point them at the tool that shows the real records.
 - Every specific fact — a code, dollar, agency, name, count, deadline, contact — must come from a tool result. NEVER invent federal programs, agency names, contract values, or contacts. If your tools don't cover it, say so plainly and stop.
@@ -128,6 +139,7 @@ You have a LARGE toolset over the federal Data Core — each tool's own descript
 Tool-use rules:
 - Some tools take a notice_id or RFP text (proposal tools) — if the user hasn't given one, ask for the solicitation number/text rather than guessing.
 - If a tool returns a "slow down"/rate_limited note, relay it briefly and suggest they try again shortly — do NOT retry it yourself.
+- A tool result with ok:false and an error_category (state "unavailable") means that data COULD NOT BE RETRIEVED. Say the lookup was unavailable or not permitted from chat. NEVER describe it as "none", "no contracts", or zero.
 - When a tool returns grounded=false / count 0 / found false, say so plainly — NEVER invent a pursuit, opportunity, contract, company, agency, deadline, dollar, contact, or term. Ground every specific ONLY in what the tool actually returned.
 - When OPEN solicitations run thin, do NOT fall back to "keep an eye on SAM.gov" / "check SAM.gov for updates" / "monitor the panel" — you have forecast + recompete tools; call them and surface (clearly labeled) FORECAST and RECOMPETE results instead. "Go check SAM yourself" is never an acceptable answer for something a tool covers.
 - DO NOT PAD A THIN RESULT. If the user asked for cyber/cloud work and the tools returned two real matches, return two and say the set is thin — never stretch to fill a list with items that only loosely touch the ask. Listing a security-system repair or an air-traffic-control system under "cyber and cloud" makes every other result look equally unreliable. Three precise matches beat seven padded ones, and a user can act on "that's all there is right now"; they cannot act on a list they have to re-filter themselves.
@@ -156,6 +168,8 @@ async function persistExchange(params: {
   citedSources: CitedSource[];
   tokensUsed: number | null;
   latencyMs: number;
+  /** Per-turn trace: models, tool execution ids/statuses, notices. No arguments or bodies. */
+  trace?: Record<string, unknown>;
 }) {
   const supabase = getSupabase();
 
@@ -189,23 +203,33 @@ async function persistExchange(params: {
     });
   }
 
-  // Insert both messages
-  await supabase.from('mindy_chat_messages').insert([
-    {
-      session_id: params.sessionId,
-      role: 'user',
-      content: params.userMessage,
-      cited_sources: [],
-    },
-    {
-      session_id: params.sessionId,
-      role: 'assistant',
-      content: params.assistantMessage,
-      cited_sources: params.citedSources,
-      tokens_used: params.tokensUsed,
-      latency_ms: params.latencyMs,
-    },
-  ]);
+  // Insert both messages. The trace column is additive (migration
+  // 20261114_ask_mindy_execution_trace); if it is absent, retry without it so the
+  // conversation itself is never lost to a telemetry column.
+  const userRow = {
+    session_id: params.sessionId,
+    role: 'user',
+    content: params.userMessage,
+    cited_sources: [],
+  };
+  const assistantRow = {
+    session_id: params.sessionId,
+    role: 'assistant',
+    content: params.assistantMessage,
+    cited_sources: params.citedSources,
+    tokens_used: params.tokensUsed,
+    latency_ms: params.latencyMs,
+  };
+  const { error: insertErr } = await supabase
+    .from('mindy_chat_messages')
+    .insert([userRow, params.trace ? { ...assistantRow, trace: params.trace } : assistantRow]);
+  if (insertErr) {
+    console.error('[chat] message insert rejected:', insertErr.message);
+    if (params.trace) {
+      const { error: retryErr } = await supabase.from('mindy_chat_messages').insert([userRow, assistantRow]);
+      if (retryErr) console.error('[chat] message insert retry rejected:', retryErr.message);
+    }
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -315,7 +339,8 @@ export async function POST(request: NextRequest) {
         // teaching knowledge base. No RAG retrieval, no teaching context, no citation chips.
         const profile = await loadBidderProfile(auth.email!);
         const userProfileBlock = formatProfileForPrompt(profile);
-        const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace('{userProfile}', userProfileBlock);
+        const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+        const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace('{today}', today).replace('{userProfile}', userProfileBlock);
 
         const messages: Array<{ role: string; content: string }> = [
           { role: 'system', content: systemPrompt },
@@ -371,175 +396,168 @@ export async function POST(request: NextRequest) {
         //     vocabulary (no per-user scoping).
         // If the model calls one, we execute it and append the result so the
         // streaming block below produces a grounded final answer. If no tool is
-        // called, messages is untouched and v1 behaviour is byte-for-byte
-        // preserved. Phase-0 spike proved both gpt-4o and the 8b Groq fallback do
-        // this reliably (scripts/spike-chat-v2-toolcall.mjs).
+        // called, messages is untouched.
+        // 2026-11-13 safety release: tools are offered and executed ONLY through the chat
+        // tool executor (src/lib/chat/chat-tool-executor.ts); the planner is chosen by
+        // resolvePlannerChain (gpt-4o default, no untested fallbacks); failures are recorded.
         let toolProvider = ''; let toolModel = '';
         let toolUsageForCost: { prompt_tokens?: number; completion_tokens?: number } | null = null;
-        // Did a Data Core tool (contacts, live SAM, contractor intel, …) actually
-        // produce the answer? If so, the answer is grounded in LIVE DATA, not the
-        // RAG corpus — so the keyword-retrieved doc chunks are NOT its sources and
-        // must NOT be shown as "Documents referenced" (Eric QC: a Forest Service
-        // contact lookup was citing unrelated podcast episodes).
-        let toolsAnswered = false;
+        // Per-turn trace (persisted on the assistant message). Ids, names and statuses only:
+        // never tool arguments or result bodies.
+        const turnTrace: {
+          planner: { provider: string; model: string } | null;
+          planner_attempts: Array<{ provider: string; model: string; ok: boolean; status: number | null }>;
+          tools_offered: number;
+          tool_executions: ChatExecutionRecord[];
+          answer: { provider: string; model: string; finish_reason: string | null; fallback: boolean } | null;
+          notices: string[];
+        } = { planner: null, planner_attempts: [], tools_offered: 0, tool_executions: [], answer: null, notices: [] };
+        const notify = (code: string, text: string) => {
+          turnTrace.notices.push(code);
+          send({ type: 'notice', code, message: text });
+        };
+        let plannerUnavailable = false;
+        // Index of an assistant tool_calls turn whose results have not all been appended yet.
+        let pendingToolTurnIdx: number | null = null;
         try {
-          const tier0 = makeTier0Tools(getSupabase(), auth.email!);
-          // Mindy is the FLAGSHIP (paid, Pro-gated) surface, so it gets the FULL
-          // Data Core toolset — every tool the MCP server exposes to external
-          // agents PLUS the private Vault/pipeline tools MCP can't offer. The MCP
-          // registry is the single source of truth: listMcpTools() yields all
-          // public + moat tools (already priced/tiered), runMcpTool() dispatches
-          // them with the SAME cost guards (BigQuery rate limits carry over). No
-          // per-call credit debit in chat — tools are included in the Pro plan
-          // (PRD: "users get a better experience in Mindy, not worse"). Since the
-          // route already Pro-gates above, moat tools are fine to expose here.
-          // get_balance is an MCP credit-meter tool — irrelevant in chat, dropped.
-          // TEACHING/CORPUS tools are ALSO dropped (Eric 2026-08-02: "anything not
-          // related to the data core we should remove. No one wants to learn here").
-          // get_winning_playbook + search_podcast_lessons read the proprietary 8-year
-          // coaching corpus — Ask Mindy is a DATA surface, not a classroom, so they
-          // must not be reachable from this chat (the corpus RAG retrieval above was
-          // removed for the same reason). They remain on the external MCP server.
-          const CHAT_EXCLUDED_TOOLS = new Set(['get_balance', 'get_winning_playbook', 'search_podcast_lessons']);
-          const mcpToolDefs = listMcpTools()
-            .filter((d) => !CHAT_EXCLUDED_TOOLS.has((d.function as { name?: string })?.name ?? ''))
-            .map((d) => ({ type: 'function' as const, function: d.function })); // strip _credits/_tier before the LLM call
-          // Route a called tool: Tier-0 (private, session-email-bound, NO email
-          // arg) stays local; everything else runs through the MCP registry with
-          // the authenticated email as the scope/rate-limit key.
-          const execTool = async (name: string, args: Record<string, unknown>): Promise<Record<string, unknown>> => {
-            if (CHAT_EXCLUDED_TOOLS.has(name)) return { ok: false, error: `tool_not_available_in_chat:${name}` };
-            if (TIER0_TOOL_NAMES.has(name)) return tier0.execute(name, args);
-            if (isMcpTool(name)) return (await runMcpTool(name, args, { userEmail: auth.email! })).result;
-            return { ok: false, error: `unknown_tool:${name}` };
-          };
-          const ALL_TOOL_DEFS = [...TIER0_TOOL_DEFS, ...mcpToolDefs];
-          const toolReqBody = (model: string) => JSON.stringify({
-            model, messages: toolRoundMessages, temperature: 0, max_tokens: 512,
-            // OPP_INTENT (Andre fix) → 'required' so an opportunity search can't decline the
-            // tool and fall back to a RAG "check SAM.gov" essay; else 'auto' (teaching Qs keep RAG).
-            tools: ALL_TOOL_DEFS, tool_choice: OPP_INTENT ? 'required' : 'auto',
+          const tier0Runtime = makeTier0Tools(getSupabase(), auth.email!);
+          const executor = createChatToolExecutor({
+            userEmail: auth.email!,
+            chatSessionId: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId) ? sessionId : null,
+            tier0: { defs: TIER0_TOOL_DEFS, names: TIER0_TOOL_NAMES, execute: (n, a) => tier0Runtime.execute(n, a) },
           });
+          // Offered tools are filtered by the chat tool policy (blocked tools are never shown).
+          const ALL_TOOL_DEFS = executor.offeredToolDefs();
+          turnTrace.tools_offered = ALL_TOOL_DEFS.length;
 
-          // ── Sonnet-5 reasoning on the tool round (2026-07-13) ──
-          // The tool round IS Chat v2's reasoning: it decides which Data Core
-          // tools to call and with what args. gpt-4o is a weak orchestrator; a
-          // real reasoning model (Sonnet 5, near-Opus on agentic work) makes the
-          // grounded answer materially better. We run Claude ONLY here — Phase 2
-          // (the streamed write-up) stays gpt-4o so streaming UX + Groq fallback
-          // are untouched. Env-tunable; disable by unsetting CHAT_CLAUDE_MODEL.
-          //
-          // Anthropic's Messages API uses a different tool schema + response
-          // shape than OpenAI, so we (a) translate the OpenAI tool defs to
-          // input_schema on the way in, and (b) translate Claude's tool_use
-          // blocks BACK into an OpenAI choices[0].message.tool_calls shape on the
-          // way out — so the consuming block below (append assistant+tool turns)
-          // is byte-for-byte unchanged and Phase 2 still speaks OpenAI.
-          //
-          // Margin guard: over-budget users skip the premium path (Claude round
-          // suppressed) exactly like they're downgraded off gpt-4o below.
-          const claudeToolModel = overBudgetEarly ? '' : (process.env.CHAT_CLAUDE_MODEL || 'claude-sonnet-5');
-          // Sonnet 5 / Opus 4.7+ REJECT a non-default temperature with a 400 —
-          // mirror call-llm.ts's guard so only legacy Claude models get temp.
-          const claudeAcceptsTemp = /haiku-4-5|sonnet-4-|opus-4-[0-5]|claude-3/i.test(claudeToolModel);
           // OpenAI {type:'function',function:{name,description,parameters}} →
-          // Anthropic {name,description,input_schema}. parameters maps 1:1.
+          // Anthropic {name,description,input_schema}. Only used when Claude is enabled.
           const anthropicTools = ALL_TOOL_DEFS.map((d) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const fn = (d as any).function || {};
+            const fn = (d.function || {}) as { name?: string; description?: string; parameters?: unknown };
             return { name: fn.name, description: fn.description, input_schema: fn.parameters };
           });
-          // Translate an Anthropic response → OpenAI choices[0].message so the
-          // consumer downstream is provider-agnostic.
+          // Translate an Anthropic response → OpenAI choices[0].message so the consumer
+          // downstream is provider-agnostic.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const anthropicToOpenAiChoice = (j: any) => {
             const blocks = Array.isArray(j?.content) ? j.content : [];
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const textBlock = blocks.find((b: any) => b?.type === 'text');
-            const toolCalls = blocks
+            const calls = blocks
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               .filter((b: any) => b?.type === 'tool_use')
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               .map((b: any) => ({ id: b.id, type: 'function', function: { name: b.name, arguments: JSON.stringify(b.input ?? {}) } }));
             return {
-              choices: [{ message: { content: textBlock?.text ?? null, tool_calls: toolCalls.length ? toolCalls : undefined } }],
-              // Normalize Anthropic usage → OpenAI shape for cost attribution.
+              choices: [{ message: { content: textBlock?.text ?? null, tool_calls: calls.length ? calls : undefined } }],
               usage: j?.usage ? { prompt_tokens: j.usage.input_tokens, completion_tokens: j.usage.output_tokens } : undefined,
             };
           };
 
-          const callToolRound = async (): Promise<{ provider: string; model: string; json: unknown } | null> => {
-            // 1) Sonnet 5 first (the reasoning upgrade), if funded + not over budget.
-            if (claudeToolModel && process.env.ANTHROPIC_API_KEY) {
-              try {
-                // Anthropic needs system + a clean user/assistant/tool transcript.
-                // Our `messages` leads with a system row; split it out and pass the
-                // rest as messages (only user/assistant present at tool-round time).
+          // One planner attempt. Returns the OpenAI-shaped JSON, or the failure details.
+          const callPlanner = async (t: PlannerTarget): Promise<{ ok: true; json: unknown } | { ok: false; status: number | null; detail: string }> => {
+            try {
+              if (t.provider === 'anthropic') {
                 const sys = toolRoundMessages.find((m) => m.role === 'system')?.content || '';
                 const convo = toolRoundMessages
                   .filter((m) => m.role === 'user' || m.role === 'assistant')
                   .map((m) => ({ role: m.role, content: m.content }));
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const forced = OPP_INTENT && anthropicSupportsForcedToolChoice(t.model);
                 const cbody: Record<string, unknown> = {
-                  model: claudeToolModel, max_tokens: 512, system: sys,
-                  // OPP_INTENT (Andre fix) → {type:'any'} forces a tool call on an opportunity
-                  // search; else {type:'auto'} so teaching questions still answer from RAG.
-                  messages: convo, tools: anthropicTools, tool_choice: OPP_INTENT ? { type: 'any' } : { type: 'auto' },
+                  model: t.model, max_tokens: TOOL_ROUND_MAX_TOKENS, system: sys,
+                  messages: convo, tools: anthropicTools, tool_choice: forced ? { type: 'any' } : { type: 'auto' },
                 };
-                if (claudeAcceptsTemp) cbody.temperature = 0;
+                if (/haiku-4-5|sonnet-4-|opus-4-[0-5]|claude-3/i.test(t.model)) cbody.temperature = 0;
                 const cr = await fetch('https://api.anthropic.com/v1/messages', {
                   method: 'POST',
                   headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
                   body: JSON.stringify(cbody),
                 });
-                if (cr.ok) return { provider: 'anthropic', model: claudeToolModel, json: anthropicToOpenAiChoice(await cr.json()) };
-                // Non-OK (429/400/5xx) → fall through to gpt-4o below.
-              } catch (e) {
-                console.error('[chat] Sonnet-5 tool round failed, falling back:', e);
+                if (cr.ok) return { ok: true, json: anthropicToOpenAiChoice(await cr.json()) };
+                return { ok: false, status: cr.status, detail: (await cr.text().catch(() => '')).slice(0, 300) };
               }
-            }
-            // 2) gpt-4o fallback (today's behaviour).
-            if (openaiKeyEarly) {
               const r = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST', headers: { Authorization: `Bearer ${openaiKeyEarly}`, 'Content-Type': 'application/json' },
-                body: toolReqBody(chatModelEarly),
+                method: 'POST', headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  model: t.model, messages: toolRoundMessages, temperature: 0, max_tokens: TOOL_ROUND_MAX_TOKENS,
+                  // OPP_INTENT (Andre fix) → 'required' so an opportunity search can't decline the tool.
+                  tools: ALL_TOOL_DEFS, tool_choice: OPP_INTENT ? 'required' : 'auto',
+                }),
               });
-              if (r.ok) return { provider: 'openai', model: chatModelEarly, json: await r.json() };
+              if (r.ok) return { ok: true, json: await r.json() };
+              return { ok: false, status: r.status, detail: (await r.text().catch(() => '')).slice(0, 300) };
+            } catch (e) {
+              return { ok: false, status: null, detail: String((e as Error)?.message || e) };
             }
-            // 3) Groq 8b last resort.
-            const g = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-              method: 'POST', headers: { Authorization: `Bearer ${groqKey || ''}`, 'Content-Type': 'application/json' },
-              body: toolReqBody(GROQ_MODEL),
-            });
-            if (g.ok) return { provider: 'groq', model: GROQ_MODEL, json: await g.json() };
-            return null;
           };
 
-          const first = await callToolRound();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const choice = (first?.json as any)?.choices?.[0]?.message;
-          const toolCalls = choice?.tool_calls as Array<{ id?: string; function?: { name?: string; arguments?: string } }> | undefined;
-          if (first && Array.isArray(toolCalls) && toolCalls.length > 0) {
-            toolProvider = first.provider; toolModel = first.model;
-            toolsAnswered = true; // live-data answer → suppress RAG doc citations
+          // Explicit planner chain (gpt-4o default; Claude only behind CHAT_CLAUDE_ENABLED;
+          // fallbacks only to compatibility-tested planners). Every failure is recorded.
+          const chain = resolvePlannerChain(process.env, { overBudget: overBudgetEarly });
+          let first: { provider: string; model: string; json: unknown } | null = null;
+          for (let i = 0; i < chain.length; i++) {
+            const t = chain[i];
+            const r = await callPlanner(t);
+            turnTrace.planner_attempts.push({ provider: t.provider, model: t.model, ok: r.ok, status: r.ok ? null : r.status });
+            if (r.ok) { first = { provider: t.provider, model: t.model, json: r.json }; break; }
+            const next = chain[i + 1];
+            void recordProviderEvent({
+              kind: next ? 'planner_fallback' : 'planner_failure',
+              provider: t.provider, model: t.model, status: r.status, detail: r.detail,
+              userEmail: auth.email!, next: next ? plannerKey(next) : undefined,
+            });
+          }
+          if (!chain.length) {
+            void recordProviderEvent({ kind: 'planner_unavailable', provider: 'none', model: 'none', detail: 'no planner configured (missing provider key)', userEmail: auth.email! });
+          }
+
+          if (!first) {
+            plannerUnavailable = true;
+          } else {
+            turnTrace.planner = { provider: first.provider, model: first.model };
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const choice = (first.json as any)?.choices?.[0]?.message;
+            const rawCalls = (choice?.tool_calls ?? []) as Array<{ id?: string; function?: { name?: string; arguments?: string } }>;
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const u = (first.json as any)?.usage;
+            toolProvider = first.provider; toolModel = first.model;
             if (u) toolUsageForCost = { prompt_tokens: u.prompt_tokens, completion_tokens: u.completion_tokens };
-            // Append the assistant's tool-call turn verbatim, then each tool result.
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (messages as any[]).push({ role: 'assistant', content: choice.content ?? null, tool_calls: toolCalls });
-            for (const tc of toolCalls) {
-              let args: Record<string, unknown> = {};
-              try { args = JSON.parse(tc.function?.arguments || '{}'); } catch { args = {}; }
-              const result = await execTool(tc.function?.name || '', args);
+            if (Array.isArray(rawCalls) && rawCalls.length > 0) {
+              // Every call gets a stable id so each result pairs with its call.
+              const toolCalls = rawCalls.map((tc, i) => ({ ...tc, id: tc.id || `call_${i}`, type: 'function' as const }));
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (messages as any[]).push({ role: 'tool', tool_call_id: tc.id || 'call_0', content: JSON.stringify(result) });
+              pendingToolTurnIdx = (messages as any[]).push({ role: 'assistant', content: choice.content ?? null, tool_calls: toolCalls }) - 1;
+              const results = await executor.executeRound(toolCalls, { provider: first.provider, model: first.model });
+              for (const r of results) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (messages as any[]).push({ role: 'tool', tool_call_id: r.tool_call_id, content: r.content });
+              }
+              pendingToolTurnIdx = null;
+              turnTrace.tool_executions = results.map((r) => r.record);
+              if (results.some((r) => r.record.status === 'failed')) {
+                notify('lookup_failed', 'One of the data lookups failed, so this answer may be incomplete.');
+              }
             }
           }
         } catch (toolErr) {
-          // Tool round is best-effort: on any failure, fall through to the plain
-          // RAG stream. A tool hiccup must never break the chat.
-          console.error('[chat] tier0 tool round failed (continuing without tools):', toolErr);
+          console.error('[chat] tool round failed:', toolErr);
+          plannerUnavailable = true;
+          // Never leave an assistant tool_calls turn without its results: the answer call
+          // would be rejected. Drop the half-built turn instead.
+          if (pendingToolTurnIdx !== null) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (messages as any[]).splice(pendingToolTurnIdx);
+            pendingToolTurnIdx = null;
+          }
+          void recordProviderEvent({ kind: 'planner_failure', provider: 'internal', model: 'tool_round', detail: String((toolErr as Error)?.message || toolErr), userEmail: auth.email! });
+        }
+        if (plannerUnavailable) {
+          notify('tools_unavailable', "Mindy's data tools did not respond for this question, so this answer has no live data behind it. Please try again.");
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (messages as any[]).push({
+            role: 'system',
+            content: 'NOTE: The live data tools were unavailable for this turn. Do not state any specific contract, award, dollar amount, date, company, agency, contact or count. Tell the user the data lookup failed and suggest trying again.',
+          });
         }
         // Log the tool-round LLM spend separately (fire-and-forget).
         if (toolProvider) {
@@ -574,11 +592,19 @@ export async function POST(request: NextRequest) {
         // Track which provider/model actually served the response for cost attribution.
         let usedProvider = 'groq';
         let usedModel = GROQ_MODEL;
+        let answerFallback = false;
         if (openaiKey) {
           const r = await streamFrom('https://api.openai.com/v1/chat/completions', openaiKey, chatModel);
           if (r.ok && r.body) { groqRes = r; usedProvider = 'openai'; usedModel = chatModel; }
+          else {
+            // The answer step needs no tools, so the existing Groq fallback is kept, but it is
+            // no longer silent.
+            const detail = (await r.text().catch(() => '')).slice(0, 300);
+            void recordProviderEvent({ kind: 'answer_fallback', provider: 'openai', model: chatModel, status: r.status, detail, userEmail: auth.email!, next: `groq:${GROQ_MODEL}` });
+          }
         }
         if (!groqRes) {
+          answerFallback = true;
           groqRes = await streamFrom('https://api.groq.com/openai/v1/chat/completions', groqKey || '', GROQ_MODEL);
           usedProvider = 'groq';
           usedModel = GROQ_MODEL;
@@ -586,6 +612,7 @@ export async function POST(request: NextRequest) {
 
         if (!groqRes.ok || !groqRes.body) {
           const errText = await groqRes.text().catch(() => '(no body)');
+          void recordProviderEvent({ kind: 'answer_failure', provider: usedProvider, model: usedModel, status: groqRes.status, detail: errText.slice(0, 300), userEmail: auth.email! });
           send({ type: 'error', message: `AI ${groqRes.status}: ${errText.slice(0, 200)}` });
           send({ type: 'done' });
           controller.close();
@@ -599,6 +626,7 @@ export async function POST(request: NextRequest) {
         const reader = groqRes.body.getReader();
         const decoder = new TextDecoder();
         let leftover = '';
+        let finishReason: string | null = null;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -615,6 +643,8 @@ export async function POST(request: NextRequest) {
             try {
               const parsed = JSON.parse(payload);
               const delta = parsed?.choices?.[0]?.delta?.content;
+              const fr = parsed?.choices?.[0]?.finish_reason;
+              if (typeof fr === 'string' && fr) finishReason = fr;
               if (typeof delta === 'string' && delta.length > 0) {
                 assistantContent += delta;
                 send({ type: 'token', content: delta });
@@ -650,6 +680,11 @@ export async function POST(request: NextRequest) {
         // the retrieved chunks weren't its sources, so chips would mislead.
         // No RAG corpus anymore → no teaching/podcast citation chips. Ask Mindy answers from the
         // Data Core tools; those surface their own structured results, not knowledge-base chips.
+        turnTrace.answer = { provider: usedProvider, model: usedModel, finish_reason: finishReason, fallback: answerFallback };
+        if (finishReason === 'length') {
+          turnTrace.notices.push('truncated');
+          send({ type: 'truncated', message: 'This answer hit its length limit and was cut off. Ask Mindy to continue, or narrow the question.' });
+        }
         const citedSources: CitedSource[] = [];
         send({ type: 'citations', sources: citedSources });
         send({ type: 'done' });
@@ -675,6 +710,7 @@ export async function POST(request: NextRequest) {
           citedSources,
           tokensUsed,
           latencyMs,
+          trace: turnTrace,
         }).catch(err => console.error('[chat] persist failed:', err));
       } catch (err) {
         console.error('[chat] stream error:', err);

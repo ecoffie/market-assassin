@@ -81,6 +81,21 @@ export async function debitCredits(
   return { ok: Boolean(row?.ok), newBalance: Number(row?.new_balance ?? 0) };
 }
 
+/** Optional per-execution trace columns on mcp_call_log (all nullable). */
+export interface ExecutionTraceFields {
+  executionId?: string;
+  chatSessionId?: string | null;
+  model?: string | null;
+  provider?: string | null;
+  /** Already redacted (src/lib/chat/redact-args.ts). Never raw arguments. */
+  argsRedacted?: Record<string, unknown> | null;
+  /** Catalog credit price of the tool, recorded even when nothing is deducted. */
+  creditPrice?: number | null;
+  /** Ids of resources a write created or changed (e.g. saved search id). */
+  resourceIds?: Record<string, unknown> | null;
+  errorCategory?: string | null;
+}
+
 export type CallStatus =
   | 'success'
   | 'failed'
@@ -93,7 +108,10 @@ export type CallStatus =
   | 'throttled' // Layer B — per-account rolling cap exceeded (blocked)
   // Log-only shadow rows (guard on, enforce off) — measure impact before enforcing:
   | 'shadow_requires_paid'
-  | 'shadow_throttled';
+  | 'shadow_throttled'
+  // Ask Mindy (channel 'app_chat'): refused by the chat tool policy or the per-round
+  // budget before the tool ran. Never charged. error_category says which rule.
+  | 'blocked_policy';
 
 /**
  * Append a call-log row (audit/analytics/abuse). Best-effort — never throws.
@@ -116,10 +134,16 @@ export async function logCall(entry: {
   apiKeyId?: string | null;
   outcome?: OutcomeTelemetry;
   /**
-   * The MCP surface the call arrived on. Only 'chatgpt' is written; the Claude/general
-   * edge passes nothing, so its rows keep channel NULL (migration 20261003_mcp_call_log_channel).
+   * The surface the call arrived on. 'chatgpt' = /chatgpt/mcp; 'app_chat' = Ask Mindy
+   * (in-app chat). The Claude/general MCP edge passes nothing, so its rows keep channel
+   * NULL (migration 20261003_mcp_call_log_channel).
    */
-  channel?: 'chatgpt';
+  channel?: 'chatgpt' | 'app_chat';
+  /**
+   * Per-execution trace (Ask Mindy safety release, migration 20261114_ask_mindy_execution_trace).
+   * All optional and additive; MCP callers pass nothing and their rows are unchanged.
+   */
+  trace?: ExecutionTraceFields;
 }): Promise<void> {
   const legacy = {
     user_email: entry.userEmail.toLowerCase(),
@@ -141,7 +165,19 @@ export async function logCall(entry: {
           error_code: entry.outcome.errorCode,
         }
       : {}),
-    ...(entry.channel === 'chatgpt' ? { channel: 'chatgpt' as const } : {}),
+    ...(entry.channel === 'chatgpt' || entry.channel === 'app_chat' ? { channel: entry.channel } : {}),
+    ...(entry.trace
+      ? {
+          execution_id: entry.trace.executionId ?? null,
+          chat_session_id: entry.trace.chatSessionId ?? null,
+          model: entry.trace.model ?? null,
+          provider: entry.trace.provider ?? null,
+          args_redacted: entry.trace.argsRedacted ?? null,
+          credit_price: entry.trace.creditPrice ?? null,
+          resource_ids: entry.trace.resourceIds ?? null,
+          error_category: entry.trace.errorCategory ?? null,
+        }
+      : {}),
   };
   const row = Object.keys(enriched).length ? { ...legacy, ...enriched } : legacy;
   try {

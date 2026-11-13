@@ -79,4 +79,33 @@ describe('logCall', () => {
     insert.mockRejectedValue(new Error('network'));
     await expect(logCall({ ...base, outcome })).resolves.toBeUndefined();
   });
+  it('writes channel=app_chat and the execution trace columns for an Ask Mindy call', async () => {
+    insert.mockResolvedValue({ error: null });
+    await logCall({
+      ...base, creditsCharged: 0, channel: 'app_chat',
+      trace: { executionId: 'e1', chatSessionId: 's1', model: 'gpt-4o', provider: 'openai', argsRedacted: { naics: '561320' }, creditPrice: 10, resourceIds: null, errorCategory: null },
+    });
+    expect(insert.mock.calls[0][0]).toMatchObject({
+      channel: 'app_chat', credits_charged: 0, execution_id: 'e1', chat_session_id: 's1', model: 'gpt-4o', provider: 'openai',
+      args_redacted: { naics: '561320' }, credit_price: 10,
+    });
+  });
+
+  it('MCP rows (no trace) carry none of the new trace columns', async () => {
+    insert.mockResolvedValue({ error: null });
+    await logCall({ ...base, outcome });
+    for (const k of ['execution_id', 'chat_session_id', 'model', 'provider', 'args_redacted', 'credit_price', 'resource_ids', 'error_category']) {
+      expect(insert.mock.calls[0][0]).not.toHaveProperty(k);
+    }
+  });
+
+  it('still records the call in the legacy shape if the trace columns are missing', async () => {
+    insert
+      .mockResolvedValueOnce({ error: { message: 'column "execution_id" of relation "mcp_call_log" does not exist' } })
+      .mockResolvedValueOnce({ error: null });
+    await logCall({ ...base, channel: 'app_chat', trace: { executionId: 'e1' } });
+    expect(insert).toHaveBeenCalledTimes(2);
+    expect(insert.mock.calls[1][0]).not.toHaveProperty('execution_id');
+    expect(insert.mock.calls[1][0]).toMatchObject({ user_email: 'u@x.com', tool_name: 't' });
+  });
 });

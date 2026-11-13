@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "source": "Mindy Chat Fixes: Bugs and the Claude-Grade Target (2026-11-13), regression test set",
+  "note": "Deterministic checks only catch the clearest pass/fail signals. They are a baseline record, not the release benchmark (which scores against a DB-built answer key).",
+  "scenarios": [
+    {
+      "id": "R1",
+      "prompt": "Federal contracts expiring in the next 18 months in Tennessee, Mississippi or Arkansas for temporary staffing, clerical, admin and warehouse work",
+      "require_any": ["36C24927N0097", "Allpro", "Mar 31, 2027", "March 31, 2027", "2027-03-31"],
+      "forbid": ["no federal contracts expiring", "there are no federal contracts", "no contracts expiring"]
+    },
+    {
+      "id": "R2",
+      "prompt": "Federal contracts expiring in the next 18 months in Tennessee only, for temporary staffing, clerical, admin and warehouse work",
+      "require_any": ["36C24927N0097", "Allpro", "Mar 31, 2027", "March 31, 2027", "2027-03-31"],
+      "forbid": ["no federal contracts expiring", "there are no federal contracts", "no contracts expiring"]
+    },
+    {
+      "id": "R3",
+      "prompt": "All USACE Memphis District temporary personnel awards since 2019",
+      "require_any": ["W912EQ"],
+      "forbid": ["no recorded awards", "no awards were found", "there are no recorded"]
+    },
+    {
+      "id": "R4",
+      "prompt": "Who buys staffing and clerical services in the Memphis metro?",
+      "require_any": ["Navy Personnel Command", "USACE", "Corps of Engineers", "Veterans Affairs", "VA Memphis"],
+      "require_all": ["$"],
+      "forbid": []
+    },
+    {
+      "id": "R5",
+      "prompt": "Is the Navy ID card administration order in Millington still active?",
+      "require_any": ["2026-07-31", "Jul 31, 2026", "July 31, 2026"],
+      "forbid": []
+    },
+    {
+      "id": "R6",
+      "prompt": "Keywords for a light industrial, clerical and warehouse staffing firm in Memphis",
+      "require_any": ["material handl", "order filler", "forklift", "general clerk"],
+      "forbid": ["superb"]
+    },
+    {
+      "id": "R7",
+      "prompt": "GSA rates for Material Handler",
+      "require_any": ["$"],
+      "forbid": [],
+      "manual": "aggressive < competitive <= median < premium"
+    },
+    {
+      "id": "R8",
+      "prompt": "Small business contact at Concord Professional Services",
+      "require_any": ["point of contact", "POC", "Geoff Haas", "website", "SAM"],
+      "forbid": []
+    },
+    {
+      "id": "R9",
+      "prompt": "How much 561320 spending runs through GSA Schedules vs VA BPAs vs agency IDIQs?",
+      "require_all": ["$", "%"],
+      "forbid": []
+    },
+    {
+      "id": "R10",
+      "prompt": "Who won the Navy business management support services contract in October 2026?",
+      "require_any": ["Booz Allen", "CACI", "Guidehouse", "Serco", "22nd Century", "not yet", "current through", "lag", "newer than"],
+      "forbid": []
+    }
+  ]
+}

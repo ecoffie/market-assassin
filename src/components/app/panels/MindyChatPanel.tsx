@@ -46,6 +46,7 @@ interface ChatMessage {
   isStreaming?: boolean;
   errored?: boolean;
   followups?: string[]; // contextual "what next?" chips, fetched after the answer completes
+  notices?: string[];   // server notices: data tools unavailable, a lookup failed, answer cut off
 }
 
 
@@ -216,6 +217,10 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id ? { ...m, citations: evt.sources } : m
               ));
+            } else if ((evt.type === 'notice' || evt.type === 'truncated') && typeof evt.message === 'string') {
+              setMessages(prev => prev.map(m =>
+                m.id === assistantMsg.id ? { ...m, notices: [...(m.notices || []), evt.message] } : m
+              ));
             } else if (evt.type === 'error') {
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id
@@ -349,11 +354,12 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
   }, [email, sendMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Cmd/Ctrl+Enter sends; plain Enter inserts newline (Slack-style)
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      sendMessage(input);
-    }
+    // Enter sends; Shift+Enter inserts a newline (Claude-style). Cmd/Ctrl+Enter still sends.
+    // Ignore Enter while an IME composition is in progress (e.g. Japanese/Chinese input).
+    if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+    if (e.shiftKey) return;
+    e.preventDefault();
+    if (!isStreaming) sendMessage(input);
   };
 
   const handleStop = () => {
@@ -597,6 +603,13 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                       </div>
                     </div>
                   )}
+                  {msg.role === 'assistant' && !!msg.notices?.length && (
+                    <div className="mt-2 space-y-1" role="status">
+                      {msg.notices.map((n, i) => (
+                        <div key={i} className="text-[12px] text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded px-2 py-1">{n}</div>
+                      ))}
+                    </div>
+                  )}
                   {/* Contextual follow-up chips — "what next?" after an answer.
                       Clicking sends the suggestion straight back to Mindy. */}
                   {msg.role === 'assistant' && !!msg.followups?.length && !msg.isStreaming && (
@@ -652,13 +665,13 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                   disabled={!input.trim()}
                   className="px-3 py-1.5 text-xs rounded-md bg-purple-600 hover:bg-purple-500 disabled:bg-surface disabled:text-slate-600 text-white font-medium transition-colors"
                 >
-                  Send <span className="text-[10px] text-purple-200">⌘↵</span>
+                  Send <span className="text-[10px] text-purple-200">↵</span>
                 </button>
               )}
             </div>
           </div>
           <div className="mt-2 flex items-center justify-between text-[11px] text-faint">
-            <span>Press <span className="text-muted font-mono">⌘ Enter</span> to send</span>
+            <span>Press <span className="text-muted font-mono">Enter</span> to send, <span className="text-muted font-mono">Shift + Enter</span> for a new line</span>
             <span>{input.length} / 2000</span>
           </div>
         </div>
