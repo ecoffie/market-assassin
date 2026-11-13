@@ -1,0 +1,113 @@
+/* Opportunity Map look for the signed-in app (/app only).
+
+   Layered ON TOP of mi-light.css. mi-light is shared by /app and ~20 other legacy
+   layouts (mindy-landing, briefings, mcp/account, oauth, ...), so the map look lives
+   under its own `.mi-app` scope, which only src/app/app/layout.tsx renders (and
+   AppMapRoot mirrors onto <html> so portals match). Public pages (--mp-* tokens,
+   PublicShell) never carry either class.
+
+   Source of truth for the values: :root in src/app/opportunity-map/template.html
+   (--bg #fff, --wash #f7f9fb, --line #e6eaef, --hair #f0f3f7, --ink #111c26,
+   --sub #6b7787, --faint #9aa5b3, primary #006aff, tints #eff5ff / #f0f6ff).
+
+   Contrast deviations (WCAG AA 4.5:1 for body text), on purpose:
+   - muted  #5a6675 (5.85 on white, 5.54 on wash) instead of the map's #6b7787,
+     which is 4.55 on white but 4.31 on the #f7f9fb wash.
+   - faint  #647080 (5.03 on white, 4.77 on wash). The map's #9aa5b3 is 2.50:1, so it
+     is used only for non-text (the slate/gray-600 border step), never for text.
+   - primary-as-TEXT (purple/violet/indigo 50-400 = text-purple-300 etc.) is #005ee0
+     (5.71 on white, 5.21 on the #eff5ff tint); #006aff is 4.26 on that tint.
+     Fills stay #006aff — white text on it is 4.66:1. */
+
+.mi-app,
+html.mi-light.mi-app {
+  --color-ground: #ffffff;
+  --color-ground-deep: #f7f9fb;
+  --color-surface: #ffffff;
+  --color-surface-2: #f7f9fb;
+  --color-input: #f7f9fb;
+  --color-hairline: #e6eaef;
+  --color-ink: #111c26;
+  --color-ink-soft: #3a4654;
+  --color-muted: #5a6675;
+  --color-faint: #647080;
+  --color-navy: #006aff;
+  --color-navy-hover: #0057d1;
+  --color-accent: #006aff;
+  --color-accent-hover: #0057d1;
+  --color-accent-blue: #006aff;
+  --color-ok: #137a4e;
+  --color-accent-emerald: #137a4e;
+  --color-navy-950: #f7f9fb;
+  --color-navy-900: #ffffff;
+  --color-navy-800: #ffffff;
+  --color-navy-700: #e6eaef;
+  --color-navy-600: #d5dbe2;
+
+  --background: #ffffff;
+  --background-dark: #f7f9fb;
+  --card-bg: #ffffff;
+  --card-border: #e6eaef;
+  --foreground: #111c26;
+  --text-primary: #111c26;
+  --text-secondary: #5a6675;
+  --text-muted: #647080;
+
+  /* text-white is the dark UI's primary text (see mi-light.css) */
+  --color-white: #111c26;
+
+  /* Fonts: next/font variables are set on the same element by src/app/app/layout.tsx */
+  --font-mono: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
+  --font-display: var(--font-space-grotesk), "Space Grotesk", system-ui, sans-serif;
+
+  --shadow-raised: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .1);
+  --shadow-overlay: 0 4px 8px -2px rgba(16, 24, 40, .1), 0 2px 4px -2px rgba(16, 24, 40, .06);
+  --shadow-modal: 0 12px 16px -4px rgba(16, 24, 40, .08), 0 4px 6px -2px rgba(16, 24, 40, .03);
+
+  /* Neutral ramp (inverted, as in mi-light) on the map's greys */
+  --color-slate-50: #0b141c; --color-slate-100: #111c26; --color-slate-200: #222e3a; --color-slate-300: #3a4654; --color-slate-400: #5a6675; --color-slate-500: #647080; --color-slate-600: #d5dbe2; --color-slate-700: #e6eaef; --color-slate-800: #ffffff; --color-slate-900: #ffffff; --color-slate-950: #f7f9fb;
+  --color-gray-50: #0b141c; --color-gray-100: #111c26; --color-gray-200: #222e3a; --color-gray-300: #3a4654; --color-gray-400: #5a6675; --color-gray-500: #647080; --color-gray-600: #d5dbe2; --color-gray-700: #e6eaef; --color-gray-800: #ffffff; --color-gray-900: #ffffff; --color-gray-950: #f7f9fb;
+  --color-zinc-50: #0b141c; --color-zinc-100: #111c26; --color-zinc-200: #222e3a; --color-zinc-300: #3a4654; --color-zinc-400: #5a6675; --color-zinc-500: #647080; --color-zinc-600: #d5dbe2; --color-zinc-700: #e6eaef; --color-zinc-800: #ffffff; --color-zinc-900: #ffffff; --color-zinc-950: #f7f9fb;
+  --color-neutral-50: #0b141c; --color-neutral-100: #111c26; --color-neutral-200: #222e3a; --color-neutral-300: #3a4654; --color-neutral-400: #5a6675; --color-neutral-500: #647080; --color-neutral-600: #d5dbe2; --color-neutral-700: #e6eaef; --color-neutral-800: #ffffff; --color-neutral-900: #ffffff; --color-neutral-950: #f7f9fb;
+  --color-stone-50: #0b141c; --color-stone-100: #111c26; --color-stone-200: #222e3a; --color-stone-300: #3a4654; --color-stone-400: #5a6675; --color-stone-500: #647080; --color-stone-600: #d5dbe2; --color-stone-700: #e6eaef; --color-stone-800: #ffffff; --color-stone-900: #ffffff; --color-stone-950: #f7f9fb;
+
+  /* Brand purples (the dark UI's primary action) -> map blue.
+     50-400 are text steps (darker, AA on tints), 500/600 fills, 700 hover,
+     800-950 tints/borders. */
+  --color-purple-50: #005ee0; --color-purple-100: #005ee0; --color-purple-200: #005ee0; --color-purple-300: #005ee0; --color-purple-400: #005ee0; --color-purple-500: #006aff; --color-purple-600: #006aff; --color-purple-700: #0057d1; --color-purple-800: #cfe1ff; --color-purple-900: #eff5ff; --color-purple-950: #f0f6ff;
+  --color-violet-50: #005ee0; --color-violet-100: #005ee0; --color-violet-200: #005ee0; --color-violet-300: #005ee0; --color-violet-400: #005ee0; --color-violet-500: #006aff; --color-violet-600: #006aff; --color-violet-700: #0057d1; --color-violet-800: #cfe1ff; --color-violet-900: #eff5ff; --color-violet-950: #f0f6ff;
+  --color-indigo-50: #005ee0; --color-indigo-100: #005ee0; --color-indigo-200: #005ee0; --color-indigo-300: #005ee0; --color-indigo-400: #005ee0; --color-indigo-500: #006aff; --color-indigo-600: #006aff; --color-indigo-700: #0057d1; --color-indigo-800: #cfe1ff; --color-indigo-900: #eff5ff; --color-indigo-950: #f0f6ff;
+
+  background: #ffffff;
+  color: #111c26;
+}
+
+/* Strong fills keep real white text. Same selector set as mi-light.css (exact 500-700
+   steps — a prefix like from-purple- would also catch the from-purple-950/40 TINTS and turn
+   their ink text white), re-asserted because .mi-app re-set --color-white to ink. */
+.mi-app :is([class^="bg-blue-500"],[class*=" bg-blue-500"],[class^="from-blue-500"],[class*=" from-blue-500"],[class^="bg-blue-600"],[class*=" bg-blue-600"],[class^="from-blue-600"],[class*=" from-blue-600"],[class^="bg-blue-700"],[class*=" bg-blue-700"],[class^="from-blue-700"],[class*=" from-blue-700"],[class^="bg-sky-500"],[class*=" bg-sky-500"],[class^="from-sky-500"],[class*=" from-sky-500"],[class^="bg-sky-600"],[class*=" bg-sky-600"],[class^="from-sky-600"],[class*=" from-sky-600"],[class^="bg-sky-700"],[class*=" bg-sky-700"],[class^="from-sky-700"],[class*=" from-sky-700"],[class^="bg-cyan-500"],[class*=" bg-cyan-500"],[class^="from-cyan-500"],[class*=" from-cyan-500"],[class^="bg-cyan-600"],[class*=" bg-cyan-600"],[class^="from-cyan-600"],[class*=" from-cyan-600"],[class^="bg-cyan-700"],[class*=" bg-cyan-700"],[class^="from-cyan-700"],[class*=" from-cyan-700"],[class^="bg-teal-500"],[class*=" bg-teal-500"],[class^="from-teal-500"],[class*=" from-teal-500"],[class^="bg-teal-600"],[class*=" bg-teal-600"],[class^="from-teal-600"],[class*=" from-teal-600"],[class^="bg-teal-700"],[class*=" bg-teal-700"],[class^="from-teal-700"],[class*=" from-teal-700"],[class^="bg-emerald-500"],[class*=" bg-emerald-500"],[class^="from-emerald-500"],[class*=" from-emerald-500"],[class^="bg-emerald-600"],[class*=" bg-emerald-600"],[class^="from-emerald-600"],[class*=" from-emerald-600"],[class^="bg-emerald-700"],[class*=" bg-emerald-700"],[class^="from-emerald-700"],[class*=" from-emerald-700"],[class^="bg-green-500"],[class*=" bg-green-500"],[class^="from-green-500"],[class*=" from-green-500"],[class^="bg-green-600"],[class*=" bg-green-600"],[class^="from-green-600"],[class*=" from-green-600"],[class^="bg-green-700"],[class*=" bg-green-700"],[class^="from-green-700"],[class*=" from-green-700"],[class^="bg-lime-500"],[class*=" bg-lime-500"],[class^="from-lime-500"],[class*=" from-lime-500"],[class^="bg-lime-600"],[class*=" bg-lime-600"],[class^="from-lime-600"],[class*=" from-lime-600"],[class^="bg-lime-700"],[class*=" bg-lime-700"],[class^="from-lime-700"],[class*=" from-lime-700"],[class^="bg-yellow-500"],[class*=" bg-yellow-500"],[class^="from-yellow-500"],[class*=" from-yellow-500"],[class^="bg-yellow-600"],[class*=" bg-yellow-600"],[class^="from-yellow-600"],[class*=" from-yellow-600"],[class^="bg-yellow-700"],[class*=" bg-yellow-700"],[class^="from-yellow-700"],[class*=" from-yellow-700"],[class^="bg-amber-500"],[class*=" bg-amber-500"],[class^="from-amber-500"],[class*=" from-amber-500"],[class^="bg-amber-600"],[class*=" bg-amber-600"],[class^="from-amber-600"],[class*=" from-amber-600"],[class^="bg-amber-700"],[class*=" bg-amber-700"],[class^="from-amber-700"],[class*=" from-amber-700"],[class^="bg-orange-500"],[class*=" bg-orange-500"],[class^="from-orange-500"],[class*=" from-orange-500"],[class^="bg-orange-600"],[class*=" bg-orange-600"],[class^="from-orange-600"],[class*=" from-orange-600"],[class^="bg-orange-700"],[class*=" bg-orange-700"],[class^="from-orange-700"],[class*=" from-orange-700"],[class^="bg-red-500"],[class*=" bg-red-500"],[class^="from-red-500"],[class*=" from-red-500"],[class^="bg-red-600"],[class*=" bg-red-600"],[class^="from-red-600"],[class*=" from-red-600"],[class^="bg-red-700"],[class*=" bg-red-700"],[class^="from-red-700"],[class*=" from-red-700"],[class^="bg-rose-500"],[class*=" bg-rose-500"],[class^="from-rose-500"],[class*=" from-rose-500"],[class^="bg-rose-600"],[class*=" bg-rose-600"],[class^="from-rose-600"],[class*=" from-rose-600"],[class^="bg-rose-700"],[class*=" bg-rose-700"],[class^="from-rose-700"],[class*=" from-rose-700"],[class^="bg-pink-500"],[class*=" bg-pink-500"],[class^="from-pink-500"],[class*=" from-pink-500"],[class^="bg-pink-600"],[class*=" bg-pink-600"],[class^="from-pink-600"],[class*=" from-pink-600"],[class^="bg-pink-700"],[class*=" bg-pink-700"],[class^="from-pink-700"],[class*=" from-pink-700"],[class^="bg-fuchsia-500"],[class*=" bg-fuchsia-500"],[class^="from-fuchsia-500"],[class*=" from-fuchsia-500"],[class^="bg-fuchsia-600"],[class*=" bg-fuchsia-600"],[class^="from-fuchsia-600"],[class*=" from-fuchsia-600"],[class^="bg-fuchsia-700"],[class*=" bg-fuchsia-700"],[class^="from-fuchsia-700"],[class*=" from-fuchsia-700"],[class^="bg-purple-500"],[class*=" bg-purple-500"],[class^="from-purple-500"],[class*=" from-purple-500"],[class^="bg-purple-600"],[class*=" bg-purple-600"],[class^="from-purple-600"],[class*=" from-purple-600"],[class^="bg-purple-700"],[class*=" bg-purple-700"],[class^="from-purple-700"],[class*=" from-purple-700"],[class^="bg-violet-500"],[class*=" bg-violet-500"],[class^="from-violet-500"],[class*=" from-violet-500"],[class^="bg-violet-600"],[class*=" bg-violet-600"],[class^="from-violet-600"],[class*=" from-violet-600"],[class^="bg-violet-700"],[class*=" bg-violet-700"],[class^="from-violet-700"],[class*=" from-violet-700"],[class^="bg-indigo-500"],[class*=" bg-indigo-500"],[class^="from-indigo-500"],[class*=" from-indigo-500"],[class^="bg-indigo-600"],[class*=" bg-indigo-600"],[class^="from-indigo-600"],[class*=" from-indigo-600"],[class^="bg-indigo-700"],[class*=" bg-indigo-700"],[class^="from-indigo-700"],[class*=" from-indigo-700"],[class^="bg-navy"],[class*=" bg-navy"],[class^="bg-accent"],[class*=" bg-accent"],[class^="bg-ok"],[class*=" bg-ok"],[class^="bg-crit"],[class*=" bg-crit"],[class^="bg-black"],[class*=" bg-black"],[class^="from-navy"],[class*=" from-navy"],[class^="from-accent"],[class*=" from-accent"],[class^="from-[#1e3a8a]"],[class*=" from-[#1e3a8a]"],[class^="bg-[#1e3a8a]"],[class*=" bg-[#1e3a8a]"],[class^="bg-[#7c3aed]"],[class*=" bg-[#7c3aed]"],[class^="bg-[#006aff]"],[class*=" bg-[#006aff]"],[class^="from-[#006aff]"],[class*=" from-[#006aff]"]){--color-white:#ffffff}
+
+/* Translucent tints of a strong hue (bg-purple-600/20) are not strong fills: ink text. */
+.mi-app :is([class^="bg-blue-500/"],[class*=" bg-blue-500/"],[class^="bg-blue-600/"],[class*=" bg-blue-600/"],[class^="bg-blue-700/"],[class*=" bg-blue-700/"],[class^="bg-sky-500/"],[class*=" bg-sky-500/"],[class^="bg-sky-600/"],[class*=" bg-sky-600/"],[class^="bg-sky-700/"],[class*=" bg-sky-700/"],[class^="bg-cyan-500/"],[class*=" bg-cyan-500/"],[class^="bg-cyan-600/"],[class*=" bg-cyan-600/"],[class^="bg-cyan-700/"],[class*=" bg-cyan-700/"],[class^="bg-teal-500/"],[class*=" bg-teal-500/"],[class^="bg-teal-600/"],[class*=" bg-teal-600/"],[class^="bg-teal-700/"],[class*=" bg-teal-700/"],[class^="bg-emerald-500/"],[class*=" bg-emerald-500/"],[class^="bg-emerald-600/"],[class*=" bg-emerald-600/"],[class^="bg-emerald-700/"],[class*=" bg-emerald-700/"],[class^="bg-green-500/"],[class*=" bg-green-500/"],[class^="bg-green-600/"],[class*=" bg-green-600/"],[class^="bg-green-700/"],[class*=" bg-green-700/"],[class^="bg-lime-500/"],[class*=" bg-lime-500/"],[class^="bg-lime-600/"],[class*=" bg-lime-600/"],[class^="bg-lime-700/"],[class*=" bg-lime-700/"],[class^="bg-yellow-500/"],[class*=" bg-yellow-500/"],[class^="bg-yellow-600/"],[class*=" bg-yellow-600/"],[class^="bg-yellow-700/"],[class*=" bg-yellow-700/"],[class^="bg-amber-500/"],[class*=" bg-amber-500/"],[class^="bg-amber-600/"],[class*=" bg-amber-600/"],[class^="bg-amber-700/"],[class*=" bg-amber-700/"],[class^="bg-orange-500/"],[class*=" bg-orange-500/"],[class^="bg-orange-600/"],[class*=" bg-orange-600/"],[class^="bg-orange-700/"],[class*=" bg-orange-700/"],[class^="bg-red-500/"],[class*=" bg-red-500/"],[class^="bg-red-600/"],[class*=" bg-red-600/"],[class^="bg-red-700/"],[class*=" bg-red-700/"],[class^="bg-rose-500/"],[class*=" bg-rose-500/"],[class^="bg-rose-600/"],[class*=" bg-rose-600/"],[class^="bg-rose-700/"],[class*=" bg-rose-700/"],[class^="bg-pink-500/"],[class*=" bg-pink-500/"],[class^="bg-pink-600/"],[class*=" bg-pink-600/"],[class^="bg-pink-700/"],[class*=" bg-pink-700/"],[class^="bg-fuchsia-500/"],[class*=" bg-fuchsia-500/"],[class^="bg-fuchsia-600/"],[class*=" bg-fuchsia-600/"],[class^="bg-fuchsia-700/"],[class*=" bg-fuchsia-700/"],[class^="bg-purple-500/"],[class*=" bg-purple-500/"],[class^="bg-purple-600/"],[class*=" bg-purple-600/"],[class^="bg-purple-700/"],[class*=" bg-purple-700/"],[class^="bg-violet-500/"],[class*=" bg-violet-500/"],[class^="bg-violet-600/"],[class*=" bg-violet-600/"],[class^="bg-violet-700/"],[class*=" bg-violet-700/"],[class^="bg-indigo-500/"],[class*=" bg-indigo-500/"],[class^="bg-indigo-600/"],[class*=" bg-indigo-600/"],[class^="bg-indigo-700/"],[class*=" bg-indigo-700/"],[class^="bg-navy/"],[class*=" bg-navy/"],[class^="bg-accent/"],[class*=" bg-accent/"]){--color-white:#111c26}
+
+/* A strong button that turns light when disabled keeps muted, readable text. */
+.mi-app [class*="disabled:bg-"]:disabled { --color-white: #5a6675; box-shadow: inset 0 0 0 1px #d5dbe2; }
+
+/* bg-white chips: map hairline */
+.mi-app :is([class^="bg-white "], [class*=" bg-white "], [class$=" bg-white"], [class="bg-white"]) { border-color: #e6eaef; }
+
+/* Headings / titles: Space Grotesk like the map. Body stays Inter.
+   Beats mi-light's `.mi-light :is(h1,.text-page)` serif rule on specificity. Pages under
+   /app that wear the public look (/app/signup renders PublicShell → .mp-site) keep theirs. */
+:is(.mi-light .mi-app, html.mi-light.mi-app) :is(h1, h2, h3, .text-page, .text-title):not(.mp-site *) {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -.01em;
+}
+
+:is(.mi-light .mi-app, html.mi-light.mi-app) ::selection { background: #cfe1ff; color: #111c26; }
+
+html.mi-light.mi-app,
+html.mi-light.mi-app body { background: #ffffff; color: #111c26; }
+html.mi-light.mi-app ::-webkit-scrollbar-track { background: #f7f9fb; }
+html.mi-light.mi-app ::-webkit-scrollbar-thumb { background: #d5dbe2; }

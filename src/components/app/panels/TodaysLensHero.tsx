@@ -57,7 +57,7 @@ export default function TodaysLensHero({ email }: { email: string }) {
 
   if (loading) {
     return (
-      <div className="rounded-2xl bg-gradient-to-br from-[#1e3a8a] to-[#7c3aed] p-6 md:p-8 mb-6 animate-pulse">
+      <div className="rounded-2xl bg-accent p-6 md:p-8 mb-6 animate-pulse">
         <div className="h-4 w-32 bg-white/20 rounded mb-3" />
         <div className="h-7 w-3/4 bg-white/25 rounded" />
       </div>
@@ -73,7 +73,7 @@ export default function TodaysLensHero({ email }: { email: string }) {
   // Quiet day (no open opps in the user's codes) â honest, not a fabricated pep talk. Still offer the map.
   if (!data.grounded || data.totalOpen === 0) {
     return (
-      <div className="rounded-2xl bg-gradient-to-br from-[#1e3a8a] to-[#7c3aed] text-white p-6 md:p-8 mb-6">
+      <div className="rounded-2xl bg-accent text-white p-6 md:p-8 mb-6">
         <div className="text-xs font-bold uppercase tracking-widest text-white/70 mb-1">Today&apos;s Intel</div>
         <h2 className="text-xl md:text-2xl font-extrabold leading-snug">
           {data.usingFallback
@@ -81,7 +81,7 @@ export default function TodaysLensHero({ email }: { email: string }) {
             : 'A quiet morning â nothing new in your codes right now.'}
         </h2>
         <p className="text-white/80 text-sm mt-1">The market moves daily. Explore the whole map, or widen your profile.</p>
-        <a href={mapHref} onClick={() => onOpenMap(data.lensStrategy || '')} className="inline-flex items-center gap-2 mt-4 bg-white text-[#1e3a8a] font-bold rounded-xl px-5 py-2.5 text-sm hover:bg-white/90 transition">
+        <a href={mapHref} onClick={() => onOpenMap(data.lensStrategy || '')} className="inline-flex items-center gap-2 mt-4 bg-white text-accent-hover font-bold rounded-xl px-5 py-2.5 text-sm hover:bg-white/90 transition">
           Open the Map <span aria-hidden>&rarr;</span>
         </a>
       </div>
@@ -91,7 +91,7 @@ export default function TodaysLensHero({ email }: { email: string }) {
   const present = data.strands.filter((s) => s.count > 0);
 
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-[#1e3a8a] to-[#7c3aed] text-white p-6 md:p-8 mb-6 shadow-lg">
+    <div className="rounded-2xl bg-accent text-white p-6 md:p-8 mb-6 shadow-lg">
       <div className="text-xs font-bold uppercase tracking-widest text-white/70 mb-1">Today&apos;s Intel</div>
       {/* The hero line â one number, one reason to look */}
       <h2 className="text-2xl md:text-3xl font-extrabold leading-tight tabular-nums">
@@ -113,7 +113,7 @@ export default function TodaysLensHero({ email }: { email: string }) {
       <a
         href={mapHref}
         onClick={() => onOpenMap(data.lensStrategy || '')}
-        className="inline-flex items-center gap-2 mt-6 bg-white text-[#1e3a8a] font-bold rounded-xl px-6 py-3 text-[15px] hover:bg-white/90 transition shadow"
+        className="inline-flex items-center gap-2 mt-6 bg-white text-accent-hover font-bold rounded-xl px-6 py-3 text-[15px] hover:bg-white/90 transition shadow"
       >
         Open Today&apos;s Lens <span aria-hidden>&rarr;</span>
       </a>
