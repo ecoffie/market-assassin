@@ -5,7 +5,9 @@
  * (the map family and the raw-HTML public pages), so every page shows the same pop-up.
  *
  * Rules (Eric 2026-11-06: "a pop up for the event on the 28th on every page just once"):
- *  - once per browser: localStorage `mindy_lcb_popup_v1`, set when it is SHOWN (closing or not)
+ *  - once per browsing session (Eric 2026-11-13: "only once per user session"): a session cookie
+ *    `mindy_lcb_popup_s` (no expiry, so it lasts until the browser closes and is shared by every tab),
+ *    set when it is SHOWN (closing or not). It was once per browser (localStorage) before.
  *  - never on the event page itself, the sign-up/sign-in flows or /admin
  *  - after a 2.5 s pause, so it never covers the first paint
  *  - gone after the event: this route returns an empty script once lazyBlueprintIsOver()
@@ -19,7 +21,7 @@ function js(s: string): string {
 
 export function eventPopupScript(now: Date = new Date()): string {
   if (lazyBlueprintIsOver(now)) return '/* event over */';
-  const KEY = 'mindy_lcb_popup_v1';
+  const KEY = 'mindy_lcb_popup_s';
   const css = [
     '.lcbp-ov{position:fixed;inset:0;z-index:2147483000;background:rgba(10,14,40,.55);display:flex;align-items:center;justify-content:center;padding:16px;animation:lcbpIn .2s ease-out}',
     '@keyframes lcbpIn{from{opacity:0}to{opacity:1}}',
@@ -49,11 +51,11 @@ export function eventPopupScript(now: Date = new Date()): string {
     + '<button type="button" class="lcbp-no" data-lcbp-close>Maybe later</button></div></div>';
   return '(function(){try{'
     + 'if(window.__lcbPop)return;window.__lcbPop=1;'
-    + 'var K=' + js(KEY) + ';try{if(localStorage.getItem(K))return;}catch(e){return;}'
+    + 'var K=' + js(KEY) + ';function seen(){return document.cookie.split("; ").some(function(c){return c.indexOf(K+"=")===0;});}if(seen())return;'
     + 'var p=location.pathname;'
     + 'if(p.indexOf(' + js(LCB.path) + ')===0||/^\\/(admin|app\\/signup|signup|signin|app\\/sign-in|oauth|setup-password|reset-password|forgot-password|auth)/.test(p))return;'
     + 'if(/[?&]embed=/.test(location.search))return;'
-    + 'setTimeout(function(){try{if(localStorage.getItem(K))return;localStorage.setItem(K,String(Date.now()));}catch(e){return;}'
+    + 'setTimeout(function(){try{if(seen())return;document.cookie=K+"=1; path=/; SameSite=Lax";if(!seen())return;}catch(e){return;}'
     + 'var st=document.createElement("style");st.textContent=' + js(css) + ';document.head.appendChild(st);'
     + 'var ov=document.createElement("div");ov.className="lcbp-ov";ov.innerHTML=' + js(html) + ';'
     + 'function close(){ov.remove();document.removeEventListener("keydown",onKey);}'
