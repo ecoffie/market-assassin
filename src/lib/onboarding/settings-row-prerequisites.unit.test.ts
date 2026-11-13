@@ -55,6 +55,8 @@ vi.mock('@/lib/two-factor-session', async (orig) => ({
   ...(await orig<Record<string, unknown>>()),
   requireMIAuthSession: () => ({ ok: true, session: { email: 'me@example.com' } }),
 }));
+// Company/buyer saves are Pro-only (2026-11-13); this file is about the settings row, so the caller is Pro.
+vi.mock('@/lib/access/require-pro', () => ({ isProEmail: async () => true, proRequiredResponse: () => new Response(null, { status: 402 }) }));
 vi.mock('@/lib/access-links', () => ({ createSecureAccessUrl: async () => 'https://getmindy.ai/prefs?t=x' }));
 process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://x.supabase.co';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'k';

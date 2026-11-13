@@ -26,6 +26,13 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-13 — Map: Players, M-Win, Save to CRM and the proposal workspace are Pro
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-13 | Pro gate (server) | One shared gate for the four map Pro features (owner decision: Pro, Team, an active 14-day trial, or staff). Signed out → 401; signed in but not Pro → 402 `pro_required` with the trial message and `/pricing`. Wired into `contacts-map` + `company-detail` (Players), `win-probability` (M-Win answers `reason:'pro_required'`, no score), `opportunities/save` for `company_map`/`buyer_map` only (opportunity saves stay free), and the proposal POSTs (draft, draft-all, chat, compliance, referee, scan, extract-sow, extract-loi-fields, upload, export). Listing drafts stays open. | `export async function requirePro` → `src/lib/access/require-pro.ts` | `require-pro.unit.test.ts` (401/402/pro/staff/error locks); `pro-gated-endpoints.unit.test.ts` (each endpoint refuses a free user before any data work) | IN REVIEW |
+| 2026-11-13 | Pro gate (map client) | A shared map lock for Pro features — signed out → sign-in, then the plan is rechecked; signed-in free → "🔒 <Feature> is a Mindy Pro feature" + Start 14-day free trial / Maybe later; tracks `pro_gate_shown` and `pro_gate_trial_click`. Plan = `/api/app/me` `proFeatures` (same verdict as the server). Wired into `__playersGate` (dataset dropdown, phone drawer, deep links, search, saved searches), the M-Win slot (locked "See your fit score — Pro" teaser + Should-I-pursue CTA), Add to targets / Add to CRM, Generate proposal / Draft capture strategy. A server 402 is the fallback lock (Players fetch and CRM save). | `window.__proGate = function(feature, onAllowed, onDenied)` → `src/app/opportunity-map/route.ts` | `pro-gate.unit.test.ts` (runs the real block in JSDOM); `players-gate-simulated-auth.unit.test.ts` (free user: lock, map never switches) | IN REVIEW |
+
 ## 2026-11-13 — AI agent gallery: discoverable from the nav, pricing and the calculator
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

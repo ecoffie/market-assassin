@@ -13,7 +13,7 @@
  * fallback for the rare firm whose BQ profile row lacks a clean HQ location.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { requirePro } from '@/lib/access/require-pro';
 import { resolveCompanyDetail } from '@/lib/bigquery/company-detail';
 import { getCachedCerts, certBucketsWithSource, certSourceLabel } from '@/lib/sam/recipient-certs';
 
@@ -23,7 +23,8 @@ export async function GET(request: NextRequest) {
   const p = new URL(request.url).searchParams;
   const email = (p.get('email') || '').trim().toLowerCase();
 
-  const auth = requireMIAuthSession(request, email || null);
+  // The company drawer is part of Players — a Pro feature (owner decision 2026-11-13).
+  const auth = await requirePro(request, email || null);
   if (!auth.ok) return auth.response;
 
   const uei = (p.get('uei') || '').trim();

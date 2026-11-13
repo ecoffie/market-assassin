@@ -1,4 +1,5 @@
 import { resolvePlan, readCreditBalance } from '@/lib/access/current-plan';
+import { isProEmail } from '@/lib/access/require-pro';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserSession } from '@/lib/api-auth';
@@ -105,16 +106,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const [profile, plan, credits] = await Promise.all([
+  const [profile, plan, credits, proFeatures] = await Promise.all([
     resolveProfile(email),
     resolvePlan(email).catch(() => null),
     readCreditBalance(email),
+    isProEmail(email).catch(() => null),
   ]);
 
   // plan/credits power the signed-in header chip ("1,240 credits · Upgrade") and the pricing
   // page's "current plan". null = could not be read; the client shows nothing rather than 0.
   return NextResponse.json(
-    { email, name: profile.name, picture: profile.picture, plan, credits },
+    // proFeatures = the SAME verdict the server's requirePro gate uses (Pro, Team, trial, staff), so
+    // the map's __proGate lock never disagrees with the endpoint it fronts. null = unknown.
+    { email, name: profile.name, picture: profile.picture, plan, credits, proFeatures },
     { headers: { 'cache-control': 'no-store' } }
   );
 }

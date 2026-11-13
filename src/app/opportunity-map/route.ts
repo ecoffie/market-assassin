@@ -1896,7 +1896,7 @@ const VIEWPORT_JS = `<script>
       if(_wantContact && !_isContact){
         var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
         var live=tk&&!(typeof window.__tokenExpired==='function'&&window.__tokenExpired(tk));
-        if(!live&&typeof window.__playersGate==='function'){
+        if((!live||window.__proState!=='pro')&&typeof window.__playersGate==='function'){
           window.__playersGate('companies', function(){ window.__applySearchFilters(intent); });
           return false;
         }
@@ -2837,10 +2837,13 @@ const VIEWPORT_JS = `<script>
       // unavailable | coverage_incomplete. ONLY an auth denial (401/403) is "denied" and may show the
       // gate copy — a 500, a BigQuery quota failure or a network error is UNAVAILABLE: never 0 Players
       // and never sales copy. See src/lib/players/truth.ts.
-      var _anyDenied=false, _allDenied=true;
+      var _anyDenied=false, _allDenied=true, _proLocked=false;
       Promise.all(_pen.map(function(t){
         return fetch(_buildContactUrl(t),{headers:ch}).then(function(r){
-          var denied=(r.status===401||r.status===403);
+          var denied=(r.status===401||r.status===403||r.status===402);
+          // 402 pro_required: Players is a Pro feature. The server is the authority, so a 402 here
+          // is the fallback lock (a free user who reached Players by a route __proGate did not see).
+          if(r.status===402)_proLocked=true;
           return r.json().catch(function(){return null;}).then(function(d){ return {r:r,d:d,denied:denied}; });
         }).then(function(x){
           var d=x.d;
@@ -2863,6 +2866,12 @@ const VIEWPORT_JS = `<script>
         // measured count, or when it is the only player type on.
         var _cs=window.__playerStatus.companies;
         window.__playersView=(_cs&&_cs.status!=='denied'&&(_cs.status==='unavailable'||_cs.status==='coverage_incomplete'||_pen.length===1))?_cs:null;
+        if(merged.length===0 && _anyDenied && _allDenied && _proLocked){
+          // Signed in but not Pro: show the lock and put the user back on the Opportunity map.
+          window.__proState='free';
+          try{ setMapMode('open'); }catch(e){}
+          if(typeof window.__showProLock==='function')window.__showProLock('Players');
+          return; }
         if(merged.length===0 && _anyDenied && _allDenied){ OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; render();
           var fe=document.getElementById('feed'); if(fe)fe.innerHTML='<div class="empty"><h4>Meet the buyers behind the opportunities</h4><p>Buying offices, incumbents, contracting officers and supplier relationships \u2014 connected to the opportunities on your map. Your current map will be waiting when you return.</p></div>';
           // Backstop for any OTHER route into a contact mode (a stale ?mode=buyers link, a
@@ -3365,6 +3374,79 @@ const VIEWPORT_JS = `<script>
   // /opportunity-map). So the buttons are links into the EXISTING, working flow carrying the FULL
   // current map URL — which is what makes "your map will be waiting" literally true: filters, lens
   // and viewport all survive because the URL does.
+  // ── PRO GATE (owner decision 2026-11-13) ───────────────────────────────────────────────
+  // Players, M-Win, CRM save and the proposal workspace are Mindy Pro features (paid Pro, Team,
+  // an active 14-day trial, or staff). __proGate(feature, onAllowed, onDenied):
+  //   signed out            -> the sign-in modal, then the plan is rechecked
+  //   signed in, not Pro    -> "<lock> <Feature> is a Mindy Pro feature" + Start 14-day free trial
+  //   Pro                   -> onAllowed()
+  // The plan comes from /api/app/me proFeatures (the SAME verdict the server's requirePro gate
+  // uses), cached per token. The SERVER is the authority: every gated endpoint also returns
+  // 402 pro_required, and the callers show this lock on a 402 (the fallback lock). If /api/app/me
+  // cannot be read, the click goes through and the server decides.
+  window.__proState = 'unknown';   // 'pro' | 'free' | 'unknown'
+  var _proTok = null, _proPromise = null;
+  function _proToken(){
+    var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
+    if(tk && typeof window.__tokenExpired==='function' && window.__tokenExpired(tk)) return '';
+    return tk;
+  }
+  window.__proCheck = function(){
+    var tk=_proToken();
+    if(!tk){ window.__proState='unknown'; return Promise.resolve(null); }
+    if(_proPromise && _proTok===tk) return _proPromise;
+    _proTok=tk;
+    _proPromise = fetch('/api/app/me',{headers:{'x-mi-auth-token':tk},cache:'no-store'})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        if(!d){ _proPromise=null; return null; }
+        var pro = (d.proFeatures===true) || (d.proFeatures==null && (d.plan==='pro'||d.plan==='team'||d.plan==='enterprise'));
+        window.__proState = pro ? 'pro' : 'free';
+        return pro;
+      })
+      .catch(function(){ _proPromise=null; return null; });
+    return _proPromise;
+  };
+  window.__showProLock = function(feature){
+    try{ if(window.__track) window.__track('tool_use','pro_gate_shown',{feature:String(feature||'')}); }catch(e){}
+    var old=document.getElementById('proLock'); if(old) try{ old.remove(); }catch(e){}
+    var bd=document.createElement('div'); bd.id='proLock';
+    bd.setAttribute('role','dialog'); bd.setAttribute('aria-modal','true'); bd.setAttribute('aria-labelledby','proLockH');
+    bd.style.cssText='position:fixed;inset:0;z-index:3500;background:rgba(8,15,26,.55);display:flex;align-items:center;justify-content:center;padding:16px';
+    var box=document.createElement('div');
+    box.style.cssText='background:#fff;color:#0b1220;max-width:420px;width:100%;border-radius:16px;padding:26px 24px 20px;box-shadow:0 24px 60px -12px rgba(8,15,26,.5);font:15px/1.5 Inter,system-ui,sans-serif;text-align:center';
+    var h=document.createElement('h2'); h.id='proLockH'; h.style.cssText='margin:0 0 8px;font-size:20px;line-height:1.3';
+    h.textContent='\\uD83D\\uDD12 '+String(feature||'This')+' is a Mindy Pro feature';
+    var pp=document.createElement('p'); pp.style.cssText='margin:0 0 18px;color:#475569';
+    pp.textContent='Start your 14-day free trial to unlock it.';
+    var go=document.createElement('a'); go.href='/pricing'; go.textContent='Start 14-day free trial';
+    go.style.cssText='display:block;background:#1B3A6B;color:#fff;text-decoration:none;font-weight:700;padding:13px 16px;border-radius:11px';
+    go.onclick=function(){ try{ if(window.__track) window.__track('link_click','pro_gate_trial_click',{feature:String(feature||'')}); }catch(e){} };
+    var later=document.createElement('button'); later.type='button'; later.textContent='Maybe later';
+    later.style.cssText='margin-top:10px;background:none;border:0;color:#475569;font:600 14px Inter,system-ui,sans-serif;padding:8px;cursor:pointer';
+    function onKey(e){ if(e.key==='Escape')close(); }
+    function close(){ try{ bd.remove(); }catch(e){} document.removeEventListener('keydown',onKey); }
+    later.onclick=close;
+    bd.onclick=function(e){ if(e.target===bd)close(); };
+    document.addEventListener('keydown',onKey);
+    box.appendChild(h); box.appendChild(pp); box.appendChild(go); box.appendChild(later);
+    bd.appendChild(box); document.body.appendChild(bd);
+    try{ go.focus(); }catch(e){}
+  };
+  window.__proGate = function(feature, onAllowed, onDenied){
+    function allow(){ if(typeof onAllowed==='function') try{ onAllowed(); }catch(e){} }
+    function deny(){ window.__showProLock(feature); if(typeof onDenied==='function') try{ onDenied(); }catch(e){} }
+    if(!_proToken()){
+      if(typeof window.openSignInModal==='function'){
+        window.openSignInModal('use '+String(feature||'this'), function(){ _proPromise=null; window.__proGate(feature,onAllowed,onDenied); });
+      } else { location.href='/app?next='+encodeURIComponent(location.pathname+location.search); }
+      return;
+    }
+    if(window.__proState==='pro'){ allow(); return; }
+    window.__proCheck().then(function(pro){ if(pro===false) deny(); else allow(); });
+  };
+  try{ window.__proCheck(); }catch(e){}
+
   window.__playersUnlockHtml = function(){
     var next = encodeURIComponent(location.pathname + location.search);
     function tick(label){
@@ -3432,8 +3514,11 @@ const VIEWPORT_JS = `<script>
       if(resumed) return;
       resumed = true;
       _pgPending = null;
-      try{ setMapMode(q.mode); }catch(e){}
-      if(typeof q.onResume==='function') try{ q.onResume(); }catch(e){}
+      // Just signed in: recheck the plan before opening Players (it is Pro-only).
+      window.__proGate('Players', function(){
+        try{ setMapMode(q.mode); }catch(e){}
+        if(typeof q.onResume==='function') try{ q.onResume(); }catch(e){}
+      });
     });
     _pgDecorateModal();
   }
@@ -3449,8 +3534,14 @@ const VIEWPORT_JS = `<script>
     if(live){
       if(_pgWaitTimer){ clearTimeout(_pgWaitTimer); _pgWaitTimer = null; }
       _pgPending = null;
-      setMapMode(mode);
-      if(typeof onResume==='function') try{ onResume(); }catch(e){}
+      // Signed in is not enough: Players is a Pro feature (owner decision 2026-11-13).
+      window.__proGate('Players', function(){
+        setMapMode(mode);
+        if(typeof onResume==='function') try{ onResume(); }catch(e){}
+      }, function(){
+        // Locked: the dataset dropdown must not keep showing "Players".
+        try{ var ds=document.getElementById('fltDataset'); if(ds)ds.value=window.__mapMode||'open'; }catch(e){}
+      });
       return;
     }
     var stale = false;
@@ -5364,7 +5455,7 @@ const VIEWPORT_JS = `<script>
       if(wantMode==='companies'||wantMode==='buyers'){
         var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
         var live=tk&&!(typeof window.__tokenExpired==='function'&&window.__tokenExpired(tk));
-        if(!live&&typeof window.__playersGate==='function'){
+        if((!live||window.__proState!=='pro')&&typeof window.__playersGate==='function'){
           window.__playersGate(wantMode, function(){ window.__applySavedSearch(ss,opts); });
           return;
         }
@@ -5610,6 +5701,10 @@ const SAVE_JS = `<script>
     var url=btn&&btn.getAttribute('data-u'); if(!url)return;
     // Resume after sign-in: re-run gateDraft on the same button (now signed in → opens the URL).
     var a=window.requireSignIn(btn.getAttribute('data-act')||'draft this', function(){ window.gateDraft(btn); }); if(!a)return;
+    // The proposal workspace is a Pro feature (owner decision 2026-11-13). Lock BEFORE opening a tab.
+    if(window.__proState!=='pro'&&typeof window.__proGate==='function'&&!btn.dataset.proOk){
+      window.__proGate('Proposal workspace', function(){ btn.dataset.proOk='1'; window.gateDraft(btn); }); return;
+    }
     // FUNNEL: proposal_started — the deepest step (map_open→pin→popup→listing→pursuit→proposal). Fired
     // at the single gateDraft choke point (every "Generate proposal" / "Draft capture strategy" CTA
     // routes through here), AFTER the sign-in gate passes so it counts a real intent, not a bounce to
@@ -6303,7 +6398,7 @@ const DRAWER_JS = `<script>
   function postSave(a){ return postReq(a,saveReq(a)); }
   function postReq(a,q){
     return fetch(q.url,{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},body:JSON.stringify(q.body)})
-      .then(function(r){ return r.json().catch(function(){return {};}).then(function(d){ return {state:saveOutcome(r),d:d||{},pipeline:q.url==='/api/pipeline'}; }); },
+      .then(function(r){ return r.json().catch(function(){return {};}).then(function(d){ return {state:saveOutcome(r),d:d||{},pipeline:q.url==='/api/pipeline',pro:r.status===402}; }); },
             function(){ return {state:'fail',d:{},pipeline:q.url==='/api/pipeline'}; });
   }
   window.__mapPostSave=postSave;
@@ -6809,6 +6904,11 @@ const DRAWER_JS = `<script>
   window.openProposalWorkspace=function(btn){
     // Sign-in gate first, and resume HERE afterwards so the click isn't lost to the login bounce.
     var a=window.requireSignIn('draft a proposal',function(){ window.openProposalWorkspace(btn); }); if(!a)return;
+    // The proposal workspace is a Pro feature (owner decision 2026-11-13). Check BEFORE the
+    // track-then-open save, so a free user is not left with a pursuit they did not ask for.
+    if(window.__proState!=='pro'&&typeof window.__proGate==='function'&&!btn.dataset.proOk){
+      window.__proGate('Proposal workspace', function(){ btn.dataset.proOk='1'; window.openProposalWorkspace(btn); }); return;
+    }
     // The tracking here is a MEANS, not the button's purpose, so the label must survive it.
     // saveCurrentOpp relabels to "Saving…"/"✓ Tracked" — correct for a Track button, wrong for one
     // that says "Generate proposal" or "Draft capture strategy". Show what this click is actually
@@ -7099,10 +7199,13 @@ const DRAWER_JS = `<script>
     if(!res||!res.grounded||!res.recommendation){
       var expired=res&&res.reason==='session_expired';
       var signedOut=(res&&res.reason==='signed_out')||expired;
+      var proLocked=res&&res.reason==='pro_required';
       var signals=pursueSignals(opp,pin);
       // Three states, three sentences. The expired one says WHY the app suddenly wants a sign-in,
       // which is the difference between "this is broken" and "oh, my session lapsed".
-      var cta=expired
+      var cta=proLocked
+        ? '<a class="pursue-lock-cta" href="/pricing" onclick="if(window.__showProLock){window.__showProLock(\\'M-Win\\');return false;}">\\ud83d\\udd12 Your recommendation is a Pro feature \\u2014 start your 14-day free trial \\u2192</a>'
+        : expired
         ? '<a class="pursue-lock-cta" href="/app?next=%2Fopportunity-map" target="_blank" rel="noopener">Your session expired \\u2014 sign in again \\u2192</a>'
         : signedOut
         ? '<a class="pursue-lock-cta" href="/app?next=%2Fopportunity-map" target="_blank" rel="noopener">Sign in for your recommendation \\u2192</a>'
@@ -7479,6 +7582,15 @@ const DRAWER_JS = `<script>
         + '<div class="vr-label">M-Win<span class="vr-tm">\\u2122</span></div>'
         + '<div class="mw-big">'+pct+'%</div>'
         + '<div class="mw-sub">'+sub+'</div>'
+        + '</div>';
+    }
+    // Signed in but not Pro: M-Win is a Pro feature (owner decision 2026-11-13). A locked teaser,
+    // never a number — the server withheld it (win-probability → reason:'pro_required').
+    if(res&&res.reason==='pro_required'){
+      return '<div class="mwin locked">'
+        + '<div class="vr-label">M-Win<span class="vr-tm">\\u2122</span></div>'
+        + '<div class="mw-lock">\\ud83d\\udd12 See your fit score \\u2014 Pro</div>'
+        + '<a class="mw-cta" href="/pricing" onclick="if(window.__showProLock){window.__showProLock(\\'M-Win\\');return false;}">Start 14-day free trial \\u2192</a>'
         + '</div>';
     }
     // Honest locked state — no personalized number without a profile.
@@ -9015,9 +9127,15 @@ const DRAWER_JS = `<script>
   window.saveCurrentCompany=function(btn){
     if(!CUR||CUR.kind!=='company'||btn.dataset.saved==='1')return;
     var a=window.requireSignIn('add this company to your targets'); if(!a)return;
+    // Saving a company to your CRM is a Pro feature (owner decision 2026-11-13).
+    if(window.__proState!=='pro'&&typeof window.__proGate==='function'&&!btn.dataset.proOk){
+      window.__proGate('Save to CRM', function(){ btn.dataset.proOk='1'; window.saveCurrentCompany(btn); }); return;
+    }
     btn.textContent='Saving\\u2026';
     // Shared body builder + HTTP-status verdict (postSave) — a non-JSON 500 is not a save.
     postSave(a).then(function(res){
+      // Server says pro_required (402): the fallback lock, never "Try again".
+      if(res.pro){ btn.textContent='Add to targets'; if(window.__showProLock)window.__showProLock('Save to CRM'); return; }
       var dup=res.state==='dup';
       if(res.state==='saved'||dup){ btn.textContent=dup?'\\u2713 In targets':'\\u2713 Added'; btn.classList.add('saved'); btn.dataset.saved='1'; }
       else btn.textContent='Try again';
@@ -9273,9 +9391,15 @@ const DRAWER_JS = `<script>
   window.saveCurrentBuyer=function(btn){
     if(!CUR||CUR.kind!=='buyer'||btn.dataset.saved==='1')return;
     var a=window.requireSignIn('add this buyer to your CRM'); if(!a)return;
+    // Saving a buyer to your CRM is a Pro feature (owner decision 2026-11-13).
+    if(window.__proState!=='pro'&&typeof window.__proGate==='function'&&!btn.dataset.proOk){
+      window.__proGate('Save to CRM', function(){ btn.dataset.proOk='1'; window.saveCurrentBuyer(btn); }); return;
+    }
     btn.textContent='Saving\\u2026';
     // Shared body builder + HTTP-status verdict (postSave) — a non-JSON 500 is not a save.
     postSave(a).then(function(res){
+      // Server says pro_required (402): the fallback lock, never "Try again".
+      if(res.pro){ btn.textContent='Add to CRM'; if(window.__showProLock)window.__showProLock('Save to CRM'); return; }
       var dup=res.state==='dup';
       if(res.state==='saved'||dup){ btn.textContent=dup?'\\u2713 In CRM':'\\u2713 Added'; btn.classList.add('saved'); btn.dataset.saved='1'; }
       else btn.textContent='Try again';

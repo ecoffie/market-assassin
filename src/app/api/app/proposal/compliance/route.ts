@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logEngagement, EventTypes } from '@/lib/engagement';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { isProEmail, proRequiredResponse } from '@/lib/access/require-pro';
 import { logToolError, ToolNames, AIProviders, classifyError } from '@/lib/tool-errors';
 import { normalizeCategory } from '@/lib/proposal/section-alignment';
 import { createClient } from '@supabase/supabase-js';
@@ -218,6 +219,8 @@ export async function POST(request: NextRequest) {
 
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
+  // The proposal workspace is a Pro feature (owner decision 2026-11-13).
+  if (!(await isProEmail(authSession.session.email))) return proRequiredResponse();
   shadowEntitlement({ route: 'app/proposal/compliance POST', capability: 'proposal.compliance', email: email, identityVerified: true, currentAllow: true });
 
   let body: RequestBody;

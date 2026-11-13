@@ -15,6 +15,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { isProEmail, proRequiredResponse } from '@/lib/access/require-pro';
 import { callLLM } from '@/lib/llm/call-llm';
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { createClient } from '@supabase/supabase-js';
@@ -150,6 +151,8 @@ export async function POST(request: NextRequest) {
   }
   const auth = requireMIAuthSession(request, email);
   if (!auth.ok) return auth.response;
+  // The proposal workspace is a Pro feature (owner decision 2026-11-13).
+  if (!(await isProEmail(auth.session.email))) return proRequiredResponse();
 
   const groqKey = process.env.GROQ_API_KEY;
   if (!groqKey) {

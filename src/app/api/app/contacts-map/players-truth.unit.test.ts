@@ -10,6 +10,8 @@ import { join } from 'node:path';
 
 const searchRecipients = vi.fn();
 vi.mock('@/lib/two-factor-session', () => ({ requireMIAuthSession: () => ({ ok: true }) }));
+// Players is Pro-only (2026-11-13); these cases are about truth states, so the caller is Pro.
+vi.mock('@/lib/access/require-pro', () => ({ requirePro: async () => ({ ok: true, email: 'pro@example.com' }) }));
 vi.mock('@/lib/players/telemetry', () => ({ recordPlayersResult: vi.fn(async () => {}) }));
 vi.mock('@/lib/bigquery/recipients', () => ({
   searchRecipients: (...a: unknown[]) => searchRecipients(...a),
@@ -120,8 +122,9 @@ describe('contacts-map Players — truth states', () => {
 
 describe('Maps client — errors never render as 0 or sales copy', () => {
   const map = readFileSync(join(__dirname, '../../../opportunity-map/route.ts'), 'utf8');
-  it('only a 401/403 counts as denied (the gate copy); everything else is unavailable', () => {
-    expect(map).toContain("var denied=(r.status===401||r.status===403);");
+  it('only a 401/403/402 counts as denied (402 = the Pro lock); everything else is unavailable', () => {
+    expect(map).toContain("var denied=(r.status===401||r.status===403||r.status===402);");
+    expect(map).toContain('if(merged.length===0 && _anyDenied && _allDenied && _proLocked)');
     expect(map).toContain("if(!d||!d.success) return {t:t,pins:[],total:null,status:'unavailable'};");
     expect(map).toContain('if(merged.length===0 && _anyDenied && _allDenied)');
   });
