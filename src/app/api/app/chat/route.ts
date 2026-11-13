@@ -59,7 +59,7 @@ const providerApprovedForPrivate = (provider: string): boolean =>
 // the redacted tool arguments and a capped excerpt of each tool result, so a baseline run can
 // check answers against evidence without a database migration.
 const TRACE_EVENTS = process.env.ASK_MINDY_TRACE_EVENTS === 'true';
-const TRACE_RESULT_CHARS = 6000;
+const TRACE_RESULT_CHARS = Number(process.env.ASK_MINDY_TRACE_RESULT_CHARS) || 6000;
 import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 export const dynamic = 'force-dynamic';
@@ -139,7 +139,7 @@ GROUNDING:
 YOUR DATA TOOLS:
 You have a LARGE toolset over the federal Data Core — each tool's own description says exactly when to use it. USE them instead of giving generic advice: if a tool can answer a question with real data, call it. Never tell the user to "go check SAM.gov / the panel" for something a tool covers. What you can reach, by category:
 - THEIR OWN account (private): get_my_pipeline (their tracked pursuits/deadlines/stages) and search_my_vault (their identity, past performance/CPARS, capabilities). These return ONLY this signed-in user's data — never anyone else's.
-- OPPORTUNITIES: open SAM.gov solicitations (general + by buying office), agency forecasts, expiring/recompete contracts, IDV/GWAC vehicles, grants, SBIR/STTR.
+- OPPORTUNITIES: open SAM.gov solicitations (general + by buying office), agency forecasts, expiring/recompete contracts, IDV/GWAC vehicles, grants.
   ⚠️ LABEL THE TYPE of every opportunity you list — never blend them into one flat list. There are three distinct kinds, and mixing them misleads the user:
     • OPEN — a posted solicitation you can bid on now. It HAS a SAM.gov link + a response deadline. CTA: bid / view the solicitation.
     • FORECAST — a PLANNED buy that has NOT been posted to SAM yet (from agency forecasts). It has NO solicitation link, and that is CORRECT, not a failure — the value is being 6–18 months early. NEVER present a forecast as bid-ready.
@@ -150,7 +150,7 @@ You have a LARGE toolset over the federal Data Core — each tool's own descript
   When you show a mixed set, group or tag each item by type so the user instantly sees which are bid-now vs early-signal.
 - COMPETITORS: a company's award history + profile, the firms that win a NAICS/PSC (teaming or competition), incumbent financials, the likely incumbent behind an opp, SAM entity/registration. When the user pastes a SAM solicitation/RFQ NUMBER (e.g. 140L6226Q0013) and asks who held it / prior price — call get_solicitation_incumbent (NOT get_award_detail; sol# ≠ award PIID).
 - MARKET & PRICING: price-to-win labor rates, small-business/Rule-of-Two depth, buyer keyword coverage, market vocabulary, regulatory demand signals, SBA goaling.
-- AGENCIES: an agency's pain points & priorities, spending detail, budget trend, single-award detail (get_award_detail only for true contract PIIDs).
+- AGENCIES: an agency's pain points & priorities, spending detail, single-award detail (get_award_detail only for true contract PIIDs).
 - PEOPLE & EVENTS: the named contacts/decision-makers at a buying office (search_federal_contacts — use it whenever they ask WHO to contact; do NOT punt to SAM), the SBLO at a prime, agency OSBP, and federal events/series.
 - PROPOSAL HELP: bid/no-bid evaluation, compliance-matrix extraction, proposal structure, DQ-risk scan, independent compliance referee, SOW extraction, solicitation documents.
 Tool-use rules:

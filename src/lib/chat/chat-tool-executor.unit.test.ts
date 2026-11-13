@@ -140,7 +140,8 @@ describe('execution logging', () => {
     expect(row.trace).toMatchObject({ model: 'gpt-4o', provider: 'openai', chatSessionId: '11111111-2222-3333-4444-555555555555', resourceIds: { saved_search_id: 'ss_1' } });
     expect(row.trace.executionId).toMatch(/^[0-9a-f-]{36}$/);
     expect(typeof row.trace.creditPrice).toBe('number');
-    expect(row.trace.argsRedacted.email).toBe('[contact]');
+    expect(row.trace.argsRedacted.email).toMatchObject({ redacted: true, type: 'string' });
+    expect(row.trace.argsRedacted.name).toMatchObject({ redacted: true });
     expect(row.trace.argsRedacted.naics).toBe('561320');
   });
 
@@ -150,3 +151,50 @@ describe('execution logging', () => {
     expect((logCall.mock.calls[0][0] as unknown as { trace: { errorCategory: string } }).trace.errorCategory).toBe('blocked_defect');
   });
 });
+
+describe('LOW hardening (independent review 2026-11-14)', () => {
+  it('refuses an empty or missing argument string instead of running an unfiltered search', async () => {
+    const results = await make().executeRound([
+      { id: 'e1', function: { name: 'get_expiring_contracts', arguments: '' } },
+      { id: 'e2', function: { name: 'get_expiring_contracts', arguments: '   ' } },
+      { id: 'e3', function: { name: 'get_expiring_contracts' } },
+    ], planner);
+    expect(runMcpTool).not.toHaveBeenCalled();
+    expect(results.every((r) => r.record.error_category === 'invalid_arguments')).toBe(true);
+  });
+
+  it('still runs a no-argument call sent as "{}"', async () => {
+    await make().executeRound([{ id: 'n', function: { name: 'list_market_schedules', arguments: '{}' } }], planner);
+    expect(runMcpTool).toHaveBeenCalledTimes(1);
+  });
+
+  it('a completed write stays a success when the logger throws afterwards, and is logged once', async () => {
+    logCall.mockImplementationOnce(async () => { throw new Error('log down'); });
+    const [r] = await make().executeRound([call('schedule_market_search', { name: 'a', naics: '561320' })], planner);
+    expect(r.record.status).toBe('success');
+    expect(JSON.parse(r.content)).toMatchObject({ schedule_id: 'ss_1' });
+    expect(logCall).toHaveBeenCalledTimes(1);
+  });
+
+  it('a result that cannot be serialized (BigInt / circular) is still a success, logged once', async () => {
+    const circ: Record<string, unknown> = { ok: true, big: BigInt(9), schedule_id: 'ss_9' };
+    circ.self = circ;
+    runMcpTool.mockResolvedValueOnce({ result: circ, credits: 0 });
+    const [r] = await make().executeRound([call('schedule_market_search', { name: 'a', naics: '561320' })], planner);
+    expect(r.record.status).toBe('success');
+    expect(JSON.parse(r.content)).toMatchObject({ ok: true, big: '9', schedule_id: 'ss_9' });
+    expect(logCall).toHaveBeenCalledTimes(1);
+    expect((logCall.mock.calls[0][0] as { status: string }).status).toBe('success');
+  });
+
+  it('an unexpected error in one call never discards earlier results in the round (incl. a completed write)', async () => {
+    const throwingTier0: Tier0Like = { ...tier0, execute: tier0Execute };
+    const ex = createChatToolExecutor({ userEmail: 'u@example.com', chatSessionId: null, tier0: throwingTier0, deps: { runMcpTool, logCall, isMcpTool: ((n: string) => { if (n === 'boom_tool') throw new Error('registry exploded'); return n !== 'get_my_pipeline' && n !== 'search_my_vault'; }) as never } });
+    const results = await ex.executeRound([call('schedule_market_search', { name: 'a', naics: '561320' }, 'w'), call('boom_tool', {}, 'b')], planner);
+    expect(results).toHaveLength(2);
+    expect(results[0].record.status).toBe('success');
+    expect(results[1].tool_call_id).toBe('b');
+    expect(results[1].record.error_category).toBe('internal_error');
+  });
+});
+

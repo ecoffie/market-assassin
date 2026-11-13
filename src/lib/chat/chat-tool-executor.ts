@@ -85,6 +85,33 @@ function refusal(category: string, message: string): Record<string, unknown> {
   return { ok: false, state: 'unavailable', error_category: category, message };
 }
 
+/** Outcome telemetry is best-effort: a classifier error must not cost the log row. */
+function safeOutcome(result: unknown): { outcome?: ReturnType<typeof classifyCallOutcome> } {
+  try { return { outcome: classifyCallOutcome(result) }; } catch { return {}; }
+}
+
+/** JSON for the model; survives BigInt / circular values instead of throwing after a write. */
+function safeStringify(value: unknown, resourceIds: Record<string, unknown> | null): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    try {
+      const seen = new WeakSet<object>();
+      return JSON.stringify(value, (_k, v) => {
+        if (typeof v === 'bigint') return v.toString();
+        if (v && typeof v === 'object') { if (seen.has(v)) return '[circular]'; seen.add(v); }
+        return v;
+      });
+    } catch {
+      return JSON.stringify({ ok: true, state: 'known', note: 'The action completed but its result could not be displayed.', resource_ids: resourceIds });
+    }
+  }
+}
+
+function safeResourceIds(name: string, result: Record<string, unknown> | undefined): Record<string, unknown> | null {
+  try { return extractResourceIds(name, result); } catch { return null; }
+}
+
 function extractResourceIds(name: string, result: Record<string, unknown> | undefined): Record<string, unknown> | null {
   if (!result) return null;
   if (name === 'schedule_market_search' || name === 'update_market_schedule') {
@@ -133,7 +160,7 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
       creditsCharged: 0, // observation period: price recorded, nothing deducted
       latencyMs: fields.latencyMs,
       channel: 'app_chat',
-      ...(fields.result !== undefined ? { outcome: classifyCallOutcome(fields.result) } : {}),
+      ...(fields.result !== undefined ? safeOutcome(fields.result) : {}),
       trace: {
         executionId,
         chatSessionId: opts.chatSessionId,
@@ -178,9 +205,13 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
     }
 
     // 2) Arguments. Refuse unparseable input instead of running it as {}.
+    // An empty or missing argument string is refused too: providers send "{}" for a no-argument
+    // call, so "" means the arguments were lost (truncation), and running it would drop every filter.
     let args: Record<string, unknown>;
     try {
-      const parsed = JSON.parse(call.function?.arguments || '{}');
+      const raw = call.function?.arguments;
+      if (typeof raw !== 'string' || raw.trim() === '') throw new Error('empty arguments');
+      const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('not an object');
       args = parsed as Record<string, unknown>;
     } catch {
@@ -223,30 +254,54 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
       }
     }
 
-    // 6) Execute with per-tool error capture.
+    // 6) Execute with per-tool error capture. ONLY the tool call itself is inside this try:
+    // once the tool has returned (possibly after a write), nothing below may report it as failed.
+    let result: Record<string, unknown> | undefined;
     try {
-      const result = tier0.names.has(name)
+      result = tier0.names.has(name)
         ? await tier0.execute(name, args)
         : (await deps.runMcpTool(name, args, { userEmail: opts.userEmail })).result;
-      const latencyMs = Date.now() - started;
-      const resourceIds = policy.decision === 'allowed_write' ? extractResourceIds(name, result) : null;
-      await log(planner, name, 'success', executionId, { args, latencyMs, resourceIds, result });
-      return done('success', policy.decision, null, result ?? {});
     } catch (err) {
       const latencyMs = Date.now() - started;
       console.error(`[chat] tool ${name} failed:`, err);
-      await log(planner, name, 'failed', executionId, { args, latencyMs, errorCategory: 'tool_error' });
+      await safeLog(planner, name, 'failed', executionId, { args, latencyMs, errorCategory: 'tool_error' });
       return done('failed', policy.decision, 'tool_error',
         refusal('tool_error', 'This lookup failed, so its data is unavailable. Do not treat it as an empty result.'));
     }
+
+    // 7) Post-execution. The tool ran: log exactly once, never throw, never flip to "failed".
+    const latencyMs = Date.now() - started;
+    const resourceIds = policy.decision === 'allowed_write' ? safeResourceIds(name, result) : null;
+    await safeLog(planner, name, 'success', executionId, { args, latencyMs, resourceIds, result });
+    return { ...done('success', policy.decision, null, {}), content: safeStringify(result ?? {}, resourceIds) };
+  }
+
+  /** logCall never throws by contract; this keeps a broken logger from ever affecting results. */
+  async function safeLog(...a: Parameters<typeof log>) {
+    try { await log(...a); } catch (err) { console.error('[chat] execution log failed (non-fatal):', err); }
   }
 
   /** Run one model round of tool calls. Always returns one result per call, in order. */
   async function executeRound(calls: ChatToolCall[], planner: PlannerIdentity): Promise<ChatToolResult[]> {
     const budget = { calls: 0, writes: 0 };
     const out: ChatToolResult[] = [];
-    // Sequential, as before (parallel execution of independent calls is Phase 2).
-    for (const call of calls) out.push(await executeOne(call, budget, planner));
+    // Sequential, as before (parallel execution of independent calls is Phase 2). Each call is
+    // isolated: an unexpected error in one call yields an error result for THAT call only, so
+    // results already produced in the round (including completed writes) are never discarded.
+    for (let i = 0; i < calls.length; i++) {
+      const call = calls[i];
+      try {
+        out.push(await executeOne(call, budget, planner));
+      } catch (err) {
+        console.error('[chat] unexpected executor error (isolated to one call):', err);
+        out.push({
+          tool_call_id: call.id || `call_${i}`,
+          content: JSON.stringify(refusal('internal_error', 'This lookup could not be completed. Do not treat it as an empty result.')),
+          record: { execution_id: 'unassigned', tool: String(call.function?.name ?? ''), decision: 'not_evaluated', status: 'failed', error_category: 'internal_error', latency_ms: 0 },
+          argsRedacted: null,
+        });
+      }
+    }
     return out;
   }
 

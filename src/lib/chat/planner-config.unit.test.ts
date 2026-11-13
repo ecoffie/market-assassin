@@ -80,4 +80,20 @@ describe('chat route wiring (source assertions)', () => {
     expect(code).toMatch(/process\.env\.ASK_MINDY_TRACE_EVENTS === 'true'/);
     expect(code).toMatch(/if \(TRACE_EVENTS\) \{/);
   });
+
+  it('the system prompt does not advertise capabilities chat currently blocks', () => {
+    const prompt = route.slice(route.indexOf('const SYSTEM_PROMPT_TEMPLATE'), route.indexOf('{userProfile}'));
+    // tool blocked in chat -> phrases that would promise its capability
+    const BLOCKED_TOOL_PHRASES: Record<string, RegExp> = {
+      search_sbir: /\bSBIR\b|\bSTTR\b/i,
+      get_agency_budget_trends: /budget trend/i,
+      add_contacts_to_crm: /add (them|contacts) to (your )?CRM/i,
+      one_click_proposal: /one[- ]click proposal/i,
+      export_proposal: /export (the )?proposal/i,
+      generate_market_report: /(generate|create|save) a market report/i,
+      delete_market_schedule: /delete (an |your )?(alert|saved search|schedule)/i,
+    };
+    for (const [tool, re] of Object.entries(BLOCKED_TOOL_PHRASES)) expect(re.test(prompt), tool).toBe(false);
+  });
 });
+

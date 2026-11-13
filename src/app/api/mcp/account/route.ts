@@ -15,6 +15,7 @@ import { resolveMcpEmail } from '@/lib/mcp/session-identity';
 import { getBalance } from '@/lib/mcp/credits';
 import { listPublicMcpTools } from '@/lib/mcp/public-catalog';
 import { getWriteClient } from '@/lib/supabase/server-clients';
+import { MCP_CHANNEL_OR_FILTER } from '@/lib/mcp/channel-filter';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -37,6 +38,8 @@ export async function GET(request: NextRequest) {
       .from('mcp_call_log')
       .select('tool_name, status, credits_charged, created_at')
       .eq('user_email', email)
+      // MCP usage only: Ask Mindy (channel 'app_chat') calls are not MCP activity.
+      .or(MCP_CHANNEL_OR_FILTER)
       .gte('created_at', sinceIso)
       .order('created_at', { ascending: false })
       .limit(ROW_CAP),

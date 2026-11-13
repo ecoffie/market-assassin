@@ -13,6 +13,11 @@ export type ProviderEventKind = 'planner_failure' | 'planner_fallback' | 'planne
 
 const ALERT_COOLDOWN_MS = 15 * 60 * 1000;
 const lastAlertAt = new Map<string, number>();
+// A planner skipped by CONFIGURATION (e.g. not on the private-data provider list) is a standing
+// condition, not an incident: it would otherwise write a tool_errors row on every turn. Those are
+// recorded at most once per cooldown per provider. Real provider failures are always recorded.
+const CONFIG_KINDS: ReadonlySet<ProviderEventKind> = new Set(['planner_unavailable']);
+const lastConfigLogAt = new Map<string, number>();
 
 function errorTypeFor(status: number | null | undefined, detail: string): ErrorType {
   if (status === 429) return ErrorTypes.AI_RATE_LIMIT;
@@ -31,6 +36,12 @@ export async function recordProviderEvent(e: {
   next?: string;
 }): Promise<void> {
   const detail = e.detail.slice(0, 500);
+  const key = `${e.kind}:${e.provider}:${e.model}`;
+  const now = Date.now();
+  if (CONFIG_KINDS.has(e.kind)) {
+    if (now - (lastConfigLogAt.get(key) ?? 0) < ALERT_COOLDOWN_MS) return;
+    lastConfigLogAt.set(key, now);
+  }
   try {
     await logToolError({
       tool: ToolNames.ASK_MINDY,
@@ -46,8 +57,6 @@ export async function recordProviderEvent(e: {
     console.error('[chat] provider event log failed:', err);
   }
 
-  const key = `${e.kind}:${e.provider}:${e.model}`;
-  const now = Date.now();
   if (now - (lastAlertAt.get(key) ?? 0) < ALERT_COOLDOWN_MS) return;
   lastAlertAt.set(key, now);
   try {
@@ -63,4 +72,5 @@ export async function recordProviderEvent(e: {
 /** Test hook. */
 export function __resetProviderEventCooldown() {
   lastAlertAt.clear();
+  lastConfigLogAt.clear();
 }

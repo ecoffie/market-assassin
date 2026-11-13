@@ -32,6 +32,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { findMismatches, type StripeSub } from '@/lib/billing/paid-entitlement';
+import { MCP_CHANNEL_OR_FILTER } from '@/lib/mcp/channel-filter';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -304,7 +305,8 @@ async function checkMcpActivation(sb: ReturnType<typeof getSupabase>): Promise<C
     fetchAllRows<CodeRow>((f, t) => sb.from('mcp_oauth_codes').select('user_email, consumed').gte('created_at', since).range(f, t)),
     fetchAllRows<Row>((f, t) => sb.from('mcp_oauth_tokens').select('user_email').gte('created_at', since).range(f, t)),
     fetchAllRows<Row>((f, t) => sb.from('mcp_api_keys').select('user_email').gte('created_at', since).range(f, t)),
-    fetchAllRows<Row>((f, t) => sb.from('mcp_call_log').select('user_email').gte('created_at', since).range(f, t)),
+    // MCP activation only: Ask Mindy (channel 'app_chat') calls are not MCP activity.
+    fetchAllRows<Row>((f, t) => sb.from('mcp_call_log').select('user_email').or(MCP_CHANNEL_OR_FILTER).gte('created_at', since).range(f, t)),
     fetchAllRows<Row>((f, t) => sb.from('mcp_credit_ledger').select('user_email').eq('reason', 'signup_grant').range(f, t)),
     fetchAllRows<Row>((f, t) => sb.from('mcp_credit_balance').select('user_email').range(f, t)),
   ]);
