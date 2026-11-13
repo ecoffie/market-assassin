@@ -15,8 +15,17 @@
  * A step that fails leaves the previous value in place and reports ok:false — the watchdog sees
  * last_status=error. A truncated forecast build is never written over a good one.
  *
+ * BIGQUERY GUARDS (this route is the only live path to two 10-17 GB scans):
+ *   - Auth: Bearer CRON_SECRET (the dispatcher) or ?password=ADMIN_PASSWORD (manual). NOT the
+ *     `x-vercel-cron` header: any client can send it, and accepting it would let anyone trigger
+ *     the scans on demand.
+ *   - Concurrency: a KV lock (SET NX, 10 min). An overlapping run returns 409 without querying.
+ *     If KV is unreachable the lock cannot be taken and the run refuses (fails closed).
+ *   - Frequency: "latest" re-scans at most once per 20h (KV timestamp) unless ?force=1;
+ *     "largest" only when its key is missing. Worst case ≈ one ~15 GB scan/day plus a ~17 GB
+ *     scan per DATA_VERSION bump, each capped by maximumBytesBilled (20 GiB).
+ *
  * Schedule: a `cron_jobs` row (daily), inserted only after this route is live and verified.
- * Auth: Bearer CRON_SECRET (dispatcher), x-vercel-cron, or ?password=ADMIN_PASSWORD (manual).
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
@@ -32,7 +41,6 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 function authorized(request: NextRequest): boolean {
-  if (request.headers.get('x-vercel-cron') === '1') return true;
   const auth = request.headers.get('authorization');
   if (auth && process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`) return true;
   const pw = request.nextUrl.searchParams.get('password');
@@ -51,20 +59,50 @@ async function forecasts(): Promise<Step> {
   return { ok: true, detail: `${summary.total} forecasts, ${summary.agencies.length} agencies` };
 }
 
-async function awardList(kind: 'latest' | 'largest'): Promise<Step> {
+const LOCK_KEY = 'cron:seo-materialize:lock';
+const LATEST_AT_KEY = 'cron:seo-materialize:latest-at';
+const LATEST_MIN_INTERVAL_MS = 20 * 60 * 60 * 1000;
+
+async function awardList(kind: 'latest' | 'largest', force: boolean): Promise<Step> {
   const cacheKey = awardListKey(kind, 50);
   const read = kind === 'latest' ? getLatestAwards : getLargestAwards;
-  if (kind === 'largest') {
-    const cached = await read(50); // cache-only probe: an all-time list only needs building once
-    if (cached.length > 0) return { ok: true, detail: `cached (${cached.length} rows), not rebuilt` };
+  const cached = await read(50); // cache-only probe, zero BigQuery
+  if (cached.length > 0 && kind === 'largest') {
+    return { ok: true, detail: `cached (${cached.length} rows), not rebuilt` };
+  }
+  if (cached.length > 0 && kind === 'latest' && !force) {
+    const last = Number(await kv.get<number>(LATEST_AT_KEY)) || 0;
+    if (Date.now() - last < LATEST_MIN_INTERVAL_MS) {
+      return { ok: true, detail: `fresh (${cached.length} rows, refreshed ${Math.round((Date.now() - last) / 3.6e6)}h ago), not rebuilt` };
+    }
   }
   const rows = await read(50, { liveBq: true, forceRefresh: true });
   if (rows.length === 0 && bqUnavailable(cacheKey, 0)) return { ok: false, detail: 'BigQuery read failed; previous value kept' };
+  if (kind === 'latest' && rows.length > 0) await kv.set(LATEST_AT_KEY, Date.now());
   return { ok: rows.length > 0, detail: `${rows.length} rows` };
 }
 
 async function handle(request: NextRequest) {
   if (!authorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const force = request.nextUrl.searchParams.get('force') === '1';
+
+  // One run at a time. SET NX with a TTL so a crashed run cannot hold the lock forever.
+  const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  let locked = false;
+  try {
+    locked = (await kv.set(LOCK_KEY, token, { nx: true, ex: 600 })) === 'OK';
+  } catch (err) {
+    return NextResponse.json({ success: false, error: `lock unavailable (KV): ${err instanceof Error ? err.message : err}` }, { status: 503 });
+  }
+  if (!locked) return NextResponse.json({ success: false, error: 'another run is in progress' }, { status: 409 });
+  try {
+    return await runAll(force);
+  } finally {
+    try { if ((await kv.get<string>(LOCK_KEY)) === token) await kv.del(LOCK_KEY); } catch { /* TTL releases it */ }
+  }
+}
+
+async function runAll(force: boolean) {
   const run = async (name: string, fn: () => Promise<Step>): Promise<[string, Step]> => {
     try { return [name, await fn()]; } catch (err) {
       return [name, { ok: false, detail: err instanceof Error ? err.message : String(err) }];
@@ -72,8 +110,8 @@ async function handle(request: NextRequest) {
   };
   const steps = Object.fromEntries(await Promise.all([
     run('forecasts', forecasts),
-    run('awardsLatest', () => awardList('latest')),
-    run('awardsLargest', () => awardList('largest')),
+    run('awardsLatest', () => awardList('latest', force)),
+    run('awardsLargest', () => awardList('largest', force)),
   ]));
   if (steps.forecasts.ok) revalidatePath('/forecasts');
   if (steps.awardsLatest.ok || steps.awardsLargest.ok) revalidatePath('/awards');
