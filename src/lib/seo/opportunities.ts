@@ -146,7 +146,7 @@ export async function getSimilarOpportunities(
 ): Promise<SimilarOpportunity[]> {
   const client = sb();
   if (!client || !opp.naicsCode) return [];
-  const { data } = await client
+  const { data, error } = await client
     .from('sam_opportunities')
     .select('notice_id, title, description, sow_text, department, notice_type, response_deadline, naics_code')
     .eq('active', true)
@@ -154,6 +154,11 @@ export async function getSimilarOpportunities(
     .neq('notice_id', opp.noticeId)
     .order('posted_date', { ascending: false })
     .limit(limit * 3); // over-fetch; filter thin below
+  if (error) {
+    // A related-links block must not take the page down; log it so a broken column is visible.
+    console.error('[seo/opportunities] similar-opportunities read failed:', error.message);
+    return [];
+  }
   if (!data?.length) return [];
   return data
     .filter(isIndexableOpp)
