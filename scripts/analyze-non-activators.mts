@@ -16,6 +16,7 @@
 import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 import { createClient } from '@supabase/supabase-js';
+import { MCP_CHANNEL_OR_FILTER } from '../src/lib/mcp/channel-filter';
 
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
@@ -32,8 +33,10 @@ async function pageAll<T>(table: string, cols: string, tune: (q: any) => any = (
 
 const ledger = await pageAll<{ user_email: string; delta: number; reason: string; created_at: string }>(
   'mcp_credit_ledger', 'user_email,delta,reason,created_at');
+// MCP activity only: Ask Mindy (channel 'app_chat') calls share mcp_call_log but are not MCP
+// activation. NULL-channel (Claude/general + historical) and chatgpt rows are kept.
 const calls = await pageAll<{ user_email: string; tool_name: string; status: string; created_at: string }>(
-  'mcp_call_log', 'user_email,tool_name,status,created_at');
+  'mcp_call_log', 'user_email,tool_name,status,created_at', (q) => q.or(MCP_CHANNEL_OR_FILTER));
 const keys = await pageAll<{ user_email: string; created_at: string; revoked_at: string | null }>(
   'mcp_api_keys', 'user_email,created_at,revoked_at');
 

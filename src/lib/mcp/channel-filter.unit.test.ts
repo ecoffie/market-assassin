@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { isMcpUsageRow, MCP_CHANNEL_OR_FILTER, MCP_CHANNEL_SQL, onlyMcpChannels } from './channel-filter';
+import { isMcpUsageRow, MCP_CHANNEL_OR_FILTER, MCP_CHANNEL_SQL, onlyMcpChannels, callChannel } from './channel-filter';
 import { fakeDb } from './fake-postgrest.test-helper';
 
 const rows = [
@@ -41,4 +41,19 @@ describe('MCP channel filter', () => {
     expect(read('src/app/api/admin/mcp-cohorts/route.ts')).toMatch(/\.or\(MCP_CHANNEL_OR_FILTER\)/);
     expect(read('src/app/api/cron/throughput-digest/route.ts')).toMatch(/from\('mcp_call_log'\)\.select\('user_email'\)\.or\(MCP_CHANNEL_OR_FILTER\)/);
   });
+
+  it('classifies rows by surface; NULL/legacy is MCP', () => {
+    expect(rows.map(callChannel)).toEqual(['mcp', 'mcp', 'chatgpt', 'app_chat', 'app_chat']);
+  });
+
+  it('analysis scripts and the dev-mode report use the shared channel logic', () => {
+    const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
+    expect(read('scripts/analyze-non-activators.mts')).toMatch(/'mcp_call_log', 'user_email,tool_name,status,created_at', \(q\) => q\.or\(MCP_CHANNEL_OR_FILTER\)\)/);
+    expect(read('scripts/analyze-trial-wall.mts')).toMatch(/'mcp_call_log', 'user_email,tool_name,status,credits_charged,created_at', \(q\) => q\.or\(MCP_CHANNEL_OR_FILTER\)\)/);
+    const report = read('scripts/chatgpt-devmode-report.ts');
+    expect(report).toMatch(/callChannel\(r\) === 'chatgpt'/);
+    expect(report).toMatch(/callChannel\(r\) === 'mcp'/);
+    expect(report).toMatch(/ask_mindy_calls_in_window: appChat\.length/);
+  });
 });
+

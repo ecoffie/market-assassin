@@ -13,6 +13,7 @@
 import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 import { createClient } from '@supabase/supabase-js';
+import { MCP_CHANNEL_OR_FILTER } from '../src/lib/mcp/channel-filter';
 
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 const DAY = 86_400_000;
@@ -32,7 +33,9 @@ type Ledger = { user_email: string; delta: number; reason: string; created_at: s
 type Call = { user_email: string; tool_name: string; status: string; credits_charged: number; created_at: string };
 
 const ledger = await pageAll<Ledger>('mcp_credit_ledger', 'user_email,delta,reason,created_at');
-const calls = await pageAll<Call>('mcp_call_log', 'user_email,tool_name,status,credits_charged,created_at');
+// MCP trial behaviour only: Ask Mindy (channel 'app_chat') calls are logged here with 0 credits
+// and would skew the wall analysis. NULL-channel (Claude/general + historical) and chatgpt kept.
+const calls = await pageAll<Call>('mcp_call_log', 'user_email,tool_name,status,credits_charged,created_at', (q) => q.or(MCP_CHANNEL_OR_FILTER));
 
 /** Search/navigation vs premium decision/report — the distinction that decides whether the
  *  fix is "more credits" or "cheaper exploration". */

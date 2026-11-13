@@ -33,3 +33,16 @@ export function isMcpUsageRow(row: { channel?: string | null }): boolean {
 export function onlyMcpChannels<Q extends { or: (filters: string) => Q }>(query: Q): Q {
   return query.or(MCP_CHANNEL_OR_FILTER);
 }
+
+export type CallChannel = 'mcp' | 'chatgpt' | 'app_chat';
+
+/**
+ * Which surface a call-log row came from. NULL/missing channel = the Claude/general MCP edge or a
+ * row written before the channel column existed, so it is classified as 'mcp'.
+ */
+export function callChannel(row: { channel?: string | null }): CallChannel {
+  if (row.channel === ASK_MINDY_CHANNEL) return 'app_chat';
+  if (row.channel === 'chatgpt') return 'chatgpt';
+  return 'mcp';
+}
+

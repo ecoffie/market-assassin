@@ -12,6 +12,7 @@
  * Writes nothing.
  */
 import { config } from 'dotenv';
+import { callChannel } from '../src/lib/mcp/channel-filter';
 config({ path: '.env.local' });
 
 const args = process.argv.slice(2);
@@ -49,8 +50,11 @@ function pct(sorted: number[], p: number): number | null {
   const all = await fetchAll((from, to) => sb.from('mcp_call_log')
     .select('created_at,tool_name,status,credits_charged,latency_ms,outcome,grounded,degraded,billing_outcome,error_code,channel')
     .eq('user_email', EMAIL).gte('created_at', SINCE).lte('created_at', UNTIL).order('created_at').range(from, to), 'mcp_call_log');
-  const chatgpt = all.filter((r) => r.channel === 'chatgpt');
-  const other = all.filter((r) => r.channel !== 'chatgpt');
+  // Three surfaces share mcp_call_log: ChatGPT MCP, the Claude/general MCP edge (NULL channel,
+  // incl. historical rows) and native Ask Mindy ('app_chat'). Ask Mindy is not MCP activity.
+  const chatgpt = all.filter((r) => callChannel(r) === 'chatgpt');
+  const other = all.filter((r) => callChannel(r) === 'mcp');
+  const appChat = all.filter((r) => callChannel(r) === 'app_chat');
 
   const ledgerRows = await fetchAll((from, to) => sb.from('mcp_credit_ledger').select('created_at,delta,reason,tool_name,channel,balance_after')
     .eq('user_email', EMAIL).gte('created_at', SINCE).lte('created_at', UNTIL).order('created_at').range(from, to), 'mcp_credit_ledger');
@@ -78,7 +82,8 @@ function pct(sorted: number[], p: number): number | null {
   const report = {
     email: EMAIL, window: { since: SINCE, until: UNTIL },
     chatgpt_calls: chatgpt.length,
-    non_chatgpt_calls_in_window: other.length,
+    non_chatgpt_calls_in_window: other.length, // other MCP surfaces only (excludes Ask Mindy)
+    ask_mindy_calls_in_window: appChat.length,
     tools,
     calls: chatgpt,
     ledger: {
@@ -97,7 +102,7 @@ function pct(sorted: number[], p: number): number | null {
 
   if (JSON_OUT) { console.log(JSON.stringify(report, null, 1)); return; }
   console.log(`\nChatGPT dev-mode report — ${EMAIL}\n  window ${SINCE} → ${UNTIL}`);
-  console.log(`  chatgpt calls: ${chatgpt.length}   non-chatgpt calls in window: ${other.length}\n`);
+  console.log(`  chatgpt calls: ${chatgpt.length}   other MCP calls in window: ${other.length}   Ask Mindy (app_chat) calls: ${appChat.length}\n`);
   console.log('  tool                          n   p50ms   p90ms   maxms  >45s >60s  outcomes');
   for (const t of tools) {
     console.log(`  ${t.tool.padEnd(28)} ${String(t.calls).padStart(3)} ${String(t.p50_ms ?? '-').padStart(7)} ${String(t.p90_ms ?? '-').padStart(7)} ${String(t.max_ms ?? '-').padStart(7)} ${String(t.over_45s).padStart(5)} ${String(t.over_60s).padStart(4)}  ${JSON.stringify(t.outcomes)}`);
