@@ -7568,3 +7568,15 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 **SEO.** Federal market intelligence for AI agents / GovCon MCP server / Mindy for Claude and Cursor.
 
 **Proof.** `UnifiedPricing.hero.unit.test.tsx` pins the headline, supporting copy, agent list and trial line, and checks that plan credits and checkout links render unchanged.
+
+## The 14-day free trial is the hero offer on /mcp/pricing (2026-11-13)
+
+**What.** Directly under the headline, /mcp/pricing now leads with the trial: "Your federal intelligence team. Free for 14 days." and one button, "Start your 14-day free trial". Under the button: 14 days free · Cancel anytime · No sales call. The terms sit right below: Mindy Pro, card required, no charge for 14 days, then $149/mo or $1,490/yr, with a reminder before the first charge.
+
+**Why it matters.** The trial was a small line under the AI-tool badges and easy to miss. It is now the first action on the page. Signed-in Pro, Team and Enterprise accounts don't see the offer at all, so a paying customer is never pointed at a second subscription.
+
+**Honest scope.** Same trial as before: the existing Pro trial checkout, card required, 14 days. No new pricing, no discount, no deadline. Plans, credits and checkout links are unchanged.
+
+**SEO.** Federal market intelligence free trial / GovCon software 14-day trial / Mindy Pro free trial.
+
+**Proof.** `UnifiedPricing.hero.unit.test.tsx` pins the hero order, the CTA's link (the Pro card's own trial link for the selected billing period), the trial terms, and that Pro/Team/Enterprise accounts get no offer.

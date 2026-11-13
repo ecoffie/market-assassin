@@ -16,7 +16,7 @@
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import MemberProof from '@/components/public-site/MemberProof';
-import { UPGRADE_OFFER_LABEL, UPGRADE_OFFER_PARAM, withUpgradePromo } from '@/lib/billing/upgrade-offer';
+import { UPGRADE_OFFER_LABEL, UPGRADE_OFFER_PARAM } from '@/lib/billing/upgrade-offer';
 import Link from 'next/link';
 import NoRefundNote from '@/components/NoRefundNote';
 import type { Catalog, Pkg, SubPlan, Tool } from '@/app/mcp/catalog-ui';
@@ -57,6 +57,47 @@ const TEAM_ANNUAL_PER_MONTH = 335.58;
 const TEAM_ANNUAL_PCT = Math.round((1 - TEAM_ANNUAL_USD / (499 * 12)) * 100); // 33
 const ENTERPRISE_CONTACT_URL = '/contact-sales';
 const REFERRALS_URL = '/app?panel=settings&section=credits&tab=referrals';
+const BILLING_URL = '/app?panel=settings&section=credits&tab=billing';
+
+// Paying accounts (Pro / Team / Enterprise, incl. trialing, comped, lifetime) are never offered
+// another trial: any app card whose CTA is a 14-day trial checkout becomes "Manage your plan".
+// (A Team subscriber's Pro card, and an Enterprise account's Pro + Teams cards, used to link to
+// the trial checkout.) Current-plan and contact-sales cards are left alone.
+const TRIAL_HREFS = new Set([PRO_TRIAL_MONTHLY, PRO_TRIAL_ANNUAL, TEAM_TRIAL_MONTHLY, TEAM_TRIAL_ANNUAL].filter(Boolean));
+export function suppressTrialCardsForPaid<T extends { href: string; cta: string; pill?: string; note?: string; current?: boolean }>(cards: T[], plan: string | null): T[] {
+  if (!plan || !['pro', 'team', 'enterprise'].includes(plan)) return cards;
+  return cards.map((c) => (c.current || !TRIAL_HREFS.has(c.href)
+    ? c
+    : { ...c, href: BILLING_URL, cta: 'Manage your plan', pill: undefined, note: 'Your current plan is active. No new subscription needed.' }));
+}
+
+// The account panel's upgrade button. Free users get NONE on this page (2026-11-13): the hero's
+// 14-day trial is the one offer, and the unapproved "25% off first month" no longer competes with
+// it here (the Stripe promotion itself is untouched). Pro keeps its Teams upgrade; Team and
+// Enterprise keep "Add credits".
+export type AccountUpgrade = { label: string; href: string; offer: boolean };
+export function accountPanelUpgrade(plan: string | null): AccountUpgrade | null {
+  if (!plan || plan === 'free') return null;
+  if (plan === 'pro') return { label: 'Upgrade to Teams', href: `${TEAMS_CONTACT_URL}?offer=${UPGRADE_OFFER_PARAM}`, offer: true };
+  return { label: 'Add credits', href: BILLING_URL, offer: false };
+}
+
+// Hero trial offer. Reuses the Pro card's existing 14-day trial payment links (no new signup,
+// eligibility or Stripe config). A signed-in Pro / Team / Enterprise account (paid, trialing,
+// comped or lifetime, per resolvePlan) gets NO offer: it is never sent to another subscription
+// checkout, and the existing "Your plan" panel below the hero already links to billing.
+export type HeroTrialOffer = { href: string; cta: string; body: string; sub: string; fine: string };
+const PAID_PLANS = new Set(['pro', 'team', 'enterprise']);
+export function heroTrialOffer(plan: string | null, annual: boolean): HeroTrialOffer | null {
+  if (plan && PAID_PLANS.has(plan)) return null;
+  return {
+    href: PRO_TRIAL ? (annual ? PRO_TRIAL_ANNUAL : PRO_TRIAL_MONTHLY) : (annual ? PRO_CHECKOUT_ANNUAL : PRO_CHECKOUT_MONTHLY),
+    cta: 'Start your 14-day free trial',
+    body: "Explore opportunities, research competitors, and put Mindy's intelligence to work before your first subscription charge.",
+    sub: '14 days free · Cancel anytime · No sales call',
+    fine: `Mindy Pro. Card required; no charge for 14 days, then ${annual ? '$1,490/yr' : '$149/mo'}. We remind you before you're charged.`,
+  };
+}
 const GOVWIN_URL = '/compare/govwin';
 
 export const PLANS_FALLBACK: SubPlan[] = [
@@ -264,26 +305,17 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
       ],
     };
   };
+  const trialOffer = heroTrialOffer(me?.plan ?? null, annual);
   const CURRENT_CARD: Record<string, string> = { free: 'Free', pro: 'Pro', team: 'Teams' };
   if (me?.plan && CURRENT_CARD[me.plan]) {
     for (const c of appCards) if (c.name === CURRENT_CARD[me.plan]) c.current = true;
   }
-  // What "Upgrade" means from each plan: Free → Pro checkout, Pro → Teams, Team/Enterprise → add credits.
-  // Upgrading members get 25% off the first month (src/lib/billing/upgrade-offer.ts) — monthly Pro
-  // checkout carries the promo code; the Teams upgrade goes to sales with the offer attached.
-  const upgrade = !me?.plan ? null
-    : me.plan === 'free' ? { label: 'Upgrade to Pro', href: withUpgradePromo(PRO_CHECKOUT_MONTHLY), offer: true }
-    : me.plan === 'pro' ? { label: 'Upgrade to Teams', href: `${TEAMS_CONTACT_URL}?offer=${UPGRADE_OFFER_PARAM}`, offer: true }
-    : { label: 'Add credits', href: '/app?panel=settings&section=credits&tab=billing', offer: false };
-  // Annual stays the normal annual offer (its own 17% discount); the first-month deal is monthly.
-  if (me?.plan === 'free' && !annual) {
-    const pro = appCards.find((c) => c.name === 'Pro');
-    if (pro) { pro.href = withUpgradePromo(PRO_CHECKOUT_MONTHLY); pro.cta = 'Upgrade to Pro'; pro.pill = UPGRADE_OFFER_LABEL; pro.note = 'Billed monthly. 25% off applies to your first month.'; }
-  }
+  const upgrade = accountPanelUpgrade(me?.plan ?? null);
   if (me?.plan === 'pro') {
     const team = appCards.find((c) => c.name === 'Teams');
     if (team) { team.href = `${TEAMS_CONTACT_URL}?offer=${UPGRADE_OFFER_PARAM}`; team.cta = 'Upgrade to Teams'; team.pill = UPGRADE_OFFER_LABEL; }
   }
+  const shownAppCards = suppressTrialCardsForPaid(appCards, me?.plan ?? null);
   const PLAN_NAME: Record<string, string> = { free: 'Free', pro: 'Pro', team: 'Teams', enterprise: 'Enterprise' };
 
   const mcpCards = plans.map(mcpCard);
@@ -365,22 +397,34 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
         <section className="promo">
           <h1>Federal market intelligence for you and <span className="l2">your AI&nbsp;agents.</span></h1>
           <p>Find opportunities, research competitors, track recompetes, and put Mindy&apos;s intelligence to work inside Claude, Cursor, and your favorite AI tools.</p>
+          {trialOffer && (
+            <>
+              <div className="offer">
+                <div className="offer-copy">
+                  <div className="offer-k">Your federal intelligence team. Free for 14 days.</div>
+                  <p className="offer-p">{trialOffer.body}</p>
+                </div>
+                <div className="offer-act">
+                  <a className="offer-cta" href={trialOffer.href}>{trialOffer.cta}</a>
+                  <div className="offer-sub">{trialOffer.sub}</div>
+                </div>
+              </div>
+              <p className="offer-fine">{trialOffer.fine}</p>
+            </>
+          )}
           <div className="agents" aria-label="Works inside your AI tools">
             <span className="agents-k">Works inside</span>
             <span className="agent">Claude</span>
             <span className="agent">Cursor</span>
             <span className="agent">Any MCP-compatible agent</span>
           </div>
-          <p className="trial">14-day free trial. No sales call.</p>
           <MemberProof />
           <div className="row">
-            <span className="chip">✦ 14-day free trial on Pro and Team</span>
-            <span className="chip">↺ Cancel anytime</span>
             <a className="chip" href={REFERRALS_URL}>♥ Refer a friend — you both get 100 credits →</a>
           </div>
         </section>
 
-        {me?.plan && upgrade && (
+        {me?.plan && (
           <section className="current-plan" aria-label="Your plan">
             <div>
               <div className="cp-k">Your plan</div>
@@ -388,7 +432,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
             </div>
             <div className="cp-actions">
               <Link className="cp-sec" href="/app?panel=settings&section=credits&tab=billing">Billing &amp; credits</Link>
-              <a className="cp-up" href={upgrade.href}>{upgrade.label}{upgrade.offer && <span className="cp-off">{UPGRADE_OFFER_LABEL}</span>}</a>
+              {upgrade && <a className="cp-up" href={upgrade.href}>{upgrade.label}{upgrade.offer && <span className="cp-off">{UPGRADE_OFFER_LABEL}</span>}</a>}
             </div>
           </section>
         )}
@@ -408,7 +452,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
         </div>
 
         <div className={`grid ${tab === 'app' || mcpCards.length <= 3 ? 'c3' : 'c4'}`}>
-          {(tab === 'app' ? appCards : mcpCards).map((p) => <PlanCard key={p.name} p={p} />)}
+          {(tab === 'app' ? shownAppCards : mcpCards).map((p) => <PlanCard key={p.name} p={p} />)}
         </div>
 
         {tab === 'app' ? (
@@ -569,17 +613,25 @@ const CSS = `
 .up .wrap{max-width:1160px;margin:0 auto;padding:0 20px}
 
 /* Hero — the old page's wash band, centered */
-.up .promo{margin:28px 0 0;border-radius:8px;padding:48px 28px 40px;text-align:center;background:var(--mp-wash);border:1px solid var(--mp-hair)}
+.up .promo{margin:24px 0 0;border-radius:8px;padding:40px 28px 30px;text-align:center;background:var(--mp-wash);border:1px solid var(--mp-hair)}
 .up .promo h1{font-family:var(--mp-font-serif);font-weight:700;line-height:1.08;letter-spacing:-.02em;font-size:clamp(32px,5.2vw,60px);color:var(--mp-ink);max-width:900px;margin:0 auto;text-wrap:balance}
 .up .promo h1 .l2{color:var(--mp-navy)}
 .up .promo p{margin:18px auto 0;color:var(--mp-body);font-size:19px;line-height:1.5;max-width:700px;text-wrap:pretty}
-.up .promo .agents{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;margin-top:22px}
+.up .promo .agents{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;margin-top:16px}
 .up .promo .agents-k{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mp-muted);margin-right:4px}
 .up .promo .agent{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;background:var(--mp-surface);border:1px solid var(--mp-line);font-size:14px;font-weight:600;color:var(--mp-ink)}
 .up .promo .agent::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--mp-navy)}
-.up .promo p.trial{margin-top:18px;font-size:15px;font-weight:600;color:var(--mp-navy)}
-@media(max-width:600px){.up .promo{padding:30px 16px 26px;margin-top:16px}.up .promo p{font-size:16px;margin-top:14px}.up .promo .agents{gap:6px;margin-top:16px}.up .promo .agents-k{font-size:11px;margin-right:2px}.up .promo .agent{font-size:13px;padding:5px 10px;gap:6px}.up .promo p.trial{font-size:14px;margin-top:14px}}
-.up .promo .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:26px}
+.up .promo .offer{display:flex;align-items:center;justify-content:space-between;gap:24px;max-width:880px;margin:24px auto 0;padding:22px 24px 22px 28px;border-radius:16px;text-align:left;color:#fff;background:var(--mp-navy);box-shadow:0 18px 40px -18px rgba(27,58,107,.55),inset 0 1px 0 rgba(255,255,255,.12)}
+.up .promo .offer-k{font-family:var(--mp-font-sans);font-size:15px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;line-height:1.3}
+.up .promo .offer .offer-p{margin:8px 0 0;font-size:15px;line-height:1.5;color:rgba(255,255,255,.82);max-width:470px}
+.up .promo .offer-act{display:flex;flex-direction:column;align-items:center;gap:8px;flex-shrink:0}
+.up .promo .offer-cta{display:inline-flex;align-items:center;justify-content:center;padding:14px 24px;border-radius:10px;background:#fff;color:var(--mp-navy);font-weight:700;font-size:16px;white-space:nowrap;text-decoration:none;box-shadow:0 6px 16px -6px rgba(0,0,0,.35);transition:transform .12s ease,box-shadow .12s ease}
+.up .promo .offer-cta:hover{transform:translateY(-1px);box-shadow:0 10px 22px -8px rgba(0,0,0,.4)}
+.up .promo .offer-cta:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.up .promo .offer-sub{font-size:12.5px;font-weight:500;color:rgba(255,255,255,.78);white-space:nowrap}
+.up .promo p.offer-fine{margin:8px auto 0;font-size:13px;color:var(--mp-muted);max-width:880px}
+@media(max-width:600px){.up .promo{padding:30px 16px 26px;margin-top:16px}.up .promo p{font-size:16px;margin-top:14px}.up .promo .agents{gap:6px;margin-top:16px}.up .promo .agents-k{font-size:11px;margin-right:2px}.up .promo .agent{font-size:13px;padding:5px 10px;gap:6px}.up .promo .offer{flex-direction:column;align-items:stretch;gap:16px;padding:20px 18px;margin-top:20px;text-align:center}.up .promo .offer-k{font-size:13.5px}.up .promo .offer .offer-p{font-size:14px;max-width:none}.up .promo .offer-cta{width:100%;white-space:normal}.up .promo .offer-sub{white-space:normal}.up .promo p.offer-fine{font-size:12px}}
+.up .promo .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:16px}
 .up .chip{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;background:var(--mp-surface);border:1px solid var(--mp-line);font-size:13px;font-weight:500;color:var(--mp-body)}
 .up a.chip{color:var(--mp-navy);font-weight:600}
 .up a.chip:hover{border-color:var(--mp-navy)}
