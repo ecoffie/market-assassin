@@ -111,3 +111,16 @@ html.mi-light.mi-app,
 html.mi-light.mi-app body { background: #ffffff; color: #111c26; }
 html.mi-light.mi-app ::-webkit-scrollbar-track { background: #f7f9fb; }
 html.mi-light.mi-app ::-webkit-scrollbar-thumb { background: #d5dbe2; }
+
+/* Billing trial-upgrade offer ("Upgrade now — +500 bonus credits"): map blue in the app.
+   SubscriptionsCard is shared with /mcp/account (outside .mi-app), so the recolour is a scoped
+   variable remap here, not a class change there. bg-emerald-500 / -500/[0.06] / -500/25 all read
+   these vars, so the button turns #006aff (hover #0057d1), the box becomes the #eff5ff-ish tint
+   with a blue border, and the title reads in the darker text blue. */
+.mi-app [data-testid="trial-upgrade-offer"] {
+  --color-emerald-500: #006aff;
+  --color-emerald-400: #0057d1;
+  --color-emerald-200: #0057d1;
+  background-color: #eff5ff;
+  border-color: #cfe1ff;
+}

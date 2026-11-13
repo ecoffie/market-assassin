@@ -755,7 +755,7 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
               aria-controls={`settings-tab-${t.id}`}
               onClick={() => switchTab(t.id)}
               className={`relative -mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
-                on ? 'border-emerald-500 text-white' : 'border-transparent text-muted hover:text-slate-200'
+                on ? 'border-accent text-white' : 'border-transparent text-muted hover:text-slate-200'
               }`}
             >
               {t.label}

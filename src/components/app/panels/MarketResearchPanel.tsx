@@ -1894,7 +1894,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 // Restore the saved profile into the inputs.
                 if (savedProfile) applySavedProfile(savedProfile);
               }}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-colors ${researchMode === 'auto' ? 'bg-emerald-600 text-white' : 'text-muted hover:text-white'}`}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-colors ${researchMode === 'auto' ? 'bg-accent text-white' : 'text-muted hover:text-white'}`}
               title="Use your saved profile"
             >
               <Zap className="w-3.5 h-3.5" strokeWidth={2} /> Auto
@@ -1954,7 +1954,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 onClick={() => setViewMode('map')}
                 className={`px-3 py-1.5 rounded-md transition-colors ${
                   viewMode === 'map'
-                    ? 'bg-emerald-600 text-white'
+                    ? 'bg-accent text-white'
                     : 'text-muted hover:text-slate-200'
                 }`}
               >
@@ -1989,7 +1989,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               else { handleGenerateAll(undefined, { notifySuccess: true }); loadRecommendedOpportunities(); }
             }}
             disabled={isGenerating || profileLoading || sportSuggesting}
-            className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-input"
+            className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-input"
           >
             {isGenerating || sportSuggesting ? 'Building...' : reportData ? 'Refresh' : 'Build Market Map'}
           </button>
@@ -2024,7 +2024,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 type="button"
                 onClick={suggestSportCodes}
                 disabled={sportSuggesting || !sportKeyword.trim()}
-                className="px-4 py-2 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg"
+                className="px-4 py-2 text-sm font-semibold text-white bg-accent hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-input rounded-lg"
               >
                 {sportSuggesting ? 'Finding…' : 'Suggest codes'}
               </button>
@@ -2097,7 +2097,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                           pscCode: pscToApply.map(s => s.code).join(', '),
                           businessType: f.businessType || 'Small Business',
                         }))}
-                        className="w-full inline-flex items-center gap-1.5 justify-center rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-2 text-xs font-semibold text-white"
+                        className="w-full inline-flex items-center gap-1.5 justify-center rounded-lg bg-accent hover:bg-accent-hover px-3 py-2 text-xs font-semibold text-white"
                       >
                         <Check className="h-4 w-4 shrink-0" strokeWidth={2.5} /> Use these codes (Small Business) — then Build Market Map
                       </button>
@@ -2334,7 +2334,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 setShowAdvancedProfile(false);
               }}
               disabled={isGenerating}
-              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:bg-input"
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:bg-input"
             >
               Apply & Refresh
             </button>
@@ -2645,7 +2645,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             type="button"
             onClick={() => researchMode === 'sport' ? handleSportBuild({ notifySuccess: true }) : handleGenerateAll(undefined, { notifySuccess: true })}
             disabled={sportSuggesting}
-            className="mt-5 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:bg-input"
+            className="mt-5 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:bg-accent-hover disabled:bg-input"
           >
             {sportSuggesting ? 'Looking up codes…' : 'Build My Market Map'}
           </button>
@@ -5914,7 +5914,7 @@ function ReportViewer({
           </div>
         ) : (
           <p className="text-muted">
-            Click <strong className="text-emerald-300">Build Market Map</strong> at the top to generate this report
+            Click <strong className="text-accent">Build Market Map</strong> at the top to generate this report
             from your saved profile.
           </p>
         )}
