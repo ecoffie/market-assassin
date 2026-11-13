@@ -122,18 +122,45 @@ export async function getActiveAwardsVersion(): Promise<string | null> {
   return value;
 }
 
+/**
+ * Tri-state read of one served page (2026-11-12).
+ *
+ *   hit     — the table answered with the page.
+ *   absent  — the table answered: no row for this (uei, page) in the active generation.
+ *             NOT proof the contractor has no awards: the table only materializes the served
+ *             population and SERVED_MAX_PAGES pages of it.
+ *   error   — the table could not answer (no client, unreadable version pointer, PostgREST
+ *             error). The caller must treat this as TEMPORARY, never as "no awards".
+ *
+ * readServedPage() collapses absent and error into null; that conflation is fine for callers
+ * that only render on a hit, and wrong for anything deciding between 404 and 5xx.
+ */
+export type ServedPageState =
+  | { status: 'hit'; page: ServedPage }
+  | { status: 'absent' }
+  | { status: 'error'; reason: string };
+
 export async function readServedPage(
   recipientUei: string,
   pageNumber: number,
   pageSize: number,
 ): Promise<ServedPage | null> {
+  const r = await readServedPageState(recipientUei, pageNumber, pageSize);
+  return r.status === 'hit' ? r.page : null;
+}
+
+export async function readServedPageState(
+  recipientUei: string,
+  pageNumber: number,
+  pageSize: number,
+): Promise<ServedPageState> {
   const supabase = serviceClient();
-  if (!supabase) return null;
+  if (!supabase) return { status: 'error', reason: 'no-service-client' };
 
   // Resolve the ACTIVE generation, never `lifecycle='live'` — see
   // getActiveAwardsVersion() for the zero-live window that motivated this.
   const version = await getActiveAwardsVersion();
-  if (!version) return null;
+  if (!version) return { status: 'error', reason: 'active-version-unreadable' };
 
   const { data, error } = await supabase
     .from('awards_serving_pages')
@@ -154,11 +181,11 @@ export async function readServedPage(
       `[awards-serving] read failed for ${recipientUei} p${pageNumber}:`,
       error.message,
     );
-    return null;
+    return { status: 'error', reason: `postgrest: ${error.message}` };
   }
-  if (!data) return null;
+  if (!data) return { status: 'absent' };
 
-  return {
+  return { status: 'hit', page: {
     rows: (data.payload ?? []) as ServedAwardRow[],
     counts: {
       contracts: data.contract_count ?? 0,
@@ -169,7 +196,7 @@ export async function readServedPage(
     sourceAsOf: data.source_as_of ?? null,
     generatedAt: data.generated_at,
     servedFrom: 'table',
-  };
+  } };
 }
 
 /**

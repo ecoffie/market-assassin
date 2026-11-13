@@ -119,6 +119,9 @@ const DEGRADED = new Map<string, string>();
 const DEGRADED_MAX = 200;
 
 function markDegraded(key: string, reason: string): void {
+  // A mark describes the MOST RECENT call for the key (see bqDegraded). Clear the other kind,
+  // or a stale mark from an earlier call in this lambda instance outranks the current answer.
+  UNAVAILABLE.delete(key);
   if (DEGRADED.size >= DEGRADED_MAX) {
     const oldest = DEGRADED.keys().next().value;
     if (oldest !== undefined) DEGRADED.delete(oldest);
@@ -154,6 +157,10 @@ const UNAVAILABLE = new Map<string, string>();
 const UNAVAILABLE_MAX = 200;
 
 function markUnavailable(key: string, reason: string): void {
+  // Same rule as markDegraded. Without this, a key that FAILED once in this instance (e.g.
+  // during a quota exhaustion) read as 'failed' on every later cold cache-only read, so callers
+  // that branch on failed-vs-unavailable skipped their recovery path (2026-11-12).
+  DEGRADED.delete(key);
   if (UNAVAILABLE.size >= UNAVAILABLE_MAX) {
     const oldest = UNAVAILABLE.keys().next().value;
     if (oldest !== undefined) UNAVAILABLE.delete(oldest);

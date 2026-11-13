@@ -40,6 +40,7 @@ import {
   getExecutivesForRecipient,
   recipientSlug,
 } from '@/lib/bigquery/recipients';
+import { WARM_QUEUE_KEY } from '@/lib/seo/served-slugs';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -53,6 +54,13 @@ const BATCH_SIZE = 200;
 // Persistent walk cursor — which index into the sitemap slug list the
 // next run starts at. Wraps to 0 at the end of the set.
 const CURSOR_KEY = 'cron:warm-contractor-pages:cursor';
+
+// Slugs drained per run from the warm-miss queue (seo:warm:queue:contractor-slugs).
+// Every public page that answers 5xx because its data is cold queues its slug; this drain
+// is what guarantees that 5xx is temporary (≤ ~1h for the first 25, 600/day). Bounded so a
+// crawler walking junk slugs cannot turn the queue into a BigQuery bill: a junk slug costs
+// only the identity lookup (~115 MB) and then resolves to a cached "not found".
+const QUEUE_DRAIN_PER_RUN = 25;
 
 function authorized(request: NextRequest): boolean {
   if (request.headers.get('x-vercel-cron') === '1') return true;
@@ -104,6 +112,7 @@ async function warmSlug(slug: string): Promise<'warmed' | 'skipped'> {
   // A previous cold crawl may have cached a 404 via ISR — force
   // regeneration now that the data keys are warm.
   revalidatePath(`/contractors/${slug}`);
+  revalidatePath(`/contractors/${slug}/contracts`);
   return 'warmed';
 }
 
@@ -131,6 +140,31 @@ async function handle(request: NextRequest) {
   let warmed = 0;
   let skipped = 0;
   const failures: Array<{ slug: string; error: string }> = [];
+
+  // 1. Drain recorded misses first: these are URLs answering 5xx right now.
+  let queued: string[] = [];
+  let queueDepthAfter: number | null = null;
+  try {
+    const popped = await kv.spop<string[]>(WARM_QUEUE_KEY, QUEUE_DRAIN_PER_RUN);
+    queued = Array.isArray(popped) ? popped : popped ? [popped as unknown as string] : [];
+  } catch (err) {
+    console.warn('[warm-contractor-pages] warm-miss queue unreadable:', err);
+  }
+  let queueWarmed = 0;
+  for (const slug of queued) {
+    try {
+      if ((await warmSlug(slug)) === 'warmed') queueWarmed++;
+    } catch (err) {
+      failures.push({ slug, error: err instanceof Error ? err.message : String(err) });
+      // Put it back so a transient BQ failure does not lose the URL.
+      try { await kv.sadd(WARM_QUEUE_KEY, slug); } catch { /* best effort */ }
+    }
+  }
+  try {
+    queueDepthAfter = await kv.scard(WARM_QUEUE_KEY);
+  } catch { /* reported as null */ }
+
+  // 2. Then the steady sitemap walk.
   for (const slug of batch) {
     try {
       const result = await warmSlug(slug);
@@ -157,6 +191,7 @@ async function handle(request: NextRequest) {
     skipped,
     failed: failures.length,
     failures: failures.slice(0, 20),
+    queue: { drained: queued.length, warmed: queueWarmed, depthAfter: queueDepthAfter },
   });
 }
 
