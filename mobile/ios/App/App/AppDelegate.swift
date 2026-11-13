@@ -102,7 +102,9 @@ public class PhoneNavPlugin: CAPPlugin, CAPBridgedPlugin {
         guard let host = url.host?.lowercased(),
               appHosts.contains(host) || host == serverHost?.lowercased() else { return false }
         let path = url.path.isEmpty ? "/" : url.path
-        return appPaths.contains { path == $0 || path.hasPrefix($0 + "/") }
+        // "/app" itself is the Mindy app (the Mindy tab); its other pages (forgot password,
+        // signup) still open in Safari.
+        return path == "/app" || appPaths.contains { path == $0 || path.hasPrefix($0 + "/") }
     }
 
     // nil = let Capacitor decide (allow), true = cancel the load.

@@ -1,7 +1,7 @@
 # Mindy phone app (iPhone + Android)
 
 A native app shell around the Mindy phone screen (`https://getmindy.ai/app/phone`,
-`src/app/app/phone/page.tsx`): sign in, then two tabs — Mindy (today's matches) and Map.
+`src/app/app/phone/page.tsx`): sign in, then two tabs — Mindy (the Mindy app, /app) and Map — without the website's top bar.
 Other pages (pricing, forgot password, outside sites) open in the phone's browser
 (`PhoneNavPlugin` in `ios/App/App/AppDelegate.swift` and `android/.../PhoneNavPlugin.java`).
 Built with Capacitor 7. Every website deploy shows up in the app right away,

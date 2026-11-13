@@ -28,6 +28,8 @@ public class PhoneNavPlugin extends Plugin {
         host = host.toLowerCase();
         if (!APP_HOSTS.contains(host) && !host.equalsIgnoreCase(serverHost)) return false;
         String path = url.getPath() == null || url.getPath().isEmpty() ? "/" : url.getPath();
+        // "/app" itself is the Mindy app (the Mindy tab); its other pages still open in the browser.
+        if (path.equals("/app")) return true;
         for (String p : APP_PATHS) {
             if (path.equals(p) || path.startsWith(p + "/")) return true;
         }
