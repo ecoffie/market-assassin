@@ -21,6 +21,14 @@ describe('raw-HTML public shell', () => {
     expect(header.querySelector('.mp-logo img')?.getAttribute('src')).toBe('/brand/mindy-logo-icon.png');
   });
 
+  it('has no Plans & Pricing link: Start for free already goes to /pricing (2026-11-13)', () => {
+    const d = doc(mpRawHeaderHtml());
+    const labels = [...d.querySelectorAll('a')].map((a) => a.textContent?.trim());
+    expect(labels).not.toContain('Plans & Pricing');
+    const toPricing = [...d.querySelectorAll('header.mp-head a[href="/pricing"]')].map((a) => a.textContent?.trim());
+    expect(toPricing).toEqual(['Start for free']);
+  });
+
   it('has a "How it works" menu in place of Learn, one card per way Mindy works', () => {
     const header = doc(mpRawHeaderHtml()).querySelector('header.mp-head')!;
     expect(header.querySelector('.mp-hiw-btn')?.textContent).toBe('How it works');
