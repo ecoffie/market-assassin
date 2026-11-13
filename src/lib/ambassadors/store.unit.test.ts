@@ -14,7 +14,10 @@ vi.mock('@vercel/kv', () => ({
 }));
 
 const store = await import('./store');
-const app = (email: string) => ({ name: 'Ann Lee', email, company: '', role: 'Coach', audienceSize: '500–2,000', audience: 'contractors in Ohio', why: 'I teach this every week', promotePlan: 'workshops and LinkedIn' });
+const app = (email: string) => ({
+  name: 'Ann Lee', email, postUrl: 'https://linkedin.com/in/ann', company: 'Lee Federal LLC', uei: 'ABC123DEF456',
+  lastEvent: 'Fort Bragg Industry Day', pursuit: 'Sources sought response to Army MICC janitorial', wantToFind: 'Who holds the current janitorial contract', attested: true as const,
+});
 
 beforeEach(() => { mem.clear(); sets.clear(); store.clearAmbassadorCache(); });
 
@@ -23,11 +26,12 @@ describe('ambassador store (KV)', () => {
     await store.saveApplication(app('Ann@Example.com'));
     const rows = await store.listAmbassadors();
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ email: 'ann@example.com', status: 'pending', audience: '[500–2,000] contractors in Ohio' });
+    expect(rows[0]).toMatchObject({ email: 'ann@example.com', status: 'pending', uei: 'ABC123DEF456', post_url: 'https://linkedin.com/in/ann', last_event: 'Fort Bragg Industry Day' });
+    expect(rows[0].attested_at).toBeTruthy();
     expect(await store.listAmbassadors('approved')).toHaveLength(0);
   });
 
-  it('approval turns on unlimited use; removal turns it off', async () => {
+  it('approval makes MCP calls free; removal turns it off', async () => {
     await store.saveApplication(app('ann@example.com'));
     expect(await store.isApprovedAmbassador('ann@example.com')).toBe(false);
     await store.setDecision('ann@example.com', 'approved', 'admin', null, 'abc123');
@@ -48,6 +52,13 @@ describe('ambassador store (KV)', () => {
     const { kv } = await import('@vercel/kv');
     vi.mocked(kv.get).mockRejectedValueOnce(new Error('quota'));
     expect(await store.isApprovedAmbassador('someone@example.com')).toBe(false);
+  });
+
+  it('still reads a row saved by the first-version form', async () => {
+    mem.set('ambassador:app:old@example.com', { email: 'old@example.com', name: 'Old', company: null, role: 'Coach', linkedin_url: null, website_url: null, audience: '[500–2,000] Ohio', why: 'because', promote_plan: null, status: 'approved', referral_code: 'x', decided_at: null, decided_by: null, decision_note: null, created_at: '2026-11-12T00:00:00Z', updated_at: '2026-11-12T00:00:00Z' });
+    sets.set('ambassador:index', new Set(['old@example.com']));
+    expect(await store.listAmbassadors('approved')).toHaveLength(1);
+    expect(await store.isApprovedAmbassador('old@example.com')).toBe(true);
   });
 
   it('builds the shared referral link to /pricing', () => {

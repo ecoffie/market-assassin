@@ -25,25 +25,28 @@ export function renderApplicationReceived(name: string): { subject: string; html
   const subject = 'We got your Mindy Ambassador application';
   const html = shell(subject, `
 <h1 style="margin:0 0 12px;font-size:22px;color:#12161d;">Thanks, ${esc(first(name))}.</h1>
-<p style="margin:0 0 14px;">We received your application to the Mindy Ambassadors program. Our team reviews every application by hand, and we will email you with a decision.</p>
-<p style="margin:0;">If you are approved, you get unlimited Mindy, a direct line to the product team, and your own referral link to earn from.</p>`);
-  const text = `Thanks, ${first(name)}.\n\nWe received your application to the Mindy Ambassadors program. Our team reviews every application by hand, and we will email you with a decision.\n\nIf you are approved, you get unlimited Mindy, a direct line to the product team, and your own referral link to earn from.\n\nQuestions? ${SUPPORT_EMAIL}\nGovCon Giants AI · getmindy.ai`;
+<p style="margin:0 0 14px;">We received your application to the Mindy Ambassador Program. We read every application and we answer either way.</p>
+<p style="margin:0;">We are starting with 15 and opening to 50 after the first quarter.</p>`);
+  const text = `Thanks, ${first(name)}.\n\nWe received your application to the Mindy Ambassador Program. We read every application and we answer either way.\n\nWe are starting with 15 and opening to 50 after the first quarter.\n\nQuestions? ${SUPPORT_EMAIL}\nGovCon Giants AI · getmindy.ai`;
   return { subject, html, text };
 }
+
+/** The exact disclosure wording from Section 6 of the program document. */
+export const DISCLOSURE_WORDING = 'Mindy gives me free access to their platform as part of their ambassador program.';
 
 export function renderApproved(name: string, referralLink: string): { subject: string; html: string; text: string } {
   const subject = "You're a Mindy Ambassador";
   const btn = (href: string, label: string) => `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 18px;"><tr><td style="border-radius:9px;background:${NAVY};"><a href="${href}" style="display:inline-block;padding:12px 24px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;">${label}</a></td></tr></table>`;
   const html = shell(subject, `
 <h1 style="margin:0 0 12px;font-size:22px;color:#12161d;">Welcome aboard, ${esc(first(name))}.</h1>
-<p style="margin:0 0 14px;">You are now a Mindy Ambassador. Here is what that means:</p>
-<p style="margin:0 0 8px;"><strong>1. Unlimited Mindy.</strong> Your account has Mindy Pro, and you are never charged credits, in the app or in your AI. Sign in with this email address.</p>
+<p style="margin:0 0 14px;">You are now a Mindy Ambassador. Your twelve months start today. Sign in with this email address.</p>
 ${btn('https://getmindy.ai/opportunity-map', 'Open Mindy')}
-<p style="margin:0 0 14px;"><strong>2. Your feedback shapes the product.</strong> Reply to this email any time with what works, what doesn't and what you wish Mindy did. You'll go straight to the team building it.</p>
-<p style="margin:0 0 8px;"><strong>3. Your referral link.</strong> Share it with your audience. Everyone who signs up through it is tracked to you. We'll share the earnings details with you soon.</p>
-<p style="margin:0 0 18px;padding:12px 14px;background:#f4f6fa;border-radius:8px;font-family:Menlo,monospace;font-size:14px;word-break:break-all;"><a href="${esc(referralLink)}" style="color:${NAVY};">${esc(referralLink)}</a></p>
-<p style="margin:0;">Thank you for helping contractors find and win federal work.</p>`);
-  const text = `Welcome aboard, ${first(name)}.\n\nYou are now a Mindy Ambassador:\n\n1. Unlimited Mindy. Your account has Mindy Pro, and you are never charged credits, in the app or in your AI. Sign in with this email address: https://getmindy.ai/opportunity-map\n\n2. Your feedback shapes the product. Reply to this email any time with what works, what doesn't and what you wish Mindy did.\n\n3. Your referral link. Share it with your audience. Everyone who signs up through it is tracked to you. We'll share the earnings details with you soon.\n${referralLink}\n\nThank you for helping contractors find and win federal work.\n\nQuestions? ${SUPPORT_EMAIL}\nGovCon Giants AI · getmindy.ai`;
+<p style="margin:0 0 8px;"><strong>Every month:</strong> four public posts, one a week, each showing a real action you took in Mindy and what came of it. Tag Mindy on every post.</p>
+<p style="margin:0 0 8px;"><strong>Disclose on every post</strong>, near the top, in plain words:</p>
+<p style="margin:0 0 14px;padding:12px 14px;background:#f4f6fa;border-radius:8px;font-style:italic;">"${DISCLOSURE_WORDING}"</p>
+<p style="margin:0 0 14px;">If you link to Mindy in a post, you can use your own link: <a href="${esc(referralLink)}" style="color:${NAVY};">${esc(referralLink)}</a></p>
+<p style="margin:0;">The full program, including the claim limits and terms, is at <a href="https://getmindy.ai/ambassadors" style="color:${NAVY};">getmindy.ai/ambassadors</a>.</p>`);
+  const text = `Welcome aboard, ${first(name)}.\n\nYou are now a Mindy Ambassador. Your twelve months start today. Sign in with this email address: https://getmindy.ai/opportunity-map\n\nEvery month: four public posts, one a week, each showing a real action you took in Mindy and what came of it. Tag Mindy on every post.\n\nDisclose on every post, near the top, in plain words:\n"${DISCLOSURE_WORDING}"\n\nIf you link to Mindy in a post, you can use your own link: ${referralLink}\n\nThe full program, including the claim limits and terms: https://getmindy.ai/ambassadors\n\nQuestions? ${SUPPORT_EMAIL}\nGovCon Giants AI · getmindy.ai`;
   return { subject, html, text };
 }
 

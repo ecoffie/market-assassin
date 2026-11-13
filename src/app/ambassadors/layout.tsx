@@ -1,13 +1,15 @@
 import type { Metadata } from 'next';
 import PublicShell from '@/components/public-site/PublicShell';
 
+const DESCRIPTION = 'Fifty federal contractors. Twelve months of Mindy. One public post a week showing what you actually did with it.';
+
 export const metadata: Metadata = {
-  title: 'Mindy Ambassadors | Mindy',
-  description: 'Apply to the Mindy Ambassadors program: use Mindy unlimited, shape the product with your feedback, and earn by sharing it with your audience.',
+  title: 'Mindy Ambassador Program | Mindy',
+  description: DESCRIPTION,
   alternates: { canonical: 'https://getmindy.ai/ambassadors' },
   openGraph: {
-    title: 'Mindy Ambassadors',
-    description: 'Use Mindy unlimited, shape the product, and earn by sharing it.',
+    title: 'Mindy Ambassador Program',
+    description: DESCRIPTION,
     url: 'https://getmindy.ai/ambassadors',
   },
 };

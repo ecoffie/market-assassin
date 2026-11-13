@@ -9,8 +9,10 @@
  *   ambassador:index        → set of every applicant email
  *
  * Lifecycle: pending → approved | rejected; approved → removed. Approving grants free Pro
- * (member-grants, the same path as a staff grant) and turns on unlimited use: the metered MCP
- * edge charges an approved ambassador 0 credits (src/lib/mcp/metered.ts).
+ * (member-grants, the same path as a staff grant) and the metered MCP edge charges an approved
+ * ambassador 0 credits (src/lib/mcp/metered.ts). The program document promises "a generous monthly
+ * credit allowance" with "a stated fair-use limit that no normal user reaches"; no such limit is
+ * enforced in code yet.
  */
 import { kv } from '@vercel/kv';
 import type { AmbassadorApplication } from './application';
@@ -21,12 +23,21 @@ export interface AmbassadorRow {
   email: string;
   name: string;
   company: string | null;
-  role: string | null;
-  linkedin_url: string | null;
-  website_url: string | null;
-  audience: string;
-  why: string;
-  promote_plan: string | null;
+  /** Section 9 of the program document (applications from 2026-11-13 on). */
+  post_url?: string | null;
+  uei?: string | null;
+  last_event?: string | null;
+  pursuit?: string | null;
+  want_to_find?: string | null;
+  /** When they ticked "I meet all six requirements and will disclose on every post." */
+  attested_at?: string | null;
+  /** First-version form fields. Kept so rows saved before 2026-11-13 still read and render. */
+  role?: string | null;
+  linkedin_url?: string | null;
+  website_url?: string | null;
+  audience?: string | null;
+  why?: string | null;
+  promote_plan?: string | null;
   status: AmbassadorStatus;
   referral_code: string | null;
   decided_at: string | null;
@@ -74,12 +85,12 @@ export async function saveApplication(a: AmbassadorApplication): Promise<{ statu
     email: norm(a.email),
     name: a.name,
     company: a.company || null,
-    role: a.role || null,
-    linkedin_url: a.linkedinUrl || null,
-    website_url: a.websiteUrl || null,
-    audience: `[${a.audienceSize}] ${a.audience}`,
-    why: a.why,
-    promote_plan: a.promotePlan || null,
+    post_url: a.postUrl,
+    uei: a.uei,
+    last_event: a.lastEvent,
+    pursuit: a.pursuit,
+    want_to_find: a.wantToFind,
+    attested_at: now,
     status: 'pending',
     referral_code: existing?.referral_code ?? null,
     decided_at: null,
