@@ -13,7 +13,7 @@
 import { BQ_TABLES, bqQuery } from './client';
 import { queryCached, bqResultState, type BqResultState } from './cache';
 import { bqUnavailable } from './cache';
-import { readServedPage } from '../awards-serving';
+import { readServedPageState } from '../awards-serving';
 import { getCachedCerts, certBuckets } from '@/lib/sam/recipient-certs';
 import { multiAgency, agencyBqOrSql } from '@/lib/opportunities/agency-match';
 import { buildPlayersQuery, cityScopeSql, geoCacheToken } from '@/lib/players/query';
@@ -215,12 +215,31 @@ export const ROLLUP_BY_SLUG_SQL = `
       ) = 1
     `;
 
+/**
+ * queryCached() keys for the public contractor pages, defined ONCE.
+ *
+ * The SEO resolver (src/lib/seo/contractor-resolve.ts) asks bqResultState() about the exact
+ * key each reader just used, to tell "the source answered: no such contractor" (cached [],
+ * safe to 404) from "the cache is cold" (unknown — never a 404). A copied key string that
+ * drifts would silently turn every cold miss back into a confident 404.
+ */
+export const seoCacheKeys = {
+  rollupBySlug: (slug: string) => `rollup:by-slug:${slug}:v2-merged`,
+  recipientBySlug: (slug: string) => `recipient:by-slug:${slug}:v2`,
+  canonicalOf: (slug: string) => `rollup:canonical-of:${slug}:v3-merged`,
+  recentAwards: (rollupUei: string, limit: number) => `rollup:${rollupUei}:recent-awards:${limit}:v4-m`,
+  yearlyTotals: (rollupUei: string) => `rollup:${rollupUei}:yearly-totals:v3-m`,
+  awardsPage: (rollupUei: string, page: number, pageSize: number) =>
+    `rollup:${rollupUei}:awards-page:${page}:${pageSize}:v2-m`,
+  awardsTotal: (rollupUei: string) => `rollup:${rollupUei}:awards-total:v2-m`,
+} as const;
+
 // liveBq: authed Mindy callers pass true to allow a cold BQ scan; public SEO
 // callers omit it → cache-only (see bigquery/cache.ts cacheOnly).
 export async function getRollupBySlug(slug: string, liveBq = false): Promise<RollupProfile | null> {
   const rows = await queryCached<RollupProfile>({
     cacheOnly: !liveBq,
-    cacheKey: `rollup:by-slug:${slug}:v2-merged`,
+    cacheKey: seoCacheKeys.rollupBySlug(slug),
     query: ROLLUP_BY_SLUG_SQL,
     params: { slugs: [slug] },
   });
@@ -405,7 +424,7 @@ export async function resolveCanonicalSlug(
 ): Promise<string | null> {
   const normSlug = normalizeCompanyName(slug);
   const rows = await queryCached<{ requested_slug: string; canonical_slug: string }>({
-    cacheKey: `rollup:canonical-of:${slug}:v3-merged`,
+    cacheKey: seoCacheKeys.canonicalOf(slug),
     query: CANONICAL_SLUG_SQL,
     params: { slug, normSlug },
     // Default cache-ONLY, and deliberately so. This query joins the full
@@ -476,7 +495,7 @@ export async function resolveCanonicalSlugsBatch(
 export async function getRecipientBySlug(slug: string, liveBq = false): Promise<RecipientProfile | null> {
   const rows = await queryCached<RecipientProfile>({
     cacheOnly: !liveBq,
-    cacheKey: `recipient:by-slug:${slug}:v2`,
+    cacheKey: seoCacheKeys.recipientBySlug(slug),
     query: `
       WITH slugged AS (
         SELECT
@@ -711,7 +730,7 @@ export async function getRecentAwardsForRecipient(
   // modification signal — never PIID repetition alone.
   return queryCached<RecentAwardRow>({
     cacheOnly: !liveBq,
-    cacheKey: `rollup:${rollupUei}:recent-awards:${limit}:v4-m`,
+    cacheKey: seoCacheKeys.recentAwards(rollupUei, limit),
     query: `
       SELECT
         award_id,
@@ -758,7 +777,7 @@ export async function getYearlyTotalsForRecipient(
 ): Promise<YearlyTotalRow[]> {
   return queryCached<YearlyTotalRow>({
     cacheOnly: !liveBq,
-    cacheKey: `rollup:${rollupUei}:yearly-totals:v3-m`,
+    cacheKey: seoCacheKeys.yearlyTotals(rollupUei),
     query: `
       SELECT
         fiscal_year,
@@ -1051,16 +1070,31 @@ export interface YearlyByAgencyRow {
  * Skips $0 modifications — they're real records but the user-facing
  * value is "what money moved", not "which admin paperwork was filed".
  */
+/**
+ * Result of a paginated awards read.
+ *
+ *   available:true            — rows/total are a real answer (cache, durable table, or live BQ).
+ *   state 'unavailable'       — cache cold and no bounded live read was allowed: WE DO NOT KNOW.
+ *   state 'failed'            — a data source errored (BQ quota/failure, Supabase error).
+ *
+ * `available` is kept for existing callers; new callers branch on `state`.
+ */
+export type PaginatedAwardsState = 'ok' | 'unavailable' | 'failed';
+
 export async function getPaginatedAwardsForRecipient(
   ueis: string[],
   rollupUei: string,
   page: number,
   pageSize: number = 50,
-): Promise<{ rows: RecentAwardRow[]; total: number; available: boolean }> {
+  liveBq = false,
+): Promise<{ rows: RecentAwardRow[]; total: number; available: boolean; state: PaginatedAwardsState }> {
   const offset = (page - 1) * pageSize;
+  const rowsKey = seoCacheKeys.awardsPage(rollupUei, page, pageSize);
+  const totalKey = seoCacheKeys.awardsTotal(rollupUei);
   const [rows, totalRows] = await Promise.all([
     queryCached<RecentAwardRow>({
-      cacheKey: `rollup:${rollupUei}:awards-page:${page}:${pageSize}:v2-m`,
+      cacheOnly: !liveBq,
+      cacheKey: rowsKey,
       query: `
         SELECT
           award_id,
@@ -1087,7 +1121,8 @@ export async function getPaginatedAwardsForRecipient(
       maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
     }),
     queryCached<{ total: number }>({
-      cacheKey: `rollup:${rollupUei}:awards-total:v2-m`,
+      cacheOnly: !liveBq,
+      cacheKey: totalKey,
       query: `
         SELECT COUNT(*) AS total
         FROM ${BQ_TABLES.awards}
@@ -1100,35 +1135,40 @@ export async function getPaginatedAwardsForRecipient(
   // A cold cache returns [] for BOTH queries, which is indistinguishable from a
   // contractor that genuinely has no awards — the ambiguity that let 11,772 pages
   // publish "Showing contracts 1-0 of 0 total" beneath a "$399M / 29 awards" title.
-  // `available:false` means WE DO NOT KNOW; the page must noindex and say so rather
-  // than render a zero, and must not fall back to the cached headline count either.
-  const rowsKey = `rollup:${rollupUei}:awards-page:${page}:${pageSize}:v2-m`;
-  const totalKey = `rollup:${rollupUei}:awards-total:v2-m`;
+  // Read the state of each key IMMEDIATELY (the side-channel is per-instance, last-call).
+  const rowsState = bqResultState(rowsKey, rows.length);
+  const totalState = bqResultState(totalKey, totalRows.length);
   const cacheAvailable =
-    !bqUnavailable(rowsKey, rows.length) && !bqUnavailable(totalKey, totalRows.length);
+    (rowsState === 'hit' || rowsState === 'empty') && (totalState === 'hit' || totalState === 'empty');
 
   if (cacheAvailable) {
-    return { rows, total: Number(totalRows[0]?.total ?? 0), available: true };
+    return { rows, total: Number(totalRows[0]?.total ?? 0), available: true, state: 'ok' };
   }
+  const bqFailed = rowsState === 'failed' || totalState === 'failed';
 
   // ── TIER 2: the durable serving table ────────────────────────────────────────
-  // Redis missed. Before conceding "unavailable", ask the table that CANNOT lapse.
-  // This is the whole point of the durable layer: a 90-day TTL emptying itself must
-  // no longer take 11,772 public pages down with it.
+  // Redis missed. Before conceding, ask the table that CANNOT lapse. A 90-day TTL
+  // emptying itself must no longer take 11,772 public pages down with it.
   //
-  // ⚠️ THERE IS NO TIER 3 THAT QUERIES BIGQUERY. A web request must never trigger a
-  // live scan — that is what turns crawler traffic into an uncontrolled bill. If the
-  // table cannot answer either, the page renders the honest unavailable state.
-  const served = await readServedPage(rollupUei, page, pageSize);
-  if (served) {
+  // Live BigQuery (TIER 3) is only ever reached when the CALLER passed liveBq=true,
+  // which the public page does only after taking a unit of the fail-closed daily
+  // cold budget (src/lib/seo/seo-unavailable.ts). Never on its own.
+  const served = await readServedPageState(rollupUei, page, pageSize);
+  if (served.status === 'hit') {
     return {
-      rows: served.rows as unknown as RecentAwardRow[],
-      total: served.counts.displayedActions,
+      rows: served.page.rows as unknown as RecentAwardRow[],
+      total: served.page.counts.displayedActions,
       available: true,
+      state: 'ok',
     };
   }
 
-  return { rows, total: Number(totalRows[0]?.total ?? 0), available: false };
+  return {
+    rows,
+    total: Number(totalRows[0]?.total ?? 0),
+    available: false,
+    state: bqFailed || served.status === 'error' ? 'failed' : 'unavailable',
+  };
 }
 
 /**

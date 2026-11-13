@@ -20,6 +20,8 @@ const read = (p: string) => readFileSync(join(root, p), 'utf8');
 
 const recipients = read('src/lib/bigquery/recipients.ts');
 const seoPage = read('src/app/contractors/[slug]/page.tsx');
+const seoWiring = read('src/lib/seo/contractor-page-data.ts');
+const seoResolver = read('src/lib/seo/contractor-resolve.ts');
 const nameResolution = read('src/lib/contractor/name-resolution.ts');
 const sitemap = read('src/app/sitemap.ts');
 const warmer = read('scripts/warm-contractor-slugs.ts');
@@ -30,9 +32,10 @@ describe('one source of contractor truth', () => {
     // MCP tools (get_contractor_profile / get_contractor_award_history)
     expect(nameResolution).toContain('getRollupOrSingleBySlug');
     expect(nameResolution).toContain("from '@/lib/bigquery/recipients'");
-    // Public SEO page
-    expect(seoPage).toContain('getRollupOrSingleBySlug');
-    expect(seoPage).toContain("from '@/lib/bigquery/recipients'");
+    // Public SEO page — resolves through the shared resolver, wired to the same function.
+    expect(seoPage).toContain('resolveContractorForPage(slug)');
+    expect(seoWiring).toContain('getRollupOrSingleBySlug(s, live)');
+    expect(seoWiring).toContain("from '@/lib/bigquery/recipients'");
   });
 
   it('the single-slug reader and the batch warmer share ONE canonical-slug query', () => {
@@ -87,11 +90,23 @@ describe('Googlebot must never reach live BigQuery', () => {
     expect(block).not.toContain('cacheOnly: false');
   });
 
-  it('a public cache miss records the slug instead of querying', () => {
+  // 2026-11-12: the rule changed from "a cache miss never queries" to "a cache miss never
+  // 404s, and any live read is bounded". Cache-miss → notFound() is what 404'd valid
+  // contractors through July 2026 (10,173 → 1,347 indexed). Behavior is covered by
+  // contractor-resolve.unit.test.ts; these lock the shape.
+  it('a public cache miss takes the fail-closed budget before any live read', () => {
+    const resolver = seoResolver.replace(/^\s*\/\/.*$/gm, '');
+    const budget = resolver.indexOf('await deps.takeBudget()');
+    const live = resolver.indexOf('deps.rollupOrSingle(slug, true)');
+    expect(budget).toBeGreaterThan(-1);
+    expect(live).toBeGreaterThan(budget);
+    expect(seoWiring).toContain("takeBudget: () => takeSeoColdBudget('contractor')");
+  });
+
+  it('a public cache miss is never a 404: the page throws the temporary-unavailable 5xx', () => {
+    expect(seoPage).toContain("if (resolution.kind === 'not_found') notFound();");
+    expect(seoPage).toContain("if (resolution.kind === 'unavailable') throw new SeoTemporarilyUnavailableError(");
     expect(seoPage).toContain('recordWarmMiss');
-    const missBlock = seoPage.slice(seoPage.indexOf('recordWarmMiss('));
-    // The miss path ends in notFound(), not in a live query.
-    expect(missBlock.slice(0, 200)).toContain('notFound()');
   });
 
   it('PIID vanity URLs stay blocked in robots.txt', () => {

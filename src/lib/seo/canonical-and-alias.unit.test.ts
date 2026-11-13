@@ -91,14 +91,19 @@ describe('defect 2 — a redirect is only issued to a serveable canonical', () =
     expect(helper.slice(helper.indexOf('catch'))).toContain('return null');
   });
 
-  const routes = [
-    'src/app/contractors/[slug]/page.tsx',
-    'src/app/contractors/[slug]/contracts/[[...page]]/page.tsx',
+  // naics/agencies still resolve aliases inline.
+  const inlineRoutes = [
     'src/app/contractors/[slug]/naics/page.tsx',
     'src/app/contractors/[slug]/agencies/page.tsx',
   ];
+  // The profile and contracts routes resolve through the shared resolver (2026-11-12), which
+  // only ever redirects to what serveableCanonical() confirmed.
+  const resolverRoutes = [
+    'src/app/contractors/[slug]/page.tsx',
+    'src/app/contractors/[slug]/contracts/[[...page]]/page.tsx',
+  ];
 
-  it.each(routes)('%s gates its redirect on serveability', (file) => {
+  it.each(inlineRoutes)('%s gates its redirect on serveability', (file) => {
     const src = code(read(file));
     expect(src, `${file} missing`).not.toBe('');
     expect(src).toContain('serveableCanonical(await resolveCanonicalSlug(slug))');
@@ -106,13 +111,30 @@ describe('defect 2 — a redirect is only issued to a serveable canonical', () =
     expect(src).not.toMatch(/const canonical = await resolveCanonicalSlug\(slug\);/);
   });
 
-  it('every contractor route that can redirect is covered — none left ungated', () => {
-    for (const f of routes) {
+  it.each(resolverRoutes)('%s redirects only on the shared resolver verdict', (file) => {
+    const src = code(read(file));
+    expect(src).toContain('resolveContractorForPage(slug)');
+    expect(src).toMatch(/resolution\.kind === 'redirect'\) permanentRedirect\(`\/contractors\/\$\{resolution\.slug\}/);
+    expect(src).not.toContain('resolveCanonicalSlug(');
+  });
+
+  it('the shared resolver redirects only to a serveable canonical', () => {
+    const wiring = code(read('src/lib/seo/contractor-page-data.ts'));
+    expect(wiring).toContain('serveable: (c) => serveableCanonical(c)');
+    const resolver = code(read('src/lib/seo/contractor-resolve.ts'));
+    // Every redirect verdict is the output of deps.serveable(...), never a raw alias.
+    const redirects = resolver.match(/kind: 'redirect', slug: (\w+)/g) ?? [];
+    expect(redirects.length).toBeGreaterThanOrEqual(2);
+    for (const r of redirects) expect(r).toMatch(/slug: (cachedTarget|target)$/);
+    expect(resolver).toContain('const cachedTarget = await deps.serveable(cachedCanonical)');
+    expect(resolver).toContain('const target = await deps.serveable(canonical)');
+  });
+
+  it('every inline contractor route that can redirect is covered — none left ungated', () => {
+    for (const f of inlineRoutes) {
       const src = code(read(f));
       const redirects = (src.match(/permanentRedirect\(`\/contractors\//g) ?? []).length;
       const gated = (src.match(/serveableCanonical\(/g) ?? []).length;
-      // Each route has one alias redirect (plus /[slug] has a separate
-      // canonical_slug consolidation that is already proven serveable).
       expect(gated, `${f}: ungated alias redirect`).toBeGreaterThanOrEqual(1);
       expect(redirects).toBeGreaterThanOrEqual(1);
     }

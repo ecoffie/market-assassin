@@ -12,8 +12,12 @@
  * This flag gates ONLY the crawler-facing cold scans. It defaults to OFF
  * ("turned off") so the burn stops on deploy. When off:
  *   - cold contractor overviews / award / contract pages serve from KV cache
- *     only (warmed top-N pages still render fully); an unwarmed slug returns
- *     notFound() instead of cold-scanning BigQuery.
+ *     only (warmed top-N pages still render fully).
+ *   - 2026-11-12: an unwarmed contractor slug no longer returns notFound() — that
+ *     404'd valid contractors and drove the July 2026 index collapse. The profile
+ *     and contracts pages now take ONE unit of a fail-closed daily budget for a
+ *     bounded live lookup, or answer 5xx and queue a warm. This flag does not gate
+ *     that path; the budget does (src/lib/seo/seo-unavailable.ts).
  *   - the sitemap serves its last cached recipient set instead of re-scanning.
  *
  * The authenticated product paths (search-bq, osbp/smb-search, chat tier-2,

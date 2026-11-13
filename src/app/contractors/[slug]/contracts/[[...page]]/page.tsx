@@ -14,12 +14,8 @@ import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
-import {
-  getRollupBySlug,
-  resolveCanonicalSlug,
-  getPaginatedAwardsForRecipient,
-} from '@/lib/bigquery/recipients';
-import { serveableCanonical } from '@/lib/seo/canonical-redirect';
+import { resolveContractorForPage, loadContractsPage } from '@/lib/seo/contractor-page-data';
+import { SeoTemporarilyUnavailableError } from '@/lib/seo/seo-unavailable';
 import { SubpageLayout } from '@/components/contractors/SubpageLayout';
 import { getAwardsSourceAsOf } from '@/lib/awards-serving';
 
@@ -56,8 +52,9 @@ function parsePage(page?: string[]): number {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug, page } = await params;
   const pageNum = parsePage(page);
-  const recipient = await getRollupBySlug(slug);
-  if (!recipient) return { title: 'Contractor Not Found | Mindy' };
+  const resolution = await resolveContractorForPage(slug);
+  if (resolution.kind !== 'found') return { title: 'Contractor Not Found | Mindy' };
+  const recipient = resolution.recipient;
 
   const name = fmtCompanyName(recipient.rollup_name);
   const canonical = recipient.canonical_slug;
@@ -88,35 +85,26 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const description = `Federal contract awards for ${name} across ${recipient.distinct_agency_count} agencies. Each entry lists its contract number, awarding agency, obligated amount, and action date.`;
   const canonicalPath = pageNum === 1 ? `/contractors/${canonical}/contracts` : `/contractors/${canonical}/contracts/${pageNum}`;
 
-  // ⚠️ Ask whether the AWARDS data can actually be served before promising it.
-  // generateMetadata runs independently of the page body, and the title/description
-  // above come from the CACHED ROLLUP row — which stays warm and confident ("29
-  // Federal Contracts ($399M)") even when the awards cache is stone cold and the
-  // body renders nothing. That mismatch is what demoted 11,772 of these pages.
-  // If the body cannot be supported, this page must not invite a click.
-  const { available } = await getPaginatedAwardsForRecipient(
-    recipient.child_ueis,
-    recipient.rollup_uei,
-    pageNum,
-    PAGE_SIZE,
-  );
-
-  // The title carries no counts either way now, so it needs no unavailable variant.
+  // Same memoized read as the body. Unavailable never reaches here as a page: the body
+  // throws the 5xx. What remains is a real answer, and a CONFIRMED zero (the data source
+  // said this contractor has no funded actions) is the only reason to noindex for content.
+  // A cold cache used to noindex here (#1325); Google read the flip-flop as the page going
+  // away. That rule is gone: an unknown is now a 5xx, never a noindex.
+  const data = await loadContractsPage(recipient, pageNum, PAGE_SIZE);
+  const confirmedEmpty = data.kind === 'ok' && data.total === 0;
   const safeTitle = title;
-  const safeDescription = available
-    ? description
-    : `Federal contract records for ${name}. Detailed award data is being refreshed — see the full contractor profile for agencies, NAICS activity, and totals.`;
+  const safeDescription = confirmedEmpty
+    ? `${name} has no funded federal award actions on record in USAspending. See the full contractor profile for agencies, NAICS activity, and totals.`
+    : description;
 
   return {
     title: safeTitle,
     description: safeDescription,
     alternates: { canonical: `${SITE_URL}${canonicalPath}` },
-    // noindex,follow when (a) past the crawl-budget page cap, or (b) the awards data
-    // is UNAVAILABLE. `follow` keeps equity flowing to the parent profile, which
-    // renders fine. Indexing resumes automatically the moment the cache is warm —
-    // no manual re-submission, because this is computed per request.
+    // noindex,follow when (a) past the crawl-budget page cap, or (b) the data source
+    // CONFIRMED there is nothing to list. `follow` keeps equity flowing to the profile.
     robots:
-      pageNum > MAX_INDEXABLE_PAGES || !available
+      pageNum > MAX_INDEXABLE_PAGES || confirmedEmpty
         ? { index: false, follow: true }
         : undefined,
     openGraph: {
@@ -133,30 +121,33 @@ export default async function ContractorContractsPage({ params }: PageProps) {
   const { slug, page } = await params;
   const pageNum = parsePage(page);
   const tail = pageNum > 1 ? `/contracts/${pageNum}` : '/contracts';
-  const recipient = await getRollupBySlug(slug);
-  if (!recipient) {
-    const canonical = await serveableCanonical(await resolveCanonicalSlug(slug));
-    if (canonical) permanentRedirect(`/contractors/${canonical}${tail}`);
-    notFound();
+  // found / redirect / confirmed-not-found / unavailable — shared with the profile page.
+  const resolution = await resolveContractorForPage(slug);
+  if (resolution.kind === 'redirect') permanentRedirect(`/contractors/${resolution.slug}${tail}`);
+  if (resolution.kind === 'not_found') notFound();
+  if (resolution.kind === 'unavailable') {
+    throw new SeoTemporarilyUnavailableError(`contracts ${slug}: ${resolution.reason}`);
   }
+  const recipient = resolution.recipient;
   if (recipient.canonical_slug !== slug) {
     // Preserve the page number when consolidating a sibling slug onto the parent.
     permanentRedirect(`/contractors/${recipient.canonical_slug}${tail}`);
   }
   const slugForLinks = recipient.canonical_slug;
 
-  const { rows: awards, total, available } = await getPaginatedAwardsForRecipient(
-    recipient.child_ueis,
-    recipient.rollup_uei,
-    pageNum,
-    PAGE_SIZE,
-  );
+  // KV → durable table → bounded live BigQuery. Anything short of a real answer is a 5xx:
+  // the July 2026 empty-table renders are what Google filed as 2,859 Soft 404s.
+  const data = await loadContractsPage(recipient, pageNum, PAGE_SIZE);
+  if (data.kind === 'unavailable') {
+    throw new SeoTemporarilyUnavailableError(`contracts ${slug} p${pageNum}: ${data.reason}`);
+  }
+  const { rows: awards, total } = data;
+  // `available` now means "there are funded actions to list". A real answer of zero renders
+  // the confirmed-empty state below (noindexed in generateMetadata), never a cold cache.
+  const available = total > 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
-  // If user asks for a page past the end, treat as not-found. Guarded on `available`:
-  // when the cache is cold EVERY page looks past-the-end, which would 404 thousands of
-  // legitimate URLs. Deliberately not 404ing or redirecting them — they noindex and
-  // recover automatically once warm.
-  if (available && pageNum > 1 && awards.length === 0) notFound();
+  // Past the end of a REAL listing → not found. Safe now: `data` is always a real answer.
+  if (pageNum > 1 && awards.length === 0) notFound();
 
   const displayName = fmtCompanyName(recipient.rollup_name);
   // Provenance: how current the DATA is (MAX(action_date) at build time), which is
@@ -236,9 +227,9 @@ export default async function ContractorContractsPage({ params }: PageProps) {
             </>
           ) : (
             <p className="mt-1 text-sm text-(--mp-muted)">
-              Award-level detail for {displayName} is being refreshed and isn&apos;t
-              available right now. This is a temporary data state, not a contractor with
-              no contracts.
+              USAspending records no funded award actions for {displayName}. Zero-dollar and
+              negative-dollar actions, such as administrative changes and deobligations, are
+              not listed here.
             </p>
           )}
         </header>
@@ -246,8 +237,7 @@ export default async function ContractorContractsPage({ params }: PageProps) {
         {!available && (
           <div className="mb-8 rounded-lg border border-(--mp-warn-line) bg-(--mp-warn-bg) p-5">
             <p className="text-sm text-(--mp-body)">
-              We&apos;d rather show you nothing than show you a wrong number. The
-              contractor profile has agency mix, NAICS activity and totals available now.
+              The contractor profile has agency mix, NAICS activity and totals.
             </p>
             <a
               href={`/contractors/${slugForLinks}`}
