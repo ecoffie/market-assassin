@@ -37,11 +37,11 @@ export const MP_HOW_IT_WORKS: readonly MpHowItWorksItem[] = FEATURE_PAGES.map((f
 
 /**
  * Right of the top bar, before the "Start for free" button. Sign in is for signed-out visitors
- * only (hidden once the account avatar paints). Contact sales was removed from the bar (2026-11-12).
+ * only (hidden once the account avatar paints). Contact sales (2026-11-12) and Plans & Pricing
+ * (2026-11-13: "the start for free button goes to that page") were removed from the bar.
  */
 export const MP_HEADER_ACCOUNT_LINKS: readonly MpChromeLink[] = [
   { href: '/app', label: 'Sign in' },
-  { href: '/pricing', label: 'Plans & Pricing' },
 ];
 
 /** No free plan for new users (2026-11): the signup CTA is the 14-day trial, chosen on /pricing. */

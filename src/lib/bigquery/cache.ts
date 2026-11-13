@@ -83,6 +83,10 @@ export interface QueryCacheOptions<T> extends BqQueryParams {
   // ALWAYS pair a cacheOnly read with bqUnavailable(key) and render an honest
   // unavailable state + noindex. Never render a zero you cannot prove.
   cacheOnly?: boolean;
+  // When false, a live query that returns ZERO rows is not written to KV. For lookups where
+  // "not found" can be a transient artifact (a derived table behind its source), so the caller
+  // can record the negative itself with a short TTL and a version (see awards.ts). Default true.
+  cacheEmpty?: boolean;
 }
 
 function buildKey(cacheKey: string): string {
@@ -334,6 +338,7 @@ export async function queryCached<T = Record<string, unknown>>(
   DEGRADED.delete(key);   // a successful run clears any prior degraded mark
   UNAVAILABLE.delete(key); // ...and any cache-only miss mark from earlier in this instance
 
+  if (opts.cacheEmpty === false && Array.isArray(rows) && rows.length === 0) return rows;
   try {
     await kv.set(key, rows, { ex: ttl });
   } catch (err) {

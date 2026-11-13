@@ -68,12 +68,6 @@
       "limit": 2000
     },
     {
-      "fingerprint": "61e73b50cef51177",
-      "file": "src/lib/seo/facets.ts",
-      "table": "sam_opportunities",
-      "limit": 50000
-    },
-    {
       "fingerprint": "64c49c7f9dc08162",
       "file": "src/app/api/app/federal-contacts/route.ts",
       "table": "federal_contacts",
