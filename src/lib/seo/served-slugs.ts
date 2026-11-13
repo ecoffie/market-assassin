@@ -22,6 +22,7 @@
  */
 import { kv } from '@vercel/kv';
 import { DATA_VERSION } from '@/lib/bigquery/cache';
+import { WARM_PRIORITY_KEY } from '@/lib/seo/warm-priority';
 
 /** Mirrors the cacheKey in getRollupBySlug(). Keep them identical. */
 function profileKey(slug: string): string {
@@ -94,6 +95,9 @@ export const WARM_QUEUE_KEY = 'seo:warm:queue:contractor-slugs';
 export async function recordWarmMiss(slug: string): Promise<void> {
   try {
     await kv.sadd(WARM_QUEUE_KEY, slug);
+    // Request frequency feeds the priority queue: each miss adds 1 to the slug's score
+    // (src/lib/seo/warm-priority.ts). Thin contractors get filtered out when the warm resolves them.
+    await kv.zincrby(WARM_PRIORITY_KEY, 1, slug);
   } catch {
     // Intentionally silent. The queue is an optimization, not a guarantee;
     // GSC and the sitemap diff both rediscover misses independently.
