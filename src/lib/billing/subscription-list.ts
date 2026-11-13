@@ -12,6 +12,8 @@ import type Stripe from 'stripe';
 import { resolveStripeCustomerByEmail } from '@/lib/stripe/resolve-customer';
 import { subscriptionGrantForPriceId } from '@/lib/mcp/packages';
 import { MCP_SUBSCRIPTION_TYPE } from '@/lib/mcp/stripe-subscription';
+import { appTierForAmount } from '@/lib/mcp/app-tier-subscription';
+import { hasEarlyUpgradeFlag } from '@/lib/mcp/trial-upgrade-bonus';
 
 export type SubscriptionKind = 'mcp' | 'app';
 
@@ -27,6 +29,11 @@ export interface SubscriptionRow {
   cancelAtPeriodEnd: boolean;
   /** The email whose Stripe customer holds this plan (the portal must open on it). */
   billedTo: string;
+  /**
+   * A live Pro/Team trial that can take the "Upgrade now, get +500 credits" offer
+   * (POST /api/app/billing/trial-upgrade re-checks everything server-side).
+   */
+  trialUpgradeEligible: boolean;
 }
 
 const LIVE = new Set(['active', 'trialing', 'past_due', 'unpaid']);
@@ -64,6 +71,12 @@ export function describeSubscription(
     currentPeriodEnd: periodEndUnix ? new Date(periodEndUnix * 1000).toISOString() : null,
     cancelAtPeriodEnd: !!sub.cancel_at_period_end,
     billedTo,
+    trialUpgradeEligible:
+      kind === 'app'
+      && sub.status === 'trialing'
+      && !sub.cancel_at_period_end
+      && !hasEarlyUpgradeFlag(sub.metadata)
+      && appTierForAmount(price?.unit_amount ?? null) !== null,
   };
 }
 

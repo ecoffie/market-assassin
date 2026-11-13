@@ -793,6 +793,20 @@ export async function POST(request: NextRequest) {
       console.error('[stripe-webhook] app-tier credit grant failed (non-fatal):', tierErr);
     }
 
+    // "Upgrade now, get +500 credits": the bonus for ending a trial early is granted ONLY here,
+    // from the PAID invoice (never from the endpoint that ended the trial). Keyed per
+    // subscription, so a redelivery or a later renewal on the same subscription is a no-op.
+    // Unlike the grants above, a failure returns 500 so Stripe retries: every step before this
+    // point is idempotent, and a swallowed failure would silently lose a bonus we promised.
+    try {
+      const { handleTrialUpgradeBonusInvoice } = await import('@/lib/mcp/trial-upgrade-bonus');
+      const bonus = await handleTrialUpgradeBonusInvoice(invoice);
+      if (bonus.handled) console.log('[stripe-webhook] trial upgrade bonus:', bonus);
+    } catch (bonusErr) {
+      console.error('[stripe-webhook] trial upgrade bonus failed (will retry):', bonusErr);
+      return NextResponse.json({ error: 'trial_upgrade_bonus_failed' }, { status: 500 });
+    }
+
     if (invoice.billing_reason === 'subscription_create') {
       return NextResponse.json({ received: true, action: 'invoice_skipped_initial' });
     }
