@@ -68,7 +68,7 @@ describe('the KEYS are unchanged — URLs, saved searches and APIs keep working'
     }
   });
   it('the horizons state object and saved payload keep open/recompete/forecast', () => {
-    expect(ROUTE).toContain('window.__horizons={open:true,recompete:true,forecast:true};');
+    expect(ROUTE).toContain('window.__horizons={open:true,recompete:false,forecast:false};');
     expect(ROUTE).toContain('filters.horizons={open:_h.open!==false,recompete:!!_h.recompete,forecast:!!_h.forecast}');
   });
   it('the ?horizon= param is still written with the keys', () => {

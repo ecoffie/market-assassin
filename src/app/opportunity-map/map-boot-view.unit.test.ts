@@ -59,3 +59,14 @@ describe('opportunity-map boot view — the United States, not the world', () =>
     expect(route).toContain('<button class="hznrow" data-hz="forecast"');
   });
 });
+
+describe('top-bar horizon button is single-select (Eric 2026-11-13)', () => {
+  const route = require('node:fs').readFileSync(require('node:path').join(__dirname, 'route.ts'), 'utf8') as string;
+  it('dropdown rows pick ONE horizon; Filters-panel chips still combine', () => {
+    for (const k of ['open', 'recompete', 'forecast']) {
+      expect(route).toMatch(new RegExp(`class="hznrow[^"]*" data-hz="${k}"[^>]*onclick="selectHorizon\\(\\\\'${k}\\\\'\\)"`));
+      expect(route).toMatch(new RegExp(`class="hzc[^"]*" data-hz="${k}"[^>]*onclick="toggleHorizon\\(\\\\'${k}\\\\'\\)"`));
+    }
+    expect(route).toContain('window.selectHorizon=function(want)');
+  });
+});

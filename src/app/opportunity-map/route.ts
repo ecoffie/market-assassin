@@ -151,9 +151,9 @@ const MORE_FILTERS = '<div class="mfwrap">'
   // top-bar control). Opportunities-map only (mfv-open). Drives window.__horizons → merged fetch.
   + '<div class="mf-sec mfv-open" data-mfsec="horizons">Show on the map <em>(categories)</em></div>'
   + '<div class="mf-checks mfv-open" data-mfsec="horizons" id="hznToggles">'
-  +   '<button class="hzc on" data-hz="open" style="--hzc:#22a06b" onclick="selectHorizon(\'open\')">Open Now</button>'
-  +   '<button class="hzc on" data-hz="recompete" style="--hzc:#b45309" onclick="selectHorizon(\'recompete\')">Coming Back</button>'
-  +   '<button class="hzc on" data-hz="forecast" style="--hzc:#7c3aed" onclick="selectHorizon(\'forecast\')">Coming Soon</button>'
+  +   '<button class="hzc on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')">Open Now</button>'
+  +   '<button class="hzc" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')">Coming Back</button>'
+  +   '<button class="hzc" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')">Coming Soon</button>'
   // Grants removed from the Horizons set (Eric 2026-08-01). The grants-map endpoint stays for now,
   // but Grants is no longer an Opportunities horizon toggle.
   + '</div>'
@@ -374,9 +374,9 @@ const SERVER_FILTERS =
   + '<div class="hznwrap mfv-open" id="hznWrap">'
   +   '<button class="fsel fsel-mode" id="hznBtn" type="button" title="Which categories to show" aria-haspopup="true" aria-expanded="false">Open now</button>'
   +   '<div class="hznpop" id="hznPop" role="menu" hidden>'
-  +     '<button class="hznrow on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')"><i></i><span class="hznlbl">Open Now</span><span class="hznn" data-hzn="open"></span></button>'
-  +     '<button class="hznrow" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')"><i></i><span class="hznlbl">Coming Back</span><span class="hznn" data-hzn="recompete"></span></button>'
-  +     '<button class="hznrow" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')"><i></i><span class="hznlbl">Coming Soon</span><span class="hznn" data-hzn="forecast"></span></button>'
+  +     '<button class="hznrow on" data-hz="open" style="--hzc:#22a06b" onclick="selectHorizon(\'open\')"><i></i><span class="hznlbl">Open Now</span><span class="hznn" data-hzn="open"></span></button>'
+  +     '<button class="hznrow" data-hz="recompete" style="--hzc:#b45309" onclick="selectHorizon(\'recompete\')"><i></i><span class="hznlbl">Coming Back</span><span class="hznn" data-hzn="recompete"></span></button>'
+  +     '<button class="hznrow" data-hz="forecast" style="--hzc:#7c3aed" onclick="selectHorizon(\'forecast\')"><i></i><span class="hznlbl">Coming Soon</span><span class="hznn" data-hzn="forecast"></span></button>'
   +   '</div>'
   + '</div>'
   // PLAYERS multi-select dropdown — Companies + Gov Buyers coexist on ONE Players map (same pattern
