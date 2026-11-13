@@ -6,7 +6,7 @@
  * No Free plan on this page. Credit allowances come from the server constants as props.
  * The credit-only MCP plans keep their own page at /mcp/pricing.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import MemberProof from '@/components/public-site/MemberProof';
 import LogoMarquee from '@/components/public-site/LogoMarquee';
@@ -25,7 +25,32 @@ type Plan = {
   lead: string; base: string; features: Feature[];
   usage: [title: string, detail: string];
   footer?: React.ReactNode;
+  /** Set for signed-in users: this card is the plan they are on now. */
+  current?: boolean;
 };
+
+type MePlan = 'free' | 'pro' | 'team' | 'enterprise';
+const PLAN_NAME: Record<MePlan, string> = { free: 'Free', pro: 'Pro', team: 'Team', enterprise: 'Enterprise' };
+const BILLING_URL = '/app?panel=settings&section=credits&tab=billing';
+const RANK: Record<string, number> = { Pro: 1, Team: 2, Enterprise: 3 };
+const PLAN_RANK: Record<MePlan, number> = { free: 0, pro: 1, team: 2, enterprise: 3 };
+
+/**
+ * Signed-in view (Eric 2026-11-13: "when i click to upgrade it does not show the current plan").
+ * The plan's own card says "Your plan" with a non-link "Current plan" button; a paying member is
+ * never sent to another trial checkout — a higher plan says "Upgrade to …" and a lower one
+ * "Manage your plan", both to billing. Free / signed-out users see the page unchanged.
+ */
+export function applyCurrentPlan(plans: Plan[], me: MePlan | null): Plan[] {
+  if (!me || me === 'free') return plans;
+  const mine = PLAN_RANK[me];
+  return plans.map((p) => {
+    const r = RANK[p.name] ?? 0;
+    if (r === mine) return { ...p, current: true, trial: false };
+    if (p.name === 'Enterprise') return p; // stays "Speak to sales"
+    return { ...p, trial: false, href: BILLING_URL, cta: r > mine ? `Upgrade to ${p.name}` : 'Manage your plan' };
+  });
+}
 
 const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
@@ -36,9 +61,23 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
   proCredits: number; teamCredits: number; forecastsLabel: string; faqs: { q: string; a: string }[];
 }) {
   const [annual, setAnnual] = useState(true);
+  // Same token every Mindy page sends; /api/app/me verifies it server-side. Any failure leaves the
+  // public page as is (never guesses a plan).
+  const [me, setMe] = useState<MePlan | null>(null);
+  useEffect(() => {
+    let t: string | null = null;
+    try { t = localStorage.getItem('mi_beta_auth_token'); } catch { /* private mode */ }
+    if (!t) return;
+    let live = true;
+    fetch('/api/app/me', { headers: { 'x-mi-auth-token': t }, credentials: 'same-origin' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (live && d?.email && d.plan && d.plan in PLAN_NAME) setMe(d.plan as MePlan); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, []);
   const maxPct = pctOff(TEAM_ANNUAL_USD, TEAM_MONTHLY_USD);
 
-  const plans: Plan[] = [
+  const basePlans: Plan[] = [
     {
       name: 'Pro', tag: 'For solo contractors and small firms going after federal work.',
       price: annual ? `$${fmt(Math.round(PRO_ANNUAL_USD / 12))}` : `$${PRO_MONTHLY_USD}`,
@@ -84,6 +123,9 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
     },
   ];
 
+  const plans = applyCurrentPlan(basePlans, me);
+  const byName = Object.fromEntries(plans.map((p) => [p.name, p]));
+
   // Full breakdown (Fyxer's "A plan to suit every need"). Same claims as the cards above and the
   // old plan cards: change a feature here only when the product changes.
   const compare: CompareGroup[] = [
@@ -127,7 +169,9 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
       <section className="hero">
         <h1>Plans that grow with you</h1>
-        <MemberProof />
+        {me ? (
+          <p className="you">You&apos;re on the <b>{PLAN_NAME[me]}</b> plan.{me !== 'free' && <> <a href={BILLING_URL}>Manage billing</a></>}</p>
+        ) : <MemberProof />}
       </section>
 
       <div className="toggle" role="group" aria-label="Billing period">
@@ -137,8 +181,8 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
 
       <section className="cards" id="plans">
         {plans.map((p) => (
-          <article key={p.name} className={`card ${p.featured ? 'featured' : ''}`}>
-            <h2>{p.name}</h2>
+          <article key={p.name} className={`card ${p.featured ? 'featured' : ''} ${p.current ? 'current' : ''}`}>
+            <h2>{p.name}{p.current && <span className="mine">Your plan</span>}</h2>
             <p className="tag">{p.tag}</p>
             {p.price ? (
               <div className="price"><span className="now">{p.price}</span>{p.was && <span className="was">{p.was}</span>}</div>
@@ -147,7 +191,9 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
             )}
             <p className="per">{p.per}</p>
             {p.trial && <p className="trial">14 day free trial</p>}
-            <a className={`cta ${p.outline ? 'outline' : ''}`} href={p.href} onClick={p.trial ? () => trackTrialClick(p.name === 'Team' ? 'team' : 'pro', annual ? 'annual' : 'monthly', 'card') : undefined}>{p.cta}</a>
+            {p.current
+              ? <span className="cta is-current" aria-current="true">Current plan</span>
+              : <a className={`cta ${p.outline ? 'outline' : ''}`} href={p.href} onClick={p.trial ? () => trackTrialClick(p.name === 'Team' ? 'team' : 'pro', annual ? 'annual' : 'monthly', 'card') : undefined}>{p.cta}</a>}
             {/* Next to every button that takes money (Eric 2026-11-12: "add the no refunds line under each trial button"). */}
             {p.trial && <NoRefundNote style={{ margin: '-14px 0 18px' }} />}
             <p className="lead">{p.lead}</p>
@@ -187,9 +233,17 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
             ))}
             <tfoot>
               <tr><th scope="row"><span className="sr">Get started</span></th>
-                <td><a className="cta" href={annual ? PRO_TRIAL_ANNUAL : PRO_TRIAL_MONTHLY} onClick={() => trackTrialClick('pro', annual ? 'annual' : 'monthly', 'table')}>Start 14-day trial</a><NoRefundNote /></td>
-                <td className="hl"><a className="cta" href={annual ? TEAM_TRIAL_ANNUAL : TEAM_TRIAL_MONTHLY} onClick={() => trackTrialClick('team', annual ? 'annual' : 'monthly', 'table')}>Start 14-day trial</a><NoRefundNote /></td>
-                <td><a className="cta outline" href={SALES_URL}>Speak to sales</a></td></tr>
+                {(['Pro', 'Team', 'Enterprise'] as const).map((n) => {
+                  const p = byName[n];
+                  return (
+                    <td key={n} className={n === 'Team' ? 'hl' : undefined}>
+                      {p.current
+                        ? <span className="cta is-current" aria-current="true">Current plan</span>
+                        : <a className={`cta ${p.outline ? 'outline' : ''}`} href={p.href} onClick={p.trial ? () => trackTrialClick(n === 'Team' ? 'team' : 'pro', annual ? 'annual' : 'monthly', 'table') : undefined}>{p.cta}</a>}
+                      {p.trial && <NoRefundNote />}
+                    </td>
+                  );
+                })}</tr>
             </tfoot>
           </table>
         </div>
@@ -228,6 +282,11 @@ const CSS = `
 .sp .cta:hover{background:var(--mp-navy-hover)}
 .sp .cta.outline{background:transparent;color:var(--mp-ink);border:1.5px solid var(--mp-ink)}
 .sp .cta.outline:hover{background:var(--mp-wash)}
+.sp .cta.is-current{background:var(--mp-wash);color:var(--mp-muted);border:1px solid var(--mp-line);cursor:default}
+.sp .card.current{border:2px solid var(--mp-ok)}
+.sp .card h2 .mine{margin-left:10px;vertical-align:middle;font:600 12px var(--mp-font-sans);color:var(--mp-ok);border:1px solid var(--mp-ok);border-radius:999px;padding:3px 10px}
+.sp .you{margin:14px 0 0;font-size:16px;color:var(--mp-body)}
+.sp .you a{color:var(--mp-navy);margin-left:6px}
 .sp .lead{font-weight:600;margin:0}
 .sp .base{color:var(--mp-muted);font-size:13px;margin:2px 0 12px}
 .sp .card ul{list-style:none;margin:0 0 22px;padding:0;display:grid;gap:12px}
