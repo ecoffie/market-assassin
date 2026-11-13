@@ -43,6 +43,23 @@ import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/ti
 import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/chat-tool-executor';
 import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, type PlannerTarget } from '@/lib/chat/planner-config';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
+import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
+
+// Every Ask Mindy turn carries customer-private context (the user's profile; often Vault or
+// pipeline results). So every provider the chat route calls directly must be on the SAME
+// approved list callLLM enforces for dataClass:'sensitive' (SENSITIVE_LLM_PROVIDERS).
+const providerApprovedForPrivate = (provider: string): boolean =>
+  provider === 'openai' ? isSensitiveApprovedProvider('openai')
+    : provider === 'anthropic' ? isSensitiveApprovedProvider('claude')
+      : provider === 'groq' ? isSensitiveApprovedProvider('groq8b')
+        : false;
+
+// Verification aid, OFF by default and never to be set in production: when
+// ASK_MINDY_TRACE_EVENTS === 'true', each turn also streams a `trace` event with the planner,
+// the redacted tool arguments and a capped excerpt of each tool result, so a baseline run can
+// check answers against evidence without a database migration.
+const TRACE_EVENTS = process.env.ASK_MINDY_TRACE_EVENTS === 'true';
+const TRACE_RESULT_CHARS = 6000;
 import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 export const dynamic = 'force-dynamic';
@@ -493,7 +510,13 @@ export async function POST(request: NextRequest) {
 
           // Explicit planner chain (gpt-4o default; Claude only behind CHAT_CLAUDE_ENABLED;
           // fallbacks only to compatibility-tested planners). Every failure is recorded.
-          const chain = resolvePlannerChain(process.env, { overBudget: overBudgetEarly });
+          const resolved = resolvePlannerChain(process.env, { overBudget: overBudgetEarly });
+          const chain = resolved.filter((t) => providerApprovedForPrivate(t.provider));
+          for (const t of resolved) {
+            if (!chain.includes(t)) {
+              void recordProviderEvent({ kind: 'planner_unavailable', provider: t.provider, model: t.model, detail: 'provider not on the approved list for private data (SENSITIVE_LLM_PROVIDERS)', userEmail: auth.email! });
+            }
+          }
           let first: { provider: string; model: string; json: unknown } | null = null;
           for (let i = 0; i < chain.length; i++) {
             const t = chain[i];
@@ -534,6 +557,18 @@ export async function POST(request: NextRequest) {
               }
               pendingToolTurnIdx = null;
               turnTrace.tool_executions = results.map((r) => r.record);
+              if (TRACE_EVENTS) {
+                send({
+                  type: 'trace',
+                  planner: turnTrace.planner,
+                  tools: results.map((r) => ({
+                    ...r.record,
+                    args: r.argsRedacted,
+                    result_excerpt: r.content.slice(0, TRACE_RESULT_CHARS),
+                    result_chars: r.content.length,
+                  })),
+                });
+              }
               if (results.some((r) => r.record.status === 'failed')) {
                 notify('lookup_failed', 'One of the data lookups failed, so this answer may be incomplete.');
               }
@@ -602,6 +637,15 @@ export async function POST(request: NextRequest) {
             const detail = (await r.text().catch(() => '')).slice(0, 300);
             void recordProviderEvent({ kind: 'answer_fallback', provider: 'openai', model: chatModel, status: r.status, detail, userEmail: auth.email!, next: `groq:${GROQ_MODEL}` });
           }
+        }
+        if (!groqRes && !providerApprovedForPrivate('groq')) {
+          // The fallback provider is not approved for private data: fail visibly instead of
+          // sending this turn's context to it.
+          void recordProviderEvent({ kind: 'answer_failure', provider: 'openai', model: chatModel, detail: 'answer fallback blocked: groq is not on the approved list for private data', userEmail: auth.email! });
+          send({ type: 'error', message: 'Mindy could not answer right now. Please try again in a moment.' });
+          send({ type: 'done' });
+          controller.close();
+          return;
         }
         if (!groqRes) {
           answerFallback = true;

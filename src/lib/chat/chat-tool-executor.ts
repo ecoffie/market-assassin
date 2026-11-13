@@ -64,6 +64,8 @@ export interface ChatToolResult {
   /** JSON string for the role:'tool' message. */
   content: string;
   record: ChatExecutionRecord;
+  /** Redacted arguments (for verification traces only; never persisted on the turn trace). */
+  argsRedacted: Record<string, unknown> | null;
 }
 
 /** The planner model/provider that requested a round of calls (logged on every row). */
@@ -154,6 +156,7 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
     const toolCallId = call.id || `call_${executionId.slice(0, 8)}`;
     const name = String(call.function?.name ?? '');
     const started = Date.now();
+    let redactedForTrace: Record<string, unknown> | null = null;
     const done = (
       status: CallStatus,
       decision: ChatExecutionRecord['decision'],
@@ -163,6 +166,7 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
       tool_call_id: toolCallId,
       content: JSON.stringify(body),
       record: { execution_id: executionId, tool: name, decision, status, error_category: errorCategory, latency_ms: Date.now() - started },
+      argsRedacted: redactedForTrace,
     });
 
     // 1) Round budget.
@@ -191,6 +195,7 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
       void _ignored;
       args = rest;
     }
+    redactedForTrace = redactToolArgs(args);
 
     // 4) Policy — re-checked at execution, not only when offering.
     const policy = policyFor(name);

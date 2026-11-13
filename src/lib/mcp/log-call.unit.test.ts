@@ -99,13 +99,29 @@ describe('logCall', () => {
     }
   });
 
-  it('still records the call in the legacy shape if the trace columns are missing', async () => {
+  it('if the trace columns are missing, retries WITH outcome and channel (not the bare legacy shape)', async () => {
     insert
       .mockResolvedValueOnce({ error: { message: 'column "execution_id" of relation "mcp_call_log" does not exist' } })
       .mockResolvedValueOnce({ error: null });
-    await logCall({ ...base, channel: 'app_chat', trace: { executionId: 'e1' } });
+    await logCall({ ...base, outcome, channel: 'app_chat', trace: { executionId: 'e1' } });
     expect(insert).toHaveBeenCalledTimes(2);
     expect(insert.mock.calls[1][0]).not.toHaveProperty('execution_id');
-    expect(insert.mock.calls[1][0]).toMatchObject({ user_email: 'u@x.com', tool_name: 't' });
+    expect(insert.mock.calls[1][0]).toMatchObject({ user_email: 'u@x.com', tool_name: 't', channel: 'app_chat', outcome: 'grounded' });
+  });
+
+  it('never writes an app_chat call without its channel (it would look like a Claude MCP call)', async () => {
+    insert.mockResolvedValue({ error: { message: 'boom' } });
+    await logCall({ ...base, outcome, channel: 'app_chat', trace: { executionId: 'e1' } });
+    for (const call of insert.mock.calls) expect(call[0]).toHaveProperty('channel', 'app_chat');
+  });
+
+  it('a Claude MCP call still falls back to the bare legacy shape (unchanged behavior)', async () => {
+    insert
+      .mockResolvedValueOnce({ error: { message: 'column "outcome" does not exist' } })
+      .mockResolvedValueOnce({ error: null });
+    await logCall({ ...base, outcome });
+    expect(insert).toHaveBeenCalledTimes(2);
+    expect(insert.mock.calls[1][0]).not.toHaveProperty('outcome');
+    expect(insert.mock.calls[1][0]).not.toHaveProperty('channel');
   });
 });

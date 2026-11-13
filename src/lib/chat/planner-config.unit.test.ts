@@ -70,4 +70,14 @@ describe('chat route wiring (source assertions)', () => {
     expect(code).toMatch(/finishReason === 'length'/);
     expect(code).toMatch(/type: 'truncated'/);
   });
+
+  it('applies the private-data provider allow-list to the planner and the answer fallback', () => {
+    expect(code).toMatch(/resolved\.filter\(\(t\) => providerApprovedForPrivate\(t\.provider\)\)/);
+    expect(code).toMatch(/!groqRes && !providerApprovedForPrivate\('groq'\)/);
+  });
+
+  it('streams verification traces only behind ASK_MINDY_TRACE_EVENTS', () => {
+    expect(code).toMatch(/process\.env\.ASK_MINDY_TRACE_EVENTS === 'true'/);
+    expect(code).toMatch(/if \(TRACE_EVENTS\) \{/);
+  });
 });
