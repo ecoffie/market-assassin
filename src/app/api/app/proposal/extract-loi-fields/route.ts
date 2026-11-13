@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { isProEmail, proRequiredResponse } from '@/lib/access/require-pro';
 import { logToolError, ToolNames, AIProviders, classifyError } from '@/lib/tool-errors';
 import { recordLlmUsage } from '@/lib/llm/usage-cost';
 import type { LoiFields } from '@/lib/proposal/loi-fields';
@@ -115,6 +116,8 @@ export async function POST(request: NextRequest) {
 
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
+  // The proposal workspace is a Pro feature (owner decision 2026-11-13).
+  if (!(await isProEmail(authSession.session.email))) return proRequiredResponse();
 
   let body: RequestBody;
   try {

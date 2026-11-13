@@ -12,6 +12,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('@/lib/two-factor-session', () => ({ requireMIAuthSession: vi.fn() }));
 vi.mock('@/lib/smart-profile/service', () => ({ getBriefingProfile: vi.fn() }));
 vi.mock('@/lib/briefings/win-probability', () => ({ calculateWinProbability: vi.fn() }));
+// M-Win is Pro-only (2026-11-13). These cases are about grounding, so the caller is Pro unless a
+// test says otherwise.
+const pro = vi.hoisted(() => ({ value: true }));
+vi.mock('@/lib/access/require-pro', () => ({ isProEmail: async () => pro.value }));
 
 import { GET } from './route';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
@@ -27,7 +31,7 @@ function req(qs: string) {
 }
 
 describe('win-probability route — grounded or honest, never a fake %', () => {
-  beforeEach(() => { auth.mockReset(); loadProfile.mockReset(); scoreWin.mockReset(); });
+  beforeEach(() => { auth.mockReset(); loadProfile.mockReset(); scoreWin.mockReset(); pro.value = true; });
 
   // AUTH FIRST, email DERIVED from the verified token (not the client param).
   const okAuth = { ok: true, session: { email: 'a@b.com' } } as unknown as ReturnType<typeof requireMIAuthSession>;
@@ -36,6 +40,15 @@ describe('win-probability route — grounded or honest, never a fake %', () => {
     auth.mockReturnValue({ ok: false } as ReturnType<typeof requireMIAuthSession>);
     const body = await (await GET(req('naics=541512'))).json();
     expect(body).toEqual({ success: true, grounded: false, reason: 'signed_out' });
+    expect(scoreWin).not.toHaveBeenCalled();
+  });
+
+  it('signed in but NOT Pro → grounded:false pro_required, NO score, no profile read', async () => {
+    auth.mockReturnValue({ ok: true, session: { email: 'free@b.com' } } as unknown as ReturnType<typeof requireMIAuthSession>);
+    pro.value = false;
+    const body = await (await GET(req('naics=541512'))).json();
+    expect(body).toEqual({ success: true, grounded: false, reason: 'pro_required', upgrade_url: '/pricing' });
+    expect(loadProfile).not.toHaveBeenCalled();
     expect(scoreWin).not.toHaveBeenCalled();
   });
 

@@ -15,6 +15,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { isProEmail, proRequiredResponse } from '@/lib/access/require-pro';
 import { scanCompliance, type ScanInput } from '@/lib/proposal/compliance-scanner';
 import type { ComplianceReq } from '@/lib/proposal/section-alignment';
 
@@ -36,6 +37,8 @@ export async function POST(request: NextRequest) {
 
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
+  // The proposal workspace is a Pro feature (owner decision 2026-11-13).
+  if (!(await isProEmail(authSession.session.email))) return proRequiredResponse();
 
   let body: ScanRequestBody;
   try {

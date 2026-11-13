@@ -679,7 +679,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var pr = draftable ? sectionProgressFromDraft(d) : stageProgress(st);
     var pill = pr.state==='done'?'<span class="pill approved">Approved</span>':(pr.state==='in_progress'?'<span class="pill draft">Draft</span>':'<span class="pill pending">Not started</span>');
 
-    var upsell = S.gated ? ('<div class="upsell"><h4>Building sections is a Pro feature</h4><p>Draft Vault-grounded sections, run compliance, and export your package with Mindy Pro.</p><a href="/pricing">Upgrade to Pro '+IC.arrow+'</a></div>') : '';
+    var upsell = S.gated ? ('<div class="upsell"><h4>Building sections is a Pro feature</h4><p>Draft Vault-grounded sections, run compliance, and export your package with Mindy Pro.</p><a href="/pricing">Start 14-day free trial '+IC.arrow+'</a></div>') : '';
 
     var head = '<div class="ed-head"><div class="ed-title">'+esc(st.label)+'</div>'+pill
       + (draftable?'<button class="btn-build" id="buildBtn" onclick="window.__wsBuild()">'+IC.check+'Build this section</button>':'')+'</div>'

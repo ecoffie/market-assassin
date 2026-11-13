@@ -63,7 +63,7 @@ export function appPricingFaqs(c: { proCredits: number; teamCredits: number }): 
     },
     {
       q: 'What are credits?',
-      a: `Credits pay for Mindy's research tools, in the app and inside Claude, ChatGPT or Cursor. Pro includes ${n(c.proCredits)} a month and Team includes ${n(c.teamCredits)} a month for the team. Need more? Add a top-up or a credit plan anytime.`,
+      a: `Credits pay for Mindy's research tools when you use them inside Claude, ChatGPT or Cursor. The Mindy app itself is included in your plan. Pro includes ${n(c.proCredits)} a month and Team includes ${n(c.teamCredits)} a month for the team. Need more? Add a top-up or a credit plan anytime.`,
     },
     {
       q: 'How much do I save with annual billing?',

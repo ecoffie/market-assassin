@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { getBriefingProfile } from '@/lib/smart-profile/service';
 import { calculateWinProbability } from '@/lib/briefings/win-probability';
+import { isProEmail } from '@/lib/access/require-pro';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -47,6 +48,12 @@ export async function GET(request: NextRequest) {
   const email = String(authSession.session.email || '').toLowerCase().trim();
   if (!email || !email.includes('@')) {
     return NextResponse.json({ success: true, grounded: false, reason: 'signed_out' });
+  }
+
+  // M-Win is a Pro feature (owner decision 2026-11-13). Signed in but not Pro → pro_required, and
+  // the drawer shows the locked "See your fit score — Pro" teaser instead of a number.
+  if (!(await isProEmail(email))) {
+    return NextResponse.json({ success: true, grounded: false, reason: 'pro_required', upgrade_url: '/pricing' });
   }
 
   try {

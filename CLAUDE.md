@@ -693,6 +693,8 @@ Decision: **differentiate coverage, NOT raw count**. 30-portal registry shipped 
 
 **Public-facing = 2 tiers only: Free → Pro**
 
+> ⚠️ **Current tiers (2026-11-13) — this older table is history.** Public plans are Free / Pro $149/mo ($1,490/yr) / Team $499/mo ($4,027/yr), both paid plans with a 14-day card trial. Pro access = `resolveAccess` (paid briefings · `access_team` · an active `trial_ends_at`); `verifyMIAccess` now honors the trial too. Pro credits are MCP-only (Claude/ChatGPT/Cursor) — the app is included in the plan. Team annual (402700¢) is recognized by the monthly credit grant. Weekly alerts: Pro/Team/trial get 15, free 5.
+
 No decision fatigue. Clear upgrade path.
 
 **MI Free Features:**

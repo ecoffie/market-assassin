@@ -1,3 +1,4 @@
+import { hasProAccess } from '@/lib/access/resolve-access';
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchAllPaged } from '@/lib/supabase/paged-read';
 import { eligibleSetAsides, eligibleSetAsidesCombined } from '@/lib/market/set-aside-eligibility';
@@ -108,9 +109,17 @@ async function fetchBuyerEmails(): Promise<Set<string>> {
  * Get alert limit for a user based on purchase history
  */
 async function getAlertLimit(email: string): Promise<{ limit: number; tier: 'free' | 'pro' }> {
-  const buyerEmails = await fetchBuyerEmails();
   const normalizedEmail = email.toLowerCase();
 
+  // Mindy Pro / Team / an active trial get the Pro limit. Before 2026-11-13 only the legacy shop
+  // purchase list below counted, so a paying Mindy Pro subscriber got the free 5/week.
+  try {
+    if (await hasProAccess(normalizedEmail)) return { limit: ALERT_LIMITS.pro, tier: 'pro' };
+  } catch (err) {
+    console.warn('[Weekly Alerts] Pro check failed; falling back to the purchase list', err);
+  }
+
+  const buyerEmails = await fetchBuyerEmails();
   if (buyerEmails.has(normalizedEmail)) {
     return { limit: ALERT_LIMITS.pro, tier: 'pro' };
   }

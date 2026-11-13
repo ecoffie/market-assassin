@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { isProEmail, proRequiredResponse } from '@/lib/access/require-pro';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { createClient } from '@supabase/supabase-js';
 
@@ -83,6 +84,8 @@ export async function POST(request: NextRequest) {
 
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
+  // The proposal workspace is a Pro feature (owner decision 2026-11-13).
+  if (!(await isProEmail(authSession.session.email))) return proRequiredResponse();
   // Coach Mode: the pursuit + uploaded doc belong to the ACTIVE CLIENT, so the
   // ownership check + document rows must key on the client (else the client's
   // pursuit fails the ownership check and the doc never attaches).
