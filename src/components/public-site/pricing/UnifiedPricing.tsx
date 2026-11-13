@@ -16,7 +16,7 @@
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import MemberProof from '@/components/public-site/MemberProof';
-import { UPGRADE_OFFER_LABEL, UPGRADE_OFFER_PARAM, withUpgradePromo } from '@/lib/billing/upgrade-offer';
+import { UPGRADE_OFFER_LABEL, UPGRADE_OFFER_PARAM } from '@/lib/billing/upgrade-offer';
 import Link from 'next/link';
 import NoRefundNote from '@/components/NoRefundNote';
 import type { Catalog, Pkg, SubPlan, Tool } from '@/app/mcp/catalog-ui';
@@ -57,6 +57,30 @@ const TEAM_ANNUAL_PER_MONTH = 335.58;
 const TEAM_ANNUAL_PCT = Math.round((1 - TEAM_ANNUAL_USD / (499 * 12)) * 100); // 33
 const ENTERPRISE_CONTACT_URL = '/contact-sales';
 const REFERRALS_URL = '/app?panel=settings&section=credits&tab=referrals';
+const BILLING_URL = '/app?panel=settings&section=credits&tab=billing';
+
+// Paying accounts (Pro / Team / Enterprise, incl. trialing, comped, lifetime) are never offered
+// another trial: any app card whose CTA is a 14-day trial checkout becomes "Manage your plan".
+// (A Team subscriber's Pro card, and an Enterprise account's Pro + Teams cards, used to link to
+// the trial checkout.) Current-plan and contact-sales cards are left alone.
+const TRIAL_HREFS = new Set([PRO_TRIAL_MONTHLY, PRO_TRIAL_ANNUAL, TEAM_TRIAL_MONTHLY, TEAM_TRIAL_ANNUAL].filter(Boolean));
+export function suppressTrialCardsForPaid<T extends { href: string; cta: string; pill?: string; note?: string; current?: boolean }>(cards: T[], plan: string | null): T[] {
+  if (!plan || !['pro', 'team', 'enterprise'].includes(plan)) return cards;
+  return cards.map((c) => (c.current || !TRIAL_HREFS.has(c.href)
+    ? c
+    : { ...c, href: BILLING_URL, cta: 'Manage your plan', pill: undefined, note: 'Your current plan is active. No new subscription needed.' }));
+}
+
+// The account panel's upgrade button. Free users get NONE on this page (2026-11-13): the hero's
+// 14-day trial is the one offer, and the unapproved "25% off first month" no longer competes with
+// it here (the Stripe promotion itself is untouched). Pro keeps its Teams upgrade; Team and
+// Enterprise keep "Add credits".
+export type AccountUpgrade = { label: string; href: string; offer: boolean };
+export function accountPanelUpgrade(plan: string | null): AccountUpgrade | null {
+  if (!plan || plan === 'free') return null;
+  if (plan === 'pro') return { label: 'Upgrade to Teams', href: `${TEAMS_CONTACT_URL}?offer=${UPGRADE_OFFER_PARAM}`, offer: true };
+  return { label: 'Add credits', href: BILLING_URL, offer: false };
+}
 
 // Hero trial offer. Reuses the Pro card's existing 14-day trial payment links (no new signup,
 // eligibility or Stripe config). A signed-in Pro / Team / Enterprise account (paid, trialing,
@@ -286,22 +310,12 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
   if (me?.plan && CURRENT_CARD[me.plan]) {
     for (const c of appCards) if (c.name === CURRENT_CARD[me.plan]) c.current = true;
   }
-  // What "Upgrade" means from each plan: Free → Pro checkout, Pro → Teams, Team/Enterprise → add credits.
-  // Upgrading members get 25% off the first month (src/lib/billing/upgrade-offer.ts) — monthly Pro
-  // checkout carries the promo code; the Teams upgrade goes to sales with the offer attached.
-  const upgrade = !me?.plan ? null
-    : me.plan === 'free' ? { label: 'Upgrade to Pro', href: withUpgradePromo(PRO_CHECKOUT_MONTHLY), offer: true }
-    : me.plan === 'pro' ? { label: 'Upgrade to Teams', href: `${TEAMS_CONTACT_URL}?offer=${UPGRADE_OFFER_PARAM}`, offer: true }
-    : { label: 'Add credits', href: '/app?panel=settings&section=credits&tab=billing', offer: false };
-  // Annual stays the normal annual offer (its own 17% discount); the first-month deal is monthly.
-  if (me?.plan === 'free' && !annual) {
-    const pro = appCards.find((c) => c.name === 'Pro');
-    if (pro) { pro.href = withUpgradePromo(PRO_CHECKOUT_MONTHLY); pro.cta = 'Upgrade to Pro'; pro.pill = UPGRADE_OFFER_LABEL; pro.note = 'Billed monthly. 25% off applies to your first month.'; }
-  }
+  const upgrade = accountPanelUpgrade(me?.plan ?? null);
   if (me?.plan === 'pro') {
     const team = appCards.find((c) => c.name === 'Teams');
     if (team) { team.href = `${TEAMS_CONTACT_URL}?offer=${UPGRADE_OFFER_PARAM}`; team.cta = 'Upgrade to Teams'; team.pill = UPGRADE_OFFER_LABEL; }
   }
+  const shownAppCards = suppressTrialCardsForPaid(appCards, me?.plan ?? null);
   const PLAN_NAME: Record<string, string> = { free: 'Free', pro: 'Pro', team: 'Teams', enterprise: 'Enterprise' };
 
   const mcpCards = plans.map(mcpCard);
@@ -410,7 +424,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
           </div>
         </section>
 
-        {me?.plan && upgrade && (
+        {me?.plan && (
           <section className="current-plan" aria-label="Your plan">
             <div>
               <div className="cp-k">Your plan</div>
@@ -418,7 +432,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
             </div>
             <div className="cp-actions">
               <Link className="cp-sec" href="/app?panel=settings&section=credits&tab=billing">Billing &amp; credits</Link>
-              <a className="cp-up" href={upgrade.href}>{upgrade.label}{upgrade.offer && <span className="cp-off">{UPGRADE_OFFER_LABEL}</span>}</a>
+              {upgrade && <a className="cp-up" href={upgrade.href}>{upgrade.label}{upgrade.offer && <span className="cp-off">{UPGRADE_OFFER_LABEL}</span>}</a>}
             </div>
           </section>
         )}
@@ -438,7 +452,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
         </div>
 
         <div className={`grid ${tab === 'app' || mcpCards.length <= 3 ? 'c3' : 'c4'}`}>
-          {(tab === 'app' ? appCards : mcpCards).map((p) => <PlanCard key={p.name} p={p} />)}
+          {(tab === 'app' ? shownAppCards : mcpCards).map((p) => <PlanCard key={p.name} p={p} />)}
         </div>
 
         {tab === 'app' ? (

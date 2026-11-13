@@ -6,8 +6,8 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { JSDOM } from 'jsdom';
-import UnifiedPricing, { PLANS_FALLBACK, heroTrialOffer } from './UnifiedPricing';
-import { PRO_TRIAL_ANNUAL, PRO_TRIAL_MONTHLY } from './app-plan-links';
+import UnifiedPricing, { PLANS_FALLBACK, accountPanelUpgrade, heroTrialOffer, suppressTrialCardsForPaid } from './UnifiedPricing';
+import { PRO_TRIAL_ANNUAL, PRO_TRIAL_MONTHLY, TEAM_TRIAL_ANNUAL } from './app-plan-links';
 
 const html = renderToStaticMarkup(
   <UnifiedPricing initialTab="mcp" proCredits={1500} teamCredits={7000} signupCredits={100} forecastsLabel="33,000+" faqs={[]} />,
@@ -84,6 +84,41 @@ describe('/mcp/pricing plans unchanged by the hero edit', () => {
     const hrefs = new Set([...doc.querySelectorAll('a')].map((a) => a.getAttribute('href')));
     for (const p of PLANS_FALLBACK.filter((x) => x.id !== 'agency')) {
       expect(hrefs.has(p.annual!.checkoutUrl) || hrefs.has(p.monthly.checkoutUrl)).toBe(true);
+    }
+  });
+});
+
+describe('account panel: no competing first-month discount for Free users', () => {
+  it('Free (and signed-out) get no upgrade button, so no "25% off first month" on this page', () => {
+    expect(accountPanelUpgrade('free')).toBeNull();
+    expect(accountPanelUpgrade(null)).toBeNull();
+  });
+  it('other plans keep their existing panel action', () => {
+    expect(accountPanelUpgrade('pro')).toMatchObject({ label: 'Upgrade to Teams', offer: true });
+    expect(accountPanelUpgrade('team')).toEqual({ label: 'Add credits', href: '/app?panel=settings&section=credits&tab=billing', offer: false });
+    expect(accountPanelUpgrade('enterprise')).toMatchObject({ label: 'Add credits', offer: false });
+  });
+});
+
+describe('app plan cards: paying accounts are never offered another trial', () => {
+  const cards = () => [
+    { name: 'Pro', href: PRO_TRIAL_ANNUAL, cta: 'Start for free', pill: '-17%', note: '14 days free…' },
+    { name: 'Teams', href: TEAM_TRIAL_ANNUAL, cta: 'Start for free', note: '14 days free…' },
+  ];
+  it('signed-out and Free keep the trial CTAs untouched', () => {
+    expect(suppressTrialCardsForPaid(cards(), null)).toEqual(cards());
+    expect(suppressTrialCardsForPaid(cards(), 'free')).toEqual(cards());
+  });
+  it('Team: the Pro card no longer links to a trial checkout; the current Teams card is untouched', () => {
+    const c = cards(); c[1] = { ...c[1], current: true } as typeof c[1];
+    const out = suppressTrialCardsForPaid(c, 'team');
+    expect(out[0]).toMatchObject({ href: '/app?panel=settings&section=credits&tab=billing', cta: 'Manage your plan', pill: undefined });
+    expect(out[1]).toBe(c[1]);
+  });
+  it('Enterprise and Pro: no card keeps a trial checkout link', () => {
+    for (const plan of ['enterprise', 'pro']) {
+      const out = suppressTrialCardsForPaid(cards(), plan);
+      expect(out.some((x) => /buy\.stripe\.com/.test(x.href))).toBe(false);
     }
   });
 });
