@@ -152,8 +152,8 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '<div class="mf-sec mfv-open" data-mfsec="horizons">Show on the map <em>(categories)</em></div>'
   + '<div class="mf-checks mfv-open" data-mfsec="horizons" id="hznToggles">'
   +   '<button class="hzc on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')">Open Now</button>'
-  +   '<button class="hzc on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')">Coming Back</button>'
-  +   '<button class="hzc on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')">Coming Soon</button>'
+  +   '<button class="hzc" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')">Coming Back</button>'
+  +   '<button class="hzc" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')">Coming Soon</button>'
   // Grants removed from the Horizons set (Eric 2026-08-01). The grants-map endpoint stays for now,
   // but Grants is no longer an Opportunities horizon toggle.
   + '</div>'
@@ -372,11 +372,11 @@ const SERVER_FILTERS =
   // shows totalForFilters per horizon, never the 1,000 pin cap). Opportunities-map only (mfv-open).
   // All checked by default; uncheck to hide; last-checked sticky. window.__horizons + toggleHorizon.
   + '<div class="hznwrap mfv-open" id="hznWrap">'
-  +   '<button class="fsel fsel-mode" id="hznBtn" type="button" title="Which categories to show" aria-haspopup="true" aria-expanded="false">Horizons</button>'
+  +   '<button class="fsel fsel-mode" id="hznBtn" type="button" title="Which categories to show" aria-haspopup="true" aria-expanded="false">Open now</button>'
   +   '<div class="hznpop" id="hznPop" role="menu" hidden>'
-  +     '<button class="hznrow on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')"><i></i><span class="hznlbl">Open Now</span><span class="hznn" data-hzn="open"></span></button>'
-  +     '<button class="hznrow on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')"><i></i><span class="hznlbl">Coming Back</span><span class="hznn" data-hzn="recompete"></span></button>'
-  +     '<button class="hznrow on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')"><i></i><span class="hznlbl">Coming Soon</span><span class="hznn" data-hzn="forecast"></span></button>'
+  +     '<button class="hznrow on" data-hz="open" style="--hzc:#22a06b" onclick="selectHorizon(\'open\')"><i></i><span class="hznlbl">Open Now</span><span class="hznn" data-hzn="open"></span></button>'
+  +     '<button class="hznrow" data-hz="recompete" style="--hzc:#b45309" onclick="selectHorizon(\'recompete\')"><i></i><span class="hznlbl">Coming Back</span><span class="hznn" data-hzn="recompete"></span></button>'
+  +     '<button class="hznrow" data-hz="forecast" style="--hzc:#7c3aed" onclick="selectHorizon(\'forecast\')"><i></i><span class="hznlbl">Coming Soon</span><span class="hznn" data-hzn="forecast"></span></button>'
   +   '</div>'
   + '</div>'
   // PLAYERS multi-select dropdown — Companies + Gov Buyers coexist on ONE Players map (same pattern
@@ -1407,6 +1407,9 @@ const ZRAIL_HTML = '<nav class="zrail">'
   + '<a href="/opportunity-map/favorites" title="Saved — opportunities you hearted"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg><span>Saved</span></a>'
   // Pursuits = the opportunities you are actively working (the "mission control" board) — crosshair icon.
   + '<a href="/opportunity-map/pursuits" title="Pursuits — opportunities you are actively working"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg><span>Pursuits</span></a>'
+  // App (Eric 2026-11-13): go back and forth between the map and the Mindy app. A deliberate rail
+  // destination (the app dashboard), not the logo — maps-home.unit.test.ts bans a bare /app logo link.
+  + '<a href="/app?panel=dashboard" title="Mindy app — briefings, alerts, research and settings"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>App</span></a>'
   // ⛔ NOTHING ELSE GOES IN THIS RAIL. Vault and Reports were removed from it (Eric 2026-08-15:
   // "the vault should not be there and we discussed also not putting reports there but through
   // another mean but it keeps resurfacing"). The rail is the DISCOVERY workspace — the two maps
@@ -3136,7 +3139,24 @@ const VIEWPORT_JS = `<script>
   // HORIZON toggles — show/hide each opportunity category on the ONE Opportunities map.
   // Default: ALL THREE ON (Eric 2026-08-12) — Open + Recompete + Forecast at launch so the market
   // is fully visible; users can uncheck via Horizons. Last-ON sticky so the map never goes blank.
-  window.__horizons={open:true,recompete:true,forecast:true};
+  // Eric 2026-11-13: the top-bar button works like the Opportunities dropdown beside it — pick ONE
+  // (Open now / Coming back / Coming soon) and the map switches to it. Default is Open now. The
+  // Filters-panel chips (.hzc) and saved searches can still combine horizons via toggleHorizon.
+  window.__horizons={open:true,recompete:false,forecast:false};
+  window.selectHorizon=function(want){
+    if(!window.__horizons||!(want in window.__horizons))return;
+    var HZ=['open','recompete','forecast'];
+    var already=HZ.every(function(h){ return (window.__horizons[h]!==false)===(h===want); });
+    if(!already){
+      window.__hzSystem=true;
+      try{
+        if(window.__horizons[want]===false)window.toggleHorizon(want);   // turn the pick on FIRST (last-on is sticky)
+        HZ.forEach(function(h){ if(h!==want&&window.__horizons[h]!==false)window.toggleHorizon(h); });
+      }finally{ window.__hzSystem=false; }
+      try{ _track('tool_use','horizon_selected',{horizon:want}); }catch(e){}
+    }
+    if(window.__closeHznPops)window.__closeHznPops();
+  };
   window.toggleHorizon=function(h){
     if(!(h in window.__horizons))return;
     var on=window.__horizons[h]!==false;
@@ -3215,7 +3235,13 @@ const VIEWPORT_JS = `<script>
     // Divisor is the ACTUAL horizon count (3 now — Grants removed), never a hardcoded 4 (Eric 2026-08-01).
     // Always just "Horizons" — the N/total count suffix was noise (Eric 2026-08-01). The dropdown
     // rows themselves show which are on (checked) with their live counts.
-    void total; if(btn)btn.textContent='Horizons';
+    // Eric 2026-11-13: "change horizons to open now". The button names what is ON: the first
+    // selected horizon, plus "+N" for the others (all three on → "Open now +2"), so it never
+    // claims Open-only while Coming back / Coming soon pins are showing.
+    var HZN_LABEL={open:'Open now',recompete:'Coming back',forecast:'Coming soon'};
+    var onList=HZ.filter(function(m){return window.__horizons[m]!==false;});
+    void total; void onCount;
+    if(btn)btn.textContent=onList.length?HZN_LABEL[onList[0]]+(onList.length>1?' +'+(onList.length-1):''):'Open now';
   };
   // Open/close the Horizons popover (Zillow Home-Type dropdown). Toggling a row does NOT close it
   // (multi-select — keep it open so you can flip several). Closes on outside click / Esc.
