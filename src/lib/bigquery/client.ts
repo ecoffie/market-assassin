@@ -142,6 +142,23 @@ function getClient(): BigQuery {
 }
 
 export const BQ_DATASET = `\`${PROJECT_ID}.${DATASET}\``;
+
+/**
+ * When a dataset table was last rebuilt (BigQuery table metadata — a free API call, not a query).
+ * Used to VERSION cached negative lookups against derived tables like award_detail_lookup: a
+ * "not found" recorded before the table was rebuilt must not outlive the rebuild.
+ * Returns null on any failure; callers then fall back to TTL alone.
+ */
+export async function getTableLastModified(table: string): Promise<string | null> {
+  try {
+    const [meta] = await getClient().dataset(DATASET).table(table).getMetadata();
+    const ms = Number(meta?.lastModifiedTime);
+    return Number.isFinite(ms) && ms > 0 ? new Date(ms).toISOString() : null;
+  } catch (err) {
+    console.warn(`[bq-client] table metadata unavailable for ${table}:`, err instanceof Error ? err.message : err);
+    return null;
+  }
+}
 export const BQ_TABLES = {
   awards: `\`${PROJECT_ID}.${DATASET}.awards\``,
   recipients: `\`${PROJECT_ID}.${DATASET}.recipients\``,

@@ -8,9 +8,10 @@
  *   - Detail pages: top 10K awards by obligation amount get their own
  *     URL (these are the awards search engines actually rank for)
  */
-import { BQ_TABLES } from './client';
+import { BQ_TABLES, getTableLastModified } from './client';
 import { dedupeInFlight } from '@/lib/seo/dedupe-in-flight';
-import { bqUnavailable, queryCached } from './cache';
+import { bqUnavailable, queryCached, DATA_VERSION } from './cache';
+import { kv } from '@vercel/kv';
 import { seoLiveBqEnabled } from '@/lib/seo/live-bq';
 import { allowAwardColdLookup } from '@/lib/seo/award-cold-budget';
 
@@ -158,6 +159,9 @@ export const getAwardLookup = dedupeInFlight(
   const run = (cacheOnly: boolean) => queryCached<AwardDetailRow>({
     cacheKey,
     cacheOnly,
+    // Live reads skip the KV read: a legacy cached [] must not answer for BigQuery.
+    forceRefresh: !cacheOnly,
+    cacheEmpty: false,
     maximumBytesBilled: String(100 * 1024 * 1024),
     query: `
       SELECT
@@ -197,17 +201,75 @@ export const getAwardLookup = dedupeInFlight(
     `,
     params: { id: awardId },
   });
+  // Positive answers stay in the shared 90-day cache. NEGATIVE answers do not (cacheEmpty:false):
+  // award_detail_lookup is a derived table rebuilt by hand after ingests, and on 2026-11-13 it
+  // stopped at 2026-04-23 while the warehouse ran to 2026-11-04 — so "not found" mostly meant
+  // "newer than the lookup table", and the old 90-day negative cache turned each of those into a
+  // 404 that outlived the rebuild by months. Negatives now live in their own record, expire in 7
+  // days, and are tied to the table's build time (see readNegative/writeNegative below).
   let rows = await run(true);
   if (rows.length) return { state: 'hit', award: rows[0] };
-  if (!bqUnavailable(cacheKey, 0)) return { state: 'missing', award: null }; // cached negative
+  // A cached [] under the positive key is a LEGACY 90-day negative written before this change.
+  // It is not trusted: fall through to the versioned negative record instead.
+  const lookupBuild = await awardLookupBuildVersion();
+  const neg = await readNegative(awardId);
+  if (neg && (lookupBuild === null || neg.build === lookupBuild)) {
+    return { state: 'missing', award: null }; // confirmed against THIS build of the table
+  }
   if (allowCold && (seoLiveBqEnabled() || (await allowAwardColdLookup()))) {
     rows = await run(false);
     if (rows.length) return { state: 'hit', award: rows[0] };
-    if (!bqUnavailable(cacheKey, 0)) return { state: 'missing', award: null };
+    if (!bqUnavailable(cacheKey, 0)) {
+      // The query ran and found nothing: a confirmed absence for this build of the table.
+      await writeNegative(awardId, cacheKey, lookupBuild);
+      return { state: 'missing', award: null };
+    }
   }
+  // Not looked up (budget spent) or the query FAILED: unknown, never "missing".
   return { state: 'unavailable', award: null };
   },
 );
+
+/** How long a confirmed "no such award" is trusted, even when the table build is unchanged. */
+export const AWARD_NEGATIVE_TTL_SECONDS = 7 * 24 * 60 * 60;
+const negativeKey = (awardId: string) => `bq:${DATA_VERSION}:awards:detail-missing:v1:${awardId}`;
+
+let buildMemo: { value: string | null; at: number } | null = null;
+const BUILD_MEMO_MS = 10 * 60 * 1000;
+
+/**
+ * award_detail_lookup's last rebuild time (table metadata, memoized 10 min). A negative recorded
+ * against an older build is stale the moment the table is rebuilt. null = unknown → TTL alone.
+ */
+export async function awardLookupBuildVersion(now = Date.now()): Promise<string | null> {
+  if (buildMemo && now - buildMemo.at < BUILD_MEMO_MS) return buildMemo.value;
+  const value = await getTableLastModified('award_detail_lookup');
+  buildMemo = { value, at: now };
+  return value;
+}
+/** Test hook. */
+export function resetAwardLookupBuildMemo(): void {
+  buildMemo = null;
+}
+
+async function readNegative(awardId: string): Promise<{ build: string | null } | null> {
+  try {
+    const v = await kv.get<{ build: string | null }>(negativeKey(awardId));
+    return v && typeof v === 'object' ? v : null;
+  } catch {
+    return null; // unreadable → not a confirmed absence
+  }
+}
+
+async function writeNegative(awardId: string, positiveCacheKey: string, build: string | null): Promise<void> {
+  try {
+    await kv.set(negativeKey(awardId), { build, at: new Date().toISOString() }, { ex: AWARD_NEGATIVE_TTL_SECONDS });
+    // Retire any legacy 90-day [] under the positive key so it cannot be mistaken for knowledge.
+    await kv.del(`bq:${DATA_VERSION}:${positiveCacheKey}`);
+  } catch (err) {
+    console.warn('[awards] negative-cache write failed:', err instanceof Error ? err.message : err);
+  }
+}
 
 /** Back-compat: the award, or null when missing OR unknown. Prefer getAwardLookup. */
 export async function getAwardById(awardId: string, allowCold = true): Promise<AwardDetailRow | null> {
