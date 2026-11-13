@@ -48,6 +48,15 @@ describe('raw-HTML public shell', () => {
     expect([...d.querySelectorAll('#mp-menu .mp-menu-h')].map((h) => h.textContent)).toContain('Mindy in your AI');
   });
 
+  it('tablets get the menu button: it shows wherever the bar hides its links (<=980px), not only on phones (2026-11-13)', async () => {
+    const { SITE_NAV_CSS } = await import('./site-nav');
+    const hideLinks = SITE_NAV_CSS.match(/@media\(max-width:(\d+)px\)\{\.mp-head-left/);
+    const showBurger = SITE_NAV_CSS.match(/@media\(max-width:(\d+)px\)\{\.mp-burger\{display:flex/);
+    expect(hideLinks?.[1]).toBe('980');
+    expect(showBurger?.[1]).toBe(hideLinks?.[1]);
+    expect(SITE_NAV_CSS).toContain('@media(min-width:621px) and (max-width:980px){.mp-menu{position:absolute;top:100%');
+  });
+
   it('renders a footer identical to the React PublicFooter', () => {
     const raw = doc(mpRawFooterHtml()).querySelector('footer')!;
     const react = doc(renderToStaticMarkup(PublicFooter())).querySelector('footer')!;

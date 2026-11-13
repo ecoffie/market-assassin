@@ -177,11 +177,15 @@ export const SITE_NAV_CSS = [
     + '.mp-evb-l{display:none}.mp-evb-s{display:inline}.mp-evb-t{font-size:15.5px;line-height:1.45}'
     + '.mp-evb-c{padding:9px 20px;font-size:15px}.mp-evb-x{right:6px;top:14px;transform:none;width:32px;height:32px}'
     + '.mp-logo span{font-size:20px}.mp-logo img{width:28px;height:28px}.mp-head .mp-su{padding:9px 14px;font-size:14px}}',
-  // Phone menu (☰). Hidden above 620px.
+  // Menu button (☰) + menu panel. Hidden above 980px, where the bar shows its links. Between 621px
+  // and 980px the left links are hidden too, so the button shows there as well (2026-11-13: tablets
+  // used to get no navigation at all — no links and no button).
   '.mp-burger,.mp-menu{display:none}',
   '@media(max-width:620px){'
     // Logged out, the bar is just logo + menu button (Zoom); Sign in / Start for free live in the menu.
     + '.mp-head .mp-anon{display:none!important}'
+    + '}',
+  '@media(max-width:980px){'
     + '.mp-burger{display:flex;align-items:center;justify-content:center;width:44px;height:44px;margin-right:-8px;border:0;background:none;color:var(--mp-ink);cursor:pointer;border-radius:10px;flex:none}'
     + '.mp-burger svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}'
     + '.mp-burger-close{display:none}html.mp-menu-open .mp-burger-open{display:none}html.mp-menu-open .mp-burger-close{display:block}'
@@ -201,6 +205,13 @@ export const SITE_NAV_CSS = [
     + '.mp-menu-signin{padding:10px 8px;font:600 17px var(--mp-font-sans);color:var(--mp-ink);text-decoration:none}'
     + '.mp-menu-su{display:flex;align-items:center;justify-content:center;height:52px;margin-top:6px;border-radius:12px;background:var(--mp-navy);color:var(--mp-surface);font:700 17px var(--mp-font-sans);text-decoration:none}'
     + 'html:has(.mindy-acct-ini,.mindy-acct-btn img) .mp-menu .mp-anon{display:none}'
+    + '}',
+  // Tablet: the bar keeps the banner above it and Sign in / Start for free in it, so the menu drops
+  // down from the bottom of the sticky top bar (.mp-top) instead of covering a fixed 60px offset,
+  // and its own Sign in / Start for free footer is left out.
+  '@media(min-width:621px) and (max-width:980px){'
+    + '.mp-menu{position:absolute;top:100%;bottom:auto;max-height:calc(100dvh - 140px);border-bottom:1px solid var(--mp-hair);box-shadow:0 18px 40px rgba(18,16,14,.12)}'
+    + '.mp-menu-foot{display:none}'
     + '}',
   '@media (prefers-reduced-motion: reduce){.mp-evb{transition:none}}',
 ].join('');
