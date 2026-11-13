@@ -8,12 +8,12 @@ const RAIL_PAGES = ['route.ts', 'favorites/route.ts', 'forecasts/route.ts', 'sav
 
 describe('map rail → app link', () => {
   for (const f of RAIL_PAGES) {
-    it(`${f} rail links to /app`, () => {
+    it(`${f} rail links to the app`, () => {
       const src = readFileSync(join(__dirname, f), 'utf8');
       const start = src.indexOf('<nav class="zrail">');
       expect(start).toBeGreaterThan(-1);
       const rail = src.slice(start, src.indexOf('</nav>', start));
-      expect(rail).toContain('<a href="/app" title="Mindy app');
+      expect(rail).toContain('<a href="/app?panel=dashboard" title="Mindy app');
       expect(rail).toContain('<span>App</span>');
     });
   }

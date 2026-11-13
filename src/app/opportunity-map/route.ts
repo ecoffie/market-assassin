@@ -1407,8 +1407,9 @@ const ZRAIL_HTML = '<nav class="zrail">'
   + '<a href="/opportunity-map/favorites" title="Saved — opportunities you hearted"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg><span>Saved</span></a>'
   // Pursuits = the opportunities you are actively working (the "mission control" board) — crosshair icon.
   + '<a href="/opportunity-map/pursuits" title="Pursuits — opportunities you are actively working"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg><span>Pursuits</span></a>'
-  // App (Eric 2026-11-13): go back and forth between the map and the Mindy app.
-  + '<a href="/app" title="Mindy app — briefings, alerts, research and settings"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>App</span></a>'
+  // App (Eric 2026-11-13): go back and forth between the map and the Mindy app. A deliberate rail
+  // destination (the app dashboard), not the logo — maps-home.unit.test.ts bans a bare /app logo link.
+  + '<a href="/app?panel=dashboard" title="Mindy app — briefings, alerts, research and settings"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>App</span></a>'
   // ⛔ NOTHING ELSE GOES IN THIS RAIL. Vault and Reports were removed from it (Eric 2026-08-15:
   // "the vault should not be there and we discussed also not putting reports there but through
   // another mean but it keeps resurfacing"). The rail is the DISCOVERY workspace — the two maps
