@@ -5,9 +5,9 @@
  *        → the review page (HTML) with Approve / Reject / Remove buttons, or JSON.
  *   POST /api/admin/ambassadors?password=…   { action: 'approve'|'reject'|'remove', email, note? }
  *
- * Approve: grants free Pro (the same member-grants path as a staff grant), turns on unlimited use
- * (approved ambassadors pay 0 credits, src/lib/mcp/metered.ts), creates their referral code and
- * emails them the welcome. Remove: revokes the Pro grant and the unlimited use.
+ * Approve: grants free Pro (the same member-grants path as a staff grant), makes metered MCP calls
+ * cost 0 credits (src/lib/mcp/metered.ts), creates their referral code and emails them the welcome.
+ * Remove: revokes the Pro grant and the zero-cost calls.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminPassword } from '@/lib/admin-auth';
@@ -85,11 +85,15 @@ const esc = (s: string | null | undefined) => (s ?? '').replace(/&/g, '&amp;').r
 
 function renderReview(rows: AmbassadorRow[], status?: AmbassadorStatus): string {
   const tab = (s?: AmbassadorStatus) => `<a class="tab${s === status ? ' on' : ''}" href="?status=${s ?? ''}" data-keep>${s ? s[0].toUpperCase() + s.slice(1) : 'All'}</a>`;
+  const link = (u: string | null | undefined, label: string) => (u ? `<a href="${esc(u)}" target="_blank" rel="noopener">${label}</a>` : '');
+  const para = (label: string, v: string | null | undefined) => (v ? `<p><b>${label}.</b> ${esc(v)}</p>` : '');
   const card = (r: AmbassadorRow) => `<article class="card">
-  <header><div><b>${esc(r.name)}</b> <span class="st st-${r.status}">${r.status}</span><div class="muted">${esc(r.email)} · ${esc(r.role)}${r.company ? ` · ${esc(r.company)}` : ''}</div></div>
+  <header><div><b>${esc(r.name)}</b> <span class="st st-${r.status}">${r.status}</span><div class="muted">${esc(r.email)}${r.company ? ` · ${esc(r.company)}` : ''}${r.uei ? ` · UEI ${esc(r.uei)}` : ''}${r.role ? ` · ${esc(r.role)}` : ''}</div></div>
   <div class="muted">${new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div></header>
-  <div class="links">${r.linkedin_url ? `<a href="${esc(r.linkedin_url)}" target="_blank" rel="noopener">LinkedIn</a>` : ''}${r.website_url ? `<a href="${esc(r.website_url)}" target="_blank" rel="noopener">Website</a>` : ''}</div>
-  <p><b>Who they reach.</b> ${esc(r.audience)}</p><p><b>Why.</b> ${esc(r.why)}</p><p><b>How they would share Mindy.</b> ${esc(r.promote_plan)}</p>
+  <div class="links">${link(r.post_url, 'Where they post')}${r.uei ? `<a href="https://sam.gov/search/?keywords=${encodeURIComponent(r.uei)}" target="_blank" rel="noopener">SAM record</a>` : ''}${link(r.linkedin_url, 'LinkedIn')}${link(r.website_url, 'Website')}</div>
+  ${para('Last event attended', r.last_event)}${para('Pursuit in motion', r.pursuit)}${para('Wants to find out', r.want_to_find)}
+  ${r.attested_at ? '<p class="muted">Attested: meets all six requirements and will disclose on every post.</p>' : ''}
+  ${para('Who they reach', r.audience)}${para('Why', r.why)}${para('How they would share Mindy', r.promote_plan)}
   ${r.referral_code ? `<p class="muted">Referral link: getmindy.ai/pricing?ref=${esc(r.referral_code)}</p>` : ''}
   ${r.decision_note ? `<p class="muted">Note: ${esc(r.decision_note)}</p>` : ''}
   <div class="acts" data-email="${esc(r.email)}">
@@ -105,7 +109,7 @@ h1{font:400 32px Georgia,serif;margin:0}.tabs{display:flex;gap:6px;flex-wrap:wra
 .muted{color:#73716b;font-size:13px}.links{display:flex;gap:12px;font-size:14px}.links a{color:#1b3a6b}.st{font-size:12px;padding:2px 8px;border-radius:999px;background:#f0eee6;margin-left:6px}
 .st-approved{background:#e6f4ea;color:#2f7d4f}.st-rejected,.st-removed{background:#fdecea;color:#b42318}.acts{display:flex;gap:8px;align-items:center;margin-top:4px}
 button{font:inherit;padding:8px 16px;border-radius:8px;border:1px solid #d6d3c8;background:#fff;cursor:pointer}button.pri{background:#1b3a6b;color:#fff;border-color:#1b3a6b}.msg{font-size:13px;color:#73716b}</style></head>
-<body><div class="wrap"><h1>Mindy Ambassadors</h1><p class="muted">${rows.length} application${rows.length === 1 ? '' : 's'}${status ? ` · ${status}` : ''}. Approving grants free Pro, unlimited use and a referral link, and emails the welcome.</p>
+<body><div class="wrap"><h1>Mindy Ambassadors</h1><p class="muted">${rows.length} application${rows.length === 1 ? '' : 's'}${status ? ` · ${status}` : ''}. Approving grants free Pro (MCP calls cost 0 credits), creates a referral link and emails the welcome. Check the requirements against their post link and SAM record before approving.</p>
 <nav class="tabs">${tab()}${STATUSES.map(tab).join('')}</nav>
 ${rows.length ? rows.map(card).join('') : '<p class="muted">No applications here yet.</p>'}
 </div><script>

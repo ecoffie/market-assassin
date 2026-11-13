@@ -1,24 +1,35 @@
 /**
  * Mindy Ambassadors — the public application (getmindy.ai/ambassadors).
  * Validation and the Slack notification. Storage lives in ./store.ts.
+ * The program itself (requirements, expectations, terms) is the owner's Ambassador Program
+ * document; the page at src/app/ambassadors/page.tsx states it.
  */
 import { postSlackMessage } from '@/lib/slack/post-message';
 
-import { AUDIENCE_SIZES } from './constants';
+import { ATTESTATION, UEI_RE, normalizeUei } from './constants';
 
-export { AUDIENCE_SIZES };
+export { ATTESTATION, UEI_RE };
 
+/**
+ * The application asks for exactly the five things in Section 9 of the Ambassador Program
+ * document, plus a name, an email and the attestation:
+ *   1. a link to where you post        → postUrl
+ *   2. your company name and UEI       → company, uei
+ *   3. the last event you attended     → lastEvent
+ *   4. the pursuit in motion right now → pursuit
+ *   5. what you would want to find out → wantToFind
+ */
 export interface AmbassadorApplication {
   name: string;
   email: string;
+  postUrl: string;
   company: string;
-  role: string;
-  linkedinUrl?: string;
-  websiteUrl?: string;
-  audienceSize: string;
-  audience: string;
-  why: string;
-  promotePlan: string;
+  uei: string;
+  lastEvent: string;
+  pursuit: string;
+  wantToFind: string;
+  /** Ticked "I meet all six requirements and will disclose on every post." */
+  attested: true;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -28,46 +39,51 @@ function clean(v: unknown, max: number): string {
   return typeof v === 'string' ? v.replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, ' ').replace(/\r/g, '').trim().slice(0, max) : '';
 }
 
-function cleanUrl(v: unknown): string | undefined {
+/** A one-line answer: newlines collapse to spaces. */
+function line(v: unknown, max: number): string {
+  return clean(v, max).replace(/\s*\n\s*/g, ' ');
+}
+
+function cleanUrl(v: unknown): string {
   let s = clean(v, 300);
-  if (!s) return undefined;
+  if (!s) return '';
   if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
   return URL_RE.test(s) ? s : '__invalid__';
 }
 
+const isChecked = (v: unknown) => v === true || v === 'on' || v === 'true' || v === 'yes';
+
 /** Validate + normalize a raw body. Returns the application or the fields that need fixing. */
 export function parseAmbassadorApplication(body: unknown): { ok: true; app: AmbassadorApplication } | { ok: false; errors: string[] } {
   const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
-  const app: AmbassadorApplication = {
-    name: clean(b.name, 120),
-    email: clean(b.email, 200).toLowerCase(),
-    company: clean(b.company, 160),
-    role: clean(b.role, 120),
-    linkedinUrl: cleanUrl(b.linkedinUrl),
-    websiteUrl: cleanUrl(b.websiteUrl),
-    audienceSize: clean(b.audienceSize, 40),
-    audience: clean(b.audience, 1500),
-    why: clean(b.why, 2000),
-    promotePlan: clean(b.promotePlan, 2000),
+  const fields = {
+    name: line(b.name, 120),
+    email: line(b.email, 200).toLowerCase(),
+    postUrl: cleanUrl(b.postUrl),
+    company: line(b.company, 160),
+    uei: normalizeUei(line(b.uei, 40)),
+    lastEvent: line(b.lastEvent, 300),
+    pursuit: line(b.pursuit, 400),
+    wantToFind: line(b.wantToFind, 400),
   };
   const errors: string[] = [];
-  if (!app.name) errors.push('name');
-  if (!EMAIL_RE.test(app.email)) errors.push('email');
-  if (!app.role) errors.push('role');
-  if (app.linkedinUrl === '__invalid__') errors.push('linkedinUrl');
-  if (app.websiteUrl === '__invalid__') errors.push('websiteUrl');
-  if (!(AUDIENCE_SIZES as readonly string[]).includes(app.audienceSize)) errors.push('audienceSize');
-  if (app.audience.length < 10) errors.push('audience');
-  if (app.why.length < 10) errors.push('why');
-  if (app.promotePlan.length < 10) errors.push('promotePlan');
-  return errors.length ? { ok: false, errors } : { ok: true, app };
+  if (!fields.name) errors.push('name');
+  if (!EMAIL_RE.test(fields.email)) errors.push('email');
+  if (!fields.postUrl || fields.postUrl === '__invalid__') errors.push('postUrl');
+  if (!fields.company) errors.push('company');
+  if (!UEI_RE.test(fields.uei)) errors.push('uei');
+  if (fields.lastEvent.length < 3) errors.push('lastEvent');
+  if (fields.pursuit.length < 10) errors.push('pursuit');
+  if (fields.wantToFind.length < 10) errors.push('wantToFind');
+  if (!isChecked(b.attested)) errors.push('attested');
+  return errors.length ? { ok: false, errors } : { ok: true, app: { ...fields, attested: true } };
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 export function ambassadorSlackMessage(a: AmbassadorApplication): { text: string; blocks: unknown[] } {
-  const text = `New ambassador application: ${a.name}${a.company ? ` (${a.company})` : ''}`;
-  const link = (u?: string) => (u ? `<${u}|${esc(u.replace(/^https?:\/\//, ''))}>` : '—');
+  const text = `New ambassador application: ${a.name} (${a.company})`;
+  const link = (u: string) => `<${u}|${esc(u.replace(/^https?:\/\//, ''))}>`;
   return {
     text,
     blocks: [
@@ -77,17 +93,15 @@ export function ambassadorSlackMessage(a: AmbassadorApplication): { text: string
         fields: [
           `*Name*\n${esc(a.name)}`,
           `*Email*\n${esc(a.email)}`,
-          `*Role*\n${esc(a.role)}`,
-          `*Company*\n${a.company ? esc(a.company) : '—'}`,
-          `*LinkedIn*\n${link(a.linkedinUrl)}`,
-          `*Website*\n${link(a.websiteUrl)}`,
-          `*Audience size*\n${esc(a.audienceSize)}`,
+          `*Company*\n${esc(a.company)}`,
+          `*UEI*\n${esc(a.uei)}`,
+          `*Where they post*\n${link(a.postUrl)}`,
+          `*Last event attended*\n${esc(a.lastEvent)}`,
         ].map((t) => ({ type: 'mrkdwn', text: t })),
       },
-      { type: 'section', text: { type: 'mrkdwn', text: `*Who they reach*\n${esc(a.audience).slice(0, 2800)}` } },
-      { type: 'section', text: { type: 'mrkdwn', text: `*Why they want in*\n${esc(a.why).slice(0, 2800)}` } },
-      { type: 'section', text: { type: 'mrkdwn', text: `*How they would share Mindy*\n${esc(a.promotePlan).slice(0, 2800)}` } },
-      { type: 'context', elements: [{ type: 'mrkdwn', text: 'Ambassadors form · getmindy.ai/ambassadors · approve or reject from /api/admin/ambassadors' }] },
+      { type: 'section', text: { type: 'mrkdwn', text: `*Pursuit in motion*\n${esc(a.pursuit).slice(0, 2800)}` } },
+      { type: 'section', text: { type: 'mrkdwn', text: `*What they want to find out*\n${esc(a.wantToFind).slice(0, 2800)}` } },
+      { type: 'context', elements: [{ type: 'mrkdwn', text: 'Attested: meets all six requirements, will disclose on every post · getmindy.ai/ambassadors · approve or reject from /api/admin/ambassadors' }] },
     ],
   };
 }
