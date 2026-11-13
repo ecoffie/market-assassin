@@ -21,6 +21,7 @@ import { MARKET_FEEDBACK_CSS, MARKET_BOOT_HTML, MARKET_BOOT_APP_OPEN, MARKET_FEE
 import { LAYOUT_MOVE_JS } from './layout-move';
 import { HIERARCHY_HORIZON_LIMIT_JS } from '@/lib/opportunities/hierarchy-sub-agency';
 import { WATCH_SCOPE_JS } from '@/lib/saved-searches/watch-scope-client';
+import { PHONE_SHELL_INLINE_JS } from '@/lib/app/phone-shell';
 
 export const dynamic = 'force-dynamic';
 
@@ -11012,6 +11013,9 @@ export async function GET(request: NextRequest) {
   } else {
     // (Removed the "← Back to Mindy" link — the top nav + icon rail already have Home/Dashboard,
     // so it was leftover noise in the right-panel header. Zillow's header is title · count · sort.)
+    // Inside the Mindy phone app's Map tab (src/app/app/phone) the website's top bar is hidden:
+    // the phone app has its own tab bar. Only when framed by that shell (src/lib/app/phone-shell.ts).
+    html = repl(html, '</head>', '<script>' + PHONE_SHELL_INLINE_JS + '</script><style>.phone-shell .zhead{display:none!important}</style></head>');
     html = repl(html, '</head>', PAGE_CSS + ZLAYOUT_CSS + DRAWER_CSS + VTAG_CSS + '<style>' + ACCOUNT_MENU_CSS + MP_ACCOUNT_OVERRIDES_CSS + SITE_NAV_CSS + ASK_MINDY_CSS + LOGIN_MODAL_CSS + MARKET_FEEDBACK_CSS + '</style>' + '</head>');
     // ROOT-CAUSE fix: neutralize the TEMPLATE's own `.fscroll{overflow-x:auto}` at the source
     // (not just override it) so the clip origin is gone entirely — dropdowns are never clipped.

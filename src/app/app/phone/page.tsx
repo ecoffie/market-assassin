@@ -4,8 +4,9 @@
  * /app/phone — the screen the Mindy phone app (mobile/, Capacitor) opens.
  *
  * The phone app is deliberately NOT the website: it signs you in, then shows two
- * tabs only — "Mindy" (today's matches from your saved profile) and "Map" (the
- * Opportunity Map). The native shell keeps the app on this page and the map and
+ * tabs only — "Mindy" (the Mindy app, /app) and "Map" (the Opportunity Map), each
+ * in a frame without the website's top bar (src/lib/app/phone-shell.ts). The native
+ * shell keeps the app on this page, /app and the map and
  * opens every other link (pricing, forgot password, blog, outside sites) in the
  * phone's browser — see mobile/ios/App/App/AppDelegate.swift (PhoneNavPlugin) and
  * mobile/android/.../PhoneNavPlugin.java.
@@ -14,11 +15,13 @@
  * /app), so the Map tab — same origin, in an iframe — is signed in too.
  */
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import { getMIApiHeaders, storedMIEmail } from '@/components/app/authHeaders';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { storedMIEmail } from '@/components/app/authHeaders';
+import { markPhoneShell } from '@/lib/app/phone-shell';
 
 const AUTH_TOKEN_KEY = 'mi_beta_auth_token';
 const TWO_FACTOR_TOKEN_KEY = 'mi_beta_2fa_token';
+const APP_PATH = '/app';
 const MAP_PATH = '/opportunity-map';
 
 const noopSubscribe = () => () => {};
@@ -27,17 +30,6 @@ const H1_STYLE = { fontFamily: 'inherit', fontWeight: 700 } as const;
 
 type Tab = 'mindy' | 'map';
 type Step = 'credentials' | 'code';
-
-interface Opp {
-  notice_id: string;
-  title: string;
-  department: string;
-  sub_tier: string | null;
-  notice_type: string | null;
-  pop_city: string | null;
-  pop_state: string | null;
-  days_until_deadline: number | null;
-}
 
 function storeSession(token: string, at: string | undefined, email: string) {
   try {
@@ -53,14 +45,6 @@ function clearSession() {
       localStorage.removeItem(k);
     }
   } catch { /* ignore */ }
-}
-
-function dueLabel(days: number | null): string {
-  if (days === null || days === undefined) return 'No due date listed';
-  if (days < 0) return 'Past due';
-  if (days === 0) return 'Due today';
-  if (days === 1) return 'Due tomorrow';
-  return `Due in ${days} days`;
 }
 
 /** fetch with a hard timeout, so a stalled request shows an error instead of spinning forever. */
@@ -82,7 +66,7 @@ export default function PhoneAppPage() {
 
   if (!ready) return <div className="min-h-dvh bg-[#1B3A6B]" />;
   if (!email) return <SignIn onSignedIn={setEmail} />;
-  return <Signed email={email} onSignOut={() => { clearSession(); setEmail(null); }} />;
+  return <Signed onSignOut={() => { clearSession(); setEmail(null); }} />;
 }
 
 function SignIn({ onSignedIn }: { onSignedIn: (email: string) => void }) {
@@ -226,28 +210,36 @@ function SignIn({ onSignedIn }: { onSignedIn: (email: string) => void }) {
   );
 }
 
-function Signed({ email, onSignOut }: { email: string; onSignOut: () => void }) {
+function Signed({ onSignOut }: { onSignOut: () => void }) {
   const [tab, setTab] = useState<Tab>('mindy');
-  const [mapSrc, setMapSrc] = useState(MAP_PATH);
   // The map iframe is created on first visit and then kept, so switching tabs never reloads it.
   const [mapOpened, setMapOpened] = useState(false);
 
-  const openMap = useCallback((noticeId?: string) => {
-    if (noticeId) setMapSrc(`${MAP_PATH}?opp=${encodeURIComponent(noticeId)}`);
-    setMapOpened(true);
-    setTab('map');
-  }, []);
+  // Tells /app and the map (in the frames below) to hide the website's top bar.
+  useEffect(() => { markPhoneShell(); }, []);
+
+  // Signing out inside the Mindy app (its sidebar menu) clears the stored session in a
+  // frame; bring the whole phone app back to the sign-in screen when that happens.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === null || (e.key === AUTH_TOKEN_KEY && !e.newValue)) onSignOut();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [onSignOut]);
 
   return (
-    <div className="flex h-dvh flex-col bg-[#F1F5F9] font-sans text-[#0F172A]">
+    <div className="flex h-dvh flex-col bg-[#FFFFFF] pt-[env(safe-area-inset-top)] font-sans text-[#0F172A]">
       <div className="relative min-h-0 flex-1">
-        <div className={tab === 'mindy' ? 'h-full' : 'hidden'}>
-          <MindyTab email={email} onOpenMap={openMap} onSignOut={onSignOut} />
-        </div>
+        <iframe
+          title="Mindy"
+          src={APP_PATH}
+          className={tab === 'mindy' ? 'h-full w-full border-0' : 'hidden'}
+        />
         {mapOpened && (
           <iframe
             title="Opportunity map"
-            src={mapSrc}
+            src={MAP_PATH}
             className={tab === 'map' ? 'h-full w-full border-0' : 'hidden'}
           />
         )}
@@ -256,7 +248,7 @@ function Signed({ email, onSignOut }: { email: string; onSignOut: () => void }) 
       <nav className="grid grid-cols-2 border-t border-[#E2E8F0] bg-[#FFFFFF] pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2" aria-label="Main">
         <TabButton label="Mindy" active={tab === 'mindy'} onClick={() => setTab('mindy')}
           icon={<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />} />
-        <TabButton label="Map" active={tab === 'map'} onClick={() => openMap()}
+        <TabButton label="Map" active={tab === 'map'} onClick={() => { setMapOpened(true); setTab('map'); }}
           icon={<><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z" /><path d="M9 4v14M15 6v14" /></>} />
       </nav>
     </div>
@@ -271,85 +263,5 @@ function TabButton({ label, active, onClick, icon }: { label: string; active: bo
         strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{icon}</svg>
       {label}
     </button>
-  );
-}
-
-function MindyTab({ email, onOpenMap, onSignOut }: { email: string; onOpenMap: (noticeId?: string) => void; onSignOut: () => void }) {
-  const [opps, setOpps] = useState<Opp[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [closingSoon, setClosingSoon] = useState(false);
-
-  const load = useCallback(async () => {
-    setOpps(null); setError(null);
-    const params = new URLSearchParams({ email, limit: '25', sort: 'soonest' });
-    if (closingSoon) params.set('urgency', 'urgent');
-    try {
-      const res = await fetchWithTimeout(`/api/mi-dashboard?${params}`, { headers: getMIApiHeaders(email) });
-      if (res.status === 401 || res.status === 403) { onSignOut(); return; }
-      const data = await res.json();
-      if (!data?.success) throw new Error(data?.error || 'Could not load');
-      setOpps(Array.isArray(data.opportunities) ? data.opportunities : []);
-    } catch {
-      // Unknown is not zero: say it failed, never show "0 matches".
-      setError('Could not load your matches. Tap Retry.');
-    }
-  }, [email, closingSoon, onSignOut]);
-
-  useEffect(() => { load(); }, [load]);
-
-  const chip = (on: boolean) => `rounded-full px-3.5 py-2 text-[13px] ${on ? 'bg-[#1B3A6B] font-semibold text-[#FFFFFF]' : 'border border-[#CBD5E1] bg-[#FFFFFF] font-medium text-[#334155]'}`;
-
-  return (
-    <div className="h-full overflow-y-auto">
-      <header className="bg-[#1B3A6B] px-5 pb-5 pt-[calc(env(safe-area-inset-top)+20px)] text-[#FFFFFF]">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-[26px]" style={H1_STYLE}>Today&apos;s matches</h1>
-            <p className="text-sm text-[#C7D2E6]">Based on your saved profile</p>
-          </div>
-          <button type="button" onClick={onSignOut} className="mt-1 rounded-lg border border-[#FFFFFF4D] px-3 py-1.5 text-xs font-medium">
-            Sign out
-          </button>
-        </div>
-      </header>
-
-      <div className="flex flex-col gap-3 p-4">
-        <div className="flex gap-2">
-          <button type="button" onClick={() => setClosingSoon(false)} className={chip(!closingSoon)}>Open now</button>
-          <button type="button" onClick={() => setClosingSoon(true)} className={chip(closingSoon)}>Closing soon</button>
-        </div>
-
-        {error && (
-          <div className="rounded-xl bg-[#FFFFFF] p-4 text-sm text-[#334155]">
-            <p>{error}</p>
-            <button type="button" onClick={load} className="mt-3 h-10 rounded-lg bg-[#1B3A6B] px-4 font-semibold text-[#FFFFFF]">Retry</button>
-          </div>
-        )}
-        {!error && opps === null && <p className="py-8 text-center text-sm text-[#64748B]">Loading your matches…</p>}
-        {!error && opps?.length === 0 && (
-          <p className="rounded-xl bg-[#FFFFFF] p-4 text-sm text-[#334155]">
-            No open opportunities match your profile right now. Try the Map tab to search everything.
-          </p>
-        )}
-
-        {opps?.map((o) => (
-          <article key={o.notice_id} className="flex flex-col gap-2 rounded-2xl bg-[#FFFFFF] p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-2 text-xs font-semibold">
-              <span className="rounded-md bg-[#ECFDF5] px-2 py-1 text-[#065F46]">{o.notice_type || 'Notice'}</span>
-              <span className="text-[#92400E]">{dueLabel(o.days_until_deadline)}</span>
-            </div>
-            <h2 className="text-base font-semibold leading-snug">{o.title}</h2>
-            <p className="text-[13px] text-[#475569]">
-              {o.sub_tier || o.department}
-              {o.pop_state ? ` · ${[o.pop_city, o.pop_state].filter(Boolean).join(', ')}` : ''}
-            </p>
-            <button type="button" onClick={() => onOpenMap(o.notice_id)}
-              className="mt-1 h-11 rounded-xl bg-[#1B3A6B] text-sm font-semibold text-[#FFFFFF]">
-              View details on map
-            </button>
-          </article>
-        ))}
-      </div>
-    </div>
   );
 }
