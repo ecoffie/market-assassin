@@ -151,9 +151,9 @@ const MORE_FILTERS = '<div class="mfwrap">'
   // top-bar control). Opportunities-map only (mfv-open). Drives window.__horizons → merged fetch.
   + '<div class="mf-sec mfv-open" data-mfsec="horizons">Show on the map <em>(categories)</em></div>'
   + '<div class="mf-checks mfv-open" data-mfsec="horizons" id="hznToggles">'
-  +   '<button class="hzc on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')">Open Now</button>'
-  +   '<button class="hzc on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')">Coming Back</button>'
-  +   '<button class="hzc on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')">Coming Soon</button>'
+  +   '<button class="hzc on" data-hz="open" style="--hzc:#22a06b" onclick="selectHorizon(\'open\')">Open Now</button>'
+  +   '<button class="hzc on" data-hz="recompete" style="--hzc:#b45309" onclick="selectHorizon(\'recompete\')">Coming Back</button>'
+  +   '<button class="hzc on" data-hz="forecast" style="--hzc:#7c3aed" onclick="selectHorizon(\'forecast\')">Coming Soon</button>'
   // Grants removed from the Horizons set (Eric 2026-08-01). The grants-map endpoint stays for now,
   // but Grants is no longer an Opportunities horizon toggle.
   + '</div>'
@@ -375,8 +375,8 @@ const SERVER_FILTERS =
   +   '<button class="fsel fsel-mode" id="hznBtn" type="button" title="Which categories to show" aria-haspopup="true" aria-expanded="false">Open now</button>'
   +   '<div class="hznpop" id="hznPop" role="menu" hidden>'
   +     '<button class="hznrow on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')"><i></i><span class="hznlbl">Open Now</span><span class="hznn" data-hzn="open"></span></button>'
-  +     '<button class="hznrow on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')"><i></i><span class="hznlbl">Coming Back</span><span class="hznn" data-hzn="recompete"></span></button>'
-  +     '<button class="hznrow on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')"><i></i><span class="hznlbl">Coming Soon</span><span class="hznn" data-hzn="forecast"></span></button>'
+  +     '<button class="hznrow" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')"><i></i><span class="hznlbl">Coming Back</span><span class="hznn" data-hzn="recompete"></span></button>'
+  +     '<button class="hznrow" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')"><i></i><span class="hznlbl">Coming Soon</span><span class="hznn" data-hzn="forecast"></span></button>'
   +   '</div>'
   + '</div>'
   // PLAYERS multi-select dropdown — Companies + Gov Buyers coexist on ONE Players map (same pattern
@@ -3138,7 +3138,24 @@ const VIEWPORT_JS = `<script>
   // HORIZON toggles — show/hide each opportunity category on the ONE Opportunities map.
   // Default: ALL THREE ON (Eric 2026-08-12) — Open + Recompete + Forecast at launch so the market
   // is fully visible; users can uncheck via Horizons. Last-ON sticky so the map never goes blank.
-  window.__horizons={open:true,recompete:true,forecast:true};
+  // Eric 2026-11-13: the top-bar button works like the Opportunities dropdown beside it — pick ONE
+  // (Open now / Coming back / Coming soon) and the map switches to it. Default is Open now. The
+  // Filters-panel chips (.hzc) and saved searches can still combine horizons via toggleHorizon.
+  window.__horizons={open:true,recompete:false,forecast:false};
+  window.selectHorizon=function(want){
+    if(!window.__horizons||!(want in window.__horizons))return;
+    var HZ=['open','recompete','forecast'];
+    var already=HZ.every(function(h){ return (window.__horizons[h]!==false)===(h===want); });
+    if(!already){
+      window.__hzSystem=true;
+      try{
+        if(window.__horizons[want]===false)window.toggleHorizon(want);   // turn the pick on FIRST (last-on is sticky)
+        HZ.forEach(function(h){ if(h!==want&&window.__horizons[h]!==false)window.toggleHorizon(h); });
+      }finally{ window.__hzSystem=false; }
+      try{ _track('tool_use','horizon_selected',{horizon:want}); }catch(e){}
+    }
+    if(window.__closeHznPops)window.__closeHznPops();
+  };
   window.toggleHorizon=function(h){
     if(!(h in window.__horizons))return;
     var on=window.__horizons[h]!==false;

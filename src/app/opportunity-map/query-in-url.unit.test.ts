@@ -216,8 +216,8 @@ describe('legacy links', () => {
     const { applied, isolated } = runScope('?q=janitorial');
     expect(applied[0].filters).toEqual({ q: 'janitorial', horizons: { open: true, recompete: true, forecast: true } });
     expect(isolated).toEqual([]);
-    // The policy it cites is the real init default.
-    expect(MAP).toContain('window.__horizons={open:true,recompete:true,forecast:true};');
+    // Since 2026-11-13 the map's own launch default is Open now only; a ?q= link keeps its
+    // documented all-three policy (it is applied explicitly, not read from the init default).
   });
   it('agency/naics links without q or horizon keep their existing behaviour (Open isolation, no horizons key)', () => {
     let r = runScope('?agency=Department%20of%20Defense');
