@@ -58,7 +58,8 @@ const providerApprovedForPrivate = (provider: string): boolean =>
 // ASK_MINDY_TRACE_EVENTS === 'true', each turn also streams a `trace` event with the planner,
 // the redacted tool arguments and a capped excerpt of each tool result, so a baseline run can
 // check answers against evidence without a database migration.
-const TRACE_EVENTS = process.env.ASK_MINDY_TRACE_EVENTS === 'true';
+// Never on a production deployment, even if the variable is set there by mistake.
+const TRACE_EVENTS = process.env.ASK_MINDY_TRACE_EVENTS === 'true' && process.env.VERCEL_ENV !== 'production';
 const TRACE_RESULT_CHARS = Number(process.env.ASK_MINDY_TRACE_RESULT_CHARS) || 6000;
 import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
@@ -342,7 +343,12 @@ export async function POST(request: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
-      const send = (obj: unknown) => controller.enqueue(encoder.encode(sseEvent(obj)));
+      // A client that disconnected makes enqueue throw. That must never be mistaken for a tool
+      // failure (it would inject a "tools unavailable" note after a completed write), so a failed
+      // send is swallowed; the server-side work and persistence still complete.
+      const send = (obj: unknown) => {
+        try { controller.enqueue(encoder.encode(sseEvent(obj))); } catch { /* client gone */ }
+      };
 
       try {
         // Tell client which session this exchange belongs to right away

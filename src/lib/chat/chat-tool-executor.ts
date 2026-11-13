@@ -45,9 +45,10 @@ export interface ChatToolExecutorDeps {
   runMcpTool: typeof runMcpTool;
   creditsFor: typeof creditsFor;
   logCall: typeof logCall;
+  preflight: typeof preflightPaidInput;
 }
 
-const DEFAULT_DEPS: ChatToolExecutorDeps = { listMcpTools, isMcpTool, runMcpTool, creditsFor, logCall };
+const DEFAULT_DEPS: ChatToolExecutorDeps = { listMcpTools, isMcpTool, runMcpTool, creditsFor, logCall, preflight: preflightPaidInput };
 
 /** One executed (or refused) call, for the turn trace. No arguments, no result bodies. */
 export interface ChatExecutionRecord {
@@ -128,6 +129,20 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
   const isRegistered = (name: string) => tier0.names.has(name) || deps.isMcpTool(name);
   const policyFor = (name: string) => chatToolPolicy(name, isRegistered(name));
 
+  // Tool JSON schemas, so redaction can validate enum fields against the declared values.
+  let schemas: Map<string, Record<string, unknown>> | null = null;
+  const schemaFor = (name: string): Record<string, unknown> | undefined => {
+    if (!schemas) {
+      schemas = new Map();
+      for (const d of deps.listMcpTools()) {
+        const fn = d.function as { name?: string; parameters?: Record<string, unknown> };
+        if (fn?.name) schemas.set(fn.name, fn.parameters ?? {});
+      }
+      for (const d of tier0.defs) schemas.set(String(d.function.name), (d.function as { parameters?: Record<string, unknown> }).parameters ?? {});
+    }
+    return schemas.get(name);
+  };
+
   /** Tool definitions the model may see: tier-0 + registry, filtered by the policy. */
   function offeredToolDefs(): Array<{ type: 'function'; function: Record<string, unknown> }> {
     const registry = deps
@@ -166,7 +181,7 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
         chatSessionId: opts.chatSessionId,
         model: planner.model,
         provider: planner.provider,
-        argsRedacted: fields.args ? redactToolArgs(fields.args) : null,
+        argsRedacted: fields.args ? redactToolArgs(fields.args, schemaFor(name)) : null,
         creditPrice: isRegistry ? deps.creditsFor(name) : 0,
         resourceIds: fields.resourceIds ?? null,
         errorCategory: fields.errorCategory ?? null,
@@ -226,7 +241,7 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
       void _ignored;
       args = rest;
     }
-    redactedForTrace = redactToolArgs(args);
+    redactedForTrace = redactToolArgs(args, schemaFor(name));
 
     // 4) Policy — re-checked at execution, not only when offering.
     const policy = policyFor(name);
@@ -236,21 +251,22 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
       return done('blocked_policy', policy.decision, category,
         refusal(category, policy.userMessage || 'That capability is not available from chat.'));
     }
+    // 5) Same input preflight as MCP (registry tools only).
+    if (deps.isMcpTool(name)) {
+      const rejection = deps.preflight(name, args);
+      if (rejection) {
+        await log(planner, name, 'rejected_invalid_input', executionId, { args, errorCategory: 'invalid_input' });
+        return done('rejected_invalid_input', policy.decision, 'invalid_input', refusal('invalid_input', rejection.message));
+      }
+    }
+
+    // Write budget is consumed only by a write that passed its input check.
     if (policy.decision === 'allowed_write') {
       budget.writes += 1;
       if (budget.writes > MAX_WRITES_PER_ROUND) {
         await log(planner, name, 'blocked_policy', executionId, { args, errorCategory: 'write_budget_exceeded' });
         return done('blocked_policy', policy.decision, 'write_budget_exceeded',
           refusal('write_budget_exceeded', 'Only one change can be made per step. Ask the user to confirm the next change separately.'));
-      }
-    }
-
-    // 5) Same input preflight as MCP (registry tools only).
-    if (deps.isMcpTool(name)) {
-      const rejection = preflightPaidInput(name, args);
-      if (rejection) {
-        await log(planner, name, 'rejected_invalid_input', executionId, { args, errorCategory: 'invalid_input' });
-        return done('rejected_invalid_input', policy.decision, 'invalid_input', refusal('invalid_input', rejection.message));
       }
     }
 

@@ -196,5 +196,31 @@ describe('LOW hardening (independent review 2026-11-14)', () => {
     expect(results[1].tool_call_id).toBe('b');
     expect(results[1].record.error_category).toBe('internal_error');
   });
+
+  it('a write rejected for invalid input does not consume the round write budget', async () => {
+    const ex = createChatToolExecutor({
+      userEmail: 'u@example.com', chatSessionId: null, tier0,
+      deps: {
+        runMcpTool, logCall,
+        preflight: (name: string, args: Record<string, unknown>) =>
+          name === 'update_market_schedule' && !args.schedule_id ? { code: 'invalid_input' as const, message: 'needs schedule_id' } : null,
+      },
+    });
+    const results = await ex.executeRound([
+      call('update_market_schedule', {}, 'w1'),
+      call('schedule_market_search', { name: 'a', naics: '561320' }, 'w2'),
+    ], planner);
+    expect(results[0].record.status).toBe('rejected_invalid_input');
+    expect(results[1].record.status).toBe('success');
+    expect(runMcpTool).toHaveBeenCalledTimes(1);
+  });
+
+  it('logged args keep a valid schema enum value and redact free text', async () => {
+    await make().executeRound([call('search_idv_contracts', { search_type: 'task', naics: '561320', query: 'our secret plan' })], planner);
+    const row = logCall.mock.calls[0][0] as unknown as { trace: { argsRedacted: Record<string, unknown> } };
+    expect(row.trace.argsRedacted.search_type).toBe('task');
+    expect(row.trace.argsRedacted.naics).toBe('561320');
+    expect(JSON.stringify(row.trace.argsRedacted)).not.toContain('secret plan');
+  });
 });
 

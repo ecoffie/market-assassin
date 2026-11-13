@@ -1,75 +1,96 @@
 /**
  * Redact tool arguments before they are written to an execution log — STRICT ALLOWLIST.
  *
- * Only approved, validated structured filter values are stored verbatim: NAICS/PSC/state codes,
- * record identifiers, agency names, dates, numeric limits, enum values and known boolean flags.
- * Every other value — descriptions, proposal text, past-performance narratives, capability lists,
- * contact names/emails/phones, free-text queries and keywords, company and client names,
- * credentials — is replaced by metadata only:
- *   { redacted: true, type, len? (string length), count? (array length), digest? }
- * `digest` is an HMAC-SHA256 (first 16 hex) keyed with LOG_DIGEST_KEY, so identical inputs can be
- * correlated without being reversible by dictionary. With no key configured, no digest is stored.
- *
- * An allowlisted field whose value fails validation is redacted too (with `invalid: true`), so a
- * free-text sentence placed in an id or code field can never be stored verbatim.
+ * A value is stored verbatim ONLY when its meaning is validated, not just its characters:
+ *   - enum fields:   the value must be one of the tool schema's declared enum values
+ *   - codes:         NAICS (2–6 digits), PSC (≤4 uppercase alnum), real US state/territory codes
+ *   - identifiers:   per-field patterns (SAM notice id = 32 hex, UUIDs, uppercase PIID/solicitation
+ *                    forms with a digit, UEI/CAGE/DoDAAC shapes) — a token like "sk-…" or "pit-…"
+ *                    or any lowercase string never matches an id pattern
+ *   - agencies:      must match a known agency name or alias (src/data/agency-aliases.json)
+ *   - dates/numbers: ISO dates, finite numbers, 4-digit fiscal years
+ *   - flags:         known boolean keys
+ * Lists are capped (≤ MAX_LIST items) and every item must validate. Everything else — descriptions,
+ * proposal text, past performance, capabilities, contact names/emails/phones, free-text queries and
+ * keywords, company/client names, credentials, unknown keys — is replaced with metadata only:
+ *   { redacted: true, type, len? (string length), count? (array length), digest?, invalid? }
+ * `digest` is HMAC-SHA256 (16 hex) keyed with LOG_DIGEST_KEY; with no key, no digest is stored.
  */
 import { createHmac } from 'node:crypto';
+import aliasData from '@/data/agency-aliases.json';
 
+type JsonSchema = { properties?: Record<string, JsonSchema>; enum?: unknown[]; items?: JsonSchema; type?: unknown };
 type Validator = (v: unknown) => boolean;
 
-const str = (re: RegExp, max = 120): Validator => (v) => typeof v === 'string' && v.length <= max && re.test(v);
-const listOf = (one: Validator, max = 50): Validator => (v) =>
-  (Array.isArray(v) && v.length <= max && v.every(one)) ||
-  (typeof v === 'string' && v.length <= 600 && v.split(',').map((s) => s.trim()).filter(Boolean).every(one));
-const oneOrList = (one: Validator) => (v: unknown) => one(v) || listOf(one)(v);
-const num: Validator = (v) => typeof v === 'number' && Number.isFinite(v);
-const numOrDigits: Validator = (v) => num(v) || (typeof v === 'string' && /^\d{1,6}$/.test(v));
-const bool: Validator = (v) => typeof v === 'boolean';
+const MAX_LIST = 25;
+const MAX_DEPTH = 3;
 
-const NAICS = str(/^\d{2,6}$/, 6);
-const PSC = str(/^[A-Za-z0-9]{1,4}$/, 4);
-const STATE = str(/^[A-Za-z]{2}$/, 2);
-const ID = str(/^[A-Za-z0-9_.:-]{1,80}$/, 80);
-const ENUM = str(/^[A-Za-z0-9_+ -]{1,40}$/, 40);
-const AGENCY = (v: unknown) => str(/^[A-Za-z0-9 .,&()'/-]{1,100}$/, 100)(v) && String(v).trim().split(/\s+/).length <= 12;
-const DATE = str(/^\d{4}-\d{2}-\d{2}$/, 10);
+const US_CODES = new Set(
+  ('AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY PR GU VI AS MP UM').split(' '),
+);
 
-const ALLOW: Readonly<Record<string, Validator>> = {
-  // classification codes
+const KNOWN_AGENCIES: ReadonlySet<string> = (() => {
+  const s = new Set<string>();
+  const aliases = (aliasData as { aliases?: Record<string, string> }).aliases ?? {};
+  for (const [k, v] of Object.entries(aliases)) {
+    s.add(k.trim().toLowerCase());
+    if (typeof v === 'string') s.add(v.trim().toLowerCase());
+  }
+  return s;
+})();
+
+const re = (pattern: RegExp, max: number): Validator => (v) => typeof v === 'string' && v.length <= max && pattern.test(v);
+const hasDigit = (v: unknown) => typeof v === 'string' && /\d/.test(v);
+const items = (v: unknown): unknown[] | null => {
+  if (Array.isArray(v)) return v.length <= MAX_LIST ? v : null;
+  if (typeof v === 'string' && v.includes(',')) {
+    const parts = v.split(',').map((x) => x.trim()).filter(Boolean);
+    return parts.length <= MAX_LIST ? parts : null;
+  }
+  return null;
+};
+const listOf = (one: Validator): Validator => (v) => { const xs = items(v); return !!xs && xs.length > 0 && xs.every(one); };
+const oneOrList = (one: Validator): Validator => (v) => one(v) || listOf(one)(v);
+
+const NAICS = re(/^\d{2,6}$/, 6);
+const PSC = re(/^[A-Z0-9]{1,4}$/, 4);
+const STATE: Validator = (v) => typeof v === 'string' && US_CODES.has(v.toUpperCase()) && v.length === 2;
+const SAM_NOTICE_ID = re(/^[0-9a-f]{32}$/, 32);
+const UUID = re(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 36);
+const AWARD_ID: Validator = (v) => re(/^[A-Z0-9][A-Z0-9_.-]{3,49}$/, 50)(v) && hasDigit(v); // uppercase only
+const UEI: Validator = (v) => re(/^[A-Z0-9]{12}$/, 12)(v) && hasDigit(v) && /[A-Z]/.test(String(v));
+const CAGE = re(/^[A-Z0-9]{5}$/, 5);
+const DODAAC = re(/^[A-Z][A-Z0-9]{5}$/, 6);
+const AGENCY: Validator = (v) => typeof v === 'string' && v.length <= 100 && KNOWN_AGENCIES.has(v.trim().toLowerCase());
+const DATE = re(/^\d{4}-\d{2}-\d{2}$/, 10);
+const NUM: Validator = (v) => typeof v === 'number' && Number.isFinite(v);
+const FY: Validator = (v) => (typeof v === 'number' && Number.isInteger(v) && v >= 1990 && v <= 2100) || re(/^(19|20)\d{2}$/, 4)(v);
+const BOOL: Validator = (v) => typeof v === 'boolean';
+
+const STRUCTURED: Readonly<Record<string, Validator>> = {
   naics: oneOrList(NAICS), naics_code: NAICS, naics_codes: listOf(NAICS),
   psc: oneOrList(PSC),
-  state: oneOrList(STATE), states: listOf(STATE), country: str(/^[A-Za-z]{2,3}$/, 3),
-  // record identifiers
-  notice_id: ID, notice_ids: listOf(ID), confirm_notice_id: ID,
-  solicitation_number: ID, piid: ID, piids: listOf(ID), contract_ids: listOf(ID),
-  uei: str(/^[A-Za-z0-9]{12}$/, 12), cage: str(/^[A-Za-z0-9]{5}$/, 5), dodaac: str(/^[A-Za-z0-9]{6}$/, 6),
-  schedule_id: ID, document_id: ID, document_ids: listOf(ID), job_id: ID, id: ID, parent_id: ID,
-  vehicle: str(/^[A-Za-z0-9 +._()/-]{1,40}$/, 40),
-  // agency identifiers
+  state: oneOrList(STATE), states: listOf(STATE),
+  notice_id: SAM_NOTICE_ID, notice_ids: listOf(SAM_NOTICE_ID), confirm_notice_id: SAM_NOTICE_ID,
+  solicitation_number: AWARD_ID, piid: AWARD_ID, piids: listOf(AWARD_ID), contract_ids: listOf(AWARD_ID), parent_id: AWARD_ID,
+  schedule_id: UUID, document_id: UUID, document_ids: listOf(UUID), job_id: UUID, id: UUID,
+  uei: UEI, cage: CAGE, dodaac: DODAAC,
   agency: AGENCY, agency_name: AGENCY, subAgency: AGENCY, office: AGENCY,
-  // dates and numeric limits
   date_from: DATE, date_to: DATE,
-  limit: num, offset: num, page: num, months_window: num, months_min: num, months_ahead: num,
-  min_value: num, max_value: num, fiscal_year: numOrDigits, from_fy: numOrDigits, to_fy: numOrDigits,
-  as_of_year: numOrDigits, lead_months: num, days: num, days_back: num, closingDays: num, postedDays: num,
-  recompete_months: num, open_closing_days: num, window_days: num, award_limit: num, limit_per_horizon: num,
-  text_limit: num, text_offset: num, coverage_target: num, n: num, e: num, s: num, w: num,
-  // enum-valued fields
-  alert_frequency: ENUM, clearance: ENUM, document_type: ENUM, likelihood: ENUM, mode: ENUM, phase: ENUM,
-  sapBuyer: ENUM, search_type: ENUM, sort_by: ENUM, source: ENUM, stage: ENUM, state_scope: ENUM,
-  status: ENUM, noticeType: ENUM, setAside: ENUM, set_aside: ENUM, section_type: ENUM,
-  // boolean flags
-  alerts_enabled: bool, async: bool, coming_back: bool, coming_soon: bool, forecast: bool,
-  forecast_include_past: bool, fullOpen: bool, hasContact: bool, hasDocs: bool, hideCommodity: bool,
-  include_ai_discovery: bool, include_emerging: bool, include_ics: bool, include_idv: bool,
-  include_owner_asserted: bool, open: bool, open_now: bool, recompete: bool, remote_only: bool,
-  small_business_only: bool, paused: bool, enabled: bool,
+  limit: NUM, offset: NUM, page: NUM, months_window: NUM, months_min: NUM, months_ahead: NUM,
+  min_value: NUM, max_value: NUM, lead_months: NUM, days: NUM, days_back: NUM, closingDays: NUM, postedDays: NUM,
+  recompete_months: NUM, open_closing_days: NUM, window_days: NUM, award_limit: NUM, limit_per_horizon: NUM,
+  text_limit: NUM, text_offset: NUM, coverage_target: NUM, n: NUM, e: NUM, s: NUM, w: NUM,
+  fiscal_year: FY, from_fy: FY, to_fy: FY, as_of_year: FY,
+  alerts_enabled: BOOL, async: BOOL, coming_back: BOOL, coming_soon: BOOL, forecast: BOOL,
+  forecast_include_past: BOOL, fullOpen: BOOL, hasContact: BOOL, hasDocs: BOOL, hideCommodity: BOOL,
+  include_ai_discovery: BOOL, include_emerging: BOOL, include_ics: BOOL, include_idv: BOOL,
+  include_owner_asserted: BOOL, open: BOOL, open_now: BOOL, recompete: BOOL, remote_only: BOOL,
+  small_business_only: BOOL, paused: BOOL, enabled: BOOL,
 };
 
-/** Structured containers whose members are themselves checked against the allowlist. */
-const CONTAINERS: ReadonlySet<string> = new Set(['filters', 'bbox', 'timeframe']);
-
-const MAX_DEPTH = 3;
+/** Structured containers whose members are checked against the same rules. */
+const CONTAINERS: ReadonlySet<string> = new Set(['filters', 'bbox', 'timeframe', 'advanced']);
 
 function digest(s: string): string | undefined {
   const key = process.env.LOG_DIGEST_KEY;
@@ -96,23 +117,37 @@ function meta(value: unknown, invalid = false): Record<string, unknown> {
   return out;
 }
 
-function redactObject(obj: Record<string, unknown>, depth: number): Record<string, unknown> {
+function enumAllows(prop: JsonSchema | undefined, v: unknown): boolean | undefined {
+  const list = prop?.enum ?? prop?.items?.enum;
+  if (!Array.isArray(list)) return undefined; // field has no declared enum
+  if (Array.isArray(v)) return v.length <= MAX_LIST && v.every((x) => list.includes(x));
+  return list.includes(v);
+}
+
+function redactObject(obj: Record<string, unknown>, schema: JsonSchema | undefined, depth: number): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(obj)) {
     if (v === undefined) continue;
+    const prop = schema?.properties?.[k];
     if (CONTAINERS.has(k) && v && typeof v === 'object' && !Array.isArray(v) && depth < MAX_DEPTH) {
-      out[k] = redactObject(v as Record<string, unknown>, depth + 1);
+      out[k] = redactObject(v as Record<string, unknown>, prop, depth + 1);
       continue;
     }
-    const check = Object.prototype.hasOwnProperty.call(ALLOW, k) ? ALLOW[k] : undefined;
+    const byEnum = enumAllows(prop, v);
+    if (byEnum !== undefined) { out[k] = byEnum ? v : meta(v, true); continue; }
+    const check = Object.prototype.hasOwnProperty.call(STRUCTURED, k) ? STRUCTURED[k] : undefined;
     if (check) out[k] = check(v) ? v : meta(v, true);
     else out[k] = meta(v);
   }
   return out;
 }
 
-export function redactToolArgs(args: unknown): Record<string, unknown> {
+/**
+ * @param schema the tool's JSON Schema `parameters` (enables the enum check). Without it, enum
+ *   fields are not recognized and are redacted — the safe default.
+ */
+export function redactToolArgs(args: unknown, schema?: JsonSchema): Record<string, unknown> {
   if (args == null) return {};
   if (typeof args !== 'object' || Array.isArray(args)) return { _args: meta(args, true) };
-  return redactObject(args as Record<string, unknown>, 0);
+  return redactObject(args as Record<string, unknown>, schema, 0);
 }

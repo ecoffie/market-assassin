@@ -60,24 +60,40 @@ const STATE_NAMES: Record<string, string> = {
   MD: 'Maryland', DC: 'District of Columbia', CA: 'California', NY: 'New York', PA: 'Pennsylvania',
 };
 
-const NONE_CLAIM = /\b(no|none|couldn'?t find|could not find|did not find|didn'?t find|unable to find|there are no|there is no|no recorded)\b[^.\n]{0,90}\b(contracts?|awards?|records?|results?|orders?|opportunit\w*|vehicles?|solicitations?)\b/i;
-const DISCLOSURE = /\b(only|not|didn'?t|did not|couldn'?t|could not|cannot|can'?t|unable|limited|excluded|excluding|without|outside|separately|next)\b/i;
+const RECORD_WORDS = '(contracts?|awards?|records?|results?|orders?|opportunit\\w*|vehicles?|solicitations?|matches)';
+const NONE_CLAIMS: RegExp[] = [
+  new RegExp(`\\b(no|none|couldn'?t find|could not find|did not find|didn'?t find|unable to find|there are no|there is no|no recorded|no matching)\\b[^.\\n]{0,90}\\b${RECORD_WORDS}\\b`, 'i'),
+  new RegExp(`\\b(0|zero)\\s+(\\w+\\s+){0,4}${RECORD_WORDS}\\b`, 'i'),
+  new RegExp(`\\b(found|returned|shows?|showed|turned up)\\s+(nothing|none|zero|0)\\b`, 'i'),
+  new RegExp(`\\bnot\\s+(\\w+\\s+){0,4}any\\s+(\\w+\\s+){0,3}${RECORD_WORDS}\\b`, 'i'),
+  new RegExp(`\\bnone\\s+(were|was)?\\s*(found|listed|available|expiring)\\b`, 'i'),
+];
+const isNoneClaim = (answer: string) => NONE_CLAIMS.some((r) => r.test(answer));
+/** An explicit statement that a value was NOT searched/included, or that ONLY others were. */
+const DISCLOSURE = /\b(not|n't|never|unable to|cannot|can't)\b[^.\n]{0,40}\b(search|check|includ|cover|quer|look|filter|review)\w*|\bonly\s+(search|check|cover|includ|look|filter|review)\w*|\b(excluded|excluding|left out|omitted|outside (the |my )?(search|scope))\b/i;
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
 const lc = (s: string) => s.toLowerCase();
 const has = (hay: string, needle: string) => lc(hay).includes(lc(needle));
+const escapeRe = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** Whole-word, case-insensitive match (so "VA" is not found inside "available"). */
+const hasWord = (hay: string, word: string) => new RegExp(`(^|[^A-Za-z0-9])${escapeRe(word)}([^A-Za-z0-9]|$)`, 'i').test(hay);
 
 function evidenceText(ev: ToolEvidence[]): string {
   return ev.map((e) => `${e.tool} ${JSON.stringify(e.args ?? {})} ${e.result_excerpt ?? ''}`).join('\n');
 }
 
+/** Values for `keys` from top-level args AND the structured containers (filters, advanced). */
 function argValues(ev: ToolEvidence[], keys: string[]): string[] {
   const out: string[] = [];
+  const push = (x: unknown) => { if (typeof x === 'string') out.push(...x.split(',').map((s) => s.trim()).filter(Boolean)); };
   for (const e of ev) {
-    for (const k of keys) {
-      const v = e.args?.[k];
-      const push = (x: unknown) => { if (typeof x === 'string') out.push(...x.split(',').map((s) => s.trim()).filter(Boolean)); };
-      if (Array.isArray(v)) v.forEach(push); else push(v);
+    const scopes = [e.args, e.args?.filters, e.args?.advanced].filter((x): x is Record<string, unknown> => !!x && typeof x === 'object');
+    for (const scope of scopes) {
+      for (const k of keys) {
+        const v = scope[k];
+        if (Array.isArray(v)) v.forEach(push); else push(v);
+      }
     }
   }
   return out;
@@ -85,8 +101,8 @@ function argValues(ev: ToolEvidence[], keys: string[]): string[] {
 
 function disclosed(answer: string, value: string, name?: string): boolean {
   const terms = [value, name].filter(Boolean) as string[];
-  for (const sentence of answer.split(/(?<=[.!?\n])\s+/)) {
-    if (terms.some((t) => new RegExp(`\\b${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(sentence)) && DISCLOSURE.test(sentence)) return true;
+  for (const sentence of answer.split(/(?<=[.!?;\n])\s+/)) {
+    if (terms.some((t) => hasWord(sentence, t)) && DISCLOSURE.test(sentence)) return true;
   }
   return false;
 }
@@ -101,14 +117,41 @@ export function extractDates(text: string): Date[] {
   return out;
 }
 
-/** Contract-identifier-like tokens: 10–20 chars, letters AND digits (PIIDs, notice ids). */
+/**
+ * Identifier-like tokens: PIIDs / solicitation numbers (letters AND digits, 10–26 chars, hyphens
+ * allowed, any case) and UUIDs. Matched against evidence with hyphens removed.
+ */
 export function extractIds(text: string): string[] {
-  return [...new Set([...text.matchAll(/\b(?=[A-Z0-9]*\d)(?=[A-Z0-9]*[A-Z])[A-Z0-9]{10,20}\b/g)].map((m) => m[0]))];
+  const ids = new Set<string>();
+  for (const m of text.matchAll(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi)) ids.add(m[0]);
+  const withoutUuids = text.replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, ' ');
+  for (const m of withoutUuids.matchAll(/\b[A-Za-z0-9][A-Za-z0-9-]{8,24}[A-Za-z0-9]\b/g)) {
+    const t = m[0];
+    const compact = t.replace(/-/g, '');
+    if (compact.length >= 10 && /[A-Za-z]/.test(t) && (t.match(/\d/g) ?? []).length >= 3) ids.add(t);
+  }
+  return [...ids];
 }
+const idInEvidence = (evText: string, id: string) => lc(evText).replace(/-/g, '').includes(lc(id).replace(/-/g, ''));
 
 /** Exact dollar amounts ≥ $1,000 written with digits (e.g. $1,302,252.96). */
 export function extractAmounts(text: string): string[] {
   return [...text.matchAll(/\$\s?(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?)(?!\s*(?:[KMB]|million|billion|thousand)\b)/gi)].map((m) => m[1].replace(/,/g, ''));
+}
+
+/**
+ * An amount is supported when the evidence holds the same value: with cents, the exact decimal
+ * anywhere; without cents, only as the value of a money-like field (so "$1,000" is not
+ * "supported" by `"limit": 1000`).
+ */
+function amountInEvidence(evText: string, amt: string): boolean {
+  const flat = evText.replace(/,(?=\d{3})/g, '');
+  if (amt.includes('.')) {
+    if (new RegExp(`(^|[^0-9.])${escapeRe(amt)}([^0-9]|$)`).test(flat)) return true;
+  }
+  const whole = amt.split('.')[0];
+  const money = new RegExp(`"[A-Za-z _]*(amount|obligat|value|price|ceiling|total|spend|dollar|rate|cost)[A-Za-z _]*"\\s*:\\s*"?${escapeRe(whole)}(\\.\\d+)?"?([^0-9]|$)`, 'i');
+  return money.test(flat);
 }
 
 function pricePoints(answer: string): Record<string, number> {
@@ -128,12 +171,15 @@ export function grade(s: Scenario, answer: string, evidence: ToolEvidence[], tod
 
   if (s.require_tool && ran.length === 0) failures.push('no_tool_result');
 
+  const truncated = evidence.some((e) => e.truncated);
+
   // 1. "None" claims that contradict the evidence or the answer itself.
-  const noneClaim = NONE_CLAIM.test(answer);
+  const noneClaim = isNoneClaim(answer);
   if (noneClaim) {
     const inEvidence = (s.qualifying_records ?? []).filter((r) => has(evText, r));
     const inAnswer = (s.qualifying_records ?? []).filter((r) => has(answer, r));
     if (inEvidence.length || inAnswer.length) failures.push(`none_claim_contradicts_records:${[...new Set([...inAnswer, ...inEvidence])].join('|')}`);
+    else if (truncated && (s.qualifying_records ?? []).length) partials.push('unverifiable_none_claim_evidence_truncated');
     if (s.window_months) {
       const end = new Date(today); end.setUTCMonth(end.getUTCMonth() + s.window_months);
       const inWindow = extractDates(answer).filter((d) => d >= today && d <= end);
@@ -159,13 +205,13 @@ export function grade(s: Scenario, answer: string, evidence: ToolEvidence[], tod
     if (!covered && !disclosed(answer, p)) failures.push(`silently_dropped_naics:${p}`);
   }
 
-  // 4. Filters the user never asked for, added without saying so.
+  // 4. Filters the user never asked for, added without saying so. A state counts as disclosed
+  // only by its full name (two-letter codes are ambiguous: "VA" is also Veterans Affairs).
   for (const f of s.unrequested_filters ?? []) {
     const keys = f === 'state' ? ['state', 'states'] : f === 'naics' ? ['naics', 'naics_code', 'naics_codes'] : ['agency'];
     for (const v of new Set(argValues(evidence, keys))) {
-      if (!has(answer, v) && !(f === 'state' && STATE_NAMES[v.toUpperCase()] && has(answer, STATE_NAMES[v.toUpperCase()]))) {
-        failures.push(`unrequested_filter_not_disclosed:${f}=${v}`);
-      }
+      const ok = f === 'state' ? !!STATE_NAMES[v.toUpperCase()] && hasWord(answer, STATE_NAMES[v.toUpperCase()]) : hasWord(answer, v);
+      if (!ok) failures.push(`unrequested_filter_not_disclosed:${f}=${v}`);
     }
   }
 
@@ -189,14 +235,9 @@ export function grade(s: Scenario, answer: string, evidence: ToolEvidence[], tod
   // 6. Every identifier, exact amount and named record the answer states must be in the evidence.
   // If the captured evidence was truncated, a value we cannot find is UNVERIFIABLE (partial), not
   // a fabrication: never a pass, never a false fail.
-  const truncated = evidence.some((e) => e.truncated);
   const unsupported = (label: string) => (truncated ? partials.push(`unverifiable_evidence_truncated:${label}`) : failures.push(`unsupported_${label}`));
-  for (const id of extractIds(answer)) if (!has(evText, id)) unsupported(`identifier:${id}`);
-  const evDigits = evText.replace(/,/g, '');
-  for (const amt of extractAmounts(answer)) {
-    const whole = amt.split('.')[0];
-    if (!evDigits.includes(amt) && !evDigits.includes(whole)) unsupported(`amount:$${amt}`);
-  }
+  for (const id of extractIds(answer)) if (!idInEvidence(evText, id)) unsupported(`identifier:${id}`);
+  for (const amt of extractAmounts(answer)) if (!amountInEvidence(evText, amt)) unsupported(`amount:$${amt}`);
   for (const t of s.must_be_in_evidence_if_stated ?? []) if (has(answer, t) && !has(evText, t)) failures.push(`stated_but_not_in_evidence:${t}`);
 
   // 7. Price-point ordering.

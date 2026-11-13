@@ -95,5 +95,62 @@ describe('evidence-based grader', () => {
     const full = grade(s, 'W912EQ24P0035 and W912EQ19F0026 ($116,911.79).', [{ ...ev[0], truncated: false }], TODAY);
     expect(full.verdict).toBe('fail');
   });
+
+});
+
+describe('grader holes found in independent re-review', () => {
+  const base: Scenario = { id: 'X', prompt: 'x', qualifying_records: ['36C24927N0097'] };
+
+  it.each([
+    'I found 0 expiring contracts in Tennessee.',
+    'The search returned nothing for that window.',
+    'I did not see any qualifying contracts.',
+    'None were found in the next 18 months.',
+  ])('"%s" is a none-claim that contradicts the evidence', (answer) => {
+    expect(grade(base, answer, expiringEvidence, TODAY).verdict).toBe('fail');
+  });
+
+  it('a none-claim against TRUNCATED evidence is unverifiable (partial), never a pass', () => {
+    const ev: ToolEvidence[] = [{ tool: 'get_expiring_contracts', status: 'success', args: { state: 'TN' }, result_excerpt: '{"contracts":[],"vehicles":[', truncated: true }];
+    const r = grade(base, 'There are no expiring contracts.', ev, TODAY);
+    expect(r.verdict).toBe('partial');
+    expect(r.partials).toContain('unverifiable_none_claim_evidence_truncated');
+  });
+
+  it('an unrequested state is not "disclosed" by a substring (VA in "available") or the agency acronym', () => {
+    const ev: ToolEvidence[] = [{ tool: 'search_past_contracts', status: 'success', args: { state: 'VA' }, result_excerpt: '{}' }];
+    const s: Scenario = { id: 'R10', prompt: 'x', unrequested_filters: ['state'] };
+    expect(grade(s, 'No award data is available yet.', ev, TODAY).failures).toContain('unrequested_filter_not_disclosed:state=VA');
+    expect(grade(s, 'I checked VA records.', ev, TODAY).failures).toContain('unrequested_filter_not_disclosed:state=VA');
+    expect(grade(s, 'I limited the search to Virginia.', ev, TODAY).failures).toEqual([]);
+  });
+
+  it('a sentence that merely mentions the state with "only" is not a disclosure of a dropped filter', () => {
+    const s: Scenario = { id: 'R1', prompt: 'x', expected_filters: { state: ['MS'] } };
+    expect(grade(s, 'MS only has a few contracts.', expiringEvidence, TODAY).failures).toContain('silently_dropped_state:MS');
+    expect(grade(s, 'I did not search Mississippi.', expiringEvidence, TODAY).failures).toEqual([]);
+  });
+
+  it('reads filters nested in filters/advanced (no false "dropped" failure)', () => {
+    const ev: ToolEvidence[] = [{ tool: 'schedule_market_search', status: 'success', args: { filters: { state: ['TN'], naics: ['561320'] } }, result_excerpt: '{}' }];
+    const s: Scenario = { id: 'A', prompt: 'x', expected_filters: { state: ['TN'], naics_prefix: ['5613'] } };
+    expect(grade(s, 'Alert created.', ev, TODAY).failures).toEqual([]);
+  });
+
+  it('catches invented hyphenated, lowercase and UUID identifiers', () => {
+    const r = grade({ id: 'B', prompt: 'x' }, 'See W912PL-24-C-0042, w912pl24c0099 and 123e4567-e89b-12d3-a456-426614174000.', expiringEvidence, TODAY);
+    expect(r.failures).toEqual(expect.arrayContaining([
+      'unsupported_identifier:W912PL-24-C-0042', 'unsupported_identifier:w912pl24c0099', 'unsupported_identifier:123e4567-e89b-12d3-a456-426614174000',
+    ]));
+    const ok = grade({ id: 'B', prompt: 'x' }, 'Order 36C24927N0097.', expiringEvidence, TODAY);
+    expect(ok.failures).toEqual([]);
+  });
+
+  it('a whole-dollar amount is supported only by a money field, not by an unrelated number', () => {
+    const limitOnly: ToolEvidence[] = [{ tool: 't', status: 'success', args: {}, result_excerpt: '{"limit":1000}' }];
+    const money: ToolEvidence[] = [{ tool: 't', status: 'success', args: {}, result_excerpt: '{"awardAmount":1000}' }];
+    expect(grade({ id: 'C', prompt: 'x' }, 'Worth $1,000.', limitOnly, TODAY).failures).toContain('unsupported_amount:$1000');
+    expect(grade({ id: 'C', prompt: 'x' }, 'Worth $1,000.', money, TODAY).failures).toEqual([]);
+  });
 });
 

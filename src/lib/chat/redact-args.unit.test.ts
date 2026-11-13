@@ -1,61 +1,84 @@
 import { describe, it, expect, afterEach } from 'vitest';
+import { listMcpTools } from '@/lib/mcp/tool-registry';
 import { redactToolArgs } from './redact-args';
 
 afterEach(() => { delete process.env.LOG_DIGEST_KEY; });
 
 const isRedacted = (v: unknown) => typeof v === 'object' && v !== null && (v as { redacted?: boolean }).redacted === true;
 const leaks = (out: unknown, secret: string) => JSON.stringify(out).toLowerCase().includes(secret.toLowerCase());
+const schemaOf = (tool: string) =>
+  (listMcpTools().find((d) => (d.function as { name: string }).name === tool)!.function as { parameters: Record<string, unknown> }).parameters;
 
-describe('redactToolArgs — strict allowlist', () => {
+describe('redactToolArgs — strict allowlist (meaning validated, not just characters)', () => {
   it('keeps validated structured filters verbatim', () => {
     const args = {
       naics: '561320', naics_codes: ['561311', '5613'], psc: 'R706', state: 'TN', states: ['MS', 'AR'],
-      agency: 'Department of Veterans Affairs', uei: 'NZ7CS4E6R7K6', piid: 'W912EQ24P0035', notice_id: 'abc123def456',
-      date_from: '2019-01-01', months_window: 18, limit: 50, include_idv: true, search_type: 'task', fiscal_year: '2026',
+      agency: 'Department of Veterans Affairs', uei: 'NZ7CS4E6R7K6', piid: 'W912EQ24P0035',
+      notice_id: '0a1b2c3d4e5f60718293a4b5c6d7e8f9', schedule_id: '11111111-2222-3333-4444-555555555555',
+      date_from: '2019-01-01', months_window: 18, limit: 50, include_idv: true, fiscal_year: '2026',
     };
     expect(redactToolArgs(args)).toEqual(args);
   });
 
-  it('accepts comma lists of valid codes', () => {
-    expect(redactToolArgs({ naics: '561320, 561311', state: 'TN,MS,AR' })).toEqual({ naics: '561320, 561311', state: 'TN,MS,AR' });
+  it('enum fields are kept only when the value is in the tool schema enum', () => {
+    const schema = schemaOf('search_idv_contracts');
+    expect(redactToolArgs({ search_type: 'task' }, schema)).toEqual({ search_type: 'task' });
+    expect(redactToolArgs({ search_type: 'Jane Doe pass Hunter2 x' }, schema).search_type).toMatchObject({ redacted: true, invalid: true });
+    // without a schema an enum-like field is not recognized and is redacted (safe default)
+    expect(isRedacted(redactToolArgs({ status: 'open' }).status)).toBe(true);
+  });
+
+  it('blocks the smuggling vectors found in independent review', () => {
+    const out = redactToolArgs({
+      agency: 'John Smith 202-555-0199 jsmith at navy.mil',
+      office: 'Jane Doe',
+      subAgency: 'call me at home',
+      filters: { agency: 'John Smith 202-555-0199' },
+      vehicle: 'Jane Doe pass Hunter2 x',
+      status: 'Jane Doe pass Hunter2 x',
+      mode: 'Hunter2',
+      id: 'sk-proj-AbCdEf1234567890xyzSECRETKEY',
+      job_id: 'pit-1234-abcd',
+      document_id: 'SECRETKEY12345',
+      schedule_id: 'my password is hunter2',
+      notice_ids: 'Jane,Doe,cell,5715550100,password,Hunter2',
+      piids: 'Jane,Doe,cell,5715550100',
+      contract_ids: Array.from({ length: 30 }, (_, i) => `W912EQ24P00${String(i).padStart(2, '0')}`),
+    });
+    for (const s of ['John Smith', '202-555', 'jsmith', 'Jane', 'Hunter2', 'sk-proj', 'pit-1234', 'SECRETKEY', 'hunter2', '5715550100', 'call me']) {
+      expect(leaks(out, s), s).toBe(false);
+    }
+    expect(out.contract_ids).toMatchObject({ redacted: true, type: 'array', count: 30 });
   });
 
   it('never stores free text, documents, narratives, contacts or credentials', () => {
-    const rfp = 'SECTION L: offerors shall describe their staffing approach';
     const args = {
       description: 'Superb Staffing Solutions, a Memphis light industrial staffing firm',
-      draft_text: 'Our team will deliver', rfp_text: rfp, text: 'vault narrative', draft: 'proposal draft',
+      draft_text: 'Our team will deliver', rfp_text: 'SECTION L: offerors shall', text: 'vault narrative', draft: 'proposal draft',
       past_performance: ['Managed 40 temp staff for VA Memphis'], capabilities: ['forklift certified crews'],
       requirement: 'L.3.2 page limit', requirements: [{ requirement: 'L.3.2' }], cai: { what: 'drones' },
       client_name: 'Acme Holdings', query: 'our secret pricing strategy', keyword: 'superb staffing', q: 'free text',
       first_name: 'Geoff', last_name: 'Haas', email: 'a@b.com', phone: '901-555-0100',
-      contacts: [{ first_name: 'Ambreen', email: 'x@y.com', phone: '555' }], company: 'Concord Professional Services',
-      api_key: 'sk-live-123', token: 'pit-abc',
+      contacts: [{ first_name: 'Ambreen', email: 'x@y.com' }], company: 'Concord Professional Services',
+      api_key: 'sk-live-123', token: 'pit-abc', location: 'Memphis, TN',
     };
     const out = redactToolArgs(args);
     for (const [k, v] of Object.entries(out)) expect(isRedacted(v), k).toBe(true);
     for (const s of ['Superb', 'Memphis', 'SECTION L', 'vault narrative', 'forklift', 'Geoff', 'Haas', 'a@b.com', '901-555', 'Ambreen', 'sk-live', 'pit-abc', 'Acme', 'secret pricing', 'Concord']) {
       expect(leaks(out, s), s).toBe(false);
     }
-    expect(out.description).toMatchObject({ type: 'string', len: args.description.length });
-    expect(out.contacts).toMatchObject({ type: 'array', count: 1 });
-    expect(out.cai).toMatchObject({ type: 'object' });
   });
 
-  it('redacts an allowlisted field whose value is not a valid code or id (no smuggling)', () => {
-    const out = redactToolArgs({ naics: 'we are a staffing firm in Memphis', notice_id: 'contact Geoff at 901', agency: 'x'.repeat(150), uei: 'short' });
-    for (const k of ['naics', 'notice_id', 'agency', 'uei']) expect(out[k], k).toMatchObject({ redacted: true, invalid: true });
-    expect(leaks(out, 'Memphis')).toBe(false);
-    expect(leaks(out, 'Geoff')).toBe(false);
+  it('redacts invalid values in allowlisted fields and unknown agencies', () => {
+    const out = redactToolArgs({ naics: 'we are a staffing firm', state: 'ZZ', uei: 'abcdefghijk1', agency: 'Acme Federal Services LLC', piid: 'w912eq24p0035' });
+    for (const k of ['naics', 'state', 'uei', 'agency', 'piid']) expect(out[k], k).toMatchObject({ redacted: true, invalid: true });
   });
 
-  it('recurses only into structured containers and applies the same allowlist there', () => {
-    const out = redactToolArgs({ filters: { naics: ['561320'], state: 'TN', q: 'secret phrase', advanced: { x: 1 } }, bbox: { n: 36.1, s: 35.0, e: -89.7, w: -90.1 } });
-    expect(out.filters).toMatchObject({ naics: ['561320'], state: 'TN' });
+  it('recurses only into structured containers, using the container schema for enums', () => {
+    const out = redactToolArgs({ filters: { naics: ['561320'], state: 'TN', q: 'secret phrase', agency: 'Department of Defense' }, bbox: { n: 36.1, s: 35.0, e: -89.7, w: -90.1 } });
+    expect(out.filters).toMatchObject({ naics: ['561320'], state: 'TN', agency: 'Department of Defense' });
     expect((out.filters as Record<string, unknown>).q).toMatchObject({ redacted: true });
-    expect((out.filters as Record<string, unknown>).advanced).toMatchObject({ redacted: true, type: 'object' });
     expect(out.bbox).toEqual({ n: 36.1, s: 35.0, e: -89.7, w: -90.1 });
-    expect(leaks(out, 'secret phrase')).toBe(false);
   });
 
   it('handles malformed input without throwing', () => {
@@ -72,9 +95,8 @@ describe('redactToolArgs — strict allowlist', () => {
     expect(redactToolArgs({ query: 'same text' }).query).not.toHaveProperty('digest');
     process.env.LOG_DIGEST_KEY = 'k1';
     const a = redactToolArgs({ query: 'same text' }).query as { digest: string };
-    const b = redactToolArgs({ query: 'same text' }).query as { digest: string };
     expect(a.digest).toMatch(/^[0-9a-f]{16}$/);
-    expect(a.digest).toBe(b.digest);
+    expect((redactToolArgs({ query: 'same text' }).query as { digest: string }).digest).toBe(a.digest);
     process.env.LOG_DIGEST_KEY = 'k2';
     expect((redactToolArgs({ query: 'same text' }).query as { digest: string }).digest).not.toBe(a.digest);
   });

@@ -77,7 +77,7 @@ describe('chat route wiring (source assertions)', () => {
   });
 
   it('streams verification traces only behind ASK_MINDY_TRACE_EVENTS', () => {
-    expect(code).toMatch(/process\.env\.ASK_MINDY_TRACE_EVENTS === 'true'/);
+    expect(code).toMatch(/process\.env\.ASK_MINDY_TRACE_EVENTS === 'true' && process\.env\.VERCEL_ENV !== 'production'/);
     expect(code).toMatch(/if \(TRACE_EVENTS\) \{/);
   });
 
