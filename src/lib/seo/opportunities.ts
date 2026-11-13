@@ -11,6 +11,7 @@
  * Source: sam_opportunities (Supabase). Read-only, service-role.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { latestLastmod } from './sitemap-xml';
 
 const MIN_BODY = 200; // chars of real description/SOW required to be indexable
 
@@ -99,7 +100,12 @@ export async function getOpportunityBySlug(slug: string): Promise<SeoOpportunity
     )
     .ilike('notice_id', `%${tail}`)
     .limit(5);
-  if (error || !data?.length) return null;
+  // A read FAILURE is not "this opportunity does not exist". Returning null here 404'd real
+  // pages whenever Supabase hiccuped, and ISR held each false 404 for a day. Throw instead: the
+  // route answers 5xx (not cached), and the next request retries. (Same rule as the contractor
+  // routes, 2026-11-12.)
+  if (error) throw new Error(`opportunity lookup failed for ${slug}: ${error.message}`);
+  if (!data?.length) return null;
 
   // Pick the row whose generated slug matches the requested slug exactly.
   const row = data.find((r) => opportunitySlug(r.title, r.notice_id) === slug) || null;
@@ -167,21 +173,103 @@ export async function getSimilarOpportunities(
  * sitemap stays sane; ordered by most recent. (Sitemap has a 50k URL limit;
  * we cap well under and can paginate later if needed.)
  */
-export async function getOpportunitySlugsForSitemap(cap = 20000): Promise<{ slug: string; lastModified: string }[]> {
+export type OpportunityStatus = 'open' | 'closed' | 'awarded';
+
+/**
+ * What a notice IS right now. `active` in sam_opportunities does not mean "open": measured
+ * 2026-11-12, 19,182 of 28,010 indexable active rows were past their response deadline and 531
+ * were award notices. The sitemap and the page must not present those as open solicitations.
+ */
+export function opportunityStatus(
+  o: { notice_type?: string | null; response_deadline?: string | null },
+  now: Date = new Date(),
+): OpportunityStatus {
+  if (o.notice_type && /award/i.test(o.notice_type)) return 'awarded';
+  if (o.response_deadline) {
+    const d = new Date(o.response_deadline);
+    if (!Number.isNaN(d.getTime()) && d.getTime() < now.getTime()) return 'closed';
+  }
+  return 'open';
+}
+
+export interface OpportunitySitemapRow {
+  slug: string;
+  status: Exclude<OpportunityStatus, 'closed'>;
+  /** Latest of posted_date / seo_enriched_at — both change what the page renders. */
+  lastModified: string | null;
+}
+
+/** LIKE pattern matching strings of at least `n` characters (PostgREST: `*` is `%`). */
+const atLeast = (n: number) => `${'_'.repeat(n)}*`;
+const PAGE = 1000; // PostgREST max-rows: a larger .limit() is silently clipped to this
+
+/**
+ * Every sitemap-worthy opportunity: active, non-thin, and OPEN or AWARDED.
+ * Closed (past-deadline) notices still render and stay indexable; they are simply not
+ * advertised — a sitemap is a claim that a URL deserves crawl priority.
+ *
+ * Replaces getOpportunitySlugsForSitemap(45000), which asked for 45,000 rows in ONE request:
+ * PostgREST clipped it to 1,000, the thin filter left 798, and the error was never checked.
+ *
+ * Cost shape: the thin test runs IN POSTGRES as a LIKE over N single-char wildcards, so the
+ * 2 KB descriptions and 20 KB sow_text never leave the database (pulling them for ~40K rows
+ * would be ~800 MB per build). Rows whose description is short qualify only if sow_text alone
+ * reaches MIN_BODY — a strict SUBSET of isIndexableOpp(), so the sitemap can never assert a
+ * page the renderer would 404. Throws on any read error: the caller answers 503, never an
+ * empty family.
+ */
+export async function getOpportunitySitemapEntries(now: Date = new Date()): Promise<OpportunitySitemapRow[]> {
   const client = sb();
-  if (!client) return [];
-  const { data } = await client
-    .from('sam_opportunities')
-    .select('notice_id, title, description, sow_text, last_modified, posted_date')
-    .eq('active', true)
-    .not('description', 'is', null)
-    .order('posted_date', { ascending: false })
-    .limit(cap);
-  if (!data?.length) return [];
-  return data
-    .filter(isIndexableOpp)
-    .map((r) => ({
+  if (!client) throw new Error('opportunity sitemap: no Supabase client');
+  const today = now.toISOString().slice(0, 10);
+  const statusOr = `response_deadline.gte.${today},response_deadline.is.null,notice_type.ilike.*award*`;
+  const select = 'notice_id, title, notice_type, response_deadline, posted_date, seo_enriched_at';
+
+  type Row = {
+    notice_id: string; title: string | null; notice_type: string | null;
+    response_deadline: string | null; posted_date: string | null; seo_enriched_at: string | null;
+  };
+  async function drain(build: (q: ReturnType<typeof base>) => ReturnType<typeof base>, label: string): Promise<Row[]> {
+    const rows: Row[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await build(base())
+        .order('notice_id', { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (error) throw new Error(`opportunity sitemap (${label}) page ${from / PAGE}: ${error.message}`);
+      const page = (data ?? []) as Row[];
+      rows.push(...page);
+      if (page.length < PAGE) break;
+      if (rows.length > 200_000) throw new Error(`opportunity sitemap (${label}): runaway pagination`);
+    }
+    return rows;
+  }
+  function base() {
+    return client!
+      .from('sam_opportunities')
+      .select(select)
+      .eq('active', true)
+      .like('title', atLeast(8))
+      .or(statusOr);
+  }
+
+  const [byDescription, bySow] = await Promise.all([
+    drain((q) => q.like('description', atLeast(MIN_BODY)), 'description'),
+    drain((q) => q.not('description', 'like', atLeast(MIN_BODY)).like('sow_text', atLeast(MIN_BODY)), 'sow'),
+  ]);
+
+  const seen = new Set<string>();
+  const out: OpportunitySitemapRow[] = [];
+  for (const r of [...byDescription, ...bySow]) {
+    if (seen.has(r.notice_id)) continue;
+    seen.add(r.notice_id);
+    if (!r.title || r.title.trim().length < 8) continue; // mirror isIndexableOpp's trim
+    const status = opportunityStatus(r, now);
+    if (status === 'closed') continue; // the date filter is day-grained; this is exact
+    out.push({
       slug: opportunitySlug(r.title, r.notice_id),
-      lastModified: (r.last_modified || r.posted_date || new Date().toISOString()).slice(0, 10),
-    }));
+      status,
+      lastModified: latestLastmod([r.posted_date, r.seo_enriched_at], now),
+    });
+  }
+  return out;
 }

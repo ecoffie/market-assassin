@@ -19,6 +19,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import MemberAwareCta from '@/components/MemberAwareCta';
 import {
+  opportunityStatus,
   getOpportunityBySlug,
   getSimilarOpportunities,
   type SeoOpportunity,
@@ -142,6 +143,19 @@ export default async function OpportunityPage({
           <span className="text-(--mp-muted)">{opp.noticeType || 'Opportunity'}</span>
         </nav>
 
+        {/* Status — `active` in SAM data does not mean open; say what this notice is. */}
+        {(() => {
+          const status = opportunityStatus({ notice_type: opp.noticeType, response_deadline: opp.responseDeadline });
+          const label =
+            status === 'awarded' ? 'Award notice' :
+            status === 'closed' ? 'Closed: the response deadline has passed' :
+            'Open for responses';
+          return (
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-(--mp-muted)" data-opportunity-status={status}>
+              {label}
+            </p>
+          );
+        })()}
         {/* Header */}
         <h1 className="text-2xl md:text-3xl font-bold text-(--mp-ink) leading-tight font-(family-name:--mp-font-serif)">{opp.title}</h1>
         <p className="text-sm text-(--mp-muted) mt-2">

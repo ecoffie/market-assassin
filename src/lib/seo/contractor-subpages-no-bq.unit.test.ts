@@ -46,7 +46,7 @@ describe('source: no live BigQuery opt-in on these public paths', () => {
     });
   }
   it('the sitemap no longer gates NAICS/agency tabs on the stored aggregate count', () => {
-    const src = code('src/app/sitemap.ts');
+    const src = code('src/lib/seo/sitemap-sections.ts');
     expect(src).not.toMatch(/distinct_(naics|agency)_count[^\n]*SUBPAGE_MIN_ROWS/);
     expect(src).toMatch(/subpageSitemapEligible\(naicsRowCounts\.get/);
     expect(src).toMatch(/subpageSitemapEligible\(agencyRowCounts\.get/);

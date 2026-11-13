@@ -21,7 +21,8 @@ const read = (p: string) => readFileSync(join(root, p), 'utf8');
 const recipients = read('src/lib/bigquery/recipients.ts');
 const seoPage = read('src/app/contractors/[slug]/page.tsx');
 const nameResolution = read('src/lib/contractor/name-resolution.ts');
-const sitemap = read('src/app/sitemap.ts');
+// The sitemap moved into per-family children (2026-11-12); its eligibility rules live here.
+const sitemap = read('src/lib/seo/sitemap-sections.ts');
 const warmer = read('scripts/warm-contractor-slugs.ts');
 const robots = read('src/app/robots.ts');
 
@@ -103,8 +104,9 @@ describe('Googlebot must never reach live BigQuery', () => {
 
 describe('the sitemap advertises only what the renderer can serve', () => {
   it('gates every contractor entry on verified cache presence', () => {
-    expect(sitemap).toContain('getServeableSlugs');
-    expect(sitemap).toContain('serveable.has(slug)');
+    expect(sitemap).toContain('getServeableProfiles');
+    expect(sitemap).toContain('const profile = serveable.get(slug);');
+    expect(sitemap).toContain('if (!profile) continue;');
   });
 
   it('the serveable check reads KV only, never BigQuery', () => {

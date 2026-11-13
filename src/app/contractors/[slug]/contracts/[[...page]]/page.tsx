@@ -22,6 +22,7 @@ import {
 import { serveableCanonical } from '@/lib/seo/canonical-redirect';
 import { SubpageLayout } from '@/components/contractors/SubpageLayout';
 import { getAwardsSourceAsOf } from '@/lib/awards-serving';
+import { awardHref, servableAwardIds } from '@/lib/seo/award-links';
 
 const SITE_URL = 'https://getmindy.ai';
 const PAGE_SIZE = 50;
@@ -162,6 +163,8 @@ export default async function ContractorContractsPage({ params }: PageProps) {
   // Provenance: how current the DATA is (MAX(action_date) at build time), which is
   // distinct from how recently the page was built. Sourced from the durable table.
   const sourceAsOf = await getAwardsSourceAsOf(recipient.rollup_uei);
+  // Which rows can link to their award page (KV presence; never the robots-blocked /contracts/<piid>).
+  const servableAwards = await servableAwardIds(awards.map((a) => a.award_id));
   const start = (pageNum - 1) * PAGE_SIZE + 1;
   const end = Math.min(start + awards.length - 1, total);
 
@@ -279,15 +282,16 @@ export default async function ContractorContractsPage({ params }: PageProps) {
                     {a.awarding_office && <span className="text-xs text-(--mp-muted) truncate block">{a.awarding_office}</span>}
                   </td>
                   <td className="px-4 py-3 font-(family-name:--mp-font-mono) text-xs">
-                    {a.piid ? (
+                    {a.piid && servableAwards.has(a.award_id) ? (
+                      // Crawlable award page, linked only when it can serve (see award-links.ts).
                       <Link
-                        href={`/contracts/${encodeURIComponent(a.piid)}`}
+                        href={awardHref(a.award_id)}
                         className="text-(--mp-muted) hover:text-(--mp-navy-hover)"
                       >
                         {a.piid}
                       </Link>
                     ) : (
-                      <span className="text-(--mp-muted)">—</span>
+                      <span className="text-(--mp-muted)">{a.piid || '—'}</span>
                     )}
                   </td>
                   <td className="px-4 py-3 font-(family-name:--mp-font-mono) text-xs text-(--mp-muted)">{a.naics_code || '—'}</td>
