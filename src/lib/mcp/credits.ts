@@ -81,6 +81,21 @@ export async function debitCredits(
   return { ok: Boolean(row?.ok), newBalance: Number(row?.new_balance ?? 0) };
 }
 
+/** Optional per-execution trace columns on mcp_call_log (all nullable). */
+export interface ExecutionTraceFields {
+  executionId?: string;
+  chatSessionId?: string | null;
+  model?: string | null;
+  provider?: string | null;
+  /** Already redacted (src/lib/chat/redact-args.ts). Never raw arguments. */
+  argsRedacted?: Record<string, unknown> | null;
+  /** Catalog credit price of the tool, recorded even when nothing is deducted. */
+  creditPrice?: number | null;
+  /** Ids of resources a write created or changed (e.g. saved search id). */
+  resourceIds?: Record<string, unknown> | null;
+  errorCategory?: string | null;
+}
+
 export type CallStatus =
   | 'success'
   | 'failed'
@@ -93,7 +108,10 @@ export type CallStatus =
   | 'throttled' // Layer B — per-account rolling cap exceeded (blocked)
   // Log-only shadow rows (guard on, enforce off) — measure impact before enforcing:
   | 'shadow_requires_paid'
-  | 'shadow_throttled';
+  | 'shadow_throttled'
+  // Ask Mindy (channel 'app_chat'): refused by the chat tool policy or the per-round
+  // budget before the tool ran. Never charged. error_category says which rule.
+  | 'blocked_policy';
 
 /**
  * Append a call-log row (audit/analytics/abuse). Best-effort — never throws.
@@ -116,10 +134,16 @@ export async function logCall(entry: {
   apiKeyId?: string | null;
   outcome?: OutcomeTelemetry;
   /**
-   * The MCP surface the call arrived on. Only 'chatgpt' is written; the Claude/general
-   * edge passes nothing, so its rows keep channel NULL (migration 20261003_mcp_call_log_channel).
+   * The surface the call arrived on. 'chatgpt' = /chatgpt/mcp; 'app_chat' = Ask Mindy
+   * (in-app chat). The Claude/general MCP edge passes nothing, so its rows keep channel
+   * NULL (migration 20261003_mcp_call_log_channel).
    */
-  channel?: 'chatgpt';
+  channel?: 'chatgpt' | 'app_chat';
+  /**
+   * Per-execution trace (Ask Mindy safety release, migration 20261114_ask_mindy_execution_trace).
+   * All optional and additive; MCP callers pass nothing and their rows are unchanged.
+   */
+  trace?: ExecutionTraceFields;
 }): Promise<void> {
   const legacy = {
     user_email: entry.userEmail.toLowerCase(),
@@ -131,26 +155,56 @@ export async function logCall(entry: {
   };
   // The newer columns ride only on the enriched row; `legacy` stays the pre-telemetry
   // shape so the retry below still lands if a newer column is ever missing.
-  const enriched = {
-    ...(entry.outcome
-      ? {
-          outcome: entry.outcome.outcome,
-          grounded: entry.outcome.grounded,
-          degraded: entry.outcome.degraded,
-          billing_outcome: entry.outcome.billingOutcome,
-          error_code: entry.outcome.errorCode,
-        }
-      : {}),
-    ...(entry.channel === 'chatgpt' ? { channel: 'chatgpt' as const } : {}),
+  const outcomeCols = entry.outcome
+    ? {
+        outcome: entry.outcome.outcome,
+        grounded: entry.outcome.grounded,
+        degraded: entry.outcome.degraded,
+        billing_outcome: entry.outcome.billingOutcome,
+        error_code: entry.outcome.errorCode,
+      }
+    : {};
+  const channelCols = entry.channel === 'chatgpt' || entry.channel === 'app_chat' ? { channel: entry.channel } : {};
+  const traceCols = entry.trace
+    ? {
+        execution_id: entry.trace.executionId ?? null,
+        chat_session_id: entry.trace.chatSessionId ?? null,
+        model: entry.trace.model ?? null,
+        provider: entry.trace.provider ?? null,
+        args_redacted: entry.trace.argsRedacted ?? null,
+        credit_price: entry.trace.creditPrice ?? null,
+        resource_ids: entry.trace.resourceIds ?? null,
+        error_category: entry.trace.errorCategory ?? null,
+      }
+    : null;
+
+  // Attempts, richest first. Each fallback drops only the newest columns, so a missing
+  // migration costs telemetry, never the call itself:
+  //   1. legacy + outcome + channel + trace   (20261114 trace columns)
+  //   2. legacy + outcome + channel           (20261002 / 20261003 columns)
+  //   3. legacy + channel                     (only for app_chat; see below)
+  //   4. legacy                               (pre-telemetry shape; never for app_chat)
+  // An Ask Mindy (app_chat) row must never be written WITHOUT its channel: with channel
+  // NULL and 0 credits charged it would be indistinguishable from a Claude/general MCP
+  // call and corrupt MCP billing/usage analytics. Dropping that row is the lesser harm.
+  const attempts: Record<string, unknown>[] = [];
+  const push = (r: Record<string, unknown>) => {
+    const sig = (o: Record<string, unknown>) => Object.keys(o).sort().join(',');
+    if (!attempts.some((a) => sig(a) === sig(r))) attempts.push(r);
   };
-  const row = Object.keys(enriched).length ? { ...legacy, ...enriched } : legacy;
+  if (traceCols) push({ ...legacy, ...outcomeCols, ...channelCols, ...traceCols });
+  push({ ...legacy, ...outcomeCols, ...channelCols });
+  if (entry.channel === 'app_chat') push({ ...legacy, ...channelCols });
+  else push(legacy);
+
   try {
-    const { error } = await getWriteClient().from('mcp_call_log').insert(row);
-    if (!error) return;
-    console.error('[mcp:credits] logCall insert rejected:', error.message);
-    if (row !== legacy) {
-      const { error: retryError } = await getWriteClient().from('mcp_call_log').insert(legacy);
-      if (retryError) console.error('[mcp:credits] logCall legacy retry rejected:', retryError.message);
+    for (let i = 0; i < attempts.length; i++) {
+      const { error } = await getWriteClient().from('mcp_call_log').insert(attempts[i]);
+      if (!error) return;
+      console.error(
+        i === 0 ? '[mcp:credits] logCall insert rejected:' : '[mcp:credits] logCall legacy retry rejected:',
+        error.message,
+      );
     }
   } catch (err) {
     console.error('[mcp:credits] logCall failed (non-fatal):', err);

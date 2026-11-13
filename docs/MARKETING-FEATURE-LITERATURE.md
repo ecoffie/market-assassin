@@ -7593,3 +7593,15 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 
 **Proof.** Examples come from `src/lib/mcp/gallery.ts` (unchanged). The activity-to-example map is `PRICING_TASK_EXAMPLES` in `src/lib/mcp/gallery-links.ts`; `gallery.unit.test.ts` fails if a mapped example or activity stops existing. Headless check: plan finder results identical to the live page.
 
+
+## Ask Mindy: safer actions, clearer answers when data is missing (2026-11-14)
+
+**What.** Ask Mindy now says plainly when a data lookup was unavailable instead of answering without data, flags an answer that ran out of room, uses today's date for every time window, and sends a message on Enter (Shift+Enter for a new line). Behind the scenes every lookup Ask Mindy runs is recorded, and actions that delete or change data outside Mindy now wait for your confirmation instead of running automatically.
+
+**Why it matters.** A research assistant is only useful if "nothing found" means nothing exists. Ask Mindy no longer turns a failed lookup into a confident "none".
+
+**Honest scope.** This is a reliability and safety release, not the full agent upgrade. A few actions are temporarily unavailable from chat (deleting an alert, adding contacts to a CRM, creating a saved market report, exporting a proposal file); each still works from its own screen in Mindy. Underlying search fixes come in the next phase.
+
+**SEO.** AI assistant for federal contracting research / GovCon AI chat / Mindy Ask Mindy.
+
+**Proof.** `src/lib/chat/chat-tool-policy.ts`, `src/lib/chat/chat-tool-executor.ts`, and their unit tests; execution rows in `mcp_call_log` with channel `app_chat`.
