@@ -13,7 +13,6 @@
  */
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { McpPublicNav } from '../public-ui';
 import { listPublicMcpTools } from '@/lib/mcp/public-catalog';
 
 export const metadata: Metadata = {
@@ -93,8 +92,6 @@ export default function McpAboutPage() {
   return (
     <main className="min-h-dvh bg-(--mp-paper) text-(--mp-ink)">
       <div className="mx-auto max-w-4xl px-5 py-8 sm:px-6">
-        <McpPublicNav active="about" />
-
         {/* HERO */}
         <section className="mt-14 text-center">
           <span className="inline-block rounded-none border border-(--mp-line) bg-(--mp-surface) px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-(--mp-muted)">

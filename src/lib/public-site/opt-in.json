@@ -44,7 +44,6 @@
     "src/lib/learn",
     "src/app/mcp/page.tsx",
     "src/app/mcp/mcp-console.tsx",
-    "src/app/mcp/public-ui.tsx",
     "src/app/mcp/about",
     "src/app/mcp/pricing",
     "src/app/mcp/tools",
