@@ -62,7 +62,7 @@ describe('raw-HTML public shell', () => {
     // The event banner above the bar wraps to 123px at 768px, so a fixed 140px offset ran the menu off-screen.
     expect(SITE_NAV_CSS).toContain('max-height:calc(100dvh - var(--mp-menu-top,140px))');
     // ...and above the Opportunity Map's own controls (up to z-index 1600), below modals (2601).
-    expect(SITE_NAV_CSS).toContain('html.mp-menu-open .mp-top,html.mp-menu-open .mp-menu{z-index:2000}');
+    expect(SITE_NAV_CSS).toContain('html.mp-menu-open .mp-top,html.mp-menu-open .mp-menu{z-index:2000}html.mp-menu-open :has(>.mp-top){z-index:2000!important}');
     const dom = new JSDOM(`<!doctype html><body>${mpRawHeaderHtml()}</body>`, { runScripts: 'dangerously' });
     const doc = dom.window.document;
     const burger = doc.querySelector<HTMLButtonElement>('.mp-head .mp-burger');

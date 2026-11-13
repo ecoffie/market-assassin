@@ -111,8 +111,11 @@ export const SITE_NAV_CSS = [
   '.mp-top{position:sticky;top:0;z-index:40;font-family:var(--mp-font-sans)}',
   // While the menu is open it sits above page widgets (the Opportunity Map's filters, markers and
   // map/list toggle reach z-index 1600) but below modals (account menu 2601) and the event pop-up.
-  // On phones .mp-top is display:contents, so the menu itself carries the z-index there.
-  'html.mp-menu-open .mp-top,html.mp-menu-open .mp-menu{z-index:2000}',
+  // On phones .mp-top is display:contents, so the menu itself carries the z-index there. A page
+  // that wraps the bar in its own positioned header (the map's .zhead, z-index 20) caps everything
+  // inside it, so the bar's direct parent is lifted too.
+  // (!important: the phone map pins .zhead{z-index:1100!important}.)
+  'html.mp-menu-open .mp-top,html.mp-menu-open .mp-menu{z-index:2000}html.mp-menu-open :has(>.mp-top){z-index:2000!important}',
   '.mp-head{height:64px;display:flex;align-items:center;gap:28px;background:var(--mp-surface);border-bottom:1px solid var(--mp-hair);'
     + 'padding:0 max(28px,env(safe-area-inset-right,0px)) 0 max(28px,env(safe-area-inset-left,0px))}',
   '.mp-head a{color:var(--mp-ink);text-decoration:none;white-space:nowrap}',
