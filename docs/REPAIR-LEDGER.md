@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-13 — Tablets (621–980px) get the site menu
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-13 | Public nav / tablets | **No navigation at 621–980px.** The bar hid its links at <=980px but the menu button only appeared at <=620px, so tablets had neither. The button and menu now show at <=980px; on tablets the menu drops down from the sticky top bar and leaves out its Sign in / Start for free footer (the bar still shows both). Phones unchanged. | `.mp-menu{position:absolute;top:100%;bottom:auto` → `src/lib/public-site/site-nav.ts` | `html.unit.test.ts` pins the button to the links' breakpoint; headless: /pricing, /opportunity-map, /home at 390–1440px, 115/115; prod baseline had no navigation at 768/900px | LIVE on merge |
+
 ## 2026-11-13 — Map: Players, M-Win, Save to CRM and the proposal workspace are Pro
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
