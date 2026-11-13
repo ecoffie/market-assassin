@@ -26,7 +26,13 @@ Runbook:
 - Dry run: `npx tsx scripts/rebuild-award-lookups.ts`
 - Rebuild: `npx tsx scripts/rebuild-award-lookups.ts --go [--probe <award_id>]`
 - Roll back: `npx tsx scripts/rebuild-award-lookups.ts --rollback` (copies `<table>__prev` back)
-- Runs automatically after a successful weekly ingest (`.github/workflows/bq-awards-ingest.yml`).
+- Runs automatically after a successful weekly ingest (`.github/workflows/bq-awards-ingest.yml`, Sundays
+  14:00 UTC): the step runs only if the import and its post-apply verification succeeded (a delayed or
+  failed USAspending export fails the import step, so the rebuild is skipped), with `--skip-if-current`
+  so a week with no new data costs one ~0.4 GB check instead of a ~43 GB rebuild.
+- Freshness alert: the daily `check-data-freshness` cron (13:05 UTC, ops Slack) compares the lookups'
+  last successful source date with the warehouse's (`bq_awards` clocks) and alerts when they lag more
+  than 36h after a merge, when the last rebuild failed, or after a rollback.
 - Outcome log: Supabase `data_sources` row `bq_award_lookups`.
 - Never run `build-lookup-tables.sh` (retired: it drops production tables before rebuilding).
 - Do not bump `DATA_VERSION` after a rebuild: negatives are versioned by the table build time.

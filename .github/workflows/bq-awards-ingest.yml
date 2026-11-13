@@ -131,7 +131,7 @@ jobs:
         run: |
           set +x
           set -o pipefail
-          ./node_modules/.bin/tsx scripts/rebuild-award-lookups.ts --go 2>&1 | tee -a /tmp/bq-awards-ingest-run.log
+          ./node_modules/.bin/tsx scripts/rebuild-award-lookups.ts --go --skip-if-current 2>&1 | tee -a /tmp/bq-awards-ingest-run.log
 
       - name: Upload failure log (no ZIP/CSV)
         if: failure()

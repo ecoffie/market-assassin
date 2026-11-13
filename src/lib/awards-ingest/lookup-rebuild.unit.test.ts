@@ -82,6 +82,26 @@ describe('production is untouched on any failure', () => {
   });
 });
 
+describe('weekly no-op', () => {
+  it('skip-if-current: lookups already match the source → no lock-held build, no copy', async () => {
+    const { bq, copies, log } = fakeBq({ prodRows: 100 }); // prod rows == source distinct awards (100)
+    const orig = bq.query.bind(bq);
+    bq.query = (async (sql: string, o?: unknown) => (sql.includes('FROM `market-assasin.usaspending.award_detail_lookup`') && sql.includes('MAX(action_date)') && !sql.includes('COUNT')
+      ? [{ mx: '2026-11-04' }] : orig(sql, o as never))) as never;
+    const r = await rebuildLookups(bq, { go: true, skipIfCurrent: true });
+    expect(r).toMatchObject({ ok: true, stage: 'up-to-date' });
+    expect(copies).toEqual([]);
+    expect(log.some((l) => l.includes('__staging'))).toBe(false);
+    expect(log.at(-1)).toContain('_award_lookup_rebuild_lock');
+  });
+  it('skip-if-current: lookups behind → full rebuild', async () => {
+    const { bq, copies } = fakeBq({ prodRows: 90 });
+    const r = await rebuildLookups(bq, { go: true, skipIfCurrent: true });
+    expect(r.ok).toBe(true);
+    expect(copies.length).toBe(4);
+  });
+});
+
 describe('guards', () => {
   it('does not run when another rebuild holds the lock', async () => {
     const { bq, copies, log } = fakeBq({ lockHeld: true });

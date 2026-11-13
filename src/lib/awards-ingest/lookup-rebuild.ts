@@ -158,7 +158,7 @@ export interface RebuildResult {
 
 export async function rebuildLookups(
   bq: RebuildBq,
-  opts: { go: boolean; probeIds?: string[]; log?: (m: string) => void },
+  opts: { go: boolean; probeIds?: string[]; skipIfCurrent?: boolean; log?: (m: string) => void },
 ): Promise<RebuildResult> {
   const log = opts.log ?? (() => {});
   const res: RebuildResult = { ok: false, published: [], stage: 'start', reasons: [], sourceMaxActionDate: null, rows: {}, estimatedBytes: 0 };
@@ -187,6 +187,25 @@ export async function rebuildLookups(
     res.sourceMaxActionDate = typeof src.mx === 'object' && src.mx ? src.mx.value : (src.mx as string | null);
     const sourceKeys: Record<LookupTable, number> = { award_detail_lookup: Number(src.awards), piid_lookup: Number(src.piids) };
     log(`source: max action ${res.sourceMaxActionDate}, ${sourceKeys.award_detail_lookup} awards, ${sourceKeys.piid_lookup} piids`);
+
+    // Already current? A successful weekly import that brought nothing new must not re-scan ~43 GB.
+    // Current = production has the source's newest action date AND one row per source award.
+    if (opts.skipIfCurrent) {
+      res.stage = 'currency';
+      const [p] = await bq.query<{ mx: { value: string } | string | null }>(
+        `SELECT CAST(MAX(action_date) AS STRING) AS mx FROM ${fq('award_detail_lookup')}`,
+        { maximumBytesBilled: 2 * 1024 ** 3 },
+      );
+      const prodMax = typeof p?.mx === 'object' && p?.mx ? p.mx.value : (p?.mx as string | null);
+      const prodRows = await bq.tableRows('award_detail_lookup');
+      if (prodMax === res.sourceMaxActionDate && prodRows === sourceKeys.award_detail_lookup) {
+        log(`lookups already current (max ${prodMax}, ${prodRows} rows) — nothing to rebuild`);
+        res.stage = 'up-to-date';
+        res.ok = true;
+        return res;
+      }
+      log(`lookups behind source (prod max ${prodMax}, ${prodRows} rows) — rebuilding`);
+    }
 
     res.stage = 'budget';
     for (const t of LOOKUPS) {

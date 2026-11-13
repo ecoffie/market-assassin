@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendOpsAlert } from '@/lib/ops-alert';
+import { classifyLookupFreshness, parseLookupStatus } from '@/lib/awards-ingest/lookup-freshness';
 import {
   classifyFreshness,
   resolveAwardsIngestClocks,
@@ -80,6 +81,20 @@ export async function GET(request: NextRequest) {
           ageDays: freshness.runAgeDays ?? freshness.sourceAgeDays ?? -1,
           refreshWith: REFRESH_SCRIPTS[s.key],
           classification: freshness.status,
+        });
+      }
+      continue;
+    }
+    if (s.key === 'bq_award_lookups') {
+      // Lookups vs the warehouse they are derived from — not an age check (2026-11-13: they sat
+      // seven months behind with no alert). Uses the ingest clocks from the bq_awards row.
+      const awardsRow = (data || []).find((r) => r.key === 'bq_awards');
+      const clocks = awardsRow ? resolveAwardsIngestClocks({ notes: awardsRow.notes, lastBuilt: awardsRow.last_built }) : null;
+      const f = classifyLookupFreshness(parseLookupStatus(s.notes), clocks);
+      if (f.status !== 'healthy') {
+        stale.push({
+          key: s.key, name: s.name, cadence: s.refresh_cadence, ageDays: -1,
+          refreshWith: `${REFRESH_SCRIPTS[s.key]} — ${f.status}: ${f.detail}`,
         });
       }
       continue;
@@ -216,6 +231,7 @@ const LIVE_SYNC_CHECKS: Array<{ key: string; name: string; table: string; column
 // registry doc's "Refresh ownership" section).
 const REFRESH_SCRIPTS: Record<string, string> = {
   bq_awards: 'npm run ingest:awards (dry-run), then npm run ingest:awards:apply after review',
+  bq_award_lookups: 'npx tsx scripts/rebuild-award-lookups.ts (dry run), then --go (atomic, validated; runs weekly after the ingest)',
   // PROVENANCE (traced from git, 2026-09-12): the canonical served roster
   // src/data/sblo-roster-2026-06.json was NOT produced by any script. It is a
   // one-off manual/agent-assisted curation (commits e517967f/95f6826c/d9de8de2).
