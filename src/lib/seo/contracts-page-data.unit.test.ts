@@ -112,7 +112,7 @@ describe('loadContractsPage (the page decision)', () => {
     );
     const r = await loadContractsPage(R, 1, 50);
     expect(r).toEqual({ kind: 'ok', rows: [ROW], total: 112 });
-    expect(m.budget).toHaveBeenCalledWith('contracts');
+    expect(m.budget).toHaveBeenCalledWith('contracts', expect.any(Date), 'power-engineers-inc/1');
     expect(m.kvStore.get(kvKey(seoCacheKeys.awardsTotal('UEI1')))).toEqual([{ total: 112 }]);
   });
 

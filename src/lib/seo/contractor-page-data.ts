@@ -24,6 +24,7 @@ import { bqResultState } from '@/lib/bigquery/cache';
 import { serveableCanonical } from '@/lib/seo/canonical-redirect';
 import { recordWarmMiss } from '@/lib/seo/served-slugs';
 import { takeSeoColdBudget } from '@/lib/seo/seo-unavailable';
+import { recordColdOutcome } from '@/lib/seo/lookup-metrics';
 import { resolveContractor, type ContractorResolution } from '@/lib/seo/contractor-resolve';
 
 const KEY_FOR = {
@@ -35,17 +36,24 @@ const KEY_FOR = {
 /** Resolve a public contractor slug. Memoized per request. */
 export const resolveContractorForPage = dedupeInFlight(
   (slug: string) => `contractor:${slug}`,
-  (slug: string): Promise<ContractorResolution> =>
-    resolveContractor(slug, {
+  async (slug: string): Promise<ContractorResolution> => {
+    let tookBudget = false;
+    const result = await resolveContractor(slug, {
       rollupOrSingle: (s, live) => getRollupOrSingleBySlug(s, live),
       canonicalOf: (s, live) => resolveCanonicalSlug(s, live),
       serveable: (c) => serveableCanonical(c),
       // A miss on a key that was never read reports 'empty' (no mark). The resolver only
       // reads a key's state right after the call that queried it, so that cannot occur.
       state: (key, s) => bqResultState(KEY_FOR[key](s), 0),
-      takeBudget: () => takeSeoColdBudget('contractor'),
+      takeBudget: async () => (tookBudget = await takeSeoColdBudget('contractor', new Date(), slug)),
       recordWarmMiss: (s) => recordWarmMiss(s),
-    }),
+    });
+    // Measurement only: outcome of the live lookups the budget actually paid for.
+    if (tookBudget) {
+      await recordColdOutcome('contractor', result.kind === 'not_found' ? 'missing' : result.kind === 'unavailable' ? 'failed' : 'found');
+    }
+    return result;
+  },
 );
 
 export type ContractsPageData =
@@ -68,14 +76,18 @@ export const loadContractsPage = dedupeInFlight(
     // spend budget doing it.
     if (first.state === 'failed') return { kind: 'unavailable', reason: 'data-source-failed' };
 
-    if (!(await takeSeoColdBudget('contracts'))) {
+    if (!(await takeSeoColdBudget('contracts', new Date(), `${recipient.canonical_slug}/${page}`))) {
       await recordWarmMiss(recipient.canonical_slug);
       return { kind: 'unavailable', reason: 'cold-budget-exhausted' };
     }
     const live = await getPaginatedAwardsForRecipient(
       recipient.child_ueis, recipient.rollup_uei, page, pageSize, true,
     );
-    if (live.state === 'ok') return { kind: 'ok', rows: live.rows, total: live.total };
+    if (live.state === 'ok') {
+      await recordColdOutcome('contracts', live.total > 0 ? 'found' : 'missing');
+      return { kind: 'ok', rows: live.rows, total: live.total };
+    }
+    await recordColdOutcome('contracts', 'failed');
     await recordWarmMiss(recipient.canonical_slug);
     return { kind: 'unavailable', reason: live.state === 'failed' ? 'bigquery-failed' : 'live-lookup-blocked' };
   },

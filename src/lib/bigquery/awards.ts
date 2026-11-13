@@ -14,6 +14,7 @@ import { bqUnavailable, queryCached, DATA_VERSION } from './cache';
 import { kv } from '@vercel/kv';
 import { seoLiveBqEnabled } from '@/lib/seo/live-bq';
 import { allowAwardColdLookup } from '@/lib/seo/award-cold-budget';
+import { recordColdOutcome } from '@/lib/seo/lookup-metrics';
 
 export interface AwardListRow {
   award_id: string;
@@ -216,14 +217,16 @@ export const getAwardLookup = dedupeInFlight(
   if (neg && (lookupBuild === null || neg.build === lookupBuild)) {
     return { state: 'missing', award: null }; // confirmed against THIS build of the table
   }
-  if (allowCold && (seoLiveBqEnabled() || (await allowAwardColdLookup()))) {
+  if (allowCold && (seoLiveBqEnabled() || (await allowAwardColdLookup(awardId)))) {
     rows = await run(false);
-    if (rows.length) return { state: 'hit', award: rows[0] };
+    if (rows.length) { await recordColdOutcome('award', 'found'); return { state: 'hit', award: rows[0] }; }
     if (!bqUnavailable(cacheKey, 0)) {
       // The query ran and found nothing: a confirmed absence for this build of the table.
       await writeNegative(awardId, cacheKey, lookupBuild);
+      await recordColdOutcome('award', 'missing');
       return { state: 'missing', award: null };
     }
+    await recordColdOutcome('award', 'failed');
   }
   // Not looked up (budget spent) or the query FAILED: unknown, never "missing".
   return { state: 'unavailable', award: null };

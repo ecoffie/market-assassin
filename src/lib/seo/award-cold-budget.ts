@@ -11,6 +11,7 @@
  * overrides it; 0 turns cold award lookups off again.
  */
 import { checkRateLimit } from '@/lib/rate-limit';
+import { recordColdDecision } from '@/lib/seo/lookup-metrics';
 
 export function awardColdDailyLimit(env: Record<string, string | undefined> = process.env): number {
   const raw = env.SEO_AWARD_COLD_LOOKUPS_PER_DAY;
@@ -19,10 +20,11 @@ export function awardColdDailyLimit(env: Record<string, string | undefined> = pr
 }
 
 /** One unit of today's global budget, or false when spent. */
-export async function allowAwardColdLookup(): Promise<boolean> {
+export async function allowAwardColdLookup(awardId?: string): Promise<boolean> {
   const limit = awardColdDailyLimit();
-  if (limit === 0) return false;
+  if (limit === 0) { await recordColdDecision('award', false, awardId); return false; }
   const day = new Date().toISOString().slice(0, 10);
   const rl = await checkRateLimit(`seo-award-cold:${day}`, limit, 26 * 60 * 60);
+  await recordColdDecision('award', rl.allowed, awardId); // measurement only
   return rl.allowed;
 }
