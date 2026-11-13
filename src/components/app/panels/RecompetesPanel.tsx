@@ -810,7 +810,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
               onClick={() => switchAwardType(t.id)}
               title={t.hint}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                awardType === t.id ? 'bg-amber-600 text-white' : 'bg-surface text-muted hover:text-white hover:bg-input'
+                awardType === t.id ? 'bg-accent text-white' : 'bg-surface text-muted hover:text-white hover:bg-input'
               }`}
             >
               {t.label}
@@ -828,7 +828,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
               value={naicsFilter}
               onChange={setNaicsFilter}
               placeholder="541512, 236, 238"
-              className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-amber-500 focus:outline-none"
+              className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-accent focus:outline-none"
             />
           </div>
           <div>
@@ -836,7 +836,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
             <select
               value={monthsFilter}
               onChange={(e) => setMonthsFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm focus:border-amber-500 focus:outline-none"
+              className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm focus:border-accent focus:outline-none"
             >
               <option value="all">All Dates</option>
               <option value="6">6 Months</option>
@@ -853,7 +853,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
             <button
               onClick={handleSearch}
               disabled={searching}
-              className="w-full px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-input disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+              className="w-full px-4 py-2 bg-accent hover:bg-accent-hover disabled:bg-input disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
             >
               {searching ? 'Searching...' : 'Search'}
             </button>
@@ -865,7 +865,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
               type="checkbox"
               checked={myStatesOnly}
               onChange={(e) => setMyStatesOnly(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-600 bg-surface text-amber-500 focus:ring-amber-500"
+              className="h-4 w-4 rounded border-slate-600 bg-surface text-accent focus:ring-accent"
             />
             <span className="font-medium">My states only</span>
             <span className="text-xs text-faint">
@@ -1457,7 +1457,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
           <button
             type="button"
             onClick={viewAllContracts}
-            className="inline-block px-6 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-colors"
+            className="inline-block px-6 py-2 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-lg transition-colors"
           >
             View all expiring awards
           </button>
