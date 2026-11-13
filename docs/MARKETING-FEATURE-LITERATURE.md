@@ -7544,3 +7544,15 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 
 **Proof.** Live data, 2026-11-07, read-only: `email_provider_events` holds 1,864 delivery events for 1,864 saved-search alerts over 30 days. Latest `cron_job_runs` row: 142 searches evaluated, 78 alerts accepted, 5 searches blocked and now named to their owners.
 
+
+## More credits on Mid and Growth MCP plans, same price (2026-11-13)
+
+**What.** Mindy's credit plans for Claude, Cursor and other AI agents now include more credits at the same prices. Entry stays $99 for 500 credits a month. Mid goes from 2,000 to 3,000 credits a month at $249. Growth goes from 3,500 to 5,000 a month at $399. Annual plans keep the two-months-free price and deliver a full year upfront: 6,000, 36,000 and 60,000 credits.
+
+**Why it matters.** Mid now covers about half again as much opportunity work as before, and Growth about 40% more, with no change to the bill. The plan finder, the usage examples and the comparison table all work from the same numbers, so the recommended plan matches what the account receives.
+
+**Honest scope.** Prices, top-ups and plan names are unchanged. Current subscribers get the new allowance on their next paid invoice. Credits already granted are untouched.
+
+**SEO.** MCP server pricing / AI agent federal contracting credits / Mindy MCP plans.
+
+**Proof.** `src/lib/mcp/packages.ts` SUBSCRIPTION_PLANS is both what the page displays and what the Stripe webhook grants, keyed by price id. Test: `UnifiedPricing.credits.unit.test.tsx` pins the grant for every monthly and annual price and renders the page to check the cards and comparison table.
