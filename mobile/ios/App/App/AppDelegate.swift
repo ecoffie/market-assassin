@@ -96,8 +96,11 @@ public class PhoneNavPlugin: CAPPlugin, CAPBridgedPlugin {
     static let appHosts: Set<String> = ["getmindy.ai", "www.getmindy.ai"]
     static let appPaths = ["/app/phone", "/opportunity-map"]
 
-    static func staysInApp(_ url: URL) -> Bool {
-        guard let host = url.host?.lowercased(), appHosts.contains(host) else { return false }
+    /// The host the app was started on (capacitor.config.ts server.url) also counts,
+    /// so a test build pointed at a preview address works the same way.
+    static func staysInApp(_ url: URL, serverHost: String? = nil) -> Bool {
+        guard let host = url.host?.lowercased(),
+              appHosts.contains(host) || host == serverHost?.lowercased() else { return false }
         let path = url.path.isEmpty ? "/" : url.path
         return appPaths.contains { path == $0 || path.hasPrefix($0 + "/") }
     }
@@ -111,7 +114,7 @@ public class PhoneNavPlugin: CAPPlugin, CAPBridgedPlugin {
         // Inside the map iframe only a link the person TAPPED counts; background
         // frames (analytics, embeds) must never pop Safari.
         if !newWindow && !mainFrame && navigationAction.navigationType != .linkActivated { return nil }
-        if !newWindow && PhoneNavPlugin.staysInApp(url) { return nil }
+        if !newWindow && PhoneNavPlugin.staysInApp(url, serverHost: bridge?.config.serverURL.host) { return nil }
         DispatchQueue.main.async { UIApplication.shared.open(url, options: [:], completionHandler: nil) }
         return true
     }
