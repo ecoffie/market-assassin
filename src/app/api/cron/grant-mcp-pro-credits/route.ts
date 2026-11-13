@@ -45,7 +45,7 @@ export const maxDuration = 120;
 // App-tier subscription price amounts (cents). MCP subs ($99/$249/$999) are NOT here — they
 // get MCP credits via the MCP subscription webhook, not this grant.
 const PRO_AMOUNTS = new Set([14900, 149000, 4900]);   // Pro $149/mo · $1,490/yr · $49 grandfathered
-const TEAM_AMOUNTS = new Set([49900, 499000]);         // Team $499/mo · $4,990/yr
+const TEAM_AMOUNTS = new Set([49900, 499000, 402700]);         // Team $499/mo · $4,990/yr · $4,027/yr (current annual)
 
 const INTERNAL_TEAM = Array.from(new Set(
   [...INTERNAL_TEAM_EMAILS, 'branden@govcongiants.com', 'eric@govcongiants.com'].map((e) => e.toLowerCase().trim()),
