@@ -9,6 +9,11 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { authedFetch } from '@/components/app/authHeaders';
+import NoRefundNote from '@/components/NoRefundNote';
+import {
+  TRIAL_UPGRADE_ENDPOINT, TRIAL_UPGRADE_SUCCESS_TEXT, TRIAL_UPGRADE_TITLE,
+  canOfferTrialUpgrade, trialUpgradeChargeNote,
+} from '@/lib/billing/trial-upgrade-offer';
 
 type Sub = {
   id: string;
@@ -20,6 +25,7 @@ type Sub = {
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
   billedTo: string;
+  trialUpgradeEligible?: boolean;
 };
 
 type Data = {
@@ -45,6 +51,12 @@ export default function SubscriptionsCard({ email, upgradeHref = '/pricing' }: {
   const [failed, setFailed] = useState(false);
   const [opening, setOpening] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  // "Upgrade now, get +500 credits": confirm step, then POST; refresh the list after.
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [upgrading, setUpgrading] = useState<string | null>(null);
+  const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
+  const [upgradeErr, setUpgradeErr] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!email) return;
@@ -61,6 +73,31 @@ export default function SubscriptionsCard({ email, upgradeHref = '/pricing' }: {
       }
     })();
     return () => { off = true; };
+  }, [email, reloadKey]);
+
+  const upgradeNow = useCallback(async (sub: Sub) => {
+    if (!email) return;
+    setUpgrading(sub.id);
+    setUpgradeErr(null);
+    try {
+      const r = await authedFetch(TRIAL_UPGRADE_ENDPOINT, email, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, subscriptionId: sub.id }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.success) {
+        setConfirmId(null);
+        setUpgradeMsg(TRIAL_UPGRADE_SUCCESS_TEXT);
+        setReloadKey((k) => k + 1);
+      } else {
+        setUpgradeErr(j?.error || 'Could not upgrade right now. Nothing was charged.');
+      }
+    } catch {
+      setUpgradeErr('Could not upgrade right now. Please try again.');
+    } finally {
+      setUpgrading(null);
+    }
   }, [email]);
 
   const manage = useCallback(async (sub: Sub) => {
@@ -150,6 +187,41 @@ export default function SubscriptionsCard({ email, upgradeHref = '/pricing' }: {
                       {opening === s.id ? 'Opening…' : 'Manage / cancel'}
                     </button>
                   </div>
+                  {canOfferTrialUpgrade(s) && (
+                    <div className="mt-2.5 rounded-lg border border-emerald-500/25 bg-emerald-500/[0.06] px-3 py-2.5" data-testid="trial-upgrade-offer">
+                      <p className="text-[13px] font-semibold text-emerald-200">{TRIAL_UPGRADE_TITLE}</p>
+                      <p className="mt-0.5 text-[12px] text-slate-300">{trialUpgradeChargeNote(s.amount, s.interval)}</p>
+                      {confirmId === s.id ? (
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => upgradeNow(s)}
+                            disabled={upgrading !== null}
+                            className="rounded-lg bg-emerald-500 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-60"
+                          >
+                            {upgrading === s.id ? 'Upgrading…' : 'Confirm: charge my card now'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmId(null)}
+                            disabled={upgrading !== null}
+                            className="rounded-lg border border-white/10 px-3 py-1.5 text-[12px] text-slate-300 hover:bg-white/[0.06] disabled:opacity-60"
+                          >
+                            Keep my trial
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => { setConfirmId(s.id); setUpgradeErr(null); }}
+                          className="mt-2 rounded-lg bg-emerald-500 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-emerald-400"
+                        >
+                          Upgrade now
+                        </button>
+                      )}
+                      <NoRefundNote align="left" style={{ fontSize: 11 }} />
+                    </div>
+                  )}
                 </div>
               );
             })
@@ -162,6 +234,8 @@ export default function SubscriptionsCard({ email, upgradeHref = '/pricing' }: {
             </p>
           )}
           <p className="text-[11px] text-slate-500">Cancel, change plan, update your card or download invoices on Stripe&apos;s secure page.</p>
+          {upgradeMsg && <p className="text-[12px] text-emerald-300" data-testid="trial-upgrade-success">{upgradeMsg}</p>}
+          {upgradeErr && <p className="text-[12px] text-red-300">{upgradeErr}</p>}
           {err && <p className="text-[12px] text-red-300">{err}</p>}
         </div>
       )}

@@ -52,8 +52,19 @@ export interface AppTierInvoiceOutcome {
   skipped?: string;
 }
 
+/**
+ * Which app tier a price amount (cents) belongs to, using the same amount sets as the
+ * invoice grant below. null = not a Pro/Team price (e.g. an MCP credits plan).
+ */
+export function appTierForAmount(amountCents: number | null | undefined): 'pro' | 'team' | null {
+  if (typeof amountCents !== 'number') return null;
+  if (PRO_AMOUNTS.has(amountCents)) return 'pro';
+  if (TEAM_AMOUNTS.has(amountCents)) return 'team';
+  return null;
+}
+
 /** Resolve the payer email: invoice field first, then the customer record. */
-async function resolveInvoiceEmail(invoice: Stripe.Invoice): Promise<string | null> {
+export async function resolveInvoiceEmail(invoice: Stripe.Invoice): Promise<string | null> {
   const direct = invoice.customer_email;
   if (direct) return direct.toLowerCase().trim();
   const cust = invoice.customer;
