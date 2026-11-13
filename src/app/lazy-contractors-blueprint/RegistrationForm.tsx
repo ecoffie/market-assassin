@@ -27,7 +27,7 @@ function readAttribution(): unknown {
 
 /** Google Calendar link: Nov 28, 11:00 AM–1:00 PM ET (16:00–18:00 UTC). */
 const GCAL = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(EVENT.title + ' (live)')}`
-  + `&dates=20261128T160000Z/20261128T180000Z&details=${encodeURIComponent(`Free live event with Eric Coffie. Your join link comes by email. Live attendees get $50 in free Mindy credits.\n${PAGE_URL}`)}`;
+  + `&dates=20261128T160000Z/20261128T180000Z&details=${encodeURIComponent(`Free live event with Eric Coffie. Your join link comes by email. Live attendees get ${EVENT.claimCredits.toLocaleString('en-US')} free Mindy credits.\n${PAGE_URL}`)}`;
 
 function icsHref(): string {
   const ics = [
@@ -152,7 +152,7 @@ export default function RegistrationForm() {
   }
 
   if (step === 'done') {
-    const shareText = `I'm going to ${EVENT.title}, a free live event on winning federal contracts with Mindy (${EVENT.shortDate}). Live attendees get $50 in free credits. Join me:`;
+    const shareText = `I'm going to ${EVENT.title}, a free live event on winning federal contracts with Mindy (${EVENT.shortDate}). Live attendees get ${EVENT.claimCredits.toLocaleString('en-US')} free Mindy credits. Join me:`;
     return (
       <div className="mp-panel" role="status" style={{ display: 'grid', gap: 16 }}>
         <p className="mp-eyebrow mp-eyebrow--accent">You&apos;re all set</p>

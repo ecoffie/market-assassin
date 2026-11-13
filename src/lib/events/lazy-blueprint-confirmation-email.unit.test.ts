@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { renderLazyBlueprintConfirmation, LAZY_BLUEPRINT_CALENDAR_DATES } from './lazy-blueprint-confirmation-email';
 
 describe('Lazy Blueprint confirmation email', () => {
-  it('confirms the seat with date, time, $50 and a calendar link', () => {
+  it('confirms the seat with date, time, the free credits and a calendar link', () => {
     const { subject, html, text } = renderLazyBlueprintConfirmation('Ann');
     expect(subject).toContain("The Lazy Contractor's Blueprint");
     expect(html).toContain('See you Nov 28, Ann!');
     expect(html).toContain('11:00 AM ET');
-    expect(html).toContain('$50 in free Mindy credits');
+    expect(html).toContain('1,000 free Mindy credits');
     expect(html).toContain(LAZY_BLUEPRINT_CALENDAR_DATES);
     expect(text).toContain('Saturday, November 28, 2026 at 11:00 AM ET');
   });

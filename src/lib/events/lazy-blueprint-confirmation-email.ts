@@ -24,7 +24,7 @@ export function lazyBlueprintCalendarUrl(): string {
     '&dates=' + LAZY_BLUEPRINT_CALENDAR_DATES +
     '&details=' +
     encodeURIComponent(
-      `Free live event with Eric Coffie: the easiest way to win federal contracts, with Mindy doing the heavy lifting.\n\nShow up live to get $50 in free Mindy credits.\n\nWe'll email your join link before we go live.\n\nhttps://getmindy.ai${EVENT.path}`,
+      `Free live event with Eric Coffie: the easiest way to win federal contracts, with Mindy doing the heavy lifting.\n\nShow up live to get 1,000 free Mindy credits.\n\nWe'll email your join link before we go live.\n\nhttps://getmindy.ai${EVENT.path}`,
     ) +
     '&location=' + encodeURIComponent('Live online')
   );
@@ -65,11 +65,11 @@ export function renderLazyBlueprintConfirmation(
 
         <tr><td style="padding:24px 32px 0;">
           <p style="margin:0 0 14px;font-size:16px;line-height:1.6;color:#3A352E;">Your seat is saved. On ${esc(when)}, Eric Coffie goes live to show the easiest way to win federal contracts, with Mindy doing the heavy lifting.</p>
-          <p style="margin:0 0 14px;font-size:16px;line-height:1.6;color:#3A352E;"><strong style="color:#12100E;">Show up live and you get $50 in free Mindy credits.</strong> Live attendees only.</p>
+          <p style="margin:0 0 14px;font-size:16px;line-height:1.6;color:#3A352E;"><strong style="color:#12100E;">Show up live and you get 1,000 free Mindy credits.</strong> Live attendees only.</p>
           ${joinUrl
-            ? `<p style="margin:0 0 12px;font-size:16px;line-height:1.6;color:#3A352E;">This is your personal link to join. Please don&rsquo;t share it: it&rsquo;s how we know you were there for the $50.</p>
+            ? `<p style="margin:0 0 12px;font-size:16px;line-height:1.6;color:#3A352E;">This is your personal link to join. Please don&rsquo;t share it: it&rsquo;s how we know you were there for the free credits.</p>
           <p style="margin:0;text-align:center;"><a href="${esc(joinUrl)}" style="display:inline-block;background-color:#1B3A6B;color:#ffffff;padding:14px 28px;text-decoration:none;font-weight:700;font-size:15px;">Join the live event</a></p>
-          <p style="margin:14px 0 0;padding:12px 14px;background-color:#FFFAEB;border:1px solid #FEDF89;font-size:14px;line-height:1.6;color:#3A352E;"><strong>The room seats ${EVENT.zoomCapacity}. Join 10 minutes early.</strong> ${EVENT.youtubeOverflowUrl ? `If it&rsquo;s full, watch live here: <a href="${esc(EVENT.youtubeOverflowUrl)}" style="color:#1B3A6B;">YouTube livestream</a>. You can still claim your $50 from there.` : 'If it&rsquo;s full, we&rsquo;ll send a YouTube livestream link so you can still watch and claim your $50.'}</p>`
+          <p style="margin:14px 0 0;padding:12px 14px;background-color:#FFFAEB;border:1px solid #FEDF89;font-size:14px;line-height:1.6;color:#3A352E;"><strong>The room seats ${EVENT.zoomCapacity}. Join 10 minutes early.</strong> ${EVENT.youtubeOverflowUrl ? `If it&rsquo;s full, watch live here: <a href="${esc(EVENT.youtubeOverflowUrl)}" style="color:#1B3A6B;">YouTube livestream</a>. You can still claim your free credits from there.` : 'If it&rsquo;s full, we&rsquo;ll send a YouTube livestream link so you can still watch and claim your free credits.'}</p>`
             : `<p style="margin:0;font-size:16px;line-height:1.6;color:#3A352E;">We&rsquo;ll email your join link before we go live. Keep an eye on your inbox.</p>`}
         </td></tr>
 
@@ -78,7 +78,7 @@ export function renderLazyBlueprintConfirmation(
           <ul style="margin:0;padding-left:20px;font-size:15px;line-height:1.7;color:#3A352E;">
             <li>How small businesses find contracts that fit, without searching SAM.gov for hours</li>
             <li>A live look at Mindy finding real contracts for real businesses</li>
-            <li>$50 in free Mindy credits (live attendees only)</li>
+            <li>1,000 free Mindy credits (live attendees only)</li>
           </ul>
         </td></tr>
 
@@ -100,7 +100,7 @@ export function renderLazyBlueprintConfirmation(
     `${EVENT.title}`,
     `${when} · Live online`,
     '',
-    'Show up live and you get $50 in free Mindy credits. Live attendees only.',
+    'Show up live and you get 1,000 free Mindy credits. Live attendees only.',
     joinUrl ? `Your personal join link (please don't share it): ${joinUrl}` : "We'll email your join link before we go live.",
     `The room seats ${EVENT.zoomCapacity}, so join 10 minutes early.${EVENT.youtubeOverflowUrl ? ` If it's full, watch on YouTube: ${EVENT.youtubeOverflowUrl}` : ''}`,
     '',
@@ -145,5 +145,5 @@ export async function sendLazyBlueprintConfirmation(params: {
 /** The welcome text sent right after registration (only with SMS consent). Kept short: one or two segments. */
 export function lazyBlueprintWelcomeSms(firstName: string): string {
   const name = (firstName || '').trim() || 'there';
-  return `You're in, ${name}! ${EVENT.title} is Sat Nov 28 at ${EVENT.timeLabel || '11:00 AM ET'}. Your join link is in your email. Show up live for $50 in Mindy credits. Reply STOP to opt out.`;
+  return `You're in, ${name}! ${EVENT.title} is Sat Nov 28 at ${EVENT.timeLabel || '11:00 AM ET'}. Your join link is in your email. Show up live for 1,000 free Mindy credits. Reply STOP to opt out.`;
 }

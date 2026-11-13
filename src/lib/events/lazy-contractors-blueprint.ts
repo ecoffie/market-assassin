@@ -27,11 +27,11 @@ export const LAZY_CONTRACTORS_BLUEPRINT = {
   startedTag: 'lcb-started-not-registered',
   /** Live-only form: registered attendees claim extra Mindy credits, granted on submit. */
   claimPath: '/lazy-contractors-blueprint/claim',
-  claimCredits: 250,
+  claimCredits: 1000,
   /** Claim window: Sat Nov 28, 11:00 AM – 3:00 PM ET (EST, UTC-5). */
   claimOpensAt: '2026-11-28T16:00:00Z',
   claimClosesAt: '2026-11-28T20:00:00Z',
-  /** Tag written on a successful claim (the dashboard's "Claimed $50" step reads it). */
+  /** Tag written on a successful claim (the dashboard's "Claimed credits" step reads it). */
   claimTag: 'mindy-day-bonus-claimed',
   /** GHL contact field that holds each registrant's personal Zoom link ({{contact.zoom_join_link}}). */
   ghlZoomFieldId: 'Gis0uE1EkzuqDwcl2Gdo',
