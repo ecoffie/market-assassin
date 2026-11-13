@@ -1,7 +1,7 @@
 'use client';
 
 import MindyLoader from '@/components/app/MindyLoader';
-import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense, useSyncExternalStore } from 'react';
 import { WELCOME_PATH } from '@/lib/mindy/post-signup-destination';
 import { encodePendingNext, oauthOnboardingRedirect, onboardingRedirectPath, PENDING_NEXT_KEY, readPendingNext, signInReturnPath } from '@/lib/mindy/sign-in-return';
 import { useSearchParams } from 'next/navigation';
@@ -28,6 +28,9 @@ import { parseAppDeepLink } from '@/lib/app/deep-link-params';
 import { MAP_SHELL_HOME_EVENT, isMapShellPanel } from '@/lib/app/map-shell';
 import { KNOWN_PANELS } from '@/lib/app/known-panels';
 import TrialOfferBanner from '@/components/app/TrialOfferBanner';
+import { isInPhoneShell } from '@/lib/app/phone-shell';
+
+const noopSubscribe = () => () => {};
 
 /** The shared account-menu script (map + public pages) without its <script> wrapper. */
 const ACCOUNT_MENU_SCRIPT = ACCOUNT_MENU_JS.replace(/^<script>/, '').replace(/<\/script>[\s\S]*$/, '');
@@ -70,6 +73,9 @@ export default function AppPage() {
 }
 
 function AppDashboard() {
+  // Inside the Mindy phone app's Mindy tab (src/app/app/phone): the header keeps only the menu
+  // button — no lookup, no account/Upgrade bar (the phone app has its own tab bar).
+  const inPhoneShell = useSyncExternalStore(noopSubscribe, isInPhoneShell, () => false);
   const [email, setEmail] = useState<string | null>(null);
   const [tier, setTier] = useState<AppTier>('free');
   // True once /api/access/check has answered, so the free-only trial banner never flashes for Pro.
@@ -1540,6 +1546,7 @@ function AppDashboard() {
             </div>
             {/* Global lookup — type a contract number → award detail (enterprise
                 "search-an-identifier" convention). Members-only header tool. */}
+            {!inPhoneShell && (<>
             <div className="flex-1 flex justify-center min-w-0 px-2">
               <GlobalLookup email={email} />
             </div>
@@ -1549,6 +1556,7 @@ function AppDashboard() {
               <style>{ACCOUNT_MENU_CSS}</style>
               <PublicAccountMenu html={accountMenuHtml({ email })} script={ACCOUNT_MENU_SCRIPT} />
             </div>
+            </>)}
           </div>
         </header>
 
