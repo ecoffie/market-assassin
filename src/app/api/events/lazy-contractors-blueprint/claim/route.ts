@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/events/lazy-contractors-blueprint/claim
- * Live attendees claim $50 (250) in Mindy credits, added to their balance on submit.
+ * Live attendees claim EVENT.claimCredits (1,000) free Mindy credits, added to their balance on submit.
  * Requires a signed-in Mindy session: the email comes from the verified session, never
  * from the request body. Only during the live window, only for emails registered for
  * the event in GHL,

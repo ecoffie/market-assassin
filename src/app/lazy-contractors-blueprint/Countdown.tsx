@@ -2,6 +2,7 @@
 
 /** Live countdown to Mindy Day (Nov 28, 2026, 11:00 AM ET = 16:00 UTC). Renders nothing before hydration. */
 import { useEffect, useState } from 'react';
+import { LAZY_CONTRACTORS_BLUEPRINT as EVENT } from '@/lib/events/lazy-contractors-blueprint';
 
 const START = Date.parse('2026-11-28T16:00:00Z');
 
@@ -28,7 +29,7 @@ export default function Countdown() {
   return (
     <div className="lcb-cd" style={{ marginTop: 18 }} role="timer" aria-label={`${d} days ${h} hours ${m} minutes until we go live`}>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{cell(d, 'days')}{cell(h, 'hours')}{cell(m, 'min')}{cell(s, 'sec')}</div>
-      <p className="mp-meta" style={{ marginTop: 10 }}>Live only. The $50 in credits goes to people who show up live.</p>
+      <p className="mp-meta" style={{ marginTop: 10 }}>Live only. The {EVENT.claimCredits.toLocaleString('en-US')} free credits go to people who show up live.</p>
     </div>
   );
 }

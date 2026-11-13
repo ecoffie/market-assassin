@@ -37,7 +37,11 @@ export async function POST(req: NextRequest) {
 
   if (!firstName) return NextResponse.json({ success: false, error: 'Please enter your first name.' }, { status: 400 });
   if (!EMAIL_RE.test(email)) return NextResponse.json({ success: false, error: 'Please enter a valid email.' }, { status: 400 });
-  // Phone is optional (2026-11-12: name + email is the whole first step); validate only when given.
+  // Phone is required on the registration form (the original form, restored 2026-11-13). The
+  // optional 'details' follow-up below (no longer sent by the page) still accepts an empty phone.
+  if (!phoneRaw && body.step !== 'details') {
+    return NextResponse.json({ success: false, error: 'Please enter your phone number.' }, { status: 400 });
+  }
   if (phoneRaw && !normalizePhoneNumber(phoneRaw)) {
     return NextResponse.json({ success: false, error: 'Please enter a valid phone number.' }, { status: 400 });
   }

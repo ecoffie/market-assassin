@@ -28,7 +28,7 @@ function rightLink(l: MpChromeLink, i: number): string {
 export function siteEventBannerHtml(now: Date = new Date()): string {
   if (lazyBlueprintIsOver(now)) return '';
   return `<div class="mp-evb-band" id="mp-evb"><div class="mp-evb">`
-    + `<p class="mp-evb-t"><span class="mp-evb-l">Join <b>${esc(LCB.title)}</b> live on <b>${esc(LCB.shortDate)}</b> — show up and get $50 in free Mindy credits</span>`
+    + `<p class="mp-evb-t"><span class="mp-evb-l">Join <b>${esc(LCB.title)}</b> live on <b>${esc(LCB.shortDate)}</b> — show up and get 1,000 free Mindy credits</span>`
     + `<span class="mp-evb-s">Join <b>${esc(LCB.title)}</b>, free and live on <b>${esc(LCB.shortDate)}</b></span></p>`
     + `<a class="mp-evb-c" href="${esc(LCB.path)}">Register free</a>`
     + `<button type="button" class="mp-evb-x" aria-label="Close banner" onclick="document.getElementById('mp-evb').hidden=true">`

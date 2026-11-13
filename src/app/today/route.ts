@@ -497,7 +497,7 @@ ${mpFontPreloadLinksHtml({ includeInter: true })}
   ${mpA11yCss('')}
 </style></head><body${evbarOn ? ' class="has-evbar"' : ''}>
 <div class="ztop">
-${evbarOn ? `<a class="evbar" href="${LCB.path}"><span class="evbar-k">Free live · ${esc(LCB.shortDate)}</span><span class="evbar-t"><b>Show up live, get $50 in free Mindy credits</b><span class="evbar-n"> — ${esc(LCB.title)}</span></span><span class="evbar-c">Register free →</span></a>` : ''}
+${evbarOn ? `<a class="evbar" href="${LCB.path}"><span class="evbar-k">Free live · ${esc(LCB.shortDate)}</span><span class="evbar-t"><b>Show up live, get 1,000 free Mindy credits</b><span class="evbar-n"> — ${esc(LCB.title)}</span></span><span class="evbar-c">Register free →</span></a>` : ''}
 <header class="zhead">
   <nav class="zh-left">
     <a href="/opportunity-map">Opportunities</a>
@@ -637,13 +637,13 @@ ${evbarOn ? `<div class="evpop" id="evpop" role="dialog" aria-modal="true" aria-
   <div class="evpop-card">
     <button type="button" class="evpop-x" id="evpop-x" aria-label="Close">×</button>
     <span class="evpop-k">Free live event · ${esc(LCB.dateLabel)}${LCB.timeLabel ? ` · ${esc(LCB.timeLabel)}` : ''}</span>
-    <p class="evpop-h" id="evpop-h">Show up live. Get $50 in free Mindy credits.</p>
+    <p class="evpop-h" id="evpop-h">Show up live. Get 1,000 free Mindy credits.</p>
     <p class="evpop-n">${esc(LCB.title)}</p>
     <p class="evpop-t">Eric Coffie goes live to show the easiest way to win federal contracts, with Mindy doing the heavy lifting.</p>
     <ul class="evpop-l">
       <li>How small businesses find contracts that fit, without searching SAM.gov for hours</li>
       <li>A live look at Mindy finding real contracts for real businesses</li>
-      <li>$50 in free Mindy credits for live attendees</li>
+      <li>1,000 free Mindy credits for live attendees</li>
     </ul>
     <a class="evpop-b" id="evpop-b" href="${LCB.path}">Save My Free Seat</a>
     <p class="evpop-s">Free to attend. No credit card.</p>

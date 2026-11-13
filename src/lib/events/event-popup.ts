@@ -44,7 +44,7 @@ export function eventPopupScript(now: Date = new Date()): string {
     + '<h2 class="lcbp-t" id="lcbpT">' + LCB.title.replace(/'/g, '&#39;') + '</h2>'
     + '<div class="lcbp-d">' + LCB.dateLabel + ' · ' + LCB.timeLabel + ' · Online</div></div>'
     + '<div class="lcbp-b"><p>Learn how to find and win federal contracts with Mindy doing the heavy lifting. '
-    + '<b>Show up live and get $50 in free Mindy credits.</b></p>'
+    + '<b>Show up live and get 1,000 free Mindy credits.</b></p>'
     + '<a class="lcbp-go" href="' + LCB.path + '?utm_source=site_popup&amp;utm_medium=popup" data-lcbp-close>Register free</a>'
     + '<button type="button" class="lcbp-no" data-lcbp-close>Maybe later</button></div></div>';
   return '(function(){try{'

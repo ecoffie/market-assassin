@@ -33,7 +33,7 @@ export const LCB_SMS_STEPS: SmsStep[] = [
     windowMinutes: 6 * 60,
     tag: 'lcb-sms-week',
     label: 'Sat Nov 21, 11:00 AM ET (one week out)',
-    text: (n) => `Hi ${n}, one week until ${EVENT.title}: Sat Nov 28 at 11:00 AM ET. Show up live for $50 in free Mindy credits. Your join link is in your email. Reply STOP to opt out.`,
+    text: (n) => `Hi ${n}, one week until ${EVENT.title}: Sat Nov 28 at 11:00 AM ET. Show up live for 1,000 free Mindy credits. Your join link is in your email. Reply STOP to opt out.`,
   },
   {
     id: 'day',
@@ -57,7 +57,7 @@ export const LCB_SMS_STEPS: SmsStep[] = [
     windowMinutes: 60,
     tag: 'lcb-sms-live',
     label: 'Sat Nov 28, 11:00 AM ET (we are live)',
-    text: (n, url) => `We're LIVE, ${n}! Jump in: ${link(url)} Stay to the end for $50 in free Mindy credits. Reply STOP to opt out.`,
+    text: (n, url) => `We're LIVE, ${n}! Jump in: ${link(url)} Stay to the end for 1,000 free Mindy credits. Reply STOP to opt out.`,
   },
 ];
 

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { LAZY_CONTRACTORS_BLUEPRINT as EVENT, lazyBlueprintClaimState } from './lazy-contractors-blueprint';
 
 describe('Lazy Blueprint live credit claim', () => {
-  it('gives 250 credits ($50) and tags the claim for the dashboard', () => {
-    expect(EVENT.claimCredits).toBe(250);
+  it('gives 1,000 credits and tags the claim for the dashboard', () => {
+    expect(EVENT.claimCredits).toBe(1000);
     expect(EVENT.claimTag).toBe('mindy-day-bonus-claimed');
   });
   it('is open only during the live event (11 AM–3 PM ET, Nov 28)', () => {
