@@ -293,16 +293,14 @@ export async function opportunityEntries(): Promise<SitemapEntry[]> {
 }
 
 /**
- * Faceted opportunity listings (NAICS×state, PSC, set-aside×NAICS). Selection is UNCHANGED in
- * this phase — including the known 1,000-row clip inside getFacetSlugsForSitemap, which today
- * limits facets to those present in the first 1,000 active rows. Lifting it would publish
- * thousands of facets, many thin (naics×state pages measure ~138 words median); that is a
- * Phase 3 indexability decision, not a sitemap fix. No lastmod: no per-facet data date exists.
+ * Faceted opportunity listings (NAICS×state, PSC, set-aside×NAICS): deterministic, route-valid,
+ * capped per type at the pre-existing size (see getFacetSlugsForSitemap / FACET_SITEMAP_CAPS).
+ * No lastmod: no per-facet data date exists.
  */
 export async function facetEntries(): Promise<SitemapEntry[]> {
   const f = await getFacetSlugsForSitemap();
-  // getFacetSlugsForSitemap swallows read errors into empty arrays. An all-empty result is that
-  // failure, not a market with zero active opportunities: refuse rather than publish nothing.
+  // getFacetSlugsForSitemap throws on a read error. An all-empty result would still be wrong
+  // (there are always active opportunities): refuse rather than publish nothing.
   if (f.naicsState.length + f.psc.length + f.setAsideNaics.length === 0) {
     throw new Error('facet source returned nothing (read failure)');
   }
