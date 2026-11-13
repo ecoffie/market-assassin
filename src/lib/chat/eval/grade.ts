@@ -55,22 +55,33 @@ export interface GradeResult {
 }
 
 const STATE_NAMES: Record<string, string> = {
-  TN: 'Tennessee', MS: 'Mississippi', AR: 'Arkansas', VA: 'Virginia', KY: 'Kentucky', AL: 'Alabama', GA: 'Georgia',
-  MO: 'Missouri', LA: 'Louisiana', TX: 'Texas', FL: 'Florida', NC: 'North Carolina', SC: 'South Carolina', OH: 'Ohio',
-  MD: 'Maryland', DC: 'District of Columbia', CA: 'California', NY: 'New York', PA: 'Pennsylvania',
+  AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California', CO: 'Colorado', CT: 'Connecticut',
+  DE: 'Delaware', DC: 'District of Columbia', FL: 'Florida', GA: 'Georgia', HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois',
+  IN: 'Indiana', IA: 'Iowa', KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland',
+  MA: 'Massachusetts', MI: 'Michigan', MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri', MT: 'Montana',
+  NE: 'Nebraska', NV: 'Nevada', NH: 'New Hampshire', NJ: 'New Jersey', NM: 'New Mexico', NY: 'New York',
+  NC: 'North Carolina', ND: 'North Dakota', OH: 'Ohio', OK: 'Oklahoma', OR: 'Oregon', PA: 'Pennsylvania',
+  RI: 'Rhode Island', SC: 'South Carolina', SD: 'South Dakota', TN: 'Tennessee', TX: 'Texas', UT: 'Utah',
+  VT: 'Vermont', VA: 'Virginia', WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming',
+  PR: 'Puerto Rico', GU: 'Guam', VI: 'U.S. Virgin Islands',
 };
 
 const RECORD_WORDS = '(contracts?|awards?|records?|results?|orders?|opportunit\\w*|vehicles?|solicitations?|matches)';
+// A "none" claim is a NEGATION applied directly to the records (≤ 2–3 intervening words), so hedges
+// such as "no incumbent listed for these contracts" or "could not confirm whether any of these
+// contracts…" are NOT read as claims that no contracts exist.
 const NONE_CLAIMS: RegExp[] = [
-  new RegExp(`\\b(no|none|couldn'?t find|could not find|did not find|didn'?t find|unable to find|there are no|there is no|no recorded|no matching)\\b[^.\\n]{0,90}\\b${RECORD_WORDS}\\b`, 'i'),
-  new RegExp(`\\b(0|zero)\\s+(\\w+\\s+){0,4}${RECORD_WORDS}\\b`, 'i'),
-  new RegExp(`\\b(found|returned|shows?|showed|turned up)\\s+(nothing|none|zero|0)\\b`, 'i'),
-  new RegExp(`\\bnot\\s+(\\w+\\s+){0,4}any\\s+(\\w+\\s+){0,3}${RECORD_WORDS}\\b`, 'i'),
+  new RegExp(`\\b(no|there are no|there is no|there were no|no matching|no recorded)\\s+(\\w+\\s+){0,2}${RECORD_WORDS}\\b`, 'i'),
+  new RegExp(`\\b(couldn'?t|could not|did not|didn'?t|was unable to|were unable to|unable to)\\s+(find|locate|identify|see)\\s+(any\\s+)?(\\w+\\s+){0,3}${RECORD_WORDS}\\b`, 'i'),
+  new RegExp(`\\b(0|zero)\\s+(\\w+\\s+){0,3}${RECORD_WORDS}\\b`, 'i'),
+  new RegExp(`\\b(found|returned|shows?|showed|turned up|came back)\\s+(nothing|none|zero|0|empty)\\b`, 'i'),
+  new RegExp(`\\bnothing\\s+(qualifies|qualified|matches|matched|was found|is expiring|expires|came up)\\b`, 'i'),
   new RegExp(`\\bnone\\s+(were|was)?\\s*(found|listed|available|expiring)\\b`, 'i'),
+  new RegExp(`\\b(search|results?|lookup)\\s+(came back|returned|was|were)\\s+(empty|blank)\\b`, 'i'),
 ];
 const isNoneClaim = (answer: string) => NONE_CLAIMS.some((r) => r.test(answer));
 /** An explicit statement that a value was NOT searched/included, or that ONLY others were. */
-const DISCLOSURE = /\b(not|n't|never|unable to|cannot|can't)\b[^.\n]{0,40}\b(search|check|includ|cover|quer|look|filter|review)\w*|\bonly\s+(search|check|cover|includ|look|filter|review)\w*|\b(excluded|excluding|left out|omitted|outside (the |my )?(search|scope))\b/i;
+const DISCLOSURE = /\b(not|n't|never|unable to|cannot|can't)\s+(\w+\s+){0,2}(search|check|includ|cover|quer|filter)\w*|\bonly\s+(search|check|cover|includ|filter)\w*|\b(excluded|excluding|left out|omitted|outside (the |my )?(search|scope))\b/i;
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
 const lc = (s: string) => s.toLowerCase();
@@ -118,17 +129,32 @@ export function extractDates(text: string): Date[] {
 }
 
 /**
- * Identifier-like tokens: PIIDs / solicitation numbers (letters AND digits, 10–26 chars, hyphens
- * allowed, any case) and UUIDs. Matched against evidence with hyphens removed.
+ * Identifier-like tokens, matched against evidence with hyphens removed:
+ *   - UUIDs and 32-hex SAM notice ids (bare or inside a sam.gov link)
+ *   - uppercase PIID / solicitation forms (≥ 10 chars without hyphens, ≥ 3 digits, ≥ 1 letter)
+ *   - lowercase compact forms (no hyphen, ≥ 5 digits), e.g. a PIID typed in lowercase
+ * Ordinary prose shapes are excluded: FY2026-FY2027, ISO-9001-2015, CMMC-L2-2025, NAICS-541512,
+ * Q3-2026-update, HUBZone-2024, B2B-2025-pilot.
+ * Known limitation: ids shorter than 10 characters (e.g. a 6-character DoDAAC) are not checked.
  */
+const PROSE_PREFIX = /^(FY|ISO|CMMC|NAICS|PSC|NIST|SOC|Q[1-4]|SP|AS|ITAR|EAR)\d*-?/;
 export function extractIds(text: string): string[] {
   const ids = new Set<string>();
-  for (const m of text.matchAll(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi)) ids.add(m[0]);
-  const withoutUuids = text.replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, ' ');
-  for (const m of withoutUuids.matchAll(/\b[A-Za-z0-9][A-Za-z0-9-]{8,24}[A-Za-z0-9]\b/g)) {
+  const uuid = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
+  for (const m of text.matchAll(uuid)) ids.add(m[0]);
+  let rest = text.replace(uuid, ' ');
+  for (const m of rest.matchAll(/(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])/gi)) {
+    if (/[a-f]/i.test(m[0]) && /\d/.test(m[0])) ids.add(m[0]);
+  }
+  rest = rest.replace(/(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])/gi, ' ');
+  for (const m of rest.matchAll(/(?<![A-Za-z0-9])[A-Z0-9]+(?:-[A-Z0-9]+)*(?![A-Za-z0-9])/g)) {
     const t = m[0];
     const compact = t.replace(/-/g, '');
-    if (compact.length >= 10 && /[A-Za-z]/.test(t) && (t.match(/\d/g) ?? []).length >= 3) ids.add(t);
+    if (compact.length >= 10 && compact.length <= 26 && /[A-Z]/.test(t) && (t.match(/\d/g) ?? []).length >= 3 && !PROSE_PREFIX.test(t)) ids.add(t);
+  }
+  for (const m of rest.matchAll(/(?<![A-Za-z0-9-])[a-z0-9]{10,20}(?![A-Za-z0-9-])/g)) {
+    const t = m[0];
+    if (/[a-z]/.test(t) && (t.match(/\d/g) ?? []).length >= 5) ids.add(t);
   }
   return [...ids];
 }
@@ -140,18 +166,23 @@ export function extractAmounts(text: string): string[] {
 }
 
 /**
- * An amount is supported when the evidence holds the same value: with cents, the exact decimal
- * anywhere; without cents, only as the value of a money-like field (so "$1,000" is not
- * "supported" by `"limit": 1000`).
+ * An amount is supported when the evidence holds a money value within $1 of it (rounded amounts
+ * allowed): any value of a money-like field (key may contain digits, e.g. "fy2025_obligations"),
+ * any "$"-prefixed number in a non-JSON excerpt, or the exact decimal anywhere. A bare unrelated
+ * number (e.g. "limit": 1000) does not support "$1,000".
  */
+function evidenceMoney(evText: string): number[] {
+  const flat = evText.replace(/(\d),(?=\d{3})/g, '$1');
+  const out: number[] = [];
+  for (const m of flat.matchAll(/"[A-Za-z0-9 _]*(amount|obligat|value|price|ceiling|total|spend|dollar|rate|cost)[A-Za-z0-9 _]*"\s*:\s*"?(-?\d+(?:\.\d+)?)"?/gi)) out.push(Number(m[2]));
+  for (const m of flat.matchAll(/\$\s?(\d+(?:\.\d+)?)/g)) out.push(Number(m[1]));
+  return out;
+}
 function amountInEvidence(evText: string, amt: string): boolean {
-  const flat = evText.replace(/,(?=\d{3})/g, '');
-  if (amt.includes('.')) {
-    if (new RegExp(`(^|[^0-9.])${escapeRe(amt)}([^0-9]|$)`).test(flat)) return true;
-  }
-  const whole = amt.split('.')[0];
-  const money = new RegExp(`"[A-Za-z _]*(amount|obligat|value|price|ceiling|total|spend|dollar|rate|cost)[A-Za-z _]*"\\s*:\\s*"?${escapeRe(whole)}(\\.\\d+)?"?([^0-9]|$)`, 'i');
-  return money.test(flat);
+  const flat = evText.replace(/(\d),(?=\d{3})/g, '$1');
+  if (amt.includes('.') && new RegExp(`(^|[^0-9.])${escapeRe(amt)}([^0-9]|$)`).test(flat)) return true;
+  const n = Number(amt);
+  return evidenceMoney(evText).some((x) => Math.abs(x - n) < 1);
 }
 
 function pricePoints(answer: string): Record<string, number> {

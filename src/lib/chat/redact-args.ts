@@ -5,8 +5,9 @@
  *   - enum fields:   the value must be one of the tool schema's declared enum values
  *   - codes:         NAICS (2–6 digits), PSC (≤4 uppercase alnum), real US state/territory codes
  *   - identifiers:   per-field patterns (SAM notice id = 32 hex, UUIDs, uppercase PIID/solicitation
- *                    forms with a digit, UEI/CAGE/DoDAAC shapes) — a token like "sk-…" or "pit-…"
- *                    or any lowercase string never matches an id pattern
+ *                    forms with a letter and a digit, USASpending generated ids, UEI/CAGE/DoDAAC
+ *                    shapes). Lowercase tokens, phone/SSN shapes, "." and "_" never match a PIID.
+ *                    Residual: an uppercase token of PIID shape cannot be told apart from a PIID.
  *   - agencies:      must match a known agency name or alias (src/data/agency-aliases.json)
  *   - dates/numbers: ISO dates, finite numbers, 4-digit fiscal years
  *   - flags:         known boolean keys
@@ -57,13 +58,27 @@ const PSC = re(/^[A-Z0-9]{1,4}$/, 4);
 const STATE: Validator = (v) => typeof v === 'string' && US_CODES.has(v.toUpperCase()) && v.length === 2;
 const SAM_NOTICE_ID = re(/^[0-9a-f]{32}$/, 32);
 const UUID = re(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 36);
-const AWARD_ID: Validator = (v) => re(/^[A-Z0-9][A-Z0-9_.-]{3,49}$/, 50)(v) && hasDigit(v); // uppercase only
+/**
+ * PIID / solicitation number: uppercase letters + digits, optional hyphen groups (≤ 4), at least one
+ * letter and one digit, no "." or "_". Phone, SSN and digit-only shapes are rejected.
+ * RESIDUAL RISK (documented, not claimed away): an uppercase alphanumeric string of PIID length is
+ * indistinguishable from a real PIID by shape alone, so such a value can still be stored verbatim.
+ */
+const PHONE_OR_SSN = /^(\d{3}-\d{2}-\d{4}|\d{3}-\d{3}-\d{4}|\d{10,11})$/;
+/** Known credential prefixes (AWS, GoHighLevel PIT, OpenAI/Stripe sk-, GitHub, Slack, Google). */
+const SECRET_PREFIX = /^(AKIA|ASIA|AGPA|AIDA|PIT-|SK-|RK-|PK-|GHP|GHO|GHU|GHS|XOX|AIZA)/;
+const AWARD_ID: Validator = (v) =>
+  typeof v === 'string' && /^[A-Z0-9]+(-[A-Z0-9]+){0,4}$/.test(v) && v.replace(/-/g, '').length >= 6 &&
+  v.length <= 30 && /[A-Z]/.test(v) && hasDigit(v) && !PHONE_OR_SSN.test(v) && !SECRET_PREFIX.test(v);
+/** USASpending generated ids (e.g. CONT_AWD_W912EQ24P0035_9700_-NONE-_-NONE-, CONT_IDV_GS07F0060N_4730). */
+const GENERATED_AWARD_ID = re(/^(CONT_(AWD|IDV)|ASST_(NON|AGG))_[A-Z0-9_-]{4,90}$/, 100);
+const CONTRACT_ID: Validator = (v) => AWARD_ID(v) || GENERATED_AWARD_ID(v);
 const UEI: Validator = (v) => re(/^[A-Z0-9]{12}$/, 12)(v) && hasDigit(v) && /[A-Z]/.test(String(v));
 const CAGE = re(/^[A-Z0-9]{5}$/, 5);
 const DODAAC = re(/^[A-Z][A-Z0-9]{5}$/, 6);
 const AGENCY: Validator = (v) => typeof v === 'string' && v.length <= 100 && KNOWN_AGENCIES.has(v.trim().toLowerCase());
 const DATE = re(/^\d{4}-\d{2}-\d{2}$/, 10);
-const NUM: Validator = (v) => typeof v === 'number' && Number.isFinite(v);
+const NUM: Validator = (v) => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= 1e12;
 const FY: Validator = (v) => (typeof v === 'number' && Number.isInteger(v) && v >= 1990 && v <= 2100) || re(/^(19|20)\d{2}$/, 4)(v);
 const BOOL: Validator = (v) => typeof v === 'boolean';
 
@@ -72,7 +87,7 @@ const STRUCTURED: Readonly<Record<string, Validator>> = {
   psc: oneOrList(PSC),
   state: oneOrList(STATE), states: listOf(STATE),
   notice_id: SAM_NOTICE_ID, notice_ids: listOf(SAM_NOTICE_ID), confirm_notice_id: SAM_NOTICE_ID,
-  solicitation_number: AWARD_ID, piid: AWARD_ID, piids: listOf(AWARD_ID), contract_ids: listOf(AWARD_ID), parent_id: AWARD_ID,
+  solicitation_number: AWARD_ID, piid: AWARD_ID, piids: listOf(AWARD_ID), contract_ids: listOf(CONTRACT_ID), parent_id: CONTRACT_ID,
   schedule_id: UUID, document_id: UUID, document_ids: listOf(UUID), job_id: UUID, id: UUID,
   uei: UEI, cage: CAGE, dodaac: DODAAC,
   agency: AGENCY, agency_name: AGENCY, subAgency: AGENCY, office: AGENCY,

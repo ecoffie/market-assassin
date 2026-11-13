@@ -154,3 +154,48 @@ describe('grader holes found in independent re-review', () => {
   });
 });
 
+describe('grader cases from the second re-review', () => {
+  const base: Scenario = { id: 'X', prompt: 'x', qualifying_records: ['36C24927N0097'] };
+
+  it('catches an invented 32-hex SAM notice id, bare or in a sam.gov link', () => {
+    const r = grade({ id: 'N', prompt: 'x' }, 'See https://sam.gov/opp/0a1b2c3d4e5f60718293a4b5c6d7e8f9/view and 9f8e7d6c5b4a39281706f5e4d3c2b1a0.', expiringEvidence, TODAY);
+    expect(r.failures).toEqual(expect.arrayContaining([
+      'unsupported_identifier:0a1b2c3d4e5f60718293a4b5c6d7e8f9', 'unsupported_identifier:9f8e7d6c5b4a39281706f5e4d3c2b1a0',
+    ]));
+  });
+
+  it.each(['Nothing qualifies in that window.', 'The search came back empty for that window.'])(
+    '"%s" is a none-claim', (answer) => { expect(grade(base, answer, expiringEvidence, TODAY).verdict).toBe('fail'); });
+
+  it.each([
+    'I could not confirm whether any of these contracts will be recompeted. AllPro holds 36C24927N0097.',
+    'There is no incumbent listed for these contracts. AllPro holds 36C24927N0097.',
+    'No set-aside applies to these opportunities. AllPro holds 36C24927N0097.',
+  ])('hedge is NOT a none-claim: "%s"', (answer) => {
+    expect(grade(base, answer, expiringEvidence, TODAY).failures.filter((f) => f.startsWith('none_claim'))).toEqual([]);
+  });
+
+  it('ordinary prose is not treated as an identifier', () => {
+    const prose = 'FY2026-FY2027 plans, ISO-9001-2015, CMMC-L2-2025, HUBZone-2024, 541512-coded work, NAICS-541512, Q3-2026-update, B2B-2025-pilot, call 571-555-0100 on 2027-03-31 or see https://sam.gov/search.';
+    expect(grade({ id: 'P', prompt: 'x' }, prose, expiringEvidence, TODAY).failures).toEqual([]);
+  });
+
+  it('a "not … look at" sentence is not a disclosure of a dropped filter', () => {
+    const s: Scenario = { id: 'D', prompt: 'x', expected_filters: { state: ['MS'] } };
+    expect(grade(s, 'Mississippi buyers do not look at small firms often.', expiringEvidence, TODAY).failures).toContain('silently_dropped_state:MS');
+  });
+
+  it('any state can be disclosed by full name (not limited to a short list)', () => {
+    const ev: ToolEvidence[] = [{ tool: 't', status: 'success', args: { state: 'WA' }, result_excerpt: '{}' }];
+    expect(grade({ id: 'W', prompt: 'x', unrequested_filters: ['state'] }, 'I narrowed the search to Washington.', ev, TODAY).failures).toEqual([]);
+  });
+
+  it('rounded amounts, digit-bearing money keys and non-JSON excerpts are supported', () => {
+    const ev = (excerpt: string): ToolEvidence[] => [{ tool: 't', status: 'success', args: {}, result_excerpt: excerpt }];
+    expect(grade({ id: 'A', prompt: 'x' }, 'About $1,302,253.', ev('{"awardAmount":1302252.96}'), TODAY).failures).toEqual([]);
+    expect(grade({ id: 'A', prompt: 'x' }, 'FY25 obligations were $2,500,000.', ev('{"fy2025_obligations":2500000}'), TODAY).failures).toEqual([]);
+    expect(grade({ id: 'A', prompt: 'x' }, 'Obligated $1,302,252.', ev('Obligated: $1,302,252'), TODAY).failures).toEqual([]);
+    expect(grade({ id: 'A', prompt: 'x' }, 'Worth $9,999,999.', ev('{"awardAmount":1302252.96}'), TODAY).failures).toContain('unsupported_amount:$9999999');
+  });
+});
+

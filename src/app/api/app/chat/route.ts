@@ -343,11 +343,16 @@ export async function POST(request: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
-      // A client that disconnected makes enqueue throw. That must never be mistaken for a tool
-      // failure (it would inject a "tools unavailable" note after a completed write), so a failed
-      // send is swallowed; the server-side work and persistence still complete.
+      // A client that disconnected makes enqueue/close throw. That must never be mistaken for a
+      // tool failure (it would inject a "tools unavailable" note after a completed write), and it
+      // must never skip cost recording or persistence: both are wrapped and never throw.
+      let clientGone = false;
       const send = (obj: unknown) => {
-        try { controller.enqueue(encoder.encode(sseEvent(obj))); } catch { /* client gone */ }
+        if (clientGone) return;
+        try { controller.enqueue(encoder.encode(sseEvent(obj))); } catch { clientGone = true; }
+      };
+      const closeStream = () => {
+        try { controller.close(); } catch { clientGone = true; }
       };
 
       try {
@@ -650,7 +655,7 @@ export async function POST(request: NextRequest) {
           void recordProviderEvent({ kind: 'answer_failure', provider: 'openai', model: chatModel, detail: 'answer fallback blocked: groq is not on the approved list for private data', userEmail: auth.email! });
           send({ type: 'error', message: 'Mindy could not answer right now. Please try again in a moment.' });
           send({ type: 'done' });
-          controller.close();
+          closeStream();
           return;
         }
         if (!groqRes) {
@@ -665,7 +670,7 @@ export async function POST(request: NextRequest) {
           void recordProviderEvent({ kind: 'answer_failure', provider: usedProvider, model: usedModel, status: groqRes.status, detail: errText.slice(0, 300), userEmail: auth.email! });
           send({ type: 'error', message: `AI ${groqRes.status}: ${errText.slice(0, 200)}` });
           send({ type: 'done' });
-          controller.close();
+          closeStream();
           return;
         }
 
@@ -679,6 +684,8 @@ export async function POST(request: NextRequest) {
         let finishReason: string | null = null;
 
         while (true) {
+          // Nobody is reading: stop the provider stream instead of generating unread tokens.
+          if (clientGone) { await reader.cancel().catch(() => {}); break; }
           const { done, value } = await reader.read();
           if (done) break;
           const chunkStr = leftover + decoder.decode(value, { stream: true });
@@ -738,7 +745,7 @@ export async function POST(request: NextRequest) {
         const citedSources: CitedSource[] = [];
         send({ type: 'citations', sources: citedSources });
         send({ type: 'done' });
-        controller.close();
+        closeStream();
 
         // Cost attribution — this route calls the LLM provider directly (bypasses
         // callLLM), so log usage explicitly. Fire-and-forget; never throws.
@@ -766,7 +773,7 @@ export async function POST(request: NextRequest) {
         console.error('[chat] stream error:', err);
         send({ type: 'error', message: String((err as Error)?.message || 'Stream failed') });
         send({ type: 'done' });
-        controller.close();
+        closeStream();
       }
     },
   });

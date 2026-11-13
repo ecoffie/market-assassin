@@ -100,4 +100,35 @@ describe('redactToolArgs — strict allowlist (meaning validated, not just chara
     process.env.LOG_DIGEST_KEY = 'k2';
     expect((redactToolArgs({ query: 'same text' }).query as { digest: string }).digest).not.toBe(a.digest);
   });
+
+  it('award-id fields reject phone, SSN, dotted, underscored and key-like values (second re-review)', () => {
+    const out = redactToolArgs({
+      piid: 'JOHN.SMITH-5715550100',
+      parent_id: '571-555-0100',
+      contract_ids: 'JANE-DOE-1,SSN-123-45-6789,PASS.HUNTER2',
+      piids: ['123-45-6789'],
+      solicitation_number: '5715550100',
+    });
+    for (const k of ['piid', 'parent_id', 'contract_ids', 'piids', 'solicitation_number']) expect(out[k], k).toMatchObject({ redacted: true });
+    for (const s of ['JOHN', 'SMITH', '571-555', '5715550100', 'HUNTER2', '123-45-6789']) expect(leaks(out, s), s).toBe(false);
+  });
+
+  it('keeps real PIIDs, solicitation numbers and USASpending generated ids', () => {
+    const real = {
+      piid: 'W912EQ24P0035', solicitation_number: '36C24926Q0001', piids: ['N0018921F3006', 'GS07F0060N'],
+      contract_ids: ['CONT_AWD_W912EQ24P0035_9700_-NONE-_-NONE-'], parent_id: 'CONT_IDV_GS07F0060N_4730',
+    };
+    expect(redactToolArgs(real)).toEqual(real);
+  });
+
+  it('bounds numeric values', () => {
+    expect(redactToolArgs({ limit: 1e308 }).limit).toMatchObject({ redacted: true, invalid: true });
+    expect(redactToolArgs({ limit: 50 }).limit).toBe(50);
+  });
+
+  it('award-id fields reject known credential prefixes even in uppercase PIID shape', () => {
+    const out = redactToolArgs({ solicitation_number: 'AKIAIOSFODNN7EXAMPLE', piids: ['PIT-ABCD1234-EF56-7890'], piid: 'SK-PROJ1234ABCD' });
+    for (const k of ['solicitation_number', 'piids', 'piid']) expect(out[k], k).toMatchObject({ redacted: true, invalid: true });
+  });
 });
+
