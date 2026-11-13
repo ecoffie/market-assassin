@@ -7557,6 +7557,18 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 
 **Proof.** `src/lib/mcp/packages.ts` SUBSCRIPTION_PLANS is both what the page displays and what the Stripe webhook grants, keyed by price id. Test: `UnifiedPricing.credits.unit.test.tsx` pins the grant for every monthly and annual price and renders the page to check the cards and comparison table.
 
+## Pricing page hero: intelligence for you and your AI agents (2026-11-13)
+
+**What.** The /mcp/pricing hero now reads "Federal market intelligence for you and your AI agents." The line under it names what Mindy does (find opportunities, research competitors, track recompetes) and where it works: Claude, Cursor, and any MCP-compatible agent.
+
+**Why it matters.** The old headline was a price comparison. A visitor arriving from an AI tool couldn't tell at a glance that Mindy runs inside their agent. Now that is in the first screen, next to the trial line, and the plan cards sit higher on the page.
+
+**Honest scope.** Copy and layout only. Plans, prices, credits, trial terms, checkout links and the webinar banner are unchanged. The tools named are the ones the MCP setup page already documents.
+
+**SEO.** Federal market intelligence for AI agents / GovCon MCP server / Mindy for Claude and Cursor.
+
+**Proof.** `UnifiedPricing.hero.unit.test.tsx` pins the headline, supporting copy, agent list and trial line, and checks that plan credits and checkout links render unchanged.
+
 ## See what your AI agent produces before you pick a plan (2026-11-13)
 
 **What.** Mindy's gallery of finished AI agent work is now one click from everywhere a buyer decides. "Mindy in your AI" in the top bar opens a short menu: See examples, Connect your AI, and Pricing for AI agents. The AI agent pricing page opens with a link to the examples, and each activity in the plan finder (find opportunities, vet the incumbent, price the bid, draft a win strategy, build a teaming shortlist, draft the proposal) has a "See example" link to that exact piece of finished work. Every example can be shared by link, and each one ends with a way to connect your AI or see plans.

@@ -196,7 +196,7 @@ export default async function ContractorPage({ params }: PageProps) {
   // Fill the core sections from BigQuery under the daily budget, or answer 5xx + queue a warm.
   let core = profileSectionState(rollupUei, sections[5].length, sections[0].length);
   if (coreSectionsUnavailable(core.recent, core.yearly) && !needsLiveBq) {
-    if (!(await takeSeoColdBudget('contractor'))) {
+    if (!(await takeSeoColdBudget('contractor', new Date(), slug))) {
       await recordWarmMiss(slug);
       throw new SeoTemporarilyUnavailableError(`profile ${slug}: sections cold, budget exhausted`);
     }

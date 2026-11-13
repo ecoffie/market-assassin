@@ -27,6 +27,7 @@
  * hourly warm cron (recordWarmMiss), which materializes it into KV.
  */
 import { kv } from '@vercel/kv';
+import { recordColdDecision } from '@/lib/seo/lookup-metrics';
 
 export class SeoTemporarilyUnavailableError extends Error {
   readonly reason: string;
@@ -77,7 +78,14 @@ export function seoColdDailyLimit(
  * KV outage is exactly when every page reads cold at once, so failing open would turn one
  * outage into a BigQuery quota storm that also takes the authenticated product down.
  */
-export async function takeSeoColdBudget(kind: SeoColdKind, now: Date = new Date()): Promise<boolean> {
+export async function takeSeoColdBudget(kind: SeoColdKind, now: Date = new Date(), id?: string): Promise<boolean> {
+  const allowed = await decide(kind, now);
+  // Measurement only (allowed/refused, unique ids); never affects the decision.
+  await recordColdDecision(kind, allowed, id, now);
+  return allowed;
+}
+
+async function decide(kind: SeoColdKind, now: Date): Promise<boolean> {
   const limit = seoColdDailyLimit(kind);
   if (limit === 0) return false;
   const key = `rl:seo-cold:${kind}:${now.toISOString().slice(0, 10)}`;

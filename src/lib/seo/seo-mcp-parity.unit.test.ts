@@ -101,7 +101,8 @@ describe('Googlebot must never reach live BigQuery', () => {
     const live = resolver.indexOf('deps.rollupOrSingle(slug, true)');
     expect(budget).toBeGreaterThan(-1);
     expect(live).toBeGreaterThan(budget);
-    expect(seoWiring).toContain("takeBudget: () => takeSeoColdBudget('contractor')");
+    // The budget call now also passes the slug for usage metrics (unique ids); same decision.
+    expect(seoWiring).toContain("takeBudget: async () => (tookBudget = await takeSeoColdBudget('contractor', new Date(), slug))");
   });
 
   it('a public cache miss is never a 404: the page throws the temporary-unavailable 5xx', () => {

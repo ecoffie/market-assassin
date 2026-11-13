@@ -364,8 +364,15 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
       <div className="wrap">
         <section className="promo">
-          <h1><span className="l1">GovWin-grade intel for $149, not $15,000.</span><br /><span className="l2">14-day free trial. No sales call.</span></h1>
-          <p>Daily opportunity digest, recompete alerts, competitor tracking — and Mindy&apos;s tools inside Claude, Cursor, or any AI agent.</p>
+          <h1>Federal market intelligence for you and <span className="l2">your AI&nbsp;agents.</span></h1>
+          <p>Find opportunities, research competitors, track recompetes, and put Mindy&apos;s intelligence to work inside Claude, Cursor, and your favorite AI tools.</p>
+          <div className="agents" aria-label="Works inside your AI tools">
+            <span className="agents-k">Works inside</span>
+            <span className="agent">Claude</span>
+            <span className="agent">Cursor</span>
+            <span className="agent">Any MCP-compatible agent</span>
+          </div>
+          <p className="trial">14-day free trial. No sales call.</p>
           <MemberProof />
           <div className="row">
             <span className="chip">✦ 14-day free trial on Pro and Team</span>
@@ -582,10 +589,16 @@ const CSS = `
 .up .wrap{max-width:1160px;margin:0 auto;padding:0 20px}
 
 /* Hero — the old page's wash band, centered */
-.up .promo{margin:32px 0 0;border-radius:8px;padding:64px 28px;text-align:center;background:var(--mp-wash);border:1px solid var(--mp-hair)}
-.up .promo h1{font-family:var(--mp-font-serif);font-weight:700;line-height:1.15;font-size:clamp(30px,5vw,56px);color:var(--mp-ink)}
+.up .promo{margin:28px 0 0;border-radius:8px;padding:48px 28px 40px;text-align:center;background:var(--mp-wash);border:1px solid var(--mp-hair)}
+.up .promo h1{font-family:var(--mp-font-serif);font-weight:700;line-height:1.08;letter-spacing:-.02em;font-size:clamp(32px,5.2vw,60px);color:var(--mp-ink);max-width:900px;margin:0 auto;text-wrap:balance}
 .up .promo h1 .l2{color:var(--mp-navy)}
-.up .promo p{margin:20px auto 0;color:var(--mp-body);font-size:19px;max-width:680px}
+.up .promo p{margin:18px auto 0;color:var(--mp-body);font-size:19px;line-height:1.5;max-width:700px;text-wrap:pretty}
+.up .promo .agents{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;margin-top:22px}
+.up .promo .agents-k{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mp-muted);margin-right:4px}
+.up .promo .agent{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;background:var(--mp-surface);border:1px solid var(--mp-line);font-size:14px;font-weight:600;color:var(--mp-ink)}
+.up .promo .agent::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--mp-navy)}
+.up .promo p.trial{margin-top:18px;font-size:15px;font-weight:600;color:var(--mp-navy)}
+@media(max-width:600px){.up .promo{padding:30px 16px 26px;margin-top:16px}.up .promo p{font-size:16px;margin-top:14px}.up .promo .agents{gap:6px;margin-top:16px}.up .promo .agents-k{font-size:11px;margin-right:2px}.up .promo .agent{font-size:13px;padding:5px 10px;gap:6px}.up .promo p.trial{font-size:14px;margin-top:14px}}
 .up .promo .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:26px}
 .up .chip{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;background:var(--mp-surface);border:1px solid var(--mp-line);font-size:13px;font-weight:500;color:var(--mp-body)}
 .up a.chip{color:var(--mp-navy);font-weight:600}
