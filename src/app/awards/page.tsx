@@ -21,6 +21,7 @@ import { getLatestAwards, getLargestAwards } from '@/lib/bigquery/awards';
 import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import { recipientSlug } from '@/lib/bigquery/recipients';
+import { awardHref, servableAwardIds } from '@/lib/seo/award-links';
 
 const SITE_URL = 'https://getmindy.ai';
 
@@ -66,6 +67,7 @@ export default async function AwardsLanding() {
     getLatestAwards(50),
     getLargestAwards(50),
   ]);
+  const servableAwards = await servableAwardIds([...largest, ...latest].map((a) => a.award_id));
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -213,16 +215,14 @@ export default async function AwardsLanding() {
                   >
                     {fmtCompanyName(a.recipient_name)}
                   </Link>
-                  <Link
-                    href={
-                      a.piid
-                        ? `/contracts/${encodeURIComponent(a.piid)}`
-                        : `/awards/${encodeURIComponent(a.award_id)}`
-                    }
-                    className="text-xs text-(--mp-muted) hover:text-(--mp-navy-hover)"
-                  >
-                    {a.piid || a.award_id.slice(0, 40)}
-                  </Link>
+                  {servableAwards.has(a.award_id) ? (
+                    // Crawlable award page, linked only when it can serve (see award-links.ts).
+                    <Link href={awardHref(a.award_id)} className="text-xs text-(--mp-muted) hover:text-(--mp-navy-hover)">
+                      {a.piid || a.award_id.slice(0, 40)}
+                    </Link>
+                  ) : (
+                    <span className="block text-xs text-(--mp-muted)">{a.piid || a.award_id.slice(0, 40)}</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-(--mp-body) max-w-[12rem]">
                   <span className="truncate block">{a.awarding_agency || '—'}</span>

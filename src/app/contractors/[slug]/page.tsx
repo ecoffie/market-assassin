@@ -47,6 +47,7 @@ import {
 } from '@/lib/bigquery/subawards';
 import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
+import { awardHref, servableAwardIds } from '@/lib/seo/award-links';
 
 const SITE_URL = 'https://getmindy.ai';
 
@@ -233,6 +234,8 @@ export default async function ContractorPage({ params }: PageProps) {
   const related = topNaicsCode
     ? await getSimilarRecipients(ueis, rollupUei, topNaicsCode, 8)
     : [];
+  // Link a row to its award page only when that page can serve (see src/lib/seo/award-links.ts).
+  const servableAwards = await servableAwardIds(recentAwards.map((a) => a.award_id));
 
   // JSON-LD: Organization + BreadcrumbList. NO `isAccessibleForFree:
   // false` directive — that signal told Google "skip ranking this".
@@ -489,8 +492,8 @@ export default async function ContractorPage({ params }: PageProps) {
                     </td>
                     <td className="px-4 py-3 text-right font-(family-name:--mp-font-mono) font-semibold text-(--mp-navy) whitespace-nowrap">
                       {/* link the row to its award detail page (was a dead-end before) */}
-                      {a.award_id ? (
-                        <Link href={`/awards/${encodeURIComponent(a.award_id)}`} className="hover:text-(--mp-navy-hover) hover:underline">
+                      {a.award_id && servableAwards.has(a.award_id) ? (
+                        <Link href={awardHref(a.award_id)} className="hover:text-(--mp-navy-hover) hover:underline">
                           {fmtMoney(Number(a.obligation_amount))} →
                         </Link>
                       ) : (

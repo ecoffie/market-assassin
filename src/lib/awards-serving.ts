@@ -273,32 +273,45 @@ export async function getAwardsSourceAsOf(recipientUei: string): Promise<string 
  * asserted-but-noindex one is the contradiction that demoted the cluster.
  */
 export async function getServedContractsUeis(): Promise<Set<string>> {
+  const r = await getServedContractsAsOf();
+  return r.ok ? new Set(r.asOf.keys()) : new Set(); // fail closed — never a partial set
+}
+
+/**
+ * Every recipient with a page-1 serving row in the ACTIVE generation, with its `source_as_of`
+ * (MAX(action_date) of the data behind the page — a data date, used as the sitemap lastmod).
+ * `ok:false` on any read failure so the caller can answer "unavailable" instead of publishing
+ * an empty family.
+ */
+export async function getServedContractsAsOf(): Promise<
+  { ok: true; asOf: Map<string, string | null> } | { ok: false; reason: string }
+> {
   const supabase = serviceClient();
-  if (!supabase) return new Set();
+  if (!supabase) return { ok: false, reason: 'no-service-client' };
 
   // Gate on the ACTIVE generation, so the sitemap and the pages agree about
   // which version is live even mid-promotion.
   const version = await getActiveAwardsVersion();
-  if (!version) return new Set();
+  if (!version) return { ok: false, reason: 'active-version-unreadable' };
 
-  const out = new Set<string>();
+  const out = new Map<string, string | null>();
   const PAGE = 1000;
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabase
       .from('awards_serving_pages')
-      .select('recipient_uei')
+      .select('recipient_uei, source_as_of')
       .eq('data_version', version)
       .eq('page_number', 1) // page 1 is what a /contracts URL resolves to
       .order('recipient_uei', { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) {
       console.error('[awards-serving] served-UEI scan failed:', error.message);
-      return new Set(); // fail closed — never a partial set
+      return { ok: false, reason: `postgrest: ${error.message}` };
     }
     const rows = data ?? [];
-    for (const r of rows) out.add(r.recipient_uei as string);
+    for (const r of rows) out.set(r.recipient_uei as string, (r.source_as_of as string | null) ?? null);
     if (rows.length < PAGE) break;
     if (out.size > 200_000) break; // backstop
   }
-  return out;
+  return { ok: true, asOf: out };
 }

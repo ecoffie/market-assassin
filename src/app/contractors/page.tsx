@@ -31,6 +31,7 @@ import MeetMindyStrip from '@/components/MeetMindyStrip';
 import BackToAppHeader from '@/components/BackToAppHeader';
 import Link from 'next/link';
 import contractorsData from '@/data/contractors.json';
+import { resolveHubTargets } from '@/lib/seo/hub-links';
 import { CANONICAL_POPULATION_LABEL } from '@/lib/data-core/contractor-corpus';
 import {
   formatCompactCurrency,
@@ -152,8 +153,23 @@ const TIER_DISPLAY_CAP: Record<string, number> = {
   'New Entrants (Under $1M)': 50,
 };
 
-export default function ContractorsIndexPage() {
+export default async function ContractorsIndexPage() {
   const tiers = buildTiers(contractorsData as ContractorRow[]);
+  // Link only to pages that serve, and to the canonical URL rather than through a 308
+  // (src/lib/seo/hub-links.ts). Candidates: each tier's display window plus headroom, so a tier
+  // still fills when some names drop. null = KV unreadable → fall back to the unverified list.
+  const candidates = tiers.flatMap((t) =>
+    t.contractors.slice(0, (TIER_DISPLAY_CAP[t.label] || 100) * 2).map((c) => getContractorSlug({ company: c.company })),
+  );
+  const hubTargets = await resolveHubTargets(candidates);
+  const usedTargets = new Set<string>();
+  const linkFor = (company: string): string | null => {
+    const slug = getContractorSlug({ company });
+    const target = hubTargets ? hubTargets.get(slug) ?? null : slug;
+    if (!target || usedTargets.has(target)) return null; // dead, or a duplicate of a listed canonical
+    usedTargets.add(target);
+    return target;
+  };
   const totalCount = tiers.reduce((sum, t) => sum + t.contractors.length, 0);
   const totalSpend = tiers.reduce(
     (sum, t) => sum + t.contractors.reduce((s, c) => s + (c.contract_value_num || 0), 0),
@@ -228,7 +244,12 @@ export default function ContractorsIndexPage() {
             .filter(t => t.contractors.length > 0)
             .map(tier => {
               const cap = TIER_DISPLAY_CAP[tier.label] || 100;
-              const visible = tier.contractors.slice(0, cap);
+              const visible: Array<{ c: ContractorRow; target: string }> = [];
+              for (const c of tier.contractors.slice(0, cap * 2)) {
+                if (visible.length >= cap) break;
+                const target = linkFor(c.company);
+                if (target) visible.push({ c, target });
+              }
               const hidden = tier.contractors.length - visible.length;
               return (
                 <section key={tier.label}>
@@ -243,12 +264,11 @@ export default function ContractorsIndexPage() {
                       so each tier fits a few hundred without
                       overwhelming the page. */}
                   <ul className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 text-sm">
-                    {visible.map(c => {
-                      const slug = getContractorSlug({ company: c.company });
+                    {visible.map(({ c, target }) => {
                       return (
-                        <li key={slug}>
+                        <li key={target}>
                           <Link
-                            href={`/contractors/${slug}`}
+                            href={`/contractors/${target}`}
                             className="block py-1 px-2 rounded hover:bg-(--mp-surface) transition-colors group"
                           >
                             <span className="text-(--mp-ink) group-hover:text-(--mp-ink) truncate block">

@@ -22,7 +22,7 @@
  */
 import type { MetadataRoute } from 'next';
 
-// Canonical SEO domain — see src/app/sitemap.ts header note.
+// Canonical SEO domain — see src/lib/seo/sitemap-sections.ts.
 // getmindy.ai is the Google-facing hostname.
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai';
 
@@ -68,9 +68,9 @@ export default function robots(): MetadataRoute.Robots {
         ],
       },
     ],
-    // Point at the sitemap INDEX (Phase 5) — lists /sitemap.xml +
-    // /sitemap-opportunities.xml so the full page set is crawled without
-    // hitting the 50k-URL single-sitemap cap.
+    // Point at the sitemap INDEX — one child per page family (static, contractors,
+    // contracts, contractor tabs, opportunities, facets) so Search Console reports
+    // indexing per family. /sitemap.xml serves the same index. (2026-11-12)
     sitemap: `${SITE_URL}/sitemap-index.xml`,
     host: SITE_URL,
   };

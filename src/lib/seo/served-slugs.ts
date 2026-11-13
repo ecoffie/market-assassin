@@ -35,7 +35,24 @@ const KEYS_PER_MGET = 200;
  * Order is not preserved; callers use the returned Set as a membership test.
  */
 export async function getServeableSlugs(slugs: string[]): Promise<Set<string>> {
-  const out = new Set<string>();
+  return new Set((await getServeableProfiles(slugs)).profiles.keys());
+}
+
+export interface ServeableProfiles {
+  /** slug → the cached record's last_action_date (a DATA date: the latest award action). */
+  profiles: Map<string, { lastActionDate: string | null }>;
+  /** KV batches that could not be read. Non-zero means "unknown", not "not serveable". */
+  failedBatches: number;
+}
+
+/**
+ * Same KV read as getServeableSlugs, also returning what the sitemap needs for lastmod and what a
+ * caller needs to tell "not serveable" apart from "could not check". Zero extra reads: the
+ * profile record is already in hand.
+ */
+export async function getServeableProfiles(slugs: string[]): Promise<ServeableProfiles> {
+  const profiles = new Map<string, { lastActionDate: string | null }>();
+  let failedBatches = 0;
   for (let i = 0; i < slugs.length; i += KEYS_PER_MGET) {
     const part = slugs.slice(i, i + KEYS_PER_MGET);
     try {
@@ -45,9 +62,13 @@ export async function getServeableSlugs(slugs: string[]): Promise<Set<string>> {
         // queryCached stores an ARRAY of rows. An empty array is a cached
         // "no rows" — real knowledge, but not a renderable page, so it does
         // not count as serveable.
-        if (Array.isArray(v) ? v.length > 0 : v != null) out.add(slug);
+        const row = Array.isArray(v) ? v[0] : v;
+        if (row == null) return;
+        const last = (row as { last_action_date?: unknown }).last_action_date;
+        profiles.set(slug, { lastActionDate: typeof last === 'string' ? last : null });
       });
     } catch (err) {
+      failedBatches++;
       console.error(
         `[served-slugs] KV mget failed at offset ${i} — omitting this batch:`,
         err instanceof Error ? err.message : err,
@@ -55,7 +76,7 @@ export async function getServeableSlugs(slugs: string[]): Promise<Set<string>> {
       // fail closed: omit, never assume serveable
     }
   }
-  return out;
+  return { profiles, failedBatches };
 }
 
 /**
