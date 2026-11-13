@@ -22,7 +22,9 @@ import {
 } from '@/lib/send-email';
 import { getOrCreateProfile, updateAccessFlags } from '@/lib/supabase/user-profiles';
 import { recordAccessGrant } from '@/lib/access/grant-audit';
-import { grantBriefingsAccess } from '@/lib/briefings/access';
+import { grantBriefingsAccess, revokeBriefingsAccessBothSides } from '@/lib/briefings/access';
+import { endAppAccessIfNoOtherSource, isMindyAppSubscription, isTerminalStatus } from '@/lib/billing/app-subscription-end';
+import { isAdvocateAccount } from '@/lib/mindy/advocate-accounts';
 import { ensureNotificationSettings } from '@/lib/onboarding/ensure-notification-settings';
 import { grantPaidBriefingClassification } from '@/lib/billing/grant-briefing-classification';
 
@@ -860,6 +862,61 @@ export async function POST(request: NextRequest) {
         subscription.status !== 'past_due') {
       // Not a cancellation, just a regular update
       return NextResponse.json({ received: true, action: 'ignored' });
+    }
+
+    // Mindy Pro / Team subscription ended (incl. a cancelled 14-day trial at its end): end app
+    // access unless another source of Pro remains. Fails safe — any lookup error keeps access.
+    // past_due is not terminal (Stripe is still retrying), so it is a no-op here.
+    if (isMindyAppSubscription(subscription)) {
+      if (!isTerminalStatus(subscription.status)) {
+        return NextResponse.json({ received: true, action: 'app_subscription_not_ended' });
+      }
+      const cust = await stripe.customers.retrieve(subscription.customer as string).catch(() => null);
+      const appEmail = cust && !cust.deleted && cust.email ? cust.email.toLowerCase() : '';
+      if (!appEmail) {
+        console.error('[stripe-webhook] app subscription ended but no customer email', subscription.id);
+        return NextResponse.json({ received: true, action: 'app_access_no_email' });
+      }
+      const result = await endAppAccessIfNoOtherSource(appEmail, subscription, {
+        async listSubscriptionsForEmail(e) {
+          const out: Stripe.Subscription[] = [];
+          const customers = await stripe.customers.list({ email: e, limit: 20 });
+          for (const c of customers.data) {
+            for await (const sub of stripe.subscriptions.list({ customer: c.id, status: 'all', limit: 100 })) out.push(sub);
+          }
+          return out;
+        },
+        async listPurchases(e) {
+          if (!supabase) throw new Error('supabase not configured');
+          const { data, error } = await supabase.from('purchases').select('product_id, product_name').eq('user_email', e);
+          if (error) throw new Error(error.message);
+          return (data || []) as Array<{ product_id: string | null; product_name: string | null }>;
+        },
+        isAdvocate: (e) => isAdvocateAccount(e),
+        revokePro: async (e) => revokeBriefingsAccessBothSides(e),
+        async revokeTeam(e) {
+          if (!supabase) return { ok: false, failure: 'supabase not configured' };
+          const { error } = await supabase.from('user_profiles')
+            .update({ access_team: false, updated_at: new Date().toISOString() }).eq('email', e);
+          return error ? { ok: false, failure: error.message } : { ok: true };
+        },
+      });
+      console.log(`[stripe-webhook] app subscription ${subscription.id} ended for ${appEmail}:`, result);
+      if (result.revokedPro || result.revokedTeam) {
+        await recordAccessGrant({
+          email: appEmail,
+          capability: result.revokedPro ? 'briefings' : 'team',
+          action: 'revoke',
+          source: 'stripe_webhook',
+          tier: result.revokedTeam ? 'team' : 'briefings',
+          actor: 'stripe',
+          reason: `${event.type} — subscription ${subscription.id} ${subscription.status}`,
+          wroteProfile: true,
+          wroteKv: result.revokedPro,
+          metadata: { event_id: event.id, result },
+        }).catch((e: unknown) => console.error('[stripe-webhook] revoke audit failed (non-fatal):', e));
+      }
+      return NextResponse.json({ received: true, action: `app_access_${result.action}`, result });
     }
 
     // Check if this is an FHC subscription by looking at product metadata
