@@ -190,7 +190,7 @@ export default async function LazyContractorsBlueprintPage() {
           <div className="lcb-final">
             <p className="lcb-final-h">{EVENT.dateLabel} · 11:00 AM ET</p>
             <a className="lcb-cta" href="#register">Save My Free Seat</a>
-            <p className="lcb-final-note">Free. No credit card. Takes 10 seconds.</p>
+            <p className="lcb-final-note">Free. No credit card.</p>
           </div>
         </div>
       </section>

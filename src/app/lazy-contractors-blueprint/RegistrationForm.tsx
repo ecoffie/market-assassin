@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * Mindy Day registration, two steps (2026-11-12 conversion pass):
- *   1. First name + email → seat saved (the short form sits above the fold on phones).
- *   2. Optional: phone + text reminders + two qualifying questions, then share + add to calendar.
+ * Mindy Day registration: the original one-step form (restored 2026-11-13 at Eric's request) —
+ * first/last name, email, phone (required), text-reminder consent and two qualifying questions.
+ * After it saves: add-to-calendar and share buttons.
  * Someone who types a name and a valid email but leaves without submitting is recorded once as
  * "started" (GHL tag lcb-started-not-registered) so a GHL email workflow can nudge them; the tag is
  * removed when they register. Never texted: no consent was given.
@@ -42,12 +42,11 @@ function icsHref(): string {
 }
 
 export default function RegistrationForm() {
-  const [step, setStep] = useState<'form' | 'details' | 'done'>('form');
+  const [step, setStep] = useState<'form' | 'done'>('form');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
-  const who = useRef({ firstName: '', email: '' });
-  const startedSent = useRef(false);
+    const startedSent = useRef(false);
 
   function noteStarted(form: HTMLFormElement | null) {
     if (!form || startedSent.current) return;
@@ -71,33 +70,10 @@ export default function RegistrationForm() {
       const res = await fetch(`${API}/register`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          firstName: fd.get('firstName'), email: fd.get('email'), website: fd.get('website'),
-          attribution: readAttribution(),
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) { setError(data.error || 'Something went wrong. Please try again.'); return; }
-      who.current = { firstName: String(fd.get('firstName') || ''), email: String(fd.get('email') || '') };
-      setStep('details');
-    } catch {
-      setError('Network error. Please try again.');
-    } finally {
-      setSending(false);
-    }
-  }
-
-  async function onDetails(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    setSending(true);
-    setError('');
-    try {
-      const res = await fetch(`${API}/register`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          step: 'details', ...who.current,
+          firstName: fd.get('firstName'), lastName: fd.get('lastName'), email: fd.get('email'),
           phone: fd.get('phone'), smsConsent: fd.get('smsConsent') === 'on',
           ownsBusiness: fd.get('ownsBusiness'), samRegistered: fd.get('samRegistered'),
+          website: fd.get('website'), attribution: readAttribution(),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -108,47 +84,6 @@ export default function RegistrationForm() {
     } finally {
       setSending(false);
     }
-  }
-
-  if (step === 'details') {
-    return (
-      <form className="mp-panel" onSubmit={onDetails} style={{ display: 'grid', gap: 16 }} role="status">
-        <p className="mp-eyebrow mp-eyebrow--accent">You&apos;re in</p>
-        <h2 className="mp-title">Your seat is saved.</h2>
-        <p className="mp-standfirst">Check your email for the confirmation. Want a text reminder before we go live?</p>
-        <Field label="Phone (optional)" htmlFor="lcb-phone">
-          <Input id="lcb-phone" name="phone" type="tel" autoComplete="tel" maxLength={30} />
-        </Field>
-        <label className="mp-meta" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', lineHeight: 1.5 }}>
-          <input type="checkbox" name="smsConsent" style={{ marginTop: 3 }} />
-          <span>Text me event reminders. Message and data rates may apply. Reply STOP to opt out.</span>
-        </label>
-        <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
-          <Field label="Do you own a business?" htmlFor="lcb-owns">
-            <Select id="lcb-owns" name="ownsBusiness" defaultValue="">
-              <option value="" disabled>Choose one</option>
-              <option value="Yes">Yes</option>
-              <option value="Starting one">Starting one</option>
-              <option value="No">No</option>
-            </Select>
-          </Field>
-          <Field label="Registered in SAM.gov?" htmlFor="lcb-sam">
-            <Select id="lcb-sam" name="samRegistered" defaultValue="">
-              <option value="" disabled>Choose one</option>
-              <option value="Yes">Yes</option>
-              <option value="No">No</option>
-              <option value="Not sure">Not sure</option>
-            </Select>
-          </Field>
-        </div>
-        {error && <p className="mp-meta" role="alert" style={{ color: 'var(--mp-crit)' }}>{error}</p>}
-        <Button type="submit" disabled={sending}>{sending ? 'Saving…' : 'Save'}</Button>
-        <button type="button" className="mp-meta" onClick={() => setStep('done')}
-          style={{ background: 'none', border: 0, cursor: 'pointer', textDecoration: 'underline', justifySelf: 'center' }}>
-          Skip
-        </button>
-      </form>
-    );
   }
 
   if (step === 'done') {
@@ -181,18 +116,48 @@ export default function RegistrationForm() {
     <form className="mp-panel" id="register" onSubmit={onRegister} style={{ display: 'grid', gap: 16 }}
       onBlur={(e) => { if ((e.target as HTMLElement).id === 'lcb-email') noteStarted(e.currentTarget); }}>
       <p className="mp-label">Save your free seat</p>
-      <Field label="First name" htmlFor="lcb-first">
-        <Input id="lcb-first" name="firstName" autoComplete="given-name" required maxLength={80} />
-      </Field>
+      <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+        <Field label="First name" htmlFor="lcb-first">
+          <Input id="lcb-first" name="firstName" autoComplete="given-name" required maxLength={80} />
+        </Field>
+        <Field label="Last name" htmlFor="lcb-last">
+          <Input id="lcb-last" name="lastName" autoComplete="family-name" maxLength={80} />
+        </Field>
+      </div>
       <Field label="Email" htmlFor="lcb-email">
         <Input id="lcb-email" name="email" type="email" autoComplete="email" required maxLength={254} />
       </Field>
+      <Field label="Phone" htmlFor="lcb-phone">
+        <Input id="lcb-phone" name="phone" type="tel" autoComplete="tel" required maxLength={30} />
+      </Field>
+      <label className="mp-meta" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', lineHeight: 1.5 }}>
+        <input type="checkbox" name="smsConsent" style={{ marginTop: 3 }} />
+        <span>Text me event reminders. Message and data rates may apply. Reply STOP to opt out.</span>
+      </label>
+      <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+        <Field label="Do you own a business?" htmlFor="lcb-owns">
+          <Select id="lcb-owns" name="ownsBusiness" defaultValue="">
+            <option value="" disabled>Choose one</option>
+            <option value="Yes">Yes</option>
+            <option value="Starting one">Starting one</option>
+            <option value="No">No</option>
+          </Select>
+        </Field>
+        <Field label="Registered in SAM.gov?" htmlFor="lcb-sam">
+          <Select id="lcb-sam" name="samRegistered" defaultValue="">
+            <option value="" disabled>Choose one</option>
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+            <option value="Not sure">Not sure</option>
+          </Select>
+        </Field>
+      </div>
       {/* Honeypot — hidden from people, filled by bots. */}
       <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true"
         style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }} />
       {error && <p className="mp-meta" role="alert" style={{ color: 'var(--mp-crit)' }}>{error}</p>}
       <Button type="submit" disabled={sending}>{sending ? 'Saving your seat…' : 'Save My Free Seat'}</Button>
-      <p className="mp-meta">Free to attend. No credit card. Your join link comes by email.</p>
+      <p className="mp-meta">Free to attend. No credit card.</p>
     </form>
   );
 }
