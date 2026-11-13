@@ -1,6 +1,6 @@
 /**
  * The site top bar: the Nov 28 event banner plus the homepage nav (logo · How it works ▾ ·
- * Mindy in your AI · Jobs ··· Sign in · Plans & Pricing · Start for free). One string, rendered by
+ * Mindy in your AI · Jobs ··· Sign in · Start for free). One string, rendered by
  * the homepage, every React public page (PublicHeader) and every raw-HTML public page (html.ts),
  * so they cannot drift. The Maps product keeps its own bar.
  *
@@ -18,7 +18,7 @@ function esc(v: string): string {
   return v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-/** Sign in is signed-out only; Plans & Pricing drops on small screens. */
+/** Sign in is signed-out only; any later right-side link drops on small screens. */
 function rightLink(l: MpChromeLink, i: number): string {
   const cls = [i === 0 ? 'mp-anon' : '', i > 0 ? 'mp-hide-sm' : ''].filter(Boolean).join(' ');
   return `<a class="${cls}" href="${esc(l.href)}">${esc(l.label)}</a>`;
@@ -71,7 +71,6 @@ function siteMenuHtml(): string {
   const items: MpChromeLink[] = [
     ...MP_HOW_IT_WORKS,
     ...MP_HEADER_PRODUCT_LINKS.filter((l) => !MP_HOW_IT_WORKS.some((h) => h.href === l.href || h.label === l.label)),
-    { href: '/pricing', label: 'Plans & Pricing' },
   ];
   const [signIn] = MP_HEADER_ACCOUNT_LINKS;
   return `<div class="mp-menu" id="mp-menu">`
