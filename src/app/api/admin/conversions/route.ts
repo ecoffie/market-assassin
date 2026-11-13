@@ -16,7 +16,7 @@ import { getCountClient } from '@/lib/supabase/server-clients';
 import { countContactsByTag } from '@/lib/ghl/event-registration';
 import { LAZY_CONTRACTORS_BLUEPRINT as EVENT } from '@/lib/events/lazy-contractors-blueprint';
 import { COURSE_GHL_TAG } from '@/lib/course/govcon-roadmap';
-import { pageVisitors, rate, visitorsFromHomepage } from '@/lib/ga4/conversions';
+import { avgEngagedSeconds, formatDuration, pageVisitors, rate, trialButtonClickers, visitorsFromHomepage } from '@/lib/ga4/conversions';
 import { easternDate, resolveRange, type DateRange } from '@/lib/admin/date-range';
 
 export const runtime = 'nodejs';
@@ -103,12 +103,14 @@ export async function GET(req: NextRequest) {
   const dates = { startDate: range.from, endDate: range.to };
 
   const paths = ['/', '/pricing', ...LEAD_MAGNETS.map((m) => m.path)];
-  const [visitors, fromHome, accounts, trials, paid, ...magnetRegs] = await Promise.all([
+  const [visitors, fromHome, accounts, trials, paid, clickers, pricingTime, ...magnetRegs] = await Promise.all([
     attempt(() => pageVisitors(paths, dates)),
     attempt(() => visitorsFromHomepage('/pricing', dates)),
     attempt(() => newAccounts(startIso, endIso)),
     attempt(() => trialStarts(startSec, endSec)),
     attempt(() => paidSignups(startSec, endSec)),
+    attempt(() => trialButtonClickers('/pricing', dates)),
+    attempt(() => avgEngagedSeconds('/pricing', dates)),
     ...LEAD_MAGNETS.map((m) => attempt(() => countContactsByTag(m.tag, fetch, { gte: startIso, lte: endIso }))),
   ]);
   const v = val(visitors);
@@ -124,6 +126,10 @@ export async function GET(req: NextRequest) {
       visitors: visit('/pricing'),
       newAccounts: val(accounts), accountRate: rate(val(accounts), visit('/pricing')),
       trialsStarted: val(trials), trialRate: rate(val(trials), visit('/pricing')),
+      trialClickers: val(clickers)?.people ?? null, trialClicks: val(clickers)?.clicks ?? null,
+      trialClickRate: rate(val(clickers)?.people ?? null, visit('/pricing')),
+      checkoutCompletion: rate(val(trials), val(clickers)?.people ?? null),
+      avgEngagedSeconds: val(pricingTime), avgEngagedTime: formatDuration(val(pricingTime)),
     },
     homepage: {
       visitors: visit('/'), toPricing: val(fromHome), rate: rate(val(fromHome), visit('/')),
@@ -133,6 +139,8 @@ export async function GET(req: NextRequest) {
       ga4: visitors.ok ? undefined : visitors.error, ga4Referrer: fromHome.ok ? undefined : fromHome.error,
       accounts: accounts.ok ? undefined : accounts.error, stripe: trials.ok ? undefined : trials.error,
       paidSignups: paid.ok ? undefined : paid.error,
+      ga4TrialClicks: clickers.ok ? undefined : clickers.error,
+      ga4PricingTime: pricingTime.ok ? undefined : pricingTime.error,
       ghl: magnetRegs.some((m) => !m.ok) ? magnetRegs.map((m) => (m.ok ? 'ok' : m.error)) : undefined,
     },
     notes: [
@@ -140,6 +148,8 @@ export async function GET(req: NextRequest) {
       'Lead-magnet registrations = GHL contacts with that tag whose contact was created in the window (someone already on your list who registers counts on the day they first joined the list).',
       'New accounts = alert-settings rows created in the window (every new account gets one).',
       'Trials started = completed Stripe checkouts on the four 14-day trial links.',
+      'Clicked a trial button = people on /pricing who clicked "Start 14-day trial" (Google Analytics; our trial_click event plus GA4 outbound clicks to Stripe checkout). Checkout completion = trials started ÷ people who clicked.',
+      'Avg time on pricing = Google Analytics engaged time on /pricing per visitor (time the tab was in front of them).',
       'Paid sign-ups = new Stripe subscriptions to Mindy (App = Pro/Team, Credits = MCP credit plans), by Eastern date; a free trial counts on the day it is first charged, abandoned checkouts and trials that cancel are excluded, one-time purchases not counted.',
     ],
   };
@@ -152,7 +162,10 @@ export async function GET(req: NextRequest) {
 
 type Report = {
   leadMagnets: { name: string; path: string; visitors: number | null; registrations: number | null; rate: string }[];
-  pricing: { visitors: number | null; newAccounts: number | null; accountRate: string; trialsStarted: number | null; trialRate: string };
+  pricing: {
+    visitors: number | null; newAccounts: number | null; accountRate: string; trialsStarted: number | null; trialRate: string;
+    trialClickers: number | null; trialClicks: number | null; trialClickRate: string; checkoutCompletion: string; avgEngagedTime: string;
+  };
   homepage: { visitors: number | null; toPricing: number | null; rate: string };
   notes: string[];
 };
@@ -248,6 +261,8 @@ ${picker(range, password)}
 <section class="sec"><div class="tiles">
 ${tile('Homepage visitors', fmt(r.homepage.visitors), `${r.homepage.rate} went to pricing`)}
 ${tile('Pricing visitors', fmt(r.pricing.visitors), `${fmt(r.homepage.toPricing)} came from the homepage`)}
+${tile('Clicked a trial button', fmt(r.pricing.trialClickers), `${r.pricing.trialClickRate} of pricing visitors`)}
+${tile('Avg time on pricing', esc(r.pricing.avgEngagedTime), 'Engaged time per visitor')}
 ${tile('Trials started', fmt(r.pricing.trialsStarted), `${r.pricing.trialRate} of pricing visitors`)}
 ${tile('New accounts', fmt(r.pricing.newAccounts), `${r.pricing.accountRate} of pricing visitors`)}
 ${tile('Mindy Day registered', fmt(mindyDay?.registrations ?? null), `${mindyDay?.rate ?? '—'} of page visitors`)}
@@ -258,8 +273,9 @@ ${tile('Mindy Day registered', fmt(mindyDay?.registrations ?? null), `${mindyDay
     { label: 'Homepage visitors', value: r.homepage.visitors },
     { label: 'Went to pricing', value: r.homepage.toPricing, note: r.homepage.rate },
     { label: 'All pricing visitors', value: r.pricing.visitors },
-    { label: 'New accounts', value: r.pricing.newAccounts, note: r.pricing.accountRate },
-    { label: 'Trials started', value: r.pricing.trialsStarted, note: r.pricing.trialRate },
+    { label: 'Clicked a trial button', value: r.pricing.trialClickers, note: r.pricing.trialClickRate },
+    { label: 'Trials started', value: r.pricing.trialsStarted, note: `${r.pricing.checkoutCompletion} of clickers` },
+    { label: 'New accounts (any source)', value: r.pricing.newAccounts, note: r.pricing.accountRate },
   ], 'var(--c1)')}</div>
 ${r.leadMagnets.map((m) => `<div class="card"><h3>${esc(m.name)}</h3><p class="note">${esc(m.path)}</p>${bars([
     { label: 'Page visitors', value: m.visitors },

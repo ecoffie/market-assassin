@@ -11,6 +11,7 @@ import Link from 'next/link';
 import MemberProof from '@/components/public-site/MemberProof';
 import LogoMarquee from '@/components/public-site/LogoMarquee';
 import NoRefundNote from '@/components/NoRefundNote';
+import { trackTrialClick } from '@/lib/ga4';
 import {
   PRO_ANNUAL_USD, PRO_MONTHLY_USD, PRO_TRIAL_ANNUAL, PRO_TRIAL_MONTHLY, SALES_URL,
   TEAM_ANNUAL_PER_MONTH, TEAM_ANNUAL_USD, TEAM_MONTHLY_USD, TEAM_TRIAL_ANNUAL, TEAM_TRIAL_MONTHLY, pctOff,
@@ -146,7 +147,7 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
             )}
             <p className="per">{p.per}</p>
             {p.trial && <p className="trial">14 day free trial</p>}
-            <a className={`cta ${p.outline ? 'outline' : ''}`} href={p.href}>{p.cta}</a>
+            <a className={`cta ${p.outline ? 'outline' : ''}`} href={p.href} onClick={p.trial ? () => trackTrialClick(p.name === 'Team' ? 'team' : 'pro', annual ? 'annual' : 'monthly', 'card') : undefined}>{p.cta}</a>
             {/* Next to every button that takes money (Eric 2026-11-12: "add the no refunds line under each trial button"). */}
             {p.trial && <NoRefundNote style={{ margin: '-14px 0 18px' }} />}
             <p className="lead">{p.lead}</p>
@@ -186,8 +187,8 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
             ))}
             <tfoot>
               <tr><th scope="row"><span className="sr">Get started</span></th>
-                <td><a className="cta" href={annual ? PRO_TRIAL_ANNUAL : PRO_TRIAL_MONTHLY}>Start 14-day trial</a><NoRefundNote /></td>
-                <td className="hl"><a className="cta" href={annual ? TEAM_TRIAL_ANNUAL : TEAM_TRIAL_MONTHLY}>Start 14-day trial</a><NoRefundNote /></td>
+                <td><a className="cta" href={annual ? PRO_TRIAL_ANNUAL : PRO_TRIAL_MONTHLY} onClick={() => trackTrialClick('pro', annual ? 'annual' : 'monthly', 'table')}>Start 14-day trial</a><NoRefundNote /></td>
+                <td className="hl"><a className="cta" href={annual ? TEAM_TRIAL_ANNUAL : TEAM_TRIAL_MONTHLY} onClick={() => trackTrialClick('team', annual ? 'annual' : 'monthly', 'table')}>Start 14-day trial</a><NoRefundNote /></td>
                 <td><a className="cta outline" href={SALES_URL}>Speak to sales</a></td></tr>
             </tfoot>
           </table>
