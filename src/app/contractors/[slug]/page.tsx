@@ -24,9 +24,6 @@ import BackToAppHeader from '@/components/BackToAppHeader';
 import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import {
-  getRollupBySlug,
-  getRollupOrSingleBySlug,
-  resolveCanonicalSlug,
   getYearlyTotalsForRecipient,
   getYearlyByAgencyForRecipient,
   getTopAgenciesForRecipient,
@@ -36,17 +33,18 @@ import {
   getSimilarRecipients,
   recipientSlug,
 } from '@/lib/bigquery/recipients';
-import { serveableCanonical } from '@/lib/seo/canonical-redirect';
 import { ContractorAnalytics } from '@/components/contractors/ContractorAnalytics';
 import { AGENCIES_SEO } from '@/data/agencies-seo';
 import { recordWarmMiss } from '@/lib/seo/served-slugs';
+import { resolveContractorForPage, profileSectionState } from '@/lib/seo/contractor-page-data';
+import { coreSectionsUnavailable } from '@/lib/seo/contractor-resolve';
+import { SeoTemporarilyUnavailableError, takeSeoColdBudget } from '@/lib/seo/seo-unavailable';
 import {
   getSubawardsPaidOutSummary,
   getSubawardsReceivedSummary,
   getTopSubawardeesForPrime,
   getTopPrimesForSubawardee,
 } from '@/lib/bigquery/subawards';
-import { seoLiveBqEnabled } from '@/lib/seo/live-bq';
 import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import { awardHref, servableAwardIds } from '@/lib/seo/award-links';
@@ -100,17 +98,13 @@ function agencySlug(name: string): string {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  // Cache-first; on miss, try live BQ + recipients fallback so small/orphan
-  // contractors still get proper meta tags (must mirror the page resolver).
-  // The live fallback is gated by seoLiveBqEnabled() (default OFF) — crawler
-  // cold-scans of the contractor long tail drained the BQ daily quota, so an
-  // unwarmed contractor now 404s instead of scanning. Re-enable: ENABLE_SEO_LIVE_BQ=1.
-  const recipient =
-    (await getRollupBySlug(slug)) ??
-    (seoLiveBqEnabled() ? await getRollupOrSingleBySlug(slug, true) : null);
-  if (!recipient) {
+  // Same memoized resolution as the page body (one budget unit per request at most), so
+  // the <head> can never disagree with the body. Unavailable → the page body throws the 5xx.
+  const resolution = await resolveContractorForPage(slug);
+  if (resolution.kind !== 'found') {
     return { title: 'Contractor Not Found | Mindy' };
   }
+  const recipient = resolution.recipient;
   const displayName = fmtCompanyName(recipient.rollup_name);
   // Front-load the total-obligated figure: it's the distinctive hook that sets
   // a Mindy data page apart from the company's own site / Wikipedia in the SERP
@@ -160,47 +154,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ContractorPage({ params }: PageProps) {
   const { slug } = await params;
-  // Fast path: cache-only rollup lookup. Hits for the warmed top-N
-  // contractors and pays zero BQ cost.
-  let recipient = await getRollupBySlug(slug);
-  // Falling back means we paid for a live BQ rollup lookup — also pass
-  // liveBq=true to the downstream sub-section queries below, otherwise the
-  // page renders an empty header for any contractor not in the warmed cache
-  // (the bug Eric hit on /contractors/excell-construction-corp).
-  let needsLiveBq = false;
-  if (!recipient) {
-    // Slug doesn't match any rollup NAME. Before 404ing, check whether it's a
-    // subsidiary slug (a child UEI's own name) that should consolidate onto its
-    // parent — if so, 308 there.
-    const canonical = await serveableCanonical(await resolveCanonicalSlug(slug));
-    if (canonical) permanentRedirect(`/contractors/${canonical}`);
-
-    // Last-ditch fallback: live BQ rollup + base-recipients table (catches
-    // small contractors and orphan UEIs that the warmed cache + rollup table
-    // both missed). ISR caches the resulting page for 7 days, so each unique
-    // cold slug pays at most a handful of live BQ queries once per window.
-    // GATED (default OFF): crawler cold-scans of the long tail drained the BQ
-    // daily quota. When off, this fallback is cache-only → an unwarmed slug
-    // 404s (no scan), and needsLiveBq stays false so the ~10 sub-section
-    // queries below also stay cache-only. Re-enable: ENABLE_SEO_LIVE_BQ=1.
-    const liveBq = seoLiveBqEnabled();
-    recipient = await getRollupOrSingleBySlug(slug, liveBq);
-    if (!recipient) {
-      // CACHE MISS on a public request path. We do NOT know whether this
-      // contractor exists — only that nothing is materialized for it — and we
-      // are not allowed to find out synchronously: a crawler-triggered cold
-      // scan is the exact shape that drained the BigQuery daily quota and took
-      // the authenticated Contractors panel down with it.
-      //
-      // So record the slug for the next bounded warm job and return. If the
-      // contractor is real, the warm materializes it and the URL starts serving;
-      // if it is not, the warm reports it as genuinely gone and it stays a 404.
-      // Either way the decision is made OFFLINE, under limits, never here.
-      await recordWarmMiss(slug);
-      notFound();
-    }
-    needsLiveBq = liveBq;
-  }
+  // found / redirect / confirmed-not-found / temporarily-unavailable. A cold cache is
+  // NEVER a 404 any more: that is what 404'd valid contractors through July 2026 and let
+  // ISR hold each false 404 for 7 days. See src/lib/seo/contractor-resolve.ts.
+  const resolution = await resolveContractorForPage(slug);
+  if (resolution.kind === 'redirect') permanentRedirect(`/contractors/${resolution.slug}`);
+  if (resolution.kind === 'not_found') notFound();
+  if (resolution.kind === 'unavailable') throw new SeoTemporarilyUnavailableError(`profile ${slug}: ${resolution.reason}`);
+  const recipient = resolution.recipient;
+  let needsLiveBq = resolution.liveBq;
 
   // Same-name orphan that resolved to a higher-spend rollup with a different
   // canonical slug → consolidate onto the canonical parent URL.
@@ -217,6 +179,35 @@ export default async function ContractorPage({ params }: PageProps) {
   const rollupUei = recipient.rollup_uei;
 
   // Fetch sub-sections in parallel — independent queries
+  const loadSections = (live: boolean) =>
+    Promise.all([
+      getYearlyTotalsForRecipient(ueis, rollupUei, live),
+      getYearlyByAgencyForRecipient(ueis, rollupUei, live),
+      getTopAgenciesForRecipient(ueis, rollupUei, 10, live),
+      getTopNaicsForRecipient(ueis, rollupUei, 25, live), // wider NAICS set for treemap (more visual diversity than agencies)
+      getTopNaicsForRecipient(ueis, rollupUei, 10, live),
+      getRecentAwardsForRecipient(ueis, rollupUei, 25, live),
+      getExecutivesForRecipient(ueis, rollupUei),
+      getSubawardsPaidOutSummary(rollupUei),
+      getSubawardsReceivedSummary(rollupUei),
+    ] as const);
+  let sections = await loadSections(needsLiveBq);
+  // Warm identity over cold sections renders a header above empty panels: a Soft 404.
+  // Fill the core sections from BigQuery under the daily budget, or answer 5xx + queue a warm.
+  let core = profileSectionState(rollupUei, sections[5].length, sections[0].length);
+  if (coreSectionsUnavailable(core.recent, core.yearly) && !needsLiveBq) {
+    if (!(await takeSeoColdBudget('contractor'))) {
+      await recordWarmMiss(slug);
+      throw new SeoTemporarilyUnavailableError(`profile ${slug}: sections cold, budget exhausted`);
+    }
+    needsLiveBq = true;
+    sections = await loadSections(true);
+    core = profileSectionState(rollupUei, sections[5].length, sections[0].length);
+  }
+  if (coreSectionsUnavailable(core.recent, core.yearly)) {
+    await recordWarmMiss(slug);
+    throw new SeoTemporarilyUnavailableError(`profile ${slug}: core sections unavailable`);
+  }
   const [
     yearly,
     yearlyByAgency,
@@ -227,17 +218,7 @@ export default async function ContractorPage({ params }: PageProps) {
     executives,
     subPaidOutSummary,
     subReceivedSummary,
-  ] = await Promise.all([
-    getYearlyTotalsForRecipient(ueis, rollupUei, needsLiveBq),
-    getYearlyByAgencyForRecipient(ueis, rollupUei, needsLiveBq),
-    getTopAgenciesForRecipient(ueis, rollupUei, 10, needsLiveBq),
-    getTopNaicsForRecipient(ueis, rollupUei, 25, needsLiveBq), // wider NAICS set for treemap (more visual diversity than agencies)
-    getTopNaicsForRecipient(ueis, rollupUei, 10, needsLiveBq),
-    getRecentAwardsForRecipient(ueis, rollupUei, 25, needsLiveBq),
-    getExecutivesForRecipient(ueis, rollupUei),
-    getSubawardsPaidOutSummary(rollupUei),
-    getSubawardsReceivedSummary(rollupUei),
-  ]);
+  ] = sections;
 
   // If the contractor has any subaward activity (in either direction),
   // fetch the top partners. We do this conditionally because most

@@ -80,9 +80,11 @@ export async function getServeableProfiles(slugs: string[]): Promise<ServeablePr
 }
 
 /**
- * Record a slug whose page cache missed, so a later bounded warm job can pick
- * it up. This is the ONLY thing a cache miss is allowed to do — never a
- * synchronous BigQuery query on a public request path.
+ * Record a slug whose page cache missed, so the hourly warm cron
+ * (/api/cron/warm-contractor-pages) drains it into KV. Every 5xx a contractor page
+ * answers for cold data queues its slug here; the drain is what makes that 5xx
+ * temporary. A synchronous BigQuery read on a public request is allowed only under
+ * the fail-closed daily budget in src/lib/seo/seo-unavailable.ts.
  *
  * Best-effort and non-blocking by contract: a failure here must never change
  * what the page returns to the visitor.
