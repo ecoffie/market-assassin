@@ -28,7 +28,7 @@ async function logOutcome(r: RebuildResult | { ok: boolean; stage: string; reaso
   if (!url || !key) { console.warn('[rebuild] no Supabase env; outcome not logged'); return; }
   const db = createClient(url, key, { auth: { persistSession: false } });
   const KEY = 'bq_award_lookups';
-  const { data: existing, error: readErr } = await db.from('data_sources').select('id, notes, last_built, record_count').eq('key', KEY).maybeSingle();
+  const { data: existing, error: readErr } = await db.from('data_sources').select('id, notes, last_built, record_count').eq('key', KEY).limit(1).maybeSingle();
   if (readErr) { console.warn('[rebuild] data_sources read failed:', readErr.message); return; }
   const status = { at: new Date().toISOString(), ok: r.ok, stage: r.stage, reasons: r.reasons, ...extra };
   const success = r.ok && 'published' in r && r.published.length === LOOKUPS.length;
