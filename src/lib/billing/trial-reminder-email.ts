@@ -10,6 +10,7 @@ import { sendEmail } from '@/lib/send-email';
 const LOGO_URL = 'https://getmindy.ai/brand/mindy-logo-3d.png';
 const BILLING_URL = 'https://getmindy.ai/app?panel=settings';
 const SUPPORT_EMAIL = 'admin@getmindy.ai';
+const APP_URL = 'https://getmindy.ai/app';
 
 export type TrialReminder = {
   email: string;
@@ -17,7 +18,18 @@ export type TrialReminder = {
   amountUsd: number;        // charged when the trial ends
   interval: 'month' | 'year';
   trialEnd: Date;
+  /** What Mindy found for them during the trial. null = couldn't be read (never shown as 0). */
+  found?: TrialFound | null;
 };
+
+export type TrialFound = {
+  alertsSent: number;           // alert emails delivered during the trial
+  opportunitiesMatched: number; // opportunities across those alerts
+  pursuitsSaved: number;        // opportunities saved to their pipeline
+};
+
+const n = (x: number) => x.toLocaleString('en-US');
+
 
 const fmtUsd = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
 const fmtDate = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
@@ -25,7 +37,29 @@ const fmtDate = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', mo
 export function renderTrialReminder(r: TrialReminder): { subject: string; html: string; text: string } {
   const when = fmtDate(r.trialEnd);
   const price = `${fmtUsd(r.amountUsd)}/${r.interval === 'year' ? 'yr' : 'mo'}`;
-  const subject = `Your ${r.planLabel} trial ends ${when}`;
+  const f = r.found;
+  const hasFound = !!f && (f.alertsSent > 0 || f.opportunitiesMatched > 0 || f.pursuitsSaved > 0);
+  const subject = hasFound
+    ? `Mindy found you ${n(f!.opportunitiesMatched)} opportunities. Your trial ends ${when}`
+    : `Your ${r.planLabel} trial ends ${when}`;
+  const stat = (num: number, label: string) => `<td width="33%" style="padding:16px 6px;text-align:center;vertical-align:top;">
+            <div style="font-size:28px;line-height:1.1;font-weight:700;color:#7c3aed;">${n(num)}</div>
+            <div style="padding-top:6px;font-size:12px;line-height:1.35;color:#3f4754;">${label}</div></td>`;
+  const foundHtml = hasFound ? `
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:#f7f7fb;border-radius:10px;"><tr>
+          ${stat(f!.alertsSent, 'alert emails sent')}
+          ${stat(f!.opportunitiesMatched, 'opportunities matched')}
+          ${stat(f!.pursuitsSaved, 'pursuits saved')}
+        </tr></table>` : '';
+  const heading = hasFound ? 'Here\'s what Mindy found for you' : 'Your free trial ends in 3 days';
+  const intro = hasFound
+    ? `In your first 11 days, Mindy watched SAM.gov for you every day. Here's what it found:`
+    : `Your <strong>${r.planLabel}</strong> trial ends in 3 days. Your alerts, opportunities and pipeline keep working when you stay.`;
+  const keepGoing = hasFound
+    ? (f!.pursuitsSaved > 0
+        ? 'Keep going and Mindy keeps tracking your pursuits through to the bid.'
+        : 'Keep going and Mindy keeps finding new matches every day. Save one to your pipeline to track it to the bid.')
+    : '';
   const html = `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${subject}</title></head>
 <body style="margin:0;background:#f4f5f7;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
@@ -36,16 +70,13 @@ export function renderTrialReminder(r: TrialReminder): { subject: string; html: 
         <span style="vertical-align:middle;color:#12161d;font-size:22px;font-weight:700;padding-left:10px;">Mindy</span>
       </td></tr>
       <tr><td style="padding:30px 28px;">
-        <h1 style="margin:0 0 12px;font-size:23px;line-height:1.25;color:#12161d;">Your free trial ends in 3 days</h1>
-        <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#3f4754;">Your <strong>${r.planLabel}</strong> trial ends on <strong>${when}</strong>. After that, the card on file will be charged <strong>${price}</strong> and your access keeps going without a break.</p>
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:#f7f7fb;border-radius:10px;">
-          <tr><td style="padding:14px 16px;font-size:14px;color:#3f4754;">Plan</td><td style="padding:14px 16px;font-size:14px;color:#12161d;text-align:right;font-weight:600;">${r.planLabel}</td></tr>
-          <tr><td style="padding:0 16px 14px;font-size:14px;color:#3f4754;">First charge</td><td style="padding:0 16px 14px;font-size:14px;color:#12161d;text-align:right;font-weight:600;">${price} on ${when}</td></tr>
-        </table>
-        <p style="margin:0 0 20px;font-size:15px;line-height:1.55;color:#3f4754;">Nothing to do if you're staying. Don't want to continue? Cancel before ${when} and you won't be charged.</p>
-        <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:9px;background:#7c3aed;">
-          <a href="${BILLING_URL}" style="display:inline-block;padding:12px 26px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;">Manage my plan &rarr;</a>
+        <h1 style="margin:0 0 12px;font-size:23px;line-height:1.25;color:#12161d;">${heading}</h1>
+        <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#3f4754;">${intro}</p>${foundHtml}
+        ${keepGoing ? `<p style="margin:0 0 20px;font-size:15px;line-height:1.55;color:#3f4754;">${keepGoing}</p>` : ''}
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 22px;"><tr><td style="border-radius:9px;background:#7c3aed;">
+          <a href="${APP_URL}" style="display:inline-block;padding:12px 26px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;">Open Mindy &rarr;</a>
         </td></tr></table>
+        <p style="margin:0;padding-top:16px;border-top:1px solid #eef0f4;font-size:13px;line-height:1.55;color:#6b7280;">Your trial ends <strong>${when}</strong>. Then your card is charged <strong>${price}</strong> and everything keeps working. Don't want to continue? Cancel before ${when} in <a href="${BILLING_URL}" style="color:#7c3aed;text-decoration:none;">Settings</a> and you won't be charged.</p>
       </td></tr>
       <tr><td style="padding:20px 28px 26px;border-top:1px solid #eef0f4;">
         <p style="margin:0;font-size:12px;line-height:1.6;color:#9aa2b0;">Questions? <a href="mailto:${SUPPORT_EMAIL}" style="color:#7c3aed;text-decoration:none;">${SUPPORT_EMAIL}</a><br>GovCon Giants AI · getmindy.ai</p>
@@ -53,7 +84,17 @@ export function renderTrialReminder(r: TrialReminder): { subject: string; html: 
     </table>
   </td></tr></table>
 </body></html>`;
-  const text = `Your free trial ends in 3 days\n\nYour ${r.planLabel} trial ends on ${when}. After that, the card on file will be charged ${price}.\n\nNothing to do if you're staying. Cancel before ${when} and you won't be charged: ${BILLING_URL}\n\nQuestions? ${SUPPORT_EMAIL}\nGovCon Giants AI · getmindy.ai`;
+  const text = [
+    hasFound ? "Here's what Mindy found for you" : 'Your free trial ends in 3 days', '',
+    ...(hasFound ? [
+      `Alert emails sent: ${n(f!.alertsSent)}`,
+      `Opportunities matched: ${n(f!.opportunitiesMatched)}`,
+      `Pursuits saved: ${n(f!.pursuitsSaved)}`, '', keepGoing, '',
+    ] : []),
+    `Open Mindy: ${APP_URL}`, '',
+    `Your trial ends ${when}. Then your card is charged ${price}. Cancel before ${when} and you won't be charged: ${BILLING_URL}`, '',
+    `Questions? ${SUPPORT_EMAIL}`, 'GovCon Giants AI · getmindy.ai',
+  ].join('\n');
   return { subject, html, text };
 }
 

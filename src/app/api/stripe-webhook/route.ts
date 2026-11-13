@@ -658,7 +658,27 @@ export async function POST(request: NextRequest) {
       // unlock the same /app surface. A team-specific welcome
       // (with "5 seats included" + "Invite teammates →" link)
       // is a Phase 2 polish; not blocking for v1 launch.
-      await sendMarketIntelligenceWelcomeEmail({ to: email, customerName });
+      // A free-trial checkout gets the trial welcome (day 0 of the onboarding sequence: trial end
+      // date, first charge, first steps) instead of the generic welcome. Any failure to read the
+      // subscription falls back to the generic welcome so nobody gets no email.
+      let trialWelcomeSent = false;
+      if (session.mode === 'subscription' && session.subscription) {
+        try {
+          const subId = typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
+          const sub = await stripe.subscriptions.retrieve(subId);
+          if (isMindyAppSubscription(sub)) {
+            const { trialContextFromSubscription, sendTrialStepEmail, firstNameOf } = await import('@/lib/billing/trial-onboarding-emails');
+            const ctx = trialContextFromSubscription(sub, email, firstNameOf(customerName));
+            if (ctx) {
+              await sendTrialStepEmail(sub.id, 'day0', ctx);
+              trialWelcomeSent = true;
+            }
+          }
+        } catch (trialErr) {
+          console.error('[stripe-webhook] trial welcome failed; sending the generic welcome:', trialErr);
+        }
+      }
+      if (!trialWelcomeSent) await sendMarketIntelligenceWelcomeEmail({ to: email, customerName });
 
       // Mindy buyers ALSO get Federal Help Center (coaching + training) included.
       // Record the FHC grant in KV (our source of who has FHC access — they access
@@ -824,8 +844,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true, action: 'trial_reminder_missing_data' });
     }
     const { sendTrialReminderEmail, trialPlanLabel } = await import('@/lib/billing/trial-reminder-email');
+    // What Mindy found during the trial (null on any read failure → the plain reminder).
+    let found = null;
+    if (supabase && subscription.trial_start) {
+      const { readTrialFound } = await import('@/lib/billing/trial-onboarding-emails');
+      found = await readTrialFound(supabase, email, new Date(subscription.trial_start * 1000));
+    }
     try {
       const result = await sendTrialReminderEmail(subscription.id, {
+        found,
         email,
         planLabel: trialPlanLabel(item?.price?.id, subscription.metadata?.tier),
         amountUsd: amount,
