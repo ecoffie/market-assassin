@@ -34,7 +34,10 @@ function code(src: string): string {
 const parity = code(read('scripts/seo-mcp-parity-report.ts'));
 const warmer = code(read('scripts/warm-contractor-slugs.ts'));
 const summaryLib = code(read('src/lib/seo/forecasts-summary.ts'));
-const builder = code(read('scripts/build-forecast-summary.ts'));
+// The build logic moved to a shared lib (2026-11-12) so the scheduled materializer can run it;
+// the script keeps the manual dry-run-by-default entry point.
+const builder = code(read('src/lib/seo/forecast-summary-builder.ts'));
+const builderScript = code(read('scripts/build-forecast-summary.ts'));
 const page = code(read('src/app/forecasts/page.tsx'));
 
 // ── DEFECT 1 ────────────────────────────────────────────────────────────────
@@ -200,7 +203,7 @@ describe('defect 4 — /forecasts reads a compact materialized summary', () => {
   });
 
   it('the builder is dry-run by default', () => {
-    expect(builder).toContain("process.argv.includes('--go')");
-    expect(builder).toContain('DRY RUN — nothing written');
+    expect(builderScript).toContain("process.argv.includes('--go')");
+    expect(builderScript).toContain('DRY RUN — nothing written');
   });
 });

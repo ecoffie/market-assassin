@@ -17,7 +17,9 @@
 import type { Metadata } from 'next';
 import MeetMindyStrip from '@/components/MeetMindyStrip';
 import Link from 'next/link';
-import { getLatestAwards, getLargestAwards } from '@/lib/bigquery/awards';
+import { getLatestAwards, getLargestAwards, awardListKey } from '@/lib/bigquery/awards';
+import { bqUnavailable } from '@/lib/bigquery/cache';
+import { SeoTemporarilyUnavailableError } from '@/lib/seo/seo-unavailable';
 import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import { recipientSlug } from '@/lib/bigquery/recipients';
@@ -67,6 +69,15 @@ export default async function AwardsLanding() {
     getLatestAwards(50),
     getLargestAwards(50),
   ]);
+  // Both lists are materialized by /api/cron/seo-materialize and read cache-only (each is a
+  // 10-17 GB scan). Both unknown = the job has not run: answer 5xx rather than a 200 page of two
+  // empty tables, which is what Google files as a Soft 404. Found 2026-11-12 with both keys absent.
+  if (
+    bqUnavailable(awardListKey('latest', 50), latest.length) &&
+    bqUnavailable(awardListKey('largest', 50), largest.length)
+  ) {
+    throw new SeoTemporarilyUnavailableError('awards landing: award lists not materialized');
+  }
   const servableAwards = await servableAwardIds([...largest, ...latest].map((a) => a.award_id));
 
   const jsonLd = {
