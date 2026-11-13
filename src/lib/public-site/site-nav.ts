@@ -73,8 +73,12 @@ function productLinkHtml(l: MpChromeLink): string {
     + `<div class="mp-hiw-panel" role="menu"><div class="mp-hiw-box mp-sub-box"><p class="mp-hiw-k">${esc(l.label)}</p><div class="mp-sub-list">${items}</div></div></div></div>`;
 }
 
-/** Toggles the phone menu (html.mp-menu-open). Inline so raw-HTML pages need no extra script. */
-const MENU_TOGGLE = "var o=document.documentElement.classList.toggle('mp-menu-open');this.setAttribute('aria-expanded',o?'true':'false');";
+/**
+ * Toggles the menu (html.mp-menu-open). Inline so raw-HTML pages need no extra script. On open it
+ * records where the top bar ends (--mp-menu-top) so the tablet drop-down never runs past the bottom
+ * of the screen: the event banner above the bar wraps to a different height at each width.
+ */
+const MENU_TOGGLE = "var d=document.documentElement,o=d.classList.toggle('mp-menu-open');this.setAttribute('aria-expanded',o?'true':'false');var h=this.closest('.mp-head');if(o&&h)d.style.setProperty('--mp-menu-top',Math.round(h.getBoundingClientRect().bottom)+'px');";
 
 const CHEVRON = '<svg class="mp-menu-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
 
@@ -105,6 +109,13 @@ function siteMenuHtml(): string {
 /** Rules for the top bar. Tokens only (the public design lint scans this file). */
 export const SITE_NAV_CSS = [
   '.mp-top{position:sticky;top:0;z-index:40;font-family:var(--mp-font-sans)}',
+  // While the menu is open it sits above page widgets (the Opportunity Map's filters, markers and
+  // map/list toggle reach z-index 1600) but below modals (account menu 2601) and the event pop-up.
+  // On phones .mp-top is display:contents, so the menu itself carries the z-index there. A page
+  // that wraps the bar in its own positioned header (the map's .zhead, z-index 20) caps everything
+  // inside it, so the bar's direct parent is lifted too.
+  // (!important: the phone map pins .zhead{z-index:1100!important}.)
+  'html.mp-menu-open .mp-top,html.mp-menu-open .mp-menu{z-index:2000}html.mp-menu-open :has(>.mp-top){z-index:2000!important}',
   '.mp-head{height:64px;display:flex;align-items:center;gap:28px;background:var(--mp-surface);border-bottom:1px solid var(--mp-hair);'
     + 'padding:0 max(28px,env(safe-area-inset-right,0px)) 0 max(28px,env(safe-area-inset-left,0px))}',
   '.mp-head a{color:var(--mp-ink);text-decoration:none;white-space:nowrap}',
@@ -208,9 +219,10 @@ export const SITE_NAV_CSS = [
     + '}',
   // Tablet: the bar keeps the banner above it and Sign in / Start for free in it, so the menu drops
   // down from the bottom of the sticky top bar (.mp-top) instead of covering a fixed 60px offset,
-  // and its own Sign in / Start for free footer is left out.
+  // and its own Sign in / Start for free footer is left out. Its height stops at the bottom of the
+  // screen (--mp-menu-top is set by MENU_TOGGLE when the menu opens).
   '@media(min-width:621px) and (max-width:980px){'
-    + '.mp-menu{position:absolute;top:100%;bottom:auto;max-height:calc(100dvh - 140px);border-bottom:1px solid var(--mp-hair);box-shadow:0 18px 40px rgba(18,16,14,.12)}'
+    + '.mp-menu{position:absolute;top:100%;bottom:auto;max-height:calc(100dvh - var(--mp-menu-top,140px));border-bottom:1px solid var(--mp-hair);box-shadow:0 18px 40px rgba(18,16,14,.12)}'
     + '.mp-menu-foot{display:none}'
     + '}',
   '@media (prefers-reduced-motion: reduce){.mp-evb{transition:none}}',
