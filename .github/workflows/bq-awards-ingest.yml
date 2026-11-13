@@ -119,6 +119,20 @@ jobs:
           set -o pipefail
           ./node_modules/.bin/tsx scripts/bq-awards-post-apply-verify.ts verify 2>&1 | tee -a /tmp/bq-awards-ingest-run.log
 
+      # Rebuild the award lookup tables from the freshly ingested awards (2026-11-13). Runs only when
+      # the ingest and its post-apply verification succeeded (default step condition). Builds into
+      # staging, validates, then publishes with an atomic copy; any failure leaves production as-is.
+      - name: Rebuild award lookup tables (atomic, validated)
+        if: env.BQ_AWARDS_INGEST_MODE == 'apply_incremental'
+        env:
+          GCP_SA_JSON: ${{ secrets.GCP_SA_JSON }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set +x
+          set -o pipefail
+          ./node_modules/.bin/tsx scripts/rebuild-award-lookups.ts --go 2>&1 | tee -a /tmp/bq-awards-ingest-run.log
+
       - name: Upload failure log (no ZIP/CSV)
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

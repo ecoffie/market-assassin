@@ -28,6 +28,14 @@
 # KV entries from the old (full-scan) queries are invalidated.
 set -euo pipefail
 
+# ⛔ RETIRED 2026-11-13. This script DROPs each production lookup table before re-creating it, so every
+# /awards/[id] and /contracts/[piid] lookup fails while it runs, and a failed build leaves no table.
+# Use the atomic, validated rebuild instead (staging → validate → backup → atomic copy):
+#   npx tsx scripts/rebuild-award-lookups.ts            # dry run
+#   npx tsx scripts/rebuild-award-lookups.ts --go
+echo "build-lookup-tables.sh is retired (destructive DROP-then-CREATE). Use: npx tsx scripts/rebuild-award-lookups.ts" >&2
+exit 1
+
 PROJECT="market-assasin"
 
 run() {
