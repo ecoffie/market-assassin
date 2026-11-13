@@ -86,7 +86,8 @@
     "src/app/jobs",
     "src/app/course",
     "src/app/features",
-    "src/app/ambassadors"
+    "src/app/ambassadors",
+    "src/app/customers"
   ],
   "runtimeRoutes": [
     "/today",
@@ -180,7 +181,8 @@
     "/features/players",
     "/features/market-research",
     "/features/bid-with-confidence",
-    "/ambassadors"
+    "/ambassadors",
+    "/customers"
   ],
   "parityRoutes": [
     "/today",

@@ -16,7 +16,7 @@ export type ProfileRow = { user_email: string; uei: string | null; created_at: s
 export type SettingsRow = { user_email: string; created_at: string | null };
 export type AwardRow = {
   recipient_uei: string; award_id: string; first_action: string; amount: number;
-  recipient_name?: string | null; awarding_agency?: string | null;
+  recipient_name?: string | null; awarding_agency?: string | null; naics_code?: string | null;
 };
 
 /** UEI → earliest join date (ms) of any member who saved it; NaN when no date is known. */
@@ -125,4 +125,79 @@ export function companyBreakdown(
       agencies: [..._ag.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([a]) => a),
     }))
     .sort((a, b) => b.lifetime.dollars - a.lifetime.dollars);
+}
+
+/**
+ * Public breakdowns for /customers. Every bucket is an AGGREGATE of at least `minCompanies`
+ * distinct member companies, so no single company's awards can be read off the page. Smaller
+ * buckets fold into `other` (unlabelled). Only positive awards count, as in tallyWins.
+ */
+export const MIN_COMPANIES_PER_BUCKET = 3;
+
+export type StatBucket = { key: string; label: string; dollars: number; contracts: number; companies: number };
+export type BucketSet = {
+  buckets: StatBucket[];
+  /** Everything not shown as its own bucket. null when nothing was folded. */
+  other: { dollars: number; contracts: number; companies: number } | null;
+};
+
+export function bucketAwards(
+  rows: AwardRow[],
+  keyOf: (r: AwardRow) => string | null | undefined,
+  labelOf: (key: string) => string,
+  { top = 8, minCompanies = MIN_COMPANIES_PER_BUCKET }: { top?: number; minCompanies?: number } = {},
+): BucketSet {
+  const acc = new Map<string, { dollars: number; awards: Set<string>; companies: Set<string> }>();
+  const won = rows.filter((r) => Number(r.amount) > 0);
+  for (const r of won) {
+    const key = (keyOf(r) || '').trim() || '__unknown__';
+    const b = acc.get(key) ?? { dollars: 0, awards: new Set<string>(), companies: new Set<string>() };
+    b.dollars += Number(r.amount);
+    b.awards.add(`${r.recipient_uei}|${r.award_id}`);
+    b.companies.add(r.recipient_uei);
+    acc.set(key, b);
+  }
+  const ranked = [...acc.entries()].sort((a, b) => b[1].dollars - a[1].dollars);
+  const shown = ranked.filter(([k, b]) => k !== '__unknown__' && b.companies.size >= minCompanies).slice(0, top);
+  const shownKeys = new Set(shown.map(([k]) => k));
+  const rest = ranked.filter(([k]) => !shownKeys.has(k));
+  const otherCompanies = new Set<string>();
+  let otherDollars = 0;
+  let otherContracts = 0;
+  for (const [, b] of rest) {
+    otherDollars += b.dollars;
+    otherContracts += b.awards.size;
+    b.companies.forEach((c) => otherCompanies.add(c));
+  }
+  return {
+    buckets: shown.map(([k, b]) => ({
+      key: k, label: labelOf(k), dollars: Math.round(b.dollars), contracts: b.awards.size, companies: b.companies.size,
+    })),
+    other: rest.length ? { dollars: Math.round(otherDollars), contracts: otherContracts, companies: otherCompanies.size } : null,
+  };
+}
+
+/** Federal fiscal year of a date: FY runs Oct 1 – Sep 30, so Oct 2025 is FY2026. */
+export function fiscalYear(date: string): number | null {
+  const t = Date.parse(date);
+  if (!Number.isFinite(t)) return null;
+  const d = new Date(t);
+  return d.getUTCMonth() >= 9 ? d.getUTCFullYear() + 1 : d.getUTCFullYear();
+}
+
+/**
+ * Wins by fiscal year of the award's first action, most recent `years` only. A year with fewer than
+ * `minCompanies` companies is left out entirely (a year has no meaningful "Other").
+ */
+export function winsByFiscalYear(
+  rows: AwardRow[], { years = 6, minCompanies = MIN_COMPANIES_PER_BUCKET, now = Date.now() } = {},
+): StatBucket[] {
+  const current = fiscalYear(new Date(now).toISOString()) ?? new Date(now).getUTCFullYear();
+  const set = bucketAwards(
+    rows.filter((r) => { const fy = fiscalYear(r.first_action); return fy !== null && fy > current - years && fy <= current; }),
+    (r) => String(fiscalYear(r.first_action)),
+    (k) => `FY${k}`,
+    { top: years, minCompanies },
+  );
+  return set.buckets.sort((a, b) => Number(a.key) - Number(b.key));
 }
