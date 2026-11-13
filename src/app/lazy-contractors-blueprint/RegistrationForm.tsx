@@ -192,7 +192,7 @@ export default function RegistrationForm() {
         style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }} />
       {error && <p className="mp-meta" role="alert" style={{ color: 'var(--mp-crit)' }}>{error}</p>}
       <Button type="submit" disabled={sending}>{sending ? 'Saving your seat…' : 'Save My Free Seat'}</Button>
-      <p className="mp-meta">Free to attend. No credit card. We may email you a reminder to finish signing up.</p>
+      <p className="mp-meta">Free to attend. No credit card. Your join link comes by email.</p>
     </form>
   );
 }
