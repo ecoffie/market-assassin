@@ -44,7 +44,7 @@ import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/cha
 import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, type PlannerTarget } from '@/lib/chat/planner-config';
 import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
 import { guardUnstatedStates } from '@/lib/chat/stated-filters';
-import { compileIntent, enforceIntent } from '@/lib/chat/intent-compiler';
+import { compileIntent, enforceIntent, dedupeToolCalls } from '@/lib/chat/intent-compiler';
 import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, lintAnalysis, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
@@ -603,10 +603,20 @@ export async function POST(request: NextRequest) {
               });
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               pendingToolTurnIdx = (messages as any[]).push({ role: 'assistant', content: choice.content ?? null, tool_calls: toolCalls }) - 1;
-              const results = await executor.executeRound(toolCalls, { provider: first.provider, model: first.model });
-              for (const r of results) {
+              const withPage = (raw: string, page: number) => { try { return JSON.stringify({ ...JSON.parse(raw || '{}'), __page: page }); } catch { return `${raw}|${page}`; } };
+              // The same search planned twice (identical after enforcement, or a code subset of another
+              // call) runs and renders once; the duplicate gets a pointer so every call has a result.
+              const dedupe = dedupeToolCalls(toolCalls.map((tc) => ({ id: tc.id, name: String(tc.function?.name || ''), args: withPage(String(tc.function.arguments ?? ''), displayOffsets.get(tc.id) ?? 0) })));
+              const keepIds = new Set(dedupe.keep.map((k) => k.id));
+              for (const d of dedupe.duplicates) turnTrace.notices.push(`duplicate_call_skipped:${d.id}:same_as:${d.of}`);
+              const results = await executor.executeRound(toolCalls.filter((tc) => keepIds.has(tc.id)), { provider: first.provider, model: first.model });
+              for (const tc of toolCalls) {
+                const r = results.find((x) => x.tool_call_id === tc.id);
+                const dup = dedupe.duplicates.find((d) => d.id === tc.id);
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (messages as any[]).push({ role: 'tool', tool_call_id: r.tool_call_id, content: r.content });
+                if (r) (messages as any[]).push({ role: 'tool', tool_call_id: r.tool_call_id, content: r.content });
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                else if (dup) (messages as any[]).push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify({ duplicate_of: dup.of, note: 'Same search as another call in this turn; its results are shown once.' }) });
               }
               pendingToolTurnIdx = null;
               turnTrace.tool_executions = results.map((r) => r.record);

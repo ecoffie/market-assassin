@@ -53,3 +53,30 @@ describe('enforceIntent: the model cannot drop or override a stated constraint',
     expect(r.unapplied[0]).toMatch(/office "USACE Memphis District"/);
   });
 });
+
+import { dedupeToolCalls } from './intent-compiler';
+describe('dedupeToolCalls (attempt 4: the planner split one question into identical calls)', () => {
+  it('keeps one of several identical calls', () => {
+    const a = JSON.stringify({ naics: '561320,561110,493110', state: 'TN', months_window: 18 });
+    const b = JSON.stringify({ naics: '561110,561320,493110', state: 'TN', months_window: 18 });
+    const r = dedupeToolCalls([{ id: 'c1', name: 'get_expiring_contracts', args: a }, { id: 'c2', name: 'get_expiring_contracts', args: b }]);
+    expect(r.keep.map((c) => c.id)).toEqual(['c1']);
+    expect(r.duplicates).toEqual([{ id: 'c2', of: 'c1' }]);
+  });
+  it('drops a call whose codes are a subset of another with the same place (city vs cities)', () => {
+    const r = dedupeToolCalls([
+      { id: 'o1', name: 'get_buying_offices', args: JSON.stringify({ state: 'TN', city: 'Memphis', naics: '561320,561110' }) },
+      { id: 'o2', name: 'get_buying_offices', args: JSON.stringify({ state: 'TN', cities: ['Memphis'], naics: '561320' }) },
+      { id: 'o3', name: 'get_buying_offices', args: JSON.stringify({ state: 'TN', cities: ['Memphis'], naics: '561110' }) },
+    ]);
+    expect(r.keep.map((c) => c.id)).toEqual(['o1']);
+  });
+  it('keeps genuinely different searches', () => {
+    const r = dedupeToolCalls([
+      { id: 'a', name: 'get_buying_offices', args: JSON.stringify({ state: 'TX', city: 'San Antonio', naics: '561612' }) },
+      { id: 'b', name: 'get_expiring_contracts', args: JSON.stringify({ state: 'TX', naics: '561612', months_window: 12 }) },
+      { id: 'c', name: 'get_expiring_contracts', args: JSON.stringify({ state: 'TN', naics: '561612', months_window: 12 }) },
+    ]);
+    expect(r.keep.map((c) => c.id)).toEqual(['a', 'b', 'c']);
+  });
+});
