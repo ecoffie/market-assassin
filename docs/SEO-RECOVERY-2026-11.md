@@ -128,8 +128,9 @@ tabs (rows not cached).
 - **The 161 prioritized contractors:** drained by the 23:23 and 00:23 UTC warm runs (160 left the
   queue; the one remaining, `the-university-of-dayton`, was re-added at score 1 by a live miss and
   now resolves through its cached alias). Identity cache: 138 cached, 12 alias cached, 6 confirmed
-  absent, 5 alias key still cold. 38 now answer 200 indexable, 12 a 308, 27 200 thin-noindex, 6 a
-  genuine 404, 3 a profile 5xx (alias), and 77 a `/contracts` 5xx (above).
+  absent, 5 alias key still cold. Of the 157 URLs that were false 5xx on 2026-11-13: 38 now answer
+  200 indexable, 12 a 308, 27 200 thin-noindex, 3 a profile 5xx (alias) and 77 a `/contracts` 5xx
+  (above). The 6 no-data 5xx are now genuine 404s.
 - **Queue health after the +10,000 bump:** no residue. 5,157 queued, top scores back at the normal
   725, warms today 85 of 2,000, legacy set 9,061. The bump only reordered work.
 
