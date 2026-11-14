@@ -234,7 +234,10 @@ export async function logCall(entry: {
  *
  * Returns the granted amount (0 when already granted, or when SIGNUP_CREDITS=0).
  */
-export async function grantSignupCreditsIfFirst(userEmail: string): Promise<number> {
+export async function grantSignupCreditsIfFirst(
+  userEmail: string,
+  opts: { sendWelcome?: boolean } = {},
+): Promise<number> {
   if (SIGNUP_CREDITS <= 0) return 0;
   const email = userEmail.toLowerCase().trim();
   if (!email) return 0;
@@ -267,7 +270,9 @@ export async function grantSignupCreditsIfFirst(userEmail: string): Promise<numb
 
   // Welcome email ONLY on a real first grant — the idempotent no-op path must not
   // re-send it every time the user reconnects. Never blocks the grant.
-  if (granted > 0) {
+  // The registration path (registration-grant.ts) passes sendWelcome:false: the current welcome copy is
+  // written for MCP ("free MCP credits") and a Maps/App registrant would get a misleading email.
+  if (granted > 0 && opts.sendWelcome !== false) {
     await sendCreditWelcomeEmail({ email, credits: granted }).catch(() => {});
   }
   return granted;
