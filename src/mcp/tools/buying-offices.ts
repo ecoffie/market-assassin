@@ -323,7 +323,12 @@ export async function getBuyingOffices(
   const coreCities = normalizeCities(input.city);
   const radiusRaw = input.metro_radius_miles == null ? NaN : Number(input.metro_radius_miles);
   const radius = Number.isFinite(radiusRaw) && radiusRaw >= 0 ? Math.min(radiusRaw, 100) : DEFAULT_METRO_RADIUS_MILES;
-  const metro = coreCities.length === 1 && radius > 0 ? expandMetroCities(coreCities[0], st.state ? [st.state] : [], radius) : null;
+  // acc7 R4: one city passed as `cities` WITH an explicit metro_radius_miles is a metro request too.
+  // Before, it searched the city only while applied_filters still reported the radius (a filter
+  // reported as applied that was not).
+  const metroCore = coreCities.length === 1 ? coreCities[0]
+    : !coreCities.length && explicitCities.length === 1 && input.metro_radius_miles != null ? explicitCities[0] : null;
+  const metro = metroCore && radius > 0 ? expandMetroCities(metroCore, st.state ? [st.state] : [], radius) : null;
   const requestedCities = Array.from(new Set([...coreCities, ...explicitCities]));
   const cities = metro ? Array.from(new Set([...metro.cities, ...requestedCities])) : requestedCities;
   const naics = normalizeNaicsPrefixes(input.naics);
@@ -354,9 +359,12 @@ export async function getBuyingOffices(
   if (cities.length) {
     if (input.city != null) applied.city = coreCities;
     if (input.cities != null) applied.cities = explicitCities;
-    if (metro) applied.metro = { core_city: coreCities[0], center: metro.center, radius_miles: radius, cities_included: metro.cities.length };
+    if (metro) applied.metro = { core_city: metroCore, center: metro.center, radius_miles: radius, cities_included: metro.cities.length };
   }
-  if (input.metro_radius_miles != null) applied.metro_radius_miles = radius;
+  if (input.metro_radius_miles != null) {
+    if (metro || radius === 0) applied.metro_radius_miles = radius;
+    else ignored.push({ arg: 'metro_radius_miles', value: String(input.metro_radius_miles), reason: 'unsupported_value', detail: 'a metro radius applies to one core city; the cities were matched exactly' });
+  }
   if (naics.codes.length) applied.naics = naics.codes;
   if (psc.codes.length) applied.psc = psc.codes;
 
