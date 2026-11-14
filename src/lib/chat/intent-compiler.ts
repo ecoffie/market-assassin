@@ -147,3 +147,35 @@ export function enforceIntent(toolName: string, rawArgs: string, intent: Compile
   }
   return { args: JSON.stringify(a), applied, unapplied };
 }
+
+/**
+ * Drop duplicate tool calls in one planning round. The planner sometimes splits one question into
+ * several calls of the same tool (one per code or per city); after constraint enforcement they can be
+ * identical, and the customer would see the same list several times. A call is a duplicate when the
+ * same tool has identical arguments, or its NAICS set is a subset of another call's with every other
+ * argument equal. `city` and `cities` are compared as one set of places.
+ */
+export function dedupeToolCalls<T extends { id: string; name: string; args: string }>(calls: T[]): { keep: T[]; duplicates: Array<{ id: string; of: string }> } {
+  type Norm = { naics: Set<string>; rest: string };
+  const norm = (c: T): Norm => {
+    let a: Record<string, unknown> = {};
+    try { a = JSON.parse(c.args || '{}'); } catch { /* compare raw */ return { naics: new Set(), rest: c.args }; }
+    const naics = new Set(listOf(a.naics));
+    const places = Array.from(new Set([...listOf(a.city), ...listOf(a.cities)].map((x) => x.toUpperCase()))).sort();
+    const rest: Record<string, unknown> = {};
+    for (const k of Object.keys(a).sort()) if (!['naics', 'city', 'cities'].includes(k)) rest[k] = a[k];
+    if (places.length) rest.__places = places;
+    return { naics, rest: JSON.stringify(rest) };
+  };
+  const normed = calls.map((c) => ({ c, n: norm(c) }));
+  const keep: T[] = [];
+  const duplicates: Array<{ id: string; of: string }> = [];
+  normed.forEach(({ c, n }, i) => {
+    const covering = normed.find(({ c: o, n: on }, j) => j !== i && o.name === c.name && on.rest === n.rest
+      && [...n.naics].every((x) => on.naics.has(x))
+      && (on.naics.size > n.naics.size || (on.naics.size === n.naics.size && j < i)));
+    if (covering) duplicates.push({ id: c.id, of: covering.c.id });
+    else keep.push(c);
+  });
+  return { keep, duplicates };
+}
