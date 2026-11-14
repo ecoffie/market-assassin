@@ -42,6 +42,7 @@ import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/ti
 // preflight, per-tool error capture, execution log). Never import runMcpTool here.
 import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/chat-tool-executor';
 import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, type PlannerTarget } from '@/lib/chat/planner-config';
+import { prepareChatToolArgs, renderExpiringRecords, checkSummaryAgainstRecords, EXPIRING_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
 
@@ -159,7 +160,7 @@ Tool-use rules:
 - If a tool returns a "slow down"/rate_limited note, relay it briefly and suggest they try again shortly — do NOT retry it yourself.
 - A tool result with ok:false and an error_category (state "unavailable") means that data COULD NOT BE RETRIEVED. Say the lookup was unavailable or not permitted from chat. NEVER describe it as "none", "no contracts", or zero.
 - Filters cover the whole request: when the user names several kinds of work, pass a NAICS for EACH kind in one call as a comma-separated list (for example "janitorial and landscaping" -> "561720,561730"); when they name several states, pass them all ("VA,MD,DC"). Never drop part of what they asked for.
-- Completeness: when a result lists records (get_expiring_contracts: contracts[], expiring_orders_in_window[] and unresolved_orders[]; _meta.records_in_window is the total), present every one, soonest first. Task and delivery orders ending in the window are expiring work: include them with their order number, incumbent, agency, place of performance and end date. If there are more than 20, show the 20 soonest and say "showing 20 of N". Never present a subset as the full list.
+- Expiring-contract records are rendered for the user by the system from the tool data (every record, or a stated page with the total). When the user asks to continue a list (for example "show expiring records 21 to 40"), call get_expiring_contracts again with exactly the same filters as the previous search plus display_offset = the first requested record number minus 1. Never present a subset as the full list.
 - Every tool result carries _meta.result_state and _meta.ignored_args. Only result_state "none_found" with an empty ignored_args is a verified zero: only then may you say nothing matched. "filter_not_applied" or "partial": name each ignored argument and say that part was NOT checked (for example: "I could not filter by city, so this covers all of Tennessee"); never present the result as complete or as a zero. "unavailable": the data could not be retrieved; never call it none.
 - When a tool returns grounded=false / count 0 / found false, say so plainly — NEVER invent a pursuit, opportunity, contract, company, agency, deadline, dollar, contact, or term. Ground every specific ONLY in what the tool actually returned.
 - When OPEN solicitations run thin, do NOT fall back to "keep an eye on SAM.gov" / "check SAM.gov for updates" / "monitor the panel" — you have forecast + recompete tools; call them and surface (clearly labeled) FORECAST and RECOMPETE results instead. "Go check SAM yourself" is never an acceptable answer for something a tool covers.
@@ -450,6 +451,7 @@ export async function POST(request: NextRequest) {
         let plannerUnavailable = false;
         // Index of an assistant tool_calls turn whose results have not all been appended yet.
         let pendingToolTurnIdx: number | null = null;
+        const renderedRecords: RenderedRecords[] = [];
         try {
           const tier0Runtime = makeTier0Tools(getSupabase(), auth.email!);
           const executor = createChatToolExecutor({
@@ -561,7 +563,13 @@ export async function POST(request: NextRequest) {
             if (u) toolUsageForCost = { prompt_tokens: u.prompt_tokens, completion_tokens: u.completion_tokens };
             if (Array.isArray(rawCalls) && rawCalls.length > 0) {
               // Every call gets a stable id so each result pairs with its call.
-              const toolCalls = rawCalls.map((tc, i) => ({ ...tc, id: tc.id || `call_${i}`, type: 'function' as const }));
+              const displayOffsets = new Map<string, number>();
+              const toolCalls = rawCalls.map((tc, i) => {
+                const id = tc.id || `call_${i}`;
+                const prepared = prepareChatToolArgs(String(tc.function?.name || ''), String(tc.function?.arguments ?? ''));
+                if (prepared.displayOffset) displayOffsets.set(id, prepared.displayOffset);
+                return { ...tc, id, type: 'function' as const, function: { ...tc.function, arguments: prepared.args } };
+              });
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               pendingToolTurnIdx = (messages as any[]).push({ role: 'assistant', content: choice.content ?? null, tool_calls: toolCalls }) - 1;
               const results = await executor.executeRound(toolCalls, { provider: first.provider, model: first.model });
@@ -571,6 +579,16 @@ export async function POST(request: NextRequest) {
               }
               pendingToolTurnIdx = null;
               turnTrace.tool_executions = results.map((r) => r.record);
+              // PR E: verified record lists are rendered from the tool data, not reproduced by the model.
+              for (const r of results) {
+                if (r.record.tool !== EXPIRING_TOOL || r.record.status !== 'success') continue;
+                try {
+                  const rendered = renderExpiringRecords(JSON.parse(r.content), { offset: displayOffsets.get(r.tool_call_id) ?? 0 });
+                  if (rendered) renderedRecords.push(rendered);
+                } catch (renderErr) {
+                  console.error('[chat] record render failed:', renderErr);
+                }
+              }
               if (TRACE_EVENTS) {
                 send({
                   type: 'trace',
@@ -613,6 +631,18 @@ export async function POST(request: NextRequest) {
           void recordLlmUsage({ userEmail: auth.email, tool: 'chat_tool_round', provider: toolProvider, model: toolModel, usage: toolUsageForCost || undefined });
         }
         // ── end Tier-0 tool round ──
+        if (renderedRecords.length) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (messages as any[]).push({
+            role: 'system',
+            content:
+              'VERIFIED RECORD LIST: the records below were rendered from the tool data and have ALREADY been shown to the user verbatim, directly above your reply. '
+              + 'Do NOT list, repeat or renumber the records, and do not restate identifiers, dates or amounts that are not in this list. '
+              + 'Write 2 to 6 sentences of analysis: what stands out (soonest end dates, agencies, incumbents, task orders versus contracts, anything not applied). '
+              + 'If you state the total, use exactly the count in the list header. If the header says the list is not complete, say so and tell the user how to continue (call the same tool with the same filters plus display_offset).\n\n'
+              + renderedRecords.map((r) => r.text).join('\n\n'),
+          });
+        }
 
         // Mindy Chat is the FLAGSHIP user-facing experience — every answer is read,
         // so grounded-Q&A quality is worth the model spend here (Eric, Jul 2: "the
@@ -678,6 +708,13 @@ export async function POST(request: NextRequest) {
         }
 
         let assistantContent = '';
+        if (renderedRecords.length) {
+          const recordBlock = `${renderedRecords.map((r) => r.text).join('\n\n')}\n\n`;
+          assistantContent = recordBlock;
+          send({ type: 'token', content: recordBlock });
+          turnTrace.notices.push('records_rendered');
+        }
+        const modelTextStart = assistantContent.length;
         let tokensUsed: number | null = null;
         // Full usage object (prompt/completion split) for cost attribution.
         let usageForCost: { prompt_tokens?: number; completion_tokens?: number } | null = null;
@@ -740,6 +777,17 @@ export async function POST(request: NextRequest) {
         // the retrieved chunks weren't its sources, so chips would mislead.
         // No RAG corpus anymore → no teaching/podcast citation chips. Ask Mindy answers from the
         // Data Core tools; those surface their own structured results, not knowledge-base chips.
+        if (renderedRecords.length) {
+          const problems = checkSummaryAgainstRecords(assistantContent.slice(modelTextStart), renderedRecords);
+          if (problems.length) {
+            const totals = renderedRecords.map((r) => r.total).join(' and ');
+            const correction = `\n\nCount check: the verified record count for this search is ${totals}; the list above is authoritative.`;
+            assistantContent += correction;
+            send({ type: 'token', content: correction });
+            turnTrace.notices.push('summary_count_corrected');
+            console.warn('[chat] summary contradicted verified records:', problems);
+          }
+        }
         turnTrace.answer = { provider: usedProvider, model: usedModel, finish_reason: finishReason, fallback: answerFallback };
         if (finishReason === 'length') {
           turnTrace.notices.push('truncated');
