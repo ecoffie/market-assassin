@@ -18,6 +18,7 @@
  */
 import { getWriteClient } from '@/lib/supabase/server-clients';
 import { annotateResultContract } from '@/lib/mcp/result-contract';
+import { parseStageGroup } from '@/lib/opportunities/acquisition-stage';
 import { makeTier1Tools, TIER1_TOOL_DEFS, TIER1_TOOL_NAMES, type Tier1Db } from '@/lib/chat/tier1-tools';
 import { makeTier2Tools, TIER2_TOOL_DEFS, TIER2_TOOL_NAMES } from '@/lib/chat/tier2-tools';
 import { getWinningPlaybook } from '@/mcp/tools/winning-playbook';
@@ -2364,6 +2365,15 @@ async function dispatchMcpTool(
         : typeof args.states === 'string' ? args.states : undefined,
       stage: typeof args.stage === 'string' ? args.stage : undefined,
     })) as unknown as Record<string, unknown>;
+    // Result contract: report the coerced arguments the tool DID apply, so a string `states`
+    // (schema: array) or a normalized `stage` ("market research" -> MARKET_RESEARCH) is not
+    // reported as ignored. An unrecognizable stage stays reported (the enum check flags it).
+    const meta = (result._meta && typeof result._meta === 'object' ? result._meta : (result._meta = {})) as Record<string, unknown>;
+    const applied = { ...((meta.applied_filters as Record<string, unknown>) ?? {}) };
+    if (typeof args.states === 'string' && args.states.trim()) applied.states = args.states;
+    const stageGroup = typeof args.stage === 'string' ? parseStageGroup(args.stage) : null;
+    if (stageGroup && stageGroup !== 'invalid') applied.stage = stageGroup;
+    if (Object.keys(applied).length) meta.applied_filters = applied;
     return { result, credits };
   }
 
