@@ -26,6 +26,14 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-14 — Ask Mindy Phase 1: research accuracy (approved 2026-11-14)
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-14 | Tool results / shared contract | **A dropped filter read as a verified zero.** Every result through `runMcpTool` (chat and MCP) now carries `_meta.result_state` (results, none_found, filter_not_applied, partial, unavailable, not_reported) and `_meta.ignored_args` (unknown argument, wrong type, enum miss, or tool-reported). A tool cannot claim none_found while an argument it was given was not applied. Ask Mindy may only say nothing matched on none_found with no ignored args. Replay of the 9 baseline tool calls: 0 false flags. | `export function annotateResultContract` in `src/lib/mcp/result-contract.ts` | `result-contract.unit.test.ts` (14); MCP and chat suites 1,244 pass | IN REVIEW |
+
+---
+
 ## 2026-11-14 — Ask Mindy safety release + Phase 0 (Option C, approved 2026-11-13)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
