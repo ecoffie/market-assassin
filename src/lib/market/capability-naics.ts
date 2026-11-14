@@ -136,7 +136,7 @@ export function capabilityPlannerNote(text: string): string | null {
   return (
     'CAPABILITY INTERPRETATION (deterministic, from Mindy\'s capability lexicon; use it, do not re-guess codes): '
     + lines.join(' | ')
-    + `. When a tool takes NAICS, pass ALL of these codes in one call as "${r.codes.join(',')}" unless the user asked for something narrower.`
+    + `. Cover ALL of them unless the user asked for something narrower: tools that accept a NAICS list (get_expiring_contracts, search_sam_opportunities) take "${r.codes.join(',')}" in one call; for a tool that takes one NAICS, call it once per code.`
     + typed
     + ' Words not listed here were not mapped to a code; search them as keywords rather than inventing a code.'
   );

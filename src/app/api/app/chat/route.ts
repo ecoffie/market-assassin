@@ -42,6 +42,7 @@ import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/ti
 // preflight, per-tool error capture, execution log). Never import runMcpTool here.
 import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/chat-tool-executor';
 import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, type PlannerTarget } from '@/lib/chat/planner-config';
+import { capabilityPlannerNote } from '@/lib/market/capability-naics';
 import { prepareChatToolArgs, renderExpiringRecords, checkSummaryAgainstRecords, EXPIRING_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
@@ -404,8 +405,11 @@ export async function POST(request: NextRequest) {
         // the FINAL streamed answer (so "how do I write a cap statement" keeps its teaching
         // corpus). Verified: AJ's exact prompt now fires get_agency_forecasts + labels
         // forecast-vs-open, instead of a RAG essay telling him to check SAM himself.
+        // P1-F: the same customer words always map to the same NAICS (deterministic lexicon), so
+        // the planner does not re-guess codes on every turn.
+        const capabilityNote = capabilityPlannerNote(message);
         const toolRoundMessages: Array<{ role: string; content: string }> = [
-          { role: 'system', content: systemPrompt },
+          { role: 'system', content: capabilityNote ? `${systemPrompt}\n\n${capabilityNote}` : systemPrompt },
         ];
         for (const h of history) {
           if (h.role === 'user' || h.role === 'assistant') {
@@ -444,6 +448,7 @@ export async function POST(request: NextRequest) {
           answer: { provider: string; model: string; finish_reason: string | null; fallback: boolean } | null;
           notices: string[];
         } = { planner: null, planner_attempts: [], tools_offered: 0, tool_executions: [], answer: null, notices: [] };
+        if (capabilityNote) turnTrace.notices.push('capability_interpreted');
         const notify = (code: string, text: string) => {
           turnTrace.notices.push(code);
           send({ type: 'notice', code, message: text });
