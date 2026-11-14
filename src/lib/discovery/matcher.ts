@@ -26,6 +26,7 @@ import { termOfArtSynonyms } from '@/lib/market/sector-expansions';
 import { GENERIC_SINGLE_WORDS, looksLikeRealWord } from '@/lib/market/keyword-sanitize';
 import { COMMON_TERM_WEIGHT, queryWords } from '@/lib/mi-dashboard/search';
 import { SHORT_DOMAIN_TOKENS, MODIFIER_TERMS, CONTEXT_TERMS } from '@/lib/beginner/activity';
+import corpusWordDf from './corpus-word-df.json';
 
 export type ConceptClass = 'distinctive' | 'qualifier' | 'supporting';
 export type Inflect = 'none' | 'plural' | 'full';
@@ -63,6 +64,12 @@ export interface Alternative {
   eligibility: 'all' | 'any';
   eligible: Concept[];
   rankOnly: Concept[];
+  /**
+   * Capability lists only: labels of eligible concepts that may NOT admit a record on their own. Each needs a
+   * second concept from this list in the same record (a rare eligible concept still admits alone). See
+   * `capabilityListTiers`. Absent = every eligible concept admits on its own (the previous behaviour).
+   */
+  partnerRequired?: string[];
 }
 
 export interface TextMatcher {
@@ -211,6 +218,43 @@ function conceptsOf(text: string): Concept[] {
   return out;
 }
 
+/**
+ * Corpus document frequency of a plain query word: the share of active SAM notices whose title or description
+ * contains it (src/lib/discovery/corpus-word-df.json, built by scripts/build-corpus-word-df.ts; words under 1% are
+ * not listed and read as 0). The matcher treats a word and its singular as the same word, so the lookup takes the
+ * higher of the two ("grounds" reads as "ground"). Phrases and recognized concepts are never looked up.
+ */
+const CORPUS_DF: Readonly<Record<string, number>> = (corpusWordDf as { df: Record<string, number> }).df;
+export const COMMON_WORD_DF = 0.05;
+export const PARTNER_WORD_DF = 0.01;
+export function corpusDf(label: string): number {
+  if (!label || label.includes(' ')) return 0;
+  return Math.max(0, ...bases(label).map((w) => CORPUS_DF[w] ?? 0));
+}
+
+/**
+ * CAPABILITY-LIST TIERS (Agent 3, 2026-11-14; blind-labeled eval in tasks/anyword-matching-2026-11-14.md).
+ * A capability list used to admit a record on ANY one distinctive word. Words that are common across all notices
+ * ("provide" 19%, "access" 9%, "air" 6%, "removal" 2%, "digital" 1%) then admitted thousands of unrelated notices:
+ * "armed and unarmed security guards patrol and access control services" returned 2,580 notices, almost all on
+ * "access". Same rule as the documented COMMON_TERM_WEIGHT ("df >= ~5% of the corpus => common"), measured per word:
+ *   df >= 5%      common   → rank only (never admits)
+ *   1% <= df < 5% partner  → admits only together with another listed word in the same record
+ *   df < 1%       rare     → admits on its own (unchanged)
+ * Recognized concepts and hyphenated compounds are never tiered. A list with one partner word and no rare word keeps
+ * that word admitting alone (otherwise it could never match). A list whose words are ALL common falls through to the
+ * existing fail-narrow rule (all required). Short queries (<= 3 meaningful concepts) are untouched.
+ */
+function capabilityListTiers(distinctive: Concept[]): { common: Concept[]; admit: Concept[]; partnerRequired: string[] } {
+  const dfOf = (c: Concept) => (c.basis === 'recognized_concept' || c.basis === 'hyphenated_compound' ? 0 : corpusDf(c.label));
+  const common = distinctive.filter((c) => dfOf(c) >= COMMON_WORD_DF);
+  const admit = distinctive.filter((c) => dfOf(c) < COMMON_WORD_DF);
+  const partner = admit.filter((c) => dfOf(c) >= PARTNER_WORD_DF);
+  const rare = admit.filter((c) => dfOf(c) < PARTNER_WORD_DF);
+  const partnerRequired = rare.length || partner.length > 1 ? partner.map((c) => c.label) : [];
+  return { common, admit, partnerRequired };
+}
+
 function alternativeOf(text: string): Alternative | null {
   const concepts = conceptsOf(text);
   if (!concepts.length) return null;
@@ -225,11 +269,15 @@ function alternativeOf(text: string): Alternative | null {
   if (meaningful.length <= CONCEPT_QUERY_MAX) {
     return { shape: 'concept_query', eligibility: 'all', eligible: meaningful, rankOnly: supporting };
   }
-  if (distinctive.length) {
-    return { shape: 'capability_list', eligibility: 'any', eligible: distinctive, rankOnly: [...qualifiers, ...supporting] };
+  const tiers = capabilityListTiers(distinctive);
+  if (tiers.admit.length) {
+    return {
+      shape: 'capability_list', eligibility: 'any', eligible: tiers.admit, rankOnly: [...tiers.common, ...qualifiers, ...supporting],
+      ...(tiers.partnerRequired.length ? { partnerRequired: tiers.partnerRequired } : {}),
+    };
   }
-  // A long list of only broad words: fail NARROW (all required) rather than admit on any one.
-  return { shape: 'capability_list', eligibility: 'all', eligible: qualifiers, rankOnly: supporting };
+  // A long list of only broad (or only corpus-common) words: fail NARROW (all required) rather than admit on any one.
+  return { shape: 'capability_list', eligibility: 'all', eligible: [...tiers.common, ...qualifiers], rankOnly: supporting };
 }
 
 /**
@@ -354,6 +402,16 @@ export function textPredicate(m: TextMatcher, cols: readonly string[]): string |
   if (m.mode === 'exact_phrase') return unit(phraseRegex(m.phrase || ''), cols);
   if (m.mode !== 'lexical') return null;
   const blocks = m.alternatives.map((a) => {
+    if (a.eligibility === 'any' && a.partnerRequired?.length) {
+      const needs = new Set(a.partnerRequired);
+      const solo = a.eligible.filter((c) => !needs.has(c.label)).map((c) => conceptUnit(c, cols));
+      const partner = a.eligible.filter((c) => needs.has(c.label));
+      const pairs: string[] = [];
+      for (let i = 0; i < partner.length; i++) for (let j = i + 1; j < partner.length; j++) {
+        pairs.push(`and(or(${conceptUnit(partner[i], cols)}),or(${conceptUnit(partner[j], cols)}))`);
+      }
+      return [...solo, ...pairs].join(',');
+    }
     if (a.eligibility === 'any' || a.eligible.length === 1) {
       return a.eligible.map((c) => conceptUnit(c, cols)).join(',');
     }
@@ -395,7 +453,10 @@ export function matchesText(m: TextMatcher, texts: Array<string | null | undefin
   if (m.mode === 'code') return jsRegex(codeRegex(m.phrase || '')).test(blob);
   if (m.mode === 'exact_phrase') return jsRegex(phraseRegex(m.phrase || '')).test(blob);
   if (m.mode !== 'lexical') return m.excluded.length > 0;
-  return m.alternatives.some((a) => (a.eligibility === 'all'
-    ? a.eligible.every((c) => conceptHit(c, blob))
-    : a.eligible.some((c) => conceptHit(c, blob))));
+  return m.alternatives.some((a) => {
+    if (a.eligibility === 'all') return a.eligible.every((c) => conceptHit(c, blob));
+    const needs = new Set(a.partnerRequired || []);
+    if (a.eligible.some((c) => !needs.has(c.label) && conceptHit(c, blob))) return true;
+    return a.eligible.filter((c) => needs.has(c.label) && conceptHit(c, blob)).length >= 2;
+  });
 }
