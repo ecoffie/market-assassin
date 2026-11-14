@@ -1438,9 +1438,6 @@
             "affairs"
           ],
           [
-            "veterans"
-          ],
-          [
             "vet"
           ]
         ]
@@ -1478,7 +1475,7 @@
         "ops": [
           {
             "op": "or",
-            "expr": "department.imatch.\"\\\\mva\\\\M\",sub_tier.imatch.\"\\\\mva\\\\M\",and(department.imatch.\"\\\\mveterans\\\\M\",department.imatch.\"\\\\maffairs\\\\M\"),and(sub_tier.imatch.\"\\\\mveterans\\\\M\",sub_tier.imatch.\"\\\\maffairs\\\\M\"),department.imatch.\"\\\\mveterans\\\\M\",sub_tier.imatch.\"\\\\mveterans\\\\M\",department.imatch.\"\\\\mvet\\\\M\",sub_tier.imatch.\"\\\\mvet\\\\M\""
+            "expr": "department.imatch.\"\\\\mva\\\\M\",sub_tier.imatch.\"\\\\mva\\\\M\",and(department.imatch.\"\\\\mveterans\\\\M\",department.imatch.\"\\\\maffairs\\\\M\"),and(sub_tier.imatch.\"\\\\mveterans\\\\M\",sub_tier.imatch.\"\\\\maffairs\\\\M\"),department.imatch.\"\\\\mvet\\\\M\",sub_tier.imatch.\"\\\\mvet\\\\M\""
           }
         ]
       },
@@ -1502,7 +1499,7 @@
           },
           {
             "op": "or",
-            "expr": "awarding_agency.imatch.\"\\\\mva\\\\M\",awarding_sub_agency.imatch.\"\\\\mva\\\\M\",and(awarding_agency.imatch.\"\\\\mveterans\\\\M\",awarding_agency.imatch.\"\\\\maffairs\\\\M\"),and(awarding_sub_agency.imatch.\"\\\\mveterans\\\\M\",awarding_sub_agency.imatch.\"\\\\maffairs\\\\M\"),awarding_agency.imatch.\"\\\\mveterans\\\\M\",awarding_sub_agency.imatch.\"\\\\mveterans\\\\M\",awarding_agency.imatch.\"\\\\mvet\\\\M\",awarding_sub_agency.imatch.\"\\\\mvet\\\\M\""
+            "expr": "awarding_agency.imatch.\"\\\\mva\\\\M\",awarding_sub_agency.imatch.\"\\\\mva\\\\M\",and(awarding_agency.imatch.\"\\\\mveterans\\\\M\",awarding_agency.imatch.\"\\\\maffairs\\\\M\"),and(awarding_sub_agency.imatch.\"\\\\mveterans\\\\M\",awarding_sub_agency.imatch.\"\\\\maffairs\\\\M\"),awarding_agency.imatch.\"\\\\mvet\\\\M\",awarding_sub_agency.imatch.\"\\\\mvet\\\\M\""
           }
         ],
         "naics": []
@@ -1617,9 +1614,6 @@
             "affairs"
           ],
           [
-            "veterans"
-          ],
-          [
             "vet"
           ]
         ]
@@ -1661,7 +1655,7 @@
           },
           {
             "op": "or",
-            "expr": "department.imatch.\"\\\\mva\\\\M\",sub_tier.imatch.\"\\\\mva\\\\M\",and(department.imatch.\"\\\\mveterans\\\\M\",department.imatch.\"\\\\maffairs\\\\M\"),and(sub_tier.imatch.\"\\\\mveterans\\\\M\",sub_tier.imatch.\"\\\\maffairs\\\\M\"),department.imatch.\"\\\\mveterans\\\\M\",sub_tier.imatch.\"\\\\mveterans\\\\M\",department.imatch.\"\\\\mvet\\\\M\",sub_tier.imatch.\"\\\\mvet\\\\M\""
+            "expr": "department.imatch.\"\\\\mva\\\\M\",sub_tier.imatch.\"\\\\mva\\\\M\",and(department.imatch.\"\\\\mveterans\\\\M\",department.imatch.\"\\\\maffairs\\\\M\"),and(sub_tier.imatch.\"\\\\mveterans\\\\M\",sub_tier.imatch.\"\\\\maffairs\\\\M\"),department.imatch.\"\\\\mvet\\\\M\",sub_tier.imatch.\"\\\\mvet\\\\M\""
           }
         ]
       },
@@ -1689,7 +1683,7 @@
           },
           {
             "op": "or",
-            "expr": "awarding_agency.imatch.\"\\\\mva\\\\M\",awarding_sub_agency.imatch.\"\\\\mva\\\\M\",and(awarding_agency.imatch.\"\\\\mveterans\\\\M\",awarding_agency.imatch.\"\\\\maffairs\\\\M\"),and(awarding_sub_agency.imatch.\"\\\\mveterans\\\\M\",awarding_sub_agency.imatch.\"\\\\maffairs\\\\M\"),awarding_agency.imatch.\"\\\\mveterans\\\\M\",awarding_sub_agency.imatch.\"\\\\mveterans\\\\M\",awarding_agency.imatch.\"\\\\mvet\\\\M\",awarding_sub_agency.imatch.\"\\\\mvet\\\\M\""
+            "expr": "awarding_agency.imatch.\"\\\\mva\\\\M\",awarding_sub_agency.imatch.\"\\\\mva\\\\M\",and(awarding_agency.imatch.\"\\\\mveterans\\\\M\",awarding_agency.imatch.\"\\\\maffairs\\\\M\"),and(awarding_sub_agency.imatch.\"\\\\mveterans\\\\M\",awarding_sub_agency.imatch.\"\\\\maffairs\\\\M\"),awarding_agency.imatch.\"\\\\mvet\\\\M\",awarding_sub_agency.imatch.\"\\\\mvet\\\\M\""
           }
         ],
         "naics": [
@@ -3857,9 +3851,6 @@
             "affairs"
           ],
           [
-            "veterans"
-          ],
-          [
             "vet"
           ]
         ]
@@ -3897,7 +3888,7 @@
         "ops": [
           {
             "op": "or",
-            "expr": "department.imatch.\"\\\\mva\\\\M\",sub_tier.imatch.\"\\\\mva\\\\M\",and(department.imatch.\"\\\\mveterans\\\\M\",department.imatch.\"\\\\maffairs\\\\M\"),and(sub_tier.imatch.\"\\\\mveterans\\\\M\",sub_tier.imatch.\"\\\\maffairs\\\\M\"),department.imatch.\"\\\\mveterans\\\\M\",sub_tier.imatch.\"\\\\mveterans\\\\M\",department.imatch.\"\\\\mvet\\\\M\",sub_tier.imatch.\"\\\\mvet\\\\M\""
+            "expr": "department.imatch.\"\\\\mva\\\\M\",sub_tier.imatch.\"\\\\mva\\\\M\",and(department.imatch.\"\\\\mveterans\\\\M\",department.imatch.\"\\\\maffairs\\\\M\"),and(sub_tier.imatch.\"\\\\mveterans\\\\M\",sub_tier.imatch.\"\\\\maffairs\\\\M\"),department.imatch.\"\\\\mvet\\\\M\",sub_tier.imatch.\"\\\\mvet\\\\M\""
           }
         ]
       },
@@ -3921,7 +3912,7 @@
           },
           {
             "op": "or",
-            "expr": "awarding_agency.imatch.\"\\\\mva\\\\M\",awarding_sub_agency.imatch.\"\\\\mva\\\\M\",and(awarding_agency.imatch.\"\\\\mveterans\\\\M\",awarding_agency.imatch.\"\\\\maffairs\\\\M\"),and(awarding_sub_agency.imatch.\"\\\\mveterans\\\\M\",awarding_sub_agency.imatch.\"\\\\maffairs\\\\M\"),awarding_agency.imatch.\"\\\\mveterans\\\\M\",awarding_sub_agency.imatch.\"\\\\mveterans\\\\M\",awarding_agency.imatch.\"\\\\mvet\\\\M\",awarding_sub_agency.imatch.\"\\\\mvet\\\\M\""
+            "expr": "awarding_agency.imatch.\"\\\\mva\\\\M\",awarding_sub_agency.imatch.\"\\\\mva\\\\M\",and(awarding_agency.imatch.\"\\\\mveterans\\\\M\",awarding_agency.imatch.\"\\\\maffairs\\\\M\"),and(awarding_sub_agency.imatch.\"\\\\mveterans\\\\M\",awarding_sub_agency.imatch.\"\\\\maffairs\\\\M\"),awarding_agency.imatch.\"\\\\mvet\\\\M\",awarding_sub_agency.imatch.\"\\\\mvet\\\\M\""
           }
         ],
         "naics": []
@@ -4679,9 +4670,6 @@
             "federal",
             "aviation",
             "administration"
-          ],
-          [
-            "aviation"
           ]
         ]
       }
@@ -4718,7 +4706,7 @@
         "ops": [
           {
             "op": "or",
-            "expr": "department.imatch.\"\\\\mfaa\\\\M\",sub_tier.imatch.\"\\\\mfaa\\\\M\",and(department.imatch.\"\\\\mfederal\\\\M\",department.imatch.\"\\\\maviation\\\\M\",department.imatch.\"\\\\madministration\\\\M\"),and(sub_tier.imatch.\"\\\\mfederal\\\\M\",sub_tier.imatch.\"\\\\maviation\\\\M\",sub_tier.imatch.\"\\\\madministration\\\\M\"),department.imatch.\"\\\\maviation\\\\M\",sub_tier.imatch.\"\\\\maviation\\\\M\""
+            "expr": "department.imatch.\"\\\\mfaa\\\\M\",sub_tier.imatch.\"\\\\mfaa\\\\M\",and(department.imatch.\"\\\\mfederal\\\\M\",department.imatch.\"\\\\maviation\\\\M\",department.imatch.\"\\\\madministration\\\\M\"),and(sub_tier.imatch.\"\\\\mfederal\\\\M\",sub_tier.imatch.\"\\\\maviation\\\\M\",sub_tier.imatch.\"\\\\madministration\\\\M\")"
           }
         ]
       },
@@ -4742,7 +4730,7 @@
           },
           {
             "op": "or",
-            "expr": "awarding_agency.imatch.\"\\\\mfaa\\\\M\",awarding_sub_agency.imatch.\"\\\\mfaa\\\\M\",and(awarding_agency.imatch.\"\\\\mfederal\\\\M\",awarding_agency.imatch.\"\\\\maviation\\\\M\",awarding_agency.imatch.\"\\\\madministration\\\\M\"),and(awarding_sub_agency.imatch.\"\\\\mfederal\\\\M\",awarding_sub_agency.imatch.\"\\\\maviation\\\\M\",awarding_sub_agency.imatch.\"\\\\madministration\\\\M\"),awarding_agency.imatch.\"\\\\maviation\\\\M\",awarding_sub_agency.imatch.\"\\\\maviation\\\\M\""
+            "expr": "awarding_agency.imatch.\"\\\\mfaa\\\\M\",awarding_sub_agency.imatch.\"\\\\mfaa\\\\M\",and(awarding_agency.imatch.\"\\\\mfederal\\\\M\",awarding_agency.imatch.\"\\\\maviation\\\\M\",awarding_agency.imatch.\"\\\\madministration\\\\M\"),and(awarding_sub_agency.imatch.\"\\\\mfederal\\\\M\",awarding_sub_agency.imatch.\"\\\\maviation\\\\M\",awarding_sub_agency.imatch.\"\\\\madministration\\\\M\")"
           }
         ],
         "naics": []
@@ -4865,9 +4853,6 @@
             "housing",
             "urban",
             "development"
-          ],
-          [
-            "housing"
           ]
         ]
       }
@@ -4908,7 +4893,7 @@
           },
           {
             "op": "or",
-            "expr": "department.imatch.\"\\\\mhud\\\\M\",sub_tier.imatch.\"\\\\mhud\\\\M\",and(department.imatch.\"\\\\mhousing\\\\M\",department.imatch.\"\\\\murban\\\\M\",department.imatch.\"\\\\mdevelopment\\\\M\"),and(sub_tier.imatch.\"\\\\mhousing\\\\M\",sub_tier.imatch.\"\\\\murban\\\\M\",sub_tier.imatch.\"\\\\mdevelopment\\\\M\"),department.imatch.\"\\\\mhousing\\\\M\",sub_tier.imatch.\"\\\\mhousing\\\\M\""
+            "expr": "department.imatch.\"\\\\mhud\\\\M\",sub_tier.imatch.\"\\\\mhud\\\\M\",and(department.imatch.\"\\\\mhousing\\\\M\",department.imatch.\"\\\\murban\\\\M\",department.imatch.\"\\\\mdevelopment\\\\M\"),and(sub_tier.imatch.\"\\\\mhousing\\\\M\",sub_tier.imatch.\"\\\\murban\\\\M\",sub_tier.imatch.\"\\\\mdevelopment\\\\M\")"
           }
         ]
       },
@@ -4936,7 +4921,7 @@
           },
           {
             "op": "or",
-            "expr": "awarding_agency.imatch.\"\\\\mhud\\\\M\",awarding_sub_agency.imatch.\"\\\\mhud\\\\M\",and(awarding_agency.imatch.\"\\\\mhousing\\\\M\",awarding_agency.imatch.\"\\\\murban\\\\M\",awarding_agency.imatch.\"\\\\mdevelopment\\\\M\"),and(awarding_sub_agency.imatch.\"\\\\mhousing\\\\M\",awarding_sub_agency.imatch.\"\\\\murban\\\\M\",awarding_sub_agency.imatch.\"\\\\mdevelopment\\\\M\"),awarding_agency.imatch.\"\\\\mhousing\\\\M\",awarding_sub_agency.imatch.\"\\\\mhousing\\\\M\""
+            "expr": "awarding_agency.imatch.\"\\\\mhud\\\\M\",awarding_sub_agency.imatch.\"\\\\mhud\\\\M\",and(awarding_agency.imatch.\"\\\\mhousing\\\\M\",awarding_agency.imatch.\"\\\\murban\\\\M\",awarding_agency.imatch.\"\\\\mdevelopment\\\\M\"),and(awarding_sub_agency.imatch.\"\\\\mhousing\\\\M\",awarding_sub_agency.imatch.\"\\\\murban\\\\M\",awarding_sub_agency.imatch.\"\\\\mdevelopment\\\\M\")"
           }
         ],
         "naics": [

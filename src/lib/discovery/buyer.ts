@@ -48,7 +48,26 @@ export function resolveBuyer(requested: string): ResolvedBuyer {
     seen.add(k);
     identity.push(w);
   }
-  return { requested, canonical: b.canonical, kind: b.kind, needles, identity };
+  return { requested, canonical: b.canonical, kind: b.kind, needles, identity: pruneSubsumedSingles(identity) };
+}
+
+/**
+ * Drop a ONE-word identity set whose word is part of a LONGER identity set of the same buyer.
+ *
+ * Measured 2026-11-14 (Agent 3, C1): the alias table carries short-name needles such as "Housing"
+ * (HUD) and "Health" (HHS). Each becomes a one-word identity set, which matches any agency that
+ * merely contains the word: HUD → Federal HOUSING Finance Agency; HHS → Defense HEALTH Agency,
+ * Animal and Plant HEALTH Inspection Service, Uniformed Services University of the HEALTH Sciences
+ * (195 of 608 active "HHS" notices, none of them HHS). The buyer's own full name already carries the
+ * word, so the single adds no real notice — it only admits other agencies.
+ *
+ * Narrowing only, and deliberately conservative: a single that is NOT a word of a longer set
+ * (an acronym like "hud", or a distinct alias like "vet") is kept, and a buyer with only one set is
+ * never left with nothing.
+ */
+function pruneSubsumedSingles(identity: string[][]): string[][] {
+  const kept = identity.filter((w) => !(w.length === 1 && identity.some((o) => o.length > 1 && o.includes(w[0]))));
+  return kept.length ? kept : identity;
 }
 
 /** One PostgREST `.or()` body over the buyer columns. Null when there is nothing to match on. */
