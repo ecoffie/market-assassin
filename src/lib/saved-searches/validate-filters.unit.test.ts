@@ -150,3 +150,28 @@ describe('list-valued multi-selects count as narrowing (they were rejected as "e
     expect(validateSavedSearchFilters({ state: [' '] }).ok).toBe(false);
   });
 });
+
+describe('a refusal says WHY and WHICH keys (names only), with the agent text unchanged', () => {
+  const cases: [string, unknown, string, string[], RegExp][] = [
+    ['not an object', [], 'not_object', [], /plain object/],
+    ['unknown keys', { naics: '541512', valueRange: '1-2', office: 'W912PL' }, 'unsupported_keys', ['valueRange', 'office'], /Unsupported filter keys: valueRange, office/],
+    ['bad value shape', { naics: '541512', sapBuyer: true }, 'invalid_value', ['sapBuyer'], /Invalid sapBuyer value/],
+    ['unknown NAICS', { naics: '999999' }, 'invalid_naics', ['naics'], /Unknown NAICS/],
+    ['unknown strategy strand', { naics: '541512', strategy: ['nope'] }, 'invalid_strategy', ['strategy'], /Unsupported strategy values: nope/],
+    ['whole market', { horizons: { open: true, recompete: false, forecast: false } }, 'no_narrowing', [], /entire federal market/],
+  ];
+  it.each(cases)('%s', (_n, input, reason, keys, error) => {
+    const res = validateSavedSearchFilters(input);
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.reason).toBe(reason);
+      expect(res.keys).toEqual(keys);
+      expect(res.error).toMatch(error);
+    }
+  });
+  it('refused keys never carry a value', () => {
+    const res = validateSavedSearchFilters({ naics: '541512', sapBuyer: 'SECRET-VALUE-123' });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(JSON.stringify(res.keys)).not.toContain('SECRET');
+  });
+});

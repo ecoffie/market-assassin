@@ -119,7 +119,9 @@ export async function createSavedSearch(
   }
 
   const validated = validateSavedSearchFilters(input.filters);
-  if (!validated.ok) return { ok: false, code: 'invalid_filters', message: validated.error };
+  if (!validated.ok) {
+    return { ok: false, code: 'invalid_filters', message: validated.error, reason: validated.reason, refusedKeys: validated.keys };
+  }
 
   if (isUnsupportedAlertScope(mode, validated.filters)) {
     return { ok: false, code: 'unsupported_alert_scope', message: unsupportedAlertScopeMessage() };

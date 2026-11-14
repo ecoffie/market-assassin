@@ -543,6 +543,8 @@ const PAGE_CSS = '<style>'
   + '.savesearch{font-family:Inter,system-ui,sans-serif;font-size:14.5px;font-weight:700;color:#fff;background:#006aff;'
   + 'border:0;border-radius:8px;height:40px;padding:0 18px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:filter .15s}'
   + '.savesearch:hover{filter:brightness(.94)}.savesearch svg{width:15px;height:15px;stroke:#fff;fill:none;stroke-width:2}'
+  // Save search watches a MARKET; Companies/Buyers (body.is-network, set by setMapMode) have none to email.
+  + 'body.is-network #saveSearchBtn{display:none!important}'
   // Set-aside multi-select dropdown (Zillow "Property type"): position:FIXED so it ESCAPES the
   // .fscroll overflow-x:auto clip (an absolute panel inside it blanked the bar). Big blue checks.
   + '.saselwrap{position:relative;flex:none}'
@@ -5322,6 +5324,9 @@ const VIEWPORT_JS = `<script>
   window.__ssMsg=_ssMsg; window.__ssReset=_ssReset;
   if(_ss)_ss.onclick=function(){
     var t=null; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){}
+    // Companies / Buyers are people, not a market a watch can email. The button is hidden there
+    // (body.is-network CSS); this guard covers any path that still reaches the click.
+    if(MODE==='companies'||MODE==='buyers'){ _ssMsg('Save works on Opportunities'); return; }
     // What this search WATCHES, for the default name — "Open", "Forecasts", or
     // "Open + Forecasts". The old label hard-coded Open/Recompetes and so lied about a
     // forecast search the moment horizons existed.
@@ -5411,13 +5416,21 @@ const VIEWPORT_JS = `<script>
       if(!confirm('Email alerts cover Open Now and Coming Soon. Coming Back contracts are not emailed \\u2014 to follow one, open it and use \\u201cTrack this recompete\\u201d.\\n\\nSave a watch for '+_keep.join(' + ')+'? Your map stays as it is.')){ return; }
       try{ if(window.__track) window.__track('tool_use','watch_scope_narrowed',{mode:MODE,keep:_keep.join('+')}); }catch(e){}
     }
+    // ── P0b: SAVE ONLY WHAT ALERTS CAN APPLY, AND ASK BEFORE LEAVING ANYTHING OUT ─────
+    // __watchFilterPlan translates the two multi-selects to the keys the alert engine reads (same
+    // meaning: the map's own data request merges them the same way) and returns the map-only
+    // filters separately. Those are never dropped silently: the customer confirms first.
+    var _wp=window.__watchFilterPlan?window.__watchFilterPlan(FILT,Q):{filters:(function(){ var f={}; for(var k in FILT){ if(FILT[k]&&FILT[k]!=='all')f[k]=FILT[k]; } if(Q)f.q=Q; return f; })(),excluded:[]};
+    if(_wp.excluded.length){
+      var _okEx=confirm(window.__watchExcludedPrompt?window.__watchExcludedPrompt(_wp.excluded):'Some map filters can\\u2019t be used in alerts. Save the watch without them?');
+      try{ if(window.__track) window.__track('tool_use','watch_filters_excluded',{keys:_wp.excluded.join(','),confirmed:!!_okEx}); }catch(e){}
+      if(!_okEx){ _ssReset(); return; }
+    }
     var _watchLabel=(_plan&&_plan.horizons)?(function(hz){ var on=[]; if(hz.open)on.push('Open Now'); if(hz.forecast)on.push('Coming Soon'); return on.join(' + ')||'Open Now'; })(_plan.horizons):_ssScopeLabel();
     var name=window.prompt('Name this saved search (you\\'ll get alerts on new matches):',
       (FILT.setAside||FILT.naics||Q||'My opportunities')+' — '+_watchLabel);
     if(!name)return;
-    // Snapshot the active filters (skip empties + scope=all) + the current viewport.
-    var filters={}; for(var k in FILT){ if(FILT[k]&&FILT[k]!=='all')filters[k]=FILT[k]; }
-    if(Q)filters.q=Q;
+    var filters=_wp.filters;
     // Capture the HORIZON chips too. Without this a user looking at forecasts saved a
     // search that recorded only "open", so the alert cron could never know to diff
     // agency_forecasts — and forecasts are the one corpus with no other push channel
@@ -5429,32 +5442,46 @@ const VIEWPORT_JS = `<script>
     _ss.textContent='Saving…';
     // A failed save says what to do (window.__saveSearchError) — the button carries the short form, a
     // dialog the full one. status 0 = no response; a non-JSON body still gets an actionable message.
+    // The event records status, code, reason and refused key NAMES only (__saveSearchFailEvent).
     var _ssFail=function(status,d){
       var m=window.__saveSearchError?window.__saveSearchError(status,d):{short:'Couldn\\'t save',detail:''};
-      try{ if(window.__track) window.__track('tool_use','watch_save_failed',{status:status,code:(d&&d.code)||''}); }catch(e){}
+      try{ if(window.__track) window.__track('tool_use','watch_save_failed',window.__saveSearchFailEvent?window.__saveSearchFailEvent(status,d):{status:status,code:(d&&d.code)||''}); }catch(e){}
       _ss.textContent=m.short; _ss.title=m.detail||''; setTimeout(_ssReset,4200);
       if(m.detail){ try{ alert(m.detail); }catch(e){} }
     };
-    fetch('/api/app/saved-searches',{method:'POST',
-      headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
-      body:JSON.stringify({email:em,name:name.slice(0,80),mode:MODE,filters:filters,bbox:b})})
-      .then(function(r){ return r.json().then(function(j){ return {s:r.status,d:j}; },function(){ return {s:r.status,d:null}; }); })
-      .then(function(res){ var d=res.d;
-        if(d&&d.success){
-          // WATCHING is a first-class state and this is the path MOST people use:
-          // measured on prod 2026-09-21, 62 of 62 saved_searches created in 30 days
-          // (34 distinct users) came through HERE, and not one was instrumented. The
-          // anonymous branch above emitted watch_created while this one emitted
-          // nothing, so the only "keep" number the funnel could show was the PURSUIT
-          // count. A watch is not a pursuit, and an uninstrumented watch reads as zero
-          // watches — worse than unknown. anonymous:false keeps the two paths
-          // distinguishable without needing two tokens.
-          // (No backticks in here: this block lives inside a TS template literal.)
-          try{ if(window.__track) window.__track('tool_use','watch_created',{anonymous:false,mode:MODE}); }catch(e){}
-          _ss.textContent='✓ Saved — alerts on'; setTimeout(function(){ if(confirm('Saved! We\\'ll email you when new opportunities match. View your saved searches?'))location.href='/opportunity-map/saved'; else _ssReset(); },400); }
-        // Never a bare "Couldn't save": every known refusal says what to do next.
-        else _ssFail(res.s,d);
-      }).catch(function(){ _ssFail(0,null); });
+    var _ssPost=function(payload,retried){
+      return fetch('/api/app/saved-searches',{method:'POST',
+        headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
+        body:JSON.stringify({email:em,name:name.slice(0,80),mode:MODE,filters:payload,bbox:b})})
+        .then(function(r){ return r.json().then(function(j){ return {s:r.status,d:j}; },function(){ return {s:r.status,d:null}; }); })
+        .then(function(res){ var d=res.d;
+          if(d&&d.success){
+            // WATCHING is a first-class state and this is the path MOST people use:
+            // measured on prod 2026-09-21, 62 of 62 saved_searches created in 30 days
+            // (34 distinct users) came through HERE, and not one was instrumented. The
+            // anonymous branch above emitted watch_created while this one emitted
+            // nothing, so the only "keep" number the funnel could show was the PURSUIT
+            // count. A watch is not a pursuit, and an uninstrumented watch reads as zero
+            // watches — worse than unknown. anonymous:false keeps the two paths
+            // distinguishable without needing two tokens.
+            // (No backticks in here: this block lives inside a TS template literal.)
+            try{ if(window.__track) window.__track('tool_use','watch_created',{anonymous:false,mode:MODE,profile_scope:payload.scope==='profile'}); }catch(e){}
+            _ss.textContent='✓ Saved — alerts on'; setTimeout(function(){ if(confirm('Saved! We\\'ll email you when new opportunities match. View your saved searches?'))location.href='/opportunity-map/saved'; else _ssReset(); },400);
+            return;
+          }
+          // DEFAULT MAP (P0b): nothing narrows it, so the server refuses a whole-market watch. Offer the
+          // customer's own market (their profile industries) instead of a dead end. Asked, never assumed;
+          // tried once. If the profile has no industries, the server says so and that message is shown.
+          if(!retried&&d&&d.code==='invalid_filters'&&d.reason==='no_narrowing'){
+            var _okP=confirm('This map shows the whole federal market, which is too broad to watch.\\n\\nWatch your market instead? Mindy will use the industries on your profile, which you can change in Settings.');
+            try{ if(window.__track) window.__track('tool_use','watch_profile_scope_offered',{accepted:!!_okP}); }catch(e){}
+            if(_okP){ var _pp={}; for(var _pk in payload)_pp[_pk]=payload[_pk]; _pp.scope='profile'; return _ssPost(_pp,true); }
+          }
+          // Never a bare "Couldn't save": every known refusal says what to do next.
+          _ssFail(res.s,d);
+        }).catch(function(){ _ssFail(0,null); });
+    };
+    _ssPost(filters,false);
   };
 
   // Apply a SAVED SEARCH to the map in-place (the reverse of Save search): take its stored

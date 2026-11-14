@@ -37,7 +37,7 @@ function handlerSource(): string {
 type Horizons = { open?: boolean; recompete?: boolean; forecast?: boolean };
 type Reply = { status?: number; body?: unknown; reject?: boolean; nonJson?: boolean };
 
-function run(opts: { horizons: Horizons; mode?: string; signedIn?: boolean; reply?: Reply }) {
+function run(opts: { horizons: Horizons; mode?: string; signedIn?: boolean; reply?: Reply; replies?: Reply[]; filt?: Record<string, unknown>; q?: string; confirmAnswers?: boolean[] }) {
   const calls: { url: string; body: Record<string, unknown> }[] = [];
   const confirms: string[] = [];
   const alerts: string[] = [];
@@ -47,10 +47,12 @@ function run(opts: { horizons: Horizons; mode?: string; signedIn?: boolean; repl
   win.prompt = (_m: string, d: string) => d;
   const btn = { textContent: 'Save search', innerHTML: '', title: '', onclick: null as null | (() => void) };
   const pending: Promise<unknown>[] = [];
-  const reply = opts.reply ?? { status: 200, body: { success: true } };
+  const replies = opts.replies ? [...opts.replies] : null;
   const signedIn = opts.signedIn !== false;
+  const answers = opts.confirmAnswers ? [...opts.confirmAnswers] : null;
   const fetchFn = (url: string, init: { body: string }) => {
     calls.push({ url, body: JSON.parse(init.body) });
+    const reply = (replies ? replies.shift() : opts.reply) ?? { status: 200, body: { success: true } };
     const p: Promise<unknown> = reply.reject
       ? Promise.reject(new TypeError('Failed to fetch'))
       : Promise.resolve({
@@ -69,11 +71,11 @@ function run(opts: { horizons: Horizons; mode?: string; signedIn?: boolean; repl
     _ss: btn,
     _ssReset: () => { btn.textContent = 'Save search'; },
     _ssMsg: (t: string) => { btn.textContent = t; },
-    FILT: { naics: '541512', state: 'VA', setAside: 'all' },
-    Q: '',
+    FILT: opts.filt ?? { naics: '541512', state: 'VA', setAside: 'all' },
+    Q: opts.q ?? '',
     MODE: opts.mode ?? 'open',
     map: { getBounds: () => ({ getWest: () => -80, getSouth: () => 36, getEast: () => -75, getNorth: () => 39 }) },
-    confirm: (m: string) => { confirms.push(m); return true; },
+    confirm: (m: string) => { confirms.push(m); return answers ? answers.shift() !== false : true; },
     prompt: (_m: string, d: string) => d,
     alert: (m: string) => { alerts.push(m); },
     fetch: fetchFn,
@@ -83,7 +85,9 @@ function run(opts: { horizons: Horizons; mode?: string; signedIn?: boolean; repl
   const names = Object.keys(deps);
   new Function(...names, handlerSource())(...names.map((n) => deps[n as keyof typeof deps]));
   btn.onclick!();
-  const settle = () => Promise.all(pending).then(() => new Promise((r) => setImmediate(r)));
+  const settle = async () => {
+    for (let i = 0; i < 5; i++) { await Promise.all(pending); await new Promise((r) => setImmediate(r)); }
+  };
   return { calls, confirms, alerts, events, btn, settle };
 }
 
@@ -192,11 +196,14 @@ describe('a failed save says what to do — never a bare "Couldn\'t save"', () =
     ['nothing deliverable', { status: 400, body: { success: false, code: 'no_deliverable_horizon', error: 'x' } }, /Turn on Open Now or Coming Soon/, /Turn on Open Now or Coming Soon, then save again/],
     ['recompete refused', { status: 400, body: { success: false, code: 'unsupported_alert_scope', error: 'x' } }, /Coming Back isn/, /Track this recompete/],
     ['profile has no NAICS', { status: 400, body: { success: false, code: 'profile_scope_unavailable', error: 'x' } }, /Add NAICS to your profile/, /Add at least one in Settings/],
-    ['invalid filter', { status: 400, body: { success: false, code: 'invalid_filters', error: 'Invalid sapBuyer value' } }, /A filter can/, /Invalid sapBuyer value.*Adjust it/],
+    ['invalid filter value', { status: 400, body: { success: false, code: 'invalid_filters', reason: 'invalid_value', refused_keys: ['sapBuyer'], error: 'Invalid sapBuyer value. Do not coerce or drop the filter and save a broader watch — ask the user to adjust.' } }, /Check a filter/, /Buyer type has a value Mindy can.t save/],
+    ['unsupported filter keys', { status: 400, body: { success: false, code: 'invalid_filters', reason: 'unsupported_keys', refused_keys: ['valueRange', 'office'], error: 'Unsupported filter keys: valueRange, office. Do not drop unsupported filters and activate a broader watch — ask the user to adjust.' } }, /A filter can.t be watched/, /Contract value, Buying office can.t be used in email alerts\. Remove them/],
+    ['unknown NAICS', { status: 400, body: { success: false, code: 'invalid_filters', reason: 'invalid_naics', refused_keys: ['naics'], error: 'Unknown NAICS code "999999" — confirm the intended code with the user' } }, /Check the industry code/, /isn.t a recognized NAICS code/],
+    ['invalid filter, legacy body without reason', { status: 400, body: { success: false, code: 'invalid_filters', error: 'Invalid sapBuyer value' } }, /A filter can.t be saved/, /Adjust your filters, then save again/],
     ['invalid mode', { status: 400, body: { success: false, code: 'invalid_mode', error: 'x' } }, /Switch to Opportunities/, /works on the Opportunities map/],
     ['missing name', { status: 400, body: { success: false, error: 'email and name are required' } }, /Name the search/, /Give this search a name/],
     ['scheduler down (503)', { status: 503, body: { success: false, code: 'scheduler_unavailable', error: 'x' } }, /Try again shortly/, /temporarily unavailable/],
-    ['unexpected 500 with a message', { status: 500, body: { success: false, error: 'boom' } }, /Couldn.t save/, /Nothing was saved: boom.*admin@getmindy\.ai/],
+    ['unexpected 500 with a message', { status: 500, body: { success: false, error: 'boom' } }, /Couldn.t save/, /Nothing was saved\..*admin@getmindy\.ai/],
     ['non-JSON error page (502)', { status: 502, nonJson: true }, /Couldn.t save/, /Nothing was saved\..*admin@getmindy\.ai/],
     ['no connection', { reject: true }, /No connection/, /Check your connection/],
   ])('%s', async (_n, reply, short, detail) => {
@@ -207,6 +214,8 @@ describe('a failed save says what to do — never a bare "Couldn\'t save"', () =
     expect(r.alerts).toHaveLength(1);
     expect(r.alerts[0]).toMatch(detail);
     expect(r.events.some((e) => e[1] === 'watch_save_failed')).toBe(true);
+    // Agent-facing server text never reaches a customer.
+    expect(r.alerts[0]).not.toMatch(/ask the user|Do not (coerce|drop)|confirm the intended code|boom/i);
   });
 
   it('a successful save shows no error', async () => {
@@ -214,5 +223,124 @@ describe('a failed save says what to do — never a bare "Couldn\'t save"', () =
     await r.settle();
     expect(r.btn.textContent).toMatch(/Saved/);
     expect(r.alerts).toEqual([]);
+  });
+});
+
+describe('P0b — map filters the alert engine cannot apply are never dropped silently', () => {
+  const H: Horizons = { open: true, recompete: false, forecast: false };
+  beforeEach(() => { mockFrom.mockReset(); });
+
+  it('multi-selects are translated to the keys alerts read (same meaning as the map request)', async () => {
+    const r = run({ horizons: H, filt: { naics: '541512', setAside: 'SBA', setAsideMulti: 'WOSB,SBA', noticeType: '', noticeMulti: 'Solicitation' } });
+    expect(r.confirms).toEqual([]);
+    expect(r.calls).toHaveLength(1);
+    const f = r.calls[0].body.filters as Record<string, unknown>;
+    expect(f.setAside).toBe('SBA,WOSB');
+    expect(f.noticeType).toBe('Solicitation');
+    expect(f).not.toHaveProperty('setAsideMulti');
+    expect(f).not.toHaveProperty('noticeMulti');
+    const { res } = await service(r.calls[0].body);
+    expect(res.ok).toBe(true);
+  });
+
+  it('map-only filters: asks first, names them in the Filters-panel words, then saves the rest', async () => {
+    // The real 2026-10-29 failure: valueRange rode along with naics/psc and refused the whole save.
+    const r = run({ horizons: H, filt: { naics: '541512', psc: 'DJ01', valueRange: '-5772114', office: 'W912PL' } });
+    expect(r.confirms[0]).toMatch(/can.t use Contract value, Buying office/);
+    expect(r.confirms[0]).toMatch(/match the same opportunities/);
+    const f = r.calls[0].body.filters as Record<string, unknown>;
+    expect(f).toMatchObject({ naics: '541512', psc: 'DJ01' });
+    expect(f).not.toHaveProperty('valueRange');
+    expect(f).not.toHaveProperty('office');
+    const { res } = await service(r.calls[0].body);
+    expect(res.ok).toBe(true);
+    const ev = r.events.find((e) => e[1] === 'watch_filters_excluded');
+    expect(ev?.[2]).toEqual({ keys: 'valueRange,office', confirmed: true });
+    expect(JSON.stringify(r.events)).not.toContain('5772114');
+    expect(JSON.stringify(r.events)).not.toContain('W912PL');
+  });
+
+  it('declining the exclusion saves nothing', () => {
+    const r = run({ horizons: H, filt: { naics: '541512', valueRange: '100-200' }, confirmAnswers: [false] });
+    expect(r.calls).toEqual([]);
+    expect(r.events.find((e) => e[1] === 'watch_filters_excluded')?.[2]).toEqual({ keys: 'valueRange', confirmed: false });
+  });
+
+  it('an unknown key still reaches the server and is refused (strict validation preserved)', async () => {
+    const r = run({ horizons: H, filt: { naics: '541512', brandNewMapFilter: 'x' } });
+    expect(r.calls[0].body.filters).toHaveProperty('brandNewMapFilter');
+    const { res } = await service(r.calls[0].body);
+    expect(res.ok).toBe(false);
+    if (!res.ok) { expect(res.code).toBe('invalid_filters'); expect(res.reason).toBe('unsupported_keys'); expect(res.refusedKeys).toEqual(['brandNewMapFilter']); }
+  });
+
+  it('default map: the server refuses a whole-market watch; Mindy offers the profile market and retries once', async () => {
+    const r = run({
+      horizons: H, filt: { setAside: 'all', strategy: [] },
+      replies: [
+        { status: 400, body: { success: false, code: 'invalid_filters', reason: 'no_narrowing', refused_keys: [], error: 'At least one narrowing filter is required' } },
+        { status: 200, body: { success: true } },
+      ],
+    });
+    await r.settle();
+    expect(r.confirms.some((m) => /too broad to watch/.test(m) && /industries on your profile/.test(m))).toBe(true);
+    expect(r.calls).toHaveLength(2);
+    expect((r.calls[1].body.filters as Record<string, unknown>).scope).toBe('profile');
+    expect(r.btn.textContent).toMatch(/Saved/);
+    // The retry is accepted by the real service and is narrowing (scope=profile).
+    const { res } = await service(r.calls[1].body);
+    expect(res.ok).toBe(true);
+  });
+
+  it('default map, offer declined: plain-English guidance, no retry', async () => {
+    const r = run({
+      horizons: H, filt: {},
+      replies: [{ status: 400, body: { success: false, code: 'invalid_filters', reason: 'no_narrowing', refused_keys: [], error: 'x' } }],
+      confirmAnswers: [false],
+    });
+    await r.settle();
+    expect(r.calls).toHaveLength(1);
+    expect(r.btn.textContent).toMatch(/Narrow the map first/);
+    expect(r.alerts[0]).toMatch(/Search for a word, place or agency/);
+  });
+
+  it('default map, profile has no industries: the second refusal is explained, never retried again', async () => {
+    const r = run({
+      horizons: H, filt: {},
+      replies: [
+        { status: 400, body: { success: false, code: 'invalid_filters', reason: 'no_narrowing', refused_keys: [], error: 'x' } },
+        { status: 400, body: { success: false, code: 'profile_scope_unavailable', error: 'x' } },
+      ],
+    });
+    await r.settle();
+    expect(r.calls).toHaveLength(2);
+    expect(r.btn.textContent).toMatch(/Add NAICS to your profile/);
+  });
+
+  it('Companies / Buyers view: Save does nothing but explain', () => {
+    for (const mode of ['companies', 'buyers']) {
+      const r = run({ horizons: H, mode });
+      expect(r.calls).toEqual([]);
+      expect(r.btn.textContent).toMatch(/Save works on Opportunities/);
+    }
+    expect(MAP).toContain("'body.is-network #saveSearchBtn{display:none!important}'");
+  });
+});
+
+describe('P0a — a failed save records why, by key NAME only', () => {
+  it('watch_save_failed carries status, code, reason and refused key names', async () => {
+    const r = run({
+      horizons: { open: true }, filt: { naics: '541512' },
+      reply: { status: 400, body: { success: false, code: 'invalid_filters', reason: 'unsupported_keys', refused_keys: ['valueRange', 'x"<script>', 'office'], error: 'Unsupported filter keys: valueRange' } },
+    });
+    await r.settle();
+    const ev = r.events.find((e) => e[1] === 'watch_save_failed');
+    expect(ev?.[2]).toEqual({ status: 400, code: 'invalid_filters', reason: 'unsupported_keys', refused_keys: 'valueRange,office' });
+  });
+
+  it('a failure with no body records the status and empty fields', async () => {
+    const r = run({ horizons: { open: true }, filt: { naics: '541512' }, reply: { reject: true } });
+    await r.settle();
+    expect(r.events.find((e) => e[1] === 'watch_save_failed')?.[2]).toEqual({ status: 0, code: '', reason: '', refused_keys: '' });
   });
 });

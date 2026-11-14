@@ -59,27 +59,32 @@ function describeValue(v: unknown): string {
  * the alert cron parses must still be a shape the cron can read. Unknown keys are not checked here.
  */
 export function valueShapeError(filters: Record<string, unknown>): string | null {
+  return valueShapeIssue(filters)?.message ?? null;
+}
+
+/** Same check as valueShapeError, plus WHICH key failed (for customer copy + telemetry: names, never values). */
+export function valueShapeIssue(filters: Record<string, unknown>): { key: string; message: string } | null {
   for (const [k, v] of Object.entries(filters)) {
     if (v === null || v === undefined) continue;
     const got = describeValue(v);
     if (k === 'sapBuyer') {
       if (typeof v !== 'string' || !SAP_BUYER_VALUES.has(v.trim().toLowerCase())) {
-        return `Invalid sapBuyer value (${got} ${JSON.stringify(v)}). Allowed: "most", "somewhat", "vehicle" (or omit it).`;
+        return { key: k, message: `Invalid sapBuyer value (${got} ${JSON.stringify(v)}). Allowed: "most", "somewhat", "vehicle" (or omit it).` };
       }
     } else if (k === 'status') {
       if (typeof v !== 'string' || !STATUS_VALUES.has(v.trim().toLowerCase())) {
-        return `Invalid status value (${got} ${JSON.stringify(v)}). Allowed: "active", "inactive", "all".`;
+        return { key: k, message: `Invalid status value (${got} ${JSON.stringify(v)}). Allowed: "active", "inactive", "all".` };
       }
     } else if (STRING_KEYS.has(k)) {
-      if (typeof v !== 'string') return `Filter ${k} must be a string (got ${got}).`;
+      if (typeof v !== 'string') return { key: k, message: `Filter ${k} must be a string (got ${got}).` };
     } else if (STRING_OR_LIST_KEYS.has(k)) {
       const ok = typeof v === 'string' || (Array.isArray(v) && v.every((x) => typeof x === 'string'));
-      if (!ok) return `Filter ${k} must be a string or a list of strings (got ${got}).`;
+      if (!ok) return { key: k, message: `Filter ${k} must be a string or a list of strings (got ${got}).` };
     } else if (FLAG_KEYS.has(k)) {
-      if (typeof v !== 'boolean' && typeof v !== 'string') return `Filter ${k} must be true/false (got ${got}).`;
+      if (typeof v !== 'boolean' && typeof v !== 'string') return { key: k, message: `Filter ${k} must be true/false (got ${got}).` };
     } else if (NUMBER_KEYS.has(k)) {
       const ok = (typeof v === 'number' && Number.isFinite(v)) || typeof v === 'string';
-      if (!ok) return `Filter ${k} must be a number (got ${got}).`;
+      if (!ok) return { key: k, message: `Filter ${k} must be a number (got ${got}).` };
     }
   }
   return null;
@@ -176,9 +181,22 @@ export function savedSearchNaicsError(filters: Record<string, unknown>): string 
   return `Unknown NAICS code${invalid.length > 1 ? 's' : ''} ${invalid.map((c) => `"${c}"`).join(', ')} — not a Census 2022 NAICS code or prefix. Confirm the intended code with the user; do not substitute one.`;
 }
 
+/**
+ * WHY a filter set was refused, separate from `error` (which is written for agents and stays
+ * unchanged). Clients turn `reason` + `keys` into customer copy; telemetry records the key NAMES,
+ * never their values.
+ */
+export type ValidateFiltersFailureReason =
+  | 'not_object'
+  | 'unsupported_keys'
+  | 'invalid_value'
+  | 'invalid_naics'
+  | 'invalid_strategy'
+  | 'no_narrowing';
+
 export type ValidateFiltersResult =
   | { ok: true; filters: SavedSearchFilters }
-  | { ok: false; error: string };
+  | { ok: false; error: string; reason: ValidateFiltersFailureReason; keys: string[] };
 
 /**
  * Normalize + validate filters before persisting. Rejects malformed input, unknown
@@ -187,7 +205,7 @@ export type ValidateFiltersResult =
  */
 export function validateSavedSearchFilters(raw: unknown): ValidateFiltersResult {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    return { ok: false, error: 'filters must be a plain object' };
+    return { ok: false, error: 'filters must be a plain object', reason: 'not_object', keys: [] };
   }
 
   const rawObj = raw as Record<string, unknown>;
@@ -203,15 +221,22 @@ export function validateSavedSearchFilters(raw: unknown): ValidateFiltersResult 
         `Unsupported filter keys: ${unknownKeys.join(', ')}. ` +
         `Supported: ${ALLOWED_SAVED_SEARCH_FILTER_KEYS.join(', ')}. ` +
         `Do not drop unsupported filters and activate a broader watch — ask the user to adjust.${hint}`,
+      reason: 'unsupported_keys',
+      keys: unknownKeys,
     };
   }
 
-  const shapeErr = valueShapeError(rawObj);
-  if (shapeErr) {
-    return { ok: false, error: `${shapeErr} Do not coerce or drop the filter and save a broader watch — ask the user to adjust.` };
+  const shapeIssue = valueShapeIssue(rawObj);
+  if (shapeIssue) {
+    return {
+      ok: false,
+      error: `${shapeIssue.message} Do not coerce or drop the filter and save a broader watch — ask the user to adjust.`,
+      reason: 'invalid_value',
+      keys: [shapeIssue.key],
+    };
   }
   const naicsErr = savedSearchNaicsError(rawObj);
-  if (naicsErr) return { ok: false, error: naicsErr };
+  if (naicsErr) return { ok: false, error: naicsErr, reason: 'invalid_naics', keys: ['naics'] };
 
   const filters: SavedSearchFilters = { ...(raw as SavedSearchFilters) };
 
@@ -225,6 +250,8 @@ export function validateSavedSearchFilters(raw: unknown): ValidateFiltersResult 
           `Unsupported strategy values: ${unknownStrategy.join(', ')}. ` +
           `Allowed: ${(STRATEGY_STRAND_KEYS as readonly string[]).join(', ')}. ` +
           `Do not drop unsupported strategy strands and save a broader watch.`,
+        reason: 'invalid_strategy',
+        keys: ['strategy'],
       };
     }
     if (Array.isArray(filters.strategy)) {
@@ -241,6 +268,8 @@ export function validateSavedSearchFilters(raw: unknown): ValidateFiltersResult 
       ok: false,
       error:
         'At least one narrowing filter is required (naics, agency, q, state, set-aside, strategy, scope=profile, or forecast horizon). Cannot schedule a watch for the entire federal market.',
+      reason: 'no_narrowing',
+      keys: [],
     };
   }
 

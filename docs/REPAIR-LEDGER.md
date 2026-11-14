@@ -26,6 +26,13 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-14 — Map Save search: customer-language errors + map/watch filter parity (P0a/P0b)
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-14 | Map Save search / filters | **7 of 12 signed-in users whose save failed (35 days) never got their watch.** The map copied every map filter into the save; 11 map-only keys (valueRange, setAsideMulti, noticeMulti, office, fsc, sap, likelihood, leadMax, vehicle, parent, work) refused the whole save, and the default map was refused as "entire market". Now: the two multi-selects translate to setAside/noticeType (same merge the map's own request does); map-only filters are left out only after a confirm; a default-map refusal offers the profile market (scope=profile) once; Save is hidden on Companies/Buyers. Server validation unchanged (strict). | `__watchFilterPlan` → `src/lib/saved-searches/watch-scope-client.ts`; `map-watch-filter-parity` → `src/app/opportunity-map/map-watch-filter-parity.unit.test.ts` | Real handler → real service end-to-end tests (save-search-errors.unit.test.ts); parity test proven red on an unregistered key, green after revert | Branch fix/map-watch-save-p0, not merged |
+| 2026-11-14 | Map Save search / errors + telemetry | **Customers were shown agent-facing validator text** ("Do not drop unsupported filters… ask the user to adjust") and raw 500 messages. The validator now returns `reason` + refused key names (agent `error` text unchanged for MCP); the map shows customer copy only and logs `watch_save_failed` with status, code, reason and refused key NAMES (validated, capped, never values). | `__saveSearchFailEvent` → `src/lib/saved-searches/watch-scope-client.ts`; `reason: 'no_narrowing'` → `src/lib/saved-searches/validate-filters.ts` | validate-filters.unit.test.ts reason/keys cases; error-copy cases assert no agent text reaches the dialog | Branch fix/map-watch-save-p0, not merged |
+
 ## 2026-11-14 — Ask Mindy safety release + Phase 0 (Option C, approved 2026-11-13)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

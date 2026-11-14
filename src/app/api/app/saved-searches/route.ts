@@ -187,7 +187,15 @@ export async function POST(request: NextRequest) {
       created.code === 'profile_scope_unavailable'
     ) {
       // `code` is additive: lets a client explain a deliberate refusal instead of "Couldn't save".
-      return NextResponse.json({ success: false, error: created.message, code: created.code }, { status: 400 });
+      // `reason` + `refused_keys` (invalid_filters only) are additive too: the Map turns them into
+      // customer copy and logs the key NAMES. `error` stays the agent-facing text for other callers.
+      return NextResponse.json({
+        success: false,
+        error: created.message,
+        code: created.code,
+        ...(created.reason ? { reason: created.reason } : {}),
+        ...(created.refusedKeys ? { refused_keys: created.refusedKeys } : {}),
+      }, { status: 400 });
     }
     return NextResponse.json({ success: false, error: created.message, code: created.code }, { status: 500 });
   }
