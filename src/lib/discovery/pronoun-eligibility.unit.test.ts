@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildTextMatcher, matchesText, textPredicate, PRONOUNS } from './matcher';
+import { buildTextMatcher, matchesText, textPredicate, PRONOUNS, FUNCTION_WORDS } from './matcher';
 
 /**
  * Live defect (reported by Agent 4, 2026-11-14, after #2047): in a typed sentence the pronoun "we" (in 2.9% of
@@ -54,6 +54,23 @@ describe('a pronoun is never an eligibility term', () => {
       expect(p).not.toMatch(/\\\\m(we|i|our|us|you)(s|\(s\))?[?]?\\\\M/);
     }
   });
+});
+
+describe('sentence forms (Agent 1): no closed-class function word ever admits or pairs', () => {
+  const OPENERS = ['We', 'We also', 'Our company', 'Our team can', 'I', 'My firm will', 'They say we', 'Both of us', 'We are able to'];
+  const VERBS = ['provide', 'offer', 'perform', 'make', 'supply', 'install', 'repair', 'deliver'];
+  const NOUNS = ['security guards', 'janitorial services', 'HVAC systems', 'medical staffing', 'metal roofing', 'replacement parts',
+    'grounds maintenance and waste removal', 'IT help desk support'];
+  const sentences = OPENERS.flatMap((o) => VERBS.flatMap((v) => NOUNS.map((n) => `${o} ${v} ${n} for agencies, so that is what we do.`)));
+  it(`covers ${sentences.length} sentences`, () => {
+    for (const q of sentences) {
+      for (const a of buildTextMatcher(q).alternatives) {
+        for (const c of a.eligible) if (FUNCTION_WORDS.has(c.label)) throw new Error(`"${c.label}" admits in: ${q}`);
+        for (const l of a.partnerRequired || []) if (FUNCTION_WORDS.has(l)) throw new Error(`"${l}" pairs in: ${q}`);
+      }
+    }
+  });
+  it('every pronoun is a function word', () => { for (const p of PRONOUNS) expect(FUNCTION_WORDS.has(p)).toBe(true); });
 });
 
 describe('unchanged', () => {
