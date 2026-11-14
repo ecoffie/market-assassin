@@ -943,7 +943,9 @@ export async function POST(request: NextRequest) {
         // Card chat charge: ONE debit per successful non-Pro card turn, through the existing atomic ledger
         // function (refuses to go below zero). Failed, empty or tools-unavailable turns cost nothing.
         let creditsCharged = 0;
-        if (isBillableTurn({ billable: cardBillable, answer: assistantContent, streamError: false, plannerUnavailable, finishReason })) {
+        // clientGone: the browser disconnected before the answer finished arriving. That answer was not
+        // received, so it is not charged; a retry after a dropped connection therefore costs once, not twice.
+        if (isBillableTurn({ billable: cardBillable, answer: assistantContent, streamError: clientGone, plannerUnavailable, finishReason })) {
           try {
             const d = await debitCredits(auth.email!, turnCredits, { reason: 'card_chat_turn', toolName: 'ask_mindy_card' });
             if (d.ok) creditsCharged = turnCredits;

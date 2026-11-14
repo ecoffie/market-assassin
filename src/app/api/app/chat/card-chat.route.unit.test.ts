@@ -225,3 +225,21 @@ describe('conversation continuity and ownership', () => {
     expect(JSON.stringify(msg?.row ?? state.inserts)).toContain(NID);
   });
 });
+
+describe('no duplicate charge on a dropped connection', () => {
+  it('the browser disconnects mid-answer → the turn is not charged (so a retry costs once)', async () => {
+    vi.resetModules();
+    const { POST } = await import('./route');
+    const req = new Request('https://getmindy.ai/api/app/chat', { method: 'POST', body: JSON.stringify({ email: ME, message: 'When is it due?', ...card }) });
+    const res = await POST(req as never);
+    const reader = res.body!.getReader();
+    await reader.read();            // the session event arrives
+    await reader.cancel();          // the visitor's connection drops
+    await new Promise((r) => setTimeout(r, 30));
+    expect(debitCredits).not.toHaveBeenCalled();
+  });
+  it('a retry after the drop is charged exactly once', async () => {
+    await post(card);
+    expect(debitCredits).toHaveBeenCalledTimes(1);
+  });
+});
