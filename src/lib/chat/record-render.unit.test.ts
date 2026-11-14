@@ -403,3 +403,15 @@ describe('attempt-2 fixes', () => {
     expect(r.text).not.toMatch(/top_places|No window given/);
   });
 });
+
+describe('truth gate: closing sentences must be next-step guidance', () => {
+  it('drops declarative summaries that characterize the records; keeps imperative next steps', () => {
+    const r = lintAnalysis('You have a solid list of agencies in the San Antonio area that purchase security guard services. Next, review the expiring contracts to identify potential opportunities.');
+    expect(r.text).toBe('Next, review the expiring contracts to identify potential opportunities.');
+    const r1 = lintAnalysis('You have several expiring contracts in Tennessee for warehouse work. Review each description to confirm the work aligns with your capabilities.');
+    expect(r1.text).toBe('Review each description to confirm the work aligns with your capabilities.');
+  });
+  it('drops hedged suggestions that carry assumptions ("Consider", "If you are interested")', () => {
+    expect(lintAnalysis('If you\'re interested in pursuing similar opportunities, consider reaching out to the listed contractors.', 'FALLBACK').text).toBe('FALLBACK');
+  });
+});
