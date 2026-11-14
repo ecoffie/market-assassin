@@ -23,6 +23,7 @@ export const CHAT_FETCH_LIMIT = 200;
 type Rec = Record<string, unknown>;
 
 import { US_STATE_NAMES } from '@/lib/utils/us-states';
+import { interpretCapabilityNaics } from '@/lib/market/capability-naics';
 /** A state named in a record's own description that differs from its reported place of performance. */
 export function describedStateConflict(description: string, popState: string): string | null {
   if (!description || !popState) return null;
@@ -67,20 +68,6 @@ export function describedPlaceConflict(description: string, popState: string): s
   const scope = up.match(/\b(NATIONWIDE|NATION-WIDE|CONUS|THROUGHOUT THE (?:SOUTHERN|NORTHERN) BORDER|MULTIPLE STATES|ALL STATES|THROUGHOUT THE UNITED STATES)\b/);
   if (scope) return `${scope[1].toLowerCase()} (work beyond one state)`;
   const map = cityStateMap();
-  // A description that ENDS with a place name ("... SUPPORT SERVICES CURLEW").
-  const tail = up.replace(/[^A-Z .'-]+$/g, '').trim().split(/\s+/);
-  for (let n = Math.min(3, tail.length); n >= 1; n--) {
-    const name = tail.slice(tail.length - n).join(' ');
-    const states = map.get(name);
-    // The name must stand alone at the end: the word before it is an activity word, not part of a
-    // longer place name ("COLUMBIA BASIN" must not match the town of Basin).
-    const before = tail[tail.length - n - 1] ?? '';
-    const standsAlone = /^(SERVICES?|SUPPORT|NON-CLINICAL|CLINICAL|AT|IN|FOR|-|OPERATIONS)$/.test(before);
-    if (states && name.length >= 4 && standsAlone) {
-      if (!states.has(popState) && !/^(SERVICES?|SUPPORT|SECURITY|GUARD|CENTER|PROGRAM|FUNDING)$/.test(name)) return name.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
-      break;
-    }
-  }
   for (const re of cues) {
     for (const m of up.matchAll(re)) {
       const words = m[1].trim().split(/\s+/);
@@ -116,6 +103,10 @@ export interface RenderedRecords {
   allowedCounts: number[];
   standalone: number;
   orders: number;
+  /** Records marked CHECK (expiring lists). */
+  flaggedIds?: string[];
+  /** Buying offices: each office's example award numbers (for cross-checking against CHECK records). */
+  officeExamples?: Array<{ office: string; ids: string[] }>;
 }
 
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : v == null ? '' : String(v).trim());
@@ -197,6 +188,15 @@ export function relevanceStems(phrases: string[]): string[] {
 }
 
 let RELEVANCE_STEMS: string[] = [];
+let REQUESTED_LABELS: string[] = [];
+
+/** A different capability the record's OWN description names (positive evidence only, from Mindy's lexicon). */
+export function describedOtherWork(description: string, requestedLabels: string[]): string | null {
+  if (!description || !requestedLabels.length) return null;
+  const labels = interpretCapabilityNaics(description).items.map((it) => it.label);
+  if (!labels.length || labels.some((l) => requestedLabels.includes(l))) return null;
+  return labels[0];
+}
 
 function recordLine(n: number, r: Rec & { _kind: string }): string {
   const id = str(r.piid) || str(r.contract_id) || 'number not recorded';
@@ -214,16 +214,19 @@ function recordLine(n: number, r: Rec & { _kind: string }): string {
   const desc = clip(str(r.description), 180);
   const value = money(r.total_obligation);
   const conflict = describedPlaceConflict(str(r.description), st);
+  const otherWork = describedOtherWork(str(r.description), REQUESTED_LABELS);
 
-  return `${n}. ${id} · ${who} · ${agency} · ${place} · ends ${end} · ${kind}${value ? ` · obligated ${value}` : ''}${desc ? ` · ${desc}` : ''}${conflict ? ` · CHECK: the description names ${conflict}, which is not in the reported place-of-performance state ${st}; this record may not belong to the requested place` : ''}`;
+  return `${n}. ${id} · ${who} · ${agency} · ${place} · ends ${end} · ${kind}${value ? ` · obligated ${value}` : ''}${desc ? ` · ${desc}` : ''}${conflict ? ` · CHECK: the description names ${conflict}, which is not in the reported place-of-performance state ${st}; this record may not belong to the requested place` : ''}${otherWork ? ` · CHECK: the description describes ${otherWork} work, not the work requested` : ''}`;
 }
 
 /**
  * Render a get_expiring_contracts result. `offset` is the 0-based index of the first record to
  * display (continuations). Returns null when the result is not renderable (no _meta).
  */
-export function renderExpiringRecords(result: Rec, opts: { offset?: number; pageSize?: number; relevancePhrases?: string[] } = {}): RenderedRecords | null {
+export function renderExpiringRecords(result: Rec, opts: { offset?: number; pageSize?: number; relevancePhrases?: string[]; requestedLabels?: string[] } = {}): RenderedRecords | null {
   RELEVANCE_STEMS = relevanceStems(opts.relevancePhrases ?? []);
+  REQUESTED_LABELS = opts.requestedLabels ?? [];
+  let flaggedIdsOut: string[] = [];
   const meta = (result?._meta && typeof result._meta === 'object' ? result._meta : null) as Rec | null;
   if (!meta) return null;
   const pageSize = Math.max(1, Math.min(opts.pageSize ?? DISPLAY_PAGE, 50));
@@ -257,8 +260,10 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
     const byAgency = new Map<string, number>();
     for (const r of records) { const a = title(str(r.awarding_agency)) || 'agency not recorded'; byAgency.set(a, (byAgency.get(a) ?? 0) + 1); }
     lines.push(`By awarding agency: ${[...byAgency.entries()].sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1)).map(([a, n]) => `${a} ${n}`).join('; ')}.`);
-    const flagged = records.filter((r) => describedPlaceConflict(str(r.description), str(r.place_of_performance_state))).length;
-    if (flagged) lines.push(`${flagged} record${flagged === 1 ? '' : 's'} carry a description that names a place outside the reported state (marked CHECK); the count above includes them as reported by USASpending.`);
+    const flaggedRecs = records.filter((r) => describedPlaceConflict(str(r.description), str(r.place_of_performance_state)) || describedOtherWork(str(r.description), REQUESTED_LABELS));
+    const flagged = flaggedRecs.length;
+    flaggedIdsOut = flaggedRecs.map((r) => str(r.piid) || str(r.contract_id));
+    if (flagged) lines.push(`${flagged} record${flagged === 1 ? ' carries' : 's carry'} a description that names a place outside the reported state or describes different work (marked CHECK); the count above includes them as reported by USASpending.`);
     const exhaustiveNow = from === 1 && to === total && retrieved === total;
     lines.push(exhaustiveNow
       ? `Showing all ${total}, soonest end date first.`
@@ -282,7 +287,7 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
   }
   const ids = page.map((r) => str(r.piid) || str(r.contract_id));
   const allowedCounts = Array.from(new Set([total, retrieved, page.length, standalone, orders, from, to].filter((n) => n >= 0)));
-  return { tool: EXPIRING_TOOL, text: lines.join('\n'), total, retrieved, from, to, shown: page.length, exhaustive, ids, allowedCounts, standalone, orders };
+  return { tool: EXPIRING_TOOL, text: lines.join('\n'), total, retrieved, from, to, shown: page.length, exhaustive, ids, allowedCounts, standalone, orders, flaggedIds: flaggedIdsOut };
 }
 
 /**
@@ -468,6 +473,7 @@ export function renderBuyingOffices(result: Rec): RenderedRecords | null {
   return {
     tool: BUYING_OFFICES_TOOL, text: lines.join('\n'), total, retrieved: offices.length, from: offices.length ? 1 : 0, to: offices.length,
     shown: offices.length, exhaustive: offices.length === total, ids: offices.map((o) => str(o.office_code) || str(o.office_name)),
+    officeExamples: offices.map((o) => ({ office: `${str(o.office_name)}${o.office_code ? ` (${str(o.office_code)})` : ''}`, ids: (Array.isArray(o.example_awards) ? (o.example_awards as Rec[]) : []).map((e) => str(e.piid) || str(e.award_id)).filter(Boolean) })),
     allowedCounts: Array.from(new Set([total, offices.length, num(totals?.award_count) ?? -1].filter((n) => n >= 0))), standalone: offices.length, orders: 0,
   };
 }
@@ -631,4 +637,18 @@ export function lintAnalysis(text: string, fallback = 'Review each record and it
   }
   const out = kept.join(' ').replace(/\s+\n/g, '\n').trim();
   return { text: out || fallback, dropped };
+}
+
+/** Cross-check within one answer: an office whose example award is a CHECK record says so. */
+export function crossCheckOffices(rendered: RenderedRecords[]): void {
+  const flagged = new Set(rendered.flatMap((r) => r.flaggedIds ?? []));
+  if (!flagged.size) return;
+  for (const r of rendered) {
+    if (!r.officeExamples) continue;
+    const notes = r.officeExamples
+      .map((o) => ({ office: o.office, hits: o.ids.filter((id) => flagged.has(id)) }))
+      .filter((o) => o.hits.length)
+      .map((o) => `${o.office}: example award ${o.hits.join(', ')} is marked CHECK in the expiring list (it may not be guard work in this place), so treat this office's ranking with caution`);
+    if (notes.length) r.text += `\n\nCHECK: ${notes.join('; ')}.`;
+  }
 }

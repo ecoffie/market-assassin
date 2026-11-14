@@ -4,7 +4,7 @@
  * summaries that contradict the verified counts.
  */
 import { describe, it, expect } from 'vitest';
-import { renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, describedStateConflict, describedPlaceConflict, lintAnalysis, collectExpiringRecords, checkSummaryAgainstRecords, prepareChatToolArgs, CHAT_FETCH_LIMIT } from './record-render';
+import { renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, describedStateConflict, describedPlaceConflict, describedOtherWork, crossCheckOffices, lintAnalysis, collectExpiringRecords, checkSummaryAgainstRecords, prepareChatToolArgs, CHAT_FETCH_LIMIT } from './record-render';
 
 const rec = (piid: string, end: string, extra: Record<string, unknown> = {}) => ({
   contract_id: `CONT_${piid}`, piid, incumbent_name: 'ALLPRO STAFFNET LLC', awarding_agency: 'Department of Veterans Affairs',
@@ -252,7 +252,7 @@ describe('independent-review fixes', () => {
       _meta: meta({ total: 2 }),
     })!;
     expect(r.text).toMatch(/By awarding agency: Department of Justice 1; Department of Veterans Affairs 1\./);
-    expect(r.text).toMatch(/1 record carry a description that names a place outside the reported state/);
+    expect(r.text).toMatch(/1 record carries a description that names a place outside the reported state or describes different work/);
   });
   it('plain award search: every award with dates, the date-filter meaning, not-the-full-list and data status', () => {
     const r = renderStatusChecks({
@@ -309,7 +309,9 @@ describe('run-E review: place conflicts from the record text', () => {
   it('flags scope words and a trailing out-of-state place; leaves in-state and unknown names alone', () => {
     expect(describedPlaceConflict('THIS TASK ORDER PROVIDES NATIONWIDE TRANSPORTATION OF UNACCOMPANIED MINORS', 'TX')).toMatch(/nationwide/);
     expect(describedPlaceConflict('PROTECTIVE SECURITY OFFICER (PSO) SERVICES THROUGHOUT THE SOUTHERN BORDER', 'TX')).toMatch(/southern border/);
-    expect(describedPlaceConflict('JOB CORPS PRIORITY 3 SUPPORT SERVICES NON-CLINICAL COLLBRAN', 'TX')).toBe('Collbran');
+    // Names without a place cue are never guessed (Jacobs Creek Job Corps is in TN; a guess flagged it as out of state).
+    expect(describedPlaceConflict('JOB CORPS PRIORITY 3 SUPPORT SERVICES NON-CLINICAL COLLBRAN', 'TX')).toBeNull();
+    expect(describedPlaceConflict('JOB CORPS PRIORITY 3 SUPPORT SERVICES JACOBS CREEK', 'TN')).toBeNull();
     expect(describedPlaceConflict('GUARD SERVICES', 'TX')).toBeNull();
     expect(describedPlaceConflict('CIRCUIT 5 D79 - FY 2027 CSO PROGRAM FUNDING', 'TX')).toBeNull();
     expect(describedPlaceConflict('JOB CORPS PRIORITY 3 NON-CLINICAL SUPPORT SERVICES COLUMBIA BASIN', 'TX')).toBeNull();
@@ -321,5 +323,22 @@ describe('run-E review: place conflicts from the record text', () => {
   it('an empty lagged search points to SAM.gov award notices', () => {
     const r = renderStatusChecks({ awards: [], _meta: { lag_note: 'published with a ~90-day delay, so the data is only reliably current through about 2026-08-15.' } })!;
     expect(r.text).toMatch(/check SAM\.gov award notices/);
+  });
+});
+
+describe('different work: positive evidence only', () => {
+  it('flags a description that names a different capability; never flags by missing keywords', () => {
+    expect(describedOtherWork('THIS TASK ORDER PROVIDES FOR THE TRANSPORTATION OF ICE DETAINEES', ['security guards'])).toBe('transportation');
+    expect(describedOtherWork('PROGRAM AND ADMINISTRATIVE SUPPORT SERVICES', ['security guards'])).toBe('clerical and administrative support');
+    expect(describedOtherWork('CIRCUIT 5 D79 - FY 2027 CSO PROGRAM FUNDING', ['security guards'])).toBeNull();
+    expect(describedOtherWork('FACT WITNESS CLERK', ['temporary staffing', 'clerical and administrative support'])).toBeNull();
+    expect(describedOtherWork('ADMINISTRATIVE CLERK', ['clerical and administrative support'])).toBeNull();
+  });
+  it('an office resting on a CHECK record says so (no contradiction between halves of one answer)', () => {
+    const exp = { flaggedIds: ['70T05026F5900N004'] } as never;
+    const offices = { text: 'offices', officeExamples: [{ office: 'MISSION ESSENTIALS (70T050)', ids: ['70T05026F5900N004'] }, { office: 'OTHER (X1)', ids: ['A1'] }] } as never;
+    crossCheckOffices([exp, offices]);
+    expect((offices as { text: string }).text).toMatch(/CHECK: MISSION ESSENTIALS \(70T050\): example award 70T05026F5900N004 is marked CHECK/);
+    expect((offices as { text: string }).text).not.toMatch(/OTHER \(X1\)/);
   });
 });
