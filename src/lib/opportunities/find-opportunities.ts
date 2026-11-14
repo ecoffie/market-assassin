@@ -60,6 +60,7 @@ import {
   classifyComingBackEvidence,
   holderSignalWhy,
   buyerNameWhy,
+  relatedCodeWhy,
   companyCodeWhy,
   type ComingBackClass,
   type MatchBasis,
@@ -718,6 +719,8 @@ export function labelOpenRow(
       else if (openEvidenceClass(stripped, plan, cap) === 'DIRECT_MATCH') basis.push('buy_side_text');
       else { cls = 'RELATED_MARKET_CANDIDATE'; basis.push('buyer_name'); }
     }
+  } else if (cls === 'RELATED_MARKET_CANDIDATE' && cap.related_market && codeIn(cap.related_market.naics, row.naics_code)) {
+    basis.push('related_market_code');
   }
   const company = companyRecallBasis(row, anchor);
   if (company) basis.push(company);
@@ -727,6 +730,7 @@ export function labelOpenRow(
 
 function openWhy(label: OpenLabel, phrase: string, row: Record<string, unknown>): string {
   if (label.basis[0] === 'buyer_name') return buyerNameWhy(phrase);
+  if (label.basis[0] === 'related_market_code') return relatedCodeWhy(phrase, row as { naics_code?: string; naics_description?: string });
   const company = label.basis.find((b) => b === 'company_registered_psc' || b === 'company_registered_naics') as
     | 'company_registered_psc' | 'company_registered_naics' | undefined;
   if (label.cls === 'WEAK_NON_MARKET' && company) return companyCodeWhy(company, row as { naics_code?: string; psc_code?: string });
@@ -1074,7 +1078,9 @@ async function queryComingBack(
         ? companyCodeWhy(basis.includes('company_registered_psc') ? 'company_registered_psc' : 'company_registered_naics', r as { naics_code?: string; psc_code?: string }, 'contract')
         : cls === 'HOLDER_SIGNAL'
           ? holderSignalWhy(phraseBack, r as { incumbent_name?: string; naics_code?: string; psc_code?: string })
-          : basis[0] === 'buyer_name' ? buyerNameWhy(phraseBack) : evidenceWhy(cls, phraseBack),
+          : basis[0] === 'buyer_name' ? buyerNameWhy(phraseBack)
+          : basis[0] === 'related_market_code' ? relatedCodeWhy(phraseBack, r as { naics_code?: string; naics_description?: string })
+          : evidenceWhy(cls, phraseBack),
       identity: { kind: 'contract_id', id: String(r.contract_id || '') },
       ...(cls ? { evidence_class: cls } : {}),
       match_basis: basis,

@@ -100,8 +100,14 @@ export function openDirectPsc(cap: CapabilityInterpretation): string[] {
   return [...cap.direct.psc];
 }
 
-/** Direct NAICS only — related-market codes stay on Coming back. */
+/** Open retrieval NAICS: direct codes (plus an industry preset's related family; see below). */
 export function openRetrievalNaics(cap: CapabilityInterpretation): string[] {
+  // An industry preset's related family (e.g. janitorial -> facilities support, landscaping) is
+  // still RETRIEVED on Open, exactly as before the direct/related split; it is only labelled
+  // RELATED_MARKET_CANDIDATE instead of DIRECT. Cyber keeps Open on its direct codes only.
+  if (cap.kind === 'industry_preset' && cap.related_market) {
+    return [...cap.direct.naics, ...cap.related_market.naics];
+  }
   return [...cap.direct.naics];
 }
 
