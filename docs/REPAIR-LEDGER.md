@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-14 — Ask Mindy on Opportunity Map cards (behind MAP_CARD_CHAT_ENABLED, off)
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-14 | Card chat / context + access + credits | Opportunity cards get "Ask Mindy about this opportunity" (flag-gated). The browser sends only the notice id; `/api/app/chat` loads the record + relevant SOW excerpt server-side (shared `selectRelevantRfp`, moved from Proposal Assist) and narrows tools to `CARD_CHAT_TOOLS`. Pro unchanged and never charged; a non-Pro account may ask on a card with ≥ one turn of existing credits; one debit (`card_chat_turn`, default 10) via `mcp_debit_credits` after a successful answer only. Also fixes a pre-existing gap: a supplied session id is reused only if it belongs to the caller. | `cardChatAccess` → `src/lib/chat/card-chat.ts`; `card_chat_turn` → `src/app/api/app/chat/route.ts`; `window.__askAboutOpp` → `src/app/opportunity-map/route.ts` | card-chat.unit.test.ts; card-chat.route.unit.test.ts (real route, mocked services; mutation-proven); card-chat-drawer.unit.test.ts (real drawer script in jsdom; mutation-proven) | Branch feat/card-chat, not merged |
+
 ## 2026-11-14 — Ask Mindy safety release + Phase 0 (Option C, approved 2026-11-13)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

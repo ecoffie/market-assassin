@@ -62,6 +62,11 @@ const providerApprovedForPrivate = (provider: string): boolean =>
 const TRACE_EVENTS = process.env.ASK_MINDY_TRACE_EVENTS === 'true' && process.env.VERCEL_ENV !== 'production';
 const TRACE_RESULT_CHARS = Number(process.env.ASK_MINDY_TRACE_RESULT_CHARS) || 6000;
 import { shadowEntitlement } from '@/lib/entitlements/shadow';
+import {
+  isCardChatEnabled, cardChatTurnCredits, parseOpportunityContext, cardChatAccess, isBillableTurn,
+  CARD_CHAT_TOOLS, OPPORTUNITY_COLUMNS, buildOpportunityContextBlock, type OpportunityRecord,
+} from '@/lib/chat/card-chat';
+import { debitCredits } from '@/lib/mcp/credits';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -320,11 +325,39 @@ export async function POST(request: NextRequest) {
   // free user could call this API directly). 403 → the UI shows the upgrade prompt.
   const chatPro = await hasProAccess(auth.email);
   shadowEntitlement({ route: 'app/chat POST', capability: 'chat.ask', email: auth.email, identityVerified: true, currentAllow: chatPro });
-  if (!chatPro) {
-    return new Response(JSON.stringify({ error: 'pro_required', upgrade: true }), {
-      status: 403,
-      headers: { 'Content-Type': 'application/json' },
-    });
+
+  // ── Opportunity Map card chat (behind MAP_CARD_CHAT_ENABLED; see src/lib/chat/card-chat.ts) ──
+  // With the flag off, `context` is ignored entirely and this route behaves exactly as before.
+  // The client sends only the notice id; the record is loaded here, never taken from the client.
+  const cardFlag = isCardChatEnabled();
+  const cardCtx = cardFlag ? parseOpportunityContext((body as { context?: unknown }).context) : null;
+  const turnCredits = cardChatTurnCredits();
+  let cardBalance: number | null = null;
+  if (!chatPro && cardCtx) {
+    const { data: bal, error: balErr } = await getSupabase()
+      .from('mcp_credit_balance').select('balance').eq('user_email', auth.email).maybeSingle();
+    // A failed read is UNKNOWN, never "has credits" (and never a fabricated 0 shown as truth).
+    cardBalance = balErr ? null : Number((bal as { balance?: number } | null)?.balance ?? 0);
+  }
+  const access = cardChatAccess({ isPro: chatPro, flagOn: cardFlag, context: cardCtx, balance: cardBalance, turnCredits });
+  if (!access.allow) {
+    return new Response(JSON.stringify({
+      error: access.error, upgrade: true,
+      ...(access.error === 'credits_required' ? { credits_per_answer: turnCredits, ...(access.balance != null ? { balance: access.balance } : {}) } : {}),
+    }), { status: access.status, headers: { 'Content-Type': 'application/json' } });
+  }
+  const cardBillable = access.billable;
+  let cardRecord: OpportunityRecord | null = null;
+  if (cardCtx) {
+    const { data: rec, error: recErr } = await getSupabase()
+      .from('sam_opportunities').select(OPPORTUNITY_COLUMNS).eq('notice_id', cardCtx.noticeId).maybeSingle();
+    if (recErr) {
+      return new Response(JSON.stringify({ error: 'opportunity_unavailable' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+    }
+    if (!rec) {
+      return new Response(JSON.stringify({ error: 'opportunity_not_found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+    }
+    cardRecord = rec as unknown as OpportunityRecord;
   }
 
   const groqKey = process.env.GROQ_API_KEY;
@@ -335,7 +368,16 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const sessionId = body.sessionId || crypto.randomUUID();
+  // A supplied session id is honored only if it is new or already belongs to this user: persistExchange
+  // used to append to ANY existing session id, so a reused id could write into another user's thread.
+  let sessionId: string = crypto.randomUUID();
+  if (typeof body.sessionId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.sessionId)) {
+    const { data: owned, error: ownErr } = await getSupabase()
+      .from('mindy_chat_sessions').select('user_email').eq('id', body.sessionId).maybeSingle();
+    if (!ownErr && (!owned || String((owned as { user_email?: string }).user_email || '').toLowerCase() === auth.email.toLowerCase())) {
+      sessionId = body.sessionId;
+    }
+  }
   const startedAt = Date.now();
 
   // SSE response — manually constructed ReadableStream since the
@@ -373,6 +415,9 @@ export async function POST(request: NextRequest) {
         const messages: Array<{ role: string; content: string }> = [
           { role: 'system', content: systemPrompt },
         ];
+        // Card chat: the selected opportunity, loaded from our record, as a labeled source block.
+        const cardContext = cardRecord ? buildOpportunityContextBlock(cardRecord, message) : null;
+        if (cardContext) messages.push({ role: 'system', content: cardContext.block });
 
         // Trim history to last HISTORY_LIMIT messages for prompt-size budget.
         const history = Array.isArray(body.history) ? body.history.slice(-HISTORY_LIMIT) : [];
@@ -403,6 +448,7 @@ export async function POST(request: NextRequest) {
         const toolRoundMessages: Array<{ role: string; content: string }> = [
           { role: 'system', content: systemPrompt },
         ];
+        if (cardContext) toolRoundMessages.push({ role: 'system', content: cardContext.block });
         for (const h of history) {
           if (h.role === 'user' || h.role === 'assistant') {
             toolRoundMessages.push({ role: h.role, content: String(h.content || '').slice(0, 2000) });
@@ -439,7 +485,9 @@ export async function POST(request: NextRequest) {
           tool_executions: ChatExecutionRecord[];
           answer: { provider: string; model: string; finish_reason: string | null; fallback: boolean } | null;
           notices: string[];
-        } = { planner: null, planner_attempts: [], tools_offered: 0, tool_executions: [], answer: null, notices: [] };
+          context?: { kind: 'opportunity'; notice_id: string };
+        } = { planner: null, planner_attempts: [], tools_offered: 0, tool_executions: [], answer: null, notices: [],
+              ...(cardCtx ? { context: { kind: 'opportunity' as const, notice_id: cardCtx.noticeId } } : {}) };
         const notify = (code: string, text: string) => {
           turnTrace.notices.push(code);
           send({ type: 'notice', code, message: text });
@@ -453,6 +501,8 @@ export async function POST(request: NextRequest) {
             userEmail: auth.email!,
             chatSessionId: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId) ? sessionId : null,
             tier0: { defs: TIER0_TOOL_DEFS, names: TIER0_TOOL_NAMES, execute: (n, a) => tier0Runtime.execute(n, a) },
+            // Card chat offers only its opportunity tools (narrowing; the policy still applies).
+            ...(cardCtx ? { allowedToolNames: CARD_CHAT_TOOLS } : {}),
           });
           // Offered tools are filtered by the chat tool policy (blocked tools are never shown).
           const ALL_TOOL_DEFS = executor.offeredToolDefs();
@@ -742,8 +792,24 @@ export async function POST(request: NextRequest) {
           turnTrace.notices.push('truncated');
           send({ type: 'truncated', message: 'This answer hit its length limit and was cut off. Ask Mindy to continue, or narrow the question.' });
         }
-        const citedSources: CitedSource[] = [];
+        const citedSources: CitedSource[] = cardContext
+          ? [{ title: cardContext.source.label, url: cardContext.source.url, doc_type: 'sam_notice', source_path: null, document_id: cardCtx?.noticeId ?? null }]
+          : [];
         send({ type: 'citations', sources: citedSources });
+
+        // Card chat charge: ONE debit per successful non-Pro card turn, through the existing atomic ledger
+        // function (refuses to go below zero). Failed, empty or tools-unavailable turns cost nothing.
+        let creditsCharged = 0;
+        if (isBillableTurn({ billable: cardBillable, answer: assistantContent, streamError: false, plannerUnavailable, finishReason })) {
+          try {
+            const d = await debitCredits(auth.email!, turnCredits, { reason: 'card_chat_turn', toolName: 'ask_mindy_card' });
+            if (d.ok) creditsCharged = turnCredits;
+            send({ type: 'credits', charged: creditsCharged, balance: d.newBalance, credits_per_answer: turnCredits });
+          } catch (debitErr) {
+            console.error('[chat] card chat debit failed:', (debitErr as Error)?.message);
+          }
+        }
+        turnTrace.notices.push(...(creditsCharged ? [`credits_charged:${creditsCharged}`] : []));
         send({ type: 'done' });
         closeStream();
 

@@ -224,3 +224,25 @@ describe('LOW hardening (independent review 2026-11-14)', () => {
   });
 });
 
+
+describe('narrowing allow-list (Opportunity Map card chat)', () => {
+  const makeNarrow = () => createChatToolExecutor({
+    userEmail: 'u@example.com',
+    chatSessionId: '11111111-2222-3333-4444-555555555555',
+    tier0,
+    deps: { runMcpTool, logCall },
+    allowedToolNames: new Set(['lookup_solicitation', 'search_my_vault', 'add_contacts_to_crm']),
+  });
+  it('offers only allowed names that the policy also allows (never widens past the policy)', () => {
+    const names = makeNarrow().offeredToolDefs().map((d) => String(d.function.name)).sort();
+    expect(names).toEqual(['lookup_solicitation', 'search_my_vault']);
+  });
+  it('refuses at execution a tool outside the list, even if the model names it', async () => {
+    const res = await makeNarrow().executeRound([call('search_contractors', { q: 'x' })], planner);
+    expect(runMcpTool).not.toHaveBeenCalled();
+    expect(JSON.parse(res[0].content)).toMatchObject({ ok: false, error_category: 'not_offered_here' });
+  });
+  it('without a list, the offered set is unchanged', () => {
+    expect(make().offeredToolDefs().length).toBeGreaterThan(makeNarrow().offeredToolDefs().length);
+  });
+});

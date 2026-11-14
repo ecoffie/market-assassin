@@ -7605,3 +7605,16 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 **SEO.** AI assistant for federal contracting research / GovCon AI chat / Mindy Ask Mindy.
 
 **Proof.** `src/lib/chat/chat-tool-policy.ts`, `src/lib/chat/chat-tool-executor.ts`, and their unit tests; execution rows in `mcp_call_log` with channel `app_chat`.
+
+## Ask Mindy about any opportunity, right on the map (2026-11-14, not yet live)
+
+**What.** Every opportunity card on the Opportunity Map can open a conversation with Mindy about that solicitation. Ask what it requires, who held it before, whether it fits your company, or who to contact, without leaving the map or uploading anything.
+
+**Why it matters.** People find opportunities on the map but had to go elsewhere to understand them. Now the answer is one click from the card, and each opportunity keeps its own conversation.
+
+**Honest scope.** Answers come from Mindy's copy of the SAM.gov record and the statement of work when Mindy has extracted it; when something is not in the record, Mindy says so. Free accounts use their existing credits for answers on opportunity cards; Mindy Pro includes it. Ships behind a flag and is off until launch.
+
+**SEO.** Ask questions about a government solicitation / AI for SAM.gov opportunities / understand a federal RFP quickly.
+
+**Proof.** Context is loaded server-side from `sam_opportunities` (89% of open notices carry full notice text, 12% an extracted statement of work, measured 2026-11-14); every answer is sourced to the SAM.gov notice.
+
