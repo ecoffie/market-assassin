@@ -417,7 +417,8 @@ export function renderStatusChecks(result: Rec): RenderedRecords | null {
   // freshness note verbatim (a model paraphrase can lose the date it is current through).
   const awardsList = Array.isArray(result?.awards) ? (result.awards as Rec[]) : [];
   if (!checks && !awardsList.length && meta.lag_note) {
-    const text = `No awards were found for this search in the requested window, and that is NOT a verified zero.${meta.auto_widened ? ' The search was also retried with the widest location scope and still found nothing.' : ''} ${freshnessSentence(meta)}`;
+    const searched = awardFilterParts((meta.applied_filters && typeof meta.applied_filters === 'object' ? meta.applied_filters : {}) as Rec);
+    const text = `No awards were found for this search${searched.length ? ` (${searched.join(' · ')})` : ' in the requested window'}, and that is NOT a verified zero.${meta.auto_widened ? ' The search was also retried with the widest location scope and still found nothing.' : ''} ${freshnessSentence(meta)}`;
     return { tool: PAST_CONTRACTS_TOOL, text, total: 0, retrieved: 0, from: 0, to: 0, shown: 0, exhaustive: false, ids: [], allowedCounts: [0], standalone: 0, orders: 0 };
   }
   if (!checks) return renderAwardList(result);
@@ -581,8 +582,27 @@ export function freshnessSentence(meta: Rec): string {
   if (!through) return note ? 'Recent awards may not be published yet, so this list may be incomplete.' : '';
   // Name whose actions are delayed from the note itself, never "this agency" (R10: a DoD delay
   // sentence over a list with no DoD awards read as applying to the list's agencies).
-  const who = /\bDoD\b|Defense/i.test(note) ? 'Defense (DoD, including Navy, Army and Air Force) contract actions reach' : 'Contract actions for this search reach';
+  const afA = (meta.applied_filters && typeof meta.applied_filters === 'object' ? (meta.applied_filters as Rec).agency : null) as Rec | string | null;
+  const agencyName = afA && typeof afA === 'object' ? str(afA.name) : str(afA);
+  const who = /\bDoD\b|Defense/i.test(note) ? 'Defense (DoD, including Navy, Army and Air Force) contract actions reach'
+    : agencyName && /by this agency/i.test(note) ? `${agencyName} contract actions reach` : 'Contract actions for this search reach';
   return `${who} USASpending with about a ${delay || '90'}-day delay, so that data is reliably current through about ${through} only${loaded ? ` (last loaded ${loaded})` : ''}; awards made after that may not appear yet. For newer awards, check SAM.gov award notices or the agency's announcements.`;
+}
+
+
+/** The filters a search_past_contracts call actually applied, in customer words (from _meta.applied_filters). */
+function awardFilterParts(af: Rec): string[] {
+  const val = (v: unknown) => (v && typeof v === 'object' ? str((v as Rec).value ?? (v as Rec).name ?? (v as Rec).code) : Array.isArray(v) ? (v as unknown[]).map(str).join(', ') : str(v));
+  const parts: string[] = [];
+  if (af.keyword) parts.push(`keyword "${val(af.keyword)}"`);
+  if (af.office && typeof af.office === 'object') parts.push(`office ${str((af.office as Rec).code)} ${str((af.office as Rec).name)}`);
+  else if (af.piid_prefix) parts.push(`number starting ${val(af.piid_prefix)}`);
+  if (af.agency) parts.push(`agency ${val(af.agency)}`);
+  if (af.naics) parts.push(`NAICS ${val(af.naics)}`);
+  if (af.psc) parts.push(`PSC ${val(af.psc)}`);
+  if (af.state) parts.push(`state ${val(af.state)}${(af.state as Rec)?.scope ? ` (${str((af.state as Rec).scope) === 'pop' ? 'place of performance' : str((af.state as Rec).scope)})` : ''}`);
+  if (af.date_from || af.date_to) parts.push(`activity ${str(af.date_from) || '...'} to ${str(af.date_to) || 'today'}`);
+  return parts;
 }
 
 export const VEHICLE_MIX_TOOL = 'get_vehicle_spend_mix';
@@ -594,16 +614,7 @@ export function renderAwardList(result: Rec): RenderedRecords | null {
   const meta = (result._meta && typeof result._meta === 'object' ? result._meta : {}) as Rec;
   const basis = (result.basis && typeof result.basis === 'object' ? result.basis : {}) as Rec;
   const af = (meta.applied_filters && typeof meta.applied_filters === 'object' ? meta.applied_filters : {}) as Rec;
-  const val = (v: unknown) => (v && typeof v === 'object' ? str((v as Rec).value ?? (v as Rec).name ?? (v as Rec).code) : Array.isArray(v) ? (v as unknown[]).map(str).join(', ') : str(v));
-  const parts: string[] = [];
-  if (af.keyword) parts.push(`keyword "${val(af.keyword)}"`);
-  if (af.office && typeof af.office === 'object') parts.push(`office ${str((af.office as Rec).code)} ${str((af.office as Rec).name)}`);
-  else if (af.piid_prefix) parts.push(`number starting ${val(af.piid_prefix)}`);
-  if (af.agency) parts.push(`agency ${val(af.agency)}`);
-  if (af.naics) parts.push(`NAICS ${val(af.naics)}`);
-  if (af.psc) parts.push(`PSC ${val(af.psc)}`);
-  if (af.state) parts.push(`state ${val(af.state)}${(af.state as Rec)?.scope ? ` (${str((af.state as Rec).scope) === 'pop' ? 'place of performance' : str((af.state as Rec).scope)})` : ''}`);
-  if (af.date_from || af.date_to) parts.push(`activity ${str(af.date_from) || '...'} to ${str(af.date_to) || 'today'}`);
+  const parts = awardFilterParts(af);
   const total = Math.max(num(meta.total) ?? awards.length, awards.length);
   const lines: string[] = [];
   lines.push(`${total} award${total === 1 ? '' : 's'} match (${parts.join(' · ') || 'no filters'}). Source: USASpending prime awards.`);

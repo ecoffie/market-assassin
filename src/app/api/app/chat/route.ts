@@ -588,14 +588,18 @@ export async function POST(request: NextRequest) {
             if (Array.isArray(rawCalls) && rawCalls.length > 0) {
               // Every call gets a stable id so each result pairs with its call.
               const displayOffsets = new Map<string, number>();
+              const scopeNotesByCall = new Map<string, { applied: string[]; unapplied: string[] }>();
               const toolCalls = rawCalls.map((tc, i) => {
                 const id = tc.id || `call_${i}`;
                 const prepared = prepareChatToolArgs(String(tc.function?.name || ''), String(tc.function?.arguments ?? ''));
                 if (prepared.displayOffset) displayOffsets.set(id, prepared.displayOffset);
                 // Phase A: constraints the customer stated are enforced on the model's arguments.
                 const enforced = enforceIntent(String(tc.function?.name || ''), prepared.args, intent);
-                for (const n of enforced.applied) { turnTrace.notices.push(`intent_applied:${tc.function?.name}:${n}`); scopeApplied.add(n); }
-                for (const n of enforced.unapplied) { turnTrace.notices.push(`intent_unapplied:${tc.function?.name}:${n}`); scopeUnapplied.add(n); }
+                for (const n of enforced.applied) turnTrace.notices.push(`intent_applied:${tc.function?.name}:${n}`);
+                for (const n of enforced.unapplied) turnTrace.notices.push(`intent_unapplied:${tc.function?.name}:${n}`);
+                // Customer-facing notes are kept per call and shown only for calls that run (a skipped
+                // duplicate's notes would describe a search the customer never sees).
+                scopeNotesByCall.set(id, enforced);
                 // Stated filters only: drop a state the conversation never implied (deterministic).
                 const guarded = guardUnstatedStates(enforced.args, conversationText);
                 for (const r of guarded.removed) turnTrace.notices.push(`unstated_filter_removed:${tc.function?.name}:${r}`);
@@ -609,6 +613,11 @@ export async function POST(request: NextRequest) {
               const dedupe = dedupeToolCalls(toolCalls.map((tc) => ({ id: tc.id, name: String(tc.function?.name || ''), args: withPage(String(tc.function.arguments ?? ''), displayOffsets.get(tc.id) ?? 0) })));
               const keepIds = new Set(dedupe.keep.map((k) => k.id));
               for (const d of dedupe.duplicates) turnTrace.notices.push(`duplicate_call_skipped:${d.id}:same_as:${d.of}`);
+              for (const id of keepIds) {
+                const notes = scopeNotesByCall.get(id);
+                for (const n of notes?.applied ?? []) scopeApplied.add(n);
+                for (const n of notes?.unapplied ?? []) scopeUnapplied.add(n);
+              }
               const results = await executor.executeRound(toolCalls.filter((tc) => keepIds.has(tc.id)), { provider: first.provider, model: first.model });
               for (const tc of toolCalls) {
                 const r = results.find((x) => x.tool_call_id === tc.id);
