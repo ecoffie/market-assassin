@@ -197,11 +197,20 @@ export function evaluateFreshness(
 
 export const BUILD_QUERY = `
 WITH elig AS (
-  SELECT rollup_uei FROM \`market-assasin.usaspending.recipients_rollup_merged\`
+  SELECT rollup_uei, child_ueis FROM \`market-assasin.usaspending.recipients_rollup_merged\`
   WHERE rollup_name IS NOT NULL AND rollup_name != ''
   ORDER BY total_obligated DESC LIMIT ${ELIGIBLE_LIMIT}
 ),
-scoped AS (SELECT a.* FROM \`market-assasin.usaspending.awards\` a JOIN elig e ON e.rollup_uei = a.recipient_uei),
+-- Every UEI the contractor page reads: the rollup's child_ueis, exactly what the live reader
+-- passes as @ueis (recipient_uei IN UNNEST(child_ueis)). DISTINCT so a UEI listed twice is
+-- never double counted. Rows stay keyed by the ROLLUP uei, which is what the page looks up.
+elig_ueis AS (
+  SELECT DISTINCT e.rollup_uei, u AS uei FROM elig e, UNNEST(e.child_ueis) AS u
+),
+scoped AS (
+  SELECT u.rollup_uei AS recipient_uei, a.* EXCEPT (recipient_uei)
+  FROM \`market-assasin.usaspending.awards\` a JOIN elig_ueis u ON a.recipient_uei = u.uei
+),
 counts AS (
   SELECT recipient_uei,
     COUNT(DISTINCT IF(obligation_amount > 0, award_id, NULL)) AS contract_count,
@@ -314,24 +323,131 @@ export async function validateGeneration(version: string): Promise<ValidationRes
 }
 
 /**
- * Step 6. Plausibility. Validation proves a build is internally coherent;
- * this asks whether it is a believable SUCCESSOR to what is live. A build that
- * halves the corpus can be perfectly valid and still catastrophic to promote.
+ * One-time, per-job authorization to promote a build whose size moved beyond TOLERANCE.
+ * Stored on the job row (awards_build_jobs.size_override), never in env or config, so it can
+ * only ever apply to the build it names. See 20261114_awards_build_jobs_supersede_override.sql.
  */
-export async function checkPlausibility(next: { recipients: number; pages: number }): Promise<{ ok: boolean; reason?: string }> {
-  const supa = db();
-  const { count: livePages } = await supa
-    .from('awards_serving_pages')
-    .select('id', { count: 'exact', head: true })
-    .eq('lifecycle', 'live')
-    .eq('data_version', DATA_VERSION);
-  if (!livePages) return { ok: true }; // nothing to compare against
+export interface SizeOverride {
+  source_version: string;
+  authorized_by: string;
+  authorized_at: string;
+  reason: string;
+  expected: { recipients: [number, number]; pages: [number, number] };
+}
 
-  const drift = Math.abs(next.pages - livePages) / livePages * 100;
-  if (drift > TOLERANCE.pagesPct) {
-    return { ok: false, reason: `page count moved ${drift.toFixed(1)}% (${livePages} → ${next.pages}), tolerance ${TOLERANCE.pagesPct}%` };
+/** An override older than this is refused: authorization is for a build about to run, not a standing waiver. */
+export const SIZE_OVERRIDE_MAX_AGE_DAYS = 7;
+
+export interface GenerationSize { recipients: number; pages: number }
+
+export interface PlausibilityResult {
+  ok: boolean;
+  reason?: string;
+  usedOverride: boolean;
+  /** Old and new counts, and the override applied (if any), for the job's telemetry. */
+  record: {
+    live: GenerationSize | null;
+    next: GenerationSize;
+    driftPct: { recipients: number | null; pages: number | null };
+    tolerancePct: { recipients: number; pages: number };
+    override: SizeOverride | null;
+  };
+}
+
+const pct = (next: number, live: number) => (live > 0 ? ((next - live) / live) * 100 : null);
+const inRange = (n: number, r: unknown) =>
+  Array.isArray(r) && r.length === 2 && Number.isFinite(r[0]) && Number.isFinite(r[1]) && n >= r[0] && n <= r[1];
+
+/** Why an override cannot be used for this job, or null when it is valid for it. */
+export function overrideRejection(raw: unknown, sourceVersion: string, now: Date): string | null {
+  if (!raw || typeof raw !== 'object') return 'no override';
+  const o = raw as Partial<SizeOverride>;
+  if (o.source_version !== sourceVersion) return `override names source ${o.source_version ?? '(none)'}, job is ${sourceVersion}`;
+  if (!o.authorized_by?.trim()) return 'override has no authorized_by';
+  if (!o.reason?.trim()) return 'override has no reason';
+  const at = Date.parse(String(o.authorized_at ?? ''));
+  if (!Number.isFinite(at)) return 'override has no valid authorized_at';
+  if (at > now.getTime() + 60_000) return 'override authorized_at is in the future';
+  if (now.getTime() - at > SIZE_OVERRIDE_MAX_AGE_DAYS * 86_400_000) return `override is older than ${SIZE_OVERRIDE_MAX_AGE_DAYS} days`;
+  if (!o.expected || !Array.isArray(o.expected.recipients) || !Array.isArray(o.expected.pages)) return 'override has no expected ranges';
+  return null;
+}
+
+/**
+ * Step 6 (pure). Plausibility: is this build a believable successor to what is live?
+ * Validation proves a build is internally coherent; a build that halves the corpus can be
+ * perfectly valid and still catastrophic to promote.
+ *
+ * Checks BOTH recipients and pages against the live generation. Beyond TOLERANCE, only a valid
+ * override on THIS job, whose expected ranges contain the new counts, lets it through.
+ */
+export function evaluatePlausibility(
+  live: GenerationSize | null,
+  next: GenerationSize,
+  job: { source_version: string; size_override?: unknown },
+  now: Date = new Date(),
+): PlausibilityResult {
+  const driftPct = live
+    ? { recipients: pct(next.recipients, live.recipients), pages: pct(next.pages, live.pages) }
+    : { recipients: null, pages: null };
+  const record: PlausibilityResult['record'] = {
+    live, next, driftPct,
+    tolerancePct: { recipients: TOLERANCE.recipientsPct, pages: TOLERANCE.pagesPct },
+    override: null,
+  };
+  if (!live || live.pages === 0) return { ok: true, usedOverride: false, record }; // first build
+
+  const over: string[] = [];
+  if (Math.abs(driftPct.recipients ?? 0) > TOLERANCE.recipientsPct)
+    over.push(`recipients moved ${driftPct.recipients!.toFixed(1)}% (${live.recipients} → ${next.recipients})`);
+  if (Math.abs(driftPct.pages ?? 0) > TOLERANCE.pagesPct)
+    over.push(`pages moved ${driftPct.pages!.toFixed(1)}% (${live.pages} → ${next.pages})`);
+  if (over.length === 0) return { ok: true, usedOverride: false, record };
+
+  const why = overrideRejection(job.size_override, job.source_version, now);
+  if (why) {
+    return { ok: false, usedOverride: false, record, reason: `${over.join('; ')}; tolerance ±${TOLERANCE.recipientsPct}%/${TOLERANCE.pagesPct}% (${why})` };
   }
-  return { ok: true };
+  const o = job.size_override as SizeOverride;
+  if (!inRange(next.recipients, o.expected.recipients) || !inRange(next.pages, o.expected.pages)) {
+    return {
+      ok: false, usedOverride: false, record,
+      reason: `${over.join('; ')}; outside the authorized ranges (recipients ${JSON.stringify(o.expected.recipients)}, pages ${JSON.stringify(o.expected.pages)})`,
+    };
+  }
+  record.override = o;
+  return { ok: true, usedOverride: true, record };
+}
+
+/**
+ * Step 6. Size of the generation production is serving NOW: resolved through the active
+ * pointer, never `lifecycle='live'` + DATA_VERSION (the worker's versions never equal
+ * DATA_VERSION, so the old comparison counted 0 live rows and always passed).
+ * Page 1 exists exactly once per recipient, so its count is the recipient count.
+ */
+export async function readLiveGenerationSize(): Promise<GenerationSize | null> {
+  const supa = db();
+  const { data: ptr, error: ptrErr } = await supa
+    .from('awards_active_version').select('active_version').eq('id', 1).limit(1).maybeSingle();
+  if (ptrErr) throw new Error(`active pointer unreadable: ${ptrErr.message}`);
+  if (!ptr?.active_version) return null;
+  const [pages, recipients] = await Promise.all([
+    supa.from('awards_serving_pages').select('id', { count: 'exact', head: true })
+      .eq('data_version', ptr.active_version),
+    supa.from('awards_serving_pages').select('id', { count: 'exact', head: true })
+      .eq('data_version', ptr.active_version).eq('page_number', 1),
+  ]);
+  if (pages.error || recipients.error) {
+    throw new Error(`live generation size unreadable: ${(pages.error ?? recipients.error)!.message}`);
+  }
+  return { recipients: recipients.count ?? 0, pages: pages.count ?? 0 };
+}
+
+export async function checkPlausibility(
+  next: GenerationSize,
+  job: { source_version: string; size_override?: unknown },
+): Promise<PlausibilityResult> {
+  return evaluatePlausibility(await readLiveGenerationSize(), next, job);
 }
 
 export async function alert(subject: string, html: string): Promise<void> {

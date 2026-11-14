@@ -7,7 +7,7 @@ import {
   BUILD_QUERY, MAX_BYTES_BILLED, PAGE_SIZE,
 } from '@/lib/awards-refresh';
 import {
-  claimNextJob, heartbeat, setJobStatus, MAX_ATTEMPTS,
+  claimNextJob, heartbeat, setJobStatus, supersedeOlderQueued, MAX_ATTEMPTS,
 } from '@/lib/awards-build-jobs';
 
 /**
@@ -77,7 +77,9 @@ export async function GET(req: NextRequest) {
   const pointerAtStart = ptrAtStart?.active_version ?? null;
   const beat = setInterval(() => { void heartbeat(job.id, workerId); }, 30_000);
 
-  const fail = async (stage: string, msg: string) => {
+  // `terminal`: a failure that would repeat identically on retry (plausibility). Retrying it
+  // would only re-run a full ~17 GiB build to reach the same verdict.
+  const fail = async (stage: string, msg: string, terminal = false, telemetry?: Record<string, unknown>) => {
     clearInterval(beat);
     // Clean up THIS build's staging rows. The generation id is unique per build,
     // so this can only ever match rows we wrote. The DB trigger is the backstop:
@@ -98,8 +100,11 @@ export async function GET(req: NextRequest) {
           `it is serving production.</p>`,
       );
     }
-    const exhausted = job.attempts >= MAX_ATTEMPTS;
-    await setJobStatus(job.id, exhausted ? 'failed' : 'queued', { error: `${stage}: ${msg}`.slice(0, 500) });
+    const exhausted = terminal || job.attempts >= MAX_ATTEMPTS;
+    await setJobStatus(job.id, exhausted ? 'failed' : 'queued', {
+      error: `${stage}: ${msg}`.slice(0, 500),
+      ...(telemetry ? { telemetry } : {}),
+    });
     if (exhausted) {
       await alert(
         'Awards build FAILED after max attempts',
@@ -156,8 +161,17 @@ export async function GET(req: NextRequest) {
     await setJobStatus(job.id, 'validated', { staging_version: stagingVersion });
 
     // ── PLAUSIBILITY ────────────────────────────────────────────────────────
-    const p = await checkPlausibility({ recipients: v.recipients, pages: v.pages });
-    if (!p.ok) return await fail('plausibility', p.reason ?? 'implausible delta');
+    const p = await checkPlausibility({ recipients: v.recipients, pages: v.pages }, job);
+    if (!p.ok) {
+      await alert(
+        'Awards build refused: size moved beyond tolerance',
+        `<p>Job ${job.id} (source ${job.source_version}) was NOT promoted: ${p.reason}.</p>` +
+          `<p>The live generation is untouched. If the change is legitimate, authorize THIS job ` +
+          `with a one-time <code>size_override</code> on its row (source_version, authorized_by, ` +
+          `authorized_at, reason, expected ranges) and re-queue it. It never applies to another job.</p>`,
+      );
+      return await fail('plausibility', p.reason ?? 'implausible delta', true, { plausibility: p.record });
+    }
 
     // ── ATOMIC PROMOTE ──────────────────────────────────────────────────────
     // One statement. No retire-then-promote, so readers never see zero-live.
@@ -190,13 +204,17 @@ export async function GET(req: NextRequest) {
       telemetry: {
         recipients: v.recipients, pages: v.pages, rows: v.rows,
         durationMs: Date.now() - t0, sourceAsOf: job.source_version, servablePages: servable,
+        // Old and new counts, and the one-time override if this build needed it.
+        plausibility: p.record, usedSizeOverride: p.usedOverride,
       },
     });
+    // This generation contains everything an older queued job would build.
+    const superseded = await supersedeOlderQueued(job);
 
     return NextResponse.json(
       { outcome: 'promoted', jobId: job.id, version: stagingVersion,
         recipients: v.recipients, pages: v.pages, servablePages: servable,
-        durationMs: Date.now() - t0 },
+        usedSizeOverride: p.usedOverride, superseded, durationMs: Date.now() - t0 },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (e) {

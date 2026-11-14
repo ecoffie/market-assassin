@@ -7,7 +7,7 @@ import {
   evaluateFreshness, alert, UPSTREAM_STALE_DAYS,
   type RefreshOutcome, type RefreshTelemetry,
 } from '@/lib/awards-refresh';
-import { enqueueBuild, alertOnStuckJobs, alertOnFailedJobs } from '@/lib/awards-build-jobs';
+import { enqueueBuild, alertOnStuckJobs, alertOnFailedJobs, alertOnQueuedJobs } from '@/lib/awards-build-jobs';
 
 /**
  * Durable awards refresh cron.
@@ -72,6 +72,7 @@ export async function GET(req: NextRequest) {
     // Watchdogs run every check — a stuck or failed job is silent by nature.
     await alertOnStuckJobs();
     await alertOnFailedJobs();
+    await alertOnQueuedJobs();
 
     // ── 2. UPSTREAM SOURCE DATE ─────────────────────────────────────────────
     const upstream = await readUpstreamSourceAsOf();
