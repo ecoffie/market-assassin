@@ -1,0 +1,1001 @@
+url,type,gsc_last_crawled,status,final_status,robots,redirect_target,data_match,alias_canonical,tab_state,classification,final_status_2026_11_13
+https://getmindy.ai/contractors/ii-vi-incorporated/contracts,contracts,2026-10-08,404,404,noindex,,no match,,,genuine 404,500
+https://getmindy.ai/contractors/young-and-rubicam-inc/contracts,contracts,2026-09-28,404,404,noindex,,no match,,,genuine 404,500
+https://getmindy.ai/contractors/tcom-limited-partnership-a-k-a-tcom-l-p/naics,naics,2026-09-28,404,404,noindex,,no match,,,genuine 404,404
+https://getmindy.ai/contractors/ac-disaster-consulting-llc,profile,2026-09-27,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/valkyrie-enterprises-inc/naics,naics,2026-09-27,308,200,"noindex, follow",https://getmindy.ai/contractors/valkyrie-enterprises-llc/naics,alias,valkyrie-enterprises-llc,unavailable,308 to canonical (noindex: rows not cached),404
+https://getmindy.ai/contractors/medical-science-and-computing-inc,profile,2026-09-27,404,404,noindex,,no match,,,genuine 404,500
+https://getmindy.ai/contractors/board-of-regents-of-the-university-of-nebraska/naics,naics,2026-09-20,308,200,"noindex, follow",https://getmindy.ai/contractors/board-of-regents-of-university-of-nebraska/naics,single-UEI,board-of-regents-of-university-of-nebraska,unavailable,308 to canonical (noindex: rows not cached),200
+https://getmindy.ai/contractors/bluetriton-brands-holdings-inc/agencies,agencies,2026-09-18,308,200,"noindex, follow",https://getmindy.ai/contractors/nestl-s-a/agencies,single-UEI,nestl-s-a,unavailable,308 to canonical (noindex: rows not cached),200
+https://getmindy.ai/contractors/optumrx-administrative-services-llc,profile,2026-09-18,308,200,,https://getmindy.ai/contractors/unitedhealth-group-incorporated,single-UEI,unitedhealth-group-incorporated,,308 to canonical indexable,200
+https://getmindy.ai/contractors/metrostar-systems-inc,profile,2026-09-18,308,200,,https://getmindy.ai/contractors/metrostar-systems-llc,alias,metrostar-systems-llc,,308 to canonical indexable,500
+https://getmindy.ai/contractors/hennebery-eddy-architects-inc,profile,2026-09-14,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/icf-incorporated-l-l-c,profile,2026-09-13,308,200,,https://getmindy.ai/contractors/icf-international-inc,single-UEI,icf-international-inc,,308 to canonical indexable,200
+https://getmindy.ai/contractors/metacomp-technologies-inc,profile,2026-09-13,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/the-university-of-dayton,profile,2026-09-13,308,200,,https://getmindy.ai/contractors/university-of-dayton,alias,university-of-dayton,,308 to canonical indexable,500
+https://getmindy.ai/contractors/turner-construction-company,profile,2026-09-13,308,200,,https://getmindy.ai/contractors/vinci,single-UEI,vinci,,308 to canonical indexable,200
+https://getmindy.ai/contractors/maritime-planning-associates-inc,profile,2026-09-13,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/varco-mac-electrical-construction-co,profile,2026-09-12,404,404,noindex,,no match,,,genuine 404,500
+https://getmindy.ai/contractors/the-university-of-dayton/agencies,agencies,2026-09-11,308,200,"noindex, follow",https://getmindy.ai/contractors/university-of-dayton/agencies,alias,university-of-dayton,unavailable,308 to canonical (noindex: rows not cached),404
+https://getmindy.ai/contractors/mn-bmcd-ml-joint-venture,profile,2026-09-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/kettner-westfalia-jagdreisen-holding-gmbh,profile,2026-09-11,404,404,noindex,,no match,,,genuine 404,500
+https://getmindy.ai/contractors/magellan-aerospace-middletown-inc/naics,naics,2026-09-11,308,200,"noindex, follow",https://getmindy.ai/contractors/magellan-aerospace-corporation/naics,single-UEI,magellan-aerospace-corporation,unavailable,308 to canonical (noindex: rows not cached),200
+https://getmindy.ai/contractors/clark-mccarthy-healthcare-partners-ii,profile,2026-09-11,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/the-afx-group-llc,profile,2026-09-10,500,500,,,alias,afx-llc,,"5xx: contractor lookup cold, budget spent",500
+https://getmindy.ai/contractors/j-e-dunn-construction-group-inc,profile,2026-09-10,308,200,,https://getmindy.ai/contractors/j-e-dunn-construction-company,alias,j-e-dunn-construction-company,,308 to canonical indexable,500
+https://getmindy.ai/contractors/belcan-llc/contracts,contracts,2026-09-10,308,500,,https://getmindy.ai/contractors/belcan-corporation/contracts,alias,belcan-corporation,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/leo-a-daly-company,profile,2026-09-10,308,200,,https://getmindy.ai/contractors/leo-a-daly-llc,alias,leo-a-daly-llc,,308 to canonical indexable,500
+https://getmindy.ai/contractors/compass-medical-provider-llc/contracts,contracts,2026-09-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/university-of-south-alabama/agencies,agencies,2026-09-10,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/bwx-technologies-inc,profile,2026-09-08,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/oil-states-international-inc,profile,2026-09-05,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/scitech-services-inc/naics,naics,2026-09-04,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/ultra-electronics-advanced-tactical-systems-inc,profile,2026-09-04,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/whiting-turner-contracting-company-the/contracts,contracts,2026-09-03,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/the-university-of-north-carolina/agencies,agencies,2026-09-03,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/caterpillar-inc/naics,naics,2026-09-03,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/performant-financial-corporation/contracts/2,contracts,2026-09-03,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/analytic-services-inc/contracts,contracts,2026-09-02,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cdi-corp/naics,naics,2026-09-02,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/innoviss-inc/naics,naics,2026-09-02,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/pepsico-inc,profile,2026-09-02,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/matrix-providers-inc,profile,2026-09-02,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aerojet-rocketdyne-inc/contracts,contracts,2026-09-02,308,200,,https://getmindy.ai/contractors/l3harris-technologies-inc/contracts,single-UEI,l3harris-technologies-inc,,308 to canonical indexable,200
+https://getmindy.ai/contractors/cepheid,profile,2026-09-02,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/el-hoss-engineering-and-transport-company-w-l-l,profile,2026-09-02,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/glaxosmithkline-plc/contracts,contracts,2026-09-02,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/ch2m-hill-cdm-pa-tac-recovery-services/contracts,contracts,2026-09-02,308,200,,https://getmindy.ai/contractors/jacobs-engineering-group-inc/contracts,single-UEI,jacobs-engineering-group-inc,,308 to canonical indexable,200
+https://getmindy.ai/contractors/chemring-group-plc/naics,naics,2026-09-02,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/jsl-technologies-inc,profile,2026-09-02,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/stutz-packing-company,profile,2026-09-01,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/manson-construction-holding-company/contracts,contracts,2026-08-31,308,500,,https://getmindy.ai/contractors/manson-construction-co/contracts,alias,manson-construction-co,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/american-bureau-of-shipping/agencies,agencies,2026-08-31,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/pts-expeditionary-communications-inc/contracts,contracts,2026-08-31,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aderas-inc,profile,2026-08-31,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/yukon-management-llc/naics,naics,2026-08-30,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/itt-inc/contracts,contracts,2026-08-30,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/watterson-construction-company,profile,2026-08-30,308,200,,https://getmindy.ai/contractors/watterson-construction-co,alias,watterson-construction-co,,308 to canonical indexable,500
+https://getmindy.ai/contractors/schnabel-inc,profile,2026-08-30,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/rq-wm-jordan-jv,profile,2026-08-30,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/merchants-co,profile,2026-08-28,308,200,,https://getmindy.ai/contractors/the-merchants-company-llc,alias,the-merchants-company-llc,,308 to canonical indexable,500
+https://getmindy.ai/contractors/eos-of-north-america-inc,profile,2026-08-28,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/acme-aerospace-inc/contracts,contracts,2026-08-28,308,200,,https://getmindy.ai/contractors/transdigm-group-incorporated/contracts,single-UEI,transdigm-group-incorporated,,308 to canonical indexable,200
+https://getmindy.ai/contractors/swiss-steel-holding-ag,profile,2026-08-28,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/advanced-turbine-engine-co-llc/contracts,contracts,2026-08-27,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/nac-international-inc,profile,2026-08-27,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/turner-construction-company/naics,naics,2026-08-26,308,200,"noindex, follow",https://getmindy.ai/contractors/vinci/naics,single-UEI,vinci,unavailable,308 to canonical (noindex: rows not cached),200
+https://getmindy.ai/contractors/b-and-o-joint-venture-llc/contracts,contracts,2026-08-26,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/dexis-interactive-incorporated/contracts,contracts,2026-08-26,308,200,,https://getmindy.ai/contractors/dexis-interactive-llc/contracts,alias,dexis-interactive-llc,,308 to canonical indexable,500
+https://getmindy.ai/contractors/haskell-company-the,profile,2026-08-26,308,200,,https://getmindy.ai/contractors/the-haskell-company,alias,the-haskell-company,,308 to canonical indexable,500
+https://getmindy.ai/contractors/intertek-group-plc,profile,2026-08-26,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/merrill-technologies-group-llc,profile,2026-08-26,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/syblon-reid-co,profile,2026-08-25,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/cianbro-az-a-joint-venture/contracts,contracts,2026-08-25,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/nb-global-solutions-llc,profile,2026-08-25,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/hess-construction-company-llc/contracts,contracts,2026-08-25,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/thales-defense-and-security-inc,profile,2026-08-25,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),200
+https://getmindy.ai/contractors/brice-turnagain-jv-llc/contracts,contracts,2026-08-24,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/dev-holdings,profile,2026-08-24,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/kenya-medical-supplies-author-ity,profile,2026-08-24,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/magellan-aerospace-corporation/naics,naics,2026-08-24,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/nova-constructors-obayashi-jv/contracts,contracts,2026-08-23,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/al-ayuni-investment-and-contracting-company,profile,2026-08-23,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/swiss-steel-holding-ag/contracts,contracts,2026-08-23,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/aptim-north-wind-construction-jv-llc/contracts,contracts,2026-08-23,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aptim-amentum-alaska-decommissioning-llc,profile,2026-08-21,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/msm-group-north-america-inc,profile,2026-08-21,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/abt-associates-international-inc/contracts,contracts,2026-08-21,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/regenstrief-institute-inc/naics,naics,2026-08-21,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/summit-therapeutics-limited,profile,2026-08-21,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/haley-and-aldrich-inc,profile,2026-08-21,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/strategic-technology-consulting-llc,profile,2026-08-21,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/mythics-llc/contracts/2,contracts,2026-08-20,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/william-demants-og-hustru-ida-emilies-millas-fond-kaldet,profile,2026-08-20,404,404,noindex,,no match,,,genuine 404,500
+https://getmindy.ai/contractors/pae-government-services-inc/contracts,contracts,2026-08-20,500,500,,,single-UEI,amentum-holdings-inc,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/fortress-north-america-llc,profile,2026-08-20,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/salado-isolation-mining-contractors-llc,profile,2026-08-20,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/art-anderson-associates-inc,profile,2026-08-20,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/cidara-therapeutics-inc/contracts,contracts,2026-08-20,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/2025-e-street-office-leasehold-condominium-unit-owners-association-inc,profile,2026-08-20,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/evolving-resources-inc,profile,2026-08-20,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/inline-electric-supply-company-inc,profile,2026-08-20,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/caci-technologies-inc,profile,2026-08-20,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/two-six-labs-llc/naics,naics,2026-08-20,200,200,"noindex, follow",,single-UEI,two-six-labs-holdings-inc,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/aircraft-wheel-and-brake-llc,profile,2026-08-20,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/austability-pty-ltd,profile,2026-08-20,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/macom-technology-solutions-holdings-inc/naics,naics,2026-08-20,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/m7-aerospace-llc,profile,2026-08-19,200,200,,,single-UEI,elbit-systems-ltd,,200 indexable,500
+https://getmindy.ai/contractors/johns-hopkins-university-applied-physics-laboratory-llc-the,profile,2026-08-19,308,200,,https://getmindy.ai/contractors/the-johns-hopkins-university-applied-physics-laboratory-llc,alias,the-johns-hopkins-university-applied-physics-laboratory-llc,,308 to canonical indexable,500
+https://getmindy.ai/contractors/electromech-technologies-llc,profile,2026-08-19,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/trustees-of-columbia-university-in-the-city-of-new-york-the,profile,2026-08-19,308,200,,https://getmindy.ai/contractors/the-trustees-of-columbia-university-in-the-city-of-new-york,alias,the-trustees-of-columbia-university-in-the-city-of-new-york,,308 to canonical indexable,200
+https://getmindy.ai/contractors/stanley-olsson-joint-venture,profile,2026-08-19,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/cadillac-asphalt-llc,profile,2026-08-19,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),200
+https://getmindy.ai/contractors/npc-inc,profile,2026-08-19,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/safran-landing-systems-canada-inc,profile,2026-08-19,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/veteran-enterprise-technology-services-llc/contracts,contracts,2026-08-19,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/colorado-department-of-public-health-and-environment,profile,2026-08-19,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/isciences-llc,profile,2026-08-19,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/herc-rentals-inc,profile,2026-08-19,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/alberici-mortenson-a-joint-venture,profile,2026-08-19,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/crawford-consulting-services-inc,profile,2026-08-19,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/national-jewish-health,profile,2026-08-19,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/insight-global-llc,profile,2026-08-19,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/dmy-engineering-consultants-inc,profile,2026-08-19,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/indica-labs-inc,profile,2026-08-19,500,500,,,alias,indica-labs-llc,,"5xx: contractor lookup cold, budget spent",500
+https://getmindy.ai/contractors/kokosing-alberici-traylor-llc,profile,2026-08-19,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/critigen-llc,profile,2026-08-19,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/vcs-durability-inc,profile,2026-08-19,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/tom-and-jerry-inc,profile,2026-08-19,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/klarquist-sparkman-llp,profile,2026-08-19,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/innovative-concepts-engineering-inc,profile,2026-08-19,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/carbon-carbon-advanced-technologies-inc,profile,2026-08-19,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/core-tech-international-corporation,profile,2026-08-19,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/case-consultants-international-llc,profile,2026-08-18,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/city-of-jacksonville,profile,2026-08-18,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/first-logistex-inc,profile,2026-08-18,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/mainsail-group-llc,profile,2026-08-18,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/cdm-stanley-a-joint-venture,profile,2026-08-18,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/l3harris-maritime-services-inc/contracts,contracts,2026-08-18,308,200,,https://getmindy.ai/contractors/l3harris-technologies-inc/contracts,single-UEI,l3harris-technologies-inc,,308 to canonical indexable,200
+https://getmindy.ai/contractors/whitestone-group-inc-the,profile,2026-08-18,308,200,,https://getmindy.ai/contractors/the-whitestone-group-inc,alias,the-whitestone-group-inc,,308 to canonical indexable,500
+https://getmindy.ai/contractors/indtai-inc,profile,2026-08-18,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/danya-international-llc,profile,2026-08-17,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ironmountain-solutions-inc,profile,2026-08-17,308,200,,https://getmindy.ai/contractors/ironmountain-solutions-llc,alias,ironmountain-solutions-llc,,308 to canonical indexable,500
+https://getmindy.ai/contractors/limbach-company-llc,profile,2026-08-17,200,200,,,single-UEI,limbach-holdings-llc,,200 indexable,500
+https://getmindy.ai/contractors/adi-american-distributors-llc/naics,naics,2026-08-17,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/bowhead-total-enterprise-solutions-llc/contracts,contracts,2026-08-17,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/signet-technologies-inc/contracts,contracts,2026-08-17,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/specialty-government-services-llc/contracts,contracts,2026-08-17,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/fluor-idaho-llc/contracts,contracts,2026-08-17,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/herc-holdings-inc/contracts,contracts,2026-08-17,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/bam-technologies-llc,profile,2026-08-17,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bogue-systems-inc,profile,2026-08-17,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/sehlke-consulting-llc/contracts,contracts,2026-08-17,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/afp-industries-inc/contracts,contracts,2026-08-17,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/koniag-management-solutions-llc,profile,2026-08-17,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/biofire-diagnostics-llc/contracts,contracts,2026-08-17,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/biomerieux-inc/contracts,contracts,2026-08-17,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/chenega-tri-services-llc/naics,naics,2026-08-17,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/robert-e-morris-co-llc,profile,2026-08-17,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/crh-public-limited-company/agencies,agencies,2026-08-17,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/american-polymers-llc/contracts,contracts,2026-08-17,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/prism-maritime-llc,profile,2026-08-17,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/royal-arc-welding-company,profile,2026-08-16,500,500,,,alias,royal-arc-welding-co,,"5xx: contractor lookup cold, budget spent",500
+https://getmindy.ai/contractors/university-of-utah,profile,2026-08-16,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/kratos-s2-inc,profile,2026-08-16,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/j-craig-venter-institute-inc,profile,2026-08-16,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/sierra-7-inc,profile,2026-08-16,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/canon-inc/contracts,contracts,2026-08-16,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/mantech-aecom-joint-venture,profile,2026-08-16,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/reliability-and-performance-technologies-llc,profile,2026-08-16,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/arc-technologies-llc,profile,2026-08-16,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/digital-consultants-llc/naics,naics,2026-08-16,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/case-western-reserve-university,profile,2026-08-16,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/1-sync-technologies-llc/contracts,contracts,2026-08-16,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/beyer-blinder-belle-architects-and-planners-llp,profile,2026-08-16,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/global-business-solutions-llc,profile,2026-08-16,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bland-and-associates-pc,profile,2026-08-16,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/azure-medical-inc/contracts,contracts,2026-08-16,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/first-nations-community-health-source-inc/contracts,contracts,2026-08-16,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/nova-dine-llc,profile,2026-08-16,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/alaire-technologies-inc,profile,2026-08-15,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/blue-bird-body-company,profile,2026-08-15,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/charles-tombras-advertising-inc/contracts,contracts,2026-08-15,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aviarms-support-corp/naics,naics,2026-08-15,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/1-sync-technologies-llc,profile,2026-08-15,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/saudi-telecom-company,profile,2026-08-15,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/redhawk-it-solutions-llc/agencies,agencies,2026-08-15,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/affolter-contracting-company-inc/contracts,contracts,2026-08-14,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/repkon-usa-defense-llc,profile,2026-08-14,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/teleperformance-se,profile,2026-08-14,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/eci-defense-group-inc,profile,2026-08-14,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cic-research-inc,profile,2026-08-14,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/safran-defense-and-space-inc/contracts,contracts,2026-08-14,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/phoenix-group-of-virginia-inc/contracts,contracts,2026-08-14,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/enterprise-furniture-consultants-inc,profile,2026-08-14,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bmnt-inc/contracts,contracts,2026-08-14,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/thermo-fisher-scientific-inc/naics,naics,2026-08-14,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/clark-smoot-consigli-a-joint-venture/naics,naics,2026-08-14,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/toronto-dominion-bank-the/contracts,contracts,2026-08-14,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/parallax-advanced-research-corp,profile,2026-08-14,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/standardaero-aviation-holdings-inc/naics,naics,2026-08-14,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/thales-usa-inc/contracts,contracts,2026-08-14,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/virginia-commercial-space-flight-authority/contracts,contracts,2026-08-14,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/fibrotex-usa-inc,profile,2026-08-14,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cornerstone-programs-corp,profile,2026-08-14,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/pulau-corporation,profile,2026-08-14,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/imia-llc,profile,2026-08-14,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/top-flight-aerostructures-inc,profile,2026-08-14,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/litefighter-systems-llc,profile,2026-08-14,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/olgoonik-worldwide-services-llc,profile,2026-08-14,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/mitchell-vantage-systems-llc,profile,2026-08-14,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/lead-builders-inc/contracts,contracts,2026-08-14,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/tst-tactical-defense-solutions-inc/contracts,contracts,2026-08-13,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/athena-construction-group-inc/contracts,contracts,2026-08-13,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/hni-corporation,profile,2026-08-13,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/high-liner-foods-usa-incorporated,profile,2026-08-13,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/c-and-c-environmental-inc,profile,2026-08-13,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/biofire-diagnostics-llc,profile,2026-08-13,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/chickasaw-federal-health-llc,profile,2026-08-13,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/marine-group-boat-works-llc,profile,2026-08-13,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/siemens-ag,profile,2026-08-13,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/specpro-bb-and-e-jv-llc,profile,2026-08-13,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aero-precision-industries-llc/contracts,contracts,2026-08-13,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/framatome-inc,profile,2026-08-13,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/national-strategic-research-institute,profile,2026-08-13,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bellamy-management-services-llc/contracts,contracts,2026-08-13,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/blindermanpower-llc,profile,2026-08-13,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ribcraft-usa-llc,profile,2026-08-13,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bowhead-communication-services-llc/contracts,contracts,2026-08-13,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/new-york-city-health-and-hospitals-corporation,profile,2026-08-13,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/chenega-reliable-services-llc/contracts,contracts,2026-08-13,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/firefly-aerospace-inc/contracts,contracts,2026-08-13,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/centron-industries-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ciqima-federal-services-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/tier-1-performance-solutions-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/monsanto-company/contracts,contracts,2026-08-12,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/rand-construction-company,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/baker-and-associates-inc/naics,naics,2026-08-12,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/alliant-solutions-partner-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cci-energy-and-construction-services-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/rapid-temps-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/barnhill-contracting-company/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ahtna-solutions-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/federal-industries-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/united-medevac-solutions-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/billy-w-jarrett-construction-company-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/alternate-perspectives-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/accura-rosser-8a-jv-llc,profile,2026-08-12,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/philadelphia-authority-for-industrial-development,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/training-resources-group-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/green-contracting-co-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/southern-co-services-inc/naics,naics,2026-08-12,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/the-powell-group-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cayuse-technologies-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/reefpoint-group-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/delta-information-systems-inc/naics,naics,2026-08-12,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/mori-associates-incorporated,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/dynamic-systems-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bishop-services-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/defense-consulting-services-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cahaba-government-benefit-administrators-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/kaihonua-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/a-tek-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/alpha-omega-change-engineering-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/red-d-arc-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/planetrisk-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/philadelphia-macaroni-company,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/boehringer-ingelheim-animal-health-france,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/sembcorp-marine-repairs-and-upgrades-pte-ltd/contracts,contracts,2026-08-12,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/stellantis-n-v,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/amec-e-and-i-inc/contracts,contracts,2026-08-12,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/aitc-five-domains-joint-venture-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/anderson-burton-construction-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/coulson-aviation-usa-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/dmg-mori-usa-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bluepath-labs-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/skillsoft-us-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/escambia-county-school-district/contracts,contracts,2026-08-12,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/bayer-aktiengesellschaft/contracts,contracts,2026-08-12,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/amtis-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/omitron-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bloodworks/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/coastal-management-solutions-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/flexible-liner-underground-technologies-ltd-co,profile,2026-08-12,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/r-p-m-supply-corporation/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/calspan-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/six-mile-nika-jv-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/keymark-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/triumvirate-environmental-inc,profile,2026-08-12,308,200,,https://getmindy.ai/contractors/triumvirate-environmental-llc,alias,triumvirate-environmental-llc,,308 to canonical indexable,500
+https://getmindy.ai/contractors/bids-bb-and-e-jv-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/stratasys-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/echostar-corporation/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/centuria-corporation/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/linde-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/the-mallory-co/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ares-holding-corporation/contracts,contracts,2026-08-12,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/spx-corporation/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aerometals-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ahtna-arcadis-8-a-jv-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/atsg-corporation/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/uptodate-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/2020-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aerospace-testing-alliance/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/alliance-one-group-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/kfs-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/alphavets-inc/agencies,agencies,2026-08-12,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/abide-international-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/blue-spader-contractors-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/complete-discovery-source-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/city-light-and-power-awp-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aerie-aerospace-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/global-solutions-ventures-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/noridian-mutual-insurance-company/contracts,contracts,2026-08-12,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/r2c-inc/contracts,contracts,2026-08-12,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/compx-security-products-inc/contracts,contracts,2026-08-12,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/century-companies-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/titan-peach-farms-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/university-corporation-for-advanced-internet-development/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/rhenus-midgard-gmbh-and-co-kg/contracts,contracts,2026-08-12,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/american-contractor-and-technology-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/calhoun-county-community-mental-health-authority/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/borsight-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/nextstep-technology-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bruker-scientific-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bluestone-environmental-group-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/chainbridge-solutions-incorporated/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/alliance-worldwide-distributing-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/koniag-services-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/artisan-construction-enterprises-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/sna-international-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cynergy-professional-systems-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bundesministerium-f-r-umwelt-naturschutz-und-reaktorsicherheit,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/astrobotic-technology-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/tetra-tech-mason-and-hanger-joint-venture,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/strategic-technology-institute-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/chickasaw-business-solutions-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ln-curtis-and-sons/naics,naics,2026-08-12,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/etelligent-group-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/goodyear-tire-and-rubber-company-the,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bobby-dodd-institute-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/binary-exchange-technologies-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/strategy-consulting-team-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/alamo-aircraft-ltd/naics,naics,2026-08-12,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/computercraft-corporation,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/chenega-decision-sciences-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/allegiant-facility-services-joint-venture-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bradsher-james-e/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/amar-health-it-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/synectic-solutions-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/elcon-enterprises-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/nativearc-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/houdstermaatschappij-wilg-b-v/contracts,contracts,2026-08-12,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/kanto-kosan-co-ltd/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cherokee-nation-aerospace-and-defense-l-l-c/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/chenega-facilities-management-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/j-g-b-enterprises-inc,profile,2026-08-12,200,200,,,no match,,,200 indexable,200
+https://getmindy.ai/contractors/alberici-mortenson-a-joint-venture/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/retro-tech-systems-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/tenet-3-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/americold-logistics-llc/contracts,contracts,2026-08-12,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/patronus-systems-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/associated-health-professionals-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bayonne-drydock-and-repair-corp/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/luhr-bros-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cymstar-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/odp-business-solutions-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/eaton-corporation-public-limited-company,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cherokee-nation-businesses-llc/naics,naics,2026-08-12,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/lexington-homes-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/amgen-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/atlas-wholesale-food-co,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/military-services-australia-pty-ltd,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/al-razaq-computing-services,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/promethean-general-contractors-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/continental-electronics-corporation/contracts,contracts,2026-08-12,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/ases-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aleut-remediation-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/mtp-drivetrain-services-l-l-c/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/coalfire-systems-inc/contracts,contracts,2026-08-12,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/fci-federal-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/spatial-front-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/lifehealth-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aesthetic-home-investments-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/american-wordata-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/centerpoint-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/central-truck-center-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/core4ce-llc/contracts,contracts,2026-08-12,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/emerson-electric-co/naics,naics,2026-08-12,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/performant-financial-corporation/contracts,contracts,2026-08-12,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/canyon-consulting-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/medical-north-america-jv/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/us-renal-care-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/curtiss-wright-ds-inc/naics,naics,2026-08-12,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/clear-global-solutions-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/trident-e-and-p-llc/naics,naics,2026-08-12,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/akima-infrastructure-protection-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cherokee-nation-operational-solutions-l-l-c/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/a-square-group-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/estes-express-lines/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/rock-gap-engineering-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/acierto-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/innovative-management-and-technology-services-llc/naics,naics,2026-08-12,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/san-antonio-shoe-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/hawaiian-dredging-construction-company-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aviation-ground-equipment-corp/naics,naics,2026-08-12,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/orc-industries-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/rjcl-corporation/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/alliant-alliance-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/blackhorse-a-parsons-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/precise-software-solutions-inc/contracts,contracts,2026-08-12,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/advantix-engineering-corp/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/asrc-federal-field-services-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/interimage-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/trendkite-inc/agencies,agencies,2026-08-12,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/ashford-international-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/spur-design-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ardl-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/acc3-international-incorporated/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cci-construction-services-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ecm-wise-corp,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/corporate-source-inc-the/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aerial-services-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ahntech-global-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bloomberg-finance-lp/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/equinix-government-solutions-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/edaptive-systems-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/oculus-group-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/altus-technical-solutions-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/paramedic-systems-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/employment-source-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bellamy-management-services-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/axiom-consultants-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/maverick-constructors-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/compx-security-products-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/olgoonik-general-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/sensata-technologies-holding-plc/naics,naics,2026-08-12,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/blueprint-consulting-services-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/daniels-and-daniels-construction-co-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/nexagen-networks-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/lockheed-martin-global-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ka-ala-systems-technology-corporation,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/alltrack-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/lrp-publications-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bauer-aktiengesellschaft/contracts,contracts,2026-08-12,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/nikkei-inc/contracts,contracts,2026-08-12,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/accelerated-development-and-support-corporation/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/associates-of-american-rr,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/temsco-helicopters-inc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/digital-technologies-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cox-subscriptions-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/karagozian-and-case-inc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/az-st-sec-of-state/naics,naics,2026-08-12,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/andrew-c-chen/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/iron-mountain-incorporated/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/erickson-incorporated/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/los-alamos-national-security-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/strategic-communications-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/catapult-health-technology-group-llc/contracts,contracts,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/disaster-solutions-alliance-llc,profile,2026-08-12,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/corpay-inc/contracts,contracts,2026-08-12,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/ayers-saint-gross-incorporated/contracts,contracts,2026-08-12,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/mccarthy-hitt-next-nga-west-joint-venture,profile,2026-08-11,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/cinteot-inc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/itc-de-llc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/evergy-inc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/harmar-mobility-llc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/applied-intellect-llc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aver-llc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/oeg-inc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/merck-kg-auf-aktien/naics,naics,2026-08-11,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/professional-management-enterprises-inc/naics,naics,2026-08-11,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/international-union-of-operating-engineers-national-training-fund/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/delta-air-lines-inc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/gc-and-e-federal-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/argus-cjw-jv-3-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/burns-and-mcdonnell-group-70-ho-ohui-ia-joint-venture,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aeg-group-inc/contracts,contracts,2026-08-11,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/camris-international-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/panum-telecom-l-l-c/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/spacesaver-systems-inc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bona-fide-conglomerate-inc/contracts,contracts,2026-08-11,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/the-johns-hopkins-health-system-corporation/naics,naics,2026-08-11,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/kajima-corporation/contracts,contracts,2026-08-11,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/american-veteran-contracting-solutions-llc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/creative-associates-international-inc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/media-fusion-llc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/symmes-maini-and-mckee-associates-inc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/alltech-engineering-corp,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/commissariat-a-energie-atomique-et-aux-energies-alternatives/contracts,contracts,2026-08-11,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/amdex-corporation,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/the-young-women-s-christian-association-of-rochester-and-monroe-county-n-y/contracts,contracts,2026-08-11,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/opportunities-and-resources-inc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/johnson-truck-center-llc/naics,naics,2026-08-11,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/ar6-cram-roofing-jv-llc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/alliant-health-solutions-inc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cherokee-nation-aerospace-and-defense-l-l-c,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/united-medevac-solutions-inc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/blue-air-training-corp/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/capp-llc/naics,naics,2026-08-11,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/specpro-sustainment-and-environmental-llc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cochlear-limited/contracts,contracts,2026-08-11,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/domestic-awardees-undisclosed/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bbix-llc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/anthony-wayne-rehabilitation-center-for-handicapped-and-blind-inc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/diversified-construction-of-oklahoma-inc/naics,naics,2026-08-11,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/intrepid-group-inc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/technology-solutions-provider-llc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/1-source-consulting-inc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/collaboration-ai-llc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/county-of-horry/contracts,contracts,2026-08-11,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/bio-medical-applications-of-missouri-inc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/general-dynamics-corporation/agencies,agencies,2026-08-11,308,200,"noindex, follow",https://getmindy.ai/contractors/general-dynamics-corp/agencies,alias,general-dynamics-corp,unavailable,308 to canonical (noindex: rows not cached),404
+https://getmindy.ai/contractors/n-s-p-ventures-corp/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bowen-consulting-group-inc-the/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/dsv-a-s/contracts,contracts,2026-08-11,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/dj-and-a-p-c,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aurora-flight-sciences-corporation/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/sallyport-global-holdings-inc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/anham-fzco,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/action-manufacturing-co/contracts,contracts,2026-08-11,200,200,,,single-UEI,action-manufacturing-company,,200 indexable,200
+https://getmindy.ai/contractors/a-g-associates-inc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/chenega-applied-solutions-llc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/circle-llc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/allcom-global-services-inc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/avectas-limited/contracts,contracts,2026-08-11,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/4-star-technologies-inc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cbj-development-co/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/elevance-health-inc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/avmedical-llc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/advanced-technologies-and-laboratories-atl-international-inc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/center-industries-corp,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/airbus-us-space-and-defense-inc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/saab-aktiebolag/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/rosenbauer-america-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/apogee-saic-capabilities-integrator-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aleut-o-and-m-services-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/entergy-arkansas-inc/contracts,contracts,2026-08-11,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/bridger-aerospace-group-llc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/eaton-aeroquip-llc/contracts,contracts,2026-08-11,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/titania-solutions-group-inc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/am-mac-incorporated/naics,naics,2026-08-11,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/north-point-defense-inc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/mountain-west-precast-llc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aerospace-testing-alliance,profile,2026-08-11,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/in-and-out-valet-co/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/american-civil-constructors-llc/contracts,contracts,2026-08-11,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/asrc-communications-ltd/contracts,contracts,2026-08-11,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/compx-security-products-inc/agencies,agencies,2026-08-11,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/ci-pond-solutions-jv-llc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/sherpa-6-inc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bay-valley-foods-llc/contracts,contracts,2026-08-11,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/indigo-it-llc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/electronic-metrology-laboratory-llc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/idaho-environmental-coalition-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/absolute-business-solutions-inc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/enpro-industries-inc/naics,naics,2026-08-11,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/flatwater-solutions-company,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/arup-laboratories-inc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/1st-american-medical-distributors-inc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/north-carolina-dept-of/naics,naics,2026-08-11,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/fundacion-inciensa,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/chickasaw-defense-group-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/brantley-construction-services-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ar6-cram-roofing-jv-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/vision-technologies-inc/contracts,contracts,2026-08-11,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/altus-architectural-studios-inc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/axon-enterprise-inc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/genesis-360-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/hottinger-bruel-and-kjaer-solutions-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/red-cedar-harmonia-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/envigo-rms-holding-corp,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/the-district-communications-group-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/civis-holding-spa,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/tsp-tankers-holdings-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/citibank-n-a/naics,naics,2026-08-11,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/achuti-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/environet-inc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/apr-energy-usa-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/evergy-inc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/c-and-c-contractors-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/matos-builders-llc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/skeo-solutions-inc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aleut-management-services-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/amg-healthcare-services-inc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/norvel-f-wood-jr/contracts,contracts,2026-08-11,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/cash-wa-distributing-co-of-kearney-inc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/anser-solutions-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/placid-refining-company-llc/contracts,contracts,2026-08-11,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/ashford-leebcor-enterprises-iv-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/busek-co-inc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/vana-solutions-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/pacific-investment-management-company-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/atlantic-nicc-jv-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/1cyberforce-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/alliance-global-group-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/dalberg-consulting-us-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/markon-llc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/areaka-trading-and-logistics-company/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/alon-israel-oil-company-ltd,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ceres-environmental-services-inc,profile,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aaecon-general-contracting-llc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/stratascor-llc/contracts,contracts,2026-08-11,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/scdatacom-llc/agencies,agencies,2026-08-11,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/kenney-business-solutions-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/blackfish-federal-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/hebco-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/starragheckert-holding-ag,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/burlington-engineering-corporation,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/american-security-programs-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ipsecure-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/tsymmetry-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/fn-herstal,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/state-of-mississippi,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/helix-electric-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/nederlandse-organisatie-voor-toegepast-natuurwetenschappelijk-onderzoek-tno,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/alaska-marine-excavation-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/trussworks-inc,profile,2026-08-10,200,200,,,single-UEI,trussworks,,200 indexable,200
+https://getmindy.ai/contractors/agsi-llc/naics,naics,2026-08-10,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/bechtel-nuclear-security-and-environmental-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/dexian-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/charles-tombras-advertising-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/force-engineering-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/jahn-corp,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/gulf-pacific-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/centerpoint-energy-services-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/health-and-human-services-agency-california,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/home-builders-institute,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aura-technologies-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/covidien-lp/contracts,contracts,2026-08-10,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/c-w-roberts-contracting-incorporated/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/asturian-consigli-jv-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/babylon-telecommunications-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aptim-aecom-decommissioning-llc,profile,2026-08-10,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/sheffield-construction-l-l-c/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/1st-coast-cargo-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/fc-gen-acquisition-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/a-t-kearney-public-sector-and-defense-services-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/evanhoe-and-associates-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/tidewater-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/signal-systems-corporation,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/the-aes-corporation,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/expal-systems-sa,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/maxim-healthcare-services-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/rightdirection-technology-solutions-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/fluent-language-solutions-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/acrow-global-limited/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/american-paragon-protective-services-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/blue-origin-washington-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aerostar-ses-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ctrmg-gapsi-jv-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cci-energy-and-construction-services-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/s-i-t-corporation,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/accessibility-services-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/acdi-voca,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ciqima-federal-services-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ist-research-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/chevron-al-khalij,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/phoenix-systems-engineering-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/riva-solutions-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cognitive-medical-systems-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bway-corporation,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/american-surgical-instrument-repair-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/55-industries-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/1st-american-medical-distributors-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bilfinger-se,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/accurate-energetic-systems-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/coastal-clinical-and-management-services-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/independent-rough-terrain-center-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/applied-defense-solutions-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/metlife-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/baxter-healthcare-corporation,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/city-light-and-power-ftc-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/saratoga-medical-center-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/crisis-response-co-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bravium-consulting-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cems-engineering-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/resicum-international-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/h-d-cw-joint-venture-the,profile,2026-08-10,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/oeg-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/numark-associates-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/meb-general-contractors-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/actuarial-research-corporation/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/amg-and-associates-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/controlled-f-o-r-c-e-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cybex-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/pinter-memorials-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/national-recoveries-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/acty-co-ltd,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/abm-federal-sales-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cdm-federal-services-europe-joint-venture/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cci-mechanical-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/independent-metal-strap-co-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/castellum-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/brothers-produce-of-dallas-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/sustainment-and-restoration-services-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/emerson-electric-co,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/w-and-k-container-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aegis-net-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aktio-corporation,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/brown-helicopter-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/deep-space-systems-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/abacus-solutions-group-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/microaire-surgical-instruments-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/arnold-defense-and-electronics-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/management-services-group-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/navmar-applied-sciences-corp,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/government-sales-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/geosyntec-jacobs-a-joint-venture/naics,naics,2026-08-10,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/basic-rubber-and-plastics-co/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/city-public-services-board,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/global-defense-logistics-s-r-l,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/astrea-group-for-trading-and-contracting,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ethan-allen-retail-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/apc-construction-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/b-o-s-security-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cccs-international-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/anderson-burton-construction-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/dassault-systemes,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/strategic-communications-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/koniag-technology-solutions-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/summitt-forests-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/anderson-hallas-architects-pc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/boeing-distribution-services-defense-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/mts3-inc/contracts,contracts,2026-08-10,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/blue-trident-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/team-greenzone-jv-llc/contracts,contracts,2026-08-10,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/chenega-systems-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/pacific-ridgeline-forestry-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/grower-direct-nut-company-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/global-science-and-technology-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/segue-technologies-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/chickasaw-health-consulting-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bullock-tice-associates-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/b-and-m-consulting-group-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/engense-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/swca-incorporated/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/berkeley-research-group-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/advanced-construction-services-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/atlantic-machinery-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/mks2-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/mtu-aero-engines-ag,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/augustine-consulting-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/electromotive-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/saab-aktiebolag/agencies,agencies,2026-08-10,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/advanced-business-software-consulting-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/applied-training-solutions-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ahtna-logistics-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/razor-consulting-solutions-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/j-and-b-builders-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aranea-solutions-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/beach-marine-services-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ains-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cxt-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/virginia-commercial-space-flight-authority,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/commonwealth-trading-partners-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/aac-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cgh-technologies-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/american-operations-corporation/naics,naics,2026-08-10,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/apogee-research-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/advancia-ahtna-jv-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/erickson-helicopters-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/logzone-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/calumet-shreveport-fuels-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/alberici-corporation/contracts,contracts,2026-08-10,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/solute,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/lionbridge-technologies-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/panagora-group-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/corporate-interiors-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/battle-s-transportation-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/kent-campa-and-kate-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/first-care-ohio-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/special-aerospace-services-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ashridge-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cofra-ag,profile,2026-08-10,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/carothers-construction-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/airgas-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/sinew-management-group-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/sia-stantec-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/linfield-hunter-and-junius-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/coherent-aerospace-and-defense-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cook-inlet-region-inc/contracts,contracts,2026-08-10,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/ams-integrated-solutions-fz-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/meadows-cmpg-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/battlespace-flight-services-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/redtown-technical-services-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/elwyn,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/mission-conversion-services-alliance-llc,profile,2026-08-10,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/accenture-public-limited-company,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/carnegie-robotics-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/byrd-enterprises-unlimited-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/the-ravens-group-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/tone-communication-services-llc/contracts,contracts,2026-08-10,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/bigelow-family-holdings-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/citibank-n-a,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/alakai-defense-systems-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/las-vegas-paving-corporation,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/lifehealth-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/delta-bridge-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cfocus-software-incorporated,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/groupe-snc-lavalin-inc/contracts,contracts,2026-08-10,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/cliftonlarsonallen-llp,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/carson-industries-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/eagle-global-scientific-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/randstad-n-v,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/saudi-telecom-company/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bowhead-program-management-and-operations-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/central-lake-armor-express-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/black-canyon-consulting-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/environmental-quality-management-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/harkcon-inc/contracts,contracts,2026-08-10,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/boston-fusion-corp/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/abba-technologies-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/minuteman-aviation-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/lendlease-us-construction-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/chatmon-vjr-jv-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/invacare-corp/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/unified-services-of-texas-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cq-jv-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ada-technologies-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/standard-bent-glass-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/mec-energy-services-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/blair-remy-corp-pc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/primetech-international-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/mid-cities-home-medical-delivery-service-l-l-c,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/incentive-technology-group-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/dalberg-consulting-us-llc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/esi-acquisition-corp/naics,naics,2026-08-10,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/time-warner-cable-inc/contracts,contracts,2026-08-10,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/cloud-lake-technology-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/trussworks-inc/agencies,agencies,2026-08-10,200,200,"noindex, follow",,single-UEI,trussworks,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/ahtna-engineering-services-llc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/frank-m-gargiulo-and-son-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/allen-corporation-of-america-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/jma-resources-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/mastec-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/performance-institute-llc-the,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/consigli-building-group-inc/contracts,contracts,2026-08-10,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/minebea-mitsumi-inc,profile,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/applied-computer-training-and-technology-inc/contracts,contracts,2026-08-10,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/veterans-holding-group-llc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/all-points-logistics-llc/naics,naics,2026-08-09,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/mitchell-consulting-services-group-inc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cargotec-oyj/naics,naics,2026-08-09,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/caliola-engineering-llc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/granite-obayashi-a-joint-venture/naics,naics,2026-08-09,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/j-kokolakis-contracting-inc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/black-diamond-advanced-technology-llc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/carter-s-contracting-services-inc-a-close-corporation/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/air-traffic-engineering-co-llc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/laitram-l-l-c,profile,2026-08-09,200,200,,,rollup,,,200 indexable,500
+https://getmindy.ai/contractors/arrowhead-realty-llc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bpa-facility-services-inc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/jag-components-llc/naics,naics,2026-08-09,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/asr-international-corp,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/worley-limited,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/abrams-group-construction-llc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/c2-alaska-llc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/colfax-corporation/contracts,contracts,2026-08-09,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/flightfab-inc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/mls-multinational-logistic-services-limited,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/daewoo-engineering-and-construction-co-ltd,profile,2026-08-09,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/crider-inc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/goodwill-industries-of-san-antonio-contract-services,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/at-and-t-technical-services-company-inc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/regan-technologies-corp/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/clarcor-inc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/hornet-acquisitionco-llc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cadence-contract-services-llc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/binary-exchange-technologies-llc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/1-source-consulting-inc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/awd-management-services-inc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/mccain-usa-inc/contracts,contracts,2026-08-09,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/algood-food-co/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/computrition-inc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/isotek-systems-llc,profile,2026-08-09,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/cavanaugh-government-group-llc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/meherrin-agricultural-and-chemical-co/contracts,contracts,2026-08-09,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/center-industries-corp/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/northeast-infrastructure-llc/contracts,contracts,2026-08-09,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/clarke-power-services-inc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/intellect-solutions-llc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/c2g-ltd-co,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bayer-aktiengesellschaft/agencies,agencies,2026-08-09,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/gilbane-exyte-a-joint-venture/agencies,agencies,2026-08-09,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/washington-gas-light-company/naics,naics,2026-08-09,308,200,"noindex, follow",https://getmindy.ai/contractors/altagas-ltd/naics,single-UEI,altagas-ltd,unavailable,308 to canonical (noindex: rows not cached),200
+https://getmindy.ai/contractors/integration-innovation-inc/agencies,agencies,2026-08-09,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/advanced-technology-and-research-corporation/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/performance-assessment-network-inc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/twenty-first-century-bean-processing-llc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/akima-infrastructure-protection-llc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/3vesta-llc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ritenet-corp,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/the-kenific-group-llc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/horizons-youth-services-l-c/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/elcon-enterprises-inc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/engenius-consulting-group-inc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ames-1-llc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/first-coast-security-services-inc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/northeast-utilities,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/brink-brothers-inc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/luna-innovations-incorporated,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cape-cdm-smith-a-joint-venture/naics,naics,2026-08-09,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/tetra-tech-mason-and-hanger-joint-venture/naics,naics,2026-08-09,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/bkm-construction-llc/contracts,contracts,2026-08-09,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/aspetto-inc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bravium-consulting-inc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/hamhed-llc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/regeneron-pharmaceuticals-inc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/digitized-schematic-solutions-llc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/air-traffic-engineering-co-llc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/access-information-management-corporation,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/american-growler-inc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/edenred,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/accessibility-services-inc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/alliance-worldwide-distributing-llc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/rsc2-inc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/kbr-diego-garcia-llc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ardl-inc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/tech7-consulting-llc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/numet-machining-techniques-llc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/fwg-solutions-inc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/progressive-construction-services-llc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/dexis-professional-services-llc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/merrick-and-company/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/rq-aecom-jv/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/efs-ebrex-sarl/contracts,contracts,2026-08-09,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/tigua-technology-services-inc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/koniag-services-inc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/alan-shintani-inc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/gilbane-exyte-a-joint-venture/naics,naics,2026-08-09,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/jahn-corp/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/fedbiz-it-solutions-llc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/master-security-company-llc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/shimmick-construction-company-inc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cdm-a-joint-venture/naics,naics,2026-08-09,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/satellite-services-inc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/telecommunication-support-services-inc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/panasonic-corporation,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/insi-cloud-inc/contracts,contracts,2026-08-09,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/the-johns-hopkins-health-system-corporation/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/mercom-incorporated,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/alcor-technical-solutions-llc/contracts,contracts,2026-08-09,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/edenred/contracts,contracts,2026-08-09,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/galveston-coastal-services-a-joint-venture/naics,naics,2026-08-09,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/cdm-stanley-a-joint-venture/naics,naics,2026-08-09,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/alexton-incorporated,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/armada-ltd,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/cci-capco-llc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/spin-systems-inc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bureau-veritas-technical-assessments-llc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/opto-knowledge-systems-inc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/altagas-ltd,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/iit-research-institute/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/c-n-s-communications-llc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/d-f-zee-s-firefighting-catering-llc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/illinois-institute-of-technology/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/nve-inc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/kadiak-llc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/advanced-space-llc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/blacksky-holdings-inc/contracts,contracts,2026-08-09,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/parsons-brinckerhoff-holdings-inc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/rape-abuse-and-incest-national-network-rainn/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/envoy-solutions-llc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/boyer-commercial-construction-inc,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/c-j-seto-support-services-llc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/caprice-electronics-inc/naics,naics,2026-08-09,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/absher-construction-co,profile,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/altegrity-inc/contracts,contracts,2026-08-09,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/carley-corporation/naics,naics,2026-08-09,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/brooks-range-contract-services-inc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/alstom/contracts,contracts,2026-08-09,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/contrack-international-inc/contracts,contracts,2026-08-09,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/new-york-embroidery-studio-inc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/telspan-data-llc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bruckedwards-inc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/dni-emerging-technologies-llc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/pacific-layberthing-south-llc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/appddictionstudio-limited-liability-company/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/alltech-engineering-corp/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/hitachi-zosen-corporation/contracts,contracts,2026-08-09,308,500,,https://getmindy.ai/contractors/nac-international-inc/contracts,single-UEI,nac-international-inc,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/bristol-bay-native-corporation/naics,naics,2026-08-09,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/global-defense-logistics-s-r-l/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/quadient-finance-usa-inc/contracts,contracts,2026-08-09,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/hardin-county-of/contracts,contracts,2026-08-09,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/pivotal-i4dm-jv-llc,profile,2026-08-09,200,200,"noindex, follow",,rollup,,,200 (noindex: thin/empty contractor),500
+https://getmindy.ai/contractors/illuminate-operations-inc/contracts,contracts,2026-08-09,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/allnative-solutions-corporation/naics,naics,2026-08-09,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/university-of-alaska-systems/contracts,contracts,2026-08-09,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/chicago-bridge-and-iron-company-n-v/contracts,contracts,2026-08-09,500,500,,,rollup,,,"5xx: contracts rows cold, contracts budget spent",500
+https://getmindy.ai/contractors/atherton-construction-llc/contracts,contracts,2026-08-08,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/1901-group-llc,profile,2026-08-08,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ovc-engineered-solutions-llc/naics,naics,2026-08-08,200,200,"noindex, follow",,rollup,,unavailable,200 (noindex: rows not cached),200
+https://getmindy.ai/contractors/ambit-group-llc/contracts,contracts,2026-08-08,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/integral-federal-inc/contracts,contracts,2026-08-08,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/ondaro-llc,profile,2026-08-08,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/argo-systems-llc,profile,2026-08-08,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/the-walbridge-group-inc,profile,2026-08-08,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/the-university-of-north-texas-health-science-center-at-fort-worth,profile,2026-08-08,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/i-solutions-direct-inc,profile,2026-08-08,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/mdu-resources-group-inc,profile,2026-08-08,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/bristol-building-constructors-llc/contracts,contracts,2026-08-08,200,200,,,rollup,,,200 indexable,200
+https://getmindy.ai/contractors/golden-gate-capital-lp,profile,2026-08-08,200,200,,,rollup,,,200 indexable,200

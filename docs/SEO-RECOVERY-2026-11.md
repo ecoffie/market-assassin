@@ -43,8 +43,9 @@ registrations kept until the index is processed.
 
 Pending (UI only; no API):
 1. Validate Fix on **Soft 404**: safe (36/36 sampled are contract pages, all now 200 + indexable).
-2. **Not found (404)**: **do not validate yet.** Classified 2026-11-13 (below): 17% of the examples
-   still answer 5xx. Validate only after the tab fix (#2025) is live and a re-run shows ~0 5xx.
+2. **Not found (404)**: **do not validate until the 2026-11-14 re-run (below) is reviewed.** No
+   false 404s remain; 80 of 1,000 still answer 5xx, 77 of them `/contracts` pages blocked by the
+   contracts cold budget.
 3. Request indexing (verified 200, indexable, self-canonical on 2026-11-13):
    - https://getmindy.ai/contractors/accenture-inc/contracts
    - https://getmindy.ai/contractors/cherokee-nation-businesses-llc/contracts
@@ -79,7 +80,8 @@ every slug checked in BigQuery (`recipients_rollup_merged`, `recipients`, and th
   warm queue; 161 were moved to the front of the priority queue on 2026-11-13 (+10,000 score,
   the "has Search Console impressions" tier; prior scores in the PR thread).
 - **3 false 404s:** tabs resolved aliases cache-only (`valkyrie-enterprises-inc/naics`,
-  `the-university-of-dayton/agencies`, `general-dynamics-corporation/agencies`). Fixed in #2025.
+  `the-university-of-dayton/agencies`, `general-dynamics-corporation/agencies`). Fixed in #2025
+  (merged + deployed 2026-11-14 00:30 UTC, `ab82b851`).
 - **7 slugs exist nowhere in the data** (e.g. `ii-vi-incorporated`, `young-and-rubicam-inc`):
   should be real 404s; 6 answer 5xx until a budgeted lookup confirms the absence.
 - **No obsolete routes.**
@@ -90,6 +92,64 @@ Evidence (kept in git; the scratchpad copy is temporary):
   robots, redirect target, data match, alias canonical, classification
 - `docs/seo-recovery/crawl-gsc-examples.py`: the crawler
   (`python3 -I crawl-gsc-examples.py <Table.csv> <out.json>`, 6 concurrent, Googlebot UA)
+
+## Not found (404) re-run: 2026-11-14 00:33 UTC
+Same 1,000 URLs, same crawler, 3 minutes after #2025 reached production and 33 minutes after the
+UTC budget reset. Per-URL results: `docs/seo-recovery/gsc-404-classification-2026-11-14-rerun.csv`
+(adds `tab_state` and the previous run's final status).
+
+| Type | URLs | 200 indexable | 308 to canonical | 200 noindex (intentional) | Genuine 404 | False 404 | Temporary 5xx |
+|---|---|---|---|---|---|---|---|
+| Profile | 500 | 449 | 15 | 29 thin | 4 | 0 | 3 |
+| Contracts | 418 | 334 | 5 | 0 | 2 | 0 | 77 |
+| NAICS tab | 65 | 0 | 5 (noindex) | 59 rows not cached | 1 | 0 | 0 |
+| Agencies tab | 17 | 0 | 3 (noindex) | 14 rows not cached | 0 | 0 | 0 |
+| **All** | **1,000** | **783** | **28** | **102** | **7** | **0** | **80** |
+
+The 308 column counts redirects whose target answers 200. The 8 tab redirects land on noindex
+tabs (rows not cached).
+
+- **False 404s: 0.** The three tab URLs 308 to their canonical tabs; `tcom-...` tab is a genuine 404.
+- **Genuine 404s: 7**, all slugs that exist nowhere in the data (6 were 5xx on 2026-11-13).
+- **Intentional noindex: 102.**
+  - 29 profiles hit the existing thin rule (`< $25K` or `< 2 awards`). This includes single-award
+    joint ventures such as Salado Isolation Mining ($1.9B, 1 award). That's by design, not a
+    cache failure.
+  - 73 tab pages (81 counting the 8 reached by redirect) are noindex because their ROWS are not
+    cached (see below). None are thin, none render a table.
+- **Temporary 5xx: 80.**
+  - 77 `/contracts` pages: all 77 contractors resolve (74 profiles 200, 3 redirect). The contracts
+    page-data key is cold and the contracts cold budget was spent (215 by 00:33, 298 by 00:35
+    against 200/day). The warm cron does not warm the `/contracts` page key (`warmSlug` warms the
+    profile sections only), so these depend on the daily budget.
+  - 3 profiles: alias slugs (`the-afx-group-llc`, `indica-labs-inc`, `royal-arc-welding-company`)
+    whose alias key is not yet cached. The warmer skips alias slugs, so they also depend on the
+    daily budget.
+- **The 161 prioritized contractors:** drained by the 23:23 and 00:23 UTC warm runs (160 left the
+  queue; the one remaining, `the-university-of-dayton`, was re-added at score 1 by a live miss and
+  now resolves through its cached alias). Identity cache: 138 cached, 12 alias cached, 6 confirmed
+  absent, 5 alias key still cold. 38 now answer 200 indexable, 12 a 308, 27 200 thin-noindex, 6 a
+  genuine 404, 3 a profile 5xx (alias), and 77 a `/contracts` 5xx (above).
+- **Queue health after the +10,000 bump:** no residue. 5,157 queued, top scores back at the normal
+  725, warms today 85 of 2,000, legacy set 9,061. The bump only reordered work.
+
+## NAICS / agencies tabs: thin vs not cached
+Both render `noindex, follow`, for different reasons. Only the first is a content judgement.
+
+| State | `data-subpage-state` | Meaning | Fix |
+|---|---|---|---|
+| **Thin** | none (table renders) | Data answered with 1 to 4 rows (`SUBPAGE_MIN_ROWS = 5`) | None. Intentional. |
+| **No rows** | `none` | Data answered with zero rows | None. Intentional. |
+| **Not cached** | `unavailable` | Row key (`all-naics` / `all-agencies`) is cold. No warmer fills it and the tab never reads BigQuery live | Only a tab-row warmer would change this |
+
+On 2026-11-14 every one of the 81 tab pages in the sample was **not cached**. None were thin. So
+the noindex on these tabs today is a cache-state outcome, not a judgement that the tab is
+worthless. The rows exist for most of these contractors (the profile's top-NAICS / top-agency
+sections are warm). This section only records the distinction. It does not propose a tab-indexing
+project: the tabs stay out of the sitemap until rows are cached
+(`subpageSitemapEligible`). Note that when a data source can't answer, contractor *resolution*
+returns a 5xx (#2025) while the *rows* return noindex. A 5xx for cold rows would mean a 5xx on
+nearly every tab indefinitely, and Google slows crawling of a host that serves many 5xx.
 
 Warming math: priority warms are capped at 2,000 per UTC day, 100 per hourly run (`23 * * * *`,
 `WARM_PRIORITY_DAILY_CAP` / `WARM_PRIORITY_PER_RUN`). The warmer resolves only slugs that are
