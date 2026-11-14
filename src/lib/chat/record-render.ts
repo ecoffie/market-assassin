@@ -278,6 +278,13 @@ function successorText(succ: unknown): string {
 export function renderStatusChecks(result: Rec): RenderedRecords | null {
   const checks = Array.isArray(result?.status_checks) ? (result.status_checks as Rec[]) : null;
   const meta = (result?._meta && typeof result._meta === 'object' ? result._meta : {}) as Rec;
+  // An empty search inside the publication-lag window is not a verified zero: state the tool's own
+  // freshness note verbatim (a model paraphrase can lose the date it is current through).
+  const awardsList = Array.isArray(result?.awards) ? (result.awards as Rec[]) : [];
+  if (!checks && !awardsList.length && meta.lag_note) {
+    const text = `No awards were found for this search in the requested window, and that is NOT a verified zero. Data freshness: ${str(meta.lag_note)}${meta.as_of ? ` (USASpending last loaded ${str(meta.as_of)})` : ''}`;
+    return { tool: PAST_CONTRACTS_TOOL, text, total: 0, retrieved: 0, from: 0, to: 0, shown: 0, exhaustive: false, ids: [], allowedCounts: [0], standalone: 0, orders: 0 };
+  }
   if (!checks) return null;
   const awards = (Array.isArray(result.awards) ? result.awards : []) as Rec[];
   const byId = new Map(awards.map((a) => [str(a.awardId), a]));
