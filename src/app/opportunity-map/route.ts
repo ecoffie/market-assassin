@@ -1099,7 +1099,10 @@ const ZLAYOUT_CSS = '<style>'
   + '.feed{display:flex!important;flex-direction:column!important;gap:12px!important;padding:14px 16px 28px!important}'
   + '.feed .card{flex:none!important;margin-bottom:0!important}'
   // Mindy header bar
-  + '.zhead{grid-area:zhead;position:relative;display:flex;flex-direction:column;background:#fff;z-index:20;' + mpTokenDeclarations() + '}'
+  // z-index 1100 (was 20): the account menu opens downward out of this header, and at 20 the
+  // filter bar below (.ztop, z 1001) covered its top items on desktop (Eric 2026-11-13: "when i
+  // click my icon on the top right i cant see the entire menu"). Phone already used 1100.
+  + '.zhead{grid-area:zhead;position:relative;display:flex;flex-direction:column;background:#fff;z-index:1100;' + mpTokenDeclarations() + '}'
   // The phone-only row under the homepage bar that holds the map menu button. Hidden on desktop.
   + '.zh-maprow{display:none;align-items:center;gap:14px;border-bottom:1px solid var(--line);background:#fff}'
   // far-left icon rail — PINNED (position:fixed) so grid/overflow can never push it off-screen.
