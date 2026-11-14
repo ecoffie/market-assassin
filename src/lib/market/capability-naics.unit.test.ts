@@ -46,3 +46,12 @@ describe('interpretation', () => {
     expect(n).toMatch(/561320 Temporary Help Services/);
   });
 });
+
+describe('acceptance run 1 fixes', () => {
+  it('clerk and guard-service wording map to the right capability; Coast Guard and National Guard do not', () => {
+    expect(interpretCapabilityNaics('APPOINTMENT CLERKS FORT CAMPBELL').codes).toEqual(['561110']);
+    expect(interpretCapabilityNaics('FY26 TIS GUARD SERVICE QTR1').codes).toEqual(['561612']);
+    expect(interpretCapabilityNaics('US Coast Guard services').codes).toEqual([]);
+    expect(interpretCapabilityNaics('National Guard services').codes).toEqual([]);
+  });
+});

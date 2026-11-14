@@ -173,11 +173,11 @@ describe('buying offices', () => {
   };
   it('renders offices with codes, exact dollars, customers and place of performance, and says it is the top N of M', () => {
     const r = renderBuyingOffices(res)!;
-    expect(r.text).toMatch(/^10 buying offices bought this work \(NAICS 5613, 5611 · work performed in TN · Memphis metro \(cities within 30 miles, in TN only\) · FY2024-FY2026\), \$65,723,501 obligated across 74 awards/);
+    expect(r.text).toMatch(/^10 contracting offices have obligations for this work \(NAICS 5613, 5611 · work performed in TN · Memphis metro \(cities within 30 miles, in TN only\) · FY2024-FY2026\), \$65,723,501 obligated across 74 awards/);
     expect(r.text).toMatch(/Showing the top 2 of 10 by obligated dollars\./);
     expect(r.text).toMatch(/1\. NAVSUP FLT LOG CTR NORFOLK \(N00189\) · Department Of Defense \/ Department Of The Navy|1\. NAVSUP FLT LOG CTR NORFOLK \(N00189\) · Department of Defense \/ Department of the Navy/);
     expect(r.text).toMatch(/customers: Navy Personnel Command \$50,000,000 · work performed in Millington, TN/);
-    expect(r.text).toMatch(/These are federal government contracting offices \(the buyers of this work\), not companies\./);
+    expect(r.text).toMatch(/These are federal government contracting offices \(buyers\), not companies\./);
   });
   it('no offices is stated with its filters', () => {
     expect(renderBuyingOffices({ ...res, offices: [], totals: null })!.text).toMatch(/^No buying offices found \(NAICS 5613, 5611/);
@@ -347,7 +347,7 @@ describe('different work: positive evidence only', () => {
 describe('run-G review: buying offices show the example awards they reference', () => {
   it('lists up to two example awards per office', () => {
     const r = renderBuyingOffices({ scope: { state: 'TN', naics: ['5613'] }, offices: [{ office_name: 'NCO 9', office_code: '36C249', obligated: 100, share_pct: 50, award_count: 2, example_awards: [{ piid: '36C24926N0041', obligated: 60 }, { piid: '36C24925P0001', obligated: 40 }, { piid: 'X3', obligated: 1 }] }], totals: { obligated: 200, award_count: 4, office_count: 2 }, notes: [], _meta: {} })!;
-    expect(r.text).toMatch(/example awards: 36C24926N0041 \$60; 36C24925P0001 \$40$/m);
+    expect(r.text).toMatch(/example awards \(obligations in this window\): 36C24926N0041 \$60; 36C24925P0001 \$40$/m);
   });
 });
 
@@ -358,11 +358,27 @@ describe('Phase B: semantic relevance vs industry-code match', () => {
       _meta: meta({ total: 2 }),
     }, { requestedLabels: ['temporary staffing', 'clerical and administrative support'] })!;
     expect(r.text).toMatch(/S1 · [^\n]*description confirms: temporary staffing/);
-    expect(r.text).toMatch(/S2 · [^\n]*industry-code match(?![^\n]*CHECK)/);
-    expect(r.text).toMatch(/1 of 2 retrieved records have a description that confirms the requested work/);
+    // FACT WITNESS CLERK now confirms (clerk is clerical); nothing is labelled code-only or counted as unconfirmed.
+    expect(r.text).toMatch(/S2 · [^\n]*description confirms: clerical and administrative support/);
+    expect(r.text).not.toMatch(/industry-code match|of 2 retrieved records/);
+    expect(r.text).toMatch(/Untagged records match by industry code/);
   });
   it('a zero or negative net office is flagged, not presented as a buyer', () => {
     const r = renderBuyingOffices({ scope: { naics: ['561612'] }, offices: [{ office_name: 'X', office_code: 'X1', obligated: -1200, share_pct: -1, award_count: 1 }], totals: { obligated: 100, award_count: 5, office_count: 3 }, notes: [], _meta: {} })!;
-    expect(r.text).toMatch(/CHECK: net obligations are zero or negative/);
+    expect(r.text).toMatch(/Also returned, with zero or negative net obligations in this window \(deobligations, so not evidence of buying\): X \(X1\) -\$1,200\./);
+    expect(r.text).not.toMatch(/^1\. X/m);
+  });
+});
+
+describe('run-1 acceptance fixes', () => {
+  it('term match handles underscores and clerk/guard-service wording', () => {
+    const r = renderExpiringRecords({ contracts: [rec('W91YTZ24P0018', '2027-01-01', { description: 'APPOINTMENT CLERKS_FORT CAMPBELL' }), rec('G1', '2027-01-02', { description: 'FY26 TIS GUARD SERVICE QTR1' })], _meta: meta({ total: 2 }) }, { requestedLabels: ['clerical and administrative support', 'security guards'] })!;
+    expect(r.text).toMatch(/W91YTZ24P0018 · [^\n]*description confirms: clerical and administrative support/);
+    expect(r.text).toMatch(/G1 · [^\n]*description confirms: security guards/);
+  });
+  it('no rendered text states a reporting-lag figure the tool did not provide', () => {
+    const b = renderBuyingOffices({ scope: { naics: ['5613'] }, offices: [{ office_name: 'A', obligated: 10, share_pct: 100, award_count: 1 }], totals: { obligated: 10, award_count: 1, office_count: 1 }, notes: [], _meta: { as_of: '2026-09-30', lag_note: 'prime contracts only; ingested weekly' } })!;
+    expect(b.text).toMatch(/Data freshness: latest action loaded 2026-09-30; prime contracts only; ingested weekly\./);
+    expect(b.text).not.toMatch(/90 days/);
   });
 });

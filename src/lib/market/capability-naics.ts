@@ -29,10 +29,10 @@ export const CAPABILITY_LEXICON: CapabilityEntry[] = [
   // Staffing
   { match: /\b(medical|nurse|nursing|clinical|healthcare|health care)\s+staffing\b/i, label: 'medical staffing', naics: ['561320', '621399'] },
   { match: /\b(it|technical|tech)\s+staffing\b/i, label: 'IT staffing', naics: ['561320', '541519'] },
-  { match: /\b(temporary|temp|contract|light industrial|industrial)\s+(staffing|labor|help|workers?|personnel)\b|\bpersonnel services\b|\bstaffing\b|\btemp\s+agency\b/i, label: 'temporary staffing', naics: ['561320'] },
+  { match: /\b(temporary|temp|contract|light industrial|industrial)\s+(staffing|labor|help|workers?|personnel)\b|\bpersonnel services\b|\btemporary help\b|\bstaffing\b|\btemp\s+agency\b/i, label: 'temporary staffing', naics: ['561320'] },
   { match: /\b(employment placement|recruiting|recruitment|executive search)\b/i, label: 'employment placement', naics: ['561311'] },
   // Administrative and office support
-  { match: /\b(clerical|administrative support|admin support|office support|office administrative|administrative services|admin services|admin|administrative)\b/i, label: 'clerical and administrative support', naics: ['561110'] },
+  { match: /\b(clerical|clerks?|secretar(?:y|ies|ial)|receptionists?|office assistants?|administrative support|admin support|office support|office administrative|administrative services|admin services|admin|administrative)\b/i, label: 'clerical and administrative support', naics: ['561110'] },
   { match: /\b(document preparation|word processing|data entry)\b/i, label: 'document preparation and data entry', naics: ['561410'] },
   { match: /\b(call center|answering service|help line|contact center)\b/i, label: 'call center', naics: ['561421'] },
   { match: /\b(translation|interpretation|interpreting|interpreter|translator)s?\b/i, label: 'translation and interpretation', naics: ['541930'] },
@@ -48,7 +48,7 @@ export const CAPABILITY_LEXICON: CapabilityEntry[] = [
   { match: /\b(landscaping|grounds maintenance|lawn care|mowing)\b/i, label: 'landscaping and grounds', naics: ['561730'] },
   { match: /\b(facilities support|facility support|base operations support|facilities management|facility management|facility operations)\b/i, label: 'facilities support', naics: ['561210'] },
   { match: /\b(pest control|exterminat\w*)\b/i, label: 'pest control', naics: ['561710'] },
-  { match: /\b(security guards?|guard services|armed guards?|unarmed guards?|security officers?|protective services)\b/i, label: 'security guards', naics: ['561612'] },
+  { match: /\b(security guards?|(?<!coast\s)(?<!national\s)guard\s+services?|armed guards?|unarmed guards?|security officers?|protective security officers?|court security officers?|protective services)\b/i, label: 'security guards', naics: ['561612'] },
   { match: /\b(security systems?|alarm systems?|access control systems?|cctv|video surveillance)\b/i, label: 'security systems', naics: ['561621'] },
   { match: /\b(waste collection|trash (removal|collection)|refuse collection|garbage collection)\b/i, label: 'waste collection', naics: ['562111'] },
   { match: /\b(environmental remediation|remediation|abatement|hazardous waste cleanup)\b/i, label: 'remediation', naics: ['562910'] },
