@@ -44,7 +44,7 @@ import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/cha
 import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, type PlannerTarget } from '@/lib/chat/planner-config';
 import { capabilityPlannerNote } from '@/lib/market/capability-naics';
 import { guardUnstatedStates } from '@/lib/chat/stated-filters';
-import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
+import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
 
@@ -600,12 +600,18 @@ export async function POST(request: NextRequest) {
               turnTrace.tool_executions = results.map((r) => r.record);
               // PR E: verified record lists are rendered from the tool data, not reproduced by the model.
               for (const r of results) {
-                if (r.record.status !== 'success' || ![EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL].includes(r.record.tool)) continue;
+                const renderers: Record<string, (p: Record<string, unknown>) => RenderedRecords | null> = {
+                  [EXPIRING_TOOL]: (p) => renderExpiringRecords(p, { offset: displayOffsets.get(r.tool_call_id) ?? 0 }),
+                  [PAST_CONTRACTS_TOOL]: renderStatusChecks,
+                  [BUYING_OFFICES_TOOL]: renderBuyingOffices,
+                  [PRICING_TOOL]: renderPricing,
+                  [KEYWORDS_TOOL]: renderKeywords,
+                };
+                const renderer = renderers[r.record.tool];
+                if (r.record.status !== 'success' || !renderer) continue;
                 try {
                   const parsed = JSON.parse(r.content);
-                  const rendered = r.record.tool === EXPIRING_TOOL
-                    ? renderExpiringRecords(parsed, { offset: displayOffsets.get(r.tool_call_id) ?? 0 })
-                    : r.record.tool === BUYING_OFFICES_TOOL ? renderBuyingOffices(parsed) : renderStatusChecks(parsed);
+                  const rendered = renderer(parsed);
                   if (rendered) renderedRecords.push(rendered);
                 } catch (renderErr) {
                   console.error('[chat] record render failed:', renderErr);
