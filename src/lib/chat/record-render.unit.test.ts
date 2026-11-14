@@ -4,7 +4,7 @@
  * summaries that contradict the verified counts.
  */
 import { describe, it, expect } from 'vitest';
-import { renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, collectExpiringRecords, checkSummaryAgainstRecords, prepareChatToolArgs, CHAT_FETCH_LIMIT } from './record-render';
+import { renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, describedStateConflict, collectExpiringRecords, checkSummaryAgainstRecords, prepareChatToolArgs, CHAT_FETCH_LIMIT } from './record-render';
 
 const rec = (piid: string, end: string, extra: Record<string, unknown> = {}) => ({
   contract_id: `CONT_${piid}`, piid, incumbent_name: 'ALLPRO STAFFNET LLC', awarding_agency: 'Department of Veterans Affairs',
@@ -214,7 +214,7 @@ describe('pricing and keywords', () => {
     expect(r.text).toMatch(/1\. warehouse worker · calc labor category n=12/);
     expect(r.text).toMatch(/3\. forklift operator · solicitation text n=5/);
     expect(r.text.match(/warehouse worker/g)).toHaveLength(1); // not duplicated
-    expect(r.text).toMatch(/Left out on purpose \(not search terms\): locations: memphis; brand: superb\./);
+    expect(r.text).toMatch(/Left out on purpose \(company names and places are not search terms\): memphis, superb\./);
   });
 });
 
@@ -226,5 +226,45 @@ describe('freshness: empty recent-window search', () => {
   });
   it('an empty search with no lag note renders nothing (the model reports the verified zero)', () => {
     expect(renderStatusChecks({ awards: [], _meta: {} })).toBeNull();
+  });
+});
+
+describe('independent-review fixes', () => {
+  it('flags a record whose description names another state; no false flag for West Virginia', () => {
+    expect(describedStateConflict('PSO SERVICES THROUGHOUT THE STATE OF PENNSYLVANIA (PA)', 'TX')).toBe('Pennsylvania');
+    expect(describedStateConflict('guard services in West Virginia', 'WV')).toBeNull();
+    expect(describedStateConflict('guard services at Fort Hood', 'TX')).toBeNull();
+  });
+  it('flags records matched by industry code only (description lacks the requested work); never hides them', () => {
+    const r = renderExpiringRecords({
+      contracts: [rec('G1', '2027-01-01', { description: 'ARMED SECURITY GUARD SERVICES' }), rec('T1', '2027-02-01', { description: 'DETAINEE TRANSPORT' })],
+      _meta: meta({ total: 2 }),
+    }, { relevancePhrases: ['security guard', 'security guards'] })!;
+    expect(r.text).toMatch(/G1 · [^\n]*ARMED SECURITY GUARD SERVICES(?![^\n]*CHECK)/);
+    expect(r.text).toMatch(/T1 · [^\n]*DETAINEE TRANSPORT · CHECK: matched by industry code only/);
+    expect(r.shown).toBe(2);
+  });
+  it('plain award search: every award with dates, the date-filter meaning, not-the-full-list and data status', () => {
+    const r = renderStatusChecks({
+      awards: [{ awardId: 'W912EQ17P0020', recipientName: 'GRAND SLAM', description: 'chefs', startDate: '2017-03-03', endDate: '2017-04-21', awardAmount: 1000, popState: 'TN' }],
+      basis: { date_filter: 'date_from/date_to select awards by transaction activity; an award that started earlier can appear.' },
+      _meta: { total: 14, result_state: 'partial', lag_note: 'data current through about 2026-08-15', applied_filters: { office: { code: 'W912EQ', name: 'W07V ENDIST MEMPHIS' }, naics: '561320', date_from: '2019-01-01' } },
+    })!;
+    expect(r.text).toMatch(/^14 awards match \(office W912EQ W07V ENDIST MEMPHIS · NAICS 561320 · activity 2019-01-01 to today\)/);
+    expect(r.text).toMatch(/Showing 1 of 14 \(largest first\); this is not the full list\./);
+    expect(r.text).toMatch(/Date filter: .*started earlier can appear/);
+    expect(r.text).toMatch(/W912EQ17P0020 · Grand Slam · chefs · 2017-03-03 to 2017-04-21/);
+    expect(r.text).toMatch(/Data status: partial\. data current through about 2026-08-15/);
+  });
+  it('vehicle mix: every bucket with dollars and share, plus rollups and classification quality', () => {
+    const r = renderVehicleMix({
+      scope: { naics: ['561320'], window: 'FY2024-FY2026' }, total_obligated: 2712483324.53, total_award_count: 12941,
+      buckets: [{ label: 'Agency IDIQs', obligated: 965000000, share_pct: 35.6, award_count: 4000 }, { label: 'Standalone contracts', obligated: 503000000, share_pct: 18.6, award_count: 3000 }],
+      rollups: { all_schedules: { obligated: 921000000, share_pct: 33.98 } },
+      classification: { verified_share_of_parented_pct: 89.07, heuristic_share_of_total_pct: 3.83, unresolved_share_of_total_pct: 0.87 },
+    })!;
+    expect(r.text).toMatch(/\$2,712,483,325 obligated across 12941 awards\. Every bucket is listed/);
+    expect(r.text).toMatch(/2\. Standalone contracts: \$503,000,000 \(18\.6%\)/);
+    expect(r.text).toMatch(/Rollups: all schedules \$921,000,000 \(33\.98%\)/);
   });
 });

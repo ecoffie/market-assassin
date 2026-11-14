@@ -22,6 +22,19 @@ export const CHAT_FETCH_LIMIT = 200;
 
 type Rec = Record<string, unknown>;
 
+import { US_STATE_NAMES } from '@/lib/utils/us-states';
+/** A state named in a record's own description that differs from its reported place of performance. */
+export function describedStateConflict(description: string, popState: string): string | null {
+  if (!description || !popState) return null;
+  for (const [code, name] of Object.entries(US_STATE_NAMES as Record<string, string>)) {
+    if (code === popState) continue;
+    const popName = (US_STATE_NAMES as Record<string, string>)[popState] ?? '';
+    if (popName && popName.toLowerCase().includes(name.toLowerCase())) continue; // "West Virginia" contains "Virginia"
+    if (new RegExp(`\\b${name.replace(/\s+/g, '\\s+')}\\b`, 'i').test(description) || new RegExp(`\\(${code}\\)`).test(description)) return name;
+  }
+  return null;
+}
+
 export interface RenderedRecords {
   tool: string;
   text: string;
@@ -113,6 +126,16 @@ function ignoredLine(meta: Rec): string | null {
   return `Not applied: ${items.join('; ')}. Results do not reflect ${ig.length === 1 ? 'that filter' : 'those filters'}.`;
 }
 
+/** Stems of the customer's capability words; a record whose description has none was matched by code only. */
+export function relevanceStems(phrases: string[]): string[] {
+  const STOP = new Set(['services', 'service', 'work', 'support', 'contracts', 'contract', 'federal', 'and', 'the', 'for']);
+  const out = new Set<string>();
+  for (const p of phrases) for (const w of p.toLowerCase().split(/[^a-z]+/)) if (w.length >= 4 && !STOP.has(w)) out.add(w.slice(0, 5));
+  return [...out];
+}
+
+let RELEVANCE_STEMS: string[] = [];
+
 function recordLine(n: number, r: Rec & { _kind: string }): string {
   const id = str(r.piid) || str(r.contract_id) || 'number not recorded';
   const who = title(str(r.incumbent_name)) || 'incumbent not recorded';
@@ -128,14 +151,18 @@ function recordLine(n: number, r: Rec & { _kind: string }): string {
       : 'task/delivery order (parent vehicle not recorded)';
   const desc = clip(str(r.description), 70);
   const value = money(r.total_obligation);
-  return `${n}. ${id} · ${who} · ${agency} · ${place} · ends ${end} · ${kind}${value ? ` · obligated ${value}` : ''}${desc ? ` · ${desc}` : ''}`;
+  const conflict = describedStateConflict(str(r.description), st);
+  const d = str(r.description).toLowerCase();
+  const codeOnly = RELEVANCE_STEMS.length > 0 && d.length > 0 && !RELEVANCE_STEMS.some((t) => d.includes(t));
+  return `${n}. ${id} · ${who} · ${agency} · ${place} · ends ${end} · ${kind}${value ? ` · obligated ${value}` : ''}${desc ? ` · ${desc}` : ''}${conflict ? ` · CHECK: the description names ${conflict} but the reported place of performance is ${st}` : ''}${codeOnly ? ' · CHECK: matched by industry code only; the description does not mention the requested work' : ''}`;
 }
 
 /**
  * Render a get_expiring_contracts result. `offset` is the 0-based index of the first record to
  * display (continuations). Returns null when the result is not renderable (no _meta).
  */
-export function renderExpiringRecords(result: Rec, opts: { offset?: number; pageSize?: number } = {}): RenderedRecords | null {
+export function renderExpiringRecords(result: Rec, opts: { offset?: number; pageSize?: number; relevancePhrases?: string[] } = {}): RenderedRecords | null {
+  RELEVANCE_STEMS = relevanceStems(opts.relevancePhrases ?? []);
   const meta = (result?._meta && typeof result._meta === 'object' ? result._meta : null) as Rec | null;
   if (!meta) return null;
   const pageSize = Math.max(1, Math.min(opts.pageSize ?? DISPLAY_PAGE, 50));
@@ -285,7 +312,7 @@ export function renderStatusChecks(result: Rec): RenderedRecords | null {
     const text = `No awards were found for this search in the requested window, and that is NOT a verified zero. Data freshness: ${str(meta.lag_note)}${meta.as_of ? ` (USASpending last loaded ${str(meta.as_of)})` : ''}`;
     return { tool: PAST_CONTRACTS_TOOL, text, total: 0, retrieved: 0, from: 0, to: 0, shown: 0, exhaustive: false, ids: [], allowedCounts: [0], standalone: 0, orders: 0 };
   }
-  if (!checks) return null;
+  if (!checks) return renderAwardList(result);
   const awards = (Array.isArray(result.awards) ? result.awards : []) as Rec[];
   const byId = new Map(awards.map((a) => [str(a.awardId), a]));
   const total = Math.max(num(meta.total) ?? awards.length, awards.length);
@@ -412,9 +439,64 @@ export function renderKeywords(result: Rec): RenderedRecords | null {
   }
   const ex = (result.excluded_terms && typeof result.excluded_terms === 'object' ? result.excluded_terms : null) as Rec | null;
   if (ex) {
-    const parts = Object.entries(ex).filter(([, v]) => Array.isArray(v) && v.length).map(([k, v]) => `${k}: ${(v as unknown[]).map(str).join(', ')}`);
-    if (parts.length) { lines.push(''); lines.push(`Left out on purpose (not search terms): ${parts.join('; ')}.`); }
+    const terms = Array.from(new Set(Object.values(ex).filter((v) => Array.isArray(v)).flatMap((v) => (v as unknown[]).map(str)).filter(Boolean)));
+    if (terms.length) { lines.push(''); lines.push(`Left out on purpose (company names and places are not search terms): ${terms.join(', ')}.`); }
   }
   const total = kws.length + extraOcc.length;
   return { tool: KEYWORDS_TOOL, text: lines.join('\n'), total, retrieved: total, from: total ? 1 : 0, to: total, shown: total, exhaustive: true, ids: [], allowedCounts: [total, kws.length, extraOcc.length], standalone: total, orders: 0 };
+}
+
+export const VEHICLE_MIX_TOOL = 'get_vehicle_spend_mix';
+
+/** search_past_contracts WITHOUT status checks: every returned award with dates and amount, count vs total, filters, date-filter meaning, lag. */
+export function renderAwardList(result: Rec): RenderedRecords | null {
+  const awards = Array.isArray(result?.awards) ? (result.awards as Rec[]) : null;
+  if (!awards || !awards.length) return null;
+  const meta = (result._meta && typeof result._meta === 'object' ? result._meta : {}) as Rec;
+  const basis = (result.basis && typeof result.basis === 'object' ? result.basis : {}) as Rec;
+  const af = (meta.applied_filters && typeof meta.applied_filters === 'object' ? meta.applied_filters : {}) as Rec;
+  const val = (v: unknown) => (v && typeof v === 'object' ? str((v as Rec).value ?? (v as Rec).name ?? (v as Rec).code) : Array.isArray(v) ? (v as unknown[]).map(str).join(', ') : str(v));
+  const parts: string[] = [];
+  if (af.keyword) parts.push(`keyword "${val(af.keyword)}"`);
+  if (af.office && typeof af.office === 'object') parts.push(`office ${str((af.office as Rec).code)} ${str((af.office as Rec).name)}`);
+  else if (af.piid_prefix) parts.push(`number starting ${val(af.piid_prefix)}`);
+  if (af.agency) parts.push(`agency ${val(af.agency)}`);
+  if (af.naics) parts.push(`NAICS ${val(af.naics)}`);
+  if (af.psc) parts.push(`PSC ${val(af.psc)}`);
+  if (af.state) parts.push(`state ${val(af.state)}${(af.state as Rec)?.scope ? ` (${str((af.state as Rec).scope) === 'pop' ? 'place of performance' : str((af.state as Rec).scope)})` : ''}`);
+  if (af.date_from || af.date_to) parts.push(`activity ${str(af.date_from) || '...'} to ${str(af.date_to) || 'today'}`);
+  const total = Math.max(num(meta.total) ?? awards.length, awards.length);
+  const lines: string[] = [];
+  lines.push(`${total} award${total === 1 ? '' : 's'} match (${parts.join(' · ') || 'no filters'}). Source: USASpending prime awards.`);
+  lines.push(awards.length < total ? `Showing ${awards.length} of ${total} (largest first); this is not the full list.` : `Showing all ${total}.`);
+  if (basis.date_filter) lines.push(`Date filter: ${str(basis.date_filter)}`);
+  lines.push('');
+  awards.forEach((a, i) => {
+    lines.push(`${i + 1}. ${str(a.awardId)} · ${title(str(a.recipientName)) || 'recipient not reported'}${a.description ? ` · ${clip(str(a.description), 80)}` : ''} · ${str(a.startDate) || '?'} to ${str(a.endDate) || '?'} · ${money(a.awardAmount)} lifetime${a.popState ? ` · performed in ${str(a.popState)}` : ''}`);
+  });
+  const ig = ignoredLine(meta);
+  if (ig) { lines.push(''); lines.push(ig); }
+  if (meta.lag_note || str(meta.result_state) === 'partial') { lines.push(''); lines.push(`Data status: ${str(meta.result_state) || 'partial'}.${meta.lag_note ? ` ${str(meta.lag_note)}` : ''}`); }
+  return { tool: PAST_CONTRACTS_TOOL, text: lines.join('\n'), total, retrieved: awards.length, from: 1, to: awards.length, shown: awards.length, exhaustive: awards.length === total, ids: awards.map((a) => str(a.awardId)), allowedCounts: Array.from(new Set([total, awards.length])), standalone: awards.length, orders: 0 };
+}
+
+/** get_vehicle_spend_mix: every bucket with dollars, share and award count; rollups; classification quality. */
+export function renderVehicleMix(result: Rec): RenderedRecords | null {
+  const buckets = Array.isArray(result?.buckets) ? (result.buckets as Rec[]) : null;
+  if (!buckets) return null;
+  const scope = (result.scope && typeof result.scope === 'object' ? result.scope : {}) as Rec;
+  const cls = (result.classification && typeof result.classification === 'object' ? result.classification : {}) as Rec;
+  const roll = (result.rollups && typeof result.rollups === 'object' ? result.rollups : {}) as Rec;
+  const lines: string[] = [];
+  lines.push(`Spending by contract vehicle (NAICS ${(Array.isArray(scope.naics) ? scope.naics as unknown[] : []).map(str).join(', ')}${scope.agency ? ` · ${str(scope.agency)}` : ''}${scope.state ? ` · ${str(scope.state)}` : ''} · ${str(scope.window)}): ${money(result.total_obligated)} obligated across ${num(result.total_award_count) ?? '?'} awards. Every bucket is listed; shares are of that total.`);
+  lines.push('');
+  buckets.filter((b) => (num(b.obligated) ?? 0) !== 0 || (num(b.award_count) ?? 0) > 0).forEach((b, i) => {
+    lines.push(`${i + 1}. ${str(b.label)}: ${money(b.obligated)} (${str(b.share_pct)}%) · ${num(b.award_count) ?? 0} awards`);
+  });
+  const r = (k: string) => (roll[k] && typeof roll[k] === 'object' ? roll[k] as Rec : null);
+  const rl = [['all schedules', r('all_schedules')], ['all BPAs', r('all_bpas')], ['all IDIQs and GWACs', r('all_idiqs_and_gwacs')]].filter(([, v]) => v).map(([k, v]) => `${k} ${money((v as Rec).obligated)} (${str((v as Rec).share_pct)}%)`);
+  if (rl.length) { lines.push(''); lines.push(`Rollups: ${rl.join('; ')}.`); }
+  lines.push(`Classification: ${str(cls.verified_share_of_parented_pct)}% of vehicle-linked dollars verified from USASpending vehicle records; ${str(cls.heuristic_share_of_total_pct)}% typed from contract-number patterns; ${str(cls.unresolved_share_of_total_pct)}% unresolved.`);
+  const n = buckets.length;
+  return { tool: VEHICLE_MIX_TOOL, text: lines.join('\n'), total: n, retrieved: n, from: 1, to: n, shown: n, exhaustive: true, ids: [], allowedCounts: [n, num(result.total_award_count) ?? 0], standalone: 0, orders: 0 };
 }

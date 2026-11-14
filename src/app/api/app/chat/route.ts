@@ -42,9 +42,9 @@ import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/ti
 // preflight, per-tool error capture, execution log). Never import runMcpTool here.
 import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/chat-tool-executor';
 import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, type PlannerTarget } from '@/lib/chat/planner-config';
-import { capabilityPlannerNote } from '@/lib/market/capability-naics';
+import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
 import { guardUnstatedStates } from '@/lib/chat/stated-filters';
-import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
+import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
 
@@ -417,6 +417,7 @@ export async function POST(request: NextRequest) {
         // P1-F: the same customer words always map to the same NAICS (deterministic lexicon), so
         // the planner does not re-guess codes on every turn.
         const capabilityNote = capabilityPlannerNote(message);
+        const capabilityPhrases = interpretCapabilityNaics(message).items.flatMap((it) => [it.phrase, it.label]);
         // What the customer has said in this conversation (for the stated-filters guard).
         const conversationText = [...history.filter((h) => h.role === 'user').map((h) => String(h.content || '')), message].join('\n');
         const toolRoundMessages: Array<{ role: string; content: string }> = [
@@ -601,11 +602,12 @@ export async function POST(request: NextRequest) {
               // PR E: verified record lists are rendered from the tool data, not reproduced by the model.
               for (const r of results) {
                 const renderers: Record<string, (p: Record<string, unknown>) => RenderedRecords | null> = {
-                  [EXPIRING_TOOL]: (p) => renderExpiringRecords(p, { offset: displayOffsets.get(r.tool_call_id) ?? 0 }),
+                  [EXPIRING_TOOL]: (p) => renderExpiringRecords(p, { offset: displayOffsets.get(r.tool_call_id) ?? 0, relevancePhrases: capabilityPhrases }),
                   [PAST_CONTRACTS_TOOL]: renderStatusChecks,
                   [BUYING_OFFICES_TOOL]: renderBuyingOffices,
                   [PRICING_TOOL]: renderPricing,
                   [KEYWORDS_TOOL]: renderKeywords,
+                  [VEHICLE_MIX_TOOL]: renderVehicleMix,
                 };
                 const renderer = renderers[r.record.tool];
                 if (r.record.status !== 'success' || !renderer) continue;
@@ -667,6 +669,11 @@ export async function POST(request: NextRequest) {
               'VERIFIED RECORD LIST: the records below were rendered from the tool data and have ALREADY been shown to the user verbatim, directly above your reply. '
               + 'Do NOT list, repeat or renumber the records, and do not restate identifiers, dates or amounts that are not in this list. '
               + 'Write 2 to 6 sentences of analysis: what stands out (soonest end dates, agencies, incumbents, task orders versus contracts, anything not applied). '
+              + 'ANALYSIS RULES (every sentence must be checkable against the list or the tool data): no magnitude words (substantial, significant, major, slight, frequent, prevalent, most, dominant) unless you give the number and share they describe; '
+              + 'compare figures only with the numbers themselves (for example "small business median $43.93 vs $53.74 for other-than-small, an 18.25% gap"); do not infer causes or patterns the tool did not compute; '
+              + 'a successor candidate keeps the tool\'s strength word ("a likely follow-on", "a possible follow-on"), never "was succeeded by", and a candidate is only linked to the award it was found for; '
+              + 'repeat every warning the list or tool carries (not the full list, data status partial, data current through a date, a probe that was truncated, CHECK lines); '
+              + 'if a list line says CHECK, say that record may not belong to the requested place; say which filters you chose that the user did not state. '
               + 'Do not restate per-record details from the list; if you refer to one, use the list\'s exact wording and numbers (no rounding), and never write "no ... contracts" unless a list line says none were found. '
               + 'For a status list: if several awards match, do not treat one as THE contract unless the records identify it; say which are active and which expired (with end dates) and name any successor candidate. '
               + 'If you state the total, use exactly the count in the list header. If the header says the list is not complete, say so and tell the user how to continue (call the same tool with the same filters plus display_offset).\n\n'
