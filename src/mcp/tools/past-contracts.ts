@@ -99,6 +99,29 @@ export interface PastContractsToolResult {
   };
 }
 
+const ABBREVIATIONS: Record<string, string> = {
+  id: 'identification', it: 'information technology', mgmt: 'management', maint: 'maintenance',
+  svc: 'services', svcs: 'services', ops: 'operations', hq: 'headquarters',
+};
+
+/**
+ * Alternative phrasings of a keyword for a retry after an empty exact-phrase search: (1) without words
+ * the agency filter already covers ("Navy ID card" with agency Navy -> "ID card"), (2) with common
+ * abbreviations spelled out ("ID card" -> "identification card"). Never adds a new concept.
+ */
+export function keywordVariants(keyword: string, agency?: string): string[] {
+  const words = keyword.trim().split(/\s+/).filter(Boolean);
+  const agencyWords = new Set(String(agency ?? '').toLowerCase().split(/[^a-z]+/).filter((w) => w.length >= 3 && !['the', 'and', 'department', 'of'].includes(w)));
+  const stripped = words.filter((w) => !agencyWords.has(w.toLowerCase().replace(/[^a-z]/g, '')));
+  const base = stripped.length ? stripped : words;
+  const expanded = base.map((w) => ABBREVIATIONS[w.toLowerCase()] ?? w);
+  const out: string[] = [];
+  for (const v of [base.join(' '), expanded.join(' ')]) {
+    if (v && v.toLowerCase() !== keyword.trim().toLowerCase() && !out.some((o) => o.toLowerCase() === v.toLowerCase())) out.push(v);
+  }
+  return out;
+}
+
 /** Awards checked for status/successor when include_status is set (each check is a detail fetch). */
 export const STATUS_CHECK_MAX = 3;
 
@@ -179,6 +202,22 @@ export async function searchPastContracts(input: PastContractsToolInput): Promis
     res = await runSearch(scope);
   }
 
+  // KEYWORD RETRY-ON-ZERO (acc6 R5): USASpending keyword search is an exact phrase, so "Navy ID card"
+  // found nothing although three Navy awards read "IDENTIFICATION CARD ...". When a keyword search is
+  // empty, retry with the words already covered by the agency filter removed and common abbreviations
+  // spelled out; the retry is reported in applied_filters.keyword_retry, never hidden.
+  let keywordRetry: { requested: string; used: string } | null = null;
+  if (keyword && res.awards.length === 0 && !res.degraded) {
+    for (const variant of keywordVariants(keyword, input.agency).slice(0, 2)) {
+      const retry = await searchAwardsByLocation({
+        state, stateScope: scope, naics: input.naics, psc: input.psc, agency: input.agency, recipient: input.recipient,
+        minValue: input.min_value, dateFrom: input.date_from, dateTo: input.date_to, includeIdv: input.include_idv, limit: input.limit,
+        keyword: variant, piidPrefix: effectivePrefix,
+      });
+      if (retry.awards.length) { res = retry; keywordRetry = { requested: keyword, used: variant }; break; }
+    }
+  }
+
   const grounded = res.awards.length > 0;
   const queried: Record<string, string | number | boolean> = {};
   for (const [k, v] of Object.entries({
@@ -212,6 +251,7 @@ export async function searchPastContracts(input: PastContractsToolInput): Promis
   if (res.textFilters?.keyword) applied.keyword = res.textFilters.keyword;
   if (res.textFilters?.piid_prefix) applied.piid_prefix = res.textFilters.piid_prefix;
   if (officeApplied) applied.office = officeApplied;
+  if (keywordRetry) applied.keyword_retry = keywordRetry;
   if (res.textFilters?.scanned_rows !== undefined) {
     applied.prefix_scan = { scanned_rows: res.textFilters.scanned_rows, truncated: !!res.textFilters.scan_truncated };
   }
