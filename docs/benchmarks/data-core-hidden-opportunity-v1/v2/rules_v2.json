@@ -1,0 +1,1334 @@
+{
+ "candidate_retrieval": "semantic top-100 (stored notice vectors, customer description embedding) UNION body-text sentences matching a profile phrase or all words of a census entry; then kept only if NAICS starts with an umbrella prefix AND the released FIND Open plan did not retrieve the row",
+ "census_entries": {
+  "guards": [
+   {
+    "entry": "Body guard services",
+    "naics": "561612",
+    "words": [
+     "body",
+     "guard"
+    ]
+   },
+   {
+    "entry": "Guard dog services",
+    "naics": "561612",
+    "words": [
+     "dog",
+     "guard"
+    ]
+   },
+   {
+    "entry": "Guard services",
+    "naics": "561612",
+    "words": [
+     "guard"
+    ]
+   },
+   {
+    "entry": "Parking security services",
+    "naics": "561612",
+    "words": [
+     "parking",
+     "security"
+    ]
+   },
+   {
+    "entry": "Patrol services, security",
+    "naics": "561612",
+    "words": [
+     "patrol",
+     "security"
+    ]
+   },
+   {
+    "entry": "Protective guard services",
+    "naics": "561612",
+    "words": [
+     "guard",
+     "protective"
+    ]
+   },
+   {
+    "entry": "Security guard services",
+    "naics": "561612",
+    "words": [
+     "guard",
+     "security"
+    ]
+   },
+   {
+    "entry": "Security patrol services",
+    "naics": "561612",
+    "words": [
+     "patrol",
+     "security"
+    ]
+   }
+  ],
+  "hvac": [
+   {
+    "entry": "Air system balancing and testing",
+    "naics": "238220",
+    "words": [
+     "air",
+     "balancing",
+     "system",
+     "testing"
+    ]
+   },
+   {
+    "entry": "Air vent installation",
+    "naics": "238220",
+    "words": [
+     "air",
+     "vent"
+    ]
+   },
+   {
+    "entry": "Blower or fan, cooling and dry heating, installation",
+    "naics": "238220",
+    "words": [
+     "blower",
+     "cooling",
+     "dry",
+     "fan",
+     "heating"
+    ]
+   },
+   {
+    "entry": "Boiler chipping, cleaning and scaling",
+    "naics": "238220",
+    "words": [
+     "boiler",
+     "chipping",
+     "scaling"
+    ]
+   },
+   {
+    "entry": "Boiler, heating, installation",
+    "naics": "238220",
+    "words": [
+     "boiler",
+     "heating"
+    ]
+   },
+   {
+    "entry": "Central heating equipment and piping installation",
+    "naics": "238220",
+    "words": [
+     "central",
+     "equipment",
+     "heating",
+     "piping"
+    ]
+   },
+   {
+    "entry": "Dry heating equipment installation",
+    "naics": "238220",
+    "words": [
+     "dry",
+     "equipment",
+     "heating"
+    ]
+   },
+   {
+    "entry": "Furnace, forced air, installation",
+    "naics": "238220",
+    "words": [
+     "air",
+     "forced",
+     "furnace"
+    ]
+   },
+   {
+    "entry": "Heating and cooling duct work installation",
+    "naics": "238220",
+    "words": [
+     "cooling",
+     "duct",
+     "heating",
+     "work"
+    ]
+   },
+   {
+    "entry": "Heating and ventilation system component (e.g., air registers, diffusers, filters, grilles, sound attenuators) installation",
+    "naics": "238220",
+    "words": [
+     "component",
+     "heating",
+     "system",
+     "ventilation"
+    ]
+   },
+   {
+    "entry": "Heating boiler installation",
+    "naics": "238220",
+    "words": [
+     "boiler",
+     "heating"
+    ]
+   },
+   {
+    "entry": "Heating contractors",
+    "naics": "238220",
+    "words": [
+     "heating"
+    ]
+   },
+   {
+    "entry": "Heating equipment installation",
+    "naics": "238220",
+    "words": [
+     "equipment",
+     "heating"
+    ]
+   },
+   {
+    "entry": "Heating, ventilation and air-conditioning (HVAC) contractors",
+    "naics": "238220",
+    "words": [
+     "airconditioning",
+     "heating",
+     "ventilation"
+    ]
+   },
+   {
+    "entry": "Hot water heating system installation",
+    "naics": "238220",
+    "words": [
+     "heating",
+     "hot",
+     "system",
+     "water"
+    ]
+   },
+   {
+    "entry": "HVAC (heating, ventilation and air-conditioning) contractors",
+    "naics": "238220",
+    "words": [
+     "hvac"
+    ]
+   },
+   {
+    "entry": "Hydronic heating system installation",
+    "naics": "238220",
+    "words": [
+     "heating",
+     "hydronic",
+     "system"
+    ]
+   },
+   {
+    "entry": "Mechanical contractors",
+    "naics": "238220",
+    "words": [
+     "mechanical"
+    ]
+   },
+   {
+    "entry": "Plumbing and heating contractors",
+    "naics": "238220",
+    "words": [
+     "heating",
+     "plumbing"
+    ]
+   },
+   {
+    "entry": "Radiant floor heating equipment installation",
+    "naics": "238220",
+    "words": [
+     "equipment",
+     "floor",
+     "heating",
+     "radiant"
+    ]
+   },
+   {
+    "entry": "Scrubber, air purification, installation",
+    "naics": "238220",
+    "words": [
+     "air",
+     "purification",
+     "scrubber"
+    ]
+   },
+   {
+    "entry": "Solar heating equipment installation",
+    "naics": "238220",
+    "words": [
+     "equipment",
+     "heating",
+     "solar"
+    ]
+   },
+   {
+    "entry": "Warm air heating system installation",
+    "naics": "238220",
+    "words": [
+     "air",
+     "heating",
+     "system",
+     "warm"
+    ]
+   }
+  ],
+  "janitorial": [
+   {
+    "entry": "Aircraft janitorial services",
+    "naics": "561720",
+    "words": [
+     "aircraft",
+     "janitorial"
+    ]
+   },
+   {
+    "entry": "Building cleaning services, janitorial",
+    "naics": "561720",
+    "words": [
+     "building",
+     "janitorial"
+    ]
+   },
+   {
+    "entry": "Custodial services",
+    "naics": "561720",
+    "words": [
+     "custodial"
+    ]
+   },
+   {
+    "entry": "Janitorial services",
+    "naics": "561720",
+    "words": [
+     "janitorial"
+    ]
+   },
+   {
+    "entry": "Janitorial services, aircraft",
+    "naics": "561720",
+    "words": [
+     "aircraft",
+     "janitorial"
+    ]
+   },
+   {
+    "entry": "Washroom sanitation services",
+    "naics": "561720",
+    "words": [
+     "sanitation",
+     "washroom"
+    ]
+   },
+   {
+    "entry": "Window cleaning services",
+    "naics": "561720",
+    "words": [
+     "window"
+    ]
+   },
+   {
+    "entry": "Carpet cleaning on customers' premises",
+    "naics": "561740",
+    "words": [
+     "carpet",
+     "customer",
+     "premis"
+    ]
+   },
+   {
+    "entry": "Carpet cleaning plants",
+    "naics": "561740",
+    "words": [
+     "carpet",
+     "plant"
+    ]
+   },
+   {
+    "entry": "Carpet cleaning services",
+    "naics": "561740",
+    "words": [
+     "carpet"
+    ]
+   },
+   {
+    "entry": "Cleaning carpets",
+    "naics": "561740",
+    "words": [
+     "carpet"
+    ]
+   },
+   {
+    "entry": "Cleaning plants, carpet and rug",
+    "naics": "561740",
+    "words": [
+     "carpet",
+     "plant",
+     "rug"
+    ]
+   },
+   {
+    "entry": "Cleaning services, carpet and rug",
+    "naics": "561740",
+    "words": [
+     "carpet",
+     "rug"
+    ]
+   },
+   {
+    "entry": "Commercial kitchen exhaust hood cleaning services",
+    "naics": "561790",
+    "words": [
+     "commercial",
+     "exhaust",
+     "hood",
+     "kitchen"
+    ]
+   },
+   {
+    "entry": "Power washing building exteriors",
+    "naics": "561790",
+    "words": [
+     "building",
+     "exterior",
+     "power",
+     "washing"
+    ]
+   },
+   {
+    "entry": "Pressure washing (e.g., buildings, decks, fences)",
+    "naics": "561790",
+    "words": [
+     "pressure",
+     "washing"
+    ]
+   }
+  ],
+  "nursing": [
+   {
+    "entry": "Contract staffing services",
+    "naics": "561320",
+    "words": [
+     "contract",
+     "staffing"
+    ]
+   },
+   {
+    "entry": "Online temporary staffing services, including intermediary platform services",
+    "naics": "561320",
+    "words": [
+     "including",
+     "intermediary",
+     "online",
+     "platform",
+     "staffing",
+     "temporary"
+    ]
+   },
+   {
+    "entry": "Temporary staffing services",
+    "naics": "561320",
+    "words": [
+     "staffing",
+     "temporary"
+    ]
+   },
+   {
+    "entry": "Advanced practicing registered nurses\u2019 (APRNs) offices (e.g., centers, clinics)",
+    "naics": "621399",
+    "words": [
+     "advanced",
+     "nurs",
+     "offic",
+     "practicing",
+     "registered"
+    ]
+   },
+   {
+    "entry": "Certified registered nurse anesthetists\u2019 (CRNAs) offices (e.g., centers, clinics)",
+    "naics": "621399",
+    "words": [
+     "anesthetist",
+     "certified",
+     "nurse",
+     "offic",
+     "registered"
+    ]
+   },
+   {
+    "entry": "Home nursing services, private practice",
+    "naics": "621399",
+    "words": [
+     "home",
+     "nursing",
+     "practice",
+     "private"
+    ]
+   },
+   {
+    "entry": "Licensed practical nurses' (LPNs) offices (e.g., centers, clinics)",
+    "naics": "621399",
+    "words": [
+     "licensed",
+     "nurs",
+     "offic",
+     "practical"
+    ]
+   },
+   {
+    "entry": "Nurses', licensed practical or registered, offices (e.g., centers, clinics)",
+    "naics": "621399",
+    "words": [
+     "licensed",
+     "nurs",
+     "offic",
+     "practical",
+     "registered"
+    ]
+   },
+   {
+    "entry": "Nursing call centers",
+    "naics": "621399",
+    "words": [
+     "call",
+     "center",
+     "nursing"
+    ]
+   },
+   {
+    "entry": "Physicians' assistants' offices (e.g., centers, clinics)",
+    "naics": "621399",
+    "words": [
+     "assistant",
+     "offic",
+     "physician"
+    ]
+   },
+   {
+    "entry": "Practical nurses' offices (e.g., centers, clinics), licensed",
+    "naics": "621399",
+    "words": [
+     "licensed",
+     "nurs",
+     "offic",
+     "practical"
+    ]
+   },
+   {
+    "entry": "Registered nurses' (RNs) offices (e.g., centers, clinics)",
+    "naics": "621399",
+    "words": [
+     "nurs",
+     "offic",
+     "registered"
+    ]
+   },
+   {
+    "entry": "Home nursing services (except private practices)",
+    "naics": "621610",
+    "words": [
+     "home",
+     "nursing"
+    ]
+   },
+   {
+    "entry": "Nursing agencies, primarily providing home nursing services",
+    "naics": "621610",
+    "words": [
+     "agency",
+     "home",
+     "nursing",
+     "primarily",
+     "providing"
+    ]
+   }
+  ],
+  "parts": [
+   {
+    "entry": "Drives, high-speed industrial (except hydrostatic), manufacturing",
+    "naics": "333612",
+    "words": [
+     "driv",
+     "highspeed",
+     "industrial"
+    ]
+   },
+   {
+    "entry": "Aircraft engine and engine parts (except carburetors, pistons, piston rings, valves) manufacturing",
+    "naics": "336412",
+    "words": [
+     "aircraft",
+     "engine",
+     "part"
+    ]
+   },
+   {
+    "entry": "Aircraft engine overhauling",
+    "naics": "336412",
+    "words": [
+     "aircraft",
+     "engine",
+     "overhauling"
+    ]
+   },
+   {
+    "entry": "Aircraft engine rebuilding",
+    "naics": "336412",
+    "words": [
+     "aircraft",
+     "engine",
+     "rebuilding"
+    ]
+   },
+   {
+    "entry": "Aircraft turbines manufacturing",
+    "naics": "336412",
+    "words": [
+     "aircraft",
+     "turbin"
+    ]
+   },
+   {
+    "entry": "Developing and producing prototypes for aircraft engines and engine parts",
+    "naics": "336412",
+    "words": [
+     "aircraft",
+     "developing",
+     "engin",
+     "engine",
+     "part",
+     "producing",
+     "prototyp"
+    ]
+   },
+   {
+    "entry": "Engines and engine parts, aircraft (except carburetors, pistons, piston rings, valves), manufacturing",
+    "naics": "336412",
+    "words": [
+     "aircraft",
+     "engin",
+     "engine",
+     "part"
+    ]
+   },
+   {
+    "entry": "Gas turbines, aircraft, manufacturing",
+    "naics": "336412",
+    "words": [
+     "aircraft",
+     "gas",
+     "turbin"
+    ]
+   },
+   {
+    "entry": "Gasoline engine parts (except carburetors, pistons, piston rings, valves), aircraft, manufacturing",
+    "naics": "336412",
+    "words": [
+     "aircraft",
+     "engine",
+     "gasoline",
+     "part"
+    ]
+   },
+   {
+    "entry": "Gasoline engines, aircraft, manufacturing",
+    "naics": "336412",
+    "words": [
+     "aircraft",
+     "engin",
+     "gasoline"
+    ]
+   },
+   {
+    "entry": "Internal combustion engines, aircraft, manufacturing",
+    "naics": "336412",
+    "words": [
+     "aircraft",
+     "combustion",
+     "engin",
+     "internal"
+    ]
+   },
+   {
+    "entry": "Jet propulsion and internal combustion engines and parts, aircraft, manufacturing",
+    "naics": "336412",
+    "words": [
+     "aircraft",
+     "combustion",
+     "engin",
+     "internal",
+     "jet",
+     "part",
+     "propulsion"
+    ]
+   },
+   {
+    "entry": "Rocket engines, aircraft, manufacturing",
+    "naics": "336412",
+    "words": [
+     "aircraft",
+     "engin",
+     "rocket"
+    ]
+   },
+   {
+    "entry": "Aircraft assemblies, subassemblies, and parts (except engines) manufacturing",
+    "naics": "336413",
+    "words": [
+     "aircraft",
+     "assembly",
+     "part",
+     "subassembly"
+    ]
+   },
+   {
+    "entry": "Aircraft auxiliary parts (e.g., crop dusting, external fuel tanks, inflight refueling equipment) manufacturing",
+    "naics": "336413",
+    "words": [
+     "aircraft",
+     "auxiliary",
+     "part"
+    ]
+   },
+   {
+    "entry": "Aircraft brakes manufacturing",
+    "naics": "336413",
+    "words": [
+     "aircraft",
+     "brak"
+    ]
+   },
+   {
+    "entry": "Aircraft control surface assemblies manufacturing",
+    "naics": "336413",
+    "words": [
+     "aircraft",
+     "assembly",
+     "control",
+     "surface"
+    ]
+   },
+   {
+    "entry": "Aircraft fuselage wing tail and similar assemblies manufacturing",
+    "naics": "336413",
+    "words": [
+     "aircraft",
+     "assembly",
+     "fuselage",
+     "similar",
+     "tail",
+     "wing"
+    ]
+   },
+   {
+    "entry": "Aircraft propellers and parts manufacturing",
+    "naics": "336413",
+    "words": [
+     "aircraft",
+     "part",
+     "propeller"
+    ]
+   },
+   {
+    "entry": "Aircraft wheels manufacturing",
+    "naics": "336413",
+    "words": [
+     "aircraft",
+     "wheel"
+    ]
+   },
+   {
+    "entry": "Airframe assemblies (except for guided missiles) manufacturing",
+    "naics": "336413",
+    "words": [
+     "airframe",
+     "assembly"
+    ]
+   },
+   {
+    "entry": "Developing and producing prototypes for aircraft parts (except engines) and auxiliary equipment",
+    "naics": "336413",
+    "words": [
+     "aircraft",
+     "auxiliary",
+     "developing",
+     "equipment",
+     "part",
+     "producing",
+     "prototyp"
+    ]
+   },
+   {
+    "entry": "Joints, universal, aircraft, manufacturing",
+    "naics": "336413",
+    "words": [
+     "aircraft",
+     "joint",
+     "universal"
+    ]
+   },
+   {
+    "entry": "Targets, trailer type, aircraft, manufacturing",
+    "naics": "336413",
+    "words": [
+     "aircraft",
+     "target",
+     "trailer"
+    ]
+   },
+   {
+    "entry": "Tow targets, aircraft, manufacturing",
+    "naics": "336413",
+    "words": [
+     "aircraft",
+     "target",
+     "tow"
+    ]
+   },
+   {
+    "entry": "Universal joints, aircraft, manufacturing",
+    "naics": "336413",
+    "words": [
+     "aircraft",
+     "joint",
+     "universal"
+    ]
+   }
+  ],
+  "steelbldg": [
+   {
+    "entry": "Curtain wall, precast concrete, installation",
+    "naics": "238120",
+    "words": [
+     "concrete",
+     "curtain",
+     "precast",
+     "wall"
+    ]
+   },
+   {
+    "entry": "Erecting structural steel",
+    "naics": "238120",
+    "words": [
+     "steel",
+     "structural"
+    ]
+   },
+   {
+    "entry": "Iron work, structural, contractors",
+    "naics": "238120",
+    "words": [
+     "iron",
+     "structural",
+     "work"
+    ]
+   },
+   {
+    "entry": "Placing and tying reinforcing rod at a construction site",
+    "naics": "238120",
+    "words": [
+     "construction",
+     "reinforcing",
+     "rod",
+     "site",
+     "tying"
+    ]
+   },
+   {
+    "entry": "Precast concrete panel, slab, or form installation",
+    "naics": "238120",
+    "words": [
+     "concrete",
+     "form",
+     "panel",
+     "precast",
+     "slab"
+    ]
+   },
+   {
+    "entry": "Reinforcing steel contractors",
+    "naics": "238120",
+    "words": [
+     "reinforcing",
+     "steel"
+    ]
+   },
+   {
+    "entry": "Steel reinforcing contractors",
+    "naics": "238120",
+    "words": [
+     "reinforcing",
+     "steel"
+    ]
+   },
+   {
+    "entry": "Structural steel erecting or iron work contractors",
+    "naics": "238120",
+    "words": [
+     "iron",
+     "steel",
+     "structural",
+     "work"
+    ]
+   },
+   {
+    "entry": "Asphalt roof shingle installation",
+    "naics": "238160",
+    "words": [
+     "asphalt",
+     "roof",
+     "shingle"
+    ]
+   },
+   {
+    "entry": "Copper roofing installation",
+    "naics": "238160",
+    "words": [
+     "copper",
+     "roofing"
+    ]
+   },
+   {
+    "entry": "Corrugated metal roofing installation",
+    "naics": "238160",
+    "words": [
+     "corrugated",
+     "metal",
+     "roofing"
+    ]
+   },
+   {
+    "entry": "Galvanized iron roofing installation",
+    "naics": "238160",
+    "words": [
+     "galvanized",
+     "iron",
+     "roofing"
+    ]
+   },
+   {
+    "entry": "Low slope roofing installation",
+    "naics": "238160",
+    "words": [
+     "low",
+     "roofing",
+     "slope"
+    ]
+   },
+   {
+    "entry": "Painting, spraying, or coating, roof",
+    "naics": "238160",
+    "words": [
+     "coating",
+     "painting",
+     "roof",
+     "spraying"
+    ]
+   },
+   {
+    "entry": "Roll roofing installation",
+    "naics": "238160",
+    "words": [
+     "roll",
+     "roofing"
+    ]
+   },
+   {
+    "entry": "Roof membrane installation",
+    "naics": "238160",
+    "words": [
+     "membrane",
+     "roof"
+    ]
+   },
+   {
+    "entry": "Roof painting, spraying, or coating",
+    "naics": "238160",
+    "words": [
+     "coating",
+     "painting",
+     "roof",
+     "spraying"
+    ]
+   },
+   {
+    "entry": "Roofing contractors",
+    "naics": "238160",
+    "words": [
+     "roofing"
+    ]
+   },
+   {
+    "entry": "Roofing, built-up tar and gravel, installation",
+    "naics": "238160",
+    "words": [
+     "builtup",
+     "gravel",
+     "roofing",
+     "tar"
+    ]
+   },
+   {
+    "entry": "Shake and shingle, roof, installation",
+    "naics": "238160",
+    "words": [
+     "roof",
+     "shake",
+     "shingle"
+    ]
+   },
+   {
+    "entry": "Sheet metal roofing installation",
+    "naics": "238160",
+    "words": [
+     "metal",
+     "roofing",
+     "sheet"
+    ]
+   },
+   {
+    "entry": "Solar reflecting coating, roof, application",
+    "naics": "238160",
+    "words": [
+     "coating",
+     "reflecting",
+     "roof",
+     "solar"
+    ]
+   },
+   {
+    "entry": "Steep slope roofing installation",
+    "naics": "238160",
+    "words": [
+     "roofing",
+     "slope",
+     "steep"
+    ]
+   },
+   {
+    "entry": "Treating roofs (by spraying, painting or coating)",
+    "naics": "238160",
+    "words": [
+     "roof",
+     "treating"
+    ]
+   },
+   {
+    "entry": "Buildings, prefabricated metal, manufacturing",
+    "naics": "332311",
+    "words": [
+     "building",
+     "metal",
+     "prefabricated"
+    ]
+   },
+   {
+    "entry": "Carports, prefabricated metal, manufacturing",
+    "naics": "332311",
+    "words": [
+     "carport",
+     "metal",
+     "prefabricated"
+    ]
+   },
+   {
+    "entry": "Dwellings, prefabricated metal, manufacturing",
+    "naics": "332311",
+    "words": [
+     "dwelling",
+     "metal",
+     "prefabricated"
+    ]
+   },
+   {
+    "entry": "Farm buildings, prefabricated metal, manufacturing",
+    "naics": "332311",
+    "words": [
+     "building",
+     "farm",
+     "metal",
+     "prefabricated"
+    ]
+   },
+   {
+    "entry": "Garages, prefabricated metal, manufacturing",
+    "naics": "332311",
+    "words": [
+     "garag",
+     "metal",
+     "prefabricated"
+    ]
+   },
+   {
+    "entry": "Greenhouses, prefabricated metal, manufacturing",
+    "naics": "332311",
+    "words": [
+     "greenhous",
+     "metal",
+     "prefabricated"
+    ]
+   },
+   {
+    "entry": "Houses, prefabricated metal, manufacturing",
+    "naics": "332311",
+    "words": [
+     "hous",
+     "metal",
+     "prefabricated"
+    ]
+   },
+   {
+    "entry": "Panels, prefabricated metal building, manufacturing",
+    "naics": "332311",
+    "words": [
+     "building",
+     "metal",
+     "panel",
+     "prefabricated"
+    ]
+   },
+   {
+    "entry": "Portable buildings, prefabricated metal, manufacturing",
+    "naics": "332311",
+    "words": [
+     "building",
+     "metal",
+     "portable",
+     "prefabricated"
+    ]
+   },
+   {
+    "entry": "Prefabricated buildings, metal, manufacturing",
+    "naics": "332311",
+    "words": [
+     "building",
+     "metal",
+     "prefabricated"
+    ]
+   },
+   {
+    "entry": "Prefabricated homes, metal, manufacturing",
+    "naics": "332311",
+    "words": [
+     "hom",
+     "metal",
+     "prefabricated"
+    ]
+   },
+   {
+    "entry": "Sections for prefabricated metal buildings manufacturing",
+    "naics": "332311",
+    "words": [
+     "building",
+     "metal",
+     "prefabricated",
+     "section"
+    ]
+   },
+   {
+    "entry": "Sheds (e.g., garden, storage, utility), prefabricated metal, manufacturing",
+    "naics": "332311",
+    "words": [
+     "metal",
+     "prefabricated",
+     "shed"
+    ]
+   },
+   {
+    "entry": "Silos, prefabricated metal, manufacturing",
+    "naics": "332311",
+    "words": [
+     "metal",
+     "prefabricated",
+     "silo"
+    ]
+   },
+   {
+    "entry": "Utility buildings, prefabricated metal, manufacturing",
+    "naics": "332311",
+    "words": [
+     "building",
+     "metal",
+     "prefabricated",
+     "utility"
+    ]
+   },
+   {
+    "entry": "Warehouses, prefabricated metal, manufacturing",
+    "naics": "332311",
+    "words": [
+     "metal",
+     "prefabricated",
+     "warehous"
+    ]
+   }
+  ]
+ },
+ "census_source": {
+  "sha256": "6506b37b9546dd9cec1f8b79e0b38b68e547a5cce5fd6f8332d35024dbd6cd63",
+  "url": "https://www.census.gov/naics/2022NAICS/2022_NAICS_Index_File.xlsx"
+ },
+ "evidence_rule": "a body sentence (description or SOW, never title), not a TOC line, containing (a profile phrase OR all content words of one census entry) AND >=1 requirement cue",
+ "frozen_at": "2026-11-14",
+ "frozen_before": "any v2 evaluation and any notice posted after 2026-11-14",
+ "normalization": "lowercase; hyphens removed (pre-fabricated == prefabricated); simple plural stem (s/es/ies); census entries match when all content words appear in one sentence, any order",
+ "not_added": "No hand-written synonyms. \"red iron\" and \"pre-engineered metal building\" are absent from the Census index and were NOT added.",
+ "profile_phrases": {
+  "guards": [
+   "security services",
+   "armed security",
+   "unarmed security",
+   "security guard",
+   "security officer",
+   "access control",
+   "patrol",
+   "visitor screening"
+  ],
+  "hvac": [
+   "hvac",
+   "heating",
+   "ventilation",
+   "air conditioning",
+   "chiller",
+   "boiler",
+   "air handler",
+   "rooftop unit",
+   "building controls"
+  ],
+  "janitorial": [
+   "janitorial",
+   "custodial",
+   "commercial cleaning",
+   "daily cleaning",
+   "restroom sanitation",
+   "trash removal",
+   "floor care",
+   "carpet cleaning",
+   "window washing"
+  ],
+  "nursing": [
+   "healthcare staffing",
+   "registered nurse",
+   "licensed practical nurse",
+   "nursing assistant",
+   "clinical staff"
+  ],
+  "parts": [
+   "replacement part",
+   "spare part",
+   "component",
+   "assemblies",
+   "military equipment",
+   "nsn",
+   "part number"
+  ],
+  "steelbldg": [
+   "pre-engineered steel building",
+   "steel building",
+   "metal roofing",
+   "standing seam",
+   "wall panel",
+   "structural steel framing",
+   "structural steel"
+  ]
+ },
+ "requirement_cues": [
+  "consist",
+  "consisting",
+  "consists",
+  "construct",
+  "construction",
+  "constructs",
+  "deliver",
+  "delivers",
+  "demolish",
+  "demolition",
+  "erect",
+  "erection",
+  "erects",
+  "furnish",
+  "furnishes",
+  "include",
+  "includes",
+  "including",
+  "install",
+  "installation",
+  "installs",
+  "maintain",
+  "maintains",
+  "maintenance",
+  "must",
+  "perform",
+  "performs",
+  "provide",
+  "provides",
+  "remove",
+  "removes",
+  "renovate",
+  "renovation",
+  "repair",
+  "repairs",
+  "replace",
+  "replacement",
+  "replaces",
+  "require",
+  "required",
+  "requires",
+  "scope",
+  "shall",
+  "supplies",
+  "supply",
+  "upgrade",
+  "upgrades",
+  "will"
+ ],
+ "roles": {
+  "PRIME_CANDIDATE": "evidence passes and the title also carries a profile phrase or census entry",
+  "SUB_SCOPE": "evidence passes, title does not",
+  "UNCERTAIN": "a term matched in the body but no sentence passes the evidence rule (no requirement cue, or only TOC lines): not shown in the lane, listed separately"
+ },
+ "toc_rule": {
+  "division_regex": "\\bDIVISION\\s+\\d{1,2}\\b",
+  "min_section_numbers": 2,
+  "note": "a sentence is a spec table-of-contents line if it has >=2 CSI section numbers, or a DIVISION heading plus >=1 section number",
+  "section_number_regex": "\\b\\d{2}\\s\\d{2}\\s\\d{2}(?:\\.\\d+)?\\b"
+ },
+ "trade_codes": {
+  "guards": [
+   "561612"
+  ],
+  "hvac": [
+   "238220"
+  ],
+  "janitorial": [
+   "561720",
+   "561740",
+   "561790"
+  ],
+  "nursing": [
+   "561320",
+   "621399",
+   "621610",
+   "621111",
+   "624120"
+  ],
+  "parts": [
+   "336413",
+   "333996",
+   "332722",
+   "336412",
+   "333612"
+  ],
+  "steelbldg": [
+   "238160",
+   "238120",
+   "332311"
+  ]
+ },
+ "umbrella_naics_prefixes": [
+  "236",
+  "237",
+  "561210"
+ ],
+ "version": "evidence-rules-v2"
+}
