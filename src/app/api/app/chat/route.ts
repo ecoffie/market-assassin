@@ -44,7 +44,7 @@ import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/cha
 import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, type PlannerTarget } from '@/lib/chat/planner-config';
 import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
 import { guardUnstatedStates } from '@/lib/chat/stated-filters';
-import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, lintAnalysis, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
+import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, lintAnalysis, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
 
@@ -418,6 +418,7 @@ export async function POST(request: NextRequest) {
         // the planner does not re-guess codes on every turn.
         const capabilityNote = capabilityPlannerNote(message);
         const capabilityPhrases = interpretCapabilityNaics(message).items.flatMap((it) => [it.phrase, it.label]);
+        const capabilityLabels = interpretCapabilityNaics(message).items.map((it) => it.label);
         // What the customer has said in this conversation (for the stated-filters guard).
         const conversationText = [...history.filter((h) => h.role === 'user').map((h) => String(h.content || '')), message].join('\n');
         const toolRoundMessages: Array<{ role: string; content: string }> = [
@@ -602,7 +603,7 @@ export async function POST(request: NextRequest) {
               // PR E: verified record lists are rendered from the tool data, not reproduced by the model.
               for (const r of results) {
                 const renderers: Record<string, (p: Record<string, unknown>) => RenderedRecords | null> = {
-                  [EXPIRING_TOOL]: (p) => renderExpiringRecords(p, { offset: displayOffsets.get(r.tool_call_id) ?? 0, relevancePhrases: capabilityPhrases }),
+                  [EXPIRING_TOOL]: (p) => renderExpiringRecords(p, { offset: displayOffsets.get(r.tool_call_id) ?? 0, relevancePhrases: capabilityPhrases, requestedLabels: capabilityLabels }),
                   [PAST_CONTRACTS_TOOL]: renderStatusChecks,
                   [BUYING_OFFICES_TOOL]: renderBuyingOffices,
                   [PRICING_TOOL]: renderPricing,
@@ -619,6 +620,7 @@ export async function POST(request: NextRequest) {
                   console.error('[chat] record render failed:', renderErr);
                 }
               }
+              crossCheckOffices(renderedRecords);
               if (TRACE_EVENTS) {
                 send({
                   type: 'trace',
@@ -811,11 +813,14 @@ export async function POST(request: NextRequest) {
         if (renderedRecords.length) {
           // Deterministic analysis check: drop unsupported magnitude words and approximated amounts.
           const anyShown = renderedRecords.some((r) => r.shown > 0);
+          const anyCheck = renderedRecords.some((r) => r.text.includes('CHECK:'));
           const linted = lintAnalysis(
             assistantContent.slice(modelTextStart),
-            anyShown
-              ? 'Review each record and its CHECK lines above before pursuing it.'
-              : 'Nothing verified was found for this search; check SAM.gov award notices or the agency\'s announcements for newer information.',
+            anyCheck
+              ? 'Review the records marked CHECK above before pursuing them.'
+              : anyShown
+                ? 'The figures above come directly from the source data for this question.'
+                : 'Nothing verified was found for this search; check SAM.gov award notices or the agency\'s announcements for newer information.',
           );
           if (linted.dropped.length) {
             turnTrace.notices.push(`analysis_sentences_dropped:${linted.dropped.length}`);

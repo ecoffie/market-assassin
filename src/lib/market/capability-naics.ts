@@ -42,6 +42,7 @@ export const CAPABILITY_LEXICON: CapabilityEntry[] = [
   { match: /\b(freight forwarding|freight brokerage|logistics management|freight arrangement)\b/i, label: 'freight arrangement', naics: ['488510'] },
   { match: /\b(office moving|household goods moving|movers?|moving services|relocation services)\b/i, label: 'moving services', naics: ['484210'] },
   { match: /\b(courier|express delivery)\w*\b/i, label: 'courier and delivery', naics: ['492110'] },
+  { match: /\b(ground transportation|transportation of|transportation services|detainee transport\w*|transport of)\b/i, label: 'transportation', naics: ['485999'] },
   // Facilities
   { match: /\b(janitorial|custodial|cleaning services|housekeeping)\b/i, label: 'janitorial', naics: ['561720'] },
   { match: /\b(landscaping|grounds maintenance|lawn care|mowing)\b/i, label: 'landscaping and grounds', naics: ['561730'] },
