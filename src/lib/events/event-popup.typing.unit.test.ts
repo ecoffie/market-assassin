@@ -63,3 +63,24 @@ describe('event pop-up never interrupts typing', () => {
     expect(popup()).toBeNull();
   });
 });
+
+describe('review fixes', () => {
+  it('does not open on an excluded page reached by client-side navigation while it waited', () => {
+    (document.getElementById('ask') as HTMLTextAreaElement).focus();
+    run();
+    window.history.replaceState(null, '', '/signup');
+    (document.getElementById('btn') as HTMLButtonElement).focus();
+    vi.advanceTimersByTime(5000);
+    expect(popup()).toBeNull();
+  });
+  it('opens when the focused field is removed without a blur event', () => {
+    const ta = document.getElementById('ask') as HTMLTextAreaElement;
+    ta.focus();
+    run();
+    vi.advanceTimersByTime(3000);
+    expect(popup()).toBeNull();
+    ta.remove();
+    vi.advanceTimersByTime(2500);
+    expect(popup()).not.toBeNull();
+  });
+});

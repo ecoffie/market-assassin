@@ -13,6 +13,8 @@
  *  - never while the visitor is typing (a focused text field): it waits until they leave the field.
  *    It used to open mid-typing and focus "Register free", so pressing Enter to send an Ask Mindy
  *    question navigated to the event page and the question was lost (found 2026-11-14).
+ *  - the excluded pages are re-checked when it opens (client-side navigation can happen while it
+ *    waits), and a focused field removed without a blur is caught by a 2 s check.
  *  - when it opens, focus goes to the dialog, not the link: a stray Enter does nothing; Escape
  *    closes; Tab reaches "Register free".
  *  - gone after the event: this route returns an empty script once lazyBlueprintIsOver()
@@ -58,13 +60,14 @@ export function eventPopupScript(now: Date = new Date()): string {
   return '(function(){try{'
     + 'if(window.__lcbPop)return;window.__lcbPop=1;'
     + 'var K=' + js(KEY) + ';function seen(){return document.cookie.split("; ").some(function(c){return c.indexOf(K+"=")===0;});}if(seen())return;'
-    + 'var p=location.pathname;'
-    + 'if(p.indexOf(' + js(LCB.path) + ')===0||/^\\/(admin|app\\/signup|signup|signin|app\\/sign-in|oauth|setup-password|reset-password|forgot-password|auth)/.test(p))return;'
-    + 'if(/[?&]embed=/.test(location.search))return;'
+    + 'function excluded(){var p=location.pathname;'
+    + 'return p.indexOf(' + js(LCB.path) + ')===0||/^\\/(admin|app\\/signup|signup|signin|app\\/sign-in|oauth|setup-password|reset-password|forgot-password|auth)/.test(p)||/[?&]embed=/.test(location.search);}'
+    + 'if(excluded())return;'
     + 'function typing(){var a=document.activeElement;if(!a)return false;if(a.isContentEditable||a.tagName==="TEXTAREA"||a.tagName==="SELECT")return true;'
     + 'return a.tagName==="INPUT"&&!/^(button|submit|reset|checkbox|radio|range|color|file|image|hidden)$/i.test(a.type||"");}'
-    + 'function whenIdle(){if(!typing()){show();return;}var h=function(){document.removeEventListener("focusout",h,true);setTimeout(whenIdle,400);};document.addEventListener("focusout",h,true);}'
-    + 'function show(){try{if(seen())return;document.cookie=K+"=1; path=/; SameSite=Lax";if(!seen())return;}catch(e){return;}'
+    + 'function whenIdle(){if(!typing()){show();return;}var done=false;var h=function(){if(done)return;done=true;document.removeEventListener("focusout",h,true);clearInterval(iv);setTimeout(whenIdle,400);};'
+    + 'var iv=setInterval(function(){if(!typing())h();},2000);document.addEventListener("focusout",h,true);}'
+    + 'function show(){if(excluded())return;try{if(seen())return;document.cookie=K+"=1; path=/; SameSite=Lax";if(!seen())return;}catch(e){return;}'
     + 'var st=document.createElement("style");st.textContent=' + js(css) + ';document.head.appendChild(st);'
     + 'var ov=document.createElement("div");ov.className="lcbp-ov";ov.innerHTML=' + js(html) + ';'
     + 'function close(){ov.remove();document.removeEventListener("keydown",onKey);}'
