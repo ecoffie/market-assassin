@@ -179,7 +179,7 @@ describe('the card invitation and the flag', () => {
   });
   it('the flag script is rendered into the page from the server flag', () => {
     expect(MAP).toContain("const CARD_CHAT_FLAG_JS = '<script>window.__CARD_CHAT_ENABLED=' + String(isCardChatEnabled()) + ';</script>';");
-    expect(MAP).toMatch(/DIBBS_FLAG_JS \+ CARD_CHAT_FLAG_JS \+/);
+    expect(MAP).toMatch(/CARD_CHAT_FLAG_JS \+ ASK_MINDY_JS/);
   });
   it('phones get a full-width card chat sheet', () => {
     expect(MAP).toContain("'@media(max-width:640px){.amk.card{width:100vw}}'");

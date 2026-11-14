@@ -11387,7 +11387,7 @@ export async function GET(request: NextRequest) {
     // <div>, so anything after it gets parsed INTO that hidden .lgm-ov (display:none) and the
     // fixed FAB/drawer compute to 0×0. Leading the body keeps the mobile chrome a direct <body> child.
     // MARKET_FEEDBACK_JS precedes VIEWPORT_JS so window.__mf exists before the first fetch round reports to it.
-    const bodyInject = MOBILE_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + DIBBS_FLAG_JS + CARD_CHAT_FLAG_JS + WATCH_SCOPE_SCRIPT + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + ACCOUNT_MENU_JS + ZHEAD_HEIGHT_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
+    const bodyInject = MOBILE_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + DIBBS_FLAG_JS + WATCH_SCOPE_SCRIPT + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + CARD_CHAT_FLAG_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + ACCOUNT_MENU_JS + ZHEAD_HEIGHT_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Code→name for the State picker (50 states + DC). Already a shared constant — the Filters
