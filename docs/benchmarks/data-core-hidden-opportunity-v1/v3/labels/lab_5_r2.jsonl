@@ -1,0 +1,30 @@
+{"id":"r3-150","label":"NO","role":"NONE","evidence":"Grease trap cleaning and grease disposal, not commercial office cleaning"}
+{"id":"r3-151","label":"NO","role":"NONE","evidence":"Specialized trauma/crime scene cleaning beyond scope of on-site cleaning crew"}
+{"id":"r3-152","label":"NO","role":"NONE","evidence":"Catered meals BPA, NAICS 722320 Caterers; 'Guard' is National Guard"}
+{"id":"r3-153","label":"PARTIAL","role":"SUB","evidence":"Contractor shall furnish required replacement components, consumables, and commercial repair parts"}
+{"id":"r3-154","label":"NO","role":"NONE","evidence":"Navy supply buy for a threaded stud part, not steel building erection"}
+{"id":"r3-155","label":"NO","role":"NONE","evidence":"Roll up door replacement installation service, NAICS 238290 building equipment contractors"}
+{"id":"r3-156","label":"NO","role":"NONE","evidence":"Manlift inspection and maintenance; 'Guard' only in Coast Guard"}
+{"id":"r3-157","label":"PARTIAL","role":"SUB","evidence":"Staff shall include qualified medical, nursing, and neuropsychologic staff for research studies"}
+{"id":"r3-158","label":"NO","role":"NONE","evidence":"Clean grease interceptors at FCC Florence, not office building cleaning"}
+{"id":"r3-159","label":"NO","role":"NONE","evidence":"Signage vinyl graphics replacement and banner stand production services"}
+{"id":"r3-160","label":"PARTIAL","role":"SUB","evidence":"Roof replacement and new structural steel platform as part of cooling tower replacement"}
+{"id":"r3-161","label":"NO","role":"NONE","evidence":"Navy supply buy for compressed cylinder, unrelated to steel buildings or roofing"}
+{"id":"r3-162","label":"NO","role":"NONE","evidence":"Thermostatic switch for HC-144 aircraft; Coast Guard is word coincidence"}
+{"id":"r3-163","label":"NO","role":"NONE","evidence":"Enhanced-use lease redevelopment opportunity of VA property, not staffing"}
+{"id":"r3-164","label":"NO","role":"NONE","evidence":"Scientific and technical expertise services; nursing staffing not explicitly stated"}
+{"id":"r3-165","label":"FIT","role":"PRIME","evidence":"Replacement of the HVAC system at Tonasket Ranger Station, NAICS 238220"}
+{"id":"r3-166","label":"NO","role":"NONE","evidence":"Navy supply buy for electro-pneumatic actuator, unrelated to steel buildings"}
+{"id":"r3-167","label":"NO","role":"NONE","evidence":"Dining facility services NAICS 722310; security text is access boilerplate"}
+{"id":"r3-168","label":"NO","role":"NONE","evidence":"Repair/modification of aircraft steering unit, not parts supply"}
+{"id":"r3-169","label":"FIT","role":"PRIME","evidence":"John Day Dam Powerhouse HVAC Upgrades solicitation"}
+{"id":"r3-170","label":"FIT","role":"PRIME","evidence":"F-117 CAD/PAD spares supply with Air Force spares packaging requirements"}
+{"id":"r3-171","label":"NO","role":"NONE","evidence":"Nursing Practice Oversight Course event, hotel attestation, NAICS 532490 rental"}
+{"id":"r3-172","label":"NO","role":"NONE","evidence":"A/E design services to upgrade fire alarm system; HVAC only interfaces"}
+{"id":"r3-173","label":"NO","role":"NONE","evidence":"Educational webinar about doing business with Coast Guard, not guard services"}
+{"id":"r3-174","label":"NO","role":"NONE","evidence":"Sand and refinish hardwood gym basketball court flooring, not office cleaning"}
+{"id":"r3-175","label":"NO","role":"NONE","evidence":"GSA seeks to lease office space in Rochester; business would be beneficiary"}
+{"id":"r3-176","label":"NO","role":"NONE","evidence":"STERIS steam filter replacement and calibration services, not building cleaning"}
+{"id":"r3-177","label":"PARTIAL","role":"SUB","evidence":"Cedar shake roof replacement with sheet metal flashing per SMACNA manual"}
+{"id":"r3-178","label":"NO","role":"NONE","evidence":"Nursing course logistics RFQ, NAICS 532490 rental, hotel layout, not staffing"}
+{"id":"r3-179","label":"NO","role":"NONE","evidence":"Navy supply buy for a canister; no guard services"}

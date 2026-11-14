@@ -1,0 +1,30 @@
+{"id":"r3-060","label":"NO","role":"NONE","evidence":"Construction management services for USACE; no parts supply involved"}
+{"id":"r3-061","label":"NO","role":"NONE","evidence":"Hospital laundry and dry-cleaning, not building cleaning"}
+{"id":"r3-062","label":"NO","role":"NONE","evidence":"Catered training meals; Guard is National Guard, not security"}
+{"id":"r3-063","label":"PARTIAL","role":"SUB","evidence":"Design-build roof job includes replacement of roof-mounted HVAC units and ductwork"}
+{"id":"r3-064","label":"FIT","role":"PRIME","evidence":"Navy solicitation for ball valve supply, a replacement part"}
+{"id":"r3-065","label":"NO","role":"NONE","evidence":"VA enhanced-use lease real estate development, no staffing"}
+{"id":"r3-066","label":"NO","role":"NONE","evidence":"Cedar shake roof replacement, solicitation cancelled; not metal roofing"}
+{"id":"r3-067","label":"NO","role":"NONE","evidence":"Firefighter turnout gear cleaning and repair, not office cleaning"}
+{"id":"r3-068","label":"NO","role":"NONE","evidence":"B-52 component repair intended sole source to Honeywell OEM"}
+{"id":"r3-069","label":"PARTIAL","role":"SUB","evidence":"Task areas include clinical trials support and licensed practitioners among scientific services"}
+{"id":"r3-070","label":"PARTIAL","role":"SUB","evidence":"HVAC replacement/modernization plus broader interior work under OTA at Robins AFB"}
+{"id":"r3-071","label":"FIT","role":"PRIME","evidence":"Procuring 11 magnetic contactors by NSN, a replacement part"}
+{"id":"r3-072","label":"NO","role":"NONE","evidence":"Carpet and vinyl flooring replacement construction project"}
+{"id":"r3-073","label":"NO","role":"NONE","evidence":"Army uniform tailoring and alterations BPA"}
+{"id":"r3-074","label":"FIT","role":"PRIME","evidence":"Procuring 11 magnetic contactors by NSN, a replacement part"}
+{"id":"r3-075","label":"NO","role":"NONE","evidence":"Carpet and vinyl flooring replacement construction project"}
+{"id":"r3-076","label":"NO","role":"NONE","evidence":"Drug demand reduction administrators and observers, not guard services"}
+{"id":"r3-077","label":"NO","role":"NONE","evidence":"Design-build vehicle barriers and guard booth construction, not guard staffing"}
+{"id":"r3-078","label":"NO","role":"NONE","evidence":"Plenum chamber mold-prevention cleaning, specialized HVAC work not office cleaning"}
+{"id":"r3-079","label":"NO","role":"NONE","evidence":"Vehicular brush guard NSN part; word coincidence with guard"}
+{"id":"r3-080","label":"PARTIAL","role":"SUB","evidence":"Mechanical systems upgrade renovation includes replacing HVAC equipment, SDVOSB construction"}
+{"id":"r3-081","label":"NO","role":"NONE","evidence":"Catered meals BPA, NAICS 722320 caterers"}
+{"id":"r3-082","label":"NO","role":"NONE","evidence":"Design-build vehicle barriers and guard booth construction, not guard staffing"}
+{"id":"r3-083","label":"NO","role":"NONE","evidence":"Multiple award construction contract; no parts supply"}
+{"id":"r3-084","label":"PARTIAL","role":"SUB","evidence":"General construction MACC scope lists HVAC among many disciplines"}
+{"id":"r3-085","label":"NO","role":"NONE","evidence":"Manlift inspection maintenance; guardrails word coincidence, no guard services"}
+{"id":"r3-086","label":"PARTIAL","role":"SUB","evidence":"Building replacement using pre-engineered metal building with gable roof"}
+{"id":"r3-087","label":"NO","role":"NONE","evidence":"Construction renovation of mechanical and fire water systems, not parts supply"}
+{"id":"r3-088","label":"PARTIAL","role":"SUB","evidence":"Supply and delivery of two 25-ton packaged AC units for HVAC replacement"}
+{"id":"r3-089","label":"PARTIAL","role":"PRIME","evidence":"Commercial HVAC duct cleaning in occupied office and lab facilities"}

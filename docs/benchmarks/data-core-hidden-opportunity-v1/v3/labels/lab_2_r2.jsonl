@@ -1,0 +1,30 @@
+{"id":"r3-060","label":"NO","role":"NONE","evidence":"Construction management services for USACE military construction, not parts supply"}
+{"id":"r3-061","label":"NO","role":"NONE","evidence":"Hospital laundry and dry-cleaning services, not commercial office building cleaning"}
+{"id":"r3-062","label":"NO","role":"NONE","evidence":"Training meals for Army National Guard; 'Guard' is a word coincidence"}
+{"id":"r3-063","label":"PARTIAL","role":"SUB","evidence":"Design-build roof replacement plus replacement of roof mounted HVAC units and ductwork"}
+{"id":"r3-064","label":"FIT","role":"PRIME","evidence":"Navy solicitation for VALVE,BALL supplies with warranty of supplies"}
+{"id":"r3-065","label":"NO","role":"NONE","evidence":"Enhanced-use lease redevelopment of VA property, not medical staffing"}
+{"id":"r3-066","label":"NO","role":"NONE","evidence":"Cedar shake roof replacement, solicitation cancelled; not metal roofing or steel buildings"}
+{"id":"r3-067","label":"NO","role":"NONE","evidence":"Cleaning and repair of firefighter turnout gear PPE, not building cleaning"}
+{"id":"r3-068","label":"NO","role":"NONE","evidence":"Repair of B-52 CONECT components, sole source to Honeywell OEM"}
+{"id":"r3-069","label":"NO","role":"NONE","evidence":"Scientific and technical expertise services; nursing staffing not explicitly stated"}
+{"id":"r3-070","label":"FIT","role":"PRIME","evidence":"Repair and modernize HVAC systems within Facility 300 at Robins AFB"}
+{"id":"r3-071","label":"FIT","role":"PRIME","evidence":"Procuring 11 magnetic contactors NSN 6110-01-043-2504 for Air Force"}
+{"id":"r3-072","label":"NO","role":"NONE","evidence":"Replace carpet and vinyl tile flooring, construction not cleaning"}
+{"id":"r3-073","label":"NO","role":"NONE","evidence":"Uniform tailoring and alterations for National Guard; 'Guard' coincidence"}
+{"id":"r3-074","label":"FIT","role":"PRIME","evidence":"Procuring 11 magnetic contactors; manufacturers and distributors may quote"}
+{"id":"r3-075","label":"NO","role":"NONE","evidence":"Replace carpet and luxury vinyl tile flooring, not cleaning services"}
+{"id":"r3-076","label":"NO","role":"NONE","evidence":"Drug testing program administrative manager and observers, not security guards"}
+{"id":"r3-077","label":"NO","role":"NONE","evidence":"Design-build construction of vehicle barriers and guard booths, not guard services"}
+{"id":"r3-078","label":"NO","role":"NONE","evidence":"Mold-prevention cleaning of plenum chambers and air-handling components, specialized not janitorial"}
+{"id":"r3-079","label":"NO","role":"NONE","evidence":"Vehicular brush guard parts; 'guard' word coincidence"}
+{"id":"r3-080","label":"FIT","role":"PRIME","evidence":"Upgrade mechanical systems, HVAC equipment in poor condition, NAICS 238220"}
+{"id":"r3-081","label":"NO","role":"NONE","evidence":"Catered meals BPA for Guam National Guard, NAICS 722320 Caterers"}
+{"id":"r3-082","label":"NO","role":"NONE","evidence":"Design-build construction of AVB systems and guard booth infrastructure"}
+{"id":"r3-083","label":"NO","role":"NONE","evidence":"Multiple award construction contract; 'replacement' refers to personnel"}
+{"id":"r3-084","label":"PARTIAL","role":"SUB","evidence":"General construction MACC may include heating, ventilation and air-conditioning work"}
+{"id":"r3-085","label":"NO","role":"NONE","evidence":"Coast Guard manlift inspection maintenance; 'security' refers to platform hardware"}
+{"id":"r3-086","label":"PARTIAL","role":"SUB","evidence":"New building replacement project uses pre-engineered metal building with gable roof"}
+{"id":"r3-087","label":"NO","role":"NONE","evidence":"Construction renovation of mechanical and fire suppression systems, not parts supply"}
+{"id":"r3-088","label":"PARTIAL","role":"PRIME","evidence":"Supply and delivery of two 25-ton packaged air-conditioning units"}
+{"id":"r3-089","label":"NO","role":"NONE","evidence":"Commercial HVAC duct cleaning, specialized service not office building cleaning"}

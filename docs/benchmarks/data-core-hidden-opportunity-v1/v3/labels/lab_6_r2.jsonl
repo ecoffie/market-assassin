@@ -1,0 +1,23 @@
+{"id":"r3-180","label":"NO","role":"NONE","evidence":"Procurement of NSN rod, splash guard; 'guard' is a part name, not security"}
+{"id":"r3-181","label":"NO","role":"NONE","evidence":"Food services for Marine Security Guards; guards are beneficiaries, work is cooking"}
+{"id":"r3-182","label":"NO","role":"NONE","evidence":"Roll up door replacement installation service under NAICS 238290 building equipment contractors"}
+{"id":"r3-183","label":"PARTIAL","role":"SUB","evidence":"Contractor manages entire population of replacement parts and component kits for landing gear"}
+{"id":"r3-184","label":"FIT","role":"PRIME","evidence":"Medical Q-coded services with Excel pricing worksheet for Nursing Services IDIQ labor segment"}
+{"id":"r3-185","label":"NO","role":"NONE","evidence":"Predominant purpose is fire-protection equipment inspection and kitchen hood cleaning, not offices"}
+{"id":"r3-186","label":"NO","role":"NONE","evidence":"Coast Guard station waterfront floats and timber/steel piles; no steel building or roofing"}
+{"id":"r3-187","label":"NO","role":"NONE","evidence":"Quarterly grease trap interceptor pumping, not commercial office building cleaning"}
+{"id":"r3-188","label":"FIT","role":"PRIME","evidence":"Non-personal service contract for four ICU Registered Nurses, NAICS 561320 temporary help"}
+{"id":"r3-189","label":"NO","role":"NONE","evidence":"Condensate pump replacement installation service under NAICS 238220 plumbing/HVAC contractors"}
+{"id":"r3-190","label":"FIT","role":"PRIME","evidence":"Supply of 40 each NSN 1420-01-390-4419 ICBM bulkhead assembly spares"}
+{"id":"r3-191","label":"FIT","role":"PRIME","evidence":"Preventive maintenance and repair services for HVAC water chillers and air handling units"}
+{"id":"r3-192","label":"NO","role":"NONE","evidence":"Design and install 500 KW roof mounted solar photovoltaic electrical system"}
+{"id":"r3-193","label":"FIT","role":"PRIME","evidence":"Supply of 4 each NSN 1650-00-404-6550 C-130 linear actuator piston spare"}
+{"id":"r3-194","label":"NO","role":"NONE","evidence":"Community outpatient substance use disorder and mental health treatment services, not nurse staffing"}
+{"id":"r3-195","label":"NO","role":"NONE","evidence":"Quarterly grease trap interceptor cleaning, not commercial office building cleaning"}
+{"id":"r3-196","label":"FIT","role":"PRIME","evidence":"Supply of 15 EA impeller, compressor NSN 2835-01-044-7730 for C-130"}
+{"id":"r3-197","label":"NO","role":"NONE","evidence":"Outpatient substance use and mental health treatment services for adults in custody"}
+{"id":"r3-198","label":"NO","role":"NONE","evidence":"Munitions facility construction; temporary security fencing and escorts are construction boilerplate"}
+{"id":"r3-199","label":"FIT","role":"PRIME","evidence":"Navy solicitation for trailing edge supply item with warranty of supplies clauses"}
+{"id":"r3-200","label":"NO","role":"NONE","evidence":"Waste removal, cleaning and inspection of oil-water separators, hazardous waste work"}
+{"id":"r3-201","label":"NO","role":"NONE","evidence":"Pest control services at USCG base; 'Guard' is Coast Guard name"}
+{"id":"r3-202","label":"PARTIAL","role":"SUB","evidence":"BOS annex: custodial services, routine cleaning of administrative offices and restrooms"}

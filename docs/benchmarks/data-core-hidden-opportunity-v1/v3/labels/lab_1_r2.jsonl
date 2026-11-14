@@ -1,0 +1,30 @@
+{"id":"r3-030","label":"FIT","role":"PRIME","evidence":"Design-build replacement and modernization of HVAC systems, NAICS 238220"}
+{"id":"r3-031","label":"FIT","role":"PRIME","evidence":"Three gearboxes NSN 2835-01-456-6510; restricted to Boeing and Honeywell approved sources"}
+{"id":"r3-032","label":"FIT","role":"PRIME","evidence":"HVAC upgrades: replace exhaust fans, AHU cooling coils, fan motor, VFD"}
+{"id":"r3-033","label":"NO","role":"NONE","evidence":"Food service for Marine Security Guards; guards are beneficiaries, not work bought"}
+{"id":"r3-034","label":"NO","role":"NONE","evidence":"Cooking services at Marine Security Guard Residence; guard is word coincidence"}
+{"id":"r3-035","label":"NO","role":"NONE","evidence":"Supply and delivery of nine fire escape door assemblies"}
+{"id":"r3-036","label":"NO","role":"NONE","evidence":"Design and install 500 KW roof mounted solar photovoltaic system"}
+{"id":"r3-037","label":"NO","role":"NONE","evidence":"Navy supply of valve assembly manifold; boilerplate clauses only"}
+{"id":"r3-038","label":"NO","role":"NONE","evidence":"Prepare and serve meals to MSG personnel at Embassy cafeteria"}
+{"id":"r3-039","label":"PARTIAL","role":"SUB","evidence":"24/7 facility maintenance includes HVAC operation and maintenance of boilers, chillers"}
+{"id":"r3-040","label":"NO","role":"NONE","evidence":"Supply of hose-tubing guard part NSN; guard is word coincidence"}
+{"id":"r3-041","label":"FIT","role":"PRIME","evidence":"Contractor shall provide Licensed Practical Nursing support services at JBSA Lackland"}
+{"id":"r3-042","label":"NO","role":"NONE","evidence":"Dry dock, hull water blast, repair and repaint vessels"}
+{"id":"r3-043","label":"NO","role":"NONE","evidence":"Q&A for flooring BPA, sheet vinyl material and installation"}
+{"id":"r3-044","label":"PARTIAL","role":"SUB","evidence":"New facility includes structural steel framing, insulated metal panel skin, roofing"}
+{"id":"r3-045","label":"FIT","role":"PRIME","evidence":"Replace existing 3-ton packaged heat pump system at Santee lab"}
+{"id":"r3-046","label":"NO","role":"NONE","evidence":"Periodic washing of C-130J aircraft per technical orders"}
+{"id":"r3-047","label":"PARTIAL","role":"SUB","evidence":"Install rooftop safety railings; work includes carpentry and roofing work"}
+{"id":"r3-048","label":"PARTIAL","role":"PRIME","evidence":"Base work: removal of roofing, installation of new corrugated metal roofing"}
+{"id":"r3-049","label":"NO","role":"NONE","evidence":"Supply of HVAC/R parts, equipment and refrigerant; business is a buyer"}
+{"id":"r3-050","label":"NO","role":"NONE","evidence":"Amendment for cooking services at Marine Security Guard Residence"}
+{"id":"r3-051","label":"NO","role":"NONE","evidence":"A/E design services SF330 for new elevator tower, NAICS 541330"}
+{"id":"r3-052","label":"NO","role":"NONE","evidence":"Supply of A-36 grade steel plates, not building erection"}
+{"id":"r3-053","label":"NO","role":"NONE","evidence":"USCG station marine repairs; timber and steel piles, new floats"}
+{"id":"r3-054","label":"NO","role":"NONE","evidence":"Inspection and maintenance of scissor and boom lifts; security is hardware"}
+{"id":"r3-055","label":"FIT","role":"PRIME","evidence":"John Day Dam Powerhouse HVAC Upgrades solicitation with specifications and drawings"}
+{"id":"r3-056","label":"FIT","role":"PRIME","evidence":"Local guard services at U.S. Embassy Bujumbura, NAICS 561612"}
+{"id":"r3-057","label":"NO","role":"NONE","evidence":"Navy supply of check valves; boilerplate clauses only"}
+{"id":"r3-058","label":"PARTIAL","role":"PRIME","evidence":"Insulation of 381 linear feet of B114 HVAC system piping"}
+{"id":"r3-059","label":"NO","role":"NONE","evidence":"USCG station marine repairs; timber and steel piles replaced, new floats"}

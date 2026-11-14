@@ -1,0 +1,23 @@
+{"id":"r3-180","label":"NO","role":"NONE","evidence":"Splash guard rod part; guard word coincidence, not guard services"}
+{"id":"r3-181","label":"NO","role":"NONE","evidence":"Cook services for Marine Security Guards; guards only beneficiaries"}
+{"id":"r3-182","label":"NO","role":"NONE","evidence":"Roll up door replacement installation service, not parts supply"}
+{"id":"r3-183","label":"PARTIAL","role":"SUB","evidence":"Contractor manages entire population of replacement parts supporting landing gear DLRs"}
+{"id":"r3-184","label":"FIT","role":"PRIME","evidence":"Nursing Services IDIQ Labor Segment under OCONUS medical services"}
+{"id":"r3-185","label":"NO","role":"NONE","evidence":"Kitchen exhaust and fire extinguisher service, predominantly fire protection"}
+{"id":"r3-186","label":"NO","role":"NONE","evidence":"Waterfront piles, floats, civil/structural scope for USCG station"}
+{"id":"r3-187","label":"NO","role":"NONE","evidence":"Grease interceptor cleaning, not office building cleaning"}
+{"id":"r3-188","label":"FIT","role":"PRIME","evidence":"NPSC for four ICU Registered Nurses, NAICS 561320 temporary help"}
+{"id":"r3-189","label":"NO","role":"NONE","evidence":"Condensate pump replacement installation, not parts supply"}
+{"id":"r3-190","label":"FIT","role":"PRIME","evidence":"Solicitation for 40 each NSN bulkhead assembly defense part"}
+{"id":"r3-191","label":"FIT","role":"PRIME","evidence":"Preventive maintenance and repair of HVAC water chillers and AHUs"}
+{"id":"r3-192","label":"NO","role":"NONE","evidence":"Design and install roof mounted solar PV electrical system"}
+{"id":"r3-193","label":"FIT","role":"PRIME","evidence":"Solicitation for 4 each C-130 piston linear actuator NSN"}
+{"id":"r3-194","label":"NO","role":"NONE","evidence":"Substance use and mental health treatment services, not nurse staffing"}
+{"id":"r3-195","label":"NO","role":"NONE","evidence":"Grease interceptor cleaning, not office building cleaning"}
+{"id":"r3-196","label":"FIT","role":"PRIME","evidence":"Compressor impeller C-130 NSN, quantity 15 EA, quote solicited"}
+{"id":"r3-197","label":"NO","role":"NONE","evidence":"Community substance use and mental health treatment, not nurse staffing"}
+{"id":"r3-198","label":"NO","role":"NONE","evidence":"Munitions facility construction; security fencing is incidental, not guard services"}
+{"id":"r3-199","label":"FIT","role":"PRIME","evidence":"Navy supply solicitation for trailing edge part, NAICS 336611"}
+{"id":"r3-200","label":"NO","role":"NONE","evidence":"Oil-water separator waste removal and cleaning, hazardous waste"}
+{"id":"r3-201","label":"NO","role":"NONE","evidence":"Pest control services; Coast Guard word coincidence"}
+{"id":"r3-202","label":"PARTIAL","role":"SUB","evidence":"BOS contract includes custodial annex: routine cleaning of administrative offices"}

@@ -1,0 +1,2895 @@
+{
+ "out": {
+  "reviewer_agreement": {
+   "items": 203,
+   "exact": 185,
+   "relevant_vs_not": 193
+  },
+  "janitorial": {
+   "q": "We clean commercial office buildings.",
+   "matched_count": 1187,
+   "retrieved": 500,
+   "faithful_top20": true,
+   "evidence_counts": {
+    "DIRECT_MATCH": 271,
+    "RELATED_MARKET_CANDIDATE": 0
+   },
+   "A": {
+    "n": 20,
+    "rel_low": 2,
+    "rel_high": 3,
+    "ci_low": [
+     0.03,
+     0.3
+    ],
+    "ci_high": [
+     0.05,
+     0.36
+    ]
+   },
+   "B": {
+    "n": 20,
+    "rel_low": 3,
+    "rel_high": 4,
+    "ci_low": [
+     0.05,
+     0.36
+    ],
+    "ci_high": [
+     0.08,
+     0.42
+    ]
+   },
+   "relevant_positions": [
+    {
+     "notice_id": "639a350c6ade4259a1517c5b41e20bef",
+     "title": "FY27 VRO Janitorial",
+     "pos_A": 133,
+     "pos_B": 7
+    },
+    {
+     "notice_id": "306bbb227dd04ea1b9e6516cc0f1ab8a",
+     "title": "Base Operations Support (BOS) and Facilities Maintenance Services at R",
+     "pos_A": 137,
+     "pos_B": 18
+    },
+    {
+     "notice_id": "a2badf39d2574984a80c99ec15091ffc",
+     "title": "SOURCES SOUGHT: N40080-27-R-XXXX 8(a) BASEWIDE JANITORIAL SERVICES FOR",
+     "pos_A": 125,
+     "pos_B": 19
+    },
+    {
+     "notice_id": "cff5331398f2455bb0d9ba94215644f4",
+     "title": "S201--VANIHCS Window Cleaning - Engineering Service  Amendment to prov",
+     "pos_A": 17,
+     "pos_B": 269
+    },
+    {
+     "notice_id": "6908ff7a8ee54ccaa6ab40b0fe6665aa",
+     "title": "S201--VANIHCS Window Cleaning - Engineering Service  Fort Wayne and Ma",
+     "pos_A": 18,
+     "pos_B": 270
+    }
+   ],
+   "median_pos_relevant": {
+    "A": 125,
+    "B": 19,
+    "n": 5
+   },
+   "closing_7d": {
+    "in_A_top20": 18,
+    "in_B_top20": 18,
+    "displaced": 12,
+    "displaced_relevant_upper": 2,
+    "displaced_positions_in_B": [
+     24,
+     25,
+     32,
+     34,
+     35,
+     39,
+     56,
+     99,
+     100,
+     269,
+     270,
+     271
+    ]
+   },
+   "closing_14d": {
+    "in_A_top20": 20,
+    "in_B_top20": 20,
+    "displaced": 14,
+    "displaced_relevant_upper": 2,
+    "displaced_positions_in_B": [
+     24,
+     25,
+     32,
+     34,
+     35,
+     39,
+     40,
+     44,
+     56,
+     99,
+     100,
+     269,
+     270,
+     271
+    ]
+   },
+   "tiers_in_top20": {
+    "A": 20,
+    "B": 20
+   }
+  },
+  "nursing": {
+   "q": "We provide nurses and medical staffing.",
+   "matched_count": 46,
+   "retrieved": 46,
+   "faithful_top20": true,
+   "evidence_counts": {
+    "DIRECT_MATCH": 23,
+    "RELATED_MARKET_CANDIDATE": 0
+   },
+   "A": {
+    "n": 20,
+    "rel_low": 6,
+    "rel_high": 8,
+    "ci_low": [
+     0.15,
+     0.52
+    ],
+    "ci_high": [
+     0.22,
+     0.61
+    ]
+   },
+   "B": {
+    "n": 20,
+    "rel_low": 7,
+    "rel_high": 9,
+    "ci_low": [
+     0.18,
+     0.57
+    ],
+    "ci_high": [
+     0.26,
+     0.66
+    ]
+   },
+   "relevant_positions": [
+    {
+     "notice_id": "fe4d9468ae4e40dcb5651aa503ea997a",
+     "title": "ISBEE Solicitation: Emergency Department Registered Nurse Services (Up",
+     "pos_A": 1,
+     "pos_B": 1
+    },
+    {
+     "notice_id": "73c6b4c398384af3983d62a4c22be786",
+     "title": "Sources Sought: IEE/ISBEE Capability Inquiry \u2013 CRNA Services \u2013 Turtle ",
+     "pos_A": 23,
+     "pos_B": 2
+    },
+    {
+     "notice_id": "14b3df8e8b9a4e21a1a20dc6f6cd80c0",
+     "title": "NPSC for Four (4) ICU RNs for the Northern Navajo Medical Center",
+     "pos_A": 6,
+     "pos_B": 3
+    },
+    {
+     "notice_id": "6bcf351fbe04459383a4b3977dfc374f",
+     "title": "License Practical Nurse (LPN)",
+     "pos_A": 2,
+     "pos_B": 4
+    },
+    {
+     "notice_id": "79e07c2848754a239dfc921d70c10869",
+     "title": "NIMHD Division of Intramural Research Population Health and Clinical R",
+     "pos_A": 14,
+     "pos_B": 5
+    },
+    {
+     "notice_id": "3f35ed7bd3404ee896c0894ea8158276",
+     "title": "ISBEE Set-Aside: FFP Commercial Non-Personal Healthcare Services \u2013 Two",
+     "pos_A": 17,
+     "pos_B": 12
+    },
+    {
+     "notice_id": "03b3adceede047a7bafa47320506ea67",
+     "title": "OCONUS Medical Q-Coded Services",
+     "pos_A": 20,
+     "pos_B": 18
+    }
+   ],
+   "median_pos_relevant": {
+    "A": 14,
+    "B": 4,
+    "n": 7
+   },
+   "closing_7d": {
+    "in_A_top20": 9,
+    "in_B_top20": 9,
+    "displaced": 1,
+    "displaced_relevant_upper": 0,
+    "displaced_positions_in_B": [
+     23
+    ]
+   },
+   "closing_14d": {
+    "in_A_top20": 11,
+    "in_B_top20": 12,
+    "displaced": 2,
+    "displaced_relevant_upper": 0,
+    "displaced_positions_in_B": [
+     21,
+     23
+    ]
+   },
+   "tiers_in_top20": {
+    "A": 20,
+    "B": 20
+   }
+  },
+  "hvac": {
+   "q": "We maintain HVAC systems.",
+   "matched_count": 211,
+   "retrieved": 211,
+   "faithful_top20": true,
+   "evidence_counts": {
+    "DIRECT_MATCH": 113,
+    "RELATED_MARKET_CANDIDATE": 0
+   },
+   "A": {
+    "n": 20,
+    "rel_low": 16,
+    "rel_high": 17,
+    "ci_low": [
+     0.58,
+     0.92
+    ],
+    "ci_high": [
+     0.64,
+     0.95
+    ]
+   },
+   "B": {
+    "n": 20,
+    "rel_low": 17,
+    "rel_high": 18,
+    "ci_low": [
+     0.64,
+     0.95
+    ],
+    "ci_high": [
+     0.7,
+     0.97
+    ]
+   },
+   "relevant_positions": [
+    {
+     "notice_id": "710ded67e65e4a8da9b774d401a92f21",
+     "title": "Z--OK-DEEP FORK NWR-QUARTERS HVAC REPLACEM",
+     "pos_A": 27,
+     "pos_B": 1
+    },
+    {
+     "notice_id": "6e82689662f44358819516314429756b",
+     "title": "J065-- HVAC upgrades at VA Loch Raven location",
+     "pos_A": 17,
+     "pos_B": 2
+    },
+    {
+     "notice_id": "2b961804938d4416b9df142dfdf48f03",
+     "title": "Tonasket Ranger Station HVAC Replacement Building 2007",
+     "pos_A": 12,
+     "pos_B": 3
+    },
+    {
+     "notice_id": "437677f94aab4f34a7733c8d9b90ec46",
+     "title": "Tonasket Ranger Station HVAC Replacement Building 2007",
+     "pos_A": 13,
+     "pos_B": 4
+    },
+    {
+     "notice_id": "fc29e3904eb3405bab37833cd265b531",
+     "title": "J065--KG - HVAC upgrades (VA-27-00018970 / 36C245-27-AP-1028 /  512-27",
+     "pos_A": 11,
+     "pos_B": 5
+    },
+    {
+     "notice_id": "51634962cc994357966d4487cae905ba",
+     "title": "Notice of Intent to Award - sole source purchase for Hydronic Water Tr",
+     "pos_A": 80,
+     "pos_B": 7
+    },
+    {
+     "notice_id": "2af01fdbb5af425da3127ce79f3a1d61",
+     "title": "Y1DA--561-24-600 Upgrade Mechanical Systems-C Level",
+     "pos_A": 70,
+     "pos_B": 9
+    },
+    {
+     "notice_id": "dba13783e1a64ab4b9f729b5145923f4",
+     "title": "J041--RFQ-SDVOSB-Metasys Building Automation System Johnson  Controls ",
+     "pos_A": 23,
+     "pos_B": 10
+    },
+    {
+     "notice_id": "062dcbc341f14f2d9c35f680dc03588a",
+     "title": "J041--TIERED EVALUATION: Preventive Maintenance and Repair  Services f",
+     "pos_A": 6,
+     "pos_B": 12
+    },
+    {
+     "notice_id": "ff72be1f24b74133b217238df0a3f376",
+     "title": "FA8501-27-RAPID-990029 RPR RPL HVAC SYSTEM BLDG 300 Bay A/Headhouse",
+     "pos_A": 1,
+     "pos_B": 13
+    },
+    {
+     "notice_id": "eb98f59db24f4fefad9b75d5b0143aef",
+     "title": "Replace HVAC System and Components at CAD593",
+     "pos_A": 4,
+     "pos_B": 14
+    },
+    {
+     "notice_id": "2fe5302eb674412f968ec7d2467088ec",
+     "title": "Construction-NUWCDIVNPT HVAC Piping Insulation",
+     "pos_A": 29,
+     "pos_B": 15
+    },
+    {
+     "notice_id": "f4f30b194c4647159c676c5005dfba09",
+     "title": "ANF Duchesne Bunkhouse AC Replacement",
+     "pos_A": 45,
+     "pos_B": 16
+    },
+    {
+     "notice_id": "97c039663e17438da93e0400971115e7",
+     "title": "NIH MULTIPLE-AWARD CONSTRUCTION CONTRACT (MACC) FOR GENERAL CONSTRUCTI",
+     "pos_A": 104,
+     "pos_B": 17
+    },
+    {
+     "notice_id": "36fa9bb531c84535b1378cd14cf8712c",
+     "title": "NIH MULTIPLE-AWARD CONSTRUCTION CONTRACT (MACC) FOR GENERAL CONSTRUCTI",
+     "pos_A": 105,
+     "pos_B": 18
+    },
+    {
+     "notice_id": "eed5595d885240c2b6ba126a46448b9d",
+     "title": "Correct Electrical Deficiencies",
+     "pos_A": 111,
+     "pos_B": 19
+    },
+    {
+     "notice_id": "a17f45b08e854ddcb919981a151df919",
+     "title": "National Coast Guard Museum- Facility Maintenance Services",
+     "pos_A": 50,
+     "pos_B": 20
+    },
+    {
+     "notice_id": "204195067ff346048a092eca7b88cdd4",
+     "title": "12445127B0002 AZ Halfmoon Ranch House HVAC Installation",
+     "pos_A": 15,
+     "pos_B": 22
+    },
+    {
+     "notice_id": "04b63f242e104b5da897a1f6e6a37aa0",
+     "title": "12445127B0002 AZ Halfmoon Ranch House HVAC Installation",
+     "pos_A": 14,
+     "pos_B": 25
+    },
+    {
+     "notice_id": "8fcab9074226427d83e3de4bbdd4150b",
+     "title": "Z2FF-FCI El Reno-Replacement of Housing Unit HVAC Systems",
+     "pos_A": 3,
+     "pos_B": 27
+    },
+    {
+     "notice_id": "ee094a05a75441fe83f1ae98416fd98a",
+     "title": "Santee Lab HVAC Replacement",
+     "pos_A": 10,
+     "pos_B": 34
+    },
+    {
+     "notice_id": "1889773fe2ab42c6a643f83151731a81",
+     "title": "FPC BRYAN, TX  - REPLACE HVAC SYSTEM ICC BUILDING",
+     "pos_A": 2,
+     "pos_B": 39
+    },
+    {
+     "notice_id": "00ff8398f865484d9a185cb32b7abbdf",
+     "title": "Clearfield Job Corps Center Design-Build (D-B) Roof & HVAC Replacement",
+     "pos_A": 9,
+     "pos_B": 49
+    },
+    {
+     "notice_id": "efa5de2516754632acd4138308552371",
+     "title": "John Day Dam Powerhouse HVAC Upgrades (W9127N27BA007)",
+     "pos_A": 18,
+     "pos_B": 106
+    },
+    {
+     "notice_id": "89b27f77366f44c48abe9bbccef3b87d",
+     "title": "John Day Dam Powerhouse HVAC Upgrades (W9127N27BA007)",
+     "pos_A": 19,
+     "pos_B": 107
+    },
+    {
+     "notice_id": "b4f4a929ee084c05ac1f973e3b0531c9",
+     "title": "Replace HVAC System and Components at CAD593",
+     "pos_A": 5,
+     "pos_B": 109
+    }
+   ],
+   "median_pos_relevant": {
+    "A": 16.0,
+    "B": 16.5,
+    "n": 26
+   },
+   "closing_7d": {
+    "in_A_top20": 4,
+    "in_B_top20": 7,
+    "displaced": 3,
+    "displaced_relevant_upper": 2,
+    "displaced_positions_in_B": [
+     27,
+     39,
+     62
+    ]
+   },
+   "closing_14d": {
+    "in_A_top20": 6,
+    "in_B_top20": 8,
+    "displaced": 5,
+    "displaced_relevant_upper": 4,
+    "displaced_positions_in_B": [
+     27,
+     34,
+     39,
+     49,
+     62
+    ]
+   },
+   "tiers_in_top20": {
+    "A": 20,
+    "B": 20
+   }
+  },
+  "guards": {
+   "q": "We provide security guards.",
+   "matched_count": 476,
+   "retrieved": 476,
+   "faithful_top20": true,
+   "evidence_counts": {
+    "DIRECT_MATCH": 292,
+    "RELATED_MARKET_CANDIDATE": 0
+   },
+   "A": {
+    "n": 20,
+    "rel_low": 2,
+    "rel_high": 2,
+    "ci_low": [
+     0.03,
+     0.3
+    ],
+    "ci_high": [
+     0.03,
+     0.3
+    ]
+   },
+   "B": {
+    "n": 20,
+    "rel_low": 3,
+    "rel_high": 3,
+    "ci_low": [
+     0.05,
+     0.36
+    ],
+    "ci_high": [
+     0.05,
+     0.36
+    ]
+   },
+   "relevant_positions": [
+    {
+     "notice_id": "70f6d2d0760b4f3b9efa8bb77d197d6d",
+     "title": "U.S. Mission Burundi Local Guard Program",
+     "pos_A": 10,
+     "pos_B": 1
+    },
+    {
+     "notice_id": "d20f40fe98fe4b02b6a8fc3251265f83",
+     "title": "Local Guard Force - U.S. Mission United Arab Emirates (UAE)",
+     "pos_A": 28,
+     "pos_B": 2
+    },
+    {
+     "notice_id": "f9a1fc0c071d460db4fe21c1d4d4cc34",
+     "title": "Transition Security Guard Services \u2014 CDC Facilities, Metro Atlanta, Ge",
+     "pos_A": 7,
+     "pos_B": 10
+    }
+   ],
+   "median_pos_relevant": {
+    "A": 10,
+    "B": 2,
+    "n": 3
+   },
+   "closing_7d": {
+    "in_A_top20": 11,
+    "in_B_top20": 12,
+    "displaced": 7,
+    "displaced_relevant_upper": 0,
+    "displaced_positions_in_B": [
+     32,
+     35,
+     38,
+     48,
+     53,
+     137,
+     255
+    ]
+   },
+   "closing_14d": {
+    "in_A_top20": 18,
+    "in_B_top20": 16,
+    "displaced": 12,
+    "displaced_relevant_upper": 0,
+    "displaced_positions_in_B": [
+     25,
+     32,
+     35,
+     38,
+     48,
+     53,
+     64,
+     81,
+     100,
+     137,
+     172,
+     255
+    ]
+   },
+   "A_noColl": {
+    "n": 20,
+    "rel_low": 3,
+    "rel_high": 3,
+    "ci_low": [
+     0.05,
+     0.36
+    ],
+    "ci_high": [
+     0.05,
+     0.36
+    ]
+   },
+   "B_noColl": {
+    "n": 20,
+    "rel_low": 3,
+    "rel_high": 3,
+    "ci_low": [
+     0.05,
+     0.36
+    ],
+    "ci_high": [
+     0.05,
+     0.36
+    ]
+   },
+   "relevant_positions_noColl": [
+    {
+     "notice_id": "70f6d2d0760b4f3b9efa8bb77d197d6d",
+     "title": "U.S. Mission Burundi Local Guard Program",
+     "pos_A": 2,
+     "pos_B": 1
+    },
+    {
+     "notice_id": "d20f40fe98fe4b02b6a8fc3251265f83",
+     "title": "Local Guard Force - U.S. Mission United Arab Emirates (UAE)",
+     "pos_A": 18,
+     "pos_B": 2
+    },
+    {
+     "notice_id": "f9a1fc0c071d460db4fe21c1d4d4cc34",
+     "title": "Transition Security Guard Services \u2014 CDC Facilities, Metro Atlanta, Ge",
+     "pos_A": 1,
+     "pos_B": 5
+    }
+   ],
+   "median_pos_relevant_noColl": {
+    "A": 2,
+    "B": 2,
+    "n": 3
+   },
+   "closing_7d_noColl": {
+    "in_A_top20": 9,
+    "in_B_top20": 8,
+    "displaced": 5,
+    "displaced_relevant_upper": 0,
+    "displaced_positions_in_B": [
+     24,
+     26,
+     34,
+     144,
+     178
+    ]
+   },
+   "closing_14d_noColl": {
+    "in_A_top20": 16,
+    "in_B_top20": 13,
+    "displaced": 8,
+    "displaced_relevant_upper": 0,
+    "displaced_positions_in_B": [
+     24,
+     26,
+     34,
+     42,
+     101,
+     107,
+     144,
+     178
+    ]
+   },
+   "collision_rows": 136,
+   "collisions_in_A_top20": 10,
+   "collisions_in_B_top20": 8,
+   "tiers_in_top20": {
+    "A": 20,
+    "B": 20
+   }
+  },
+  "steelbldg": {
+   "q": "We erect steel buildings and install metal roofing.",
+   "matched_count": 572,
+   "retrieved": 500,
+   "faithful_top20": true,
+   "evidence_counts": {
+    "DIRECT_MATCH": 293,
+    "RELATED_MARKET_CANDIDATE": 0
+   },
+   "A": {
+    "n": 20,
+    "rel_low": 3,
+    "rel_high": 4,
+    "ci_low": [
+     0.05,
+     0.36
+    ],
+    "ci_high": [
+     0.08,
+     0.42
+    ]
+   },
+   "B": {
+    "n": 20,
+    "rel_low": 11,
+    "rel_high": 14,
+    "ci_low": [
+     0.34,
+     0.74
+    ],
+    "ci_high": [
+     0.48,
+     0.85
+    ]
+   },
+   "relevant_positions": [
+    {
+     "notice_id": "210d9a8ca71f45e3ba10457201d1f3d9",
+     "title": "P758 Machinery Control Development Center, Philadelphia Navy Yard, PA",
+     "pos_A": 29,
+     "pos_B": 1
+    },
+    {
+     "notice_id": "ab6b9a4a51a94fc2be0fee597c174c6e",
+     "title": "F-15 Aerospace Ground Equipment (AGE) Facility, Vandenberg SFB",
+     "pos_A": 89,
+     "pos_B": 7
+    },
+    {
+     "notice_id": "b08fa8ab3a6d41a3b8a58fc869b015d8",
+     "title": "New Meadows Range Barn",
+     "pos_A": 21,
+     "pos_B": 8
+    },
+    {
+     "notice_id": "af34b449094844d6a983249225d53185",
+     "title": "GAOA Mesa Falls VC Roof Repairs in Caribou-Targhee National Forest, Id",
+     "pos_A": 105,
+     "pos_B": 9
+    },
+    {
+     "notice_id": "00ff8398f865484d9a185cb32b7abbdf",
+     "title": "Clearfield Job Corps Center Design-Build (D-B) Roof & HVAC Replacement",
+     "pos_A": 97,
+     "pos_B": 10
+    },
+    {
+     "notice_id": "1ba6bd54228444fe91bd10ab7d007971",
+     "title": "88th RD US ARMY RESERVE CENTER MONCLOVA, OH CONSTRUCT STORAGE BUILDING",
+     "pos_A": 58,
+     "pos_B": 11
+    },
+    {
+     "notice_id": "6a82397510894b1ab59fd1ae19b06fd6",
+     "title": "88th RD US ARMY RESERVE CENTER MONCLOVA, OH CONSTRUCT STORAGE BUILDING",
+     "pos_A": 59,
+     "pos_B": 12
+    },
+    {
+     "notice_id": "c4094dc11366430dbdaa397ffc28e96c",
+     "title": "Outdoor Fitness Facility, Building 389\u2014 Supply, Delivery, and Limited ",
+     "pos_A": 1,
+     "pos_B": 14
+    },
+    {
+     "notice_id": "7255fc7ded594c1ab70888592a1d8db9",
+     "title": "Fenn Ranger Station roofing replacement",
+     "pos_A": 50,
+     "pos_B": 15
+    },
+    {
+     "notice_id": "b75232e01627477ba024adc55fa2e5e9",
+     "title": "Chesapeake and Delaware (C and D) Canal Building Replacement Project. ",
+     "pos_A": 61,
+     "pos_B": 18
+    },
+    {
+     "notice_id": "1511422418e848f896a0010668d90da1",
+     "title": "Cooling Tower, Roofing, and Structural Construction",
+     "pos_A": 52,
+     "pos_B": 19
+    },
+    {
+     "notice_id": "3003948ae80248a0b83d74a8d4bdde2c",
+     "title": "Munitions Maintenance and Inspection Facility and Conventional Munitio",
+     "pos_A": 2,
+     "pos_B": 41
+    },
+    {
+     "notice_id": "d220126158854b719cbc6be76079241e",
+     "title": "New Meadows Range Barn",
+     "pos_A": 20,
+     "pos_B": 74
+    }
+   ],
+   "median_pos_relevant": {
+    "A": 52,
+    "B": 12,
+    "n": 13
+   },
+   "closing_7d": {
+    "in_A_top20": 9,
+    "in_B_top20": 7,
+    "displaced": 9,
+    "displaced_relevant_upper": 0,
+    "displaced_positions_in_B": [
+     65,
+     66,
+     72,
+     73,
+     80,
+     87,
+     164,
+     182,
+     183
+    ]
+   },
+   "closing_14d": {
+    "in_A_top20": 13,
+    "in_B_top20": 11,
+    "displaced": 12,
+    "displaced_relevant_upper": 1,
+    "displaced_positions_in_B": [
+     41,
+     62,
+     65,
+     66,
+     72,
+     73,
+     80,
+     87,
+     99,
+     164,
+     182,
+     183
+    ]
+   },
+   "tiers_in_top20": {
+    "A": 20,
+    "B": 20
+   }
+  },
+  "parts": {
+   "q": "We supply industrial and defense replacement parts.",
+   "matched_count": 81,
+   "retrieved": 81,
+   "faithful_top20": true,
+   "evidence_counts": {
+    "DIRECT_MATCH": 6,
+    "RELATED_MARKET_CANDIDATE": 4
+   },
+   "A": {
+    "n": 20,
+    "rel_low": 7,
+    "rel_high": 8,
+    "ci_low": [
+     0.18,
+     0.57
+    ],
+    "ci_high": [
+     0.22,
+     0.61
+    ]
+   },
+   "B": {
+    "n": 20,
+    "rel_low": 12,
+    "rel_high": 14,
+    "ci_low": [
+     0.39,
+     0.78
+    ],
+    "ci_high": [
+     0.48,
+     0.85
+    ]
+   },
+   "relevant_positions": [
+    {
+     "notice_id": "b8ebdda115d644b5865c90d436ea31ef",
+     "title": "20--TRAILING EDGE",
+     "pos_A": 5,
+     "pos_B": 1
+    },
+    {
+     "notice_id": "8f25163f92414f3fb539446fa926f000",
+     "title": "417 SCMS Landing Gear Depot Support (LGDS)",
+     "pos_A": 6,
+     "pos_B": 3
+    },
+    {
+     "notice_id": "2b8e93b57c9042deb0e2cce01ac06287",
+     "title": "VALVE,BALL",
+     "pos_A": 2,
+     "pos_B": 5
+    },
+    {
+     "notice_id": "4f826f90373c4ce58da76667d924feac",
+     "title": "Wire Rope Replacement Services at PSNS",
+     "pos_A": 7,
+     "pos_B": 7
+    },
+    {
+     "notice_id": "0e5b303d19d741eb90c9a643f352bdde",
+     "title": "IMPELLER, COMPRESSOR for C-130",
+     "pos_A": 20,
+     "pos_B": 11
+    },
+    {
+     "notice_id": "8df12170d0ec45b192ca0dfd1795f396",
+     "title": "Magnetic Contactor",
+     "pos_A": 50,
+     "pos_B": 12
+    },
+    {
+     "notice_id": "33aa1bd13f0947a886e0b75cc8221aba",
+     "title": "ICBM Bulkhead Assembly",
+     "pos_A": 54,
+     "pos_B": 15
+    },
+    {
+     "notice_id": "ea319eba58794f5490f6ebc5b4eb3316",
+     "title": "F-16 Grip Assembly, Contr",
+     "pos_A": 64,
+     "pos_B": 16
+    },
+    {
+     "notice_id": "ec4d153da53443488239545c60f58ea4",
+     "title": "Magnetic Contactor",
+     "pos_A": 49,
+     "pos_B": 17
+    },
+    {
+     "notice_id": "a95ebc03dffc49159d4a9332c8f39f93",
+     "title": "PLENUM, TURBINE FOR THE POWER SYSTEMS",
+     "pos_A": 59,
+     "pos_B": 18
+    },
+    {
+     "notice_id": "247ef8fb7815441ebe8551d462dbb987",
+     "title": "F-117 CAD/PAD",
+     "pos_A": 66,
+     "pos_B": 19
+    },
+    {
+     "notice_id": "ea3c65c7161d4e4a892c7d1e1257e270",
+     "title": "C-130 Pison, Linear Actua",
+     "pos_A": 36,
+     "pos_B": 20
+    },
+    {
+     "notice_id": "7aca9db0ce4e4c59a68f108caaa65fb7",
+     "title": "USAFE Fire Trainer Maintenance Services",
+     "pos_A": 14,
+     "pos_B": 45
+    },
+    {
+     "notice_id": "2496a76a4a29471583ae60ec84355f49",
+     "title": "F-16 Power Supply",
+     "pos_A": 19,
+     "pos_B": 80
+    }
+   ],
+   "median_pos_relevant": {
+    "A": 28.0,
+    "B": 15.5,
+    "n": 14
+   },
+   "closing_7d": {
+    "in_A_top20": 10,
+    "in_B_top20": 7,
+    "displaced": 6,
+    "displaced_relevant_upper": 1,
+    "displaced_positions_in_B": [
+     29,
+     32,
+     36,
+     38,
+     45,
+     53
+    ]
+   },
+   "closing_14d": {
+    "in_A_top20": 13,
+    "in_B_top20": 10,
+    "displaced": 7,
+    "displaced_relevant_upper": 1,
+    "displaced_positions_in_B": [
+     29,
+     32,
+     36,
+     38,
+     45,
+     53,
+     62
+    ]
+   },
+   "tiers_in_top20": {
+    "A": 6,
+    "B": 6
+   }
+  },
+  "pooled_A": {
+   "n": 120,
+   "rel_low": 36,
+   "rel_high": 42,
+   "ci_low": [
+    0.23,
+    0.39
+   ],
+   "ci_high": [
+    0.27,
+    0.44
+   ]
+  },
+  "pooled_B": {
+   "n": 120,
+   "rel_low": 53,
+   "rel_high": 62,
+   "ci_low": [
+    0.36,
+    0.53
+   ],
+   "ci_high": [
+    0.43,
+    0.6
+   ]
+  },
+  "human_overlap": [
+   {
+    "biz": "steelbldg",
+    "notice_id": "c4094dc11366430dbdaa397ffc28e96c",
+    "human": "FIT",
+    "ai_low": true,
+    "ai_high": true
+   },
+   {
+    "biz": "janitorial",
+    "notice_id": "a2badf39d2574984a80c99ec15091ffc",
+    "human": "FIT",
+    "ai_low": true,
+    "ai_high": true
+   },
+   {
+    "biz": "steelbldg",
+    "notice_id": "1ba6bd54228444fe91bd10ab7d007971",
+    "human": "PARTIAL",
+    "ai_low": true,
+    "ai_high": true
+   },
+   {
+    "biz": "guards",
+    "notice_id": "27a5d9ebe68640fd9cd52e889f70d147",
+    "human": "NO",
+    "ai_low": false,
+    "ai_high": false
+   },
+   {
+    "biz": "steelbldg",
+    "notice_id": "210d9a8ca71f45e3ba10457201d1f3d9",
+    "human": "PARTIAL",
+    "ai_low": true,
+    "ai_high": true
+   },
+   {
+    "biz": "steelbldg",
+    "notice_id": "91e1a83848304f2d84cfe6e95588d9e6",
+    "human": "PARTIAL",
+    "ai_low": false,
+    "ai_high": false
+   },
+   {
+    "biz": "hvac",
+    "notice_id": "a1b1f2db2fcf4f1f9d108530ea86d6e8",
+    "human": "FIT",
+    "ai_low": false,
+    "ai_high": false
+   },
+   {
+    "biz": "steelbldg",
+    "notice_id": "ab6b9a4a51a94fc2be0fee597c174c6e",
+    "human": "FIT",
+    "ai_low": true,
+    "ai_high": true
+   },
+   {
+    "biz": "nursing",
+    "notice_id": "fe4d9468ae4e40dcb5651aa503ea997a",
+    "human": "FIT",
+    "ai_low": true,
+    "ai_high": true
+   },
+   {
+    "biz": "guards",
+    "notice_id": "3003948ae80248a0b83d74a8d4bdde2c",
+    "human": "NO",
+    "ai_low": false,
+    "ai_high": false
+   }
+  ]
+ },
+ "labels": {
+  "parts|4f826f90373c4ce58da76667d924feac": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "SUB",
+   "role2": "SUB",
+   "id": "r3-000"
+  },
+  "nursing|1b8d7b8228d4449788d2a0095df3c132": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-001"
+  },
+  "guards|d20f40fe98fe4b02b6a8fc3251265f83": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-002"
+  },
+  "steelbldg|c4094dc11366430dbdaa397ffc28e96c": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-003"
+  },
+  "janitorial|0aa9434aea704fe6a33608de1eb080f8": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-004"
+  },
+  "hvac|204195067ff346048a092eca7b88cdd4": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-005"
+  },
+  "steelbldg|142d5737ba4841ab980c641a9f221eed": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-006"
+  },
+  "janitorial|cff5331398f2455bb0d9ba94215644f4": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-007"
+  },
+  "nursing|2efd7af339a048958c2575f112228cdf": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-008"
+  },
+  "janitorial|ccb7a86d45a342aeb30085adb96b66b9": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-009"
+  },
+  "hvac|b4f4a929ee084c05ac1f973e3b0531c9": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-010"
+  },
+  "guards|e2d4959436b848e889f898dcff8e7863": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-011"
+  },
+  "steelbldg|2aab2f5afecd465db78e16f59f83da0b": {
+   "lo": false,
+   "hi": true,
+   "r1": "NO",
+   "r2": "PARTIAL",
+   "role1": "NONE",
+   "role2": "SUB",
+   "id": "r3-012"
+  },
+  "guards|1e3d37c860144e599984fa6ed41fdb1c": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-013"
+  },
+  "janitorial|a2badf39d2574984a80c99ec15091ffc": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-014"
+  },
+  "guards|1772deeb57ad42788b71a244e4485e5e": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-015"
+  },
+  "parts|a95ebc03dffc49159d4a9332c8f39f93": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-016"
+  },
+  "steelbldg|368875530f44437da80fecccf8771e34": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-017"
+  },
+  "hvac|51634962cc994357966d4487cae905ba": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-018"
+  },
+  "steelbldg|122d538999234fe0b7e9c9108209b9ef": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-019"
+  },
+  "parts|081e9bb1314b4769a52355f96b1da1e6": {
+   "lo": false,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "NO",
+   "role1": "PRIME",
+   "role2": "NONE",
+   "id": "r3-020"
+  },
+  "janitorial|8d73d2309bd7491b96461093c04da51a": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-021"
+  },
+  "steelbldg|7b34193d7be140c5b3d3d964f1602132": {
+   "lo": false,
+   "hi": true,
+   "r1": "NO",
+   "r2": "PARTIAL",
+   "role1": "NONE",
+   "role2": "SUB",
+   "id": "r3-022"
+  },
+  "guards|c4220170aff44e40803f8e8da751dc39": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-023"
+  },
+  "janitorial|55de359f31574c9884887861ea211f2a": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-024"
+  },
+  "guards|a17f45b08e854ddcb919981a151df919": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-025"
+  },
+  "janitorial|ebae27c253664eeead81df6041fe423c": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-026"
+  },
+  "steelbldg|1ba6bd54228444fe91bd10ab7d007971": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "SUB",
+   "role2": "SUB",
+   "id": "r3-027"
+  },
+  "nursing|2c74cfbc93714c7e82530f050e58e02a": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-028"
+  },
+  "janitorial|6feb428ac9604194911858c83efaebef": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-029"
+  },
+  "hvac|8fcab9074226427d83e3de4bbdd4150b": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "FIT",
+   "role1": "SUB",
+   "role2": "PRIME",
+   "id": "r3-030"
+  },
+  "parts|11940de6ec4d4cc7b0b330a4bd9412fb": {
+   "lo": false,
+   "hi": true,
+   "r1": "NO",
+   "r2": "FIT",
+   "role1": "NONE",
+   "role2": "PRIME",
+   "id": "r3-031"
+  },
+  "hvac|6e82689662f44358819516314429756b": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-032"
+  },
+  "guards|04f1dcb3316f4674b9e89340824c854a": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-033"
+  },
+  "guards|4806009d43ca4bdf8f49b35dd2efa66c": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-034"
+  },
+  "steelbldg|889b960037f64c288fd031fb8d5c49e3": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-035"
+  },
+  "steelbldg|9a99b38488df4a31a78b196b7e16f0a8": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-036"
+  },
+  "steelbldg|feb723bfdff045959950c9939e81fc92": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-037"
+  },
+  "guards|27a5d9ebe68640fd9cd52e889f70d147": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-038"
+  },
+  "hvac|a17f45b08e854ddcb919981a151df919": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "SUB",
+   "role2": "SUB",
+   "id": "r3-039"
+  },
+  "guards|0c2420e19e284f4d8b9746a6cb80b151": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-040"
+  },
+  "nursing|6bcf351fbe04459383a4b3977dfc374f": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-041"
+  },
+  "janitorial|fa24050b593a4b5fb9a4bc3f595138b0": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-042"
+  },
+  "hvac|80f12d55b60544b1b7e44cd4934ed666": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-043"
+  },
+  "steelbldg|210d9a8ca71f45e3ba10457201d1f3d9": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "SUB",
+   "role2": "SUB",
+   "id": "r3-044"
+  },
+  "hvac|ee094a05a75441fe83f1ae98416fd98a": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-045"
+  },
+  "janitorial|d7dd58ab3a34406ea8b9a1d6b6caf030": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-046"
+  },
+  "steelbldg|5afe716a38494a6f84b1e84205805f86": {
+   "lo": false,
+   "hi": true,
+   "r1": "NO",
+   "r2": "PARTIAL",
+   "role1": "NONE",
+   "role2": "SUB",
+   "id": "r3-047"
+  },
+  "steelbldg|b08fa8ab3a6d41a3b8a58fc869b015d8": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "SUB",
+   "role2": "PRIME",
+   "id": "r3-048"
+  },
+  "hvac|6635408bf7984f729108c506c4593309": {
+   "lo": false,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "NO",
+   "role1": "PRIME",
+   "role2": "NONE",
+   "id": "r3-049"
+  },
+  "guards|8ef069449ca14442b6eb85bfa448ce44": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-050"
+  },
+  "hvac|37836979a951480f981d6cfa43274ebd": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-051"
+  },
+  "steelbldg|f9f306cddaea462f8ff5dcf6f3dfc544": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-052"
+  },
+  "steelbldg|9dd384ff00b14dee90912bdb9e276f73": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-053"
+  },
+  "guards|3b1170f73baa45c4ab5aa1c6a410642a": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-054"
+  },
+  "hvac|89b27f77366f44c48abe9bbccef3b87d": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-055"
+  },
+  "guards|70f6d2d0760b4f3b9efa8bb77d197d6d": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-056"
+  },
+  "steelbldg|409f6db2fc3b4d16b6dbc6bea9944cab": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-057"
+  },
+  "hvac|2fe5302eb674412f968ec7d2467088ec": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-058"
+  },
+  "steelbldg|fe69d91d0e5e48b5b612600f844c1085": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-059"
+  },
+  "parts|756cc0888e3b4666a20e234af398dd9d": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-060"
+  },
+  "janitorial|280468eda6144d2094c0818dfbe398ba": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-061"
+  },
+  "guards|c94190c2ae7641978bd21c211a1bc344": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-062"
+  },
+  "hvac|00ff8398f865484d9a185cb32b7abbdf": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "SUB",
+   "role2": "SUB",
+   "id": "r3-063"
+  },
+  "parts|2b8e93b57c9042deb0e2cce01ac06287": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-064"
+  },
+  "nursing|8771a116b6154477ae98f9db3a15787e": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-065"
+  },
+  "steelbldg|b953889e46e84907946f76f1323475fd": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-066"
+  },
+  "janitorial|10f9a49cd2f34e9ca3b60c23353a84cb": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-067"
+  },
+  "parts|bb647f16ca7f4cf6ad857e7f913be543": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-068"
+  },
+  "nursing|6d967fe9e77e45adbee8dbaca09bcd21": {
+   "lo": false,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "NO",
+   "role1": "SUB",
+   "role2": "NONE",
+   "id": "r3-069"
+  },
+  "hvac|ff72be1f24b74133b217238df0a3f376": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "FIT",
+   "role1": "SUB",
+   "role2": "PRIME",
+   "id": "r3-070"
+  },
+  "parts|ec4d153da53443488239545c60f58ea4": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-071"
+  },
+  "janitorial|f2679d302225400abd198d1f2f0fb719": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-072"
+  },
+  "guards|ee62f46c0fe2419b86d95740c000d6c0": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-073"
+  },
+  "parts|8df12170d0ec45b192ca0dfd1795f396": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-074"
+  },
+  "janitorial|837a61b6cb6e4c48911189781921c4ea": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-075"
+  },
+  "guards|e7a4f77e93974f739f4ddbb89eb219fb": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-076"
+  },
+  "guards|502461101394447581abb27486cb618a": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-077"
+  },
+  "janitorial|32611396cf6b45a39be97c2b102093c9": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-078"
+  },
+  "guards|ccee9263c2cd4119bda8658f54db3fba": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-079"
+  },
+  "hvac|2af01fdbb5af425da3127ce79f3a1d61": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "FIT",
+   "role1": "SUB",
+   "role2": "PRIME",
+   "id": "r3-080"
+  },
+  "guards|81607c4f25ac49099cac99a3f1222ae9": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-081"
+  },
+  "guards|9d5262e193c34ced839229f7a71b2d5e": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-082"
+  },
+  "parts|8cb419e483fd4f74a5c6d6388379bcae": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-083"
+  },
+  "hvac|36fa9bb531c84535b1378cd14cf8712c": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "SUB",
+   "role2": "SUB",
+   "id": "r3-084"
+  },
+  "guards|d466245e5a1a41f098ade6ea0f2eb60c": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-085"
+  },
+  "steelbldg|b75232e01627477ba024adc55fa2e5e9": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "SUB",
+   "role2": "SUB",
+   "id": "r3-086"
+  },
+  "parts|1711cf832a3245baa4c5410b8165b514": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-087"
+  },
+  "hvac|1889773fe2ab42c6a643f83151731a81": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "SUB",
+   "role2": "PRIME",
+   "id": "r3-088"
+  },
+  "janitorial|8f44826f79b848d293c202d499b23738": {
+   "lo": false,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "NO",
+   "role1": "PRIME",
+   "role2": "NONE",
+   "id": "r3-089"
+  },
+  "janitorial|9e72b400c1724b9ca8e1196714f29ce3": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-090"
+  },
+  "parts|2496a76a4a29471583ae60ec84355f49": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-091"
+  },
+  "guards|56adfa5f86fe4a65a48dc4e38866872c": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-092"
+  },
+  "guards|c355d58bb7ab4a2192559a967c98f38c": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-093"
+  },
+  "guards|217691e119644c8a84deb7984474baf5": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-094"
+  },
+  "hvac|eb98f59db24f4fefad9b75d5b0143aef": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "SUB",
+   "id": "r3-095"
+  },
+  "guards|b9ed32a87d164c478d2660fa1a3cfcb7": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-096"
+  },
+  "steelbldg|91e1a83848304f2d84cfe6e95588d9e6": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-097"
+  },
+  "steelbldg|a3940f0817bf4406881d4f4c85759cee": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-098"
+  },
+  "steelbldg|95d9289f44b141c781cd30c8b47e738f": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-099"
+  },
+  "hvac|710ded67e65e4a8da9b774d401a92f21": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-100"
+  },
+  "janitorial|4896561344914692ae37b6829f4f0f5f": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-101"
+  },
+  "steelbldg|d220126158854b719cbc6be76079241e": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "SUB",
+   "role2": "SUB",
+   "id": "r3-102"
+  },
+  "guards|7b2b7ea1a40e4f7091cc7327d9e851ad": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-103"
+  },
+  "steelbldg|175630fcf28e40fa8b4e0cb041275ab3": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-104"
+  },
+  "nursing|3f35ed7bd3404ee896c0894ea8158276": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-105"
+  },
+  "guards|362f8cc5a7b04e28a2307db14ee3d1ca": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-106"
+  },
+  "steelbldg|3003948ae80248a0b83d74a8d4bdde2c": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "SUB",
+   "role2": "SUB",
+   "id": "r3-107"
+  },
+  "hvac|04b63f242e104b5da897a1f6e6a37aa0": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-108"
+  },
+  "janitorial|6908ff7a8ee54ccaa6ab40b0fe6665aa": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-109"
+  },
+  "janitorial|beb85d56d7d04bf6ae33797f9597c423": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-110"
+  },
+  "guards|3f0d63c852844f1fb2835fa415427ac8": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-111"
+  },
+  "hvac|eed5595d885240c2b6ba126a46448b9d": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "SUB",
+   "role2": "SUB",
+   "id": "r3-112"
+  },
+  "nursing|205c96ff889240b6b41bcca895b902dd": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-113"
+  },
+  "parts|c4c9a65948d5461cbacc7ea7106bbde5": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-114"
+  },
+  "nursing|c81c11dcc8204c7a9e490d7dc6b1d754": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-115"
+  },
+  "steelbldg|af34b449094844d6a983249225d53185": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-116"
+  },
+  "janitorial|639a350c6ade4259a1517c5b41e20bef": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-117"
+  },
+  "hvac|ff98fb4ddc5c4c31b2b1a15c4511eeed": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-118"
+  },
+  "nursing|85b83d408f1f422885991142c2734b45": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-119"
+  },
+  "hvac|9cb99d7da57646b5a74ffd8dbdeb88f6": {
+   "lo": false,
+   "hi": true,
+   "r1": "NO",
+   "r2": "FIT",
+   "role1": "NONE",
+   "role2": "PRIME",
+   "id": "r3-120"
+  },
+  "parts|2ae0a536b1e94baab7208b6ad09bcd78": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-121"
+  },
+  "guards|8b78eba8c3304c9aa52d4f2398a2a2ae": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-122"
+  },
+  "parts|ff72be1f24b74133b217238df0a3f376": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-123"
+  },
+  "guards|dbc3f40c12c64031b69b55fa069d9596": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-124"
+  },
+  "steelbldg|6a82397510894b1ab59fd1ae19b06fd6": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "SUB",
+   "role2": "SUB",
+   "id": "r3-125"
+  },
+  "parts|ea319eba58794f5490f6ebc5b4eb3316": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-126"
+  },
+  "steelbldg|00ff8398f865484d9a185cb32b7abbdf": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "SUB",
+   "role2": "SUB",
+   "id": "r3-127"
+  },
+  "nursing|73c6b4c398384af3983d62a4c22be786": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-128"
+  },
+  "hvac|a1b1f2db2fcf4f1f9d108530ea86d6e8": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-129"
+  },
+  "janitorial|b5a46985ca83437d9529eb2ee5351bd9": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-130"
+  },
+  "nursing|e48796139b264825931f38fb0332fa0c": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-131"
+  },
+  "hvac|dba13783e1a64ab4b9f729b5145923f4": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-132"
+  },
+  "steelbldg|ab6b9a4a51a94fc2be0fee597c174c6e": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-133"
+  },
+  "guards|30667d79049c4d6795f0e5c96f64d744": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-134"
+  },
+  "hvac|f4f30b194c4647159c676c5005dfba09": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-135"
+  },
+  "hvac|97c039663e17438da93e0400971115e7": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "SUB",
+   "role2": "SUB",
+   "id": "r3-136"
+  },
+  "hvac|fc29e3904eb3405bab37833cd265b531": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-137"
+  },
+  "hvac|437677f94aab4f34a7733c8d9b90ec46": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-138"
+  },
+  "janitorial|58e86f111e8441b8b28c0998f0faa2c4": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-139"
+  },
+  "guards|c12044745d8f42a181cf3adecdfafd83": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-140"
+  },
+  "nursing|fe4d9468ae4e40dcb5651aa503ea997a": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-141"
+  },
+  "parts|733ad71e60ee40cfb258233fa00a6e99": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-142"
+  },
+  "nursing|893df920c62e4ce7b0bdd8e45488bcab": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-143"
+  },
+  "guards|1257feb150d6420693efef09e5bd6086": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-144"
+  },
+  "guards|51ef97706881437ca7bef12a9760fca2": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-145"
+  },
+  "steelbldg|b2b1451f15c44612a7284357613b5601": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-146"
+  },
+  "steelbldg|b2a1517738814dcd975e2dd7303926cd": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-147"
+  },
+  "guards|697d6dcd313c43f8871e6c4623f335ce": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-148"
+  },
+  "guards|f9a1fc0c071d460db4fe21c1d4d4cc34": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-149"
+  },
+  "janitorial|a580e1b7b2a243abb316f9624efc9ef9": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-150"
+  },
+  "janitorial|4a8816c5e9554e87962ce1589d0ff126": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-151"
+  },
+  "guards|1915dec5fe274c77b34983d1e942444c": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-152"
+  },
+  "parts|7aca9db0ce4e4c59a68f108caaa65fb7": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "SUB",
+   "role2": "SUB",
+   "id": "r3-153"
+  },
+  "steelbldg|f031c02daf014776af04589cdf449546": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-154"
+  },
+  "parts|5275408e2efe4eafaef4b675f67f27f4": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-155"
+  },
+  "guards|0a04f6b8d6504156af09a7c222e32e47": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-156"
+  },
+  "nursing|79e07c2848754a239dfc921d70c10869": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "SUB",
+   "role2": "SUB",
+   "id": "r3-157"
+  },
+  "janitorial|66957d99cff4487bbbf5290808255b7f": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-158"
+  },
+  "parts|541f04fa4dfd4835a2ac4c9d01ddc23f": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-159"
+  },
+  "steelbldg|1511422418e848f896a0010668d90da1": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "SUB",
+   "role2": "SUB",
+   "id": "r3-160"
+  },
+  "steelbldg|60361120b1a345448645f332a129b8f9": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-161"
+  },
+  "guards|3d9ba715b1834053a0b5b125fb723563": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-162"
+  },
+  "nursing|e6ef04ccf9964c3481faf0778d5118bf": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-163"
+  },
+  "nursing|cbe19b3b86a24b3c9caf45e8a8b4301b": {
+   "lo": false,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "NO",
+   "role1": "SUB",
+   "role2": "NONE",
+   "id": "r3-164"
+  },
+  "hvac|2b961804938d4416b9df142dfdf48f03": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-165"
+  },
+  "steelbldg|78f30d15189a41de97da991d90b85120": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-166"
+  },
+  "guards|0e0b39f4e70c459abeb6ebdae744f9fb": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-167"
+  },
+  "parts|d1a6fbf97d48454eb07b8a7184a634fd": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-168"
+  },
+  "hvac|efa5de2516754632acd4138308552371": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-169"
+  },
+  "parts|247ef8fb7815441ebe8551d462dbb987": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-170"
+  },
+  "nursing|ab69f409193545d4923dbd2dd594ef86": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-171"
+  },
+  "hvac|fe55df3f1a75416f8dac41214550e0eb": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-172"
+  },
+  "guards|3a3e4c9b9ab646e79cdb90abf831a858": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-173"
+  },
+  "janitorial|43c0728310a04335a7516484caf76f11": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-174"
+  },
+  "janitorial|e7e93a880b5f4104877fca7b54f468e9": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-175"
+  },
+  "janitorial|b3ae455976d94198a6d4344a5bd2ca78": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-176"
+  },
+  "steelbldg|7255fc7ded594c1ab70888592a1d8db9": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "PRIME",
+   "role2": "SUB",
+   "id": "r3-177"
+  },
+  "nursing|cab4f08197944b5e8b222d991a7d70b8": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-178"
+  },
+  "guards|3c462fb17ce14ad199a7565c9555aaf0": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-179"
+  },
+  "guards|f52f59d8c98d4d87bd21bf4670d0fefc": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-180"
+  },
+  "guards|7622fdb698e649889895262813695eb0": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-181"
+  },
+  "parts|a116ecc5b02d481a84c925408386a727": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-182"
+  },
+  "parts|8f25163f92414f3fb539446fa926f000": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "SUB",
+   "role2": "SUB",
+   "id": "r3-183"
+  },
+  "nursing|03b3adceede047a7bafa47320506ea67": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-184"
+  },
+  "janitorial|6e32322598474887aaa575a061b8f3ce": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-185"
+  },
+  "steelbldg|d3229ae3e4544a80b2e540685b5bb791": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-186"
+  },
+  "janitorial|50a4447cea054d92aa54f6e936ad1898": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-187"
+  },
+  "nursing|14b3df8e8b9a4e21a1a20dc6f6cd80c0": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-188"
+  },
+  "parts|b89e7d9df42245668a708071ff95a9d4": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-189"
+  },
+  "parts|33aa1bd13f0947a886e0b75cc8221aba": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-190"
+  },
+  "hvac|062dcbc341f14f2d9c35f680dc03588a": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-191"
+  },
+  "steelbldg|08ca315dd7f74f64bd118120a4f094aa": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-192"
+  },
+  "parts|ea3c65c7161d4e4a892c7d1e1257e270": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-193"
+  },
+  "nursing|0bb5e286dc2a482cacececbf1f9e15c8": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-194"
+  },
+  "janitorial|5d29d8b653d84fa0a3fddc2d67790020": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-195"
+  },
+  "parts|0e5b303d19d741eb90c9a643f352bdde": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-196"
+  },
+  "nursing|1016443d95d5412bbdfb8e23ce514e71": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-197"
+  },
+  "guards|3003948ae80248a0b83d74a8d4bdde2c": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-198"
+  },
+  "parts|b8ebdda115d644b5865c90d436ea31ef": {
+   "lo": true,
+   "hi": true,
+   "r1": "FIT",
+   "r2": "FIT",
+   "role1": "PRIME",
+   "role2": "PRIME",
+   "id": "r3-199"
+  },
+  "janitorial|d01261cbdd774cc183ca4aa6d81e8126": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-200"
+  },
+  "guards|9e81de51647b47f3bc3712117814300b": {
+   "lo": false,
+   "hi": false,
+   "r1": "NO",
+   "r2": "NO",
+   "role1": "NONE",
+   "role2": "NONE",
+   "id": "r3-201"
+  },
+  "janitorial|306bbb227dd04ea1b9e6516cc0f1ab8a": {
+   "lo": true,
+   "hi": true,
+   "r1": "PARTIAL",
+   "r2": "PARTIAL",
+   "role1": "SUB",
+   "role2": "SUB",
+   "id": "r3-202"
+  }
+ }
+}

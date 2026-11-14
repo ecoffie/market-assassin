@@ -1,0 +1,30 @@
+{"id":"r3-090","label":"NO","role":"NONE","evidence":"Grease trap cleaning service at VAMC, not office building cleaning"}
+{"id":"r3-091","label":"FIT","role":"PRIME","evidence":"26 EA of NSN 6130-01-457-1188 F-16 power supply replacement part"}
+{"id":"r3-092","label":"NO","role":"NONE","evidence":"Prepared breakfast, lunch, dinner meals for National Guard; Guard is coincidence"}
+{"id":"r3-093","label":"NO","role":"NONE","evidence":"Cleaning services of guard booth and bathrooms; guard is a location"}
+{"id":"r3-094","label":"NO","role":"NONE","evidence":"NSN bracket, guard mount supply part; word coincidence only"}
+{"id":"r3-095","label":"FIT","role":"SUB","evidence":"Replace HVAC system; restricted to HVAC MECH MACC contractors only"}
+{"id":"r3-096","label":"NO","role":"NONE","evidence":"Annual fire protection system inspection at Coast Guard air station"}
+{"id":"r3-097","label":"NO","role":"NONE","evidence":"Remove and replace existing built-up membrane roofs, not metal roofing"}
+{"id":"r3-098","label":"NO","role":"NONE","evidence":"Navy supply solicitation for check valves; clause boilerplate only"}
+{"id":"r3-099","label":"NO","role":"NONE","evidence":"Supply of steel plate material, not building erection or roofing"}
+{"id":"r3-100","label":"FIT","role":"PRIME","evidence":"Remove and replace existing HVAC system at DFNWR Headquarters"}
+{"id":"r3-101","label":"NO","role":"NONE","evidence":"Commercial kitchen hood and duct cleaning per NFPA 96, specialized"}
+{"id":"r3-102","label":"PARTIAL","role":"SUB","evidence":"Base work includes installation of new corrugated metal roofing on barn"}
+{"id":"r3-103","label":"NO","role":"NONE","evidence":"Maintenance and inspection of scissor and boom lifts at Coast Guard"}
+{"id":"r3-104","label":"NO","role":"NONE","evidence":"Navy supply solicitation for check valves; clause boilerplate only"}
+{"id":"r3-105","label":"FIT","role":"PRIME","evidence":"Non-personal PA/Nurse Practitioner services, two full-time equivalent positions"}
+{"id":"r3-106","label":"NO","role":"NONE","evidence":"Caterer meals BPA for Utah Army National Guard"}
+{"id":"r3-107","label":"PARTIAL","role":"SUB","evidence":"Structural steel framing and standing seam metal roofing within munitions facility"}
+{"id":"r3-108","label":"FIT","role":"PRIME","evidence":"Supply and install HVAC ductless split unit system, NAICS 238220"}
+{"id":"r3-109","label":"FIT","role":"PRIME","evidence":"Window washing services for Marion and Fort Wayne VA campuses"}
+{"id":"r3-110","label":"NO","role":"NONE","evidence":"Clean room design/build construction open to IDIQ construction holders"}
+{"id":"r3-111","label":"NO","role":"NONE","evidence":"Construction of small arms range at Pease ANGB"}
+{"id":"r3-112","label":"PARTIAL","role":"SUB","evidence":"Electrical deficiencies project includes minor HVAC and plumbing improvements"}
+{"id":"r3-113","label":"NO","role":"NONE","evidence":"Single source MRI-compatible IV infusion pump equipment purchase"}
+{"id":"r3-114","label":"NO","role":"NONE","evidence":"Construction management services SATOC for USACE, not parts supply"}
+{"id":"r3-115","label":"NO","role":"NONE","evidence":"Purchase breakaway bed cables for nurse call system, product not staffing"}
+{"id":"r3-116","label":"FIT","role":"PRIME","evidence":"Existing corrugated metal panel roofing and trim removed and replaced"}
+{"id":"r3-117","label":"FIT","role":"PRIME","evidence":"Janitorial services at USACE Vancouver Resident Office building"}
+{"id":"r3-118","label":"NO","role":"NONE","evidence":"Supply of HVAC filters and filtration media, not maintenance services"}
+{"id":"r3-119","label":"NO","role":"NONE","evidence":"Construction to modernize nurse call system, not nurse staffing"}

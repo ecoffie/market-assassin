@@ -1,0 +1,30 @@
+{"id":"r3-000","label":"PARTIAL","role":"SUB","evidence":"Replace wire ropes with new wire rope; replacement parts are a component of service"}
+{"id":"r3-001","label":"NO","role":"NONE","evidence":"Enhanced-use lease real estate development, not medical staffing"}
+{"id":"r3-002","label":"FIT","role":"PRIME","evidence":"Contractor to provide Local Guard Services for U.S. Mission UAE"}
+{"id":"r3-003","label":"PARTIAL","role":"PRIME","evidence":"Supplying Pre-Engineered Building structure and shop drawings, plus fence installation; RED HORSE builds"}
+{"id":"r3-004","label":"NO","role":"NONE","evidence":"Floor repair in restraint rooms, not cleaning services"}
+{"id":"r3-005","label":"PARTIAL","role":"PRIME","evidence":"Supply and install ductless split HVAC units; installation not maintenance"}
+{"id":"r3-006","label":"NO","role":"NONE","evidence":"Check valve supply, not steel buildings or roofing"}
+{"id":"r3-007","label":"FIT","role":"PRIME","evidence":"Window cleaning service for VA facility, building cleaning work"}
+{"id":"r3-008","label":"NO","role":"NONE","evidence":"Enhanced-use lease real estate development, not medical staffing"}
+{"id":"r3-009","label":"NO","role":"NONE","evidence":"Underwater vessel hull cleaning and zinc anode renewal, not office cleaning"}
+{"id":"r3-010","label":"PARTIAL","role":"PRIME","evidence":"Replace HVAC system and components; HVAC work, replacement not maintenance"}
+{"id":"r3-011","label":"NO","role":"NONE","evidence":"Air National Guard industry day on foundation repair; guard word coincidence"}
+{"id":"r3-012","label":"NO","role":"NONE","evidence":"Replace built-up membrane roofs, not metal roofing or steel buildings"}
+{"id":"r3-013","label":"NO","role":"NONE","evidence":"Drug demand reduction program personnel, Air National Guard; not security guards"}
+{"id":"r3-014","label":"FIT","role":"PRIME","evidence":"Basewide custodial and janitorial services at MCB Quantico facilities"}
+{"id":"r3-015","label":"NO","role":"NONE","evidence":"Diesel engine guard part NSN, not security guard services"}
+{"id":"r3-016","label":"FIT","role":"PRIME","evidence":"DLA solicitation for turbine plenum replacement part, 3 each"}
+{"id":"r3-017","label":"NO","role":"NONE","evidence":"Globe valve supply, not steel buildings or roofing"}
+{"id":"r3-018","label":"PARTIAL","role":"PRIME","evidence":"HVAC hydronic water treatment/maintenance program; sole source intent, WOSB only"}
+{"id":"r3-019","label":"NO","role":"NONE","evidence":"Interior renovation of facility into special access facility, not steel erection"}
+{"id":"r3-020","label":"PARTIAL","role":"PRIME","evidence":"Moisture separator overhaul/repair to ready-for-issue; defense part work"}
+{"id":"r3-021","label":"NO","role":"NONE","evidence":"Trash removal at commissaries, not office cleaning"}
+{"id":"r3-022","label":"NO","role":"NONE","evidence":"Remove and replace built-up roofs, not metal roofing"}
+{"id":"r3-023","label":"NO","role":"NONE","evidence":"Ball valve supply, not security guards"}
+{"id":"r3-024","label":"NO","role":"NONE","evidence":"Vessel fuel tank and bilge cleaning, not office cleaning"}
+{"id":"r3-025","label":"NO","role":"NONE","evidence":"24/7 museum facility maintenance; Coast Guard coincidence, no guard services stated"}
+{"id":"r3-026","label":"NO","role":"NONE","evidence":"Pharmacy clean room biological sampling and analysis, not office cleaning"}
+{"id":"r3-027","label":"PARTIAL","role":"SUB","evidence":"Includes installation of pre-fabricated metal storage building within larger construction"}
+{"id":"r3-028","label":"NO","role":"NONE","evidence":"Nursing practice oversight training course, not staffing nurses"}
+{"id":"r3-029","label":"NO","role":"NONE","evidence":"Clean room design/build limited to IDIQ holders, not office cleaning"}

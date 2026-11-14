@@ -1,0 +1,30 @@
+{"id":"r3-150","label":"NO","role":"NONE","evidence":"Grease trap cleaning and disposal, not office building cleaning"}
+{"id":"r3-151","label":"NO","role":"NONE","evidence":"Specialized trauma/crime scene biohazard cleaning, not routine office cleaning"}
+{"id":"r3-152","label":"NO","role":"NONE","evidence":"Catered meals BPA; no guard services; Guard is National Guard"}
+{"id":"r3-153","label":"PARTIAL","role":"SUB","evidence":"Contractor shall furnish replacement components and repair parts within fire trainer maintenance"}
+{"id":"r3-154","label":"NO","role":"NONE","evidence":"Continuous thread stud supply, boilerplate text only, no steel building erection"}
+{"id":"r3-155","label":"NO","role":"NONE","evidence":"Roll up door replacement installation, not parts supply"}
+{"id":"r3-156","label":"NO","role":"NONE","evidence":"Manlift maintenance; Coast Guard word coincidence, no guard services"}
+{"id":"r3-157","label":"PARTIAL","role":"SUB","evidence":"Research staff includes qualified medical and nursing staff among many roles"}
+{"id":"r3-158","label":"NO","role":"NONE","evidence":"Cleaning grease interceptors of 12,000 gallons, not office cleaning"}
+{"id":"r3-159","label":"NO","role":"NONE","evidence":"Vinyl signage and banner stand production, not parts supply"}
+{"id":"r3-160","label":"PARTIAL","role":"SUB","evidence":"Roof replacement and structural steel platform within cooling tower replacement project"}
+{"id":"r3-161","label":"NO","role":"NONE","evidence":"Compressed cylinder item purchase; not steel buildings or roofing"}
+{"id":"r3-162","label":"NO","role":"NONE","evidence":"Aircraft thermostatic switch purchase; Coast Guard coincidence, no guard services"}
+{"id":"r3-163","label":"NO","role":"NONE","evidence":"Enhanced-use lease redevelopment of VA land, no staffing"}
+{"id":"r3-164","label":"PARTIAL","role":"SUB","evidence":"Scientific support may include clinical trials support and licensed practitioners"}
+{"id":"r3-165","label":"PARTIAL","role":"PRIME","evidence":"Replacement HVAC system removal and installation, NAICS 238220 small business"}
+{"id":"r3-166","label":"NO","role":"NONE","evidence":"Electro-pneumatic actuator item purchase; steel building work absent"}
+{"id":"r3-167","label":"NO","role":"NONE","evidence":"Dining facility services; guard text is access-vetting boilerplate"}
+{"id":"r3-168","label":"NO","role":"NONE","evidence":"Aircraft steering unit repair/modification, not parts supply"}
+{"id":"r3-169","label":"PARTIAL","role":"PRIME","evidence":"Powerhouse HVAC upgrades construction solicitation at John Day Dam"}
+{"id":"r3-170","label":"FIT","role":"PRIME","evidence":"F-117 CAD/PAD Air Force spares supply solicitation with packaging requirements"}
+{"id":"r3-171","label":"NO","role":"NONE","evidence":"Nursing practice training course with hotel; not staffing nurses"}
+{"id":"r3-172","label":"NO","role":"NONE","evidence":"A/E design services for fire alarm upgrade; HVAC only interface mention"}
+{"id":"r3-173","label":"NO","role":"NONE","evidence":"USCG industry engagement webinar notice, no work bought"}
+{"id":"r3-174","label":"NO","role":"NONE","evidence":"Hardwood gym floor sanding and refinishing, not office cleaning"}
+{"id":"r3-175","label":"NO","role":"NONE","evidence":"GSA office space lease presolicitation, no cleaning work"}
+{"id":"r3-176","label":"NO","role":"NONE","evidence":"Steam filter replacement and calibration on sterilization equipment"}
+{"id":"r3-177","label":"PARTIAL","role":"PRIME","evidence":"Ranger station cedar shake roof replacement, roofing work though not metal"}
+{"id":"r3-178","label":"NO","role":"NONE","evidence":"Nursing practice oversight course with hotel; not staffing"}
+{"id":"r3-179","label":"NO","role":"NONE","evidence":"Canister item purchase; no guard services"}

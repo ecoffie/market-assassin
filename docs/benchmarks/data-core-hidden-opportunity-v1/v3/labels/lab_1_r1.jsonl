@@ -1,0 +1,30 @@
+{"id":"r3-030","label":"PARTIAL","role":"SUB","evidence":"Design-build replacement of HVAC systems under NAICS 238220; maintenance firm covers part"}
+{"id":"r3-031","label":"NO","role":"NONE","evidence":"Gearbox restricted to approved sources Boeing and Honeywell only"}
+{"id":"r3-032","label":"FIT","role":"PRIME","evidence":"HVAC upgrades, AHU, fans, chillers, TAB at VA Loch Raven"}
+{"id":"r3-033","label":"NO","role":"NONE","evidence":"Cook services for Marine Security Guards; guard is word coincidence"}
+{"id":"r3-034","label":"NO","role":"NONE","evidence":"Cooking services at Marine Security Guard Residence, not guard services"}
+{"id":"r3-035","label":"NO","role":"NONE","evidence":"Supply and delivery of nine hollow metal fire doors"}
+{"id":"r3-036","label":"NO","role":"NONE","evidence":"Design and install 500 KW rooftop solar PV electrical system"}
+{"id":"r3-037","label":"NO","role":"NONE","evidence":"Valve assembly supply, boilerplate clauses only"}
+{"id":"r3-038","label":"NO","role":"NONE","evidence":"Food services for Marine Security Guard detachment, not guarding"}
+{"id":"r3-039","label":"PARTIAL","role":"SUB","evidence":"Museum facility maintenance includes HVAC operation and maintenance of boilers, chillers"}
+{"id":"r3-040","label":"NO","role":"NONE","evidence":"NSN hose-tubing guard part; word coincidence"}
+{"id":"r3-041","label":"FIT","role":"PRIME","evidence":"Contractor shall provide Licensed Practical Nursing support services at JBSA Lackland"}
+{"id":"r3-042","label":"NO","role":"NONE","evidence":"Dry dock, hull cleaning, repair of barges and vessels"}
+{"id":"r3-043","label":"NO","role":"NONE","evidence":"Q&A for flooring installation BPA, not HVAC"}
+{"id":"r3-044","label":"PARTIAL","role":"SUB","evidence":"Multi-story lab construction includes structural steel framing and built-up roofing"}
+{"id":"r3-045","label":"FIT","role":"PRIME","evidence":"Replace existing 3-ton packaged heat pump HVAC unit at lab"}
+{"id":"r3-046","label":"NO","role":"NONE","evidence":"Aircraft washing of C-130J, not building cleaning"}
+{"id":"r3-047","label":"NO","role":"NONE","evidence":"Install rooftop safety railings; roofing only incidental"}
+{"id":"r3-048","label":"PARTIAL","role":"SUB","evidence":"Barn project includes removing roofing and installing new corrugated metal roofing"}
+{"id":"r3-049","label":"PARTIAL","role":"PRIME","evidence":"Supply HVAC/R repair parts and refrigerant supporting preventive maintenance"}
+{"id":"r3-050","label":"NO","role":"NONE","evidence":"Cooking services at Marine Security Guard Residence Kuwait"}
+{"id":"r3-051","label":"NO","role":"NONE","evidence":"A/E design services for new elevator tower"}
+{"id":"r3-052","label":"NO","role":"NONE","evidence":"Purchase of A-36 steel plates"}
+{"id":"r3-053","label":"NO","role":"NONE","evidence":"Marine pier, piles and floats repair, not buildings or roofing"}
+{"id":"r3-054","label":"NO","role":"NONE","evidence":"Manlift inspection and maintenance; guardrails word coincidence"}
+{"id":"r3-055","label":"FIT","role":"PRIME","evidence":"John Day Dam Powerhouse HVAC upgrades solicitation with specifications and drawings"}
+{"id":"r3-056","label":"FIT","role":"PRIME","evidence":"Local guard services at U.S. Embassy Burundi, NAICS 561612"}
+{"id":"r3-057","label":"NO","role":"NONE","evidence":"Check valve supply, boilerplate clauses only"}
+{"id":"r3-058","label":"PARTIAL","role":"PRIME","evidence":"HVAC piping insulation project, 381 feet of pipe on HVAC system"}
+{"id":"r3-059","label":"NO","role":"NONE","evidence":"Coast Guard station piers, piles and floats repairs"}

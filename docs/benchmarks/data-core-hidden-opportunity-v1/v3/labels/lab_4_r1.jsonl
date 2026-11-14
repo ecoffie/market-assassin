@@ -1,0 +1,30 @@
+{"id":"r3-120","label":"NO","role":"NONE","evidence":"Rental of temporary HVAC equipment, not maintenance service"}
+{"id":"r3-121","label":"NO","role":"NONE","evidence":"Solid waste collection at Fort Buchanan; no parts supply"}
+{"id":"r3-122","label":"NO","role":"NONE","evidence":"Propeller guard part; 'guard' word coincidence, not guard services"}
+{"id":"r3-123","label":"NO","role":"NONE","evidence":"HVAC repair/modernization construction OTA, not parts supply"}
+{"id":"r3-124","label":"NO","role":"NONE","evidence":"Ohio Air National Guard breakroom construction; guard word coincidence"}
+{"id":"r3-125","label":"PARTIAL","role":"SUB","evidence":"Includes installation of pre-fabricated metal storage building within larger construction"}
+{"id":"r3-126","label":"FIT","role":"PRIME","evidence":"Four each of NSN F-16 grip assembly replacement part"}
+{"id":"r3-127","label":"PARTIAL","role":"SUB","evidence":"Design-build roof replacement plus HVAC replacement and seismic upgrades"}
+{"id":"r3-128","label":"FIT","role":"PRIME","evidence":"Two CRNAs, non-personal healthcare staffing services, small business sources sought"}
+{"id":"r3-129","label":"NO","role":"NONE","evidence":"Lightning protection upgrade; HVAC only mentioned as grounding location"}
+{"id":"r3-130","label":"NO","role":"NONE","evidence":"Grease trap cleaning and disposal, not office cleaning"}
+{"id":"r3-131","label":"NO","role":"NONE","evidence":"Substance use and mental health treatment services for offenders"}
+{"id":"r3-132","label":"FIT","role":"PRIME","evidence":"Operation, maintenance, repair of Metasys BAS and HVAC equipment, NAICS 238220"}
+{"id":"r3-133","label":"FIT","role":"PRIME","evidence":"Construction of pre-engineered metal warehouse storage building at Vandenberg"}
+{"id":"r3-134","label":"NO","role":"NONE","evidence":"Wash and fold laundry service for DC National Guard"}
+{"id":"r3-135","label":"FIT","role":"PRIME","evidence":"Replace AC coil and outdoor equipment at Duchesne bunkhouse"}
+{"id":"r3-136","label":"PARTIAL","role":"SUB","evidence":"General construction MACC lists HVAC and roofing among many disciplines"}
+{"id":"r3-137","label":"FIT","role":"PRIME","evidence":"HVAC upgrades: replace coils, fan motors, exhaust fans, TAB at VA"}
+{"id":"r3-138","label":"FIT","role":"PRIME","evidence":"Replacement of HVAC system at Tonasket Ranger Station, NAICS 238220"}
+{"id":"r3-139","label":"NO","role":"NONE","evidence":"Laundering and dry cleaning of police uniforms, not building cleaning"}
+{"id":"r3-140","label":"NO","role":"NONE","evidence":"Coast Guard confined space training; guard word coincidence"}
+{"id":"r3-141","label":"FIT","role":"PRIME","evidence":"Up to eight Emergency Department RNs, NAICS 561320 staffing"}
+{"id":"r3-142","label":"NO","role":"NONE","evidence":"Roll up door replacement installation, not parts supply"}
+{"id":"r3-143","label":"NO","role":"NONE","evidence":"NCLEX exam prep software platform, not nurse staffing"}
+{"id":"r3-144","label":"NO","role":"NONE","evidence":"NSN safety guard part; not security guard services"}
+{"id":"r3-145","label":"NO","role":"NONE","evidence":"Coast Guard environmental engineering IDIQ; guard word coincidence"}
+{"id":"r3-146","label":"NO","role":"NONE","evidence":"Supply of nine hollow metal fire escape door assemblies"}
+{"id":"r3-147","label":"NO","role":"NONE","evidence":"Compressed cylinder supply with contract clause boilerplate"}
+{"id":"r3-148","label":"NO","role":"NONE","evidence":"Manlift inspection maintenance; 'security' and guardrails are word coincidences"}
+{"id":"r3-149","label":"FIT","role":"PRIME","evidence":"Security guard services NAICS 561612, though sole-source modification to incumbent"}
