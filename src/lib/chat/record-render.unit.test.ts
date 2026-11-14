@@ -173,7 +173,7 @@ describe('buying offices', () => {
   };
   it('renders offices with codes, exact dollars, customers and place of performance, and says it is the top N of M', () => {
     const r = renderBuyingOffices(res)!;
-    expect(r.text).toMatch(/^10 buying offices bought this work \(NAICS 5613, 5611 · work performed in TN · Memphis metro \(cities within 30 miles\) · FY2024-FY2026\), \$65,723,501 obligated across 74 awards/);
+    expect(r.text).toMatch(/^10 buying offices bought this work \(NAICS 5613, 5611 · work performed in TN · Memphis metro \(cities within 30 miles, in TN only\) · FY2024-FY2026\), \$65,723,501 obligated across 74 awards/);
     expect(r.text).toMatch(/Showing the top 2 of 10 by obligated dollars\./);
     expect(r.text).toMatch(/1\. NAVSUP FLT LOG CTR NORFOLK \(N00189\) · Department Of Defense \/ Department Of The Navy|1\. NAVSUP FLT LOG CTR NORFOLK \(N00189\) · Department of Defense \/ Department of the Navy/);
     expect(r.text).toMatch(/customers: Navy Personnel Command \$50,000,000 · work performed in Millington, TN/);
@@ -288,7 +288,8 @@ describe('lintAnalysis', () => {
     expect(r.dropped).toHaveLength(3);
   });
   it('never returns empty text', () => {
-    expect(lintAnalysis('Spending is substantial.').text).toBe('The verified list above is the result for this question.');
+    expect(lintAnalysis('Spending is substantial.').text).toBe('Review each record and its CHECK lines above before pursuing it.');
+    expect(lintAnalysis('Spending is substantial.', 'Check SAM.gov award notices.').text).toBe('Check SAM.gov award notices.');
   });
 });
 
@@ -301,5 +302,24 @@ describe('successor search limits are disclosed', () => {
       _meta: { total: 1 },
     })!;
     expect(r.text).toMatch(/successor search hit its row limit; a smaller follow-on could be missed/);
+  });
+});
+
+describe('run-E review: place conflicts from the record text', () => {
+  it('flags scope words and a trailing out-of-state place; leaves in-state and unknown names alone', () => {
+    expect(describedPlaceConflict('THIS TASK ORDER PROVIDES NATIONWIDE TRANSPORTATION OF UNACCOMPANIED MINORS', 'TX')).toMatch(/nationwide/);
+    expect(describedPlaceConflict('PROTECTIVE SECURITY OFFICER (PSO) SERVICES THROUGHOUT THE SOUTHERN BORDER', 'TX')).toMatch(/southern border/);
+    expect(describedPlaceConflict('JOB CORPS PRIORITY 3 SUPPORT SERVICES NON-CLINICAL COLLBRAN', 'TX')).toBe('Collbran');
+    expect(describedPlaceConflict('GUARD SERVICES', 'TX')).toBeNull();
+    expect(describedPlaceConflict('CIRCUIT 5 D79 - FY 2027 CSO PROGRAM FUNDING', 'TX')).toBeNull();
+    expect(describedPlaceConflict('JOB CORPS PRIORITY 3 NON-CLINICAL SUPPORT SERVICES COLUMBIA BASIN', 'TX')).toBeNull();
+  });
+  it('expiring lists carry the industry-code caveat', () => {
+    const r = renderExpiringRecords({ contracts: [rec('A1', '2027-01-01')], _meta: meta({ total: 1 }) })!;
+    expect(r.text).toMatch(/Matched by industry \(NAICS\) code: .* check each description/);
+  });
+  it('an empty lagged search points to SAM.gov award notices', () => {
+    const r = renderStatusChecks({ awards: [], _meta: { lag_note: 'published with a ~90-day delay, so the data is only reliably current through about 2026-08-15.' } })!;
+    expect(r.text).toMatch(/check SAM\.gov award notices/);
   });
 });

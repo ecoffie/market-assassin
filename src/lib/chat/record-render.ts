@@ -64,7 +64,23 @@ export function describedPlaceConflict(description: string, popState: string): s
     /\b(?:IN THE|IN|AT|NEAR|AROUND)\s+([A-Z][A-Z.' -]{2,28}?)\s+(?:AREA|METRO|METROPOLITAN|REGION|INTERNATIONAL AIRPORT|AIRPORT|AIR BASE|COUNTY)\b/g,
     /\b([A-Z][A-Z.' -]{2,28}?)\s+(?:INTERNATIONAL AIRPORT|JOB CORPS(?: CENTER)?)\b/g,
   ];
+  const scope = up.match(/\b(NATIONWIDE|NATION-WIDE|CONUS|THROUGHOUT THE (?:SOUTHERN|NORTHERN) BORDER|MULTIPLE STATES|ALL STATES|THROUGHOUT THE UNITED STATES)\b/);
+  if (scope) return `${scope[1].toLowerCase()} (work beyond one state)`;
   const map = cityStateMap();
+  // A description that ENDS with a place name ("... SUPPORT SERVICES CURLEW").
+  const tail = up.replace(/[^A-Z .'-]+$/g, '').trim().split(/\s+/);
+  for (let n = Math.min(3, tail.length); n >= 1; n--) {
+    const name = tail.slice(tail.length - n).join(' ');
+    const states = map.get(name);
+    // The name must stand alone at the end: the word before it is an activity word, not part of a
+    // longer place name ("COLUMBIA BASIN" must not match the town of Basin).
+    const before = tail[tail.length - n - 1] ?? '';
+    const standsAlone = /^(SERVICES?|SUPPORT|NON-CLINICAL|CLINICAL|AT|IN|FOR|-|OPERATIONS)$/.test(before);
+    if (states && name.length >= 4 && standsAlone) {
+      if (!states.has(popState) && !/^(SERVICES?|SUPPORT|SECURITY|GUARD|CENTER|PROGRAM|FUNDING)$/.test(name)) return name.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+      break;
+    }
+  }
   for (const re of cues) {
     for (const m of up.matchAll(re)) {
       const words = m[1].trim().split(/\s+/);
@@ -236,6 +252,8 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
   } else {
     lines.push(`${total} expiring record${total === 1 ? '' : 's'} match (${filters}). Source: Mindy recompete data (USASpending)${meta.window && (meta.window as Rec).as_of ? `, as of ${str((meta.window as Rec).as_of)}` : ''}.`);
     lines.push(`${standalone} standalone contract${standalone === 1 ? '' : 's'} and ${orders} task/delivery order${orders === 1 ? '' : 's'} were retrieved.`);
+    const af0 = (meta.applied_filters && typeof meta.applied_filters === 'object' ? meta.applied_filters : {}) as Rec;
+    if (af0.naics) lines.push('Matched by industry (NAICS) code: the code is how the agency classified each contract and can include other work than the words you used, so check each description. Place of performance is as USASpending reports it.');
     const byAgency = new Map<string, number>();
     for (const r of records) { const a = title(str(r.awarding_agency)) || 'agency not recorded'; byAgency.set(a, (byAgency.get(a) ?? 0) + 1); }
     lines.push(`By awarding agency: ${[...byAgency.entries()].sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1)).map(([a, n]) => `${a} ${n}`).join('; ')}.`);
@@ -425,7 +443,7 @@ export function renderBuyingOffices(result: Rec): RenderedRecords | null {
   const parts: string[] = [];
   if (Array.isArray(scope.naics) && scope.naics.length) parts.push(`NAICS ${(scope.naics as unknown[]).map(str).join(', ')}`);
   if (scope.state) parts.push(`work performed in ${str(scope.state)}`);
-  if (metro) parts.push(`${title(str(metro.core_city))} metro (cities within ${str(metro.radius_miles)} miles)`);
+  if (metro) parts.push(`${title(str(metro.core_city))} metro (cities within ${str(metro.radius_miles)} miles${scope.state ? `, in ${str(scope.state)} only` : ''})`);
   else if (Array.isArray(scope.cities) && scope.cities.length) parts.push(`cities ${(scope.cities as unknown[]).map((c) => title(str(c))).join(', ')}`);
   if (scope.window) parts.push(str(scope.window));
   const lines: string[] = [];
@@ -435,6 +453,8 @@ export function renderBuyingOffices(result: Rec): RenderedRecords | null {
     const officeCount = num(totals?.office_count) ?? offices.length;
     lines.push(`${officeCount} buying office${officeCount === 1 ? '' : 's'} bought this work (${parts.join(' · ')}), ${money(totals?.obligated)} obligated across ${num(totals?.award_count) ?? '?'} awards. Source: USASpending prime awards; location is where the work was performed, not where the office sits.`);
     lines.push(offices.length < officeCount ? `Showing the top ${offices.length} of ${officeCount} by obligated dollars.` : `Showing all ${officeCount}, by obligated dollars.`);
+    lines.push('Ranked by obligations under the industry (NAICS) codes shown; a code can include other work than the words you used, so check the example awards.');
+    if (meta.as_of) lines.push(`Award data loaded through ${str(meta.as_of)}; the most recent months may be incomplete because agencies report with a delay (Defense about 90 days).`);
     lines.push('');
     offices.forEach((o, i) => {
       const customers = (Array.isArray(o.top_funding_offices) ? (o.top_funding_offices as Rec[]) : []).slice(0, 3).map((f) => `${title(str(f.name))} ${money(f.obligated)}`).filter((x) => x.trim());
@@ -513,7 +533,7 @@ export function freshnessSentence(meta: Rec): string {
   const delay = note.match(/~?(\d+)-day delay/i)?.[1];
   const loaded = str(meta.as_of) || note.match(/last loaded (\d{4}-\d{2}-\d{2})/i)?.[1] || '';
   if (!through) return note ? 'Recent awards may not be published yet, so this list may be incomplete.' : '';
-  return `This agency's contract actions reach USASpending with about a ${delay || '90'}-day delay, so this data is reliably current through about ${through} only${loaded ? ` (last loaded ${loaded})` : ''}; awards made after that may not appear yet.`;
+  return `This agency's contract actions reach USASpending with about a ${delay || '90'}-day delay, so this data is reliably current through about ${through} only${loaded ? ` (last loaded ${loaded})` : ''}; awards made after that may not appear yet. For newer awards, check SAM.gov award notices or the agency's announcements.`;
 }
 
 export const VEHICLE_MIX_TOOL = 'get_vehicle_spend_mix';
@@ -580,6 +600,8 @@ export function renderVehicleMix(result: Rec): RenderedRecords | null {
   const r = (k: string) => (roll[k] && typeof roll[k] === 'object' ? roll[k] as Rec : null);
   const rl = [['all schedules', r('all_schedules')], ['all BPAs', r('all_bpas')], ['all IDIQs and GWACs', r('all_idiqs_and_gwacs')]].filter(([, v]) => v).map(([k, v]) => `${k} ${money((v as Rec).obligated)} (${str((v as Rec).share_pct)}%)`);
   if (rl.length) { lines.push(''); lines.push(`Rollups: ${rl.join('; ')}.`); }
+  const vmeta = (result._meta && typeof result._meta === 'object' ? result._meta : {}) as Rec;
+  if (vmeta.as_of) lines.push(`Award data loaded through ${str(vmeta.as_of)}; the most recent months may be incomplete because agencies report with a delay (Defense about 90 days).`);
   lines.push(`Classification: of the dollars linked to a vehicle, ${str(cls.verified_share_of_parented_pct)}% were verified from USASpending vehicle records. Of all dollars, ${str(cls.heuristic_share_of_total_pct)}% were typed from contract-number patterns and ${str(cls.unresolved_share_of_total_pct)}% could not be classified.`);
   const n = buckets.length;
   return { tool: VEHICLE_MIX_TOOL, text: lines.join('\n'), total: n, retrieved: n, from: 1, to: n, shown: n, exhaustive: true, ids: [], allowedCounts: [n, num(result.total_award_count) ?? 0], standalone: 0, orders: 0 };
@@ -594,7 +616,7 @@ const APPROX_MONEY_RE = /\b(approximately|approx\.?|about|around|roughly|nearly|
  * use a magnitude/frequency word with no number in the same sentence, or approximate a dollar figure
  * (the list shows the exact one). Returns the kept text and what was dropped (for the trace).
  */
-export function lintAnalysis(text: string): { text: string; dropped: string[] } {
+export function lintAnalysis(text: string, fallback = 'Review each record and its CHECK lines above before pursuing it.'): { text: string; dropped: string[] } {
   const src = String(text || '').trim();
   if (!src) return { text: '', dropped: [] };
   const sentences = src.split(/(?<=[.!?])\s+|\n+/);
@@ -608,5 +630,5 @@ export function lintAnalysis(text: string): { text: string; dropped: string[] } 
     kept.push(s);
   }
   const out = kept.join(' ').replace(/\s+\n/g, '\n').trim();
-  return { text: out || 'The verified list above is the result for this question.', dropped };
+  return { text: out || fallback, dropped };
 }
