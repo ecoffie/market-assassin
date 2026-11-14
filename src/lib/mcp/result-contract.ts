@@ -94,6 +94,7 @@ function typeMatches(value: unknown, type: string): boolean {
 export function schemaArgIssues(
   args: Record<string, unknown> | null | undefined,
   parameters: JsonSchemaParams | null | undefined,
+  applied: ReadonlySet<string> = new Set(),
 ): IgnoredArg[] {
   const out: IgnoredArg[] = [];
   if (!args || typeof args !== 'object') return out;
@@ -111,7 +112,8 @@ export function schemaArgIssues(
       out.push({ arg, value: displayValue(value), reason: 'wrong_type', detail: `expected ${types.join(' or ')}` });
       continue;
     }
-    if (Array.isArray(prop.enum) && prop.enum.length && typeof value !== 'object' && !prop.enum.includes(value)) {
+    if (Array.isArray(prop.enum) && prop.enum.length && typeof value !== 'object' && !prop.enum.includes(value)
+      && !applied.has(arg)) {
       out.push({ arg, value: displayValue(value), reason: 'invalid_value', detail: `allowed: ${prop.enum.join(', ')}` });
     }
   }
@@ -176,22 +178,34 @@ export function annotateResultContract<T>(
 
   const applied = appliedNames(r, meta);
   const toolIgnored = Array.isArray(meta.ignored_args) ? meta.ignored_args.filter(isIgnoredArg) : [];
-  const schemaIgnored = schemaArgIssues(args, parameters).filter(
+  const schemaIgnored = schemaArgIssues(args, parameters, applied).filter(
     // The tool coerced it (e.g. accepted an array for a string field) and says so.
     (i) => !(i.reason === 'wrong_type' && applied.has(i.arg)),
   );
   const seen = new Set(toolIgnored.map((i) => i.arg));
   const ignored = [...toolIgnored, ...schemaIgnored.filter((i) => !seen.has(i.arg))];
 
-  const incomplete = typeof meta.incomplete_reason === 'string' && meta.incomplete_reason.length > 0;
-  const derived = deriveResultState({ grounded: meta.grounded, degraded: meta.degraded, ignoredCount: ignored.length, incomplete });
+  // Mirror the billing/outcome classifier (call-outcome.ts) so the contract never disagrees with it:
+  //  - billable_candidate: candidates came back but are not corroborated (grounded=false there
+  //    means "not corroborated", not "nothing came back") -> results exist, flagged incomplete;
+  //  - Tier-1/Tier-2 tools carry no _meta.grounded but return a structured `count`.
+  let grounded: unknown = meta.grounded;
+  let incompleteReason = typeof meta.incomplete_reason === 'string' && meta.incomplete_reason ? meta.incomplete_reason : '';
+  if (meta.billing_outcome === 'billable_candidate') {
+    grounded = true;
+    if (!incompleteReason) incompleteReason = 'candidates returned but not corroborated';
+  } else if (typeof grounded !== 'boolean' && typeof r.count === 'number' && Number.isFinite(r.count)) {
+    grounded = r.count > 0;
+  }
+  const incomplete = incompleteReason.length > 0;
+  const derived = deriveResultState({ grounded, degraded: meta.degraded, ignoredCount: ignored.length, incomplete });
   const toolState = RESULT_STATES.includes(meta.result_state as ResultState) ? (meta.result_state as ResultState) : null;
   let state: ResultState = toolState ?? derived;
   if (ignored.length > 0 && (state === 'none_found' || state === 'results')) {
     state = state === 'none_found' ? 'filter_not_applied' : 'partial';
   }
 
-  r._meta = { ...meta, result_state: state, ignored_args: ignored };
+  r._meta = { ...meta, result_state: state, ignored_args: ignored, ...(incompleteReason && !meta.incomplete_reason ? { incomplete_reason: incompleteReason } : {}) };
   return result;
 }
 
