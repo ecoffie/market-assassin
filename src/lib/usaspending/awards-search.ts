@@ -15,6 +15,7 @@
  * on awards (unlike SAM opportunity notices, where pop_state is ~36% filled).
  */
 
+import { isoDay } from '@/lib/usaspending/freshness';
 import { CONTRACT_CODES, IDV_CODES } from '@/lib/usaspending/award-type-codes';
 import { usaSpendingAwardingAgencyFilter } from '@/lib/usaspending/awarding-agency-filter';
 
@@ -215,7 +216,7 @@ async function fireOne(
   if (opts.dateFrom || opts.dateTo) {
     filters.time_period = [{
       start_date: opts.dateFrom || '2000-01-01',
-      end_date: opts.dateTo || new Date().toISOString().split('T')[0],
+      end_date: opts.dateTo || isoDay(new Date()), // federal business day (US Eastern)
     }];
   }
 

@@ -10,6 +10,7 @@
  */
 import { searchAwardsByLocation, normalizePiidPrefix, type AwardRow, type StateScope } from '@/lib/usaspending/awards-search';
 import { assessPublicationLag, fetchUsaSpendingLastUpdated } from '@/lib/usaspending/freshness';
+import { isoDay } from '@/lib/usaspending/freshness';
 import { usaSpendingAwardingAgencyFilter } from '@/lib/usaspending/awarding-agency-filter';
 import { officeRemainder, looksLikeOffice, resolveAwardingOffices } from '@/lib/usaspending/office-resolve';
 import type { IgnoredArg } from '@/lib/mcp/result-contract';
@@ -205,7 +206,7 @@ export async function searchPastContracts(input: PastContractsToolInput): Promis
   if (input.min_value !== undefined) applied.min_value = input.min_value;
   if (hasWindow) {
     applied.date_from = input.date_from || '2000-01-01';
-    applied.date_to = input.date_to || new Date().toISOString().slice(0, 10);
+    applied.date_to = input.date_to || isoDay(new Date()); // federal business day (US Eastern), one date basis
   }
   if (input.include_idv) applied.include_idv = true;
   if (res.textFilters?.keyword) applied.keyword = res.textFilters.keyword;
