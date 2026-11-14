@@ -431,3 +431,15 @@ describe('acceptance attempt 4 fixes', () => {
     expect(r.text).not.toMatch(/used for this work/);
   });
 });
+
+import { renderStatusChecks as rsc5, freshnessSentence as fs5 } from './record-render';
+describe('acceptance attempt 5 fixes', () => {
+  const meta = { total: 0, applied_filters: { agency: { type: 'awarding', tier: 'subtier', name: 'Department of the Navy' }, date_from: '2026-10-01', date_to: '2026-10-31', keyword: { value: 'business management support', applied: 'server_keyword' } }, lag_note: 'USASpending data was last loaded 2026-11-14, but contract actions by this agency are published with a ~90-day delay, so the data is only reliably current through about 2026-08-16.' };
+  it('an empty award search states what it searched', () => {
+    const r = rsc5({ awards: [], _meta: meta })!;
+    expect(r.text).toMatch(/^No awards were found for this search \(keyword "business management support" · agency Department of the Navy · activity 2026-10-01 to 2026-10-31\), and that is NOT a verified zero/);
+  });
+  it('the delay sentence names the applied agency when the note says "this agency"', () => {
+    expect(fs5(meta)).toMatch(/^Department of the Navy contract actions reach USASpending with about a 90-day delay/);
+  });
+});
