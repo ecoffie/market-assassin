@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   isCardChatEnabled, cardChatTurnCredits, parseOpportunityContext, cardChatAccess, isBillableTurn,
-  buildOpportunityContextBlock, CARD_CHAT_TOOLS, type OpportunityRecord,
+  buildOpportunityContextBlock, describeDeadline, CARD_CHAT_TOOLS, type OpportunityRecord,
 } from './card-chat';
 import { listMcpTools } from '@/lib/mcp/tool-registry';
 import { TIER0_TOOL_NAMES } from './tier0-tools';
@@ -104,6 +104,34 @@ describe('buildOpportunityContextBlock — facts only from the record', () => {
     expect(block).toContain('not available in Mindy\'s copy of this notice');
     expect(block).toContain('get_solicitation_documents');
     expect(block).not.toContain('noticedesc');
+  });
+});
+
+describe('describeDeadline — time zones are converted in code, never by the model', () => {
+  it('a UTC evening deadline reads as the right Eastern time (the live-check miss: 23:00 UTC is 6:00 PM ET, not 11 PM)', () => {
+    const d = describeDeadline('2026-11-27T23:00:00+00:00')!;
+    expect(d).toContain('6:00 PM Eastern');
+    expect(d).toContain('2026-11-27 23:00 UTC');
+    expect(d).toContain('do not convert time zones yourself');
+  });
+  it('follows daylight saving (summer is UTC-4)', () => {
+    expect(describeDeadline('2026-07-01T16:00:00Z')).toContain('12:00 PM Eastern');
+  });
+  it('crosses midnight into the previous Eastern day', () => {
+    expect(describeDeadline('2026-12-05T03:30:00Z')).toContain('Dec 4, 2026, 10:30 PM Eastern');
+  });
+  it('date-only, unparseable and empty values are not invented', () => {
+    expect(describeDeadline('2026-12-04')).toBe('2026-12-04');
+    expect(describeDeadline('soon')).toBe('soon');
+    expect(describeDeadline(null)).toBeNull();
+  });
+  it('the context block carries the Eastern reading', () => {
+    const { block } = buildOpportunityContextBlock({
+      notice_id: NID, title: 't', solicitation_number: 'S1', department: null, sub_tier: null, office: null, notice_type: null,
+      set_aside_description: null, naics_code: null, psc_code: null, posted_date: null, response_deadline: '2026-11-27T23:00:00+00:00',
+      pop_city: null, pop_state: null, description: null, sow_text: null, ui_link: null, active: true,
+    }, 'when is it due');
+    expect(block).toMatch(/Response deadline: 2026-11-27T23:00:00\+00:00 \(= .*6:00 PM Eastern/);
   });
 });
 

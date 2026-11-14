@@ -126,6 +126,24 @@ function usableText(s: string | null): string {
 }
 
 /**
+ * The deadline as the record stores it plus its Eastern and UTC readings, computed here so the model never
+ * converts time zones itself (live check 2026-11-14: a stored 23:00 UTC came back as "11:00 PM Eastern").
+ * A date-only or unparseable value is returned unchanged.
+ */
+export function describeDeadline(raw: string | null): string | null {
+  const t = (raw || '').trim();
+  if (!t) return null;
+  if (!/T\d{2}:\d{2}/.test(t)) return t;
+  const d = new Date(t);
+  if (Number.isNaN(d.getTime())) return t;
+  const et = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+  }).format(d);
+  const utc = d.toISOString().slice(0, 16).replace('T', ' ');
+  return `${t} (= ${et} Eastern = ${utc} UTC). State the deadline using these readings; do not convert time zones yourself`;
+}
+
+/**
  * The labeled source block the model receives. Every fact comes from the record; absent fields are said to
  * be absent, never filled in. `question` selects which parts of a long statement of work are included.
  */
@@ -148,7 +166,7 @@ export function buildOpportunityContextBlock(rec: OpportunityRecord, question: s
     line('NAICS', rec.naics_code),
     line('PSC', rec.psc_code),
     line('Posted', rec.posted_date),
-    line('Response deadline', rec.response_deadline),
+    line('Response deadline', describeDeadline(rec.response_deadline)),
     line('Place of performance', place || null),
     line('Status', rec.active === false ? 'inactive' : rec.active ? 'active' : null),
     'Notice text:',
