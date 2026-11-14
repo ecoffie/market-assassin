@@ -10,6 +10,11 @@
  *    set when it is SHOWN (closing or not). It was once per browser (localStorage) before.
  *  - never on the event page itself, the sign-up/sign-in flows or /admin
  *  - after a 2.5 s pause, so it never covers the first paint
+ *  - never while the visitor is typing (a focused text field): it waits until they leave the field.
+ *    It used to open mid-typing and focus "Register free", so pressing Enter to send an Ask Mindy
+ *    question navigated to the event page and the question was lost (found 2026-11-14).
+ *  - when it opens, focus goes to the dialog, not the link: a stray Enter does nothing; Escape
+ *    closes; Tab reaches "Register free".
  *  - gone after the event: this route returns an empty script once lazyBlueprintIsOver()
  * Event facts come from src/lib/events/lazy-contractors-blueprint.ts.
  */
@@ -25,6 +30,7 @@ export function eventPopupScript(now: Date = new Date()): string {
   const css = [
     '.lcbp-ov{position:fixed;inset:0;z-index:2147483000;background:rgba(10,14,40,.55);display:flex;align-items:center;justify-content:center;padding:16px;animation:lcbpIn .2s ease-out}',
     '@keyframes lcbpIn{from{opacity:0}to{opacity:1}}',
+    '.lcbp:focus{outline:none}',
     '.lcbp{position:relative;width:min(460px,100%);background:#fff;border-radius:24px;box-shadow:0 30px 80px rgba(10,14,40,.35);overflow:hidden;font-family:Inter,system-ui,sans-serif;color:#12100e}',
     '.lcbp-top{background:#1b3a6b;color:#fff;padding:26px 28px 22px}',
     '.lcbp-k{font:700 12px/1 Inter,system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#c9d6e8}',
@@ -40,7 +46,7 @@ export function eventPopupScript(now: Date = new Date()): string {
     '@media (prefers-reduced-motion:reduce){.lcbp-ov{animation:none}}',
   ].join('');
   const html =
-    '<div class="lcbp" role="dialog" aria-modal="true" aria-labelledby="lcbpT">'
+    '<div class="lcbp" role="dialog" aria-modal="true" aria-labelledby="lcbpT" tabindex="-1">'
     + '<button type="button" class="lcbp-x" aria-label="Close" data-lcbp-close>&times;</button>'
     + '<div class="lcbp-top"><div class="lcbp-k">Free live event · ' + LCB.shortDate + '</div>'
     + '<h2 class="lcbp-t" id="lcbpT">' + LCB.title.replace(/'/g, '&#39;') + '</h2>'
@@ -55,15 +61,19 @@ export function eventPopupScript(now: Date = new Date()): string {
     + 'var p=location.pathname;'
     + 'if(p.indexOf(' + js(LCB.path) + ')===0||/^\\/(admin|app\\/signup|signup|signin|app\\/sign-in|oauth|setup-password|reset-password|forgot-password|auth)/.test(p))return;'
     + 'if(/[?&]embed=/.test(location.search))return;'
-    + 'setTimeout(function(){try{if(seen())return;document.cookie=K+"=1; path=/; SameSite=Lax";if(!seen())return;}catch(e){return;}'
+    + 'function typing(){var a=document.activeElement;if(!a)return false;if(a.isContentEditable||a.tagName==="TEXTAREA"||a.tagName==="SELECT")return true;'
+    + 'return a.tagName==="INPUT"&&!/^(button|submit|reset|checkbox|radio|range|color|file|image|hidden)$/i.test(a.type||"");}'
+    + 'function whenIdle(){if(!typing()){show();return;}var h=function(){document.removeEventListener("focusout",h,true);setTimeout(whenIdle,400);};document.addEventListener("focusout",h,true);}'
+    + 'function show(){try{if(seen())return;document.cookie=K+"=1; path=/; SameSite=Lax";if(!seen())return;}catch(e){return;}'
     + 'var st=document.createElement("style");st.textContent=' + js(css) + ';document.head.appendChild(st);'
     + 'var ov=document.createElement("div");ov.className="lcbp-ov";ov.innerHTML=' + js(html) + ';'
     + 'function close(){ov.remove();document.removeEventListener("keydown",onKey);}'
     + 'function onKey(e){if(e.key==="Escape")close();}'
     + 'ov.addEventListener("click",function(e){if(e.target===ov||(e.target.closest&&e.target.closest("[data-lcbp-close]")))close();});'
     + 'document.addEventListener("keydown",onKey);document.body.appendChild(ov);'
-    + 'var go=ov.querySelector(".lcbp-go");if(go)go.focus();'
-    + '},2500);'
+    + 'var dlg=ov.querySelector(".lcbp");if(dlg)dlg.focus();'
+    + '}'
+    + 'setTimeout(whenIdle,2500);'
     + '}catch(e){}})();';
 }
 
