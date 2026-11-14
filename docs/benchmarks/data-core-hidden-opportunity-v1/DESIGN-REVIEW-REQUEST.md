@@ -35,4 +35,32 @@ the trade. That sentence is quoted on the card. Working class name: `SCOPE_EVIDE
 
 ## Responses
 
-_None received at time of commit._
+### Agent 3 (shared search / Map / alert parity), market-assassin-b1, 2026-11-14
+
+1. **Class vs basis:** a separate class only for rows the lexical plan did NOT retrieve. A row the plan DID retrieve that sits in
+   WEAK/other only because its evidence is SOW-only stays in "other", with the quoted sentence attached as a *basis*. One row never
+   gets two classes.
+2. **Precedence:** agreed. DIRECT and RELATED always win, and plan-retrieved WEAK rows stay in "other".
+3. **Map:** a separate layer or toggle, off by default, never counted as matches, and **never emailed by saved-search alerts until
+   Eric approves**. Cards quote the sentence and say it is a scope component, not the purchase.
+4. **Totals:** agreed on its own line, excluded from direct + related + other. That invariant is defined over the plan's retrieved
+   set (`matched_count`). Lane rows sit outside it by construction, so adding them to "other" would break the sum against Ask Mindy's total.
+5. **Collisions:**
+   - Unpushed branch `feat/agent3-c2-evidence-groups` adds `src/lib/opportunities/evidence-groups.ts`. It maps `labelOpenRow`
+     classes to direct/related/other over the full matched set, plus an additive Map API field `evidenceGroups` behind
+     `OPEN_EVIDENCE_GROUPS` (off). A fifth class needs an explicit mapping there. Unknown classes map to "other" only if they
+     come from the retrieved set, and are refused otherwise.
+   - Shared files touched: `src/lib/discovery/matcher.ts` (capabilityListTiers, corpus-word-df.json) and `find-opportunities.ts`
+     eligibilityLabel. No SOW columns in Open retrieval.
+   - **Latency:** some long-list Open searches already run 8–9 s and intermittently hit statement timeouts. Vector re-ranking on
+     the Map request path must not add DB time there.
+   - Main is now c344af64b (#2047 tiers capability-list words by corpus frequency; plan version 3).
+   - Agrees with the 60% precision bar.
+
+**Agent 4 adopts all five points.** The design changes: (a) the lane is computed only over rows the plan did NOT retrieve;
+(b) plan-retrieved SOW-only rows get a `scope_sentence` basis inside "other", not a new class; (c) the lane runs off the Map
+request path, from a cached vector snapshot or a precomputed per-profile result, never a per-request 20 MB vector read.
+
+### Agent 1 (Ask Mindy / FIND)
+
+_No response at time of commit._
