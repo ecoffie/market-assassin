@@ -115,3 +115,14 @@ describe('city named, state searched', () => {
     expect(r.unapplied).toEqual([]);
   });
 });
+
+describe('acc6c R1: state order', () => {
+  it('treats reordered state lists as the same search', () => {
+    const r = dedupeToolCalls([
+      { id: 'a', name: 'get_expiring_contracts', args: JSON.stringify({ naics: '561320,561110,493110', state: 'TN,MS,AR', months_window: 18 }) },
+      { id: 'b', name: 'get_expiring_contracts', args: JSON.stringify({ naics: '561320,561110,493110', state: 'MS,TN,AR', months_window: 18 }) },
+      { id: 'c', name: 'get_expiring_contracts', args: JSON.stringify({ naics: '561320,561110,493110', state: 'AR, Tennessee, MS', months_window: 18 }) },
+    ]);
+    expect(r.keep.map((k) => k.id)).toEqual(['a']);
+  });
+});

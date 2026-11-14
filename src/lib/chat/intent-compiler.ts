@@ -205,7 +205,11 @@ export function dedupeToolCalls<T extends { id: string; name: string; args: stri
     const naics = new Set(listOf(a.naics));
     const places = Array.from(new Set([...listOf(a.city), ...listOf(a.cities)].map((x) => x.toUpperCase()))).sort();
     const rest: Record<string, unknown> = {};
-    for (const k of Object.keys(a).sort()) if (!['naics', 'city', 'cities'].includes(k)) rest[k] = a[k];
+    for (const k of Object.keys(a).sort()) {
+      if (['naics', 'city', 'cities'].includes(k)) continue;
+      // State lists compare as sets: "TN,MS,AR" and "MS,TN,AR" are the same search (acc6c R1).
+      rest[k] = ['state', 'states'].includes(k) ? listOf(a[k]).map((x) => normalizeStateCode(x) ?? x.toUpperCase()).sort().join(',') : a[k];
+    }
     if (places.length) rest.__places = places;
     return { naics, rest: JSON.stringify(rest) };
   };

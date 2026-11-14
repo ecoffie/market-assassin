@@ -45,7 +45,7 @@ import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, typ
 import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
 import { guardUnstatedStates } from '@/lib/chat/stated-filters';
 import { compileIntent, enforceIntent, dedupeToolCalls } from '@/lib/chat/intent-compiler';
-import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, lintAnalysis, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
+import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, renderSbloContact, lintAnalysis, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, SBLO_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
 
@@ -638,6 +638,7 @@ export async function POST(request: NextRequest) {
                   [PRICING_TOOL]: renderPricing,
                   [KEYWORDS_TOOL]: renderKeywords,
                   [VEHICLE_MIX_TOOL]: renderVehicleMix,
+                  [SBLO_TOOL]: renderSbloContact,
                 };
                 const renderer = renderers[r.record.tool];
                 if (r.record.status !== 'success' || !renderer) continue;
@@ -699,7 +700,7 @@ export async function POST(request: NextRequest) {
             content:
               'VERIFIED RECORD LIST: the records below were rendered from the tool data and have ALREADY been shown to the user verbatim, directly above your reply. '
               + 'Do NOT list, repeat or renumber the records, and do not restate identifiers, dates or amounts that are not in this list. '
-              + 'WHAT EACH LIST IS: a buying-offices list is federal government offices that buy this work (prospective customers, never partners or competitors); an expiring or past-award list is contracts with the incumbent companies holding them; a keyword list is search terms; a rate list is GSA schedule ceiling rates; a vehicle list is spending by contract vehicle. '
+              + 'WHAT EACH LIST IS: a buying-offices list is federal government offices that buy this work (prospective customers, never partners or competitors); an expiring or past-award list is contracts with the incumbent companies holding them; a keyword list is search terms; a rate list is GSA schedule ceiling rates; a vehicle list is spending by contract vehicle; a contact list is the people the record names, with its own label of whether they are a designated small business liaison. '
               + 'Write 1 to 3 short sentences of NEXT-STEP guidance only: what the customer should look at or do next with these records (for example review the CHECK lines, open a solicitation, check SAM.gov for awards newer than the data, ask for the next page). '
               + 'Do not state any number, date, dollar amount, name, ranking, superlative, trend or characterization, and do not restate or summarize the records: the list carries every fact and warning, and sentences that add facts are removed before display.\n\n'
               + renderedRecords.map((r) => r.text).join('\n\n'),
