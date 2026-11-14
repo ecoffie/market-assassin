@@ -223,8 +223,15 @@ async function queryCalcAPIAllPages(params: {
 
 export interface LaborCategorySummary {
   category: string;
+  /** n for every per-title figure below: fetched records whose labor_category is exactly this title. */
   recordCount: number;
+  /**
+   * @deprecated Ambiguous name: this is the median of ONE title's fetched records (titleMedian),
+   * not the market median (priceToWinGuidance.competitiveRate). Kept for existing readers.
+   */
   median: number;
+  /** Median of the fetched records with exactly this labor_category title (n = recordCount). */
+  titleMedian: number;
   percentile25: number;
   percentile75: number;
   min: number;
@@ -245,6 +252,17 @@ export interface PricingIntelData {
     aggressiveRate: number;
     competitiveRate: number;
     premiumRate: number;
+  };
+  /**
+   * The population the three price-to-win rates were computed over (they share ONE population,
+   * so aggressive <= competitive <= premium always holds). Additive.
+   */
+  priceToWinBasis?: {
+    source: 'calc_server_aggregation' | 'local_fetched_records';
+    /** The CALC keyword whose matching records form the population. */
+    searchTerm: string | null;
+    /** Records in the population. */
+    n: number;
   };
   topVendors: Array<{
     name: string;
@@ -276,10 +294,19 @@ function computePercentile(sorted: number[], p: number): number {
  * Fetch pricing intelligence for a given NAICS code.
  * Makes 2-3 CALC+ API calls and returns aggregated analysis.
  */
-export async function fetchPricingIntel(naicsCode: string): Promise<PricingIntelData | null> {
+export interface PricingIntelOptions {
+  /**
+   * Throw when EVERY CALC term query errored (e.g. a 429), instead of returning null. null
+   * means "CALC had no records"; a caller that must keep "upstream failed" distinct from
+   * "nothing found" (the MCP tool's degraded flag) sets this.
+   */
+  throwOnUpstreamError?: boolean;
+}
+
+export async function fetchPricingIntel(naicsCode: string, opts: PricingIntelOptions = {}): Promise<PricingIntelData | null> {
   const searchTerms = getSearchTermsForNAICS(naicsCode);
   const label = NAICS_TITLES[naicsCode]?.title || `NAICS ${naicsCode}`;
-  return runPricingIntel(searchTerms, naicsCode, label);
+  return runPricingIntel(searchTerms, naicsCode, label, opts);
 }
 
 /**
@@ -288,13 +315,13 @@ export async function fetchPricingIntel(naicsCode: string): Promise<PricingIntel
  * roles, e.g. "Software Engineer, Project Manager". More accurate than NAICS→keyword
  * translation because it queries the exact labor categories the user is pricing.
  */
-export async function fetchPricingIntelByKeywords(rawKeywords: string): Promise<PricingIntelData | null> {
+export async function fetchPricingIntelByKeywords(rawKeywords: string, opts: PricingIntelOptions = {}): Promise<PricingIntelData | null> {
   const terms = rawKeywords.split(',').map((s) => s.trim()).filter((s) => s.length >= 2).slice(0, 4);
   if (terms.length === 0) return null;
-  return runPricingIntel(terms, '', terms.join(', '));
+  return runPricingIntel(terms, '', terms.join(', '), opts);
 }
 
-async function runPricingIntel(searchTerms: string[], naicsCode: string, naicsDescription: string): Promise<PricingIntelData | null> {
+async function runPricingIntel(searchTerms: string[], naicsCode: string, naicsDescription: string, opts: PricingIntelOptions = {}): Promise<PricingIntelData | null> {
   console.log(`[CALC+] Pricing intel — terms: ${searchTerms.join(', ')}${naicsCode ? ` (NAICS ${naicsCode})` : ''}`);
 
   // Fetch the FULL record set for each term by paginating (the API caps at 20/
@@ -347,7 +374,13 @@ async function runPricingIntel(searchTerms: string[], naicsCode: string, naicsDe
   }
 
   console.log(`[CALC+] Total unique records: ${allRecords.length}`);
-  if (allRecords.length === 0) return null;
+  if (allRecords.length === 0) {
+    const errored = termResults.filter((t) => t.error || !t.out);
+    if (opts.throwOnUpstreamError && termResults.length > 0 && errored.length === termResults.length) {
+      throw new Error(`CALC+ unavailable: ${errored.map((t) => t.error).join('; ')}`);
+    }
+    return null;
+  }
 
   const smallBizRecords = sbResult.results;
   const largeBizRecords = lgResult.results;
@@ -380,6 +413,7 @@ async function runPricingIntel(searchTerms: string[], naicsCode: string, naicsDe
       category: cat,
       recordCount: prices.length,
       median: computePercentile(sorted, 50),
+      titleMedian: computePercentile(sorted, 50),
       percentile25: computePercentile(sorted, 25),
       percentile75: computePercentile(sorted, 75),
       min: sorted[0],
@@ -453,13 +487,20 @@ async function runPricingIntel(searchTerms: string[], naicsCode: string, naicsDe
   // at the cheap end — which produced a $40 "median" for accountants whose REAL
   // median is $102. The aggregations.histogram_percentiles / median_price are the
   // true distribution. Fall back to the local computation only if absent.
-  const agg = termResults.find((t) => t.out?.aggregations)?.out?.aggregations;
+  const aggTerm = termResults.find((t) => t.out?.aggregations);
+  const agg = aggTerm?.out?.aggregations;
   const aggPct = agg?.histogram_percentiles?.values;
   const aggMedian = agg?.median_price?.values?.['50.0'];
   const aggCount = agg?.wage_stats?.count;
-  const p25 = aggPct?.['25.0'] ?? computePercentile(allPrices, 25);
-  const p50 = aggMedian ?? aggPct?.['50.0'] ?? computePercentile(allPrices, 50);
-  const p75 = aggPct?.['75.0'] ?? computePercentile(allPrices, 75);
+  // All three rates come from ONE population, never a mix: the server aggregation when it
+  // carries both quartiles and a median, else the locally fetched records. Mixing a server
+  // median with a local quartile could put "aggressive" above "competitive".
+  const serverComplete =
+    typeof aggPct?.['25.0'] === 'number' && typeof aggPct?.['75.0'] === 'number' &&
+    typeof (aggMedian ?? aggPct?.['50.0']) === 'number';
+  const p25 = serverComplete ? aggPct!['25.0'] : computePercentile(allPrices, 25);
+  const p50 = serverComplete ? (aggMedian ?? aggPct!['50.0']) : computePercentile(allPrices, 50);
+  const p75 = serverComplete ? aggPct!['75.0'] : computePercentile(allPrices, 75);
   // Real total record count for the headline (server count, not the page slice).
   const realRecordCount = aggCount ?? allRecords.length;
 
@@ -476,6 +517,9 @@ async function runPricingIntel(searchTerms: string[], naicsCode: string, naicsDe
       competitiveRate: p50,
       premiumRate: p75,
     },
+    priceToWinBasis: serverComplete
+      ? { source: 'calc_server_aggregation', searchTerm: aggTerm?.term ?? null, n: aggCount ?? allRecords.length }
+      : { source: 'local_fetched_records', searchTerm: searchTerms.slice(0, 3).join(', '), n: allPrices.length },
     topVendors,
     naicsCode,
     naicsDescription,

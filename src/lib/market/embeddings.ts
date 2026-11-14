@@ -70,6 +70,48 @@ export async function embedText(text: string): Promise<number[]> {
   throw new Error('OpenAI embeddings rate-limited after retries');
 }
 
+/**
+ * Batch form of embedText: one OpenAI request per 256 inputs instead of one per input
+ * (keyword ranking embeds 50-120 short candidates; sequential calls took 10-30s).
+ * Returns vectors in input order. Throws on failure, like embedText.
+ */
+export async function embedTexts(texts: string[]): Promise<number[][]> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error('OPENAI_API_KEY not set');
+  const inputs = texts.map((t) => (t || '').trim().slice(0, MAX_INPUT_CHARS) || '-');
+  const out: number[][] = [];
+  for (let i = 0; i < inputs.length; i += 256) {
+    const chunk = inputs.slice(i, i + 256);
+    let done = false;
+    for (let attempt = 0; attempt < 4 && !done; attempt++) {
+      const res = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: EMBED_MODEL, input: chunk }),
+      });
+      if (res.status === 429) {
+        await sleep(Math.min(8000, 1000 * (attempt + 1) ** 2));
+        continue;
+      }
+      if (!res.ok) {
+        const err = await res.text().catch(() => '');
+        throw new Error(`OpenAI embeddings ${res.status}: ${err.slice(0, 200)}`);
+      }
+      const data = await res.json();
+      const rows = ((data?.data ?? []) as { index: number; embedding: number[] }[])
+        .slice()
+        .sort((a, b) => a.index - b.index);
+      if (rows.length !== chunk.length || rows.some((r) => r.embedding?.length !== EMBED_DIM)) {
+        throw new Error('unexpected batch embedding response');
+      }
+      out.push(...rows.map((r) => r.embedding));
+      done = true;
+    }
+    if (!done) throw new Error('OpenAI embeddings rate-limited after retries');
+  }
+  return out;
+}
+
 export function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length || a.length === 0) return 0;
   let dot = 0;

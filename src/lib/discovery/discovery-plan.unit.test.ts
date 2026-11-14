@@ -228,7 +228,12 @@ describe('4 · policy', () => {
   it('janitorial Recompete = MCP industry preset + 18 months', () => {
     const p = planFor({ query: 'janitorial' });
     expect(p.horizons.recompete.via).toBe('industry_preset');
-    expect(p.horizons.recompete.naics).toEqual(['561210', '561720', '561730']);
+    // Retrieval is the whole Facilities & Maintenance family (order is not meaningful in an OR).
+    expect([...p.horizons.recompete.naics].sort()).toEqual(['561210', '561720', '561730']);
+    // Evidence: only Janitorial Services is direct; facilities support + landscaping are related
+    // market (2026-11-14: a 561210 "Bombing Range Operation" was labelled a direct janitorial match).
+    expect(p.expansion.direct.naics).toEqual(['561720']);
+    expect(p.expansion.related?.naics).toEqual(['561210', '561730']);
     expect(p.horizons.recompete.ops).toContainEqual({ op: 'lte', col: 'period_of_performance_current_end', val: '2028-03-22' });
   });
 });

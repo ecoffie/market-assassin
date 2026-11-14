@@ -30,6 +30,7 @@
  * without it, Lockheed ($32.45B).
  */
 import { CONTRACT_AWARD_TYPE_CODES } from '@/lib/market/spend-query';
+import { usaSpendingAwardingAgencyFilter } from '@/lib/usaspending/awarding-agency-filter';
 import { fiscalYearTimePeriod, latestCompleteFiscalYear } from '@/lib/utils/fiscal-year';
 
 const RECIPIENT_URL = 'https://api.usaspending.gov/api/v2/recipient/';
@@ -175,7 +176,8 @@ export async function getRecipientAnnualObligations(
     const code = opts.naics.replace(/\D/g, '');
     if (code.length >= 2) filters.naics_codes = { require: [code] };
   }
-  if (opts.agency) filters.agencies = [{ type: 'awarding', tier: 'toptier', name: opts.agency }];
+  // Sub-tier for military departments (Navy/Army/Air Force are not USASpending toptiers).
+  if (opts.agency) filters.agencies = [usaSpendingAwardingAgencyFilter(opts.agency)];
 
   // ONE call: group=fiscal_year returns an aggregate per FY for the whole parent
   // family. No per-entity rows, so nothing to cap and nothing to truncate.

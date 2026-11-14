@@ -15,6 +15,7 @@ import { lookupLocalEntitiesByName, lookupLocalEntityByUEI } from '@/lib/sam/ent
 import { classifyNameHits } from '@/lib/contractor/name-resolution';
 import { filterBlankPscList } from '@/lib/contractor/award-history-shape';
 import { mcpFlags } from '@/lib/mcp/flags';
+import { lookupCachedEntityPocs, REGISTERED_POC_LABEL } from '@/lib/sam/registered-poc';
 import {
   certFlag, downgradeOnExtractConflict, downgradeUncheckedPlaceholderNegatives, unestablishedPrograms,
   type CertProgram, type CertificationRecord,
@@ -145,6 +146,15 @@ export interface SamEntityResult {
      * `unavailable` = the check could not run, so placeholder negatives were made not_established.
      */
     certification_cross_check?: CertCrossCheck;
+    /**
+     * Where entity.pointsOfContact came from. sam_api_cache = the stored raw SAM response for this
+     * UEI (dated by points_of_contact_as_of); none = no registered POC held. Never a live call
+     * beyond the entity lookup itself.
+     */
+    points_of_contact_source?: 'sam_live' | 'local_registry' | 'sam_api_cache' | 'none';
+    points_of_contact_as_of?: string | null;
+    /** These are registered SAM POCs, not a designated small business liaison. */
+    points_of_contact_label?: string;
     /**
      * found = unique entity. ambiguous = several hits, none selected.
      * not_found = both live and local agreed there is no row.
@@ -363,6 +373,32 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
     }
   }
 
+  // Registered POCs (R8, 2026-11-13). The local path used to return no pointsOfContact even when
+  // Mindy held them: the mirror column was not mapped, and the stored raw SAM response for the
+  // UEI (sam_api_cache) was never consulted. Cache-only read, no live SAM call.
+  let pocSource: 'sam_live' | 'local_registry' | 'sam_api_cache' | 'none' = 'none';
+  let pocAsOf: string | null = null;
+  if (entity) {
+    if (entity.pointsOfContact?.some((p) => (p.name || '').trim())) {
+      pocSource = usedLocal ? 'local_registry' : 'sam_live';
+    } else if (usedLocal || degraded) {
+      // Only when the answer did not come from a live SAM detail record: a live record without a
+      // POC block is SAM's current answer, and an older cached block must not override it.
+      try {
+        const cached = await lookupCachedEntityPocs(entity.ueiSAM);
+        if (cached.status === 'found') {
+          const before = entity;
+          entity = { ...entity, pointsOfContact: cached.pocs };
+          matches = matches.map((m) => (m === before || m.ueiSAM === before.ueiSAM ? { ...m, pointsOfContact: cached.pocs } : m));
+          pocSource = 'sam_api_cache';
+          pocAsOf = cached.asOf;
+        }
+      } catch (pocErr) {
+        console.warn('[mcp:lookup_sam_entity] cached POC read failed:', pocErr);
+      }
+    }
+  }
+
   // Name search sets `entity` to the top match's full registration AND keeps every
   // hit in `matches`. Counting the detail record made _meta.match_count 1 while
   // matches held 18 (Tanaq family, 2026-09-16). UEI mode is one record or none.
@@ -437,6 +473,11 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
       // Shared vocabulary with get_contractor_profile (resolution) and award history (match_status).
       match_status: lookupStatus === 'found' ? 'unique' : lookupStatus,
       ...(entity ? { certification_cross_check: certCrossCheck } : {}),
+      ...(entity ? {
+        points_of_contact_source: pocSource,
+        ...(pocSource === 'sam_api_cache' ? { points_of_contact_as_of: pocAsOf } : {}),
+        ...(pocSource !== 'none' ? { points_of_contact_label: REGISTERED_POC_LABEL } : {}),
+      } : {}),
       ...(usedLocal ? { as_of: localAsOf, source_note: 'Live SAM was unavailable; served from Mindy\'s local SAM mirror. Registration details are as of the date shown, not re-verified just now.' } : {}),
       ...(reconciliation ? { reconciliation } : {}),
     },
