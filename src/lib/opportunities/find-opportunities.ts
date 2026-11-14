@@ -564,13 +564,23 @@ export function mcpDiscoveryInput(input: FindOpportunitiesInput, anchor?: Compan
   };
 }
 
-function eligibilityLabel(plan: DiscoveryPlan): string {
+export function eligibilityLabel(plan: DiscoveryPlan): string {
   const m = plan.matcher;
   if (m.mode === 'exact_phrase') return `exact phrase "${m.phrase}"`;
   if (m.mode === 'code') return `code ${m.phrase}`;
   if (m.mode !== 'lexical') return 'no text concept';
   return m.alternatives
-    .map((a) => `${a.eligibility === 'all' ? 'ALL' : 'ANY'}(${a.eligible.map((c) => c.label).join(' · ')})${a.rankOnly.length ? ` rank-only(${a.rankOnly.map((c) => c.label).join(' · ')})` : ''}`)
+    .map((a) => {
+      // Must describe the rule the matcher applies (Phase 1: output == behaviour). Words in partnerRequired admit only
+      // with another listed word (matcher.ts capabilityListTiers), so they are named under PAIR, never under ANY.
+      const needs = new Set(a.partnerRequired || []);
+      const solo = a.eligible.filter((c) => !needs.has(c.label)).map((c) => c.label);
+      const pair = a.eligible.filter((c) => needs.has(c.label)).map((c) => c.label);
+      const head = a.eligibility === 'all'
+        ? `ALL(${a.eligible.map((c) => c.label).join(' · ')})`
+        : [solo.length ? `ANY(${solo.join(' · ')})` : '', pair.length ? `PAIR_ANY_TWO(${pair.join(' · ')})` : ''].filter(Boolean).join(' OR ');
+      return `${head}${a.rankOnly.length ? ` rank-only(${a.rankOnly.map((c) => c.label).join(' · ')})` : ''}`;
+    })
     .join(' OR ');
 }
 

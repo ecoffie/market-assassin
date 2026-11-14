@@ -28,7 +28,12 @@ import { buildTextMatcher, textPredicate, exclusionPredicate, isCodeLike, type T
 import { resolveBuyer, buyerPredicate, type ResolvedBuyer } from './buyer';
 import type { SurfacePolicy } from './policy';
 
-export const DISCOVERY_PLAN_VERSION = 2;
+/**
+ * Bump whenever the SAME input can admit different records. v3 (2026-11-14, Agent 3): capability lists tier words by
+ * corpus frequency (matcher.ts capabilityListTiers) and one-word buyer aliases inside a buyer's own name are pruned
+ * (buyer.ts, PR #2045). Outputs, golden plans and replays use this stamp to tell plan semantics apart.
+ */
+export const DISCOVERY_PLAN_VERSION = 3;
 export const PIPELINE = ['structured_intent', 'concept_classification', 'eligibility', 'horizon_policy', 'ranking'] as const;
 
 export const OPEN_TEXT_COLS = ['title', 'description', 'sow_text', 'department', 'solicitation_number'] as const;
