@@ -80,6 +80,11 @@ export interface ChatToolExecutorOptions {
   chatSessionId: string | null;
   tier0: Tier0Like;
   deps?: Partial<ChatToolExecutorDeps>;
+  /**
+   * Optional NARROWING allow-list (Opportunity Map card chat). When set, only these names are offered and
+   * executed; it can never add a tool the policy blocks. Unset = the full policy-filtered set, unchanged.
+   */
+  allowedToolNames?: ReadonlySet<string>;
 }
 
 function refusal(category: string, message: string): Record<string, unknown> {
@@ -127,6 +132,8 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
   const tier0 = opts.tier0;
 
   const isRegistered = (name: string) => tier0.names.has(name) || deps.isMcpTool(name);
+  const allowed = opts.allowedToolNames;
+  const inAllowList = (name: string) => !allowed || allowed.has(name);
   const policyFor = (name: string) => chatToolPolicy(name, isRegistered(name));
 
   // Tool JSON schemas, so redaction can validate enum fields against the declared values.
@@ -151,7 +158,10 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
       // A registry tool may never shadow a chat-private tool.
       .filter((d) => !tier0.names.has(String(d.function?.name ?? '')));
     const all = [...tier0.defs.map((d) => ({ type: 'function' as const, function: d.function as Record<string, unknown> })), ...registry];
-    return all.filter((d) => isChatOfferable(policyFor(String(d.function?.name ?? ''))));
+    return all.filter((d) => {
+      const n = String(d.function?.name ?? '');
+      return inAllowList(n) && isChatOfferable(policyFor(n));
+    });
   }
 
   async function log(
@@ -243,7 +253,13 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
     }
     redactedForTrace = redactToolArgs(args, schemaFor(name));
 
-    // 4) Policy — re-checked at execution, not only when offering.
+    // 4) Policy — re-checked at execution, not only when offering. A narrowing allow-list (card chat)
+    //    is enforced here too, so a model cannot call a tool it was never offered.
+    if (!inAllowList(name)) {
+      await log(planner, name, 'blocked_policy', executionId, { args, errorCategory: 'not_offered_here' });
+      return done('blocked_policy', 'not_evaluated', 'not_offered_here',
+        refusal('not_offered_here', 'That capability is not available in this conversation.'));
+    }
     const policy = policyFor(name);
     if (!isChatOfferable(policy)) {
       const category = policy.decision === 'requires_confirmation' ? 'confirmation_required' : policy.decision;

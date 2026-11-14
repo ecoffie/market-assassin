@@ -21,6 +21,7 @@ import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { createClient } from '@supabase/supabase-js';
 import { loadBidderProfile, formatProfileForPrompt, loadVaultContext } from '@/lib/proposal/loaders';
 import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
+import { selectRelevantRfp } from '@/lib/proposal/select-relevant';
 
 // RAG-as-standard: Manual Drive answers are informed by Mindy's real proposal
 // corpus (winning technical/pricing/past-perf volumes, templates, cap
@@ -46,45 +47,6 @@ const RFP_CONTEXT_BUDGET = 60000; // chars of RFP in the prompt (~15K tokens) �
                                   // for Manual Drive) has the window for it, so
                                   // feed more so the answer's section is present
 
-/**
- * Pick the parts of a big solicitation most RELEVANT to the user's question
- * (Eric QC: asking "how many projects / dollar amount" got generic fluff because
- * the chat only saw the first 8K of a 350K doc). Splits into windows, scores
- * each by keyword overlap with the question, returns the top windows up to a
- * char budget — so specific numbers deep in the doc actually reach the model.
- */
-function selectRelevantRfp(rfpText: string, question: string, budget: number): string {
-  if (rfpText.length <= budget) return rfpText;
-  const WIN = 2000;
-  const windows: { text: string; score: number; idx: number }[] = [];
-  // Question keywords (drop short/stop words).
-  const stop = new Set(['the', 'and', 'for', 'are', 'you', 'what', 'how', 'many', 'this', 'that', 'with', 'need', 'does', 'have', 'can', 'will', 'about', 'tell', 'give', 'into']);
-  const terms = (question.toLowerCase().match(/[a-z0-9$]{3,}/g) || []).filter(t => !stop.has(t));
-  // Always include intent keywords for common asks.
-  const intent = /past[ _-]?perform|reference|project|dollar|value|amount|\$|price|deadline|due|page|submit|evaluat|award|set[ _-]?aside|naics|bond|licens|requir/i;
-  for (let i = 0; i < rfpText.length; i += WIN) {
-    const text = rfpText.slice(i, i + WIN + 400); // small overlap
-    const low = text.toLowerCase();
-    let score = 0;
-    for (const t of terms) if (low.includes(t)) score += 2;
-    if (intent.test(text)) score += 1;
-    // Numbers/dollar figures are valuable for "how many / how much" questions.
-    if (/\$[\d,]+|\b\d+\s*(projects?|years?|references?|contracts?)\b/i.test(text)) score += 2;
-    windows.push({ text, score, idx: i });
-  }
-  // Always keep the first window (cover page / summary) + the top-scoring rest.
-  const first = windows[0];
-  const ranked = windows.slice(1).filter(w => w.score > 0).sort((a, b) => b.score - a.score);
-  const chosen = [first, ...ranked];
-  const out: string[] = [];
-  let used = 0;
-  // Re-order chosen by document position so it reads coherently.
-  for (const w of chosen.sort((a, b) => a.idx - b.idx)) {
-    if (used + w.text.length > budget) break;
-    out.push(w.text); used += w.text.length;
-  }
-  return out.join('\n…\n');
-}
 
 const SYSTEM_PROMPT = `You are Mindy, a senior federal proposal writer helping a small-business contractor draft a response. You are in MANUAL mode — the user drives; do exactly what they ask.
 

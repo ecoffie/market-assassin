@@ -32,6 +32,13 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 |---|---|---|---|---|---|
 | 2026-11-14 | Credits / registration | The existing introductory grant (100, MCP_SIGNUP_CREDITS default; prod not overridden) fired only on the first MCP touch, so Maps/App registrants never got it. Now scheduled at the three verified sign-in seams through the same `mcp_grant_signup_credits` (one `signup_grant` per account), off until `SIGNUP_GRANT_AT_REGISTRATION_SINCE` is set; only accounts created after the cutover within 30 days; no backfill; no welcome email on this path. | `scheduleRegistrationGrant` → `src/lib/mcp/registration-grant.ts` | registration-grant.unit.test.ts; registration-grant.pglite.unit.test.ts against the real function | Branch feat/registration-signup-credits, not pushed |
 
+## 2026-11-14 — Ask Mindy on Opportunity Map cards (behind MAP_CARD_CHAT_ENABLED, off)
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-14 | Card chat / context + access + credits | Opportunity cards get "Ask Mindy about this opportunity" (flag-gated). The browser sends only the notice id; `/api/app/chat` loads the record + relevant SOW excerpt server-side (shared `selectRelevantRfp`, moved from Proposal Assist) and narrows tools to `CARD_CHAT_TOOLS`. Pro unchanged and never charged; a non-Pro account may ask on a card with ≥ one turn of existing credits; one debit (`card_chat_turn`, default 10) via `mcp_debit_credits` after a successful answer only. Also fixes a pre-existing gap: a supplied session id is reused only if it belongs to the caller. | `cardChatAccess` → `src/lib/chat/card-chat.ts`; `card_chat_turn` → `src/app/api/app/chat/route.ts`; `window.__askAboutOpp` → `src/app/opportunity-map/route.ts` | card-chat.unit.test.ts; card-chat.route.unit.test.ts (real route, mocked services; mutation-proven); card-chat-drawer.unit.test.ts (real drawer script in jsdom; mutation-proven) | Branch feat/card-chat, not merged |
+| 2026-11-14 | Card chat / deadline time zone | Live check (4 real notices, gpt-4o, $0.28): a stored deadline of 23:00 UTC was answered as "11:00 PM Eastern" (correct: 6:00 PM ET). The context block passed the raw ISO value and left the conversion to the model. `describeDeadline` now computes the Eastern and UTC readings in code and tells the model not to convert. Re-run answered "6:00 PM Eastern (11:00 PM UTC)". | `src/lib/chat/card-chat.ts` `describeDeadline`; `card-chat.unit.test.ts` (block test red without the fix) | Live re-run 2026-11-14 14:50 UTC | Fixed, flag off |
+
 ## 2026-11-14 — Ask Mindy Phase 1: research accuracy (approved 2026-11-14)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

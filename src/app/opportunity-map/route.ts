@@ -4,6 +4,7 @@
  * We only adapt our data into the shape the prototype's JS expects; nothing about the design
  * is rebuilt.
  */
+import { isCardChatEnabled } from '@/lib/chat/card-chat';
 import { NextRequest, NextResponse } from 'next/server';
 import { PLAYERS_HEADER_TEXT_JS, PROVEN_PLAYERS_LABEL, PROVEN_PLAYERS_DESCRIPTION } from '@/lib/players/copy';
 import { getMapOpportunities, SET_GROUPS } from '@/lib/opportunities/map-data';
@@ -1654,6 +1655,9 @@ const PLAYERS_COPY_JS = '<script>window.__playersHeaderText=' + PLAYERS_HEADER_T
 // DIBBS map switch (src/lib/dibbs/availability.ts). Same reason as above: its own <script>,
 // loaded before VIEWPORT_JS, so the syntax-checked viewport script has no interpolation.
 const DIBBS_FLAG_JS = '<script>window.__DIBBS_MAP_ENABLED=' + String(DIBBS_MAP_ENABLED) + ';</script>';
+// Ask Mindy on opportunity cards (src/lib/chat/card-chat.ts). Off unless MAP_CARD_CHAT_ENABLED=true; the chat
+// route enforces the same flag, so this only controls whether the invitation is shown.
+const CARD_CHAT_FLAG_JS = '<script>window.__CARD_CHAT_ENABLED=' + String(isCardChatEnabled()) + ';</script>';
 // What a signed-in Save search can watch (F1). Defined before VIEWPORT_JS, whose handler calls it.
 const WATCH_SCOPE_SCRIPT = '<script>' + WATCH_SCOPE_JS + '</script>';
 const VIEWPORT_JS = `<script>
@@ -6218,6 +6222,7 @@ const DRAWER_CSS = '<style>'
   + '.odoc{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--hair);font-size:13px}'
   + '.odoc a{color:var(--jan);text-decoration:none;font-weight:600}'
   + '.oact{position:sticky;bottom:0;display:flex;gap:9px;flex-wrap:wrap;margin-top:26px;padding:14px 0 4px;background:linear-gradient(transparent,#fff 22%);border-top:1px solid var(--line)}'
+  + '.oact .b.ask{flex-basis:100%;background:#eef4ff;border-color:#c7d7fe;color:#1d4ed8;font-weight:700}'
   + '.oact .b{flex:1;min-width:130px;text-align:center;padding:11px 12px;border-radius:10px;font:700 13px Inter,system-ui,sans-serif;cursor:pointer;text-decoration:none;border:1px solid var(--line);background:#fff;color:var(--ink)}'
   + '.oact .b.pri{background:var(--ink);color:#fff;border-color:var(--ink)}'
   + '.oact .b.saved{color:#22a06b;border-color:#22a06b;background:#f0fdf7}'
@@ -6981,7 +6986,12 @@ const DRAWER_JS = `<script>
     // /app?panel=proposals until 2026-08-13). It was "Win this contract", which collided with the
     // "Win This Contract" SECTION heading, so the button gets the concrete action name instead.
     // id=osec-actions so it stays the deep-link anchor (it's the sticky bar, not a tab).
+    // CARD CHAT (flag): the invitation leads the bar; the workflow buttons below are unchanged. Only a real
+    // SAM notice id (32 hex) gets it — the server refuses anything else anyway.
+    var _cc=!!window.__CARD_CHAT_ENABLED && /^[0-9a-f]{32}$/.test(String(o.id||'').toLowerCase());
+    if(_cc) window.__cardChatOpp={id:String(o.id).toLowerCase(),title:o.title||'',deadline:o.deadline||''};
     return '<div class="oact" id="osec-actions">'
+      + (_cc?'<button class="b ask" onclick="window.__askAboutOpp&&window.__askAboutOpp(window.__cardChatOpp)">Ask Mindy about this opportunity</button>':'')
       + '<button class="b pri" onclick="saveCurrentOpp(this)">Start pursuit</button>'
       // Opens the MAP-NATIVE Proposal Workspace via openProposalWorkspace (tracks, then opens with
       // ?pursuit=<id>). No data-u: the destination is not a static URL any more, it depends on the
@@ -10790,6 +10800,10 @@ const ASK_MINDY_CSS =
   + '.amk-ov.show{opacity:1;pointer-events:auto}'
   + '.amk{position:fixed;top:0;right:0;height:100dvh;width:min(440px,94vw);background:#fff;box-shadow:-14px 0 44px rgba(16,24,40,.22);z-index:2601;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1)}'
   + '.amk.show{transform:none}'
+  // Card chat: full width on phones (the card is one tap back), source line + credits note under answers.
+  + '@media(max-width:640px){.amk.amk-card{width:100vw}}'
+  + '.amk-src{margin-top:6px;font:500 11.5px Inter,system-ui,sans-serif;color:#64748b}.amk-src a{color:#2563eb}'
+  + '.amk-credits{margin-top:4px;font:500 11.5px Inter,system-ui,sans-serif;color:#64748b}'
   + '.amk-hd{display:flex;align-items:center;gap:10px;padding:15px 17px 13px;border-bottom:1px solid #eef1f5}'
   + '.amk-hd .mk{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#1e3a8a,#2563eb);flex:none}'
   + '.amk-hd .tt{flex:1;min-width:0}'
@@ -10853,6 +10867,16 @@ const ASK_MINDY_JS = `<script>(function(){
   function tok(){ try{return localStorage.getItem('mi_beta_auth_token');}catch(e){return null;} }
   function email(){ try{ var t=tok()||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){ return ''; } }
   var sessionId='', history=[], busy=false;
+  // ── CARD CHAT (MAP_CARD_CHAT_ENABLED): ask about ONE opportunity. The browser sends only the notice id;
+  // the server loads the record and documents. Each opportunity keeps its own thread in this browser, and
+  // the map-view conversation is kept aside and restored when the drawer goes back to view mode.
+  // The class is amk-card, NOT card: the map already styles .card (listing cards, incl. a :hover transform)
+  // and a shared name let that hover rule pin the closed drawer on screen on touch devices.
+  var oppCtx=null, viewState={sessionId:'',history:[]}, viewPlaceholder=(input&&input.placeholder)||'';
+  function cardKey(id){ return 'mindy_card_chat:'+id; }
+  function loadCard(id){ try{ var j=JSON.parse(localStorage.getItem(cardKey(id))||'null'); if(j&&typeof j==='object')return {sessionId:String(j.sessionId||''),history:Array.isArray(j.history)?j.history.slice(-8):[]}; }catch(e){} return {sessionId:'',history:[]}; }
+  function saveCard(){ if(!oppCtx)return; try{ localStorage.setItem(cardKey(oppCtx.id),JSON.stringify({sessionId:sessionId,history:history.slice(-8)})); }catch(e){} }
+  function leaveCard(){ if(!oppCtx)return; saveCard(); oppCtx=null; sessionId=viewState.sessionId; history=viewState.history; drawer.classList.remove('amk-card'); if(input)input.placeholder=viewPlaceholder; body.innerHTML=''; }
   // ── The GROUNDED view context (approved vision: "Context: N open opps in view \\u00b7 FL \\u00b7 NAICS 236220").
   // Read fresh from the map's bridge every time the drawer opens — never a stale snapshot, never fabricated.
   function viewCtx(){ try{ if(typeof window.__mindyViewCtx==='function') return window.__mindyViewCtx()||{}; }catch(e){} return {}; }
@@ -10869,12 +10893,36 @@ const ASK_MINDY_JS = `<script>(function(){
     if(c.agency) p.push(c.agency);
     return p;
   }
-  function renderCtx(){ if(!ctxEl)return; var c=viewCtx(); var parts=ctxParts(c);
+  function renderCtx(){ if(!ctxEl)return;
+    if(oppCtx){ ctxEl.innerHTML='<span class="dim">About:</span> '+esc(oppCtx.title||'this opportunity')+(oppCtx.deadline?' <span class="dim">\\u00b7 due '+esc(String(oppCtx.deadline).slice(0,10))+'</span>':''); return; }
+    var c=viewCtx(); var parts=ctxParts(c);
     ctxEl.innerHTML='<span class="dim">Context:</span> '+parts.map(esc).join(' \\u00b7 '); }
   // Threaded to the chat so answers are about THIS view — a compact, factual preface (no invented numbers).
   function ctxPreamble(){ var c=viewCtx(); var parts=ctxParts(c); if(!parts.length)return '';
     return '[Current map view \\u2014 '+parts.join('; ')+'. Answer for THIS view when the question is about "these"/"this"/"here".]\\n\\n'; }
-  function setOpen(o){ ov.classList.toggle('show',o); drawer.classList.toggle('show',o); drawer.setAttribute('aria-hidden',o?'false':'true'); if(o){ renderCtx(); if(!body.children.length){ greet(); } setTimeout(function(){ input&&input.focus(); },220); } }
+  function setOpen(o){ ov.classList.toggle('show',o); drawer.classList.toggle('show',o); drawer.setAttribute('aria-hidden',o?'false':'true'); if(o){ renderCtx(); if(!body.children.length){ if(oppCtx)greetCard(); else greet(); } setTimeout(function(){ input&&input.focus(); },220); } }
+  function greetCard(){
+    var chips=[['What does it require?','Summarize what this solicitation requires: scope, deliverables, and key dates.'],
+      ['Who held this before?','Who held this work before, and what did the prior contract cost?'],
+      ['Is this a fit for us?','Based on my company profile, is this opportunity a good fit? Say what is missing.'],
+      ['Who should I contact?','Who is the contracting contact for this opportunity?']];
+    var h='<div class="amk-empty"><b>Ask about this opportunity</b><div class="lead">Answers come from its SAM.gov record and documents, with the source shown.</div><div class="amk-chips">';
+    chips.forEach(function(ch){ h+='<button data-q="'+esc(ch[1])+'">'+esc(ch[0])+'</button>'; });
+    h+='</div></div>';
+    body.innerHTML=h;
+    Array.prototype.forEach.call(body.querySelectorAll('.amk-chips button'),function(b){ b.onclick=function(){ ask(b.getAttribute('data-q')); }; });
+  }
+  window.__askAboutOpp=function(op){
+    op=op||window.__cardChatOpp; var id=String((op&&op.id)||'').toLowerCase();
+    if(!/^[0-9a-f]{32}$/.test(id)||busy) return;
+    if(!oppCtx) viewState={sessionId:sessionId,history:history.slice()}; else saveCard();
+    oppCtx={id:id,title:String(op.title||''),deadline:String(op.deadline||'')};
+    var st=loadCard(id); sessionId=st.sessionId; history=st.history;
+    drawer.classList.add('amk-card'); if(input)input.placeholder='Ask about this opportunity\\u2026'; body.innerHTML='';
+    if(history.length){ history.forEach(function(m){ addMsg(m.role==='user'?'user':'assistant', m.content); }); }
+    try{ if(window.__track) window.__track('tool_use','card_chat_open',{has_history:history.length>0}); }catch(e){}
+    setOpen(true);
+  };
   function greet(){
     var c=viewCtx();
     // View-aware follow-up chips — data-core only, NO teaching. Adapt the wording to what\\u2019s in view.
@@ -10893,6 +10941,7 @@ const ASK_MINDY_JS = `<script>(function(){
   }
   // Public opener — context-aware: seed the input with the current search term (does NOT auto-send).
   window.openAskMindy=function(seed){
+    leaveCard();
     var q=(seed!=null?String(seed):'').trim();
     if(!q){ var c=viewCtx(); if(c&&c.q)q=String(c.q).trim(); }
     if(q&&input)input.value=q;
@@ -10910,7 +10959,9 @@ const ASK_MINDY_JS = `<script>(function(){
   function ask(q){
     q=(q||'').trim(); if(!q||busy)return;
     var t=tok(), em=email();
-    if(!t||!em){ if(window.openSignInModal){window.openSignInModal('ask Mindy',function(){location.reload();});}else{location.href='/app?next='+encodeURIComponent(location.pathname);} return; }
+    // Card chat resumes the same question after sign-in (the card and its thread stay open); view mode keeps
+    // its existing reload.
+    if(!t||!em){ var _cq=q, _card=!!oppCtx; if(window.openSignInModal){window.openSignInModal(_card?'ask Mindy about this opportunity':'ask Mindy',function(){ if(_card&&oppCtx){ ask(_cq); } else location.reload(); });}else{location.href='/app?next='+encodeURIComponent(location.pathname);} return; }
     // clear the greeting on first ask
     if(body.querySelector('.amk-empty'))body.innerHTML='';
     if(input){ input.value=''; input.style.height='auto'; }
@@ -10921,10 +10972,15 @@ const ASK_MINDY_JS = `<script>(function(){
     var acc='', started=false;
     // Prepend the grounded view context to the MESSAGE (not shown to the user) so the answer
     // is about "these"/"here" — the map\\u2019s real filters + count, never fabricated.
-    var sendMsg=ctxPreamble()+q;
-    fetch('/api/app/chat',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},body:JSON.stringify({email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8)})})
+    // Card chat sends NO view preamble: the server supplies the opportunity from its own record.
+    var sendMsg=oppCtx?q:(ctxPreamble()+q);
+    var payload={email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8)};
+    if(oppCtx){ payload.context={kind:'opportunity',notice_id:oppCtx.id}; try{ if(window.__track) window.__track('tool_use','card_chat_ask',{turn:Math.floor(history.length/2)+1}); }catch(e){} }
+    fetch('/api/app/chat',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},body:JSON.stringify(payload)})
       .then(function(r){
         if(r.status===403){ upsell(); busy=false; if(send)send.disabled=false; return null; }
+        if(r.status===402){ r.json().then(function(d){ creditsWall(bub,d||{}); },function(){ creditsWall(bub,{}); }); busy=false; if(send)send.disabled=false; return null; }
+        if(r.status===404&&oppCtx){ bub.textContent='Mindy could not load this opportunity right now. Try reopening it.'; busy=false; if(send)send.disabled=false; return null; }
         if(r.status===401){ bub.textContent='Please sign in again to ask Mindy.'; busy=false; if(send)send.disabled=false; return null; }
         if(!r.ok||!r.body){ bub.textContent='Something went wrong. Try again.'; busy=false; if(send)send.disabled=false; return null; }
         var reader=r.body.getReader(), dec=new TextDecoder(), buf='';
@@ -10938,13 +10994,22 @@ const ASK_MINDY_JS = `<script>(function(){
             else if(ev.type==='token'){ if(!started){ bub.textContent=''; started=true; } acc+=(ev.content||''); bub.textContent=acc; body.scrollTop=body.scrollHeight; }
             // citations event is now always empty (RAG corpus removed 2026-08-02) \\u2014 ignored.
             else if(ev.type==='error'){ if(!started)bub.textContent=(ev.message||'Something went wrong.'); }
+            else if(ev.type==='citations'&&oppCtx&&Array.isArray(ev.sources)&&ev.sources.length){ var sd=document.createElement('div'); sd.className='amk-src'; var s0=ev.sources[0]; sd.innerHTML='Source: '+(s0.url?'<a href="'+esc(s0.url)+'" target="_blank" rel="noopener">'+esc(s0.title||'SAM.gov notice')+'</a>':esc(s0.title||'SAM.gov notice')); aEl.appendChild(sd); }
+            else if(ev.type==='credits'&&typeof ev.balance==='number'){ var cd=document.createElement('div'); cd.className='amk-credits'; cd.textContent=(ev.charged?ev.charged+' credits used \\u00b7 ':'')+ev.balance+' credits left'; aEl.appendChild(cd); }
           });
           return pump();
         }); }
-        function finish(){ if(!started&&!acc)bub.textContent='Mindy had no answer for that \\u2014 try rephrasing.'; history.push({role:'user',content:q}); history.push({role:'assistant',content:acc}); if(acc)followups(aEl); busy=false; if(send)send.disabled=false; body.scrollTop=body.scrollHeight; }
+        function finish(){ if(!started&&!acc)bub.textContent='Mindy had no answer for that \\u2014 try rephrasing.'; history.push({role:'user',content:q}); history.push({role:'assistant',content:acc}); saveCard(); if(acc&&!oppCtx)followups(aEl); busy=false; if(send)send.disabled=false; body.scrollTop=body.scrollHeight; }
         return pump();
       })
       .catch(function(){ bub.textContent='Connection failed. Check your network and try again.'; busy=false; if(send)send.disabled=false; });
+  }
+  // Card chat out of credits: say what an answer costs and what they hold; Pro is the next step. No new grant.
+  function creditsWall(bub,d){
+    var per=(typeof d.credits_per_answer==='number')?d.credits_per_answer:null, bal=(typeof d.balance==='number')?d.balance:null;
+    bub.innerHTML='<b>You\\u2019re out of free credits for now.</b><br>'+(per?('Each answer about an opportunity uses '+per+' credits'+(bal!=null?' and you have '+bal:'')+'. '):'')
+      +'Mindy Pro includes Ask Mindy without per-answer credits, plus deeper research. <a href="/market-intelligence">See Pro</a>';
+    try{ if(window.__track) window.__track('tool_use','card_chat_credits_wall',{balance:bal}); }catch(e){}
   }
   // Follow-up ACTION chips under an answer (the vision\\u2019s bottom row). Data-core next steps only.
   function followups(aEl){
@@ -11324,7 +11389,7 @@ export async function GET(request: NextRequest) {
     // <div>, so anything after it gets parsed INTO that hidden .lgm-ov (display:none) and the
     // fixed FAB/drawer compute to 0×0. Leading the body keeps the mobile chrome a direct <body> child.
     // MARKET_FEEDBACK_JS precedes VIEWPORT_JS so window.__mf exists before the first fetch round reports to it.
-    const bodyInject = MOBILE_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + DIBBS_FLAG_JS + WATCH_SCOPE_SCRIPT + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + ACCOUNT_MENU_JS + ZHEAD_HEIGHT_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
+    const bodyInject = MOBILE_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + DIBBS_FLAG_JS + WATCH_SCOPE_SCRIPT + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + CARD_CHAT_FLAG_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + ACCOUNT_MENU_JS + ZHEAD_HEIGHT_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Code→name for the State picker (50 states + DC). Already a shared constant — the Filters

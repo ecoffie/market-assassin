@@ -7618,6 +7618,18 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 
 **Proof.** Grant amount from production configuration and the credit ledger (299 grants of 100 credits through 2026-11-12). One-grant-per-account enforced by the database's unique index, tested against the real function.
 
+## Ask Mindy about any opportunity, right on the map (2026-11-14, not yet live)
+
+**What.** Every opportunity card on the Opportunity Map can open a conversation with Mindy about that solicitation. Ask what it requires, who held it before, whether it fits your company, or who to contact, without leaving the map or uploading anything.
+
+**Why it matters.** People find opportunities on the map but had to go elsewhere to understand them. Now the answer is one click from the card, and each opportunity keeps its own conversation.
+
+**Honest scope.** Answers come from Mindy's copy of the SAM.gov record and the statement of work when Mindy has extracted it; when something is not in the record, Mindy says so. Free accounts use their existing credits for answers on opportunity cards; Mindy Pro includes it. Ships behind a flag and is off until launch.
+
+**SEO.** Ask questions about a government solicitation / AI for SAM.gov opportunities / understand a federal RFP quickly.
+
+**Proof.** Context is loaded server-side from `sam_opportunities` (89% of open notices carry full notice text, 12% an extracted statement of work, measured 2026-11-14); every answer is sourced to the SAM.gov notice.
+
 ## "None" now means none: every Mindy lookup says what it checked (2026-11-14)
 
 **What.** Every Mindy data lookup, in Ask Mindy and through AI agents connected over MCP, now reports what kind of answer it is: results, a verified zero, a filter it could not apply, an incomplete list, or a source that was unavailable. The expiring-contracts lookup now accepts several states and NAICS codes at once ("Tennessee, Mississippi or Arkansas"; "5613, 5611, 4931"), understands state names, and lists every task order ending in the window at the top of the result instead of only inside its parent vehicle.
