@@ -49,7 +49,7 @@ daily/weekly cadence, Forecast watermark engine — all untouched. Recompete is 
 
 ## 3. Before / after (live DB, the cron's own 30-day window, read-only)
 
-Agent 2's figures reproduce exactly: HVAC maintenance 1,389 → 133 · medical staffing 612 → 75 · janitorial 36 → 144.
+Agent 2's figures reproduce exactly: HVAC maintenance 1,389 → 133 · medical staffing 612 → 75 · janitorial 36 → 144 (the janitorial increase is mostly the related-family over-retrieval described in §4, not recovered recall).
 
 186 alerting searches, 82 owners (`audit-saved-search-parity.ts`, on the shipped code path):
 
@@ -98,9 +98,23 @@ canonical-only, both, and a recall pool neither returned (target NAICS + loose t
 (— = undefined: no results, or no relevant rows found in any stratum.) Sample is 15 per stratum; treat single-digit
 differences as noise.
 
-**Reading:** canonical is never worse on precision and is equal or better on recall in every intent except
-"construction in Georgia" (where legacy's recall comes from returning 883 rows at 15% precision). Switching removes the
-gross overmatch and the agency undermatch. **It does not make plain-English alerts accurate** — see §5.
+**Reading (corrected 2026-11-14 — the first version of this record said "canonical is never worse on precision"; that was wrong):**
+- Precision IMPROVES under canonical for hvac (2→20), medical staffing (1→7), "fix air conditioners" (2→7),
+  "construction in Georgia" (15→51) and broad construction (73→79), and agency VA goes from no results to 100%.
+- Precision REGRESSES for **janitorial services: 93% → 43%** (recall 48% → 89%). Root cause: the janitorial preset
+  RETRIEVES its related family (561210 facilities support, 561730 landscaping) on Open, so every notice in those codes is
+  admitted with no janitorial evidence (steam testing, weed control, bombing-range operation). Measured fix in §5.
+- Precision is UNCHANGED for multi-select NAICS (30/30) and stays 0% for the three plain-English intents
+  ("we clean office buildings", "nurses for VA hospitals", "security guard services in Texas").
+- Recall REGRESSES for "construction in Georgia" (74% → 9%). **This recall figure is not reliable:** the recall probe for
+  that intent was not state-restricted, and labelers were told to mark a blank-state notice relevant when the work matched,
+  so construction notices from other states with no state field were counted as relevant Georgia work. Treat the Georgia
+  recall pair as unmeasured; precision (15% → 51%) stands.
+- multi-select NAICS precision of 30% reflects a definitional gap, not an evaluator defect: the state filter matches place
+  of performance OR buying-office state, while labelers judged place of performance only.
+
+Net: canonical removes the whole-market overmatch and the agency undermatch, introduces one measured precision regression
+(janitorial), and does not make plain-English intents accurate. Switching engines alone is not "faithful alerts".
 
 ## 5. Defects in the SHARED canonical matcher (out of scope here; affect Map + MCP today)
 
