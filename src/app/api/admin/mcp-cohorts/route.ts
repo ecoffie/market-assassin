@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { MCP_CHANNEL_OR_FILTER } from '@/lib/mcp/channel-filter';
 
 /**
  * MCP ACTIVATION + RETENTION COHORTS
@@ -58,6 +59,9 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase
       .from('mcp_call_log')
       .select('user_email, created_at, tool_name, status, credits_charged')
+      // MCP cohorts only: Ask Mindy (channel 'app_chat') calls would make chat-only users
+      // look like MCP users. NULL-channel and chatgpt rows are MCP.
+      .or(MCP_CHANNEL_OR_FILTER)
       .order('created_at', { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) {

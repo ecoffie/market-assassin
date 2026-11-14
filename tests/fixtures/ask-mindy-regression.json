@@ -1,0 +1,88 @@
+{
+  "version": 3,
+  "source": "Mindy Chat Fixes: Bugs and the Claude-Grade Target (2026-11-13), regression test set",
+  "grader": "src/lib/chat/eval/grade.ts (evidence-based; a partial is never counted as a pass)",
+  "official_baseline": {
+    "date": "2026-11-13",
+    "commit": "f03700fd",
+    "model": "openai:gpt-4o",
+    "method": "hand-graded against tool evidence",
+    "result": { "pass": 1, "partial": 2, "fail": 7 },
+    "per_scenario": { "R1": "fail", "R2": "fail", "R3": "pass", "R4": "fail", "R5": "fail", "R6": "fail", "R7": "partial", "R8": "partial", "R9": "fail", "R10": "fail" },
+    "note": "Recorded as graded. The v1 phrase checks marked R1 and R2 as passes; both answers said no contracts were expiring while the evidence held qualifying orders. Do not overwrite this record."
+  },
+  "scenarios": [
+    {
+      "id": "R1",
+      "prompt": "Federal contracts expiring in the next 18 months in Tennessee, Mississippi or Arkansas for temporary staffing, clerical, admin and warehouse work",
+      "require_tool": true,
+      "expected_filters": { "state": ["TN", "MS", "AR"], "naics_prefix": ["5613", "5611", "4931"] },
+      "qualifying_records": ["36C24927N0097", "15JA4522F00000022", "AllPro"],
+      "window_months": 18,
+      "required_groups": [["36C24927N0097", "AllPro"], ["15JA4522F00000022", "fact witness"], ["Fort Campbell", "appointment clerk"], ["Oak Ridge", "Department of Energy"]]
+    },
+    {
+      "id": "R2",
+      "prompt": "Federal contracts expiring in the next 18 months in Tennessee only, for temporary staffing, clerical, admin and warehouse work",
+      "require_tool": true,
+      "expected_filters": { "state": ["TN"], "naics_prefix": ["5613", "5611", "4931"] },
+      "qualifying_records": ["36C24927N0097", "15JA4522F00000022", "AllPro"],
+      "window_months": 18,
+      "required_groups": [["36C24927N0097", "AllPro"], ["15JA4522F00000022", "fact witness"], ["Fort Campbell", "appointment clerk"], ["Oak Ridge", "Department of Energy"]]
+    },
+    {
+      "id": "R3",
+      "prompt": "All USACE Memphis District temporary personnel awards since 2019",
+      "require_tool": true,
+      "qualifying_records": ["W912EQ"],
+      "required_groups": [["W912EQ"], ["Grand Slam"], ["GT Services"], ["J Group"]]
+    },
+    {
+      "id": "R4",
+      "prompt": "Who buys staffing and clerical services in the Memphis metro?",
+      "require_tool": true,
+      "required_groups": [["Navy Personnel Command", "Millington"], ["USACE", "Corps of Engineers", "W912EQ"], ["VA Memphis", "Veterans Affairs", "36C249"]]
+    },
+    {
+      "id": "R5",
+      "prompt": "Is the Navy ID card administration order in Millington still active?",
+      "require_tool": true,
+      "qualifying_records": ["N0018921F3006"],
+      "required_groups": [["2026-07-31", "Jul 31, 2026", "July 31, 2026"], ["successor", "replaced", "follow-on", "no successor", "checked"]]
+    },
+    {
+      "id": "R6",
+      "prompt": "Keywords for a light industrial, clerical and warehouse staffing firm in Memphis",
+      "require_tool": true,
+      "min_matches": { "terms": ["material handl", "order filler", "forklift", "general clerk", "warehouse worker", "laborer"], "min": 2 },
+      "list_items_forbid": ["memphis", "superb"]
+    },
+    {
+      "id": "R7",
+      "prompt": "GSA rates for Material Handler",
+      "require_tool": true,
+      "price_order": true
+    },
+    {
+      "id": "R8",
+      "prompt": "Small business contact at Concord Professional Services",
+      "require_tool": true,
+      "required_groups": [["Geoff Haas", "Daniel Reed", "Chris Rud", "point of contact"]],
+      "partial_if_only": [["Geoff Haas", "Daniel Reed", "Chris Rud", "point of contact"]],
+      "must_be_in_evidence_if_stated": ["Geoff Haas", "Daniel Reed", "Chris Rud"]
+    },
+    {
+      "id": "R9",
+      "prompt": "How much 561320 spending runs through GSA Schedules vs VA BPAs vs agency IDIQs?",
+      "require_tool": true,
+      "required_groups": [["$"], ["%"], ["GSA"], ["BPA"]]
+    },
+    {
+      "id": "R10",
+      "prompt": "Who won the Navy business management support services contract in October 2026?",
+      "require_tool": true,
+      "unrequested_filters": ["state"],
+      "required_groups": [["Booz Allen", "CACI", "Guidehouse", "Serco", "22nd Century", "Ignite", "current through", "not yet published", "newer than", "data cutoff"]]
+    }
+  ]
+}

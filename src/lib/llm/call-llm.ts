@@ -49,7 +49,7 @@ export interface LlmOpts {
   userEmail?: string | null;
 }
 
-type Provider = 'groq70b' | 'groq8b' | 'claude' | 'openai' | 'grok';
+export type Provider = 'groq70b' | 'groq8b' | 'claude' | 'openai' | 'grok';
 
 // EXTRACTION = high volume (every doc, chunked) → cheap/fast only, NO Claude.
 //   The cache absorbs most of these anyway.
@@ -83,6 +83,15 @@ function sensitiveProviders(): Provider[] {
   const raw = process.env.SENSITIVE_LLM_PROVIDERS;
   if (!raw) return DEFAULT_SENSITIVE_PROVIDERS;
   return raw.split(',').map(s => s.trim()).filter(Boolean) as Provider[];
+}
+
+/**
+ * True when `p` is on the approved provider list for customer-private (Vault/proposal) data.
+ * Exported for callers that talk to providers directly instead of through callLLM (the Ask
+ * Mindy chat route), so they honor the SAME list, including a SENSITIVE_LLM_PROVIDERS override.
+ */
+export function isSensitiveApprovedProvider(p: Provider): boolean {
+  return sensitiveProviders().includes(p);
 }
 
 function envChain(): Provider[] | null {

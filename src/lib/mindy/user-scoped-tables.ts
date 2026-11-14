@@ -42,6 +42,10 @@ export const USER_EMAIL_TABLES = [
   // handles its real column (`sharer_email`) via EMAIL_OWNERSHIP_REFS.
   'opportunity_shares',
   'purchases',
+  // Ask Mindy conversations (2026-11-14). mindy_chat_messages has no user_email: it is keyed
+  // by session_id with ON DELETE CASCADE (20260527_mindy_chat.sql), so deleting a user's
+  // sessions also removes every message and its `trace`. Re-key moves the sessions with the user.
+  'mindy_chat_sessions',
 ] as const;
 
 export type UserEmailTable = (typeof USER_EMAIL_TABLES)[number];

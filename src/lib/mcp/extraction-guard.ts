@@ -21,6 +21,7 @@
  */
 import { resolvePayer } from './payer';
 import { getWriteClient } from '@/lib/supabase/server-clients';
+import { MCP_CHANNEL_OR_FILTER } from './channel-filter';
 
 /**
  * Ledger reasons that mark an account as having PAID standing (Layer A gate).
@@ -96,6 +97,9 @@ async function proprietaryCountSince(userEmail: string, sinceMs: number, proprie
     .eq('user_email', userEmail.toLowerCase())
     .in('tool_name', proprietary)
     .in('status', DELIVERED_STATUSES as unknown as string[])
+    // MCP usage only. Ask Mindy (channel 'app_chat') calls are logged here too but are
+    // not MCP extraction; NULL-channel (Claude/general + historical) and chatgpt rows count.
+    .or(MCP_CHANNEL_OR_FILTER)
     .gte('created_at', sinceIso);
   if (error) throw error;
   return count ?? 0;
