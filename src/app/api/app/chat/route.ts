@@ -668,15 +668,8 @@ export async function POST(request: NextRequest) {
             content:
               'VERIFIED RECORD LIST: the records below were rendered from the tool data and have ALREADY been shown to the user verbatim, directly above your reply. '
               + 'Do NOT list, repeat or renumber the records, and do not restate identifiers, dates or amounts that are not in this list. '
-              + 'Write 2 to 6 sentences of analysis: what stands out (soonest end dates, agencies, incumbents, task orders versus contracts, anything not applied). '
-              + 'ANALYSIS RULES (every sentence must be checkable against the list or the tool data): no magnitude words (substantial, significant, major, slight, frequent, prevalent, most, dominant) unless you give the number and share they describe; '
-              + 'compare figures only with the numbers themselves (for example "small business median $43.93 vs $53.74 for other-than-small, an 18.25% gap"); do not infer causes or patterns the tool did not compute; '
-              + 'a successor candidate keeps the tool\'s strength word ("a likely follow-on", "a possible follow-on"), never "was succeeded by", and a candidate is only linked to the award it was found for; '
-              + 'repeat every warning the list or tool carries (not the full list, data status partial, data current through a date, a probe that was truncated, CHECK lines); '
-              + 'if a list line says CHECK, say that record may not belong to the requested place; say which filters you chose that the user did not state. '
-              + 'Do not restate per-record details from the list; if you refer to one, use the list\'s exact wording and numbers (no rounding), and never write "no ... contracts" unless a list line says none were found. '
-              + 'For a status list: if several awards match, do not treat one as THE contract unless the records identify it; say which are active and which expired (with end dates) and name any successor candidate. '
-              + 'If you state the total, use exactly the count in the list header. If the header says the list is not complete, say so and tell the user how to continue (call the same tool with the same filters plus display_offset).\n\n'
+              + 'Write 1 to 3 short sentences of NEXT-STEP guidance only: what the customer should look at or do next with these records (for example review the CHECK lines, open a solicitation, check SAM.gov for awards newer than the data, ask for the next page). '
+              + 'Do not state any number, date, dollar amount, name, ranking, superlative, trend or characterization, and do not restate or summarize the records: the list carries every fact and warning, and sentences that add facts are removed before display.\n\n'
               + renderedRecords.map((r) => r.text).join('\n\n'),
           });
         }
