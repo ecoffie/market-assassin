@@ -1,0 +1,581 @@
+{
+ "per_trade": {
+  "janitorial@30": {
+   "C": {
+    "n": 1,
+    "rel": 0,
+    "precision": 0.0,
+    "rel_families": 0
+   },
+   "vocab": {
+    "kept": 1,
+    "rel": 0,
+    "fp": 1,
+    "abstain": 0,
+    "precision": 0.0,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {
+     "PRIME_CANDIDATE|NO": 1
+    }
+   },
+   "profile": {
+    "kept": 0,
+    "rel": 0,
+    "fp": 0,
+    "abstain": 1,
+    "precision": null,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {}
+   },
+   "either": {
+    "kept": 1,
+    "rel": 0,
+    "fp": 1,
+    "abstain": 0,
+    "precision": 0.0,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {
+     "PRIME_CANDIDATE|NO": 1
+    }
+   }
+  },
+  "janitorial@100": {
+   "C": {
+    "n": 9,
+    "rel": 0,
+    "precision": 0.0,
+    "rel_families": 0
+   },
+   "vocab": {
+    "kept": 8,
+    "rel": 0,
+    "fp": 8,
+    "abstain": 1,
+    "precision": 0.0,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {
+     "PRIME_CANDIDATE|NO": 5,
+     "SUB_SCOPE|NO": 3
+    }
+   },
+   "profile": {
+    "kept": 0,
+    "rel": 0,
+    "fp": 0,
+    "abstain": 9,
+    "precision": null,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {}
+   },
+   "either": {
+    "kept": 8,
+    "rel": 0,
+    "fp": 8,
+    "abstain": 1,
+    "precision": 0.0,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {
+     "PRIME_CANDIDATE|NO": 5,
+     "SUB_SCOPE|NO": 3
+    }
+   }
+  },
+  "nursing@30": {
+   "C": {
+    "n": 1,
+    "rel": 0,
+    "precision": 0.0,
+    "rel_families": 0
+   },
+   "vocab": {
+    "kept": 1,
+    "rel": 0,
+    "fp": 1,
+    "abstain": 0,
+    "precision": 0.0,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {
+     "SUB_SCOPE|NO": 1
+    }
+   },
+   "profile": {
+    "kept": 0,
+    "rel": 0,
+    "fp": 0,
+    "abstain": 1,
+    "precision": null,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {}
+   },
+   "either": {
+    "kept": 1,
+    "rel": 0,
+    "fp": 1,
+    "abstain": 0,
+    "precision": 0.0,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {
+     "SUB_SCOPE|NO": 1
+    }
+   }
+  },
+  "nursing@100": {
+   "C": {
+    "n": 6,
+    "rel": 0,
+    "precision": 0.0,
+    "rel_families": 0
+   },
+   "vocab": {
+    "kept": 5,
+    "rel": 0,
+    "fp": 5,
+    "abstain": 1,
+    "precision": 0.0,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {
+     "SUB_SCOPE|NO": 2,
+     "PRIME_CANDIDATE|NO": 3
+    }
+   },
+   "profile": {
+    "kept": 0,
+    "rel": 0,
+    "fp": 0,
+    "abstain": 6,
+    "precision": null,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {}
+   },
+   "either": {
+    "kept": 5,
+    "rel": 0,
+    "fp": 5,
+    "abstain": 1,
+    "precision": 0.0,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {
+     "SUB_SCOPE|NO": 2,
+     "PRIME_CANDIDATE|NO": 3
+    }
+   }
+  },
+  "hvac@30": {
+   "C": {
+    "n": 8,
+    "rel": 4,
+    "precision": 0.5,
+    "rel_families": 3
+   },
+   "vocab": {
+    "kept": 6,
+    "rel": 4,
+    "fp": 2,
+    "abstain": 2,
+    "precision": 0.6666666666666666,
+    "recall_vs_C": 1.0,
+    "rel_families": 3,
+    "roles": {
+     "SUB_SCOPE|PARTIAL": 4,
+     "SUB_SCOPE|NO": 2
+    }
+   },
+   "profile": {
+    "kept": 7,
+    "rel": 4,
+    "fp": 3,
+    "abstain": 1,
+    "precision": 0.5714285714285714,
+    "recall_vs_C": 1.0,
+    "rel_families": 3,
+    "roles": {
+     "SUB_SCOPE|PARTIAL": 4,
+     "SUB_SCOPE|NO": 3
+    }
+   },
+   "either": {
+    "kept": 7,
+    "rel": 4,
+    "fp": 3,
+    "abstain": 1,
+    "precision": 0.5714285714285714,
+    "recall_vs_C": 1.0,
+    "rel_families": 3,
+    "roles": {
+     "SUB_SCOPE|PARTIAL": 4,
+     "SUB_SCOPE|NO": 3
+    }
+   }
+  },
+  "hvac@100": {
+   "C": {
+    "n": 23,
+    "rel": 12,
+    "precision": 0.5217391304347826,
+    "rel_families": 8
+   },
+   "vocab": {
+    "kept": 13,
+    "rel": 9,
+    "fp": 4,
+    "abstain": 10,
+    "precision": 0.6923076923076923,
+    "recall_vs_C": 0.75,
+    "rel_families": 6,
+    "roles": {
+     "SUB_SCOPE|PARTIAL": 6,
+     "SUB_SCOPE|NO": 4,
+     "PRIME_CANDIDATE|PARTIAL": 3
+    }
+   },
+   "profile": {
+    "kept": 12,
+    "rel": 8,
+    "fp": 4,
+    "abstain": 11,
+    "precision": 0.6666666666666666,
+    "recall_vs_C": 0.6666666666666666,
+    "rel_families": 5,
+    "roles": {
+     "SUB_SCOPE|PARTIAL": 8,
+     "SUB_SCOPE|NO": 4
+    }
+   },
+   "either": {
+    "kept": 16,
+    "rel": 11,
+    "fp": 5,
+    "abstain": 7,
+    "precision": 0.6875,
+    "recall_vs_C": 0.9166666666666666,
+    "rel_families": 7,
+    "roles": {
+     "SUB_SCOPE|PARTIAL": 8,
+     "SUB_SCOPE|NO": 5,
+     "PRIME_CANDIDATE|PARTIAL": 3
+    }
+   }
+  },
+  "guards@30": {
+   "C": {
+    "n": 1,
+    "rel": 0,
+    "precision": 0.0,
+    "rel_families": 0
+   },
+   "vocab": {
+    "kept": 1,
+    "rel": 0,
+    "fp": 1,
+    "abstain": 0,
+    "precision": 0.0,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {
+     "SUB_SCOPE|NO": 1
+    }
+   },
+   "profile": {
+    "kept": 0,
+    "rel": 0,
+    "fp": 0,
+    "abstain": 1,
+    "precision": null,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {}
+   },
+   "either": {
+    "kept": 1,
+    "rel": 0,
+    "fp": 1,
+    "abstain": 0,
+    "precision": 0.0,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {
+     "SUB_SCOPE|NO": 1
+    }
+   }
+  },
+  "guards@100": {
+   "C": {
+    "n": 9,
+    "rel": 0,
+    "precision": 0.0,
+    "rel_families": 0
+   },
+   "vocab": {
+    "kept": 9,
+    "rel": 0,
+    "fp": 9,
+    "abstain": 0,
+    "precision": 0.0,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {
+     "SUB_SCOPE|NO": 7,
+     "PRIME_CANDIDATE|NO": 2
+    }
+   },
+   "profile": {
+    "kept": 0,
+    "rel": 0,
+    "fp": 0,
+    "abstain": 9,
+    "precision": null,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {}
+   },
+   "either": {
+    "kept": 9,
+    "rel": 0,
+    "fp": 9,
+    "abstain": 0,
+    "precision": 0.0,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {
+     "SUB_SCOPE|NO": 7,
+     "PRIME_CANDIDATE|NO": 2
+    }
+   }
+  },
+  "steelbldg@30": {
+   "C": {
+    "n": 15,
+    "rel": 5,
+    "precision": 0.3333333333333333,
+    "rel_families": 5
+   },
+   "vocab": {
+    "kept": 10,
+    "rel": 5,
+    "fp": 5,
+    "abstain": 5,
+    "precision": 0.5,
+    "recall_vs_C": 1.0,
+    "rel_families": 5,
+    "roles": {
+     "SUB_SCOPE|PARTIAL": 3,
+     "SUB_SCOPE|FIT": 2,
+     "SUB_SCOPE|NO": 4,
+     "PRIME_CANDIDATE|NO": 1
+    }
+   },
+   "profile": {
+    "kept": 3,
+    "rel": 2,
+    "fp": 1,
+    "abstain": 12,
+    "precision": 0.6666666666666666,
+    "recall_vs_C": 0.4,
+    "rel_families": 2,
+    "roles": {
+     "SUB_SCOPE|PARTIAL": 2,
+     "SUB_SCOPE|NO": 1
+    }
+   },
+   "either": {
+    "kept": 10,
+    "rel": 5,
+    "fp": 5,
+    "abstain": 5,
+    "precision": 0.5,
+    "recall_vs_C": 1.0,
+    "rel_families": 5,
+    "roles": {
+     "SUB_SCOPE|PARTIAL": 3,
+     "SUB_SCOPE|FIT": 2,
+     "SUB_SCOPE|NO": 4,
+     "PRIME_CANDIDATE|NO": 1
+    }
+   }
+  },
+  "steelbldg@100": {
+   "C": {
+    "n": 53,
+    "rel": 11,
+    "precision": 0.20754716981132076,
+    "rel_families": 8
+   },
+   "vocab": {
+    "kept": 30,
+    "rel": 11,
+    "fp": 19,
+    "abstain": 23,
+    "precision": 0.36666666666666664,
+    "recall_vs_C": 1.0,
+    "rel_families": 8,
+    "roles": {
+     "SUB_SCOPE|PARTIAL": 8,
+     "SUB_SCOPE|FIT": 2,
+     "SUB_SCOPE|NO": 18,
+     "PRIME_CANDIDATE|NO": 1,
+     "PRIME_CANDIDATE|PARTIAL": 1
+    }
+   },
+   "profile": {
+    "kept": 8,
+    "rel": 5,
+    "fp": 3,
+    "abstain": 45,
+    "precision": 0.625,
+    "recall_vs_C": 0.45454545454545453,
+    "rel_families": 5,
+    "roles": {
+     "SUB_SCOPE|PARTIAL": 5,
+     "SUB_SCOPE|NO": 3
+    }
+   },
+   "either": {
+    "kept": 31,
+    "rel": 11,
+    "fp": 20,
+    "abstain": 22,
+    "precision": 0.3548387096774194,
+    "recall_vs_C": 1.0,
+    "rel_families": 8,
+    "roles": {
+     "SUB_SCOPE|PARTIAL": 9,
+     "SUB_SCOPE|FIT": 2,
+     "SUB_SCOPE|NO": 19,
+     "PRIME_CANDIDATE|NO": 1
+    }
+   }
+  },
+  "parts@30": {
+   "C": {
+    "n": 0,
+    "rel": 0,
+    "precision": null,
+    "rel_families": 0
+   },
+   "vocab": {
+    "kept": 0,
+    "rel": 0,
+    "fp": 0,
+    "abstain": 0,
+    "precision": null,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {}
+   },
+   "profile": {
+    "kept": 0,
+    "rel": 0,
+    "fp": 0,
+    "abstain": 0,
+    "precision": null,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {}
+   },
+   "either": {
+    "kept": 0,
+    "rel": 0,
+    "fp": 0,
+    "abstain": 0,
+    "precision": null,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {}
+   }
+  },
+  "parts@100": {
+   "C": {
+    "n": 0,
+    "rel": 0,
+    "precision": null,
+    "rel_families": 0
+   },
+   "vocab": {
+    "kept": 0,
+    "rel": 0,
+    "fp": 0,
+    "abstain": 0,
+    "precision": null,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {}
+   },
+   "profile": {
+    "kept": 0,
+    "rel": 0,
+    "fp": 0,
+    "abstain": 0,
+    "precision": null,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {}
+   },
+   "either": {
+    "kept": 0,
+    "rel": 0,
+    "fp": 0,
+    "abstain": 0,
+    "precision": null,
+    "recall_vs_C": null,
+    "rel_families": 0,
+    "roles": {}
+   }
+  }
+ },
+ "pooled": {
+  "C@30": {
+   "shown": 26,
+   "rel": 9,
+   "precision": 0.34615384615384615
+  },
+  "vocab@30": {
+   "shown": 19,
+   "rel": 9,
+   "precision": 0.47368421052631576
+  },
+  "profile@30": {
+   "shown": 10,
+   "rel": 6,
+   "precision": 0.6
+  },
+  "either@30": {
+   "shown": 20,
+   "rel": 9,
+   "precision": 0.45
+  },
+  "C@100": {
+   "shown": 100,
+   "rel": 23,
+   "precision": 0.23
+  },
+  "vocab@100": {
+   "shown": 65,
+   "rel": 20,
+   "precision": 0.3076923076923077
+  },
+  "profile@100": {
+   "shown": 20,
+   "rel": 13,
+   "precision": 0.65
+  },
+  "either@100": {
+   "shown": 69,
+   "rel": 22,
+   "precision": 0.3188405797101449
+  }
+ },
+ "gate_seconds": 0.6063039302825928,
+ "gate_calls": 252
+}
