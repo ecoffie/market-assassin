@@ -186,3 +186,20 @@ describe('deterministic metro expansion (no dependence on which suburbs a model 
     expect(calls.find((c) => 'cities' in c.params)!.params.cities).toEqual(['ATLANTIS']);
   });
 });
+
+describe('acc7 R4: metro radius with one city in `cities`', () => {
+  it('expands the metro instead of reporting a radius it did not apply', async () => {
+    const { d, calls } = deps();
+    const r = await getBuyingOffices({ state: 'TN', cities: ['Memphis'], naics: '561320', metro_radius_miles: 30 }, d, NOW);
+    const sent = calls.find((c) => 'cities' in c.params)!.params.cities as string[];
+    expect(sent).toEqual(expect.arrayContaining(['MEMPHIS', 'MILLINGTON']));
+    expect(r._meta.applied_filters.metro).toMatchObject({ core_city: 'MEMPHIS', radius_miles: 30 });
+  });
+  it('several explicit cities with a radius are matched exactly and the radius is reported as not applied', async () => {
+    const { d, calls } = deps();
+    const r = await getBuyingOffices({ state: 'TN', cities: ['Memphis', 'Nashville'], naics: '561320', metro_radius_miles: 30 }, d, NOW);
+    expect(calls.find((c) => 'cities' in c.params)!.params.cities).toEqual(['MEMPHIS', 'NASHVILLE']);
+    expect(r._meta.applied_filters.metro_radius_miles).toBeUndefined();
+    expect(JSON.stringify(r._meta.ignored_args)).toMatch(/metro_radius_miles/);
+  });
+});
