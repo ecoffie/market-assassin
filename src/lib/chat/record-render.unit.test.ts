@@ -173,8 +173,8 @@ describe('buying offices', () => {
   };
   it('renders offices with codes, exact dollars, customers and place of performance, and says it is the top N of M', () => {
     const r = renderBuyingOffices(res)!;
-    expect(r.text).toMatch(/^10 contracting offices have obligations for this work \(NAICS 5613, 5611 · work performed in TN · Memphis metro \(cities within 30 miles, in TN only\) · FY2024-FY2026\), \$65,723,501 obligated across 74 awards/);
-    expect(r.text).toMatch(/Showing the top 2 of 10 by obligated dollars\./);
+    expect(r.text).toMatch(/^10 contracting offices recorded award actions for this work \(NAICS 5613, 5611 · work performed in TN · Memphis metro \(cities within 30 miles, in TN only\) · FY2024-FY2026\), \$65,723,501 net obligated \(after deobligations\) across 74 awards/);
+    expect(r.text).toMatch(/Showing the top 2 of 10 by net obligations: 2 with positive net obligations are listed below\./);
     expect(r.text).toMatch(/1\. NAVSUP FLT LOG CTR NORFOLK \(N00189\) · Department Of Defense \/ Department Of The Navy|1\. NAVSUP FLT LOG CTR NORFOLK \(N00189\) · Department of Defense \/ Department of the Navy/);
     expect(r.text).toMatch(/customers: Navy Personnel Command \$50,000,000 · work performed in Millington, TN/);
     expect(r.text).toMatch(/These are federal government contracting offices \(buyers\), not companies\./);
@@ -339,7 +339,7 @@ describe('different work: positive evidence only', () => {
     const exp = { flaggedIds: ['70T05026F5900N004'], ids: ['70T05026F5900N004'] } as never;
     const offices = { text: 'offices', ids: [], officeExamples: [{ office: 'MISSION ESSENTIALS (70T050)', ids: ['70T05026F5900N004'] }, { office: 'OTHER (X1)', ids: ['A1'] }] } as never;
     crossCheckOffices([exp, offices]);
-    expect((offices as { text: string }).text).toMatch(/CHECK: MISSION ESSENTIALS \(70T050\): example award 70T05026F5900N004 is marked CHECK/);
+    expect((offices as { text: string }).text).toMatch(/CHECK: MISSION ESSENTIALS \(70T050\): its award 70T05026F5900N004 is marked CHECK in the expiring list/);
     expect((offices as { text: string }).text).not.toMatch(/OTHER \(X1\)/);
   });
 });
@@ -380,5 +380,26 @@ describe('run-1 acceptance fixes', () => {
     const b = renderBuyingOffices({ scope: { naics: ['5613'] }, offices: [{ office_name: 'A', obligated: 10, share_pct: 100, award_count: 1 }], totals: { obligated: 10, award_count: 1, office_count: 1 }, notes: [], _meta: { as_of: '2026-09-30', lag_note: 'prime contracts only; ingested weekly' } })!;
     expect(b.text).toMatch(/Data freshness: latest action loaded 2026-09-30; prime contracts only; ingested weekly\./);
     expect(b.text).not.toMatch(/90 days/);
+  });
+});
+
+describe('attempt-2 fixes', () => {
+  it('an office is cautioned when flagged orders carry its code as the contract-number prefix', () => {
+    const exp = { flaggedIds: ['70CDCR26FR0000079', '70CDCR26FR0000053'], ids: [] } as never;
+    const offices = { text: 'offices', ids: [], officeExamples: [{ office: 'DETENTION COMPLIANCE AND REMOVALS (70CDCR)', ids: ['70CDCR25FR0000001'] }] } as never;
+    crossCheckOffices([exp, offices]);
+    expect((offices as { text: string }).text).toMatch(/DETENTION COMPLIANCE AND REMOVALS \(70CDCR\): its awards 70CDCR26FR0000079, 70CDCR26FR0000053 are marked CHECK/);
+  });
+  it('CHECK records outside the shown page are listed so every reference is visible', () => {
+    const rows = Array.from({ length: 22 }, (_, i) => rec(`P${String(i).padStart(2, '0')}`, `2027-01-${String(i + 1).padStart(2, '0')}`));
+    rows[21] = rec('PA1', '2027-02-01', { description: 'PSO SERVICES THROUGHOUT THE STATE OF PENNSYLVANIA (PA)' });
+    const r = renderExpiringRecords({ contracts: rows, _meta: meta({ total: 22 }) })!;
+    expect(r.text).toMatch(/Also marked CHECK \(outside the rows shown above\):\n22\. PA1 · /);
+    expect(r.ids).toContain('PA1');
+  });
+  it('tool-internal notes are not shown; a defaulted window is stated in plain words', () => {
+    const r = renderBuyingOffices({ scope: { naics: ['5613'], window: 'FY2024-FY2026' }, offices: [{ office_name: 'A', obligated: 5, share_pct: 100, award_count: 1 }], totals: { obligated: 5, award_count: 1, office_count: 1 }, notes: ['No window given: defaulted to FY2024-FY2026.', 'see top_places'], _meta: {} })!;
+    expect(r.text).toMatch(/FY2024-FY2026 \(default window; none was given\)/);
+    expect(r.text).not.toMatch(/top_places|No window given/);
   });
 });

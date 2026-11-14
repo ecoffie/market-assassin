@@ -287,6 +287,16 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
     lines.push('');
     page.forEach((r, i) => lines.push(recordLine(offset + i + 1, r)));
   }
+  const pageIds = new Set(page.map((r) => str(r.contract_id) || str(r.piid)));
+  const offPage = records
+    .map((r, i) => ({ r, i }))
+    .filter(({ r }) => !pageIds.has(str(r.contract_id) || str(r.piid)))
+    .filter(({ r }) => describedPlaceConflict(str(r.description), str(r.place_of_performance_state)) || describedOtherWork(str(r.description), REQUESTED_LABELS));
+  if (offPage.length) {
+    lines.push('');
+    lines.push(`Also marked CHECK (outside the rows shown above):`);
+    offPage.forEach(({ r, i }) => lines.push(recordLine(i + 1, r)));
+  }
   const exhaustive = retrieved > 0 && from === 1 && to === total && retrieved === total;
   if (retrieved > 0 && !exhaustive) {
     lines.push('');
@@ -298,7 +308,7 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
       lines.push(`Mindy retrieved ${retrieved} of the ${total} matching records; narrow the filters (for example by agency or a shorter window) to see the rest.`);
     }
   }
-  const ids = page.map((r) => str(r.piid) || str(r.contract_id));
+  const ids = [...page, ...offPage.map((x) => x.r)].map((r) => str(r.piid) || str(r.contract_id));
   const allowedCounts = Array.from(new Set([total, retrieved, page.length, standalone, orders, from, to].filter((n) => n >= 0)));
   return { tool: EXPIRING_TOOL, text: lines.join('\n'), total, retrieved, from, to, shown: page.length, exhaustive, ids, allowedCounts, standalone, orders, flaggedIds: flaggedIdsOut };
 }
@@ -401,7 +411,7 @@ export function renderStatusChecks(result: Rec): RenderedRecords | null {
   // freshness note verbatim (a model paraphrase can lose the date it is current through).
   const awardsList = Array.isArray(result?.awards) ? (result.awards as Rec[]) : [];
   if (!checks && !awardsList.length && meta.lag_note) {
-    const text = `No awards were found for this search in the requested window, and that is NOT a verified zero. ${freshnessSentence(meta)}`;
+    const text = `No awards were found for this search in the requested window, and that is NOT a verified zero.${meta.auto_widened ? ' The search was also retried with the widest location scope and still found nothing.' : ''} ${freshnessSentence(meta)}`;
     return { tool: PAST_CONTRACTS_TOOL, text, total: 0, retrieved: 0, from: 0, to: 0, shown: 0, exhaustive: false, ids: [], allowedCounts: [0], standalone: 0, orders: 0 };
   }
   if (!checks) return renderAwardList(result);
@@ -464,15 +474,18 @@ export function renderBuyingOffices(result: Rec): RenderedRecords | null {
   if (scope.state) parts.push(`work performed in ${str(scope.state)}`);
   if (metro) parts.push(`${title(str(metro.core_city))} metro (cities within ${str(metro.radius_miles)} miles${scope.state ? `, in ${str(scope.state)} only` : ''})`);
   else if (Array.isArray(scope.cities) && scope.cities.length) parts.push(`cities ${(scope.cities as unknown[]).map((c) => title(str(c))).join(', ')}`);
-  if (scope.window) parts.push(str(scope.window));
+  const toolNotes = Array.isArray(result.notes) ? (result.notes as unknown[]).map(str) : [];
+  const defaultedWindow = toolNotes.some((n) => /no window given|defaulted/i.test(n));
+  if (scope.window) parts.push(`${str(scope.window)}${defaultedWindow ? ' (default window; none was given)' : ''}`);
   const lines: string[] = [];
   if (!offices.length) {
     lines.push(`No buying offices found (${parts.join(' · ') || 'no filters'}). Source: USASpending prime awards.`);
   } else {
     const officeCount = num(totals?.office_count) ?? offices.length;
-    lines.push(`${officeCount} contracting office${officeCount === 1 ? '' : 's'} ${officeCount === 1 ? 'has' : 'have'} obligations for this work (${parts.join(' · ')}), ${money(totals?.obligated)} obligated across ${num(totals?.award_count) ?? '?'} awards. Source: USASpending prime awards; location is where the work was performed, not where the office sits.`);
+    lines.push(`${officeCount} contracting office${officeCount === 1 ? '' : 's'} recorded award actions for this work (${parts.join(' · ')}), ${money(totals?.obligated)} net obligated (after deobligations) across ${num(totals?.award_count) ?? '?'} awards. Source: USASpending prime awards; location is where the work was performed, not where the office sits.`);
     lines.push('These are federal government contracting offices (buyers), not companies. Office totals are net of deobligations.');
-    lines.push(offices.length < officeCount ? `Showing the top ${offices.length} of ${officeCount} by obligated dollars.` : `Showing all ${officeCount}, by obligated dollars.`);
+    const positive = offices.filter((o) => (num(o.obligated) ?? 0) > 0).length;
+    lines.push(`${offices.length < officeCount ? `Showing the top ${offices.length} of ${officeCount}` : `Showing all ${officeCount}`} by net obligations: ${positive} with positive net obligations are listed below${offices.length - positive ? `, and ${offices.length - positive} with zero or negative net obligations are listed separately` : ''}.`);
     lines.push('Ranked by obligations under the industry (NAICS) codes shown; a code can include other work than the words you used, so check the example awards listed for each office.');
     if (meta.as_of || meta.lag_note) lines.push(`Data freshness: ${meta.as_of ? `latest action loaded ${str(meta.as_of)}` : ''}${meta.as_of && meta.lag_note ? '; ' : ''}${meta.lag_note ? str(meta.lag_note) : ''}.`.replace(/\.\.$/, '.'));
     lines.push('');
@@ -489,8 +502,7 @@ export function renderBuyingOffices(result: Rec): RenderedRecords | null {
       lines.push(`Also returned, with zero or negative net obligations in this window (deobligations, so not evidence of buying): ${nonBuyers.map((o) => `${str(o.office_name)}${o.office_code ? ` (${str(o.office_code)})` : ''} ${money(o.obligated)}`).join('; ')}.`);
     }
   }
-  const notes = Array.isArray(result.notes) ? (result.notes as unknown[]).map(str).filter(Boolean) : [];
-  if (notes.length) { lines.push(''); notes.slice(0, 3).forEach((n) => lines.push(n)); }
+
   const total = num(totals?.office_count) ?? offices.length;
   return {
     tool: BUYING_OFFICES_TOOL, text: lines.join('\n'), total, retrieved: offices.length, from: offices.length ? 1 : 0, to: offices.length,
@@ -669,9 +681,14 @@ export function crossCheckOffices(rendered: RenderedRecords[]): void {
   for (const r of rendered) {
     if (!r.officeExamples) continue;
     const notes = r.officeExamples
-      .map((o) => ({ office: o.office, hits: o.ids.filter((id) => flagged.has(id)) }))
+      .map((o) => {
+        const code = (o.office.match(/\(([A-Z0-9]{5,6})\)\s*$/) ?? [])[1] ?? '';
+        const byExample = o.ids.filter((id) => flagged.has(id));
+        const byPrefix = code ? [...flagged].filter((id) => id.toUpperCase().startsWith(code) && !byExample.includes(id)) : [];
+        return { office: o.office, hits: [...byExample, ...byPrefix] };
+      })
       .filter((o) => o.hits.length)
-      .map((o) => `${o.office}: example award ${o.hits.map((h) => (shown.has(h) ? h : `${h} (in the expiring results but not among the rows shown)`)).join(', ')} is marked CHECK there (it may not be the requested work in this place), so treat this office's ranking with caution`);
+      .map((o) => `${o.office}: its award${o.hits.length === 1 ? '' : 's'} ${o.hits.join(', ')} ${o.hits.length === 1 ? 'is' : 'are'} marked CHECK in the expiring list (different work or place), so this office's total may include work that is not what you asked for`);
     if (notes.length) r.text += `\n\nCHECK: ${notes.join('; ')}.`;
   }
 }
