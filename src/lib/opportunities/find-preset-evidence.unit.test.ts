@@ -78,3 +78,19 @@ describe('why text', () => {
     expect(w).not.toMatch(/Direct match/);
   });
 });
+
+describe('review fixes', () => {
+  it('Open: a related-family code the customer typed is direct (same as Coming back)', () => {
+    const typed = plan('janitorial 561210');
+    const cap = interpretCapability('janitorial 561210');
+    const l = labelOpenRow(open({ title: 'Base operations support', naics_code: '561210' }), typed, cap);
+    expect(l.cls).toBe('DIRECT_MATCH');
+  });
+  it('"custodial and landscaping": landscaping is direct because the customer asked for it', () => {
+    const cap = interpretCapability('custodial and landscaping');
+    expect(cap.direct.naics.sort()).toEqual(['561720', '561730']);
+    expect(cap.related_market?.naics).toEqual(['561210']);
+    const l = labelOpenRow(open({ title: 'Grounds maintenance', naics_code: '561730' }), plan('custodial and landscaping'), cap);
+    expect(l.cls).toBe('DIRECT_MATCH');
+  });
+});
