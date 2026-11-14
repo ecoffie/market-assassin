@@ -32,6 +32,7 @@ const planOwned = (f: Record<string, unknown>) =>
   || ['fullOpen', 'hideCommodity', 'hasDocs', 'hasContact'].some((k) => typeof f[k] === 'boolean');
 
 async function profileFor(email: string) {
+  // unranged-ok: one owner's single settings row (.maybeSingle()), never a list
   const { data, error } = await db.from('user_notification_settings').select('naics_codes, location_states').eq('user_email', email).maybeSingle();
   if (error) throw new Error(`profile read failed: ${error.message}`);
   return { profileNaics: (data?.naics_codes as string[] | null) || [], profileStates: (data?.location_states as string[] | null) || [] };
@@ -52,9 +53,15 @@ async function run(build: (q: any) => any): Promise<{ count: number | null; ids:
 }
 
 async function main() {
-  const { data, error } = await db.from('saved_searches').select('id, user_email, name, mode, filters').eq('alerts_enabled', true);
-  if (error) throw new Error(error.message);
-  const rows = (data || []) as Row[];
+  // Paged: PostgREST caps an unranged select at 1,000 rows silently, which would under-report the population.
+  const rows: Row[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db.from('saved_searches').select('id, user_email, name, mode, filters')
+      .eq('alerts_enabled', true).order('id').range(from, from + 999);
+    if (error) throw new Error(error.message);
+    rows.push(...((data || []) as Row[]));
+    if (!data || data.length < 1000) break;
+  }
   const out = [];
   for (const s of rows) {
     const affected = planOwned(s.filters || {});
