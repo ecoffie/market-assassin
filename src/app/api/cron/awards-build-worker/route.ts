@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash, randomUUID } from 'node:crypto';
 import { verifyAdminPassword } from '@/lib/admin-auth';
-import { bqQuery } from '@/lib/bigquery/client';
+import { bqQuery, bqJobOptions } from '@/lib/bigquery/client';
 import {
   validateGeneration, checkPlausibility, alert, refreshDb,
   BUILD_QUERY, MAX_BYTES_BILLED, PAGE_SIZE,
@@ -127,6 +127,8 @@ export async function GET(req: NextRequest) {
         query: BUILD_QUERY,
         maximumBytesBilled: String(MAX_BYTES_BILLED), // BigQuery hard-fails past this
         bulkJob: 'awards-build-worker',
+        // Cost attribution in JOBS_BY_PROJECT (build 12 billed under feature=legacy).
+        labels: bqJobOptions({ feature: 'awards-serving', tool: 'awards-build-worker', queryFamily: 'serving-table-build' }).labels,
       })) as BuiltRow[];
     } catch (e) {
       return await fail('build', e instanceof Error ? e.message : String(e));

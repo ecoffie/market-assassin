@@ -11,7 +11,10 @@ Running record of the recovery from the July to September 2026 indexing collapse
 | #1995 | Award/forecast/awards pages 5xx instead of noindex; `/api/cron/seo-materialize` (daily `cron_jobs` row) | /forecasts + /awards 200 indexable |
 | #1996 | Award "not found" cached 7 days, versioned by lookup-table build | negative stamped with build, legacy 90-day entries retired |
 | #1997 | Facet sitemap deterministic, route-valid, 700 URLs | 700/700 200 + indexable + self-canonical |
-| this PR | Atomic, validated award lookup rebuild, run after the weekly ingest | see below |
+| #2001 | Atomic, validated award lookup rebuild, run after the weekly ingest | see "Award lookup tables" |
+| #2025 | NAICS/agencies tabs resolve through `resolveContractorForPage` | 3 false 404s → 308; genuine 404s stay 404 |
+| #2031 | Serving-table build reads child UEIs; real size check + one-time override; queue supersession; 36h queued alert | build 12 promoted 2026-11-14 (below) |
+| this PR | Validator reads pages in a total order and refuses duplicate/missing pages; BigQuery cost labels | regression test; no data change |
 
 ## Award lookup tables
 `award_detail_lookup` (serves `/awards/[id]`) and `piid_lookup` (serves `/contracts/[piid]`) are derived
@@ -43,10 +46,8 @@ registrations kept until the index is processed.
 
 Pending (UI only; no API):
 1. Validate Fix on **Soft 404**: safe (36/36 sampled are contract pages, all now 200 + indexable).
-2. **Not found (404)**: **on hold until the durable `/contracts` table recovery (below) is
-   verified.** The 2026-11-14 01:35 UTC re-run is clean (0 false 404s, 1 temporary 5xx), but 76
-   of the formerly failing `/contracts` pages are 200 only because a one-off preview warm filled
-   their KV keys (90-day TTL); the durable table behind them is 78 days stale.
+2. **Not found (404)**: **on hold until the final audit (below) is reviewed.** The durable
+   `/contracts` table was rebuilt and promoted on 2026-11-14 (source 2026-11-04).
 3. Request indexing (verified 200, indexable, self-canonical on 2026-11-13):
    - https://getmindy.ai/contractors/accenture-inc/contracts
    - https://getmindy.ai/contractors/cherokee-nation-businesses-llc/contracts
@@ -240,6 +241,30 @@ be served.
    prod. The worker returns `idle` with no job, so a frequent tick is free. Builds then follow
    the weekly ingest through `awards-refresh`'s freshness gate (one build per upstream advance).
 6. *Search Console:* re-run the 1,000-URL audit once, then decide on the 404 validation.
+
+## Durable `/contracts` serving table: production rebuild, 2026-11-14
+Executed with #2031 deployed (`3ac645e2`) after the migration
+`20261114_awards_build_jobs_supersede_override.sql` (applied `--only`, checksum `1333fd7f98679225`).
+
+| Item | Value |
+|---|---|
+| Superseded | jobs 5-11 (exactly 7 rows), `superseded_by = 12`; rows kept |
+| One-time override | job 12 only: source 2026-11-04, recipients 11,900-12,100, pages 30,500-31,500, authorized 2026-11-14 02:40 UTC |
+| Build | job 12, attempt 1, `worker-44323649`, 387 s; BigQuery job `job_V1nSgb_yz6u07Csao9tfeVJCDvZS` billed **17.255 GiB** (cap 20 GiB) |
+| Promoted generation | **`2026-11-04-build-12-a1-6a6edf7a`**, 2026-11-14 02:47:39 UTC, source as of **2026-11-04** |
+| Counts | **12,000 contractors, 30,978 pages, 1,435,246 award rows** (equal to the dry run) |
+| Integrity (direct SQL) | 0 duplicate pages, 0 page gaps, 0 wrong page counts, 0 wrong row totals, 0 missing checksums or source dates |
+| Size check | live 9,613 / 23,434 → 12,000 / 30,978 (+24.8% / +32.2%), passed by the job-12 override; recorded in job telemetry |
+| **Rollback** | previous generation **`2026-08-28-build-4-a1-c75cc3c6`** (23,434 pages, `retired`, recorded as `previous_version`). Repoint with `promote_awards_version` to roll back. `awards-prune` is dry-run only. |
+| Production checks | 20/20 sampled `/contracts` pages 200, indexable, self-canonical, full tables, incl. `performant-financial-corporation/contracts/2`; 11 had no KV entry, so they were served from the table; the contracts cold budget was unchanged (634 → 634), so no live BigQuery |
+
+Found during verification and fixed in this PR: the validator paged by `recipient_uei` alone
+(not unique), so its telemetry said 1,435,307 rows against 1,435,246 in the table. It now
+orders by `(recipient_uei, page_number)` and refuses a read with duplicate or missing pages.
+
+**Scheduling:** `cron_jobs` row `awards-build-worker` (`15 * * * *`, `timeout_ms` 800000:
+fire-and-forget, `dispatched`). Idle with no claimable job (about 1 s, no BigQuery). New source
+versions come from `awards-refresh` (11:00 UTC daily) after each weekly ingest.
 
 ## Single-award contractors noindexed by the thin-profile rule (policy review, no change)
 The profile rule noindexes `total_obligated < $25K || award_count < 2`

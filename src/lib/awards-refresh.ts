@@ -1,7 +1,7 @@
 import { kv } from '@vercel/kv';
 import { createHash } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { bqQuery } from './bigquery/client';
+import { bqQuery, bqJobOptions } from './bigquery/client';
 import { DATA_VERSION } from './bigquery/cache';
 import { sendOpsAlert } from './ops-alert';
 import { readAllPages } from './paged-read';
@@ -111,6 +111,7 @@ export async function readUpstreamSourceAsOf(): Promise<{ date: string | null; a
       FROM \`market-assasin.usaspending.awards\``,
     maximumBytesBilled: String(2 * 1024 ** 3),
     bulkJob: 'awards-refresh-freshness-probe',
+    labels: bqJobOptions({ feature: 'awards-serving', tool: 'awards-refresh', queryFamily: 'freshness-probe' }).labels,
   });
   const r = rows[0];
   if (!r) return { date: null, ageDays: null };
@@ -276,7 +277,13 @@ export async function validateGeneration(version: string): Promise<ValidationRes
       .select('recipient_uei, page_number, row_count, contract_count, displayed_action_count, total_action_count, payload_checksum, source_as_of')
       .eq('data_version', version)
       .eq('lifecycle', 'staging')
-      .order('recipient_uei', { ascending: true }) as never,
+      // (recipient_uei, page_number) is UNIQUE within a generation, so this order is total and
+      // range pagination reads every page exactly once. recipient_uei alone is NOT unique
+      // (up to 3 pages per contractor): Postgres may order ties differently per request, so a
+      // page can be read twice and another skipped. Build 12 (2026-11-14) reported 1,435,307
+      // rows against 1,435,246 in the table for exactly that reason.
+      .order('recipient_uei', { ascending: true })
+      .order('page_number', { ascending: true }) as never,
   );
 
   if (read.error) {
@@ -304,6 +311,25 @@ export async function validateGeneration(version: string): Promise<ValidationRes
   if (rows.some((r) => (r.displayed_action_count ?? 0) > (r.total_action_count ?? 0)))
     failures.push('displayed_action_count exceeds total_action_count');
   if (rows.some((r) => (r.page_number ?? 0) > MAX_PAGES)) failures.push('page beyond MAX_PAGES');
+  // Every (recipient, page) exactly once, and each recipient's pages contiguous from 1. A
+  // duplicate means the read was not in a total order (pages double-read, others skipped); a
+  // gap means a page is missing. Either way the counts above cannot be trusted.
+  const pagesByRecipient = new Map<string, number[]>();
+  for (const r of rows) {
+    const list = pagesByRecipient.get(r.recipient_uei) ?? [];
+    list.push(r.page_number);
+    pagesByRecipient.set(r.recipient_uei, list);
+  }
+  let duplicatePages = 0;
+  let gappedRecipients = 0;
+  for (const list of pagesByRecipient.values()) {
+    const uniq = new Set(list);
+    duplicatePages += list.length - uniq.size;
+    const max = Math.max(...list);
+    if (uniq.size !== max || !uniq.has(1)) gappedRecipients++;
+  }
+  if (duplicatePages > 0) failures.push(`${duplicatePages} page(s) read more than once`);
+  if (gappedRecipients > 0) failures.push(`${gappedRecipients} recipient(s) with missing pages`);
   // source_as_of is a property of each RECIPIENT's records, not a generation-wide
   // constant — a healthy build legitimately holds ~970 distinct dates. Requiring
   // one value failed every real build. Check what actually matters: present,
