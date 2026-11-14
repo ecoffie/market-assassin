@@ -5,6 +5,8 @@ import { bqQuery, bqJobOptions } from '@/lib/bigquery/client';
 import {
   validateGeneration, checkPlausibility, alert, refreshDb,
   BUILD_QUERY, MAX_BYTES_BILLED, PAGE_SIZE,
+  readServedRecipients, retainParam, classifyRemovals, compareCoverage, readLiveGenerationSize,
+  type ServedRecipients,
 } from '@/lib/awards-refresh';
 import {
   claimNextJob, heartbeat, setJobStatus, supersedeOlderQueued, MAX_ATTEMPTS,
@@ -120,11 +122,22 @@ export async function GET(req: NextRequest) {
   };
 
   try {
+    // ── SERVED CONTRACTORS (before spending anything) ───────────────────────
+    // The build retains every contractor the active and previous generations serve. If that
+    // set cannot be read, building would silently drop them: stop (retryable) instead.
+    let served: ServedRecipients;
+    try {
+      served = await readServedRecipients();
+    } catch (e) {
+      return await fail('coverage-read', e instanceof Error ? e.message : String(e));
+    }
+
     // ── BUILD ───────────────────────────────────────────────────────────────
     let built: BuiltRow[];
     try {
       built = (await bqQuery<BuiltRow>({
         query: BUILD_QUERY,
+        params: { retain_ueis: retainParam(served.retain) },
         maximumBytesBilled: String(MAX_BYTES_BILLED), // BigQuery hard-fails past this
         bulkJob: 'awards-build-worker',
         // Cost attribution in JOBS_BY_PROJECT (build 12 billed under feature=legacy).
@@ -161,6 +174,30 @@ export async function GET(req: NextRequest) {
     const v = await validateGeneration(stagingVersion);
     if (!v.ok) return await fail('validation', v.failures.join('; '));
     await setJobStatus(job.id, 'validated', { staging_version: stagingVersion });
+
+    // ── COVERAGE vs the active generation ───────────────────────────────────
+    // Every served contractor missing from staging needs a verified reason; any unexplained
+    // removal (or a mass removal) stops promotion for review. Terminal: a retry would rebuild
+    // the same set.
+    const staging = new Set(v.recipientUeis ?? []);
+    const removed = [...served.active].filter((u) => !staging.has(u));
+    let coverage;
+    try {
+      const reasons = await classifyRemovals(removed);
+      const live = await readLiveGenerationSize();
+      coverage = compareCoverage(served, staging, reasons, { live: live?.pages ?? null, staging: v.pages });
+    } catch (e) {
+      return await fail('coverage', e instanceof Error ? e.message : String(e));
+    }
+    if (!coverage.ok) {
+      await alert(
+        'Awards build refused: served contractors would be removed',
+        `<p>Job ${job.id} (source ${job.source_version}) was NOT promoted: ${coverage.reason}.</p>` +
+          `<p>retained ${coverage.retained} · added ${coverage.added} · removed ${coverage.removed} ` +
+          `${JSON.stringify(coverage.removedByReason)}</p><p>The live generation is untouched.</p>`,
+      );
+      return await fail('coverage', coverage.reason ?? 'coverage regression', true, { coverage });
+    }
 
     // ── PLAUSIBILITY ────────────────────────────────────────────────────────
     const p = await checkPlausibility({ recipients: v.recipients, pages: v.pages }, job);
@@ -208,6 +245,7 @@ export async function GET(req: NextRequest) {
         durationMs: Date.now() - t0, sourceAsOf: job.source_version, servablePages: servable,
         // Old and new counts, and the one-time override if this build needed it.
         plausibility: p.record, usedSizeOverride: p.usedOverride,
+        coverage,
       },
     });
     // This generation contains everything an older queued job would build.
@@ -216,7 +254,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       { outcome: 'promoted', jobId: job.id, version: stagingVersion,
         recipients: v.recipients, pages: v.pages, servablePages: servable,
-        usedSizeOverride: p.usedOverride, superseded, durationMs: Date.now() - t0 },
+        usedSizeOverride: p.usedOverride, superseded,
+        coverage: { retained: coverage.retained, added: coverage.added, removed: coverage.removed,
+          restoredFromPrevious: coverage.restoredFromPrevious, removedByReason: coverage.removedByReason },
+        durationMs: Date.now() - t0 },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (e) {

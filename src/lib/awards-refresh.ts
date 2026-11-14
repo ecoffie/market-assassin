@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { bqQuery, bqJobOptions } from './bigquery/client';
 import { DATA_VERSION } from './bigquery/cache';
+import { COMPUTED_SLUG_SQL } from './bigquery/recipients';
 import { sendOpsAlert } from './ops-alert';
 import { readAllPages } from './paged-read';
 
@@ -197,10 +198,27 @@ export function evaluateFreshness(
 }
 
 export const BUILD_QUERY = `
-WITH elig AS (
-  SELECT rollup_uei, child_ueis FROM \`market-assasin.usaspending.recipients_rollup_merged\`
+WITH rollups AS (
+  SELECT rollup_uei, child_ueis, total_obligated, ${COMPUTED_SLUG_SQL('rollup_name')} AS slug
+  FROM \`market-assasin.usaspending.recipients_rollup_merged\`
   WHERE rollup_name IS NOT NULL AND rollup_name != ''
-  ORDER BY total_obligated DESC LIMIT ${ELIGIBLE_LIMIT}
+),
+rollup_rank AS (
+  SELECT rollup_uei, child_ueis,
+    ROW_NUMBER() OVER (ORDER BY total_obligated DESC) AS spend_rank,
+    -- The page resolves a slug to its highest-spend rollup; only that rollup is reachable.
+    ROW_NUMBER() OVER (PARTITION BY slug ORDER BY total_obligated DESC) AS slug_rank
+  FROM rollups
+),
+-- The top ${ELIGIBLE_LIMIT} by spend, PLUS every contractor production already serves
+-- (@retain_ueis: the active and previous generations) that is still a rollup and still the
+-- canonical owner of its slug. A contractor whose rank slips below the cut keeps its pages
+-- (build 12 dropped 251 that way). One with no positive-obligation award action produces no
+-- rows below, so it falls out on its own, and the coverage check reports why.
+elig AS (
+  SELECT rollup_uei, child_ueis FROM rollup_rank
+  WHERE spend_rank <= ${ELIGIBLE_LIMIT}
+     OR (rollup_uei IN UNNEST(@retain_ueis) AND slug_rank = 1)
 ),
 -- Every UEI the contractor page reads: the rollup's child_ueis, exactly what the live reader
 -- passes as @ueis (recipient_uei IN UNNEST(child_ueis)). DISTINCT so a UEI listed twice is
@@ -253,6 +271,8 @@ export interface ValidationResult {
   recipients: number;
   pages: number;
   rows: number;
+  /** Every recipient in the staging generation (for the coverage comparison). */
+  recipientUeis?: string[];
 }
 
 /**
@@ -345,7 +365,10 @@ export async function validateGeneration(version: string): Promise<ValidationRes
   if (recipients < TOLERANCE.minRecipients)
     failures.push(`only ${recipients} recipients (min ${TOLERANCE.minRecipients})`);
 
-  return { ok: failures.length === 0, failures, recipients, pages: rows.length, rows: totalRows };
+  return {
+    ok: failures.length === 0, failures, recipients, pages: rows.length, rows: totalRows,
+    recipientUeis: [...pagesByRecipient.keys()],
+  };
 }
 
 /**
@@ -474,6 +497,148 @@ export async function checkPlausibility(
   job: { source_version: string; size_override?: unknown },
 ): Promise<PlausibilityResult> {
   return evaluatePlausibility(await readLiveGenerationSize(), next, job);
+}
+
+// ── coverage: never silently drop a contractor production serves ──────────────────────────
+
+/** A served contractor absent from staging is acceptable only for one of these reasons. */
+export type RemovalReason = 'not-a-rollup' | 'not-canonical-for-slug' | 'no-qualifying-awards' | 'unexplained';
+
+/** Explained removals above this share of the active generation still stop for review. */
+export const REMOVAL_REVIEW_PCT = 2;
+
+export interface ServedRecipients {
+  activeVersion: string | null;
+  previousVersion: string | null;
+  active: Set<string>;
+  previous: Set<string>;
+  /** active ∪ previous, sorted: what the build retains. */
+  retain: string[];
+}
+
+async function readPage1Recipients(version: string): Promise<string[]> {
+  const supa = db();
+  const read = await readAllPages<{ recipient_uei: string }>(() =>
+    supa.from('awards_serving_pages').select('recipient_uei')
+      .eq('data_version', version).eq('page_number', 1)
+      // Unique within a version (one page 1 per recipient), so range pagination is exact.
+      .order('recipient_uei', { ascending: true }) as never,
+  );
+  if (read.error || !read.exhausted) throw new Error(`served recipients unreadable for ${version}: ${read.error ?? 'incomplete read'}`);
+  return read.rows.map((r) => r.recipient_uei);
+}
+
+/** Contractors the active and previous production generations serve. Throws if unreadable. */
+export async function readServedRecipients(): Promise<ServedRecipients> {
+  const { data: ptr, error } = await db()
+    .from('awards_active_version').select('active_version, previous_version').eq('id', 1).limit(1).maybeSingle();
+  if (error) throw new Error(`active pointer unreadable: ${error.message}`);
+  const activeVersion = ptr?.active_version ?? null;
+  const previousVersion = ptr?.previous_version ?? null;
+  const active = new Set(activeVersion ? await readPage1Recipients(activeVersion) : []);
+  const previous = new Set(previousVersion ? await readPage1Recipients(previousVersion) : []);
+  return { activeVersion, previousVersion, active, previous, retain: [...new Set([...active, ...previous])].sort() };
+}
+
+/** BigQuery rejects an untyped empty array parameter; a sentinel no UEI can equal avoids that. */
+export const retainParam = (retain: string[]) => (retain.length ? retain : ['__none__']);
+
+/**
+ * Why each removed contractor fell out, VERIFIED against the warehouse, not inferred:
+ * not a rollup any more (merged/renamed), no longer the canonical owner of its slug, or a
+ * canonical rollup with zero positive-obligation actions across its child UEIs. A removed
+ * contractor that still has qualifying actions is 'unexplained'.
+ */
+export async function classifyRemovals(removed: string[]): Promise<Map<string, RemovalReason>> {
+  const out = new Map<string, RemovalReason>();
+  if (removed.length === 0) return out;
+  const rows = await bqQuery<{ rollup_uei: string; slug_rank: number; positive_actions: number }>({
+    query: `
+      WITH rollups AS (
+        SELECT rollup_uei, child_ueis, total_obligated, ${COMPUTED_SLUG_SQL('rollup_name')} AS slug
+        FROM \`market-assasin.usaspending.recipients_rollup_merged\`
+        WHERE rollup_name IS NOT NULL AND rollup_name != ''
+      ),
+      ranked AS (
+        SELECT rollup_uei, child_ueis,
+          ROW_NUMBER() OVER (PARTITION BY slug ORDER BY total_obligated DESC) AS slug_rank
+        FROM rollups
+      ),
+      hit AS (SELECT * FROM ranked WHERE rollup_uei IN UNNEST(@removed)),
+      ueis AS (SELECT DISTINCT h.rollup_uei, u FROM hit h, UNNEST(h.child_ueis) u)
+      SELECT h.rollup_uei, h.slug_rank,
+        (SELECT COUNTIF(a.obligation_amount > 0) FROM \`market-assasin.usaspending.awards\` a
+          JOIN ueis x ON a.recipient_uei = x.u WHERE x.rollup_uei = h.rollup_uei) AS positive_actions
+      FROM hit h`,
+    params: { removed },
+    maximumBytesBilled: String(MAX_BYTES_BILLED),
+    bulkJob: 'awards-build-coverage-check',
+    labels: bqJobOptions({ feature: 'awards-serving', tool: 'awards-build-worker', queryFamily: 'coverage-check' }).labels,
+  });
+  const byUei = new Map(rows.map((r) => [r.rollup_uei, r]));
+  for (const uei of removed) {
+    const r = byUei.get(uei);
+    if (!r) out.set(uei, 'not-a-rollup');
+    else if (Number(r.slug_rank) > 1) out.set(uei, 'not-canonical-for-slug');
+    else if (Number(r.positive_actions) === 0) out.set(uei, 'no-qualifying-awards');
+    else out.set(uei, 'unexplained');
+  }
+  return out;
+}
+
+export interface CoverageReport {
+  ok: boolean;
+  reason?: string;
+  retained: number;
+  added: number;
+  removed: number;
+  restoredFromPrevious: number;
+  removedByReason: Partial<Record<RemovalReason, number>>;
+  removedSample: Array<{ recipient_uei: string; reason: RemovalReason }>;
+  pages: { live: number | null; staging: number; delta: number | null };
+}
+
+/**
+ * Pure. Staging vs the active generation: retained / added / removed, every removal with its
+ * verified reason. Promotion stops on ANY unexplained removal, and on explained removals above
+ * REMOVAL_REVIEW_PCT of the active generation (a mass merge deserves a human look).
+ */
+export function compareCoverage(
+  served: Pick<ServedRecipients, 'active' | 'previous'>,
+  staging: Set<string>,
+  reasons: Map<string, RemovalReason>,
+  pages: { live: number | null; staging: number },
+): CoverageReport {
+  let retained = 0;
+  for (const u of served.active) if (staging.has(u)) retained++;
+  let added = 0;
+  let restoredFromPrevious = 0;
+  for (const u of staging) {
+    if (!served.active.has(u)) {
+      added++;
+      if (served.previous.has(u)) restoredFromPrevious++;
+    }
+  }
+  const removedList = [...served.active].filter((u) => !staging.has(u)).sort();
+  const removedByReason: Partial<Record<RemovalReason, number>> = {};
+  for (const u of removedList) {
+    const r = reasons.get(u) ?? 'unexplained';
+    removedByReason[r] = (removedByReason[r] ?? 0) + 1;
+  }
+  const report: CoverageReport = {
+    ok: true, retained, added, removed: removedList.length, restoredFromPrevious, removedByReason,
+    removedSample: removedList.slice(0, 50).map((u) => ({ recipient_uei: u, reason: reasons.get(u) ?? 'unexplained' })),
+    pages: { live: pages.live, staging: pages.staging, delta: pages.live === null ? null : pages.staging - pages.live },
+  };
+  const unexplained = removedByReason.unexplained ?? 0;
+  if (unexplained > 0) {
+    return { ...report, ok: false, reason: `${unexplained} served contractor(s) removed with qualifying award data (unexplained)` };
+  }
+  const cap = (served.active.size * REMOVAL_REVIEW_PCT) / 100;
+  if (served.active.size > 0 && removedList.length > cap) {
+    return { ...report, ok: false, reason: `${removedList.length} served contractors removed (> ${REMOVAL_REVIEW_PCT}% of ${served.active.size}); review before promoting` };
+  }
+  return report;
 }
 
 export async function alert(subject: string, html: string): Promise<void> {

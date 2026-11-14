@@ -33,7 +33,7 @@ vi.mock('@supabase/supabase-js', () => ({
   }),
 }));
 vi.mock('@/lib/ops-alert', () => ({ sendOpsAlert: vi.fn(async ({ subject }: { subject: string }) => { fake.alerts.push(subject); }) }));
-vi.mock('@/lib/bigquery/client', () => ({ bqQuery: vi.fn() }));
+vi.mock('@/lib/bigquery/client', async (orig) => ({ ...(await orig<Record<string, unknown>>()), bqQuery: vi.fn() }));
 vi.mock('@vercel/kv', () => ({ kv: { set: vi.fn(), get: vi.fn(), del: vi.fn() } }));
 
 import {

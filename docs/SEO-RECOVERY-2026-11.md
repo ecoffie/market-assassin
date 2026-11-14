@@ -299,6 +299,22 @@ Candidate fix (not done, needs approval): keep any contractor present in the liv
 eligible for the next build ("sticky" eligibility, at most 251 more today), and make validation
 report contractors dropped against live. A rollback would restore the 251 but drop 2,638.
 
+## Serving-table retention: dry run, 2026-11-14 (fix for the 251 dropped contractors)
+Eligibility is now the top 12,000 by spend **plus** every contractor the active or previous
+production generation serves that is still a rollup and still the canonical owner of its slug.
+Promotion stops on any unexplained removal, or on explained removals above 2% of the active
+generation. Read-only measurements (source 2026-11-04, same as build 12):
+
+| Item | Value |
+|---|---|
+| Build query estimate | **17.25 GiB** with the 12,251-UEI retain list (unchanged; cap 20 GiB) |
+| Retain list | 12,251 = active 12,000 ∪ previous 9,613 |
+| The 251 dropped by build 12 | **202** still canonical rollups (rank 12,003+), all with qualifying awards, so retained · **49** no longer a rollup (merged or renamed), so not retained |
+| Expected next build | **12,202 contractors, 31,413 pages, 1,453,296 award rows** (+202 / +435 / +18,050 vs live; +1.7% / +1.4%, inside ±10%, no override needed) |
+| Expected removals vs active | 0 (all 12,000 active are still in the top 12,000) |
+| The 9 Search Console 5xx | **all 9 covered**: canonical rollups ranked 12,003 to 12,275 with 3 to 342 qualifying actions (1 to 3 pages each) |
+| Measurement cost | 0.019 GiB (rollup classification) + 1.039 GiB (positive-action counts for the 284 child UEIs of the 202) |
+
 ## Single-award contractors noindexed by the thin-profile rule (policy review, no change)
 The profile rule noindexes `total_obligated < $25K || award_count < 2`
 (`src/app/contractors/[slug]/page.tsx`). That treats a single high-value award as low value.
