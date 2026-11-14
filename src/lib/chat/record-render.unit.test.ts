@@ -392,11 +392,12 @@ describe('run-1 acceptance fixes', () => {
 });
 
 describe('attempt-2 fixes', () => {
-  it('an office is cautioned when flagged orders carry its code as the contract-number prefix', () => {
+  // Option B (R11, flagged by every RC review): reversed. A shared prefix does not put a statewide record inside a metro office total.
+  it('an office is NOT cautioned only because flagged orders share its code as the contract-number prefix', () => {
     const exp = { flaggedIds: ['70CDCR26FR0000079', '70CDCR26FR0000053'], ids: [] } as never;
     const offices = { text: 'offices', ids: [], officeExamples: [{ office: 'DETENTION COMPLIANCE AND REMOVALS (70CDCR)', ids: ['70CDCR25FR0000001'] }] } as never;
     crossCheckOffices([exp, offices]);
-    expect((offices as { text: string }).text).toMatch(/DETENTION COMPLIANCE AND REMOVALS \(70CDCR\): its awards 70CDCR26FR0000079, 70CDCR26FR0000053 are marked CHECK/);
+    expect((offices as { text: string }).text).not.toMatch(/DETENTION COMPLIANCE AND REMOVALS \(70CDCR\)[^\n]*marked CHECK/);
   });
   it('CHECK records outside the shown page are listed so every reference is visible', () => {
     const rows = Array.from({ length: 22 }, (_, i) => rec(`P${String(i).padStart(2, '0')}`, `2027-01-${String(i + 1).padStart(2, '0')}`));

@@ -71,7 +71,9 @@ export function describedRegionNote(description: string, popState: string): stri
   if (!m || !st) return null;
   const states = BORDER_REGIONS[`THROUGHOUT THE ${m[1]} BORDER`];
   if (!states?.includes(st)) return null;
-  return `the description says the work is throughout the ${m[1].toLowerCase()} border (a region spanning ${states.join(', ')}), so it is not specific to one city or to ${st} alone`;
+  // Quote the record's own words only. The region-to-states table decides that this is not a
+  // conflict, but its contents are not in the evidence and are never printed (rcb1/rcb2 R11).
+  return `its own description says the work is "${m[0]}", so it is not limited to one city`;
 }
 
 export function describedPlaceConflict(description: string, popState: string): string | null {
@@ -823,10 +825,11 @@ export function crossCheckOffices(rendered: RenderedRecords[]): void {
     if (!r.officeExamples) continue;
     const notes = r.officeExamples
       .map((o) => {
-        const code = (o.office.match(/\(([A-Z0-9]{5,6})\)\s*$/) ?? [])[1] ?? '';
-        const byExample = o.ids.filter((id) => flagged.has(id));
-        const byPrefix = code ? [...flagged].filter((id) => id.toUpperCase().startsWith(code) && !byExample.includes(id)) : [];
-        return { office: o.office, hits: [...byExample, ...byPrefix] };
+        // Evidence only (Option B, R11): an award is tied to an office's total only when the office lists
+        // it as its own in-window award. A shared contract-number prefix does not show that a statewide
+        // record (no city recorded) is inside a metro-scoped office total.
+        const hits = o.ids.filter((id) => flagged.has(id));
+        return { office: o.office, hits };
       })
       .filter((o) => o.hits.length)
       .map((o) => `${o.office}: its award${o.hits.length === 1 ? '' : 's'} ${o.hits.join(', ')} ${o.hits.length === 1 ? 'is' : 'are'} marked CHECK in the expiring list (different work or place), so this office's total may include work that is not what you asked for`);

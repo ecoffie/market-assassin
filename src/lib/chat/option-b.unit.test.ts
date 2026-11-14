@@ -34,7 +34,9 @@ describe('R11: region-wide work is never presented as specific to the office\'s 
   const desc = 'PROTECTIVE SECURITY OFFICER (PSO) SERVICES THROUGHOUT THE SOUTHERN BORDER';
   it('a border region that includes the reported state is a factual qualifier, not a CHECK', () => {
     expect(describedPlaceConflict(desc, 'TX')).toBeNull();
-    expect(describedRegionNote(desc, 'TX')).toBe('the description says the work is throughout the southern border (a region spanning CA, AZ, NM, TX), so it is not specific to one city or to TX alone');
+    expect(describedRegionNote(desc, 'TX')).toBe('its own description says the work is "THROUGHOUT THE SOUTHERN BORDER", so it is not limited to one city');
+    // rcb1/rcb2 R11: no state list or other fact that is not in the record
+    expect(describedRegionNote(desc, 'TX')).not.toMatch(/\b(CA|AZ|NM|California|Arizona|New Mexico)\b/);
     expect(describedRegionNote(desc, 'TN')).toBeNull();
     expect(describedRegionNote('GUARD SERVICES AT FORT SAM HOUSTON', 'TX')).toBeNull();
   });
@@ -45,13 +47,14 @@ describe('R11: region-wide work is never presented as specific to the office\'s 
     const expiring = renderExpiringRecords({ contracts: recs, expiring_orders_in_window: [], _meta: { total: recs.length } }, { requestedLabels: ['security guards'] })!;
     expect(expiring.ids).not.toContain('70RFP426FRE700022'); // not on the shown page
     crossCheckOffices([offices, expiring]);
-    expect(offices.text).toMatch(/PLACE NOTE: FPS EAST CCG DIV 4 ACQ DIV \(70RFP4\): for its award 70RFP426FRE700022 \(listed above for this office\), the description says the work is throughout the southern border/);
+    expect(offices.text).toMatch(/PLACE NOTE: FPS EAST CCG DIV 4 ACQ DIV \(70RFP4\): for its award 70RFP426FRE700022 \(listed above for this office\), its own description says the work is "THROUGHOUT THE SOUTHERN BORDER", so it is not limited to one city/);
+    expect(offices.text).not.toMatch(/\b(CA|AZ|NM)\b/);
     expect(offices.text).toMatch(/not a limit on where this work happens/);
     expect(offices.text).not.toMatch(/San-Antonio-specific/);
   });
   it('a shown row carries the qualifier inline', () => {
     const r = renderExpiringRecords({ contracts: [{ piid: 'A1', description: desc, place_of_performance_state: 'TX', period_of_performance_current_end: '2027-01-01', total_obligation: 5 }], expiring_orders_in_window: [], _meta: { total: 1 } })!;
-    expect(r.text).toMatch(/A1 · .* · note: the description says the work is throughout the southern border/);
+    expect(r.text).toMatch(/A1 · .* · note: its own description says the work is "THROUGHOUT THE SOUTHERN BORDER", so it is not limited to one city/);
     expect(r.text).not.toMatch(/A1 · [^\n]*CHECK/);
   });
   it('no office qualifier without evidence (award not in any list)', () => {
