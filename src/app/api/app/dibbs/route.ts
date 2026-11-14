@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { DIBBS_FEED_PAUSED } from '@/lib/dibbs/availability';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -73,8 +74,17 @@ export async function GET(request: NextRequest) {
 
   query = query.range(offset, offset + limit - 1);
 
-  const { data, error, count } = await query;
+  // Freshness (Eric, 2026-11-14): the newest row a successful sync wrote. Read in parallel; a failure
+  // leaves lastUpdatedAt null ("unknown" in the notice), never a guessed date, and never fails the search.
+  const lastSync = sb.from('dibbs_rfqs').select('synced_at').not('synced_at', 'is', null)
+    .order('synced_at', { ascending: false }).limit(1);
+  const [{ data, error, count }, { data: lastRow, error: lastErr }] = await Promise.all([query, lastSync]);
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  if (lastErr) console.error('[api/app/dibbs] last-sync read failed:', lastErr.message);
+  const freshness = {
+    paused: DIBBS_FEED_PAUSED,
+    lastUpdatedAt: lastErr ? null : ((lastRow?.[0] as { synced_at?: string } | undefined)?.synced_at ?? null),
+  };
 
   const rows = (data || []).map((r: Record<string, unknown>) => ({
     solicitationNumber: r.solicitation_number,
@@ -98,5 +108,6 @@ export async function GET(request: NextRequest) {
     limit,
     hasMore: (count ?? 0) > offset + rows.length,
     rfqs: rows,
+    freshness,
   });
 }

@@ -13,3 +13,11 @@
  * re-enabling is this one constant once a sustainable source exists.
  */
 export const DIBBS_MAP_ENABLED = false;
+
+/**
+ * Is the DIBBS sync paused? (Eric, 2026-11-14: customer-facing freshness notice on the DIBBS panel.)
+ * The sync has not run since 2026-11-02 (last successful `sync-dibbs` run 2026-11-02T08:00Z). While true,
+ * the DIBBS panel tells customers updates are paused and shows the last successful update, read from the
+ * data (`max(dibbs_rfqs.synced_at)`), never typed here. Set false only when a sustainable sync is live again.
+ */
+export const DIBBS_FEED_PAUSED = true;

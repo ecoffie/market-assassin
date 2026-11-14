@@ -9,9 +9,10 @@
  * Authed /api/app route → MUST send getMIApiHeaders(email) or it 401s.
  */
 import { useState, useCallback, useEffect } from 'react';
-import { Package, Flame, Zap } from 'lucide-react';
+import { Package, Flame, Zap, AlertTriangle } from 'lucide-react';
 import { authedFetch } from '../authHeaders';
 import type { AppTier } from '../UnifiedSidebar';
+import { dibbsFreshnessNotice, type DibbsFreshness } from '@/lib/dibbs/freshness';
 
 interface Props {
   email: string | null;
@@ -57,6 +58,8 @@ export default function DibbsPanel({ email }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [freshness, setFreshness] = useState<DibbsFreshness | null>(null);
+  const freshnessNotice = dibbsFreshnessNotice(freshness);
 
   const [q, setQ] = useState('');
   const [nsn, setNsn] = useState('');
@@ -88,6 +91,7 @@ export default function DibbsPanel({ email }: Props) {
         setRfqs(prev => (offset === 0 ? data.rfqs : [...prev, ...data.rfqs]));
         setTotal(data.total || 0);
         setHasMore(!!data.hasMore);
+        if (data.freshness) setFreshness(data.freshness as DibbsFreshness);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Search failed');
       } finally {
@@ -121,6 +125,14 @@ export default function DibbsPanel({ email }: Props) {
           isn&apos;t on SAM.gov. Search by keyword, NSN, or FSC.
         </p>
       </div>
+
+      {/* Freshness (Eric, 2026-11-14): the sync is paused; say so, with the last update read from the data. */}
+      {freshnessNotice && (
+        <div role="status" className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-sm text-amber-300">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" strokeWidth={2} />
+          <span>{freshnessNotice}</span>
+        </div>
+      )}
 
       {/* Search / filters */}
       <form onSubmit={onSubmit} className="bg-ground border border-surface rounded-xl p-4 space-y-3">
@@ -198,8 +210,8 @@ export default function DibbsPanel({ email }: Props) {
         <div className="text-center py-12 text-muted">
           <p className="text-lg mb-1">No DIBBS RFQs match.</p>
           <p className="text-sm text-faint">
-            Try a broader keyword, or a shorter NSN/FSC prefix (e.g. just the 4-digit FSC). New
-            RFQs sync daily.
+            Try a broader keyword, or a shorter NSN/FSC prefix (e.g. just the 4-digit FSC).
+            {freshness?.paused ? '' : ' New RFQs sync daily.'}
           </p>
         </div>
       )}
