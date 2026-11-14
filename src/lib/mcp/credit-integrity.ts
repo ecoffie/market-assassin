@@ -135,6 +135,8 @@ export const REQUIRED_ONE_OF: Readonly<Record<string, readonly string[]>> = {
   extract_statement_of_work: ['notice_id', 'rfp_text'],
   draft_proposal: ['notice_id', 'rfp_text'],
   search_agency_opps_by_office: ['agency', 'dodaac'],
+  // A nationwide all-industry office ranking is refused by the tool itself; refuse it here first.
+  get_buying_offices: ['state', 'naics', 'psc'],
   get_current_acquisition_intelligence: [
     'agency', 'office', 'dodaac', 'capability', 'keywords', 'naics', 'psc', 'notice_ids', 'contract_ids', 'piids',
   ],

@@ -82,6 +82,8 @@ import { matchRecompeteSowTool } from '@/mcp/tools/recompete-sow';
 import { extractStatementOfWork } from '@/mcp/tools/statement-of-work';
 import { getFederalEventSeries } from '@/mcp/tools/event-series';
 import { getSbaGoalingShare } from '@/mcp/tools/sba-goaling';
+import { getBuyingOffices } from '@/mcp/tools/buying-offices';
+import { getVehicleSpendMix } from '@/mcp/tools/vehicle-spend-mix';
 import { draftProposal, draftProposalSection } from '@/mcp/tools/draft-proposal';
 import { exportProposal } from '@/mcp/tools/export-proposal';
 import { getBalance } from '@/lib/mcp/credits';
@@ -149,6 +151,9 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   assess_market_depth: 10,
   get_agency_spending_detail: 10,
   get_sba_goaling_share: 10,
+  // Ask Mindy only (hidden from public MCP). Same tier as the other BigQuery profile reads.
+  get_buying_offices: 10,
+  get_vehicle_spend_mix: 10,
   get_award_detail: 10,
   add_contacts_to_crm: 10,
   schedule_market_search: 0,
@@ -1874,6 +1879,73 @@ const SBA_GOALING_TOOL_DEF = {
   },
 };
 
+// Ask Mindy only (hidden from public MCP: public-catalog-config.ts). BigQuery award warehouse.
+const BUYING_OFFICES_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_buying_offices',
+    description:
+      'WHO BUYS this work in a place: contracting offices ranked by net obligated dollars, from federal contract ' +
+      'actions (USASpending, prime contracts). Use for "who buys X in <city / metro / state>". Returns each office ' +
+      'with its name, office code (a DoDAAC for Defense offices), agency and sub-agency, award count, obligated ' +
+      'dollars and share, top NAICS, example award ids, top place-of-performance cities, and the customer (funding) ' +
+      'offices behind it; rank_by:"funding" ranks the customer organizations instead. Location is PLACE OF ' +
+      'PERFORMANCE: an office located elsewhere (e.g. a regional contracting center) is ranked for a city when the ' +
+      'work it bought is performed there, so name the office AND where the work is. For a metro, pass the core city in `city` with the state: ' +
+      'it expands to every city within metro_radius_miles (default 30) automatically; cities_without_rows lists requested cities that had nothing. Requires a state, NAICS ' +
+      'or PSC. Default window: the latest three complete fiscal years. _meta.result_state "unavailable" (including ' +
+      'incomplete_reason "scope_too_broad") is NOT a zero: narrow the window and retry.',
+    parameters: {
+      type: 'object',
+      properties: {
+        state: { type: 'string', description: 'US state, 2-letter code or full name (place of performance).' },
+        city: { type: 'string', description: 'One city, or several comma-separated (place of performance).' },
+        cities: { type: 'array', items: { type: 'string' }, description: 'Several cities, e.g. a metro core city plus suburbs.' },
+        metro_radius_miles: { type: 'number', description: 'Metro radius in miles around a single core `city` (default 30; 0 = that city only).' },
+        naics: { type: 'string', description: 'NAICS code(s) or prefixes, comma-separated, e.g. "561320" or "5613,5611". Staffing and clerical: 5613 (employment services) and 5611/5614 (office administrative and business support).' },
+        psc: { type: 'string', description: 'PSC code(s) or prefixes, comma-separated, e.g. "R6" or "R699".' },
+        fiscal_year: { type: 'number', description: 'One federal fiscal year (Oct 1 - Sep 30).' },
+        fiscal_year_from: { type: 'number', description: 'First fiscal year of the window, inclusive.' },
+        fiscal_year_to: { type: 'number', description: 'Last fiscal year of the window, inclusive.' },
+        date_from: { type: 'string', description: 'Action date lower bound (YYYY-MM-DD). Overrides fiscal years.' },
+        date_to: { type: 'string', description: 'Action date upper bound (YYYY-MM-DD).' },
+        rank_by: { type: 'string', enum: ['awarding', 'funding'], description: '"awarding" (default) = contracting offices; "funding" = the customer organizations whose money it is.' },
+        limit: { type: 'number', description: 'Offices to return (default 10, max 50).' },
+      },
+    },
+  },
+};
+
+// Ask Mindy only (hidden from public MCP: public-catalog-config.ts). BigQuery + USASpending IDV records.
+const VEHICLE_SPEND_MIX_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_vehicle_spend_mix',
+    description:
+      'HOW a market buys: net obligated dollars and share by contract VEHICLE type for a NAICS (optionally one ' +
+      'awarding agency and/or place-of-performance state). Buckets: GSA Schedules (GSA-administered MAS), ' +
+      'VA-administered Federal Supply Schedules, other schedules, VA BPAs, other agencies\' BPAs, GWACs, GSA ' +
+      'multi-agency IDIQs (non-schedule), agency IDIQs, BOAs, standalone awards (no parent vehicle), and ' +
+      '"vehicle type not established". Each bucket carries obligated $, share %, award count, the rule used, and ' +
+      'how much of it is verified from USASpending\'s own IDV record versus typed from the PIID pattern ' +
+      '(heuristic_obligated). Shares sum to ~100% of the net total; rollups give all schedules / all BPAs / all ' +
+      'IDIQs+GWACs. Use for "how much X runs through GSA Schedules vs BPAs vs IDIQs". State the verified share and ' +
+      'any heuristic or unresolved share when you answer. Default window: the latest three complete fiscal years.',
+    parameters: {
+      type: 'object',
+      properties: {
+        naics: { type: 'string', description: 'NAICS code or prefix (required), comma-separated for several, e.g. "561320".' },
+        agency: { type: 'string', description: 'Optional awarding agency or sub-agency, exact name or common abbreviation (e.g. "VA", "Department of Veterans Affairs").' },
+        state: { type: 'string', description: 'Optional place-of-performance state, 2-letter code or full name.' },
+        fiscal_year: { type: 'number', description: 'One federal fiscal year.' },
+        fiscal_year_from: { type: 'number', description: 'First fiscal year, inclusive.' },
+        fiscal_year_to: { type: 'number', description: 'Last fiscal year, inclusive.' },
+      },
+      required: ['naics'],
+    },
+  },
+};
+
 const DRAFT_PROPOSAL_TOOL_DEF = {
   type: 'function' as const,
   function: {
@@ -2038,6 +2110,8 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     STATEMENT_OF_WORK_TOOL_DEF,
     EVENT_SERIES_TOOL_DEF,
     SBA_GOALING_TOOL_DEF,
+    BUYING_OFFICES_TOOL_DEF,
+    VEHICLE_SPEND_MIX_TOOL_DEF,
     DRAFT_PROPOSAL_TOOL_DEF,
     DRAFT_PROPOSAL_SECTION_TOOL_DEF,
     EXPORT_PROPOSAL_TOOL_DEF,
@@ -2108,6 +2182,8 @@ export function isMcpTool(name: string): boolean {
     name === 'extract_statement_of_work' ||
     name === 'get_federal_event_series' ||
     name === 'get_sba_goaling_share' ||
+    name === 'get_buying_offices' ||
+    name === 'get_vehicle_spend_mix' ||
     name === 'draft_proposal' ||
     name === 'draft_proposal_section' ||
     name === 'export_proposal' ||
@@ -2835,6 +2911,18 @@ async function dispatchMcpTool(
       category: typeof args.category === 'string' ? args.category : undefined,
       query: typeof args.query === 'string' ? args.query : undefined,
     }) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_buying_offices') {
+    // Raw args on purpose: the tool normalizes arrays / comma lists / state names itself and
+    // reports anything it could not apply in _meta.ignored_args (P1-1 contract).
+    const result = (await getBuyingOffices(args)) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_vehicle_spend_mix') {
+    const result = (await getVehicleSpendMix(args)) as unknown as Record<string, unknown>;
     return { result, credits };
   }
 
