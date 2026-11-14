@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import dfTable from './corpus-word-df.json';
-import { buildTextMatcher, matchesText, textPredicate, corpusDf, COMMON_WORD_DF, PARTNER_WORD_DF } from './matcher';
+import { buildTextMatcher, matchesText, textPredicate, corpusDf, COMMON_WORD_DF, PARTNER_WORD_DF, MAX_PARTNER_WORDS, CORPUS_DF_MAX_AGE_DAYS } from './matcher';
+import { buildDiscoveryPlan } from './plan';
+import { MCP_POLICY } from './policy';
+import { eligibilityLabel } from '@/lib/opportunities/find-opportunities';
 
 /**
  * Capability-list tiers (Agent 3, 2026-11-14). A capability list (>= 4 meaningful words) used to admit a record on ANY
@@ -21,6 +24,11 @@ describe('the measured frequency table', () => {
     expect(meta.minDf).toBe(0.01);
     expect(Object.keys(df).length).toBe(meta.words);
     for (const v of Object.values(df)) expect(v).toBeGreaterThanOrEqual(0.01);
+  });
+  it(`is no older than ${'$'}{CORPUS_DF_MAX_AGE_DAYS} days (rebuild with scripts/build-corpus-word-df.ts --write)`, () => {
+    const measured = Date.parse((dfTable as { _meta: { measured: string } })._meta.measured);
+    expect(Number.isFinite(measured)).toBe(true);
+    expect((Date.now() - measured) / 86_400_000).toBeLessThan(CORPUS_DF_MAX_AGE_DAYS);
   });
   it('looks a word up with its singular, and never looks up a phrase', () => {
     expect(corpusDf('grounds')).toBe(corpusDf('ground'));
@@ -67,6 +75,30 @@ describe('the SQL predicate and the JS mirror carry the same rule', () => {
     expect(p).toContain('title.imatch."\\\\mjanitorial');
     expect(p).toMatch(/and\(or\(title\.imatch\."\\\\m\(grounds/);
     expect(p).not.toMatch(/(^|,)title\.imatch\."\\\\m\(grounds[^)]*\)\\\\M"(,|$)/);
+  });
+});
+
+describe('the tool output describes the rule the code applies', () => {
+  it('eligibility label names every partner-required word under PAIR, never under ANY', () => {
+    const plan = buildDiscoveryPlan({ query: 'janitorial custodial grounds turf waste removal' }, MCP_POLICY);
+    const label = eligibilityLabel(plan);
+    const a = plan.matcher.alternatives[0];
+    expect(a.partnerRequired?.length).toBeGreaterThan(0);
+    const pair = label.match(/PAIR_ANY_TWO\(([^)]*)\)/)?.[1] ?? '';
+    const any = label.match(/(?:^|\s)ANY\(([^)]*)\)/)?.[1] ?? '';
+    for (const w of a.partnerRequired!) { expect(pair).toContain(w); expect(any).not.toContain(w); }
+    expect(any).toContain('janitorial');
+  });
+});
+
+describe('query size stays bounded', () => {
+  it(`keeps at most ${'$'}{MAX_PARTNER_WORDS} partner words (<= 15 pairs); the rest rank only`, () => {
+    // 9 words that each sit between 1% and 5% of notices, plus one rare word.
+    const q = 'janitorial staff training medical building construction development digital removal guard';
+    const a = buildTextMatcher(q).alternatives[0];
+    expect((a.partnerRequired || []).length).toBeLessThanOrEqual(MAX_PARTNER_WORDS);
+    const pairs = (textPredicate(buildTextMatcher(q), ['title']) || '').match(/and\(or\(/g) || [];
+    expect(pairs.length).toBeLessThanOrEqual((MAX_PARTNER_WORDS * (MAX_PARTNER_WORDS - 1)) / 2);
   });
 });
 

@@ -18,7 +18,8 @@ import fs from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { mapsOpenRequest, applyMapsOpenFilters } from '@/lib/opportunities/maps-open-discovery';
 import { applyMapFilters, parseMapFilters } from '@/lib/opportunities/map-filters';
-import { buildTextMatcher, conceptHit, matchesText, type Concept } from '@/lib/discovery/matcher';
+import { buildTextMatcher, conceptHit, matchesText, textPredicate, exclusionPredicate, type Concept } from '@/lib/discovery/matcher';
+import { OPEN_TEXT_COLS } from '@/lib/discovery/plan';
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
 const FX = (process.env.FIXTURE_DIR || 'tests/fixtures/anyword-matching-2026-11-14') + '/';
@@ -141,7 +142,41 @@ async function score() {
   console.log(JSON.stringify(out));
 }
 
+/**
+ * parity : FIXTURE_DIR=<dir> npx tsx scripts/eval-anyword-matching.ts parity
+ * The SQL text predicate (textPredicate, run by Postgres) and the JS mirror (matchesText, used by the evidence
+ * labellers) must give the SAME verdict for every labeled notice, or rows get fetched then silently dropped (or the
+ * reverse). Live DB, read-only. Exits 1 on any disagreement.
+ */
+async function parity() {
+  const key = JSON.parse(fs.readFileSync(FX + 'key.json', 'utf8'));
+  let total = 0, bad = 0;
+  for (const [id, k] of Object.entries<any>(key)) { // eslint-disable-line @typescript-eslint/no-explicit-any
+    const m = buildTextMatcher(k.q);
+    const pred = textPredicate(m, OPEN_TEXT_COLS); const excl = exclusionPredicate(m, OPEN_TEXT_COLS);
+    const ids = Object.keys(k.items).map((it) => it.split(':')[1]);
+    const rows: Row[] = [];
+    for (let i = 0; i < ids.length; i += 50) {
+      const { data, error } = await db.from('sam_opportunities').select(['notice_id', ...OPEN_TEXT_COLS].join(',')).in('notice_id', ids.slice(i, i + 50));
+      if (error) throw new Error(error.message); rows.push(...(data as unknown as Row[]));
+    }
+    const sqlIds = new Set<string>();
+    for (let i = 0; i < ids.length; i += 50) {
+      let q = db.from('sam_opportunities').select('notice_id').in('notice_id', ids.slice(i, i + 50));
+      if (pred) q = q.or(pred); if (excl) q = q.or(excl);
+      const { data, error } = await q; if (error) throw new Error(`${id}: ${error.message}`);
+      for (const r of data as Array<{ notice_id: string }>) sqlIds.add(r.notice_id);
+    }
+    let disagree = 0;
+    for (const r of rows) { total++; const js = matchesText(m, OPEN_TEXT_COLS.map((c) => r[c])); if (js !== sqlIds.has(String(r.notice_id))) { disagree++; bad++; console.log(`  DISAGREE ${id} ${r.notice_id} js=${js} sql=${sqlIds.has(String(r.notice_id))}`); } }
+    console.log(`${id}: ${rows.length} rows, ${disagree} disagreements`);
+  }
+  console.log(`parity: ${total} rows, ${bad} disagreements`);
+  if (bad) process.exit(1);
+}
+
 const cmd = process.argv[2];
 if (cmd === 'build') build().catch((e) => { console.error(e); process.exit(1); });
 else if (cmd === 'score') score().catch((e) => { console.error(e); process.exit(1); });
-else { console.error('usage: build | score'); process.exit(2); }
+else if (cmd === 'parity') parity().catch((e) => { console.error(e); process.exit(1); });
+else { console.error('usage: build | score | parity'); process.exit(2); }

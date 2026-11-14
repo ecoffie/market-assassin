@@ -227,6 +227,9 @@ function conceptsOf(text: string): Concept[] {
 const CORPUS_DF: Readonly<Record<string, number>> = (corpusWordDf as { df: Record<string, number> }).df;
 export const COMMON_WORD_DF = 0.05;
 export const PARTNER_WORD_DF = 0.01;
+export const MAX_PARTNER_WORDS = 6;
+/** The frequency table must be rebuilt (scripts/build-corpus-word-df.ts) before it is this old; a test enforces it. */
+export const CORPUS_DF_MAX_AGE_DAYS = 180;
 export function corpusDf(label: string): number {
   if (!label || label.includes(' ')) return 0;
   return Math.max(0, ...bases(label).map((w) => CORPUS_DF[w] ?? 0));
@@ -249,10 +252,15 @@ function capabilityListTiers(distinctive: Concept[]): { common: Concept[]; admit
   const dfOf = (c: Concept) => (c.basis === 'recognized_concept' || c.basis === 'hyphenated_compound' ? 0 : corpusDf(c.label));
   const common = distinctive.filter((c) => dfOf(c) >= COMMON_WORD_DF);
   const admit = distinctive.filter((c) => dfOf(c) < COMMON_WORD_DF);
-  const partner = admit.filter((c) => dfOf(c) >= PARTNER_WORD_DF);
+  // Pairs grow quadratically; keep the MAX_PARTNER_WORDS rarest partner words (at most 15 pairs) and let the rest rank
+  // only, so a long list can never push the PostgREST URL past its limit. Narrowing only.
+  const partnerAll = admit.filter((c) => dfOf(c) >= PARTNER_WORD_DF).sort((x, y) => dfOf(x) - dfOf(y));
+  const partner = partnerAll.slice(0, MAX_PARTNER_WORDS);
+  const overflow = partnerAll.slice(MAX_PARTNER_WORDS);
   const rare = admit.filter((c) => dfOf(c) < PARTNER_WORD_DF);
+  const kept = admit.filter((c) => !overflow.includes(c));
   const partnerRequired = rare.length || partner.length > 1 ? partner.map((c) => c.label) : [];
-  return { common, admit, partnerRequired };
+  return { common: [...common, ...overflow], admit: kept, partnerRequired };
 }
 
 function alternativeOf(text: string): Alternative | null {

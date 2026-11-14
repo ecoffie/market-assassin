@@ -130,11 +130,49 @@ arguments). Real customer search text, `find_opportunities(query=…)`:
   handling (C3) are the next levers; both need their own labeling.
 - Chat's top results for this query do not change (ranking, not eligibility).
 - The frequency table is a snapshot; it must be rebuilt with `scripts/build-corpus-word-df.ts` when the corpus shifts.
-- `find-opportunities.ts` (Agent 1's) eligibility label still prints `ANY(...)` for lists that now carry a partner rule;
-  cosmetic, left for Agent 1.
 
 ## 7. C2 readiness
 
 C2 (count only Agent 1's DIRECT_MATCH as matches on Map/alerts; related market and other shown separately; the three
 sum to Ask Mindy's total) can build on this once reviewed. Effect measured here: for the one alerting watch on the
 janitorial preset, direct matches go 6 → 3 and it would still email. Not implemented.
+
+## 8. Agent 1 review (2026-11-14) and follow-ups in this PR
+
+Agent 1 (read-only review of head 1c36fdf1c): the change does not weaken any Phase 1 evidence standard (text matching
+only gets stricter, DIRECT_MATCH only gets harder to reach). Items addressed:
+
+1. **Output must describe the applied rule (must-fix).** `eligibilityLabel` in `find-opportunities.ts` (feeds
+   `_meta.discovery.eligibility` / `consumed[]`) now prints partner words under `PAIR_ANY_TWO(...)`, never under `ANY(...)`.
+   Edited at Agent 1's request; test asserts every `partnerRequired` word is named under PAIR and none under ANY.
+2. **Plan version** bumped 2 → 3 (`DISCOVERY_PLAN_VERSION`), covering this change and C1. Golden plans regenerated: the
+   diff is only the version stamp, i.e. no golden plan's matching changed.
+3. **SQL == JS.** `scripts/eval-anyword-matching.ts parity` runs the SQL text predicate in Postgres and `matchesText` on
+   the same columns for every labeled notice: **403 rows, 0 disagreements.** (Live check; a unit test cannot run SQL.)
+4. **Stale table.** `_meta.measured` is stored; a unit test fails once the table is older than 180 days
+   (`CORPUS_DF_MAX_AGE_DAYS`), forcing a rebuild with `scripts/build-corpus-word-df.ts --write`.
+5. **Recall per query, not in the aggregate** (95% one-sided Clopper-Pearson upper bound on the loss rate):
+
+| Search | Source | Relevant in labeled current sample | Relevant lost | Loss rate (95% upper bound) |
+|---|---|---|---|---|
+| janitorial_list | saved | 6 | 0 | 0% (≤ 39%) |
+| construction_list | saved | 18 | 0 | 0% (≤ 15%) |
+| construction_modern | saved | 12 | 0 | 0% (≤ 22%) |
+| marketing_list | saved | 1 | 0 | 0% (≤ 95%) |
+| bakery_list | saved | 7 | 0 | 0% (≤ 35%) |
+| elearning_list | saved | 4 | 0 | 0% (≤ 53%) |
+| battery_list | saved | 8 | 0 | 0% (≤ 31%) |
+| novice_ac | constructed | 1 | 1 | 100% (≤ 100%) |
+| hvac_list | constructed | 5 | 0 | 0% (≤ 45%) |
+| novice_nurses | constructed | 0 | 0 | n/a (no relevant in sample) |
+| guards_list | constructed | 0 | 0 | n/a (no relevant in sample) |
+| chat sample (janitorial list, DIRECT_MATCH rows) | saved | 6 | 1 | 17% (≤ 58%) |
+
+   The samples cannot rule out a recall loss of up to the bounds shown; they show none observed on real searches.
+   Agent 1's suggested refinement (keep phrases the customer typed together, e.g. "waste removal", "grounds
+   maintenance", as one concept that admits alone) would recover the one chat-sample loss (debris removal) and is not
+   in this PR; it needs its own measurement.
+6. **Query length.** At most 6 partner words (15 pairs); extra partner words rank only (`MAX_PARTNER_WORDS`). Tested.
+
+Chat: the top results chat displays for the tested query are unchanged by this PR. What improves is the evidence labels,
+the counts, and the Map and alert results. Do not describe this as a chat-answer improvement.
