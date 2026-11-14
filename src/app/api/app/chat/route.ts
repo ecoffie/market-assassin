@@ -43,6 +43,7 @@ import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/ti
 import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/chat-tool-executor';
 import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, type PlannerTarget } from '@/lib/chat/planner-config';
 import { capabilityPlannerNote } from '@/lib/market/capability-naics';
+import { guardUnstatedStates } from '@/lib/chat/stated-filters';
 import { prepareChatToolArgs, renderExpiringRecords, checkSummaryAgainstRecords, EXPIRING_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
@@ -162,8 +163,8 @@ Tool-use rules:
 - A tool result with ok:false and an error_category (state "unavailable") means that data COULD NOT BE RETRIEVED. Say the lookup was unavailable or not permitted from chat. NEVER describe it as "none", "no contracts", or zero.
 - Filters cover the whole request. get_expiring_contracts accepts several NAICS codes and several states comma-separated in ONE call: when the user names several kinds of work or several states, pass them all there (for example "janitorial and landscaping" -> naics "561720,561730"; "VA, MD and DC" -> state "VA,MD,DC"). Other tools take ONE NAICS code and ONE state per call unless their own description says they accept lists: call them once per code or state instead of joining values. Never drop part of what the user asked for.
 - Expiring-contract records are rendered for the user by the system from the tool data (every record, or a stated page with the total). When the user asks to continue a list (for example "show expiring records 21 to 40"), call get_expiring_contracts again with exactly the same filters as the previous search plus display_offset = the first requested record number minus 1. Never present a subset as the full list.
-- Only pass search filters the user stated. Never add a state, agency, NAICS or date range they did not name.
-- Is a contract still active / who replaced it: find its PIID (search_past_contracts with keyword, agency and location, or the number the user gave), then call get_award_detail and report status, the end date and the successor result: name each candidate with its evidence, or say "checked, none found" and what was checked.
+- Only pass search filters the user stated or clearly implied. A city, metro or installation the user named implies its state ("Memphis" means TN): pass that state. Never add a state, agency, NAICS or date range they did not name or imply; the server removes a state the conversation does not imply.
+- Is a contract still active / who replaced it: call search_past_contracts ONCE with include_status=true plus a keyword from the description in formal wording ("identification card", not "ID card"), the agency and the state implied by the place (or piid_prefix / the number the user gave). Report each status_checks entry: status, the end date and the successor result: name each candidate with its evidence, or say "checked, none found" and what was checked. Do not ask the user for a contract number first.
 - If a result has _meta.lag_note, say the data is current through that date and recent awards may not be published yet. Never say no award was made.
 - Contacts at a company: call get_sblo_contact. If it has no named liaison but returns registered_points_of_contact, name those people with their titles, say they are the firm's registered SAM points of contact (not a designated small business liaison) as of the as_of date, and never state an email or phone the tool did not return.
 - Every tool result carries _meta.result_state and _meta.ignored_args. Only result_state "none_found" with an empty ignored_args is a verified zero: only then may you say nothing matched. "filter_not_applied" or "partial": name each ignored argument and say that part was NOT checked (for example: "I could not filter by city, so this covers all of Tennessee"); never present the result as complete or as a zero. "unavailable": the data could not be retrieved; never call it none. "not_reported": the tool gives no status; judge from the rows it returned (zero rows means nothing matched those filters) and still name any ignored arguments.
@@ -412,6 +413,8 @@ export async function POST(request: NextRequest) {
         // P1-F: the same customer words always map to the same NAICS (deterministic lexicon), so
         // the planner does not re-guess codes on every turn.
         const capabilityNote = capabilityPlannerNote(message);
+        // What the customer has said in this conversation (for the stated-filters guard).
+        const conversationText = [...history.filter((h) => h.role === 'user').map((h) => String(h.content || '')), message].join('\n');
         const toolRoundMessages: Array<{ role: string; content: string }> = [
           { role: 'system', content: capabilityNote ? `${systemPrompt}\n\n${capabilityNote}` : systemPrompt },
         ];
@@ -577,7 +580,10 @@ export async function POST(request: NextRequest) {
                 const id = tc.id || `call_${i}`;
                 const prepared = prepareChatToolArgs(String(tc.function?.name || ''), String(tc.function?.arguments ?? ''));
                 if (prepared.displayOffset) displayOffsets.set(id, prepared.displayOffset);
-                return { ...tc, id, type: 'function' as const, function: { ...tc.function, arguments: prepared.args } };
+                // Stated filters only: drop a state the conversation never implied (deterministic).
+                const guarded = guardUnstatedStates(prepared.args, conversationText);
+                for (const r of guarded.removed) turnTrace.notices.push(`unstated_filter_removed:${tc.function?.name}:${r}`);
+                return { ...tc, id, type: 'function' as const, function: { ...tc.function, arguments: guarded.args } };
               });
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               pendingToolTurnIdx = (messages as any[]).push({ role: 'assistant', content: choice.content ?? null, tool_calls: toolCalls }) - 1;
