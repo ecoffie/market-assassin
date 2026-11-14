@@ -416,6 +416,13 @@ export function renderStatusChecks(result: Rec): RenderedRecords | null {
   // An empty search inside the publication-lag window is not a verified zero: state the tool's own
   // freshness note verbatim (a model paraphrase can lose the date it is current through).
   const awardsList = Array.isArray(result?.awards) ? (result.awards as Rec[]) : [];
+  if (!checks && !awardsList.length && !meta.lag_note && Array.isArray(result?.awards) && !meta.degraded) {
+    // acc6 R5: an empty result without a lag note was left to the model, which wrote "there are no
+    // current awards". An empty search is reported with its filters and never as proof of none.
+    const searched = awardFilterParts((meta.applied_filters && typeof meta.applied_filters === 'object' ? meta.applied_filters : {}) as Rec);
+    const text = `No awards matched this search${searched.length ? ` (${searched.join(' · ')})` : ''}. This is NOT proof that no such contract exists: a keyword search matches only those words in award records, and an award described differently, recorded under another agency or location, or not yet published would not appear.${meta.auto_widened ? ' The search was also retried with the widest location scope.' : ''}`;
+    return { tool: PAST_CONTRACTS_TOOL, text, total: 0, retrieved: 0, from: 0, to: 0, shown: 0, exhaustive: false, ids: [], allowedCounts: [0], standalone: 0, orders: 0 };
+  }
   if (!checks && !awardsList.length && meta.lag_note) {
     const searched = awardFilterParts((meta.applied_filters && typeof meta.applied_filters === 'object' ? meta.applied_filters : {}) as Rec);
     const text = `No awards were found for this search${searched.length ? ` (${searched.join(' · ')})` : ' in the requested window'}, and that is NOT a verified zero.${meta.auto_widened ? ' The search was also retried with the widest location scope and still found nothing.' : ''} ${freshnessSentence(meta)}`;
@@ -426,13 +433,7 @@ export function renderStatusChecks(result: Rec): RenderedRecords | null {
   const byId = new Map(awards.map((a) => [str(a.awardId), a]));
   const total = Math.max(num(meta.total) ?? awards.length, awards.length);
   const af = (meta.applied_filters && typeof meta.applied_filters === 'object' ? meta.applied_filters : {}) as Rec;
-  const fparts: string[] = [];
-  const val = (v: unknown) => (v && typeof v === 'object' ? str((v as Rec).value ?? (v as Rec).name) : str(v));
-  if (af.keyword) fparts.push(`keyword "${val(af.keyword)}"`);
-  if (af.piid_prefix) fparts.push(`number starting ${val(af.piid_prefix)}`);
-  if (af.agency) fparts.push(`agency ${val(af.agency)}`);
-  if (af.state) fparts.push(`place of performance ${val(af.state)}`);
-  if (af.naics) fparts.push(`NAICS ${val(af.naics)}`);
+  const fparts = awardFilterParts(af);
   const lines: string[] = [];
   lines.push(`${total} award${total === 1 ? '' : 's'} match (${fparts.join(' · ') || 'no filters'}). Source: USASpending. Status checked for ${checks.length}:`);
   lines.push('');
@@ -594,7 +595,9 @@ export function freshnessSentence(meta: Rec): string {
 function awardFilterParts(af: Rec): string[] {
   const val = (v: unknown) => (v && typeof v === 'object' ? str((v as Rec).value ?? (v as Rec).name ?? (v as Rec).code) : Array.isArray(v) ? (v as unknown[]).map(str).join(', ') : str(v));
   const parts: string[] = [];
-  if (af.keyword) parts.push(`keyword "${val(af.keyword)}"`);
+  const retry = (af.keyword_retry && typeof af.keyword_retry === 'object' ? af.keyword_retry : null) as Rec | null;
+  if (retry) parts.push(`keyword "${str(retry.used)}" (your wording "${str(retry.requested)}" matched nothing, so Mindy searched without the agency words and with abbreviations spelled out)`);
+  else if (af.keyword) parts.push(`keyword "${val(af.keyword)}"`);
   if (af.office && typeof af.office === 'object') parts.push(`office ${str((af.office as Rec).code)} ${str((af.office as Rec).name)}`);
   else if (af.piid_prefix) parts.push(`number starting ${val(af.piid_prefix)}`);
   if (af.agency) parts.push(`agency ${val(af.agency)}`);

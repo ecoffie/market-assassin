@@ -146,7 +146,7 @@ describe('status checks (search_past_contracts include_status)', () => {
   };
   it('renders every checked award with status, end date and successor; never picks one', () => {
     const r = renderStatusChecks(result)!;
-    expect(r.text).toMatch(/^3 awards match \(keyword "identification card" · agency Department of the Navy · place of performance TN\)/);
+    expect(r.text).toMatch(/^3 awards match \(keyword "identification card" · agency Department of the Navy · state TN\)/); // fixture state carries no scope
     expect(r.text).toMatch(/N0018921F3006 · Magellan Federal · .* · EXPIRED: ended 2026-07-31 \(105 days ago\) · candidate successor \(unconfirmed; USASpending does not link follow-ons\): N0018926FD111 · Gemini Tech Services LLC/);
     expect(r.text).toMatch(/N0018925CZ092 · .* · ACTIVE: ends 2027-07-31 \(259 days left\)/);
     expect(r.text).toMatch(/1 more matching award was not status-checked; this is not the full list\./);
@@ -155,8 +155,8 @@ describe('status checks (search_past_contracts include_status)', () => {
     const r = renderStatusChecks({ ...result, status_checks: [{ award_id: 'X1', status: 'expired', days_until_end: -3, end_date: '2026-11-11', successor: { state: 'unavailable' } }], _meta: { total: 1 } })!;
     expect(r.text).toMatch(/successor check unavailable \(source error, not a none\)/);
   });
-  it('returns null without status_checks', () => {
-    expect(renderStatusChecks({ awards: [], _meta: {} })).toBeNull();
+  it('returns null without status_checks or awards to show', () => {
+    expect(renderStatusChecks({ _meta: {} })).toBeNull();
   });
 });
 
@@ -226,8 +226,14 @@ describe('freshness: empty recent-window search', () => {
     expect(r.text).toMatch(/reliably current through about 2026-08-15 only \(last loaded 2026-11-13\)/);
     expect(r.text).not.toMatch(/no award was made|Treat an empty/);
   });
-  it('an empty search with no lag note renders nothing (the model reports the verified zero)', () => {
-    expect(renderStatusChecks({ awards: [], _meta: {} })).toBeNull();
+  it('acc6 R5: an empty search with no lag note is rendered with its filters and never as proof of none', () => {
+    const r = renderStatusChecks({ awards: [], _meta: { applied_filters: { agency: { name: 'Department of the Navy' }, keyword: { value: 'Navy ID card' }, state: { value: 'TN', scope: 'pop' } } } })!;
+    expect(r.text).toMatch(/^No awards matched this search \(keyword "Navy ID card" · agency Department of the Navy · state TN \(place of performance\)\)\. This is NOT proof that no such contract exists/);
+    expect(renderStatusChecks({ awards: [], _meta: { degraded: true } })).toBeNull();
+  });
+  it('acc6 R5: a keyword retry is disclosed in the filters', () => {
+    const r = renderStatusChecks({ awards: [], _meta: { applied_filters: { keyword: { value: 'identification card' }, keyword_retry: { requested: 'Navy ID card', used: 'identification card' } } } })!;
+    expect(r.text).toMatch(/keyword "identification card" \(your wording "Navy ID card" matched nothing/);
   });
 });
 
