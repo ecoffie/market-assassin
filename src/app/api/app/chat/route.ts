@@ -397,13 +397,21 @@ export async function POST(request: NextRequest) {
 
   // SSE response — manually constructed ReadableStream since the
   // Vercel Edge / Node runtime doesn't expose an out-of-the-box helper.
+  // The browser disconnecting must stop billing. Three signals, because no single one is reliable
+  // everywhere: enqueue/close throwing (local Node), the stream being cancelled, and the request's abort
+  // signal (Next.js aborts it when the response connection closes). Production 2026-11-14 proved the
+  // first alone is not enough: on Vercel the writes kept succeeding after the client left, and an
+  // abandoned card-chat answer was charged.
+  let clientGone = false;
+  try { request.signal?.addEventListener?.('abort', () => { clientGone = true; }, { once: true }); } catch { /* no signal */ }
+  if (request.signal?.aborted) clientGone = true;
   const stream = new ReadableStream({
+    cancel() { clientGone = true; },
     async start(controller) {
       const encoder = new TextEncoder();
       // A client that disconnected makes enqueue/close throw. That must never be mistaken for a
       // tool failure (it would inject a "tools unavailable" note after a completed write), and it
       // must never skip cost recording or persistence: both are wrapped and never throw.
-      let clientGone = false;
       const send = (obj: unknown) => {
         if (clientGone) return;
         try { controller.enqueue(encoder.encode(sseEvent(obj))); } catch { clientGone = true; }

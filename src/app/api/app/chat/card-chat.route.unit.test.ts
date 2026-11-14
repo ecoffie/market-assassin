@@ -238,6 +238,21 @@ describe('no duplicate charge on a dropped connection', () => {
     await new Promise((r) => setTimeout(r, 30));
     expect(debitCredits).not.toHaveBeenCalled();
   });
+  it('production case: the request is aborted while the stream keeps being read → not charged', async () => {
+    // On Vercel (2026-11-14) a closed browser did not make enqueue throw; the response stream kept
+    // being drained and only the request signal reported the disconnect. That turn was charged.
+    vi.resetModules();
+    const { POST } = await import('./route');
+    const ac = new AbortController();
+    const req = new Request('https://getmindy.ai/api/app/chat', { method: 'POST', signal: ac.signal, body: JSON.stringify({ email: ME, message: 'When is it due?', ...card }) });
+    const res = await POST(req as never);
+    const reader = res.body!.getReader();
+    await reader.read();            // the session event arrives
+    ac.abort();                     // the visitor's connection drops; the platform keeps reading
+    for (;;) { const { done } = await reader.read(); if (done) break; }
+    await new Promise((r) => setTimeout(r, 30));
+    expect(debitCredits).not.toHaveBeenCalled();
+  });
   it('a retry after the drop is charged exactly once', async () => {
     await post(card);
     expect(debitCredits).toHaveBeenCalledTimes(1);
