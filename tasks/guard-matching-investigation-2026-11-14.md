@@ -112,3 +112,18 @@ names guard posts) are plausible subcontract scope: exactly the case Agent 4's s
 4. Ranking (meaning order inside a tier, Agent 4's proposal) is a separate open decision for Eric.
 
 Ships as its own PR, separate from #2048 (C2), #2043 (alerts) and any performance change.
+
+## 5. Cross-check with Agent 4's post-#2050 evaluation (branch research/data-core-hidden-opp-benchmark-v1, dd21f980e)
+
+Agent 4 independently counted 136 of the 476 guard rows as Coast Guard / Marine Security Guard collisions (my
+210 "organization-only" also includes National Guard). Its blind top-20 for guards: 2 relevant (production
+order), 3 with meaning order, **3 with the collisions removed**. Removing organization collisions alone does not
+lift guards top-20 precision, because the next DIRECT rows are "guard" as an object (brush, hose, safety guard)
+and National Guard meals / laundry. This matches section 2: organizations are ~44% of the noise, verbs and
+objects most of the rest.
+
+So A is worth doing for correctness (wrong DIRECT labels on every search that shares a word with an agency name,
+e.g. "defense", "marketing", "food"), but it is **not** the fix that makes guard searches useful. For guards that
+requires B (the typed phrase) and C (code-based recall: 9 of 13 guard notices never say "guard"). Janitorial is
+the same shape: Agent 4 finds the 271-row DIRECT tier is grease-trap / duct / hull cleaning and 8 of the 12
+janitorial-coded rows in the window are classed "other": a matching and recall problem, not ranking.
