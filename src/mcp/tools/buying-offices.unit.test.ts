@@ -164,3 +164,25 @@ describe('Ask-Mindy-only availability', () => {
     });
   }
 });
+
+describe('deterministic metro expansion (no dependence on which suburbs a model recalls)', () => {
+  it('a single core city expands to cities within the radius in the state', async () => {
+    const { d, calls } = deps();
+    const r = await getBuyingOffices({ state: 'TN', city: 'Memphis', naics: '5613' }, d, NOW);
+    const sent = calls.find((c) => 'cities' in c.params)!.params.cities as string[];
+    expect(sent).toEqual(expect.arrayContaining(['MEMPHIS', 'MILLINGTON', 'GERMANTOWN', 'COLLIERVILLE']));
+    expect(r._meta.applied_filters.metro).toMatchObject({ core_city: 'MEMPHIS', center: 'MEMPHIS|TN', radius_miles: 30 });
+    // expansion towns with no awards are expected and are not reported as misses
+    expect(r.cities_without_rows).toEqual([]);
+  });
+  it('metro_radius_miles=0 keeps the exact city only', async () => {
+    const { d, calls } = deps();
+    await getBuyingOffices({ state: 'TN', city: 'Memphis', naics: '5613', metro_radius_miles: 0 }, d, NOW);
+    expect(calls.find((c) => 'cities' in c.params)!.params.cities).toEqual(['MEMPHIS']);
+  });
+  it('a city not in the list is kept as given (never dropped)', async () => {
+    const { d, calls } = deps();
+    await getBuyingOffices({ state: 'TN', city: 'Atlantis', naics: '5613' }, d, NOW);
+    expect(calls.find((c) => 'cities' in c.params)!.params.cities).toEqual(['ATLANTIS']);
+  });
+});

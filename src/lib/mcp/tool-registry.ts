@@ -1868,9 +1868,8 @@ const BUYING_OFFICES_TOOL_DEF = {
       'dollars and share, top NAICS, example award ids, top place-of-performance cities, and the customer (funding) ' +
       'offices behind it; rank_by:"funding" ranks the customer organizations instead. Location is PLACE OF ' +
       'PERFORMANCE: an office located elsewhere (e.g. a regional contracting center) is ranked for a city when the ' +
-      'work it bought is performed there, so name the office AND where the work is. For a metro, pass the core city ' +
-      'plus its suburbs in `cities` (e.g. Memphis metro: Memphis, Millington, Germantown, Bartlett, Collierville, ' +
-      'Cordova) with the state; cities_without_rows lists requested cities that had nothing. Requires a state, NAICS ' +
+      'work it bought is performed there, so name the office AND where the work is. For a metro, pass the core city in `city` with the state: ' +
+      'it expands to every city within metro_radius_miles (default 30) automatically; cities_without_rows lists requested cities that had nothing. Requires a state, NAICS ' +
       'or PSC. Default window: the latest three complete fiscal years. _meta.result_state "unavailable" (including ' +
       'incomplete_reason "scope_too_broad") is NOT a zero: narrow the window and retry.',
     parameters: {
@@ -1879,6 +1878,7 @@ const BUYING_OFFICES_TOOL_DEF = {
         state: { type: 'string', description: 'US state, 2-letter code or full name (place of performance).' },
         city: { type: 'string', description: 'One city, or several comma-separated (place of performance).' },
         cities: { type: 'array', items: { type: 'string' }, description: 'Several cities, e.g. a metro core city plus suburbs.' },
+        metro_radius_miles: { type: 'number', description: 'Metro radius in miles around a single core `city` (default 30; 0 = that city only).' },
         naics: { type: 'string', description: 'NAICS code(s) or prefixes, comma-separated, e.g. "561320" or "5613,5611". Staffing and clerical: 5613 (employment services) and 5611/5614 (office administrative and business support).' },
         psc: { type: 'string', description: 'PSC code(s) or prefixes, comma-separated, e.g. "R6" or "R699".' },
         fiscal_year: { type: 'number', description: 'One federal fiscal year (Oct 1 - Sep 30).' },

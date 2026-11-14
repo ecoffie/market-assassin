@@ -24,6 +24,8 @@
 import {
   bqDateString,
   normalizeCities,
+  expandMetroCities,
+  DEFAULT_METRO_RADIUS_MILES,
   normalizeNaicsPrefixes,
   normalizePscPrefixes,
   normalizeStateArg,
@@ -46,6 +48,8 @@ export interface BuyingOfficesInput {
   state?: unknown;
   city?: unknown;
   cities?: unknown;
+  /** Radius (miles) for expanding a single core `city` to its metro (default 30; 0 = exact city only). */
+  metro_radius_miles?: unknown;
   naics?: unknown;
   psc?: unknown;
   fiscal_year?: unknown;
@@ -313,7 +317,15 @@ export async function getBuyingOffices(
   const ignored: IgnoredArg[] = [];
   const st = normalizeStateArg(input.state);
   ignored.push(...st.ignored);
-  const cities = normalizeCities(input.city, input.cities);
+  // A single core `city` expands deterministically to every city within metro_radius_miles in the
+  // requested state (Mindy's city list), so a metro never depends on which suburbs a model recalls.
+  const explicitCities = normalizeCities(input.cities);
+  const coreCities = normalizeCities(input.city);
+  const radiusRaw = input.metro_radius_miles == null ? NaN : Number(input.metro_radius_miles);
+  const radius = Number.isFinite(radiusRaw) && radiusRaw >= 0 ? Math.min(radiusRaw, 100) : DEFAULT_METRO_RADIUS_MILES;
+  const metro = coreCities.length === 1 && radius > 0 ? expandMetroCities(coreCities[0], st.state ? [st.state] : [], radius) : null;
+  const requestedCities = Array.from(new Set([...coreCities, ...explicitCities]));
+  const cities = metro ? Array.from(new Set([...metro.cities, ...requestedCities])) : requestedCities;
   const naics = normalizeNaicsPrefixes(input.naics);
   ignored.push(...naics.ignored);
   const psc = normalizePscPrefixes(input.psc);
@@ -340,9 +352,11 @@ export async function getBuyingOffices(
   if (fy.window.date_to) applied.date_to = fy.window.date_to;
   if (st.state) applied.state = st.state;
   if (cities.length) {
-    if (input.city != null) applied.city = cities;
-    if (input.cities != null) applied.cities = cities;
+    if (input.city != null) applied.city = coreCities;
+    if (input.cities != null) applied.cities = explicitCities;
+    if (metro) applied.metro = { core_city: coreCities[0], center: metro.center, radius_miles: radius, cities_included: metro.cities.length };
   }
+  if (input.metro_radius_miles != null) applied.metro_radius_miles = radius;
   if (naics.codes.length) applied.naics = naics.codes;
   if (psc.codes.length) applied.psc = psc.codes;
 
@@ -490,7 +504,8 @@ export async function getBuyingOffices(
     result.cities_matched = cities
       .filter((c) => seen.has(c))
       .map((c) => ({ city: c, obligated: round2(num(seen.get(c)!.obligated)), award_count: num(seen.get(c)!.award_count) }));
-    result.cities_without_rows = cities.filter((c) => !seen.has(c));
+    // Report only the cities the caller NAMED; metro-expansion towns with no awards are expected.
+    result.cities_without_rows = requestedCities.filter((c) => !seen.has(c));
     if (result.cities_without_rows.length && offices.length) {
       notes.push(`Checked, no awards in scope performed in: ${result.cities_without_rows.join(', ')} (the city must match the place-of-performance city spelling).`);
     }

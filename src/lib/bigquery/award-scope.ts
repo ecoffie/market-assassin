@@ -1,3 +1,4 @@
+import cityCoordsData from '@/data/us-city-coords.json';
 /**
  * Shared scope helpers for the Ask-Mindy-only BigQuery award aggregation tools
  * (get_buying_offices, get_vehicle_spend_mix).
@@ -231,3 +232,40 @@ export function num(v: unknown): number {
 }
 
 export const round2 = (n: number) => Math.round(n * 100) / 100;
+
+
+/** Default metro radius for a core city (miles). Millington is ~17 mi from Memphis. */
+export const DEFAULT_METRO_RADIUS_MILES = 30;
+
+function haversineMiles(a: [number, number], b: [number, number]): number {
+  const R = 3958.8;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(b[0] - a[0]);
+  const dLon = toRad(b[1] - a[1]);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+/**
+ * Deterministic metro expansion: every city in Mindy's US city list within `radiusMiles` of the
+ * core city (in the given states when provided; the core city itself is resolved in those states).
+ * Returns null when the core city is not in the list (caller keeps the exact city only).
+ */
+export function expandMetroCities(core: string, states: string[], radiusMiles = DEFAULT_METRO_RADIUS_MILES): { cities: string[]; center: string } | null {
+  const coords = cityCoordsData as unknown as Record<string, [number, number]>;
+  const c = core.toUpperCase().replace(/\s+/g, ' ').trim();
+  const centerKey = (states.length ? states : Object.keys(coords).filter((k) => k.startsWith(`${c}|`)).map((k) => k.split('|')[1]))
+    .map((s) => `${c}|${s}`)
+    .find((k) => coords[k]);
+  if (!centerKey) return null;
+  const center = coords[centerKey];
+  const allow = states.length ? new Set(states) : null;
+  const out: string[] = [];
+  for (const [key, pt] of Object.entries(coords)) {
+    const [city, st] = key.split('|');
+    if (allow && !allow.has(st)) continue;
+    if (!Array.isArray(pt) || haversineMiles(center, pt) > radiusMiles) continue;
+    if (!out.includes(city)) out.push(city);
+  }
+  return { cities: out.sort(), center: centerKey };
+}
