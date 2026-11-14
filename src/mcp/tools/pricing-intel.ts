@@ -32,7 +32,8 @@ import { withCache } from '@/lib/mcp/external-cache';
 import { mcpFlags } from '@/lib/mcp/flags';
 
 const CACHE_TTL_SECONDS = 12 * 60 * 60; // 12h — CALC refreshes upstream daily; cache saves the 20-180-call fan-out
-const CACHE_API_TYPE = 'calc:pricing';
+// v2: payload gained priceToWinBasis + titleMedian (Ask Mindy R7); a v1 cache row lacks them.
+const CACHE_API_TYPE = 'calc:pricing:v2';
 
 export interface PricingIntelInput {
   /** NAICS code, e.g. "541512". Mutually exclusive with keyword. */
@@ -46,6 +47,11 @@ export interface PricingIntelResult {
   queried: { naics?: string; keyword?: string };
   /** The full CALC pricing intel (pass-through so the agent can cite sub-fields). */
   pricing: PricingIntelData | null;
+  /**
+   * Ask Mindy R7: every rate with its population and n, the explicit ordering, and a statement
+   * that names all three price points. Additive; absent when there are no rates.
+   */
+  rate_summary?: RateSummary;
   /**
    * Pre-narrated conclusion the agent can quote verbatim. OPTIONAL and TOGGLED OFF
    * by default (mcpFlags.aiHint) — the data layer + `_meta` signals ship first;
@@ -68,6 +74,86 @@ export interface PricingIntelResult {
     validation_error?: string;
     /** Present when a non-services NAICS was requested — CALC prices labor, not products (FM-U02). */
     not_applicable?: string;
+  };
+}
+
+export interface RateSummaryRate {
+  label: 'aggressive' | 'competitive' | 'premium';
+  /** Alternative name for the same figure (competitive IS the market median). */
+  also_called?: string;
+  percentile: 25 | 50 | 75;
+  hourly: number;
+  population: string;
+  n: number;
+}
+
+export interface RateSummary {
+  unit: string;
+  ordering: string;
+  ordering_holds: boolean;
+  population: { description: string; search_term: string | null; source: string; n: number };
+  rates: RateSummaryRate[];
+  market_median: { hourly: number; percentile: 50; same_as: 'competitive'; n: number };
+  by_business_size: {
+    small: { median: number; n: number; population: string };
+    other_than_small: { median: number; n: number; population: string };
+  };
+  /** Per-title medians: a DIFFERENT, smaller population than the market rates above. */
+  per_title_medians: Array<{ title: string; title_median: number; p25: number; p75: number; n: number; population: string }>;
+  /** One sentence stating every price point in order; safe to quote. */
+  statement: string;
+}
+
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/** Build the labelled rate block from CALC data. Pure; exported for tests. */
+export function buildRateSummary(data: PricingIntelData): RateSummary {
+  const ptw = data.priceToWinGuidance;
+  const basis = data.priceToWinBasis ?? {
+    source: 'calc_server_aggregation' as const,
+    searchTerm: data.searchTermsUsed[0] ?? null,
+    n: data.totalRecordsAnalyzed,
+  };
+  const term = basis.searchTerm;
+  const popDesc =
+    basis.source === 'calc_server_aggregation'
+      ? `All GSA CALC+ awarded labor-category records matching "${term}" (percentiles computed by CALC over the full match set)`
+      : `The GSA CALC+ records fetched for "${term}" (CALC aggregation unavailable; computed locally)`;
+  const popShort = `all CALC records matching "${term}"`;
+  const n = basis.n;
+  const rates: RateSummaryRate[] = [
+    { label: 'aggressive', percentile: 25, hourly: r2(ptw.aggressiveRate), population: popShort, n },
+    { label: 'competitive', also_called: 'market median', percentile: 50, hourly: r2(ptw.competitiveRate), population: popShort, n },
+    { label: 'premium', percentile: 75, hourly: r2(ptw.premiumRate), population: popShort, n },
+  ];
+  const holds = ptw.aggressiveRate <= ptw.competitiveRate && ptw.competitiveRate <= ptw.premiumRate;
+  const biz = data.businessSizeComparison;
+  const lead = data.searchTermsUsed[0] ?? term;
+  return {
+    unit: 'USD per hour, GSA Schedule ceiling rate',
+    ordering: 'aggressive <= competitive (market median) <= premium',
+    ordering_holds: holds,
+    population: { description: popDesc, search_term: term, source: basis.source, n },
+    rates,
+    market_median: { hourly: r2(ptw.competitiveRate), percentile: 50, same_as: 'competitive', n },
+    by_business_size: {
+      small: { median: r2(biz.smallBusiness.median), n: biz.smallBusiness.count, population: `CALC records matching "${lead}" with business_size = small` },
+      other_than_small: { median: r2(biz.largeBusiness.median), n: biz.largeBusiness.count, population: `CALC records matching "${lead}" with business_size = other than small` },
+    },
+    per_title_medians: data.laborCategories.slice(0, 10).map((c) => ({
+      title: c.category,
+      title_median: r2(c.titleMedian ?? c.median),
+      p25: r2(c.percentile25),
+      p75: r2(c.percentile75),
+      n: c.recordCount,
+      population: `fetched records whose labor_category is exactly "${c.category}" (a subset; not the market rate population)`,
+    })),
+    statement:
+      `GSA CALC+ ceiling rates for "${term}" (n=${n} records): ` +
+      `aggressive (25th percentile) $${rates[0].hourly.toFixed(2)}/hr; ` +
+      `competitive (market median, 50th percentile) $${rates[1].hourly.toFixed(2)}/hr; ` +
+      `premium (75th percentile) $${rates[2].hourly.toFixed(2)}/hr. ` +
+      `Ordering: aggressive <= competitive <= premium${holds ? '' : ' (NOT satisfied by this data; report the figures as-is)'}.`,
   };
 }
 
@@ -107,7 +193,7 @@ function buildHint(
   if (grounded && data) {
     return {
       summary:
-        `Median GSA rate for "${topCat?.category ?? 'the top labor category'}" in ${scope} is ${fmtRate(ptw?.competitiveRate)} (market midpoint / price-to-win target). Price-to-win: aggressive ${fmtRate(ptw?.aggressiveRate)} / competitive ${fmtRate(ptw?.competitiveRate)} / premium ${fmtRate(ptw?.premiumRate)}. Based on ${records} awarded records across ${categories} labor categories. Small vs large business gap ${fmtPct(biz?.gapPercent)} (small ${fmtRate(biz?.smallBusiness?.median)} vs large ${fmtRate(biz?.largeBusiness?.median)}).${vendors ? ` Top vendor: ${data.topVendors[0].name} (avg ${fmtRate(data.topVendors[0].avgRate)}, ${data.topVendors[0].businessSize === 'S' ? 'small' : 'large'} biz).` : ''}`,
+        `Market median GSA rate (50th percentile of ${data.priceToWinBasis?.n ?? records} CALC records matching "${data.priceToWinBasis?.searchTerm ?? scope}") is ${fmtRate(ptw?.competitiveRate)}; it is the competitive rate, not the median of any single title${topCat ? ` (the largest title, "${topCat.category}", has its own median ${fmtRate(topCat.titleMedian ?? topCat.median)} over n=${topCat.recordCount})` : ''}. Price-to-win: aggressive ${fmtRate(ptw?.aggressiveRate)} / competitive ${fmtRate(ptw?.competitiveRate)} / premium ${fmtRate(ptw?.premiumRate)}. Based on ${records} awarded records across ${categories} labor categories. Small vs large business gap ${fmtPct(biz?.gapPercent)} (small ${fmtRate(biz?.smallBusiness?.median)} vs large ${fmtRate(biz?.largeBusiness?.median)}).${vendors ? ` Top vendor: ${data.topVendors[0].name} (avg ${fmtRate(data.topVendors[0].avgRate)}, ${data.topVendors[0].businessSize === 'S' ? 'small' : 'large'} biz).` : ''}`,
       how_to_use:
         `Quote the three price-to-win targets as the bid-rate ceiling: lead with competitive (${fmtRate(ptw?.competitiveRate)}) as the defensible target; aggressive (${fmtRate(ptw?.aggressiveRate)}) to undercut on price; premium (${fmtRate(ptw?.premiumRate)}) for differentiated value. The top vendors are the likely competitor rate card.`,
       key_caveats: [
@@ -176,7 +262,9 @@ export async function getPricingIntel(input: PricingIntelInput): Promise<Pricing
       CACHE_API_TYPE,
       params,
       CACHE_TTL_SECONDS,
-      () => (naics ? fetchPricingIntel(naics) : fetchPricingIntelByKeywords(keyword!)),
+      () => (naics
+        ? fetchPricingIntel(naics, { throwOnUpstreamError: true })
+        : fetchPricingIntelByKeywords(keyword!, { throwOnUpstreamError: true })),
     );
     data = value;
     fromCache = hit;
@@ -221,6 +309,7 @@ export async function getPricingIntel(input: PricingIntelInput): Promise<Pricing
   const result: PricingIntelResult = {
     queried,
     pricing: naicsNotPriceable ? null : data,
+    ...(grounded && data ? { rate_summary: buildRateSummary(data) } : {}),
     _meta: {
       grounded,
       degraded,

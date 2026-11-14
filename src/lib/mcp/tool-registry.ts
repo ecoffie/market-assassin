@@ -268,7 +268,9 @@ const PRICING_INTEL_TOOL_DEF = {
       'daily refresh). Pass a NAICS code OR a labor-category keyword to get the market median, ' +
       'aggressive/competitive/premium price-to-win rates, small-vs-large gap, top labor categories, ' +
       'and top competing vendors. Returns grounded=false when CALC has no rates — do not invent rates. ' +
-      'Rates are GSA Schedule ceiling rates (not commercial).',
+      'Rates are GSA Schedule ceiling rates (not commercial). rate_summary gives every rate with its population and n: ' +
+      'aggressive (25th pct) <= competitive (= market median, 50th pct) <= premium (75th pct), all over ONE population; ' +
+      'per_title_medians are single-title subsets, not the market median. Quote rate_summary.statement to state all three.',
     parameters: {
       type: 'object',
       properties: {

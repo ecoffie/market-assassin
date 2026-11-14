@@ -155,7 +155,7 @@ async function liveSolicitationTexts(codes: string[], terms: string[]): Promise<
 }
 
 const defaultDeps: CompanyKeywordsDeps = {
-  embed: embedTexts,
+  embed: (t) => embedTexts(t),
   codesForTerm: (t) => codesForTerm(t, { limit: 3 }),
   getVocabulary: (c) => getVocabulary(c, { limit: 40 }),
   calcTitles: liveCalcTitles,

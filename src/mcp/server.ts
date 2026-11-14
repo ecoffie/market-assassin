@@ -148,7 +148,9 @@ server.registerTool(
       'premium price-to-win rates, small-vs-large business gap, top labor categories, and top ' +
       'competing vendors. Returns grounded=false when CALC has no rates for the input — in that ' +
       'case tell the user no pricing data was found and suggest a broader/sibling term; do NOT ' +
-      'invent rates. Rates are GSA Schedule ceiling rates only (not commercial).',
+      'invent rates. Rates are GSA Schedule ceiling rates only (not commercial). rate_summary gives every rate with ' +
+      'its population and n (aggressive 25th <= competitive = market median 50th <= premium 75th, one population); ' +
+      'per_title_medians are single-title subsets. Quote rate_summary.statement to state all three.',
     inputSchema: {
       naics: z
         .string()
