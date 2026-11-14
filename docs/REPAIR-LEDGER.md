@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-14 — Introductory credits at registration (one per account)
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-14 | Credits / registration | The existing introductory grant (100, MCP_SIGNUP_CREDITS default; prod not overridden) fired only on the first MCP touch, so Maps/App registrants never got it. Now scheduled at the three verified sign-in seams through the same `mcp_grant_signup_credits` (one `signup_grant` per account), off until `SIGNUP_GRANT_AT_REGISTRATION_SINCE` is set; only accounts created after the cutover within 30 days; no backfill; no welcome email on this path. | `scheduleRegistrationGrant` → `src/lib/mcp/registration-grant.ts` | registration-grant.unit.test.ts; registration-grant.pglite.unit.test.ts against the real function | Branch feat/registration-signup-credits, not pushed |
+
 ## 2026-11-14 — Ask Mindy Phase 1: research accuracy (approved 2026-11-14)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

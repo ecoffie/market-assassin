@@ -7606,6 +7606,18 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 
 **Proof.** `src/lib/chat/chat-tool-policy.ts`, `src/lib/chat/chat-tool-executor.ts`, and their unit tests; execution rows in `mcp_call_log` with channel `app_chat`.
 
+## One Mindy account, one set of free credits (2026-11-14, not yet live)
+
+**What.** New Mindy accounts receive the existing introductory credits when they register, whether they start on the Opportunity Map, in the app, or by connecting an AI assistant. Each account receives them once.
+
+**Why it matters.** Until now only people who connected through MCP received the free credits. Someone who signed up on the map started with nothing to try Mindy's research with.
+
+**Honest scope.** Credits are not a Pro trial and grant no Pro features. Starting a Pro trial still requires a card. Existing accounts keep their balances; this applies to accounts created after launch.
+
+**SEO.** Free government contracting research credits / free Mindy account / GovCon AI free trial credits.
+
+**Proof.** Grant amount from production configuration and the credit ledger (299 grants of 100 credits through 2026-11-12). One-grant-per-account enforced by the database's unique index, tested against the real function.
+
 ## "None" now means none: every Mindy lookup says what it checked (2026-11-14)
 
 **What.** Every Mindy data lookup, in Ask Mindy and through AI agents connected over MCP, now reports what kind of answer it is: results, a verified zero, a filter it could not apply, an incomplete list, or a source that was unavailable. The expiring-contracts lookup now accepts several states and NAICS codes at once ("Tennessee, Mississippi or Arkansas"; "5613, 5611, 4931"), understands state names, and lists every task order ending in the window at the top of the result instead of only inside its parent vehicle.
