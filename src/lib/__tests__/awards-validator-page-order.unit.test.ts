@@ -53,7 +53,7 @@ vi.mock('@supabase/supabase-js', () => ({
   }),
 }));
 vi.mock('@/lib/ops-alert', () => ({ sendOpsAlert: vi.fn() }));
-vi.mock('@/lib/bigquery/client', () => ({ bqQuery: vi.fn(), bqJobOptions: () => ({ labels: {} }) }));
+vi.mock('@/lib/bigquery/client', async (orig) => ({ ...(await orig<Record<string, unknown>>()), bqQuery: vi.fn() }));
 vi.mock('@vercel/kv', () => ({ kv: { set: vi.fn(), get: vi.fn(), del: vi.fn() } }));
 
 import { validateGeneration } from '../awards-refresh';
