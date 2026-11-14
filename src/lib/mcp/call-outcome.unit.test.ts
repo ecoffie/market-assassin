@@ -52,6 +52,8 @@ describe('credit integrity — the full inventory of tier-1/tier-2 refusal codes
     company_name_required: 'nonbillable_invalid_input',
     naics_or_psc_required: 'nonbillable_invalid_input',
     unknown_set_aside: 'nonbillable_invalid_input',
+    unknown_state: 'nonbillable_invalid_input',
+    invalid_naics: 'nonbillable_invalid_input',
     sam_unavailable: 'nonbillable_system_failure',
     rate_limited: 'nonbillable_system_failure',
     lookup_failed: 'nonbillable_system_failure',
