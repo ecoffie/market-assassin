@@ -7605,3 +7605,16 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 **SEO.** AI assistant for federal contracting research / GovCon AI chat / Mindy Ask Mindy.
 
 **Proof.** `src/lib/chat/chat-tool-policy.ts`, `src/lib/chat/chat-tool-executor.ts`, and their unit tests; execution rows in `mcp_call_log` with channel `app_chat`.
+
+## One Mindy account, one set of free credits (2026-11-14, not yet live)
+
+**What.** New Mindy accounts receive the existing introductory credits when they register, whether they start on the Opportunity Map, in the app, or by connecting an AI assistant. Each account receives them once.
+
+**Why it matters.** Until now only people who connected through MCP received the free credits. Someone who signed up on the map started with nothing to try Mindy's research with.
+
+**Honest scope.** Credits are not a Pro trial and grant no Pro features. Starting a Pro trial still requires a card. Existing accounts keep their balances; this applies to accounts created after launch.
+
+**SEO.** Free government contracting research credits / free Mindy account / GovCon AI free trial credits.
+
+**Proof.** Grant amount from production configuration and the credit ledger (299 grants of 100 credits through 2026-11-12). One-grant-per-account enforced by the database's unique index, tested against the real function.
+
