@@ -218,3 +218,11 @@ stops receiving alerts today.
   with C3 (sentence/capability-list handling), not papered over by C2.
 
 **Status:** design approved for review; Agent 1 conditions recorded; not implemented, not deployed.
+
+**Agent 1 follow-up (2026-11-14):** accepts the C1 fixture guard (`d51096b11`, PR #2045) and the three-group invariant
+(direct + related + other == MCP total). On the labeller finding: no Phase 1 guarantee is affected (none of the 33
+accepted answers called `find_opportunities`; rubric v1.0 makes no DIRECT_MATCH promise for Open). P1-D did not change the
+text matcher; the capability_list any-word rule in `openEvidenceClass` is search accuracy (R2/R3), owned here. Ask Mindy
+chat prints `find_opportunities` labels as returned, so a fix must be blind-label checked on at least one capability_list
+query in chat as well as Map/alerts. **Sequencing agreed: fix the any-word rule BEFORE C2 counts DIRECT_MATCH rows**;
+otherwise `0e41b9aa`'s "6 matches" would include MQ-9 and electrical notices as janitorial work.
