@@ -20,6 +20,9 @@
  * keep something. The moment a real email is attached the row is owned by that
  * email and the anon id no longer resolves it.
  */
+import { alertActivationPlan, profileHasNaics } from '@/lib/saved-searches/alert-activation';
+import type { SavedSearchMode } from '@/lib/saved-searches/constants';
+import type { SavedSearchFilters } from '@/lib/saved-searches/types';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
@@ -94,6 +97,8 @@ export async function POST(request: NextRequest) {
       alertsOn: r.alertsOn,
       notEmailable: r.notEmailable,
       comingBackExcluded: r.comingBackExcluded,
+      // Claimed with alerts OFF because the saved filters cannot be honored (unified validator).
+      filtersNotHonored: r.filtersNotHonored,
     });
   }
 
@@ -134,7 +139,42 @@ export async function POST(request: NextRequest) {
   }
 
   const shape = checkWatchPayload(body.filters, body.bbox, body.name);
-  if (!shape.ok) return NextResponse.json({ success: false, error: shape.error }, { status: 400 });
+  if (!shape.ok) {
+    return NextResponse.json({
+      success: false,
+      error: shape.error,
+      ...(shape.code ? { code: shape.code } : {}),
+      ...(shape.reason ? { reason: shape.reason } : {}),
+      ...(shape.refusedKeys ? { refused_keys: shape.refusedKeys } : {}),
+    }, { status: 400 });
+  }
+
+  // A VERIFIED owner's watch alerts the moment it is stored, so it must pass the same activation rule as
+  // the signed-in Save path and the claim (alert-activation.ts): emailable horizons, valid filters, and
+  // profile NAICS for a profile-scoped watch. Refused, never stored as an alert the cron cannot honor.
+  if (!isAnonId(owner)) {
+    const plan = alertActivationPlan(
+      (body.mode === 'recompete' ? 'recompete' : 'open') as SavedSearchMode,
+      ((body.filters as SavedSearchFilters) ?? {}),
+    );
+    if (!plan.ok || plan.kind !== 'full') {
+      const refusalCode = plan.ok ? 'unsupported_alert_scope' : plan.refusal.code;
+      return NextResponse.json({
+        success: false,
+        error: 'These filters cannot be used for email alerts as saved.',
+        code: refusalCode,
+        ...(!plan.ok && plan.refusal.reason ? { reason: plan.refusal.reason } : {}),
+        ...(!plan.ok && plan.refusal.keys ? { refused_keys: plan.refusal.keys } : {}),
+      }, { status: 400 });
+    }
+    if (plan.profileScoped && (await profileHasNaics(db(), owner)) !== true) {
+      return NextResponse.json({
+        success: false,
+        error: 'scope=profile requires at least one NAICS code on the Mindy profile.',
+        code: 'profile_scope_unavailable',
+      }, { status: 400 });
+    }
+  }
 
   const r = await saveMapWatch(db(), {
     owner,

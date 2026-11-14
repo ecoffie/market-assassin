@@ -37,12 +37,12 @@ function handlerSource(): string {
 type Horizons = { open?: boolean; recompete?: boolean; forecast?: boolean };
 type Reply = { status?: number; body?: unknown; reject?: boolean; nonJson?: boolean };
 
-function run(opts: { horizons: Horizons; mode?: string; signedIn?: boolean; reply?: Reply; replies?: Reply[]; filt?: Record<string, unknown>; q?: string; confirmAnswers?: boolean[] }) {
+function run(opts: { horizons: Horizons; mode?: string; signedIn?: boolean; reply?: Reply; replies?: Reply[]; filt?: Record<string, unknown>; q?: string; confirmAnswers?: boolean[]; win?: Record<string, unknown> }) {
   const calls: { url: string; body: Record<string, unknown> }[] = [];
   const confirms: string[] = [];
   const alerts: string[] = [];
   const events: unknown[][] = [];
-  const win: Record<string, unknown> = { __horizons: { ...opts.horizons }, __track: (...a: unknown[]) => events.push(a) };
+  const win: Record<string, unknown> = { __horizons: { ...opts.horizons }, __track: (...a: unknown[]) => events.push(a), ...(opts.win ?? {}) };
   new Function('window', WATCH_SCOPE_JS)(win);
   win.prompt = (_m: string, d: string) => d;
   const btn = { textContent: 'Save search', innerHTML: '', title: '', onclick: null as null | (() => void) };
@@ -192,7 +192,6 @@ describe('anonymous saves and claimed watches — what activation can email', ()
 describe('a failed save says what to do — never a bare "Couldn\'t save"', () => {
   const H: Horizons = { open: true, recompete: false, forecast: true };
   it.each<[string, Reply, RegExp, RegExp]>([
-    ['expired session (401)', { status: 401, body: { success: false, error: 'Sign in required' } }, /Sign in again/, /Sign in again, then click Save search/],
     ['nothing deliverable', { status: 400, body: { success: false, code: 'no_deliverable_horizon', error: 'x' } }, /Turn on Open Now or Coming Soon/, /Turn on Open Now or Coming Soon, then save again/],
     ['recompete refused', { status: 400, body: { success: false, code: 'unsupported_alert_scope', error: 'x' } }, /Coming Back isn/, /Track this recompete/],
     ['profile has no NAICS', { status: 400, body: { success: false, code: 'profile_scope_unavailable', error: 'x' } }, /Add NAICS to your profile/, /Add at least one in Settings/],
@@ -342,5 +341,73 @@ describe('P0a — a failed save records why, by key NAME only', () => {
     const r = run({ horizons: { open: true }, filt: { naics: '541512' }, reply: { reject: true } });
     await r.settle();
     expect(r.events.find((e) => e[1] === 'watch_save_failed')?.[2]).toEqual({ status: 0, code: '', reason: '', refused_keys: '' });
+  });
+});
+
+describe('expired sign-in: keep the filters, ask, never switch identity silently', () => {
+  const H: Horizons = { open: true, recompete: false, forecast: false };
+
+  it('a locally expired token: nothing is sent; sign-in again resumes the SAME save', async () => {
+    let expired = true;
+    let resume: (() => void) | null = null;
+    const r = run({
+      horizons: H, filt: { naics: '541512', valueRange: '1-2' },
+      win: { __tokenExpired: () => expired, openSignInModal: (_p: string, cb: () => void) => { resume = cb; } },
+    });
+    // map-only filter confirm, then the sign-in offer; no request yet
+    expect(r.confirms[0]).toMatch(/can.t use Contract value/);
+    expect(r.confirms[1]).toMatch(/sign-in has expired/);
+    expect(r.calls).toEqual([]);
+    expect(r.events.find((e) => e[1] === 'watch_session_expired')?.[2]).toEqual({ source: 'local', choice: 'sign_in' });
+    // the person signs in; the save resumes with the same planned filters and does not re-ask about them
+    expired = false;
+    resume!();
+    await r.settle();
+    expect(r.calls).toHaveLength(1);
+    expect(r.calls[0].url).toBe('/api/app/saved-searches');
+    expect(r.calls[0].body.filters).toMatchObject({ naics: '541512' });
+    expect(r.calls[0].body.filters).not.toHaveProperty('valueRange');
+    expect(r.confirms.filter((m) => /can.t use Contract value/.test(m))).toHaveLength(1);
+  });
+
+  it('declines sign-in, explicitly chooses device-only: an anonymous watch with the same filters', async () => {
+    const r = run({ horizons: H, filt: { naics: '541512', state: 'VA' }, confirmAnswers: [false, true, false], win: { __tokenExpired: () => true } });
+    await r.settle();
+    expect(r.confirms[1]).toMatch(/on this device only, without email alerts/);
+    expect(r.calls).toHaveLength(1);
+    expect(r.calls[0].url).toBe('/api/app/map-watch');
+    expect(r.calls[0].body).toHaveProperty('anonId');
+    expect(r.calls[0].body).not.toHaveProperty('email');
+    expect(r.calls[0].body.filters).toMatchObject({ naics: '541512', state: 'VA' });
+  });
+
+  it('declines both: nothing is saved', () => {
+    const r = run({ horizons: H, filt: { naics: '541512' }, confirmAnswers: [false, false], win: { __tokenExpired: () => true } });
+    expect(r.calls).toEqual([]);
+  });
+
+  it('a server 401 gets the same choice, and the refusal is logged', async () => {
+    const r = run({ horizons: H, filt: { naics: '541512' }, reply: { status: 401, body: { success: false, error: 'Sign in required' } }, confirmAnswers: [false, false] });
+    await r.settle();
+    expect(r.calls).toHaveLength(1);
+    expect(r.confirms.some((m) => /sign-in has expired/.test(m))).toBe(true);
+    expect(r.events.find((e) => e[1] === 'watch_save_failed')?.[2]).toMatchObject({ status: 401 });
+    expect(r.events.find((e) => e[1] === 'watch_session_expired')?.[2]).toEqual({ source: 'server', choice: 'declined' });
+  });
+});
+
+describe('anonymous saves use the same plan and the same customer copy', () => {
+  it('translates multi-selects and asks before leaving map-only filters out', () => {
+    const r = run({ horizons: { open: true }, signedIn: false, filt: { naics: '541512', setAsideMulti: 'WOSB', fsc: '7030' } });
+    expect(r.confirms[0]).toMatch(/DLA Supply Class/);
+    const f = r.calls[0].body.filters as Record<string, unknown>;
+    expect(f).toMatchObject({ naics: '541512', setAside: 'WOSB' });
+    expect(f).not.toHaveProperty('fsc');
+    expect(f).not.toHaveProperty('setAsideMulti');
+  });
+  it('a refused anonymous save explains itself (no bare "Couldn\'t save")', async () => {
+    const r = run({ horizons: { open: true }, signedIn: false, filt: {}, reply: { status: 400, body: { success: false, code: 'invalid_filters', reason: 'no_narrowing', refused_keys: [], error: 'x' } } });
+    await r.settle();
+    expect(r.btn.textContent).toMatch(/Narrow the map first/);
   });
 });

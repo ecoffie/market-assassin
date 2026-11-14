@@ -5341,6 +5341,36 @@ const VIEWPORT_JS = `<script>
       }catch(e){ return 'Open Now'; }
     }
     var em=_uemail();
+    // EXPIRED SIGN-IN (P0 release fix): the stored token still decodes to a real email, so this used
+    // to take the signed-in path and fail with a 401. The tracker already checks expiry; Save now does
+    // too, and never quietly switches the person to an anonymous save (see _ssExpired below).
+    var _expired=!!(t&&em&&typeof window.__tokenExpired==='function'&&window.__tokenExpired(t));
+    // A failed save says what to do (window.__saveSearchError) — the button carries the short form, a
+    // dialog the full one. status 0 = no response; a non-JSON body still gets an actionable message.
+    // The event records status, code, reason and refused key NAMES only (__saveSearchFailEvent).
+    var _ssFail=function(status,d){
+      var m=window.__saveSearchError?window.__saveSearchError(status,d):{short:'Couldn\\'t save',detail:''};
+      try{ if(window.__track) window.__track('tool_use','watch_save_failed',window.__saveSearchFailEvent?window.__saveSearchFailEvent(status,d):{status:status,code:(d&&d.code)||''}); }catch(e){}
+      _ss.textContent=m.short; _ss.title=m.detail||''; setTimeout(_ssReset,4200);
+      if(m.detail){ try{ alert(m.detail); }catch(e){} }
+    };
+    // ── P0b: SAVE ONLY WHAT ALERTS CAN APPLY, AND ASK BEFORE LEAVING ANYTHING OUT ─────
+    // ONE plan for every path (anonymous, signed-in, resumed after sign-in): __watchFilterPlan translates
+    // the two multi-selects to the keys the alert engine reads (same meaning: the map's own data request
+    // merges them the same way) and returns the map-only filters separately. Those are never dropped
+    // silently: the customer confirms first. A confirm given on this page is remembered for the same
+    // set of filters so a resume after sign-in does not ask twice.
+    var _wp=window.__watchFilterPlan?window.__watchFilterPlan(FILT,Q):{filters:(function(){ var f={}; for(var k in FILT){ if(FILT[k]&&FILT[k]!=='all')f[k]=FILT[k]; } if(Q)f.q=Q; return f; })(),excluded:[]};
+    if(_wp.excluded.length){
+      var _exKey=MODE+'|'+_wp.excluded.join(',');
+      var _okEx=(window.__ssExcludedOk===_exKey);
+      if(!_okEx){
+        _okEx=confirm(window.__watchExcludedPrompt?window.__watchExcludedPrompt(_wp.excluded):'Some map filters can\\u2019t be used in alerts. Save the watch without them?');
+        try{ if(window.__track) window.__track('tool_use','watch_filters_excluded',{keys:_wp.excluded.join(','),confirmed:!!_okEx}); }catch(e){}
+      }
+      if(!_okEx){ _ssReset(); return; }
+      window.__ssExcludedOk=_exKey;
+    }
     // ── ANONYMOUS VISITORS KEEP THE MARKET, NO ACCOUNT REQUIRED ──────────────
     // Measured over 30 days: 8,583 people used this map and only 329 were signed
     // in — 8,254 (96%) anonymous. Sending them to a sign-in modal at the exact
@@ -5351,19 +5381,21 @@ const VIEWPORT_JS = `<script>
     // anon id, with a name derived from what they are already looking at (no
     // prompt — naming a thing you have not seen yet is work, and it came BEFORE
     // any value). Alerts stay OFF until they choose to add an email, which is
-    // the honest upgrade moment rather than a toll gate.
-    if(!t||!em){
+    // the honest upgrade moment rather than a toll gate. The saved filters are the
+    // same planned set the signed-in path uses, so a claimed watch can be honored.
+    var _anonSave=function(){
       var _aid=_anonId();
       if(!_aid){ if(window.openSignInModal){window.openSignInModal('save this search and get alerts',function(){location.reload();});}else{location.href='/app?next=%2Fopportunity-map';} return; }
-      var _af={}; for(var _k in FILT){ if(FILT[_k]&&FILT[_k]!=='all')_af[_k]=FILT[_k]; }
-      if(Q)_af.q=Q;
+      var _af={}; for(var _k in _wp.filters)_af[_k]=_wp.filters[_k];
       try{ var _h2=window.__horizons||{}; _af.horizons={open:_h2.open!==false,recompete:!!_h2.recompete,forecast:!!_h2.forecast}; }catch(e){}
       var _ab=null; try{ var _mb=map.getBounds(); _ab={w:_mb.getWest(),s:_mb.getSouth(),e:_mb.getEast(),n:_mb.getNorth()}; }catch(e){}
       _ss.textContent='Saving…';
       fetch('/api/app/map-watch',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({anonId:_aid,mode:MODE,filters:_af,bbox:_ab})})
-        .then(function(r){return r.json();}).then(function(d){
+        .then(function(r){ return r.json().then(function(j){ return {s:r.status,d:j}; },function(){ return {s:r.status,d:null}; }); })
+        .then(function(res){ var d=res.d;
           if(d&&d.success){
+            window.__ssExcludedOk=null;
             try{ _track('tool_use','watch_created',{anonymous:true,mode:MODE,named:d.name}); }catch(e){}
             _ss.textContent='\u2713 Watching';
             // ── ALERTS REQUIRE A VERIFIED ACCOUNT ────────────────────────────
@@ -5393,10 +5425,32 @@ const VIEWPORT_JS = `<script>
               if(!_a){ _ssReset(); return; }
               window.__claimAnonWatches&&window.__claimAnonWatches();
             },500);
-          } else _ssMsg('Couldn\\'t save');
-        }).catch(function(){ _ssMsg('Couldn\\'t save'); });
-      return;
-    }
+          } else _ssFail(res.s,d);
+        }).catch(function(){ _ssFail(0,null); });
+    };
+    if(!t||!em){ _anonSave(); return; }
+    // ── EXPIRED SIGN-IN: ASK, KEEP THE FILTERS, NEVER SWITCH IDENTITY SILENTLY ──
+    // First offer: sign in again and resume this exact save (the map state and the confirmed plan are
+    // still on this page). Only if that is declined: an explicitly chosen device-only save without
+    // alerts. Declining both saves nothing. source = 'local' (token expiry seen before sending) or
+    // 'server' (the server answered 401).
+    var _ssExpired=function(source){
+      var _resume=function(){ try{ _ss.onclick(); }catch(e){} };
+      var _signIn=confirm('Your sign-in has expired, so this search isn\\u2019t saved yet.\\n\\nSign in again to save it with these filters?');
+      try{ if(window.__track) window.__track('tool_use','watch_session_expired',{source:source,choice:_signIn?'sign_in':'declined'}); }catch(e){}
+      if(_signIn){
+        _ssReset();
+        if(typeof window.openSignInModal==='function'){ window.openSignInModal('save this search', _resume); }
+        else location.href='/app?next='+encodeURIComponent(location.pathname+location.search);
+        return;
+      }
+      if(confirm('Save it on this device only, without email alerts? Signing in later turns alerts on.')){
+        try{ if(window.__track) window.__track('tool_use','watch_session_expired',{source:source,choice:'device_only'}); }catch(e){}
+        _anonSave(); return;
+      }
+      _ssReset();
+    };
+    if(_expired){ _ssExpired('local'); return; }
     // ── F1: WATCH ONLY WHAT CAN BE EMAILED, AND SAY SO ───────────────────────
     // The map boots with Recompetes on, and saved-search alerts cannot email
     // recompetes (the service answers unsupported_alert_scope). Every signed-in
@@ -5416,16 +5470,6 @@ const VIEWPORT_JS = `<script>
       if(!confirm('Email alerts cover Open Now and Coming Soon. Coming Back contracts are not emailed \\u2014 to follow one, open it and use \\u201cTrack this recompete\\u201d.\\n\\nSave a watch for '+_keep.join(' + ')+'? Your map stays as it is.')){ return; }
       try{ if(window.__track) window.__track('tool_use','watch_scope_narrowed',{mode:MODE,keep:_keep.join('+')}); }catch(e){}
     }
-    // ── P0b: SAVE ONLY WHAT ALERTS CAN APPLY, AND ASK BEFORE LEAVING ANYTHING OUT ─────
-    // __watchFilterPlan translates the two multi-selects to the keys the alert engine reads (same
-    // meaning: the map's own data request merges them the same way) and returns the map-only
-    // filters separately. Those are never dropped silently: the customer confirms first.
-    var _wp=window.__watchFilterPlan?window.__watchFilterPlan(FILT,Q):{filters:(function(){ var f={}; for(var k in FILT){ if(FILT[k]&&FILT[k]!=='all')f[k]=FILT[k]; } if(Q)f.q=Q; return f; })(),excluded:[]};
-    if(_wp.excluded.length){
-      var _okEx=confirm(window.__watchExcludedPrompt?window.__watchExcludedPrompt(_wp.excluded):'Some map filters can\\u2019t be used in alerts. Save the watch without them?');
-      try{ if(window.__track) window.__track('tool_use','watch_filters_excluded',{keys:_wp.excluded.join(','),confirmed:!!_okEx}); }catch(e){}
-      if(!_okEx){ _ssReset(); return; }
-    }
     var _watchLabel=(_plan&&_plan.horizons)?(function(hz){ var on=[]; if(hz.open)on.push('Open Now'); if(hz.forecast)on.push('Coming Soon'); return on.join(' + ')||'Open Now'; })(_plan.horizons):_ssScopeLabel();
     var name=window.prompt('Name this saved search (you\\'ll get alerts on new matches):',
       (FILT.setAside||FILT.naics||Q||'My opportunities')+' — '+_watchLabel);
@@ -5440,15 +5484,6 @@ const VIEWPORT_JS = `<script>
     if(_plan&&_plan.horizons)filters.horizons=_plan.horizons;
     var b=null; try{ var mb2=map.getBounds(); b={w:mb2.getWest(),s:mb2.getSouth(),e:mb2.getEast(),n:mb2.getNorth()}; }catch(e){}
     _ss.textContent='Saving…';
-    // A failed save says what to do (window.__saveSearchError) — the button carries the short form, a
-    // dialog the full one. status 0 = no response; a non-JSON body still gets an actionable message.
-    // The event records status, code, reason and refused key NAMES only (__saveSearchFailEvent).
-    var _ssFail=function(status,d){
-      var m=window.__saveSearchError?window.__saveSearchError(status,d):{short:'Couldn\\'t save',detail:''};
-      try{ if(window.__track) window.__track('tool_use','watch_save_failed',window.__saveSearchFailEvent?window.__saveSearchFailEvent(status,d):{status:status,code:(d&&d.code)||''}); }catch(e){}
-      _ss.textContent=m.short; _ss.title=m.detail||''; setTimeout(_ssReset,4200);
-      if(m.detail){ try{ alert(m.detail); }catch(e){} }
-    };
     var _ssPost=function(payload,retried){
       return fetch('/api/app/saved-searches',{method:'POST',
         headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
@@ -5465,6 +5500,7 @@ const VIEWPORT_JS = `<script>
             // watches — worse than unknown. anonymous:false keeps the two paths
             // distinguishable without needing two tokens.
             // (No backticks in here: this block lives inside a TS template literal.)
+            window.__ssExcludedOk=null;
             try{ if(window.__track) window.__track('tool_use','watch_created',{anonymous:false,mode:MODE,profile_scope:payload.scope==='profile'}); }catch(e){}
             _ss.textContent='✓ Saved — alerts on'; setTimeout(function(){ if(confirm('Saved! We\\'ll email you when new opportunities match. View your saved searches?'))location.href='/opportunity-map/saved'; else _ssReset(); },400);
             return;
@@ -5476,6 +5512,11 @@ const VIEWPORT_JS = `<script>
             var _okP=confirm('This map shows the whole federal market, which is too broad to watch.\\n\\nWatch your market instead? Mindy will use the industries on your profile, which you can change in Settings.');
             try{ if(window.__track) window.__track('tool_use','watch_profile_scope_offered',{accepted:!!_okP}); }catch(e){}
             if(_okP){ var _pp={}; for(var _pk in payload)_pp[_pk]=payload[_pk]; _pp.scope='profile'; return _ssPost(_pp,true); }
+          }
+          // The server says the session is no longer valid: same choice as a locally expired token.
+          if(res.s===401){
+            try{ if(window.__track) window.__track('tool_use','watch_save_failed',window.__saveSearchFailEvent?window.__saveSearchFailEvent(401,d):{status:401}); }catch(e){}
+            _ssExpired('server'); return;
           }
           // Never a bare "Couldn't save": every known refusal says what to do next.
           _ssFail(res.s,d);
@@ -5786,9 +5827,12 @@ const SAVE_JS = `<script>
       body:JSON.stringify({action:'claim',anonId:aid})})
       .then(function(r){return r.json();}).then(function(c){
         // Only a VERIFIED claim counts.
-        if(c&&c.success&&c.claimed>0){ try{ if(window.__track)window.__track('tool_use','watch_claimed',{watches:c.claimed,alerts_on:c.alertsOn,not_emailable:c.notEmailable,coming_back_excluded:c.comingBackExcluded}); }catch(e){}
+        if(c&&c.success&&c.claimed>0){ try{ if(window.__track)window.__track('tool_use','watch_claimed',{watches:c.claimed,alerts_on:c.alertsOn,not_emailable:c.notEmailable,coming_back_excluded:c.comingBackExcluded,filters_not_honored:c.filtersNotHonored||0}); }catch(e){}
           // F3: say what actually turned on. "Alerts on" only when a claimed watch really alerts.
-          ui('__ssMsg', c.alertsEnabled===false ? '\u2713 Saved \u2014 Coming Back isn\u2019t emailed'
+          // Unified validator: a claimed watch whose filters alerts cannot honor is kept with alerts OFF,
+          // and the message says so instead of implying alerts that will never send.
+          ui('__ssMsg', c.filtersNotHonored>0 ? (c.alertsOn>0 ? '\u2713 Alerts on \u2014 some watches need a filter change' : '\u2713 Saved \u2014 change a filter to turn on alerts')
+            : c.alertsEnabled===false ? '\u2713 Saved \u2014 Coming Back isn\u2019t emailed'
             : (c.comingBackExcluded>0||c.notEmailable>0) ? '\u2713 Alerts on (not Coming Back)' : '\u2713 Alerts on'); }
         else ui('__ssReset');
       }).catch(function(){ ui('__ssReset'); });
