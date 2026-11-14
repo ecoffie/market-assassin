@@ -169,7 +169,7 @@ export default function SubscriptionsCard({ email, upgradeHref = '/pricing' }: {
                         {price && <span className="ml-2 font-normal text-slate-400">{price}</span>}
                       </p>
                       <p className="mt-1 flex flex-wrap items-center gap-2 text-[12px]">
-                        <span className={`rounded-full px-2 py-0.5 font-medium ${ok && !s.cancelAtPeriodEnd ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}`}>
+                        <span data-status-color className={`rounded-full px-2 py-0.5 font-medium ${ok && !s.cancelAtPeriodEnd ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}`}>
                           {s.cancelAtPeriodEnd ? 'Cancelling' : statusLabel(s.status)}
                         </span>
                         {date && <span className="text-slate-500">{s.cancelAtPeriodEnd ? `Ends ${date}` : `Renews ${date}`}</span>}

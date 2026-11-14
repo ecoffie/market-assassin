@@ -707,7 +707,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
                   disabled={searching}
                   className={`w-8 h-8 text-sm rounded-lg transition-colors ${
                     page === pageNum
-                      ? 'bg-emerald-500 text-white'
+                      ? 'bg-purple-600 text-white'
                       : 'bg-surface text-muted hover:bg-input'
                   }`}
                 >

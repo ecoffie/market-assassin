@@ -50,7 +50,7 @@ import { PURSUIT_COLLAB_CSS, PURSUIT_COLLAB_JS } from '../pursuit-collab';
 
 export const dynamic = 'force-dynamic';
 
-const PAGE = `<!DOCTYPE html><html lang="en"><head>
+const PAGE = `<!DOCTYPE html><html lang="en" class="mindy-map"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Proposal Workspace — Mindy</title>
 <style>

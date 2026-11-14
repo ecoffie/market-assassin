@@ -681,7 +681,12 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-5 max-w-6xl">
+    // data-app-accent="blue": the shared cards rendered here (CreditsConsole, SubscriptionsCard —
+    // also used on /mcp/account — plus TargetingCard / NaicsPicker) use emerald for actions and
+    // highlights; app-map.css remaps emerald to the map blue under this attribute, inside /app only.
+    // Real status marks (VERIFIED, Active, Full coverage, done steps) carry data-status-color and
+    // keep their green.
+    <div className="p-4 sm:p-6 space-y-5 max-w-6xl" data-app-accent="blue">
       {/* Styled "Start over?" confirm — replaces the native window.confirm so it
           matches Mindy's dark UI. */}
       {showResetConfirm && (
@@ -767,7 +772,7 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
         })}
       </div>
 
-      {message && <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-300">{message}</div>}
+      {message && <div className="rounded-lg border border-purple-800 bg-purple-900 p-4 text-purple-300">{message}</div>}
       {error && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-300">{error}</div>}
 
       {/* ── Alerts & matching ─────────────────────────────────────────── */}
@@ -800,7 +805,7 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
                 onClick={() => setForm({ ...form, alert_mode: 'market_discovery' })}
                 className={`rounded-lg border px-3 py-2 text-left text-sm ${
                   form.alert_mode === 'market_discovery'
-                    ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-100'
+                    ? 'border-purple-500/50 bg-purple-500/10 text-purple-100'
                     : 'border-hairline text-slate-200 hover:bg-input'
                 }`}
               >
@@ -814,7 +819,7 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
                 }}
                 className={`rounded-lg border px-3 py-2 text-left text-sm ${
                   form.alert_mode === 'focused'
-                    ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-100'
+                    ? 'border-purple-500/50 bg-purple-500/10 text-purple-100'
                     : 'border-hairline text-slate-200 hover:bg-input'
                 } ${!canSelectFocused(parseList(form.keywords)).ok ? 'opacity-50' : ''}`}
               >
@@ -857,7 +862,7 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
                         const added = parseList(form.naics_codes).includes(s.code);
                         return (
                           <button key={s.code} onClick={() => toggleNaicsCode(s.code)} title={s.name}
-                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors ${added ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-200' : 'border-slate-600 bg-surface text-slate-200 hover:bg-input'}`}>
+                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors ${added ? 'border-purple-600 bg-purple-600 text-white' : 'border-slate-600 bg-surface text-slate-200 hover:bg-input'}`}>
                             {added ? <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} /> : <Plus className="h-3 w-3 shrink-0" strokeWidth={2.5} />} {s.code} <span className="max-w-[150px] truncate opacity-70">{s.name}</span>
                           </button>
                         );
@@ -873,7 +878,7 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
                         const added = parseList(form.psc_codes).includes(s.code);
                         return (
                           <button key={s.code} onClick={() => togglePscSuggestion(s.code)} title={s.name}
-                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors ${added ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-200' : 'border-purple-500/40 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20'}`}>
+                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors ${added ? 'border-purple-600 bg-purple-600 text-white' : 'border-purple-500/40 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20'}`}>
                             {added ? <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} /> : <Plus className="h-3 w-3 shrink-0" strokeWidth={2.5} />} {s.code} <span className="max-w-[150px] truncate opacity-70">{s.name}</span>
                           </button>
                         );
@@ -998,7 +1003,7 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
                       title={title}
                       className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${
                         verdict.status === 'valid'
-                          ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+                          ? 'border-purple-600 bg-purple-600 text-white'
                           : verdict.status === 'malformed'
                             ? 'border-red-500/40 bg-red-500/10 text-red-200'
                             : 'border-amber-500/40 bg-amber-500/10 text-amber-200'
@@ -1022,7 +1027,7 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
                         key={p.code}
                         onClick={() => togglePscSuggestion(p.code)}
                         title={added ? `Click to remove ${p.code}` : p.name}
-                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors ${added ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25' : 'border-purple-500/40 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20'}`}
+                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors ${added ? 'border-purple-600 bg-purple-600 text-white hover:bg-purple-700' : 'border-purple-500/40 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20'}`}
                       >
                         {added ? <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} /> : <Plus className="h-3 w-3 shrink-0" strokeWidth={2.5} />} {p.code} <span className="max-w-[150px] truncate opacity-70">{p.name}</span>
                       </button>
@@ -1078,7 +1083,7 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
               <select
                 value={form.email_frequency}
                 onChange={(e) => setForm({ ...form, email_frequency: e.target.value })}
-                className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white outline-none focus:border-emerald-500"
+                className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white outline-none focus:border-purple-500"
               >
                 <option value="daily">Daily</option>
                 <option value="mwf">Mon / Wed / Fri</option>
@@ -1098,7 +1103,7 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
                   <span className="block text-sm font-medium text-white">
                     Text me when a tracked pursuit changes
                     {smsVerified && (
-                      <span className="ml-2 inline-flex items-center gap-1 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300 align-middle"><Check className="h-3 w-3 shrink-0" strokeWidth={2.5} /> VERIFIED</span>
+                      <span data-status-color className="ml-2 inline-flex items-center gap-1 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300 align-middle"><Check className="h-3 w-3 shrink-0" strokeWidth={2.5} /> VERIFIED</span>
                     )}
                   </span>
                   <span className="block text-xs text-muted mt-0.5">
@@ -1128,13 +1133,13 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
                           onChange={(e) => { setSmsPhone(e.target.value); setSmsMsg(null); }}
                           placeholder="(555) 123-4567"
                           disabled={smsStage === 'code_sent'}
-                          className="flex-1 px-3 py-2 bg-ground border border-hairline rounded-lg text-white outline-none focus:border-emerald-500 disabled:opacity-60"
+                          className="flex-1 px-3 py-2 bg-ground border border-hairline rounded-lg text-white outline-none focus:border-purple-500 disabled:opacity-60"
                         />
                         <button
                           type="button"
                           onClick={sendSmsCode}
                           disabled={smsBusy}
-                          className="px-3 py-2 text-sm rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium disabled:opacity-50 whitespace-nowrap"
+                          className="px-3 py-2 text-sm rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium disabled:opacity-50 whitespace-nowrap"
                         >
                           {smsBusy && smsStage === 'idle' ? 'Sending…' : smsStage === 'code_sent' ? 'Resend code' : 'Send code'}
                         </button>
@@ -1148,13 +1153,13 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
                             value={smsCode}
                             onChange={(e) => { setSmsCode(e.target.value.replace(/\D/g, '')); setSmsMsg(null); }}
                             placeholder="6-digit code"
-                            className="flex-1 px-3 py-2 bg-ground border border-hairline rounded-lg text-white tracking-widest outline-none focus:border-emerald-500"
+                            className="flex-1 px-3 py-2 bg-ground border border-hairline rounded-lg text-white tracking-widest outline-none focus:border-purple-500"
                           />
                           <button
                             type="button"
                             onClick={verifySmsCode}
                             disabled={smsBusy}
-                            className="px-3 py-2 text-sm rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium disabled:opacity-50 whitespace-nowrap"
+                            className="px-3 py-2 text-sm rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium disabled:opacity-50 whitespace-nowrap"
                           >
                             {smsBusy ? 'Verifying…' : 'Verify'}
                           </button>
@@ -1186,7 +1191,7 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
                   value={form.alert_recipient_email}
                   onChange={(e) => setForm({ ...form, alert_recipient_email: e.target.value })}
                   placeholder="client@company.com"
-                  className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white outline-none focus:border-purple-500"
                 />
                 <span className="block text-xs text-faint mt-1">
                   Daily/weekly alerts for this client go here. Leave blank and they fall back to your inbox.
@@ -1292,7 +1297,7 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
             your current email keeps working until you confirm.
           </p>
           {changeEmailStage === 'sent' ? (
-            <div className="text-sm text-emerald-400">
+            <div className="text-sm text-purple-400">
               {changeEmailMsg?.text}
               <button
                 onClick={() => { setChangeEmailStage('idle'); setChangeEmailMsg(null); setNewEmail(''); }}
@@ -1326,7 +1331,7 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
             </div>
           )}
           {changeEmailStage === 'idle' && changeEmailMsg && (
-            <p className={`text-sm mt-2 ${changeEmailMsg.kind === 'err' ? 'text-red-400' : 'text-emerald-400'}`}>
+            <p className={`text-sm mt-2 ${changeEmailMsg.kind === 'err' ? 'text-red-400' : 'text-purple-400'}`}>
               {changeEmailMsg.text}
             </p>
           )}
@@ -1351,7 +1356,7 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
             {pwBusy ? 'Sending…' : 'Email me a password link'}
           </button>
           {pwMsg && (
-            <p className={`text-sm mt-2 ${pwMsg.kind === 'err' ? 'text-red-400' : 'text-emerald-400'}`}>
+            <p className={`text-sm mt-2 ${pwMsg.kind === 'err' ? 'text-red-400' : 'text-purple-400'}`}>
               {pwMsg.text}
             </p>
           )}
@@ -1407,7 +1412,7 @@ function SaveBar({
       <button
         onClick={onSave}
         disabled={saving}
-        className="px-5 py-2 bg-surface hover:bg-input disabled:opacity-60 text-slate-200 rounded-lg transition-colors"
+        className="px-5 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white rounded-lg font-medium transition-colors"
       >
         {saving ? 'Saving...' : 'Save Settings'}
       </button>
@@ -1415,7 +1420,7 @@ function SaveBar({
         <button
           onClick={onComplete}
           disabled={saving}
-          className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white rounded-lg font-medium transition-colors"
+          className="px-5 py-2 border border-purple-500/50 bg-purple-500/10 hover:bg-purple-500/20 disabled:opacity-60 text-purple-300 rounded-lg font-medium transition-colors"
         >
           Mark Onboarding Complete
         </button>
@@ -1558,14 +1563,14 @@ function LinkEmailControl({
           />
           <button
             type="button" onClick={confirm} disabled={busy || code.length < 6}
-            className="rounded-md bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+            className="rounded-md bg-purple-600 hover:bg-purple-700 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
           >
             {busy ? 'Checking…' : 'Confirm'}
           </button>
         </div>
       )}
 
-      {msg && <p className="text-[11px] text-emerald-300">{msg}</p>}
+      {msg && <p className="text-[11px] text-purple-300">{msg}</p>}
       {err && <p className="text-[11px] text-red-300">{err}</p>}
     </div>
   );
@@ -1634,7 +1639,7 @@ function TeamUpgradeCard({
   if (hasTeam || done) {
     if (!done) return null;
     return (
-      <div className="bg-ground border border-emerald-500/30 rounded-xl p-5">
+      <div className="bg-ground border border-purple-800 rounded-xl p-5">
         <h2 className="font-semibold text-white mb-1">You&apos;re on a team 🎉</h2>
         <p className="text-sm text-muted">
           Your team workspace is ready and your pursuits moved over. Invite teammates from Team Access.
@@ -1688,7 +1693,7 @@ function Field({ label, value, onChange, placeholder }: { label: string; value: 
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white placeholder-faint outline-none focus:border-emerald-500"
+        className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white placeholder-faint outline-none focus:border-purple-500"
       />
     </label>
   );
@@ -1756,7 +1761,7 @@ function StatesField({ value, onChange }: { value: string[]; onChange: (states: 
             key={region.label}
             type="button"
             onClick={() => applyRegion(region.states)}
-            className="px-2.5 py-1 text-xs rounded-md border border-hairline bg-surface/60 text-ink-soft hover:border-emerald-500 hover:text-emerald-300 transition-colors"
+            className="px-2.5 py-1 text-xs rounded-md border border-hairline bg-surface/60 text-ink-soft hover:border-purple-500 hover:text-purple-300 transition-colors"
           >
             + {region.label}
             <span className="text-faint ml-1">({region.states.length})</span>
@@ -1775,7 +1780,7 @@ function StatesField({ value, onChange }: { value: string[]; onChange: (states: 
               onClick={() => toggleState(state)}
               className={`px-1.5 py-1 text-xs rounded font-medium transition-colors ${
                 on
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
                   : 'bg-surface/40 text-muted hover:bg-surface hover:text-slate-200'
               }`}
             >
@@ -1794,7 +1799,7 @@ function StatesField({ value, onChange }: { value: string[]; onChange: (states: 
 function ChecklistItem({ label, done }: { label: string; done: boolean }) {
   return (
     <div className="flex items-center gap-3 text-sm">
-      <span className={`h-5 w-5 rounded-full flex items-center justify-center ${done ? 'bg-emerald-500 text-white' : 'bg-surface text-faint'}`}>
+      <span data-status-color className={`h-5 w-5 rounded-full flex items-center justify-center ${done ? 'bg-emerald-500 text-white' : 'bg-surface text-faint'}`}>
         {done && <Check className="h-3 w-3" strokeWidth={3} />}
       </span>
       <span className={done ? 'text-slate-200' : 'text-faint'}>{label}</span>

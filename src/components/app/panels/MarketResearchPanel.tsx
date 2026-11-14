@@ -1850,7 +1850,10 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   const readyReports = REPORTS.filter(report => recommendedReports.includes(report.id) && canAccessReport(report.tier));
 
   return (
-    <div className="p-6 space-y-6">
+    // data-app-accent="blue": this panel's action/highlight colour is emerald; inside /app,
+    // app-map.css remaps emerald to the map blue under this attribute. Status marks (days-left
+    // badge, the TRIBAL tier badge) carry data-status-color and keep green. Chart hexes are unchanged.
+    <div className="p-6 space-y-6" data-app-accent="blue">
       {/* Print / Save-as-PDF support (Eric, Jul 15 — restore the old MA "print
           your report"). Prints ONLY #mr-print-region regardless of the app
           shell via the classic visibility-hidden trick, and flattens the dark
@@ -2726,7 +2729,7 @@ function RecommendedOpportunityCard({
   return (
     <article className="flex min-h-[260px] flex-col rounded-lg border border-surface bg-ground-deep/60 p-4">
       <div className="mb-3 flex items-start justify-between gap-3">
-        <span className={`rounded px-2 py-1 text-xs font-medium ${
+        <span data-status-color className={`rounded px-2 py-1 text-xs font-medium ${
           opportunity.isUrgent ? 'bg-red-500/15 text-red-200' : 'bg-emerald-500/15 text-emerald-200'
         }`}>
           {opportunity.daysLeft != null ? `${Math.max(opportunity.daysLeft, 0)} days left` : deadline}
@@ -3446,7 +3449,7 @@ function TopPrimesChart({ primes, tier2 = [], tribal = [], email }: TopPrimesCha
     const samUrl = `https://sam.gov/search/?index=ei&q=${encodeURIComponent(p.name)}`;
     return (
       <li key={`${p.name}-${i}`} className="flex items-start gap-2.5">
-        <div className={`shrink-0 w-5 h-5 rounded-full ${style.bg} border ${style.border} flex items-center justify-center text-[8px] font-semibold ${style.text}`}>
+        <div data-status-color className={`shrink-0 w-5 h-5 rounded-full ${style.bg} border ${style.border} flex items-center justify-center text-[8px] font-semibold ${style.text}`}>
           {style.label}
         </div>
         <div className="min-w-0 flex-1">

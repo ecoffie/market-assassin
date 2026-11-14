@@ -1525,7 +1525,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                                       ? 'Draft Proposal — SAM docs still downloading'
                                       : 'Draft Proposal'
                                 }
-                                className="inline-flex items-center rounded bg-emerald-600/80 px-1.5 py-1 font-semibold text-white hover:bg-emerald-500"
+                                className="inline-flex items-center rounded bg-purple-600 px-1.5 py-1 font-semibold text-white hover:bg-purple-700"
                               >
                                 <PenLine className="h-3.5 w-3.5" strokeWidth={2} />
                               </button>

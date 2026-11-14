@@ -38,7 +38,7 @@ interface CollabHotCardProps {
 }
 
 const CTA_CLASS =
-  'mt-3 inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 text-white text-sm font-semibold px-4 py-2 transition shadow shadow-purple-900/30';
+  'mt-3 inline-flex items-center gap-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold px-4 py-2 transition shadow-sm';
 
 export function CollabHotCard({ email, onPanelChange }: CollabHotCardProps) {
   const [hot, setHot] = useState<HotOpp | null>(null);

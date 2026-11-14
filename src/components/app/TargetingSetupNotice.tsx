@@ -102,7 +102,7 @@ export default function TargetingSetupNotice({ email, surface }: { email: string
                 <span><span className="font-mono text-amber-200">{o.code}</span> — {o.title}</span>
                 <span className="flex gap-2">
                   <button disabled={!!busy} onClick={() => accept(o.code)}
-                    className="rounded-md bg-emerald-500 px-3 py-1 font-semibold text-gray-950 disabled:opacity-40">
+                    className="rounded-md bg-purple-600 px-3 py-1 font-semibold text-white hover:bg-purple-700 disabled:opacity-40">
                     {replacesStarter ? `Use ${o.code} instead of the starter codes` : `Add ${o.code}`}
                   </button>
                   <button disabled={!!busy} onClick={() => reject(o.code)}

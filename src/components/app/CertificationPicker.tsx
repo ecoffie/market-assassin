@@ -97,7 +97,7 @@ export default function CertificationPicker({
       >
         <span
           className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-            on ? 'border-emerald-400 bg-emerald-500' : 'border-hairline'
+            on ? 'border-purple-500 bg-purple-600' : 'border-hairline'
           }`}
         >
           {on && <Check className="h-3 w-3 text-white" strokeWidth={3} />}

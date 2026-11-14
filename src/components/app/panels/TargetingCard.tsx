@@ -666,7 +666,7 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
             </>
           ) : (
             <div className="text-xs">
-              <div className="flex items-start gap-1 text-emerald-400 font-medium">
+              <div data-status-color className="flex items-start gap-1 text-emerald-400 font-medium">
                 <Check className="mt-0.5 h-3 w-3 shrink-0" strokeWidth={2.5} /> <span>Full coverage — your {naics.length} code{naics.length !== 1 ? 's' : ''} cover {Math.round((coverage.coveragePct || 0) * 100)}% of your {fmtMoney(coverage.sectorMarket || coverage.totalMarket)} &ldquo;{coverage.keyword}&rdquo; market.</span>
               </div>
               <div className="text-faint mt-1">

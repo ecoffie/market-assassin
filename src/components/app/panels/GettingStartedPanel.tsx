@@ -76,7 +76,7 @@ export default function GettingStartedPanel({
                 onClick={() => setOpen(expanded ? null : j.key)}
                 className="w-full flex items-start gap-3 p-4 text-left"
               >
-                <span className={`shrink-0 mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${done ? 'bg-emerald-600 text-white' : 'bg-surface text-ink-soft'}`}>
+                <span data-status-color className={`shrink-0 mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${done ? 'bg-emerald-600 text-white' : 'bg-surface text-ink-soft'}`}>
                   {done ? <Check className="h-4 w-4" strokeWidth={3} /> : j.num}
                 </span>
                 <span className="flex-1">
