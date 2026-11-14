@@ -177,6 +177,7 @@ describe('buying offices', () => {
     expect(r.text).toMatch(/Showing the top 2 of 10 by obligated dollars\./);
     expect(r.text).toMatch(/1\. NAVSUP FLT LOG CTR NORFOLK \(N00189\) · Department Of Defense \/ Department Of The Navy|1\. NAVSUP FLT LOG CTR NORFOLK \(N00189\) · Department of Defense \/ Department of the Navy/);
     expect(r.text).toMatch(/customers: Navy Personnel Command \$50,000,000 · work performed in Millington, TN/);
+    expect(r.text).toMatch(/These are federal government contracting offices \(the buyers of this work\), not companies\./);
   });
   it('no offices is stated with its filters', () => {
     expect(renderBuyingOffices({ ...res, offices: [], totals: null })!.text).toMatch(/^No buying offices found \(NAICS 5613, 5611/);
@@ -340,5 +341,12 @@ describe('different work: positive evidence only', () => {
     crossCheckOffices([exp, offices]);
     expect((offices as { text: string }).text).toMatch(/CHECK: MISSION ESSENTIALS \(70T050\): example award 70T05026F5900N004 is marked CHECK/);
     expect((offices as { text: string }).text).not.toMatch(/OTHER \(X1\)/);
+  });
+});
+
+describe('run-G review: buying offices show the example awards they reference', () => {
+  it('lists up to two example awards per office', () => {
+    const r = renderBuyingOffices({ scope: { state: 'TN', naics: ['5613'] }, offices: [{ office_name: 'NCO 9', office_code: '36C249', obligated: 100, share_pct: 50, award_count: 2, example_awards: [{ piid: '36C24926N0041', obligated: 60 }, { piid: '36C24925P0001', obligated: 40 }, { piid: 'X3', obligated: 1 }] }], totals: { obligated: 200, award_count: 4, office_count: 2 }, notes: [], _meta: {} })!;
+    expect(r.text).toMatch(/example awards: 36C24926N0041 \$60; 36C24925P0001 \$40$/m);
   });
 });
