@@ -7,8 +7,8 @@ The new activation baseline (`ACTIVATION_BASELINE_START`) starts only after ever
 | # | Area | Acceptance criterion (proven on production) | Owner | Evidence |
 |---|---|---|---|---|
 | **A. Search relevance and reliability** |||||
-| A1 | Discovery matcher | A fixed panel of real business descriptions returns relevant open opportunities at the agreed precision; pronoun/function-word regressions (#2047, #2050) covered by the panel | Agent 3 (search) + Agent 4 (relevance labels) | |
-| A2 | Honest empty/unknown | A query with no matches says so; an unavailable source is shown as unavailable, never zero | Agent 3 | |
+| A1 | Discovery relevance | On a blind, human-labelled holdout of SAM.gov notices posted after 2026-11-14, each benchmark category (7 services, 7 products) reaches **≥60% top-20 precision** and loses no relevant DIRECT row. The 36-search regression panel and the beginner-sentence tests (#2047, #2050) show no loss of target-trade results. **Evidence:** Agent 4's scorer output plus a regression run on production | Agent 3 (search) + Agent 4 (labels) | |
+| A2 | Honest empty / unknown: **NOT MET as of 2026-11-14** | A query with no matches says it found none. An unavailable source or horizon is labelled unavailable, never 0. A query the system cannot answer returns an explained failure, never a bare error. **Known open:** four long paragraph-style queries currently return HTTP 500 (statement timeout, pre-existing; tasks/long-query-timeouts-2026-11-14.md) | Agent 3 | |
 | A3 | Onboarding suggestions | The opportunities shown to a new account from its business description pass Agent 4's relevance review on a sample | Agent 4 | |
 | **B. Ask Mindy accuracy, grounding and errors** |||||
 | B1 | Grounding | **Set:** the frozen 11-question Ask Mindy benchmark (R1–R11) plus one beginner-language question ("We provide security guards. What government opportunities can we bid on?", which failed on production 2026-11-14), so 12 in total. Graded with rubric **v1.1**: v1.0 plus one rule covering question 12, "facts trace to evidence; a source that's missing or unavailable is never shown as zero". The set and the rubric are frozen before the first run and never changed between runs. **Pass:** 3 independent PRODUCTION runs, each graded by a fresh reviewer who sees only the answer and that turn's tool evidence. Every run scores 12/12 on fact grounding: every number, identifier, name and date traces to that turn's tool results, with zero fabrications. At most 1 disclosure miss (caveats or closing wording) per run, each one listed. **How to prove it:** production disables trace events, so capture the streamed answer and grade it against that window's app_chat `mcp_call_log` rows and tool payloads. Record each turn's UTC window, `llm_usage_log` cost and `tool_errors` (must be 0). State the model served: the staff account is moved to gpt-4o-mini by the margin guard, while customers get gpt-4o, so run on a synthetic account under budget or name the model. About $0.06 per run. Running it costs OpenAI money, so it needs Eric's go-ahead | Agent 1 | |
@@ -23,9 +23,9 @@ The new activation baseline (`ACTIVATION_BASELINE_START`) starts only after ever
 | D2 | Access to saved work | A customer can find, open and remove what they tracked, from a second device | Agent 2 | |
 | D3 | Portability *(enhancement)* | A customer can export their tracked opportunities | — | |
 | **E. Alerts, contract changes and deadlines** |||||
-| E1 | Saved-search alerts | Alerts run on the canonical evaluator (or the legacy one is proven equivalent); a test watch alerts on a matching new notice and not on a non-matching one | Agent 3 | |
-| E2 | Change detection | A tracked opportunity with an amendment / deadline move produces a `pursuit_change_log` row and the owner's change email within the cron window | Agent 3 | |
-| E3 | Email to app | The change/alert email link opens the right opportunity (record link, never filtered away) | Agent 3 | |
+| E1 | Saved-search alert parity: **NOT MET as of 2026-11-14** | For every alerting saved search, the alert applies the same filters and matching the Map applies to that saved search. **Evidence:** a per-watch parity table on production with 0 unexplained differences, plus one test watch that alerts on a matching new notice and stays silent on a non-matching one. It can be met by #2043 (once Eric approves it) or by a fixed legacy path; the evidence must show parity, not just which evaluator ran. **Today:** 36 of 186 alerting saved searches return different notices from the Map, and 4 stored Full & Open flags are silently ignored | Agent 3 | |
+| E2 | Change detection | An amendment or deadline move on a tracked opportunity produces a `pursuit_change_log` row and the owner's email within the cron window. **Evidence:** a real change observed end to end on production | Agent 3 | |
+| E3 | Email to app | Every alert or change email links by record id (`?opp=<notice_id>`), opens that exact opportunity, and carries no profile filters that could hide it. **Evidence:** a click-through on production from a real email | Agent 3 | |
 | **F. Registration and onboarding** |||||
 | F1 | Every signup door | Email setup-password, password, Google, Microsoft and magic link each create an account, mint a session and land in the product | Agent 2 | |
 | F2 | Funnel logging | Each door writes `signup_started` / `signup_completed` and exactly one `account_verified`; existing-account redirects are not failures | Agent 2 | |
@@ -35,7 +35,7 @@ The new activation baseline (`ACTIVATION_BASELINE_START`) starts only after ever
 | G2 | Activation dashboard | `/admin/activation` loads on production and reconciles with direct SQL on the same window | Agent 2 | |
 
 ## Open questions for owners
-- A1/A3 precision threshold and panel: Agent 4 to propose from the Data Core relevance work.
-- E1: is legacy-evaluator equivalence acceptable, or must #2043 be on? Agent 3 to decide.
+- A1: the threshold and benchmark were proposed by Agent 3 (≥60% top-20 per category on a blind holdout); Agent 4 to confirm the panel and the labels. A3 (onboarding suggestions) still needs Agent 4's criterion.
+- E1: legacy-evaluator equivalence is NOT shown today (Agent 3). Whether #2043 goes on (needs a migration, a re-baseline and customer notices) is Eric's decision.
 - B1/C1: criteria set by Agent 1 (2026-11-14). The rubric (GRADING-RUBRIC.md, frozen as v1.1) lives in Agent 1's local evidence folder. Commit **only** GRADING-RUBRIC.md before the first graded run, after checking it holds no customer data: market-assassin is a PUBLIC repo. The rest of that folder (staff-account answers) stays local.
 - B2: blocked on two unauthorized development items (fallback model, tool-result size cap). Eric to decide.
