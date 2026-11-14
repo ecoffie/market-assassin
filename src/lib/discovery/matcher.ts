@@ -100,6 +100,44 @@ export const DISCOVERY_SUPPORTING: ReadonlySet<string> = new Set([
 export const DISCOVERY_QUALIFIERS: ReadonlySet<string> = new Set(['market']);
 
 /**
+ * Pronouns never name a market and never establish eligibility (Agent 3, 2026-11-14). They still COUNT toward the
+ * query's shape (a typed sentence stays the capability list it was), but they are moved to rank-only, so they can
+ * neither admit a record nor be required as a partner. Live defect this closes: "We provide security guards." made
+ * "we" (2.9% of notices) a partner word, so the trade word needed "we" in the same notice and 0 of 13 open guard
+ * notices (561612) came back, while Navy parts notices containing "we" and "Coast Guard" did.
+ */
+export const PRONOUNS: ReadonlySet<string> = new Set([
+  'i', 'me', 'my', 'mine', 'we', 'us', 'our', 'ours', 'you', 'your', 'yours', 'he', 'him', 'his', 'she', 'her', 'hers',
+  'they', 'them', 'their', 'theirs', 'itself', 'ourselves', 'themselves',
+]);
+
+/**
+ * CLOSED-CLASS English function words (pronouns, determiners, prepositions, conjunctions, auxiliaries / modals,
+ * wh-words, function adverbs). Same treatment as pronouns: they count toward shape, never admit, never pair. Agent 1
+ * (2026-11-14): the capability-list tiers exposed every unlisted function word at 1–5% of notices as a PARTNER word
+ * ("so", "into", "about", "between", "while", "both", "every", "some", "same", "how", "was", "were" …), the same
+ * failure as "we". Open-class verbs ("make", "offer", "serve") are sentence handling (C3) and are NOT listed here.
+ * "it" is excluded on purpose: it is matched only as the upper-case acronym IT (TOKEN_ACRONYMS).
+ */
+export const FUNCTION_WORDS: ReadonlySet<string> = new Set([
+  ...PRONOUNS,
+  // determiners / quantifiers
+  'this', 'that', 'these', 'those', 'each', 'every', 'either', 'neither', 'both', 'some', 'many', 'much', 'more', 'most',
+  'few', 'several', 'such', 'same', 'own', 'no', 'its', 'whose', 'which', 'what', 'who', 'whom',
+  // prepositions
+  'at', 'by', 'from', 'into', 'onto', 'over', 'under', 'about', 'above', 'below', 'between', 'among', 'through', 'during',
+  'before', 'after', 'since', 'until', 'while', 'within', 'without', 'against', 'per', 'via', 'as', 'than', 'upon',
+  // conjunctions
+  'but', 'nor', 'so', 'yet', 'if', 'then', 'because', 'although', 'though', 'whether',
+  // auxiliaries / modals
+  'am', 'was', 'were', 'be', 'been', 'being', 'had', 'having', 'do', 'does', 'did', 'doing', 'can', 'could', 'will',
+  'would', 'shall', 'should', 'may', 'might', 'must',
+  // wh-words and function adverbs
+  'where', 'when', 'why', 'how', 'also', 'too', 'very', 'just', 'only', 'even', 'still', 'already', 'again', 'ever',
+  'never', 'not', 'yes', 'here', 'there', 'etc',
+]);
+
+/**
  * Recognized concepts — ONE unit whose forms are interchangeable. `acronyms` match case-sensitively.
  * `cybersecurity` mirrors MCP's own CYBER_DIRECT_RE (`cyber(?:\s*security)?`): with word boundaries
  * alone, "cyber" stopped matching "cybersecurity" — 249 active notices say cybersecurity, 25 say cyber
@@ -264,7 +302,29 @@ function capabilityListTiers(distinctive: Concept[]): { common: Concept[]; admit
 }
 
 function alternativeOf(text: string): Alternative | null {
-  const concepts = conceptsOf(text);
+  const all = conceptsOf(text);
+  if (!all.length) return null;
+  const pronouns = all.filter((c) => FUNCTION_WORDS.has(c.label));
+  // Shape is decided on every concept (unchanged); pronouns are then removed from eligibility and only rank.
+  const alt = alternativeOfConcepts(all);
+  if (!alt || !pronouns.length) return alt;
+  const isPronoun = (c: Concept) => FUNCTION_WORDS.has(c.label);
+  const eligible = alt.eligible.filter((c) => !isPronoun(c));
+  if (!eligible.length) {
+    // Only a pronoun could admit: decide on the other words alone (fail-narrow if they are all broad); a query made
+    // of nothing but pronouns keeps its own words.
+    const rest = all.filter((c) => !isPronoun(c));
+    return rest.length ? alternativeOfConcepts(rest) : alt;
+  }
+  const partnerRequired = (alt.partnerRequired || []).filter((l) => !FUNCTION_WORDS.has(l));
+  const solo = eligible.filter((c) => !partnerRequired.includes(c.label));
+  // A partner word that lost its only partner (the pronoun) admits alone again, as a lone partner word always does.
+  const keepPartners = solo.length || partnerRequired.length > 1 ? partnerRequired : [];
+  const { partnerRequired: _drop, ...rest } = alt;
+  return { ...rest, eligible, rankOnly: [...alt.rankOnly, ...alt.eligible.filter(isPronoun)], ...(keepPartners.length ? { partnerRequired: keepPartners } : {}) };
+}
+
+function alternativeOfConcepts(concepts: Concept[]): Alternative | null {
   if (!concepts.length) return null;
   const distinctive = concepts.filter((c) => c.cls === 'distinctive');
   const qualifiers = concepts.filter((c) => c.cls === 'qualifier');
@@ -308,7 +368,11 @@ export function buildTextMatcher(residual: string, exclusions: string[] = []): T
 
   const normalized = normalizeQuery(trimmed);
   const parts = trimmed.split(/\s*[,;]\s*|\s+or\s+/i).map((s) => s.trim()).filter(Boolean);
-  const alternatives = parts.map(alternativeOf).filter(Boolean) as Alternative[];
+  const built = parts.map(alternativeOf).filter(Boolean) as Alternative[];
+  // A comma-separated part made ONLY of function words ("…, so that is what we do.") names no market: drop it when the
+  // query has another part, so it can never admit on "so" / "that" / "we". A query with nothing else keeps its words.
+  const marketParts = built.filter((a) => !a.eligible.every((c) => FUNCTION_WORDS.has(c.label)));
+  const alternatives = marketParts.length ? marketParts : built;
   if (!alternatives.length) return { mode: 'none', normalized, phrase: null, alternatives: [], excluded };
   return { mode: 'lexical', normalized, phrase: null, alternatives, excluded };
 }
