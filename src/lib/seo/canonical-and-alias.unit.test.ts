@@ -91,25 +91,16 @@ describe('defect 2 — a redirect is only issued to a serveable canonical', () =
     expect(helper.slice(helper.indexOf('catch'))).toContain('return null');
   });
 
-  // naics/agencies still resolve aliases inline.
-  const inlineRoutes = [
-    'src/app/contractors/[slug]/naics/page.tsx',
-    'src/app/contractors/[slug]/agencies/page.tsx',
-  ];
-  // The profile and contracts routes resolve through the shared resolver (2026-11-12), which
-  // only ever redirects to what serveableCanonical() confirmed.
+  // Every public contractor route resolves through the shared resolver: the profile and
+  // contracts routes since 2026-11-12, the naics/agencies tabs since 2026-11-13 (their inline,
+  // cache-only alias lookup 404'd aliases whose canonical page was live). The resolver only
+  // ever redirects to what serveableCanonical() confirmed.
   const resolverRoutes = [
     'src/app/contractors/[slug]/page.tsx',
     'src/app/contractors/[slug]/contracts/[[...page]]/page.tsx',
+    'src/app/contractors/[slug]/naics/page.tsx',
+    'src/app/contractors/[slug]/agencies/page.tsx',
   ];
-
-  it.each(inlineRoutes)('%s gates its redirect on serveability', (file) => {
-    const src = code(read(file));
-    expect(src, `${file} missing`).not.toBe('');
-    expect(src).toContain('serveableCanonical(await resolveCanonicalSlug(slug))');
-    // The raw resolver must not still feed permanentRedirect directly.
-    expect(src).not.toMatch(/const canonical = await resolveCanonicalSlug\(slug\);/);
-  });
 
   it.each(resolverRoutes)('%s redirects only on the shared resolver verdict', (file) => {
     const src = code(read(file));
@@ -130,13 +121,10 @@ describe('defect 2 — a redirect is only issued to a serveable canonical', () =
     expect(resolver).toContain('const target = await deps.serveable(canonical)');
   });
 
-  it('every inline contractor route that can redirect is covered — none left ungated', () => {
-    for (const f of inlineRoutes) {
+  it('no contractor route keeps an inline alias lookup of its own', () => {
+    for (const f of resolverRoutes) {
       const src = code(read(f));
-      const redirects = (src.match(/permanentRedirect\(`\/contractors\//g) ?? []).length;
-      const gated = (src.match(/serveableCanonical\(/g) ?? []).length;
-      expect(gated, `${f}: ungated alias redirect`).toBeGreaterThanOrEqual(1);
-      expect(redirects).toBeGreaterThanOrEqual(1);
+      expect(src, `${f}: inline alias lookup`).not.toMatch(/resolveCanonicalSlug\(|serveableCanonical\(/);
     }
   });
 });

@@ -6,21 +6,31 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { isSeoTemporarilyUnavailable } from '@/lib/seo/seo-unavailable';
 
 const state = vi.hoisted(() => ({
   recipient: null as Record<string, unknown> | null,
+  /** Overrides the resolver verdict; null ⇒ 'found' with state.recipient. */
+  resolution: null as Record<string, unknown> | null,
   naics: { rows: [] as unknown[], state: 'unavailable' as string },
   agencies: { rows: [] as unknown[], state: 'unavailable' as string },
 }));
 
+const { resolveContractorForPage } = vi.hoisted(() => ({
+  resolveContractorForPage: vi.fn(async (slug: string) => {
+    void slug; // asserted via toHaveBeenCalledWith
+    return state.resolution ?? { kind: 'found', recipient: state.recipient, liveBq: false };
+  }),
+}));
 vi.mock('@/lib/bigquery/recipients', () => ({
   SUBPAGE_MIN_ROWS: 5,
-  getRollupBySlug: vi.fn(async () => state.recipient),
-  resolveCanonicalSlug: vi.fn(async () => null),
   getAllNaicsForRecipientWithState: vi.fn(async () => state.naics),
   getAllAgenciesForRecipientWithState: vi.fn(async () => state.agencies),
 }));
-vi.mock('@/lib/seo/canonical-redirect', () => ({ serveableCanonical: vi.fn(async () => null) }));
+// The tabs resolve the contractor exactly as the profile and /contracts pages do.
+vi.mock('@/lib/seo/contractor-page-data', () => ({ resolveContractorForPage }));
 vi.mock('next/navigation', () => ({
   notFound: () => { throw new Error('NEXT_NOT_FOUND'); },
   permanentRedirect: (to: string) => { throw new Error(`REDIRECT:${to}`); },
@@ -47,6 +57,8 @@ const naicsRows = (n: number) => Array.from({ length: n }, (_, i) => ({ naics_co
 const agencyRows = (n: number) => Array.from({ length: n }, (_, i) => ({ awarding_agency: `Agency ${i}`, total_amount: 1000 * (n - i), pct_of_total: 1 / n }));
 
 beforeEach(() => {
+  resolveContractorForPage.mockClear();
+  state.resolution = null;
   state.recipient = { ...RECIPIENT };
   state.naics = { rows: [], state: 'unavailable' };
   state.agencies = { rows: [], state: 'unavailable' };
@@ -114,3 +126,72 @@ for (const P of PAGES) {
     });
   });
 }
+
+/**
+ * Resolution on the tabs (2026-11-13). The Search Console "Not found (404)" export held tab
+ * URLs that 404'd although the contractor exists under a canonical slug: the tabs read the
+ * rollup cache only and fell back to a cache-only alias lookup, so every alias and every cold
+ * contractor answered 404. These are the three found in the 1,000-URL classification, with
+ * the canonical slugs BigQuery's alias resolver returns for them.
+ */
+const FALSE_404S = [
+  { tab: 'naics', mod: NaicsPage, from: 'valkyrie-enterprises-inc', to: 'valkyrie-enterprises-llc' },
+  { tab: 'agencies', mod: AgenciesPage, from: 'the-university-of-dayton', to: 'university-of-dayton' },
+  { tab: 'agencies', mod: AgenciesPage, from: 'general-dynamics-corporation', to: 'general-dynamics-corp' },
+] as const;
+
+describe('tab resolution: the three false 404s from the 2026-11-13 Search Console export', () => {
+  for (const c of FALSE_404S) {
+    it(`/contractors/${c.from}/${c.tab} → 308 /contractors/${c.to}/${c.tab}`, async () => {
+      state.resolution = { kind: 'redirect', slug: c.to };
+      await expect(c.mod.default(params(c.from))).rejects.toThrow(`REDIRECT:/contractors/${c.to}/${c.tab}`);
+      expect(resolveContractorForPage).toHaveBeenCalledWith(c.from);
+    });
+  }
+});
+
+for (const P of PAGES) {
+  describe(`/contractors/[slug]/${P.name} resolution`, () => {
+    it('confirmed nonexistent contractor ⇒ genuine 404', async () => {
+      state.resolution = { kind: 'not_found' };
+      await expect(P.mod.default(params('no-such-company'))).rejects.toThrow('NEXT_NOT_FOUND');
+      const meta = await P.mod.generateMetadata(params('no-such-company'));
+      expect(meta.robots).toBeUndefined();
+    });
+
+    it('cold cache / budget spent / data source failed ⇒ temporary 5xx, never 404 or noindex', async () => {
+      for (const reason of ['cold-budget-exhausted', 'bigquery-failed', 'alias-target-cold']) {
+        state.resolution = { kind: 'unavailable', reason };
+        const err = await P.mod.default(params()).then(() => null, (e: unknown) => e);
+        expect(isSeoTemporarilyUnavailable(err)).toBe(true);
+        expect(String((err as Error).message)).toContain(reason);
+        const meta = await P.mod.generateMetadata(params());
+        expect(meta.robots).toBeUndefined();
+      }
+    });
+
+    it('resolved under a sibling slug ⇒ 308 to the canonical slug on the same tab', async () => {
+      state.recipient = { ...RECIPIENT, canonical_slug: 'acme-defense-incorporated' };
+      await expect(P.mod.default(params())).rejects.toThrow(`REDIRECT:/contractors/acme-defense-incorporated/${P.name}`);
+    });
+
+    it('single-UEI contractor (no rollup row) ⇒ the tab renders instead of 404ing', async () => {
+      state.recipient = { ...RECIPIENT, rollup_uei: 'UEI9', child_ueis: ['UEI9'] };
+      P.set(P.rows(6), 'hit');
+      const out = await html(P.mod);
+      expect((out.match(/<tbody[\s\S]*?<\/tbody>/)?.[0].match(/<tr/g) ?? []).length).toBe(6);
+    });
+  });
+}
+
+describe('source: one resolution mechanism, no second lookup path', () => {
+  const code = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
+  for (const tab of ['naics', 'agencies']) {
+    it(`${tab} resolves through resolveContractorForPage only`, () => {
+      const src = code(`src/app/contractors/[slug]/${tab}/page.tsx`);
+      expect(src).toMatch(/resolveContractorForPage\(slug\)/);
+      expect(src).not.toMatch(/getRollupBySlug|resolveCanonicalSlug|serveableCanonical/);
+    });
+  }
+});
+
