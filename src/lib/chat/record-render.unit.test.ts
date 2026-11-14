@@ -433,7 +433,7 @@ describe('acceptance attempt 4 fixes', () => {
   });
   it('labels word-matched labor categories as word matches, not titles for this work', () => {
     const r = rk4({ keyword_sources: [{ keyword: 'staffing', sources: [{ type: 'input_text' }] }], occupational_titles: [{ keyword: 'industrial engineer', sources: [{ type: 'gsa_calc' }] }] })!;
-    expect(r.text).toMatch(/share a word with your description\. These are word matches/);
+    expect(r.text).toMatch(/GSA CALC labor categories found by a word from your description/);
     expect(r.text).not.toMatch(/used for this work/);
   });
 });
@@ -447,5 +447,29 @@ describe('acceptance attempt 5 fixes', () => {
   });
   it('the delay sentence names the applied agency when the note says "this agency"', () => {
     expect(fs5(meta)).toMatch(/^Department of the Navy contract actions reach USASpending with about a 90-day delay/);
+  });
+});
+
+import { renderSbloContact } from './record-render';
+describe('acc6c review fixes', () => {
+  const res = { contact: { company: 'CONCORD PROFESSIONAL SERVICES, INC.', sblo_name: null, uei: 'NZ7CS4E6R7K6', source: 'USASpending (BigQuery, live)' }, registered_points_of_contact: { label: 'registered SAM point of contact, not a designated small business liaison', as_of: '2026-08-15T17:41:45.047+00:00', contacts: [{ name: 'Geoff Haas', title: 'President', roles: ['government business POC'] }] }, _meta: { has_named_sblo: false } };
+  it('R8: SAM contacts keep the source label that they are not a small business liaison', () => {
+    const r = renderSbloContact(res)!;
+    expect(r.text).toMatch(/^No designated small business liaison is on record for Concord Professional Services, INC\. \(UEI NZ7CS4E6R7K6\)\./);
+    expect(r.text).toMatch(/labeled by the source as "registered SAM point of contact, not a designated small business liaison", as of 2026-08-15/);
+    expect(r.text).toMatch(/1\. Geoff Haas, President · government business POC/);
+    expect(r.text).toMatch(/withholds these contacts' email and phone/);
+  });
+  it('R6: the related-titles heading states each source honestly', () => {
+    const r = rk4({ keyword_sources: [{ keyword: 'staffing', sources: [{ type: 'input_text' }] }], occupational_titles: [{ keyword: 'forklift operator', sources: [{ type: 'solicitation_text', n: 5 }] }] })!;
+    expect(r.text).toMatch(/"solicitation text" titles appeared in SAM solicitations under the industry codes for this work/);
+    expect(r.text).not.toMatch(/that share a word with your description/);
+  });
+});
+
+describe('acc7b R10: no location sentence when no location was asked', () => {
+  it('omits the widened-location sentence without a state filter', () => {
+    const r = rsc5({ awards: [], _meta: { auto_widened: true, applied_filters: { keyword: { value: 'x' } } } })!;
+    expect(r.text).not.toMatch(/widest location scope|company location/i);
   });
 });

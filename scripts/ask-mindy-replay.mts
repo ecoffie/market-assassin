@@ -13,7 +13,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import {
-  renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix,
+  renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, renderSbloContact,
 } from '../src/lib/chat/record-render';
 import { interpretCapabilityNaics } from '../src/lib/market/capability-naics';
 
@@ -25,6 +25,7 @@ const RENDER: Record<string, (r: Rec, prompt: string) => { text: string } | null
   get_pricing_intel: (r) => renderPricing(r),
   derive_company_keywords: (r) => renderKeywords(r),
   get_vehicle_spend_mix: (r) => renderVehicleMix(r),
+  get_sblo_contact: (r) => renderSbloContact(r),
 };
 const hash = (s: string) => createHash('sha256').update(s).digest('hex').slice(0, 12);
 

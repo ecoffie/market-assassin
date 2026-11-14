@@ -420,12 +420,12 @@ export function renderStatusChecks(result: Rec): RenderedRecords | null {
     // acc6 R5: an empty result without a lag note was left to the model, which wrote "there are no
     // current awards". An empty search is reported with its filters and never as proof of none.
     const searched = awardFilterParts((meta.applied_filters && typeof meta.applied_filters === 'object' ? meta.applied_filters : {}) as Rec);
-    const text = `No awards matched this search${searched.length ? ` (${searched.join(' · ')})` : ''}. This is NOT proof that no such contract exists: a keyword search matches only those words in award records, and an award described differently, recorded under another agency or location, or not yet published would not appear.${meta.auto_widened ? ' The search was also retried with the widest location scope.' : ''}`;
+    const text = `No awards matched this search${searched.length ? ` (${searched.join(' · ')})` : ''}. This is NOT proof that no such contract exists: a keyword search matches only those words in award records, and an award described differently, recorded under another agency or location, or not yet published would not appear.${meta.auto_widened && (meta.applied_filters as Rec | undefined)?.state ? ' Both place of performance and company location were checked for that state.' : ''}`;
     return { tool: PAST_CONTRACTS_TOOL, text, total: 0, retrieved: 0, from: 0, to: 0, shown: 0, exhaustive: false, ids: [], allowedCounts: [0], standalone: 0, orders: 0 };
   }
   if (!checks && !awardsList.length && meta.lag_note) {
     const searched = awardFilterParts((meta.applied_filters && typeof meta.applied_filters === 'object' ? meta.applied_filters : {}) as Rec);
-    const text = `No awards were found for this search${searched.length ? ` (${searched.join(' · ')})` : ' in the requested window'}, and that is NOT a verified zero.${meta.auto_widened ? ' The search was also retried with the widest location scope and still found nothing.' : ''} ${freshnessSentence(meta)}`;
+    const text = `No awards were found for this search${searched.length ? ` (${searched.join(' · ')})` : ' in the requested window'}, and that is NOT a verified zero.${meta.auto_widened && (meta.applied_filters as Rec | undefined)?.state ? ' Both place of performance and company location were checked for that state.' : ''} ${freshnessSentence(meta)}`;
     return { tool: PAST_CONTRACTS_TOOL, text, total: 0, retrieved: 0, from: 0, to: 0, shown: 0, exhaustive: false, ids: [], allowedCounts: [0], standalone: 0, orders: 0 };
   }
   if (!checks) return renderAwardList(result);
@@ -558,7 +558,7 @@ export function renderKeywords(result: Rec): RenderedRecords | null {
   const extraOcc = occ.filter((o) => !kwSet.has(str(o.keyword).toLowerCase()));
   if (extraOcc.length) {
     lines.push('');
-    lines.push(`Related job titles (${extraOcc.length} more) from GSA CALC labor categories and SAM solicitation text that share a word with your description. These are word matches; Mindy has not confirmed that each title is this kind of work:`);
+    lines.push(`Related job titles (${extraOcc.length} more). Each line shows its source: "calc labor category" titles are GSA CALC labor categories found by a word from your description; "solicitation text" titles appeared in SAM solicitations under the industry codes for this work. Mindy has not confirmed that each title is this kind of work:`);
     extraOcc.forEach((o, i) => lines.push(`${kws.length + i + 1}. ${str(o.keyword)} · ${src(o) || 'source not reported'}`));
   }
   const ex = (result.excluded_terms && typeof result.excluded_terms === 'object' ? result.excluded_terms : null) as Rec | null;
@@ -606,6 +606,40 @@ function awardFilterParts(af: Rec): string[] {
   if (af.state) parts.push(`state ${val(af.state)}${(af.state as Rec)?.scope ? ` (${str((af.state as Rec).scope) === 'pop' ? 'place of performance' : str((af.state as Rec).scope)})` : ''}`);
   if (af.date_from || af.date_to) parts.push(`activity ${str(af.date_from) || '...'} to ${str(af.date_to) || 'today'}`);
   return parts;
+}
+
+export const SBLO_TOOL = 'get_sblo_contact';
+
+/**
+ * Render get_sblo_contact: a named small business liaison only when the record has one; otherwise the
+ * firm's registered SAM points of contact WITH the tool's own label that they are not a designated
+ * small business liaison (acc6c R8: the free-text answer dropped that label and presented general
+ * contacts as the liaison the customer asked for). Email/phone are never invented.
+ */
+export function renderSbloContact(result: Rec): RenderedRecords | null {
+  const c = (result?.contact && typeof result.contact === 'object' ? result.contact : null) as Rec | null;
+  const poc = (result?.registered_points_of_contact && typeof result.registered_points_of_contact === 'object' ? result.registered_points_of_contact : null) as Rec | null;
+  const meta = (result?._meta && typeof result._meta === 'object' ? result._meta : {}) as Rec;
+  if (!c && !poc) return null;
+  const company = title(str(c?.company) || str(poc?.company)) || 'this company';
+  const lines: string[] = [];
+  if (c && str(c.sblo_name)) {
+    lines.push(`Designated small business liaison for ${company}: ${str(c.sblo_name)}${str(c.title) ? `, ${str(c.title)}` : ''}${str(c.email) ? ` · ${str(c.email)}` : ''}${str(c.phone) ? ` · ${str(c.phone)}` : ''}. Source: ${str(c.source) || 'not reported'}.`);
+  } else {
+    lines.push(`No designated small business liaison is on record for ${company}${str(c?.uei) || str(poc?.uei) ? ` (UEI ${str(c?.uei) || str(poc?.uei)})` : ''}.`);
+  }
+  const people = (Array.isArray(poc?.contacts) ? poc!.contacts : []) as Rec[];
+  if (people.length) {
+    lines.push('');
+    lines.push(`Registered SAM.gov points of contact (${people.length}), labeled by the source as "${str(poc!.label) || 'registered SAM point of contact'}"${str(poc!.as_of) ? `, as of ${str(poc!.as_of).slice(0, 10)}` : ''}:`);
+    people.forEach((p, i) => {
+      const roles = (Array.isArray(p.roles) ? p.roles : []).map(str).filter(Boolean);
+      lines.push(`${i + 1}. ${str(p.name) || 'name not reported'}${str(p.title) ? `, ${str(p.title)}` : ''}${roles.length ? ` · ${roles.join(', ')}` : ''}`);
+    });
+    lines.push('SAM.gov withholds these contacts\' email and phone on its public data, so none is shown; reach them through the firm\'s website or a channel listed on its SAM registration.');
+  }
+  if (!people.length && !(c && str(c.sblo_name))) lines.push('No registered SAM.gov point of contact was found either; that is not proof the firm has none.');
+  return { tool: SBLO_TOOL, text: lines.join('\n'), total: people.length, retrieved: people.length, from: people.length ? 1 : 0, to: people.length, shown: people.length, exhaustive: true, ids: [], allowedCounts: [people.length], standalone: 0, orders: 0 };
 }
 
 export const VEHICLE_MIX_TOOL = 'get_vehicle_spend_mix';

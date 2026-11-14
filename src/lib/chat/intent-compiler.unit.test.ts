@@ -95,8 +95,9 @@ describe('acceptance attempt 4 fixes (enforceIntent)', () => {
     const q = 'Keywords for a light industrial, clerical and warehouse staffing firm in Memphis';
     const a = enforce('derive_company_keywords', { description: 'A staffing company providing temp workers', past_performance: [{ title: 'Provided staffing solutions' }], limit: 12 }, q);
     expect(a.a).toEqual({ description: q, limit: 12 });
+    // acc7b R6: a fragment of this turn's request is widened to the whole request (one list, everything named).
     const b = enforce('derive_company_keywords', { description: 'staffing firm', limit: 12 }, q);
-    expect(b.a).toEqual({ description: 'staffing firm', limit: 12 });
+    expect(b.a).toEqual({ description: q, limit: 12 });
   });
   it('keeps past performance the customer pasted earlier in the conversation', () => {
     const intent = compileIntent('Now derive my keywords', NOW, 'We provided warehouse staffing to DLA Memphis\nNow derive my keywords');
@@ -113,5 +114,45 @@ describe('city named, state searched', () => {
   it('says nothing when the customer named the state itself', () => {
     const r = enforce('get_expiring_contracts', { naics: '561612', state: 'TX', months_window: 12 }, 'Which agencies buy security guard services in the San Antonio area, and which of the current guard contracts in Texas expire in the next 12 months?');
     expect(r.unapplied).toEqual([]);
+  });
+});
+
+describe('acc6c R1: state order', () => {
+  it('treats reordered state lists as the same search', () => {
+    const r = dedupeToolCalls([
+      { id: 'a', name: 'get_expiring_contracts', args: JSON.stringify({ naics: '561320,561110,493110', state: 'TN,MS,AR', months_window: 18 }) },
+      { id: 'b', name: 'get_expiring_contracts', args: JSON.stringify({ naics: '561320,561110,493110', state: 'MS,TN,AR', months_window: 18 }) },
+      { id: 'c', name: 'get_expiring_contracts', args: JSON.stringify({ naics: '561320,561110,493110', state: 'AR, Tennessee, MS', months_window: 18 }) },
+    ]);
+    expect(r.keep.map((k) => k.id)).toEqual(['a']);
+  });
+});
+
+describe('acc7b near-misses', () => {
+  it('R2: the applied-codes note lists every code searched and which ones Mindy added', () => {
+    const r = enforce('get_expiring_contracts', { naics: '561320', state: 'TN', months_window: 18 }, 'Federal contracts expiring in the next 18 months in Tennessee for temporary staffing, clerical, admin and warehouse work');
+    expect(r.applied).toContain('industry codes 561320, 561110, 493110 for the work you named (561110, 493110 added by Mindy)');
+  });
+  it('R6: a fragment of the request is replaced by the whole request', () => {
+    const q = 'Keywords for a light industrial, clerical and warehouse staffing firm in Memphis';
+    expect(enforce('derive_company_keywords', { description: 'warehouse staffing', limit: 12 }, q).a.description).toBe(q);
+  });
+});
+
+describe('acc7 R4: buying-office calls that differ only by the default radius', () => {
+  it('keeps the broader-coded call', () => {
+    const r = dedupeToolCalls([
+      { id: '1', name: 'get_buying_offices', args: JSON.stringify({ state: 'TN', city: 'Memphis', naics: '561320,561110', limit: 10 }) },
+      { id: '2', name: 'get_buying_offices', args: JSON.stringify({ state: 'TN', cities: ['Memphis'], naics: '561320', metro_radius_miles: 30 }) },
+      { id: '3', name: 'get_buying_offices', args: JSON.stringify({ state: 'TN', cities: ['Memphis'], naics: '561110', metro_radius_miles: 30, limit: 10 }) },
+    ]);
+    expect(r.keep.map((k) => k.id)).toEqual(['1']);
+  });
+  it('a different radius is a different search', () => {
+    const r = dedupeToolCalls([
+      { id: '1', name: 'get_buying_offices', args: JSON.stringify({ state: 'TN', city: 'Memphis', naics: '561320' }) },
+      { id: '2', name: 'get_buying_offices', args: JSON.stringify({ state: 'TN', city: 'Memphis', naics: '561320', metro_radius_miles: 0 }) },
+    ]);
+    expect(r.keep.map((k) => k.id)).toEqual(['1', '2']);
   });
 });
