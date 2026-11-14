@@ -26,6 +26,14 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-14 — Ask Mindy Phase 1: chat input lost to the event pop-up
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-14 | Site event pop-up / Ask Mindy input | **Typing an Ask Mindy question and pressing Enter navigated to /lazy-contractors-blueprint and lost the question.** The site pop-up opened on a 2.5 s timer while the customer was typing and focused "Register free", so Enter activated the link (reproduced headless on production: NAV to the event page 139 ms after Enter, textarea gone). The pop-up now waits until no text field has focus, and focuses the dialog instead of the link. Once-per-session rule unchanged. | `function whenIdle()` in `src/lib/events/event-popup.ts` | `event-popup.typing.unit.test.ts` (jsdom, 4; old script fails 2); `event-popup.unit.test.ts` | IN REVIEW |
+
+---
+
 ## 2026-11-14 — Ask Mindy safety release + Phase 0 (Option C, approved 2026-11-13)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
