@@ -29,8 +29,21 @@ export interface AwardsByLocationOptions {
   stateScope?: StateScope;        // default 'pop'
   naics?: string;                 // 6-digit exact or 2-5 digit prefix
   psc?: string;
-  agency?: string;                // awarding agency (toptier) name
+  agency?: string;                // awarding agency name (military departments map to sub-tier)
   recipient?: string;             // recipient name keyword
+  /**
+   * Free-text keyword (USASpending `filters.keywords`, matched as one phrase against award
+   * description, award id and recipient). When `piidPrefix` is also given the server query is the
+   * prefix and this keyword is matched client-side against description + recipient (USASpending
+   * ORs multiple keywords, so both cannot be sent together without losing the AND).
+   */
+  keyword?: string;
+  /**
+   * Contract-number (PIID) prefix, e.g. "W912EQ" (an office DoDAAC). Sent to USASpending as a
+   * keyword (which matches award ids by prefix) and then enforced client-side: only rows whose
+   * Award ID starts with the prefix are kept.
+   */
+  piidPrefix?: string;
   minValue?: number;
   dateFrom?: string;              // action-date lower bound (YYYY-MM-DD)
   dateTo?: string;
@@ -74,6 +87,41 @@ export interface AwardsByLocationResult {
   totalEstimate: number;
   requestsFired: number;
   degraded: boolean;
+  /** How keyword / piid_prefix were applied (server-side vs client-side), for _meta.applied_filters. */
+  textFilters?: {
+    keyword?: { value: string; applied: 'server_keyword' | 'client_side_description_recipient' };
+    piid_prefix?: { value: string; applied: 'server_keyword_plus_client_prefix_check' };
+    /** Rows scanned server-side before client-side filtering (both-filter mode only). */
+    scanned_rows?: number;
+    /** True when the server-side scan stopped at the page cap with more rows remaining. */
+    scan_truncated?: boolean;
+  };
+}
+
+/** Pages scanned per request when a client-side keyword filter runs over a PIID-prefix query. */
+export const PREFIX_SCAN_MAX_PAGES = 15;
+const PREFIX_SCAN_PAGE_SIZE = 100;
+const PREFIX_SCAN_BATCH = 5;
+
+/** Normalize a PIID prefix; returns null when it is not a plausible prefix (2-17 alphanumerics). */
+export function normalizePiidPrefix(raw: string | undefined | null): string | null {
+  const v = String(raw ?? '').replace(/[\s-]/g, '').toUpperCase();
+  return /^[A-Z0-9]{2,17}$/.test(v) ? v : null;
+}
+
+/**
+ * Client-side keyword match used only in prefix+keyword mode: the whole phrase appears, or every
+ * significant word (3+ chars) appears as a word prefix, in the description or recipient name.
+ */
+export function rowMatchesKeyword(row: Pick<AwardRow, 'description' | 'recipientName'>, keyword: string): boolean {
+  const hay = `${row.description} ${row.recipientName}`.toLowerCase();
+  const phrase = keyword.trim().toLowerCase();
+  if (!phrase) return true;
+  if (hay.includes(phrase)) return true;
+  const words = phrase.split(/[^a-z0-9]+/).filter((w) => w.length >= 3);
+  if (!words.length) return false;
+  // words contain only [a-z0-9] (split above), so no regex escaping is needed.
+  return words.every((w) => new RegExp(`\\b${w}`).test(hay));
 }
 
 const FIELDS = [
@@ -104,6 +152,8 @@ interface FireResult {
   rows: AwardRow[];
   total: number;
   ok: boolean;
+  scanned?: number;
+  truncated?: boolean;
 }
 
 /** USASpending spending_by_award often returns NAICS/PSC/office/state as null
@@ -183,35 +233,80 @@ async function fireOne(
   if (opts.psc) filters.psc_codes = [opts.psc.trim().toUpperCase()];
   if (opts.agency) filters.agencies = [usaSpendingAwardingAgencyFilter(opts.agency)];
   if (opts.recipient) filters.recipient_search_text = [opts.recipient.trim()];
+  const prefix = normalizePiidPrefix(opts.piidPrefix);
+  const keyword = opts.keyword?.trim() || '';
+  // USASpending ORs entries in `keywords`, so prefix + keyword cannot both go server-side.
+  // Prefix is the narrower, office-anchored key: send it, then match the keyword client-side.
+  if (prefix) filters.keywords = [prefix];
+  else if (keyword) filters.keywords = [keyword];
   if (locationFilter) Object.assign(filters, locationFilter);
 
-  const body = {
-    filters,
-    fields: FIELDS,
-    page: 1,
-    limit: perRequestLimit,
-    sort: 'Award Amount',
-    order: 'desc',
-    subawards: false,
+  const scanMode = !!(prefix && keyword);
+  const pageSize = scanMode ? PREFIX_SCAN_PAGE_SIZE : perRequestLimit;
+
+  const fetchPage = async (page: number): Promise<{ rows: AwardRow[]; total: number | null; hasNext: boolean; ok: boolean }> => {
+    const body = {
+      filters,
+      fields: FIELDS,
+      page,
+      limit: pageSize,
+      sort: 'Award Amount',
+      order: 'desc',
+      subawards: false,
+    };
+    try {
+      const resp = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) {
+        console.error(`[usaspending:awards-search] ${resp.status} for ${JSON.stringify(awardTypeCodes)}`);
+        return { rows: [], total: null, hasNext: false, ok: false };
+      }
+      const data = await resp.json();
+      const rows: AwardRow[] = (data.results || []).map((c: Record<string, unknown>) => mapAwardRow(c, opts));
+      return { rows, total: data.page_metadata?.total ?? null, hasNext: !!data.page_metadata?.hasNext, ok: true };
+    } catch (err) {
+      console.error('[usaspending:awards-search] fetch failed:', err);
+      return { rows: [], total: null, hasNext: false, ok: false };
+    }
   };
 
-  try {
-    const resp = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!resp.ok) {
-      console.error(`[usaspending:awards-search] ${resp.status} for ${JSON.stringify(awardTypeCodes)}`);
-      return { rows: [], total: 0, ok: false };
-    }
-    const data = await resp.json();
-    const rows: AwardRow[] = (data.results || []).map((c: Record<string, unknown>) => mapAwardRow(c, opts));
-    return { rows, total: data.page_metadata?.total ?? rows.length, ok: true };
-  } catch (err) {
-    console.error('[usaspending:awards-search] fetch failed:', err);
-    return { rows: [], total: 0, ok: false };
+  const keepPrefix = (rows: AwardRow[]) => (prefix ? rows.filter((r) => r.awardId.toUpperCase().startsWith(prefix)) : rows);
+
+  if (!scanMode) {
+    const p = await fetchPage(1);
+    if (!p.ok) return { rows: [], total: 0, ok: false };
+    const rows = keepPrefix(p.rows);
+    // With a prefix check the server total can include non-prefix keyword hits; report what we kept
+    // unless the server total is the only signal of more rows.
+    const total = prefix ? (p.hasNext ? Math.max(rows.length, p.total ?? rows.length) : rows.length) : (p.total ?? rows.length);
+    return { rows, total, ok: true };
   }
+
+  // Scan mode: page the prefix population (batches of parallel pages), keep keyword matches.
+  const kept: AwardRow[] = [];
+  let scanned = 0;
+  let anyOk = false;
+  let more = true;
+  let page = 1;
+  while (more && page <= PREFIX_SCAN_MAX_PAGES) {
+    const batch: number[] = [];
+    for (let i = 0; i < PREFIX_SCAN_BATCH && page <= PREFIX_SCAN_MAX_PAGES; i++) batch.push(page++);
+    const pages = await Promise.all(batch.map(fetchPage));
+    more = false;
+    for (const p of pages) {
+      if (!p.ok) continue;
+      anyOk = true;
+      scanned += p.rows.length;
+      kept.push(...keepPrefix(p.rows).filter((r) => rowMatchesKeyword(r, keyword)));
+    }
+    const last = pages[pages.length - 1];
+    more = !!(last?.ok && last.hasNext);
+  }
+  if (!anyOk) return { rows: [], total: 0, ok: false, scanned: 0, truncated: false };
+  return { rows: kept, total: kept.length, ok: true, scanned, truncated: more };
 }
 
 function locationFiltersFor(state: string | undefined, scope: StateScope): (Record<string, unknown> | null)[] {
@@ -252,9 +347,13 @@ export async function searchAwardsByLocation(opts: AwardsByLocationOptions = {})
   const byId = new Map<string, AwardRow>();
   let totalEstimate = 0;
   let anyOk = false;
+  let scanned = 0;
+  let scanTruncated = false;
   for (const r of results) {
     if (r.ok) anyOk = true;
     totalEstimate += r.total;
+    scanned += r.scanned ?? 0;
+    if (r.truncated) scanTruncated = true;
     for (const row of r.rows) {
       const key = row.generatedId || row.awardId || `${row.recipientUei}:${row.awardAmount}`;
       const prev = byId.get(key);
@@ -267,11 +366,22 @@ export async function searchAwardsByLocation(opts: AwardsByLocationOptions = {})
   // multiple requests it double-counts overlap, so only trust it for one job.
   const total = results.length === 1 ? totalEstimate : Math.max(totalEstimate, merged.length);
 
+  const prefix = normalizePiidPrefix(opts.piidPrefix);
+  const keyword = opts.keyword?.trim() || '';
+  const textFilters: AwardsByLocationResult['textFilters'] = {};
+  if (prefix) textFilters.piid_prefix = { value: prefix, applied: 'server_keyword_plus_client_prefix_check' };
+  if (keyword) textFilters.keyword = { value: keyword, applied: prefix ? 'client_side_description_recipient' : 'server_keyword' };
+  if (prefix && keyword) {
+    textFilters.scanned_rows = scanned;
+    textFilters.scan_truncated = scanTruncated;
+  }
+
   return {
     awards: merged,
     count: merged.length,
     totalEstimate: total,
     requestsFired: jobs.length,
     degraded: !anyOk,
+    ...(prefix || keyword ? { textFilters } : {}),
   };
 }

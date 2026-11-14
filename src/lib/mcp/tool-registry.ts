@@ -364,7 +364,14 @@ const AWARD_DETAIL_TOOL_DEF = {
       'parent IDV/vehicle you must hold to compete, period of performance (recompete timing), recipient, ' +
       'NAICS/PSC, funding account. Pass a contract number (PIID) OR a generated_internal_id. Do NOT pass a ' +
       'SAM solicitation/RFQ number — use get_solicitation_incumbent for those. Returns grounded=false when ' +
-      'no award matches — do not invent figures.',
+      'no award matches — do not invent figures. ' +
+      'USE THIS for "is this contract/order still active?" and "when does it end?": returns status ' +
+      '(active | expired | not_started | unknown, computed against today from the period-of-performance end), ' +
+      'days_until_end, and, when expired or ending within 180 days, a successor probe (likely follow-on awards ' +
+      'from the same awarding office PIID prefix with the same NAICS or PSC starting near the old end date, each ' +
+      'with its evidence; or state none_found with exactly what was checked). If you only have a description ' +
+      '("the Navy ID card order in Millington"), first find the PIID with search_past_contracts (keyword + agency, ' +
+      'e.g. keyword "identification card"), then call this.',
     parameters: {
       type: 'object',
       properties: {
@@ -953,7 +960,13 @@ const PAST_CONTRACTS_TOOL_DEF = {
       'Returns each award\'s recipient, amount, agency, NAICS/PSC, place-of-performance + recipient state, dates, ' +
       'and a USASpending deep link. These are ALREADY-AWARDED contracts — for open solicitations use ' +
       'search_sam_opportunities; for one firm\'s full history use get_contractor_award_history. grounded=false ' +
-      'when nothing matches — broaden the codes/date or try state_scope:"both"; do not invent awards.',
+      'when nothing matches — broaden the codes/date or try state_scope:"both"; do not invent awards. ' +
+      'keyword finds an award by what it is (a phrase from its description, e.g. "identification card", ' +
+      '"business management support"); piid_prefix finds an office\'s awards by contract-number prefix (e.g. ' +
+      '"W912EQ" = USACE Memphis District, "N00189" = NAVSUP FLC Norfolk). Only pass the filters the user asked ' +
+      'for: do NOT add a state the user did not name. _meta.applied_filters lists every filter applied. When the ' +
+      'date window is recent, _meta.lag_note explains that DoD awards publish with a ~90-day delay: report "not ' +
+      'yet published / data current through <date>", never "no award was made".',
     parameters: {
       type: 'object',
       properties: {
@@ -961,13 +974,15 @@ const PAST_CONTRACTS_TOOL_DEF = {
         state_scope: { type: 'string', enum: ['pop', 'recipient', 'both'], description: 'Which location to match (default "pop" = place of performance).' },
         naics: { type: 'string', description: 'NAICS code — 6-digit exact or 2-5 digit prefix.' },
         psc: { type: 'string', description: 'Product/Service Code.' },
-        agency: { type: 'string', description: 'Awarding agency name (toptier).' },
+        agency: { type: 'string', description: 'Awarding agency name. Military departments ("Navy", "Army", "Air Force") are matched as USASpending sub-tier agencies.' },
         recipient: { type: 'string', description: 'Recipient company-name keyword.' },
         min_value: { type: 'number', description: 'Minimum award amount (dollars).' },
         date_from: { type: 'string', description: 'Action-date lower bound (YYYY-MM-DD).' },
         date_to: { type: 'string', description: 'Action-date upper bound (YYYY-MM-DD).' },
         include_idv: { type: 'boolean', description: 'Also include IDV vehicles (IDIQ/GWAC/BPA), not just definitive contracts (default false).' },
         limit: { type: 'number', description: 'Max awards returned (default 25, max 100).' },
+        keyword: { type: 'string', description: 'Phrase matched against award description / award id / recipient (USASpending keyword search, exact phrase). Use the formal wording ("identification card", not "ID card"). With piid_prefix, matched against description and recipient of that office\'s awards.' },
+        piid_prefix: { type: 'string', description: 'Contract-number (PIID) prefix, e.g. an office DoDAAC "W912EQ" or "N00189". Only awards whose PIID starts with it are returned.' },
       },
     },
   },
@@ -2483,6 +2498,8 @@ async function dispatchMcpTool(
       date_to: typeof args.date_to === 'string' ? args.date_to : undefined,
       include_idv: typeof args.include_idv === 'boolean' ? args.include_idv : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
+      keyword: typeof args.keyword === 'string' ? args.keyword : undefined,
+      piid_prefix: typeof args.piid_prefix === 'string' ? args.piid_prefix : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

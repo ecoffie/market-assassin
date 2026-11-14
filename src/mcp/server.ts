@@ -293,7 +293,9 @@ server.registerTool(
       'Full USASpending detail for one federal award: obligated→ceiling (the real prize size), the ' +
       'parent IDV/vehicle you must hold to compete, period of performance (recompete timing), recipient, ' +
       'NAICS/PSC, funding account. Pass a contract number (PIID) OR a generated_internal_id. Returns ' +
-      'grounded=false when no award matches — do not invent figures.',
+      'grounded=false when no award matches — do not invent figures. Also returns status (active | expired | ' +
+      'not_started | unknown vs today), days_until_end, and a successor probe (likely follow-ons with evidence, ' +
+      'or none_found with what was checked) when expired or ending within 180 days.',
     inputSchema: {
       piid: z.string().optional().describe('Contract number (PIID), e.g. "140F0822D0024".'),
       id: z.string().optional().describe('USASpending generated_internal_id, if already known (skips the resolve).'),
@@ -841,23 +843,28 @@ server.registerTool(
       'Awarded federal prime contracts (past/historical, USASpending) BY LOCATION + NAICS / PSC / agency / recipient / ' +
       'value / date. state_scope: "pop" (place of performance, default), "recipient" (awardee HQ), or "both" (union). ' +
       'Already-awarded contracts — for open solicitations use search_sam_opportunities; for one firm use ' +
-      'get_contractor_award_history. grounded=false when nothing matches; do not invent awards.',
+      'get_contractor_award_history. grounded=false when nothing matches; do not invent awards. keyword = a phrase from ' +
+      'the award description; piid_prefix = contract-number prefix (office DoDAAC, e.g. "W912EQ"). Only pass filters the ' +
+      'user asked for. _meta.applied_filters lists what was applied; _meta.lag_note flags a window inside the ~90-day ' +
+      'DoD publication delay (say "not yet published", not "none").',
     inputSchema: {
       state: z.string().optional().describe('State — full name ("Florida") or 2-letter code ("FL").'),
       state_scope: z.enum(['pop', 'recipient', 'both']).optional().describe('Which location to match (default "pop").'),
       naics: z.string().optional().describe('NAICS — 6-digit exact or 2-5 digit prefix.'),
       psc: z.string().optional().describe('Product/Service Code.'),
-      agency: z.string().optional().describe('Awarding agency name (toptier).'),
+      agency: z.string().optional().describe('Awarding agency name (military departments matched as sub-tier).'),
       recipient: z.string().optional().describe('Recipient company-name keyword.'),
       min_value: z.number().optional().describe('Minimum award amount (dollars).'),
       date_from: z.string().optional().describe('Action-date lower bound (YYYY-MM-DD).'),
       date_to: z.string().optional().describe('Action-date upper bound (YYYY-MM-DD).'),
       include_idv: z.boolean().optional().describe('Also include IDV vehicles (default false).'),
       limit: z.number().int().min(1).max(100).optional().describe('Max awards (default 25).'),
+      keyword: z.string().optional().describe('Phrase matched against award description / id / recipient (exact phrase).'),
+      piid_prefix: z.string().optional().describe('Contract-number prefix, e.g. office DoDAAC "W912EQ".'),
     },
   },
-  async ({ state, state_scope, naics, psc, agency, recipient, min_value, date_from, date_to, include_idv, limit }) => {
-    const result = await searchPastContracts({ state, state_scope, naics, psc, agency, recipient, min_value, date_from, date_to, include_idv, limit });
+  async ({ state, state_scope, naics, psc, agency, recipient, min_value, date_from, date_to, include_idv, limit, keyword, piid_prefix }) => {
+    const result = await searchPastContracts({ state, state_scope, naics, psc, agency, recipient, min_value, date_from, date_to, include_idv, limit, keyword, piid_prefix });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );
