@@ -23,6 +23,7 @@ export const CHAT_FETCH_LIMIT = 200;
 type Rec = Record<string, unknown>;
 
 import { US_STATE_NAMES } from '@/lib/utils/us-states';
+import { assessPublicationLag, isDodAgency } from '@/lib/usaspending/freshness';
 import { interpretCapabilityNaics } from '@/lib/market/capability-naics';
 /** A state named in a record's own description that differs from its reported place of performance. */
 export function describedStateConflict(description: string, popState: string): string | null {
@@ -56,6 +57,11 @@ function cityStateMap(): Map<string, Set<string>> {
  * International Airport", "Curlew Job Corps Center") that is a known US city but has no city of that
  * name in the reported place-of-performance state. Unknown names are never flagged.
  */
+/** US states that border Mexico / Canada (public geography). */
+const REGION_STATES: Record<string, string[]> = {
+  'THROUGHOUT THE SOUTHERN BORDER': ['CA', 'AZ', 'NM', 'TX'],
+  'THROUGHOUT THE NORTHERN BORDER': ['WA', 'ID', 'MT', 'ND', 'MN', 'WI', 'MI', 'OH', 'PA', 'NY', 'VT', 'NH', 'ME', 'AK'],
+};
 export function describedPlaceConflict(description: string, popState: string): string | null {
   const stateHit = describedStateConflict(description, popState);
   if (stateHit) return stateHit;
@@ -68,11 +74,7 @@ export function describedPlaceConflict(description: string, popState: string): s
   const scope = up.match(/\b(NATIONWIDE|NATION-WIDE|CONUS|THROUGHOUT THE (?:SOUTHERN|NORTHERN) BORDER|MULTIPLE STATES|ALL STATES|THROUGHOUT THE UNITED STATES)\b/);
   // A border region that includes the reported state is not a conflict (R11: a San Antonio guard
   // award "throughout the southern border" was wrongly marked).
-  const BORDER: Record<string, string[]> = {
-    'THROUGHOUT THE SOUTHERN BORDER': ['CA', 'AZ', 'NM', 'TX'],
-    'THROUGHOUT THE NORTHERN BORDER': ['WA', 'ID', 'MT', 'ND', 'MN', 'WI', 'MI', 'OH', 'PA', 'NY', 'VT', 'NH', 'ME', 'AK'],
-  };
-  if (scope && !(BORDER[scope[1]]?.includes(popState.toUpperCase()))) return `${scope[1].toLowerCase()} (work beyond one state)`;
+  if (scope && !(REGION_STATES[scope[1]]?.includes(popState.toUpperCase()))) return `${scope[1].toLowerCase()} (work beyond one state)`;
   const map = cityStateMap();
   for (const re of cues) {
     for (const m of up.matchAll(re)) {
@@ -88,6 +90,20 @@ export function describedPlaceConflict(description: string, popState: string): s
     }
   }
   return null;
+}
+
+/**
+ * A multi-state region named in the description that INCLUDES the reported state is not a conflict,
+ * but the work may extend beyond that state; say so as a fact, never as a CHECK.
+ */
+export function describedRegionNote(description: string, popState: string): string | null {
+  const up = String(description || '').toUpperCase();
+  const st = String(popState || '').toUpperCase();
+  const m = up.match(/\bTHROUGHOUT THE (SOUTHERN|NORTHERN) BORDER\b/);
+  if (!m || !st) return null;
+  const states = REGION_STATES[`THROUGHOUT THE ${m[1]} BORDER`];
+  if (!states?.includes(st)) return null;
+  return `the description names the ${m[1].toLowerCase()} border, a region spanning ${states.join(', ')}; it includes the reported state ${st}, so the work may also extend to other states in that region`;
 }
 
 export interface RenderedRecords {
@@ -231,8 +247,9 @@ function recordLine(n: number, r: Rec & { _kind: string }): string {
   const otherWork = describedOtherWork(str(r.description), REQUESTED_LABELS);
   const confirms = describedRequestedWork(str(r.description), REQUESTED_LABELS);
   const basis = confirms ? ` · description confirms: ${confirms}` : '';
+  const region = conflict ? null : describedRegionNote(str(r.description), st);
 
-  return `${n}. ${id} · ${who} · ${agency} · ${place} · ends ${end} · ${kind}${value ? ` · obligated ${value}` : ''}${desc ? ` · ${desc}` : ''}${conflict ? ` · CHECK: the description names ${conflict}, which is not in the reported place-of-performance state ${st}; this record may not belong to the requested place` : ''}${basis}${otherWork ? ` · CHECK: the description describes ${otherWork} work, not the work requested` : ''}`;
+  return `${n}. ${id} · ${who} · ${agency} · ${place} · ends ${end} · ${kind}${value ? ` · obligated ${value}` : ''}${desc ? ` · ${desc}` : ''}${conflict ? ` · CHECK: the description names ${conflict}, which is not in the reported place-of-performance state ${st}; this record may not belong to the requested place` : ''}${region ? ` · note: ${region}` : ''}${basis}${otherWork ? ` · CHECK: the description describes ${otherWork} work, not the work requested` : ''}`;
 }
 
 /**
@@ -496,6 +513,8 @@ export function renderBuyingOffices(result: Rec): RenderedRecords | null {
     lines.push(`${offices.length < officeCount ? `Showing the top ${offices.length} of ${officeCount}` : `Showing all ${officeCount}`} by net obligations: ${positive} with positive net obligations are listed below${offices.length - positive ? `, and ${offices.length - positive} with zero or negative net obligations are listed separately` : ''}.`);
     lines.push('Ranked by obligations under the industry (NAICS) codes shown; a code can include other work than the words you used, so check the example awards listed for each office.');
     if (meta.as_of || meta.lag_note) lines.push(`Data freshness: ${meta.as_of ? `latest action loaded ${str(meta.as_of)}` : ''}${meta.as_of && meta.lag_note ? '; ' : ''}${meta.lag_note ? str(meta.lag_note) : ''}.`.replace(/\.\.$/, '.'));
+    const dodLag = defenseLagSentence(meta, offices.some((o) => isDodAgency(str(o.agency)) || isDodAgency(str(o.sub_agency))));
+    if (dodLag) lines.push(dodLag);
     lines.push('');
     const buyers = offices.filter((o) => (num(o.obligated) ?? 0) > 0);
     const nonBuyers = offices.filter((o) => (num(o.obligated) ?? 0) <= 0);
@@ -503,11 +522,17 @@ export function renderBuyingOffices(result: Rec): RenderedRecords | null {
       const customers = (Array.isArray(o.top_funding_offices) ? (o.top_funding_offices as Rec[]) : []).slice(0, 3).map((f) => `${title(str(f.name))} ${money(f.obligated)}`).filter((x) => x.trim());
       const places = (Array.isArray(o.top_places) ? (o.top_places as Rec[]) : []).slice(0, 3).map((p) => [title(str(p.city)), str(p.state)].filter(Boolean).join(', ')).filter(Boolean);
       const examples = (Array.isArray(o.example_awards) ? (o.example_awards as Rec[]) : []).slice(0, 2).map((e) => `${str(e.piid) || str(e.award_id)} ${money(e.obligated)}`).filter((x) => x.trim());
-      lines.push(`${i + 1}. ${str(o.office_name) || 'office name not reported'}${o.office_code ? ` (${str(o.office_code)})` : ''} · ${[title(str(o.agency)), title(str(o.sub_agency))].filter(Boolean).join(' / ')} · ${money(o.obligated)} (${str(o.share_pct)}%) · ${num(o.award_count) ?? 0} awards${customers.length ? ` · customers: ${customers.join('; ')}` : ''}${places.length ? ` · work performed in ${places.join('; ')}` : ''}${examples.length ? ` · example awards (obligations in this window): ${examples.join('; ')}` : ''}`);
+      // Cosmetic (release hardening): no code repeated when the name already carries it; no repeated
+      // agency/sub-agency; singular "award".
+      const oName = str(o.office_name) || 'office name not reported';
+      const oCode = str(o.office_code);
+      const agencyParts = Array.from(new Set([title(str(o.agency)), title(str(o.sub_agency))].filter(Boolean)));
+      const nAw = num(o.award_count) ?? 0;
+      lines.push(`${i + 1}. ${oName}${oCode && !oName.toUpperCase().includes(`(${oCode.toUpperCase()})`) ? ` (${oCode})` : ''} · ${agencyParts.join(' / ')} · ${money(o.obligated)} (${str(o.share_pct)}%) · ${nAw} award${nAw === 1 ? '' : 's'}${customers.length ? ` · customers: ${customers.join('; ')}` : ''}${places.length ? ` · work performed in ${places.join('; ')}` : ''}${examples.length ? ` · example awards (obligations in this window): ${examples.join('; ')}` : ''}`);
     });
     if (nonBuyers.length) {
       lines.push('');
-      lines.push(`Also returned, with zero or negative net obligations in this window (deobligations, so not evidence of buying): ${nonBuyers.map((o) => `${str(o.office_name)}${o.office_code ? ` (${str(o.office_code)})` : ''} ${money(o.obligated)}`).join('; ')}.`);
+      lines.push(`Also returned, with net obligations of zero or less in this window (deobligations or no net spending, so not evidence of buying here): ${nonBuyers.map((o) => `${str(o.office_name)}${o.office_code ? ` (${str(o.office_code)})` : ''} ${money(o.obligated)}`).join('; ')}.`);
     }
   }
 
@@ -608,6 +633,25 @@ function awardFilterParts(af: Rec): string[] {
   return parts;
 }
 
+/**
+ * Defense publication lag for warehouse-backed totals (buying offices, vehicle mix). Same rule and
+ * cutoff as search_past_contracts (assessPublicationLag): DoD actions reach USASpending ~90 days late,
+ * so a window ending after the cutoff can be missing recent Defense dollars. Applies only when Defense
+ * dollars can be in the totals (a Defense office is listed, or no non-Defense agency filter).
+ */
+export function defenseLagSentence(meta: Rec, defenseInScope: boolean, now?: Date): string | null {
+  if (!defenseInScope) return null;
+  const af = (meta.applied_filters && typeof meta.applied_filters === 'object' ? meta.applied_filters : {}) as Rec;
+  const fyTo = num(af.fiscal_year_to) ?? Number(str(af.fiscal_year_to));
+  const fyFrom = num(af.fiscal_year_from) ?? Number(str(af.fiscal_year_from));
+  const dateTo = str(af.date_to) || (Number.isFinite(fyTo) && fyTo > 0 ? `${fyTo}-09-30` : '');
+  const dateFrom = str(af.date_from) || (Number.isFinite(fyFrom) && fyFrom > 0 ? `${fyFrom - 1}-10-01` : '');
+  if (!dateTo) return null;
+  const lag = assessPublicationLag({ dateFrom, dateTo, asOf: str(meta.as_of) || null, now });
+  if (!lag.applies) return null;
+  return `Defense (DoD, including Navy, Army and Air Force) contract actions reach USASpending with about a ${lag.lag_days}-day delay, so Defense dollars after about ${lag.dod_complete_through} may not be in these totals yet; the window runs through ${dateTo}.`;
+}
+
 export const SBLO_TOOL = 'get_sblo_contact';
 
 /**
@@ -692,13 +736,16 @@ export function renderVehicleMix(result: Rec): RenderedRecords | null {
   lines.push(`Spending by contract vehicle (NAICS ${(Array.isArray(scope.naics) ? scope.naics as unknown[] : []).map(str).join(', ')}${scope.agency ? ` · ${str(scope.agency)}` : ''}${scope.state ? ` · ${str(scope.state)}` : ''} · ${str(scope.window)}): ${money(result.total_obligated)} obligated across ${num(result.total_award_count) ?? '?'} awards. Every bucket is listed; shares are of that total.`);
   lines.push('');
   buckets.filter((b) => (num(b.obligated) ?? 0) !== 0 || (num(b.award_count) ?? 0) > 0).forEach((b, i) => {
-    lines.push(`${i + 1}. ${str(b.label)}: ${money(b.obligated)} (${str(b.share_pct)}%) · ${num(b.award_count) ?? 0} awards`);
+    lines.push(`${i + 1}. ${str(b.label)}: ${money(b.obligated)} (${str(b.share_pct)}%) · ${num(b.award_count) ?? 0} award${num(b.award_count) === 1 ? '' : 's'}`);
   });
   const r = (k: string) => (roll[k] && typeof roll[k] === 'object' ? roll[k] as Rec : null);
   const rl = [['all schedules', r('all_schedules')], ['all BPAs', r('all_bpas')], ['all IDIQs and GWACs', r('all_idiqs_and_gwacs')]].filter(([, v]) => v).map(([k, v]) => `${k} ${money((v as Rec).obligated)} (${str((v as Rec).share_pct)}%)`);
   if (rl.length) { lines.push(''); lines.push(`Rollups: ${rl.join('; ')}.`); }
   const vmeta = (result._meta && typeof result._meta === 'object' ? result._meta : {}) as Rec;
   if (vmeta.as_of || vmeta.lag_note) lines.push(`Data freshness: ${vmeta.as_of ? `latest action loaded ${str(vmeta.as_of)}` : ''}${vmeta.as_of && vmeta.lag_note ? '; ' : ''}${vmeta.lag_note ? str(vmeta.lag_note) : ''}.`.replace(/\.\.$/, '.'));
+  // No agency breakdown here: Defense dollars can be in the totals unless a non-Defense agency was filtered.
+  const vDod = defenseLagSentence(vmeta, !str(scope.agency) || isDodAgency(str(scope.agency)));
+  if (vDod) lines.push(vDod);
   lines.push(`Classification: of the dollars linked to a vehicle, ${str(cls.verified_share_of_parented_pct)}% were verified from USASpending vehicle records. Of all dollars, ${str(cls.heuristic_share_of_total_pct)}% were typed from contract-number patterns and ${str(cls.unresolved_share_of_total_pct)}% could not be classified.`);
   const n = buckets.length;
   return { tool: VEHICLE_MIX_TOOL, text: lines.join('\n'), total: n, retrieved: n, from: 1, to: n, shown: n, exhaustive: true, ids: [], allowedCounts: [n, num(result.total_award_count) ?? 0], standalone: 0, orders: 0 };
@@ -744,13 +791,14 @@ export function crossCheckOffices(rendered: RenderedRecords[]): void {
     if (!r.officeExamples) continue;
     const notes = r.officeExamples
       .map((o) => {
-        const code = (o.office.match(/\(([A-Z0-9]{5,6})\)\s*$/) ?? [])[1] ?? '';
-        const byExample = o.ids.filter((id) => flagged.has(id));
-        const byPrefix = code ? [...flagged].filter((id) => id.toUpperCase().startsWith(code) && !byExample.includes(id)) : [];
-        return { office: o.office, hits: [...byExample, ...byPrefix] };
+        // Evidence only (release hardening, acc7/8 R11): an award links to an office's total only when
+        // the office's own result lists it as an in-window example award. A shared contract-number
+        // prefix is not evidence that a statewide record sits inside a metro-scoped office total.
+        const hits = o.ids.filter((id) => flagged.has(id));
+        return { office: o.office, hits };
       })
       .filter((o) => o.hits.length)
-      .map((o) => `${o.office}: its award${o.hits.length === 1 ? '' : 's'} ${o.hits.join(', ')} ${o.hits.length === 1 ? 'is' : 'are'} marked CHECK in the expiring list (different work or place), so this office's total may include work that is not what you asked for`);
+      .map((o) => `${o.office}: its in-window award${o.hits.length === 1 ? '' : 's'} ${o.hits.join(', ')} (listed above for this office) ${o.hits.length === 1 ? 'is' : 'are'} marked CHECK in the expiring list (different work or place), so part of this office's total may be work that is not what you asked for`);
     if (notes.length) r.text += `\n\nCHECK: ${notes.join('; ')}.`;
   }
 }

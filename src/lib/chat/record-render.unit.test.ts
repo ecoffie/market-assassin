@@ -347,7 +347,7 @@ describe('different work: positive evidence only', () => {
     const exp = { flaggedIds: ['70T05026F5900N004'], ids: ['70T05026F5900N004'] } as never;
     const offices = { text: 'offices', ids: [], officeExamples: [{ office: 'MISSION ESSENTIALS (70T050)', ids: ['70T05026F5900N004'] }, { office: 'OTHER (X1)', ids: ['A1'] }] } as never;
     crossCheckOffices([exp, offices]);
-    expect((offices as { text: string }).text).toMatch(/CHECK: MISSION ESSENTIALS \(70T050\): its award 70T05026F5900N004 is marked CHECK in the expiring list/);
+    expect((offices as { text: string }).text).toMatch(/CHECK: MISSION ESSENTIALS \(70T050\): its in-window award 70T05026F5900N004 \(listed above for this office\) is marked CHECK in the expiring list/);
     expect((offices as { text: string }).text).not.toMatch(/OTHER \(X1\)/);
   });
 });
@@ -373,7 +373,7 @@ describe('Phase B: semantic relevance vs industry-code match', () => {
   });
   it('a zero or negative net office is flagged, not presented as a buyer', () => {
     const r = renderBuyingOffices({ scope: { naics: ['561612'] }, offices: [{ office_name: 'X', office_code: 'X1', obligated: -1200, share_pct: -1, award_count: 1 }], totals: { obligated: 100, award_count: 5, office_count: 3 }, notes: [], _meta: {} })!;
-    expect(r.text).toMatch(/Also returned, with zero or negative net obligations in this window \(deobligations, so not evidence of buying\): X \(X1\) -\$1,200\./);
+    expect(r.text).toMatch(/Also returned, with net obligations of zero or less in this window \(deobligations or no net spending, so not evidence of buying here\): X \(X1\) -\$1,200\./);
     expect(r.text).not.toMatch(/^1\. X/m);
   });
 });
@@ -392,11 +392,12 @@ describe('run-1 acceptance fixes', () => {
 });
 
 describe('attempt-2 fixes', () => {
-  it('an office is cautioned when flagged orders carry its code as the contract-number prefix', () => {
+  // Release hardening: reversed. A shared prefix is not evidence the award is inside the office's scoped total.
+  it('an office is NOT cautioned only because flagged orders share its code as the contract-number prefix', () => {
     const exp = { flaggedIds: ['70CDCR26FR0000079', '70CDCR26FR0000053'], ids: [] } as never;
     const offices = { text: 'offices', ids: [], officeExamples: [{ office: 'DETENTION COMPLIANCE AND REMOVALS (70CDCR)', ids: ['70CDCR25FR0000001'] }] } as never;
     crossCheckOffices([exp, offices]);
-    expect((offices as { text: string }).text).toMatch(/DETENTION COMPLIANCE AND REMOVALS \(70CDCR\): its awards 70CDCR26FR0000079, 70CDCR26FR0000053 are marked CHECK/);
+    expect((offices as { text: string }).text).not.toMatch(/DETENTION COMPLIANCE AND REMOVALS \(70CDCR\)[^\n]*marked CHECK/);
   });
   it('CHECK records outside the shown page are listed so every reference is visible', () => {
     const rows = Array.from({ length: 22 }, (_, i) => rec(`P${String(i).padStart(2, '0')}`, `2027-01-${String(i + 1).padStart(2, '0')}`));

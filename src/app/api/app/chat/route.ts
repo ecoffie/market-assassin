@@ -44,7 +44,8 @@ import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/cha
 import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, type PlannerTarget } from '@/lib/chat/planner-config';
 import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
 import { guardUnstatedStates } from '@/lib/chat/stated-filters';
-import { compileIntent, enforceIntent, dedupeToolCalls } from '@/lib/chat/intent-compiler';
+import { compileIntent, enforceIntent, dedupeToolCalls, inferredCodeDisclosure } from '@/lib/chat/intent-compiler';
+import { getNaics } from '@/lib/codes/lookup';
 import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, renderSbloContact, lintAnalysis, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, SBLO_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
@@ -422,6 +423,7 @@ export async function POST(request: NextRequest) {
         const intent = compileIntent(message, requestNow, [...history.filter((h) => h.role === 'user').map((h) => String(h.content || '')), message].join('\n'));
         const scopeApplied = new Set<string>();
         const scopeUnapplied = new Set<string>();
+        let scopeInferred: string | null = null;
         const capabilityNote = capabilityPlannerNote(message);
         const capabilityPhrases = interpretCapabilityNaics(message).items.flatMap((it) => [it.phrase, it.label]);
         const capabilityLabels = interpretCapabilityNaics(message).items.map((it) => it.label);
@@ -618,6 +620,8 @@ export async function POST(request: NextRequest) {
                 for (const n of notes?.applied ?? []) scopeApplied.add(n);
                 for (const n of notes?.unapplied ?? []) scopeUnapplied.add(n);
               }
+              const codeNote = inferredCodeDisclosure(toolCalls.filter((tc) => keepIds.has(tc.id)).map((tc) => String(tc.function.arguments ?? '')), intent, (c) => getNaics(c)?.title ?? null);
+              if (codeNote) scopeInferred = codeNote;
               const results = await executor.executeRound(toolCalls.filter((tc) => keepIds.has(tc.id)), { provider: first.provider, model: first.model });
               for (const tc of toolCalls) {
                 const r = results.find((x) => x.tool_call_id === tc.id);
@@ -773,7 +777,8 @@ export async function POST(request: NextRequest) {
         let assistantContent = '';
         if (renderedRecords.length) {
           const scopeLines = [
-            scopeApplied.size ? `From your request: ${[...scopeApplied].join('; ')}.` : '',
+            scopeApplied.size ? `From your request: ${[...scopeApplied].map((n) => n.replace(/ from your request$/, '')).join('; ')}.` : '',
+            scopeInferred ? `${scopeInferred}.` : '',
             scopeUnapplied.size ? `Could not apply: ${[...scopeUnapplied].join('; ')}. The results below do not reflect ${scopeUnapplied.size === 1 ? 'it' : 'them'}.` : '',
           ].filter(Boolean).join('\n');
           const recordBlock = `${scopeLines ? `${scopeLines}\n\n` : ''}${renderedRecords.map((r) => r.text).join('\n\n')}\n\n`;

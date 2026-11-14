@@ -129,9 +129,10 @@ describe('acc6c R1: state order', () => {
 });
 
 describe('acc7b near-misses', () => {
-  it('R2: the applied-codes note lists every code searched and which ones Mindy added', () => {
+  it('R2: missing codes are restored; their disclosure is the single inferred-codes line, not a per-call note', () => {
     const r = enforce('get_expiring_contracts', { naics: '561320', state: 'TN', months_window: 18 }, 'Federal contracts expiring in the next 18 months in Tennessee for temporary staffing, clerical, admin and warehouse work');
-    expect(r.applied).toContain('industry codes 561320, 561110, 493110 for the work you named (561110, 493110 added by Mindy)');
+    expect(r.a.naics).toBe('561320,561110,493110');
+    expect(r.applied.join(' ')).not.toMatch(/industry codes/);
   });
   it('R6: a fragment of the request is replaced by the whole request', () => {
     const q = 'Keywords for a light industrial, clerical and warehouse staffing firm in Memphis';

@@ -31,6 +31,8 @@ export interface CompiledIntent {
   windowMonths: number | null;
   capabilityCodes: string[];
   capabilityLabels: string[];
+  /** Industry codes the customer typed (6-digit, real). Every other searched code was chosen by Mindy. */
+  typedCodes: string[];
   /** The customer asked for all / every / a complete list. */
   completeness: boolean;
   /** Agencies the customer named without an office ("the Navy ... contract"). */
@@ -93,6 +95,7 @@ export function compileIntent(text: string, now: Date = new Date(), customerText
     windowMonths,
     capabilityCodes: cap.typedCodes.length ? cap.typedCodes : cap.codes,
     capabilityLabels: cap.items.map((i) => i.label),
+    typedCodes: cap.typedCodes,
     completeness: /\b(all|every|complete\s+list|full\s+list)\b/i.test(src),
     agencyPhrases: offices.length ? [] : Array.from(new Set([...src.matchAll(AGENCY_RE)].map((m) => m[1]))),
     requestText: src.trim(),
@@ -154,7 +157,9 @@ export function enforceIntent(toolName: string, rawArgs: string, intent: Compile
       const have = listOf(a.naics);
       const covered = (c: string) => have.some((h) => /^\d+$/.test(h) && (c.startsWith(h) || h.startsWith(c)));
       const missing = intent.capabilityCodes.filter((c) => !covered(c));
-      if (missing.length) { a.naics = [...have, ...missing].join(','); applied.push(`industry codes ${[...have, ...missing].join(', ')} for the work you named (${missing.join(', ')} added by Mindy)`); }
+      // Customer-facing disclosure of every code Mindy chose (lexicon or planner) is one line built from
+      // the executed calls (inferredCodeDisclosure); no per-call note here.
+      if (missing.length) a.naics = [...have, ...missing].join(',');
     }
   }
 
@@ -232,4 +237,22 @@ export function dedupeToolCalls<T extends { id: string; name: string; args: stri
     else keep.push(c);
   });
   return { keep, duplicates };
+}
+
+/**
+ * Release hardening: disclose industry codes Mindy chose when the customer did not type them. Built
+ * from the arguments of the calls that actually ran, so a code the planner picked (R10: 541611 for
+ * "business management support") is disclosed the same way as one from the capability lexicon.
+ */
+export function inferredCodeDisclosure(executedArgs: string[], intent: CompiledIntent, titleOf: (code: string) => string | null): string | null {
+  const codes: string[] = [];
+  for (const raw of executedArgs) {
+    let a: Record<string, unknown> = {};
+    try { a = JSON.parse(raw || '{}'); } catch { continue; }
+    for (const c of listOf(a.naics)) if (/^\d{2,6}$/.test(c) && !codes.includes(c)) codes.push(c);
+  }
+  const chosen = codes.filter((c) => !intent.typedCodes.includes(c));
+  if (!chosen.length) return null;
+  const items = chosen.map((c) => { const t = titleOf(c); return t ? `${c} ${t}` : c.length < 6 ? `${c} (all codes starting ${c})` : c; });
+  return `Industry codes chosen by Mindy for the work you described (you did not give ${intent.typedCodes.length ? 'these' : 'any'}): ${items.join('; ')}. Results are limited to these codes, so work filed under other codes is not included`;
 }
