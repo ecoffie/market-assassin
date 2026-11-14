@@ -361,3 +361,53 @@ export function renderBuyingOffices(result: Rec): RenderedRecords | null {
     allowedCounts: Array.from(new Set([total, offices.length, num(totals?.award_count) ?? -1].filter((n) => n >= 0))), standalone: offices.length, orders: 0,
   };
 }
+
+export const PRICING_TOOL = 'get_pricing_intel';
+export const KEYWORDS_TOOL = 'derive_company_keywords';
+
+/** Render get_pricing_intel rate_summary: one line per rate (label then figure), with population and n. */
+export function renderPricing(result: Rec): RenderedRecords | null {
+  const rs = (result?.rate_summary && typeof result.rate_summary === 'object' ? result.rate_summary : null) as Rec | null;
+  if (!rs) return null;
+  const rates = (Array.isArray(rs.rates) ? rs.rates : []) as Rec[];
+  if (!rates.length) return null;
+  const pop = (rs.population && typeof rs.population === 'object' ? rs.population : {}) as Rec;
+  const lines: string[] = [];
+  lines.push(`GSA CALC+ labor rates (${str(rs.unit) || 'USD per hour'}), ${str(pop.description) || 'CALC records'}, n=${str(pop.n)}:`);
+  for (const r of rates) {
+    const lbl = str(r.label);
+    const name = lbl ? lbl[0].toUpperCase() + lbl.slice(1) : 'Rate';
+    const also = r.also_called ? ` (${str(r.also_called)})` : '';
+    const median = str(r.also_called).toLowerCase().includes('median') ? `\nMedian: $${Number(r.hourly).toFixed(2)}/hr (same figure as the competitive rate: 50th percentile, n=${str(r.n)})` : '';
+    lines.push(`${name}: $${Number(r.hourly).toFixed(2)}/hr${also} · ${str(r.percentile)}th percentile · n=${str(r.n)}${median}`);
+  }
+  if (rs.ordering) lines.push(`Ordering: ${str(rs.ordering)}${rs.ordering_holds === false ? ' (NOT satisfied by this data)' : ''}.`);
+  const n = num(pop.n) ?? 0;
+  return { tool: PRICING_TOOL, text: lines.join('\n'), total: n, retrieved: n, from: 0, to: 0, shown: rates.length, exhaustive: true, ids: [], allowedCounts: [n], standalone: 0, orders: 0 };
+}
+
+/** Render derive_company_keywords: every keyword and occupational title with its sources; excluded terms. */
+export function renderKeywords(result: Rec): RenderedRecords | null {
+  const kws = (Array.isArray(result?.keyword_sources) ? result.keyword_sources : null) as Rec[] | null;
+  if (!kws) return null;
+  const occ = (Array.isArray(result.occupational_titles) ? result.occupational_titles : []) as Rec[];
+  const src = (k: Rec) => ((Array.isArray(k.sources) ? k.sources : []) as Rec[])
+    .map((x) => `${str(x.type).replace(/_/g, ' ')}${x.n != null ? ` n=${str(x.n)}` : ''}`).join('; ');
+  const lines: string[] = [];
+  lines.push(`Keywords (${kws.length}), each with where it came from:`);
+  kws.forEach((k, i) => lines.push(`${i + 1}. ${str(k.keyword)} · ${src(k) || 'source not reported'}`));
+  const kwSet = new Set(kws.map((k) => str(k.keyword).toLowerCase()));
+  const extraOcc = occ.filter((o) => !kwSet.has(str(o.keyword).toLowerCase()));
+  if (extraOcc.length) {
+    lines.push('');
+    lines.push(`Job titles buyers use for this work (${extraOcc.length} more), from GSA CALC labor categories and SAM solicitation text:`);
+    extraOcc.forEach((o, i) => lines.push(`${kws.length + i + 1}. ${str(o.keyword)} · ${src(o) || 'source not reported'}`));
+  }
+  const ex = (result.excluded_terms && typeof result.excluded_terms === 'object' ? result.excluded_terms : null) as Rec | null;
+  if (ex) {
+    const parts = Object.entries(ex).filter(([, v]) => Array.isArray(v) && v.length).map(([k, v]) => `${k}: ${(v as unknown[]).map(str).join(', ')}`);
+    if (parts.length) { lines.push(''); lines.push(`Left out on purpose (not search terms): ${parts.join('; ')}.`); }
+  }
+  const total = kws.length + extraOcc.length;
+  return { tool: KEYWORDS_TOOL, text: lines.join('\n'), total, retrieved: total, from: total ? 1 : 0, to: total, shown: total, exhaustive: true, ids: [], allowedCounts: [total, kws.length, extraOcc.length], standalone: total, orders: 0 };
+}

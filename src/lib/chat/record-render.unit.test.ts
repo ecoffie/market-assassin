@@ -4,7 +4,7 @@
  * summaries that contradict the verified counts.
  */
 import { describe, it, expect } from 'vitest';
-import { renderExpiringRecords, renderStatusChecks, renderBuyingOffices, collectExpiringRecords, checkSummaryAgainstRecords, prepareChatToolArgs, CHAT_FETCH_LIMIT } from './record-render';
+import { renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, collectExpiringRecords, checkSummaryAgainstRecords, prepareChatToolArgs, CHAT_FETCH_LIMIT } from './record-render';
 
 const rec = (piid: string, end: string, extra: Record<string, unknown> = {}) => ({
   contract_id: `CONT_${piid}`, piid, incumbent_name: 'ALLPRO STAFFNET LLC', awarding_agency: 'Department of Veterans Affairs',
@@ -180,5 +180,40 @@ describe('buying offices', () => {
   });
   it('no offices is stated with its filters', () => {
     expect(renderBuyingOffices({ ...res, offices: [], totals: null })!.text).toMatch(/^No buying offices found \(NAICS 5613, 5611/);
+  });
+});
+
+describe('pricing and keywords', () => {
+  it('pricing: every rate on its own line with percentile and n; the median is identified as the competitive figure', () => {
+    const r = renderPricing({ rate_summary: {
+      unit: 'USD per hour, GSA Schedule ceiling rate', ordering: 'aggressive <= competitive (market median) <= premium', ordering_holds: true,
+      population: { description: 'All GSA CALC+ records matching "Material Handler"', n: 50 },
+      rates: [
+        { label: 'aggressive', percentile: 25, hourly: 35.34, n: 50 },
+        { label: 'competitive', also_called: 'market median', percentile: 50, hourly: 44.08, n: 50 },
+        { label: 'premium', percentile: 75, hourly: 52.53, n: 50 },
+      ] } })!;
+    expect(r.text).toMatch(/Aggressive: \$35\.34\/hr · 25th percentile · n=50/);
+    expect(r.text).toMatch(/Competitive: \$44\.08\/hr \(market median\)/);
+    expect(r.text).toMatch(/Median: \$44\.08\/hr \(same figure as the competitive rate/);
+    expect(r.text).toMatch(/Premium: \$52\.53\/hr/);
+  });
+  it('keywords: every keyword and the extra job titles, each with its source; exclusions stated', () => {
+    const r = renderKeywords({
+      keywords: ['warehouse worker', 'light industrial'],
+      keyword_sources: [
+        { keyword: 'warehouse worker', sources: [{ type: 'calc_labor_category', n: 12 }] },
+        { keyword: 'light industrial', sources: [{ type: 'input_text' }] },
+      ],
+      occupational_titles: [
+        { keyword: 'warehouse worker', sources: [{ type: 'calc_labor_category', n: 12 }] },
+        { keyword: 'forklift operator', sources: [{ type: 'solicitation_text', n: 5 }] },
+      ],
+      excluded_terms: { locations: ['memphis'], brand: ['superb'] },
+    })!;
+    expect(r.text).toMatch(/1\. warehouse worker · calc labor category n=12/);
+    expect(r.text).toMatch(/3\. forklift operator · solicitation text n=5/);
+    expect(r.text.match(/warehouse worker/g)).toHaveLength(1); // not duplicated
+    expect(r.text).toMatch(/Left out on purpose \(not search terms\): locations: memphis; brand: superb\./);
   });
 });
