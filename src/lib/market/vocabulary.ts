@@ -13,6 +13,7 @@
  * an empty result never throws — callers degrade to their prior behavior.
  */
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { isBoilerplateVocabTerm } from './vocabulary-stoplist';
 
 export interface VocabTerm {
   term: string;
@@ -64,7 +65,9 @@ export async function getVocabulary(
       .order('weight', { ascending: false })
       .limit(200);
     if (error || !data) return [];
-    const terms = data as VocabTerm[];
+    // Award-funding boilerplate ("base obligated", "obligated amount", "option period") is
+    // filtered on read so stored rows obey the same rule as a rebuild (vocabulary-stoplist.ts).
+    const terms = (data as VocabTerm[]).filter((t) => !isBoilerplateVocabTerm(t.term));
     CACHE.set(cacheKey, { at: Date.now(), terms });
     return terms.slice(0, limit);
   } catch {
@@ -117,6 +120,7 @@ export async function codesForTerm(
       .order('weight', { ascending: false })
       .limit(opts.limit ?? 20);
     if (error || !data) return [];
+    if (isBoilerplateVocabTerm(t)) return [];
     return data as { code: string; weight: number }[];
   } catch {
     return [];

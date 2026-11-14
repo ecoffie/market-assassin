@@ -7,6 +7,7 @@
  * no multiple-award-IDIQ vehicle rollup, no snapshot resilience. Just "the top-N
  * contracts expiring within a window that match NAICS/agency/state/value".
  */
+import { federalToday, addMonthsIso } from '@/lib/dates/federal-day';
 import { createClient } from '@supabase/supabase-js';
 import { getNaics } from '@/lib/codes/lookup';
 import { annotateRecompeteRow, type RecompeteRowAnnotations } from '@/lib/recompete/annotate';
@@ -66,6 +67,14 @@ export interface ExpiringContractsInput {
   agency?: string;
   /** 2-letter place-of-performance state. */
   state?: string;
+  /** Clock override for deterministic tests; defaults to now. */
+  now?: Date;
+  /**
+   * Several 2-letter place-of-performance states, OR'd (`IN (...)`). When present this takes
+   * precedence over `state`; callers must pass validated 2-letter codes (the MCP tool normalizes
+   * names like "Tennessee" first). Absent → `state` behaves exactly as before.
+   */
+  states?: string[];
   /** Expiration window in months (default 18). */
   monthsWindow?: number;
   /**
@@ -172,6 +181,11 @@ export interface ExpiringContractsResult {
   /** Rows folded into a canonical sibling because they were the same award under another id. */
   duplicates_collapsed: number;
   degraded: boolean;
+  /**
+   * The period-of-performance-end window the query actually applied: `after` is exclusive,
+   * `through` inclusive, both YYYY-MM-DD; `as_of` is the date "today" was evaluated.
+   */
+  window?: { after: string; through: string; as_of: string; months: number };
 }
 
 export async function queryExpiringContracts(input: ExpiringContractsInput): Promise<ExpiringContractsResult> {
@@ -182,11 +196,17 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
   const months = Math.min(Math.max(Number(input.monthsWindow) || 18, 1), 60);
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-  const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
-  const maxDate = new Date(today);
-  maxDate.setMonth(maxDate.getMonth() + months);
-  const maxStr = maxDate.toISOString().split('T')[0];
+  // One date basis (federal business day, US Eastern) for the window, the status overlay and
+  // award status; see src/lib/dates/federal-day.ts.
+  const today = input.now ?? new Date();
+  const todayStr = federalToday(today);
+  const maxStr = addMonthsIso(todayStr, months);
+  const minMonthsIn = Number(input.minMonthsWindow);
+  let afterStr = todayStr;
+  if (Number.isFinite(minMonthsIn) && minMonthsIn > 0) {
+    afterStr = addMonthsIso(todayStr, Math.min(minMonthsIn, months));
+  }
+  const appliedWindow = { after: afterStr, through: maxStr, as_of: todayStr, months };
 
   const build = (withQuality: boolean) => {
     let q = supabase
@@ -239,8 +259,17 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
       });
       q = q.or(clauses.join(','));
     }
-    const state = (input.state || '').trim().toUpperCase();
-    if (state) q = q.eq('place_of_performance_state', state);
+    const stateCodes = (input.states || [])
+      .map((x) => String(x || '').trim().toUpperCase())
+      .filter((x) => /^[A-Z]{2}$/.test(x));
+    if (stateCodes.length > 1) {
+      q = q.in('place_of_performance_state', stateCodes);
+    } else if (stateCodes.length === 1) {
+      q = q.eq('place_of_performance_state', stateCodes[0]);
+    } else {
+      const state = (input.state || '').trim().toUpperCase();
+      if (state) q = q.eq('place_of_performance_state', state);
+    }
     if (Number.isFinite(input.minValue)) q = q.gte('total_obligation', Number(input.minValue));
     if (Number.isFinite(input.maxValue)) q = q.lte('total_obligation', Number(input.maxValue));
     if (input.likelihood && ['high', 'medium', 'low'].includes(input.likelihood)) {
@@ -268,7 +297,7 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
   }
   if (res.error) {
     console.error('[recompete:query] supabase error:', res.error.message);
-    return { contracts: [], total: 0, count: null, duplicates_collapsed: 0, degraded: true };
+    return { contracts: [], total: 0, count: null, duplicates_collapsed: 0, degraded: true, window: appliedWindow };
   }
 
   // Same award under two contract_ids (a re-parented order / a legacy April id) → ONE row, chosen
@@ -326,7 +355,7 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
   rawContracts = merged.rows;
   const collapsed = primary.collapsed + merged.collapsed;
 
-  const now = new Date();
+  const now = input.now ?? new Date();
   const contracts = rawContracts.map((c) => {
     // set_aside_type is NULL on every recompete row (the sync omits it); the backfill (2026-07-29)
     // recovered it into set_aside_enriched from BQ awards.set_aside. Coalesce so every downstream
@@ -344,5 +373,5 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
     return annotateRecompeteRow({ ...c, set_aside_type, naics_description }, now);
   });
   const total = res.count != null ? Math.max(res.count - primary.collapsed, contracts.length) : contracts.length;
-  return { contracts, total, count: res.count ?? null, duplicates_collapsed: collapsed, degraded: false };
+  return { contracts, total, count: res.count ?? null, duplicates_collapsed: collapsed, degraded: false, window: appliedWindow };
 }

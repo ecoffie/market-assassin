@@ -1,0 +1,158 @@
+/**
+ * Phase A intent compiler: constraints come from the customer's words and are enforced on the model's
+ * tool arguments. One test per demonstrated failure (independent reviews 2026-11-14).
+ */
+import { describe, it, expect } from 'vitest';
+import { compileIntent, enforceIntent } from './intent-compiler';
+
+const NOW = new Date('2026-11-14T03:30:00Z'); // 10:30 PM Eastern on 2026-11-13
+const enforce = (tool: string, args: Record<string, unknown>, text: string) => {
+  const r = enforceIntent(tool, JSON.stringify(args), compileIntent(text, NOW));
+  return { ...r, a: JSON.parse(r.args) };
+};
+
+describe('compileIntent', () => {
+  it('reads named offices, since-dates, windows, explicit states, codes and completeness', () => {
+    const c = compileIntent('All USACE Memphis District temporary personnel awards since 2019', NOW);
+    expect(c).toMatchObject({ officePhrases: ['USACE Memphis District'], sinceDate: '2019-01-01', completeness: true, explicitStates: [], federalDate: '2026-11-13' });
+    const r1 = compileIntent('Federal contracts expiring in the next 18 months in Tennessee, Mississippi or Arkansas for temporary staffing, clerical, admin and warehouse work', NOW);
+    expect(r1).toMatchObject({ windowMonths: 18, explicitStates: ['AR', 'MS', 'TN'], capabilityCodes: ['561320', '561110', '493110'] });
+  });
+  it('never reads an acronym as a state ("Navy ID card", "VA BPAs")', () => {
+    expect(compileIntent('Is the Navy ID card administration order in Millington still active?', NOW).explicitStates).toEqual([]);
+    expect(compileIntent('How much 561320 spending runs through GSA Schedules vs VA BPAs?', NOW).explicitStates).toEqual([]);
+  });
+});
+
+describe('enforceIntent: the model cannot drop or override a stated constraint', () => {
+  it('R3 (runs F/H): a named office replaces a broader agency, the office is the scope (no city-implied state), since-date enforced', () => {
+    const r = enforce('search_past_contracts', { agency: 'USACE', state: 'TN', state_scope: 'pop', naics: '561320' }, 'All USACE Memphis District temporary personnel awards since 2019');
+    expect(r.a).toEqual({ agency: 'USACE Memphis District', naics: '561320', date_from: '2019-01-01' });
+    expect(r.applied.join(' | ')).toMatch(/office "USACE Memphis District".*no state filter.*since 2019-01-01/);
+  });
+  it('keeps the model agency when it already names the office', () => {
+    const r = enforce('search_past_contracts', { agency: 'USACE Memphis District', date_from: '2019-01-01' }, 'All USACE Memphis District awards since 2019');
+    expect(r.applied).toEqual([]);
+  });
+  it('R1/R2: dropped codes, states and the window are restored', () => {
+    const r = enforce('get_expiring_contracts', { naics: '5613', state: 'TN', months_window: 12 }, 'Federal contracts expiring in the next 18 months in Tennessee, Mississippi or Arkansas for temporary staffing, clerical, admin and warehouse work');
+    expect(r.a.months_window).toBe(18);
+    expect(r.a.state.split(',').sort()).toEqual(['AR', 'MS', 'TN']);
+    expect(r.a.naics.split(',')).toEqual(['5613', '561110', '493110']); // 561320 covered by the 5613 prefix
+  });
+  it('does not add anything the customer did not say', () => {
+    const r = enforce('get_expiring_contracts', { naics: '561612', state: 'TX' }, 'Which agencies buy security guard services in the San Antonio area, and which of the current guard contracts in Texas expire in the next 12 months?');
+    expect(r.a).toEqual({ naics: '561612', state: 'TX', months_window: 12 });
+  });
+  it('a window beyond the tool limit is reported as unapplied, never silently shortened', () => {
+    const r = enforce('get_expiring_contracts', { naics: '561320' }, 'contracts expiring in the next 72 months for staffing');
+    expect(r.unapplied).toEqual(['a 72-month window (the tool\'s maximum is 60)']);
+  });
+  it('a named office that a tool cannot filter on is reported as unapplied', () => {
+    const r = enforce('get_agency_intel', { agency: 'Army' }, 'What does the USACE Memphis District buy?');
+    expect(r.unapplied[0]).toMatch(/office "USACE Memphis District"/);
+  });
+});
+
+import { dedupeToolCalls } from './intent-compiler';
+describe('dedupeToolCalls (attempt 4: the planner split one question into identical calls)', () => {
+  it('keeps one of several identical calls', () => {
+    const a = JSON.stringify({ naics: '561320,561110,493110', state: 'TN', months_window: 18 });
+    const b = JSON.stringify({ naics: '561110,561320,493110', state: 'TN', months_window: 18 });
+    const r = dedupeToolCalls([{ id: 'c1', name: 'get_expiring_contracts', args: a }, { id: 'c2', name: 'get_expiring_contracts', args: b }]);
+    expect(r.keep.map((c) => c.id)).toEqual(['c1']);
+    expect(r.duplicates).toEqual([{ id: 'c2', of: 'c1' }]);
+  });
+  it('drops a call whose codes are a subset of another with the same place (city vs cities)', () => {
+    const r = dedupeToolCalls([
+      { id: 'o1', name: 'get_buying_offices', args: JSON.stringify({ state: 'TN', city: 'Memphis', naics: '561320,561110' }) },
+      { id: 'o2', name: 'get_buying_offices', args: JSON.stringify({ state: 'TN', cities: ['Memphis'], naics: '561320' }) },
+      { id: 'o3', name: 'get_buying_offices', args: JSON.stringify({ state: 'TN', cities: ['Memphis'], naics: '561110' }) },
+    ]);
+    expect(r.keep.map((c) => c.id)).toEqual(['o1']);
+  });
+  it('keeps genuinely different searches', () => {
+    const r = dedupeToolCalls([
+      { id: 'a', name: 'get_buying_offices', args: JSON.stringify({ state: 'TX', city: 'San Antonio', naics: '561612' }) },
+      { id: 'b', name: 'get_expiring_contracts', args: JSON.stringify({ state: 'TX', naics: '561612', months_window: 12 }) },
+      { id: 'c', name: 'get_expiring_contracts', args: JSON.stringify({ state: 'TN', naics: '561612', months_window: 12 }) },
+    ]);
+    expect(r.keep.map((c) => c.id)).toEqual(['a', 'b', 'c']);
+  });
+});
+
+describe('acceptance attempt 4 fixes (enforceIntent)', () => {
+  it('R10: a named agency the planner left off is applied', () => {
+    const r = enforce('search_past_contracts', { naics: '541611', date_from: '2026-10-01', date_to: '2026-10-31' }, 'Who won the Navy business management support services contract in October 2026?');
+    expect(r.a.agency).toBe('Navy');
+    expect(r.applied).toContain('agency "Navy" from your request');
+  });
+  it('R10: an agency the planner already chose is not replaced; "Army Corps of Engineers" is one agency', () => {
+    expect(enforce('search_past_contracts', { agency: 'Department of the Navy' }, 'Navy awards').applied).toEqual([]);
+    expect(compileIntent('Army Corps of Engineers awards in Tennessee', NOW).agencyPhrases).toEqual(['Army Corps of Engineers']);
+  });
+  it('R6: keyword inputs are the customer\'s words; invented past performance is dropped', () => {
+    const q = 'Keywords for a light industrial, clerical and warehouse staffing firm in Memphis';
+    const a = enforce('derive_company_keywords', { description: 'A staffing company providing temp workers', past_performance: [{ title: 'Provided staffing solutions' }], limit: 12 }, q);
+    expect(a.a).toEqual({ description: q, limit: 12 });
+    // acc7b R6: a fragment of this turn's request is widened to the whole request (one list, everything named).
+    const b = enforce('derive_company_keywords', { description: 'staffing firm', limit: 12 }, q);
+    expect(b.a).toEqual({ description: q, limit: 12 });
+  });
+  it('keeps past performance the customer pasted earlier in the conversation', () => {
+    const intent = compileIntent('Now derive my keywords', NOW, 'We provided warehouse staffing to DLA Memphis\nNow derive my keywords');
+    const r = enforceIntent('derive_company_keywords', JSON.stringify({ description: 'Now derive my keywords', past_performance: ['provided warehouse staffing to DLA Memphis'] }), intent);
+    expect(JSON.parse(r.args).past_performance).toEqual(['provided warehouse staffing to DLA Memphis']);
+  });
+});
+
+describe('city named, state searched', () => {
+  it('R5: discloses that a city became a whole-state search', () => {
+    const r = enforce('search_past_contracts', { keyword: 'ID card', state: 'TN' }, 'Is the Navy ID card administration order in Millington still active?');
+    expect(r.unapplied.join(' ')).toMatch(/covers all of TN; it cannot filter to a city/);
+  });
+  it('says nothing when the customer named the state itself', () => {
+    const r = enforce('get_expiring_contracts', { naics: '561612', state: 'TX', months_window: 12 }, 'Which agencies buy security guard services in the San Antonio area, and which of the current guard contracts in Texas expire in the next 12 months?');
+    expect(r.unapplied).toEqual([]);
+  });
+});
+
+describe('acc6c R1: state order', () => {
+  it('treats reordered state lists as the same search', () => {
+    const r = dedupeToolCalls([
+      { id: 'a', name: 'get_expiring_contracts', args: JSON.stringify({ naics: '561320,561110,493110', state: 'TN,MS,AR', months_window: 18 }) },
+      { id: 'b', name: 'get_expiring_contracts', args: JSON.stringify({ naics: '561320,561110,493110', state: 'MS,TN,AR', months_window: 18 }) },
+      { id: 'c', name: 'get_expiring_contracts', args: JSON.stringify({ naics: '561320,561110,493110', state: 'AR, Tennessee, MS', months_window: 18 }) },
+    ]);
+    expect(r.keep.map((k) => k.id)).toEqual(['a']);
+  });
+});
+
+describe('acc7b near-misses', () => {
+  it('R2: the applied-codes note lists every code searched and which ones Mindy added', () => {
+    const r = enforce('get_expiring_contracts', { naics: '561320', state: 'TN', months_window: 18 }, 'Federal contracts expiring in the next 18 months in Tennessee for temporary staffing, clerical, admin and warehouse work');
+    expect(r.applied).toContain('industry codes 561320, 561110, 493110 for the work you named (561110, 493110 added by Mindy)');
+  });
+  it('R6: a fragment of the request is replaced by the whole request', () => {
+    const q = 'Keywords for a light industrial, clerical and warehouse staffing firm in Memphis';
+    expect(enforce('derive_company_keywords', { description: 'warehouse staffing', limit: 12 }, q).a.description).toBe(q);
+  });
+});
+
+describe('acc7 R4: buying-office calls that differ only by the default radius', () => {
+  it('keeps the broader-coded call', () => {
+    const r = dedupeToolCalls([
+      { id: '1', name: 'get_buying_offices', args: JSON.stringify({ state: 'TN', city: 'Memphis', naics: '561320,561110', limit: 10 }) },
+      { id: '2', name: 'get_buying_offices', args: JSON.stringify({ state: 'TN', cities: ['Memphis'], naics: '561320', metro_radius_miles: 30 }) },
+      { id: '3', name: 'get_buying_offices', args: JSON.stringify({ state: 'TN', cities: ['Memphis'], naics: '561110', metro_radius_miles: 30, limit: 10 }) },
+    ]);
+    expect(r.keep.map((k) => k.id)).toEqual(['1']);
+  });
+  it('a different radius is a different search', () => {
+    const r = dedupeToolCalls([
+      { id: '1', name: 'get_buying_offices', args: JSON.stringify({ state: 'TN', city: 'Memphis', naics: '561320' }) },
+      { id: '2', name: 'get_buying_offices', args: JSON.stringify({ state: 'TN', city: 'Memphis', naics: '561320', metro_radius_miles: 0 }) },
+    ]);
+    expect(r.keep.map((k) => k.id)).toEqual(['1', '2']);
+  });
+});

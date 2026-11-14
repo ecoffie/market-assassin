@@ -148,7 +148,9 @@ server.registerTool(
       'premium price-to-win rates, small-vs-large business gap, top labor categories, and top ' +
       'competing vendors. Returns grounded=false when CALC has no rates for the input — in that ' +
       'case tell the user no pricing data was found and suggest a broader/sibling term; do NOT ' +
-      'invent rates. Rates are GSA Schedule ceiling rates only (not commercial).',
+      'invent rates. Rates are GSA Schedule ceiling rates only (not commercial). rate_summary gives every rate with ' +
+      'its population and n (aggressive 25th <= competitive = market median 50th <= premium 75th, one population); ' +
+      'per_title_medians are single-title subsets. Quote rate_summary.statement to state all three.',
     inputSchema: {
       naics: z
         .string()
@@ -293,7 +295,9 @@ server.registerTool(
       'Full USASpending detail for one federal award: obligated→ceiling (the real prize size), the ' +
       'parent IDV/vehicle you must hold to compete, period of performance (recompete timing), recipient, ' +
       'NAICS/PSC, funding account. Pass a contract number (PIID) OR a generated_internal_id. Returns ' +
-      'grounded=false when no award matches — do not invent figures.',
+      'grounded=false when no award matches — do not invent figures. Also returns status (active | expired | ' +
+      'not_started | unknown vs today), days_until_end, and a successor probe (likely follow-ons with evidence, ' +
+      'or none_found with what was checked) when expired or ending within 180 days.',
     inputSchema: {
       piid: z.string().optional().describe('Contract number (PIID), e.g. "140F0822D0024".'),
       id: z.string().optional().describe('USASpending generated_internal_id, if already known (skips the resolve).'),
@@ -729,9 +733,9 @@ server.registerTool(
       'suggested capture start (PoP end − 12 months), not a recompete date; estimated_recompete_date is null. grounded=false — widen months_window. ' +
       'For market FIND across three horizons prefer find_opportunities.',
     inputSchema: {
-      naics: z.string().optional().describe('NAICS code; ≤5 digits = prefix, 6 = exact.'),
+      naics: z.string().optional().describe('NAICS code or comma-separated codes (OR); ≤5 digits = prefix, 6 = exact.'),
       agency: z.string().optional().describe('Agency name, case-insensitive partial.'),
-      state: z.string().optional().describe('2-letter place-of-performance state.'),
+      state: z.string().optional().describe('Place-of-performance state: 2-letter code or name; several comma-separated (OR).'),
       months_window: z.number().int().min(1).max(60).optional().describe('Expiration window in months (default 18).'),
       months_min: z.number().int().min(0).max(60).optional().describe('Skip contracts ending sooner than this many months. Capture window: months_min=6, months_window=18.'),
       min_value: z.number().optional().describe('Minimum obligated dollars.'),
@@ -841,23 +845,29 @@ server.registerTool(
       'Awarded federal prime contracts (past/historical, USASpending) BY LOCATION + NAICS / PSC / agency / recipient / ' +
       'value / date. state_scope: "pop" (place of performance, default), "recipient" (awardee HQ), or "both" (union). ' +
       'Already-awarded contracts — for open solicitations use search_sam_opportunities; for one firm use ' +
-      'get_contractor_award_history. grounded=false when nothing matches; do not invent awards.',
+      'get_contractor_award_history. grounded=false when nothing matches; do not invent awards. keyword = a phrase from ' +
+      'the award description; piid_prefix = contract-number prefix (office DoDAAC, e.g. "W912EQ"). Only pass filters the ' +
+      'user asked for. _meta.applied_filters lists what was applied; _meta.lag_note flags a window inside the ~90-day ' +
+      'DoD publication delay (say "not yet published", not "none").',
     inputSchema: {
       state: z.string().optional().describe('State — full name ("Florida") or 2-letter code ("FL").'),
       state_scope: z.enum(['pop', 'recipient', 'both']).optional().describe('Which location to match (default "pop").'),
       naics: z.string().optional().describe('NAICS — 6-digit exact or 2-5 digit prefix.'),
       psc: z.string().optional().describe('Product/Service Code.'),
-      agency: z.string().optional().describe('Awarding agency name (toptier).'),
+      agency: z.string().optional().describe('Awarding agency name (military departments matched as sub-tier).'),
       recipient: z.string().optional().describe('Recipient company-name keyword.'),
       min_value: z.number().optional().describe('Minimum award amount (dollars).'),
       date_from: z.string().optional().describe('Action-date lower bound (YYYY-MM-DD).'),
       date_to: z.string().optional().describe('Action-date upper bound (YYYY-MM-DD).'),
       include_idv: z.boolean().optional().describe('Also include IDV vehicles (default false).'),
       limit: z.number().int().min(1).max(100).optional().describe('Max awards (default 25).'),
+      keyword: z.string().optional().describe('Phrase matched against award description / id / recipient (exact phrase).'),
+      piid_prefix: z.string().optional().describe('Contract-number prefix, e.g. office DoDAAC "W912EQ".'),
+      include_status: z.boolean().optional().describe('Also return status_checks (active/expired, days to end, likely successor) for the top 3 matches.'),
     },
   },
-  async ({ state, state_scope, naics, psc, agency, recipient, min_value, date_from, date_to, include_idv, limit }) => {
-    const result = await searchPastContracts({ state, state_scope, naics, psc, agency, recipient, min_value, date_from, date_to, include_idv, limit });
+  async ({ state, state_scope, naics, psc, agency, recipient, min_value, date_from, date_to, include_idv, limit, keyword, piid_prefix, include_status }) => {
+    const result = await searchPastContracts({ state, state_scope, naics, psc, agency, recipient, min_value, date_from, date_to, include_idv, limit, keyword, piid_prefix, include_status });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );
@@ -1317,7 +1327,10 @@ server.registerTool(
       'roster, then the 3,502-prime DB — the hand-verified moat), then a LIVE BigQuery fallback that confirms an ' +
       'out-of-snapshot company is a real federal prime + returns live award context. A blank name/email (including ' +
       'every BigQuery-tier match — BQ has award data, not SBLO contacts) means no public SBLO was found; it surfaces ' +
-      'the supplier portal and NEVER invents a contact. grounded=false = not curated and not a matching prime.',
+      'the supplier portal and NEVER invents a contact. When no named SBLO is curated, returns registered_points_of_contact: ' +
+      'the people listed on the firm\'s SAM registration (from Mindy\'s stored SAM data, dated by as_of), labelled ' +
+      '"registered SAM point of contact, not a designated small business liaison". SAM redacts POC email/phone; never ' +
+      'invent them. grounded=false = not curated, not a matching prime, and no registered POC held.',
     inputSchema: {
       company: z.string().describe('Prime contractor / company name, e.g. "AECOM", "Leidos".'),
     },
@@ -1406,17 +1419,23 @@ server.registerTool(
       'by MEANING. NAICS is the wrong discovery key; a company\'s real vocabulary finds the market its codes miss. Pass a ' +
       'description and/or past-performance scope descriptions (the richest signal). Returns ranked keywords to feed an ' +
       'opportunity search. Semantic embeddings (no BigQuery); fails soft to lexical order if embeddings are down ' +
-      '(_meta.ranked). grounded=false = not enough input text — do NOT invent keywords.',
+      '(_meta.ranked). grounded=false = not enough input text — do NOT invent keywords. City/state names and the ' +
+      'company name are never returned as keywords (excluded_terms). Candidates also come from grounded market ' +
+      'sources (naics_vocabulary, GSA CALC+ labor-category titles, SAM solicitation text); keyword_sources names the ' +
+      'source and count of every keyword.',
     inputSchema: {
       description: z.string().optional().describe('What the company does — one-liner / pitch / capability summary.'),
       past_performance: z.array(z.string()).optional().describe('Past-performance scope descriptions (richest signal).'),
       capabilities: z.array(z.string()).optional().describe('Capability / service descriptions.'),
       code_titles: z.array(z.string()).optional().describe('NAICS/PSC title text the caller already knows (optional).'),
       limit: z.number().int().min(1).max(25).optional().describe('Max keywords (default 12).'),
+      brand_exclude: z.array(z.string()).optional().describe("The company's own name / brand / proper nouns to keep out of the keywords. Only brand-distinctive words are removed."),
+      naics: z.array(z.string()).optional().describe('Optional 6-digit NAICS codes for the market sources. Inferred when omitted.'),
+      include_market_terms: z.boolean().optional().describe('Add grounded market terms (vocabulary, CALC labor categories, solicitation text). Default true.'),
     },
   },
-  async ({ description, past_performance, capabilities, code_titles, limit }) => {
-    const result = await deriveCompanyKeywords({ description, past_performance, capabilities, code_titles, limit });
+  async ({ description, past_performance, capabilities, code_titles, limit, brand_exclude, naics, include_market_terms }) => {
+    const result = await deriveCompanyKeywords({ description, past_performance, capabilities, code_titles, limit, brand_exclude, naics, include_market_terms: include_market_terms ?? true });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );

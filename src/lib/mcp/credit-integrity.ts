@@ -67,11 +67,12 @@ export function creditsForOutcome(tool: string, outcome: BillingOutcome, baseCre
  * Inventory of every `ok: false` code those modules return (tier1-tools.ts,
  * tier2-tools.ts), pinned by credit-integrity.unit.test.ts:
  *   invalid input  → keyword_required, naics_required, company_name_required,
- *                    naics_or_psc_required, unknown_set_aside, unknown_tool:<name>
+ *                    naics_or_psc_required, unknown_set_aside, unknown_state, invalid_naics,
+ *                    unknown_tool:<name>
  *   system failure → sam_unavailable, rate_limited, lookup_failed, and anything else
  * Unknown codes default to system failure: an unrecognised refusal is never billed.
  */
-const INVALID_INPUT_ERROR = /(^|_)required$|^unknown_set_aside$|^unknown_tool:/;
+const INVALID_INPUT_ERROR = /(^|_)required$|^unknown_set_aside$|^unknown_state$|^invalid_naics$|^unknown_tool:/;
 
 export function errorCodeBillingOutcome(code: string): BillingOutcome {
   return INVALID_INPUT_ERROR.test(code) ? 'nonbillable_invalid_input' : 'nonbillable_system_failure';
@@ -134,6 +135,8 @@ export const REQUIRED_ONE_OF: Readonly<Record<string, readonly string[]>> = {
   extract_statement_of_work: ['notice_id', 'rfp_text'],
   draft_proposal: ['notice_id', 'rfp_text'],
   search_agency_opps_by_office: ['agency', 'dodaac'],
+  // A nationwide all-industry office ranking is refused by the tool itself; refuse it here first.
+  get_buying_offices: ['state', 'naics', 'psc'],
   get_current_acquisition_intelligence: [
     'agency', 'office', 'dodaac', 'capability', 'keywords', 'naics', 'psc', 'notice_ids', 'contract_ids', 'piids',
   ],

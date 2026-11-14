@@ -26,13 +26,27 @@ const APPROVED_HIDDEN = [
   'verify_m_scale',
 ];
 
+/**
+ * Ask Mindy Phase 1 (2026-11-14): tools built for NATIVE Ask Mindy only. Hidden from every
+ * external MCP surface; publishing or pricing them for MCP needs a separate owner review.
+ */
+const ASK_MINDY_ONLY = ['get_buying_offices', 'get_vehicle_spend_mix'];
+const ALL_HIDDEN = [...APPROVED_HIDDEN, ...ASK_MINDY_ONLY].sort();
+
 describe('public MCP catalog', () => {
   it('every registered tool is classified exactly once', () => {
     expect(auditPublicCatalog()).toEqual({ unclassified: [], both: [], unknownPublic: [], unknownHidden: [] });
   });
 
-  it('hides exactly the 11 approved tools', () => {
-    expect(Object.keys(HIDDEN_FROM_PUBLIC_MCP).sort()).toEqual(APPROVED_HIDDEN);
+  it('hides exactly the 11 audit-approved tools plus the Ask-Mindy-only tools', () => {
+    expect(Object.keys(HIDDEN_FROM_PUBLIC_MCP).sort()).toEqual(ALL_HIDDEN);
+  });
+
+  it('Ask-Mindy-only tools are hidden as plain "hide" (chat offers them), never public', () => {
+    for (const t of ASK_MINDY_ONLY) {
+      expect(HIDDEN_FROM_PUBLIC_MCP[t]?.decision, t).toBe('hide');
+      expect(isPublicMcpTool(t), t).toBe(false);
+    }
   });
 
   it('keeps the Potato journey step public (CAI → Pathway Fit)', () => {
@@ -50,14 +64,14 @@ describe('public MCP catalog', () => {
 
   it('the internal registry is unchanged: hidden tools stay registered for Chat and composition', () => {
     const internal = listMcpTools().map(name);
-    for (const t of APPROVED_HIDDEN) expect(internal, t).toContain(t);
-    expect(internal.length).toBe(PUBLIC_MCP_TOOLS.length + APPROVED_HIDDEN.length);
+    for (const t of ALL_HIDDEN) expect(internal, t).toContain(t);
+    expect(internal.length).toBe(PUBLIC_MCP_TOOLS.length + ALL_HIDDEN.length);
   });
 
   it('the public list is the registry minus the hidden set', () => {
     const pub = listPublicMcpTools().map(name).sort();
     expect(pub).toEqual([...PUBLIC_MCP_TOOLS].sort());
-    for (const t of APPROVED_HIDDEN) expect(pub).not.toContain(t);
+    for (const t of ALL_HIDDEN) expect(pub).not.toContain(t);
   });
 
   it('the external transport registers ONLY public tools (not listed, not callable)', () => {

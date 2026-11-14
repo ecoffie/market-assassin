@@ -17,6 +17,8 @@
  * stays gated by mcpFlags (see src/lib/mcp/flags.ts).
  */
 import { getWriteClient } from '@/lib/supabase/server-clients';
+import { annotateResultContract } from '@/lib/mcp/result-contract';
+import { parseStageGroup } from '@/lib/opportunities/acquisition-stage';
 import { makeTier1Tools, TIER1_TOOL_DEFS, TIER1_TOOL_NAMES, type Tier1Db } from '@/lib/chat/tier1-tools';
 import { makeTier2Tools, TIER2_TOOL_DEFS, TIER2_TOOL_NAMES } from '@/lib/chat/tier2-tools';
 import { getWinningPlaybook } from '@/mcp/tools/winning-playbook';
@@ -80,6 +82,8 @@ import { matchRecompeteSowTool } from '@/mcp/tools/recompete-sow';
 import { extractStatementOfWork } from '@/mcp/tools/statement-of-work';
 import { getFederalEventSeries } from '@/mcp/tools/event-series';
 import { getSbaGoalingShare } from '@/mcp/tools/sba-goaling';
+import { getBuyingOffices } from '@/mcp/tools/buying-offices';
+import { getVehicleSpendMix } from '@/mcp/tools/vehicle-spend-mix';
 import { draftProposal, draftProposalSection } from '@/mcp/tools/draft-proposal';
 import { exportProposal } from '@/mcp/tools/export-proposal';
 import { getBalance } from '@/lib/mcp/credits';
@@ -147,6 +151,9 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   assess_market_depth: 10,
   get_agency_spending_detail: 10,
   get_sba_goaling_share: 10,
+  // Ask Mindy only (hidden from public MCP). Same tier as the other BigQuery profile reads.
+  get_buying_offices: 10,
+  get_vehicle_spend_mix: 10,
   get_award_detail: 10,
   add_contacts_to_crm: 10,
   schedule_market_search: 0,
@@ -267,7 +274,9 @@ const PRICING_INTEL_TOOL_DEF = {
       'daily refresh). Pass a NAICS code OR a labor-category keyword to get the market median, ' +
       'aggressive/competitive/premium price-to-win rates, small-vs-large gap, top labor categories, ' +
       'and top competing vendors. Returns grounded=false when CALC has no rates — do not invent rates. ' +
-      'Rates are GSA Schedule ceiling rates (not commercial).',
+      'Rates are GSA Schedule ceiling rates (not commercial). rate_summary gives every rate with its population and n: ' +
+      'aggressive (25th pct) <= competitive (= market median, 50th pct) <= premium (75th pct), all over ONE population; ' +
+      'per_title_medians are single-title subsets, not the market median. Quote rate_summary.statement to state all three.',
     parameters: {
       type: 'object',
       properties: {
@@ -363,7 +372,14 @@ const AWARD_DETAIL_TOOL_DEF = {
       'parent IDV/vehicle you must hold to compete, period of performance (recompete timing), recipient, ' +
       'NAICS/PSC, funding account. Pass a contract number (PIID) OR a generated_internal_id. Do NOT pass a ' +
       'SAM solicitation/RFQ number — use get_solicitation_incumbent for those. Returns grounded=false when ' +
-      'no award matches — do not invent figures.',
+      'no award matches — do not invent figures. ' +
+      'USE THIS for "is this contract/order still active?" and "when does it end?": returns status ' +
+      '(active | expired | not_started | unknown, computed against today from the period-of-performance end), ' +
+      'days_until_end, and, when expired or ending within 180 days, a successor probe (likely follow-on awards ' +
+      'from the same awarding office PIID prefix with the same NAICS or PSC starting near the old end date, each ' +
+      'with its evidence; or state none_found with exactly what was checked). If you only have a description ' +
+      '("the Navy ID card order in Millington"), first find the PIID with search_past_contracts (keyword + agency, ' +
+      'e.g. keyword "identification card"), then call this.',
     parameters: {
       type: 'object',
       properties: {
@@ -827,14 +843,16 @@ const EXPIRING_CONTRACTS_TOOL_DEF = {
       'months, capture_start_basis) — not a recompete date; estimated_recompete_date is null (not established). ' +
       'place_of_performance_state is the place of ' +
       'performance as reported by USASpending. ' +
+      'expiring_orders_in_window[] lists every in-window task/delivery order at top level with its parent vehicle; ' +
+      '_meta.records_in_window counts standalone + orders + unresolved orders, so contracts:[] alone never means none. ' +
       'grounded=false when nothing matches — widen months_window. For customer-facing market FIND across Open + ' +
       'Recompete + Forecast, prefer find_opportunities.',
     parameters: {
       type: 'object',
       properties: {
-        naics: { type: 'string', description: 'NAICS code; ≤5 digits = prefix, 6 = exact.' },
+        naics: { type: 'string', description: 'NAICS code or comma-separated codes (OR); ≤5 digits = prefix, 6 = exact. Example: "5613,5611,4931".' },
         agency: { type: 'string', description: 'Agency name, case-insensitive partial.' },
-        state: { type: 'string', description: '2-letter place-of-performance state.' },
+        state: { type: 'string', description: 'Place-of-performance state: 2-letter code or name; several comma-separated (OR). Example: "TN,MS,AR".' },
         months_window: { type: 'number', description: 'Expiration window in months (default 18, max 60).' },
         months_min: { type: 'number', description: 'Skip contracts ending sooner than this many months (capture window). Example: months_min=6 with months_window=18. Omit to include the soonest expirations.' },
         min_value: { type: 'number', description: 'Minimum obligated dollars.' },
@@ -952,7 +970,13 @@ const PAST_CONTRACTS_TOOL_DEF = {
       'Returns each award\'s recipient, amount, agency, NAICS/PSC, place-of-performance + recipient state, dates, ' +
       'and a USASpending deep link. These are ALREADY-AWARDED contracts — for open solicitations use ' +
       'search_sam_opportunities; for one firm\'s full history use get_contractor_award_history. grounded=false ' +
-      'when nothing matches — broaden the codes/date or try state_scope:"both"; do not invent awards.',
+      'when nothing matches — broaden the codes/date or try state_scope:"both"; do not invent awards. ' +
+      'keyword finds an award by what it is (a phrase from its description, e.g. "identification card", ' +
+      '"business management support"); piid_prefix finds an office\'s awards by contract-number prefix (e.g. ' +
+      '"W912EQ" = USACE Memphis District, "N00189" = NAVSUP FLC Norfolk). Only pass the filters the user asked ' +
+      'for: do NOT add a state the user did not name. _meta.applied_filters lists every filter applied. When the ' +
+      'date window is recent, _meta.lag_note explains that DoD awards publish with a ~90-day delay: report "not ' +
+      'yet published / data current through <date>", never "no award was made".',
     parameters: {
       type: 'object',
       properties: {
@@ -960,13 +984,16 @@ const PAST_CONTRACTS_TOOL_DEF = {
         state_scope: { type: 'string', enum: ['pop', 'recipient', 'both'], description: 'Which location to match (default "pop" = place of performance).' },
         naics: { type: 'string', description: 'NAICS code — 6-digit exact or 2-5 digit prefix.' },
         psc: { type: 'string', description: 'Product/Service Code.' },
-        agency: { type: 'string', description: 'Awarding agency name (toptier).' },
+        agency: { type: 'string', description: 'Awarding agency name. Military departments ("Navy", "Army", "Air Force") are matched as USASpending sub-tier agencies.' },
         recipient: { type: 'string', description: 'Recipient company-name keyword.' },
         min_value: { type: 'number', description: 'Minimum award amount (dollars).' },
         date_from: { type: 'string', description: 'Action-date lower bound (YYYY-MM-DD).' },
         date_to: { type: 'string', description: 'Action-date upper bound (YYYY-MM-DD).' },
         include_idv: { type: 'boolean', description: 'Also include IDV vehicles (IDIQ/GWAC/BPA), not just definitive contracts (default false).' },
         limit: { type: 'number', description: 'Max awards returned (default 25, max 100).' },
+        keyword: { type: 'string', description: 'Phrase matched against award description / award id / recipient (USASpending keyword search, exact phrase). Use the formal wording ("identification card", not "ID card"). With piid_prefix, matched against description and recipient of that office\'s awards.' },
+        piid_prefix: { type: 'string', description: 'Contract-number (PIID) prefix, e.g. an office DoDAAC "W912EQ" or "N00189". Only awards whose PIID starts with it are returned.' },
+        include_status: { type: 'boolean', description: 'Also return status_checks for the top 3 matches: active/expired, days to end, end date, and a likely-successor check (candidates with evidence, or checked-none-found). Use for "is it still active" and "who replaced it".' },
       },
     },
   },
@@ -1545,7 +1572,11 @@ const SBLO_CONTACT_TOOL_DEF = {
       'fallback (~317K recipients) that confirms an out-of-snapshot company is a real federal prime + returns live ' +
       'award context. Returns SBLO name/title/email/phone/portal when curated; a blank name/email (including every ' +
       'BigQuery-tier match — BQ has award data, NOT SBLO contacts) means no public SBLO was found, so it surfaces the ' +
-      'supplier portal and NEVER invents a contact. grounded=false = not curated and not a matching federal prime.',
+      'supplier portal and NEVER invents a contact. When no named SBLO is curated (most small firms), returns ' +
+      'registered_points_of_contact: the people the firm listed on its SAM registration (names/titles, from Mindy\'s ' +
+      'stored SAM data, dated by as_of), labelled "registered SAM point of contact, not a designated small business ' +
+      'liaison". SAM redacts POC email/phone; never invent them. grounded=false = not curated, not a matching federal ' +
+      'prime, and no registered POC held.',
     parameters: {
       type: 'object',
       properties: {
@@ -1650,7 +1681,12 @@ const COMPANY_KEYWORDS_TOOL_DEF = {
       'ranked by MEANING. NAICS is the wrong discovery key; a company\'s real vocabulary finds the market its codes miss. ' +
       'Pass a description and/or past-performance scope descriptions (the richest signal). Returns ranked keywords to ' +
       'feed an opportunity search. Uses semantic embeddings (no BigQuery); fails soft to lexical order if embeddings are ' +
-      'down (_meta.ranked says which). grounded=false = not enough input text — do NOT invent keywords.',
+      'down (_meta.ranked says which). grounded=false = not enough input text — do NOT invent keywords. ' +
+      'City/state names and the company name are never returned as keywords (excluded_terms lists them). Besides ' +
+      'phrases from the input, candidates come from grounded market sources: naics_vocabulary for the given or ' +
+      'inferred NAICS, GSA CALC+ awarded labor-category titles, and occupational phrases in SAM solicitation text. ' +
+      'keyword_sources names the source (and count) of every keyword; occupational_titles lists the job titles ' +
+      'buyers price and staff.',
     parameters: {
       type: 'object',
       properties: {
@@ -1659,6 +1695,9 @@ const COMPANY_KEYWORDS_TOOL_DEF = {
         capabilities: { type: 'array', items: { type: 'string' }, description: 'Capability / service descriptions.' },
         code_titles: { type: 'array', items: { type: 'string' }, description: 'NAICS/PSC title text the caller already knows (optional).' },
         limit: { type: 'number', description: 'Max keywords (default 12, max 25).' },
+        brand_exclude: { type: 'array', items: { type: 'string' }, description: "The company's own name / brand / other proper nouns to keep out of the keywords (e.g. [\"Superb Staffing\"]). Only brand-distinctive words are removed; capability words like \"staffing\" stay." },
+        naics: { type: 'array', items: { type: 'string' }, description: 'Optional 6-digit NAICS codes for the market sources. Inferred from the description when omitted (naics_used says how).' },
+        include_market_terms: { type: 'boolean', description: 'Add grounded market terms (vocabulary, CALC labor categories, solicitation text). Default true.' },
       },
     },
   },
@@ -1850,6 +1889,73 @@ const SBA_GOALING_TOOL_DEF = {
   },
 };
 
+// Ask Mindy only (hidden from public MCP: public-catalog-config.ts). BigQuery award warehouse.
+const BUYING_OFFICES_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_buying_offices',
+    description:
+      'WHO BUYS this work in a place: contracting offices ranked by net obligated dollars, from federal contract ' +
+      'actions (USASpending, prime contracts). Use for "who buys X in <city / metro / state>". Returns each office ' +
+      'with its name, office code (a DoDAAC for Defense offices), agency and sub-agency, award count, obligated ' +
+      'dollars and share, top NAICS, example award ids, top place-of-performance cities, and the customer (funding) ' +
+      'offices behind it; rank_by:"funding" ranks the customer organizations instead. Location is PLACE OF ' +
+      'PERFORMANCE: an office located elsewhere (e.g. a regional contracting center) is ranked for a city when the ' +
+      'work it bought is performed there, so name the office AND where the work is. For a metro, pass the core city in `city` with the state: ' +
+      'it expands to every city within metro_radius_miles (default 30) automatically; cities_without_rows lists requested cities that had nothing. Requires a state, NAICS ' +
+      'or PSC. Default window: the latest three complete fiscal years. _meta.result_state "unavailable" (including ' +
+      'incomplete_reason "scope_too_broad") is NOT a zero: narrow the window and retry.',
+    parameters: {
+      type: 'object',
+      properties: {
+        state: { type: 'string', description: 'US state, 2-letter code or full name (place of performance).' },
+        city: { type: 'string', description: 'One city, or several comma-separated (place of performance).' },
+        cities: { type: 'array', items: { type: 'string' }, description: 'Several cities, e.g. a metro core city plus suburbs.' },
+        metro_radius_miles: { type: 'number', description: 'Metro radius in miles around a single core `city` (default 30; 0 = that city only).' },
+        naics: { type: 'string', description: 'NAICS code(s) or prefixes, comma-separated, e.g. "561320" or "5613,5611". Staffing and clerical: 5613 (employment services) and 5611/5614 (office administrative and business support).' },
+        psc: { type: 'string', description: 'PSC code(s) or prefixes, comma-separated, e.g. "R6" or "R699".' },
+        fiscal_year: { type: 'number', description: 'One federal fiscal year (Oct 1 - Sep 30).' },
+        fiscal_year_from: { type: 'number', description: 'First fiscal year of the window, inclusive.' },
+        fiscal_year_to: { type: 'number', description: 'Last fiscal year of the window, inclusive.' },
+        date_from: { type: 'string', description: 'Action date lower bound (YYYY-MM-DD). Overrides fiscal years.' },
+        date_to: { type: 'string', description: 'Action date upper bound (YYYY-MM-DD).' },
+        rank_by: { type: 'string', enum: ['awarding', 'funding'], description: '"awarding" (default) = contracting offices; "funding" = the customer organizations whose money it is.' },
+        limit: { type: 'number', description: 'Offices to return (default 10, max 50).' },
+      },
+    },
+  },
+};
+
+// Ask Mindy only (hidden from public MCP: public-catalog-config.ts). BigQuery + USASpending IDV records.
+const VEHICLE_SPEND_MIX_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_vehicle_spend_mix',
+    description:
+      'HOW a market buys: net obligated dollars and share by contract VEHICLE type for a NAICS (optionally one ' +
+      'awarding agency and/or place-of-performance state). Buckets: GSA Schedules (GSA-administered MAS), ' +
+      'VA-administered Federal Supply Schedules, other schedules, VA BPAs, other agencies\' BPAs, GWACs, GSA ' +
+      'multi-agency IDIQs (non-schedule), agency IDIQs, BOAs, standalone awards (no parent vehicle), and ' +
+      '"vehicle type not established". Each bucket carries obligated $, share %, award count, the rule used, and ' +
+      'how much of it is verified from USASpending\'s own IDV record versus typed from the PIID pattern ' +
+      '(heuristic_obligated). Shares sum to ~100% of the net total; rollups give all schedules / all BPAs / all ' +
+      'IDIQs+GWACs. Use for "how much X runs through GSA Schedules vs BPAs vs IDIQs". State the verified share and ' +
+      'any heuristic or unresolved share when you answer. Default window: the latest three complete fiscal years.',
+    parameters: {
+      type: 'object',
+      properties: {
+        naics: { type: 'string', description: 'NAICS code or prefix (required), comma-separated for several, e.g. "561320".' },
+        agency: { type: 'string', description: 'Optional awarding agency or sub-agency, exact name or common abbreviation (e.g. "VA", "Department of Veterans Affairs").' },
+        state: { type: 'string', description: 'Optional place-of-performance state, 2-letter code or full name.' },
+        fiscal_year: { type: 'number', description: 'One federal fiscal year.' },
+        fiscal_year_from: { type: 'number', description: 'First fiscal year, inclusive.' },
+        fiscal_year_to: { type: 'number', description: 'Last fiscal year, inclusive.' },
+      },
+      required: ['naics'],
+    },
+  },
+};
+
 const DRAFT_PROPOSAL_TOOL_DEF = {
   type: 'function' as const,
   function: {
@@ -2014,6 +2120,8 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     STATEMENT_OF_WORK_TOOL_DEF,
     EVENT_SERIES_TOOL_DEF,
     SBA_GOALING_TOOL_DEF,
+    BUYING_OFFICES_TOOL_DEF,
+    VEHICLE_SPEND_MIX_TOOL_DEF,
     DRAFT_PROPOSAL_TOOL_DEF,
     DRAFT_PROPOSAL_SECTION_TOOL_DEF,
     EXPORT_PROPOSAL_TOOL_DEF,
@@ -2084,6 +2192,8 @@ export function isMcpTool(name: string): boolean {
     name === 'extract_statement_of_work' ||
     name === 'get_federal_event_series' ||
     name === 'get_sba_goaling_share' ||
+    name === 'get_buying_offices' ||
+    name === 'get_vehicle_spend_mix' ||
     name === 'draft_proposal' ||
     name === 'draft_proposal_section' ||
     name === 'export_proposal' ||
@@ -2109,6 +2219,35 @@ export interface McpToolRun {
  * that to an MCP error). Does NOT debit — that's Slice 3.
  */
 export async function runMcpTool(
+  name: string,
+  args: Record<string, unknown>,
+  ctx: McpToolContext,
+): Promise<McpToolRun> {
+  const run = await dispatchMcpTool(name, args, ctx);
+  // P1-1 shared result contract: every result states whether it is a verified zero, unavailable,
+  // or missing an argument it was given. Additive `_meta` fields only; never throws.
+  try {
+    annotateResultContract(run.result, args, toolParameters(name));
+  } catch (err) {
+    console.error('[runMcpTool] result contract annotation failed', name, err);
+  }
+  return run;
+}
+
+let PARAMS_BY_NAME: Map<string, Record<string, unknown>> | null = null;
+/** Declared JSON-schema parameters for a tool (from the same defs listMcpTools serves). */
+export function toolParameters(name: string): { properties?: Record<string, { type?: string | string[]; enum?: unknown[] }> } | null {
+  if (!PARAMS_BY_NAME) {
+    PARAMS_BY_NAME = new Map();
+    for (const d of listMcpTools()) {
+      const fn = (d as { function?: { name?: string; parameters?: Record<string, unknown> } }).function;
+      if (fn?.name) PARAMS_BY_NAME.set(fn.name, fn.parameters ?? {});
+    }
+  }
+  return (PARAMS_BY_NAME.get(name) as { properties?: Record<string, { type?: string }> } | undefined) ?? null;
+}
+
+async function dispatchMcpTool(
   name: string,
   args: Record<string, unknown>,
   ctx: McpToolContext,
@@ -2334,6 +2473,15 @@ export async function runMcpTool(
         : typeof args.states === 'string' ? args.states : undefined,
       stage: typeof args.stage === 'string' ? args.stage : undefined,
     })) as unknown as Record<string, unknown>;
+    // Result contract: report the coerced arguments the tool DID apply, so a string `states`
+    // (schema: array) or a normalized `stage` ("market research" -> MARKET_RESEARCH) is not
+    // reported as ignored. An unrecognizable stage stays reported (the enum check flags it).
+    const meta = (result._meta && typeof result._meta === 'object' ? result._meta : (result._meta = {})) as Record<string, unknown>;
+    const applied = { ...((meta.applied_filters as Record<string, unknown>) ?? {}) };
+    if (typeof args.states === 'string' && args.states.trim()) applied.states = args.states;
+    const stageGroup = typeof args.stage === 'string' ? parseStageGroup(args.stage) : null;
+    if (stageGroup && stageGroup !== 'invalid') applied.stage = stageGroup;
+    if (Object.keys(applied).length) meta.applied_filters = applied;
     return { result, credits };
   }
 
@@ -2380,10 +2528,14 @@ export async function runMcpTool(
   }
 
   if (name === 'get_expiring_contracts') {
+    // Strings, comma lists and arrays all reach the tool; it normalizes them and reports any
+    // value it could not apply (it never silently drops one — the R1/R2 defect).
+    const listArg = (v: unknown): string | string[] | undefined =>
+      typeof v === 'string' ? v : Array.isArray(v) ? v.map((x) => String(x)) : typeof v === 'number' ? String(v) : undefined;
     const result = (await expiringContracts({
-      naics: typeof args.naics === 'string' ? args.naics : undefined,
+      naics: listArg(args.naics),
       agency: typeof args.agency === 'string' ? args.agency : undefined,
-      state: typeof args.state === 'string' ? args.state : undefined,
+      state: listArg(args.state),
       months_window: typeof args.months_window === 'number' ? args.months_window : undefined,
       months_min: typeof args.months_min === 'number' ? args.months_min : undefined,
       min_value: typeof args.min_value === 'number' ? args.min_value : undefined,
@@ -2453,6 +2605,9 @@ export async function runMcpTool(
       date_to: typeof args.date_to === 'string' ? args.date_to : undefined,
       include_idv: typeof args.include_idv === 'boolean' ? args.include_idv : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
+      keyword: typeof args.keyword === 'string' ? args.keyword : undefined,
+      piid_prefix: typeof args.piid_prefix === 'string' ? args.piid_prefix : undefined,
+      include_status: args.include_status === true,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
@@ -2703,6 +2858,9 @@ export async function runMcpTool(
       capabilities: Array.isArray(args.capabilities) ? (args.capabilities as string[]) : undefined,
       code_titles: Array.isArray(args.code_titles) ? (args.code_titles as string[]) : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
+      brand_exclude: Array.isArray(args.brand_exclude) ? (args.brand_exclude as string[]) : undefined,
+      naics: Array.isArray(args.naics) ? (args.naics as string[]) : undefined,
+      include_market_terms: typeof args.include_market_terms === 'boolean' ? args.include_market_terms : true,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
@@ -2766,6 +2924,18 @@ export async function runMcpTool(
       category: typeof args.category === 'string' ? args.category : undefined,
       query: typeof args.query === 'string' ? args.query : undefined,
     }) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_buying_offices') {
+    // Raw args on purpose: the tool normalizes arrays / comma lists / state names itself and
+    // reports anything it could not apply in _meta.ignored_args (P1-1 contract).
+    const result = (await getBuyingOffices(args)) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_vehicle_spend_mix') {
+    const result = (await getVehicleSpendMix(args)) as unknown as Record<string, unknown>;
     return { result, credits };
   }
 

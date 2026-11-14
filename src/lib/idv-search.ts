@@ -4,6 +4,7 @@
  */
 
 import { CONTRACT_CODES, IDV_CODES } from '@/lib/usaspending/award-type-codes';
+import { usaSpendingAwardingAgencyFilter } from '@/lib/usaspending/awarding-agency-filter';
 
 const API_URL = 'https://api.usaspending.gov/api/v2/search/spending_by_award/';
 
@@ -176,11 +177,9 @@ export async function searchIDVContracts(options: IDVSearchOptions = {}): Promis
 
   // Add agency filter
   if (agency) {
-    filters.agencies = [{
-      type: "awarding",
-      tier: "toptier",
-      name: agency
-    }];
+    // Military departments (Navy/Army/Air Force) are SUB-tier agencies in USASpending; sending
+    // "Department of the Navy" as toptier returns empty. Shared helper maps them to subtier.
+    filters.agencies = [usaSpendingAwardingAgencyFilter(agency)];
   }
 
   // Add state filter

@@ -24,6 +24,7 @@ import {
   type EvidenceClass,
 } from '@/lib/opportunities/market-interpretation';
 import { companyRecallBasis, type CompanyAnchor, type CompanyRecallBasis } from './company-anchor';
+import { getNaics } from '@/lib/codes/lookup';
 
 export type MatchBasis =
   | 'structured_scope'
@@ -31,6 +32,8 @@ export type MatchBasis =
   | 'buy_side_code'
   | 'holder_name'
   | 'buyer_name'
+  /** The row's NAICS is in the capability's related market (same industry family), not its direct codes. */
+  | 'related_market_code'
   | CompanyRecallBasis;
 
 /** Coming back classes: the two FIND evidence classes + the holder-name signal. */
@@ -61,7 +64,13 @@ function codeIn(list: string[], value: string | null | undefined): boolean {
 
 /** Codes the PLAN itself retrieved on (typed NAICS/PSC, crosswalks, industry preset, term-of-art). */
 function planCodeHit(row: RecompeteEvidenceRow, plan: DiscoveryPlan, cap: CapabilityInterpretation): boolean {
-  const naicsList = [...plan.horizons.recompete.naics, ...cap.direct.naics];
+  // Related-market codes are retrieved but are not evidence of the requested work, unless the
+  // customer typed that code themselves (plan.naics holds only typed/explicit codes).
+  const related = new Set(cap.related_market?.naics ?? []);
+  const naicsList = [
+    ...plan.horizons.recompete.naics.filter((c) => !related.has(c) || plan.naics.includes(c)),
+    ...cap.direct.naics,
+  ];
   const pscList = [...plan.psc, ...cap.direct.psc];
   return codeIn(naicsList, row.naics_code) || codeIn(pscList, row.psc_code);
 }
@@ -109,6 +118,9 @@ export function classifyComingBackEvidence(
   if (plan.matcher.mode === 'none') return { cls: 'DIRECT_MATCH', basis: ['structured_scope', ...basis] };
   if (planCodeHit(row, plan, cap)) return { cls: 'DIRECT_MATCH', basis: ['buy_side_code', ...basis] };
   if (matchesText(plan.matcher, buySide(row))) return { cls: 'DIRECT_MATCH', basis: ['buy_side_text', ...basis] };
+  if (cap.related_market && codeIn(cap.related_market.naics, row.naics_code)) {
+    return { cls: 'RELATED_MARKET_CANDIDATE', basis: ['related_market_code', ...basis] };
+  }
   if (holderHit) return { cls: 'HOLDER_SIGNAL', basis: ['holder_name', ...basis] };
   if (matchesText(plan.matcher, [row.awarding_agency, row.awarding_sub_agency])) {
     return { cls: 'RELATED_MARKET_CANDIDATE', basis: ['buyer_name', ...basis] };
@@ -120,6 +132,14 @@ export function holderSignalWhy(phrase: string, row: { incumbent_name?: string |
   const codes = [row.naics_code && `NAICS ${row.naics_code}`, row.psc_code && `PSC ${row.psc_code}`].filter(Boolean).join(' / ');
   return `Holder signal, not a match: only the holder's name (“${row.incumbent_name || 'unknown'}”) carries “${phrase}”. `
     + `What this contract bought${codes ? ` (${codes})` : ''} does not establish that work, and a name is not verified evidence the holder performs it.`;
+}
+
+/** A row retrieved by a related-market code: same industry family, not established as the requested work. */
+export function relatedCodeWhy(phrase: string, row: { naics_code?: string | null; naics_description?: string | null }): string {
+  const title = row.naics_description || (row.naics_code ? getNaics(row.naics_code)?.title : null);
+  const code = row.naics_code ? `NAICS ${row.naics_code}${title ? ` ${title}` : ''}` : 'its industry code';
+  return `Related-market candidate for “${phrase}”: this contract is in the same industry family (${code}), `
+    + `but the record does not say it includes ${phrase}. Check the scope before treating it as ${phrase} work.`;
 }
 
 export function buyerNameWhy(phrase: string): string {
