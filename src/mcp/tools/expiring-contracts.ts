@@ -14,13 +14,56 @@ import {
   type VehicleRollup,
 } from '@/lib/recompete/vehicle-rollup';
 import { mcpFlags } from '@/lib/mcp/flags';
+import { normalizeStateCode } from '@/lib/utils/us-states';
+import type { IgnoredArg } from '@/lib/mcp/result-contract';
+
+/** An order under a vehicle, listed at top level so an in-window order is never only nested. */
+export type ExpiringOrderInWindow = ExpiringContract & {
+  parent_vehicle_piid: string | null;
+  vehicle_ordering_end_date: string | null;
+  vehicle_ordering_period_status: VehicleRollup['ordering_period_status'];
+};
+
+function argTokens(raw: unknown, splitter: RegExp): string[] {
+  const arr = Array.isArray(raw) ? raw : raw === undefined || raw === null ? [] : [raw];
+  return arr
+    .flatMap((v) => String(v ?? '').split(splitter))
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
+
+/** NAICS from a string, comma/space list, or array. 2-6 digits each; anything else is reported, never guessed. */
+export function resolveNaicsArg(raw: unknown): { codes: string[]; invalid: string[] } {
+  const codes: string[] = [];
+  const invalid: string[] = [];
+  for (const t of argTokens(raw, /[,;\s]+/)) {
+    if (/^\d{2,6}$/.test(t)) { if (!codes.includes(t)) codes.push(t); } else invalid.push(t);
+  }
+  return { codes, invalid };
+}
+
+/**
+ * States from a code, a full name, a list ("TN, MS or AR", ["Tennessee","MS"]). Splits only on
+ * , ; / & and the words " or " / " and " between spaces, so the Oregon code "OR" survives.
+ */
+export function resolveStateArg(raw: unknown): { codes: string[]; invalid: string[] } {
+  const codes: string[] = [];
+  const invalid: string[] = [];
+  for (const t of argTokens(raw, /\s*[,;\/&]\s*|\s+(?:or|and)\s+/i)) {
+    const code = normalizeStateCode(t);
+    if (code) { if (!codes.includes(code)) codes.push(code); } else invalid.push(t);
+  }
+  return { codes, invalid };
+}
 
 export interface ExpiringContractsToolInput {
-  naics?: string;
+  /** One code, a comma/space list, or an array; ≤5 digits = prefix, 6 = exact. */
+  naics?: string | string[];
   /** Multiple NAICS as ONE market (OR across codes) — a saved search's full code set. */
   naicsCodes?: string[];
   agency?: string;
-  state?: string;
+  /** 2-letter code or full name; several as a list or array (OR'd). */
+  state?: string | string[];
   months_window?: number;
   /**
    * Skip contracts ending sooner than this many months. The default window
@@ -54,6 +97,12 @@ export interface ExpiringContractsToolResult {
    * with parent_vehicle = 'UNKNOWN' — never a standalone recompete, never grouped into a vehicle.
    */
   unresolved_orders: Array<ExpiringContract & { parent_vehicle: 'UNKNOWN' }>;
+  /**
+   * Every task/delivery order ending in the window, at top level with its parent vehicle. The
+   * same orders also appear inside vehicles[] (unchanged). Added because a reader that looked
+   * only at contracts[] saw zero while in-window orders sat nested.
+   */
+  expiring_orders_in_window: ExpiringOrderInWindow[];
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
   _meta: {
     grounded: boolean;
@@ -68,6 +117,18 @@ export interface ExpiringContractsToolResult {
     vehicles_ordering_end_unknown: number;
     /** Orders whose parent vehicle could not be established (listed in unresolved_orders). */
     orders_parent_unknown: number;
+    /** expiring_orders_in_window.length. */
+    expiring_orders_in_window: number;
+    /** Every record ending in the window that this response lists: standalone + orders + unresolved orders. */
+    records_in_window: number;
+    /** The filters that actually shaped the query (normalized). */
+    applied_filters: Record<string, unknown>;
+    /** Arguments that did not shape the query, with the reason. */
+    ignored_args: IgnoredArg[];
+    window?: { after: string; through: string; as_of: string; months: number };
+    /** Set when more rows matched than were returned. */
+    incomplete_reason?: string;
+    result_state?: 'filter_not_applied';
   };
 }
 
@@ -75,11 +136,43 @@ export async function expiringContracts(
   input: ExpiringContractsToolInput,
   deps: { vehicleLookup?: VehicleLookup } = {},
 ): Promise<ExpiringContractsToolResult> {
-  const res = await queryExpiringContracts({
-    naics: input.naics,
-    naicsCodes: input.naicsCodes,
+  const naicsGiven = input.naicsCodes?.length ? input.naicsCodes : input.naics;
+  const naicsArg = resolveNaicsArg(naicsGiven);
+  const stateArg = resolveStateArg(input.state);
+  const ignored: IgnoredArg[] = [];
+  if (naicsArg.invalid.length) {
+    ignored.push({ arg: 'naics', value: naicsArg.invalid.join(', '), reason: 'invalid_value', detail: 'NAICS must be 2-6 digits' });
+  }
+  if (stateArg.invalid.length) {
+    ignored.push({ arg: 'state', value: stateArg.invalid.join(', '), reason: 'invalid_value', detail: 'not a recognized US state or code' });
+  }
+  const queried: Record<string, string | number> = {};
+  for (const [k, v] of Object.entries({
+    naics: Array.isArray(input.naics) ? input.naics.join(',') : input.naics,
     agency: input.agency,
-    state: input.state,
+    state: Array.isArray(input.state) ? input.state.join(',') : input.state,
+    months_window: input.months_window, months_min: input.months_min, likelihood: input.likelihood,
+  })) {
+    if (v !== undefined && v !== '') queried[k] = v as string | number;
+  }
+  // A filter whose every value was unrecognizable is NOT dropped: running without it would
+  // answer a broader (national / all-industry) question and present it as this one.
+  const naicsUnusable = naicsArg.invalid.length > 0 && naicsArg.codes.length === 0;
+  const stateUnusable = stateArg.invalid.length > 0 && stateArg.codes.length === 0;
+  if (naicsUnusable || stateUnusable) {
+    return {
+      queried, contracts: [], vehicles: [], unresolved_orders: [], expiring_orders_in_window: [],
+      _meta: {
+        grounded: false, degraded: false, count: 0, total: 0, vehicle_count: 0, orders_rolled_up: 0,
+        vehicles_ordering_end_unknown: 0, orders_parent_unknown: 0, expiring_orders_in_window: 0,
+        records_in_window: 0, applied_filters: {}, ignored_args: ignored, result_state: 'filter_not_applied',
+      },
+    };
+  }
+  const res = await queryExpiringContracts({
+    naicsCodes: naicsArg.codes.length ? naicsArg.codes : undefined,
+    agency: input.agency,
+    states: stateArg.codes.length ? stateArg.codes : undefined,
     monthsWindow: input.months_window,
     minMonthsWindow: input.months_min,
     minValue: input.min_value,
@@ -99,15 +192,39 @@ export async function expiringContracts(
   const { standalone, vehicles, unresolved } = rollupOrdersByVehicle(res.contracts, orderingEnds);
 
   const grounded = standalone.length > 0 || vehicles.length > 0 || unresolved.length > 0;
-  const queried: Record<string, string | number> = {};
-  for (const [k, v] of Object.entries({ naics: input.naics, agency: input.agency, state: input.state, months_window: input.months_window, months_min: input.months_min, likelihood: input.likelihood })) {
-    if (v !== undefined && v !== '') queried[k] = v as string | number;
-  }
+  const orderVehicle = new Map<string, VehicleRollup>();
+  for (const v of vehicles) for (const o of v.orders) orderVehicle.set(o.contract_id, v);
+  const expiringOrders: ExpiringOrderInWindow[] = res.contracts
+    .filter((c) => orderVehicle.has(c.contract_id))
+    .map((c) => {
+      const v = orderVehicle.get(c.contract_id)!;
+      return {
+        ...c,
+        parent_vehicle_piid: v.vehicle_piid,
+        vehicle_ordering_end_date: v.ordering_end_date,
+        vehicle_ordering_period_status: v.ordering_period_status,
+      };
+    });
+  const applied: Record<string, unknown> = {};
+  if (naicsArg.codes.length) applied.naics = naicsArg.codes;
+  if (stateArg.codes.length) applied.state = stateArg.codes;
+  if (input.agency) applied.agency = input.agency;
+  if (res.window) applied.months_window = res.window.months;
+  if (input.months_min !== undefined) applied.months_min = input.months_min;
+  if (input.min_value !== undefined) applied.min_value = input.min_value;
+  if (input.max_value !== undefined) applied.max_value = input.max_value;
+  if (input.likelihood) applied.likelihood = input.likelihood;
+  if (input.eligible_set_asides?.length) applied.eligible_set_asides = input.eligible_set_asides;
+  const rowsReturned = res.contracts.length;
+  const incomplete = !res.degraded && res.total > rowsReturned
+    ? `returned ${rowsReturned} of ${res.total} matching records (row limit); raise limit (max 200) or narrow the filters before saying this is the full list`
+    : undefined;
   const result: ExpiringContractsToolResult = {
     queried,
     contracts: standalone,
     vehicles,
     unresolved_orders: unresolved,
+    expiring_orders_in_window: expiringOrders,
     _meta: {
       grounded,
       degraded: res.degraded,
@@ -117,6 +234,12 @@ export async function expiringContracts(
       orders_rolled_up: vehicles.reduce((n, v) => n + v.orders_in_result, 0),
       vehicles_ordering_end_unknown: vehicles.filter((v) => v.ordering_end_status === 'unknown').length,
       orders_parent_unknown: unresolved.length,
+      expiring_orders_in_window: expiringOrders.length,
+      records_in_window: standalone.length + expiringOrders.length + unresolved.length,
+      applied_filters: applied,
+      ignored_args: ignored,
+      ...(res.window ? { window: res.window } : {}),
+      ...(incomplete ? { incomplete_reason: incomplete } : {}),
     },
   };
   if (mcpFlags.aiHint) {

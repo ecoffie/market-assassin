@@ -66,6 +66,12 @@ export interface ExpiringContractsInput {
   agency?: string;
   /** 2-letter place-of-performance state. */
   state?: string;
+  /**
+   * Several 2-letter place-of-performance states, OR'd (`IN (...)`). When present this takes
+   * precedence over `state`; callers must pass validated 2-letter codes (the MCP tool normalizes
+   * names like "Tennessee" first). Absent → `state` behaves exactly as before.
+   */
+  states?: string[];
   /** Expiration window in months (default 18). */
   monthsWindow?: number;
   /**
@@ -172,6 +178,11 @@ export interface ExpiringContractsResult {
   /** Rows folded into a canonical sibling because they were the same award under another id. */
   duplicates_collapsed: number;
   degraded: boolean;
+  /**
+   * The period-of-performance-end window the query actually applied: `after` is exclusive,
+   * `through` inclusive, both YYYY-MM-DD; `as_of` is the date "today" was evaluated.
+   */
+  window?: { after: string; through: string; as_of: string; months: number };
 }
 
 export async function queryExpiringContracts(input: ExpiringContractsInput): Promise<ExpiringContractsResult> {
@@ -187,6 +198,14 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
   const maxDate = new Date(today);
   maxDate.setMonth(maxDate.getMonth() + months);
   const maxStr = maxDate.toISOString().split('T')[0];
+  const minMonthsIn = Number(input.minMonthsWindow);
+  let afterStr = todayStr;
+  if (Number.isFinite(minMonthsIn) && minMonthsIn > 0) {
+    const d = new Date(today);
+    d.setMonth(d.getMonth() + Math.min(minMonthsIn, months));
+    afterStr = d.toISOString().split('T')[0];
+  }
+  const appliedWindow = { after: afterStr, through: maxStr, as_of: todayStr, months };
 
   const build = (withQuality: boolean) => {
     let q = supabase
@@ -239,8 +258,17 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
       });
       q = q.or(clauses.join(','));
     }
-    const state = (input.state || '').trim().toUpperCase();
-    if (state) q = q.eq('place_of_performance_state', state);
+    const stateCodes = (input.states || [])
+      .map((x) => String(x || '').trim().toUpperCase())
+      .filter((x) => /^[A-Z]{2}$/.test(x));
+    if (stateCodes.length > 1) {
+      q = q.in('place_of_performance_state', stateCodes);
+    } else if (stateCodes.length === 1) {
+      q = q.eq('place_of_performance_state', stateCodes[0]);
+    } else {
+      const state = (input.state || '').trim().toUpperCase();
+      if (state) q = q.eq('place_of_performance_state', state);
+    }
     if (Number.isFinite(input.minValue)) q = q.gte('total_obligation', Number(input.minValue));
     if (Number.isFinite(input.maxValue)) q = q.lte('total_obligation', Number(input.maxValue));
     if (input.likelihood && ['high', 'medium', 'low'].includes(input.likelihood)) {
@@ -268,7 +296,7 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
   }
   if (res.error) {
     console.error('[recompete:query] supabase error:', res.error.message);
-    return { contracts: [], total: 0, count: null, duplicates_collapsed: 0, degraded: true };
+    return { contracts: [], total: 0, count: null, duplicates_collapsed: 0, degraded: true, window: appliedWindow };
   }
 
   // Same award under two contract_ids (a re-parented order / a legacy April id) → ONE row, chosen
@@ -344,5 +372,5 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
     return annotateRecompeteRow({ ...c, set_aside_type, naics_description }, now);
   });
   const total = res.count != null ? Math.max(res.count - primary.collapsed, contracts.length) : contracts.length;
-  return { contracts, total, count: res.count ?? null, duplicates_collapsed: collapsed, degraded: false };
+  return { contracts, total, count: res.count ?? null, duplicates_collapsed: collapsed, degraded: false, window: appliedWindow };
 }
