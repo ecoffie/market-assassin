@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import aliasData from '@/data/agency-aliases.json';
+import prunedFixture from './__fixtures__/buyer-pruned-singles.json';
 import { resolveBuyer, buyerMatches } from './buyer';
 
 /**
@@ -142,6 +143,21 @@ describe('C1 — invariants over every alias key', () => {
         expect(id.some((o) => o.length > 1 && o.includes(w[0]))).toBe(false);
       }
     }
+  });
+
+  it('the set of pruned one-word aliases is exactly the live-measured set (a new alias that triggers pruning fails here)', () => {
+    // Agent 1 review of #2045: the rule applies to every FUTURE alias too. A later one-word alias that is a word of
+    // the buyer's full name, and is the only thing matching some of that buyer's own rows, would be pruned silently.
+    // This pins the measured set; a change means: re-measure that buyer on live data, then update the fixture.
+    const actual: Record<string, string[]> = {};
+    for (const k of keys) {
+      const b = resolveBuyerIdentity(k);
+      if (!b.canonical || actual[b.canonical]) continue;
+      const after = new Set(resolveBuyer(k).identity.map((w) => w.join(' ')));
+      const dropped = unprunedIdentity(k).map((w) => w.join(' ')).filter((w) => !after.has(w)).sort();
+      if (dropped.length) actual[b.canonical] = dropped;
+    }
+    expect(actual).toEqual((prunedFixture as { pruned: Record<string, string[]> }).pruned);
   });
 
   it('an unknown buyer passes through unchanged', () => {
