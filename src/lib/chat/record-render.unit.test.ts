@@ -473,3 +473,21 @@ describe('acc7b R10: no location sentence when no location was asked', () => {
     expect(r.text).not.toMatch(/widest location scope|company location/i);
   });
 });
+
+describe('release check: buying-office label follows rank_by', () => {
+  const base = (rank_by: string, offices: Record<string, unknown>[]) => renderBuyingOffices({ offices, scope: { state: 'TN' }, totals: { obligated: 11226, award_count: 2, office_count: offices.length }, _meta: { office_count: offices.length, applied_filters: { rank_by } } })!.text;
+  it('a funding ranking is labeled customer (funding) offices, never contracting offices, and names their contracting offices', () => {
+    const t = base('funding', [
+      { office_name: 'NAVY PERSONNEL COMMAND', agency: 'Department of Defense', obligated: 18120, share_pct: 100, award_count: 1, top_awarding_offices: [{ code: 'N00189', name: 'NAVSUP FLT LOG CTR NORFOLK', obligated: 18120 }] },
+      { office_name: 'MRPBS MINNEAPOLIS MN', agency: 'Department of Agriculture', obligated: -6895.2, share_pct: -61, award_count: 1 },
+    ]);
+    expect(t).toMatch(/^2 customer \(funding\) offices have award actions recorded for this work/);
+    expect(t).not.toMatch(/paid for|contracting offices? recorded award actions/);
+    expect(t).toMatch(/contracting offices: NAVSUP FLT LOG CTR NORFOLK \(N00189\) \$18,120/);
+  });
+  it('an awarding ranking keeps the accepted wording exactly', () => {
+    const t = base('awarding', [{ office_name: 'W07V ENDIST MEMPHIS', office_code: 'W912EQ', agency: 'Department of Defense', obligated: 5, share_pct: 100, award_count: 2 }]);
+    expect(t).toMatch(/^1 contracting office recorded award actions for this work/);
+    expect(t).toMatch(/These are federal government contracting offices \(buyers\), not companies\./);
+  });
+});

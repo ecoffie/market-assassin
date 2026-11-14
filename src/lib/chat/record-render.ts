@@ -490,8 +490,15 @@ export function renderBuyingOffices(result: Rec): RenderedRecords | null {
     lines.push(`No buying offices found (${parts.join(' · ') || 'no filters'}). Source: USASpending prime awards.`);
   } else {
     const officeCount = num(totals?.office_count) ?? offices.length;
-    lines.push(`${officeCount} contracting office${officeCount === 1 ? '' : 's'} recorded award actions for this work (${parts.join(' · ')}), ${money(totals?.obligated)} net obligated (after deobligations) across ${num(totals?.award_count) ?? '?'} awards. Source: USASpending prime awards; location is where the work was performed, not where the office sits.`);
-    lines.push('These are federal government contracting offices (buyers), not companies. Office totals are net of deobligations.');
+    // The ranking role is the tool's applied_filters.rank_by. A funding ranking lists the customer offices
+    // whose money is on the awards, not contracting offices (release check: R4 ranked by funding was
+    // labeled "contracting offices"). "Award actions recorded" stays true for a net-negative office.
+    const rankAf = (meta.applied_filters && typeof meta.applied_filters === 'object' ? meta.applied_filters : {}) as Rec;
+    const funding = str(rankAf.rank_by) === 'funding';
+    lines.push(`${officeCount} ${funding ? `customer (funding) office${officeCount === 1 ? ' has' : 's have'} award actions recorded for` : `contracting office${officeCount === 1 ? '' : 's'} recorded award actions for`} this work (${parts.join(' · ')}), ${money(totals?.obligated)} net obligated (after deobligations) across ${num(totals?.award_count) ?? '?'} awards. Source: USASpending prime awards; location is where the work was performed, not where the office sits.`);
+    lines.push(funding
+      ? 'Ranked by customer (funding) office: these are the federal offices whose money is on the awards, and each line names the contracting office that made them. They are government offices, not companies. Office totals are net of deobligations.'
+      : 'These are federal government contracting offices (buyers), not companies. Office totals are net of deobligations.');
     const positive = offices.filter((o) => (num(o.obligated) ?? 0) > 0).length;
     lines.push(`${offices.length < officeCount ? `Showing the top ${offices.length} of ${officeCount}` : `Showing all ${officeCount}`} by net obligations: ${positive} with positive net obligations are listed below${offices.length - positive ? `, and ${offices.length - positive} with zero or negative net obligations are listed separately` : ''}.`);
     lines.push('Ranked by obligations under the industry (NAICS) codes shown; a code can include other work than the words you used, so check the example awards listed for each office.');
@@ -501,9 +508,10 @@ export function renderBuyingOffices(result: Rec): RenderedRecords | null {
     const nonBuyers = offices.filter((o) => (num(o.obligated) ?? 0) <= 0);
     buyers.forEach((o, i) => {
       const customers = (Array.isArray(o.top_funding_offices) ? (o.top_funding_offices as Rec[]) : []).slice(0, 3).map((f) => `${title(str(f.name))} ${money(f.obligated)}`).filter((x) => x.trim());
+      const contracting = (Array.isArray(o.top_awarding_offices) ? (o.top_awarding_offices as Rec[]) : []).slice(0, 3).map((f) => `${str(f.name)}${str(f.code) && !str(f.name).includes(`(${str(f.code)})`) ? ` (${str(f.code)})` : ''} ${money(f.obligated)}`).filter((x) => x.trim());
       const places = (Array.isArray(o.top_places) ? (o.top_places as Rec[]) : []).slice(0, 3).map((p) => [title(str(p.city)), str(p.state)].filter(Boolean).join(', ')).filter(Boolean);
       const examples = (Array.isArray(o.example_awards) ? (o.example_awards as Rec[]) : []).slice(0, 2).map((e) => `${str(e.piid) || str(e.award_id)} ${money(e.obligated)}`).filter((x) => x.trim());
-      lines.push(`${i + 1}. ${str(o.office_name) || 'office name not reported'}${o.office_code ? ` (${str(o.office_code)})` : ''} · ${[title(str(o.agency)), title(str(o.sub_agency))].filter(Boolean).join(' / ')} · ${money(o.obligated)} (${str(o.share_pct)}%) · ${num(o.award_count) ?? 0} awards${customers.length ? ` · customers: ${customers.join('; ')}` : ''}${places.length ? ` · work performed in ${places.join('; ')}` : ''}${examples.length ? ` · example awards (obligations in this window): ${examples.join('; ')}` : ''}`);
+      lines.push(`${i + 1}. ${str(o.office_name) || 'office name not reported'}${o.office_code ? ` (${str(o.office_code)})` : ''} · ${[title(str(o.agency)), title(str(o.sub_agency))].filter(Boolean).join(' / ')} · ${money(o.obligated)} (${str(o.share_pct)}%) · ${num(o.award_count) ?? 0} awards${funding ? (contracting.length ? ` · contracting offices: ${contracting.join('; ')}` : '') : (customers.length ? ` · customers: ${customers.join('; ')}` : '')}${places.length ? ` · work performed in ${places.join('; ')}` : ''}${examples.length ? ` · example awards (obligations in this window): ${examples.join('; ')}` : ''}`);
     });
     if (nonBuyers.length) {
       lines.push('');
