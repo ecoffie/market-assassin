@@ -19,9 +19,10 @@ import { SeoTemporarilyUnavailableError } from '@/lib/seo/seo-unavailable';
 import { SubpageLayout } from '@/components/contractors/SubpageLayout';
 import { getAwardsSourceAsOf } from '@/lib/awards-serving';
 import { awardHref, servableAwardIds } from '@/lib/seo/award-links';
+import { CONTRACTS_PAGE_SIZE } from '@/lib/seo/contracts-page-warm';
 
 const SITE_URL = 'https://getmindy.ai';
-const PAGE_SIZE = 50;
+const PAGE_SIZE = CONTRACTS_PAGE_SIZE; // shared with the warm cron: the size is part of the cache key
 const MAX_INDEXABLE_PAGES = 20; // we'll noindex pages past this — long tail not worth crawl budget
 
 export const revalidate = 604800; // 7d

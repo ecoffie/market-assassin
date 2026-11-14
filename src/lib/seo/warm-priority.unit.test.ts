@@ -6,6 +6,9 @@ const m = vi.hoisted(() => ({
   z: new Map<string, number>(), set: new Set<string>(), kv: new Map<string, unknown>(),
   profiles: new Map<string, { total_obligated: number; award_count: number }>(),
   failOn: new Set<string>(), warmed: [] as string[],
+  /** /contracts page-1 state per rollup UEI: what a cache-only read sees, and what a live read returns. */
+  pages: new Map<string, { cache: 'ok' | 'unavailable' | 'failed'; live: 'ok' | 'unavailable' | 'failed' }>(),
+  pageReads: [] as Array<{ uei: string; live: boolean }>,
 }));
 vi.mock('@vercel/kv', () => ({
   kv: {
@@ -39,6 +42,12 @@ vi.mock('@/lib/bigquery/recipients', () => ({
   getTopNaicsForRecipient: vi.fn(async () => []),
   getRecentAwardsForRecipient: vi.fn(async (_u: string[], uei: string) => { m.warmed.push(uei); return []; }),
   getExecutivesForRecipient: vi.fn(async () => []),
+  getPaginatedAwardsForRecipient: vi.fn(async (_u: string[], uei: string, _p: number, _s: number, liveBq = false) => {
+    m.pageReads.push({ uei, live: liveBq });
+    const p = m.pages.get(uei) ?? { cache: 'ok', live: 'ok' };
+    const state = liveBq ? p.live : p.cache;
+    return { rows: [], total: 0, available: state === 'ok', state };
+  }),
   recipientSlug: (n: string) => n.toLowerCase(),
   seoCacheKeys: { recentAwards: (uei: string) => `recent:${uei}` },
 }));
@@ -55,6 +64,7 @@ const req = (headers: Record<string, string> = { authorization: 'Bearer s3cret' 
 beforeEach(() => {
   process.env.CRON_SECRET = 's3cret';
   m.z.clear(); m.set.clear(); m.kv.clear(); m.profiles.clear(); m.failOn.clear(); m.warmed = [];
+  m.pages.clear(); m.pageReads = [];
   m.kv.set('cron:warm-contractor-pages:cursor', 0);
 });
 
@@ -109,3 +119,68 @@ describe('hourly priority drain', () => {
 it('the priority key is namespaced apart from the legacy set', () => {
   expect(WARM_PRIORITY_KEY).not.toBe('seo:warm:queue:contractor-slugs');
 });
+
+/**
+ * /contracts page 1 (2026-11-14): 77 contract pages answered 5xx in the Search Console re-run
+ * because only the profile sections were warmed. The warmer now fills page 1 too.
+ */
+describe('/contracts page 1 in the warm drain', () => {
+  const contractor = (s: string, score: number, award_count = 9) => {
+    m.profiles.set(s, { total_obligated: 5e6, award_count });
+    m.z.set(s, score);
+  };
+
+  it('cold contract page ⇒ warmed by one live read after the cache-only miss', async () => {
+    contractor('cold', 900);
+    m.pages.set('cold', { cache: 'unavailable', live: 'ok' });
+    const body = await (await GET(req())).json();
+    expect(m.pageReads).toEqual([{ uei: 'cold', live: false }, { uei: 'cold', live: true }]);
+    expect(body.priority).toMatchObject({ warmed: 1, stoppedBy: null });
+    expect(body.contractsPage1).toMatchObject({ warmed: 1, failed: 0 });
+  });
+
+  it('cache reuse: page already served ⇒ no live read; profile + page warmed together read page 1 once', async () => {
+    contractor('warm', 900);
+    m.pages.set('warm', { cache: 'ok', live: 'ok' });
+    const body = await (await GET(req())).json();
+    expect(m.pageReads.filter((r) => r.uei === 'warm')).toEqual([{ uei: 'warm', live: false }]);
+    expect(body.contractsPage1).toMatchObject({ cached: 1, warmed: 0 });
+  });
+
+  it('failed page warm ⇒ contractor stays queued at its score, drain stops, daily count not charged', async () => {
+    contractor('a', 900); contractor('b', 800); contractor('c', 700);
+    m.pages.set('b', { cache: 'unavailable', live: 'failed' });
+    const body = await (await GET(req())).json();
+    expect(body.priority.stoppedBy).toMatch(/BigQuery failure at b/);
+    expect([...m.z.entries()].sort()).toEqual([['b', 800], ['c', 700]]);
+    expect(m.kv.get(warmDailyKey())).toBe(1); // only 'a'
+    expect(m.pageReads.some((r) => r.uei === 'c')).toBe(false);
+  });
+
+  it('BigQuery budget exhausted (live read unanswered) ⇒ treated as a failed warm, not a success', async () => {
+    contractor('q', 900);
+    m.pages.set('q', { cache: 'unavailable', live: 'unavailable' });
+    const body = await (await GET(req())).json();
+    expect(body.priority.stoppedBy).toMatch(/BigQuery failure at q/);
+    expect(m.z.get('q')).toBe(900);
+    expect(body.contractsPage1).toMatchObject({ failed: 1 });
+  });
+
+  it('daily warm cap reached ⇒ no contract page is read', async () => {
+    m.kv.set(warmDailyKey(), WARM_PRIORITY_DAILY_CAP);
+    contractor('a', 900);
+    m.pages.set('a', { cache: 'unavailable', live: 'ok' });
+    await GET(req());
+    expect(m.pageReads.some((r) => r.uei === 'a')).toBe(false);
+  });
+
+  it('contractor with no awards ⇒ its contract page is never read', async () => {
+    // Queue drains stop at the thin gate first; warmContractsPage1 also refuses award_count 0
+    // (contracts-page-warm.unit.test.ts), so no path reads an empty contractor's page.
+    contractor('none', 900, 0);
+    const body = await (await GET(req())).json();
+    expect(body.priority.thin).toBe(1);
+    expect(m.pageReads.some((r) => r.uei === 'none')).toBe(false);
+  });
+});
+

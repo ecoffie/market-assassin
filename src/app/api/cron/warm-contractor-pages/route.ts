@@ -45,6 +45,7 @@ import {
   WARM_PRIORITY_KEY, WARM_PRIORITY_PER_RUN, WARM_PRIORITY_DAILY_CAP, warmDailyKey, isThinContractor,
 } from '@/lib/seo/warm-priority';
 import { bqResultState } from '@/lib/bigquery/cache';
+import { warmContractsPage1, type ContractsWarmResult } from '@/lib/seo/contracts-page-warm';
 import { seoCacheKeys } from '@/lib/bigquery/recipients';
 
 export const runtime = 'nodejs';
@@ -96,7 +97,14 @@ async function sitemapSlugs(): Promise<string[]> {
 
 type WarmResult = 'warmed' | 'skipped' | 'thin' | 'failed';
 
-async function warmSlug(slug: string, opts: { skipThin?: boolean } = {}): Promise<WarmResult> {
+/** Per-run tally of /contracts page-1 outcomes, reported in the JSON response. */
+type ContractsTally = Record<ContractsWarmResult, number>;
+const newContractsTally = (): ContractsTally => ({ cached: 0, warmed: 0, 'no-awards': 0, failed: 0 });
+
+async function warmSlug(
+  slug: string,
+  opts: { skipThin?: boolean; contracts?: ContractsTally } = {},
+): Promise<WarmResult> {
   // Warm the slug-resolution key first (the page's 404 gate). liveBq=true
   // is what turns a cache miss into a BQ scan + KV write.
   const rollup = await getRollupOrSingleBySlug(slug, true);
@@ -122,6 +130,13 @@ async function warmSlug(slug: string, opts: { skipThin?: boolean } = {}): Promis
   // queryCached swallows BigQuery errors into a 'failed' mark. A failed core section means the
   // warm did not happen (quota exhausted, most likely): report it so the drain stops.
   if (bqResultState(seoCacheKeys.recentAwards(rollupUei, 25), 0) === 'failed') return 'failed';
+
+  // /contracts page 1: same reader + keys as the page, cache first (KV, durable table), live
+  // only when both miss, nothing for a contractor with no awards. A failure is a failed warm:
+  // the slug goes back on the queue and the drain stops, exactly like a failed core section.
+  const contracts = await warmContractsPage1(rollup);
+  if (opts.contracts) opts.contracts[contracts]++;
+  if (contracts === 'failed') return 'failed';
 
   // A previous cold crawl may have cached a 404 via ISR — force
   // regeneration now that the data keys are warm.
@@ -153,6 +168,7 @@ async function handle(request: NextRequest) {
 
   let warmed = 0;
   let skipped = 0;
+  const contracts = newContractsTally();
   const failures: Array<{ slug: string; error: string }> = [];
 
   // 1. Drain the PRIORITY queue first (src/lib/seo/warm-priority.ts): highest score first, bounded
@@ -170,7 +186,7 @@ async function handle(request: NextRequest) {
     for (let i = 0; i < items.length; i++) {
       const { slug, score } = items[i];
       let r: WarmResult;
-      try { r = await warmSlug(slug, { skipThin: true }); } catch { r = 'failed'; }
+      try { r = await warmSlug(slug, { skipThin: true, contracts }); } catch { r = 'failed'; }
       priority.drained++;
       if (r === 'failed') {
         // Stop: put this and every unprocessed item back at its score.
@@ -208,7 +224,7 @@ async function handle(request: NextRequest) {
   let queueWarmed = 0;
   for (const slug of queued) {
     try {
-      const r = await warmSlug(slug, { skipThin: true });
+      const r = await warmSlug(slug, { skipThin: true, contracts });
       if (r === 'warmed') queueWarmed++;
       if (r === 'failed') { await kv.sadd(WARM_QUEUE_KEY, slug); break; }
     } catch (err) {
@@ -223,7 +239,7 @@ async function handle(request: NextRequest) {
   // 2. Then the steady sitemap walk.
   for (const slug of batch) {
     try {
-      const result = await warmSlug(slug);
+      const result = await warmSlug(slug, { contracts });
       if (result === 'warmed') warmed++;
       else skipped++;
     } catch (err) {
@@ -249,6 +265,7 @@ async function handle(request: NextRequest) {
     failures: failures.slice(0, 20),
     priority,
     queue: { drained: queued.length, warmed: queueWarmed, depthAfter: queueDepthAfter },
+    contractsPage1: contracts,
   });
 }
 
