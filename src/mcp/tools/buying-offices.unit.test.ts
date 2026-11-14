@@ -203,3 +203,17 @@ describe('acc7 R4: metro radius with one city in `cities`', () => {
     expect(JSON.stringify(r._meta.ignored_args)).toMatch(/metro_radius_miles/);
   });
 });
+
+describe('release hardening: Defense publication lag is in the tool evidence', () => {
+  it('a Defense office in a window past the DoD cutoff carries _meta.defense_lag', async () => {
+    const { d } = deps();
+    const r = await getBuyingOffices({ state: 'TN', city: 'Memphis', naics: '5613' }, d, NOW);
+    expect(r._meta.defense_lag).toMatchObject({ applies: true, lag_days: 90, window_end: '2026-09-30' });
+    expect(r._meta.defense_lag!.note).toMatch(/^Defense \(DoD, including Navy, Army and Air Force\) contract actions are published with a ~90-day delay, so Defense dollars after about 2026-08-1\d may not be in these totals yet; the window runs through 2026-09-30\.$/);
+  });
+  it('an old window carries no defense_lag', async () => {
+    const { d } = deps();
+    const r = await getBuyingOffices({ state: 'TN', city: 'Memphis', naics: '5613', fiscal_year_from: 2022, fiscal_year_to: 2023 }, d, NOW);
+    expect(r._meta.defense_lag ?? null).toBeNull();
+  });
+});

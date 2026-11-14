@@ -100,3 +100,35 @@ export function assessPublicationLag(opts: {
     'Check SAM.gov award notices or the agency announcement for recent awards.';
   return { ...base, applies: true, note };
 }
+
+export interface WarehouseDefenseLag {
+  applies: true;
+  lag_days: number;
+  dod_complete_through: string;
+  window_end: string;
+  note: string;
+}
+
+/**
+ * Defense publication lag for a fiscal-year window over the BigQuery award warehouse (buying offices,
+ * vehicle mix). Same cutoff as assessPublicationLag, so every tool states one rule. Returns null when
+ * the window ends before the cutoff or when no Defense dollars can be in the totals.
+ */
+export function warehouseDefenseLag(opts: {
+  fyFrom?: number | null; fyTo?: number | null; dateFrom?: string | null; dateTo?: string | null;
+  asOf?: string | null; defenseInScope: boolean; now?: Date;
+}): WarehouseDefenseLag | null {
+  if (!opts.defenseInScope) return null;
+  const windowEnd = (opts.dateTo || (opts.fyTo ? `${opts.fyTo}-09-30` : '')).slice(0, 10);
+  if (!windowEnd) return null;
+  const windowStart = (opts.dateFrom || (opts.fyFrom ? `${opts.fyFrom - 1}-10-01` : '')).slice(0, 10) || undefined;
+  const a = assessPublicationLag({ dateFrom: windowStart, dateTo: windowEnd, asOf: opts.asOf, now: opts.now });
+  if (!a.applies) return null;
+  return {
+    applies: true,
+    lag_days: a.lag_days,
+    dod_complete_through: a.dod_complete_through,
+    window_end: windowEnd,
+    note: `Defense (DoD, including Navy, Army and Air Force) contract actions are published with a ~${a.lag_days}-day delay, so Defense dollars after about ${a.dod_complete_through} may not be in these totals yet; the window runs through ${windowEnd}.`,
+  };
+}

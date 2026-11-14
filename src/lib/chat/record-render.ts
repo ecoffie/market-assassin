@@ -23,7 +23,6 @@ export const CHAT_FETCH_LIMIT = 200;
 type Rec = Record<string, unknown>;
 
 import { US_STATE_NAMES } from '@/lib/utils/us-states';
-import { assessPublicationLag, isDodAgency } from '@/lib/usaspending/freshness';
 import { interpretCapabilityNaics } from '@/lib/market/capability-naics';
 /** A state named in a record's own description that differs from its reported place of performance. */
 export function describedStateConflict(description: string, popState: string): string | null {
@@ -507,19 +506,26 @@ export function renderBuyingOffices(result: Rec): RenderedRecords | null {
     lines.push(`No buying offices found (${parts.join(' · ') || 'no filters'}). Source: USASpending prime awards.`);
   } else {
     const officeCount = num(totals?.office_count) ?? offices.length;
-    lines.push(`${officeCount} contracting office${officeCount === 1 ? '' : 's'} recorded award actions for this work (${parts.join(' · ')}), ${money(totals?.obligated)} net obligated (after deobligations) across ${num(totals?.award_count) ?? '?'} awards. Source: USASpending prime awards; location is where the work was performed, not where the office sits.`);
-    lines.push('These are federal government contracting offices (buyers), not companies. Office totals are net of deobligations.');
+    // The ranking role comes from the tool's applied_filters.rank_by (acc final R4: a funding ranking
+    // was labeled "contracting offices").
+    const funding = str(af.rank_by) === 'funding';
+    const kindOne = funding ? 'customer (funding) office' : 'contracting office';
+    lines.push(`${officeCount} ${kindOne}${officeCount === 1 ? '' : 's'} ${funding ? 'paid for' : 'recorded award actions for'} this work (${parts.join(' · ')}), ${money(totals?.obligated)} net obligated (after deobligations) across ${num(totals?.award_count) ?? '?'} awards. Source: USASpending prime awards; location is where the work was performed, not where the office sits.`);
+    lines.push(funding
+      ? 'These are the federal customer (funding) offices whose money paid for the work, ranked by funding office; each line names the contracting office that made the awards. They are government offices, not companies. Totals are net of deobligations.'
+      : 'These are federal government contracting offices (buyers), not companies. Office totals are net of deobligations.');
     const positive = offices.filter((o) => (num(o.obligated) ?? 0) > 0).length;
     lines.push(`${offices.length < officeCount ? `Showing the top ${offices.length} of ${officeCount}` : `Showing all ${officeCount}`} by net obligations: ${positive} with positive net obligations are listed below${offices.length - positive ? `, and ${offices.length - positive} with zero or negative net obligations are listed separately` : ''}.`);
     lines.push('Ranked by obligations under the industry (NAICS) codes shown; a code can include other work than the words you used, so check the example awards listed for each office.');
     if (meta.as_of || meta.lag_note) lines.push(`Data freshness: ${meta.as_of ? `latest action loaded ${str(meta.as_of)}` : ''}${meta.as_of && meta.lag_note ? '; ' : ''}${meta.lag_note ? str(meta.lag_note) : ''}.`.replace(/\.\.$/, '.'));
-    const dodLag = defenseLagSentence(meta, offices.some((o) => isDodAgency(str(o.agency)) || isDodAgency(str(o.sub_agency))));
+    const dodLag = defenseLagSentence(meta);
     if (dodLag) lines.push(dodLag);
     lines.push('');
     const buyers = offices.filter((o) => (num(o.obligated) ?? 0) > 0);
     const nonBuyers = offices.filter((o) => (num(o.obligated) ?? 0) <= 0);
     buyers.forEach((o, i) => {
       const customers = (Array.isArray(o.top_funding_offices) ? (o.top_funding_offices as Rec[]) : []).slice(0, 3).map((f) => `${title(str(f.name))} ${money(f.obligated)}`).filter((x) => x.trim());
+      const contracting = (Array.isArray(o.top_awarding_offices) ? (o.top_awarding_offices as Rec[]) : []).slice(0, 3).map((f) => `${str(f.name)}${str(f.code) ? ` (${str(f.code)})` : ''} ${money(f.obligated)}`).filter((x) => x.trim());
       const places = (Array.isArray(o.top_places) ? (o.top_places as Rec[]) : []).slice(0, 3).map((p) => [title(str(p.city)), str(p.state)].filter(Boolean).join(', ')).filter(Boolean);
       const examples = (Array.isArray(o.example_awards) ? (o.example_awards as Rec[]) : []).slice(0, 2).map((e) => `${str(e.piid) || str(e.award_id)} ${money(e.obligated)}`).filter((x) => x.trim());
       // Cosmetic (release hardening): no code repeated when the name already carries it; no repeated
@@ -528,7 +534,7 @@ export function renderBuyingOffices(result: Rec): RenderedRecords | null {
       const oCode = str(o.office_code);
       const agencyParts = Array.from(new Set([title(str(o.agency)), title(str(o.sub_agency))].filter(Boolean)));
       const nAw = num(o.award_count) ?? 0;
-      lines.push(`${i + 1}. ${oName}${oCode && !oName.toUpperCase().includes(`(${oCode.toUpperCase()})`) ? ` (${oCode})` : ''} · ${agencyParts.join(' / ')} · ${money(o.obligated)} (${str(o.share_pct)}%) · ${nAw} award${nAw === 1 ? '' : 's'}${customers.length ? ` · customers: ${customers.join('; ')}` : ''}${places.length ? ` · work performed in ${places.join('; ')}` : ''}${examples.length ? ` · example awards (obligations in this window): ${examples.join('; ')}` : ''}`);
+      lines.push(`${i + 1}. ${oName}${oCode && !oName.toUpperCase().includes(`(${oCode.toUpperCase()})`) ? ` (${oCode})` : ''} · ${agencyParts.join(' / ')} · ${money(o.obligated)} (${str(o.share_pct)}%) · ${nAw} award${nAw === 1 ? '' : 's'}${funding ? (contracting.length ? ` · contracting offices: ${contracting.join('; ')}` : '') : (customers.length ? ` · customers: ${customers.join('; ')}` : '')}${places.length ? ` · work performed in ${places.join('; ')}` : ''}${examples.length ? ` · example awards (obligations in this window): ${examples.join('; ')}` : ''}`);
     });
     if (nonBuyers.length) {
       lines.push('');
@@ -634,22 +640,12 @@ function awardFilterParts(af: Rec): string[] {
 }
 
 /**
- * Defense publication lag for warehouse-backed totals (buying offices, vehicle mix). Same rule and
- * cutoff as search_past_contracts (assessPublicationLag): DoD actions reach USASpending ~90 days late,
- * so a window ending after the cutoff can be missing recent Defense dollars. Applies only when Defense
- * dollars can be in the totals (a Defense office is listed, or no non-Defense agency filter).
+ * Defense publication lag for warehouse-backed totals: the tool's own _meta.defense_lag.note, shown as
+ * given (final acceptance review: a renderer-computed caveat is a date the evidence does not contain).
  */
-export function defenseLagSentence(meta: Rec, defenseInScope: boolean, now?: Date): string | null {
-  if (!defenseInScope) return null;
-  const af = (meta.applied_filters && typeof meta.applied_filters === 'object' ? meta.applied_filters : {}) as Rec;
-  const fyTo = num(af.fiscal_year_to) ?? Number(str(af.fiscal_year_to));
-  const fyFrom = num(af.fiscal_year_from) ?? Number(str(af.fiscal_year_from));
-  const dateTo = str(af.date_to) || (Number.isFinite(fyTo) && fyTo > 0 ? `${fyTo}-09-30` : '');
-  const dateFrom = str(af.date_from) || (Number.isFinite(fyFrom) && fyFrom > 0 ? `${fyFrom - 1}-10-01` : '');
-  if (!dateTo) return null;
-  const lag = assessPublicationLag({ dateFrom, dateTo, asOf: str(meta.as_of) || null, now });
-  if (!lag.applies) return null;
-  return `Defense (DoD, including Navy, Army and Air Force) contract actions reach USASpending with about a ${lag.lag_days}-day delay, so Defense dollars after about ${lag.dod_complete_through} may not be in these totals yet; the window runs through ${dateTo}.`;
+export function defenseLagSentence(meta: Rec): string | null {
+  const dl = (meta.defense_lag && typeof meta.defense_lag === 'object' ? meta.defense_lag : null) as Rec | null;
+  return dl && dl.applies === true && str(dl.note) ? str(dl.note) : null;
 }
 
 export const SBLO_TOOL = 'get_sblo_contact';
@@ -743,8 +739,7 @@ export function renderVehicleMix(result: Rec): RenderedRecords | null {
   if (rl.length) { lines.push(''); lines.push(`Rollups: ${rl.join('; ')}.`); }
   const vmeta = (result._meta && typeof result._meta === 'object' ? result._meta : {}) as Rec;
   if (vmeta.as_of || vmeta.lag_note) lines.push(`Data freshness: ${vmeta.as_of ? `latest action loaded ${str(vmeta.as_of)}` : ''}${vmeta.as_of && vmeta.lag_note ? '; ' : ''}${vmeta.lag_note ? str(vmeta.lag_note) : ''}.`.replace(/\.\.$/, '.'));
-  // No agency breakdown here: Defense dollars can be in the totals unless a non-Defense agency was filtered.
-  const vDod = defenseLagSentence(vmeta, !str(scope.agency) || isDodAgency(str(scope.agency)));
+  const vDod = defenseLagSentence(vmeta);
   if (vDod) lines.push(vDod);
   lines.push(`Classification: of the dollars linked to a vehicle, ${str(cls.verified_share_of_parented_pct)}% were verified from USASpending vehicle records. Of all dollars, ${str(cls.heuristic_share_of_total_pct)}% were typed from contract-number patterns and ${str(cls.unresolved_share_of_total_pct)}% could not be classified.`);
   const n = buckets.length;

@@ -620,7 +620,7 @@ export async function POST(request: NextRequest) {
                 for (const n of notes?.applied ?? []) scopeApplied.add(n);
                 for (const n of notes?.unapplied ?? []) scopeUnapplied.add(n);
               }
-              const codeNote = inferredCodeDisclosure(toolCalls.filter((tc) => keepIds.has(tc.id)).map((tc) => String(tc.function.arguments ?? '')), intent, (c) => getNaics(c)?.title ?? null);
+              const codeNote = inferredCodeDisclosure(toolCalls.filter((tc) => keepIds.has(tc.id)).map((tc) => ({ name: String(tc.function?.name || ''), args: String(tc.function.arguments ?? '') })), intent, (c) => getNaics(c)?.title ?? null);
               if (codeNote) scopeInferred = codeNote;
               const results = await executor.executeRound(toolCalls.filter((tc) => keepIds.has(tc.id)), { provider: first.provider, model: first.model });
               for (const tc of toolCalls) {

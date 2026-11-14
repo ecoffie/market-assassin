@@ -150,3 +150,16 @@ describe('classification rules', () => {
     expect(resolveAgency('Department of the Navy').name).toBe('Department of the Navy');
   });
 });
+
+describe('release hardening: Defense publication lag is in the tool evidence', () => {
+  it('a government-wide mix past the DoD cutoff carries _meta.defense_lag', async () => {
+    const { d } = bqDeps();
+    const r = await getVehicleSpendMix({ naics: '561320' }, { bq: d, lookupParentTypes: lookup }, NOW);
+    expect(r._meta.defense_lag).toMatchObject({ applies: true, window_end: '2026-09-30' });
+  });
+  it('a non-Defense agency filter carries no defense_lag', async () => {
+    const { d } = bqDeps();
+    const r = await getVehicleSpendMix({ naics: '561320', agency: 'Department of Veterans Affairs' }, { bq: d, lookupParentTypes: lookup }, NOW);
+    expect(r._meta.defense_lag ?? null).toBeNull();
+  });
+});

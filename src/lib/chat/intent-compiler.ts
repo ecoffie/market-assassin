@@ -244,9 +244,17 @@ export function dedupeToolCalls<T extends { id: string; name: string; args: stri
  * from the arguments of the calls that actually ran, so a code the planner picked (R10: 541611 for
  * "business management support") is disclosed the same way as one from the capability lexicon.
  */
-export function inferredCodeDisclosure(executedArgs: string[], intent: CompiledIntent, titleOf: (code: string) => string | null): string | null {
+/**
+ * Tools whose `naics` argument is a strict filter on the records returned. Only these can truthfully say
+ * "results are limited to these codes" (final acceptance R6: derive_company_keywords also matches by
+ * words, so the line was false there).
+ */
+export const STRICT_NAICS_FILTER_TOOLS: ReadonlySet<string> = new Set(['get_expiring_contracts', 'search_past_contracts', 'get_buying_offices', 'get_vehicle_spend_mix']);
+
+export function inferredCodeDisclosure(executed: Array<{ name: string; args: string }>, intent: CompiledIntent, titleOf: (code: string) => string | null): string | null {
   const codes: string[] = [];
-  for (const raw of executedArgs) {
+  for (const { name, args: raw } of executed) {
+    if (!STRICT_NAICS_FILTER_TOOLS.has(name)) continue;
     let a: Record<string, unknown> = {};
     try { a = JSON.parse(raw || '{}'); } catch { continue; }
     for (const c of listOf(a.naics)) if (/^\d{2,6}$/.test(c) && !codes.includes(c)) codes.push(c);
