@@ -222,9 +222,10 @@ export async function expiringContracts(
   const result: ExpiringContractsToolResult = {
     queried,
     contracts: standalone,
-    vehicles,
-    unresolved_orders: unresolved,
+    // Listed before vehicles[] (a large nested block) so a reader does not skim past in-window orders.
     expiring_orders_in_window: expiringOrders,
+    unresolved_orders: unresolved,
+    vehicles,
     _meta: {
       grounded,
       degraded: res.degraded,
