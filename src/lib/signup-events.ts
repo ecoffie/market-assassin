@@ -13,6 +13,7 @@
  *   });
  */
 
+import { after } from 'next/server';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Event types
@@ -22,6 +23,13 @@ export enum SignupEventType {
   STEP_COMPLETED = 'step_completed',
   SIGNUP_COMPLETED = 'signup_completed',
   SIGNUP_FAILED = 'signup_failed',
+  /**
+   * The account's FIRST verified sign-in (any door: email setup-password, password, Google, Microsoft,
+   * magic link). Recorded once per account (partial unique index, migration 20261114_signup_events_account_verified).
+   * This is the registration count the activation dashboard uses: signup_completed only means a setup
+   * email was sent or an alert profile was saved, and neither proves a person reached the product.
+   */
+  ACCOUNT_VERIFIED = 'account_verified',
 }
 
 // Wizard steps
@@ -45,7 +53,8 @@ export enum SignupErrorType {
   UNKNOWN = 'unknown',
 }
 
-// Event status
+// Event status. 'skipped' = not a signup at all (for example an EXISTING account re-saving its alert
+// profile without signing in). It is excluded from the failure rate, which counts status = 'failed'.
 export type SignupEventStatus = 'success' | 'failed' | 'skipped';
 
 // Event interface
@@ -244,4 +253,93 @@ export async function logStepCompleted(
     source,
     userEmail: email,
   });
+}
+
+/**
+ * An existing account reached a signup form while signed out. That is a redirect to sign-in, not a failed
+ * signup: logging it as 'failed' made October/November look like 87% of signups failing (2026-11-14 audit:
+ * all 135 failures since 2026-10-01 were sign_in_required from accounts that already existed).
+ */
+export async function logExistingAccountRedirect(source: string, email?: string): Promise<string | null> {
+  return logSignupEvent({
+    eventType: SignupEventType.SIGNUP_FAILED,
+    status: 'skipped',
+    source,
+    userEmail: email,
+    errorType: 'existing_account',
+    errorMessage: 'sign_in_required',
+  });
+}
+
+// ── Verified registration ────────────────────────────────────────────────────────────────────────
+
+/** Only accounts created this recently are recorded, so a session refresh months later never writes. */
+export const ACCOUNT_VERIFIED_WINDOW_DAYS = 30;
+
+export type AccountVerifiedDecision = 'record' | 'invalid_email' | 'unknown_created_at' | 'outside_window';
+
+export function accountVerifiedDecision(
+  email: string | null | undefined,
+  accountCreatedAt: string | null | undefined,
+  now: Date = new Date(),
+): AccountVerifiedDecision {
+  const e = String(email || '').trim().toLowerCase();
+  if (!e.includes('@') || e.startsWith('anon:')) return 'invalid_email';
+  const created = Date.parse(String(accountCreatedAt || ''));
+  // Unknown creation time: never assume the account is new.
+  if (!Number.isFinite(created)) return 'unknown_created_at';
+  if (now.getTime() - created > ACCOUNT_VERIFIED_WINDOW_DAYS * 86_400_000) return 'outside_window';
+  return 'record';
+}
+
+export type AccountVerifiedOutcome = AccountVerifiedDecision | 'recorded' | 'already_recorded' | 'error';
+
+/**
+ * Record the account's first verified sign-in. Idempotent: a prior row short-circuits, and the partial unique
+ * index makes a concurrent duplicate fail with 23505, which is treated as already recorded. Never throws.
+ */
+export async function recordAccountVerified(
+  p: { email: string; accountCreatedAt: string | null | undefined; channel: string },
+  opts: { db?: SupabaseClient; now?: Date } = {},
+): Promise<AccountVerifiedOutcome> {
+  const decision = accountVerifiedDecision(p.email, p.accountCreatedAt, opts.now);
+  if (decision !== 'record') return decision;
+  const email = p.email.trim().toLowerCase();
+  try {
+    const db = opts.db ?? getSupabase();
+    const { data: prior, error: priorErr } = await db
+      .from('signup_events')
+      .select('id')
+      .eq('event_type', SignupEventType.ACCOUNT_VERIFIED)
+      .eq('user_email', email)
+      .limit(1);
+    if (priorErr) {
+      console.error('[SignupEvent] account_verified lookup failed:', priorErr.message);
+      return 'error';
+    }
+    if (prior && prior.length > 0) return 'already_recorded';
+    const { error } = await db.from('signup_events').insert({
+      event_type: SignupEventType.ACCOUNT_VERIFIED,
+      status: 'success',
+      user_email: email,
+      source: p.channel,
+      metadata: { channel: p.channel, account_created_at: p.accountCreatedAt },
+    });
+    if (error) {
+      if ((error as { code?: string }).code === '23505') return 'already_recorded';
+      console.error('[SignupEvent] account_verified insert failed:', error.message);
+      return 'error';
+    }
+    return 'recorded';
+  } catch (err) {
+    console.error('[SignupEvent] account_verified exception:', (err as Error)?.message);
+    return 'error';
+  }
+}
+
+/** Fire-and-forget beside sign-in (after() keeps it alive past the response, like the registration grant). */
+export function scheduleAccountVerified(email: string, accountCreatedAt: string | null | undefined, channel: string): void {
+  if (accountVerifiedDecision(email, accountCreatedAt) !== 'record') return;
+  const run = () => recordAccountVerified({ email, accountCreatedAt, channel }).then(() => undefined);
+  try { after(run); } catch { void run(); }
 }

@@ -8,6 +8,10 @@ import { getPartnerReferralByCode } from '@/lib/mindy/partner-referrals';
 import { enqueuePendingSignup } from '@/lib/resilience/signup-queue';
 import { normalizeAttribution, pushLeadToGhl, isYouTubeSource } from '@/lib/mindy/lead-attribution';
 import { signupEmailFormatError, isInvalidRecipientError, MISTYPED_EMAIL_MESSAGE } from '@/lib/mindy/signup-email';
+import {
+  logSignupEvent, logSignupFailed, logExistingAccountRedirect, extractIpAddress, extractUserAgent,
+  SignupEventType, SignupStep,
+} from '@/lib/signup-events';
 
 export const runtime = 'nodejs';
 
@@ -246,16 +250,33 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Signup funnel logging (2026-11-14). This is the /app and Opportunity Map signup door, and it logged
+    // nothing, so signup_events showed 4 completions in November while ~130 accounts were created.
+    // Every call is fire-and-forget and never changes the response.
+    const signupSource = typeof body.source === 'string' && body.source.trim() ? body.source.trim().slice(0, 60) : 'mindy_signup';
+
     if (!email) {
+      logSignupFailed(signupSource, new Error('Email is required'), undefined, SignupStep.EMAIL).catch(() => {});
       return NextResponse.json({ success: false, error: 'Email is required' }, { status: 400 });
     }
 
+    logSignupEvent({
+      eventType: SignupEventType.SIGNUP_STARTED,
+      source: signupSource,
+      userEmail: email,
+      ipAddress: extractIpAddress(request),
+      userAgent: extractUserAgent(request),
+      metadata: { utm_source: attribution.utm_source || null, has_next: typeof body.next === 'string' },
+    }).catch(() => {});
+
     if (isRateLimited(getClientKey(request, email))) {
+      logSignupFailed(signupSource, new Error('rate_limited'), email).catch(() => {});
       return NextResponse.json({ success: false, error: 'Too many signup attempts. Please try again later.' }, { status: 429 });
     }
 
     const emailError = await validateSignupEmail(email);
     if (emailError) {
+      logSignupFailed(signupSource, new Error(`validation: ${emailError}`), email, SignupStep.EMAIL).catch(() => {});
       return NextResponse.json({ success: false, error: emailError }, { status: 400 });
     }
 
@@ -289,8 +310,13 @@ export async function POST(request: NextRequest) {
       console.error('[Mindy Signup] setup-link failed (DB likely down) — queuing:', (linkError as Error)?.message);
       const queued = await enqueuePendingSignup({ email, referralCode, source: typeof body.source === 'string' ? body.source : 'mindy_signup' });
       if (queued) {
+        logSignupEvent({
+          eventType: SignupEventType.SIGNUP_COMPLETED, status: 'success', source: signupSource, userEmail: email,
+          metadata: { queued: true },
+        }).catch(() => {});
         return NextResponse.json({ success: true, message: QUEUED_MESSAGE, queued: true });
       }
+      logSignupFailed(signupSource, new Error('database unavailable: setup link and queue both failed'), email).catch(() => {});
       // KV also unavailable — last resort, honest error rather than a silent drop.
       return NextResponse.json(
         { success: false, error: "Signups are briefly paused while we restore service. Please try again in a few minutes." },
@@ -324,6 +350,7 @@ export async function POST(request: NextRequest) {
     } catch (sendError) {
       if (isInvalidRecipientError(sendError)) {
         console.warn('[Mindy Signup] recipient address rejected by mail provider — returning 400');
+        logSignupFailed(signupSource, new Error('validation: recipient rejected by mail provider'), email, SignupStep.EMAIL).catch(() => {});
         return NextResponse.json({ success: false, error: MISTYPED_EMAIL_MESSAGE }, { status: 400 });
       }
       throw sendError;
@@ -350,9 +377,21 @@ export async function POST(request: NextRequest) {
       console.warn('[Mindy Signup] attribution record failed (non-fatal):', attrErr);
     }
 
+    // 'invite' = a NEW auth user; 'recovery' = the address already had an account, so this was a returning
+    // person using the signup form, not a new signup.
+    if (link.type === 'invite') {
+      logSignupEvent({
+        eventType: SignupEventType.SIGNUP_COMPLETED, status: 'success', source: signupSource, userEmail: email,
+        metadata: { link_type: link.type, utm_source: attribution.utm_source || null },
+      }).catch(() => {});
+    } else {
+      logExistingAccountRedirect(signupSource, email).catch(() => {});
+    }
+
     return NextResponse.json({ success: true, message: SUCCESS_MESSAGE });
   } catch (error) {
     console.error('[Mindy Signup] Failed to create account:', error);
+    logSignupFailed('mindy_signup', error).catch(() => {});
     return NextResponse.json({ success: false, error: 'Unable to create account' }, { status: 500 });
   }
 }

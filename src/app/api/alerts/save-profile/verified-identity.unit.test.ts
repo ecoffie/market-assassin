@@ -71,7 +71,7 @@ vi.mock('@supabase/supabase-js', () => ({
   }),
 }));
 vi.mock('@/lib/signup-events', () => ({
-  logSignupEvent: async () => {}, logSignupCompleted: async () => {}, logSignupFailed: async () => {},
+  logSignupEvent: async () => {}, logSignupCompleted: async () => {}, logSignupFailed: async () => {}, logExistingAccountRedirect: async () => {},
   SignupEventType: { SIGNUP_STARTED: 'signup_started' }, SignupStep: { EMAIL: 'email', DELIVERY: 'delivery' },
   extractIpAddress: () => null, extractUserAgent: () => null,
 }));

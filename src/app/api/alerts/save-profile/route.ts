@@ -12,6 +12,7 @@ import {
   logSignupEvent,
   logSignupCompleted,
   logSignupFailed,
+  logExistingAccountRedirect,
   SignupEventType,
   SignupStep,
   extractIpAddress,
@@ -225,7 +226,8 @@ export async function POST(request: NextRequest) {
     }
     // An anonymous caller never touches an EXISTING user's state (that was the overwrite hole).
     if (anonymous && existingSave) {
-      logSignupFailed(source || 'unknown', new Error(SIGN_IN_REQUIRED.code), email).catch(() => {});
+      // An EXISTING account re-saving while signed out: a redirect to sign-in, not a failed signup.
+      logExistingAccountRedirect(source || 'unknown', email).catch(() => {});
       return NextResponse.json(
         { success: false, error: SIGN_IN_REQUIRED.error, code: SIGN_IN_REQUIRED.code },
         { status: 401 }
