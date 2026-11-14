@@ -10873,10 +10873,19 @@ const ASK_MINDY_JS = `<script>(function(){
   // The class is amk-card, NOT card: the map already styles .card (listing cards, incl. a :hover transform)
   // and a shared name let that hover rule pin the closed drawer on screen on touch devices.
   var oppCtx=null, viewState={sessionId:'',history:[]}, viewPlaceholder=(input&&input.placeholder)||'';
+  // CHARGE ONCE PER QUESTION: every card question gets a stable turn id. It is saved here as "pending" BEFORE
+  // the request and cleared only when the answer has fully arrived, so a dropped connection, a refresh or a
+  // reopen asks the server for THAT question again (same id): the server returns the saved answer for free
+  // instead of answering and charging twice. A new question always gets a new id.
+  var pendingTurn=null;
+  function newTurnId(){ try{ if(window.crypto&&crypto.randomUUID) return crypto.randomUUID(); }catch(e){}
+    var b=new Uint8Array(16); try{ crypto.getRandomValues(b); }catch(e){ for(var i=0;i<16;i++)b[i]=Math.floor(Math.random()*256); }
+    b[6]=(b[6]&15)|64; b[8]=(b[8]&63)|128; var h=Array.prototype.map.call(b,function(x){return (x+256).toString(16).slice(1);}).join('');
+    return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20); }
   function cardKey(id){ return 'mindy_card_chat:'+id; }
-  function loadCard(id){ try{ var j=JSON.parse(localStorage.getItem(cardKey(id))||'null'); if(j&&typeof j==='object')return {sessionId:String(j.sessionId||''),history:Array.isArray(j.history)?j.history.slice(-8):[]}; }catch(e){} return {sessionId:'',history:[]}; }
-  function saveCard(){ if(!oppCtx)return; try{ localStorage.setItem(cardKey(oppCtx.id),JSON.stringify({sessionId:sessionId,history:history.slice(-8)})); }catch(e){} }
-  function leaveCard(){ if(!oppCtx)return; saveCard(); oppCtx=null; sessionId=viewState.sessionId; history=viewState.history; drawer.classList.remove('amk-card'); if(input)input.placeholder=viewPlaceholder; body.innerHTML=''; }
+  function loadCard(id){ try{ var j=JSON.parse(localStorage.getItem(cardKey(id))||'null'); if(j&&typeof j==='object'){ var pd=(j.pending&&typeof j.pending.turnId==='string'&&typeof j.pending.q==='string')?{turnId:j.pending.turnId,q:j.pending.q}:null; return {sessionId:String(j.sessionId||''),history:Array.isArray(j.history)?j.history.slice(-8):[],pending:pd}; } }catch(e){} return {sessionId:'',history:[],pending:null}; }
+  function saveCard(){ if(!oppCtx)return; try{ localStorage.setItem(cardKey(oppCtx.id),JSON.stringify({sessionId:sessionId,history:history.slice(-8),pending:pendingTurn})); }catch(e){} }
+  function leaveCard(){ if(!oppCtx)return; saveCard(); oppCtx=null; pendingTurn=null; sessionId=viewState.sessionId; history=viewState.history; drawer.classList.remove('amk-card'); if(input)input.placeholder=viewPlaceholder; body.innerHTML=''; }
   // ── The GROUNDED view context (approved vision: "Context: N open opps in view \\u00b7 FL \\u00b7 NAICS 236220").
   // Read fresh from the map's bridge every time the drawer opens — never a stale snapshot, never fabricated.
   function viewCtx(){ try{ if(typeof window.__mindyViewCtx==='function') return window.__mindyViewCtx()||{}; }catch(e){} return {}; }
@@ -10917,11 +10926,14 @@ const ASK_MINDY_JS = `<script>(function(){
     if(!/^[0-9a-f]{32}$/.test(id)||busy) return;
     if(!oppCtx) viewState={sessionId:sessionId,history:history.slice()}; else saveCard();
     oppCtx={id:id,title:String(op.title||''),deadline:String(op.deadline||'')};
-    var st=loadCard(id); sessionId=st.sessionId; history=st.history;
+    var st=loadCard(id); sessionId=st.sessionId; history=st.history; pendingTurn=st.pending;
     drawer.classList.add('amk-card'); if(input)input.placeholder='Ask about this opportunity\\u2026'; body.innerHTML='';
     if(history.length){ history.forEach(function(m){ addMsg(m.role==='user'?'user':'assistant', m.content); }); }
-    try{ if(window.__track) window.__track('tool_use','card_chat_open',{has_history:history.length>0}); }catch(e){}
+    try{ if(window.__track) window.__track('tool_use','card_chat_open',{has_history:history.length>0,pending:!!pendingTurn}); }catch(e){}
     setOpen(true);
+    // A question that was asked but whose answer never fully arrived (connection dropped, page refreshed):
+    // fetch the saved answer. replay never runs the model and never charges.
+    if(pendingTurn){ var pd=pendingTurn; ask(pd.q,{turnId:pd.turnId,replay:true}); }
   };
   function greet(){
     var c=viewCtx();
@@ -10956,7 +10968,9 @@ const ASK_MINDY_JS = `<script>(function(){
   if(send)send.onclick=function(){ ask(input?input.value:''); };
   function addMsg(role, text){ var d=document.createElement('div'); d.className='amk-msg '+(role==='user'?'u':'a'); d.innerHTML=(role==='user')?esc(text):('<div class="bub"></div>'); if(role!=='user')d.querySelector('.bub').textContent=text||''; body.appendChild(d); body.scrollTop=body.scrollHeight; return d; }
   function upsell(){ body.innerHTML='<div class="amk-up"><h4>\\ud83d\\udd12 Ask Mindy is a Pro feature</h4><p>Get grounded, real-data answers on set-asides, agencies, opportunities, teaming and proposals \\u2014 with sources.</p><a href="/market-intelligence">Upgrade to Pro</a></div>'; }
-  function ask(q){
+  // opts (card chat only): turnId = reuse this question's id (retry/reopen); replay = only fetch the saved answer.
+  function ask(q,opts){
+    opts=opts||{};
     q=(q||'').trim(); if(!q||busy)return;
     var t=tok(), em=email();
     // Card chat resumes the same question after sign-in (the card and its thread stay open); view mode keeps
@@ -10964,25 +10978,48 @@ const ASK_MINDY_JS = `<script>(function(){
     if(!t||!em){ var _cq=q, _card=!!oppCtx; if(window.openSignInModal){window.openSignInModal(_card?'ask Mindy about this opportunity':'ask Mindy',function(){ if(_card&&oppCtx){ ask(_cq); } else location.reload(); });}else{location.href='/app?next='+encodeURIComponent(location.pathname);} return; }
     // clear the greeting on first ask
     if(body.querySelector('.amk-empty'))body.innerHTML='';
-    if(input){ input.value=''; input.style.height='auto'; }
+    if(input&&!opts.turnId){ input.value=''; input.style.height='auto'; }
+    // A card question is recorded as pending (with its turn id) before it is sent.
+    var turnId=null, polls=opts.polls||0;
+    if(oppCtx){ turnId=opts.turnId||newTurnId(); pendingTurn={turnId:turnId,q:q}; saveCard(); }
     addMsg('user', q);
     var aEl=addMsg('assistant',''); var bub=aEl.querySelector('.bub');
     bub.innerHTML='<span class="amk-typing"><i></i><i></i><i></i></span>';
     busy=true; if(send)send.disabled=true;
-    var acc='', started=false;
+    var acc='', started=false, gotDone=false, gotError=false;
     // Prepend the grounded view context to the MESSAGE (not shown to the user) so the answer
     // is about "these"/"here" — the map\\u2019s real filters + count, never fabricated.
     // Card chat sends NO view preamble: the server supplies the opportunity from its own record.
     var sendMsg=oppCtx?q:(ctxPreamble()+q);
     var payload={email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8)};
-    if(oppCtx){ payload.context={kind:'opportunity',notice_id:oppCtx.id}; try{ if(window.__track) window.__track('tool_use','card_chat_ask',{turn:Math.floor(history.length/2)+1}); }catch(e){} }
+    if(oppCtx){ payload.context={kind:'opportunity',notice_id:oppCtx.id}; payload.turn_id=turnId; if(opts.replay)payload.replay_only=true;
+      if(!opts.turnId){ try{ if(window.__track) window.__track('tool_use','card_chat_ask',{turn:Math.floor(history.length/2)+1}); }catch(e){} } }
+    var cardAtSend=oppCtx;
+    function release(){ busy=false; if(send)send.disabled=false; }
+    // Drop the question's two bubbles (it is about to be re-asked with the same turn id).
+    function dropBubbles(){ var u=aEl.previousSibling; if(aEl.parentNode)aEl.parentNode.removeChild(aEl); if(u&&u.classList&&u.classList.contains('u')&&u.parentNode)u.parentNode.removeChild(u); }
+    // The answer did not arrive: offer to get it. Same turn id, so an answer the server already finished
+    // comes back free, and one it did not finish is answered (and charged) once.
+    function offerRetry(msg){ bub.textContent=msg; var w=document.createElement('div'); w.className='amk-act'; var b=document.createElement('button'); b.textContent='Get the answer';
+      b.onclick=function(){ if(busy||oppCtx!==cardAtSend)return; dropBubbles(); ask(q,{turnId:turnId}); }; w.appendChild(b); aEl.appendChild(w); }
     fetch('/api/app/chat',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},body:JSON.stringify(payload)})
       .then(function(r){
-        if(r.status===403){ upsell(); busy=false; if(send)send.disabled=false; return null; }
-        if(r.status===402){ r.json().then(function(d){ creditsWall(bub,d||{}); },function(){ creditsWall(bub,{}); }); busy=false; if(send)send.disabled=false; return null; }
-        if(r.status===404&&oppCtx){ bub.textContent='Mindy could not load this opportunity right now. Try reopening it.'; busy=false; if(send)send.disabled=false; return null; }
+        if(r.status===403){ if(turnId){ pendingTurn=null; saveCard(); } upsell(); busy=false; if(send)send.disabled=false; return null; }
+        if(r.status===402){ if(turnId){ pendingTurn=null; saveCard(); } r.json().then(function(d){ creditsWall(bub,d||{}); },function(){ creditsWall(bub,{}); }); busy=false; if(send)send.disabled=false; return null; }
+        // Charge once per question: the same question is still being answered by another request (a second
+        // tab, a double click, a retry during a slow answer). Wait, then fetch the saved answer (free).
+        if(r.status===409&&turnId){ return r.json().catch(function(){ return {}; }).then(function(d){
+          if(d&&d.error==='turn_in_progress'&&polls<20){ bub.innerHTML='<span class="amk-typing"><i></i><i></i><i></i></span>';
+            // Stay busy while waiting so a new question cannot replace this pending one.
+            setTimeout(function(){ release(); if(oppCtx!==cardAtSend)return; dropBubbles(); ask(q,{turnId:turnId,replay:true,polls:polls+1}); },(Math.min(10,Math.max(1,+(d.retry_after)||3)))*1000); return null; }
+          pendingTurn=null; saveCard();
+          bub.textContent=(d&&d.error==='turn_in_progress')?'Mindy is still working on this answer. Reopen this opportunity in a minute to see it.':'Something went wrong. Ask again.'; release(); return null; }); }
+        if(r.status===404&&turnId&&opts.replay){ return r.json().catch(function(){ return {}; }).then(function(d){
+          if(d&&d.error==='turn_not_completed'){ offerRetry('This answer did not finish, so it was not charged.'); release(); return null; }
+          bub.textContent='Mindy could not load this opportunity right now. Try reopening it.'; release(); return null; }); }
+        if(r.status===404&&oppCtx){ if(turnId){ pendingTurn=null; saveCard(); } bub.textContent='Mindy could not load this opportunity right now. Try reopening it.'; busy=false; if(send)send.disabled=false; return null; }
         if(r.status===401){ bub.textContent='Please sign in again to ask Mindy.'; busy=false; if(send)send.disabled=false; return null; }
-        if(!r.ok||!r.body){ bub.textContent='Something went wrong. Try again.'; busy=false; if(send)send.disabled=false; return null; }
+        if(!r.ok||!r.body){ if(turnId){ offerRetry('Something went wrong before the answer arrived.'); release(); return null; } bub.textContent='Something went wrong. Try again.'; busy=false; if(send)send.disabled=false; return null; }
         var reader=r.body.getReader(), dec=new TextDecoder(), buf='';
         function pump(){ return reader.read().then(function(res){
           if(res.done){ finish(); return; }
@@ -10993,16 +11030,26 @@ const ASK_MINDY_JS = `<script>(function(){
             if(ev.type==='session'){ sessionId=ev.sessionId||sessionId; }
             else if(ev.type==='token'){ if(!started){ bub.textContent=''; started=true; } acc+=(ev.content||''); bub.textContent=acc; body.scrollTop=body.scrollHeight; }
             // citations event is now always empty (RAG corpus removed 2026-08-02) \\u2014 ignored.
-            else if(ev.type==='error'){ if(!started)bub.textContent=(ev.message||'Something went wrong.'); }
+            else if(ev.type==='error'){ gotError=true; if(!started)bub.textContent=(ev.message||'Something went wrong.'); }
+            else if(ev.type==='done'){ gotDone=true; }
+            else if(ev.type==='replayed'){ var rd=document.createElement('div'); rd.className='amk-credits'; rd.textContent='Saved answer \\u00b7 no extra credits'; aEl.appendChild(rd); }
             else if(ev.type==='citations'&&oppCtx&&Array.isArray(ev.sources)&&ev.sources.length){ var sd=document.createElement('div'); sd.className='amk-src'; var s0=ev.sources[0]; sd.innerHTML='Source: '+(s0.url?'<a href="'+esc(s0.url)+'" target="_blank" rel="noopener">'+esc(s0.title||'SAM.gov notice')+'</a>':esc(s0.title||'SAM.gov notice')); aEl.appendChild(sd); }
             else if(ev.type==='credits'&&typeof ev.balance==='number'){ var cd=document.createElement('div'); cd.className='amk-credits'; cd.textContent=(ev.charged?ev.charged+' credits used \\u00b7 ':'')+ev.balance+' credits left'; aEl.appendChild(cd); }
           });
           return pump();
         }); }
-        function finish(){ if(!started&&!acc)bub.textContent='Mindy had no answer for that \\u2014 try rephrasing.'; history.push({role:'user',content:q}); history.push({role:'assistant',content:acc}); saveCard(); if(acc&&!oppCtx)followups(aEl); busy=false; if(send)send.disabled=false; body.scrollTop=body.scrollHeight; }
-        return pump();
+        function finish(){
+          // Card chat: only a FULLY received answer clears the pending question. A stream that ended without
+          // its done event lost the connection: keep the turn id so "Get the answer" (or reopening the card)
+          // fetches it without a second charge.
+          if(turnId&&!gotDone){ if(oppCtx===cardAtSend){ offerRetry(acc?'The connection dropped before the answer finished.':'The connection dropped before the answer arrived.'); } release(); body.scrollTop=body.scrollHeight; return; }
+          if(turnId&&oppCtx===cardAtSend){ pendingTurn=null; }
+          if(!started&&!acc&&!gotError)bub.textContent='Mindy had no answer for that \\u2014 try rephrasing.';
+          if(!(turnId&&gotError&&!acc)){ history.push({role:'user',content:q}); history.push({role:'assistant',content:acc}); }
+          saveCard(); if(acc&&!oppCtx)followups(aEl); busy=false; if(send)send.disabled=false; body.scrollTop=body.scrollHeight; }
+        return pump().catch(function(){ if(turnId){ if(oppCtx===cardAtSend)offerRetry('The connection dropped before the answer finished.'); release(); return; } bub.textContent='Connection failed. Check your network and try again.'; release(); });
       })
-      .catch(function(){ bub.textContent='Connection failed. Check your network and try again.'; busy=false; if(send)send.disabled=false; });
+      .catch(function(){ if(turnId){ offerRetry('Connection failed before the answer arrived.'); release(); return; } bub.textContent='Connection failed. Check your network and try again.'; busy=false; if(send)send.disabled=false; });
   }
   // Card chat out of credits: say what an answer costs and what they hold; Pro is the next step. No new grant.
   function creditsWall(bub,d){

@@ -99,7 +99,7 @@ describe('chat route wiring (source assertions)', () => {
   it('stream close never throws or recurses, and a disconnect stops the provider stream', () => {
     expect(route).toMatch(/const closeStream = \(\) => \{\n\s+try \{ controller\.close\(\); \} catch \{ clientGone = true; \}/);
     expect(code.match(/controller\.close\(\)/g)).toHaveLength(1); // only inside closeStream
-    expect(code).toMatch(/if \(clientGone\) \{ await reader\.cancel\(\)/);
+    expect(code).toMatch(/if \(clientGone\) \{ streamCut = true; await reader\.cancel\(\)/);
   });
 });
 

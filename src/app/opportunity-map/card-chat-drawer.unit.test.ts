@@ -188,3 +188,100 @@ describe('the card invitation and the flag', () => {
     expect(js).not.toMatch(/classList\.(add|remove|toggle)\('card'\)/);
   });
 });
+
+describe('charge once per question: the browser reuses a question\'s turn id', () => {
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+  const S = '11111111-2222-4333-8444-555555555555';
+  const askCard = async (t: ReturnType<typeof boot>, q: string) => {
+    (t.w.document.getElementById('amkIn') as HTMLTextAreaElement).value = q;
+    (t.doc.getElementById('amkSend') as HTMLButtonElement).click();
+    await t.settle();
+  };
+  const pending = (t: ReturnType<typeof boot>) => JSON.parse(t.store['mindy_card_chat:' + NID] || '{}').pending ?? null;
+
+  it('every card question gets its own turn id; a completed answer clears it; map-view chat sends none', async () => {
+    const t = boot();
+    (t.w.__askAboutOpp as (o: unknown) => void)(OPP);
+    await askCard(t, 'When is it due?');
+    await askCard(t, 'Is it set aside?');
+    expect(String(t.calls[0].turn_id)).toMatch(UUID);
+    expect(String(t.calls[1].turn_id)).toMatch(UUID);
+    expect(t.calls[0].turn_id).not.toBe(t.calls[1].turn_id);
+    expect(t.calls[0].replay_only).toBeUndefined();
+    expect(pending(t)).toBeNull();
+    (t.w.openAskMindy as () => void)();
+    await askCard(t, 'Who buys here?');
+    expect(t.calls[2].turn_id).toBeUndefined();
+  });
+
+  it('the connection drops (no done event): the question stays pending; "Get the answer" resends the SAME turn id', async () => {
+    const t = boot({ replies: [
+      { events: [{ type: 'session', sessionId: S }, { type: 'token', content: 'Due Dec' }] }, // stream cut, no done
+      { events: [{ type: 'session', sessionId: S }, { type: 'token', content: 'Due Dec 4.' }, { type: 'replayed', charged: 0 }, { type: 'done' }] },
+    ] });
+    (t.w.__askAboutOpp as (o: unknown) => void)(OPP);
+    await askCard(t, 'When is it due?');
+    const first = t.calls[0].turn_id;
+    expect(pending(t)).toEqual({ turnId: first, q: 'When is it due?' });
+    expect(t.body().textContent).toContain('The connection dropped before the answer finished.');
+    const btn = [...t.body().querySelectorAll('.amk-act button')].find((b) => b.textContent === 'Get the answer') as HTMLButtonElement;
+    btn.click();
+    await t.settle();
+    expect(t.calls[1]).toMatchObject({ turn_id: first, message: 'When is it due?' });
+    expect(t.body().textContent).toContain('Saved answer · no extra credits');
+    expect(t.body().querySelectorAll('.amk-msg.u').length).toBe(1); // the question is not duplicated on screen
+    expect(pending(t)).toBeNull();
+  });
+
+  it('refresh/reopen with a pending question fetches the saved answer (replay only, same turn id) and keeps it', async () => {
+    const t = boot({ replies: [
+      { events: [{ type: 'session', sessionId: S }, { type: 'token', content: 'Due Dec 4.' }, { type: 'citations', sources: [{ title: 'SAM.gov notice W912PL26Q0042', url: null }] }, { type: 'replayed', charged: 0 }, { type: 'done' }] },
+    ] });
+    const TID = '0a0a0a0a-1111-4222-8333-444444444444';
+    t.store['mindy_card_chat:' + NID] = JSON.stringify({ sessionId: S, history: [], pending: { turnId: TID, q: 'When is it due?' } });
+    (t.w.__askAboutOpp as (o: unknown) => void)(OPP);
+    await t.settle();
+    expect(t.calls[0]).toMatchObject({ turn_id: TID, replay_only: true, message: 'When is it due?', sessionId: S });
+    const txt = t.body().textContent || '';
+    expect(txt).toContain('Due Dec 4.');
+    expect(txt).toContain('Saved answer · no extra credits');
+    expect(pending(t)).toBeNull();
+    expect(JSON.parse(t.store['mindy_card_chat:' + NID]).history).toEqual([{ role: 'user', content: 'When is it due?' }, { role: 'assistant', content: 'Due Dec 4.' }]);
+  });
+
+  it('reopen finds the answer never finished (404 turn_not_completed): says it was not charged and offers to ask again with the same id', async () => {
+    const t = boot({ replies: [{ status: 404, json: { error: 'turn_not_completed' } }] });
+    const TID = '0a0a0a0a-1111-4222-8333-444444444444';
+    t.store['mindy_card_chat:' + NID] = JSON.stringify({ sessionId: S, history: [], pending: { turnId: TID, q: 'When is it due?' } });
+    (t.w.__askAboutOpp as (o: unknown) => void)(OPP);
+    await t.settle();
+    expect(t.body().textContent).toContain('This answer did not finish, so it was not charged.');
+    ([...t.body().querySelectorAll('.amk-act button')].find((b) => b.textContent === 'Get the answer') as HTMLButtonElement).click();
+    await t.settle();
+    expect(t.calls[1]).toMatchObject({ turn_id: TID, message: 'When is it due?' });
+    expect(t.calls[1].replay_only).toBeUndefined();
+  });
+
+  it('the same question is still being answered elsewhere (409): waits, then fetches the saved answer with the same id', async () => {
+    const t = boot({ replies: [
+      { status: 409, json: { error: 'turn_in_progress', retry_after: 1 } },
+      { events: [{ type: 'session', sessionId: S }, { type: 'token', content: 'Due Dec 4.' }, { type: 'replayed', charged: 0 }, { type: 'done' }] },
+    ] });
+    (t.w.__askAboutOpp as (o: unknown) => void)(OPP);
+    await askCard(t, 'When is it due?');
+    expect(t.calls).toHaveLength(1);
+    await new Promise((r) => setTimeout(r, 1100));
+    await t.settle();
+    expect(t.calls[1]).toMatchObject({ turn_id: t.calls[0].turn_id, replay_only: true });
+    expect(t.body().textContent).toContain('Due Dec 4.');
+    expect(t.body().querySelectorAll('.amk-msg.u').length).toBe(1);
+  });
+
+  it('an answer that failed on the server is not kept as pending (asking again is a new, free-until-answered question)', async () => {
+    const t = boot({ replies: [{ events: [{ type: 'session', sessionId: S }, { type: 'error', message: 'Mindy could not answer right now.' }, { type: 'done' }] }] });
+    (t.w.__askAboutOpp as (o: unknown) => void)(OPP);
+    await askCard(t, 'When is it due?');
+    expect(t.body().textContent).toContain('Mindy could not answer right now.');
+    expect(pending(t)).toBeNull();
+  });
+});

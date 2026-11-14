@@ -7,9 +7,10 @@
  *      writes is ever presented to the model as a record fact.
  *   2. ACCESS: Pro behaves exactly as today. A non-Pro account may ask on a card when it holds at least one
  *      turn's worth of its existing credits (the introductory grant or anything it bought). No new grant.
- *   3. CHARGE: a successful non-Pro card turn costs CARD_CHAT_TURN_CREDITS, debited ONCE after the answer
- *      completes, through the existing atomic ledger function (mcp_debit_credits: never below zero).
- *      Failed, empty or tools-unavailable turns cost nothing. Pro card turns are not charged (unchanged).
+ *   3. CHARGE: a successful non-Pro card turn costs CARD_CHAT_TURN_CREDITS, charged ONCE PER QUESTION: the
+ *      answer is saved and debited in one transaction (src/lib/chat/card-chat-turns.ts), and a retry, refresh
+ *      or reopen of the same question replays the saved answer for free. Failed, empty, degraded or
+ *      incomplete turns cost nothing. Pro card turns are not charged (unchanged).
  */
 import { selectRelevantRfp } from '@/lib/proposal/select-relevant';
 
@@ -62,13 +63,18 @@ export function cardChatAccess(p: {
   return { allow: true, billable: true };
 }
 
-/** A turn is billable only if it produced an answer with live data behind it and did not error. */
+/**
+ * A turn is billable only if it produced a COMPLETE answer with live data behind it. Approved rule
+ * (2026-11-14): failed, empty, degraded or incomplete answers are free. "Complete" means the model said it
+ * finished ('stop'); a length cut, a provider error, a content filter, a missing finish signal or a stream we
+ * stopped early (streamError) is incomplete.
+ */
 export function isBillableTurn(t: {
   billable: boolean; answer: string; streamError: boolean; plannerUnavailable: boolean; finishReason: string | null;
 }): boolean {
   if (!t.billable || t.streamError || t.plannerUnavailable) return false;
   if (!t.answer || !t.answer.trim()) return false;
-  return t.finishReason !== 'error' && t.finishReason !== 'content_filter';
+  return t.finishReason === 'stop';
 }
 
 /**
