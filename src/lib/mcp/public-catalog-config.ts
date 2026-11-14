@@ -115,6 +115,17 @@ export const HIDDEN_FROM_PUBLIC_MCP: Readonly<Record<string, HiddenToolEntry>> =
     decision: 'hide',
     reason: 'Composed inside build_pursuit_dossier; 1 customer call in 90 days as a standalone tool.',
   },
+  // Ask Mindy Phase 1 (2026-11-14): built for native Ask Mindy only. `hide` (not hide_until_fixed)
+  // so chat offers them as allowed_read. Publishing to external MCP hosts, or pricing them for MCP,
+  // needs a separate owner review.
+  get_buying_offices: {
+    decision: 'hide',
+    reason: 'Ask Mindy only (Phase 1 R4). Not yet reviewed for public MCP availability or pricing.',
+  },
+  get_vehicle_spend_mix: {
+    decision: 'hide',
+    reason: 'Ask Mindy only (Phase 1 R9). Not yet reviewed for public MCP availability or pricing.',
+  },
 };
 
 const PUBLIC_SET: ReadonlySet<string> = new Set(PUBLIC_MCP_TOOLS);
