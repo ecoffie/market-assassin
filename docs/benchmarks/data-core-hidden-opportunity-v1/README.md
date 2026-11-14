@@ -1,7 +1,7 @@
 # Data Core hidden-opportunity benchmark — v1
 
-**Status: research artifact. Every relevance label is AI-generated and UNVERIFIED by a human.**
-`labels.jsonl` → `label_status: "AI_UNVERIFIED"`, `human_label: null`. Agreement between the two AI
+**Status: research artifact. Relevance labels are AI-generated and UNVERIFIED, except 47 items a human reviewed on 2026-11-14** (`human_label` filled; see `HUMAN-REVIEW-RESULTS.md`).
+Unreviewed items: `label_status: "AI_UNVERIFIED"`, `human_label: null`. Agreement between the two AI
 reviewers is not human ground truth. Nothing in this folder is wired into the product.
 
 Owner: Agent 4 (Data Core). Audit it supports: "Mindy Data Core — Classification-Resilient Opportunity
@@ -53,8 +53,8 @@ adjudication.
 
 ## Known limits (read before quoting any number)
 
-1. **No human labels yet.** The 60% production bar requires an independently reviewed benchmark. It is not met
-   until `--labels human` says so.
+1. **47 human labels, one reviewer.** The 60% production bar requires an independently reviewed benchmark on a holdout. It is not met;
+   see `HUMAN-REVIEW-RESULTS.md` for what the 47 labels show.
 2. **Small n.** The gated lane shows 20 items (13 relevant). 95% Wilson interval 43–82%.
 3. **One snapshot, mostly construction.** Five of six trades contribute nothing hidden; steel and HVAC carry
    the result. Notices close; rerun on a fresh snapshot (time-split holdout) before deciding.

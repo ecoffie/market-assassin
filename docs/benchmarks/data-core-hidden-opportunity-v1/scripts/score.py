@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
 """Recompute every benchmark number from the files in this folder alone (no DB, no API).
-Usage: python3 -I scripts/score.py [--labels final|human]
---labels human uses human_label where a human has filled it in, else skips the item (reported)."""
+Usage: python3 -I scripts/score.py [--labels final|human|merged]
+--labels human uses human_label where a human has filled it in, else skips the item (reported).
+--labels merged uses human_label where filled in, else the AI final_label (mixed provenance; say so when quoting)."""
 import json,sys,os,collections,hashlib
 HERE=os.path.dirname(os.path.abspath(__file__)); ROOT=os.path.dirname(HERE); sys.path.insert(0,HERE)
 import gate
-mode='human' if '--labels' in sys.argv and sys.argv[sys.argv.index('--labels')+1]=='human' else 'final'
+mode=sys.argv[sys.argv.index('--labels')+1] if '--labels' in sys.argv else 'final'
+assert mode in ('final','human','merged'), mode
 rd=lambda f:[json.loads(l) for l in open(os.path.join(ROOT,f)) if l.strip()]
 N={n['notice_id']:n for n in rd('notices.jsonl')}; LB={l['item_id']:l for l in rd('labels.jsonl')}; RT={r['item_id']:r for r in rd('retrieval.jsonl')}
 lexraw=open(os.path.join(ROOT,'gate_lexicon.json')).read(); lex=json.loads(lexraw)
 print('lexicon sha256',hashlib.sha256(lexraw.encode()).hexdigest())
 G={g:gate.Gate(lex,g) for g in ('vocab','profile')}
 def lab(i):
-  l=LB[i]; return l['human_label'] if mode=='human' else l['final_label']
+  l=LB[i]
+  if mode=='human': return l['human_label']
+  if mode=='merged': return l['human_label'] or l['final_label']
+  return l['final_label']
 rel=lambda x:x in('FIT','PARTIAL')
 # 1. reviewer agreement
 for s in ('core252','ext73'):
