@@ -7605,3 +7605,15 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 **SEO.** AI assistant for federal contracting research / GovCon AI chat / Mindy Ask Mindy.
 
 **Proof.** `src/lib/chat/chat-tool-policy.ts`, `src/lib/chat/chat-tool-executor.ts`, and their unit tests; execution rows in `mcp_call_log` with channel `app_chat`.
+
+## Save search keeps your filters honest (2026-11-14)
+
+**What.** Saving a search on the Opportunity Map now works with the filters people actually use. Multi-select set-asides and notice types carry straight into the alert. Filters that alerts can't apply, like contract value or buying office, are named before you save, and you choose whether to save without them. On the default map, Mindy offers to watch your own market instead of refusing.
+
+**Why it matters.** Some people pressed Save and got a refusal they couldn't act on, so they left without the watch they wanted. Now every refusal says what to change, in plain words.
+
+**Honest scope.** Alerts still cover Open Now and Coming Soon only. Filters that only narrow Coming Back contracts, the Buyers view or DLA supply bids are not part of an alert, and Mindy says so rather than quietly dropping them.
+
+**SEO.** Save government contract searches / federal opportunity alerts by set-aside / SAM.gov saved search alerts.
+
+**Proof.** 12 signed-in users hit a failed save in the 35 days to 2026-11-14 (`user_engagement`, `watch_save_failed`); 7 never saved a search afterward (`saved_searches`). End-to-end tests run the real map save handler against the real saved-search service.

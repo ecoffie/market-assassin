@@ -27,10 +27,11 @@
  * to email an address that is not an address. Alerts turn on only when a real
  * email is attached, which is also the moment the watch becomes a habit loop.
  */
-import { alertableScope } from '@/lib/saved-searches/alert-scope';
 import type { SavedSearchMode } from '@/lib/saved-searches/constants';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { valueShapeError, savedSearchNaicsError } from '@/lib/saved-searches/validate-filters';
+import { validateSavedSearchFilters } from '@/lib/saved-searches/validate-filters';
+import { alertActivationPlan, profileHasNaics } from '@/lib/saved-searches/alert-activation';
+import type { SavedSearchFilters } from '@/lib/saved-searches/types';
 
 /** `anon:` + a uuid, as emitted by the map's telemetry identity. */
 const ANON_RE = /^anon:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -145,6 +146,12 @@ export interface ClaimResult {
   notEmailable: number;
   /** Alerting watches whose recompete horizon was removed — recompetes are not emailed. */
   comingBackExcluded: number;
+  /**
+   * Claimed with alerts OFF because the saved filters cannot be honored by the alert engine (map-only
+   * keys, no narrowing filter, a bad value, or a profile-scoped watch with no profile NAICS). Kept as a
+   * bookmark; never broadened to fit.
+   */
+  filtersNotHonored: number;
   error?: string;
 }
 
@@ -169,7 +176,7 @@ export async function claimAnonWatch(
   verifiedEmail: string,
 ): Promise<ClaimResult> {
   const fail = (error: string): ClaimResult =>
-    ({ ok: false, claimed: 0, alertsOn: 0, notEmailable: 0, comingBackExcluded: 0, error });
+    ({ ok: false, claimed: 0, alertsOn: 0, notEmailable: 0, comingBackExcluded: 0, filtersNotHonored: 0, error });
   if (!isAnonId(anonId)) return fail('invalid anon id');
   const e = verifiedEmail.trim().toLowerCase();
   if (!e.includes('@')) return fail('invalid email');
@@ -183,14 +190,27 @@ export async function claimAnonWatch(
     .eq('user_email', owner);
   if (readErr) return fail(readErr.message);
   const list = (rows || []) as Array<{ id: string; mode: string; filters: Record<string, unknown> | null }>;
-  if (list.length === 0) return { ok: true, claimed: 0, alertsOn: 0, notEmailable: 0, comingBackExcluded: 0 };
+  if (list.length === 0) return { ok: true, claimed: 0, alertsOn: 0, notEmailable: 0, comingBackExcluded: 0, filtersNotHonored: 0 };
 
   const alerting: string[] = [];
   const silent: string[] = [];
   let comingBackExcluded = 0;
+  let filtersNotHonored = 0;
+  // Profile NAICS is read once, only if a profile-scoped watch needs it. null = UNKNOWN → cannot activate.
+  let profileOk: boolean | null | undefined;
   for (const r of list) {
-    const plan = alertableScope((r.mode || 'open') as SavedSearchMode, r.filters || {});
-    if (plan.kind === 'none') { silent.push(r.id); continue; }
+    // The SAME activation rule the signed-in path applies (alert-activation.ts). Rows stored before the
+    // unified validator can hold map-only keys or no narrowing filter; they are claimed with alerts OFF.
+    const plan = alertActivationPlan((r.mode || 'open') as SavedSearchMode, (r.filters || {}) as SavedSearchFilters);
+    if (!plan.ok) {
+      silent.push(r.id);
+      if (plan.refusal.code !== 'unsupported_alert_scope') filtersNotHonored++;
+      continue;
+    }
+    if (plan.profileScoped) {
+      if (profileOk === undefined) profileOk = await profileHasNaics(db, e);
+      if (profileOk !== true) { silent.push(r.id); filtersNotHonored++; continue; }
+    }
     alerting.push(r.id);
     if (plan.kind === 'partial') {
       // Narrow BEFORE alerts turn on, while the row is still anon-owned and silent: a failure
@@ -227,7 +247,7 @@ export async function claimAnonWatch(
   if (typeof on === 'string') return fail(on);
   const off = await move(silent, false);
   if (typeof off === 'string') return { ...fail(off), claimed: on, alertsOn: on };
-  return { ok: true, claimed: on + off, alertsOn: on, notEmailable: off, comingBackExcluded };
+  return { ok: true, claimed: on + off, alertsOn: on, notEmailable: off - filtersNotHonored, comingBackExcluded, filtersNotHonored };
 }
 
 /** Most watches one anonymous identity may hold. Bounds unauthenticated writes. */
@@ -236,7 +256,15 @@ export const MAX_ANON_WATCHES = 25;
 /** Largest accepted serialized filter payload, in bytes. */
 export const MAX_FILTER_BYTES = 4096;
 
-export interface PayloadCheck { ok: boolean; error?: string }
+export interface PayloadCheck {
+  ok: boolean;
+  error?: string;
+  /** Set when the filters failed the shared validator (same reasons as the signed-in path). */
+  code?: 'invalid_filters';
+  reason?: string;
+  /** Refused filter key NAMES, never values. */
+  refusedKeys?: string[];
+}
 
 /**
  * Validate an anonymous watch payload before it reaches the database.
@@ -253,13 +281,15 @@ export function checkWatchPayload(
   if (filters != null && (typeof filters !== 'object' || Array.isArray(filters))) {
     return { ok: false, error: 'filters must be an object' };
   }
-  // Every value the alert cron will parse must be a shape it can read. A verified owner's watch alerts
-  // immediately, and claimAnonWatch turns an anon row into an alerting one without re-reading it — so the
-  // check belongs here, at the only insert. (2026-10-01: `sapBuyer: true` broke a search for 4 days.)
-  if (filters != null) {
-    const valueErr = valueShapeError(filters as Record<string, unknown>)
-      ?? savedSearchNaicsError(filters as Record<string, unknown>);
-    if (valueErr) return { ok: false, error: valueErr };
+  // ONE validator for every watch, anonymous or signed in (P0 release fix, 2026-11-14). This used to check
+  // value shapes and NAICS only, so an anonymous watch could store map-only keys (valueRange, office, …) or
+  // a whole-market scope, and claiming it at sign-in turned it into an alerting watch the alert engine could
+  // not honor. The Map now plans the payload with __watchFilterPlan (translate the two multi-selects, ask
+  // before leaving map-only filters out), so a current client never sends a refused key.
+  // (2026-10-01: `sapBuyer: true` broke a search for 4 days — value shapes are still checked here.)
+  {
+    const v = validateSavedSearchFilters(filters ?? {});
+    if (!v.ok) return { ok: false, error: v.error, code: 'invalid_filters', reason: v.reason, refusedKeys: v.keys };
   }
   if (bbox != null && (typeof bbox !== 'object' || Array.isArray(bbox))) {
     return { ok: false, error: 'bbox must be an object' };

@@ -74,8 +74,21 @@ describe('the claim runs in SAVE_JS scope', () => {
   it('a verified claim fires watch_claimed and says Alerts on', async () => {
     const h = run({ signedIn: true, resp: { success: true, claimed: 2 } });
     h.claim(); await flush(); await flush();
-    expect(h.events).toEqual([['tool_use', 'watch_claimed', { watches: 2 }]]);
+    expect(h.events).toEqual([['tool_use', 'watch_claimed', { watches: 2, filters_not_honored: 0 }]]);
     expect(h.ui).toEqual(['msg:✓ Alerts on']);
+  });
+
+  it('a claim that kept some watches silent (filters alerts cannot honor) says so', async () => {
+    const h = run({ signedIn: true, resp: { success: true, claimed: 2, alertsOn: 1, alertsEnabled: true, filtersNotHonored: 1 } });
+    h.claim(); await flush(); await flush();
+    expect(h.events[0][2]).toMatchObject({ watches: 2, alerts_on: 1, filters_not_honored: 1 });
+    expect(h.ui[0]).toMatch(/some watches need a filter change/);
+  });
+
+  it('a claim where nothing could alert because of filters says how to turn alerts on', async () => {
+    const h = run({ signedIn: true, resp: { success: true, claimed: 1, alertsOn: 0, alertsEnabled: false, filtersNotHonored: 1 } });
+    h.claim(); await flush(); await flush();
+    expect(h.ui[0]).toMatch(/change a filter to turn on alerts/);
   });
 
   it('claiming nothing (or a refusal) fires no event and claims no success', async () => {

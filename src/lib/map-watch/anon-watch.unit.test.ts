@@ -98,10 +98,16 @@ describe('an anonymous watch can NEVER email anyone', () => {
 
 type WRow = { id: string; user_email: string; mode: string; filters: Record<string, unknown>; alerts_enabled: boolean };
 /** A saved_searches fake honouring select/update + eq/in, with exact counts — like PostgREST. */
-function claimDb(rows: WRow[], opts: { nullCount?: boolean; failFilterUpdate?: boolean } = {}) {
+function claimDb(rows: WRow[], opts: { nullCount?: boolean; failFilterUpdate?: boolean; profileNaics?: string[] | 'error' } = {}) {
   const writes: Array<{ payload: Record<string, unknown>; ids: string[] }> = [];
   const db = {
-    from: () => {
+    from: (table?: string) => {
+      if (table === 'user_notification_settings') {
+        const res = opts.profileNaics === 'error'
+          ? { data: null, error: { message: 'down' } }
+          : { data: { naics_codes: opts.profileNaics ?? [] }, error: null };
+        return { select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve(res) }) }) };
+      }
       const conds: Array<[string, string, unknown]> = [];
       let payload: Record<string, unknown> | null = null;
       const match = (r: WRow) => conds.every(([op, k, v]) =>
@@ -125,8 +131,8 @@ function claimDb(rows: WRow[], opts: { nullCount?: boolean; failFilterUpdate?: b
   };
   return { db: db as never, writes };
 }
-const w = (id: string, mode: string, horizons?: Record<string, unknown>): WRow =>
-  ({ id, user_email: ANON, mode, filters: { naics: '541512', state: 'VA', ...(horizons ? { horizons } : {}) }, alerts_enabled: false });
+const w = (id: string, mode: string, horizons?: Record<string, unknown>, extra: Record<string, unknown> = {}): WRow =>
+  ({ id, user_email: ANON, mode, filters: { naics: '541512', state: 'VA', ...(horizons ? { horizons } : {}), ...extra }, alerts_enabled: false });
 
 describe('claiming is the only way alerts turn on', () => {
   it('attaches the verified email and enables alerts on an emailable watch, scoped to that anon id', async () => {
@@ -223,13 +229,79 @@ describe('checkWatchPayload — stored values must be readable by the alert cron
     expect(checkWatchPayload({ naics: '541512', status: true }, null, null).ok).toBe(false);
   });
 
-  it('accepts the Map payload shapes measured in production (incl. keys outside the MCP allowlist)', () => {
-    const real = {
-      naics: '541512', state: ['FL', 'GA'], valueRange: '-10297772', setAsideMulti: 'SDVOSB',
-      noticeMulti: 'Solicitation,Presolicitation,Sources Sought', fsc: '7030', closingDays: '30',
-      postedDays: '30', country: 'us', status: 'active', scope: 'profile', hasDocs: '1', fullOpen: true,
-      sapBuyer: 'most', strategy: ['repeat_buyer', 'sb_friendly'], horizons: { open: true, forecast: true },
-    };
-    expect(checkWatchPayload(real, null, null)).toEqual({ ok: true });
+  // UNIFIED VALIDATION (P0 release fix, 2026-11-14). This test used to assert that an anonymous watch may
+  // store keys outside the allowlist. Those rows became ALERTING watches at claim time even though the alert
+  // engine cannot apply those keys. Anonymous watches now follow the signed-in rules; the Map translates the
+  // two multi-selects and asks before leaving map-only filters out, so a current client never sends them.
+  const real = {
+    naics: '541512', state: ['FL', 'GA'], valueRange: '-10297772', setAsideMulti: 'SDVOSB',
+    noticeMulti: 'Solicitation,Presolicitation,Sources Sought', fsc: '7030', closingDays: '30',
+    postedDays: '30', country: 'us', status: 'active', scope: 'profile', hasDocs: '1', fullOpen: true,
+    sapBuyer: 'most', strategy: ['repeat_buyer', 'sb_friendly'], horizons: { open: true, forecast: true },
+  };
+  it('refuses the old Map payload with map-only keys, naming them (names only)', () => {
+    const r = checkWatchPayload(real, null, null);
+    expect(r.ok).toBe(false);
+    expect(r.code).toBe('invalid_filters');
+    expect(r.reason).toBe('unsupported_keys');
+    expect(r.refusedKeys).toEqual(['valueRange', 'setAsideMulti', 'noticeMulti', 'fsc']);
+    expect(JSON.stringify(r.refusedKeys)).not.toContain('10297772');
+  });
+  it('accepts the same watch as the Map now plans it (multi-selects translated, map-only keys confirmed out)', () => {
+    const planned: Record<string, unknown> = { ...real, setAside: 'SDVOSB', noticeType: 'Solicitation,Presolicitation,Sources Sought' };
+    for (const k of ['valueRange', 'setAsideMulti', 'noticeMulti', 'fsc']) delete planned[k];
+    expect(checkWatchPayload(planned, null, null)).toEqual({ ok: true });
+  });
+  it('refuses a whole-market anonymous watch, same as the signed-in path', () => {
+    const r = checkWatchPayload({ horizons: { open: true, recompete: false, forecast: false } }, null, null);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe('no_narrowing');
+  });
+});
+
+// UNIFIED ACTIVATION (P0 release fix, 2026-11-14): rows stored before the unified validator can hold map-only
+// keys or no narrowing filter. Claiming them must not turn alerts on; they stay as bookmarks, untouched.
+describe('claiming never activates filters the alert engine cannot honor', () => {
+  it('a stored watch with a map-only key is claimed with alerts OFF and its filters untouched', async () => {
+    const rows = [w('a', 'open', { open: true, recompete: false, forecast: false }, { valueRange: '-5772114' })];
+    const before = JSON.parse(JSON.stringify(rows[0].filters));
+    const r = await claimAnonWatch(claimDb(rows).db, ANON, 'a@b.com');
+    expect(r).toMatchObject({ ok: true, claimed: 1, alertsOn: 0, filtersNotHonored: 1, notEmailable: 0 });
+    expect(rows[0]).toMatchObject({ user_email: 'a@b.com', alerts_enabled: false });
+    expect(rows[0].filters).toEqual(before);
+  });
+
+  it('a whole-market stored watch is claimed with alerts OFF', async () => {
+    const rows: WRow[] = [{ id: 'a', user_email: ANON, mode: 'open', filters: { horizons: { open: true, recompete: false, forecast: false } }, alerts_enabled: false }];
+    const r = await claimAnonWatch(claimDb(rows).db, ANON, 'a@b.com');
+    expect(r).toMatchObject({ ok: true, alertsOn: 0, filtersNotHonored: 1 });
+    expect(rows[0].alerts_enabled).toBe(false);
+  });
+
+  it('a mix: valid watches alert, unhonorable ones do not, recompete-only stays notEmailable', async () => {
+    const rows = [w('a', 'open'), w('b', 'open', undefined, { office: 'W912PL' }), w('c', 'recompete')];
+    const r = await claimAnonWatch(claimDb(rows).db, ANON, 'a@b.com');
+    expect(r).toMatchObject({ ok: true, claimed: 3, alertsOn: 1, filtersNotHonored: 1, notEmailable: 1 });
+    expect(rows.map((x) => x.alerts_enabled)).toEqual([true, false, false]);
+  });
+});
+
+describe('a profile-scoped watch alerts only with profile NAICS (same rule as the signed-in path)', () => {
+  const prof = (): WRow[] => [{ id: 'p', user_email: ANON, mode: 'open', filters: { scope: 'profile', horizons: { open: true, recompete: false, forecast: false } }, alerts_enabled: false }];
+  it('profile has NAICS → alerts on', async () => {
+    const rows = prof();
+    const r = await claimAnonWatch(claimDb(rows, { profileNaics: ['541512'] }).db, ANON, 'a@b.com');
+    expect(r).toMatchObject({ alertsOn: 1, filtersNotHonored: 0 });
+  });
+  it('profile has no NAICS → alerts off', async () => {
+    const rows = prof();
+    const r = await claimAnonWatch(claimDb(rows, { profileNaics: [] }).db, ANON, 'a@b.com');
+    expect(r).toMatchObject({ alertsOn: 0, filtersNotHonored: 1 });
+    expect(rows[0].alerts_enabled).toBe(false);
+  });
+  it('profile read fails → UNKNOWN → alerts off, never assumed', async () => {
+    const rows = prof();
+    const r = await claimAnonWatch(claimDb(rows, { profileNaics: 'error' }).db, ANON, 'a@b.com');
+    expect(r).toMatchObject({ alertsOn: 0, filtersNotHonored: 1 });
   });
 });

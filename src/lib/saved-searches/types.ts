@@ -61,4 +61,13 @@ export type SavedSearchServiceErrorCode =
 
 export type SavedSearchServiceResult<T> =
   | { ok: true; data: T }
-  | { ok: false; code: SavedSearchServiceErrorCode; message: string };
+  | {
+      ok: false;
+      code: SavedSearchServiceErrorCode;
+      /** Agent-facing explanation (MCP relays it). Never shown to a customer verbatim. */
+      message: string;
+      /** invalid_filters only: why, for customer copy (see ValidateFiltersFailureReason). */
+      reason?: string;
+      /** invalid_filters only: the refused filter key NAMES, never their values. */
+      refusedKeys?: string[];
+    };

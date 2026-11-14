@@ -17,8 +17,21 @@ describe('saved-search filter validation', () => {
     expect(res.ok).toBe(true);
   });
 
-  it('accepts forecast-only horizon', () => {
-    expect(savedSearchHasNarrowingFilter({ horizons: { forecast: true } })).toBe(true);
+  it('accepts a forecast-only horizon (Open explicitly off)', () => {
+    expect(savedSearchHasNarrowingFilter({ horizons: { open: false, forecast: true } })).toBe(true);
+    expect(savedSearchHasNarrowingFilter({ horizons: { open: 'false', forecast: true } })).toBe(true);
+  });
+
+  // 2026-11-14: "Open + Coming Soon" with nothing else is the whole Open market. The cron reads a missing
+  // `open` as ON, so { forecast: true } alone also emails every Open opportunity. This test used to assert
+  // that shape was narrowing. 8 account watches were alerting on the entire Open market that way.
+  it('rejects Open + Coming Soon (or Coming Back) with nothing else: that is the whole Open market', () => {
+    expect(savedSearchHasNarrowingFilter({ horizons: { forecast: true } })).toBe(false);
+    expect(savedSearchHasNarrowingFilter({ horizons: { open: true, forecast: true, recompete: false } })).toBe(false);
+    expect(savedSearchHasNarrowingFilter({ horizons: { open: true, forecast: true, recompete: true } })).toBe(false);
+    const r = validateSavedSearchFilters({ horizons: { open: true, forecast: true, recompete: false } });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe('no_narrowing');
   });
 
   it('accepts scope=profile', () => {
@@ -148,5 +161,30 @@ describe('list-valued multi-selects count as narrowing (they were rejected as "e
   it('still rejects empty or blank lists', () => {
     expect(validateSavedSearchFilters({ naics: [] }).ok).toBe(false);
     expect(validateSavedSearchFilters({ state: [' '] }).ok).toBe(false);
+  });
+});
+
+describe('a refusal says WHY and WHICH keys (names only), with the agent text unchanged', () => {
+  const cases: [string, unknown, string, string[], RegExp][] = [
+    ['not an object', [], 'not_object', [], /plain object/],
+    ['unknown keys', { naics: '541512', valueRange: '1-2', office: 'W912PL' }, 'unsupported_keys', ['valueRange', 'office'], /Unsupported filter keys: valueRange, office/],
+    ['bad value shape', { naics: '541512', sapBuyer: true }, 'invalid_value', ['sapBuyer'], /Invalid sapBuyer value/],
+    ['unknown NAICS', { naics: '999999' }, 'invalid_naics', ['naics'], /Unknown NAICS/],
+    ['unknown strategy strand', { naics: '541512', strategy: ['nope'] }, 'invalid_strategy', ['strategy'], /Unsupported strategy values: nope/],
+    ['whole market', { horizons: { open: true, recompete: false, forecast: false } }, 'no_narrowing', [], /entire federal market/],
+  ];
+  it.each(cases)('%s', (_n, input, reason, keys, error) => {
+    const res = validateSavedSearchFilters(input);
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.reason).toBe(reason);
+      expect(res.keys).toEqual(keys);
+      expect(res.error).toMatch(error);
+    }
+  });
+  it('refused keys never carry a value', () => {
+    const res = validateSavedSearchFilters({ naics: '541512', sapBuyer: 'SECRET-VALUE-123' });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(JSON.stringify(res.keys)).not.toContain('SECRET');
   });
 });
