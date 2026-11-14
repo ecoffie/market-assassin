@@ -829,14 +829,16 @@ const EXPIRING_CONTRACTS_TOOL_DEF = {
       'months, capture_start_basis) — not a recompete date; estimated_recompete_date is null (not established). ' +
       'place_of_performance_state is the place of ' +
       'performance as reported by USASpending. ' +
+      'expiring_orders_in_window[] lists every in-window task/delivery order at top level with its parent vehicle; ' +
+      '_meta.records_in_window counts standalone + orders + unresolved orders, so contracts:[] alone never means none. ' +
       'grounded=false when nothing matches — widen months_window. For customer-facing market FIND across Open + ' +
       'Recompete + Forecast, prefer find_opportunities.',
     parameters: {
       type: 'object',
       properties: {
-        naics: { type: 'string', description: 'NAICS code; ≤5 digits = prefix, 6 = exact.' },
+        naics: { type: 'string', description: 'NAICS code or comma-separated codes (OR); ≤5 digits = prefix, 6 = exact. Example: "5613,5611,4931".' },
         agency: { type: 'string', description: 'Agency name, case-insensitive partial.' },
-        state: { type: 'string', description: '2-letter place-of-performance state.' },
+        state: { type: 'string', description: 'Place-of-performance state: 2-letter code or name; several comma-separated (OR). Example: "TN,MS,AR".' },
         months_window: { type: 'number', description: 'Expiration window in months (default 18, max 60).' },
         months_min: { type: 'number', description: 'Skip contracts ending sooner than this many months (capture window). Example: months_min=6 with months_window=18. Omit to include the soonest expirations.' },
         min_value: { type: 'number', description: 'Minimum obligated dollars.' },
@@ -2420,10 +2422,14 @@ async function dispatchMcpTool(
   }
 
   if (name === 'get_expiring_contracts') {
+    // Strings, comma lists and arrays all reach the tool; it normalizes them and reports any
+    // value it could not apply (it never silently drops one — the R1/R2 defect).
+    const listArg = (v: unknown): string | string[] | undefined =>
+      typeof v === 'string' ? v : Array.isArray(v) ? v.map((x) => String(x)) : typeof v === 'number' ? String(v) : undefined;
     const result = (await expiringContracts({
-      naics: typeof args.naics === 'string' ? args.naics : undefined,
+      naics: listArg(args.naics),
       agency: typeof args.agency === 'string' ? args.agency : undefined,
-      state: typeof args.state === 'string' ? args.state : undefined,
+      state: listArg(args.state),
       months_window: typeof args.months_window === 'number' ? args.months_window : undefined,
       months_min: typeof args.months_min === 'number' ? args.months_min : undefined,
       min_value: typeof args.min_value === 'number' ? args.min_value : undefined,

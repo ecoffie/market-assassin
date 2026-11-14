@@ -729,9 +729,9 @@ server.registerTool(
       'suggested capture start (PoP end − 12 months), not a recompete date; estimated_recompete_date is null. grounded=false — widen months_window. ' +
       'For market FIND across three horizons prefer find_opportunities.',
     inputSchema: {
-      naics: z.string().optional().describe('NAICS code; ≤5 digits = prefix, 6 = exact.'),
+      naics: z.string().optional().describe('NAICS code or comma-separated codes (OR); ≤5 digits = prefix, 6 = exact.'),
       agency: z.string().optional().describe('Agency name, case-insensitive partial.'),
-      state: z.string().optional().describe('2-letter place-of-performance state.'),
+      state: z.string().optional().describe('Place-of-performance state: 2-letter code or name; several comma-separated (OR).'),
       months_window: z.number().int().min(1).max(60).optional().describe('Expiration window in months (default 18).'),
       months_min: z.number().int().min(0).max(60).optional().describe('Skip contracts ending sooner than this many months. Capture window: months_min=6, months_window=18.'),
       min_value: z.number().optional().describe('Minimum obligated dollars.'),
