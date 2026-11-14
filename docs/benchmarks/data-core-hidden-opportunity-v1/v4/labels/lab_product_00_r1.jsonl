@@ -1,0 +1,35 @@
+{"id": "r4-0001", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Contractor shall bring all tools and materials; hoist repair labour service"}
+{"id": "r4-0003", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "return INVERTER,AIRCRAFT to Ready For Issue condition; repair service"}
+{"id": "r4-0005", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "fire trainer maintenance services; consumable parts only incidental"}
+{"id": "r4-0006", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "61--POWER SUPPLY, PSC 6120, solicitation for power supply"}
+{"id": "r4-0007", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "replace existing Aircraft Electrical Component Test Stand; procurement and installation"}
+{"id": "r4-0008", "label": "NO", "role": "NONE", "restriction": "UNCLEAR", "evidence": "Datron radio sets and ancillaries; communications equipment not computer hardware"}
+{"id": "r4-0009", "label": "NO", "role": "NONE", "restriction": "APPROVED_SOURCE", "evidence": "CONVERTER,SIGNAL DA; Source Approval Statement applies to this NSN"}
+{"id": "r4-0014", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "BOOSTER ASSEMBLY,AI PSC 1680 aircraft component solicitation"}
+{"id": "r4-0019", "label": "PARTIAL", "role": "PRIME", "restriction": "BRAND_NAME", "evidence": "Brand Name Polymedco iFOBT reagents, supplies plus analyzer service"}
+{"id": "r4-0022", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Rental of one 100-ton Chill Water System"}
+{"id": "r4-0024", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "VALVE, STEM per Dresser-Rand drawings; valve part not fastener"}
+{"id": "r4-0025", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "48--VALVE,BALL 1.000NPS; valve not fastener"}
+{"id": "r4-0029", "label": "PARTIAL", "role": "PRIME", "restriction": "NONE", "evidence": "Microscope: Spine national requirements contract, PSC 6515 medical equipment"}
+{"id": "r4-0032", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "VALVE ASSEMBLY,MANI PSC 4820 solicitation"}
+{"id": "r4-0033", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "JLM Roll Up Door Replacement IAW Statement of Work, installation"}
+{"id": "r4-0035", "label": "PARTIAL", "role": "PRIME", "restriction": "NONE", "evidence": "HSR 49.2 MHz RF System Power Amplifiers, PSC 5996 RFI"}
+{"id": "r4-0040", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "base maintenance; extend current contract on Sole Source basis"}
+{"id": "r4-0047", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "STEERING UNIT,AIRCR, IN REPAIR/MODIFICATION OF; repair service"}
+{"id": "r4-0049", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "NETSAFA International Training Center Support; training services"}
+{"id": "r4-0052", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "59--CONNECTOR,ELECTRIC; connector not fastener"}
+{"id": "r4-0053", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "purchase of one heavy-duty long-haul tractor"}
+{"id": "r4-0057", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Tinker AFB Multiple Award Construction Contract"}
+{"id": "r4-0058", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Industrial Wastewater Treatment Plant Upgrades construction project"}
+{"id": "r4-0059", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "architect-engineer and design services for energy efficiency projects"}
+{"id": "r4-0061", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Scientific and Regulatory Support Services professional services IDIQ"}
+{"id": "r4-0065", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Design Renovation, System Support Center building renovation"}
+{"id": "r4-0066", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "BOLT,MACHINE PSC 5306; provide one additional fastener per heat/lot"}
+{"id": "r4-0069", "label": "NO", "role": "NONE", "restriction": "BRAND_NAME", "evidence": "software support and maintenance for InnovMetric PolyWorks Inspector"}
+{"id": "r4-0071", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5930013701872 SWITCH,SENSITIVE Qty 100; Approved source is 73030 793524-4"}
+{"id": "r4-0073", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "providing Boiler Blow-Off Valves, PSC 4820 Valve, nonpowered"}
+{"id": "r4-0074", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "Mastercam License Renewal sole source to CNC Software; software license"}
+{"id": "r4-0075", "label": "PARTIAL", "role": "PRIME", "restriction": "NONE", "evidence": "53--KEY PSC 5315 hardware item solicitation"}
+{"id": "r4-0076", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "service for isolation valves installed; roll up door installation"}
+{"id": "r4-0077", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "PARTS KIT,BALL VALV PSC 4820; valve kit not fastener"}
+{"id": "r4-0080", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Angkor Sentinel 27 Transportation Services performance work statement"}

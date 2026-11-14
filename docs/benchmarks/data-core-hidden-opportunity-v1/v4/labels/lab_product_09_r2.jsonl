@@ -1,0 +1,35 @@
+{"id": "r4-0571", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5996014397962 AMPLIFIER,RADIO FREQUE; Approved source is 1NUQ8"}
+{"id": "r4-0572", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "AC POWER CONVERTER, FSC 1680 aircraft accessory component"}
+{"id": "r4-0573", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Renovate Building 1203 DOAS/AHU and Fire Suppression Water System construction"}
+{"id": "r4-0576", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PARTS KIT BALL VALV, FSC 4820 valves"}
+{"id": "r4-0579", "label": "NO", "role": "NONE", "restriction": "OEM_ONLY", "evidence": "OEM authorized commercial maintenance and support plan for AMT equipment"}
+{"id": "r4-0581", "label": "PARTIAL", "role": "PRIME", "restriction": "BRAND_NAME", "evidence": "iFOBT Brand Name Polymedco CPRR: equipment, reagents, controls, consumable supplies, service"}
+{"id": "r4-0587", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Denver P&DC Roof Replacement construction project"}
+{"id": "r4-0590", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Technical/Project Management Support task order, technical project-management, data-management support"}
+{"id": "r4-0592", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "design, fabricate, deliver, commission a custom industrial furnace"}
+{"id": "r4-0593", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 6515014495924 ADMINISTRATION SET,INT; Approved sources are 1G026, 30TR5, 6ESG8"}
+{"id": "r4-0595", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB, FSC 5998 electronic assembly, not fasteners"}
+{"id": "r4-0597", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "PIPE FITTINGS - FITTING ASSY, 3\" DOG LEG, FSC 4730 fittings"}
+{"id": "r4-0598", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Condensate Pump Replacements at West Haven VAMC, NAICS 238220"}
+{"id": "r4-0599", "label": "PARTIAL", "role": "SUB", "restriction": "NONE", "evidence": "replace the existing batteries in the Frenchman Work Center Solar System"}
+{"id": "r4-0606", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "sole source EOS Library Software Subscription to SIRSI CORPORATION, SaaS"}
+{"id": "r4-0608", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "LEVEL 1 Studs, FSC 5307 studs"}
+{"id": "r4-0609", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Albany VAMC Bulk Road Salt, PSC 6810 chemicals"}
+{"id": "r4-0610", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "6550 VISN 4 Coagulation Testing, advanced testing of coagulation conditions"}
+{"id": "r4-0614", "label": "NO", "role": "NONE", "restriction": "UNCLEAR", "evidence": "deliver and install Thermo Scientific TSX3005GA blood bank refrigerators and freezer"}
+{"id": "r4-0615", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 5930016544948 SWITCH ASSEMBLY, Qty 96, all responsible sources"}
+{"id": "r4-0616", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "procurement and installation services for an Aircraft Electrical Component Test Stand"}
+{"id": "r4-0617", "label": "FIT", "role": "PRIME", "restriction": "SOLE_SOURCE", "evidence": "53--KEY NSN 5315-016416696; negotiate with only one source FAR 6.302-1"}
+{"id": "r4-0619", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN: 1560-007802339; MANIFOLD,ENGINE AIR; small business set aside"}
+{"id": "r4-0620", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Electrical / Mechanical Technician Support, on-site technical support for pharmacy systems"}
+{"id": "r4-0622", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "F-16 BATTERY,STORAGE NSN 6140010550435WF, 11 EA"}
+{"id": "r4-0626", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Valve Guide for a valve assembly per DRESSER-RAND Drawing 5100493"}
+{"id": "r4-0627", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Hawaii National Marine Sanctuary Vessel Charter Services, NAICS 483114"}
+{"id": "r4-0628", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "59--CIRCUIT CARD ASSY, FSC 5998, NAICS 334412"}
+{"id": "r4-0630", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "16--HOISTING UNIT, FSC 1680 aircraft components, AS9100"}
+{"id": "r4-0632", "label": "PARTIAL", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "KitCheck RFID Crash Carts; scans RFID tagged medications and supplies"}
+{"id": "r4-0633", "label": "NO", "role": "NONE", "restriction": "UNCLEAR", "evidence": "MANIFOLD ASSEMBLY - AND SIMILAR REPLACEMENT PARTS, IN REPAIR/MODIFICATION OF"}
+{"id": "r4-0634", "label": "NO", "role": "NONE", "restriction": "APPROVED_SOURCE", "evidence": "NSN 6625015007981 METER,ELECTRICAL FREQU; Approved sources are 6Z382, 88416, 96169"}
+{"id": "r4-0635", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Building 592 renovations, electrical distribution, HVAC, mezzanine office construction"}
+{"id": "r4-0636", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 1560016879695 STIFFENER,AIRCRAFT; Approved source is 81205 5-87829-128"}
+{"id": "r4-0638", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "F-16 Piston, Reaction Cyl, 12 each of NSN 1680-01-052-0832"}

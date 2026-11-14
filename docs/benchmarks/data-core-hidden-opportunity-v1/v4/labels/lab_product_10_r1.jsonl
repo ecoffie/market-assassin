@@ -1,0 +1,35 @@
+{"id": "r4-0639", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5340016814463 RETAINER,NUT AND BOLT; Approved source is 51439"}
+{"id": "r4-0640", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Condensate Pump Replacement installation service, not fasteners"}
+{"id": "r4-0644", "label": "PARTIAL", "role": "SUB", "restriction": "NONE", "evidence": "Complete Component Parts Kits; replacement parts supporting landing gear DLRs"}
+{"id": "r4-0646", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Electrical upgrades construction at dam, not component supply"}
+{"id": "r4-0649", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Screws, FSC Code is 5305, NAICS 332722, 100% small business"}
+{"id": "r4-0650", "label": "NO", "role": "NONE", "restriction": "OEM_ONLY", "evidence": "Open, inspect, report and overhaul of hub; all replacement parts new OEM"}
+{"id": "r4-0652", "label": "NO", "role": "NONE", "restriction": "UNCLEAR", "evidence": "VALVE ASSEMBLY IN REPAIR/MODIFICATION OF; repair service, FAA-certified repair stations"}
+{"id": "r4-0654", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Repair Taxiway airfield paving construction"}
+{"id": "r4-0655", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "HSR dipole quad magnet power supplies sources sought, no valves"}
+{"id": "r4-0658", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5930012233397 SWITCH ASSEMBLY; Approved source is 81590"}
+{"id": "r4-0659", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Electrical inspection service; replace panel screws incidental"}
+{"id": "r4-0660", "label": "PARTIAL", "role": "PRIME", "restriction": "NONE", "evidence": "WASHER,FLAT NASM15795-810, PSC 5310; neighbouring hardware to nuts"}
+{"id": "r4-0662", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Refuse Collection services, not medical supplies"}
+{"id": "r4-0664", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "12-Foot Pull-Behind Tractor Grader, not fasteners"}
+{"id": "r4-0665", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Pharmacy move service contract, not hardware"}
+{"id": "r4-0666", "label": "FIT", "role": "SUB", "restriction": "SOLE_SOURCE", "evidence": "SCREW,MACHINE NSN 5305-010877548; OEM only known source, only one responsible source"}
+{"id": "r4-0668", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Sump grease trap services, not medical supplies"}
+{"id": "r4-0669", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Transesophageal echocardiography scanning systems, heart valve disorders only"}
+{"id": "r4-0670", "label": "NO", "role": "NONE", "restriction": "APPROVED_SOURCE", "evidence": "Thin Layer Explosives; valid Qualification Acceptance Letter qualified source required"}
+{"id": "r4-0671", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "VALVE,CHECK PSC 4820, not fasteners"}
+{"id": "r4-0674", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NUT,PLAIN,HEXAGON PSC 5310 solicitation"}
+{"id": "r4-0675", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Roll Up Door Replacement installation service, SDVOSB set-aside"}
+{"id": "r4-0677", "label": "NO", "role": "NONE", "restriction": "UNCLEAR", "evidence": "Remove and replace fire sprinkler construction; only MACBOA holders"}
+{"id": "r4-0678", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Digital Intermediate Frequency Subsystem SATCOM CSO call for solutions"}
+{"id": "r4-0679", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "NSN: 4820-01-109-4813HS NOUN: VALVE, REGULATING, FL TOP"}
+{"id": "r4-0680", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Facilities operation and maintenance services, not supplies"}
+{"id": "r4-0682", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "UAS training and simulation systems RFI, not IT equipment purchase"}
+{"id": "r4-0683", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Two Plastic Media Blast Booths, not valves"}
+{"id": "r4-0684", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "SOVOS 1099 Pro software licenses; sole source contract intent"}
+{"id": "r4-0687", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Automated Blood Bank Solid Phase Analyzer and reagents"}
+{"id": "r4-0689", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Roll Up Door Replacement installation service, SDVOSB set-aside"}
+{"id": "r4-0690", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Site Utility Infrastructure construction, not medical supplies"}
+{"id": "r4-0692", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "TAILPIECE,VALVE PSC 4820 Navy solicitation"}
+{"id": "r4-0693", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 1560-01-699-3344 PARTS KIT,FASTENER; alternate offerors submit Source Approval Request"}
+{"id": "r4-0694", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "SCR,CAP,SLFLKG self-locking screws PSC 5305"}

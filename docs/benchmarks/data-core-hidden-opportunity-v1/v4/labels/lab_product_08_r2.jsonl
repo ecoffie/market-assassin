@@ -1,0 +1,35 @@
+{"id": "r4-0512", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5930014176001 SWITCH,PUSH Qty 10; Approved source is 32245"}
+{"id": "r4-0514", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "national requirements contract for Epinephrine 0.3 MG Auto-Injector, fully competitive"}
+{"id": "r4-0515", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "requirements for manufacture of the CHASSIS,ELECTRICAL- FSC 6120"}
+{"id": "r4-0516", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Municipal Solid Waste and Recyclable Materials Collection Services"}
+{"id": "r4-0517", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Enterprise WAN and LAN Services Basic Ordering Agreement, services PSC 7G21"}
+{"id": "r4-0519", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5985015937720 ANTENNA Qty 4; Approved sources are 0F5W6, 66544"}
+{"id": "r4-0521", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "procurement and installation services for an Aircraft Electrical Component Test Stand"}
+{"id": "r4-0522", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "TITLE: NUT, FSC 5310 nuts and washers supply solicitation"}
+{"id": "r4-0523", "label": "PARTIAL", "role": "SUB", "restriction": "NONE", "evidence": "component-level supply chain: high-voltage firing capacitors, solid-state high-voltage switches"}
+{"id": "r4-0525", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "HSR Main Arc Dipole and Quadrupole Power Supplies, no valves"}
+{"id": "r4-0531", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Janitorial Services at the Vancouver Resident Office, PSC S201"}
+{"id": "r4-0532", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "sources capable of supplying U.S.-manufactured nitrile examination gloves"}
+{"id": "r4-0533", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "deposit-level paint services for HC-144 components and aircraft"}
+{"id": "r4-0534", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "inspection, testing, preventive maintenance, repair services for Automatic Transfer Switches"}
+{"id": "r4-0535", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Parts Kit for a size 3 inch Ball Valve, FSC 4820"}
+{"id": "r4-0538", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "A mobile CT scanner and technicians is required, PSC W065"}
+{"id": "r4-0541", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Preservation, Hull, Mechanical, and Electrical/Electronic Repairs for trailerable boats"}
+{"id": "r4-0542", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "TITLE: VALVE,BALL, FSC 4820 valve nonpowered supply solicitation"}
+{"id": "r4-0545", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "small business sources capable of providing Boiler Blow-Off Valves, PSC 4820"}
+{"id": "r4-0548", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "provide target aircraft that replicate threat systems, full aerial target solutions"}
+{"id": "r4-0549", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "PROCESSOR,TARGET LO, IN REPAIR/MODIFICATION OF; items overhauled, repaired, tested"}
+{"id": "r4-0550", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Nuclear Medicine Radiopharmaceutical Supply for FDG dose supplies, NAICS 325412"}
+{"id": "r4-0551", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 1680-015979798 ACTUATOR,ELECT-MECH; only source(s) previously approved solicited"}
+{"id": "r4-0552", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "modular Software Defined Radio for Navy aircraft, Next Generation Tactical Radio"}
+{"id": "r4-0553", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Vacuum Pump Assembly articles shall be repaired, tested and inspected"}
+{"id": "r4-0554", "label": "NO", "role": "NONE", "restriction": "APPROVED_SOURCE", "evidence": "OSCILLATOR,NONCRYST, IN REPAIR/MODIFICATION OF; requires engineering source approval"}
+{"id": "r4-0555", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "DCNG requires wash and fold laundry service"}
+{"id": "r4-0559", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Laboratory testing and analysis of processing quality water, services"}
+{"id": "r4-0561", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "TITLE: DOOR,AIRCRAFT, FSC 1560 airframe structural components supply"}
+{"id": "r4-0562", "label": "FIT", "role": "PRIME", "restriction": "SOLE_SOURCE", "evidence": "IMPELLER,COMPRESSOR NSN 2835-01-044-7730; available from only one or limited sources"}
+{"id": "r4-0563", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "procure a complete, stationary, top-loading electric deep pit furnace"}
+{"id": "r4-0564", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Purchase, delivery, and installation of precast single vault toilet"}
+{"id": "r4-0568", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Rental of two 60-ton Chill Water Systems, PSC W035"}
+{"id": "r4-0569", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Enterprise Encounter-Based Endoscopy Video Imaging System, medical equipment special notice"}
+{"id": "r4-0570", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 1650-012047657 DAMPENER,FLUID PRESSURE; Current Approved Sources: ARKWIN INDUSTRIES"}

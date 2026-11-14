@@ -1,0 +1,35 @@
+{"id": "r4-0697", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Four each of NSN 1680-01-263-0648, F-16 Grip Assembly; TDP provided"}
+{"id": "r4-0699", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "JLM Roll Up Door Replacement, N099 Installation of Equipment"}
+{"id": "r4-0700", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5950012448263 COIL,ELECTRICAL Qty 21; Approved source is 99643 30987-1"}
+{"id": "r4-0701", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "CHASSIS, FSC 5998; screws mentioned only as workmanship criteria"}
+{"id": "r4-0703", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PARTS KIT,BALL VALV, FSC 4820 valves, total small business set-aside"}
+{"id": "r4-0705", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "59--JUNCTION BOX, FSC 5975 electrical hardware, small business set-aside"}
+{"id": "r4-0706", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "PLATE,MOUNTING, FSC 5340 hardware, not computer or IT equipment"}
+{"id": "r4-0711", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Four each of NSN 1680-01-263-0648, F-16 Grip Assembly; TDP provided"}
+{"id": "r4-0712", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "ROD,THREADED END, FSC 5306 bolts, small business set-aside"}
+{"id": "r4-0713", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Construct New MRI/CT Building, Y1DZ construction project"}
+{"id": "r4-0715", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "construction renovation; PIV post indicator valve replaced as part of project scope"}
+{"id": "r4-0716", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "4 each of NSN 1650-00-404-6550, C-130 piston linear actuator"}
+{"id": "r4-0718", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "SKIN,AIRCRAFT, FSC 1560 airframe structural components"}
+{"id": "r4-0723", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Assorted Cap Screws, FSC Code is 5305, 100% Small Business Set Aside"}
+{"id": "r4-0724", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "FIBER,TRANS,4, PSC 7G21; state OEM CAGE and part number offered"}
+{"id": "r4-0725", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Moron Air Base Postal Services, R613 performance work statement"}
+{"id": "r4-0726", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "59--CABLE ASSEMBLY, FSC 5930, small business set-aside"}
+{"id": "r4-0727", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5945008375279 RELAY,THERMAL Qty 47; Approved source is 27192 6957ED14-6A"}
+{"id": "r4-0731", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5330012046231 SEAL,AIRCRAFT,STRUCTUR; Approved sources are 43999 L3010052-001"}
+{"id": "r4-0732", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "CAP,VALVE: Bonnet for a size 3 inch Ball Valve, FSC 4820"}
+{"id": "r4-0734", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "AMC/A6 Information Technology Needs CSO, PSC DA01, AOI-based submissions"}
+{"id": "r4-0738", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5985015717458 TRIPOD,ANTENNA; Approved source is 14304 RF-392-AT001"}
+{"id": "r4-0741", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "MOISTURE SEPARATOR; This RFQ is for a repair requirement"}
+{"id": "r4-0744", "label": "FIT", "role": "PRIME", "restriction": "SOLE_SOURCE", "evidence": "manufacture of 11 EA VLV, REGUL PRESSURE; negotiate with only one source"}
+{"id": "r4-0746", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "This solicitation is for repair. This is a sole source requirement"}
+{"id": "r4-0748", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "intends to solicit The Boeing Company for Beowulf DDI&T follow-on"}
+{"id": "r4-0750", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "15--PANEL,STRUCTURAL,AI, FSC 1560, NAICS 336413, critical safety item"}
+{"id": "r4-0752", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5945013553743 SOLENOID,ELECTRICAL; Approved sources are 08080 K309-000460"}
+{"id": "r4-0754", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Tinker AFB 2026 Multiple Award Construction Contract, Z2JZ"}
+{"id": "r4-0756", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5325004970724 STUD,TURNLOCK FASTENER; source controlled drawing item, approved sources"}
+{"id": "r4-0757", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "replacement and disposal of the 150kVA emergency power diesel generator"}
+{"id": "r4-0758", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Sources sought: automated ultrasound-based fracture detection technologies, BARDA planning"}
+{"id": "r4-0759", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "sole source basis with Sikorsky for the repair of CONTROL PANEL, AIRCR"}
+{"id": "r4-0760", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "replace four attic exhaust fans; fasteners only incidental to installation"}
+{"id": "r4-0761", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Correct Storm Water Drainage construction at Salem VA Medical Center"}

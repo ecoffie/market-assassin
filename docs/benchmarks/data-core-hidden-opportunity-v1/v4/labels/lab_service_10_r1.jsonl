@@ -1,0 +1,35 @@
+{"id":"r4-0787","label":"NO","role":"NONE","evidence":"Valve disk supply; guard word appears only in boilerplate clauses"}
+{"id":"r4-0788","label":"NO","role":"NONE","evidence":"Lease of historic dune shack; landscape mentioned only as preservation requirement"}
+{"id":"r4-0791","label":"NO","role":"NONE","evidence":"Pilot spin recovery training; no cleaning work"}
+{"id":"r4-0792","label":"FIT","role":"PRIME","evidence":"Janitorial services contractor to clean National Weather Service office, Sioux Falls"}
+{"id":"r4-0794","label":"PARTIAL","role":"SUB","evidence":"Demolition and modular office construction; scope lists site improvements including landscaping"}
+{"id":"r4-0801","label":"PARTIAL","role":"SUB","evidence":"Construction repository listing HVAC work among carpentry, plumbing, electrical trades"}
+{"id":"r4-0802","label":"NO","role":"NONE","evidence":"Procurement of an electric deep pit furnace; no guard services"}
+{"id":"r4-0803","label":"PARTIAL","role":"SUB","evidence":"VA emergency department renovation including Division 23 HVAC sections"}
+{"id":"r4-0805","label":"NO","role":"NONE","evidence":"Postal services contract; security access only a compliance requirement"}
+{"id":"r4-0810","label":"NO","role":"NONE","evidence":"Caretaker services with security patrols and grounds upkeep; no office cleaning stated"}
+{"id":"r4-0812","label":"PARTIAL","role":"SUB","evidence":"Construction repository listing HVAC work among carpentry, plumbing, electrical trades"}
+{"id":"r4-0814","label":"FIT","role":"PRIME","evidence":"Remove and replace two Bard HVAC units, NAICS 238220, small business set-aside"}
+{"id":"r4-0815","label":"NO","role":"NONE","evidence":"Fire alarm system repair; Coast Guard security only ID requirement"}
+{"id":"r4-0817","label":"NO","role":"NONE","evidence":"Holiday decoration furnishing and installation, not landscaping or grounds maintenance"}
+{"id":"r4-0818","label":"NO","role":"NONE","evidence":"Telebehavioral crisis assessment by prescribing providers, not nurse staffing"}
+{"id":"r4-0821","label":"FIT","role":"PRIME","evidence":"Unarmed Access Control Officers and Escort support services, 8(a) set-aside"}
+{"id":"r4-0824","label":"NO","role":"NONE","evidence":"Design-build warehouse construction; clean only as finishings description"}
+{"id":"r4-0826","label":"NO","role":"NONE","evidence":"Stevedoring and terminal services in Bahrain; no guard service procured"}
+{"id":"r4-0827","label":"FIT","role":"PRIME","evidence":"Mowing and maintenance services for dam reservoir and lake"}
+{"id":"r4-0828","label":"FIT","role":"PRIME","evidence":"Prefabricated steel sheds with installation labor solicitation"}
+{"id":"r4-0829","label":"NO","role":"NONE","evidence":"Surgical suite renovation construction; nurse call is only a spec section"}
+{"id":"r4-0830","label":"NO","role":"NONE","evidence":"VTC and audio-visual conference room upgrade; ID forms are access boilerplate"}
+{"id":"r4-0832","label":"NO","role":"NONE","evidence":"Meals for Iowa Army National Guard training; National Guard is just a name"}
+{"id":"r4-0833","label":"FIT","role":"PRIME","evidence":"John Day Dam Powerhouse HVAC Upgrades solicitation with specifications and drawings"}
+{"id":"r4-0834","label":"NO","role":"NONE","evidence":"Flooring replacement construction; security language is site access boilerplate"}
+{"id":"r4-0838","label":"NO","role":"NONE","evidence":"Ball valve supply; no guard services"}
+{"id":"r4-0841","label":"PARTIAL","role":"SUB","evidence":"Trailhead site work: retaining walls, compacted aggregate trails, picnic sites, revegetation"}
+{"id":"r4-0843","label":"NO","role":"NONE","evidence":"Design-build recreation center renovation; HVAC not explicitly stated"}
+{"id":"r4-0844","label":"NO","role":"NONE","evidence":"Stevedoring and terminal services in Israel ports; no guard contract"}
+{"id":"r4-0846","label":"FIT","role":"PRIME","evidence":"Landscaping services for Eureka CA Weather Forecast Office"}
+{"id":"r4-0848","label":"FIT","role":"PRIME","evidence":"Market survey for janitorial services at FAA facilities, NAICS 561720"}
+{"id":"r4-0851","label":"NO","role":"NONE","evidence":"Air Force housing privatization management advisory services; security only a PWS section"}
+{"id":"r4-0852","label":"NO","role":"NONE","evidence":"G7 event management and logistics support; no nurse staffing"}
+{"id":"r4-0857","label":"NO","role":"NONE","evidence":"Janitorial services for ranger district; no steel erection or roofing"}
+{"id":"r4-0858","label":"NO","role":"NONE","evidence":"Ball valve parts kit supply; no guard services"}

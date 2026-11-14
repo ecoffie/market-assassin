@@ -1,0 +1,35 @@
+{"id": "r4-0274", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5999145868645 HEAT SINK-INSULATOR; Approved sources are 7PZX0, F0579"}
+{"id": "r4-0277", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "inspection, maintenance, and repair of all elevators systems"}
+{"id": "r4-0279", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "VALVE,CHECK; Complete Lift Check Valve per NAVSHIPS Drawing 845-4687721"}
+{"id": "r4-0281", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Maintenance Service Contract for Doosan Forklifts; PM procedures"}
+{"id": "r4-0282", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "61--CABLE ASSEMBLY, PSC 6150, first article approval"}
+{"id": "r4-0283", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Janitorial services for ranger district; services requirement"}
+{"id": "r4-0284", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "WING ASSEMBLY,AIRCR; requires engineering source approval; approved source(s)"}
+{"id": "r4-0285", "label": "PARTIAL", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "FUSE,HYDRAULIC SYST PSC 4820; items require government source approval prior to award"}
+{"id": "r4-0286", "label": "FIT", "role": "SUB", "restriction": "SOLE_SOURCE", "evidence": "COMPUTER,AIR DATA F-16 NSN 6610-01-621-9255; only one source, Honeywell"}
+{"id": "r4-0287", "label": "PARTIAL", "role": "PRIME", "restriction": "NONE", "evidence": "Sources sought VISN 2 Downstate General Radiopharmaceuticals, PSC 6505"}
+{"id": "r4-0288", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "STUFFING BOX ASSEMB PSC 2040; marine hardware, not fastener"}
+{"id": "r4-0289", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Lightning Protection upgrades construction services, VA Medical Center"}
+{"id": "r4-0291", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Procurement of classroom equipment for US Embassy Yerevan"}
+{"id": "r4-0292", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PUMP,AXIAL PISTONS NSN 1650-01-523-8294 replacement parts, repair/modification"}
+{"id": "r4-0295", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "TRANSMISSION, MECHANICAL, NSN 1680011438497RK, PN NF53301-02A; pre-solicitation synopsis"}
+{"id": "r4-0297", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Aircraft Electrical Component Test Stand procurement and installation services"}
+{"id": "r4-0298", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "PARTS KIT,VALVE,OVERHAUL NSN 1660-00-442-2007; Approved Sources listed; SAR package"}
+{"id": "r4-0299", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5963016511646 ELECTRONIC MODULE; source controlled drawing item, approved source"}
+{"id": "r4-0300", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Annual Service Contract on a flow cytometer system"}
+{"id": "r4-0301", "label": "FIT", "role": "PRIME", "restriction": "OEM_ONLY", "evidence": "Spare parts for MH-65E seats; BAE is the OEM and only distributor"}
+{"id": "r4-0302", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "USAFE Fire Trainer Maintenance Services sources sought"}
+{"id": "r4-0304", "label": "PARTIAL", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "48--DISK,VALVE, IN REPAIR/MODIFICATION OF; EAF repair requirement"}
+{"id": "r4-0307", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 6532015254062 BLANKET,HEATING; Approved source is 33JE3"}
+{"id": "r4-0313", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PARTS KIT,BALL VALV PSC 4820; Navy supply solicitation"}
+{"id": "r4-0318", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "36--CANISTER PSC 3655; not electrical or electronic component"}
+{"id": "r4-0319", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "VALVE,BUTTERFLY PSC 4820 Navy supply solicitation"}
+{"id": "r4-0320", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Epinephrine 0.3 MG auto-injector; pharmaceutical, not computer hardware"}
+{"id": "r4-0321", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Custom R&D industrial furnace design, fabricate, commission"}
+{"id": "r4-0322", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "48--VALVE ASSEMBLY,MANI PSC 4820; first article approval"}
+{"id": "r4-0323", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "construction of new boiler plant and demolition, seismic deficiencies"}
+{"id": "r4-0324", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "LASER SERVICES Holmium lasers, RFI sources sought, services"}
+{"id": "r4-0325", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "53--KEY PSC 5315; not an electrical component"}
+{"id": "r4-0326", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "BOLT PSC 5306; first article testing"}
+{"id": "r4-0336", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "LOGICARE patient instructions license; Sole Source to Four Points Technology"}
+{"id": "r4-0337", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "SCREW,MACHINE PSC 5305 Navy supply RFQ"}

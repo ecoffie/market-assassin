@@ -1,0 +1,35 @@
+{"id":"r4-0571","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5996014397962 AMPLIFIER,RADIO FREQUE; Approved source is 1NUQ8 FLA-I-122-152-12829"}
+{"id":"r4-0572","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"AC POWER CONVERTER, PSC 1680 aircraft accessories supply solicitation"}
+{"id":"r4-0573","label":"NO","role":"NONE","restriction":"NONE","evidence":"Renovate Building 1203 mechanical systems construction project, PIV replaced as scope"}
+{"id":"r4-0576","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PARTS KIT BALL VALV, PSC 4820 valves"}
+{"id":"r4-0579","label":"NO","role":"NONE","restriction":"OEM_ONLY","evidence":"annual OEM authorized commercial maintenance plan for AMT brand equipment"}
+{"id":"r4-0581","label":"PARTIAL","role":"PRIME","restriction":"BRAND_NAME","evidence":"iFOBT Brand Name Polymedco cost per reportable result, reagents, supplies, analyzer service"}
+{"id":"r4-0587","label":"NO","role":"NONE","restriction":"NONE","evidence":"Denver P&DC Roof Replacement construction; re-fastening only incidental"}
+{"id":"r4-0590","label":"NO","role":"NONE","restriction":"NONE","evidence":"Technical/Project Management Support services task order under SeaPort NxG"}
+{"id":"r4-0592","label":"NO","role":"NONE","restriction":"NONE","evidence":"design, fabricate, deliver and commission a custom industrial furnace"}
+{"id":"r4-0593","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 6515014495924 ADMINISTRATION SET,INT; Approved sources are 1G026, 30TR5, 6ESG8"}
+{"id":"r4-0595","label":"NO","role":"NONE","restriction":"NONE","evidence":"CIRCUIT CARD ASSEMB, PSC 5998, not fasteners"}
+{"id":"r4-0597","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"PIPE FITTINGS - FITTING ASSY, PSC 4730, NAICS 332912 valve and hose fitting"}
+{"id":"r4-0598","label":"NO","role":"NONE","restriction":"NONE","evidence":"Condensate Pump Replacement at West Haven VAMC, NAICS 238220 services"}
+{"id":"r4-0599","label":"NO","role":"NONE","restriction":"NONE","evidence":"replace existing solar system batteries, NAICS 238210 electrical contractors"}
+{"id":"r4-0606","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"sole source to SIRSI CORPORATION for EOS library software subscription"}
+{"id":"r4-0608","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"LEVEL 1 Studs, PSC 5307; requires CMMC Level 2"}
+{"id":"r4-0609","label":"NO","role":"NONE","restriction":"NONE","evidence":"Albany VAMC Bulk Road Salt, PSC 6810 chemicals"}
+{"id":"r4-0610","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"VISN 4 Coagulation Testing, PSC 6550 diagnostic testing for nine VA medical centers"}
+{"id":"r4-0614","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"deliver and install Thermo Scientific blood bank refrigerators and freezer"}
+{"id":"r4-0615","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 5930016544948 SWITCH ASSEMBLY, Qty 96"}
+{"id":"r4-0616","label":"NO","role":"NONE","restriction":"NONE","evidence":"procurement and installation of Aircraft Electrical Component Test Stand (AECTS)"}
+{"id":"r4-0617","label":"PARTIAL","role":"PRIME","restriction":"SOLE_SOURCE","evidence":"53--KEY NSN 1H-5315-016416696-D4; only one source under FAR 6.302-1"}
+{"id":"r4-0619","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 1560-007802339 MANIFOLD,ENGINE AIR, IQC 5-year small business set aside"}
+{"id":"r4-0620","label":"NO","role":"NONE","restriction":"NONE","evidence":"Electrical/Mechanical Technician Support on-site labor services at CMOP Chelmsford"}
+{"id":"r4-0622","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"F-16 BATTERY,STORAGE NSN 6140010550435WF, 11 EA"}
+{"id":"r4-0626","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"GUIDE GOVERNOR valve guide P/N 365203 per Dresser-Rand drawings, PSC 4820"}
+{"id":"r4-0627","label":"NO","role":"NONE","restriction":"NONE","evidence":"Hawaii National Marine Sanctuary Vessel Charter Services, NAICS 483114"}
+{"id":"r4-0628","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"59--CIRCUIT CARD ASSY, PSC 5998 electronic component"}
+{"id":"r4-0630","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"16--HOISTING UNIT, PSC 1680 aircraft accessories, AS9100 quality"}
+{"id":"r4-0632","label":"PARTIAL","role":"PRIME","restriction":"BRAND_NAME","evidence":"KitCheck RFID crash carts, PSC 6515, station scans RFID tagged medications"}
+{"id":"r4-0633","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"48--MANIFOLD ASSEMBLY AND SIMILAR REPLACEMENT PARTS, PSC 4820"}
+{"id":"r4-0634","label":"PARTIAL","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 6625015007981 METER,ELECTRICAL FREQU; Approved sources 6Z382, 88416, 96169"}
+{"id":"r4-0635","label":"NO","role":"NONE","restriction":"NONE","evidence":"Building 592 renovations, 8(a) MACC construction set-aside"}
+{"id":"r4-0636","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 1560016879695 STIFFENER,AIRCRAFT; Approved source is 81205 5-87829-128"}
+{"id":"r4-0638","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"F-16 Piston, Reaction Cyl, 12 each of NSN 1680-01-052-0832"}

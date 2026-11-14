@@ -1,0 +1,35 @@
+{"id":"r4-0543","label":"PARTIAL","role":"SUB","evidence":"Design-build modernization of Army Reserve Center; HVAC systems failing and to be replaced"}
+{"id":"r4-0544","label":"NO","role":"NONE","evidence":"HVAC replacement; grounds mentioned only as restoring areas damaged by construction"}
+{"id":"r4-0546","label":"NO","role":"NONE","evidence":"Industrial wastewater treatment plant construction; ground only in demolition lowering text"}
+{"id":"r4-0547","label":"PARTIAL","role":"SUB","evidence":"Housing decommissioning requires metal roofing system on existing purlins in technical proposal"}
+{"id":"r4-0556","label":"NO","role":"NONE","evidence":"Navy supply item HMI panel; mercury clause only"}
+{"id":"r4-0557","label":"NO","role":"NONE","evidence":"Design-build cyber operations facility; security means technical standards, not guards"}
+{"id":"r4-0558","label":"PARTIAL","role":"SUB","evidence":"Paving IDIQ; projects may include landscaping, electrical, and drainage work"}
+{"id":"r4-0560","label":"NO","role":"NONE","evidence":"HDPE waterline replacement; steel only as survey stakes"}
+{"id":"r4-0565","label":"NO","role":"NONE","evidence":"Ergonomic workstation furniture installation; no guard services"}
+{"id":"r4-0566","label":"FIT","role":"PRIME","evidence":"Roads, parking, grounds renovation including asphalt paving, earthwork, site restoration, NAICS 237310"}
+{"id":"r4-0567","label":"PARTIAL","role":"SUB","evidence":"Design-build remediation of parking lots, sidewalks, curbs, landscaping, signage"}
+{"id":"r4-0574","label":"NO","role":"NONE","evidence":"Snow removal services; no nursing or medical staffing"}
+{"id":"r4-0575","label":"NO","role":"NONE","evidence":"Construction management and physical security enhancements, not guard services"}
+{"id":"r4-0577","label":"PARTIAL","role":"SUB","evidence":"Demolition and modular office build; site improvements include landscaping"}
+{"id":"r4-0578","label":"NO","role":"NONE","evidence":"Holiday decoration design, installation and removal, not grounds maintenance"}
+{"id":"r4-0580","label":"FIT","role":"PRIME","evidence":"Snow plowing and shoveling at Westville Lake project areas, NAICS 561730"}
+{"id":"r4-0582","label":"NO","role":"NONE","evidence":"Construction of modular MRI/CT building; no staffing"}
+{"id":"r4-0583","label":"NO","role":"NONE","evidence":"Surgical suite renovation; HVAC not explicitly stated in text shown"}
+{"id":"r4-0584","label":"NO","role":"NONE","evidence":"FUDS program management and community relations support, no guard services"}
+{"id":"r4-0585","label":"NO","role":"NONE","evidence":"Roof drainage gutter maintenance only; not steel building or metal roofing"}
+{"id":"r4-0586","label":"NO","role":"NONE","evidence":"Dam spillway reconstruction; guard text absent, vegetation protection only"}
+{"id":"r4-0588","label":"NO","role":"NONE","evidence":"Meeting and event facilities BPA; security guards only a classified meeting clause"}
+{"id":"r4-0589","label":"NO","role":"NONE","evidence":"Surgical suite renovation with demolition; no paving work shown"}
+{"id":"r4-0591","label":"FIT","role":"SUB","evidence":"Service road project restricted to listed Civil/Paving MACC contractors only"}
+{"id":"r4-0594","label":"NO","role":"NONE","evidence":"Cost share reimbursement to Georgian center for its security services, not guard contract"}
+{"id":"r4-0596","label":"FIT","role":"PRIME","evidence":"Road maintenance grading on Forest Service roads, NAICS 237310 small business set-aside"}
+{"id":"r4-0600","label":"NO","role":"NONE","evidence":"Psychological evaluation service, not nursing or medical staffing"}
+{"id":"r4-0601","label":"NO","role":"NONE","evidence":"Jetty repair industry day; asphalt walkway merely removed and discarded"}
+{"id":"r4-0602","label":"FIT","role":"PRIME","evidence":"Grounds maintenance services for Riverside National Cemetery, landscape maintenance PWS"}
+{"id":"r4-0603","label":"FIT","role":"PRIME","evidence":"Mechanical construction MATOC replacing air handling unit, NAICS 238220, HVAC work"}
+{"id":"r4-0604","label":"FIT","role":"PRIME","evidence":"Mowing and maintenance service IDIQ for Summersville Lake 2027-2031"}
+{"id":"r4-0605","label":"NO","role":"NONE","evidence":"Nuclear seal ring supply item; contract clause text only"}
+{"id":"r4-0607","label":"NO","role":"NONE","evidence":"Range maintenance and repair of training areas, no HVAC work stated"}
+{"id":"r4-0611","label":"NO","role":"NONE","evidence":"Park enhancements IFB; no paving scope stated, only vendor list text"}
+{"id":"r4-0612","label":"NO","role":"NONE","evidence":"Cooking services for Marine Security Guards, not guard services"}

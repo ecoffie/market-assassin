@@ -1,0 +1,35 @@
+{"id": "r4-0339", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "U008 TCCC training services, not supplies"}
+{"id": "r4-0340", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "clinical research sites support, no IT hardware purchase item"}
+{"id": "r4-0341", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "ultrasound AI fracture detection technology RFI, not supplies"}
+{"id": "r4-0343", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "VALVE ASSEMBLY,MANI in repair/modification; FAR 6.302-1 one source"}
+{"id": "r4-0345", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "VALVE,SAFETY RELIEF NSN 4820 014645994 PART NUMBER 94-D-277"}
+{"id": "r4-0346", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "consultant capacity for regulatory review, services"}
+{"id": "r4-0347", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "fire trainer maintenance services, parts incidental"}
+{"id": "r4-0351", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "E-6B depot maintenance repair and overhaul services"}
+{"id": "r4-0356", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "manufacture requirements for the VALVE,PLUG PSC 4820"}
+{"id": "r4-0358", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "QUILL ASSY,AIRCRAFT PSC 1680 solicitation"}
+{"id": "r4-0360", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "eFOIA cloud-native software system, not hardware"}
+{"id": "r4-0361", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "BOLT BLANK NSN 5306015466220; Approved source is 4U884 5165336-99"}
+{"id": "r4-0362", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "CONVERTER,SIGNAL DA overhaul/repair contract"}
+{"id": "r4-0363", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "HVAC repair and modernization OTA construction work"}
+{"id": "r4-0364", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "stationary electric deep pit furnace, outside computer hardware"}
+{"id": "r4-0365", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "ARCHIBUS workplace management support services"}
+{"id": "r4-0366", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "VALVE, GLOBE PSC 4820, not fasteners"}
+{"id": "r4-0368", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Enterprise Data Platform RFP, software/services"}
+{"id": "r4-0369", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "abatement and flooring BPA questions and answers"}
+{"id": "r4-0371", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Building 2 Steam Station Replacement construction"}
+{"id": "r4-0372", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "ICBM Bulkhead Assembly 40 each NSN 1420-01-390-4419"}
+{"id": "r4-0374", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "IGNITER, SPARK, A/C HEATER NSN 1660-012958869 source(s) of supply listed"}
+{"id": "r4-0377", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "fire trainer maintenance non-personal services"}
+{"id": "r4-0378", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "procurement of Washers PSC 5310 solicitation W519TC27QA032"}
+{"id": "r4-0379", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "ICBM Bulkhead Assembly 40 each NSN 1420-01-390-4419"}
+{"id": "r4-0381", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "USNIC SAR Data Recompete, no item evidence"}
+{"id": "r4-0382", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "fire suppression installation service, fasteners incidental"}
+{"id": "r4-0384", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "AIRCRAFT COMPONENTS repair; This is a sole source requirement"}
+{"id": "r4-0386", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "VALVE,BALL 1.000NPS PSC 4820, not fasteners"}
+{"id": "r4-0387", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "STEM,FLUID VALVE PSC 4820, not fasteners"}
+{"id": "r4-0388", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "campaign analysis support services"}
+{"id": "r4-0390", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "PARTS KIT,BALL VALV PSC 4820, not fasteners"}
+{"id": "r4-0391", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "VALVE,BALL PSC 4820, not fasteners"}
+{"id": "r4-0394", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "deposit-level paint services for HC-144 aircraft"}
+{"id": "r4-0395", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "SYNTHESIZER,ELECTRI in repair/modification of, repair"}

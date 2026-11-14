@@ -1,0 +1,35 @@
+{"id": "r4-0208", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "30--GEAR, PINION is mechanical drive component not electronic"}
+{"id": "r4-0210", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "F-16 Piston, Reaction Cyl NSN 1680-01-052-0832 aircraft component"}
+{"id": "r4-0213", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "BOLT,EXTERNALLY REL PSC 5306 solicitation for bolts"}
+{"id": "r4-0214", "label": "PARTIAL", "role": "PRIME", "restriction": "NONE", "evidence": "6505 Ramipril capsules drug, neighbouring family to medical supplies"}
+{"id": "r4-0215", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Backup power generator design-build construction, valves only in certification list"}
+{"id": "r4-0216", "label": "PARTIAL", "role": "SUB", "restriction": "UNCLEAR", "evidence": "purchase, remove/replace primary logic controller unit Albany UltraFast door, authorized businesses"}
+{"id": "r4-0217", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "USCGC drydock repair work items, ship repair service"}
+{"id": "r4-0218", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "sole-source preventive maintenance technician service for Danobat Spherical Grinder"}
+{"id": "r4-0219", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "59-- electronic component in repair/modification of, repair service not hardware sale"}
+{"id": "r4-0224", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "RECEIVER SUBASSEMBL, no evidence of computer hardware or IT equipment"}
+{"id": "r4-0225", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "53--SCREW,MACHINE PSC 5305 Screw, Flat Head for Navy submarines"}
+{"id": "r4-0226", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Maintenance Service Contract for Doosan Forklifts, labour service"}
+{"id": "r4-0228", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "repair to Ready For Issue condition NRP,USSR,AIRCRAFT in repair/modification"}
+{"id": "r4-0230", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "TAILPIECE,VALVE PSC 4820 solicitation, valve component"}
+{"id": "r4-0232", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Vertical Transportation Equipment maintenance, repair and inspection services"}
+{"id": "r4-0235", "label": "PARTIAL", "role": "PRIME", "restriction": "NONE", "evidence": "Epinephrine 0.3 MG/0.3 ML Injection Auto-Injector, pharmaceutical requirements contract"}
+{"id": "r4-0237", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "NSN 2840-01-276-9822NZ NOUN: SEAL, AIR, AIRCRAFT special notice"}
+{"id": "r4-0238", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "replacement and disposal of 150kVA diesel generator, installation construction"}
+{"id": "r4-0241", "label": "PARTIAL", "role": "PRIME", "restriction": "NONE", "evidence": "6505 Nitroglycerin Patches RFP drug, neighbouring family to medical supplies"}
+{"id": "r4-0243", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "eFOIA cloud-native software system via Commercial Solutions Opening"}
+{"id": "r4-0245", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "design and installation of Active Vehicle Barrier Control System, construction"}
+{"id": "r4-0250", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "backup power and control system improvements engineering, integration, commissioning services"}
+{"id": "r4-0251", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "SCREW,CAP,HEXAGON H PSC 5305 furnished under this contract"}
+{"id": "r4-0252", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 6515016775151 SUCTION APPARATUS,SURG; Approved source is 0UJ27"}
+{"id": "r4-0253", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "ITS4US Deployment Accelerator BAA, open-source transit software pilots"}
+{"id": "r4-0255", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 1560-01-646-5571 PANEL, STRUCTURAL, AIRCRAFT; Approved sources are H&R Parts"}
+{"id": "r4-0256", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Facilities Operation and Maintenance Services NAMRU-S, support service"}
+{"id": "r4-0260", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "RCMI & CDM Support Services revenue cycle administrative services"}
+{"id": "r4-0261", "label": "PARTIAL", "role": "PRIME", "restriction": "NONE", "evidence": "Filgrastim Biosimilar PSC 6505 presolicitation, drug neighbouring medical supplies"}
+{"id": "r4-0263", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB PSC 5998 solicitation"}
+{"id": "r4-0264", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Urology Equipment Site Prep construction renovation of rooms"}
+{"id": "r4-0266", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Industry Day announcement construction Callao Naval Base, no product buy"}
+{"id": "r4-0268", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "BPA Bolt, Nut, Screw, Rivet & Washer Manufacturing PSC 5305,5306,5307,5310"}
+{"id": "r4-0270", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Vertical Transportation Equipment maintenance, repair and inspection services"}
+{"id": "r4-0271", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "sole-source commercial ground fuels delivery, not computer hardware"}

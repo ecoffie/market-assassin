@@ -1,0 +1,35 @@
+{"id":"r4-0639","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5340016814463 RETAINER,NUT AND BOLT; Approved source is 51439 FTR-483-A-2-.125-S"}
+{"id":"r4-0640","label":"NO","role":"NONE","restriction":"NONE","evidence":"Condensate Pump Replacements IAW the attached Performance Work Statement, NAICS 238220"}
+{"id":"r4-0644","label":"PARTIAL","role":"SUB","restriction":"NONE","evidence":"Complete Component Parts Kits: Support Depot remanufacture of landing gear DLRs"}
+{"id":"r4-0646","label":"NO","role":"NONE","restriction":"NONE","evidence":"qualified sources capable of performing electric upgrades at Lac qui Parle Dam"}
+{"id":"r4-0649","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Screws; The FSC Code is 5305 and the NAICS code is 332722"}
+{"id":"r4-0650","label":"NO","role":"NONE","restriction":"OEM_ONLY","evidence":"Open, Inspect, Report with possible repair; replacement parts shall be new OEM parts"}
+{"id":"r4-0652","label":"NO","role":"NONE","restriction":"NONE","evidence":"VALVE ASSEMBLY,MANI, IN REPAIR/MODIFICATION OF; aviation repair requirement, not supply"}
+{"id":"r4-0654","label":"NO","role":"NONE","restriction":"NONE","evidence":"Repair Taxiway Alpha & Bravo: mill and overlay of airfield paving, construction"}
+{"id":"r4-0655","label":"NO","role":"NONE","restriction":"NONE","evidence":"STATEMENT OF WORK for the HSR Main Arc Dipole and Quadrupole Power Supplies"}
+{"id":"r4-0658","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5930012233397 SWITCH ASSEMBLY; Approved source is 81590 348-754-3786-001"}
+{"id":"r4-0659","label":"NO","role":"NONE","restriction":"NONE","evidence":"Tri-Annual Electrical Inspection service; replace missing panel screws incidental to maintenance"}
+{"id":"r4-0660","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"WASHER,FLAT must be manufactured in accordance with NASM15795, part number NASM15795-810"}
+{"id":"r4-0662","label":"NO","role":"NONE","restriction":"NONE","evidence":"non-personal solid waste management services for U.S. Army Garrison Fort Buchanan"}
+{"id":"r4-0664","label":"NO","role":"NONE","restriction":"NONE","evidence":"12-Foot Pull-Behind Tractor Grader, Johnson Manufacturing 1200RS or equal"}
+{"id":"r4-0665","label":"NO","role":"NONE","restriction":"NONE","evidence":"relocation and moving services for the VA Medical Center pharmacy move"}
+{"id":"r4-0666","label":"FIT","role":"PRIME","restriction":"SOLE_SOURCE","evidence":"SCREW,MACHINE NIIN 010877548; intends to solicit and negotiate with Only One Responsible Source"}
+{"id":"r4-0668","label":"NO","role":"NONE","restriction":"NONE","evidence":"Sump Grease Traps-Oil Water Separator (GT-OWS) Services for DPW facilities"}
+{"id":"r4-0669","label":"NO","role":"NONE","restriction":"NONE","evidence":"TEE Scanning System, a specialized medical imaging device; heart valve is anatomy"}
+{"id":"r4-0670","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"procure Thin Layer Explosive (TLX), Detonating Cord Assembly; valid Qualification Acceptance Letter required"}
+{"id":"r4-0671","label":"NO","role":"NONE","restriction":"NONE","evidence":"VALVE,CHECK per Emerson drawing DS-B-90380; a valve, not a fastener"}
+{"id":"r4-0674","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NUT,PLAIN,HEXAGON, FSC 5310, total small business set-aside with first article"}
+{"id":"r4-0675","label":"NO","role":"NONE","restriction":"NONE","evidence":"JLM Roll Up Door Replacement IAW Statement of Work, N099 Installation of Equipment"}
+{"id":"r4-0677","label":"NO","role":"NONE","restriction":"UNCLEAR","evidence":"Remove and Replace Fire Sprinkler; only available to current Tinker AFB MACBOA holders"}
+{"id":"r4-0678","label":"NO","role":"NONE","restriction":"NONE","evidence":"Commercial Digital Intermediate Frequency Subsystem (DIFS) for SATCOM teleports, CSO call"}
+{"id":"r4-0679","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN: 4820-01-109-4813HS NOUN: VALVE, REGULATING, FL TOP DRAWING: 2-43916-5"}
+{"id":"r4-0680","label":"NO","role":"NONE","restriction":"NONE","evidence":"Facilities Operation and Maintenance Services, NAICS 561210 Facilities Support Services"}
+{"id":"r4-0682","label":"NO","role":"NONE","restriction":"NONE","evidence":"RFI for Group 1 and 2 UAS training, mission planning, simulation systems"}
+{"id":"r4-0683","label":"NO","role":"NONE","restriction":"NONE","evidence":"two (2) separate, independent, and equal-sized new Plastic Media Blast (PMB) booths"}
+{"id":"r4-0684","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"NOTICE OF INTENT TO AWARD A SOLE SOURCE CONTRACT; 1099 Pro software licenses"}
+{"id":"r4-0687","label":"NO","role":"NONE","restriction":"NONE","evidence":"Automated Blood Bank Solid Phase Analyzer and Associated Reagents/Consumables"}
+{"id":"r4-0689","label":"NO","role":"NONE","restriction":"NONE","evidence":"JLM Roll Up Door Replacement IAW Statement of Work, N099 Installation of Equipment"}
+{"id":"r4-0690","label":"NO","role":"NONE","restriction":"NONE","evidence":"Upgrade/Replace Site Utility Infrastructure, Project #598-22-115, construction"}
+{"id":"r4-0692","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"TAILPIECE,VALVE, FSC 4820, total small business set-aside"}
+{"id":"r4-0693","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 1560-01-699-3344 PARTS KIT,FASTENER; alternate offerors must submit SAR package"}
+{"id":"r4-0694","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"SCR,CAP,SLFLKG; self-locking screws must be marked with six dots"}

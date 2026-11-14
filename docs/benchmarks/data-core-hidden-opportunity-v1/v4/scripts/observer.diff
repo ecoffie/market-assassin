@@ -1,0 +1,12 @@
+diff --git a/src/lib/opportunities/find-opportunities.ts b/src/lib/opportunities/find-opportunities.ts
+index 8a3b8d349..c428b3a97 100644
+--- a/src/lib/opportunities/find-opportunities.ts
++++ b/src/lib/opportunities/find-opportunities.ts
+@@ -875,6 +875,7 @@ async function queryOpenNow(
+     const evidence_counts: EvidenceCounts = openEvidenceCounts(ranked);
+     if (p.company) evidence_counts.COMPANY_REGISTERED_CODE = ranked.filter((x) => x.label.tier === OPEN_TIER.COMPANY_CODE).length;
+     const sliced = ranked.slice(0, limit);
++    (globalThis as any).__A4_RANKED = { ranked, count, p }; // A4 EVAL OBSERVER (scratch worktree only, never committed)
+     const phrase = p.searchText || 'this work';
+ 
+     const items: HorizonItem[] = sliced.map(({ row: r, cls, label }) => {

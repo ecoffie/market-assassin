@@ -8,16 +8,16 @@ Eric's brief to Agent 3, "Search scope change: SAM.gov first".
 | Fact (read-only, production, 2026-11-14) | Value |
 |---|---|
 | `sam_opportunities` rows, all `source = 'sam.gov'` | 265,938 |
-| Open now (`response_deadline > now()`) | 10,797 |
-| Open and bought by DLA (published on SAM.gov) | 4,345 |
-| Open product notices (PSC begins with a digit) | 6,942 |
-| Open DLA product notices | 4,283 |
+| Open now as production search defines it (`active = true` and `response_deadline > now()`; corrected by Agent 3) | 9,716 |
+| Future deadline but inactive (not shown by any search; excluded) | 1,081 |
+| Open and bought by DLA (published on SAM.gov) | 4,211 |
+| Open product notices (PSC begins with a digit) | 6,575 |
 
 - FIND Open reads only `sam_opportunities`. DIBBS RFQs live in the separate `dibbs_rfqs` table and have never been in the benchmark,
   v1 through v3. **No benchmark row needs removing.**
-- The benchmark filter going forward is `sam_opportunities.source = 'sam.gov'` plus open now. DLA notices published on SAM.gov
+- The benchmark filter going forward is `sam_opportunities.source = 'sam.gov'` AND `active = true` AND `response_deadline > now()` (production's open definition, `map-filters.ts`). Active rows with no deadline (9,712) are shown by no search and are excluded until Eric decides. DLA notices published on SAM.gov
   stay in. DIBBS-only RFQs (rows existing only in `dibbs_rfqs`) are out.
-- Products are the majority of open SAM.gov work (64%), most of it DLA. A services-only benchmark would miss most of the corpus.
+- Products are the majority of open SAM.gov work (6,575 of 9,716, 68%). About 1,937 DIBBS solicitations also appear on SAM.gov and stay in scope through their SAM row. SBIR topics shown on the Open map are not SAM.gov and are left out. A services-only benchmark would miss most of the corpus.
 
 ## 2. Categories and phrasings
 
@@ -87,8 +87,7 @@ stated component. NO when the trade word comes from:
 
 - None from the benchmark itself; it is offline and read-only.
 - If search is narrowed to SAM.gov, DIBBS RFQs remain in their own panel (`DibbsPanel`, `/api/app/dibbs`) unless Eric decides
-  otherwise. Agent 3 owns the exact list of search surfaces that read `dibbs_rfqs` (from the code: Opportunity Map data and route,
-  opportunity detail, multisite briefings) and the proposed source filter.
+  otherwise. Agent 3 owns the exact list of search surfaces that read `dibbs_rfqs` and the proposed source filter. Agent 3's audit (correcting this note): the hidden DLA Map mode (off), the opportunity-detail fallback, the DIBBS panel and API, and the sync cron. The multisite briefings read `aggregated_opportunities`, not `dibbs_rfqs`.
 
 ## 6. Ready to run on approval
 

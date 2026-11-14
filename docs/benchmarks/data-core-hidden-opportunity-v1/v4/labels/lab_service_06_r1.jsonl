@@ -1,0 +1,35 @@
+{"id":"r4-0466","label":"FIT","role":"PRIME","evidence":"Refurbishment and fill media replacement of three cooling tower cells at health center"}
+{"id":"r4-0467","label":"NO","role":"NONE","evidence":"Coast Guard is agency name; buys propeller hub overhaul, not guard services"}
+{"id":"r4-0469","label":"NO","role":"NONE","evidence":"Demolition of old boiler plant building, not paving or site work"}
+{"id":"r4-0470","label":"NO","role":"NONE","evidence":"Backup power generator design-bid-build; HVAC only appears in referenced standards"}
+{"id":"r4-0471","label":"NO","role":"NONE","evidence":"Cutter STORIS operations and maintenance personnel; steel is vessel rules reference"}
+{"id":"r4-0472","label":"FIT","role":"PRIME","evidence":"Repair and resurfacing of three parking lots: crack sealing, patching, seal coating, striping"}
+{"id":"r4-0473","label":"FIT","role":"PRIME","evidence":"Requirement for one equipment shed under NAICS 332311 (though amendment cancels solicitation)"}
+{"id":"r4-0478","label":"NO","role":"NONE","evidence":"Industrial wastewater treatment plant upgrade construction; no grounds maintenance"}
+{"id":"r4-0479","label":"NO","role":"NONE","evidence":"Pedestrian bridge replacement restricted to listed MACC contractors; not paving scope"}
+{"id":"r4-0480","label":"PARTIAL","role":"PRIME","evidence":"Information monitoring and protection services under NAICS 561612 security guards category"}
+{"id":"r4-0481","label":"NO","role":"NONE","evidence":"Domestic water system correction; opening text only says see amendment"}
+{"id":"r4-0482","label":"PARTIAL","role":"SUB","evidence":"Car wash fabric tension shade structure with steel framework, plus repaving; design only"}
+{"id":"r4-0486","label":"PARTIAL","role":"SUB","evidence":"Blast booth housed in pre-engineered metal building, a stated component"}
+{"id":"r4-0494","label":"FIT","role":"PRIME","evidence":"Scheduled interior and exterior window cleaning services for FBI facility, small business set-aside"}
+{"id":"r4-0498","label":"FIT","role":"PRIME","evidence":"Snow plowing, shoveling and sanding services at dam, NAICS 561730 small business"}
+{"id":"r4-0499","label":"NO","role":"NONE","evidence":"Dredged material area construction; HVAC work explicitly excluded"}
+{"id":"r4-0503","label":"NO","role":"NONE","evidence":"Design-build healthcare facility construction MATOC; no guard services"}
+{"id":"r4-0504","label":"NO","role":"NONE","evidence":"Caterer meals; National Guard is only the issuing office"}
+{"id":"r4-0506","label":"NO","role":"NONE","evidence":"Boiler stack demolition and replacement construction; not guard services"}
+{"id":"r4-0507","label":"NO","role":"NONE","evidence":"Construction MACC; Air National Guard is only a location"}
+{"id":"r4-0509","label":"FIT","role":"PRIME","evidence":"Road reconstruction: subgrade construction, excavation, grading, aggregate surfacing, clearing and grubbing"}
+{"id":"r4-0511","label":"NO","role":"NONE","evidence":"Built-up roof replacement on two laboratory buildings; no HVAC work"}
+{"id":"r4-0513","label":"NO","role":"NONE","evidence":"Design-build recreation center renovation; no stated HVAC maintenance component"}
+{"id":"r4-0518","label":"FIT","role":"PRIME","evidence":"Custodial service for dormitory rooms, restrooms, administrative offices at two buildings"}
+{"id":"r4-0520","label":"PARTIAL","role":"SUB","evidence":"Groundwater treatment plant construction listing HVAC among building systems"}
+{"id":"r4-0524","label":"NO","role":"NONE","evidence":"Solid waste dumpster collection, not office building cleaning"}
+{"id":"r4-0526","label":"NO","role":"NONE","evidence":"Barn roofing, lead paint abatement, siding, and waterline; no grounds maintenance"}
+{"id":"r4-0527","label":"FIT","role":"PRIME","evidence":"On-site dialysis registered nurse personnel services at VA medical center"}
+{"id":"r4-0528","label":"NO","role":"NONE","evidence":"New parking garage construction; no guard services"}
+{"id":"r4-0529","label":"FIT","role":"PRIME","evidence":"RFP for custodial and related services at TSA location, airport"}
+{"id":"r4-0530","label":"NO","role":"NONE","evidence":"Crane and forklift rental with operator; National Guard is customer only"}
+{"id":"r4-0536","label":"FIT","role":"PRIME","evidence":"IDIQ MACC for new construction, renovation and repair of paving projects, NAICS 237310"}
+{"id":"r4-0537","label":"NO","role":"NONE","evidence":"Keyboard data equipment supply purchase, not cleaning services"}
+{"id":"r4-0539","label":"NO","role":"NONE","evidence":"Design-build cyber operations facility construction; security refers to building standards"}
+{"id":"r4-0540","label":"FIT","role":"PRIME","evidence":"Mowing and maintenance services IDIQ for Walhonding Area projects"}

@@ -1,0 +1,35 @@
+{"id": "r4-0212", "label": "FIT", "role": "PRIME", "evidence": "NAICS 561730; VAMC Providence seeking Landscaping and Snow Removal services, lawn mowing"}
+{"id": "r4-0220", "label": "FIT", "role": "PRIME", "evidence": "Tree Clearing and Tree Felling Services at Eufaula Lake, NAICS 561730"}
+{"id": "r4-0221", "label": "NO", "role": "NONE", "evidence": "Procures a spectrum analyzer supply item; no cleaning services"}
+{"id": "r4-0222", "label": "NO", "role": "NONE", "evidence": "Removal and replacement of domestic hot-water heaters; plumbing, not HVAC"}
+{"id": "r4-0223", "label": "NO", "role": "NONE", "evidence": "FRA Broad Agency Announcement for applied railroad research projects"}
+{"id": "r4-0227", "label": "NO", "role": "NONE", "evidence": "Procure a stationary top-loading electric deep pit furnace; no guard services"}
+{"id": "r4-0229", "label": "PARTIAL", "role": "SUB", "evidence": "Construction project to Replace Boilers 4 and 5; heating equipment component"}
+{"id": "r4-0231", "label": "NO", "role": "NONE", "evidence": "Durable Medical Equipment delivery services; no nurse staffing"}
+{"id": "r4-0233", "label": "NO", "role": "NONE", "evidence": "Purchase of utility task vehicle and track set; no building erection"}
+{"id": "r4-0234", "label": "NO", "role": "NONE", "evidence": "Canal pipeline and concrete construction; no security guard services"}
+{"id": "r4-0236", "label": "FIT", "role": "PRIME", "evidence": "Thin lift asphalt overlay, chip seal, asphalt concrete pavement patching, markings"}
+{"id": "r4-0239", "label": "FIT", "role": "PRIME", "evidence": "Complete landscaping, grounds and lawn care, and gardening services contract"}
+{"id": "r4-0240", "label": "NO", "role": "NONE", "evidence": "Navy supply buy for capstan variable speed control; clause boilerplate only"}
+{"id": "r4-0242", "label": "FIT", "role": "PRIME", "evidence": "Turf-care supplies and application services, NAICS 561730 Landscaping Services"}
+{"id": "r4-0244", "label": "NO", "role": "NONE", "evidence": "Pressure reducing valve supply; oxygen cleaning of parts, not janitorial"}
+{"id": "r4-0246", "label": "NO", "role": "NONE", "evidence": "Navy supply buy for towed array subassembly; no cleaning services"}
+{"id": "r4-0247", "label": "NO", "role": "NONE", "evidence": "Sole source amplifier modules purchase; security only refers to access controls"}
+{"id": "r4-0248", "label": "PARTIAL", "role": "SUB", "evidence": "Design-build ACP work includes site grading, subgrade preparation, paving, reinforced concrete"}
+{"id": "r4-0249", "label": "NO", "role": "NONE", "evidence": "Navy supply buy for rotary relay; contract clause text only"}
+{"id": "r4-0254", "label": "NO", "role": "NONE", "evidence": "Sole source Mastercam software license renewal; no guard services"}
+{"id": "r4-0257", "label": "NO", "role": "NONE", "evidence": "Snow removal only, plowing access road; no landscaping or grounds work"}
+{"id": "r4-0258", "label": "FIT", "role": "PRIME", "evidence": "Remove and replace two operating room chillers; HVAC work Division 23"}
+{"id": "r4-0259", "label": "FIT", "role": "PRIME", "evidence": "Utility tunnel pumproom chilled water pumps replacement and upgrades"}
+{"id": "r4-0262", "label": "FIT", "role": "PRIME", "evidence": "Aseptic Janitorial/or Custodial Services at White River Junction VA"}
+{"id": "r4-0265", "label": "NO", "role": "NONE", "evidence": "CAPE modeling and simulation computing environment; data security, not guards"}
+{"id": "r4-0267", "label": "NO", "role": "NONE", "evidence": "Ergonomic workstation furniture modernization turnkey solution; no HVAC work"}
+{"id": "r4-0269", "label": "FIT", "role": "PRIME", "evidence": "Roadway resurfacing with full depth reclamation and asphalt concrete pavement, ditch grading"}
+{"id": "r4-0272", "label": "FIT", "role": "PRIME", "evidence": "Custodial services: routine cleaning, deep clean floors, shampoo carpets, office windows"}
+{"id": "r4-0273", "label": "NO", "role": "NONE", "evidence": "Navy supply buy for 1-inch ball valve; no cleaning services"}
+{"id": "r4-0275", "label": "PARTIAL", "role": "SUB", "evidence": "Chilled water plant construction plus civil/site utility upgrades and water mains"}
+{"id": "r4-0276", "label": "NO", "role": "NONE", "evidence": "Sole source preventive maintenance of Danobat grinder; cleaning solutions disposal only"}
+{"id": "r4-0278", "label": "NO", "role": "NONE", "evidence": "Juvenile detention center sewer upgrade; no HVAC work shown"}
+{"id": "r4-0280", "label": "PARTIAL", "role": "SUB", "evidence": "Construction project to Replace Boilers 4 and 5; heating equipment component"}
+{"id": "r4-0290", "label": "FIT", "role": "PRIME", "evidence": "Grounds maintenance services for Riverside National Cemetery, PSC S208"}
+{"id": "r4-0293", "label": "FIT", "role": "PRIME", "evidence": "Paving IDIQ: maintaining, repairing and constructing paved roadways, parking areas, airfields"}

@@ -1,0 +1,35 @@
+{"id": "r4-0150", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Valve Stem for a valve assembly, PSC 4820, P/N 831159"}
+{"id": "r4-0151", "label": "PARTIAL", "role": "PRIME", "restriction": "NONE", "evidence": "Blood Culture Analyzer plus BOTTLE PLASTIC AEROBIC 50/PK line items"}
+{"id": "r4-0153", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "High Consequence Infectious Disease staff training service"}
+{"id": "r4-0154", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "service for isolation Valves installed for steam and condensate lines; roll up door"}
+{"id": "r4-0155", "label": "FIT", "role": "PRIME", "restriction": "QPL", "evidence": "TRAILING EDGE PSC 2090 replacement part; QUALIFICATION REQUIREMENTS clause"}
+{"id": "r4-0156", "label": "PARTIAL", "role": "PRIME", "restriction": "NONE", "evidence": "PSC 6550 advanced testing and monitoring of coagulation conditions, nine VA centers"}
+{"id": "r4-0157", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "VALVE,CHECK Lift Check Valve per NAVSHIPS drawing; not a fastener"}
+{"id": "r4-0162", "label": "NO", "role": "NONE", "restriction": "OEM_ONLY", "evidence": "OEM authorized commercial maintenance and support plan for AMT equipment"}
+{"id": "r4-0164", "label": "PARTIAL", "role": "SUB", "restriction": "SOLE_SOURCE", "evidence": "ACTUATOR,HYDRAULIC NSN 7H-4810-014847259; only one source FAR 6.302-1"}
+{"id": "r4-0165", "label": "PARTIAL", "role": "PRIME", "restriction": "NONE", "evidence": "BPA medical grade gas, laboratory and specialty gases, dry ice pellets"}
+{"id": "r4-0168", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "59--CONNECTOR,ELECTRIC PSC 5935 NSN 5995-01-481-6257"}
+{"id": "r4-0172", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 1680-015322852 Wheel Assembly Main C-130, part number 040-21702"}
+{"id": "r4-0173", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PARTS KIT,BALL VALV PSC 4820 solicitation"}
+{"id": "r4-0174", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Fort Hood GOCO Aircraft and Ground Fuel Services"}
+{"id": "r4-0177", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5935012384460 CONNECTOR,PLUG,ELECTRI; Approved source is 79198 3F2D"}
+{"id": "r4-0178", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "renewal of Sonnet software and maintenance support, sole source"}
+{"id": "r4-0181", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "design-build construction infrastructure project at Callao Naval Base"}
+{"id": "r4-0183", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "F-16 Interconnecting Group NSN 5895012140033 QTY 4"}
+{"id": "r4-0184", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Enterprise System Integrator Managed Service Provider RFI"}
+{"id": "r4-0185", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Wire Rope Replacement Services contract, performance work statement"}
+{"id": "r4-0187", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "ELECTRONIC MODULE,S repaired under this contract; repair service"}
+{"id": "r4-0188", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Civil Works Construction Management Services SATOC"}
+{"id": "r4-0189", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "New Manufacture of PANEL,CONTROL,ELECT 1680012808653RK L5304289-031"}
+{"id": "r4-0191", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "ANGKOR SENTINEL 27 CATERING SERVICES"}
+{"id": "r4-0192", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Booster pumping plant construction price schedule clearing, excavation"}
+{"id": "r4-0193", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "WHEEL HALF,AIRCRAFT in repair; return to Ready For Issue condition"}
+{"id": "r4-0194", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Correct Electrical Deficiencies construction project Fayetteville VAMC"}
+{"id": "r4-0195", "label": "PARTIAL", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "NextGen Passport Personalization Printers hardware customized to Department requirements"}
+{"id": "r4-0197", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PARTS KIT,BALL VALV PSC 4820 solicitation"}
+{"id": "r4-0198", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Parts Kit for a size 3 inch Ball Valve consisting of one Ball"}
+{"id": "r4-0200", "label": "FIT", "role": "PRIME", "restriction": "BRAND_NAME", "evidence": "SIX (6) MIDMARK 626 BARRIER FREE EXAM CHAIRS"}
+{"id": "r4-0201", "label": "PARTIAL", "role": "SUB", "restriction": "APPROVED_SOURCE", "evidence": "COUPLING ASSEMBLY,SELF-SEALING; Approved sources: EATON, SIKORSKY, ALLEN AIRCRAFT"}
+{"id": "r4-0205", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "roadway reconditioning aggregate surface course; rock bolts only in spec index"}
+{"id": "r4-0206", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "sole-source sustaining engineering evaluation of test benches with Thales"}
+{"id": "r4-0207", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Preservation, Hull, Mechanical, Electrical repairs for USS GREEN BAY"}

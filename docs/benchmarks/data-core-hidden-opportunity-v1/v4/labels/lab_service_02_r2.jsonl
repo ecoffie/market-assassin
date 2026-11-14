@@ -1,0 +1,35 @@
+{"id": "r4-0133", "label": "NO", "role": "NONE", "evidence": "Buys emergency medical membership access and medical evacuation services, not nurse staffing"}
+{"id": "r4-0135", "label": "NO", "role": "NONE", "evidence": "Supply solicitation for activated charcoal; no cleaning services procured"}
+{"id": "r4-0137", "label": "NO", "role": "NONE", "evidence": "Coast Guard is the agency name; procurement is for valves"}
+{"id": "r4-0138", "label": "FIT", "role": "PRIME", "evidence": "Soliciting contractors to perform parking lot repaving and repair services"}
+{"id": "r4-0140", "label": "NO", "role": "NONE", "evidence": "Navy supply buy for self-locking cap screws; only clause boilerplate"}
+{"id": "r4-0141", "label": "PARTIAL", "role": "SUB", "evidence": "Caretaker services include site security: minimum 2 security guards per shift"}
+{"id": "r4-0145", "label": "NO", "role": "NONE", "evidence": "Coast Guard requests pricing for flexible rubber pipe couplings"}
+{"id": "r4-0146", "label": "FIT", "role": "PRIME", "evidence": "Requirement for roof assessment and repair services, NAICS 238160 roofing"}
+{"id": "r4-0148", "label": "NO", "role": "NONE", "evidence": "Interior renovation of urology rooms; site prep means preparing rooms for equipment"}
+{"id": "r4-0149", "label": "FIT", "role": "PRIME", "evidence": "Seven FTE medical technologists under NAICS 561320 temporary help services"}
+{"id": "r4-0152", "label": "NO", "role": "NONE", "evidence": "Navy supply buy for valve tailpiece; security text is classified documents clause"}
+{"id": "r4-0158", "label": "FIT", "role": "PRIME", "evidence": "Airfield pavement repairs: milling, asphalt overlay, restripe pavement sections"}
+{"id": "r4-0159", "label": "FIT", "role": "PRIME", "evidence": "Title: NY Montezuma NWR main shop roof solicitation"}
+{"id": "r4-0160", "label": "NO", "role": "NONE", "evidence": "Coast Guard requirement for fluid filter elements; agency name only"}
+{"id": "r4-0161", "label": "NO", "role": "NONE", "evidence": "Navy repair/modification of vent valve; metallic mercury clause only"}
+{"id": "r4-0163", "label": "PARTIAL", "role": "SUB", "evidence": "Caretaker services include site security: minimum 2 security guards per shift"}
+{"id": "r4-0166", "label": "NO", "role": "NONE", "evidence": "Roof replacement at Building 347; site prep is generic construction boilerplate"}
+{"id": "r4-0167", "label": "NO", "role": "NONE", "evidence": "Design-bid-build hospital alteration; physical security is a design discipline"}
+{"id": "r4-0169", "label": "NO", "role": "NONE", "evidence": "Forklift preventive maintenance; guards refers to roller guards on equipment"}
+{"id": "r4-0170", "label": "FIT", "role": "PRIME", "evidence": "Information Monitoring and Protection Services under NAICS 561612 security guards"}
+{"id": "r4-0171", "label": "NO", "role": "NONE", "evidence": "Barracks facilities construction, NAICS 236220; no grounds maintenance stated"}
+{"id": "r4-0175", "label": "NO", "role": "NONE", "evidence": "Navy supply buy for check valves; only clause boilerplate"}
+{"id": "r4-0176", "label": "PARTIAL", "role": "SUB", "evidence": "Interior and exterior window cleaning plus specialized glazing maintenance and repairs"}
+{"id": "r4-0179", "label": "NO", "role": "NONE", "evidence": "Industrial wastewater treatment plant upgrades construction; ground mention is demolition method"}
+{"id": "r4-0180", "label": "NO", "role": "NONE", "evidence": "Rental of a 16-foot CONEX storage container, not building erection"}
+{"id": "r4-0182", "label": "NO", "role": "NONE", "evidence": "IT security officer (ISSO) FISMA support, not physical guard services"}
+{"id": "r4-0186", "label": "NO", "role": "NONE", "evidence": "Replace remote wilderness trail bridge with no motorized access; no paving"}
+{"id": "r4-0190", "label": "PARTIAL", "role": "SUB", "evidence": "Medical services staffing includes Registered Nurse and Physician Assistant coverage"}
+{"id": "r4-0196", "label": "NO", "role": "NONE", "evidence": "Crane and forklift rental with operators; National Guard is the customer"}
+{"id": "r4-0199", "label": "NO", "role": "NONE", "evidence": "Hotel rooms, meeting space and meals for National Guard event"}
+{"id": "r4-0202", "label": "NO", "role": "NONE", "evidence": "Navy supply buy for cable assembly replacement parts"}
+{"id": "r4-0203", "label": "NO", "role": "NONE", "evidence": "Navy supply buy for canisters; no cleaning services"}
+{"id": "r4-0204", "label": "PARTIAL", "role": "SUB", "evidence": "Jetty repair requires removing and disposing asphalt walkway within repair area"}
+{"id": "r4-0209", "label": "NO", "role": "NONE", "evidence": "BPA for landscaping and grounds equipment supplies, not maintenance services"}
+{"id": "r4-0211", "label": "PARTIAL", "role": "SUB", "evidence": "Facility maintenance contract covering systems including HVAC, roads, generators, roofing"}

@@ -1,0 +1,35 @@
+{"id": "r4-0613", "label": "FIT", "role": "PRIME", "evidence": "Window Cleaning Services, Interior and Exterior Windows at VA building"}
+{"id": "r4-0618", "label": "FIT", "role": "PRIME", "evidence": "acquire armed Protective Security Officer services protecting federal buildings; NAICS 561612"}
+{"id": "r4-0621", "label": "PARTIAL", "role": "SUB", "evidence": "storage building construction includes placement of aggregate, asphalt and concrete; earthwork"}
+{"id": "r4-0623", "label": "FIT", "role": "PRIME", "evidence": "Aseptic Janitorial/or Custodial Services White River Junction VA"}
+{"id": "r4-0624", "label": "FIT", "role": "PRIME", "evidence": "Information Monitoring and Protection Services, NAICS 561612 security guards, small business set-aside"}
+{"id": "r4-0625", "label": "FIT", "role": "PRIME", "evidence": "thin lift asphalt overlay, chip seal, crack sealing, asphalt pavement patching, markings"}
+{"id": "r4-0629", "label": "NO", "role": "NONE", "evidence": "supply procurement of SWITCH CONNECT ASSY parts; no cleaning work"}
+{"id": "r4-0631", "label": "NO", "role": "NONE", "evidence": "replacement of HVAC system at ranger station; no steel building or roofing"}
+{"id": "r4-0637", "label": "NO", "role": "NONE", "evidence": "annual inspection of water mist fire suppression system; Coast Guard is agency name"}
+{"id": "r4-0641", "label": "NO", "role": "NONE", "evidence": "requirement to repair various building systems; no guard services"}
+{"id": "r4-0642", "label": "PARTIAL", "role": "SUB", "evidence": "General Contractor shall provide unarmed guards at project site after construction hours"}
+{"id": "r4-0643", "label": "NO", "role": "NONE", "evidence": "cleaning, inspection, and repair of dam sewage lagoon, not office cleaning"}
+{"id": "r4-0645", "label": "NO", "role": "NONE", "evidence": "parts kit ball valve supply; security only refers to DD254 classification"}
+{"id": "r4-0647", "label": "FIT", "role": "PRIME", "evidence": "road re-surfacing for the Access Road, NAICS 237310, $25K-$100K"}
+{"id": "r4-0648", "label": "NO", "role": "NONE", "evidence": "GSA seeks to lease office space; ground floors means building floors"}
+{"id": "r4-0651", "label": "NO", "role": "NONE", "evidence": "fiber optic cable to flightline equipment; secure areas need escorts only"}
+{"id": "r4-0653", "label": "NO", "role": "NONE", "evidence": "circuit card assembly supply procurement; no cleaning services"}
+{"id": "r4-0656", "label": "FIT", "role": "PRIME", "evidence": "provide Occupational Medicine providers, nursing staff (RN, LPN), clinic support"}
+{"id": "r4-0657", "label": "PARTIAL", "role": "SUB", "evidence": "car wash area repaved with asphalt pavers, milling, striping alongside shade structures"}
+{"id": "r4-0661", "label": "NO", "role": "NONE", "evidence": "repair of DISK ASSEMBLY,FLUID parts; no building erection or roofing"}
+{"id": "r4-0663", "label": "NO", "role": "NONE", "evidence": "trenching, conduit and ground-well installation; electrical infrastructure, not grounds maintenance"}
+{"id": "r4-0667", "label": "NO", "role": "NONE", "evidence": "valve assembly supply from DLA; no construction work"}
+{"id": "r4-0672", "label": "PARTIAL", "role": "PRIME", "evidence": "Mechanical Support Services title only; HVAC not explicitly stated"}
+{"id": "r4-0673", "label": "NO", "role": "NONE", "evidence": "Federal Highway road repairs Road 107; no steel buildings or metal roofing"}
+{"id": "r4-0676", "label": "FIT", "role": "PRIME", "evidence": "provide gardening services to one of its official residences, base plus options"}
+{"id": "r4-0681", "label": "NO", "role": "NONE", "evidence": "local voice and data circuits; GR are telecom generic requirements"}
+{"id": "r4-0685", "label": "NO", "role": "NONE", "evidence": "IDIQ for floor covering, protective coating, maintenance and repairs; no steel buildings"}
+{"id": "r4-0686", "label": "NO", "role": "NONE", "evidence": "dockside repair of cutter WAESCHE; Coast Guard is agency name only"}
+{"id": "r4-0688", "label": "FIT", "role": "PRIME", "evidence": "Mowing and Maintenance Service IDIQ Contract for Burnsville Lake"}
+{"id": "r4-0691", "label": "NO", "role": "NONE", "evidence": "new fiber optic cable to flightline equipment; no paving stated"}
+{"id": "r4-0695", "label": "FIT", "role": "PRIME", "evidence": "requirement for janitorial services at Visitor Center and Headquarters Administrative Office"}
+{"id": "r4-0696", "label": "PARTIAL", "role": "SUB", "evidence": "technical support services include radome, HVAC, dehumidification, environmental-control systems"}
+{"id": "r4-0698", "label": "NO", "role": "NONE", "evidence": "tailpiece valve supply; security refers to classified document access"}
+{"id": "r4-0702", "label": "NO", "role": "NONE", "evidence": "refuse and recycling collection services; Coast Guard is agency name"}
+{"id": "r4-0704", "label": "NO", "role": "NONE", "evidence": "replace fire and intrusion alarms; park provides security guards, not contractor"}

@@ -1,0 +1,35 @@
+{"id": "r4-0697", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Four each of NSN 1680-01-263-0648 F-16 Grip Assembly"}
+{"id": "r4-0699", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "JLM Roll Up Door Replacement installation of equipment"}
+{"id": "r4-0700", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5950012448263 COIL,ELECTRICAL; Approved source is 99643"}
+{"id": "r4-0701", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "CHASSIS PSC 5998; screws only mentioned in workmanship clause"}
+{"id": "r4-0703", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PARTS KIT,BALL VALV PSC 4820 Navy solicitation"}
+{"id": "r4-0705", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "59--JUNCTION BOX PSC 5975 Navy solicitation"}
+{"id": "r4-0706", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "PLATE,MOUNTING PSC 5340 is hardware, not computer equipment"}
+{"id": "r4-0711", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Four each of NSN 1680-01-263-0648 F-16 Grip Assembly"}
+{"id": "r4-0712", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "ROD,THREADED END PSC 5306 Navy fastener item"}
+{"id": "r4-0713", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Construct Modular Imaging Center MRI/CT building construction"}
+{"id": "r4-0715", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Renovate Building 1203 DOAS/AHU and fire suppression water system construction"}
+{"id": "r4-0716", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "4 each of NSN 1650-00-404-6550 C-130 Piston Linear Actuator"}
+{"id": "r4-0718", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "SKIN,AIRCRAFT PSC 1560 NAVSUP Philadelphia solicitation"}
+{"id": "r4-0723", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Assorted Cap Screws PSC 5305 combined synopsis/solicitation"}
+{"id": "r4-0724", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "FIBER,TRANS,4 PSC 7G21 not computer hardware or IT equipment"}
+{"id": "r4-0725", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Moron Air Base Postal Services PSC R613"}
+{"id": "r4-0726", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "59--CABLE ASSEMBLY PSC 5930 Navy solicitation"}
+{"id": "r4-0727", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5945008375279 RELAY,THERMAL Qty 47; Approved source is 27192"}
+{"id": "r4-0731", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5330012046231 SEAL,AIRCRAFT,STRUCTUR; Approved sources are 43999"}
+{"id": "r4-0732", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "CAP,VALVE PSC 4820 valve part, not a fastener"}
+{"id": "r4-0734", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "AMC/A6 Information Technology Needs Commercial Solutions Opening"}
+{"id": "r4-0738", "label": "PARTIAL", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5985015717458 TRIPOD,ANTENNA; Approved source is 14304"}
+{"id": "r4-0741", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "MOISTURE SEPARATOR PSC 1680 Navy solicitation"}
+{"id": "r4-0744", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 1H-4820-016287604-X5 manufacture of 11 EA VLV, REGUL PRESSURE"}
+{"id": "r4-0746", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "This solicitation is for repair. This is a sole source requirement."}
+{"id": "r4-0748", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Design, Development, Integration, and Test Growler Beowulf system sources sought"}
+{"id": "r4-0750", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "15--PANEL,STRUCTURAL,AI PSC 1560 critical safety item, no drawings"}
+{"id": "r4-0752", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5945013553743 SOLENOID,ELECTRICAL; Approved sources are 08080 K309-000460"}
+{"id": "r4-0754", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Tinker AFB 2026 Multiple Award Construction Contract MACC"}
+{"id": "r4-0756", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5325004970724 STUD,TURNLOCK FASTENER; source controlled drawing item"}
+{"id": "r4-0757", "label": "PARTIAL", "role": "PRIME", "restriction": "NONE", "evidence": "replacement and disposal of the 150kVA emergency power diesel generator"}
+{"id": "r4-0758", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Automated Ultrasound-Based Fracture Detection BARDA sources sought notice"}
+{"id": "r4-0759", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "sole source basis with Sikorsky for the repair of CONTROL PANEL, AIRCR"}
+{"id": "r4-0760", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Removal and placement of attic ventilation fans, labor and installation"}
+{"id": "r4-0761", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Correct Storm Water Drainage construction project"}

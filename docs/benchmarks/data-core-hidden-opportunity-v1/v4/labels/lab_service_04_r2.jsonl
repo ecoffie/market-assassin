@@ -1,0 +1,35 @@
+{"id": "r4-0294", "label": "PARTIAL", "role": "PRIME", "evidence": "Steam Station Replacement at West Haven VAMC under NAICS 238220 HVAC contractors"}
+{"id": "r4-0296", "label": "NO", "role": "NONE", "evidence": "Full seismic retrofit of Building 16; demolition and construction services, no cleaning"}
+{"id": "r4-0303", "label": "FIT", "role": "PRIME", "evidence": "Seven Full-Time Equivalent Medical Technologists, NAICS 561320 Temporary Help Services"}
+{"id": "r4-0305", "label": "NO", "role": "NONE", "evidence": "Supply of NSN floor, portable shelter, qty 16; product delivery only"}
+{"id": "r4-0306", "label": "PARTIAL", "role": "SUB", "evidence": "Facility repair project scope includes repair of the failing HVAC systems"}
+{"id": "r4-0308", "label": "NO", "role": "NONE", "evidence": "Site utility water infrastructure upgrade; security means cameras/access control equipment"}
+{"id": "r4-0309", "label": "PARTIAL", "role": "PRIME", "evidence": "Campground updates: road alignment adjusted, subbase enhanced, campsites and parking redesigned"}
+{"id": "r4-0310", "label": "NO", "role": "NONE", "evidence": "Construction of aircraft maintenance hangar and support facilities; no grounds maintenance"}
+{"id": "r4-0311", "label": "FIT", "role": "PRIME", "evidence": "Embankment repairs, trail reconstruction, culvert replacement, stream regrading site work"}
+{"id": "r4-0312", "label": "NO", "role": "NONE", "evidence": "Base life support and facility rehab services; office cleaning not stated"}
+{"id": "r4-0314", "label": "FIT", "role": "PRIME", "evidence": "Custodial services: comprehensive cleaning of facilities, flooring, restrooms, glass surfaces"}
+{"id": "r4-0315", "label": "NO", "role": "NONE", "evidence": "GSA seeks to lease office space; secured parking is a building feature"}
+{"id": "r4-0316", "label": "PARTIAL", "role": "SUB", "evidence": "Parking garage construction with associated site, stormwater, landscape improvements"}
+{"id": "r4-0317", "label": "NO", "role": "NONE", "evidence": "Hydrostatic testing of fire extinguishers; 'guard against' is boilerplate"}
+{"id": "r4-0327", "label": "NO", "role": "NONE", "evidence": "Maintenance of electronic intrusion detection and access control systems, not guard staffing"}
+{"id": "r4-0328", "label": "NO", "role": "NONE", "evidence": "Coast Guard is agency name; open, inspect, report salt water pump"}
+{"id": "r4-0329", "label": "FIT", "role": "PRIME", "evidence": "Roadway reconditioning, adding aggregate surface course, and culvert replacement"}
+{"id": "r4-0330", "label": "NO", "role": "NONE", "evidence": "Demolition of substations and construction of 12.47 kV electrical distribution"}
+{"id": "r4-0331", "label": "NO", "role": "NONE", "evidence": "Jetty rehabilitation industry day; asphalt walkway removal incidental, not replaced"}
+{"id": "r4-0332", "label": "NO", "role": "NONE", "evidence": "Visitor center reroofing and painting; 'snow guards' are physical objects"}
+{"id": "r4-0333", "label": "NO", "role": "NONE", "evidence": "Information System Security Officer duties for FISMA IT system support"}
+{"id": "r4-0334", "label": "NO", "role": "NONE", "evidence": "RFI for metrology grade oscilloscope; security clearance boilerplate"}
+{"id": "r4-0335", "label": "NO", "role": "NONE", "evidence": "Design and construction of barracks; Main Gate access is directions only"}
+{"id": "r4-0338", "label": "NO", "role": "NONE", "evidence": "Facility infrastructure upgrades for Electronic Health Record system; no paving stated"}
+{"id": "r4-0342", "label": "NO", "role": "NONE", "evidence": "Replacement of HVAC system; protecting existing landscaping is incidental"}
+{"id": "r4-0344", "label": "FIT", "role": "PRIME", "evidence": "Ballfield maintenance: infields, turf repair, aeration and topdressing of fields"}
+{"id": "r4-0348", "label": "FIT", "role": "PRIME", "evidence": "Snow plowing, shoveling, sanding services under NAICS 561730 landscaping services"}
+{"id": "r4-0349", "label": "NO", "role": "NONE", "evidence": "Construction renovation of cystoscopy rooms for urology equipment site prep"}
+{"id": "r4-0350", "label": "NO", "role": "NONE", "evidence": "Correct Domestic Water System; plumbing work, no HVAC stated"}
+{"id": "r4-0352", "label": "NO", "role": "NONE", "evidence": "Asbestos dismantling/removal supervision services; steel frame is existing structure type"}
+{"id": "r4-0353", "label": "NO", "role": "NONE", "evidence": "Window cleaning and maintenance; protecting grounds and landscaping is incidental"}
+{"id": "r4-0354", "label": "FIT", "role": "PRIME", "evidence": "Recurring janitorial services, NAICS 561720 Janitorial Services, Sector Key West"}
+{"id": "r4-0355", "label": "NO", "role": "NONE", "evidence": "Postal services operations at Moron Air Base; security access is compliance"}
+{"id": "r4-0357", "label": "NO", "role": "NONE", "evidence": "Industrial wastewater treatment plant upgrades; roads mentioned only as interference avoidance"}
+{"id": "r4-0359", "label": "FIT", "role": "PRIME", "evidence": "SLV-CB Pumping Plant roof repair or replacement"}

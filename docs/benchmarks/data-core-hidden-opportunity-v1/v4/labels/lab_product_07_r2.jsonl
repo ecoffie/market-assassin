@@ -1,0 +1,35 @@
+{"id": "r4-0449", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PSC 1680 aircraft components; solicitation and the Adjuster Assembly Packaging Specification"}
+{"id": "r4-0451", "label": "FIT", "role": "PRIME", "restriction": "QPL", "evidence": "NSN 6350002697978 BELL,ELECTRICAL; This is a qualified products list (QPL) item"}
+{"id": "r4-0453", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "USNIC SAR Data Recompete, PSC 7A21, a data purchase"}
+{"id": "r4-0456", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "garage bay doors at Peaks and MLWC for full replacement"}
+{"id": "r4-0457", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "6525 September 2026 Equipment Only Consolidation, imaging equipment not supplies"}
+{"id": "r4-0459", "label": "PARTIAL", "role": "SUB", "restriction": "NONE", "evidence": "Network cabling and IT Room Improvements; Wall mounted IT cabinet choose 1"}
+{"id": "r4-0461", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "FLCPS intends to solicit for DECK CLIP BOLT, PSC 5305"}
+{"id": "r4-0462", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "construction (design-bid-build) of aircraft pavements, parking apron and taxiway"}
+{"id": "r4-0463", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "SCREW,MACHINE, PSC 5305 screws, Navy commercial product procurement"}
+{"id": "r4-0464", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "These appliances require a service and support contract for hardware break-fix support"}
+{"id": "r4-0465", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "sole-source contract to 3dB Labs for NOMAD-PILOT Handheld Spectrum Analyzer"}
+{"id": "r4-0468", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "INTERACTIVE TEST UN; repair price, Repair Turn Around Time (RTAT)"}
+{"id": "r4-0474", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "VALVE ASSEMBLY,MANI, PSC 4820 valve assembly refurbishment"}
+{"id": "r4-0475", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "IMU, SDI, PSC 6605 navigational instruments, not a component line"}
+{"id": "r4-0476", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "STUD,CONTINUOUS THD; Studs, bolts, hex cap screws ... and nuts; MIL-DTL-1222"}
+{"id": "r4-0477", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Contractor shall provide all resources necessary to provide Condensate Pump Replacements"}
+{"id": "r4-0483", "label": "NO", "role": "NONE", "restriction": "BRAND_NAME", "evidence": "Nanopositioners and Motion Controllers on brand name only basis, PSC 6640"}
+{"id": "r4-0484", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "PREVENTATIVE MAINTENANCE / REPAIR OF OIL WATER SEPARATOR SYSTEMS services"}
+{"id": "r4-0485", "label": "PARTIAL", "role": "PRIME", "restriction": "NONE", "evidence": "NUT,POPPET, PSC 4810 valve part; Part - Nut-poppet; Material - QQ-N-281"}
+{"id": "r4-0487", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "6550 Reagents Consumables Microbiology Testing; molecular diagnostic testing system and reagents"}
+{"id": "r4-0488", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "LIGHT SIGNAL RECEIV, PSC 7G21, not computer hardware"}
+{"id": "r4-0489", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Rental of one 100-ton Chill Water Systems, PSC W035 equipment rental"}
+{"id": "r4-0490", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "12-Foot Pull-Behind Tractor Grader (Brand Name or Equal), PSC 3830"}
+{"id": "r4-0491", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Rental of two 60-ton Chill Water Systems, PSC W035 equipment rental"}
+{"id": "r4-0492", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "PARTS KIT,BALL VALV, PSC 4820; Part - Ball (Q3)"}
+{"id": "r4-0493", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Request for Prototype Proposals for an Ultrasound Diagnostic System, Hand Carried"}
+{"id": "r4-0495", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "TEE Scanning System, a specialized medical imaging device, PSC 6525"}
+{"id": "r4-0496", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 5310-01-096-1264, Washer, Flat, P/N 70106-08105-102"}
+{"id": "r4-0497", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Rental of two 60-ton Chill Water Systems, PSC W035 equipment rental"}
+{"id": "r4-0500", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "RFP for two 60-ton chill water rental system, PSC W035"}
+{"id": "r4-0501", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Booster Pol TAL Drive Mtr; production-style linear shift mechanism with servo motor"}
+{"id": "r4-0502", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "multidisciplinary scientific and regulatory professional services in support of FDA Centers"}
+{"id": "r4-0505", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "GAS TEMPERATURE EXHAUST THERMOCOUPLE MANUFACTURED BY AERO PRECISION ... AND AMETEK; OTHER THAN FULL AND OPEN"}
+{"id": "r4-0508", "label": "NO", "role": "NONE", "restriction": "APPROVED_SOURCE", "evidence": "Only Mechanical MACC Contractors listed may submit; HVAC mechanical replacement"}
+{"id": "r4-0510", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "hotel lodging, meeting and function room rental, and related hospitality services"}

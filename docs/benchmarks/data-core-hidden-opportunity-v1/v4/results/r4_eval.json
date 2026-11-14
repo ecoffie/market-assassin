@@ -1,0 +1,3310 @@
+{
+ "labels": {
+  "items": 1059,
+  "exact": 959,
+  "relevant_vs_not": 987
+ },
+ "janitorial": {
+  "cat": "service",
+  "q": "We clean commercial office buildings.",
+  "sizes": {
+   "base": 1187,
+   "A": 1187,
+   "C": 1187
+  },
+  "sets_source": "agent3",
+  "retrieval_precision": {
+   "base": {
+    "sample": {
+     "n": 30,
+     "lo": 1,
+     "hi": 1,
+     "p": [
+      0.03,
+      0.03
+     ],
+     "ci_lo": [
+      0.01,
+      0.17
+     ],
+     "ci_hi": [
+      0.01,
+      0.17
+     ]
+    }
+   },
+   "note": "A and C identical to production for this business"
+  },
+  "recall_known": {
+   "base": {
+    "lo": {
+     "n": 28,
+     "found": 20,
+     "r": 0.71
+    },
+    "hi": {
+     "n": 29,
+     "found": 21,
+     "r": 0.72
+    }
+   },
+   "A": {
+    "lo": {
+     "n": 28,
+     "found": 20,
+     "r": 0.71
+    },
+    "hi": {
+     "n": 29,
+     "found": 21,
+     "r": 0.72
+    }
+   },
+   "C": {
+    "lo": {
+     "n": 28,
+     "found": 20,
+     "r": 0.71
+    },
+    "hi": {
+     "n": 29,
+     "found": 21,
+     "r": 0.72
+    }
+   }
+  },
+  "recall_code_floor": {
+   "floor_total": 44,
+   "floor_in_base": 27,
+   "sample": 25,
+   "sample_relevant_hi": 25,
+   "found": {
+    "base": 17,
+    "A": 17,
+    "C": 17
+   },
+   "relevant_floor_not_retrieved": [
+    {
+     "id": "907fa7b41fea4549a49a3624212beaf7",
+     "title": "Market Survey for Janitorial Services at FAA Facilities in King Salmon, Alaska"
+    },
+    {
+     "id": "e76596d4c1f24e77978695697ba6f78b",
+     "title": "Custodial Services for the 88th DPW - KS065"
+    },
+    {
+     "id": "548771f52e634cbfb7e94e5e2ed00ffc",
+     "title": "Custodial and Related Services for TSA Location-Dane County Regional Airport, Ma"
+    },
+    {
+     "id": "05044bcd730f4077a74ba996c13d1eb5",
+     "title": "EOS Custodial Service"
+    },
+    {
+     "id": "5d8aa2693f7c4dd7adf3f6494c77eb5d",
+     "title": "JANITORIAL SERVICES, Channel Islands NP"
+    },
+    {
+     "id": "33a5e9a539eb4c38ac44b1b8f147be12",
+     "title": "S201--Aseptic Janitorial/or Custodial Services WRJ  White River J"
+    },
+    {
+     "id": "7ae8524194814199a5097befb063ca6c",
+     "title": "S201--Aseptic Janitorial/or Custodial Services WRJ  White River J"
+    },
+    {
+     "id": "493c07c6c2a0458a840b613652f584b7",
+     "title": "EOS Custodial Service"
+    }
+   ]
+  },
+  "lost": {
+   "by_A": [],
+   "by_B": [],
+   "removed_labelled": {
+    "by_A": 0,
+    "by_B": 0
+   },
+   "removed_total": {
+    "by_A": 0,
+    "by_B": 0
+   }
+  },
+  "classification": {
+   "base": {
+    "labelled": 76,
+    "direct": 61,
+    "direct_relevant_lo": 12,
+    "direct_relevant_hi": 13,
+    "other": 15,
+    "other_relevant_lo": 8,
+    "relevant_lo": 20,
+    "relevant_in_direct": 12
+   },
+   "A": {
+    "labelled": 76,
+    "direct": 61,
+    "direct_relevant_lo": 12,
+    "direct_relevant_hi": 13,
+    "other": 15,
+    "other_relevant_lo": 8,
+    "relevant_lo": 20,
+    "relevant_in_direct": 12
+   },
+   "C": {
+    "labelled": 76,
+    "direct": 61,
+    "direct_relevant_lo": 12,
+    "direct_relevant_hi": 13,
+    "other": 15,
+    "other_relevant_lo": 8,
+    "relevant_lo": 20,
+    "relevant_in_direct": 12
+   }
+  },
+  "top20": {
+   "base": {
+    "n": 20,
+    "lo": 2,
+    "hi": 3,
+    "p": [
+     0.1,
+     0.15
+    ],
+    "ci_lo": [
+     0.03,
+     0.3
+    ],
+    "ci_hi": [
+     0.05,
+     0.36
+    ]
+   },
+   "A": {
+    "n": 20,
+    "lo": 2,
+    "hi": 3,
+    "p": [
+     0.1,
+     0.15
+    ],
+    "ci_lo": [
+     0.03,
+     0.3
+    ],
+    "ci_hi": [
+     0.05,
+     0.36
+    ]
+   },
+   "C": {
+    "n": 20,
+    "lo": 2,
+    "hi": 3,
+    "p": [
+     0.1,
+     0.15
+    ],
+    "ci_lo": [
+     0.03,
+     0.3
+    ],
+    "ci_hi": [
+     0.05,
+     0.36
+    ]
+   }
+  },
+  "off_code_relevant": {
+   "n": 1,
+   "retrieved": {
+    "base": 1,
+    "A": 1,
+    "C": 1
+   }
+  }
+ },
+ "nursing": {
+  "cat": "service",
+  "q": "We provide nurses and medical staffing.",
+  "sizes": {
+   "base": 46,
+   "A": 46,
+   "C": 46
+  },
+  "sets_source": "agent3",
+  "retrieval_precision": {
+   "base": {
+    "sample": {
+     "n": 30,
+     "lo": 8,
+     "hi": 9,
+     "p": [
+      0.27,
+      0.3
+     ],
+     "ci_lo": [
+      0.14,
+      0.44
+     ],
+     "ci_hi": [
+      0.17,
+      0.48
+     ]
+    }
+   },
+   "note": "A and C identical to production for this business"
+  },
+  "recall_known": {
+   "base": {
+    "lo": {
+     "n": 12,
+     "found": 10,
+     "r": 0.83
+    },
+    "hi": {
+     "n": 15,
+     "found": 13,
+     "r": 0.87
+    }
+   },
+   "A": {
+    "lo": {
+     "n": 12,
+     "found": 10,
+     "r": 0.83
+    },
+    "hi": {
+     "n": 15,
+     "found": 13,
+     "r": 0.87
+    }
+   },
+   "C": {
+    "lo": {
+     "n": 12,
+     "found": 10,
+     "r": 0.83
+    },
+    "hi": {
+     "n": 15,
+     "found": 13,
+     "r": 0.87
+    }
+   }
+  },
+  "recall_code_floor": {
+   "floor_total": 12,
+   "floor_in_base": 6,
+   "sample": 12,
+   "sample_relevant_hi": 8,
+   "found": {
+    "base": 6,
+    "A": 6,
+    "C": 6
+   },
+   "relevant_floor_not_retrieved": [
+    {
+     "id": "cc96953a2c544b5aae32bbe732b3a0f7",
+     "title": "Q701--7 Full Time Equivalent Medical Technologists   - Clinical Laboratory Scien"
+    },
+    {
+     "id": "1e8889e557cc442f970ea295807a37db",
+     "title": "Q701--7 Full Time Equivalent Medical Technologists   - Clinical Laboratory Scien"
+    }
+   ]
+  },
+  "lost": {
+   "by_A": [],
+   "by_B": [],
+   "removed_labelled": {
+    "by_A": 0,
+    "by_B": 0
+   },
+   "removed_total": {
+    "by_A": 0,
+    "by_B": 0
+   }
+  },
+  "classification": {
+   "base": {
+    "labelled": 40,
+    "direct": 23,
+    "direct_relevant_lo": 7,
+    "direct_relevant_hi": 9,
+    "other": 17,
+    "other_relevant_lo": 3,
+    "relevant_lo": 10,
+    "relevant_in_direct": 7
+   },
+   "A": {
+    "labelled": 40,
+    "direct": 23,
+    "direct_relevant_lo": 7,
+    "direct_relevant_hi": 9,
+    "other": 17,
+    "other_relevant_lo": 3,
+    "relevant_lo": 10,
+    "relevant_in_direct": 7
+   },
+   "C": {
+    "labelled": 40,
+    "direct": 23,
+    "direct_relevant_lo": 7,
+    "direct_relevant_hi": 9,
+    "other": 17,
+    "other_relevant_lo": 3,
+    "relevant_lo": 10,
+    "relevant_in_direct": 7
+   }
+  },
+  "top20": {
+   "base": {
+    "n": 20,
+    "lo": 6,
+    "hi": 8,
+    "p": [
+     0.3,
+     0.4
+    ],
+    "ci_lo": [
+     0.15,
+     0.52
+    ],
+    "ci_hi": [
+     0.22,
+     0.61
+    ]
+   },
+   "A": {
+    "n": 20,
+    "lo": 6,
+    "hi": 8,
+    "p": [
+     0.3,
+     0.4
+    ],
+    "ci_lo": [
+     0.15,
+     0.52
+    ],
+    "ci_hi": [
+     0.22,
+     0.61
+    ]
+   },
+   "C": {
+    "n": 20,
+    "lo": 6,
+    "hi": 8,
+    "p": [
+     0.3,
+     0.4
+    ],
+    "ci_lo": [
+     0.15,
+     0.52
+    ],
+    "ci_hi": [
+     0.22,
+     0.61
+    ]
+   }
+  },
+  "off_code_relevant": {
+   "n": 4,
+   "retrieved": {
+    "base": 4,
+    "A": 4,
+    "C": 4
+   }
+  }
+ },
+ "hvac": {
+  "cat": "service",
+  "q": "We maintain HVAC systems.",
+  "sizes": {
+   "base": 211,
+   "A": 211,
+   "C": 211
+  },
+  "sets_source": "agent3",
+  "retrieval_precision": {
+   "base": {
+    "sample": {
+     "n": 30,
+     "lo": 19,
+     "hi": 21,
+     "p": [
+      0.63,
+      0.7
+     ],
+     "ci_lo": [
+      0.46,
+      0.78
+     ],
+     "ci_hi": [
+      0.52,
+      0.83
+     ]
+    }
+   },
+   "note": "A and C identical to production for this business"
+  },
+  "recall_known": {
+   "base": {
+    "lo": {
+     "n": 53,
+     "found": 47,
+     "r": 0.89
+    },
+    "hi": {
+     "n": 60,
+     "found": 51,
+     "r": 0.85
+    }
+   },
+   "A": {
+    "lo": {
+     "n": 53,
+     "found": 47,
+     "r": 0.89
+    },
+    "hi": {
+     "n": 60,
+     "found": 51,
+     "r": 0.85
+    }
+   },
+   "C": {
+    "lo": {
+     "n": 53,
+     "found": 47,
+     "r": 0.89
+    },
+    "hi": {
+     "n": 60,
+     "found": 51,
+     "r": 0.85
+    }
+   }
+  },
+  "recall_code_floor": {
+   "floor_total": 69,
+   "floor_in_base": 29,
+   "sample": 25,
+   "sample_relevant_hi": 20,
+   "found": {
+    "base": 11,
+    "A": 11,
+    "C": 11
+   },
+   "relevant_floor_not_retrieved": [
+    {
+     "id": "b458a55a68254471a20b39660b0c980f",
+     "title": "NTX VAMC Utility Tunnel Pump Room"
+    },
+    {
+     "id": "af64aac30933462a938619a6596b072c",
+     "title": "J041--Building 2 Steam Station Replacement"
+    },
+    {
+     "id": "ce0884fcac854610ae17cbe74b9d2749",
+     "title": "Mechanical Support Services"
+    },
+    {
+     "id": "5976c44429454e0790be5c6276f95b92",
+     "title": "J041--RFQ SDVOSB Set-Aside  CHILLER TUBE CLEANING SERVICES"
+    },
+    {
+     "id": "62ea21e641dd4ccd9f8ae1786761a1b0",
+     "title": "Cooling Tower Refurbishment Services"
+    },
+    {
+     "id": "084d5efc5ec44a9885a37b90e6705ffa",
+     "title": "REMOVE AND REPAIR TWO HIGH VELOCITY AIR HANDLING UNITS"
+    },
+    {
+     "id": "974f9b5eb51f4ade85b43f47c548e773",
+     "title": "Radiant Heating Panel Replacement"
+    },
+    {
+     "id": "57fda78b20d645b3976ecaaec0e44217",
+     "title": "Z1DA--Project 695-24-107 Replace Boilers 4 and 5  Clement J. Zablocki, VA Medica"
+    },
+    {
+     "id": "24f7ab7243ec47bb9b169bb61bc32754",
+     "title": "Z1DA--Project 695-24-107 Replace Boilers 4 and 5  Clement J. Zablocki, VA Medica"
+    }
+   ]
+  },
+  "lost": {
+   "by_A": [],
+   "by_B": [],
+   "removed_labelled": {
+    "by_A": 0,
+    "by_B": 0
+   },
+   "removed_total": {
+    "by_A": 0,
+    "by_B": 0
+   }
+  },
+  "classification": {
+   "base": {
+    "labelled": 64,
+    "direct": 52,
+    "direct_relevant_lo": 44,
+    "direct_relevant_hi": 46,
+    "other": 12,
+    "other_relevant_lo": 3,
+    "relevant_lo": 47,
+    "relevant_in_direct": 44
+   },
+   "A": {
+    "labelled": 64,
+    "direct": 52,
+    "direct_relevant_lo": 44,
+    "direct_relevant_hi": 46,
+    "other": 12,
+    "other_relevant_lo": 3,
+    "relevant_lo": 47,
+    "relevant_in_direct": 44
+   },
+   "C": {
+    "labelled": 64,
+    "direct": 52,
+    "direct_relevant_lo": 44,
+    "direct_relevant_hi": 46,
+    "other": 12,
+    "other_relevant_lo": 3,
+    "relevant_lo": 47,
+    "relevant_in_direct": 44
+   }
+  },
+  "top20": {
+   "base": {
+    "n": 20,
+    "lo": 16,
+    "hi": 17,
+    "p": [
+     0.8,
+     0.85
+    ],
+    "ci_lo": [
+     0.58,
+     0.92
+    ],
+    "ci_hi": [
+     0.64,
+     0.95
+    ]
+   },
+   "A": {
+    "n": 20,
+    "lo": 16,
+    "hi": 17,
+    "p": [
+     0.8,
+     0.85
+    ],
+    "ci_lo": [
+     0.58,
+     0.92
+    ],
+    "ci_hi": [
+     0.64,
+     0.95
+    ]
+   },
+   "C": {
+    "n": 20,
+    "lo": 16,
+    "hi": 17,
+    "p": [
+     0.8,
+     0.85
+    ],
+    "ci_lo": [
+     0.58,
+     0.92
+    ],
+    "ci_hi": [
+     0.64,
+     0.95
+    ]
+   }
+  },
+  "off_code_relevant": {
+   "n": 24,
+   "retrieved": {
+    "base": 24,
+    "A": 24,
+    "C": 24
+   }
+  }
+ },
+ "guards": {
+  "cat": "service",
+  "q": "We provide security guards.",
+  "sizes": {
+   "base": 476,
+   "A": 273,
+   "C": 13
+  },
+  "sets_source": "agent3",
+  "retrieval_precision": {
+   "base": {
+    "est_relevant_lo": 11,
+    "est_relevant_hi": 11,
+    "p_lo": 0.02,
+    "p_hi": 0.02
+   },
+   "A": {
+    "sample": {
+     "n": 25,
+     "lo": 1,
+     "hi": 1,
+     "p": [
+      0.04,
+      0.04
+     ],
+     "ci_lo": [
+      0.01,
+      0.2
+     ],
+     "ci_hi": [
+      0.01,
+      0.2
+     ]
+    }
+   },
+   "removed_by_A": {
+    "sample": {
+     "n": 25,
+     "lo": 0,
+     "hi": 0,
+     "p": [
+      0.0,
+      0.0
+     ],
+     "ci_lo": [
+      0.0,
+      0.13
+     ],
+     "ci_hi": [
+      0.0,
+      0.13
+     ]
+    }
+   },
+   "C": {
+    "exact": {
+     "n": 13,
+     "lo": 7,
+     "hi": 7,
+     "p": [
+      0.54,
+      0.54
+     ],
+     "ci_lo": [
+      0.29,
+      0.77
+     ],
+     "ci_hi": [
+      0.29,
+      0.77
+     ]
+    }
+   },
+   "removed_by_B": {
+    "sample": {
+     "n": 25,
+     "lo": 0,
+     "hi": 0,
+     "p": [
+      0.0,
+      0.0
+     ],
+     "ci_lo": [
+      0.0,
+      0.13
+     ],
+     "ci_hi": [
+      0.0,
+      0.13
+     ]
+    }
+   }
+  },
+  "recall_known": {
+   "base": {
+    "lo": {
+     "n": 14,
+     "found": 8,
+     "r": 0.57
+    },
+    "hi": {
+     "n": 17,
+     "found": 9,
+     "r": 0.53
+    }
+   },
+   "A": {
+    "lo": {
+     "n": 14,
+     "found": 8,
+     "r": 0.57
+    },
+    "hi": {
+     "n": 17,
+     "found": 8,
+     "r": 0.47
+    }
+   },
+   "C": {
+    "lo": {
+     "n": 14,
+     "found": 7,
+     "r": 0.5
+    },
+    "hi": {
+     "n": 17,
+     "found": 7,
+     "r": 0.41
+    }
+   }
+  },
+  "recall_code_floor": {
+   "floor_total": 13,
+   "floor_in_base": 4,
+   "sample": 13,
+   "sample_relevant_hi": 12,
+   "found": {
+    "base": 4,
+    "A": 4,
+    "C": 4
+   },
+   "relevant_floor_not_retrieved": [
+    {
+     "id": "dd2a1e1eb1f4418eb7161a7190a0850f",
+     "title": "Protective Security Officer Services, Los Angeles Area"
+    },
+    {
+     "id": "4f53202e2ec94470b19966fdb5b46bdf",
+     "title": "INSCOM G-2 Access Control and Security Escorts (ACES)"
+    },
+    {
+     "id": "50d048f7979e4f2d87c4489f0bb201db",
+     "title": "INSCOM G-2 Access Control and Security Escorts (ACES)"
+    },
+    {
+     "id": "929dab13b40e498e96c51ad906aa8cba",
+     "title": "Information Monitoring and Protection Services"
+    },
+    {
+     "id": "576c356b59d3424882e08dac2df4f2e5",
+     "title": "Armed Protective Security Officer Services, Los Angeles Area"
+    },
+    {
+     "id": "9b15ab7698a4462995535a70b3570b5b",
+     "title": "FRCSE Information Monitoring and Protection Services - Modular Project"
+    },
+    {
+     "id": "5cdaa092de0c4f3c9ca93cb9e8e16125",
+     "title": "FRCSE Information Monitoring and Protection Services - Modular Project"
+    },
+    {
+     "id": "dda144819afc493f8204c2e31f866fd4",
+     "title": "INSCOM G-2 Access Control and Security Escorts (ACES)"
+    }
+   ]
+  },
+  "lost": {
+   "by_A": [
+    {
+     "id": "56a94fb9d694432093d1a0a34557cd0b",
+     "title": "Israel S&RTS",
+     "lo": false,
+     "labels": [
+      "NO",
+      "PARTIAL"
+     ]
+    }
+   ],
+   "by_B": [
+    {
+     "id": "810015404c5c4209a599180812995e67",
+     "title": "CON | Z1DA | REPLACE OR CHILLERS | 580-23-105 | SOLICITATION",
+     "lo": true,
+     "labels": [
+      "PARTIAL",
+      "PARTIAL"
+     ]
+    }
+   ],
+   "removed_labelled": {
+    "by_A": 56,
+    "by_B": 68
+   },
+   "removed_total": {
+    "by_A": 203,
+    "by_B": 260
+   }
+  },
+  "classification": {
+   "base": {
+    "labelled": 137,
+    "direct": 86,
+    "direct_relevant_lo": 4,
+    "direct_relevant_hi": 4,
+    "other": 51,
+    "other_relevant_lo": 4,
+    "relevant_lo": 8,
+    "relevant_in_direct": 4
+   },
+   "A": {
+    "labelled": 81,
+    "direct": 44,
+    "direct_relevant_lo": 4,
+    "direct_relevant_hi": 4,
+    "other": 37,
+    "other_relevant_lo": 4,
+    "relevant_lo": 8,
+    "relevant_in_direct": 4
+   },
+   "C": {
+    "labelled": 13,
+    "direct": 4,
+    "direct_relevant_lo": 4,
+    "direct_relevant_hi": 4,
+    "other": 9,
+    "other_relevant_lo": 3,
+    "relevant_lo": 7,
+    "relevant_in_direct": 4
+   }
+  },
+  "top20": {
+   "base": {
+    "n": 20,
+    "lo": 2,
+    "hi": 2,
+    "p": [
+     0.1,
+     0.1
+    ],
+    "ci_lo": [
+     0.03,
+     0.3
+    ],
+    "ci_hi": [
+     0.03,
+     0.3
+    ]
+   },
+   "A": {
+    "n": 20,
+    "lo": 3,
+    "hi": 3,
+    "p": [
+     0.15,
+     0.15
+    ],
+    "ci_lo": [
+     0.05,
+     0.36
+    ],
+    "ci_hi": [
+     0.05,
+     0.36
+    ]
+   },
+   "C": {
+    "n": 13,
+    "lo": 7,
+    "hi": 7,
+    "p": [
+     0.54,
+     0.54
+    ],
+    "ci_lo": [
+     0.29,
+     0.77
+    ],
+    "ci_hi": [
+     0.29,
+     0.77
+    ]
+   }
+  },
+  "off_code_relevant": {
+   "n": 4,
+   "retrieved": {
+    "base": 4,
+    "A": 4,
+    "C": 3
+   }
+  },
+  "protective_services": {
+   "labelled": 68,
+   "relevant_hi": 12,
+   "relevant_lo": 11,
+   "retrieved": {
+    "base": 7,
+    "A": 6,
+    "C": 5
+   },
+   "relevant_not_in_C": [
+    {
+     "id": "4f53202e2ec94470b19966fdb5b46bdf",
+     "title": "INSCOM G-2 Access Control and Security Escorts (ACES)",
+     "in_base": false,
+     "in_A": false,
+     "lo": true
+    },
+    {
+     "id": "50d048f7979e4f2d87c4489f0bb201db",
+     "title": "INSCOM G-2 Access Control and Security Escorts (ACES)",
+     "in_base": false,
+     "in_A": false,
+     "lo": true
+    },
+    {
+     "id": "56a94fb9d694432093d1a0a34557cd0b",
+     "title": "Israel S&RTS",
+     "in_base": true,
+     "in_A": false,
+     "lo": false
+    },
+    {
+     "id": "576c356b59d3424882e08dac2df4f2e5",
+     "title": "Armed Protective Security Officer Services, Los Angeles Area",
+     "in_base": false,
+     "in_A": false,
+     "lo": true
+    },
+    {
+     "id": "810015404c5c4209a599180812995e67",
+     "title": "CON | Z1DA | REPLACE OR CHILLERS | 580-23-105 | SOLICITATION",
+     "in_base": true,
+     "in_A": true,
+     "lo": true
+    },
+    {
+     "id": "dd2a1e1eb1f4418eb7161a7190a0850f",
+     "title": "Protective Security Officer Services, Los Angeles Area",
+     "in_base": false,
+     "in_A": false,
+     "lo": true
+    },
+    {
+     "id": "dda144819afc493f8204c2e31f866fd4",
+     "title": "INSCOM G-2 Access Control and Security Escorts (ACES)",
+     "in_base": false,
+     "in_A": false,
+     "lo": true
+    }
+   ]
+  }
+ },
+ "steelbldg": {
+  "cat": "service",
+  "q": "We erect steel buildings and install metal roofing.",
+  "sizes": {
+   "base": 572,
+   "A": 572,
+   "C": 572
+  },
+  "sets_source": "agent3",
+  "retrieval_precision": {
+   "base": {
+    "sample": {
+     "n": 30,
+     "lo": 2,
+     "hi": 4,
+     "p": [
+      0.07,
+      0.13
+     ],
+     "ci_lo": [
+      0.02,
+      0.21
+     ],
+     "ci_hi": [
+      0.05,
+      0.3
+     ]
+    }
+   },
+   "note": "A and C identical to production for this business"
+  },
+  "recall_known": {
+   "base": {
+    "lo": {
+     "n": 22,
+     "found": 17,
+     "r": 0.77
+    },
+    "hi": {
+     "n": 27,
+     "found": 22,
+     "r": 0.81
+    }
+   },
+   "A": {
+    "lo": {
+     "n": 22,
+     "found": 17,
+     "r": 0.77
+    },
+    "hi": {
+     "n": 27,
+     "found": 22,
+     "r": 0.81
+    }
+   },
+   "C": {
+    "lo": {
+     "n": 22,
+     "found": 17,
+     "r": 0.77
+    },
+    "hi": {
+     "n": 27,
+     "found": 22,
+     "r": 0.81
+    }
+   }
+  },
+  "recall_code_floor": {
+   "floor_total": 17,
+   "floor_in_base": 9,
+   "sample": 17,
+   "sample_relevant_hi": 11,
+   "found": {
+    "base": 6,
+    "A": 6,
+    "C": 6
+   },
+   "relevant_floor_not_retrieved": [
+    {
+     "id": "2bd5e12e31604255a22317f1be085ba6",
+     "title": "Equipment Shed"
+    },
+    {
+     "id": "6229ec758d05403a95dcb40422f194dd",
+     "title": "Z--SLV-CB PUMPING PLANT ROOF"
+    },
+    {
+     "id": "faa8aac4b1a14663b0d3e313fc7cbd39",
+     "title": "NY MONTEZUMA NWR MAIN SHOP ROOF"
+    },
+    {
+     "id": "17b47b0fd9ea40b999bfb9fa007b6d4b",
+     "title": "Roof Assessment and Repair at the Albuquerque Area Indian Health Service Healthc"
+    },
+    {
+     "id": "c27b048bc9da4521b4d3749d630b4438",
+     "title": "Large Component Blast Booth, 309 Aerospace Maintenance and Regeneration Group (A"
+    }
+   ]
+  },
+  "lost": {
+   "by_A": [],
+   "by_B": [],
+   "removed_labelled": {
+    "by_A": 0,
+    "by_B": 0
+   },
+   "removed_total": {
+    "by_A": 0,
+    "by_B": 0
+   }
+  },
+  "classification": {
+   "base": {
+    "labelled": 69,
+    "direct": 52,
+    "direct_relevant_lo": 16,
+    "direct_relevant_hi": 19,
+    "other": 17,
+    "other_relevant_lo": 1,
+    "relevant_lo": 17,
+    "relevant_in_direct": 16
+   },
+   "A": {
+    "labelled": 69,
+    "direct": 52,
+    "direct_relevant_lo": 16,
+    "direct_relevant_hi": 19,
+    "other": 17,
+    "other_relevant_lo": 1,
+    "relevant_lo": 17,
+    "relevant_in_direct": 16
+   },
+   "C": {
+    "labelled": 69,
+    "direct": 52,
+    "direct_relevant_lo": 16,
+    "direct_relevant_hi": 19,
+    "other": 17,
+    "other_relevant_lo": 1,
+    "relevant_lo": 17,
+    "relevant_in_direct": 16
+   }
+  },
+  "top20": {
+   "base": {
+    "n": 20,
+    "lo": 3,
+    "hi": 4,
+    "p": [
+     0.15,
+     0.2
+    ],
+    "ci_lo": [
+     0.05,
+     0.36
+    ],
+    "ci_hi": [
+     0.08,
+     0.42
+    ]
+   },
+   "A": {
+    "n": 20,
+    "lo": 3,
+    "hi": 4,
+    "p": [
+     0.15,
+     0.2
+    ],
+    "ci_lo": [
+     0.05,
+     0.36
+    ],
+    "ci_hi": [
+     0.08,
+     0.42
+    ]
+   },
+   "C": {
+    "n": 20,
+    "lo": 3,
+    "hi": 4,
+    "p": [
+     0.15,
+     0.2
+    ],
+    "ci_lo": [
+     0.05,
+     0.36
+    ],
+    "ci_hi": [
+     0.08,
+     0.42
+    ]
+   }
+  },
+  "off_code_relevant": {
+   "n": 13,
+   "retrieved": {
+    "base": 13,
+    "A": 13,
+    "C": 13
+   }
+  }
+ },
+ "grounds": {
+  "cat": "service",
+  "q": "We do landscaping and grounds maintenance.",
+  "sizes": {
+   "base": 47,
+   "A": 47,
+   "C": 47
+  },
+  "sets_source": "agent4_masking",
+  "retrieval_precision": {
+   "base": {
+    "sample": {
+     "n": 30,
+     "lo": 11,
+     "hi": 12,
+     "p": [
+      0.37,
+      0.4
+     ],
+     "ci_lo": [
+      0.22,
+      0.54
+     ],
+     "ci_hi": [
+      0.25,
+      0.58
+     ]
+    }
+   },
+   "note": "A and C identical to production for this business"
+  },
+  "recall_known": {
+   "base": {
+    "lo": {
+     "n": 30,
+     "found": 15,
+     "r": 0.5
+    },
+    "hi": {
+     "n": 34,
+     "found": 16,
+     "r": 0.47
+    }
+   },
+   "A": {
+    "lo": {
+     "n": 30,
+     "found": 15,
+     "r": 0.5
+    },
+    "hi": {
+     "n": 34,
+     "found": 16,
+     "r": 0.47
+    }
+   },
+   "C": {
+    "lo": {
+     "n": 30,
+     "found": 15,
+     "r": 0.5
+    },
+    "hi": {
+     "n": 34,
+     "found": 16,
+     "r": 0.47
+    }
+   }
+  },
+  "recall_code_floor": {
+   "floor_total": 37,
+   "floor_in_base": 6,
+   "sample": 25,
+   "sample_relevant_hi": 23,
+   "found": {
+    "base": 5,
+    "A": 5,
+    "C": 5
+   },
+   "relevant_floor_not_retrieved": [
+    {
+     "id": "ad43be18d6e044b8a092e42bd2e0302f",
+     "title": "Snow Removal and Sanding Services, Franklin Falls Dam, Franklin, NH"
+    },
+    {
+     "id": "dd4c40a91e0640f69c9a77c7c8978391",
+     "title": "Snow Removal Services WFO Johnston"
+    },
+    {
+     "id": "9f03dbddb7c541a7a2d9a81b317d0f6f",
+     "title": "MSGR gardening services"
+    },
+    {
+     "id": "9f92e5f543e9427c9638f4796a1df016",
+     "title": "Grounds maintenance services for Riverside National Cemetery. -- S208"
+    },
+    {
+     "id": "cbcfdaeb735f4adca04d6bc6b79a9ccb",
+     "title": "W9123727QA005 Walhonding Mowing and Maintenance IDIQ 2027-2031"
+    },
+    {
+     "id": "e5710bca84ce46e69604516635768245",
+     "title": "Snow Removal and Sanding Services, Franklin Falls Dam, Franklin, NH"
+    },
+    {
+     "id": "672211eec23b430186f875c37ece71a8",
+     "title": "Grounds maintenance services for Riverside National Cemetery. -- S208"
+    },
+    {
+     "id": "c3975d1c11084d8ab8b38a4a69823c26",
+     "title": "Burnsville Lake Mowing and Maintenance Services 2027-2031"
+    },
+    {
+     "id": "ac81ea67297f46cd989da6ca48e95c9d",
+     "title": "Snow Removal and Sanding Services, Franklin Falls Dam, Franklin, NH"
+    },
+    {
+     "id": "796d62d510f24b5ab165767683791504",
+     "title": "W9123727QA002 Summersville Mowing and Maintenance IDIQ 2027-2031"
+    },
+    {
+     "id": "4959112071bf4c14b859316f9a506193",
+     "title": "Powerline Tree Clearing and Dead Tree Felling Services"
+    },
+    {
+     "id": "282a3c96219a47e8b998e69f96749933",
+     "title": "Ballfield Maintenance"
+    }
+   ]
+  },
+  "lost": {
+   "by_A": [],
+   "by_B": [],
+   "removed_labelled": {
+    "by_A": 0,
+    "by_B": 0
+   },
+   "removed_total": {
+    "by_A": 0,
+    "by_B": 0
+   }
+  },
+  "classification": {
+   "base": {
+    "labelled": 36,
+    "direct": 21,
+    "direct_relevant_lo": 13,
+    "direct_relevant_hi": 14,
+    "other": 15,
+    "other_relevant_lo": 2,
+    "relevant_lo": 15,
+    "relevant_in_direct": 13
+   },
+   "A": {
+    "labelled": 36,
+    "direct": 21,
+    "direct_relevant_lo": 13,
+    "direct_relevant_hi": 14,
+    "other": 15,
+    "other_relevant_lo": 2,
+    "relevant_lo": 15,
+    "relevant_in_direct": 13
+   },
+   "C": {
+    "labelled": 36,
+    "direct": 21,
+    "direct_relevant_lo": 13,
+    "direct_relevant_hi": 14,
+    "other": 15,
+    "other_relevant_lo": 2,
+    "relevant_lo": 15,
+    "relevant_in_direct": 13
+   }
+  },
+  "top20": {
+   "base": {
+    "n": 20,
+    "lo": 12,
+    "hi": 13,
+    "p": [
+     0.6,
+     0.65
+    ],
+    "ci_lo": [
+     0.39,
+     0.78
+    ],
+    "ci_hi": [
+     0.43,
+     0.82
+    ]
+   },
+   "A": {
+    "n": 20,
+    "lo": 12,
+    "hi": 13,
+    "p": [
+     0.6,
+     0.65
+    ],
+    "ci_lo": [
+     0.39,
+     0.78
+    ],
+    "ci_hi": [
+     0.43,
+     0.82
+    ]
+   },
+   "C": {
+    "n": 20,
+    "lo": 12,
+    "hi": 13,
+    "p": [
+     0.6,
+     0.65
+    ],
+    "ci_lo": [
+     0.39,
+     0.78
+    ],
+    "ci_hi": [
+     0.43,
+     0.82
+    ]
+   }
+  },
+  "off_code_relevant": {
+   "n": 9,
+   "retrieved": {
+    "base": 9,
+    "A": 9,
+    "C": 9
+   }
+  }
+ },
+ "paving": {
+  "cat": "service",
+  "q": "We do asphalt paving and site work.",
+  "sizes": {
+   "base": 161,
+   "A": 161,
+   "C": 161
+  },
+  "sets_source": "agent4_masking",
+  "retrieval_precision": {
+   "base": {
+    "sample": {
+     "n": 30,
+     "lo": 15,
+     "hi": 21,
+     "p": [
+      0.5,
+      0.7
+     ],
+     "ci_lo": [
+      0.33,
+      0.67
+     ],
+     "ci_hi": [
+      0.52,
+      0.83
+     ]
+    }
+   },
+   "note": "A and C identical to production for this business"
+  },
+  "recall_known": {
+   "base": {
+    "lo": {
+     "n": 40,
+     "found": 36,
+     "r": 0.9
+    },
+    "hi": {
+     "n": 50,
+     "found": 45,
+     "r": 0.9
+    }
+   },
+   "A": {
+    "lo": {
+     "n": 40,
+     "found": 36,
+     "r": 0.9
+    },
+    "hi": {
+     "n": 50,
+     "found": 45,
+     "r": 0.9
+    }
+   },
+   "C": {
+    "lo": {
+     "n": 40,
+     "found": 36,
+     "r": 0.9
+    },
+    "hi": {
+     "n": 50,
+     "found": 45,
+     "r": 0.9
+    }
+   }
+  },
+  "recall_code_floor": {
+   "floor_total": 63,
+   "floor_in_base": 45,
+   "sample": 25,
+   "sample_relevant_hi": 21,
+   "found": {
+    "base": 16,
+    "A": 16,
+    "C": 16
+   },
+   "relevant_floor_not_retrieved": [
+    {
+     "id": "8c5433032ca340fb847be0d453c97740",
+     "title": "USFS, Dakota Prairie Grasslands, Little Missouri NG Road Maintenance"
+    },
+    {
+     "id": "4213fc63f7bd4f0bbcc67cf662c232ac",
+     "title": "NJ-NY ERFO FW WARI 2019-1(1) - Wallkill River National Wildlife Refuge"
+    },
+    {
+     "id": "fd3a28b37c2f46b3b12f919bd448d2fb",
+     "title": "NJ-NY ERFO FW WARI 2019-1(1) - Wallkill River National Wildlife Refuge"
+    },
+    {
+     "id": "e7ac88b2efad46a3bdca843b625520dc",
+     "title": "Z--Access Road Repair National Elk Refuge"
+    },
+    {
+     "id": "284671cdad7848049c0a676deb546203",
+     "title": "Custer Gallatin National Forest Ashland and Sioux Road Maintenance"
+    }
+   ]
+  },
+  "lost": {
+   "by_A": [],
+   "by_B": [],
+   "removed_labelled": {
+    "by_A": 0,
+    "by_B": 0
+   },
+   "removed_total": {
+    "by_A": 0,
+    "by_B": 0
+   }
+  },
+  "classification": {
+   "base": {
+    "labelled": 57,
+    "direct": 32,
+    "direct_relevant_lo": 26,
+    "direct_relevant_hi": 29,
+    "other": 25,
+    "other_relevant_lo": 10,
+    "relevant_lo": 36,
+    "relevant_in_direct": 26
+   },
+   "A": {
+    "labelled": 57,
+    "direct": 32,
+    "direct_relevant_lo": 26,
+    "direct_relevant_hi": 29,
+    "other": 25,
+    "other_relevant_lo": 10,
+    "relevant_lo": 36,
+    "relevant_in_direct": 26
+   },
+   "C": {
+    "labelled": 57,
+    "direct": 32,
+    "direct_relevant_lo": 26,
+    "direct_relevant_hi": 29,
+    "other": 25,
+    "other_relevant_lo": 10,
+    "relevant_lo": 36,
+    "relevant_in_direct": 26
+   }
+  },
+  "top20": {
+   "base": {
+    "n": 20,
+    "lo": 15,
+    "hi": 17,
+    "p": [
+     0.75,
+     0.85
+    ],
+    "ci_lo": [
+     0.53,
+     0.89
+    ],
+    "ci_hi": [
+     0.64,
+     0.95
+    ]
+   },
+   "A": {
+    "n": 20,
+    "lo": 15,
+    "hi": 17,
+    "p": [
+     0.75,
+     0.85
+    ],
+    "ci_lo": [
+     0.53,
+     0.89
+    ],
+    "ci_hi": [
+     0.64,
+     0.95
+    ]
+   },
+   "C": {
+    "n": 20,
+    "lo": 15,
+    "hi": 17,
+    "p": [
+     0.75,
+     0.85
+    ],
+    "ci_lo": [
+     0.53,
+     0.89
+    ],
+    "ci_hi": [
+     0.64,
+     0.95
+    ]
+   }
+  },
+  "off_code_relevant": {
+   "n": 10,
+   "retrieved": {
+    "base": 10,
+    "A": 10,
+    "C": 10
+   }
+  }
+ },
+ "parts": {
+  "cat": "product",
+  "q": "We supply industrial and defense replacement parts.",
+  "sizes": {
+   "base": 81,
+   "A": 55,
+   "C": 55
+  },
+  "sets_source": "agent3",
+  "retrieval_precision": {
+   "base": {
+    "est_relevant_lo": 28,
+    "est_relevant_hi": 31,
+    "p_lo": 0.35,
+    "p_hi": 0.38
+   },
+   "A": {
+    "sample": {
+     "n": 25,
+     "lo": 12,
+     "hi": 13,
+     "p": [
+      0.48,
+      0.52
+     ],
+     "ci_lo": [
+      0.3,
+      0.67
+     ],
+     "ci_hi": [
+      0.33,
+      0.7
+     ]
+    }
+   },
+   "removed_by_A": {
+    "sample": {
+     "n": 25,
+     "lo": 2,
+     "hi": 2,
+     "p": [
+      0.08,
+      0.08
+     ],
+     "ci_lo": [
+      0.02,
+      0.25
+     ],
+     "ci_hi": [
+      0.02,
+      0.25
+     ]
+    }
+   }
+  },
+  "recall_known": {
+   "base": {
+    "lo": {
+     "n": 17,
+     "found": 17,
+     "r": 1.0
+    },
+    "hi": {
+     "n": 19,
+     "found": 19,
+     "r": 1.0
+    }
+   },
+   "A": {
+    "lo": {
+     "n": 17,
+     "found": 15,
+     "r": 0.88
+    },
+    "hi": {
+     "n": 19,
+     "found": 17,
+     "r": 0.89
+    }
+   },
+   "C": {
+    "lo": {
+     "n": 17,
+     "found": 15,
+     "r": 0.88
+    },
+    "hi": {
+     "n": 19,
+     "found": 17,
+     "r": 0.89
+    }
+   }
+  },
+  "recall_code_floor": {
+   "floor_total": 0,
+   "floor_in_base": 0,
+   "sample": 0,
+   "sample_relevant_hi": 0,
+   "found": {
+    "base": 0,
+    "A": 0,
+    "C": 0
+   },
+   "relevant_floor_not_retrieved": []
+  },
+  "lost": {
+   "by_A": [
+    {
+     "id": "c4ad8e5f353f4f68829ec2bce49b5488",
+     "title": "Replace Door Control Unit",
+     "lo": true,
+     "labels": [
+      "PARTIAL",
+      "PARTIAL"
+     ]
+    },
+    {
+     "id": "8f25163f92414f3fb539446fa926f000",
+     "title": "417 SCMS Landing Gear Depot Support (LGDS)",
+     "lo": true,
+     "labels": [
+      "PARTIAL",
+      "PARTIAL"
+     ]
+    }
+   ],
+   "by_B": [],
+   "removed_labelled": {
+    "by_A": 25,
+    "by_B": 0
+   },
+   "removed_total": {
+    "by_A": 26,
+    "by_B": 0
+   }
+  },
+  "classification": {
+   "base": {
+    "labelled": 59,
+    "direct": 6,
+    "direct_relevant_lo": 3,
+    "direct_relevant_hi": 4,
+    "other": 53,
+    "other_relevant_lo": 14,
+    "relevant_lo": 17,
+    "relevant_in_direct": 3
+   },
+   "A": {
+    "labelled": 34,
+    "direct": 5,
+    "direct_relevant_lo": 2,
+    "direct_relevant_hi": 3,
+    "other": 29,
+    "other_relevant_lo": 13,
+    "relevant_lo": 15,
+    "relevant_in_direct": 2
+   },
+   "C": {
+    "labelled": 34,
+    "direct": 5,
+    "direct_relevant_lo": 2,
+    "direct_relevant_hi": 3,
+    "other": 29,
+    "other_relevant_lo": 13,
+    "relevant_lo": 15,
+    "relevant_in_direct": 2
+   }
+  },
+  "top20": {
+   "base": {
+    "n": 20,
+    "lo": 5,
+    "hi": 6,
+    "p": [
+     0.25,
+     0.3
+    ],
+    "ci_lo": [
+     0.11,
+     0.47
+    ],
+    "ci_hi": [
+     0.15,
+     0.52
+    ]
+   },
+   "A": {
+    "n": 20,
+    "lo": 7,
+    "hi": 9,
+    "p": [
+     0.35,
+     0.45
+    ],
+    "ci_lo": [
+     0.18,
+     0.57
+    ],
+    "ci_hi": [
+     0.26,
+     0.66
+    ]
+   },
+   "C": {
+    "n": 20,
+    "lo": 7,
+    "hi": 9,
+    "p": [
+     0.35,
+     0.45
+    ],
+    "ci_lo": [
+     0.18,
+     0.57
+    ],
+    "ci_hi": [
+     0.26,
+     0.66
+    ]
+   }
+  },
+  "off_code_relevant": null,
+  "restrictions_among_relevant": {
+   "NONE": 13,
+   "UNCLEAR": 4,
+   "SOLE_SOURCE": 2
+  }
+ },
+ "fasteners": {
+  "cat": "product",
+  "q": "We supply fasteners like bolts, screws and nuts.",
+  "sizes": {
+   "base": 245,
+   "A": 245,
+   "C": 245
+  },
+  "sets_source": "agent4_masking",
+  "retrieval_precision": {
+   "base": {
+    "sample": {
+     "n": 30,
+     "lo": 4,
+     "hi": 4,
+     "p": [
+      0.13,
+      0.13
+     ],
+     "ci_lo": [
+      0.05,
+      0.3
+     ],
+     "ci_hi": [
+      0.05,
+      0.3
+     ]
+    }
+   },
+   "note": "A and C identical to production for this business"
+  },
+  "recall_known": {
+   "base": {
+    "lo": {
+     "n": 32,
+     "found": 13,
+     "r": 0.41
+    },
+    "hi": {
+     "n": 33,
+     "found": 14,
+     "r": 0.42
+    }
+   },
+   "A": {
+    "lo": {
+     "n": 32,
+     "found": 13,
+     "r": 0.41
+    },
+    "hi": {
+     "n": 33,
+     "found": 14,
+     "r": 0.42
+    }
+   },
+   "C": {
+    "lo": {
+     "n": 32,
+     "found": 13,
+     "r": 0.41
+    },
+    "hi": {
+     "n": 33,
+     "found": 14,
+     "r": 0.42
+    }
+   }
+  },
+  "recall_code_floor": {
+   "floor_total": 39,
+   "floor_in_base": 10,
+   "sample": 25,
+   "sample_relevant_hi": 25,
+   "found": {
+    "base": 6,
+    "A": 6,
+    "C": 6
+   },
+   "relevant_floor_not_retrieved": [
+    {
+     "id": "41572d0b3eae4ed1b8e0f5616e08c3ac",
+     "title": "SCREW,MACHINE"
+    },
+    {
+     "id": "d6117481c18445838b3dd93c43855305",
+     "title": "NUT,SELF-LOCKING,HE"
+    },
+    {
+     "id": "6136400fae7943b285c23d28a37b0132",
+     "title": "53--KEY"
+    },
+    {
+     "id": "b60e3da15890494b9b5c8b64d13555e1",
+     "title": "53--SCREW,CAP,SOCKET HE"
+    },
+    {
+     "id": "0837c29ccea5446e84b0807abd795a4f",
+     "title": "53--SCREW,CAP,SOCKET HE"
+    },
+    {
+     "id": "3ace86837c1f4c809b48982093bf97bd",
+     "title": "53--SCREW,MACHINE"
+    },
+    {
+     "id": "905e3a72488a4b0887935c7b480a91d3",
+     "title": "LEVEL 1 Studs"
+    },
+    {
+     "id": "38919699c4db4aa494bdbb7b3b976429",
+     "title": "SCREW,CAP,HEXAGON H"
+    },
+    {
+     "id": "2bb28e1ddd8d4d10a59382d5ef882f6d",
+     "title": "WASHER,FLAT - 40A /HELICOPTER, BLACK HAWK UH-60A, UH-60L, HH/UH-60M, UH-60V"
+    },
+    {
+     "id": "f3f57587eec249a9803e690df7a2f2a7",
+     "title": "Washers, Anti-friction"
+    },
+    {
+     "id": "23fa9d7d00de41efb48b61f23876f1b8",
+     "title": "53--KEY"
+    },
+    {
+     "id": "bafb4223c3c2488d9007b44dcf7d6bd2",
+     "title": "SCREW,MACHINE"
+    }
+   ]
+  },
+  "lost": {
+   "by_A": [],
+   "by_B": [],
+   "removed_labelled": {
+    "by_A": 0,
+    "by_B": 0
+   },
+   "removed_total": {
+    "by_A": 0,
+    "by_B": 0
+   }
+  },
+  "classification": {
+   "base": {
+    "labelled": 52,
+    "direct": 34,
+    "direct_relevant_lo": 13,
+    "direct_relevant_hi": 14,
+    "other": 18,
+    "other_relevant_lo": 0,
+    "relevant_lo": 13,
+    "relevant_in_direct": 13
+   },
+   "A": {
+    "labelled": 52,
+    "direct": 34,
+    "direct_relevant_lo": 13,
+    "direct_relevant_hi": 14,
+    "other": 18,
+    "other_relevant_lo": 0,
+    "relevant_lo": 13,
+    "relevant_in_direct": 13
+   },
+   "C": {
+    "labelled": 52,
+    "direct": 34,
+    "direct_relevant_lo": 13,
+    "direct_relevant_hi": 14,
+    "other": 18,
+    "other_relevant_lo": 0,
+    "relevant_lo": 13,
+    "relevant_in_direct": 13
+   }
+  },
+  "top20": {
+   "base": {
+    "n": 20,
+    "lo": 7,
+    "hi": 8,
+    "p": [
+     0.35,
+     0.4
+    ],
+    "ci_lo": [
+     0.18,
+     0.57
+    ],
+    "ci_hi": [
+     0.22,
+     0.61
+    ]
+   },
+   "A": {
+    "n": 20,
+    "lo": 7,
+    "hi": 8,
+    "p": [
+     0.35,
+     0.4
+    ],
+    "ci_lo": [
+     0.18,
+     0.57
+    ],
+    "ci_hi": [
+     0.22,
+     0.61
+    ]
+   },
+   "C": {
+    "n": 20,
+    "lo": 7,
+    "hi": 8,
+    "p": [
+     0.35,
+     0.4
+    ],
+    "ci_lo": [
+     0.18,
+     0.57
+    ],
+    "ci_hi": [
+     0.22,
+     0.61
+    ]
+   }
+  },
+  "off_code_relevant": {
+   "n": 5,
+   "retrieved": {
+    "base": 5,
+    "A": 5,
+    "C": 5
+   }
+  },
+  "restrictions_among_relevant": {
+   "NONE": 26,
+   "APPROVED_SOURCE": 4,
+   "UNCLEAR": 1,
+   "SOLE_SOURCE": 2
+  }
+ },
+ "electrical": {
+  "cat": "product",
+  "q": "We supply electrical and electronic components.",
+  "sizes": {
+   "base": 803,
+   "A": 803,
+   "C": 803
+  },
+  "sets_source": "agent4_masking",
+  "retrieval_precision": {
+   "base": {
+    "sample": {
+     "n": 30,
+     "lo": 5,
+     "hi": 9,
+     "p": [
+      0.17,
+      0.3
+     ],
+     "ci_lo": [
+      0.07,
+      0.34
+     ],
+     "ci_hi": [
+      0.17,
+      0.48
+     ]
+    }
+   },
+   "note": "A and C identical to production for this business"
+  },
+  "recall_known": {
+   "base": {
+    "lo": {
+     "n": 37,
+     "found": 16,
+     "r": 0.43
+    },
+    "hi": {
+     "n": 42,
+     "found": 20,
+     "r": 0.48
+    }
+   },
+   "A": {
+    "lo": {
+     "n": 37,
+     "found": 16,
+     "r": 0.43
+    },
+    "hi": {
+     "n": 42,
+     "found": 20,
+     "r": 0.48
+    }
+   },
+   "C": {
+    "lo": {
+     "n": 37,
+     "found": 16,
+     "r": 0.43
+    },
+    "hi": {
+     "n": 42,
+     "found": 20,
+     "r": 0.48
+    }
+   }
+  },
+  "recall_code_floor": {
+   "floor_total": 843,
+   "floor_in_base": 96,
+   "sample": 25,
+   "sample_relevant_hi": 24,
+   "found": {
+    "base": 2,
+    "A": 2,
+    "C": 2
+   },
+   "relevant_floor_not_retrieved": [
+    {
+     "id": "e8c00a673bbf4358a2ef70acdb73c1f6",
+     "title": "CIRCUIT CARD ASSEMB"
+    },
+    {
+     "id": "e992e53f22a14d33ae450d12ebb9efcb",
+     "title": "59--RELAY,THERMAL"
+    },
+    {
+     "id": "46e889042cb042ef8c60a3ba6f169223",
+     "title": "59--HEADSET-MICROPHONE"
+    },
+    {
+     "id": "1f33049b138343c08e17373cebfc2c74",
+     "title": "59--AMPLIFIER,ELECTRONIC C"
+    },
+    {
+     "id": "e65fd0e5ddbe4caea3bfe2d5af47a13e",
+     "title": "59--CONNECTOR,PLUG,ELECTRI"
+    },
+    {
+     "id": "29dd6392b1a14b99a306d9bb2a39db53",
+     "title": "59--ANTENNA"
+    },
+    {
+     "id": "11e2fdfde7bd4bcb89e8e74d386025af",
+     "title": "59--TRIPOD,ANTENNA"
+    },
+    {
+     "id": "cc0c9e61221946298b981b4be895a507",
+     "title": "59--HOLDER,HANDSET"
+    },
+    {
+     "id": "678984c83f7343abbcd9a99479a6d7aa",
+     "title": "CCA, POWER BOARD"
+    },
+    {
+     "id": "39c8314e4a564047895995a4de0320a7",
+     "title": "59--SWITCH, ASSEMBLY"
+    },
+    {
+     "id": "efec2a9dec944c5aa697ead36f19c6ed",
+     "title": "59--OSCILLATOR,NONCRYST, IN REPAIR/MODIFICATION OF"
+    },
+    {
+     "id": "940a4f1bfc3949e095c51eb62d3e56a8",
+     "title": "59--CIRCUIT CARD ASSY"
+    }
+   ]
+  },
+  "lost": {
+   "by_A": [],
+   "by_B": [],
+   "removed_labelled": {
+    "by_A": 0,
+    "by_B": 0
+   },
+   "removed_total": {
+    "by_A": 0,
+    "by_B": 0
+   }
+  },
+  "classification": {
+   "base": {
+    "labelled": 52,
+    "direct": 36,
+    "direct_relevant_lo": 14,
+    "direct_relevant_hi": 17,
+    "other": 16,
+    "other_relevant_lo": 2,
+    "relevant_lo": 16,
+    "relevant_in_direct": 14
+   },
+   "A": {
+    "labelled": 52,
+    "direct": 36,
+    "direct_relevant_lo": 14,
+    "direct_relevant_hi": 17,
+    "other": 16,
+    "other_relevant_lo": 2,
+    "relevant_lo": 16,
+    "relevant_in_direct": 14
+   },
+   "C": {
+    "labelled": 52,
+    "direct": 36,
+    "direct_relevant_lo": 14,
+    "direct_relevant_hi": 17,
+    "other": 16,
+    "other_relevant_lo": 2,
+    "relevant_lo": 16,
+    "relevant_in_direct": 14
+   }
+  },
+  "top20": {
+   "base": {
+    "n": 20,
+    "lo": 9,
+    "hi": 9,
+    "p": [
+     0.45,
+     0.45
+    ],
+    "ci_lo": [
+     0.26,
+     0.66
+    ],
+    "ci_hi": [
+     0.26,
+     0.66
+    ]
+   },
+   "A": {
+    "n": 20,
+    "lo": 9,
+    "hi": 9,
+    "p": [
+     0.45,
+     0.45
+    ],
+    "ci_lo": [
+     0.26,
+     0.66
+    ],
+    "ci_hi": [
+     0.26,
+     0.66
+    ]
+   },
+   "C": {
+    "n": 20,
+    "lo": 9,
+    "hi": 9,
+    "p": [
+     0.45,
+     0.45
+    ],
+    "ci_lo": [
+     0.26,
+     0.66
+    ],
+    "ci_hi": [
+     0.26,
+     0.66
+    ]
+   }
+  },
+  "off_code_relevant": {
+   "n": 10,
+   "retrieved": {
+    "base": 10,
+    "A": 10,
+    "C": 10
+   }
+  },
+  "restrictions_among_relevant": {
+   "NONE": 23,
+   "APPROVED_SOURCE": 18,
+   "QPL": 1
+  }
+ },
+ "valves": {
+  "cat": "product",
+  "q": "We supply industrial valves.",
+  "sizes": {
+   "base": 43,
+   "A": 43,
+   "C": 43
+  },
+  "sets_source": "agent4_masking",
+  "retrieval_precision": {
+   "base": {
+    "sample": {
+     "n": 30,
+     "lo": 7,
+     "hi": 9,
+     "p": [
+      0.23,
+      0.3
+     ],
+     "ci_lo": [
+      0.12,
+      0.41
+     ],
+     "ci_hi": [
+      0.17,
+      0.48
+     ]
+    }
+   },
+   "note": "A and C identical to production for this business"
+  },
+  "recall_known": {
+   "base": {
+    "lo": {
+     "n": 28,
+     "found": 10,
+     "r": 0.36
+    },
+    "hi": {
+     "n": 36,
+     "found": 13,
+     "r": 0.36
+    }
+   },
+   "A": {
+    "lo": {
+     "n": 28,
+     "found": 10,
+     "r": 0.36
+    },
+    "hi": {
+     "n": 36,
+     "found": 13,
+     "r": 0.36
+    }
+   },
+   "C": {
+    "lo": {
+     "n": 28,
+     "found": 10,
+     "r": 0.36
+    },
+    "hi": {
+     "n": 36,
+     "found": 13,
+     "r": 0.36
+    }
+   }
+  },
+  "recall_code_floor": {
+   "floor_total": 245,
+   "floor_in_base": 10,
+   "sample": 25,
+   "sample_relevant_hi": 23,
+   "found": {
+    "base": 0,
+    "A": 0,
+    "C": 0
+   },
+   "relevant_floor_not_retrieved": [
+    {
+     "id": "796e109a16a741f3a5725b0c3c67ee8e",
+     "title": "Valve, Solenoid - NSN 4810-01-044-9244"
+    },
+    {
+     "id": "de00ad6560554381b614683fb5432099",
+     "title": "VALVE,LINEAR,DIRECT"
+    },
+    {
+     "id": "d7c7df1b3f6b499db08a77d45f471fb2",
+     "title": "FD2030-27-00258"
+    },
+    {
+     "id": "a7c7efc9e3ee491a9b3bafbf52a185ac",
+     "title": "48--VLV, REGUL PRESSURE"
+    },
+    {
+     "id": "7fa29757f2e14bdda362f5e85d44fe8a",
+     "title": "PARTS KIT,BALL VALV"
+    },
+    {
+     "id": "d42828c396f74c0d88e585e7580fd4e1",
+     "title": "48--VALVE,PLUG"
+    },
+    {
+     "id": "257085af059140ca8fbc3c82f06baba5",
+     "title": "4820--Boiler Blow-Off Valves - STC"
+    },
+    {
+     "id": "a1037a40a84d4a73b40dce9e7e38ae90",
+     "title": "VALVE,ANGLE RELIEF"
+    },
+    {
+     "id": "870c0eb87b774fa3928c29e934be3c29",
+     "title": "48--DISK,VALVE, IN REPAIR/MODIFICATION OF"
+    },
+    {
+     "id": "ced72d07183b4d28bcae57640a4ecd14",
+     "title": "PARTS KIT BALL VALV"
+    },
+    {
+     "id": "9cdcafe0dd4c472b877f2953fbd8a248",
+     "title": "VALVE,BUTTERFLY"
+    },
+    {
+     "id": "f3618f9f8a444f5c9791b8d18ed8c417",
+     "title": "48--GUIDE,VALVE STEM"
+    }
+   ]
+  },
+  "lost": {
+   "by_A": [],
+   "by_B": [],
+   "removed_labelled": {
+    "by_A": 0,
+    "by_B": 0
+   },
+   "removed_total": {
+    "by_A": 0,
+    "by_B": 0
+   }
+  },
+  "classification": {
+   "base": {
+    "labelled": 35,
+    "direct": 12,
+    "direct_relevant_lo": 10,
+    "direct_relevant_hi": 10,
+    "other": 23,
+    "other_relevant_lo": 0,
+    "relevant_lo": 10,
+    "relevant_in_direct": 10
+   },
+   "A": {
+    "labelled": 35,
+    "direct": 12,
+    "direct_relevant_lo": 10,
+    "direct_relevant_hi": 10,
+    "other": 23,
+    "other_relevant_lo": 0,
+    "relevant_lo": 10,
+    "relevant_in_direct": 10
+   },
+   "C": {
+    "labelled": 35,
+    "direct": 12,
+    "direct_relevant_lo": 10,
+    "direct_relevant_hi": 10,
+    "other": 23,
+    "other_relevant_lo": 0,
+    "relevant_lo": 10,
+    "relevant_in_direct": 10
+   }
+  },
+  "top20": {
+   "base": {
+    "n": 20,
+    "lo": 10,
+    "hi": 13,
+    "p": [
+     0.5,
+     0.65
+    ],
+    "ci_lo": [
+     0.3,
+     0.7
+    ],
+    "ci_hi": [
+     0.43,
+     0.82
+    ]
+   },
+   "A": {
+    "n": 20,
+    "lo": 10,
+    "hi": 13,
+    "p": [
+     0.5,
+     0.65
+    ],
+    "ci_lo": [
+     0.3,
+     0.7
+    ],
+    "ci_hi": [
+     0.43,
+     0.82
+    ]
+   },
+   "C": {
+    "n": 20,
+    "lo": 10,
+    "hi": 13,
+    "p": [
+     0.5,
+     0.65
+    ],
+    "ci_lo": [
+     0.3,
+     0.7
+    ],
+    "ci_hi": [
+     0.43,
+     0.82
+    ]
+   }
+  },
+  "off_code_relevant": {
+   "n": 0,
+   "retrieved": {
+    "base": 0,
+    "A": 0,
+    "C": 0
+   }
+  },
+  "restrictions_among_relevant": {
+   "NONE": 31,
+   "SOLE_SOURCE": 2,
+   "APPROVED_SOURCE": 2,
+   "UNCLEAR": 1
+  }
+ },
+ "aircraft": {
+  "cat": "product",
+  "q": "We supply aircraft parts and components.",
+  "sizes": {
+   "base": 475,
+   "A": 475,
+   "C": 475
+  },
+  "sets_source": "agent4_masking",
+  "retrieval_precision": {
+   "base": {
+    "sample": {
+     "n": 30,
+     "lo": 14,
+     "hi": 14,
+     "p": [
+      0.47,
+      0.47
+     ],
+     "ci_lo": [
+      0.3,
+      0.64
+     ],
+     "ci_hi": [
+      0.3,
+      0.64
+     ]
+    }
+   },
+   "note": "A and C identical to production for this business"
+  },
+  "recall_known": {
+   "base": {
+    "lo": {
+     "n": 42,
+     "found": 26,
+     "r": 0.62
+    },
+    "hi": {
+     "n": 45,
+     "found": 28,
+     "r": 0.62
+    }
+   },
+   "A": {
+    "lo": {
+     "n": 42,
+     "found": 26,
+     "r": 0.62
+    },
+    "hi": {
+     "n": 45,
+     "found": 28,
+     "r": 0.62
+    }
+   },
+   "C": {
+    "lo": {
+     "n": 42,
+     "found": 26,
+     "r": 0.62
+    },
+    "hi": {
+     "n": 45,
+     "found": 28,
+     "r": 0.62
+    }
+   }
+  },
+  "recall_code_floor": {
+   "floor_total": 612,
+   "floor_in_base": 165,
+   "sample": 25,
+   "sample_relevant_hi": 21,
+   "found": {
+    "base": 4,
+    "A": 4,
+    "C": 4
+   },
+   "relevant_floor_not_retrieved": [
+    {
+     "id": "dd3448ac98ca4813af5b1f19ff7d7b5e",
+     "title": "MANIFOLD,ENGINE AIR"
+    },
+    {
+     "id": "a4d2cc395b1c4fb1b9cacaaf7a96652d",
+     "title": "16--DUCT ASSY"
+    },
+    {
+     "id": "3ab598b3a4c04683abf03377fe5ac594",
+     "title": "TRANSMISSION, MECHANICAL, NSN# 1680011438497RK, PN# NF53301-02A"
+    },
+    {
+     "id": "541fbf43f6a449048bf0134b13ca4581",
+     "title": "GUIDE,SWASHPLATE"
+    },
+    {
+     "id": "073f710214ba488f9be90bfa26dc8fd5",
+     "title": "Control Assembly, LA"
+    },
+    {
+     "id": "db8c60065c44448085f61641453cd2a8",
+     "title": "New Manufacture of PANEL,CONTROL,ELECT/1680012808653RK/ L5304289-031"
+    },
+    {
+     "id": "f1cf7343529b433587bec1a3386fc23e",
+     "title": "BOOSTER ASSEMBLY,AI"
+    },
+    {
+     "id": "d2230d35c5aa45ccb9bad5bd2686dc40",
+     "title": "15--PANEL,STRUCTURAL,AI"
+    },
+    {
+     "id": "55ae4075954a4febb305aaa4e79cf9dc",
+     "title": "16--PUMP,AXIAL PISTONS - AND SIMILAR REPLACEMENT PARTS, IN REPAIR/MODIFICATION O"
+    },
+    {
+     "id": "4fc72f0e09af4f678043fe5b27495ff6",
+     "title": "HELICOPTER, BLACKHAWK, UH-60A; FOLD SET, ROTARY WIN"
+    },
+    {
+     "id": "2883bbfb314a472e93093777afc4a24d",
+     "title": "FITTING,STRUCTURAL_End_Item_B-52_NSN_1560014347038FG_PN_1560-01-434-7038FG"
+    },
+    {
+     "id": "ba6045b8d77b4e5bb61dc5859b7a6ec2",
+     "title": "16--HOISTING UNIT"
+    }
+   ]
+  },
+  "lost": {
+   "by_A": [],
+   "by_B": [],
+   "removed_labelled": {
+    "by_A": 0,
+    "by_B": 0
+   },
+   "removed_total": {
+    "by_A": 0,
+    "by_B": 0
+   }
+  },
+  "classification": {
+   "base": {
+    "labelled": 53,
+    "direct": 45,
+    "direct_relevant_lo": 26,
+    "direct_relevant_hi": 28,
+    "other": 8,
+    "other_relevant_lo": 0,
+    "relevant_lo": 26,
+    "relevant_in_direct": 26
+   },
+   "A": {
+    "labelled": 53,
+    "direct": 45,
+    "direct_relevant_lo": 26,
+    "direct_relevant_hi": 28,
+    "other": 8,
+    "other_relevant_lo": 0,
+    "relevant_lo": 26,
+    "relevant_in_direct": 26
+   },
+   "C": {
+    "labelled": 53,
+    "direct": 45,
+    "direct_relevant_lo": 26,
+    "direct_relevant_hi": 28,
+    "other": 8,
+    "other_relevant_lo": 0,
+    "relevant_lo": 26,
+    "relevant_in_direct": 26
+   }
+  },
+  "top20": {
+   "base": {
+    "n": 20,
+    "lo": 9,
+    "hi": 11,
+    "p": [
+     0.45,
+     0.55
+    ],
+    "ci_lo": [
+     0.26,
+     0.66
+    ],
+    "ci_hi": [
+     0.34,
+     0.74
+    ]
+   },
+   "A": {
+    "n": 20,
+    "lo": 9,
+    "hi": 11,
+    "p": [
+     0.45,
+     0.55
+    ],
+    "ci_lo": [
+     0.26,
+     0.66
+    ],
+    "ci_hi": [
+     0.34,
+     0.74
+    ]
+   },
+   "C": {
+    "n": 20,
+    "lo": 9,
+    "hi": 11,
+    "p": [
+     0.45,
+     0.55
+    ],
+    "ci_lo": [
+     0.26,
+     0.66
+    ],
+    "ci_hi": [
+     0.34,
+     0.74
+    ]
+   }
+  },
+  "off_code_relevant": {
+   "n": 6,
+   "retrieved": {
+    "base": 6,
+    "A": 6,
+    "C": 6
+   }
+  },
+  "restrictions_among_relevant": {
+   "NONE": 27,
+   "APPROVED_SOURCE": 13,
+   "OEM_ONLY": 2,
+   "SOLE_SOURCE": 1,
+   "UNCLEAR": 2
+  }
+ },
+ "medical": {
+  "cat": "product",
+  "q": "We supply medical, dental and laboratory supplies.",
+  "sizes": {
+   "base": 156,
+   "A": 156,
+   "C": 156
+  },
+  "sets_source": "agent4_masking",
+  "retrieval_precision": {
+   "base": {
+    "sample": {
+     "n": 30,
+     "lo": 3,
+     "hi": 5,
+     "p": [
+      0.1,
+      0.17
+     ],
+     "ci_lo": [
+      0.03,
+      0.26
+     ],
+     "ci_hi": [
+      0.07,
+      0.34
+     ]
+    }
+   },
+   "note": "A and C identical to production for this business"
+  },
+  "recall_known": {
+   "base": {
+    "lo": {
+     "n": 20,
+     "found": 9,
+     "r": 0.45
+    },
+    "hi": {
+     "n": 33,
+     "found": 13,
+     "r": 0.39
+    }
+   },
+   "A": {
+    "lo": {
+     "n": 20,
+     "found": 9,
+     "r": 0.45
+    },
+    "hi": {
+     "n": 33,
+     "found": 13,
+     "r": 0.39
+    }
+   },
+   "C": {
+    "lo": {
+     "n": 20,
+     "found": 9,
+     "r": 0.45
+    },
+    "hi": {
+     "n": 33,
+     "found": 13,
+     "r": 0.39
+    }
+   }
+  },
+  "recall_code_floor": {
+   "floor_total": 88,
+   "floor_in_base": 16,
+   "sample": 25,
+   "sample_relevant_hi": 24,
+   "found": {
+    "base": 4,
+    "A": 4,
+    "C": 4
+   },
+   "relevant_floor_not_retrieved": [
+    {
+     "id": "4145a040954f4fc38ef779ba90355dd6",
+     "title": "65--BLANKET,SURVIVAL"
+    },
+    {
+     "id": "ca111bb2f4d54dbf9016e5839ccaa3ec",
+     "title": "6525--SEP 2026 Equipment Only Consolidation"
+    },
+    {
+     "id": "0454e56b2493496e9ab71ab58d6c319f",
+     "title": "65--ADMINISTRATION SET,INT"
+    },
+    {
+     "id": "e7fbffbbf75045c588fb343c252fdee5",
+     "title": "Midmark 626 Barrier Free Exam Chairs"
+    },
+    {
+     "id": "a387fa5eef144162b8029769c9f1e335",
+     "title": "6505--Sources Sought VISN2 DOWNSTATE GENERAL RADIOPHARMACEUTICALS"
+    },
+    {
+     "id": "2bb0c84c7c87482a8283ad28dfdc3871",
+     "title": "6550--VISN 4 Coagulation Testing"
+    },
+    {
+     "id": "dfb4dcac249c49929a568cd556ed5f9d",
+     "title": "6505--Ramipril Capsules RFP"
+    },
+    {
+     "id": "ee5ba420f0884bafb97e17fc83cc79e4",
+     "title": "6505--Nitroglycerin Patches"
+    },
+    {
+     "id": "ae9e6c6f10ea4b25967b54605b3d3a0b",
+     "title": "6550--Cepheid GeneXpert Testing Supplies"
+    },
+    {
+     "id": "37605f249e454dd29ba8b5f34c93a64e",
+     "title": "NX EQ Microscope Spine"
+    },
+    {
+     "id": "d742a4e725fe443aac2da20a8186e26b",
+     "title": "6515--Pearson Neuropsych testing supplies"
+    },
+    {
+     "id": "18c48e15951a478db59f59d8a149be08",
+     "title": "65--LITTER,FOLDING,POLE"
+    }
+   ]
+  },
+  "lost": {
+   "by_A": [],
+   "by_B": [],
+   "removed_labelled": {
+    "by_A": 0,
+    "by_B": 0
+   },
+   "removed_total": {
+    "by_A": 0,
+    "by_B": 0
+   }
+  },
+  "classification": {
+   "base": {
+    "labelled": 52,
+    "direct": 32,
+    "direct_relevant_lo": 7,
+    "direct_relevant_hi": 9,
+    "other": 20,
+    "other_relevant_lo": 2,
+    "relevant_lo": 9,
+    "relevant_in_direct": 7
+   },
+   "A": {
+    "labelled": 52,
+    "direct": 32,
+    "direct_relevant_lo": 7,
+    "direct_relevant_hi": 9,
+    "other": 20,
+    "other_relevant_lo": 2,
+    "relevant_lo": 9,
+    "relevant_in_direct": 7
+   },
+   "C": {
+    "labelled": 52,
+    "direct": 32,
+    "direct_relevant_lo": 7,
+    "direct_relevant_hi": 9,
+    "other": 20,
+    "other_relevant_lo": 2,
+    "relevant_lo": 9,
+    "relevant_in_direct": 7
+   }
+  },
+  "top20": {
+   "base": {
+    "n": 20,
+    "lo": 6,
+    "hi": 7,
+    "p": [
+     0.3,
+     0.35
+    ],
+    "ci_lo": [
+     0.15,
+     0.52
+    ],
+    "ci_hi": [
+     0.18,
+     0.57
+    ]
+   },
+   "A": {
+    "n": 20,
+    "lo": 6,
+    "hi": 7,
+    "p": [
+     0.3,
+     0.35
+    ],
+    "ci_lo": [
+     0.15,
+     0.52
+    ],
+    "ci_hi": [
+     0.18,
+     0.57
+    ]
+   },
+   "C": {
+    "n": 20,
+    "lo": 6,
+    "hi": 7,
+    "p": [
+     0.3,
+     0.35
+    ],
+    "ci_lo": [
+     0.15,
+     0.52
+    ],
+    "ci_hi": [
+     0.18,
+     0.57
+    ]
+   }
+  },
+  "off_code_relevant": {
+   "n": 5,
+   "retrieved": {
+    "base": 5,
+    "A": 5,
+    "C": 5
+   }
+  },
+  "restrictions_among_relevant": {
+   "BRAND_NAME": 2,
+   "NONE": 20,
+   "SOLE_SOURCE": 2,
+   "APPROVED_SOURCE": 5,
+   "UNCLEAR": 4
+  }
+ },
+ "ithardware": {
+  "cat": "product",
+  "q": "We sell computer hardware and IT equipment.",
+  "sizes": {
+   "base": 468,
+   "A": 468,
+   "C": 468
+  },
+  "sets_source": "agent4_masking",
+  "retrieval_precision": {
+   "base": {
+    "sample": {
+     "n": 30,
+     "lo": 0,
+     "hi": 3,
+     "p": [
+      0.0,
+      0.1
+     ],
+     "ci_lo": [
+      -0.0,
+      0.11
+     ],
+     "ci_hi": [
+      0.03,
+      0.26
+     ]
+    }
+   },
+   "note": "A and C identical to production for this business"
+  },
+  "recall_known": {
+   "base": {
+    "lo": {
+     "n": 0,
+     "found": 0,
+     "r": null
+    },
+    "hi": {
+     "n": 7,
+     "found": 3,
+     "r": 0.43
+    }
+   },
+   "A": {
+    "lo": {
+     "n": 0,
+     "found": 0,
+     "r": null
+    },
+    "hi": {
+     "n": 7,
+     "found": 3,
+     "r": 0.43
+    }
+   },
+   "C": {
+    "lo": {
+     "n": 0,
+     "found": 0,
+     "r": null
+    },
+    "hi": {
+     "n": 7,
+     "found": 3,
+     "r": 0.43
+    }
+   }
+  },
+  "recall_code_floor": {
+   "floor_total": 100,
+   "floor_in_base": 9,
+   "sample": 25,
+   "sample_relevant_hi": 4,
+   "found": {
+    "base": 0,
+    "A": 0,
+    "C": 0
+   },
+   "relevant_floor_not_retrieved": [
+    {
+     "id": "881a500a1e25426dae29beb431903b8a",
+     "title": "COMPUTER,DIGITAL"
+    },
+    {
+     "id": "bb7bfee1976f400dbc07656ef1731f90",
+     "title": "Procurement of classroom equipment for US Embassy Yerevan"
+    },
+    {
+     "id": "a8037d5023134e149aafe9182733c305",
+     "title": "LIGHT SIGNAL RECEIV"
+    },
+    {
+     "id": "9d0b22f4ff5b4fa790c3273b2ce02605",
+     "title": "FIBER,TRANS,4"
+    }
+   ]
+  },
+  "lost": {
+   "by_A": [],
+   "by_B": [],
+   "removed_labelled": {
+    "by_A": 0,
+    "by_B": 0
+   },
+   "removed_total": {
+    "by_A": 0,
+    "by_B": 0
+   }
+  },
+  "classification": {
+   "base": {
+    "labelled": 51,
+    "direct": 35,
+    "direct_relevant_lo": 0,
+    "direct_relevant_hi": 2,
+    "other": 16,
+    "other_relevant_lo": 0,
+    "relevant_lo": 0,
+    "relevant_in_direct": 0
+   },
+   "A": {
+    "labelled": 51,
+    "direct": 35,
+    "direct_relevant_lo": 0,
+    "direct_relevant_hi": 2,
+    "other": 16,
+    "other_relevant_lo": 0,
+    "relevant_lo": 0,
+    "relevant_in_direct": 0
+   },
+   "C": {
+    "labelled": 51,
+    "direct": 35,
+    "direct_relevant_lo": 0,
+    "direct_relevant_hi": 2,
+    "other": 16,
+    "other_relevant_lo": 0,
+    "relevant_lo": 0,
+    "relevant_in_direct": 0
+   }
+  },
+  "top20": {
+   "base": {
+    "n": 20,
+    "lo": 0,
+    "hi": 0,
+    "p": [
+     0.0,
+     0.0
+    ],
+    "ci_lo": [
+     -0.0,
+     0.16
+    ],
+    "ci_hi": [
+     -0.0,
+     0.16
+    ]
+   },
+   "A": {
+    "n": 20,
+    "lo": 0,
+    "hi": 0,
+    "p": [
+     0.0,
+     0.0
+    ],
+    "ci_lo": [
+     -0.0,
+     0.16
+    ],
+    "ci_hi": [
+     -0.0,
+     0.16
+    ]
+   },
+   "C": {
+    "n": 20,
+    "lo": 0,
+    "hi": 0,
+    "p": [
+     0.0,
+     0.0
+    ],
+    "ci_lo": [
+     -0.0,
+     0.16
+    ],
+    "ci_hi": [
+     -0.0,
+     0.16
+    ]
+   }
+  },
+  "off_code_relevant": {
+   "n": 0,
+   "retrieved": {
+    "base": 0,
+    "A": 0,
+    "C": 0
+   }
+  },
+  "restrictions_among_relevant": {
+   "UNCLEAR": 2,
+   "NONE": 4,
+   "APPROVED_SOURCE": 1
+  }
+ }
+}

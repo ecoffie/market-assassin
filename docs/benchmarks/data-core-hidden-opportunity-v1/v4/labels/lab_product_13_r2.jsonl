@@ -1,0 +1,31 @@
+{"id":"r4-0820","label":"NO","role":"NONE","restriction":"NONE","evidence":"procurement and installation services for an Aircraft Electrical Component Test Stand"}
+{"id":"r4-0822","label":"NO","role":"NONE","restriction":"NONE","evidence":"commercial software solutions, digital eMarketplace architectures, Web-Based Ordering System"}
+{"id":"r4-0823","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Parts Kit for a size 3 inch Ball Valve consisting of one Ball"}
+{"id":"r4-0825","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4810-01-044-9244 Nomenclature: Valve, Solenoid; Approved Source(s): TRIUMPH ACTUATION"}
+{"id":"r4-0831","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"HELICOPTER, BLACKHAWK, UH-60A; FOLD SET, ROTARY WIN; NSN 1680-015455596"}
+{"id":"r4-0835","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"Bloomberg Professional Terminal; terminal equipment no longer provided by Bloomberg"}
+{"id":"r4-0836","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"15--DOOR,AIRCRAFT, PSC 1560, NAICS 336413 aircraft parts"}
+{"id":"r4-0837","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"59--SWITCH, ASSEMBLY NSN 1H-5930-017358930, full and open competition"}
+{"id":"r4-0839","label":"NO","role":"NONE","restriction":"NONE","evidence":"designing, manufacturing, testing HSR Main Arc Dipole and Quadrupole Power Supplies"}
+{"id":"r4-0840","label":"NO","role":"NONE","restriction":"NONE","evidence":"replace flooring, resilient base, stainless steel corner guards, and paint"}
+{"id":"r4-0842","label":"NO","role":"NONE","restriction":"NONE","evidence":"Contractor F-16 Pilot Services Ferry Flight Operations for Two F-16"}
+{"id":"r4-0845","label":"NO","role":"NONE","restriction":"NONE","evidence":"lifecycle sustainment and operational support for VBECS medical device software"}
+{"id":"r4-0847","label":"NO","role":"NONE","restriction":"NONE","evidence":"Building 592 renovations, electrical power distribution replacement, HVAC improvements"}
+{"id":"r4-0849","label":"NO","role":"NONE","restriction":"NONE","evidence":"Large Format Wire Electrical Discharge Machining (EDM) System, PSC 3419"}
+{"id":"r4-0850","label":"NO","role":"NONE","restriction":"NONE","evidence":"multidisciplinary scientific and regulatory professional services in support of FDA"}
+{"id":"r4-0853","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"61--CABLE ASSEMBLY,SPEC- AND SIMILAR REPLACEMENT PARTS, PSC 6150"}
+{"id":"r4-0854","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"VALVE,LINEAR,DIRECT, PSC 4810, solicitation for supplies"}
+{"id":"r4-0855","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"sole source basis with Sikorsky for the repair of CONTROL PANEL, AIRCR"}
+{"id":"r4-0856","label":"FIT","role":"PRIME","restriction":"OEM_ONLY","evidence":"Gearbox Assemblies for HC-130J; brand name basis to OEM or OEM authorized distributor"}
+{"id":"r4-0860","label":"NO","role":"NONE","restriction":"NONE","evidence":"contractor to dispose of about 80 Cubic yards of contaminated soil"}
+{"id":"r4-0863","label":"NO","role":"NONE","restriction":"NONE","evidence":"Condensate Pump Replacements at West Haven VAMC, NAICS 238220 service"}
+{"id":"r4-0865","label":"NO","role":"NONE","restriction":"NONE","evidence":"POWER DISTRO UNIT repair price, teardown and evaluation, repair turn around time"}
+{"id":"r4-0866","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"official solicitation for procurement of the Door (L), Aircraft for the UH-60"}
+{"id":"r4-0868","label":"NO","role":"NONE","restriction":"NONE","evidence":"Product Support Integrator procuring commercially available components for CP DEPMEDS"}
+{"id":"r4-0870","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"procurement of a maximum of twenty (20) Electrical Hull Penetrators and cable assemblies"}
+{"id":"r4-0871","label":"PARTIAL","role":"SUB","restriction":"SOLE_SOURCE","evidence":"sole-source contract with Pearson for neuropsychological assessment kits, consumables, manuals"}
+{"id":"r4-0872","label":"PARTIAL","role":"SUB","restriction":"NONE","evidence":"Healthcare professionals (medical, dental...), equipment, supplies, pharmacy, laboratory"}
+{"id":"r4-0873","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"sole source basis with J&S Tool, Inc. for perishable tooling"}
+{"id":"r4-0876","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 5965006429879 HOLDER,HANDSET: Line 0001 Qty 389"}
+{"id":"r4-0878","label":"NO","role":"NONE","restriction":"NONE","evidence":"15--SUPPORT,STRUCTURAL, IN REPAIR/MODIFICATION OF"}
+{"id":"r4-0879","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Power Distribution and Illumination Systems, Electrical; FSC 6150; NSN 6150-01-208-9751"}

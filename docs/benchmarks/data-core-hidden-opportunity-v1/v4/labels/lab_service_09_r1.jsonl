@@ -1,0 +1,35 @@
+{"id": "r4-0707", "label": "FIT", "role": "PRIME", "evidence": "Janitorial Services RFQ, mop floors, small business set-aside NAICS 561720"}
+{"id": "r4-0708", "label": "FIT", "role": "PRIME", "evidence": "Roadway reconditioning, aggregate surface course, culvert replacement on access roads"}
+{"id": "r4-0709", "label": "FIT", "role": "PRIME", "evidence": "Grounds Maintenance Service contract: weed control, lawn care, groundskeeping at ARTCC"}
+{"id": "r4-0710", "label": "NO", "role": "NONE", "evidence": "Park enhancements IFB; no paving or site work stated in text"}
+{"id": "r4-0714", "label": "NO", "role": "NONE", "evidence": "Industry day for Army Reserve Center construction; badge security text only"}
+{"id": "r4-0717", "label": "NO", "role": "NONE", "evidence": "Child care services for Yellow Ribbon program; not guard work"}
+{"id": "r4-0719", "label": "PARTIAL", "role": "SUB", "evidence": "Design-build SCIF facility includes site work, paving, access control infrastructure"}
+{"id": "r4-0720", "label": "NO", "role": "NONE", "evidence": "Printer and scanner maintenance; security search boilerplate only"}
+{"id": "r4-0721", "label": "NO", "role": "NONE", "evidence": "Navy block assembly supply item; clause boilerplate only"}
+{"id": "r4-0722", "label": "NO", "role": "NONE", "evidence": "Electrical distribution upgrades; asphalt only incidental surface restoration"}
+{"id": "r4-0728", "label": "NO", "role": "NONE", "evidence": "Aircraft electrical test stand procurement and installation, not steel buildings"}
+{"id": "r4-0729", "label": "NO", "role": "NONE", "evidence": "Snow removal services, not nursing or medical staffing"}
+{"id": "r4-0730", "label": "NO", "role": "NONE", "evidence": "Power supply repair for Navy NSN item"}
+{"id": "r4-0733", "label": "FIT", "role": "PRIME", "evidence": "Armed Protective Security Officer services for federal buildings, Los Angeles"}
+{"id": "r4-0735", "label": "FIT", "role": "PRIME", "evidence": "Janitorial services for cemetery administration and maintenance buildings, performance-based"}
+{"id": "r4-0736", "label": "NO", "role": "NONE", "evidence": "Cemetery gravesite expansion construction; no guard services"}
+{"id": "r4-0737", "label": "NO", "role": "NONE", "evidence": "Valve stem guide supply item; clause boilerplate"}
+{"id": "r4-0739", "label": "NO", "role": "NONE", "evidence": "VA surgical suite renovation construction; electronic security division only specs"}
+{"id": "r4-0740", "label": "PARTIAL", "role": "SUB", "evidence": "Design-build repair includes repair of HVAC and electrical systems"}
+{"id": "r4-0742", "label": "PARTIAL", "role": "SUB", "evidence": "Groundworks for modular cafe include drainage and soft landscaping"}
+{"id": "r4-0743", "label": "FIT", "role": "PRIME", "evidence": "Asphalt services, re-pave various areas at Carr Creek Lake, small business set-aside"}
+{"id": "r4-0745", "label": "NO", "role": "NONE", "evidence": "Cemetery rehabilitation specs; no paving or site work evident in shown text"}
+{"id": "r4-0747", "label": "PARTIAL", "role": "SUB", "evidence": "Mechanical MATOC may include incidental asphalt and concrete paving"}
+{"id": "r4-0749", "label": "NO", "role": "NONE", "evidence": "Electrical panel replacement project; no steel erection or roofing stated"}
+{"id": "r4-0751", "label": "NO", "role": "NONE", "evidence": "Rubber pipe couplings supply; Coast Guard only organization name"}
+{"id": "r4-0753", "label": "PARTIAL", "role": "SUB", "evidence": "Demolition and modular office build includes site improvements, sidewalks, parking, landscaping"}
+{"id": "r4-0755", "label": "PARTIAL", "role": "SUB", "evidence": "Cutter drydock work items include clean HVAC duct system"}
+{"id": "r4-0762", "label": "PARTIAL", "role": "SUB", "evidence": "Airfield apron and taxiway construction; asphalt concrete pavement experience required"}
+{"id": "r4-0764", "label": "NO", "role": "NONE", "evidence": "Catered meals BPA; National Guard only organization name"}
+{"id": "r4-0765", "label": "NO", "role": "NONE", "evidence": "Built-up roof replacement on VA building; no metal roofing stated"}
+{"id": "r4-0776", "label": "NO", "role": "NONE", "evidence": "Ball valve parts kit supply; clause boilerplate"}
+{"id": "r4-0779", "label": "FIT", "role": "PRIME", "evidence": "Remove and replace radiant heating panels, furnish labor and materials"}
+{"id": "r4-0783", "label": "FIT", "role": "PRIME", "evidence": "Custodial service cleaning dormitory, restrooms, administrative offices per PWS"}
+{"id": "r4-0785", "label": "NO", "role": "NONE", "evidence": "Psychological evaluation service, not nursing or staffing"}
+{"id": "r4-0786", "label": "NO", "role": "NONE", "evidence": "Refuse and recycling collection; Coast Guard only organization name"}

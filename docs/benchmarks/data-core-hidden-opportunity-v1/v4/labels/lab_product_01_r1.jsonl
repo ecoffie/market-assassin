@@ -1,0 +1,35 @@
+{"id": "r4-0081", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "BUTTERFLY VLV 3.00, PSC 4820, RFQ for a buy"}
+{"id": "r4-0085", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Maintenance Service Contract for Doosan Forklifts, PSC J039 service"}
+{"id": "r4-0087", "label": "FIT", "role": "PRIME", "restriction": "SOLE_SOURCE", "evidence": "6515 Triplane endo transducers, intent to sole source, OEM product"}
+{"id": "r4-0088", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 6532015246932 BLANKET,SURVIVAL; Approved source is 515E6 BPS-01"}
+{"id": "r4-0090", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "SCREW,CAP,SOCKET HE, PSC 5305, NSN 5305-017029638, QTY 6 EA"}
+{"id": "r4-0092", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "snow removal services at the WFO in Gaylord, MI"}
+{"id": "r4-0093", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "procurement and installation of Aircraft Electrical Component Test Stand, ground test equipment"}
+{"id": "r4-0094", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "FITTING,STRUCTURAL B-52 NSN 1560-01-434-7038FG new manufacture spares"}
+{"id": "r4-0095", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5980012719925 DISPLAY,OPTOELECTRONIC; Approved source is 58774 KW-615-17"}
+{"id": "r4-0096", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "PIPE FITTINGS FITTING ASSY bronze, PSC 4730, not fasteners"}
+{"id": "r4-0100", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Aluminum Roll 3105-H18, PSC 9515 raw material, not IT hardware"}
+{"id": "r4-0102", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "BULKHEAD,AIRCRAFT NSN 1560-017279075 P/N 68A332002-2063 KC-46A"}
+{"id": "r4-0106", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5965017225331 HEADSET-MICROPHONE; Approved source is 32108 857641-2160"}
+{"id": "r4-0108", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "VALVE,CHECK PSC 4820, valve not fastener"}
+{"id": "r4-0111", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5340006315301 RETAINER,NUT AND BOLT; Approved sources are 1JX19 LS4893-10C"}
+{"id": "r4-0112", "label": "PARTIAL", "role": "PRIME", "restriction": "NONE", "evidence": "Automated Blood Bank Solid Phase Analyzer and Associated Reagents/Consumables"}
+{"id": "r4-0113", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "DRAWER,ELECTRONICS PSC 6130 repair price, RTAT repair service"}
+{"id": "r4-0115", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 1560-015613886 PARTS KIT,CONTROL SURFACE,AIRCRAFT; Source Approval Request required"}
+{"id": "r4-0116", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "Gammagard S/D kits, pharmaceutical, TAKEDA only responsible source"}
+{"id": "r4-0117", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "IMPELLER,COMPRESSOR NSN 2835-01-044-7730 C-130; HONEYWELL limited source"}
+{"id": "r4-0118", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "VALVE,BALL PSC 4820, total small business set-aside, SUBSAFE markings"}
+{"id": "r4-0120", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CCA, POWER BOARD PSC 5998, CASREP emergency acquisition"}
+{"id": "r4-0121", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "53--HELICAL SPRING PSC 5360, mechanical spring not electrical"}
+{"id": "r4-0122", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 6530016631222 LITTER,FOLDING,POLE; Approved sources are 06ST7 60-0022"}
+{"id": "r4-0125", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "RM16-1405 BUILDING 592 RENOVATIONS, construction project"}
+{"id": "r4-0126", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Breathing Air Systems Services preventive maintenance of compressors"}
+{"id": "r4-0129", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Replace B650 3rd and 2nd Flooring construction project"}
+{"id": "r4-0131", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Wall-to-Wall Pharmacy Inventory services, PSC R706"}
+{"id": "r4-0134", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "VALVE,BALL PSC 4820, valve not fastener"}
+{"id": "r4-0136", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "procurement and installation of Aircraft Electrical Component Test Stand"}
+{"id": "r4-0139", "label": "NO", "role": "NONE", "restriction": "APPROVED_SOURCE", "evidence": "repair SLAT,AIRCRAFT 1560-01-724-2732 to RFI; Government source approval required"}
+{"id": "r4-0142", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "WINDOW DEFROSTING NOZZLE NSN 1680-01-613-5720, 100% small business set-aside"}
+{"id": "r4-0143", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "VALVE,ANGLE RELIEF PSC 4820, requirements for manufacture"}
+{"id": "r4-0144", "label": "NO", "role": "NONE", "restriction": "UNCLEAR", "evidence": "THRUST REVERSER SEC, IN REPAIR/MODIFICATION OF, repaired by FAA certified repair stations"}
+{"id": "r4-0147", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "ELECTRONIC COMPONEN repaired under this contract, repair service"}
