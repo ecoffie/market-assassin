@@ -15,6 +15,8 @@ import type { IgnoredArg } from '@/lib/mcp/result-contract';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import { mcpFlags } from '@/lib/mcp/flags';
 
+import { getAwardDetail } from './award-detail';
+
 export interface PastContractsToolInput {
   state?: string;
   /** 'pop' (place of performance, default) | 'recipient' (HQ) | 'both' (union). */
@@ -32,6 +34,12 @@ export interface PastContractsToolInput {
   keyword?: string;
   /** Contract-number prefix, e.g. an office DoDAAC like "W912EQ" or "N00189". */
   piid_prefix?: string;
+  /**
+   * Also report status (active / expired), days to end and a likely-successor check for the top
+   * matches (up to STATUS_CHECK_MAX), in the same call. "Is X still active / who replaced it" in
+   * one step instead of a second get_award_detail call per award.
+   */
+  include_status?: boolean;
 }
 
 export interface PastContractsToolResult {
@@ -46,6 +54,15 @@ export interface PastContractsToolResult {
     date_filter: string;
     do_not: string;
   };
+  /** Present when include_status was requested: one entry per checked award (top matches). */
+  status_checks?: Array<{
+    award_id: string;
+    status: string;
+    days_until_end: number | null;
+    end_date: string | null;
+    successor: unknown;
+    error?: string;
+  }>;
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
   _meta: {
     grounded: boolean;
@@ -79,6 +96,9 @@ export interface PastContractsToolResult {
     };
   };
 }
+
+/** Awards checked for status/successor when include_status is set (each check is a detail fetch). */
+export const STATUS_CHECK_MAX = 3;
 
 export async function searchPastContracts(input: PastContractsToolInput): Promise<PastContractsToolResult> {
   const requestedScope: StateScope = input.state_scope ?? 'pop';
@@ -226,6 +246,26 @@ export async function searchPastContracts(input: PastContractsToolInput): Promis
         'date_from/date_to select which awards return, by transaction activity — an award whose period of performance already ENDED can still appear in a later window.',
       ],
     };
+  }
+  if (input.include_status && result.awards.length) {
+    result.status_checks = await Promise.all(
+      result.awards.slice(0, STATUS_CHECK_MAX).map(async (row) => {
+        try {
+          const d = await getAwardDetail({ piid: row.awardId });
+          return {
+            award_id: row.awardId,
+            status: d.status,
+            days_until_end: d.days_until_end,
+            end_date: d.status_basis?.end_date_used ?? null,
+            successor: d.successor,
+          };
+        } catch (err) {
+          return { award_id: row.awardId, status: 'unknown', days_until_end: null, end_date: null, successor: null, error: String((err as Error)?.message || err).slice(0, 120) };
+        }
+      }),
+    );
+    if (result._meta.applied_filters) (result._meta.applied_filters as Record<string, unknown>).include_status = true;
+    else result._meta.applied_filters = { include_status: true };
   }
   return result;
 }

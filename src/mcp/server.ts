@@ -861,10 +861,11 @@ server.registerTool(
       limit: z.number().int().min(1).max(100).optional().describe('Max awards (default 25).'),
       keyword: z.string().optional().describe('Phrase matched against award description / id / recipient (exact phrase).'),
       piid_prefix: z.string().optional().describe('Contract-number prefix, e.g. office DoDAAC "W912EQ".'),
+      include_status: z.boolean().optional().describe('Also return status_checks (active/expired, days to end, likely successor) for the top 3 matches.'),
     },
   },
-  async ({ state, state_scope, naics, psc, agency, recipient, min_value, date_from, date_to, include_idv, limit, keyword, piid_prefix }) => {
-    const result = await searchPastContracts({ state, state_scope, naics, psc, agency, recipient, min_value, date_from, date_to, include_idv, limit, keyword, piid_prefix });
+  async ({ state, state_scope, naics, psc, agency, recipient, min_value, date_from, date_to, include_idv, limit, keyword, piid_prefix, include_status }) => {
+    const result = await searchPastContracts({ state, state_scope, naics, psc, agency, recipient, min_value, date_from, date_to, include_idv, limit, keyword, piid_prefix, include_status });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );

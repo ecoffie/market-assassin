@@ -983,6 +983,7 @@ const PAST_CONTRACTS_TOOL_DEF = {
         limit: { type: 'number', description: 'Max awards returned (default 25, max 100).' },
         keyword: { type: 'string', description: 'Phrase matched against award description / award id / recipient (USASpending keyword search, exact phrase). Use the formal wording ("identification card", not "ID card"). With piid_prefix, matched against description and recipient of that office\'s awards.' },
         piid_prefix: { type: 'string', description: 'Contract-number (PIID) prefix, e.g. an office DoDAAC "W912EQ" or "N00189". Only awards whose PIID starts with it are returned.' },
+        include_status: { type: 'boolean', description: 'Also return status_checks for the top 3 matches: active/expired, days to end, end date, and a likely-successor check (candidates with evidence, or checked-none-found). Use for "is it still active" and "who replaced it".' },
       },
     },
   },
@@ -2500,6 +2501,7 @@ async function dispatchMcpTool(
       limit: typeof args.limit === 'number' ? args.limit : undefined,
       keyword: typeof args.keyword === 'string' ? args.keyword : undefined,
       piid_prefix: typeof args.piid_prefix === 'string' ? args.piid_prefix : undefined,
+      include_status: args.include_status === true,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
