@@ -89,3 +89,19 @@ OFF = API responses byte-identical to today (tested). No migration, no data writ
 
 Not started (Eric, 2026-11-14). Agent 4 is investigating Data Core's semantic search, statement-of-work intelligence
 and hidden-opportunity recovery; any new matching proposal is coordinated with Agent 4 first. C2 proposes none.
+
+## 6. Agent 1 review of slice 1 (2026-11-14): no objection; conditions for slice 2
+
+1. Additive `open_now.evidence_totals` in `find_opportunities` is acceptable, with: `evidence_counts` unchanged; a new
+   `evidence_counts_scope` field disclosing that those counts are window-scoped (500 rows, deadline order, DIRECT and
+   RELATED only), closing today's "window read as population" gap; `evidence_totals` null + reason when not computed,
+   never 0; `complete: true` only when every row was classified. It changes a public MCP tool's output, so it needs
+   Eric's approval and an MCP-CHANGELOG entry (credits unchanged). Ask Mindy's renderer does not show it unless wired.
+2. `find_opportunities` should call `evidenceCapability` (one derivation), keeping the pinning test.
+3. Cost: never add the full-set read to every call. (a) If `matched_count` <= the 500-row window, the window IS the full
+   set: exact totals from rows already fetched, no extra cost. (b) Above it, `evidence_totals: null`, reason
+   `not_computed_over_window`. (c) Background totals cached per plan version and query only if Eric wants them for big
+   searches. The 3,000 cap applies to Map/alert surfaces, not MCP.
+4. Every count names its unit (listings on the Map; rows in MCP and Ask Mindy).
+
+Slice 2 therefore costs nothing on the request path and needs Eric's approval of the tool-output change.
