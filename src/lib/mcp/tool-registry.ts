@@ -17,6 +17,8 @@
  * stays gated by mcpFlags (see src/lib/mcp/flags.ts).
  */
 import { getWriteClient } from '@/lib/supabase/server-clients';
+import { annotateResultContract } from '@/lib/mcp/result-contract';
+import { parseStageGroup } from '@/lib/opportunities/acquisition-stage';
 import { makeTier1Tools, TIER1_TOOL_DEFS, TIER1_TOOL_NAMES, type Tier1Db } from '@/lib/chat/tier1-tools';
 import { makeTier2Tools, TIER2_TOOL_DEFS, TIER2_TOOL_NAMES } from '@/lib/chat/tier2-tools';
 import { getWinningPlaybook } from '@/mcp/tools/winning-playbook';
@@ -2113,6 +2115,35 @@ export async function runMcpTool(
   args: Record<string, unknown>,
   ctx: McpToolContext,
 ): Promise<McpToolRun> {
+  const run = await dispatchMcpTool(name, args, ctx);
+  // P1-1 shared result contract: every result states whether it is a verified zero, unavailable,
+  // or missing an argument it was given. Additive `_meta` fields only; never throws.
+  try {
+    annotateResultContract(run.result, args, toolParameters(name));
+  } catch (err) {
+    console.error('[runMcpTool] result contract annotation failed', name, err);
+  }
+  return run;
+}
+
+let PARAMS_BY_NAME: Map<string, Record<string, unknown>> | null = null;
+/** Declared JSON-schema parameters for a tool (from the same defs listMcpTools serves). */
+export function toolParameters(name: string): { properties?: Record<string, { type?: string | string[]; enum?: unknown[] }> } | null {
+  if (!PARAMS_BY_NAME) {
+    PARAMS_BY_NAME = new Map();
+    for (const d of listMcpTools()) {
+      const fn = (d as { function?: { name?: string; parameters?: Record<string, unknown> } }).function;
+      if (fn?.name) PARAMS_BY_NAME.set(fn.name, fn.parameters ?? {});
+    }
+  }
+  return (PARAMS_BY_NAME.get(name) as { properties?: Record<string, { type?: string }> } | undefined) ?? null;
+}
+
+async function dispatchMcpTool(
+  name: string,
+  args: Record<string, unknown>,
+  ctx: McpToolContext,
+): Promise<McpToolRun> {
   const credits = creditsFor(name);
 
   if (TIER1_TOOL_NAMES.has(name)) {
@@ -2334,6 +2365,15 @@ export async function runMcpTool(
         : typeof args.states === 'string' ? args.states : undefined,
       stage: typeof args.stage === 'string' ? args.stage : undefined,
     })) as unknown as Record<string, unknown>;
+    // Result contract: report the coerced arguments the tool DID apply, so a string `states`
+    // (schema: array) or a normalized `stage` ("market research" -> MARKET_RESEARCH) is not
+    // reported as ignored. An unrecognizable stage stays reported (the enum check flags it).
+    const meta = (result._meta && typeof result._meta === 'object' ? result._meta : (result._meta = {})) as Record<string, unknown>;
+    const applied = { ...((meta.applied_filters as Record<string, unknown>) ?? {}) };
+    if (typeof args.states === 'string' && args.states.trim()) applied.states = args.states;
+    const stageGroup = typeof args.stage === 'string' ? parseStageGroup(args.stage) : null;
+    if (stageGroup && stageGroup !== 'invalid') applied.stage = stageGroup;
+    if (Object.keys(applied).length) meta.applied_filters = applied;
     return { result, credits };
   }
 
