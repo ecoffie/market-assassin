@@ -3,6 +3,7 @@ import { qualifyReferralFromRequest } from '@/lib/mcp/referrals';
 import { verifyUserSession } from '@/lib/api-auth';
 import { createMIAuthSessionToken } from '@/lib/two-factor-session';
 import { scheduleAttributionClaim } from '@/lib/attribution/claim-from-request';
+import { scheduleRegistrationGrant } from '@/lib/mcp/registration-grant';
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,6 +21,8 @@ export async function POST(request: NextRequest) {
     // Share/anonymous acquisition: associate this browser's pre-signup history with the account.
     // This route is where Google, Microsoft, magic-link and /app sessions are minted.
     scheduleAttributionClaim(request, auth.email, auth.createdAt ?? null);
+    // One introductory credit grant per account, at registration (off until the cutover is set).
+    scheduleRegistrationGrant(auth.email, auth.createdAt ?? null);
     const authenticatedAt = new Date().toISOString();
 
     return NextResponse.json({

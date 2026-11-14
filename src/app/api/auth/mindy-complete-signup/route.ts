@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyUserSession } from '@/lib/api-auth';
 import { ensureMindyFreeProfile } from '@/lib/mindy/free-profile';
 import { scheduleAttributionClaim } from '@/lib/attribution/claim-from-request';
+import { scheduleRegistrationGrant } from '@/lib/mcp/registration-grant';
 
 export async function POST(request: NextRequest) {
   const auth = await verifyUserSession(request);
@@ -15,6 +16,8 @@ export async function POST(request: NextRequest) {
     // The email setup-password path verifies here and never mints an MI token, so the
     // share/anonymous acquisition claim has to run here too (mi-session covers the rest).
     scheduleAttributionClaim(request, auth.email, auth.createdAt ?? null);
+    // One introductory credit grant per account, at registration (off until the cutover is set).
+    scheduleRegistrationGrant(auth.email, auth.createdAt ?? null);
     return NextResponse.json({ success: true, email: auth.email });
   } catch (error) {
     console.error('[Mindy Complete Signup] Failed to complete signup:', error);
