@@ -67,7 +67,7 @@ describe('opening a card conversation', () => {
   it('pins the opportunity and shows opportunity starters', () => {
     const t = boot();
     (t.w.__askAboutOpp as (o: unknown) => void)(OPP);
-    expect(t.doc.getElementById('amk')!.classList.contains('card')).toBe(true);
+    expect(t.doc.getElementById('amk')!.classList.contains('amk-card')).toBe(true);
     expect(t.ctx()).toContain('About: Janitorial Services, Building 12');
     expect(t.ctx()).toContain('due 2026-12-04');
     expect(t.body().textContent).toContain('Ask about this opportunity');
@@ -77,7 +77,7 @@ describe('opening a card conversation', () => {
   it('a malformed id does nothing', () => {
     const t = boot();
     (t.w.__askAboutOpp as (o: unknown) => void)({ id: 'W912PL26Q0042', title: 'x' });
-    expect(t.doc.getElementById('amk')!.classList.contains('card')).toBe(false);
+    expect(t.doc.getElementById('amk')!.classList.contains('amk-card')).toBe(false);
   });
 });
 
@@ -160,7 +160,7 @@ describe('sign-in and the existing map-view chat', () => {
     const t = boot();
     (t.w.__askAboutOpp as (o: unknown) => void)(OPP);
     (t.w.openAskMindy as (s?: string) => void)();
-    expect(t.doc.getElementById('amk')!.classList.contains('card')).toBe(false);
+    expect(t.doc.getElementById('amk')!.classList.contains('amk-card')).toBe(false);
     (t.w.document.getElementById('amkIn') as HTMLTextAreaElement).value = 'Who buys the most here?';
     (t.doc.getElementById('amkSend') as HTMLButtonElement).click();
     await t.settle();
@@ -182,6 +182,9 @@ describe('the card invitation and the flag', () => {
     expect(MAP).toMatch(/CARD_CHAT_FLAG_JS \+ ASK_MINDY_JS/);
   });
   it('phones get a full-width card chat sheet', () => {
-    expect(MAP).toContain("'@media(max-width:640px){.amk.card{width:100vw}}'");
+    expect(MAP).toContain("'@media(max-width:640px){.amk.amk-card{width:100vw}}'");
+    // never the bare .card class: the map styles .card (listing cards) incl. a :hover transform
+    const js = MAP.slice(MAP.indexOf('const ASK_MINDY_JS'), MAP.indexOf('</script>`;', MAP.indexOf('const ASK_MINDY_JS')));
+    expect(js).not.toMatch(/classList\.(add|remove|toggle)\('card'\)/);
   });
 });

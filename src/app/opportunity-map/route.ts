@@ -10801,7 +10801,7 @@ const ASK_MINDY_CSS =
   + '.amk{position:fixed;top:0;right:0;height:100dvh;width:min(440px,94vw);background:#fff;box-shadow:-14px 0 44px rgba(16,24,40,.22);z-index:2601;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1)}'
   + '.amk.show{transform:none}'
   // Card chat: full width on phones (the card is one tap back), source line + credits note under answers.
-  + '@media(max-width:640px){.amk.card{width:100vw}}'
+  + '@media(max-width:640px){.amk.amk-card{width:100vw}}'
   + '.amk-src{margin-top:6px;font:500 11.5px Inter,system-ui,sans-serif;color:#64748b}.amk-src a{color:#2563eb}'
   + '.amk-credits{margin-top:4px;font:500 11.5px Inter,system-ui,sans-serif;color:#64748b}'
   + '.amk-hd{display:flex;align-items:center;gap:10px;padding:15px 17px 13px;border-bottom:1px solid #eef1f5}'
@@ -10870,11 +10870,13 @@ const ASK_MINDY_JS = `<script>(function(){
   // ── CARD CHAT (MAP_CARD_CHAT_ENABLED): ask about ONE opportunity. The browser sends only the notice id;
   // the server loads the record and documents. Each opportunity keeps its own thread in this browser, and
   // the map-view conversation is kept aside and restored when the drawer goes back to view mode.
-  var oppCtx=null, viewState={sessionId:'',history:[]};
+  // The class is amk-card, NOT card: the map already styles .card (listing cards, incl. a :hover transform)
+  // and a shared name let that hover rule pin the closed drawer on screen on touch devices.
+  var oppCtx=null, viewState={sessionId:'',history:[]}, viewPlaceholder=(input&&input.placeholder)||'';
   function cardKey(id){ return 'mindy_card_chat:'+id; }
   function loadCard(id){ try{ var j=JSON.parse(localStorage.getItem(cardKey(id))||'null'); if(j&&typeof j==='object')return {sessionId:String(j.sessionId||''),history:Array.isArray(j.history)?j.history.slice(-8):[]}; }catch(e){} return {sessionId:'',history:[]}; }
   function saveCard(){ if(!oppCtx)return; try{ localStorage.setItem(cardKey(oppCtx.id),JSON.stringify({sessionId:sessionId,history:history.slice(-8)})); }catch(e){} }
-  function leaveCard(){ if(!oppCtx)return; saveCard(); oppCtx=null; sessionId=viewState.sessionId; history=viewState.history; drawer.classList.remove('card'); body.innerHTML=''; }
+  function leaveCard(){ if(!oppCtx)return; saveCard(); oppCtx=null; sessionId=viewState.sessionId; history=viewState.history; drawer.classList.remove('amk-card'); if(input)input.placeholder=viewPlaceholder; body.innerHTML=''; }
   // ── The GROUNDED view context (approved vision: "Context: N open opps in view \\u00b7 FL \\u00b7 NAICS 236220").
   // Read fresh from the map's bridge every time the drawer opens — never a stale snapshot, never fabricated.
   function viewCtx(){ try{ if(typeof window.__mindyViewCtx==='function') return window.__mindyViewCtx()||{}; }catch(e){} return {}; }
@@ -10916,7 +10918,7 @@ const ASK_MINDY_JS = `<script>(function(){
     if(!oppCtx) viewState={sessionId:sessionId,history:history.slice()}; else saveCard();
     oppCtx={id:id,title:String(op.title||''),deadline:String(op.deadline||'')};
     var st=loadCard(id); sessionId=st.sessionId; history=st.history;
-    drawer.classList.add('card'); body.innerHTML='';
+    drawer.classList.add('amk-card'); if(input)input.placeholder='Ask about this opportunity\\u2026'; body.innerHTML='';
     if(history.length){ history.forEach(function(m){ addMsg(m.role==='user'?'user':'assistant', m.content); }); }
     try{ if(window.__track) window.__track('tool_use','card_chat_open',{has_history:history.length>0}); }catch(e){}
     setOpen(true);
