@@ -35,6 +35,52 @@ export function describedStateConflict(description: string, popState: string): s
   return null;
 }
 
+import cityCoordsForPlaces from '@/data/us-city-coords.json';
+let CITY_STATE_MAP: Map<string, Set<string>> | null = null;
+function cityStateMap(): Map<string, Set<string>> {
+  if (!CITY_STATE_MAP) {
+    CITY_STATE_MAP = new Map();
+    for (const k of Object.keys(cityCoordsForPlaces as Record<string, unknown>)) {
+      const [c, st] = k.split('|');
+      if (!c || !st) continue;
+      const set = CITY_STATE_MAP.get(c) ?? new Set<string>();
+      set.add(st);
+      CITY_STATE_MAP.set(c, set);
+    }
+  }
+  return CITY_STATE_MAP;
+}
+/**
+ * A place named in the description with a place cue ("in the Phoenix area", "at Portsmouth
+ * International Airport", "Curlew Job Corps Center") that is a known US city but has no city of that
+ * name in the reported place-of-performance state. Unknown names are never flagged.
+ */
+export function describedPlaceConflict(description: string, popState: string): string | null {
+  const stateHit = describedStateConflict(description, popState);
+  if (stateHit) return stateHit;
+  if (!description || !popState) return null;
+  const up = description.toUpperCase();
+  const cues = [
+    /\b(?:IN THE|IN|AT|NEAR|AROUND)\s+([A-Z][A-Z.' -]{2,28}?)\s+(?:AREA|METRO|METROPOLITAN|REGION|INTERNATIONAL AIRPORT|AIRPORT|AIR BASE|COUNTY)\b/g,
+    /\b([A-Z][A-Z.' -]{2,28}?)\s+(?:INTERNATIONAL AIRPORT|JOB CORPS(?: CENTER)?)\b/g,
+  ];
+  const map = cityStateMap();
+  for (const re of cues) {
+    for (const m of up.matchAll(re)) {
+      const words = m[1].trim().split(/\s+/);
+      for (let n = Math.min(3, words.length); n >= 1; n--) {
+        const name = words.slice(words.length - n).join(' ');
+        const states = map.get(name);
+        if (states) {
+          if (!states.has(popState)) return name.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+          break;
+        }
+      }
+    }
+  }
+  return null;
+}
+
 export interface RenderedRecords {
   tool: string;
   text: string;
@@ -149,12 +195,11 @@ function recordLine(n: number, r: Rec & { _kind: string }): string {
     : r._kind === 'order'
       ? `task/delivery order under ${str(r.parent_vehicle_piid) || 'its parent vehicle'}`
       : 'task/delivery order (parent vehicle not recorded)';
-  const desc = clip(str(r.description), 70);
+  const desc = clip(str(r.description), 180);
   const value = money(r.total_obligation);
-  const conflict = describedStateConflict(str(r.description), st);
-  const d = str(r.description).toLowerCase();
-  const codeOnly = RELEVANCE_STEMS.length > 0 && d.length > 0 && !RELEVANCE_STEMS.some((t) => d.includes(t));
-  return `${n}. ${id} · ${who} · ${agency} · ${place} · ends ${end} · ${kind}${value ? ` · obligated ${value}` : ''}${desc ? ` · ${desc}` : ''}${conflict ? ` · CHECK: the description names ${conflict} but the reported place of performance is ${st}` : ''}${codeOnly ? ' · CHECK: matched by industry code only; the description does not mention the requested work' : ''}`;
+  const conflict = describedPlaceConflict(str(r.description), st);
+
+  return `${n}. ${id} · ${who} · ${agency} · ${place} · ends ${end} · ${kind}${value ? ` · obligated ${value}` : ''}${desc ? ` · ${desc}` : ''}${conflict ? ` · CHECK: the description names ${conflict}, which is not in the reported place-of-performance state ${st}; this record may not belong to the requested place` : ''}`;
 }
 
 /**
@@ -191,6 +236,11 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
   } else {
     lines.push(`${total} expiring record${total === 1 ? '' : 's'} match (${filters}). Source: Mindy recompete data (USASpending)${meta.window && (meta.window as Rec).as_of ? `, as of ${str((meta.window as Rec).as_of)}` : ''}.`);
     lines.push(`${standalone} standalone contract${standalone === 1 ? '' : 's'} and ${orders} task/delivery order${orders === 1 ? '' : 's'} were retrieved.`);
+    const byAgency = new Map<string, number>();
+    for (const r of records) { const a = title(str(r.awarding_agency)) || 'agency not recorded'; byAgency.set(a, (byAgency.get(a) ?? 0) + 1); }
+    lines.push(`By awarding agency: ${[...byAgency.entries()].sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1)).map(([a, n]) => `${a} ${n}`).join('; ')}.`);
+    const flagged = records.filter((r) => describedPlaceConflict(str(r.description), str(r.place_of_performance_state))).length;
+    if (flagged) lines.push(`${flagged} record${flagged === 1 ? '' : 's'} carry a description that names a place outside the reported state (marked CHECK); the count above includes them as reported by USASpending.`);
     const exhaustiveNow = from === 1 && to === total && retrieved === total;
     lines.push(exhaustiveNow
       ? `Showing all ${total}, soonest end date first.`
@@ -281,6 +331,12 @@ export const PAST_CONTRACTS_TOOL = 'search_past_contracts';
 function successorText(succ: unknown): string {
   const s = (succ && typeof succ === 'object' ? succ : null) as Rec | null;
   if (!s) return 'successor not checked';
+  const checked = (s.checked && typeof s.checked === 'object' ? s.checked : {}) as Rec;
+  const limit = checked.truncated === true ? ' (the successor search hit its row limit; a smaller follow-on could be missed)' : '';
+  return successorCore(s) + limit;
+}
+
+function successorCore(s: Rec): string {
   const state = str(s.state);
   if (state === 'candidates') {
     const cands = (Array.isArray(s.candidates) ? s.candidates : []) as Rec[];
@@ -309,7 +365,7 @@ export function renderStatusChecks(result: Rec): RenderedRecords | null {
   // freshness note verbatim (a model paraphrase can lose the date it is current through).
   const awardsList = Array.isArray(result?.awards) ? (result.awards as Rec[]) : [];
   if (!checks && !awardsList.length && meta.lag_note) {
-    const text = `No awards were found for this search in the requested window, and that is NOT a verified zero. Data freshness: ${str(meta.lag_note)}${meta.as_of ? ` (USASpending last loaded ${str(meta.as_of)})` : ''}`;
+    const text = `No awards were found for this search in the requested window, and that is NOT a verified zero. ${freshnessSentence(meta)}`;
     return { tool: PAST_CONTRACTS_TOOL, text, total: 0, retrieved: 0, from: 0, to: 0, shown: 0, exhaustive: false, ids: [], allowedCounts: [0], standalone: 0, orders: 0 };
   }
   if (!checks) return renderAwardList(result);
@@ -343,7 +399,7 @@ export function renderStatusChecks(result: Rec): RenderedRecords | null {
     lines.push('');
     lines.push(`${total - checks.length} more matching award${total - checks.length === 1 ? ' was' : 's were'} not status-checked; this is not the full list.`);
   }
-  if (meta.lag_note) lines.push(str(meta.lag_note));
+  if (meta.lag_note) lines.push(freshnessSentence(meta));
   const ids = checks.map((c) => str(c.award_id));
   return {
     tool: PAST_CONTRACTS_TOOL, text: lines.join('\n'), total, retrieved: awards.length, from: checks.length ? 1 : 0, to: checks.length,
@@ -446,6 +502,20 @@ export function renderKeywords(result: Rec): RenderedRecords | null {
   return { tool: KEYWORDS_TOOL, text: lines.join('\n'), total, retrieved: total, from: total ? 1 : 0, to: total, shown: total, exhaustive: true, ids: [], allowedCounts: [total, kws.length, extraOcc.length], standalone: total, orders: 0 };
 }
 
+
+/**
+ * Customer-facing freshness sentence. The tool's lag_note is written for the model ("Treat an empty
+ * result as ... NOT as 'no award was made'") and must not be shown verbatim; only its facts are.
+ */
+export function freshnessSentence(meta: Rec): string {
+  const note = str(meta.lag_note);
+  const through = note.match(/current through (?:about )?(\d{4}-\d{2}-\d{2})/i)?.[1];
+  const delay = note.match(/~?(\d+)-day delay/i)?.[1];
+  const loaded = str(meta.as_of) || note.match(/last loaded (\d{4}-\d{2}-\d{2})/i)?.[1] || '';
+  if (!through) return note ? 'Recent awards may not be published yet, so this list may be incomplete.' : '';
+  return `This agency's contract actions reach USASpending with about a ${delay || '90'}-day delay, so this data is reliably current only through about ${through}${loaded ? ` (last loaded ${loaded})` : ''}; awards made after that may not appear yet.`;
+}
+
 export const VEHICLE_MIX_TOOL = 'get_vehicle_spend_mix';
 
 /** search_past_contracts WITHOUT status checks: every returned award with dates and amount, count vs total, filters, date-filter meaning, lag. */
@@ -470,13 +540,27 @@ export function renderAwardList(result: Rec): RenderedRecords | null {
   lines.push(`${total} award${total === 1 ? '' : 's'} match (${parts.join(' · ') || 'no filters'}). Source: USASpending prime awards.`);
   lines.push(awards.length < total ? `Showing ${awards.length} of ${total} (largest first); this is not the full list.` : `Showing all ${total}.`);
   if (basis.date_filter) lines.push(`Date filter: ${str(basis.date_filter)}`);
+  const from = str(af.date_from);
+  if (from) {
+    const before = awards.filter((a) => str(a.startDate) && str(a.startDate) < from);
+    if (before.length) lines.push(`${before.length} of the awards shown started before ${from} (${before.map((a) => `${str(a.awardId)} started ${str(a.startDate)}`).join('; ')}); they appear because they had activity in the window.`);
+  }
+  const latest = [...awards].filter((a) => str(a.startDate)).sort((x, y) => (str(y.startDate) < str(x.startDate) ? -1 : 1))[0];
+  if (latest) lines.push(`Latest start date shown: ${str(latest.startDate)} (${str(latest.awardId)}, ${title(str(latest.recipientName))}).`);
+  const byRecipient = new Map<string, number>();
+  for (const a of awards) { const k = title(str(a.recipientName)) || 'recipient not reported'; byRecipient.set(k, (byRecipient.get(k) ?? 0) + 1); }
+  lines.push(`By recipient (awards shown): ${[...byRecipient.entries()].sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1)).map(([k, n]) => `${k} ${n}`).join('; ')}.`);
+  const office = (af.office && typeof af.office === 'object' ? af.office : null) as Rec | null;
+  const cands = office && Array.isArray(office.candidates) ? (office.candidates as unknown[]).map(str) : [];
+  const others = cands.filter((c) => !c.startsWith(`${str(office?.code)} `));
+  if (others.length) lines.push(`Other office codes matching "${str(office?.requested)}" were found but not searched: ${others.join('; ')}.`);
   lines.push('');
   awards.forEach((a, i) => {
-    lines.push(`${i + 1}. ${str(a.awardId)} · ${title(str(a.recipientName)) || 'recipient not reported'}${a.description ? ` · ${clip(str(a.description), 80)}` : ''} · ${str(a.startDate) || '?'} to ${str(a.endDate) || '?'} · ${money(a.awardAmount)} lifetime${a.popState ? ` · performed in ${str(a.popState)}` : ''}`);
+    lines.push(`${i + 1}. ${str(a.awardId)} · ${title(str(a.recipientName)) || 'recipient not reported'}${a.description ? ` · ${clip(str(a.description), 180)}` : ''} · ${str(a.startDate) || '?'} to ${str(a.endDate) || '?'} · ${money(a.awardAmount)} lifetime${a.popState ? ` · performed in ${str(a.popState)}` : ''}`);
   });
   const ig = ignoredLine(meta);
   if (ig) { lines.push(''); lines.push(ig); }
-  if (meta.lag_note || str(meta.result_state) === 'partial') { lines.push(''); lines.push(`Data status: ${str(meta.result_state) || 'partial'}.${meta.lag_note ? ` ${str(meta.lag_note)}` : ''}`); }
+  if (meta.lag_note || str(meta.result_state) === 'partial') { lines.push(''); lines.push(`Data status: ${str(meta.result_state) === 'partial' ? 'may be incomplete' : str(meta.result_state) || 'may be incomplete'}.${meta.lag_note ? ` ${freshnessSentence(meta)}` : ''}`); }
   return { tool: PAST_CONTRACTS_TOOL, text: lines.join('\n'), total, retrieved: awards.length, from: 1, to: awards.length, shown: awards.length, exhaustive: awards.length === total, ids: awards.map((a) => str(a.awardId)), allowedCounts: Array.from(new Set([total, awards.length])), standalone: awards.length, orders: 0 };
 }
 
@@ -496,7 +580,33 @@ export function renderVehicleMix(result: Rec): RenderedRecords | null {
   const r = (k: string) => (roll[k] && typeof roll[k] === 'object' ? roll[k] as Rec : null);
   const rl = [['all schedules', r('all_schedules')], ['all BPAs', r('all_bpas')], ['all IDIQs and GWACs', r('all_idiqs_and_gwacs')]].filter(([, v]) => v).map(([k, v]) => `${k} ${money((v as Rec).obligated)} (${str((v as Rec).share_pct)}%)`);
   if (rl.length) { lines.push(''); lines.push(`Rollups: ${rl.join('; ')}.`); }
-  lines.push(`Classification: ${str(cls.verified_share_of_parented_pct)}% of vehicle-linked dollars verified from USASpending vehicle records; ${str(cls.heuristic_share_of_total_pct)}% typed from contract-number patterns; ${str(cls.unresolved_share_of_total_pct)}% unresolved.`);
+  lines.push(`Classification: of the dollars linked to a vehicle, ${str(cls.verified_share_of_parented_pct)}% were verified from USASpending vehicle records. Of all dollars, ${str(cls.heuristic_share_of_total_pct)}% were typed from contract-number patterns and ${str(cls.unresolved_share_of_total_pct)}% could not be classified.`);
   const n = buckets.length;
   return { tool: VEHICLE_MIX_TOOL, text: lines.join('\n'), total: n, retrieved: n, from: 1, to: n, shown: n, exhaustive: true, ids: [], allowedCounts: [n, num(result.total_award_count) ?? 0], standalone: 0, orders: 0 };
+}
+
+const MAGNITUDE_RE = /\b(substantial(ly)?|significant(ly)?|major|minor|slight(ly)?|frequent(ly)?|prevalent|dominant|dominat\w*|primarily|predominantly|mostly|most of|the bulk|largest share|key player|heavily|considerabl[ey]|notabl[ey] large|large(ly)?|small(er)? share|a lot of|many of|numerous|common(ly)?|typical(ly)?|often|rarely|popular)\b/i;
+const SUPERLATIVE_RE = /\b(most|least|latest|newest|oldest|earliest|recent|largest|biggest|smallest|highest|lowest|top|leading|prominent|notabl[ey]|key|main|primary|first|only|all of|every)\b/i;
+const APPROX_MONEY_RE = /\b(approximately|approx\.?|about|around|roughly|nearly|almost|over|under|more than|less than|some)\s+\$/i;
+
+/**
+ * Deterministic check of the model's analysis when a verified list was rendered. Drops sentences that
+ * use a magnitude/frequency word with no number in the same sentence, or approximate a dollar figure
+ * (the list shows the exact one). Returns the kept text and what was dropped (for the trace).
+ */
+export function lintAnalysis(text: string): { text: string; dropped: string[] } {
+  const src = String(text || '').trim();
+  if (!src) return { text: '', dropped: [] };
+  const sentences = src.split(/(?<=[.!?])\s+|\n+/);
+  const kept: string[] = [];
+  const dropped: string[] = [];
+  for (const raw of sentences) {
+    const s = raw.trim();
+    if (!s) continue;
+    const hasNumber = /\d/.test(s);
+    if (hasNumber || /\$/.test(s) || MAGNITUDE_RE.test(s) || SUPERLATIVE_RE.test(s) || APPROX_MONEY_RE.test(s)) { dropped.push(s); continue; }
+    kept.push(s);
+  }
+  const out = kept.join(' ').replace(/\s+\n/g, '\n').trim();
+  return { text: out || 'The verified list above is the result for this question.', dropped };
 }

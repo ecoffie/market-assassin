@@ -4,7 +4,7 @@
  * summaries that contradict the verified counts.
  */
 import { describe, it, expect } from 'vitest';
-import { renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, describedStateConflict, collectExpiringRecords, checkSummaryAgainstRecords, prepareChatToolArgs, CHAT_FETCH_LIMIT } from './record-render';
+import { renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, describedStateConflict, describedPlaceConflict, lintAnalysis, collectExpiringRecords, checkSummaryAgainstRecords, prepareChatToolArgs, CHAT_FETCH_LIMIT } from './record-render';
 
 const rec = (piid: string, end: string, extra: Record<string, unknown> = {}) => ({
   contract_id: `CONT_${piid}`, piid, incumbent_name: 'ALLPRO STAFFNET LLC', awarding_agency: 'Department of Veterans Affairs',
@@ -220,9 +220,10 @@ describe('pricing and keywords', () => {
 
 describe('freshness: empty recent-window search', () => {
   it('states the lag note verbatim and says it is not a verified zero', () => {
-    const r = renderStatusChecks({ awards: [], _meta: { result_state: 'partial', as_of: '2026-11-13', lag_note: 'Contract actions by this agency are published with a ~90-day delay, so the data is only reliably current through about 2026-08-15.' } })!;
+    const r = renderStatusChecks({ awards: [], _meta: { result_state: 'partial', as_of: '2026-11-13', lag_note: 'Contract actions by this agency are published with a ~90-day delay, so the data is only reliably current through about 2026-08-15. Treat an empty or thin result as "not yet published", NOT as "no award was made".' } })!;
     expect(r.text).toMatch(/NOT a verified zero/);
-    expect(r.text).toMatch(/only reliably current through about 2026-08-15/);
+    expect(r.text).toMatch(/reliably current only through about 2026-08-15 \(last loaded 2026-11-13\)/);
+    expect(r.text).not.toMatch(/no award was made|Treat an empty/);
   });
   it('an empty search with no lag note renders nothing (the model reports the verified zero)', () => {
     expect(renderStatusChecks({ awards: [], _meta: {} })).toBeNull();
@@ -235,26 +236,37 @@ describe('independent-review fixes', () => {
     expect(describedStateConflict('guard services in West Virginia', 'WV')).toBeNull();
     expect(describedStateConflict('guard services at Fort Hood', 'TX')).toBeNull();
   });
-  it('flags records matched by industry code only (description lacks the requested work); never hides them', () => {
+  it('does not label records by keyword guesswork (a court-security-officer order is not flagged as unrelated)', () => {
+    const r = renderExpiringRecords({ contracts: [rec('C1', '2027-01-01', { description: 'CSO PROGRAM FUNDING' })], _meta: meta({ total: 1 }) }, { relevancePhrases: ['security guard'] })!;
+    expect(r.text).not.toMatch(/matched by industry code only/);
+  });
+  it('flags a description naming a city outside the reported state via a place cue; unknown names are not flagged', () => {
+    expect(describedPlaceConflict('AIRPORT SECURITY SCREENING SERVICES AT PORTSMOUTH INTERNATIONAL AIRPORT(PSM)', 'TX')).toBe('Portsmouth');
+    expect(describedPlaceConflict('ENFORCEMENT AND REMOVAL OPERATIONS IN THE PHOENIX AREA', 'TX')).toBe('Phoenix');
+    expect(describedPlaceConflict('GUARD SERVICES IN THE SAN ANTONIO AREA', 'TX')).toBeNull();
+    expect(describedPlaceConflict('GUARD SERVICES AT ZZQX AIRPORT', 'TX')).toBeNull();
+  });
+  it('adds a deterministic by-agency breakdown and counts the CHECK records', () => {
     const r = renderExpiringRecords({
-      contracts: [rec('G1', '2027-01-01', { description: 'ARMED SECURITY GUARD SERVICES' }), rec('T1', '2027-02-01', { description: 'DETAINEE TRANSPORT' })],
+      contracts: [rec('A1', '2027-01-01'), rec('A2', '2027-01-02', { awarding_agency: 'Department of Justice', description: 'PSO SERVICES THROUGHOUT THE STATE OF PENNSYLVANIA (PA)' })],
       _meta: meta({ total: 2 }),
-    }, { relevancePhrases: ['security guard', 'security guards'] })!;
-    expect(r.text).toMatch(/G1 · [^\n]*ARMED SECURITY GUARD SERVICES(?![^\n]*CHECK)/);
-    expect(r.text).toMatch(/T1 · [^\n]*DETAINEE TRANSPORT · CHECK: matched by industry code only/);
-    expect(r.shown).toBe(2);
+    })!;
+    expect(r.text).toMatch(/By awarding agency: Department of Justice 1; Department of Veterans Affairs 1\./);
+    expect(r.text).toMatch(/1 record carry a description that names a place outside the reported state/);
   });
   it('plain award search: every award with dates, the date-filter meaning, not-the-full-list and data status', () => {
     const r = renderStatusChecks({
       awards: [{ awardId: 'W912EQ17P0020', recipientName: 'GRAND SLAM', description: 'chefs', startDate: '2017-03-03', endDate: '2017-04-21', awardAmount: 1000, popState: 'TN' }],
       basis: { date_filter: 'date_from/date_to select awards by transaction activity; an award that started earlier can appear.' },
-      _meta: { total: 14, result_state: 'partial', lag_note: 'data current through about 2026-08-15', applied_filters: { office: { code: 'W912EQ', name: 'W07V ENDIST MEMPHIS' }, naics: '561320', date_from: '2019-01-01' } },
+      _meta: { total: 14, result_state: 'partial', lag_note: 'data current through about 2026-08-15', applied_filters: { office: { code: 'W912EQ', name: 'W07V ENDIST MEMPHIS', requested: 'Memphis', candidates: ['W500TW W07V ENDIST MEMPHIS', 'W912EQ W07V ENDIST MEMPHIS'] }, naics: '561320', date_from: '2019-01-01' } },
     })!;
     expect(r.text).toMatch(/^14 awards match \(office W912EQ W07V ENDIST MEMPHIS · NAICS 561320 · activity 2019-01-01 to today\)/);
     expect(r.text).toMatch(/Showing 1 of 14 \(largest first\); this is not the full list\./);
     expect(r.text).toMatch(/Date filter: .*started earlier can appear/);
     expect(r.text).toMatch(/W912EQ17P0020 · Grand Slam · chefs · 2017-03-03 to 2017-04-21/);
-    expect(r.text).toMatch(/Data status: partial\. data current through about 2026-08-15/);
+    expect(r.text).toMatch(/Data status: may be incomplete\./);
+    expect(r.text).toMatch(/1 of the awards shown started before 2019-01-01 \(W912EQ17P0020 started 2017-03-03\)/);
+    expect(r.text).toMatch(/Other office codes matching "Memphis" were found but not searched: W500TW W07V ENDIST MEMPHIS\./);
   });
   it('vehicle mix: every bucket with dollars and share, plus rollups and classification quality', () => {
     const r = renderVehicleMix({
@@ -266,5 +278,28 @@ describe('independent-review fixes', () => {
     expect(r.text).toMatch(/\$2,712,483,325 obligated across 12941 awards\. Every bucket is listed/);
     expect(r.text).toMatch(/2\. Standalone contracts: \$503,000,000 \(18\.6%\)/);
     expect(r.text).toMatch(/Rollups: all schedules \$921,000,000 \(33\.98%\)/);
+  });
+});
+
+describe('lintAnalysis', () => {
+  it('keeps next-step guidance and drops sentences that state facts, numbers, superlatives or magnitudes', () => {
+    const r = lintAnalysis('Review the CHECK lines before pursuing those records. The USACE Memphis District awarded 12 contracts since 2019. GT Services LLC appears frequently. The most recent award went to The J Group. Open each solicitation on SAM.gov to confirm the scope.');
+    expect(r.text).toBe('Review the CHECK lines before pursuing those records. Open each solicitation on SAM.gov to confirm the scope.');
+    expect(r.dropped).toHaveLength(3);
+  });
+  it('never returns empty text', () => {
+    expect(lintAnalysis('Spending is substantial.').text).toBe('The verified list above is the result for this question.');
+  });
+});
+
+
+describe('successor search limits are disclosed', () => {
+  it('says when the successor probe hit its row limit', () => {
+    const r = renderStatusChecks({
+      awards: [{ awardId: 'N1', recipientName: 'X' }],
+      status_checks: [{ award_id: 'N1', status: 'expired', days_until_end: -1, end_date: '2026-11-13', successor: { state: 'candidates', candidates: [{ awardId: 'N2', recipientName: 'Y' }], checked: { truncated: true } } }],
+      _meta: { total: 1 },
+    })!;
+    expect(r.text).toMatch(/successor search hit its row limit; a smaller follow-on could be missed/);
   });
 });
