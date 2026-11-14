@@ -1,0 +1,210 @@
+{
+ "_note": "Every buyer whose identity C1 (pruneSubsumedSingles) changes, with the one-word sets it drops. Measured live 2026-11-14: every row these drops removed belonged to a different agency (298 Open / 3,022 Recompete). A NEW entry here means a new alias triggered pruning: re-measure that buyer on live data before accepting it (PR #2045).",
+ "pruned": {
+  "Administration for Strategic Preparedness and Response (ASPR)": [
+   "preparedness"
+  ],
+  "Air Force Sustainment Center": [
+   "sustainment"
+  ],
+  "Architect of the Capitol (AOC)": [
+   "capitol"
+  ],
+  "Army Futures Command": [
+   "futures"
+  ],
+  "Bonneville Power Administration (BPA)": [
+   "bonneville"
+  ],
+  "Bureau of Engraving and Printing (BEP)": [
+   "engraving"
+  ],
+  "Bureau of Prisons": [
+   "prisons"
+  ],
+  "Bureau of Reclamation": [
+   "reclamation"
+  ],
+  "Bureau of the Fiscal Service": [
+   "fiscal"
+  ],
+  "CDFI Fund": [
+   "cdfi"
+  ],
+  "Census Bureau": [
+   "census"
+  ],
+  "Centers for Medicare & Medicaid Services": [
+   "medicaid",
+   "medicare"
+  ],
+  "Community Oriented Policing Services (COPS Office)": [
+   "policing"
+  ],
+  "Congressional Budget Office (CBO)": [
+   "budget"
+  ],
+  "Cybersecurity and Infrastructure Security Agency": [
+   "cybersecurity"
+  ],
+  "DHS Science and Technology Directorate (S&T)": [
+   "t"
+  ],
+  "DOE Fossil Energy": [
+   "fossil"
+  ],
+  "Defense Commissary Agency (DeCA)": [
+   "commissary"
+  ],
+  "Defense Logistics Agency": [
+   "logistics"
+  ],
+  "Department of Health and Human Services": [
+   "health"
+  ],
+  "Department of Homeland Security": [
+   "homeland"
+  ],
+  "Department of Housing and Urban Development": [
+   "housing"
+  ],
+  "Department of Veterans Affairs": [
+   "veterans"
+  ],
+  "Federal Aviation Administration": [
+   "aviation"
+  ],
+  "Federal Communications Commission": [
+   "communications"
+  ],
+  "Federal Emergency Management Agency": [
+   "emergency"
+  ],
+  "Federal Highway Administration": [
+   "highway"
+  ],
+  "Federal Mediation and Conciliation Service (FMCS)": [
+   "mediation"
+  ],
+  "Federal Railroad Administration (FRA)": [
+   "railroad"
+  ],
+  "Federal Transit Administration": [
+   "transit"
+  ],
+  "Government Accountability Office": [
+   "accountability"
+  ],
+  "Government Publishing Office (GPO)": [
+   "publishing"
+  ],
+  "Immigration and Customs Enforcement": [
+   "immigration"
+  ],
+  "Institute of Museum and Library Services": [
+   "museum"
+  ],
+  "Library of Congress": [
+   "library"
+  ],
+  "Maritime Administration (MARAD)": [
+   "maritime"
+  ],
+  "Millennium Challenge Corporation": [
+   "millennium"
+  ],
+  "National Archives and Records Administration": [
+   "archives",
+   "records"
+  ],
+  "National Endowment for the Arts": [
+   "arts"
+  ],
+  "National Endowment for the Humanities": [
+   "humanities"
+  ],
+  "National Geospatial-Intelligence Agency (NGA)": [
+   "geospatial"
+  ],
+  "National Institute of Corrections (NIC)": [
+   "corrections"
+  ],
+  "National Institute of Standards and Technology": [
+   "standards"
+  ],
+  "National Reconnaissance Office (NRO)": [
+   "reconnaissance"
+  ],
+  "National Science Foundation": [
+   "science"
+  ],
+  "National Weather Service (NWS)": [
+   "weather"
+  ],
+  "Natural Resources Conservation Service": [
+   "conservation"
+  ],
+  "Office of Elementary and Secondary Education (OESE)": [
+   "elementary"
+  ],
+  "Office of Energy Efficiency and Renewable Energy (EERE)": [
+   "efficiency",
+   "renewable"
+  ],
+  "Office of Government Ethics (OGE)": [
+   "ethics"
+  ],
+  "Office of Personnel Management": [
+   "personnel"
+  ],
+  "Office of Postsecondary Education (OPE)": [
+   "postsecondary"
+  ],
+  "Office of the Comptroller of the Currency (OCC)": [
+   "comptroller"
+  ],
+  "Patent and Trademark Office": [
+   "patent"
+  ],
+  "Pension Benefit Guaranty Corporation": [
+   "pension"
+  ],
+  "Pipeline and Hazardous Materials Safety Administration (PHMSA)": [
+   "pipeline"
+  ],
+  "Privacy and Civil Liberties Oversight Board": [
+   "privacy"
+  ],
+  "Securities and Exchange Commission": [
+   "securities"
+  ],
+  "Smithsonian Institution": [
+   "smithsonian"
+  ],
+  "U.S. Citizenship and Immigration Services (USCIS)": [
+   "citizenship"
+  ],
+  "U.S. Customs and Border Protection": [
+   "border",
+   "customs"
+  ],
+  "U.S. Fish and Wildlife Service": [
+   "wildlife"
+  ],
+  "U.S. Geological Survey": [
+   "geological"
+  ],
+  "U.S. Marshals Service": [
+   "marshals"
+  ],
+  "U.S. Postal Service (USPS)": [
+   "postal"
+  ],
+  "USDA Rural Development": [
+   "rural"
+  ],
+  "United States Mint": [
+   "mint"
+  ]
+ }
+}
