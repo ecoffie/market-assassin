@@ -21,7 +21,7 @@ import { alert } from './awards-refresh';
  * same partial index for cheap polling.
  */
 
-export type JobStatus = 'queued' | 'running' | 'validated' | 'promoted' | 'failed';
+export type JobStatus = 'queued' | 'running' | 'validated' | 'promoted' | 'failed' | 'superseded';
 
 export interface BuildJob {
   id: number;
@@ -36,6 +36,11 @@ export interface BuildJob {
   telemetry: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
+  /** Set with status 'superseded': the newer job that made this one redundant. */
+  superseded_by?: number | null;
+  superseded_at?: string | null;
+  /** One-time size override for THIS job only (see awards-refresh.ts SizeOverride). */
+  size_override?: unknown;
 }
 
 /** A lease older than this is presumed dead and may be reclaimed. */
@@ -44,6 +49,8 @@ export const LEASE_STALE_MINUTES = 15;
 export const STUCK_JOB_MINUTES = 30;
 /** Give up after this many attempts rather than retrying a poisoned job forever. */
 export const MAX_ATTEMPTS = 3;
+/** A job still 'queued' after this long means no worker is running it. Alert. */
+export const QUEUED_ALERT_HOURS = 36;
 
 function db(): SupabaseClient {
   const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '').trim();
@@ -97,7 +104,34 @@ export async function enqueueBuild(
     }
     return { job: null, created: false, error: error.message };
   }
+  // A newer upstream version makes every older queued job redundant: building them would be
+  // full rebuilds of data this job already contains. Mark, never delete (the queue is history).
+  await supersedeOlderQueued(data as BuildJob);
   return { job: data as BuildJob, created: true };
+}
+
+/**
+ * Mark every 'queued' job created before `newer` as superseded by it. Never touches running,
+ * validated, promoted or failed rows, and never deletes. Non-fatal: a failure is alerted and
+ * leaves the older jobs queued (the newest-first claim still builds the newest one).
+ */
+export async function supersedeOlderQueued(newer: Pick<BuildJob, 'id' | 'created_at'>): Promise<number> {
+  const now = new Date().toISOString();
+  const { count, error } = await db()
+    .from('awards_build_jobs')
+    .update(
+      { status: 'superseded', superseded_by: newer.id, superseded_at: now, updated_at: now },
+      { count: 'exact' },
+    )
+    .eq('status', 'queued')
+    .lt('created_at', newer.created_at)
+    .neq('id', newer.id);
+  if (error) {
+    console.error('[awards-jobs] supersede failed:', error.message);
+    await alert('Awards build queue: supersede failed', `<p>Older queued jobs were not marked superseded by job ${newer.id}.</p><pre>${error.message}</pre>`);
+    return 0;
+  }
+  return count ?? 0;
 }
 
 /**
@@ -111,12 +145,27 @@ export async function claimNextJob(workerId: string): Promise<BuildJob | null> {
   const supa = db();
   const staleBefore = new Date(Date.now() - LEASE_STALE_MINUTES * 60_000).toISOString();
 
+  // ONE build at a time. A live lease anywhere means another worker is building; a second
+  // concurrent build would double the BigQuery bill and race the promote.
+  const { data: active, error: activeErr } = await supa
+    .from('awards_build_jobs')
+    .select('id')
+    .eq('status', 'running')
+    .gte('locked_at', staleBefore)
+    .limit(1);
+  if (activeErr) {
+    console.error('[awards-jobs] active-build check failed:', activeErr.message);
+    return null; // unknown ⇒ do not start a build
+  }
+  if ((active ?? []).length > 0) return null;
+
+  // NEWEST first: the newest source version contains everything older queued jobs would build.
   const { data: candidates } = await supa
     .from('awards_build_jobs')
     .select('*')
     .in('status', ['queued', 'running'])
     .lt('attempts', MAX_ATTEMPTS)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(5);
 
   for (const c of (candidates ?? []) as BuildJob[]) {
@@ -200,6 +249,39 @@ export async function alertOnStuckJobs(): Promise<number> {
     );
   }
   return stuck.length;
+}
+
+/**
+ * Jobs still 'queued' after QUEUED_ALERT_HOURS. That means no worker is claiming them, which is
+ * exactly how the serving table went stale from 2026-08-30 to 2026-11-14 without an alert: the
+ * stuck-job watchdog only ever looked at 'running'.
+ */
+export async function alertOnQueuedJobs(now: Date = new Date()): Promise<number> {
+  const before = new Date(now.getTime() - QUEUED_ALERT_HOURS * 3600_000).toISOString();
+  const { data, error } = await db()
+    .from('awards_build_jobs')
+    .select('id, source_version, created_at')
+    .eq('status', 'queued')
+    .lt('created_at', before)
+    .order('created_at', { ascending: true })
+    .limit(20);
+  if (error) {
+    console.error('[awards-jobs] queued-job scan FAILED:', error.message);
+    await alert('Awards queued-job watchdog could not run', `<pre>${error.message}</pre>`);
+    return 0;
+  }
+  const queued = data ?? [];
+  if (queued.length > 0) {
+    await alert(
+      'Awards build job waiting with no worker',
+      `<p>${queued.length} build job(s) have been queued for over ${QUEUED_ALERT_HOURS}h. ` +
+        `Nothing is running <code>/api/cron/awards-build-worker</code>, so the serving table is ` +
+        `not being rebuilt.</p><ul>` +
+        queued.map((j) => `<li>job ${j.id} · source ${j.source_version} · queued ${j.created_at}</li>`).join('') +
+        `</ul>`,
+    );
+  }
+  return queued.length;
 }
 
 /** Jobs that exhausted their retries. Alert once, then leave them alone. */
