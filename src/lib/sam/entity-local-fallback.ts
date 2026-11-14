@@ -55,7 +55,7 @@ function db() {
 const LOCAL_ENTITY_COLUMNS =
   'uei, cage_code, legal_business_name, dba_name, physical_city, physical_state, physical_zip, '
   + 'physical_country, primary_naics, naics_codes, certifications, certification_records, '
-  + 'registration_status, registration_expiry, exclusion_flag, sam_url, synced_at';
+  + 'registration_status, registration_expiry, exclusion_flag, sam_url, points_of_contact, synced_at';
 
 /**
  * Shape a `sam_entities` row into the same SAMEntity the live API returns.
@@ -128,6 +128,16 @@ function toSamEntity(r: Record<string, unknown>): SAMEntity {
   const naics = arr(r.naics_codes);
   const primary = str(r.primary_naics);
 
+  // Registered SAM POCs (R8, 2026-11-13): the mirror stores the same {name,title,phone,email,type}
+  // shape the live transformer emits. This mapper used to drop the column, so a local answer lost
+  // the names a live answer carries. Empty array = the mirror holds none (left ABSENT, not []),
+  // so a caller can still try the stored raw SAM response (lib/sam/registered-poc.ts).
+  const pocs = Array.isArray(r.points_of_contact)
+    ? (r.points_of_contact as Array<Record<string, unknown>>)
+        .filter((p) => p && typeof p === 'object' && str(p.name).trim())
+        .map((p) => ({ name: str(p.name).trim(), title: str(p.title), phone: str(p.phone), email: str(p.email), type: str(p.type) }))
+    : [];
+
   return {
     ueiSAM: str(r.uei),
     cageCode: str(r.cage_code),
@@ -155,6 +165,7 @@ function toSamEntity(r: Record<string, unknown>): SAMEntity {
     ...(certs.length ? { businessTypes: certs } : {}),
     certificationStatus,
     ...(str(r.sam_url) ? { samUrl: str(r.sam_url) } : {}),
+    ...(pocs.length ? { pointsOfContact: pocs } : {}),
   } as SAMEntity;
 }
 

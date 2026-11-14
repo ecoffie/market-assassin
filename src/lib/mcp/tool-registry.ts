@@ -1546,7 +1546,11 @@ const SBLO_CONTACT_TOOL_DEF = {
       'fallback (~317K recipients) that confirms an out-of-snapshot company is a real federal prime + returns live ' +
       'award context. Returns SBLO name/title/email/phone/portal when curated; a blank name/email (including every ' +
       'BigQuery-tier match — BQ has award data, NOT SBLO contacts) means no public SBLO was found, so it surfaces the ' +
-      'supplier portal and NEVER invents a contact. grounded=false = not curated and not a matching federal prime.',
+      'supplier portal and NEVER invents a contact. When no named SBLO is curated (most small firms), returns ' +
+      'registered_points_of_contact: the people the firm listed on its SAM registration (names/titles, from Mindy\'s ' +
+      'stored SAM data, dated by as_of), labelled "registered SAM point of contact, not a designated small business ' +
+      'liaison". SAM redacts POC email/phone; never invent them. grounded=false = not curated, not a matching federal ' +
+      'prime, and no registered POC held.',
     parameters: {
       type: 'object',
       properties: {
