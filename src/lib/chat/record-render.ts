@@ -56,6 +56,24 @@ function cityStateMap(): Map<string, Set<string>> {
  * International Airport", "Curlew Job Corps Center") that is a known US city but has no city of that
  * name in the reported place-of-performance state. Unknown names are never flagged.
  */
+const BORDER_REGIONS: Record<string, string[]> = {
+  'THROUGHOUT THE SOUTHERN BORDER': ['CA', 'AZ', 'NM', 'TX'],
+  'THROUGHOUT THE NORTHERN BORDER': ['WA', 'ID', 'MT', 'ND', 'MN', 'WI', 'MI', 'OH', 'PA', 'NY', 'VT', 'NH', 'ME', 'AK'],
+};
+/**
+ * Option B (rel1 R11): a description naming a multi-state border region that INCLUDES the reported
+ * state is not a conflict, but the work is not specific to one place. Returns a factual qualifier.
+ */
+export function describedRegionNote(description: string, popState: string): string | null {
+  const up = String(description || '').toUpperCase();
+  const st = String(popState || '').toUpperCase();
+  const m = up.match(/\bTHROUGHOUT THE (SOUTHERN|NORTHERN) BORDER\b/);
+  if (!m || !st) return null;
+  const states = BORDER_REGIONS[`THROUGHOUT THE ${m[1]} BORDER`];
+  if (!states?.includes(st)) return null;
+  return `the description says the work is throughout the ${m[1].toLowerCase()} border (a region spanning ${states.join(', ')}), so it is not specific to one city or to ${st} alone`;
+}
+
 export function describedPlaceConflict(description: string, popState: string): string | null {
   const stateHit = describedStateConflict(description, popState);
   if (stateHit) return stateHit;
@@ -111,6 +129,8 @@ export interface RenderedRecords {
   orders: number;
   /** Records marked CHECK (expiring lists). */
   flaggedIds?: string[];
+  /** Expiring lists: award id -> factual region qualifier, for every retrieved record (shown or not). */
+  regionNotes?: Record<string, string>;
   /** Buying offices: each office's example award numbers (for cross-checking against CHECK records). */
   officeExamples?: Array<{ office: string; ids: string[] }>;
 }
@@ -231,8 +251,9 @@ function recordLine(n: number, r: Rec & { _kind: string }): string {
   const otherWork = describedOtherWork(str(r.description), REQUESTED_LABELS);
   const confirms = describedRequestedWork(str(r.description), REQUESTED_LABELS);
   const basis = confirms ? ` · description confirms: ${confirms}` : '';
+  const region = conflict ? null : describedRegionNote(str(r.description), st);
 
-  return `${n}. ${id} · ${who} · ${agency} · ${place} · ends ${end} · ${kind}${value ? ` · obligated ${value}` : ''}${desc ? ` · ${desc}` : ''}${conflict ? ` · CHECK: the description names ${conflict}, which is not in the reported place-of-performance state ${st}; this record may not belong to the requested place` : ''}${basis}${otherWork ? ` · CHECK: the description describes ${otherWork} work, not the work requested` : ''}`;
+  return `${n}. ${id} · ${who} · ${agency} · ${place} · ends ${end} · ${kind}${value ? ` · obligated ${value}` : ''}${desc ? ` · ${desc}` : ''}${conflict ? ` · CHECK: the description names ${conflict}, which is not in the reported place-of-performance state ${st}; this record may not belong to the requested place` : ''}${region ? ` · note: ${region}` : ''}${basis}${otherWork ? ` · CHECK: the description describes ${otherWork} work, not the work requested` : ''}`;
 }
 
 /**
@@ -316,7 +337,13 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
   }
   const ids = [...page, ...offPage.map((x) => x.r)].map((r) => str(r.piid) || str(r.contract_id));
   const allowedCounts = Array.from(new Set([total, retrieved, page.length, standalone, orders, from, to].filter((n) => n >= 0)));
-  return { tool: EXPIRING_TOOL, text: lines.join('\n'), total, retrieved, from, to, shown: page.length, exhaustive, ids, allowedCounts, standalone, orders, flaggedIds: flaggedIdsOut };
+  const regionNotes: Record<string, string> = {};
+  for (const r of records) {
+    const note = describedPlaceConflict(str(r.description), str(r.place_of_performance_state)) ? null : describedRegionNote(str(r.description), str(r.place_of_performance_state));
+    const rid = str(r.piid) || str(r.contract_id);
+    if (note && rid) regionNotes[rid] = note;
+  }
+  return { tool: EXPIRING_TOOL, text: lines.join('\n'), total, retrieved, from, to, shown: page.length, exhaustive, ids, allowedCounts, standalone, orders, flaggedIds: flaggedIdsOut, regionNotes };
 }
 
 /**
@@ -743,8 +770,52 @@ export function lintAnalysis(text: string, fallback = 'Review each record and it
   return { text: out || fallback, dropped };
 }
 
+/**
+ * Option B (rel2 R9): next steps built only from what the verified lists actually show, used when every
+ * tool result in the turn was rendered. A model-written closing can point to things the answer does
+ * not show ("review the specific contracts" under a vehicle-bucket list); these sentences cannot.
+ * Each sentence names an element of a list that is on screen. At most three, in list order.
+ */
+export function deterministicNextSteps(rendered: RenderedRecords[]): string {
+  const steps: string[] = [];
+  const add = (s: string) => { if (!steps.includes(s)) steps.push(s); };
+  if (rendered.some((r) => r.text.includes('CHECK:') || /marked CHECK/.test(r.text))) add('Review the records marked CHECK above before pursuing them.');
+  for (const r of rendered) {
+    if (r.tool === EXPIRING_TOOL && r.shown > 0) {
+      add('Open each listed record\'s description to confirm it matches your work before contacting the incumbent.');
+      if (!r.exhaustive) add('Ask for the next page to see the remaining records.');
+    } else if (r.tool === PAST_CONTRACTS_TOOL) {
+      add(r.shown > 0
+        ? 'Check SAM.gov for the award numbers listed above, since recent extensions or follow-on awards may not be published yet.'
+        : 'Check SAM.gov award notices or the agency\'s announcements for awards newer than this data.');
+    } else if (r.tool === BUYING_OFFICES_TOOL && r.shown > 0) {
+      add('Review the example awards listed for each office above to confirm they match your work.');
+    } else if (r.tool === VEHICLE_MIX_TOOL && r.shown > 0) {
+      add('Compare the vehicle buckets above to decide which contract vehicles to pursue.');
+    } else if (r.tool === PRICING_TOOL) {
+      add('Compare your proposed rates with the percentiles above.');
+    } else if (r.tool === KEYWORDS_TOOL && r.shown > 0) {
+      add('Use the keywords above in your SAM.gov saved searches and capability statement.');
+    } else if (r.tool === SBLO_TOOL) {
+      add('Contact the people listed above through the firm\'s website or the channel on its SAM registration.');
+    }
+  }
+  return steps.slice(0, 3).join(' ');
+}
+
 /** Cross-check within one answer: an office whose example award is a CHECK record says so. */
 export function crossCheckOffices(rendered: RenderedRecords[]): void {
+  // Option B (rel1 R11): an office's place is the recorded place of performance of its awards. When the
+  // office's own in-window award is described as region-wide work, say the office line is not specific
+  // to the place shown. Evidence: the same award id, its own description.
+  const regionNotes: Record<string, string> = Object.assign({}, ...rendered.map((r) => r.regionNotes ?? {}));
+  if (Object.keys(regionNotes).length) {
+    for (const r of rendered) {
+      if (!r.officeExamples) continue;
+      const qual = r.officeExamples.flatMap((o) => o.ids.filter((id) => regionNotes[id]).map((id) => `${o.office}: for its award ${id} (listed above for this office), ${regionNotes[id]}; the "work performed in" place shown for this office is the place of performance recorded for its awards, not a limit on where this work happens`));
+      if (qual.length) r.text += `\n\nPLACE NOTE: ${qual.join('; ')}.`;
+    }
+  }
   const flagged = new Set(rendered.flatMap((r) => r.flaggedIds ?? []));
   const shown = new Set(rendered.flatMap((r) => r.ids));
   if (!flagged.size) return;

@@ -45,7 +45,7 @@ import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, typ
 import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
 import { guardUnstatedStates } from '@/lib/chat/stated-filters';
 import { compileIntent, enforceIntent, dedupeToolCalls } from '@/lib/chat/intent-compiler';
-import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, renderSbloContact, lintAnalysis, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, SBLO_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
+import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, renderSbloContact, lintAnalysis, deterministicNextSteps, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, SBLO_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
 
@@ -476,6 +476,8 @@ export async function POST(request: NextRequest) {
         // Index of an assistant tool_calls turn whose results have not all been appended yet.
         let pendingToolTurnIdx: number | null = null;
         const renderedRecords: RenderedRecords[] = [];
+        // Option B: true while every tool result this turn was shown as a verified list.
+        let allResultsRendered = true;
         try {
           const tier0Runtime = makeTier0Tools(getSupabase(), auth.email!);
           const executor = createChatToolExecutor({
@@ -641,12 +643,14 @@ export async function POST(request: NextRequest) {
                   [SBLO_TOOL]: renderSbloContact,
                 };
                 const renderer = renderers[r.record.tool];
-                if (r.record.status !== 'success' || !renderer) continue;
+                if (r.record.status !== 'success' || !renderer) { allResultsRendered = false; continue; }
                 try {
                   const parsed = JSON.parse(r.content);
                   const rendered = renderer(parsed);
                   if (rendered) renderedRecords.push(rendered);
+                  else allResultsRendered = false;
                 } catch (renderErr) {
+                  allResultsRendered = false;
                   console.error('[chat] record render failed:', renderErr);
                 }
               }
@@ -849,7 +853,10 @@ export async function POST(request: NextRequest) {
           // Deterministic analysis check: drop unsupported magnitude words and approximated amounts.
           const anyShown = renderedRecords.some((r) => r.shown > 0);
           const anyCheck = renderedRecords.some((r) => r.text.includes('CHECK:'));
-          const linted = lintAnalysis(
+          // Option B (rel2 R9): when every result is a verified list, the closing is built from those lists
+          // only; the model's closing is not shown (it could refer to things the answer does not show).
+          const deterministic = allResultsRendered ? deterministicNextSteps(renderedRecords) : '';
+          const linted = deterministic ? { text: deterministic, dropped: [] as string[] } : lintAnalysis(
             assistantContent.slice(modelTextStart),
             anyCheck
               ? 'Review the records marked CHECK above before pursuing them.'
