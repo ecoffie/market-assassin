@@ -1,6 +1,6 @@
 # C2: direct / related-market / other result groups (Agent 3, 2026-11-14)
 
-**Status:** plan + first implementation slice (library only, no surface wired) on `feat/agent3-c2-evidence-groups`; flag OFF. Approved
+**Status:** slice 1 (library) + slice 2 (Ask Mindy / MCP `find_opportunities` output, approved by Eric 2026-11-14) on `feat/agent3-c2-evidence-groups`; not merged. Map: design only (section 7). Alerts: measurement only (section 8). Approved
 direction (Eric, 2026-11-14): classify Open results into three groups with the existing evidence rules, keep the
 invariant `direct + related + other = Ask Mindy's total`, never present related-market notices as confirmed direct
 matches, do not change shared retrieval or official NAICS/PSC classifications, separate PR, release-controlled.

@@ -9,6 +9,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { recompeteRowAnnotations } from '@/lib/recompete/annotate';
 import { parseAwardLineage, NOT_ORDER_UNDER_VEHICLE_OR } from '@/lib/recompete/award-lineage';
 import { dedupeRecompeteRows, type DedupeableRecompeteRow } from '@/lib/recompete/dedupe-orders';
+import { evidenceMarket, openEvidenceSummary, type EvidenceCountsScope, type EvidenceTotals } from './evidence-group-map';
 import {
   interpretMarket,
   evidenceWhy,
@@ -186,6 +187,17 @@ export interface HorizonResult {
   allowed_handoffs: HandoffKey[];
   semantics_note: string | null;
   evidence_counts?: EvidenceCounts | null;
+  /**
+   * Open now only (C2, 2026-11-14). What evidence_counts covers: the classified candidate window (rows, deadline order,
+   * DIRECT and RELATED only). `covers_full_result` is true only when that window is the whole matched result.
+   */
+  evidence_counts_scope?: EvidenceCountsScope | null;
+  /**
+   * Open now only (C2). Full-result groups (rows): direct + related + other === total when complete. When the window is
+   * not the whole result the groups are null with a reason (never 0). Computed from rows already classified; no extra
+   * query. Groups come from labelOpenRow: DIRECT_MATCH → direct, RELATED_MARKET_CANDIDATE → related, else other.
+   */
+  evidence_totals?: EvidenceTotals | null;
   /** Coming Soon only: forecast publisher coverage when it is not complete (canonical plan). */
   coverage?: { state: 'partial' | 'unestablished'; gaps: ForecastCoverageGap[] };
   /** Coming Back only: task/delivery orders the plan matched and excluded (null = count unavailable). Internal. */
@@ -614,10 +626,9 @@ function interpretQuery(input: FindOpportunitiesInput, company: CompanyAnchorRes
   const policy = mcpDiscoveryPolicy(input);
   const plan = buildDiscoveryPlan(mcpDiscoveryInput(input, company?.anchor), policy);
   const basePlan = plan.company ? buildDiscoveryPlan(mcpDiscoveryInput(input, null), policy) : null;
-  const keywordText = plan.intent.residualKind === 'keyword' ? plan.intent.residual.replace(/^"|"$/g, '') : '';
-  const primaryAgency = String(input.agency || '').trim() || plan.buyers[0]?.requested || null;
   // Presentation + evidence labelling: the SAME capability the plan retrieved with, plus the buyer.
-  const market = interpretMarket(keywordText, primaryAgency);
+  // ONE derivation (evidence-group-map.ts evidenceMarket): the same keyword residual + primary buyer C2 uses.
+  const market = evidenceMarket(plan, input.agency);
   const recompeteMonths = policy.recompete.windowMonths ?? 18;
   const elig = eligibilityLabel(plan);
   return {
@@ -874,6 +885,8 @@ async function queryOpenNow(
         || a.i - b.i);
     const evidence_counts: EvidenceCounts = openEvidenceCounts(ranked);
     if (p.company) evidence_counts.COMPANY_REGISTERED_CODE = ranked.filter((x) => x.label.tier === OPEN_TIER.COMPANY_CODE).length;
+    // C2: full-result groups ONLY when the classified window is the whole result (no extra query, never 0 for unknown).
+    const evidence = openEvidenceSummary({ classes: ranked.map((x) => x.cls), matchedCount: count ?? null, windowLimit: fetchCap, companyUnion: !!p.basePlan });
     const sliced = ranked.slice(0, limit);
     const phrase = p.searchText || 'this work';
 
@@ -925,6 +938,8 @@ async function queryOpenNow(
         'Canonical discovery eligibility (word-bounded). Ranked DIRECT_MATCH → RELATED_MARKET_CANDIDATE → other, then by how many of the query’s concepts a notice carries, then deadline. Geography: place of performance OR buying-office state.'
         + (p.company ? ' Company-anchored: rows recalled only by the company’s registered PSC/NAICS rank after related-market rows and are never DIRECT_MATCH. eligibility is a separate screen.' : ''),
       evidence_counts,
+      evidence_counts_scope: evidence.scope,
+      evidence_totals: evidence.totals,
       ...(p.company ? { eligibility_counts: eligibilityCounts(items, p.company) } : {}),
       ...(stageInfo ? { stage: { ...stageInfo, returned_by_signal: stageSignalCounts(items) } } : {}),
     };

@@ -13,32 +13,15 @@
  */
 import { labelOpenRow } from './find-opportunities';
 import type { CompanyAnchor } from './company-anchor';
-import { interpretMarket, type MarketInterpretation } from './market-interpretation';
-import type { OpenRelevanceClass } from './open-relevance';
+import type { MarketInterpretation } from './market-interpretation';
 import type { DiscoveryPlan } from '@/lib/discovery';
 
-export type EvidenceGroup = 'direct' | 'related' | 'other';
+import { evidenceGroupOf, type EvidenceGroup } from './evidence-group-map';
+export { evidenceGroupOf, evidenceCapability, evidenceMarket, openEvidenceSummary, type EvidenceGroup } from './evidence-group-map';
 
 /** Same flag contract as SAVED_SEARCH_OPEN_CANONICAL / SAVED_SEARCH_FORECAST_CANONICAL. */
 export function evidenceGroupsEnabled(env: string | undefined = process.env.OPEN_EVIDENCE_GROUPS): boolean {
   return env === 'true';
-}
-
-/** The only mapping. A related-market notice is never "direct"; anything not DIRECT or RELATED is "other". */
-export function evidenceGroupOf(cls: OpenRelevanceClass): EvidenceGroup {
-  if (cls === 'DIRECT_MATCH') return 'direct';
-  if (cls === 'RELATED_MARKET_CANDIDATE') return 'related';
-  return 'other';
-}
-
-/**
- * The capability `labelOpenRow` needs, derived exactly as find_opportunities derives it (interpretQuery): the plan's
- * keyword residual plus the primary buyer. Kept identical on purpose; slice 2 moves find_opportunities onto this helper.
- */
-export function evidenceCapability(plan: DiscoveryPlan, agency?: string | null): MarketInterpretation['capability'] {
-  const keywordText = plan.intent.residualKind === 'keyword' ? plan.intent.residual.replace(/^"|"$/g, '') : '';
-  const primaryAgency = String(agency || '').trim() || plan.buyers[0]?.requested || null;
-  return interpretMarket(keywordText, primaryAgency).capability;
 }
 
 /** Columns `labelOpenRow` reads for an Open row. */
@@ -68,7 +51,7 @@ export function groupOpenRows(
  */
 export const EVIDENCE_TOTALS_MAX = 3000;
 
-export type EvidenceTotals =
+export type EvidenceSetTotals =
   | ({ complete: true; total: number } & EvidenceGroupCounts)
   | { complete: false; total: number | null; direct: null; related: null; other: null; reason: string };
 
@@ -92,7 +75,7 @@ export async function openEvidenceTotals(args: {
   cap: MarketInterpretation['capability'];
   anchor?: CompanyAnchor | null;
   max?: number;
-}): Promise<EvidenceTotals> {
+}): Promise<EvidenceSetTotals> {
   const max = args.max ?? EVIDENCE_TOTALS_MAX;
   const head = await args.count();
   if (head.error || head.count == null) {
