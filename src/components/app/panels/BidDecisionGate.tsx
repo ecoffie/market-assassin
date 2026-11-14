@@ -85,7 +85,7 @@ export default function BidDecisionGate({ onProceed, email, pipelineId }: { onPr
               {(g.detail || g.help) && <div className="text-faint mt-0.5">{g.detail || g.help}{g.source && <span className="text-slate-600"> · {g.source}</span>}</div>}
             </div>
             <div className="flex gap-1 shrink-0">
-              <button onClick={() => setGates(p => ({ ...p, [g.id]: true }))} className={`rounded px-2.5 py-1 text-xs font-medium ${gates[g.id] === true ? 'bg-emerald-600 text-white' : 'bg-surface text-muted hover:bg-input'}`}>Yes</button>
+              <button data-status-color onClick={() => setGates(p => ({ ...p, [g.id]: true }))} className={`rounded px-2.5 py-1 text-xs font-medium ${gates[g.id] === true ? 'bg-emerald-600 text-white' : 'bg-surface text-muted hover:bg-input'}`}>Yes</button>
               <button onClick={() => setGates(p => ({ ...p, [g.id]: false }))} className={`rounded px-2.5 py-1 text-xs font-medium ${gates[g.id] === false ? 'bg-red-600 text-white' : 'bg-surface text-muted hover:bg-input'}`}>No</button>
             </div>
           </div>

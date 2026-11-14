@@ -52,7 +52,7 @@ const HUB_AGENCIES_JSON = JSON.stringify(TOP_AGENCIES);
 const HUB_NAICS_JSON = JSON.stringify(TOP_NAICS.map((n) => ({ ...n, valueLabel: fmtV(n.value) })));
 void fmtB; // (agency budgets are pre-formatted client-side below)
 
-const PAGE = `<!DOCTYPE html><html lang="en"><head>
+const PAGE = `<!DOCTYPE html><html lang="en" class="mindy-map"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Market research — Mindy</title>
 <style>

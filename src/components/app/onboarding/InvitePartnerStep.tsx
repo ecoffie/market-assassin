@@ -107,7 +107,7 @@ export default function InvitePartnerStep({
                   navigator.clipboard?.writeText(ref.link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {});
                   track?.({ phase: 'invite', method: 'copy' });
                 }}
-                className="shrink-0 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-400"
+                className="shrink-0 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700"
               >
                 {copied ? '✓ Copied' : 'Copy link'}
               </button>

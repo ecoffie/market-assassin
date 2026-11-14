@@ -165,7 +165,7 @@ export default function UnifiedSidebar({
 
   const tierColors: Record<AppTier, string> = {
     free: 'text-gray-400',
-    pro: 'text-emerald-400',
+    pro: 'text-purple-400',
     team: 'text-blue-400',
     enterprise: 'text-purple-400',
   };
@@ -360,7 +360,7 @@ export default function UnifiedSidebar({
         {!isCollapsed && userTier === 'free' && (
           <Link
             href="/market-intelligence"
-            className="block w-full px-3 py-2 text-center text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors"
+            className="block w-full px-3 py-2 text-center text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
           >
             Upgrade to Pro
           </Link>

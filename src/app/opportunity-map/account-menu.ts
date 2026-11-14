@@ -35,7 +35,7 @@ import {
 // Scoped under .mindy-acct so it can't collide with a host page's classes. The
 // avatar itself reuses the existing .zh-acct sizing on the map/favorites; this
 // block adds the photo, the dropdown, and the "signed in as" header.
-export const ACCOUNT_MENU_CSS =
+const ACCOUNT_MENU_BASE_CSS =
   '.mindy-acct{position:relative;display:inline-flex}'
   + '.mindy-acct-btn{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;border:1px solid var(--line,#e6eaef);color:var(--sub,#6b7787);background:#fff;cursor:pointer;overflow:hidden;padding:0}'
   + '.mindy-acct-btn:hover{border-color:#c7d2e0}'
@@ -75,6 +75,30 @@ export const ACCOUNT_MENU_CSS =
   +   'html.mindy-anon .app{grid-template-columns:0 minmax(0,1fr) 400px!important}'
   +   'html.mindy-anon .app.collapsed{grid-template-columns:0 minmax(0,1fr) 0px!important}'
   + '}';
+
+// ── Map blue (signed-in app + Opportunity Map pages only) ───────────────────
+// The signed-in app (/app, `.mi-app` from src/app/app/layout.tsx) and the Opportunity Map pages
+// (`<html class="mindy-map">`, ACCOUNT_MENU_MAP_HTML_CLASS) wear the map's primary blue, so the
+// Upgrade button, the credits pill, the initials avatar and the logged-out "Start for free" pill
+// turn #006aff there. Public pages carry neither class and keep their navy (MP_ACCOUNT_OVERRIDES_CSS
+// in src/lib/public-site/css.ts). `:not(.mp-site *)` keeps a PublicShell page rendered inside the
+// /app tree (e.g. /app/signup) on the public look. Three-class specificity beats the public
+// overrides, which the map route also loads. Contrast: white on #006aff 4.66:1; text #005ee0 on
+// the #eff5ff tint 5.21:1.
+export const ACCOUNT_MENU_MAP_HTML_CLASS = 'mindy-map';
+const BLUE_SCOPE = ':is(.mi-app,.mindy-map)';
+export const ACCOUNT_MENU_BLUE_CSS =
+  BLUE_SCOPE + ' .mindy-upg:not(.mp-site *){background:#006aff}'
+  + BLUE_SCOPE + ' .mindy-upg:not(.mp-site *):hover{background:#0057d1}'
+  + BLUE_SCOPE + ' .mindy-cred:not(.mp-site *){color:#005ee0;border-color:#cfe1ff;background:#eff5ff}'
+  + BLUE_SCOPE + ' .mindy-cred:not(.mp-site *):hover{color:#0057d1;border-color:#006aff}'
+  + BLUE_SCOPE + ' .mindy-acct-btn:not(.mp-site *) .mindy-acct-ini{background:#006aff}'
+  + BLUE_SCOPE + ' .mindy-acct-btn.mindy-acct-signin:not(.mp-site *){background:#006aff;filter:none;border-color:transparent}'
+  + BLUE_SCOPE + ' .mindy-acct-btn.mindy-acct-signin:not(.mp-site *):hover{background:#0057d1;filter:none}'
+  // The Proposals draft-count badge is an inline style (green), so it needs !important.
+  + BLUE_SCOPE + ' #mindyAcctPropCt:not(.mp-site *){color:#005ee0!important;background:#eff5ff!important}';
+
+export const ACCOUNT_MENU_CSS = ACCOUNT_MENU_BASE_CSS + ACCOUNT_MENU_BLUE_CSS;
 
 // ── HTML ────────────────────────────────────────────────────────────────────
 // The avatar button + the dropdown. Rendered in the top-right of every page.

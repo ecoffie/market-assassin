@@ -124,3 +124,31 @@ html.mi-light.mi-app ::-webkit-scrollbar-thumb { background: #d5dbe2; }
   background-color: #eff5ff;
   border-color: #cfe1ff;
 }
+
+/* Settings (and the shared cards it renders: CreditsConsole, SubscriptionsCard, TargetingCard,
+   NaicsPicker) use emerald for ACTIONS and highlights. Those components are shared with surfaces
+   outside /app (e.g. /mcp/account), so the recolour is a scoped variable remap under
+   [data-app-accent="blue"], not a class change there. Same steps as the purple remap above:
+   50-400 text (#005ee0, AA on the tints), 500/600 fill, 700 hover, 800-950 tints. */
+.mi-app [data-app-accent="blue"] {
+  --color-emerald-50: #005ee0; --color-emerald-100: #005ee0; --color-emerald-200: #005ee0; --color-emerald-300: #005ee0; --color-emerald-400: #0057d1; --color-emerald-500: #006aff; --color-emerald-600: #006aff; --color-emerald-700: #0057d1; --color-emerald-800: #cfe1ff; --color-emerald-900: #eff5ff; --color-emerald-950: #f0f6ff;
+  --color-green-50: #005ee0; --color-green-100: #005ee0; --color-green-200: #005ee0; --color-green-300: #005ee0; --color-green-400: #0057d1; --color-green-500: #006aff; --color-green-600: #006aff; --color-green-700: #0057d1; --color-green-800: #cfe1ff; --color-green-900: #eff5ff; --color-green-950: #f0f6ff;
+}
+/* Real status marks (VERIFIED, an Active subscription, Full coverage, a done step) stay green:
+   mi-light's light-mode emerald/green values, restored. */
+.mi-app [data-app-accent="blue"] [data-status-color] {
+  --color-emerald-200: oklch(43.2% 0.095 166.913); --color-emerald-300: oklch(50.8% 0.118 165.612); --color-emerald-400: oklch(50.8% 0.118 165.612); --color-emerald-500: oklch(59.6% 0.145 163.225); --color-emerald-600: oklch(59.6% 0.145 163.225);
+  --color-green-300: oklch(52.7% 0.154 150.069); --color-green-400: oklch(52.7% 0.154 150.069); --color-green-500: oklch(62.7% 0.194 149.214);
+}
+
+/* Leftover green ACTION buttons across the /app panels (Vault, Proposals, Alerts, Pipeline, ...):
+   the dark UI's solid `bg-emerald-600` + `hover:bg-emerald-500` button becomes the map blue.
+   Matches the exact solid token only (not bg-emerald-600/20 tints, not bg-emerald-500 status
+   dots/progress bars), and never an element marked data-status-color (a done step, a "Yes" gate).
+   The vars are set on the button itself, so its own fill, hover and disabled steps resolve blue. */
+.mi-app :is([class^="bg-emerald-600 "],[class*=" bg-emerald-600 "],[class$=" bg-emerald-600"],[class="bg-emerald-600"]):not([data-status-color]) {
+  --color-emerald-600: #006aff;
+  --color-emerald-500: #0057d1;
+  --color-emerald-800: #cfe1ff;
+  --color-white: #ffffff;
+}

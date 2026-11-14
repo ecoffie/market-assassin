@@ -20,7 +20,7 @@ import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../account
 
 export const dynamic = 'force-dynamic';
 
-const PAGE = `<!DOCTYPE html><html lang="en"><head>
+const PAGE = `<!DOCTYPE html><html lang="en" class="mindy-map"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Coming Soon — Mindy</title>
 <style>

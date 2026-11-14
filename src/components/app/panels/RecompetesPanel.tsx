@@ -687,7 +687,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
           </p>
           {profileDefaults && (
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-              <span className={`px-2 py-1 rounded ${usingProfileDefaults ? 'bg-emerald-500/15 text-emerald-300' : 'bg-surface text-muted'}`}>
+              <span className={`px-2 py-1 rounded ${usingProfileDefaults ? 'bg-purple-900 text-purple-300 border border-purple-800' : 'bg-surface text-muted'}`}>
                 {usingProfileDefaults ? 'Using saved profile' : 'Custom search'}
               </span>
               {profileDefaults.naicsCodes.length > 0 && (
@@ -790,7 +790,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
             <button
               onClick={useSavedProfile}
               disabled={searching}
-              className="px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 disabled:opacity-50 text-emerald-300 text-sm rounded-lg transition-colors"
+              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
             >
               Use Saved Profile
             </button>
@@ -882,7 +882,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
               type="checkbox"
               checked={eligibleOnly}
               onChange={(e) => setEligibleOnly(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-600 bg-surface text-emerald-500 focus:ring-emerald-500"
+              className="h-4 w-4 rounded border-slate-600 bg-surface text-purple-500 focus:ring-purple-500"
             />
             <span className="font-medium">Set-asides I qualify for</span>
             <span className="text-xs text-faint">
@@ -896,7 +896,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
         {awardType === 'definitive' && profileDefaults?.eligibilitySource === 'business_type' && (
           <p className="mt-2 text-xs text-faint">
             Based on the certification you gave at signup. Hold more than one?{' '}
-            <a href="/app?panel=vault&section=identity" className="text-emerald-300 underline hover:text-emerald-200">
+            <a href="/app?panel=vault&section=identity" className="text-purple-300 underline hover:text-purple-200">
               Add them in your Vault
             </a>{' '}
             so nothing reserved for you gets filtered out.
@@ -907,7 +907,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
         {awardType === 'definitive' && profileDefaults?.eligibilitySource === 'none' && (
           <p className="mt-2 text-xs text-faint">
             Set-aside work is reserved for certified firms.{' '}
-            <a href="/app?panel=vault&section=identity" className="text-emerald-300 underline hover:text-emerald-200">
+            <a href="/app?panel=vault&section=identity" className="text-purple-300 underline hover:text-purple-200">
               Add your certifications
             </a>{' '}
             to filter this list to what you can actually win.
@@ -919,7 +919,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
             <button
               type="button"
               onClick={viewAllContracts}
-              className="ml-2 font-medium text-emerald-300 hover:text-emerald-200"
+              className="ml-2 font-medium text-purple-300 hover:text-purple-200"
             >
               View all
             </button>
@@ -978,9 +978,9 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                           resolution as the #19 teaming fix: don't open the empty
                           cached drawer for entities not in the DB. */}
                       <div className="flex items-center gap-1.5 mb-2">
-                        <span className="text-xs text-emerald-500">Prime (sub to them):</span>
+                        <span className="text-xs text-muted">Prime (sub to them):</span>
                         {c.usaSpendingUrl ? (
-                          <a href={c.usaSpendingUrl} target="_blank" rel="noreferrer" className="text-xs font-medium text-amber-300 hover:text-amber-200 underline decoration-dotted">
+                          <a href={c.usaSpendingUrl} target="_blank" rel="noreferrer" className="text-xs font-medium text-purple-300 hover:text-purple-200 underline decoration-dotted">
                             {c.recipientName} ↗
                           </a>
                         ) : (
@@ -1023,7 +1023,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                           setDrillAwardId(willOpen ? c.awardId : null);
                           if (willOpen) loadAwardDetail(c);
                         }}
-                        className="mt-1.5 text-xs text-amber-400 hover:text-amber-300 transition-colors"
+                        className="mt-1.5 text-xs text-purple-300 hover:text-purple-200 transition-colors"
                       >
                         {drillAwardId === c.awardId ? '▼ Hide award detail' : '▸ Award detail (ceiling, vehicle, dates)'}
                       </button>
@@ -1061,10 +1061,10 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                     const key = c.generatedId || c.awardId;
                     const det = drillDetail[key];
                     if (det === 'loading' || !det) return <div className="mt-3 rounded-lg border border-hairline bg-ground-deep/50 p-3 text-xs text-faint">Loading award detail from USASpending…</div>;
-                    if (det === 'error') return <div className="mt-3 rounded-lg border border-hairline bg-ground-deep/50 p-3 text-xs text-faint">Couldn’t load the award detail. <a href={c.usaSpendingUrl} target="_blank" rel="noreferrer" className="text-amber-400">View on USASpending ↗</a></div>;
+                    if (det === 'error') return <div className="mt-3 rounded-lg border border-hairline bg-ground-deep/50 p-3 text-xs text-faint">Couldn’t load the award detail. <a href={c.usaSpendingUrl} target="_blank" rel="noreferrer" className="text-purple-300">View on USASpending ↗</a></div>;
                     const d = det as AwardDetail;
                     return (
-                      <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/[0.04] p-4">
+                      <div className="mt-3 rounded-lg border border-purple-800 bg-purple-950 p-4">
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           <div>
                             <div className="text-[10px] uppercase tracking-wider text-faint">Obligated → Ceiling</div>
@@ -1094,7 +1094,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                             {d.pscDescription && <span>PSC: {d.pscDescription}</span>}
                           </div>
                         )}
-                        <a href={d.usaSpendingUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block text-[11px] text-amber-400 hover:text-amber-300">Full Contract Summary on USASpending ↗</a>
+                        <a href={d.usaSpendingUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block text-[11px] text-purple-300 hover:text-purple-200">Full Contract Summary on USASpending ↗</a>
                       </div>
                     );
                   })()}
@@ -1120,7 +1120,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
           {myStatesOnly && visibleContracts.length === 0 ? (
             <div className="px-5 py-8 text-center text-sm text-faint">
               No expiring awards with a place of performance in {profileDefaults?.states?.join(', ')}.
-              <button type="button" onClick={() => setMyStatesOnly(false)} className="ml-1 font-medium text-amber-300 hover:text-amber-200">
+              <button type="button" onClick={() => setMyStatesOnly(false)} className="ml-1 font-medium text-purple-300 hover:text-purple-200">
                 Show all areas
               </button>
             </div>
@@ -1143,7 +1143,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpandedContract(contract.piid); }
                   }}
-                  className={`cursor-pointer p-5 transition-colors hover:bg-surface/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 ${contract.daysUntilExpiration <= 90 ? 'bg-red-500/5' : ''}`}
+                  className={`cursor-pointer p-5 transition-colors hover:bg-surface/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60 ${contract.daysUntilExpiration <= 90 ? 'bg-red-500/5' : ''}`}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
@@ -1174,10 +1174,10 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                       {/* Title — the whole card toggles now, so this is just the
                           visual affordance (no nested button inside a clickable card). */}
                       <div className="group mb-1 flex w-full items-start gap-2">
-                        <h4 className="text-white font-medium line-clamp-2 group-hover:text-amber-200">
+                        <h4 className="text-white font-medium line-clamp-2 group-hover:text-purple-200">
                           {contract.title || 'Contract'}
                         </h4>
-                        <span className="mt-0.5 shrink-0 text-xs font-medium text-amber-300 group-hover:text-amber-200">
+                        <span className="mt-0.5 shrink-0 text-xs font-medium text-purple-300 group-hover:text-purple-200">
                           {isExpanded ? 'Hide details ▲' : 'Details ▼'}
                         </span>
                       </div>
@@ -1194,7 +1194,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                       {/* Incumbent — clickable to open YoY award history */}
                       {contract.incumbent?.name && (
                         <div className="flex items-center gap-1.5 mb-2" onClick={(e) => e.stopPropagation()}>
-                          <span className="text-xs text-amber-500">
+                          <span className="text-xs text-muted">
                             {contract.isMultiAward ? 'Lead incumbent:' : 'Incumbent:'}
                           </span>
                           <ContractorLink
@@ -1302,7 +1302,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                         {(() => {
                           const mapHref = mapLinkForRecompete(contract.contractId);
                           return mapHref ? (
-                            <a href={mapHref} className="text-[11px] text-amber-400 hover:text-amber-300">
+                            <a href={mapHref} className="text-[11px] text-purple-300 hover:text-purple-200">
                               Open on the map →
                             </a>
                           ) : null;
@@ -1446,7 +1446,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
 
       {/* Empty State */}
       {!loading && !searching && contracts.length === 0 && !error && (
-        <div className="bg-gradient-to-br from-amber-900/30 to-slate-900 border border-amber-500/30 rounded-xl p-6 text-center">
+        <div className="bg-purple-950 border border-purple-800 rounded-xl p-6 text-center">
           <div className="text-5xl mb-4">⏰</div>
           <p className="text-ink-soft mb-2">
             <strong className="text-white">No recompetes found for these filters</strong>
