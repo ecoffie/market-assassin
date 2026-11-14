@@ -1,0 +1,1811 @@
+{
+ "query": "We clean commercial office buildings.",
+ "trade_term_list": "janitorial",
+ "trade_similarity": 0.7101,
+ "rules_version": "evidence-rules-v2",
+ "plan_status": "ok",
+ "released_counts_unchanged": {
+  "DIRECT_MATCH": 204,
+  "RELATED_MARKET_CANDIDATE": 0,
+  "other": 48,
+  "matched_total": 252
+ },
+ "lane": {
+  "candidates": 68,
+  "shown": 40,
+  "uncertain_not_shown": 18,
+  "other_rows_eligible_for_scope_basis": 48
+ },
+ "timing_ms": {
+  "plan": 2167,
+  "load_vectors": 4401,
+  "rank_and_gate": 1007,
+  "total": 7575
+ },
+ "shown": [
+  {
+   "title": "Design Build Markey DC0094ZZ Multi Floor Interior Finish Improvements",
+   "solicitation_number": "47PE5326R0068",
+   "notice_id": "94b7e3c8a0774f0e860f4ec2c14717bc",
+   "naics_code": "236220",
+   "psc_code": "Z2AA",
+   "agency": "GENERAL SERVICES ADMINISTRATION / PUBLIC BUILDINGS SERVICE",
+   "response_deadline": "2026-11-16T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "This project includes corridor carpet replacement, painting, lighting installation, and marble replacement across multiple floors, following a design-build approach with finish selections from the 95% design stage at the Markey Federal Building DC0094ZZ.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Carpet cleaning services",
+     "kind": "census",
+     "census_naics": "561740"
+    },
+    {
+     "term": "Cleaning carpets",
+     "kind": "census",
+     "census_naics": "561740"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "semantic",
+    "body_terms"
+   ],
+   "semantic_rank": 13,
+   "semantic_score": 0.3649,
+   "sam_url": "https://sam.gov/opp/94b7e3c8a0774f0e860f4ec2c14717bc/view"
+  },
+  {
+   "title": "DHS HSI Schwartz 2nd Floor Carpet Replacement",
+   "solicitation_number": "47PD5527Q0010",
+   "notice_id": "3675ba38b0674995bf133a52f77c9fc6",
+   "naics_code": "236220",
+   "psc_code": "Z2AA",
+   "agency": "GENERAL SERVICES ADMINISTRATION / PUBLIC BUILDINGS SERVICE",
+   "response_deadline": "2026-12-05T00:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "PRIME_CANDIDATE",
+   "scope_sentence": "Contractor to provide all labor, materials and support necessary to replace approximately 6000 square feet of carpet and adjacent base boards in the HSI space on the 2nd floor of the Schwartz Federal Building, located at 880 Front Street, San Diego, CA 92101, in accordance with the statement of work.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Carpet cleaning services",
+     "kind": "census",
+     "census_naics": "561740"
+    },
+    {
+     "term": "Cleaning carpets",
+     "kind": "census",
+     "census_naics": "561740"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "semantic",
+    "body_terms"
+   ],
+   "semantic_rank": 23,
+   "semantic_score": 0.3547,
+   "sam_url": "https://sam.gov/opp/3675ba38b0674995bf133a52f77c9fc6/view"
+  },
+  {
+   "title": "DHS HSI Schwartz 2nd Floor Carpet Replacement",
+   "solicitation_number": "47PD5527Q0010",
+   "notice_id": "c40dbc1f3f8d405bb1db80d80e4c50cb",
+   "naics_code": "236220",
+   "psc_code": "Z2AA",
+   "agency": "GENERAL SERVICES ADMINISTRATION / PUBLIC BUILDINGS SERVICE",
+   "response_deadline": "2026-12-05T00:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "PRIME_CANDIDATE",
+   "scope_sentence": "Contractor to provide all labor, materials and support necessary to replace approximately 6000 square feet of carpet and adjacent base boards in the HSI space on the 2nd floor of the Schwartz Federal Building, located at 880 Front Street, San Diego, CA 92101, in accordance with the statement of work.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Carpet cleaning services",
+     "kind": "census",
+     "census_naics": "561740"
+    },
+    {
+     "term": "Cleaning carpets",
+     "kind": "census",
+     "census_naics": "561740"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "semantic",
+    "body_terms"
+   ],
+   "semantic_rank": 27,
+   "semantic_score": 0.3489,
+   "sam_url": "https://sam.gov/opp/c40dbc1f3f8d405bb1db80d80e4c50cb/view"
+  },
+  {
+   "title": "Non-personal services Seawater Pump Renovation",
+   "solicitation_number": "1305M327Q0034",
+   "notice_id": "f070889d4f8249b8bb550a7b8c1566ce",
+   "naics_code": "236220",
+   "psc_code": "Z2JZ",
+   "agency": "COMMERCE, DEPARTMENT OF / NATIONAL OCEANIC AND ATMOSPHERIC ADMINISTRATION",
+   "response_deadline": "2026-12-07T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "\u25cf Phase 3 (Execution): Upon COR verification of materials, the Contractor may enter the strict 10-day maximum shutdown window to execute demolition, installation, and commissioning",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "semantic",
+    "body_terms"
+   ],
+   "semantic_rank": 31,
+   "semantic_score": 0.3465,
+   "sam_url": "https://sam.gov/opp/f070889d4f8249b8bb550a7b8c1566ce/view"
+  },
+  {
+   "title": "B462 Entryway Carpet Offutt AFB",
+   "solicitation_number": "FA460027R0002",
+   "notice_id": "9f6aeb35eaa94f889b8210d1644415f4",
+   "naics_code": "236220",
+   "psc_code": "Z2AA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2026-11-19T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "PRIME_CANDIDATE",
+   "scope_sentence": "DESCRIPTION OF REQUIREMENT This is a new construction requirement for the removal and installation of the entryway carpet and painting of curb at B462 on Offutt AFB, Nebraska.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Carpet cleaning services",
+     "kind": "census",
+     "census_naics": "561740"
+    },
+    {
+     "term": "Cleaning carpets",
+     "kind": "census",
+     "census_naics": "561740"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "semantic",
+    "body_terms"
+   ],
+   "semantic_rank": 50,
+   "semantic_score": 0.3344,
+   "sam_url": "https://sam.gov/opp/9f6aeb35eaa94f889b8210d1644415f4/view"
+  },
+  {
+   "title": "Z2DA--612A4-27-018 | Replace B650 3rd and 2nd Flooring",
+   "solicitation_number": "36C26127Q00260001",
+   "notice_id": "837a61b6cb6e4c48911189781921c4ea",
+   "naics_code": "236220",
+   "psc_code": "Z2DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-20T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Scope of Work: The contractor shall replace approximately 38,000 square feet (SF) of carpet and luxury vinyl tile throughout Building 650 3rd and 2nd Floors as shown in Exhibit A - BLDG 650 2nd and 3rd Floors Room Flooring Replacement and Attachment 1 - BLDG 650 Mather 2nd and 3rd Floor Carpet Replacement Current Flooring.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Carpet cleaning services",
+     "kind": "census",
+     "census_naics": "561740"
+    },
+    {
+     "term": "Cleaning carpets",
+     "kind": "census",
+     "census_naics": "561740"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "semantic",
+    "body_terms"
+   ],
+   "semantic_rank": 80,
+   "semantic_score": 0.3171,
+   "sam_url": "https://sam.gov/opp/837a61b6cb6e4c48911189781921c4ea/view"
+  },
+  {
+   "title": "Z2DA--612A4-27-018 | Replace B650 3rd and 2nd Flooring",
+   "solicitation_number": "36C26127Q00260001",
+   "notice_id": "f2679d302225400abd198d1f2f0fb719",
+   "naics_code": "236220",
+   "psc_code": "Z2DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-20T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Scope of Work: The contractor shall replace approximately 38,000 square feet (SF) of carpet and luxury vinyl tile throughout Building 650 3rd and 2nd Floors as shown in Exhibit A - BLDG 650 2nd and 3rd Floors Room Flooring Replacement and Attachment 1 - BLDG 650 Mather 2nd and 3rd Floor Carpet Replacement Current Flooring.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Carpet cleaning services",
+     "kind": "census",
+     "census_naics": "561740"
+    },
+    {
+     "term": "Cleaning carpets",
+     "kind": "census",
+     "census_naics": "561740"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "semantic",
+    "body_terms"
+   ],
+   "semantic_rank": 81,
+   "semantic_score": 0.3171,
+   "sam_url": "https://sam.gov/opp/f2679d302225400abd198d1f2f0fb719/view"
+  },
+  {
+   "title": "FY27 NRM  Replace Flooring in McClellan  VA Northern California Health Care System  McClellan CA  Project 612A4 27 020",
+   "solicitation_number": "36C26127Q0047",
+   "notice_id": "bfc14294001d4d5dbb20fe49a288b687",
+   "naics_code": "236220",
+   "psc_code": "Z1AZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-17T23:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Department of Veterans Affairs B C D E F A B C D E F 2 1 4 5 6 7 8 9 10 Phase ARCHITECT/ENGINEER OF RECORD STAMP 3 2 1 4 5 6 7 8 9 10 612A4-27-020 VA102A ARCHITECTURAL PLAN - EXISTING LEVEL 1 FLOORING REPLACE FLOORING IN MCCLELLAN 98 04.28.2026 5342 Dudley Boulevard Street McClellan Park, CA 95652 Revisions: Date: 1/8\" = 1'-0\" 1 Floor 2 FEET SCALE 20 15 10 5 0 5 1/8\" = 1'-0\" N EXISTING CARPET EXIS",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Carpet cleaning services",
+     "kind": "census",
+     "census_naics": "561740"
+    },
+    {
+     "term": "Cleaning carpets",
+     "kind": "census",
+     "census_naics": "561740"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "semantic",
+    "body_terms"
+   ],
+   "semantic_rank": 92,
+   "semantic_score": 0.3155,
+   "sam_url": "https://sam.gov/opp/bfc14294001d4d5dbb20fe49a288b687/view"
+  },
+  {
+   "title": "FY27 NRM  Replace Flooring in McClellan  VA Northern California Health Care System  McClellan CA  Project 612A4 27 020",
+   "solicitation_number": "36C26127Q0047",
+   "notice_id": "b8205e6e69db41bc85611de60bbe9566",
+   "naics_code": "236220",
+   "psc_code": "Z1AZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-17T23:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Department of Veterans Affairs B C D E F A B C D E F 2 1 4 5 6 7 8 9 10 Phase ARCHITECT/ENGINEER OF RECORD STAMP 3 2 1 4 5 6 7 8 9 10 612A4-27-020 VA102A ARCHITECTURAL PLAN - EXISTING LEVEL 1 FLOORING REPLACE FLOORING IN MCCLELLAN 98 04.28.2026 5342 Dudley Boulevard Street McClellan Park, CA 95652 Revisions: Date: 1/8\" = 1'-0\" 1 Floor 2 FEET SCALE 20 15 10 5 0 5 1/8\" = 1'-0\" N EXISTING CARPET EXIS",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Carpet cleaning services",
+     "kind": "census",
+     "census_naics": "561740"
+    },
+    {
+     "term": "Cleaning carpets",
+     "kind": "census",
+     "census_naics": "561740"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "semantic",
+    "body_terms"
+   ],
+   "semantic_rank": 93,
+   "semantic_score": 0.3155,
+   "sam_url": "https://sam.gov/opp/b8205e6e69db41bc85611de60bbe9566/view"
+  },
+  {
+   "title": "Facility Enhancement and Maintenance IDIQ",
+   "solicitation_number": "FA441827R0001",
+   "notice_id": "7f2faf7581d44e019f1fbd1a951eed93",
+   "naics_code": "236220",
+   "psc_code": "Z1AA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2026-11-16T21:30:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Floor Covering: Removal and replacement of floor covering materials, including but not limited to carpet, vinyl composition tile (VCT), luxury vinyl tile (LVT), rubber flooring, and ceramic/porcelain tile.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Carpet cleaning services",
+     "kind": "census",
+     "census_naics": "561740"
+    },
+    {
+     "term": "Cleaning carpets",
+     "kind": "census",
+     "census_naics": "561740"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 204,
+   "semantic_score": 0.2917,
+   "sam_url": "https://sam.gov/opp/7f2faf7581d44e019f1fbd1a951eed93/view"
+  },
+  {
+   "title": "Correct Electrical Deficiencies",
+   "solicitation_number": "36C24627B0001",
+   "notice_id": "eed5595d885240c2b6ba126a46448b9d",
+   "naics_code": "236220",
+   "psc_code": "6150",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-08T15:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "ONS B02-AE350 BUILDING SECTIONS, WALL SECTIONS, DETAILS B02-AE900 DOOR AND WINDOW SCHEDULES AND GENERAL NOTES B02-AL101 FIRST FLOOR LIFE SAFETY PLAN B02-ID001 FIRST FLOOR DEMOLITION PLAN B37-AD101 INTERIOR DESIGN FINISH LISTING Structural B02-S001 STRUCTURAL SYMBOLS & NOTATIONS B02-S002 GENERAL NOTES B02-S003 GENERAL NOTES B02-S004 SPECIAL INSPECTION NOTES B02-S010 TYPICAL DETAILS B02-S011 TYPICAL",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 208,
+   "semantic_score": 0.2902,
+   "sam_url": "https://sam.gov/opp/eed5595d885240c2b6ba126a46448b9d/view"
+  },
+  {
+   "title": "Alaska Construction IDIQ Sources Sought",
+   "solicitation_number": "20261019",
+   "notice_id": "dbfcde26fd3b4c12a1f1c2eef34ad3d0",
+   "naics_code": "236220",
+   "psc_code": null,
+   "agency": "GENERAL SERVICES ADMINISTRATION / PUBLIC BUILDINGS SERVICE",
+   "response_deadline": "2026-11-19T21:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The contractor s roles and responsibilities may include: design, demolition, abatement, repair and alteration of interior space including but not limited to, carpentry, woods and plastics, drywall, insulation, doors and openings, finishes, paint, bathroom fixtures, plumbing, HVAC, electrical, fire/life/safety equipment, specialized security equipment, fencing, windows, outdoor lighting.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 224,
+   "semantic_score": 0.288,
+   "sam_url": "https://sam.gov/opp/dbfcde26fd3b4c12a1f1c2eef34ad3d0/view"
+  },
+  {
+   "title": "Market Intelligence Notice: Fort Hood Bldg 410 General Stilwell Army Reserve Center (ARC)",
+   "solicitation_number": "W912QR-PDB-FORTHOOD",
+   "notice_id": "c3daacd708a04bca8f8519633fa5556c",
+   "naics_code": "236220",
+   "psc_code": null,
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-24T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "exterior doors, windows, and storefronts require replacement;",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 337,
+   "semantic_score": 0.2725,
+   "sam_url": "https://sam.gov/opp/c3daacd708a04bca8f8519633fa5556c/view"
+  },
+  {
+   "title": "Central Utility Building Addition and Renovation Construction, UIP Subproject 1-CUB",
+   "solicitation_number": "RFP-376508-CD",
+   "notice_id": "b3e96254b8dc47f48e58f2821e5100ad",
+   "naics_code": "236210",
+   "psc_code": "Z2EZ",
+   "agency": "ENERGY, DEPARTMENT OF / ENERGY, DEPARTMENT OF",
+   "response_deadline": "2026-11-17T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The General Contractor must start their on-site efforts, and complete the construction scope under this contract, within the shutdown window.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 408,
+   "semantic_score": 0.2675,
+   "sam_url": "https://sam.gov/opp/b3e96254b8dc47f48e58f2821e5100ad/view"
+  },
+  {
+   "title": "Construction Services for the Gate 7 Parking Garage St. Elizabeths West Campus",
+   "solicitation_number": "47PB5126R0038 ",
+   "notice_id": "b186c45b95294ce7a599f20bb542fff2",
+   "naics_code": "236220",
+   "psc_code": "Y1AZ",
+   "agency": "GENERAL SERVICES ADMINISTRATION / PUBLIC BUILDINGS SERVICE",
+   "response_deadline": "2026-11-23T21:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "e and building envelope construction, including a classical architectural brick fa ade with openings Exterior doors, windows, louvers, waterproofing, sealants, flashings, and related envelope components Mechanical, electrical, plumbing, fire protection, fire alarm, emergency communications, lighting, controls, IT, telecommunications, electronic security, access control, CCTV, parking guidance, and",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 415,
+   "semantic_score": 0.2668,
+   "sam_url": "https://sam.gov/opp/b186c45b95294ce7a599f20bb542fff2/view"
+  },
+  {
+   "title": "Design Build (DB) Requirement for Land Port of Entry Modernization Project in Limestone, Maine",
+   "solicitation_number": "47PB5126R0009",
+   "notice_id": "650c7ab0f8cb4037939f8c96c30f36be",
+   "naics_code": "236220",
+   "psc_code": "Y1AZ",
+   "agency": "GENERAL SERVICES ADMINISTRATION / PUBLIC BUILDINGS SERVICE",
+   "response_deadline": "2027-03-01T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Building upgrades include waterproofing basement window wells, insulating and heating the East Garage/Storage Room, replacing the emergency generator, upgrading electrical service capacity, adding fire alarm monitoring, and installing new telecommunications infrastructure to support Federal operations.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 498,
+   "semantic_score": 0.2608,
+   "sam_url": "https://sam.gov/opp/650c7ab0f8cb4037939f8c96c30f36be/view"
+  },
+  {
+   "title": "ANGKOR SENTINEL 27 BASE LIFE SUPPORT FACILITY REHAB SERVICES",
+   "solicitation_number": "W91QVP-26-AS27-BLS",
+   "notice_id": "1e19076d91554ce4a457b8f8fa23f346",
+   "naics_code": "561210",
+   "psc_code": "S216",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-20T23:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "replace broken window panes;",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 564,
+   "semantic_score": 0.2561,
+   "sam_url": "https://sam.gov/opp/1e19076d91554ce4a457b8f8fa23f346/view"
+  },
+  {
+   "title": "RANGE MAINTENANCE AND REPAIR SUPPORT",
+   "solicitation_number": "N4008527R0004",
+   "notice_id": "81c1fdee704740ec817277939bbe63c9",
+   "naics_code": "561210",
+   "psc_code": "S216",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE NAVY",
+   "response_deadline": "2026-11-30T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "metal and wood), repair/replace Range Maintenance ammo tables, wooden steps located on ranges, repair to structures/facilities, berm maintenance, firing position maintenance, bunkers, retaining walls of wood or sandbags and metal, bleachers, and wooden steps berm maintenance bunkers retaining walls, repair/replace lateral limit signs, range firing lane markers, commercial cleaning/janitorial, pres",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "janitorial",
+     "kind": "profile"
+    },
+    {
+     "term": "commercial cleaning",
+     "kind": "profile"
+    },
+    {
+     "term": "Janitorial services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 570,
+   "semantic_score": 0.2559,
+   "sam_url": "https://sam.gov/opp/81c1fdee704740ec817277939bbe63c9/view"
+  },
+  {
+   "title": "Y1DZ--653-26-110 Light Remodel Bldg 17",
+   "solicitation_number": "36C26027R0033",
+   "notice_id": "0cbd997f40f54e8b9c5e41d7d82c2007",
+   "naics_code": "236220",
+   "psc_code": "Y1DZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-09T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Install new 2x2 grid with gasket seal and new tiles (4227 sq ft) Demo carpet and flooring and remove tripping hazard transitions between rooms by making transitions smooth and flat (4102sq ft) Ceiling tiles, carpet, wall base trim and flooring are suspected asbestos containing material, Asbestos abatement will be required Demo wall base trim Raise flooring in A106 and E122 roughly \u00bd\u201d to remove tra",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Carpet cleaning services",
+     "kind": "census",
+     "census_naics": "561740"
+    },
+    {
+     "term": "Cleaning carpets",
+     "kind": "census",
+     "census_naics": "561740"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 655,
+   "semantic_score": 0.2507,
+   "sam_url": "https://sam.gov/opp/0cbd997f40f54e8b9c5e41d7d82c2007/view"
+  },
+  {
+   "title": "Correct Electrical Deficiencies",
+   "solicitation_number": "36C24627B0001",
+   "notice_id": "33cea54e56594fd4a20fb45b1905b49a",
+   "naics_code": "236220",
+   "psc_code": "6150",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-08T15:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "ONS B02-AE350 BUILDING SECTIONS, WALL SECTIONS, DETAILS B02-AE900 DOOR AND WINDOW SCHEDULES AND GENERAL NOTES B02-AL101 FIRST FLOOR LIFE SAFETY PLAN B02-ID001 FIRST FLOOR DEMOLITION PLAN B37-AD101 INTERIOR DESIGN FINISH LISTING Structural B02-S001 STRUCTURAL SYMBOLS & NOTATIONS B02-S002 GENERAL NOTES B02-S003 GENERAL NOTES B02-S004 SPECIAL INSPECTION NOTES B02-S010 TYPICAL DETAILS B02-S011 TYPICAL",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 714,
+   "semantic_score": 0.2471,
+   "sam_url": "https://sam.gov/opp/33cea54e56594fd4a20fb45b1905b49a/view"
+  },
+  {
+   "title": "Central Utility Building Addition and Renovation Construction, UIP Subproject 1-CUB",
+   "solicitation_number": "RFP-376508-CD",
+   "notice_id": "14034cd5817d49c38056351ef936d097",
+   "naics_code": "236210",
+   "psc_code": "Z2EZ",
+   "agency": "ENERGY, DEPARTMENT OF / ENERGY, DEPARTMENT OF",
+   "response_deadline": "2026-11-17T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The General Contractor must start their on-site efforts, and complete the construction scope under this contract, within the shutdown window.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 792,
+   "semantic_score": 0.2425,
+   "sam_url": "https://sam.gov/opp/14034cd5817d49c38056351ef936d097/view"
+  },
+  {
+   "title": "FY27 San Francisco District Maintenance Dredging",
+   "solicitation_number": "W912P727S0002",
+   "notice_id": "9e0853c1c7f147e3bacff6805aa589a3",
+   "naics_code": "237990",
+   "psc_code": "Z1KF",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-04T23:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "-- 2 of 5 -- P a g e | 3 11/4/2026 Table 1: Project Description Summary and Price Range Project Name Location Required Depth, MLLW (ft.) Placement Dredge Type Estimated Price range (Millions) Anticipated Solicitation Issuance Date Environmental Window Redwood City Harbor San Mateo County, CA -30 In-Bay (SF-11) orDeep Ocean (SF- DODS), Clamshell $5-10 1-Mar-27 1 June to 30 November San Joaquin/ Sto",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 834,
+   "semantic_score": 0.2405,
+   "sam_url": "https://sam.gov/opp/9e0853c1c7f147e3bacff6805aa589a3/view"
+  },
+  {
+   "title": "Central Utility Building Addition and Renovation Construction, UIP Subproject 1-CUB",
+   "solicitation_number": "RFP-376508-CD",
+   "notice_id": "4e7d0c4832764a279ed8191c8f4e789d",
+   "naics_code": "236210",
+   "psc_code": "Z2EZ",
+   "agency": "ENERGY, DEPARTMENT OF / ENERGY, DEPARTMENT OF",
+   "response_deadline": "2026-12-17T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The General Contractor must start their on-site efforts, and complete the construction scope under this contract, within the shutdown window.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 862,
+   "semantic_score": 0.2389,
+   "sam_url": "https://sam.gov/opp/4e7d0c4832764a279ed8191c8f4e789d/view"
+  },
+  {
+   "title": "Phase 2 Construct Arabian Leopard Exhibit at the National Zoological Park",
+   "solicitation_number": "33330226RT0010015",
+   "notice_id": "deb1fc6cb1f24bf482fb14f4851872c0",
+   "naics_code": "236220",
+   "psc_code": "Y1JA",
+   "agency": "SMITHSONIAN INSTITUTION / SMITHSONIAN INSTITUTION",
+   "response_deadline": "2026-11-20T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "1 9519 - ANIMAL EQUIPMENT ** DIVISION 12 - FURNISHINGS SECTION 12 1423 - SIMULATED NATURE - ARTIFICIAL PLANTS ** SECTION 12 2413 - ROLLER WINDOW SHADES SECTION 12 3661.16 - SOLID SURFACING COUNTERTOPS SECTION 12 5610 - FURNITURE DIVISION 13 - SPECIAL CONSTRUCTION SECTION 13 3100 - SPECIAL STRUCTURES ** DIVISION 21 -",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 898,
+   "semantic_score": 0.2374,
+   "sam_url": "https://sam.gov/opp/deb1fc6cb1f24bf482fb14f4851872c0/view"
+  },
+  {
+   "title": "Unaccompanied Personnel Housing Restoration at NSB Kings Bay, GA",
+   "solicitation_number": "N6945027RUPHR",
+   "notice_id": "710a4d5ab16a49deb5d49c8473cb5448",
+   "naics_code": "236220",
+   "psc_code": "Z2FC",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE NAVY",
+   "response_deadline": "2027-11-17T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Exterior renovation includes replacement of gutters, windows, doors, safety railings, lights.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 997,
+   "semantic_score": 0.2332,
+   "sam_url": "https://sam.gov/opp/710a4d5ab16a49deb5d49c8473cb5448/view"
+  },
+  {
+   "title": "FY27 NRM  Replace Flooring in McClellan  VA Northern California Health Care System  McClellan CA  Project 612A4 27 020",
+   "solicitation_number": "36C26127Q0047",
+   "notice_id": "def2d19916684484b1124c4881e53737",
+   "naics_code": "236220",
+   "psc_code": "Z1AZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-02T23:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Department of Veterans Affairs B C D E F A B C D E F 2 1 4 5 6 7 8 9 10 Phase ARCHITECT/ENGINEER OF RECORD STAMP 3 2 1 4 5 6 7 8 9 10 612A4-27-020 VA102A ARCHITECTURAL PLAN - EXISTING LEVEL 1 FLOORING REPLACE FLOORING IN MCCLELLAN 98 04.28.2026 5342 Dudley Boulevard Street McClellan Park, CA 95652 Revisions: Date: 1/8\" = 1'-0\" 1 Floor 2 FEET SCALE 20 15 10 5 0 5 1/8\" = 1'-0\" N EXISTING CARPET EXIS",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Carpet cleaning services",
+     "kind": "census",
+     "census_naics": "561740"
+    },
+    {
+     "term": "Cleaning carpets",
+     "kind": "census",
+     "census_naics": "561740"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1145,
+   "semantic_score": 0.2282,
+   "sam_url": "https://sam.gov/opp/def2d19916684484b1124c4881e53737/view"
+  },
+  {
+   "title": "KAUTZ ROAD SUBSTATION CONSTRUCION, UIP SUBPROJECT 2- KRS",
+   "solicitation_number": "RFP-383167-CD",
+   "notice_id": "0d455f653c70449796f54eea428f0d56",
+   "naics_code": "237130",
+   "psc_code": "Z2MZ",
+   "agency": "ENERGY, DEPARTMENT OF / ENERGY, DEPARTMENT OF",
+   "response_deadline": "2026-12-18T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The General Contractor must start their on-site efforts, and complete the construction scope under this contract, within the shutdown window.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237130 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1185,
+   "semantic_score": 0.2271,
+   "sam_url": "https://sam.gov/opp/0d455f653c70449796f54eea428f0d56/view"
+  },
+  {
+   "title": "New Meadows Range Barn",
+   "solicitation_number": "1240LT27Q0027",
+   "notice_id": "b08fa8ab3a6d41a3b8a58fc869b015d8",
+   "naics_code": "237110",
+   "psc_code": "Z2JZ",
+   "agency": "AGRICULTURE, DEPARTMENT OF / FOREST SERVICE",
+   "response_deadline": "2026-11-29T00:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Removal of lead-based paint siding and felt paper, installation of plywood sheathing and building wrap, installation of new siding in-kind, installation of new trim in-kind around the windows, doors, and corners and painting of all aforementioned surfaces.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1232,
+   "semantic_score": 0.2258,
+   "sam_url": "https://sam.gov/opp/b08fa8ab3a6d41a3b8a58fc869b015d8/view"
+  },
+  {
+   "title": "KAUTZ ROAD SUBSTATION CONSTRUCION, UIP SUBPROJECT 2- KRS",
+   "solicitation_number": "RFP-383167-CD",
+   "notice_id": "558314f2c9aa4128b07bd410f81a4ccc",
+   "naics_code": "237130",
+   "psc_code": "Z2MZ",
+   "agency": "ENERGY, DEPARTMENT OF / ENERGY, DEPARTMENT OF",
+   "response_deadline": "2026-12-18T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The General Contractor must start their on-site efforts, and complete the construction scope under this contract, within the shutdown window.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237130 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1613,
+   "semantic_score": 0.2156,
+   "sam_url": "https://sam.gov/opp/558314f2c9aa4128b07bd410f81a4ccc/view"
+  },
+  {
+   "title": "Construction Services for Confined Aquatic Disposal Cell Construction and Maintenance Dredging of the Providence River Federal Navigation Project, Providence, Rhode Island.",
+   "solicitation_number": "W912WJ27X1CUP",
+   "notice_id": "a426eaa48dd345d08ade07b924e9c4a4",
+   "naics_code": "237990",
+   "psc_code": null,
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-26T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "In order to accomplish all dredging requirements within the specified dredging window it is expected that the Contractor will need to meet a production rate of 300,000 CY per 30 calendar days.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1663,
+   "semantic_score": 0.2147,
+   "sam_url": "https://sam.gov/opp/a426eaa48dd345d08ade07b924e9c4a4/view"
+  },
+  {
+   "title": "Construction Services for Confined Aquatic Disposal Cell Construction and Maintenance Dredging of the Providence River Federal Navigation Project, Providence, Rhode Island.",
+   "solicitation_number": "W912WJ27X1CUP",
+   "notice_id": "f0c0e79824604daf8c7b49c8cbc166bd",
+   "naics_code": "237990",
+   "psc_code": null,
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-03T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "In order to accomplish all dredging requirements within the specified dredging window it is expected that the Contractor will need to meet a production rate of 300,000 CY per 30 calendar days.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1670,
+   "semantic_score": 0.2146,
+   "sam_url": "https://sam.gov/opp/f0c0e79824604daf8c7b49c8cbc166bd/view"
+  },
+  {
+   "title": "Yaquina River Clamshell Dredging 2027",
+   "solicitation_number": "W9127N27BA002",
+   "notice_id": "4185fc349d804489ad890e3512cb4478",
+   "naics_code": "237990",
+   "psc_code": "Y1KF",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-17T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The in-water work window is 01 July 2027 - 31 October 2027.SUBMISSION REQUIREMENTS FOR RESPONSES TO THIS SOURCES SOUGHT SYNOPSIS Vendors interested in this requirement(s) with Portland District must submit the documentation and meet the requirements identified below.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1824,
+   "semantic_score": 0.2113,
+   "sam_url": "https://sam.gov/opp/4185fc349d804489ad890e3512cb4478/view"
+  },
+  {
+   "title": "Korea Limited Life Support (KLLS)",
+   "solicitation_number": "W90VN926RA999",
+   "notice_id": "8b5e6de43f68440a9db2f900494c0438",
+   "naics_code": "561210",
+   "psc_code": "S299",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-30T02:22:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Key requirements include (but are not limited to): Sustainment support operations (facility maintenance/cleaning, laundry, shower trailers, waste management, bulk/bottled water, power generation, portable latrines, gray/black water removal, custodial services, catering) Base life support (water production, ice, pest control, cold storage, billeting/cots, generators, light towers) Quality Control P",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "custodial",
+     "kind": "profile"
+    },
+    {
+     "term": "Custodial services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1879,
+   "semantic_score": 0.2104,
+   "sam_url": "https://sam.gov/opp/8b5e6de43f68440a9db2f900494c0438/view"
+  },
+  {
+   "title": "Repair Aids to Navigation (ATON) - Southern Area of USCG District Northeast",
+   "solicitation_number": "70Z0G126BSSNE1057",
+   "notice_id": "bd91cddac9464be99743a88325709e2e",
+   "naics_code": "237990",
+   "psc_code": "Z2BC",
+   "agency": "HOMELAND SECURITY, DEPARTMENT OF / US COAST GUARD",
+   "response_deadline": "2026-12-08T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Chatham Light (LLNR 525): Replace windows in kind & clean/recoat exterior/interior.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1901,
+   "semantic_score": 0.2101,
+   "sam_url": "https://sam.gov/opp/bd91cddac9464be99743a88325709e2e/view"
+  },
+  {
+   "title": "INDUSTRY DAY: FORT HUNTER LIGGETT BARRACKS PDB-OTA",
+   "solicitation_number": "W912QR-INDUSTRYDAY-FHLBARRACKS",
+   "notice_id": "c36ebbda60b34d2ea282b81883206f11",
+   "naics_code": "236220",
+   "psc_code": "Y1JZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-17T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "(4) multi-story CTE Barracks (approximately 46,000 total SF each), which will feature open bays, along with integrated officers sleeping rooms, team rooms, laundry facilities, restrooms, showers, storage, and janitorial closets.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "janitorial",
+     "kind": "profile"
+    },
+    {
+     "term": "Janitorial services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3058,
+   "semantic_score": 0.1895,
+   "sam_url": "https://sam.gov/opp/c36ebbda60b34d2ea282b81883206f11/view"
+  },
+  {
+   "title": "New Meadows Range Barn",
+   "solicitation_number": "1240LT27Q0027",
+   "notice_id": "d220126158854b719cbc6be76079241e",
+   "naics_code": "237110",
+   "psc_code": "Z2JZ",
+   "agency": "AGRICULTURE, DEPARTMENT OF / FOREST SERVICE",
+   "response_deadline": "2026-11-29T00:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Removal of lead-based paint siding and felt paper, installation of plywood sheathing and building wrap, installation of new siding in-kind, installation of new trim in-kind around the windows, doors, and corners and painting of all aforementioned surfaces.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3180,
+   "semantic_score": 0.1877,
+   "sam_url": "https://sam.gov/opp/d220126158854b719cbc6be76079241e/view"
+  },
+  {
+   "title": "RANGE MAINTENANCE AND REPAIR SUPPORT",
+   "solicitation_number": "N4008527R0004",
+   "notice_id": "e96f16e22b2b4a2a908658d78f41fa6a",
+   "naics_code": "561210",
+   "psc_code": "S216",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE NAVY",
+   "response_deadline": "2026-11-30T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "metal and wood), repair/replace Range Maintenance ammo tables, wooden steps located on ranges, repair to structures/facilities, berm maintenance, firing position maintenance, bunkers, retaining walls of wood or sandbags and metal, bleachers, and wooden steps berm maintenance bunkers retaining walls, repair/replace lateral limit signs, range firing lane markers, commercial cleaning/janitorial, pres",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "janitorial",
+     "kind": "profile"
+    },
+    {
+     "term": "commercial cleaning",
+     "kind": "profile"
+    },
+    {
+     "term": "Janitorial services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3408,
+   "semantic_score": 0.1844,
+   "sam_url": "https://sam.gov/opp/e96f16e22b2b4a2a908658d78f41fa6a/view"
+  },
+  {
+   "title": "RANGE MAINTENANCE AND REPAIR SUPPORT",
+   "solicitation_number": "N4008527R0004",
+   "notice_id": "47f8335cf5da49ca96c759fc8a511243",
+   "naics_code": "561210",
+   "psc_code": "S216",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE NAVY",
+   "response_deadline": "2026-11-30T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "metal and wood), repair/replace Range Maintenance ammo tables, wooden steps located on ranges, repair to structures/facilities, berm maintenance, firing position maintenance, bunkers, retaining walls of wood or sandbags and metal, bleachers, and wooden steps berm maintenance bunkers retaining walls, repair/replace lateral limit signs, range firing lane markers, commercial cleaning/janitorial, pres",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "janitorial",
+     "kind": "profile"
+    },
+    {
+     "term": "commercial cleaning",
+     "kind": "profile"
+    },
+    {
+     "term": "Janitorial services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 4738,
+   "semantic_score": 0.168,
+   "sam_url": "https://sam.gov/opp/47f8335cf5da49ca96c759fc8a511243/view"
+  },
+  {
+   "title": "ANGKOR SENTINEL 27 BASE LIFE SUPPORT FACILITY REHAB SERVICES",
+   "solicitation_number": "W91QVP-26-AS27-BLS",
+   "notice_id": "cf8a3ba528dd415597455cf230e83e99",
+   "naics_code": "561210",
+   "psc_code": "S216",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-20T23:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "replace broken window panes;",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 5908,
+   "semantic_score": 0.146,
+   "sam_url": "https://sam.gov/opp/cf8a3ba528dd415597455cf230e83e99/view"
+  },
+  {
+   "title": "ANGKOR SENTINEL 27 BASE LIFE SUPPORT FACILITY REHAB SERVICES",
+   "solicitation_number": "W91QVP-26-AS27-BLS",
+   "notice_id": "8636ca1f8a914ccca738bee046a4b010",
+   "naics_code": "561210",
+   "psc_code": "S216",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-20T23:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "replace broken window panes;",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6512,
+   "semantic_score": 0.1354,
+   "sam_url": "https://sam.gov/opp/8636ca1f8a914ccca738bee046a4b010/view"
+  }
+ ],
+ "uncertain": [
+  {
+   "title": "Y1DA | 521-24-102 | Renovate Wards 2K and 2B for Optometry/Ophthalmology Clinical Use",
+   "solicitation_number": "36C24726R0134",
+   "notice_id": "0a4f50772f664aa299a097276497f567",
+   "naics_code": "236220",
+   "psc_code": "Y1DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-19T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "DIVISION AND SECTION TITLES DATE DIVISION 10 \u2013 SPECIALTIES 10 14 00 Signage 01-21 10 26 00 Wall and Door Protection 01-21 10 28 00 Toilet, Bath, and Laundry Accessories 01-21 10 44 13 Fire Extinguisher Cabinets 08-18 DIVISION 11 \u2013 EQUIPMENT NOT USED DIVISION 12 \u2013 FURNISHINGS 12 24 00 Window Shades 08-17 12 32 00 Manufactured Wood Casework 01-21 12 36 00 Countertops 12-18 DIVISION 13 - SPECIAL CONS",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3766,
+   "semantic_score": 0.1789,
+   "sam_url": "https://sam.gov/opp/0a4f50772f664aa299a097276497f567/view"
+  },
+  {
+   "title": "Y1PZ--Fort Sill NC Gravesite Expansion and FCA Deficiencies  920CM3006",
+   "solicitation_number": "36C78626B0030",
+   "notice_id": "1902d071870f4aea99f9b6964a6808da",
+   "naics_code": "237990",
+   "psc_code": "Y1PZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-18T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "mbrane 07 60 00 Flashing and Sheet Metal 07 84 00 Firestopping 07 92 00 Joint Sealants DIVISION 08 - OPENINGS 08 11 13 Hollow Metal Doors and Frames 08 14 00 Interior Wood Doors 08 51 13 Aluminum Windows 08 71 00 Door Hardware DIVISION 09 \u2013 FINISHES 09 06 00 Schedule for Finishes 09 29 00 Gypsum Board 09 65 13 Resilient Base and Accessories 09 65",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2563,
+   "semantic_score": 0.1973,
+   "sam_url": "https://sam.gov/opp/1902d071870f4aea99f9b6964a6808da/view"
+  },
+  {
+   "title": "Annual Maintenance Dredging of Morehead City Inner Harbor",
+   "solicitation_number": "W912PM26BA004",
+   "notice_id": "1efe2b5d5b0e42ebb347cb04f720592d",
+   "naics_code": "237990",
+   "psc_code": "Z1KF",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-31T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "The environmental window for mechanical dredging in the Northwest leg, West Leg, East Leg, and Range C of the Inner Harbor is August 1 March",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3126,
+   "semantic_score": 0.1886,
+   "sam_url": "https://sam.gov/opp/1efe2b5d5b0e42ebb347cb04f720592d/view"
+  },
+  {
+   "title": "HUMBOLT PACIFIC CREST TRAIL BRIDGE REPLACEMENT",
+   "solicitation_number": "1240LT27Q0026",
+   "notice_id": "22002f1b55244f899dc514011343ff8c",
+   "naics_code": "237310",
+   "psc_code": "Y1LB",
+   "agency": "AGRICULTURE, DEPARTMENT OF / FOREST SERVICE",
+   "response_deadline": "2026-11-29T00:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "Just cancel the open Teams window, then select the join through browser option.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237310 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3302,
+   "semantic_score": 0.186,
+   "sam_url": "https://sam.gov/opp/22002f1b55244f899dc514011343ff8c/view"
+  },
+  {
+   "title": "Z2DA--FY27 NRM RENOVATE SURGICAL SUITE  PHASE II",
+   "solicitation_number": "36C24627B0002",
+   "notice_id": "24ea1676f57d4dcbb70c2f668ae2164f",
+   "naics_code": "236220",
+   "psc_code": "Z2DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-11T14:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": " 01-21 08 17 10 Integrated Door Assemblies 01-21 08 31 13 Access Doors and Frames 01-21 08 32 13 ICU Sliding Glass Doors 01-21 08 41 13 Aluminum-Framed Entrances and Storefronts 01-21 08 56 59 Service and Teller Window Units 01-21 08 71 00 Door Hardware 01-21 08 71 13 Automatic Door Operators 01-21 08 80 00 Glazing 01-21 DIVISION 09 \u2013 FINISHES 09 05 16 Subsurface Preparation for Floor Finishes 01-",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 779,
+   "semantic_score": 0.2431,
+   "sam_url": "https://sam.gov/opp/24ea1676f57d4dcbb70c2f668ae2164f/view"
+  },
+  {
+   "title": "White Horse Hill National Game Preserve Water Main",
+   "solicitation_number": "140FGA26R0044",
+   "notice_id": "250c991ada6143bf90ba612d41df4f8f",
+   "naics_code": "237110",
+   "psc_code": "Y1NE",
+   "agency": "INTERIOR, DEPARTMENT OF THE / DEPARTMENTAL OFFICES",
+   "response_deadline": "2026-12-03T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "Nonsmoking Building: Smoking is not permitted within the building or within 25 feet (8 m) of entrances, operable windows, or outdoor-air intakes.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": null,
+   "semantic_score": null,
+   "sam_url": "https://sam.gov/opp/250c991ada6143bf90ba612d41df4f8f/view"
+  },
+  {
+   "title": "Amendment 0002 Y1DZ--36C261-28-AP-0022 | 612-27-1-6009-0001 | Construct Modular  Imaging Center in Stockton | 612A4-CSI-002",
+   "solicitation_number": "36C26127Q0029",
+   "notice_id": "2c624d0668744bc89d37e48ea7fb7fd4",
+   "naics_code": "236220",
+   "psc_code": "Y1DZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-04T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "cess Doors and Frames 06-25 08 34 53 Security Doors and Frames 01-21 08 41 13 Aluminum-Framed Entrances and Storefronts 01-21 08 51 13 Aluminum Windows 01-21 08 56 53 Blast Resistant Windows 01-21 08 71 00 Door Hardware 03-24 08 71 13 Automatic Door Operators 01-21 08 80 00 Glazing 01-21 08 90 00 Louvers and Vents 01-21 DIVISION 09 \u2013 FINISHES 09 05 16 Subsurface Preparation for Floor Finishes 01-2",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 755,
+   "semantic_score": 0.2444,
+   "sam_url": "https://sam.gov/opp/2c624d0668744bc89d37e48ea7fb7fd4/view"
+  },
+  {
+   "title": "GAOA Grizzly Bear Campground",
+   "solicitation_number": "127EAX27Q0004",
+   "notice_id": "34ef2f096eb94bf9b887f2009b9f4674",
+   "naics_code": "237990",
+   "psc_code": "Z1PA",
+   "agency": "AGRICULTURE, DEPARTMENT OF / FOREST SERVICE",
+   "response_deadline": "2026-11-20T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "alants and Caulking -- 3 of 244 -- 001500 LIST OF DRAWINGS AND SPECIFICATIONS Page 3 of 3 DIVISION 8: OPENINGS Section 008110 Metal Doors and Frames Section 008710 Finish Hardware Section 008851 Polycarbonate Window Glazing DIVISION 9: FINISHES Section 009725 Epoxy Coating Systems Section 009900 Painting DIVISION 10: SPECIALTIES Section 010800 Toilet and Bath Accessories DIVISION 22: PLUMBING Sect",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1963,
+   "semantic_score": 0.2089,
+   "sam_url": "https://sam.gov/opp/34ef2f096eb94bf9b887f2009b9f4674/view"
+  },
+  {
+   "title": "Construction of Chilled Water Plant and Site Utility Upgrades at VA Medical Center in West Haven, CT",
+   "solicitation_number": "W912WJ26RA008",
+   "notice_id": "6370f6ed68ac469ea853c27dc60d8a41",
+   "naics_code": "236220",
+   "psc_code": "Y1NB",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-20T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "IONS 10 26 00 1/21 WALL AND DOOR PROTECTION 10 28 00 1/21 TOILET, BATH, AND LAUNDRY ACCESSORIES 10 44 13 8/18 FIRE EXTINGUISHER CABINETS DIVISION 12 - FURNISHINGS 12 24 00 8/17 WINDOW SHADES 12 36 00 11/23 WINDOW STOOLS DIVISION 14 - CONVEYING EQUIPMENT 14 21 00 4/24 TRACTION ELEVATOR - NEW DIVISION 21 - FIRE SUPPRESSION 21 08 00.01 8/19 DVA/USACE PROJECTS COMMISSIONING OF FIRE SUPPRESSION SYSTEMS",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 130,
+   "semantic_score": 0.3049,
+   "sam_url": "https://sam.gov/opp/6370f6ed68ac469ea853c27dc60d8a41/view"
+  },
+  {
+   "title": "HUMBOLT PACIFIC CREST TRAIL BRIDGE REPLACEMENT",
+   "solicitation_number": "1240LT27Q0026",
+   "notice_id": "66a5b16cc8c148118faf47b1a307faa3",
+   "naics_code": "237310",
+   "psc_code": "Y1LB",
+   "agency": "AGRICULTURE, DEPARTMENT OF / FOREST SERVICE",
+   "response_deadline": "2026-11-29T00:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "Just cancel the open Teams window, then select the join through browser option.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237310 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2479,
+   "semantic_score": 0.1988,
+   "sam_url": "https://sam.gov/opp/66a5b16cc8c148118faf47b1a307faa3/view"
+  },
+  {
+   "title": "GAOA Grizzly Bear Campground",
+   "solicitation_number": "127EAX27Q0004",
+   "notice_id": "6bee8edb96c446d59b9e699525d896d7",
+   "naics_code": "237990",
+   "psc_code": "Z1PA",
+   "agency": "AGRICULTURE, DEPARTMENT OF / FOREST SERVICE",
+   "response_deadline": "2026-11-20T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "alants and Caulking -- 3 of 238 -- 001500 LIST OF DRAWINGS AND SPECIFICATIONS Page 3 of 3 DIVISION 8: OPENINGS Section 008110 Metal Doors and Frames Section 008710 Finish Hardware Section 008851 Polycarbonate Window Glazing DIVISION 9: FINISHES Section 009725 Epoxy Coating Systems Section 009900 Painting DIVISION 10: SPECIALTIES Section 010800 Toilet and Bath Accessories DIVISION 22: PLUMBING Sect",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1965,
+   "semantic_score": 0.2089,
+   "sam_url": "https://sam.gov/opp/6bee8edb96c446d59b9e699525d896d7/view"
+  },
+  {
+   "title": "GAOA  Facilities, Barracks Inyo NF",
+   "solicitation_number": "1240BH26Q0078",
+   "notice_id": "705abfc6d1564a89bfe4e40f52b9e2f6",
+   "naics_code": "236220",
+   "psc_code": "Z1FB",
+   "agency": "AGRICULTURE, DEPARTMENT OF / FOREST SERVICE",
+   "response_deadline": "2026-11-18T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "07 80 00 - Fire Protection (Historic Shake Roof) DIVISION 08 - OPENINGS 08 10 00 - Doors 08 11 00 - Metal Doors and Frames 08 14 00 - Interior Wood Doors 08 40 00 - Entrance Doors, Storm and Screen Doors 08 50 00 - Windows 08 70 00 - Hardware -- 2 of 139 -- Inyo National Forest 08 90 00 - Louvers and Vents DIVISION 09 - FINISHES 09 21 00 - Gypsum Board Assemblies 09 51 00 - Acoustical Ceilings 09 ",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 262,
+   "semantic_score": 0.2816,
+   "sam_url": "https://sam.gov/opp/705abfc6d1564a89bfe4e40f52b9e2f6/view"
+  },
+  {
+   "title": "Z2DZ--Project Number 653-105, Seismic Retrofit of Building 16,    Roseburg VAMC, Oregon",
+   "solicitation_number": "36C10F26R0084 ",
+   "notice_id": "7cea9a6c360a47a2b7cdf8d584239c86",
+   "naics_code": "236220",
+   "psc_code": "Z2DZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-10T21:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "13.13 Synthetic Roof Tiles 01-21 07 60 00 Flashing and Sheet Metal 01-21 07 72 00 Roof Accessories 01-21 07 84 00 Firestopping 01-21 07 92 00 Joint Sealants 04-22 DIVISION 08 - OPENINGS 08 11 13 Hollow Metal Doors and Frames 01-21 08 14 00 Interior Wood Doors 01-21 08 31 13 Access Doors and Frames 04-22 08 51 13 Aluminum Windows 01-21 08 71 00 Door Hardware 03-24 08 71 13 Automatic Door Operators ",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 230,
+   "semantic_score": 0.287,
+   "sam_url": "https://sam.gov/opp/7cea9a6c360a47a2b7cdf8d584239c86/view"
+  },
+  {
+   "title": "Base Maintenance for Fort Leonard Wood, Missouri",
+   "solicitation_number": "W911S726CA003",
+   "notice_id": "906d1c357bde48a3af8921cd7078d6ee",
+   "naics_code": "561210",
+   "psc_code": "M1AZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-18T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "Custodial Responsibilities C.5.1.11.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "custodial",
+     "kind": "profile"
+    },
+    {
+     "term": "Custodial services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1943,
+   "semantic_score": 0.2092,
+   "sam_url": "https://sam.gov/opp/906d1c357bde48a3af8921cd7078d6ee/view"
+  },
+  {
+   "title": "RM16-1405 BUILDING 592 RENOVATIONS",
+   "solicitation_number": "N4008527R0017",
+   "notice_id": "909e581682c44c4dbf22ef2ec4f5de82",
+   "naics_code": "236220",
+   "psc_code": "Y1JZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE NAVY",
+   "response_deadline": "2026-12-01T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": " FRAMES 08 33 23 08/20, CHG 1: 02/22 OVERHEAD COILING DOORS 08 41 13 08/18, CHG 1: 08/18 ALUMINUM-FRAMED STOREFRONT WINDOWS 08 51 23 08/20, CHG 1: 02/22 STEEL WINDOWS 08 71 00 02/16, CHG 4: 02/22 DOOR HARDWARE 08 81 00 05/19 GLAZING 08 91 00 08/20 METAL WALL LOUVERS DIVISION 09 - FINISHES 09 22 00 08/24 SUPPORTS FOR PLASTER AND GYPSUM BOARD 09 29 00 08/24 GYPSUM BOARD 09 51 00 08/20 ACOUSTICAL CEI",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 205,
+   "semantic_score": 0.2912,
+   "sam_url": "https://sam.gov/opp/909e581682c44c4dbf22ef2ec4f5de82/view"
+  },
+  {
+   "title": "Construction of Chilled Water Plant and Site Utility Upgrades at VA Medical Center in West Haven, CT",
+   "solicitation_number": "W912WJ26RA008",
+   "notice_id": "b3184af4cd104d9280c1de6e24e4846f",
+   "naics_code": "236220",
+   "psc_code": "Y1NB",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-20T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "IONS 10 26 00 1/21 WALL AND DOOR PROTECTION 10 28 00 1/21 TOILET, BATH, AND LAUNDRY ACCESSORIES 10 44 13 8/18 FIRE EXTINGUISHER CABINETS DIVISION 12 - FURNISHINGS 12 24 00 8/17 WINDOW SHADES 12 36 00 11/23 WINDOW STOOLS DIVISION 14 - CONVEYING EQUIPMENT 14 21 00 4/24 TRACTION ELEVATOR - NEW DIVISION 21 - FIRE SUPPRESSION 21 08 00.01 8/19 DVA/USACE PROJECTS COMMISSIONING OF FIRE SUPPRESSION SYSTEMS",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 343,
+   "semantic_score": 0.2717,
+   "sam_url": "https://sam.gov/opp/b3184af4cd104d9280c1de6e24e4846f/view"
+  },
+  {
+   "title": "RM16-1405 BUILDING 592 RENOVATIONS",
+   "solicitation_number": "N4008527R0017",
+   "notice_id": "d46964fc7c1446ac8b9a912a8c720d4a",
+   "naics_code": "236220",
+   "psc_code": "Y1JZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE NAVY",
+   "response_deadline": "2026-12-01T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": " FRAMES 08 33 23 08/20, CHG 1: 02/22 OVERHEAD COILING DOORS 08 41 13 08/18, CHG 1: 08/18 ALUMINUM-FRAMED STOREFRONT WINDOWS 08 51 23 08/20, CHG 1: 02/22 STEEL WINDOWS 08 71 00 02/16, CHG 4: 02/22 DOOR HARDWARE 08 81 00 05/19 GLAZING 08 91 00 08/20 METAL WALL LOUVERS DIVISION 09 - FINISHES 09 22 00 08/24 SUPPORTS FOR PLASTER AND GYPSUM BOARD 09 29 00 08/24 GYPSUM BOARD 09 51 00 08/20 ACOUSTICAL CEI",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 999,
+   "semantic_score": 0.2331,
+   "sam_url": "https://sam.gov/opp/d46964fc7c1446ac8b9a912a8c720d4a/view"
+  },
+  {
+   "title": "Y1DZ--Project Number 657-507, Correct Seismic Deficiencies for  Building 14, Marion VAMC, Illinois    Construction of New Boiler Plant and Demolition of Existing",
+   "solicitation_number": "36C10F26R0085",
+   "notice_id": "ebfedf446ea34a92912572363b013769",
+   "naics_code": "236220",
+   "psc_code": "Y1DZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-20T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "- OPENINGS 08 11 13 Hollow Metal Doors and Frames 01-21 08 31 13 Access Doors and Frames 04-22 08 33 00 Coiling Doors and Grilles 01-21 08 36 13 Sectional Doors 01-21 08 41 13 Aluminum-Framed Entrances and Storefronts 01-21 08 44 13 Glazed Aluminum Curtain Walls 04-20 08 56 53 Blast Resistant Windows 01-21 08 71 00 Door Hardware 03-24 08 80 00 Glazing 01-21 08 90 00 Louvers and Vents 01-21 DIVISIO",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Window cleaning services",
+     "kind": "census",
+     "census_naics": "561720"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 903,
+   "semantic_score": 0.2372,
+   "sam_url": "https://sam.gov/opp/ebfedf446ea34a92912572363b013769/view"
+  }
+ ]
+}

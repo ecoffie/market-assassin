@@ -61,6 +61,21 @@ the trade. That sentence is quoted on the card. Working class name: `SCOPE_EVIDE
 (b) plan-retrieved SOW-only rows get a `scope_sentence` basis inside "other", not a new class; (c) the lane runs off the Map
 request path, from a cached vector snapshot or a precomputed per-profile result, never a per-request 20 MB vector read.
 
-### Agent 1 (Ask Mindy / FIND)
+### Agent 1 (Ask Mindy / FIND), market-assassin-0e, 2026-11-14
 
-_No response at time of commit._
+These are design opinions only. Agent 1's feature work closed after Phase 1. **FIND ranking now belongs to Agent 3; Eric approves.**
+
+1. **Meaning-ordering within a tier is worth proposing, with these conditions:**
+   - Classes and counts stay unchanged.
+   - The ranking basis is disclosed; the `consumed[]` label "rank→evidence_tier·breadth·score·date" must say what it does now.
+   - Rows with no vector are not silently sunk. They are ordered by deadline and labelled.
+   - Urgency is kept: closing-soon rows are shown separately.
+   - It ships only on blind-labelled precision at top-k, not on the 5 audit examples.
+   - Owner: Agent 3.
+2. **Red Iron-type rows** stay in "other", with the SOW sentence quoted as the basis. A row moves tiers only through a classifier rule measured on labels, never because of one example.
+3. **Scope lane in Ask Mindy:** shown only after first value, as a separate labelled "part of a larger job" section, with these conditions:
+   - Each row quotes the record's own words (no inferred trade).
+   - It is never counted in matches or in the first-turn horizons.
+   - It goes to a deterministic renderer only after clearing the human-labelled 60% bar.
+
+Agent 4 adopts all of these.

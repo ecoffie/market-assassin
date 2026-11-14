@@ -1,0 +1,1553 @@
+{
+ "query": "We provide security guards.",
+ "trade_term_list": "guards",
+ "trade_similarity": 0.7297,
+ "rules_version": "evidence-rules-v2",
+ "plan_status": "ok",
+ "released_counts_unchanged": {
+  "DIRECT_MATCH": 108,
+  "RELATED_MARKET_CANDIDATE": 0,
+  "other": 21,
+  "matched_total": 129
+ },
+ "lane": {
+  "candidates": 56,
+  "shown": 34,
+  "uncertain_not_shown": 18,
+  "other_rows_eligible_for_scope_basis": 21
+ },
+ "timing_ms": {
+  "plan": 1662,
+  "load_vectors": 1372,
+  "rank_and_gate": 559,
+  "total": 3593
+ },
+ "shown": [
+  {
+   "title": "Access Control Point (ACP) Active Vehicle Barrier (AVB) Systems and Guard Booths",
+   "solicitation_number": "W912DY27ACPAVB",
+   "notice_id": "502461101394447581abb27486cb618a",
+   "naics_code": "237310",
+   "psc_code": "Z2LB",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-18T15:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "PRIME_CANDIDATE",
+   "scope_sentence": "This Sources Sought / Market Research Capabilities Questionnaire is issued to identify and assess potential industry capabilities, small-business participation, and acquisition-strategy considerations for a potential design-build construction project involving Active Vehicle Barrier Control System (AVBCS), guard booth, and associated access control point (ACP) infrastructure improvements at Shop G",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "access control",
+     "kind": "profile"
+    },
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237310 (umbrella code).",
+   "retrieved_via": [
+    "semantic",
+    "body_terms"
+   ],
+   "semantic_rank": 38,
+   "semantic_score": 0.2902,
+   "sam_url": "https://sam.gov/opp/502461101394447581abb27486cb618a/view"
+  },
+  {
+   "title": "Access Control Point (ACP) Active Vehicle Barrier (AVB) Systems and Guard Booths",
+   "solicitation_number": "W912DY27ACPAVB",
+   "notice_id": "9d5262e193c34ced839229f7a71b2d5e",
+   "naics_code": "237310",
+   "psc_code": "Z2LB",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-18T15:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "PRIME_CANDIDATE",
+   "scope_sentence": "This Sources Sought / Market Research Capabilities Questionnaire is issued to identify and assess potential industry capabilities, small-business participation, and acquisition-strategy considerations for a potential design-build construction project involving Active Vehicle Barrier Control System (AVBCS), guard booth, and associated access control point (ACP) infrastructure improvements at Shop G",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "access control",
+     "kind": "profile"
+    },
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237310 (umbrella code).",
+   "retrieved_via": [
+    "semantic",
+    "body_terms"
+   ],
+   "semantic_rank": 39,
+   "semantic_score": 0.2902,
+   "sam_url": "https://sam.gov/opp/9d5262e193c34ced839229f7a71b2d5e/view"
+  },
+  {
+   "title": "Small Arms Range Construction Pease ANGB",
+   "solicitation_number": "W50S8A27BA002",
+   "notice_id": "3f0d63c852844f1fb2835fa415427ac8",
+   "naics_code": "236220",
+   "psc_code": "Y1JZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-14T15:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "This notice constitutes an Invitation for Bids (IFB), Solicitation W50S8A-27-B-A002 for the construction of a Small Arms Range at Pease Air National Guard Base (ANGB) in Newington, NH.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "semantic",
+    "body_terms"
+   ],
+   "semantic_rank": 40,
+   "semantic_score": 0.2864,
+   "sam_url": "https://sam.gov/opp/3f0d63c852844f1fb2835fa415427ac8/view"
+  },
+  {
+   "title": "Carville Job Corps Center Caretaker Services",
+   "solicitation_number": "1605AE-27-Q-00001",
+   "notice_id": "827d8815df304cb6908560a43b9e151c",
+   "naics_code": "561210",
+   "psc_code": "Z1CA",
+   "agency": "LABOR, DEPARTMENT OF / OFFICE OF THE ASSISTANT SECRETARY FOR ADMINISTRATION AND MANAGEMENT",
+   "response_deadline": "2026-11-20T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Provide security services for the campus on the 26-acre site having approximately 117,000 GSF among 9 buildings, to protect against theft of government property and vandalism.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "security services",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "semantic",
+    "body_terms"
+   ],
+   "semantic_rank": 88,
+   "semantic_score": 0.2645,
+   "sam_url": "https://sam.gov/opp/827d8815df304cb6908560a43b9e151c/view"
+  },
+  {
+   "title": "Munitions Maintenance and Inspection Facility and Conventional Munitions Cube Storage Addition, HIANG, JBPHH, HI",
+   "solicitation_number": "W50SLF26RA005",
+   "notice_id": "3003948ae80248a0b83d74a8d4bdde2c",
+   "naics_code": "236220",
+   "psc_code": "Y1GA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-25T01:30:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The Hawaii National Guard intends to issue a Request for Proposals (RFP) to award a single firm fixed-price contract for services, non-personal, to provide all plant, labor, transportation, materials, tools, equipment, appliances and supervision necessary for the Construction of KNMD209085 Munitions Maintenance and Inspection Facility and KNMD209086 Conventional Munitions Cube Storage Addition loc",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "semantic",
+    "body_terms"
+   ],
+   "semantic_rank": 91,
+   "semantic_score": 0.2638,
+   "sam_url": "https://sam.gov/opp/3003948ae80248a0b83d74a8d4bdde2c/view"
+  },
+  {
+   "title": "B422 BREAKROOM, B300 BDOC",
+   "solicitation_number": "W50S8R27BA002",
+   "notice_id": "dbc3f40c12c64031b69b55fa069d9596",
+   "naics_code": "236220",
+   "psc_code": "Z2QA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-08T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The Ohio Air National Guard intends to issue an Invitation for Bids to award a single firm fixed-price contract for construction services, to provide all plant, labor, transportation, materials, tools, equipment, appliances and supervision necessary for B422 Breakroom and B300 BDOC projects, at 179th Cyberspace Wing, 1947 Harrington Memorial Rd., Mansfield, Ohio ANG.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "semantic",
+    "body_terms"
+   ],
+   "semantic_rank": 93,
+   "semantic_score": 0.2635,
+   "sam_url": "https://sam.gov/opp/dbc3f40c12c64031b69b55fa069d9596/view"
+  },
+  {
+   "title": "Construction Services for the Gate 7 Parking Garage St. Elizabeths West Campus",
+   "solicitation_number": "47PB5126R0038 ",
+   "notice_id": "b186c45b95294ce7a599f20bb542fff2",
+   "naics_code": "236220",
+   "psc_code": "Y1AZ",
+   "agency": "GENERAL SERVICES ADMINISTRATION / PUBLIC BUILDINGS SERVICE",
+   "response_deadline": "2026-11-23T21:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "GSA anticipates awarding a single Firm-Fixed-Price construction contract for the new construction of the Gate 7 Parking Garage and associated site, utility, security, stormwater, landscape, and infrastructure improvements.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Parking security services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 125,
+   "semantic_score": 0.2586,
+   "sam_url": "https://sam.gov/opp/b186c45b95294ce7a599f20bb542fff2/view"
+  },
+  {
+   "title": "Department of Veteran Affairs - Personnel Security Adjudication Center",
+   "solicitation_number": "W9127S27RA008",
+   "notice_id": "38bc1cb65d984189adfb41551e7f5c59",
+   "naics_code": "236220",
+   "psc_code": "Y1AA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-19T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Contingent upon funding availability at the time of award, the Government may exercise an option for the building and parking lot to be supported by a physical security fence including automated gate access and controls.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Parking security services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 137,
+   "semantic_score": 0.2565,
+   "sam_url": "https://sam.gov/opp/38bc1cb65d984189adfb41551e7f5c59/view"
+  },
+  {
+   "title": "Department of Veteran Affairs - Personnel Security Adjudication Center",
+   "solicitation_number": "W9127S27RA008",
+   "notice_id": "bb93ad84d3ce4df59aeda8ddd2424938",
+   "naics_code": "236220",
+   "psc_code": "Y1AA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-19T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Contingent upon funding availability at the time of award, the Government may exercise an option for the building and parking lot to be supported by a physical security fence including automated gate access and controls.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Parking security services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 138,
+   "semantic_score": 0.2565,
+   "sam_url": "https://sam.gov/opp/bb93ad84d3ce4df59aeda8ddd2424938/view"
+  },
+  {
+   "title": "LOCK AND DAM 25 NEW 1,200 FT LOCK NAVIGATION AND ECOSYSTEM SUSTAINABILITY PROGRAM (NESP) ",
+   "solicitation_number": "W912P926RA004",
+   "notice_id": "2234f63f08e7439b97d1fd2f5c082f94",
+   "naics_code": "237990",
+   "psc_code": "Y1PZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-16T16:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "This contract will consist of construction of a new 1,200-foot drilled shaft-founded lock in the auxiliary miter gate bay, a 1,200-foot upstream ported guard wall, and a 650-foot downstream guard wall.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 257,
+   "semantic_score": 0.2403,
+   "sam_url": "https://sam.gov/opp/2234f63f08e7439b97d1fd2f5c082f94/view"
+  },
+  {
+   "title": "LOCK AND DAM 25 NEW 1,200 FT LOCK NAVIGATION AND ECOSYSTEM SUSTAINABILITY PROGRAM (NESP) ",
+   "solicitation_number": "W912P926RA004",
+   "notice_id": "c555fa17805644e78e6cb32be8e9a44f",
+   "naics_code": "237990",
+   "psc_code": "Y1PZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-09T16:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "This contract will consist of construction of a new 1,200-foot drilled shaft-founded lock in the auxiliary miter gate bay, a 1,200-foot upstream ported guard wall, and a 650-foot downstream guard wall.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 265,
+   "semantic_score": 0.2397,
+   "sam_url": "https://sam.gov/opp/c555fa17805644e78e6cb32be8e9a44f/view"
+  },
+  {
+   "title": "LOCK AND DAM 25 NEW 1,200 FT LOCK NAVIGATION AND ECOSYSTEM SUSTAINABILITY PROGRAM (NESP) ",
+   "solicitation_number": "W912P926RA004",
+   "notice_id": "e91745414d264b8ea97478fd67cf4982",
+   "naics_code": "237990",
+   "psc_code": "Y1PZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-09T16:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "This contract will consist of construction of a new 1,200-foot drilled shaft-founded lock in the auxiliary miter gate bay, a 1,200-foot upstream ported guard wall, and a 650-foot downstream guard wall.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 275,
+   "semantic_score": 0.2389,
+   "sam_url": "https://sam.gov/opp/e91745414d264b8ea97478fd67cf4982/view"
+  },
+  {
+   "title": "LOCK AND DAM 25 NEW 1,200 FT LOCK NAVIGATION AND ECOSYSTEM SUSTAINABILITY PROGRAM (NESP) ",
+   "solicitation_number": "W912P926RA004",
+   "notice_id": "c35f894d02fd48a78421d36ec89b912e",
+   "naics_code": "237990",
+   "psc_code": "Y1PZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-16T16:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "This contract will consist of construction of a new 1,200-foot drilled shaft-founded lock in the auxiliary miter gate bay, a 1,200-foot upstream ported guard wall, and a 650-foot downstream guard wall.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 339,
+   "semantic_score": 0.2345,
+   "sam_url": "https://sam.gov/opp/c35f894d02fd48a78421d36ec89b912e/view"
+  },
+  {
+   "title": "Construction IDIQ Industry Day-Nov 12",
+   "solicitation_number": "SN-0001",
+   "notice_id": "9346dce028f147bcbe43f0451df66f3f",
+   "naics_code": "236220",
+   "psc_code": "Y1EB",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2027-11-12T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Purpose: The Louisiana Air National Guard (LAANG), 159th Fighter Wing, announces an upcoming Industry Day to engage with industry partners, provide information regarding potential contracting opportunities, and facilitate communication between the Government and interested vendors on a construction IDIQ.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 375,
+   "semantic_score": 0.2325,
+   "sam_url": "https://sam.gov/opp/9346dce028f147bcbe43f0451df66f3f/view"
+  },
+  {
+   "title": "LOCK AND DAM 25 NEW 1,200 FT LOCK NAVIGATION AND ECOSYSTEM SUSTAINABILITY PROGRAM (NESP) ",
+   "solicitation_number": "W912P926RA004",
+   "notice_id": "ee65c92564ab49f2a49b169edf9955d5",
+   "naics_code": "237990",
+   "psc_code": "Y1PZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-16T16:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "This contract will consist of construction of a new 1,200-foot drilled shaft-founded lock in the auxiliary miter gate bay, a 1,200-foot upstream ported guard wall, and a 650-foot downstream guard wall.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 471,
+   "semantic_score": 0.227,
+   "sam_url": "https://sam.gov/opp/ee65c92564ab49f2a49b169edf9955d5/view"
+  },
+  {
+   "title": "CONSTRUCTION Indefinite-Delivery Indefinite Quantity (IDIQ) Multiple Award Task Order Contract (MATOC)",
+   "solicitation_number": "W50S88-27-MATOC",
+   "notice_id": "8c1a79a9ec614b89ac56a730fd6880e1",
+   "naics_code": "236220",
+   "psc_code": null,
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-03T23:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Synopsis: CONSTRUCTION Indefinite-Delivery Indefinite Quantity (IDIQ) Multiple Award Task Order Contract (MATOC) The ND Air National Guard, 119th WG, Fargo, ND, is sourcing local (within 250 miles) vendors that are responsible in accordance with Revolutionary Federal Acquisition Regulation Overhaul (RFO) Part 9, a Small Business, and are capable of performing both simple and complex construction s",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 491,
+   "semantic_score": 0.2262,
+   "sam_url": "https://sam.gov/opp/8c1a79a9ec614b89ac56a730fd6880e1/view"
+  },
+  {
+   "title": "USCG ISA Tenant Improvement Construction Project",
+   "solicitation_number": "100520260002",
+   "notice_id": "acc0c8a3def84422a3da25f0e352378d",
+   "naics_code": "236220",
+   "psc_code": "Z2AA",
+   "agency": "GENERAL SERVICES ADMINISTRATION / PUBLIC BUILDINGS SERVICE",
+   "response_deadline": "2026-11-23T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "This Sources Sought Notice is being issued by the General Services Administration (GSA), Acquisition Project Delivery for tenant fit-out Construction services for the United States Coast Guard (USCG) Northeast District to support mission-critical operations across the Northeast maritime region.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 522,
+   "semantic_score": 0.2247,
+   "sam_url": "https://sam.gov/opp/acc0c8a3def84422a3da25f0e352378d/view"
+  },
+  {
+   "title": "Carville Job Corps Center Caretaker Services",
+   "solicitation_number": "1605AE-27-Q-00001",
+   "notice_id": "4d4fddd349c94bf4b61fa11059995bbd",
+   "naics_code": "561210",
+   "psc_code": "Z1CA",
+   "agency": "LABOR, DEPARTMENT OF / OFFICE OF THE ASSISTANT SECRETARY FOR ADMINISTRATION AND MANAGEMENT",
+   "response_deadline": "2026-11-23T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Provide security services for the campus on the 26-acre site having approximately 117,000 GSF among 9 buildings, to protect against theft of government property and vandalism.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "security services",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 598,
+   "semantic_score": 0.2216,
+   "sam_url": "https://sam.gov/opp/4d4fddd349c94bf4b61fa11059995bbd/view"
+  },
+  {
+   "title": "Y--Folsom Dam Electronic Access Control and Surveillance (EACSS) Fiber Backbone Up",
+   "solicitation_number": "140RR027R0001",
+   "notice_id": "4abf8fbfbfa24ba0b8e235d3d4077c5e",
+   "naics_code": "237130",
+   "psc_code": "Y1PZ",
+   "agency": "INTERIOR, DEPARTMENT OF THE / DEPARTMENTAL OFFICES",
+   "response_deadline": "2026-11-17T01:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "PRIME_CANDIDATE",
+   "scope_sentence": "Folsom Dam Electronic Access Control and Surveillance (EACSS) Fiber Backbone Upgrade",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "access control",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237130 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 919,
+   "semantic_score": 0.2124,
+   "sam_url": "https://sam.gov/opp/4abf8fbfbfa24ba0b8e235d3d4077c5e/view"
+  },
+  {
+   "title": "USCG Station Cape Charles Sewage Lift Station Repairs",
+   "solicitation_number": "70ZL1927QELIZ0002",
+   "notice_id": "22c2e5738b374b93819697fb415270c7",
+   "naics_code": "237110",
+   "psc_code": "Z",
+   "agency": "HOMELAND SECURITY, DEPARTMENT OF / US COAST GUARD",
+   "response_deadline": "2026-12-02T00:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "PAGE 1 OF 6 DEPARTMENT OF HOMELAND SECURITY UNITED STATES COAST GUARD ENGINEERING SERVICES DIVISION SCOPE OF WORK FOR REPLACE SEWAGE LIFT STATION U.S.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    },
+    {
+     "term": "Security guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1085,
+   "semantic_score": 0.2086,
+   "sam_url": "https://sam.gov/opp/22c2e5738b374b93819697fb415270c7/view"
+  },
+  {
+   "title": "LOCK AND DAM 25 NEW 1,200 FT LOCK NAVIGATION AND ECOSYSTEM SUSTAINABILITY PROGRAM (NESP) ",
+   "solicitation_number": "W912P926RA004",
+   "notice_id": "8f8193b0e9924e128abad534366aba7c",
+   "naics_code": "237990",
+   "psc_code": "Y1PZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-16T16:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "This contract will consist of construction of a new 1,200-foot drilled shaft-founded lock in the auxiliary miter gate bay, a 1,200-foot upstream ported guard wall, and a 650-foot downstream guard wall.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1439,
+   "semantic_score": 0.2031,
+   "sam_url": "https://sam.gov/opp/8f8193b0e9924e128abad534366aba7c/view"
+  },
+  {
+   "title": "JOHN DAY DAM NAVIGATION LOCK TAINTER VALVE (TV) REPAIRS TV3 AND TV4",
+   "solicitation_number": "W9127N27BA009",
+   "notice_id": "658d72fd7da64c1db8fe559b05226dfe",
+   "naics_code": "237990",
+   "psc_code": "Z2KA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-19T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Check in with security at the front gate and then proceed to the parking lot across the road from the construction trailer;",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Parking security services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1901,
+   "semantic_score": 0.1976,
+   "sam_url": "https://sam.gov/opp/658d72fd7da64c1db8fe559b05226dfe/view"
+  },
+  {
+   "title": "JOHN DAY DAM NAVIGATION LOCK TAINTER VALVE (TV) REPAIRS TV3 AND TV4",
+   "solicitation_number": "W9127N27BA009",
+   "notice_id": "ef7bf49b5e9f4ed78d6d5dc80a7182e0",
+   "naics_code": "237990",
+   "psc_code": "Z2KA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-30T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Check in with security at the front gate and then proceed to the parking lot across the road from the construction trailer;",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Parking security services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1906,
+   "semantic_score": 0.1976,
+   "sam_url": "https://sam.gov/opp/ef7bf49b5e9f4ed78d6d5dc80a7182e0/view"
+  },
+  {
+   "title": "Y1DZ--598-22-115 Site Utility Infrastructure-NLR",
+   "solicitation_number": "36C25626R0084",
+   "notice_id": "d39f3b04afef421cb47a90583ff27861",
+   "naics_code": "237110",
+   "psc_code": "Y1DZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-16T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The new pump house installation shall include all labor and materials required for a complete and operational system including, but not limited to, structure, fence, paving, piping, cameras, access control, emergency generator, appurtenances, and accessories as required.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "access control",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2174,
+   "semantic_score": 0.1949,
+   "sam_url": "https://sam.gov/opp/d39f3b04afef421cb47a90583ff27861/view"
+  },
+  {
+   "title": "Solicitation:  Construct Combat Rescue Helicopter Flight Simulator Facility at Moffett ANGB",
+   "solicitation_number": "W50S8X26BA011",
+   "notice_id": "5dfe3be29797483cb34ebea03b77c74d",
+   "naics_code": "236220",
+   "psc_code": "Y1AZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-27T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The USPFO for California intends to award a single firm-fixed-price contract for non-personal construction services, to include all plant, labor, transportation, materials, tools, equipment, appliances, and supervision necessary for the construction of a Combat Rescue Helicopter (CRH) Operational Flight Trainer (OFT) simulator facility at Moffett Air National Guard Base (ANGB), Mountain View, Cali",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2197,
+   "semantic_score": 0.1947,
+   "sam_url": "https://sam.gov/opp/5dfe3be29797483cb34ebea03b77c74d/view"
+  },
+  {
+   "title": "N00164-27-Q-0026 \u2013 BLANKET PURCHASE AGREEMENT \u2013 BUSINESS MEETING/EVENT FACILITIES",
+   "solicitation_number": "N0016427Q0026",
+   "notice_id": "b56b5773b8a34743b0ed83fbf6d6e5d5",
+   "naics_code": "561210",
+   "psc_code": "X1AB",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE NAVY",
+   "response_deadline": "2026-11-24T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "3.2.1 Security Guards In accordance with (IAW) DoDM 5200.01 volume 3 enclosure 2 section 16b, the DoD activity sponsoring a classified meeting or conference (NSWC Crane) will assign an official to serve as the security manager for the meeting and is responsible for ensuring security provisions identified in DoDM 5200.01 volume 3 enclosure 2 section 16b(1) through 16b(8) are met.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "security guard",
+     "kind": "profile"
+    },
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    },
+    {
+     "term": "Security guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2284,
+   "semantic_score": 0.1938,
+   "sam_url": "https://sam.gov/opp/b56b5773b8a34743b0ed83fbf6d6e5d5/view"
+  },
+  {
+   "title": "Solicitation:  Construct Combat Rescue Helicopter Flight Simulator Facility at Moffett ANGB",
+   "solicitation_number": "W50S8X26BA011",
+   "notice_id": "e323b5748db4496680bee238d37b6fdd",
+   "naics_code": "236220",
+   "psc_code": "Y1AZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-27T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The USPFO for California intends to award a single firm-fixed-price contract for non-personal construction services, to include all plant, labor, transportation, materials, tools, equipment, appliances, and supervision necessary for the construction of a Combat Rescue Helicopter (CRH) Operational Flight Trainer (OFT) simulator facility at Moffett Air National Guard Base (ANGB), Mountain View, Cali",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2458,
+   "semantic_score": 0.192,
+   "sam_url": "https://sam.gov/opp/e323b5748db4496680bee238d37b6fdd/view"
+  },
+  {
+   "title": "Z2DA--612A4-27-018 | Replace B650 3rd and 2nd Flooring",
+   "solicitation_number": "36C26127Q00260001",
+   "notice_id": "837a61b6cb6e4c48911189781921c4ea",
+   "naics_code": "236220",
+   "psc_code": "Z2DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-20T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "VA Northern California Health Care System 612A4-27-018 Page 4 of 5 Statement of Work Replace B650 3rd and 2nd Flooring Project #612A4-27-018 General Intention: The purpose of this project is to replace flooring, resilient base, stainless steel corner guards, and paint throughout B650 3rd and 2nd Floor of the Sacramento Veterans Affairs Medical Center (VAMC) of VA Northern California Healthcare Sys",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3406,
+   "semantic_score": 0.183,
+   "sam_url": "https://sam.gov/opp/837a61b6cb6e4c48911189781921c4ea/view"
+  },
+  {
+   "title": "Z2DA--612A4-27-018 | Replace B650 3rd and 2nd Flooring",
+   "solicitation_number": "36C26127Q00260001",
+   "notice_id": "f2679d302225400abd198d1f2f0fb719",
+   "naics_code": "236220",
+   "psc_code": "Z2DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-20T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "VA Northern California Health Care System 612A4-27-018 Page 4 of 5 Statement of Work Replace B650 3rd and 2nd Flooring Project #612A4-27-018 General Intention: The purpose of this project is to replace flooring, resilient base, stainless steel corner guards, and paint throughout B650 3rd and 2nd Floor of the Sacramento Veterans Affairs Medical Center (VAMC) of VA Northern California Healthcare Sys",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3407,
+   "semantic_score": 0.183,
+   "sam_url": "https://sam.gov/opp/f2679d302225400abd198d1f2f0fb719/view"
+  },
+  {
+   "title": "Y1DZ--598-22-115 Site Utility Infrastructure-NLR",
+   "solicitation_number": "36C25626R0084",
+   "notice_id": "ff6c45cdb1f24931b502cb2596fd4333",
+   "naics_code": "237110",
+   "psc_code": "Y1DZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-16T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The new pump house installation shall include all labor and materials required for a complete and operational system including, but not limited to, structure, fence, paving, piping, cameras, access control, emergency generator, appurtenances, and accessories as required.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "access control",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3728,
+   "semantic_score": 0.1802,
+   "sam_url": "https://sam.gov/opp/ff6c45cdb1f24931b502cb2596fd4333/view"
+  },
+  {
+   "title": "FCC Allenwood - Replace Heating Loop - 27Z2BH9",
+   "solicitation_number": "15B20127PR000166",
+   "notice_id": "9c3d18528e344fd2a323509324fa6c0b",
+   "naics_code": "237110",
+   "psc_code": "Y1FA",
+   "agency": "JUSTICE, DEPARTMENT OF / FEDERAL PRISON SYSTEM / BUREAU OF PRISONS",
+   "response_deadline": "2026-11-20T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The work occurs inside an operating correctional facility and requires background investigations, security escorting, tool accountability, site access controls, project security plans, quality control programs, testing and balancing, commissioning, training, record documents, and complete closeout documentation.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "access control",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 4613,
+   "semantic_score": 0.1727,
+   "sam_url": "https://sam.gov/opp/9c3d18528e344fd2a323509324fa6c0b/view"
+  },
+  {
+   "title": "Z1DA--Design Build | NRM 654-27-130 | Eliminate Trip Hazards  Facility Wide VASNHCS",
+   "solicitation_number": "36C26127R0011",
+   "notice_id": "456e701820014b0ba6d8477f7329f4b2",
+   "naics_code": "236220",
+   "psc_code": "Z1DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-17T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "A manual emergency access control gate shall be installed in the flag circle to restrict entry by unauthorized vehicles.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "access control",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 8155,
+   "semantic_score": 0.1442,
+   "sam_url": "https://sam.gov/opp/456e701820014b0ba6d8477f7329f4b2/view"
+  },
+  {
+   "title": "MOD/MODE/US BYPASS CANAL REPAIRS",
+   "solicitation_number": "140RR027R0009",
+   "notice_id": "6ea9e9bfd4d8493ab60f6448cebd7975",
+   "naics_code": "237990",
+   "psc_code": "Y1KB",
+   "agency": "INTERIOR, DEPARTMENT OF THE / DEPARTMENTAL OFFICES",
+   "response_deadline": "2026-12-14T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Housing for construction personnel will not be permitted on Government land, except housing for guards or watchmen as may be approved by COR.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 8408,
+   "semantic_score": 0.1415,
+   "sam_url": "https://sam.gov/opp/6ea9e9bfd4d8493ab60f6448cebd7975/view"
+  },
+  {
+   "title": "LOCK AND DAM 25 NEW 1,200 FT LOCK NAVIGATION AND ECOSYSTEM SUSTAINABILITY PROGRAM (NESP) ",
+   "solicitation_number": "W912P926RA004",
+   "notice_id": "e12f362fe2c6419fbf7c547626ac81fd",
+   "naics_code": "237990",
+   "psc_code": "Y1PZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-16T16:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "This contract will consist of construction of a new 1,200-foot drilled shaft-founded lock in the auxiliary miter gate bay, a 1,200-foot upstream ported guard wall, and a 650-foot downstream guard wall.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": null,
+   "semantic_score": null,
+   "sam_url": "https://sam.gov/opp/e12f362fe2c6419fbf7c547626ac81fd/view"
+  }
+ ],
+ "uncertain": [
+  {
+   "title": "AZ BL COLO 7528(1) Burro Creek Road",
+   "solicitation_number": "6982AF27B000002",
+   "notice_id": "07013cf162754b15ba4b0f1b7d02d803",
+   "naics_code": "237310",
+   "psc_code": "Y1LB",
+   "agency": "TRANSPORTATION, DEPARTMENT OF / FEDERAL HIGHWAY ADMINISTRATION",
+   "response_deadline": "2026-11-17T21:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "The project begins at the bridge over Burro Creek and ends at the cattle guard near the intersection with US Hwy",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237310 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 8954,
+   "semantic_score": 0.1331,
+   "sam_url": "https://sam.gov/opp/07013cf162754b15ba4b0f1b7d02d803/view"
+  },
+  {
+   "title": "AZ BL COLO 7528(1) Burro Creek Road",
+   "solicitation_number": "6982AF27B000002",
+   "notice_id": "083b9ad04fdd4f7aae459778b7b0ed0d",
+   "naics_code": "237310",
+   "psc_code": "Y1LB",
+   "agency": "TRANSPORTATION, DEPARTMENT OF / FEDERAL HIGHWAY ADMINISTRATION",
+   "response_deadline": "2026-11-17T21:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "The project begins at the bridge over Burro Creek and ends at the cattle guard near the intersection with US Hwy",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237310 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 9716,
+   "semantic_score": 0.1036,
+   "sam_url": "https://sam.gov/opp/083b9ad04fdd4f7aae459778b7b0ed0d/view"
+  },
+  {
+   "title": "AZ BL COLO 7528(1) Burro Creek Road",
+   "solicitation_number": "6982AF27B000002",
+   "notice_id": "13846ea5a67847f69808fc716ac208c6",
+   "naics_code": "237310",
+   "psc_code": "Y1LB",
+   "agency": "TRANSPORTATION, DEPARTMENT OF / FEDERAL HIGHWAY ADMINISTRATION",
+   "response_deadline": "2026-11-17T21:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "The project begins at the bridge over Burro Creek and ends at the cattle guard near the intersection with US Hwy",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237310 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 9717,
+   "semantic_score": 0.1036,
+   "sam_url": "https://sam.gov/opp/13846ea5a67847f69808fc716ac208c6/view"
+  },
+  {
+   "title": "Y1PZ--Fort Sill NC Gravesite Expansion and FCA Deficiencies  920CM3006",
+   "solicitation_number": "36C78626B0030",
+   "notice_id": "1902d071870f4aea99f9b6964a6808da",
+   "naics_code": "237990",
+   "psc_code": "Y1PZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-18T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "28.33 Conduits and Backboxes for Electronic Safety and Security 28 08 00 Commissioning of Electronic Safety and Security Systems 28 13 00 Physical Access Control System 28 13 53 Security Access Detection 28 23 00 Video Surveillance 28 26 00 Electronic Personal Protection 28 31 00 Fire Detection and Alarm DIVISION 31 \u2013 EARTHWORK 31 20 11 Earthwork (Short Form) Rev 01",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "access control",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1599,
+   "semantic_score": 0.2009,
+   "sam_url": "https://sam.gov/opp/1902d071870f4aea99f9b6964a6808da/view"
+  },
+  {
+   "title": "Dugway Proving Ground (DPG) Horizontal Facility Construction Road Maintenance",
+   "solicitation_number": "W911S6-27-B-A001",
+   "notice_id": "27182172882c402e88b15746dc198ffd",
+   "naics_code": "237310",
+   "psc_code": "Y1LB",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-18T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "5 CHIP SEAL COAT 2/15/2024 02786 OPEN-GRADED SURFACE COURSE (OGSC) 9/8/2022 02787 BONDED WEARING COURSE (BWC) 6/9/2022 02821 CHAIN LINK FENCING AND GATES 6/28/2018 02825 CATTLE GUARD 12/7/2023 -- 9 of 589 -- 02841 W-BEAM GUARDRAIL 12/7/2023 02842 DELINEATORS 02843 CRASH CUSHIONS AND BARRIER END TREATMENTS 12/7/2023 02844 CONCRETE BARRIER 12/5/2024 02845 HIGH TENSION CABLE BARRIER 12/7/2023 02890 R",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237310 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6186,
+   "semantic_score": 0.1614,
+   "sam_url": "https://sam.gov/opp/27182172882c402e88b15746dc198ffd/view"
+  },
+  {
+   "title": "Dugway Proving Ground (DPG) Horizontal Facility Construction Road Maintenance",
+   "solicitation_number": "W911S6-27-B-A001",
+   "notice_id": "2b9eed28c47e4643903ddd688195ede1",
+   "naics_code": "237310",
+   "psc_code": "Y1LB",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-18T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "5 CHIP SEAL COAT 2/15/2024 02786 OPEN-GRADED SURFACE COURSE (OGSC) 9/8/2022 02787 BONDED WEARING COURSE (BWC) 6/9/2022 02821 CHAIN LINK FENCING AND GATES 6/28/2018 02825 CATTLE GUARD 12/7/2023 -- 9 of 589 -- 02841 W-BEAM GUARDRAIL 12/7/2023 02842 DELINEATORS 02843 CRASH CUSHIONS AND BARRIER END TREATMENTS 12/7/2023 02844 CONCRETE BARRIER 12/5/2024 02845 HIGH TENSION CABLE BARRIER 12/7/2023 02890 R",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237310 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6187,
+   "semantic_score": 0.1614,
+   "sam_url": "https://sam.gov/opp/2b9eed28c47e4643903ddd688195ede1/view"
+  },
+  {
+   "title": "B422 BREAKROOM, B300 BDOC",
+   "solicitation_number": "W50S8R27BA002",
+   "notice_id": "34a292ff204840c7bc445749b90a43ef",
+   "naics_code": "236220",
+   "psc_code": "Z2QA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-10T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "PBXP272018 1 PROJECT SPECIFICATIONS For Project PBXP272018 B422 Kitchenette Renovation At 179 CYBERSPACE WING OHIO AIR NATIONAL GUARD 1947 HARRINGTON MEMORIAL ROAD MANSFIELD LAHM AIRPORT, OHIO -- 1 of 39 -- PBXP272018 2 TABLE OF CONTENTS DIVISION 01 GENERAL REQUIREMENTS SECTION 01 11 00 SUMMARY PART 1 GENERAL",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2629,
+   "semantic_score": 0.1902,
+   "sam_url": "https://sam.gov/opp/34a292ff204840c7bc445749b90a43ef/view"
+  },
+  {
+   "title": "EAST CANAL EFFICIENCY IMPROVEMENTS",
+   "solicitation_number": "140R4026R0025",
+   "notice_id": "57738cbf0dea458e8e61771c13a35882",
+   "naics_code": "237110",
+   "psc_code": "Y1NE",
+   "agency": "INTERIOR, DEPARTMENT OF THE / BUREAU OF RECLAMATION",
+   "response_deadline": "2026-11-20T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": " $ 15 05 50 00 Bar Grating 121.25 ft 2 $ $ 16 05 50 00 Diversion Pipeline Trash Rack For the lump sum of $ 17 05 50 00 Siphon Inlet Trash Rack For the lump sum of $ 18 05 50 00 Side Channel Spillway Metal Fabrications For the lump sum of $ 19 05 50 00 Vault Covers 1 each $ $ 20 05 50 00 Guard Posts 11 each $ $ 21 31 03 33 Removal and Control of Water for Diversion Pipeline Inlet Structure For the ",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 9415,
+   "semantic_score": 0.122,
+   "sam_url": "https://sam.gov/opp/57738cbf0dea458e8e61771c13a35882/view"
+  },
+  {
+   "title": "Dugway Proving Ground (DPG) Horizontal Facility Construction Road Maintenance",
+   "solicitation_number": "W911S6-27-B-A001",
+   "notice_id": "6676e1e7fc614e80b67de2b259b515f1",
+   "naics_code": "237310",
+   "psc_code": "Y1LB",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-18T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "5 CHIP SEAL COAT 2/15/2024 02786 OPEN-GRADED SURFACE COURSE (OGSC) 9/8/2022 02787 BONDED WEARING COURSE (BWC) 6/9/2022 02821 CHAIN LINK FENCING AND GATES 6/28/2018 02825 CATTLE GUARD 12/7/2023 -- 9 of 589 -- 02841 W-BEAM GUARDRAIL 12/7/2023 02842 DELINEATORS 02843 CRASH CUSHIONS AND BARRIER END TREATMENTS 12/7/2023 02844 CONCRETE BARRIER 12/5/2024 02845 HIGH TENSION CABLE BARRIER 12/7/2023 02890 R",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237310 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3571,
+   "semantic_score": 0.1816,
+   "sam_url": "https://sam.gov/opp/6676e1e7fc614e80b67de2b259b515f1/view"
+  },
+  {
+   "title": "Increase Emergency Power",
+   "solicitation_number": "36C24126Q0707",
+   "notice_id": "7cf2475364cb4cb5a6c821dcfcce484c",
+   "naics_code": "236220",
+   "psc_code": "Z2DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-18T20:30:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "B.7 SECURITY, IDENTIFICATION, PARKING & VA REGULATIONS: It is the responsibility of the Contractor to park in the appropriate designated parking areas.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Parking security services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1328,
+   "semantic_score": 0.2045,
+   "sam_url": "https://sam.gov/opp/7cf2475364cb4cb5a6c821dcfcce484c/view"
+  },
+  {
+   "title": "F-15EX 8-Bay Maintenance Hangar Complex-Industry Day",
+   "solicitation_number": "W50S8527H1CU0",
+   "notice_id": "ac45b77cb345463bbac059f25478baa2",
+   "naics_code": "236210",
+   "psc_code": "Y1BZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-01T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "Selfridge Air National Guard Base Dining Facility (Building 164) 44875 N.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 793,
+   "semantic_score": 0.2153,
+   "sam_url": "https://sam.gov/opp/ac45b77cb345463bbac059f25478baa2/view"
+  },
+  {
+   "title": "SPECIAL MISSIONS TRAINING CENTER LIVE-FIRE MARITIME/URBAN TRAINING SYSTEM",
+   "solicitation_number": "70ZL7126R622000001",
+   "notice_id": "b20bf7a9a2cb430aa34cdb11208235e5",
+   "naics_code": "236220",
+   "psc_code": null,
+   "agency": "HOMELAND SECURITY, DEPARTMENT OF / US COAST GUARD",
+   "response_deadline": "2026-11-15T16:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "Coast Guard (USCG) is issuing this Request for Information (RFI) for market-research purposes to identify capable sources;",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1462,
+   "semantic_score": 0.2028,
+   "sam_url": "https://sam.gov/opp/b20bf7a9a2cb430aa34cdb11208235e5/view"
+  },
+  {
+   "title": "INDUSTRY DAY: FORT HUNTER LIGGETT BARRACKS PDB-OTA",
+   "solicitation_number": "W912QR-INDUSTRYDAY-FHLBARRACKS",
+   "notice_id": "c36ebbda60b34d2ea282b81883206f11",
+   "naics_code": "236220",
+   "psc_code": "Y1JZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-17T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "To access Fort Hunter Liggett, please proceed directly to the Main Gate / Access Control Point.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "access control",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 4943,
+   "semantic_score": 0.1698,
+   "sam_url": "https://sam.gov/opp/c36ebbda60b34d2ea282b81883206f11/view"
+  },
+  {
+   "title": "HAFB Multiple Award Construction Contract V (MACC V)",
+   "solicitation_number": "FA820126R0016",
+   "notice_id": "d52a3a4ef0cd433583653d8c4ec1f182",
+   "naics_code": "236220",
+   "psc_code": "Z2JZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2026-12-09T22:30:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "Utah Air National Guard (UTANG) Base;",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 508,
+   "semantic_score": 0.2254,
+   "sam_url": "https://sam.gov/opp/d52a3a4ef0cd433583653d8c4ec1f182/view"
+  },
+  {
+   "title": "AZ BL COLO 7528(1) Burro Creek Road",
+   "solicitation_number": "6982AF27B000002",
+   "notice_id": "d6f6fdca13254c15aa5780ecb43eee20",
+   "naics_code": "237310",
+   "psc_code": "Y1LB",
+   "agency": "TRANSPORTATION, DEPARTMENT OF / FEDERAL HIGHWAY ADMINISTRATION",
+   "response_deadline": "2026-11-17T21:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "The project begins at the bridge over Burro Creek and ends at the cattle guard near the intersection with US Hwy",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Guard services",
+     "kind": "census",
+     "census_naics": "561612"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237310 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 8956,
+   "semantic_score": 0.1331,
+   "sam_url": "https://sam.gov/opp/d6f6fdca13254c15aa5780ecb43eee20/view"
+  },
+  {
+   "title": "Y1DA--NRM-CONST 528-CSI-102 Urology Equipment Site Prep | FY27 NRM",
+   "solicitation_number": "36C24226B0065",
+   "notice_id": "ee6285b153234cda8c6c7e99b03840d7",
+   "naics_code": "236220",
+   "psc_code": "Y1DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-07T15:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "28.33 Conduits and Backboxes for Electronic Safety and Security 09-11 28 13 00 Physical Access Control System 10-11 28 31 00 Fire Detection and Alarm 10-11 -- 4 of 1298 -- Buffalo VAMC Design Urology Equipment Site Prep Buffalo, NY Project #528-CSI-102 10-17-24 00 01 15 - 1 SECTION 00 01 15 LIST OF DRAWING SHEETS The drawings listed below accompanying this specification form a part of the contract",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "access control",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7177,
+   "semantic_score": 0.1538,
+   "sam_url": "https://sam.gov/opp/ee6285b153234cda8c6c7e99b03840d7/view"
+  },
+  {
+   "title": "763-25-700  EHRM Infrastructure Upgrades Construction  Dallas CMOP, TX",
+   "solicitation_number": "36C77626B0028_1",
+   "notice_id": "fc8dcde8ff8842f0abaeec8f105cfea1",
+   "naics_code": "236220",
+   "psc_code": "Y1DZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-23T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "28.33 Conduits and Backboxes for Electronic Safety and Security 09-11 28 08 00 Commissioning of Electronic Safety and Security Systems 11-16 28 13 00 Physical Access Control System 10-11 28 16 00 Intrusion Detection System 10-11 28 23 00 Video Surveillance 09-11 DIVISIONS 31 THROUGH 48 \u2013 NOT USED -- 3 of 640 -- 763-25-700 | EHRM Infrastructure Upgrades Dallas Consolidated Mail Outpatient Pharmacy ",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "access control",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": null,
+   "semantic_score": null,
+   "sam_url": "https://sam.gov/opp/fc8dcde8ff8842f0abaeec8f105cfea1/view"
+  },
+  {
+   "title": "Y1DA--NRM-CONST 528-CSI-102 Urology Equipment Site Prep | FY27 NRM",
+   "solicitation_number": "36C24226B0065",
+   "notice_id": "febca32da44741ebb4db61c4adf224ae",
+   "naics_code": "236220",
+   "psc_code": "Y1DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-07T15:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "28.33 Conduits and Backboxes for Electronic Safety and Security 09-11 28 13 00 Physical Access Control System 10-11 28 31 00 Fire Detection and Alarm 10-11 -- 4 of 1298 -- Buffalo VAMC Design Urology Equipment Site Prep Buffalo, NY Project #528-CSI-102 10-17-24 00 01 15 - 1 SECTION 00 01 15 LIST OF DRAWING SHEETS The drawings listed below accompanying this specification form a part of the contract",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "access control",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7178,
+   "semantic_score": 0.1538,
+   "sam_url": "https://sam.gov/opp/febca32da44741ebb4db61c4adf224ae/view"
+  }
+ ]
+}

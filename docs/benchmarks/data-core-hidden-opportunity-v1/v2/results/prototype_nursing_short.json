@@ -1,0 +1,27 @@
+{
+ "query": "We provide nurses and medical staffing.",
+ "trade_term_list": "nursing",
+ "trade_similarity": 0.7037,
+ "rules_version": "evidence-rules-v2",
+ "plan_status": "ok",
+ "released_counts_unchanged": {
+  "DIRECT_MATCH": 23,
+  "RELATED_MARKET_CANDIDATE": 0,
+  "other": 23,
+  "matched_total": 46
+ },
+ "lane": {
+  "candidates": 7,
+  "shown": 0,
+  "uncertain_not_shown": 0,
+  "other_rows_eligible_for_scope_basis": 23
+ },
+ "timing_ms": {
+  "plan": 1270,
+  "load_vectors": 1888,
+  "rank_and_gate": 542,
+  "total": 3700
+ },
+ "shown": [],
+ "uncertain": []
+}

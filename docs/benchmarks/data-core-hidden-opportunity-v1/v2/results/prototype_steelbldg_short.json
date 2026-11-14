@@ -1,0 +1,307 @@
+{
+ "query": "We erect steel buildings and install metal roofing.",
+ "trade_term_list": "steelbldg",
+ "trade_similarity": 0.8072,
+ "rules_version": "evidence-rules-v2",
+ "plan_status": "ok",
+ "released_counts_unchanged": {
+  "DIRECT_MATCH": 459,
+  "RELATED_MARKET_CANDIDATE": 0,
+  "other": 256,
+  "matched_total": 715
+ },
+ "lane": {
+  "candidates": 17,
+  "shown": 7,
+  "uncertain_not_shown": 2,
+  "other_rows_eligible_for_scope_basis": 256
+ },
+ "timing_ms": {
+  "plan": 3906,
+  "load_vectors": 2086,
+  "rank_and_gate": 384,
+  "total": 6376
+ },
+ "shown": [
+  {
+   "title": "DESC2103C - Bulk Fuel Storage Tanks Phase II, Yokota Air Base, Japan",
+   "solicitation_number": "W912HV26RA009",
+   "notice_id": "7dbef03b804f4ec3b055eb15101df6e7",
+   "naics_code": "237120",
+   "psc_code": "Y1NA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2027-01-25T05:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The roof will be a low slope concrete roof with built-up roofing with overhangs over doorways.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Low slope roofing installation",
+     "kind": "census",
+     "census_naics": "238160"
+    },
+    {
+     "term": "Roofing contractors",
+     "kind": "census",
+     "census_naics": "238160"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237120 (umbrella code).",
+   "retrieved_via": [
+    "semantic",
+    "body_terms"
+   ],
+   "semantic_rank": 50,
+   "semantic_score": 0.298,
+   "sam_url": "https://sam.gov/opp/7dbef03b804f4ec3b055eb15101df6e7/view"
+  },
+  {
+   "title": "DESC2103C - Bulk Fuel Storage Tanks Phase II, Yokota Air Base, Japan",
+   "solicitation_number": "W912HV26RA009",
+   "notice_id": "889164421a7648c68dad58bf1983be02",
+   "naics_code": "237120",
+   "psc_code": "Y1NA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2027-01-25T05:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The roof will be a low slope concrete roof with built-up roofing with overhangs over doorways.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Low slope roofing installation",
+     "kind": "census",
+     "census_naics": "238160"
+    },
+    {
+     "term": "Roofing contractors",
+     "kind": "census",
+     "census_naics": "238160"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237120 (umbrella code).",
+   "retrieved_via": [
+    "semantic",
+    "body_terms"
+   ],
+   "semantic_rank": 76,
+   "semantic_score": 0.2878,
+   "sam_url": "https://sam.gov/opp/889164421a7648c68dad58bf1983be02/view"
+  },
+  {
+   "title": "DESC2103C - Bulk Fuel Storage Tanks Phase II, Yokota Air Base, Japan",
+   "solicitation_number": "W912HV26RA009",
+   "notice_id": "722fdc916e5744dfb0d68fdd3d992fd3",
+   "naics_code": "237120",
+   "psc_code": "Y1NA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2027-01-25T05:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The roof will be a low slope concrete roof with built-up roofing with overhangs over doorways.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Low slope roofing installation",
+     "kind": "census",
+     "census_naics": "238160"
+    },
+    {
+     "term": "Roofing contractors",
+     "kind": "census",
+     "census_naics": "238160"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237120 (umbrella code).",
+   "retrieved_via": [
+    "semantic",
+    "body_terms"
+   ],
+   "semantic_rank": 91,
+   "semantic_score": 0.2806,
+   "sam_url": "https://sam.gov/opp/722fdc916e5744dfb0d68fdd3d992fd3/view"
+  },
+  {
+   "title": "Market Intelligence Notice: Fort Hood Bldg 410 General Stilwell Army Reserve Center (ARC)",
+   "solicitation_number": "W912QR-PDB-FORTHOOD",
+   "notice_id": "c3daacd708a04bca8f8519633fa5556c",
+   "naics_code": "236220",
+   "psc_code": null,
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-24T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Key facility deficiencies include: Roof membrane system has exceeded useful life and is past warranty;",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Roof membrane installation",
+     "kind": "census",
+     "census_naics": "238160"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 103,
+   "semantic_score": 0.2771,
+   "sam_url": "https://sam.gov/opp/c3daacd708a04bca8f8519633fa5556c/view"
+  },
+  {
+   "title": "Design/Build Maintenance and Repair Army Reserve (MRAR), Area Maintenance Support Activity (AMSA) 21, JBMDL, NJ",
+   "solicitation_number": "W912QR26RA062",
+   "notice_id": "ada6d118165a47d4aa4dd1981aef8b74",
+   "naics_code": "236220",
+   "psc_code": "Z2JZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-21T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The project also repairs the exterior structural elements, replaces the failing standing seam metal roof, and corrects all life safety deficiencies while maintaining the elements of the building's exterior.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "standing seam",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 517,
+   "semantic_score": 0.2339,
+   "sam_url": "https://sam.gov/opp/ada6d118165a47d4aa4dd1981aef8b74/view"
+  },
+  {
+   "title": "Facility Readiness and Maintenance Execution (FRAME) Request for Proposal (RFP) - DRAFT",
+   "solicitation_number": "FA461027R0001",
+   "notice_id": "f71aad73670b4b7e9b23c5c650adee08",
+   "naics_code": "561210",
+   "psc_code": "Z1AZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2027-02-01T00:30:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The scope of work involves facility infrastructure and systems (including water and gas mains, roads, generators, power distribution, HVAC, waste systems, and roofing) alongside the execution of distinct sustainment projects and standby support for urgent repairs during select launch operations to ensure maximum operational readiness.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Roofing contractors",
+     "kind": "census",
+     "census_naics": "238160"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2258,
+   "semantic_score": 0.192,
+   "sam_url": "https://sam.gov/opp/f71aad73670b4b7e9b23c5c650adee08/view"
+  },
+  {
+   "title": "Request for Information (RFI) - Local Construction Subcontractors for Spangdahlem AB MACC",
+   "solicitation_number": null,
+   "notice_id": "17e68d89f9b243eaba61ebc41933d88c",
+   "naics_code": "236220",
+   "psc_code": null,
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2027-04-30T14:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Areas of interest include, but are not limited to: General Construction & Carpentry Electrical (High and Low Voltage) Plumbing & Pipefitting Heating, Ventilation, and Air Conditioning (HVAC) Roofing (Commercial and Industrial) Concrete, Masonry, and Paving Civil & Site Work (Excavation, Grading) Painting and specialized coatings Fire Protection & Suppression Systems Environmental Remediation & Aba",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Roofing contractors",
+     "kind": "census",
+     "census_naics": "238160"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 8918,
+   "semantic_score": 0.1163,
+   "sam_url": "https://sam.gov/opp/17e68d89f9b243eaba61ebc41933d88c/view"
+  }
+ ],
+ "uncertain": [
+  {
+   "title": "The Mission and Installation Contracting Command (MICC), Fort Campbell, KY, is issuing this Special Notice to identify small business concerns interested in receiving future request for quotations for various construction and related facility-support.",
+   "solicitation_number": "MICCFTCINNOVATION",
+   "notice_id": "7d1f1804fc6c4070bb1ec592b7c99a41",
+   "naics_code": "236220",
+   "psc_code": "Z2JZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2027-09-16T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "Carpentry, masonry, welding, roofing, painting, electrical, plumbing, and heating, ventilation, and air conditioning (HVAC) work;",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Roofing contractors",
+     "kind": "census",
+     "census_naics": "238160"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 531,
+   "semantic_score": 0.2332,
+   "sam_url": "https://sam.gov/opp/7d1f1804fc6c4070bb1ec592b7c99a41/view"
+  },
+  {
+   "title": "Tri-Base Area Construction Basic Ordering Agreement",
+   "solicitation_number": "FA558724R0003",
+   "notice_id": "b396cc60a47f4b5797d85a02a9a0d833",
+   "naics_code": "236220",
+   "psc_code": "Z2AZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2029-04-27T13:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "Both principle contractors with a diverse experience in renovating, altering and modernization of facilities and specialty trade contractors experineced in Asphalt and Concrete Paving and Commercial Roofing are urged to apply.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Roofing contractors",
+     "kind": "census",
+     "census_naics": "238160"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 9471,
+   "semantic_score": 0.1059,
+   "sam_url": "https://sam.gov/opp/b396cc60a47f4b5797d85a02a9a0d833/view"
+  }
+ ]
+}

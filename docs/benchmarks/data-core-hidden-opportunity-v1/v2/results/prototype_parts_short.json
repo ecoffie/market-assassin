@@ -1,0 +1,2273 @@
+{
+ "query": "We supply industrial and defense replacement parts.",
+ "trade_term_list": "parts",
+ "trade_similarity": 0.7917,
+ "rules_version": "evidence-rules-v2",
+ "plan_status": "ok",
+ "released_counts_unchanged": {
+  "DIRECT_MATCH": 428,
+  "RELATED_MARKET_CANDIDATE": 0,
+  "other": 87,
+  "matched_total": 515
+ },
+ "lane": {
+  "candidates": 80,
+  "shown": 53,
+  "uncertain_not_shown": 27,
+  "other_rows_eligible_for_scope_basis": 87
+ },
+ "timing_ms": {
+  "plan": 2295,
+  "load_vectors": 1927,
+  "rank_and_gate": 562,
+  "total": 4784
+ },
+ "shown": [
+  {
+   "title": "Gas Line Repair",
+   "solicitation_number": "GasLineRepair",
+   "notice_id": "bd183f1fac734a10bc7bbe0975c4f21c",
+   "naics_code": "237120",
+   "psc_code": "J047",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2026-11-17T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The 55th Contracting Squadron, Offutt Air Force Base, NE, is seeking information for the following items listed below: General: The purpose of this sources sought is to conduct Market Research in accordance with RFO Part 10, for the repair and replacement of existing gas leaks on 6 pipe and 8 pipe and valves, along with some associated component replacement on 2 pipe and valves.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237120 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3482,
+   "semantic_score": 0.3456,
+   "sam_url": "https://sam.gov/opp/bd183f1fac734a10bc7bbe0975c4f21c/view"
+  },
+  {
+   "title": "Air Force Civil Augmentation Program (AFCAP) VI",
+   "solicitation_number": "FA805127R0001",
+   "notice_id": "3097cf05e09647cdb53db2cec0156e8e",
+   "naics_code": "561210",
+   "psc_code": "S216",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2026-12-01T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "This is a Multiple-Award Indefinite-Delivery/Indefinite-Quantity (IDIQ) contract designed to provide rapid, global contingency planning, logistics, and emergency construction capabilities to the Department of the Air Force, other DoD components, and Federal agencies.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 5421,
+   "semantic_score": 0.3103,
+   "sam_url": "https://sam.gov/opp/3097cf05e09647cdb53db2cec0156e8e/view"
+  },
+  {
+   "title": "Air Force Contract Augmentation Program (AFCAP) VI",
+   "solicitation_number": "FA805127R0001",
+   "notice_id": "34d2b95fb5e24584877e7203f17213cd",
+   "naics_code": "561210",
+   "psc_code": "S216",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2026-12-03T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "This is a Multiple-Award Indefinite-Delivery/Indefinite-Quantity (IDIQ) contract designed to provide rapid, global contingency planning, logistics, and emergency construction capabilities to the Department of the Air Force, other DoD components, and Federal agencies.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 5422,
+   "semantic_score": 0.3103,
+   "sam_url": "https://sam.gov/opp/34d2b95fb5e24584877e7203f17213cd/view"
+  },
+  {
+   "title": "Air Force Contract Augmentation Program (AFCAP) VI",
+   "solicitation_number": "FA805127R0001",
+   "notice_id": "d0066f1e540f447080b579bbdb5f85d0",
+   "naics_code": "561210",
+   "psc_code": "S216",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2026-12-03T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "This is a Multiple-Award Indefinite-Delivery/Indefinite-Quantity (IDIQ) contract designed to provide rapid, global contingency planning, logistics, and emergency construction capabilities to the Department of the Air Force, other DoD components, and Federal agencies.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 5423,
+   "semantic_score": 0.3103,
+   "sam_url": "https://sam.gov/opp/d0066f1e540f447080b579bbdb5f85d0/view"
+  },
+  {
+   "title": "Air Force Civil Augmentation Program (AFCAP) VI",
+   "solicitation_number": "FA805127R0001",
+   "notice_id": "6994032a74bd4eef9c62258d44faade4",
+   "naics_code": "561210",
+   "psc_code": "S216",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2026-12-01T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "This is a Multiple-Award Indefinite-Delivery/Indefinite-Quantity (IDIQ) contract designed to provide rapid, global contingency planning, logistics, and emergency construction capabilities to the Department of the Air Force, other DoD components, and Federal agencies.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 5425,
+   "semantic_score": 0.3103,
+   "sam_url": "https://sam.gov/opp/6994032a74bd4eef9c62258d44faade4/view"
+  },
+  {
+   "title": "Base Maintenance for Fort Leonard Wood, Missouri",
+   "solicitation_number": "W911S726CA003",
+   "notice_id": "906d1c357bde48a3af8921cd7078d6ee",
+   "naics_code": "561210",
+   "psc_code": "M1AZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-18T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Maintenance and Repair of Railroad Components C.5.7.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 5779,
+   "semantic_score": 0.2984,
+   "sam_url": "https://sam.gov/opp/906d1c357bde48a3af8921cd7078d6ee/view"
+  },
+  {
+   "title": "ICD-705 Controlled Spaces Modernization and Sustainment Program - (Progressive Design-build (PDB) Other Transaction Agreement (OTA)",
+   "solicitation_number": "W912UM27S0TA1",
+   "notice_id": "4961c4af95e2444783d66f6766e12527",
+   "naics_code": "236220",
+   "psc_code": "Y1AA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-17T05:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Replace or modernize principal components of the existing HVAC system to support ICD-705 environmental and security standards.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 5909,
+   "semantic_score": 0.2929,
+   "sam_url": "https://sam.gov/opp/4961c4af95e2444783d66f6766e12527/view"
+  },
+  {
+   "title": "ICD-705 Controlled Spaces Modernization and Sustainment Program - (Progressive Design-build (PDB) Other Transaction Agreement (OTA)",
+   "solicitation_number": "W912UM27S0TA1",
+   "notice_id": "d000ad231a124c06a28d15cf93e062f0",
+   "naics_code": "236220",
+   "psc_code": "Y1AA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-17T05:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Replace or modernize principal components of the existing HVAC system to support ICD-705 environmental and security standards.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 5910,
+   "semantic_score": 0.2929,
+   "sam_url": "https://sam.gov/opp/d000ad231a124c06a28d15cf93e062f0/view"
+  },
+  {
+   "title": "Non-personal services Seawater Pump Renovation",
+   "solicitation_number": "1305M327Q0034",
+   "notice_id": "f070889d4f8249b8bb550a7b8c1566ce",
+   "naics_code": "236220",
+   "psc_code": "Z2JZ",
+   "agency": "COMMERCE, DEPARTMENT OF / NATIONAL OCEANIC AND ATMOSPHERIC ADMINISTRATION",
+   "response_deadline": "2026-12-07T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Non-personal services for seawater pump renovation at the oyster breeding center, electrical and plumbing components present.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6054,
+   "semantic_score": 0.2859,
+   "sam_url": "https://sam.gov/opp/f070889d4f8249b8bb550a7b8c1566ce/view"
+  },
+  {
+   "title": "Denison Valve Replacement",
+   "solicitation_number": "W912BV27RKT01",
+   "notice_id": "5885b7e86a6e4771998a4b03888b29cf",
+   "naics_code": "237990",
+   "psc_code": "N048",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-03T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The work will include the removal and disposal of the existing valves, as well as the inspection and refurbishment of existing valves operating equipment, including stem extensions, shafts, bearings, bushings, and associated components.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6061,
+   "semantic_score": 0.2856,
+   "sam_url": "https://sam.gov/opp/5885b7e86a6e4771998a4b03888b29cf/view"
+  },
+  {
+   "title": "Design-Build Design-Bid-Build Multiple-Award Task-Order Contract in Lithuania and Latvia",
+   "solicitation_number": "W912GB27RA011",
+   "notice_id": "4192a0928e8744108fbd0260c5aba679",
+   "naics_code": "236220",
+   "psc_code": "Y1JZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-12T13:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Additionally, no materials or items of equipment, to include identifiable sub-assemblies, shall be manufactured or assembled by a firm other than from within the 32 NATO member nations for such task orders.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "assemblies",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6258,
+   "semantic_score": 0.2776,
+   "sam_url": "https://sam.gov/opp/4192a0928e8744108fbd0260c5aba679/view"
+  },
+  {
+   "title": "Outdoor Fitness Facility, Building 389\u2014 Supply, Delivery, and Limited Installation Support",
+   "solicitation_number": "HARBSS-2027-01",
+   "notice_id": "c4094dc11366430dbdaa397ffc28e96c",
+   "naics_code": "236220",
+   "psc_code": "5670",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2026-11-26T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "n of Performance: Homestead Air Reserve Base, Florida Response Due Date/Time: November 26, 2026, 5:00 PM EST Response Submission: Nika Salemi, [email] Proposed NAICS Code: 236220, Commercial and Institutional Building Construction Proposed Product Service Code (PSC): 5670 Building Components, Prefabricated",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6375,
+   "semantic_score": 0.2729,
+   "sam_url": "https://sam.gov/opp/c4094dc11366430dbdaa397ffc28e96c/view"
+  },
+  {
+   "title": "(EAR048) Repair Fire Alarm System Eareckson Air Station Facilities",
+   "solicitation_number": "W911KB27RWP12",
+   "notice_id": "0d3a824b37564ebaa09df4c3b57adbca",
+   "naics_code": "236220",
+   "psc_code": "Y1JZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-16T23:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Key project components include: Demolition of existing fire alarm control panels, initiating devices, notification appliances, conduit, and wiring across affected buildings Installation of a new wireless/hybrid addressable fire alarm system, including wireless devices, gateways/repeaters for campus-wide RF coverage, limited residual hard-wired elements only where essential, and integration with su",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6414,
+   "semantic_score": 0.2714,
+   "sam_url": "https://sam.gov/opp/0d3a824b37564ebaa09df4c3b57adbca/view"
+  },
+  {
+   "title": "Small Arms Range Construction Pease ANGB",
+   "solicitation_number": "W50S8A27BA002",
+   "notice_id": "3f0d63c852844f1fb2835fa415427ac8",
+   "naics_code": "236220",
+   "psc_code": "Y1JZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-14T15:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Specifically, the newly constructed range must have Monaco fire-alarm components.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6423,
+   "semantic_score": 0.2712,
+   "sam_url": "https://sam.gov/opp/3f0d63c852844f1fb2835fa415427ac8/view"
+  },
+  {
+   "title": "FA27 Fall Arrest Inspection Services",
+   "solicitation_number": "FA462026QA303",
+   "notice_id": "da68e1a3e39e41e0ae6b6adac38e3984",
+   "naics_code": "561210",
+   "psc_code": "H342",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2026-11-26T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "As a minimum the inspection shall consist of the following actions: \uf0b7 A hands on inspection of all components of the installed system \uf0b7 Visually verify all end terminations \uf0b7 Tighten all lock nuts to the required torque \uf0b7 Inspect for presence of cotter pins where appropriate \uf0b7 Check for damage to all components including cable along its entire length, intermediate brackets and end termination \uf0b7 In",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6508,
+   "semantic_score": 0.2685,
+   "sam_url": "https://sam.gov/opp/da68e1a3e39e41e0ae6b6adac38e3984/view"
+  },
+  {
+   "title": "12445127B0001 AZ Lakeside Office Sewer Line Replacement",
+   "solicitation_number": "12445127B0001",
+   "notice_id": "c5940509ac084a65b929775d21b034df",
+   "naics_code": "237110",
+   "psc_code": "Z2AA",
+   "agency": "AGRICULTURE, DEPARTMENT OF / FOREST SERVICE",
+   "response_deadline": "2026-12-14T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "CALENDAR DAYS YES NO (If \"YES\", indicate within how many calendar days after award in Item 12b.) 10 30 calendar days and complete it within ________________ ________________ calendar days after receiving 10 1300 12/14/2026 90 NSN 7540-01-155-3212 x x x x copies to perform the work required are due at the place specified in Item 8 by _____________ ___________________ (hour) local time calendar days",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "nsn",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6544,
+   "semantic_score": 0.2673,
+   "sam_url": "https://sam.gov/opp/c5940509ac084a65b929775d21b034df/view"
+  },
+  {
+   "title": "Dredged Material Containment Area (DMCA) O&M Construction IDC",
+   "solicitation_number": "W912HN27RA006",
+   "notice_id": "4bded44eb9c9468288a673d06601aeda",
+   "naics_code": "237990",
+   "psc_code": "Z2KF",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-27T23:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Representative construction and maintenance tasks may include, but are not limited to construction, rehabilitation, repair, and maintenance of designated DMCA infrastructure, including dikes, embankments, roads, access areas, drainage and water-control systems, shoreline protection, marine access features, and associated structural, mechanical, and electrical components.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6592,
+   "semantic_score": 0.2657,
+   "sam_url": "https://sam.gov/opp/4bded44eb9c9468288a673d06601aeda/view"
+  },
+  {
+   "title": "(EAR048) Repair Fire Alarm System Eareckson Air Station Facilities",
+   "solicitation_number": "W911KB27RWP12",
+   "notice_id": "d590693fcd754a4aa9ec104177e44f6f",
+   "naics_code": "236220",
+   "psc_code": "Y1JZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-16T23:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Key project components include: Demolition of existing fire alarm control panels, initiating devices, notification appliances, conduit, and wiring across affected buildings Installation of a new wireless/hybrid addressable fire alarm system, including wireless devices, gateways/repeaters for campus-wide RF coverage, limited residual hard-wired elements only where essential, and integration with su",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6649,
+   "semantic_score": 0.264,
+   "sam_url": "https://sam.gov/opp/d590693fcd754a4aa9ec104177e44f6f/view"
+  },
+  {
+   "title": "Seawater Pump Renovation",
+   "solicitation_number": "1305M327Q0034",
+   "notice_id": "2a70224c02a049208ef4cffb362eefe7",
+   "naics_code": "236220",
+   "psc_code": "Z2JZ",
+   "agency": "COMMERCE, DEPARTMENT OF / NATIONAL OCEANIC AND ATMOSPHERIC ADMINISTRATION",
+   "response_deadline": "2026-12-07T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Amendment 0001 to Seawater pump renovation at the oyster breeding center, electrical and plumbing components present.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6802,
+   "semantic_score": 0.2591,
+   "sam_url": "https://sam.gov/opp/2a70224c02a049208ef4cffb362eefe7/view"
+  },
+  {
+   "title": "Ross Springs Waterline Replacement",
+   "solicitation_number": "1240LT27Q0022",
+   "notice_id": "244a74b3200645ba88f97615419af32d",
+   "naics_code": "237110",
+   "psc_code": "Z2NE",
+   "agency": "AGRICULTURE, DEPARTMENT OF / FOREST SERVICE",
+   "response_deadline": "2026-11-21T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The removal of mud and debris from treads, tracks and undercarriage, with emphasis on axles, frame, cross-members, motor mounts, and underneath steps, running boards, and front bumper/brushguard assemblies will be required.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "assemblies",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6807,
+   "semantic_score": 0.2588,
+   "sam_url": "https://sam.gov/opp/244a74b3200645ba88f97615419af32d/view"
+  },
+  {
+   "title": "Ross Springs Waterline Replacement",
+   "solicitation_number": "1240LT27Q0022",
+   "notice_id": "dbe8d99b7d23443fbaef4f269bd97116",
+   "naics_code": "237110",
+   "psc_code": "Z2NE",
+   "agency": "AGRICULTURE, DEPARTMENT OF / FOREST SERVICE",
+   "response_deadline": "2026-12-01T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The removal of mud and debris from treads, tracks and undercarriage, with emphasis on axles, frame, cross-members, motor mounts, and underneath steps, running boards, and front bumper/brushguard assemblies will be required.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "assemblies",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6808,
+   "semantic_score": 0.2588,
+   "sam_url": "https://sam.gov/opp/dbe8d99b7d23443fbaef4f269bd97116/view"
+  },
+  {
+   "title": "Ross Springs Waterline Replacement",
+   "solicitation_number": "1240LT27Q0022",
+   "notice_id": "7beec214da634fd9a1743393fd81db5a",
+   "naics_code": "237110",
+   "psc_code": "Z2NE",
+   "agency": "AGRICULTURE, DEPARTMENT OF / FOREST SERVICE",
+   "response_deadline": "2026-11-21T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The removal of mud and debris from treads, tracks and undercarriage, with emphasis on axles, frame, cross-members, motor mounts, and underneath steps, running boards, and front bumper/brushguard assemblies will be required.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "assemblies",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6810,
+   "semantic_score": 0.2588,
+   "sam_url": "https://sam.gov/opp/7beec214da634fd9a1743393fd81db5a/view"
+  },
+  {
+   "title": "2-STEP SEALED BID - TINKER AFB WWYK250019 Remove and Replace Fire Sprinkler in Plasma Booth Dust Collectors and Replace the Building F/A System, B3221",
+   "solicitation_number": "FA813726R0021",
+   "notice_id": "2ec493f6357847498b0b00f3979ae8d0",
+   "naics_code": "236220",
+   "psc_code": "Z1AA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2026-12-30T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Assemblies, framework, fixtures, or apparatus not readily identified on the project drawings or this Statement of Work (SOW) shall be provided by the Contractor as required for a complete, fully operating, and functioning system or systems ready for use by the Government.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "assemblies",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6860,
+   "semantic_score": 0.2572,
+   "sam_url": "https://sam.gov/opp/2ec493f6357847498b0b00f3979ae8d0/view"
+  },
+  {
+   "title": "(EAR048) Repair Fire Alarm System Eareckson Air Station Facilities",
+   "solicitation_number": "W911KB27RWP12",
+   "notice_id": "8f5e0e950205411e91871000a577af1d",
+   "naics_code": "236220",
+   "psc_code": "Y1JZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-16T23:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Key project components include: Demolition of existing fire alarm control panels, initiating devices, notification appliances, conduit, and wiring across affected buildings Installation of a new wireless/hybrid addressable fire alarm system, including wireless devices, gateways/repeaters for campus-wide RF coverage, limited residual hard-wired elements only where essential, and integration with su",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6902,
+   "semantic_score": 0.2558,
+   "sam_url": "https://sam.gov/opp/8f5e0e950205411e91871000a577af1d/view"
+  },
+  {
+   "title": "B422 BREAKROOM, B300 BDOC",
+   "solicitation_number": "W50S8R27BA002",
+   "notice_id": "718ef853fa6d4d9197d6d305ced1313e",
+   "naics_code": "236220",
+   "psc_code": "Z2QA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-10T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The contractor shall perform selective demolition in the BDOC to remove the existing controller desk, obsolete floor-fed utility components associated with the existing desk arrangement, including the existing junction box, exposed power whips, and associated miscellaneous components no longer required.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6932,
+   "semantic_score": 0.2549,
+   "sam_url": "https://sam.gov/opp/718ef853fa6d4d9197d6d305ced1313e/view"
+  },
+  {
+   "title": "USCG Station Milford Haven Water Treatment Repairs and Equipment Replacement",
+   "solicitation_number": "70ZL1927QELIZ0001",
+   "notice_id": "2868af209deb4016b0adf6365fade660",
+   "naics_code": "237110",
+   "psc_code": "Z2NE",
+   "agency": "HOMELAND SECURITY, DEPARTMENT OF / US COAST GUARD",
+   "response_deadline": "2026-12-01T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "OBJECTIVE Restore full reliability to the station's drinking water system, replace worn components, provide equipment backup, and ensure safe, compliant drinking water for base personnel.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6945,
+   "semantic_score": 0.2546,
+   "sam_url": "https://sam.gov/opp/2868af209deb4016b0adf6365fade660/view"
+  },
+  {
+   "title": "Electrical Projects \u2013 Use of Progressive Design Build (PDB) with Other Transaction Authority (OTA) - Request for Information",
+   "solicitation_number": "MHMV200009-MHMV120009-MHMV08002",
+   "notice_id": "da72b3c7b2e34500aa9c05827572e6c8",
+   "naics_code": "237130",
+   "psc_code": "Y1MZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2026-11-19T23:30:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "This goal will be achieved by establishing the new substation facility within a defined 100ft x 150ft footprint directly south of the existing location, and installing all-new substation components, security fencing, distribution poles, switching gear, and conductors.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237130 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6947,
+   "semantic_score": 0.2544,
+   "sam_url": "https://sam.gov/opp/da72b3c7b2e34500aa9c05827572e6c8/view"
+  },
+  {
+   "title": "Design/Build Maintenance and Repair Army Reserve (MRAR), Area Maintenance Support Activity (AMSA) 21, JBMDL, NJ",
+   "solicitation_number": "W912QR26RA062",
+   "notice_id": "ada6d118165a47d4aa4dd1981aef8b74",
+   "naics_code": "236220",
+   "psc_code": "Z2JZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-21T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The project will repair failing facility components and extend the economic life of the facility by 25 years, providing a modern maintenance facility that enables readiness for the Army Reserve units located in the surrounding area.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7073,
+   "semantic_score": 0.2509,
+   "sam_url": "https://sam.gov/opp/ada6d118165a47d4aa4dd1981aef8b74/view"
+  },
+  {
+   "title": "Cooling Tower, Roofing, and Structural Construction",
+   "solicitation_number": "2031ZA26R00027",
+   "notice_id": "1511422418e848f896a0010668d90da1",
+   "naics_code": "236220",
+   "psc_code": "Z2EC",
+   "agency": "TREASURY, DEPARTMENT OF THE / BUREAU OF ENGRAVING AND PRINTING",
+   "response_deadline": "2026-12-11T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The contractor shall provide recommendations for upgrading each chiller and its tonnage, including pumps, motors, piping, coils, and other associated components, to accommodate the newly installed cooling tower.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7241,
+   "semantic_score": 0.246,
+   "sam_url": "https://sam.gov/opp/1511422418e848f896a0010668d90da1/view"
+  },
+  {
+   "title": "B422 BREAKROOM, B300 BDOC",
+   "solicitation_number": "W50S8R27BA002",
+   "notice_id": "db34a56abed341e7b28e841737c967df",
+   "naics_code": "236220",
+   "psc_code": "Z2QA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-10T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The contractor shall perform selective demolition in the BDOC to remove the existing controller desk, obsolete floor-fed utility components associated with the existing desk arrangement, including the existing junction box, exposed power whips, and associated miscellaneous components no longer required.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7318,
+   "semantic_score": 0.2438,
+   "sam_url": "https://sam.gov/opp/db34a56abed341e7b28e841737c967df/view"
+  },
+  {
+   "title": "Y--Shasta Powerplant (SH-PP) Compressor Room Modernization",
+   "solicitation_number": "140RR027R0018",
+   "notice_id": "79e03775b20a4dad802d337401dede17",
+   "naics_code": "237990",
+   "psc_code": "Y1AZ",
+   "agency": "INTERIOR, DEPARTMENT OF THE / DEPARTMENTAL OFFICES",
+   "response_deadline": "2026-11-20T01:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Principal Components of the Work include, but are not limited to: A.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7642,
+   "semantic_score": 0.2339,
+   "sam_url": "https://sam.gov/opp/79e03775b20a4dad802d337401dede17/view"
+  },
+  {
+   "title": "HST Roof Safety Construction Project",
+   "solicitation_number": "10326",
+   "notice_id": "ea42676a12d349d6b75786a13a31878e",
+   "naics_code": "236220",
+   "psc_code": "Z2AA",
+   "agency": "GENERAL SERVICES ADMINISTRATION / PUBLIC BUILDINGS SERVICE",
+   "response_deadline": "2026-11-16T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "This is a Repair and Alteration (R&A) project s anticipated scope of work includes field verification of existing roof and structural conditions, fabrication and installation of anchorage components, structural attachments, drilling/coring, welding where required, roof penetrations, flashing, waterproofing, protection of existing roof systems, rooftop equipment, solar infrastructure, lightning pro",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7688,
+   "semantic_score": 0.2324,
+   "sam_url": "https://sam.gov/opp/ea42676a12d349d6b75786a13a31878e/view"
+  },
+  {
+   "title": "DHS HSI Schwartz 2nd Floor Carpet Replacement",
+   "solicitation_number": "47PD5527Q0010",
+   "notice_id": "c40dbc1f3f8d405bb1db80d80e4c50cb",
+   "naics_code": "236220",
+   "psc_code": "Z2AA",
+   "agency": "GENERAL SERVICES ADMINISTRATION / PUBLIC BUILDINGS SERVICE",
+   "response_deadline": "2026-12-05T00:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The Contractor shall also be responsible for relocating any electrical and/or mechanical building system components necessary to perform this work.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7944,
+   "semantic_score": 0.2253,
+   "sam_url": "https://sam.gov/opp/c40dbc1f3f8d405bb1db80d80e4c50cb/view"
+  },
+  {
+   "title": "Modernize 6N Inpatient Restrooms (Swing for 3N)",
+   "solicitation_number": "36C25626R0108",
+   "notice_id": "bfc4c99915e94beab0922e2bd2243f4a",
+   "naics_code": "236220",
+   "psc_code": "Y1DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-07T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The contractor shall provide all labor, materials, equipment, and supervision necessary to remove and replace ten (10) existing inpatient restroom Patient Care Units (PCUs) with VA-approved fixed-type toilet, sink, cabinet, and countertop assemblies.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "assemblies",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7974,
+   "semantic_score": 0.2242,
+   "sam_url": "https://sam.gov/opp/bfc4c99915e94beab0922e2bd2243f4a/view"
+  },
+  {
+   "title": "Modernize 6N Inpatient Restrooms (Swing for 3N)",
+   "solicitation_number": "36C25626R0108",
+   "notice_id": "f61836f75ef849639ec51ed112696ac7",
+   "naics_code": "236220",
+   "psc_code": "Y1DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-20T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The contractor shall provide all labor, materials, equipment, and supervision necessary to remove and replace ten (10) existing inpatient restroom Patient Care Units (PCUs) with VA-approved fixed-type toilet, sink, cabinet, and countertop assemblies.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "assemblies",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7975,
+   "semantic_score": 0.2242,
+   "sam_url": "https://sam.gov/opp/f61836f75ef849639ec51ed112696ac7/view"
+  },
+  {
+   "title": "Z1DA--550-26-121 FY27 NRM Emergent Repairs  North Water Tower 71 & South Water Tower 94 CON",
+   "solicitation_number": "36C25227B0008",
+   "notice_id": "16c430e81b994828af7e2871c64f562c",
+   "naics_code": "237110",
+   "psc_code": "Z1DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2027-01-06T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Contractor must provide all tools, materials, components, labor, and supervision for repair and painting of project 550-26-121 Emergent Repairs North Water Tower 71 & South Water Tower 94 CON.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 8083,
+   "semantic_score": 0.2211,
+   "sam_url": "https://sam.gov/opp/16c430e81b994828af7e2871c64f562c/view"
+  },
+  {
+   "title": "J065-- HVAC upgrades at VA Loch Raven location",
+   "solicitation_number": "36C24527Q0061",
+   "notice_id": "6e82689662f44358819516314429756b",
+   "naics_code": "561210",
+   "psc_code": "J065",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-14T13:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Duration of warranty starts after acceptance and use of new equipment & components O&Ms for all new equipment and other components requiring preventative maintenance shall be provided to the VA.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 8088,
+   "semantic_score": 0.2207,
+   "sam_url": "https://sam.gov/opp/6e82689662f44358819516314429756b/view"
+  },
+  {
+   "title": "DHS HSI Schwartz 2nd Floor Carpet Replacement",
+   "solicitation_number": "47PD5527Q0010",
+   "notice_id": "3675ba38b0674995bf133a52f77c9fc6",
+   "naics_code": "236220",
+   "psc_code": "Z2AA",
+   "agency": "GENERAL SERVICES ADMINISTRATION / PUBLIC BUILDINGS SERVICE",
+   "response_deadline": "2026-12-05T00:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The Contractor shall also be responsible for relocating any electrical and/or mechanical building system components necessary to perform this work.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 8164,
+   "semantic_score": 0.2188,
+   "sam_url": "https://sam.gov/opp/3675ba38b0674995bf133a52f77c9fc6/view"
+  },
+  {
+   "title": "J065--KG - HVAC upgrades (VA-27-00018970 / 36C245-27-AP-1028 /  512-27-1-444-0007 ) EDA: 12/11/2026 ; STATUS: Moved to  Keysha Gorman for action on 11/6/2026 (DGM) ; NEED DATE  11-20-26 (unrealistic per PALT) MOVED TO BC FOR ASSIGNMENT",
+   "solicitation_number": "36C24527Q0061",
+   "notice_id": "fc29e3904eb3405bab37833cd265b531",
+   "naics_code": "561210",
+   "psc_code": "J065",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-30T13:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Duration of warranty starts after acceptance and use of new equipment & components O&Ms for all new equipment and other components requiring preventative maintenance shall be provided to the VA.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 8326,
+   "semantic_score": 0.2139,
+   "sam_url": "https://sam.gov/opp/fc29e3904eb3405bab37833cd265b531/view"
+  },
+  {
+   "title": "USACE SPK DBB Construction - Calaveras Wastewater Treatment Plant Improvements - Copperopolis, CA",
+   "solicitation_number": "W9123827X1CHG",
+   "notice_id": "737fe18fcbda4c9380639dde065f1a07",
+   "naics_code": "237110",
+   "psc_code": "Y1PD",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-07T16:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "electrical improvements to include upgrading the existing PG&E service size to the main switchboard located in the Control Building, installing a new transformer, raceways, metering panel, new Motor Control Center (MCC), and associated wiring and components;",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 8417,
+   "semantic_score": 0.2118,
+   "sam_url": "https://sam.gov/opp/737fe18fcbda4c9380639dde065f1a07/view"
+  },
+  {
+   "title": "Z2DA--612A4-27-018 | Replace B650 3rd and 2nd Flooring",
+   "solicitation_number": "36C26127Q00260001",
+   "notice_id": "837a61b6cb6e4c48911189781921c4ea",
+   "naics_code": "236220",
+   "psc_code": "Z2DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-20T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The contractor will be responsible for disposing of all equipment components and trash demolished or replaced as part of this project.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 9031,
+   "semantic_score": 0.1977,
+   "sam_url": "https://sam.gov/opp/837a61b6cb6e4c48911189781921c4ea/view"
+  },
+  {
+   "title": "Z2DA--612A4-27-018 | Replace B650 3rd and 2nd Flooring",
+   "solicitation_number": "36C26127Q00260001",
+   "notice_id": "f2679d302225400abd198d1f2f0fb719",
+   "naics_code": "236220",
+   "psc_code": "Z2DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-20T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The contractor will be responsible for disposing of all equipment components and trash demolished or replaced as part of this project.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 9032,
+   "semantic_score": 0.1977,
+   "sam_url": "https://sam.gov/opp/f2679d302225400abd198d1f2f0fb719/view"
+  },
+  {
+   "title": "Ross Springs Waterline Replacement",
+   "solicitation_number": "1240LT27Q0022",
+   "notice_id": "30766a35fce84b0683b6119c26ec7df4",
+   "naics_code": "237110",
+   "psc_code": "Z2NE",
+   "agency": "AGRICULTURE, DEPARTMENT OF / FOREST SERVICE",
+   "response_deadline": "2027-11-21T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The removal of mud and debris from treads, tracks and undercarriage, with emphasis on axles, frame, cross-members, motor mounts, and underneath steps, running boards, and front bumper/brushguard assemblies will be required.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "assemblies",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 9065,
+   "semantic_score": 0.1962,
+   "sam_url": "https://sam.gov/opp/30766a35fce84b0683b6119c26ec7df4/view"
+  },
+  {
+   "title": "Ross Springs Waterline Replacement",
+   "solicitation_number": "1240LT27Q0022",
+   "notice_id": "ff5a815a19f348e8a0606ce16ec022d4",
+   "naics_code": "237110",
+   "psc_code": "Z2NE",
+   "agency": "AGRICULTURE, DEPARTMENT OF / FOREST SERVICE",
+   "response_deadline": "2026-11-21T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The removal of mud and debris from treads, tracks and undercarriage, with emphasis on axles, frame, cross-members, motor mounts, and underneath steps, running boards, and front bumper/brushguard assemblies will be required.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "assemblies",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 9066,
+   "semantic_score": 0.1962,
+   "sam_url": "https://sam.gov/opp/ff5a815a19f348e8a0606ce16ec022d4/view"
+  },
+  {
+   "title": "Cooling Tower, Roofing, and Structural Construction",
+   "solicitation_number": "2031ZA26R00027",
+   "notice_id": "1744af7270c241aa8625a14fa869de1c",
+   "naics_code": "236220",
+   "psc_code": "Z2EC",
+   "agency": "TREASURY, DEPARTMENT OF THE / BUREAU OF ENGRAVING AND PRINTING",
+   "response_deadline": "2026-12-11T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The contractor shall provide recommendations for upgrading each chiller and its tonnage, including pumps, motors, piping, coils, and other associated components, to accommodate the newly installed cooling tower.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 9136,
+   "semantic_score": 0.1947,
+   "sam_url": "https://sam.gov/opp/1744af7270c241aa8625a14fa869de1c/view"
+  },
+  {
+   "title": "Z1DA--36C25227B0026 Remodel ENT Procedure Rooms  CON 537-19-109",
+   "solicitation_number": "36C25227B0007",
+   "notice_id": "14da32519d2f4187b272992532c7cc55",
+   "naics_code": "236220",
+   "psc_code": "Z1DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-24T16:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Contractor must provide all tools, materials, components, labor, and supervision necessary to complete renovation of the ENT procedure rooms, at Jesse Brown VA Medical Center.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 9144,
+   "semantic_score": 0.1939,
+   "sam_url": "https://sam.gov/opp/14da32519d2f4187b272992532c7cc55/view"
+  },
+  {
+   "title": "Construct Interim Remedial Action (IRA) for the Nelson Tunnel Superfund Site",
+   "solicitation_number": "W9128F27RA056",
+   "notice_id": "2bb3f13c6474402eb9e3c042a86d4cb9",
+   "naics_code": "237990",
+   "psc_code": "Y1LC",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-20T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The IROD selected remedy is Alternative 4, Drive New Adit to Intersect Nelson Tunnel, Tunnel Rehabilitation, Install Bulkhead in Nelson Tunnel and Flow Control Structure in Commodore 5 level and include the following remedial components.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 9166,
+   "semantic_score": 0.1931,
+   "sam_url": "https://sam.gov/opp/2bb3f13c6474402eb9e3c042a86d4cb9/view"
+  },
+  {
+   "title": "Department Of Energy - National Nuclear Security Administration Joint Cyber Facility Construction Solicitation",
+   "solicitation_number": "47PB5427R0003",
+   "notice_id": "e87be19f02de482e99c7ad4ca3402fa8",
+   "naics_code": "236220",
+   "psc_code": "Z2JZ",
+   "agency": "GENERAL SERVICES ADMINISTRATION / PUBLIC BUILDINGS SERVICE",
+   "response_deadline": "2026-12-07T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Work includes, demolition, architectural, mechanical, electrical, plumbing, fire protection, telecommunications, audio visual system infrastructure, security infrastructure, equipment, and coordinating installation of system furniture components, all of which must strictly adhere to accreditation requirements and standards.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 9225,
+   "semantic_score": 0.1907,
+   "sam_url": "https://sam.gov/opp/e87be19f02de482e99c7ad4ca3402fa8/view"
+  },
+  {
+   "title": "Construction Services for the Gate 7 Parking Garage St. Elizabeths West Campus",
+   "solicitation_number": "47PB5126R0038 ",
+   "notice_id": "b186c45b95294ce7a599f20bb542fff2",
+   "naics_code": "236220",
+   "psc_code": "Y1AZ",
+   "agency": "GENERAL SERVICES ADMINISTRATION / PUBLIC BUILDINGS SERVICE",
+   "response_deadline": "2026-11-23T21:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "uding structural framing, parking decks, ramps, stairs, elevators, roof assemblies, and related structural components Mechanically ventilated parking garage systems, including ventilation equipment, shafts, ductwork, louvers or openings, controls, electrical power, life-safety interfaces, testing, balancing, and commissioning support Exterior fa ade and building envelope construction, including a ",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    },
+    {
+     "term": "assemblies",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 9239,
+   "semantic_score": 0.1897,
+   "sam_url": "https://sam.gov/opp/b186c45b95294ce7a599f20bb542fff2/view"
+  },
+  {
+   "title": "Y--NGWSP Cutter Lateral Reach 21 Booster Plant",
+   "solicitation_number": "140RR027B0004",
+   "notice_id": "1625839307684d649fbff555a5cde4a9",
+   "naics_code": "237110",
+   "psc_code": "Y1KZ",
+   "agency": "INTERIOR, DEPARTMENT OF THE / BUREAU OF RECLAMATION",
+   "response_deadline": "2027-01-25T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The principal components of work include the following items:",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 9370,
+   "semantic_score": 0.1832,
+   "sam_url": "https://sam.gov/opp/1625839307684d649fbff555a5cde4a9/view"
+  },
+  {
+   "title": "Phase 2 Construct Arabian Leopard Exhibit at the National Zoological Park",
+   "solicitation_number": "33330226RT0010015",
+   "notice_id": "deb1fc6cb1f24bf482fb14f4851872c0",
+   "naics_code": "236220",
+   "psc_code": "Y1JA",
+   "agency": "SMITHSONIAN INSTITUTION / SMITHSONIAN INSTITUTION",
+   "response_deadline": "2026-11-20T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "00100084 National Zoological Conservation Biology Institute (NZCBI) Construct Arabian Leopard Facility (ALF) Phase 2 \u2013 Habitat & Care Bldg 100% Final CD Issued for Bid TABLE OF CONTENTS TOC - 3 DIVISION 09 - FINISHES SECTION 09 0561.13 - MOISTURE VAPOR EMISSION CONTROL SECTION 09 2116.23 - GYPSUM BOARD SHAFT WALL ASSEMBLIES SECTION 09 2216 - NON-STRUCTURAL METAL FRAMING SECTION 09 2900 - GYPSUM BO",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "assemblies",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 9715,
+   "semantic_score": 0.157,
+   "sam_url": "https://sam.gov/opp/deb1fc6cb1f24bf482fb14f4851872c0/view"
+  },
+  {
+   "title": "Z1DA--FY27 NRM - Correct Mather Loop Road and Install Speed Bumps",
+   "solicitation_number": "36C26127Q0112",
+   "notice_id": "319573e715c74310b898bd157ccc1377",
+   "naics_code": "236220",
+   "psc_code": "Z1DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-16T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The contractor will dispose of all components demolished or replaced as part of this project.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 9720,
+   "semantic_score": 0.1566,
+   "sam_url": "https://sam.gov/opp/319573e715c74310b898bd157ccc1377/view"
+  },
+  {
+   "title": "NGWSP Cutter Lateral Reach 21 Booster Plant",
+   "solicitation_number": "140RR027B0004",
+   "notice_id": "d20f39b306754b988e0b0b9e2983aad9",
+   "naics_code": "237110",
+   "psc_code": "Y1KZ",
+   "agency": "INTERIOR, DEPARTMENT OF THE / BUREAU OF RECLAMATION",
+   "response_deadline": "2027-01-25T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The principal components of work include the following items:",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": null,
+   "semantic_score": null,
+   "sam_url": "https://sam.gov/opp/d20f39b306754b988e0b0b9e2983aad9/view"
+  }
+ ],
+ "uncertain": [
+  {
+   "title": "WH Ford RTC Fueling System Repairs ",
+   "solicitation_number": "W9128F27RA054",
+   "notice_id": "045214907dfd4e14bf2cbcc7ea1a9e5e",
+   "naics_code": "237120",
+   "psc_code": "Y1GC",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-23T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "and repairing and recoating fuel system canopies, piping, and related components.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237120 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 5809,
+   "semantic_score": 0.2975,
+   "sam_url": "https://sam.gov/opp/045214907dfd4e14bf2cbcc7ea1a9e5e/view"
+  },
+  {
+   "title": "Y1DA | 521-24-102 | Renovate Wards 2K and 2B for Optometry/Ophthalmology Clinical Use",
+   "solicitation_number": "36C24726R0134",
+   "notice_id": "0a4f50772f664aa299a097276497f567",
+   "naics_code": "236220",
+   "psc_code": "Y1DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-19T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "ories 01-21 07 81 00 Applied Fireproofing 10-17 07 84 00 Firestopping 01-21 07 92 00 Joint Sealants 04-22 07 95 13 Expansion Joint Cover Assemblies 01-21 DIVISION 08 - OPENINGS 08 11 13 Hollow Metal Doors and Frames 01-21 08 14 00 Interior Wood Doors 01-21 08 31 13 Access Doors and Frames 04-22 08 41 13 Aluminum-Framed Entrances and Storefronts 01-21 08 71 00 Door Hardware 03-24 08 71 13 Automatic",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "assemblies",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 8682,
+   "semantic_score": 0.2064,
+   "sam_url": "https://sam.gov/opp/0a4f50772f664aa299a097276497f567/view"
+  },
+  {
+   "title": "Z1DZ--Replace Dental Vacuum Piping",
+   "solicitation_number": "36C26127Q0072",
+   "notice_id": "1fec7c173e494cad820af5202590b6f4",
+   "naics_code": "236220",
+   "psc_code": "Z1DZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-17T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "al Metal Framing 06-18 09 29 00 Gypsum Board 04-20 09 51 00 Acoustical Ceilings 12-18 09 91 00 Painting 01-21 DIVISION 13 - SPECIAL CONSTRUCTION 13 05 41 Seismic Restraint Requirements for Non-Structural Components 01-21 DIVISION 22 \u2013 PLUMBING 22 05 11 Common Work Results for Plumbing 01-23 22 05 12 General Motor Requirements for Plumbing Equipment 09-20 22 05 23 General-Duty Valves for Plumbing P",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6916,
+   "semantic_score": 0.2555,
+   "sam_url": "https://sam.gov/opp/1fec7c173e494cad820af5202590b6f4/view"
+  },
+  {
+   "title": "Z2DA--FY27 NRM RENOVATE SURGICAL SUITE  PHASE II",
+   "solicitation_number": "36C24627B0002",
+   "notice_id": "24ea1676f57d4dcbb70c2f668ae2164f",
+   "naics_code": "236220",
+   "psc_code": "Z2DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-11T14:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": " 07 42 43 Composite Wall Panels 07 53 23 Ethylene-Propylene-Diene-Monomer Roofing 01-21 07 60 00 Flashing and Sheet Metal 01-21 07 71 00 Roof Specialties 01-21 07 81 00 Applied Fireproofing 10-17 07 84 00 Firestopping 01-21 07 92 00 Joint Sealants 10-17 DIVISION 08 - OPENINGS 08 11 13 Hollow Metal Doors and Frames 01-21 08 14 00 Interior Wood Doors 01-21 08 17 10 Integrated Door Assemblies 01-21 0",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "assemblies",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7871,
+   "semantic_score": 0.2273,
+   "sam_url": "https://sam.gov/opp/24ea1676f57d4dcbb70c2f668ae2164f/view"
+  },
+  {
+   "title": "Amendment 0006 to Provide Official RFI Responses, Update Solicitation Documents, Extend Proposal Due Date, & other Official Information",
+   "solicitation_number": "36C26027R0002-0006",
+   "notice_id": "299fab9bad854b0786fcc742e3f934d5",
+   "naics_code": "236220",
+   "psc_code": "Y1DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-25T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "12 32 00 Manufactured Wood Casework 01-21 12 36 00 Countertops 12-23 DIVISION 13 - SPECIAL CONSTRUCTION \u2013 NOT USED 13 05 41 Seismic Restraint for Non-Structural Components 09-26 DIVISION 14\u2013 CONVEYING EQUIPEMENT 14 92 00 Pneumatic Tube System 09-23 DIVISION 21- FIRE SUPPRESSION 21 13 13 Wet-Pipe Sprinkler Systems 06-15 DIVISION 22 \u2013 PLUMBING 22 05 11 Common Work Results for Plumbing 01-23 22 05 19",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7594,
+   "semantic_score": 0.2356,
+   "sam_url": "https://sam.gov/opp/299fab9bad854b0786fcc742e3f934d5/view"
+  },
+  {
+   "title": "GAOA Powell Duplex Improvements, Nez Perce - Clearwater National Forest",
+   "solicitation_number": "1240LU27Q0001",
+   "notice_id": "2b976816a33644abb82d9b58843982bb",
+   "naics_code": "236118",
+   "psc_code": "Y1FA",
+   "agency": "AGRICULTURE, DEPARTMENT OF / FOREST SERVICE",
+   "response_deadline": "2026-12-02T01:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "09 2116 - Gypsum Board Assemblies B.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "assemblies",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236118 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 8625,
+   "semantic_score": 0.2075,
+   "sam_url": "https://sam.gov/opp/2b976816a33644abb82d9b58843982bb/view"
+  },
+  {
+   "title": "Amendment 0002 Y1DZ--36C261-28-AP-0022 | 612-27-1-6009-0001 | Construct Modular  Imaging Center in Stockton | 612A4-CSI-002",
+   "solicitation_number": "36C26127Q0029",
+   "notice_id": "2c624d0668744bc89d37e48ea7fb7fd4",
+   "naics_code": "236220",
+   "psc_code": "Y1DZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-04T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "ION 13 - SPECIAL CONSTRUCTION 13 05 41 Seismic Restraint Requirements for Non-Structural Components 01-21 13 34",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 8776,
+   "semantic_score": 0.2041,
+   "sam_url": "https://sam.gov/opp/2c624d0668744bc89d37e48ea7fb7fd4/view"
+  },
+  {
+   "title": "FY23-28 General Construction Services BPA - W911S223S8000",
+   "solicitation_number": "W911S223S8000",
+   "notice_id": "35f133fcffdd4dd8853907bb75bb00ed",
+   "naics_code": "236220",
+   "psc_code": "Z2QA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2027-12-01T04:59:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "Mechanical - Heating, ventilation, and air-conditioning (HVAC) systems and components, chillers, refrigerants, air hand",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6768,
+   "semantic_score": 0.26,
+   "sam_url": "https://sam.gov/opp/35f133fcffdd4dd8853907bb75bb00ed/view"
+  },
+  {
+   "title": "Fairbanks Command and Data Acquisition Station (FCDAS) for Operations and Maintenance Services",
+   "solicitation_number": "1332KP26R0041",
+   "notice_id": "3f8f8ef32fec469ba9fcee54541f6984",
+   "naics_code": "561210",
+   "psc_code": "DG11",
+   "agency": "COMMERCE, DEPARTMENT OF / NATIONAL OCEANIC AND ATMOSPHERIC ADMINISTRATION",
+   "response_deadline": "2026-11-19T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "(DoD Components: refer to DoDI 5200.48, only for specific CUI protection requirements.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7485,
+   "semantic_score": 0.2389,
+   "sam_url": "https://sam.gov/opp/3f8f8ef32fec469ba9fcee54541f6984/view"
+  },
+  {
+   "title": "EAST CANAL EFFICIENCY IMPROVEMENTS",
+   "solicitation_number": "140R4026R0025",
+   "notice_id": "57738cbf0dea458e8e61771c13a35882",
+   "naics_code": "237110",
+   "psc_code": "Y1NE",
+   "agency": "INTERIOR, DEPARTMENT OF THE / BUREAU OF RECLAMATION",
+   "response_deadline": "2026-11-20T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "-- 2 of 300 -- EAST CANAL EFFICIENCY IMPROVEMENTS \u2013 UNCOMPAHGRE PROJECT, COLORADO FOREWORD This solicitation involves furnishing and installing several sections of Pipeline diverting existing open-channel water from the West Loutsenhizer Arroyo into a pipeline system for the Uncompahgre Project to supplement the East Canal as well as upgrading existing components of the East Canal.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 9097,
+   "semantic_score": 0.1956,
+   "sam_url": "https://sam.gov/opp/57738cbf0dea458e8e61771c13a35882/view"
+  },
+  {
+   "title": "Construction of Chilled Water Plant and Site Utility Upgrades at VA Medical Center in West Haven, CT",
+   "solicitation_number": "W912WJ26RA008",
+   "notice_id": "6370f6ed68ac469ea853c27dc60d8a41",
+   "naics_code": "236220",
+   "psc_code": "Y1NB",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-20T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "2 13 08/25 METAL WALL PANELS 07 42 63 08/25 FABRICATED WALL PANEL ASSEMBLIES 07 54 23 1/21 THERMOPLASTIC POLYOLEFIN (TPO) ROOFING 07 60 00 1/21 FLASHING AND SHEET METAL 07 71 00 1/21 ROOF SPECIALTIES 07 72 00 1/21 ROOF ACCESSORIES 07 81 00 7/23 APPLIED FIREPROOFING 07 84 00 1/21 FIRESTOPPING 07 92 00 4/22 JOINT SEALANTS 07 95 13 1/21 EXPANSION JOINT COVER ASSEMBLIES DIVISION 08 - OPENINGS 08 11 13",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "assemblies",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6391,
+   "semantic_score": 0.2724,
+   "sam_url": "https://sam.gov/opp/6370f6ed68ac469ea853c27dc60d8a41/view"
+  },
+  {
+   "title": "Fairbanks Command and Data Acquisition Station (FCDAS) for Operations and Maintenance Services",
+   "solicitation_number": "1332KP26R0041",
+   "notice_id": "6c3b66c3374147d7a8438202ae4908a3",
+   "naics_code": "561210",
+   "psc_code": "DG11",
+   "agency": "COMMERCE, DEPARTMENT OF / NATIONAL OCEANIC AND ATMOSPHERIC ADMINISTRATION",
+   "response_deadline": "2026-11-19T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "(DoD Components: refer to DoDI 5200.48, only for specific CUI protection requirements.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7486,
+   "semantic_score": 0.2389,
+   "sam_url": "https://sam.gov/opp/6c3b66c3374147d7a8438202ae4908a3/view"
+  },
+  {
+   "title": "GAOA  Facilities, Barracks Inyo NF",
+   "solicitation_number": "1240BH26Q0078",
+   "notice_id": "705abfc6d1564a89bfe4e40f52b9e2f6",
+   "naics_code": "236220",
+   "psc_code": "Z1FB",
+   "agency": "AGRICULTURE, DEPARTMENT OF / FOREST SERVICE",
+   "response_deadline": "2026-11-18T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "07 80 00 - Fire Protection (Historic Shake Roof) DIVISION 08 - OPENINGS 08 10 00 - Doors 08 11 00 - Metal Doors and Frames 08 14 00 - Interior Wood Doors 08 40 00 - Entrance Doors, Storm and Screen Doors 08 50 00 - Windows 08 70 00 - Hardware -- 2 of 139 -- Inyo National Forest 08 90 00 - Louvers and Vents DIVISION 09 - FINISHES 09 21 00 - Gypsum Board Assemblies 09 51 00 - Acoustical Ceilings 09 ",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "assemblies",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7833,
+   "semantic_score": 0.2279,
+   "sam_url": "https://sam.gov/opp/705abfc6d1564a89bfe4e40f52b9e2f6/view"
+  },
+  {
+   "title": "Fire Door Inspection, Assessment, and Maintenance at the Albuquerque Area IHS Healthcare Facilities",
+   "solicitation_number": "75H70727Q00003",
+   "notice_id": "7390db3f3afa46d3a8424450ec68c329",
+   "naics_code": "561210",
+   "psc_code": "J012",
+   "agency": "HEALTH AND HUMAN SERVICES, DEPARTMENT OF / INDIAN HEALTH SERVICE",
+   "response_deadline": "2026-11-25T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "Applicable life-safety plans, floor plans, door schedules, and photos of door assemblies",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "assemblies",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 9164,
+   "semantic_score": 0.1931,
+   "sam_url": "https://sam.gov/opp/7390db3f3afa46d3a8424450ec68c329/view"
+  },
+  {
+   "title": "Fairbanks Command and Data Acquisition Station (FCDAS) for Operations and Maintenance Services",
+   "solicitation_number": "1332KP26R0041",
+   "notice_id": "7c62b9d76576408181274c7dc79ae5cc",
+   "naics_code": "561210",
+   "psc_code": "DG11",
+   "agency": "COMMERCE, DEPARTMENT OF / NATIONAL OCEANIC AND ATMOSPHERIC ADMINISTRATION",
+   "response_deadline": "2026-11-19T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "(DoD Components: refer to DoDI 5200.48, only for specific CUI protection requirements.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6715,
+   "semantic_score": 0.2616,
+   "sam_url": "https://sam.gov/opp/7c62b9d76576408181274c7dc79ae5cc/view"
+  },
+  {
+   "title": "Z2DZ--Project Number 653-105, Seismic Retrofit of Building 16,    Roseburg VAMC, Oregon",
+   "solicitation_number": "36C10F26R0084 ",
+   "notice_id": "7cea9a6c360a47a2b7cdf8d584239c86",
+   "naics_code": "236220",
+   "psc_code": "Z2DZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-10T21:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": " Seismic Restraint Requirements for Non-Structural Components 01-21 DIVISION 14 \u2013 CONVEYING EQUIPMENT 14 42 50 WHEELCHAIR LIFTS DIVISION 21- FIRE SUPPRESSION 21 08 00 Commissioning of Fire Suppression System 11-16 21 13 13 Wet-Pipe Sprinkler Systems 06-15 DIVISION 22 \u2013 PLUMBING 22 05 11 Common Work Results for Plumbing 01-23 22 05 23 General-Duty Valves for Plumbing Piping 09-20 22 07 11 Plumbing ",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 8255,
+   "semantic_score": 0.2156,
+   "sam_url": "https://sam.gov/opp/7cea9a6c360a47a2b7cdf8d584239c86/view"
+  },
+  {
+   "title": "WH Ford RTC Fueling System Repairs ",
+   "solicitation_number": "W9128F27RA054",
+   "notice_id": "84fbb130d87e4f0da921e419a5eb3e8a",
+   "naics_code": "237120",
+   "psc_code": "Y1GC",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-23T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "and repairing and recoating fuel system canopies, piping, and related components.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237120 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 5982,
+   "semantic_score": 0.2894,
+   "sam_url": "https://sam.gov/opp/84fbb130d87e4f0da921e419a5eb3e8a/view"
+  },
+  {
+   "title": "Z2DA--666-27-102 Lightning Protection Update B71N",
+   "solicitation_number": "36C25926Q0880_1",
+   "notice_id": "a1b1f2db2fcf4f1f9d108530ea86d6e8",
+   "naics_code": "236220",
+   "psc_code": "Z2DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-27T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "The specific location where the grounding system bonds together the structural steel, electrical system, lightning protection components, and plumbing to create an equipotential ground could not be identified during the assessment.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 8462,
+   "semantic_score": 0.2109,
+   "sam_url": "https://sam.gov/opp/a1b1f2db2fcf4f1f9d108530ea86d6e8/view"
+  },
+  {
+   "title": "F-15 Aerospace Ground Equipment (AGE) Facility, Vandenberg SFB",
+   "solicitation_number": "W912PL27S0005",
+   "notice_id": "ab6b9a4a51a94fc2be0fee597c174c6e",
+   "naics_code": "236220",
+   "psc_code": "Y1JZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-20T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "Coastal Corrosion Mitigation: Experience protecting metal buildings and exterior components (such as standing s",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 5723,
+   "semantic_score": 0.3001,
+   "sam_url": "https://sam.gov/opp/ab6b9a4a51a94fc2be0fee597c174c6e/view"
+  },
+  {
+   "title": "Construction of Chilled Water Plant and Site Utility Upgrades at VA Medical Center in West Haven, CT",
+   "solicitation_number": "W912WJ26RA008",
+   "notice_id": "b3184af4cd104d9280c1de6e24e4846f",
+   "naics_code": "236220",
+   "psc_code": "Y1NB",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-20T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "2 13 08/25 METAL WALL PANELS 07 42 63 08/25 FABRICATED WALL PANEL ASSEMBLIES 07 54 23 1/21 THERMOPLASTIC POLYOLEFIN (TPO) ROOFING 07 60 00 1/21 FLASHING AND SHEET METAL 07 71 00 1/21 ROOF SPECIALTIES 07 72 00 1/21 ROOF ACCESSORIES 07 81 00 7/23 APPLIED FIREPROOFING 07 84 00 1/21 FIRESTOPPING 07 92 00 4/22 JOINT SEALANTS 07 95 13 1/21 EXPANSION JOINT COVER ASSEMBLIES DIVISION 08 - OPENINGS 08 11 13",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "assemblies",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7401,
+   "semantic_score": 0.2415,
+   "sam_url": "https://sam.gov/opp/b3184af4cd104d9280c1de6e24e4846f/view"
+  },
+  {
+   "title": "Z1DZ--Replace Dental Vacuum Piping",
+   "solicitation_number": "36C26127Q0072",
+   "notice_id": "b494949bc2684d028ff9f14aa4ae6c17",
+   "naics_code": "236220",
+   "psc_code": "Z1DZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-17T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "al Metal Framing 06-18 09 29 00 Gypsum Board 04-20 09 51 00 Acoustical Ceilings 12-18 09 91 00 Painting 01-21 DIVISION 13 - SPECIAL CONSTRUCTION 13 05 41 Seismic Restraint Requirements for Non-Structural Components 01-21 DIVISION 22 \u2013 PLUMBING 22 05 11 Common Work Results for Plumbing 01-23 22 05 12 General Motor Requirements for Plumbing Equipment 09-20 22 05 23 General-Duty Valves for Plumbing P",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6917,
+   "semantic_score": 0.2554,
+   "sam_url": "https://sam.gov/opp/b494949bc2684d028ff9f14aa4ae6c17/view"
+  },
+  {
+   "title": "Fire Door Inspection, Assessment, and Maintenance at the Albuquerque Area IHS Healthcare Facilities",
+   "solicitation_number": "75H70727Q00003",
+   "notice_id": "c144fd6e73834d7f8acd2f4ecf625328",
+   "naics_code": "561210",
+   "psc_code": "J012",
+   "agency": "HEALTH AND HUMAN SERVICES, DEPARTMENT OF / INDIAN HEALTH SERVICE",
+   "response_deadline": "2026-11-24T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "Applicable life-safety plans, floor plans, door schedules, and photos of door assemblies",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "assemblies",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 9104,
+   "semantic_score": 0.1954,
+   "sam_url": "https://sam.gov/opp/c144fd6e73834d7f8acd2f4ecf625328/view"
+  },
+  {
+   "title": "Float Well Pipe Repairs, Surry Mountain Dam, Surry, NH",
+   "solicitation_number": "W912WJ27X1CTD",
+   "notice_id": "c238a780fbd94c20996b45ed89f84c2c",
+   "naics_code": "237990",
+   "psc_code": null,
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-23T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "HUBZone, small business, etc.), as well as qualifications and experience in performing the work components stated above.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7728,
+   "semantic_score": 0.2311,
+   "sam_url": "https://sam.gov/opp/c238a780fbd94c20996b45ed89f84c2c/view"
+  },
+  {
+   "title": "Y1DZ--Project Number 657-507, Correct Seismic Deficiencies for  Building 14, Marion VAMC, Illinois    Construction of New Boiler Plant and Demolition of Existing",
+   "solicitation_number": "36C10F26R0085",
+   "notice_id": "ebfedf446ea34a92912572363b013769",
+   "naics_code": "236220",
+   "psc_code": "Y1DZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-20T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "ne Air Barrier, Vapor Permeable 01-21 07 54 23 Thermoplastic Polyolefin (TPO) Roofing 01-21 07 60 00 Flashing and Sheet Metal 01-21 07 71 00 Roof Specialties 01-21 07 72 00 Roof Accessories 01-21 07 81 00 Applied Fireproofing 07-23 07 84 00 Firestopping 01-21 07 92 00 Joint Sealants 04-22 07 95 13 Expansion Joint Cover Assemblies 01-21 DIVISION 08 - OPENINGS 08 11 13 Hollow Metal Doors and Frames ",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "assemblies",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 8059,
+   "semantic_score": 0.2219,
+   "sam_url": "https://sam.gov/opp/ebfedf446ea34a92912572363b013769/view"
+  },
+  {
+   "title": "Y1DA--NRM-CONST 528-CSI-102 Urology Equipment Site Prep | FY27 NRM",
+   "solicitation_number": "36C24226B0065",
+   "notice_id": "ee6285b153234cda8c6c7e99b03840d7",
+   "naics_code": "236220",
+   "psc_code": "Y1DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-07T15:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "es 01-21 08 14 00 Interior Wood Doors 01-21 08 17 10 Integrated Door Assemblies 01-21 08 31 13 Access Doors and Frames 04-22 08 71 00 Door Hardware 05-22 08 71 13 Automatic Door Operators 01-21 -- 2 of 1298 -- 00 01 10-2 Buffalo VAMC Design Urology Equipment Site Prep Buffalo, NY Project# 528-CSI-102 SECTION NO.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "assemblies",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 8267,
+   "semantic_score": 0.2154,
+   "sam_url": "https://sam.gov/opp/ee6285b153234cda8c6c7e99b03840d7/view"
+  },
+  {
+   "title": "36C25627R0012_SOLICITATION_NOTICE_REPLACE PERIMETER SECURITY FENCE",
+   "solicitation_number": "36C25627R0012_SOLICITATION",
+   "notice_id": "f31b5c7a119a4fd28bc966e52981d952",
+   "naics_code": "236220",
+   "psc_code": "Y1DZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-17T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "(1) year parts and labor warranty on equipment, components, and materials furnished plus any manufacturer\u2019s warranty greater than one",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "component",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 5770,
+   "semantic_score": 0.2985,
+   "sam_url": "https://sam.gov/opp/f31b5c7a119a4fd28bc966e52981d952/view"
+  },
+  {
+   "title": "Y1DA--NRM-CONST 528-CSI-102 Urology Equipment Site Prep | FY27 NRM",
+   "solicitation_number": "36C24226B0065",
+   "notice_id": "febca32da44741ebb4db61c4adf224ae",
+   "naics_code": "236220",
+   "psc_code": "Y1DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-07T15:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "es 01-21 08 14 00 Interior Wood Doors 01-21 08 17 10 Integrated Door Assemblies 01-21 08 31 13 Access Doors and Frames 04-22 08 71 00 Door Hardware 05-22 08 71 13 Automatic Door Operators 01-21 -- 2 of 1298 -- 00 01 10-2 Buffalo VAMC Design Urology Equipment Site Prep Buffalo, NY Project# 528-CSI-102 SECTION NO.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "assemblies",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "term only in a specification table-of-contents line",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 8268,
+   "semantic_score": 0.2154,
+   "sam_url": "https://sam.gov/opp/febca32da44741ebb4db61c4adf224ae/view"
+  }
+ ]
+}

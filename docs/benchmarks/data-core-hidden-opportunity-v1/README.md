@@ -6,7 +6,7 @@ reviewers is not human ground truth. Nothing in this folder is wired into the pr
 
 Owner: Agent 4 (Data Core). Audit it supports: "Mindy Data Core — Classification-Resilient Opportunity
 Intelligence" (claude.ai artifact Q4L1LUYRvHEqcMuhBKxcAR). Experiment write-up: `EXPERIMENT.md`.
-Human review: `review/`. Design review request to Agents 1 and 3: `DESIGN-REVIEW-REQUEST.md`.
+Human review: `review/` and the accept/reject page https://claude.ai/artifact/ALfvurSY5XuhbNCamX1RAi (decisions saved in its `reviews` collection). v2 prototype and results: `v2/EXPERIMENT-V2.md`. Design review request to Agents 1 and 3: `DESIGN-REVIEW-REQUEST.md`.
 
 ## Question
 

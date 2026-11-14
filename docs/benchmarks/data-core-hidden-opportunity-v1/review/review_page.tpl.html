@@ -1,0 +1,205 @@
+<title>Hidden-Opportunity Label Review</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: work queue on the left, one notice at a time on the right; stacks on phones. */
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --ink:#18202b; --muted:#5c6776; --line:#dde2e8;
+  --accent:#1f5fae; --accent-ink:#ffffff; --hl:#fff1b8; --hl-ink:#3a2c00;
+  --ok:#1d7a46; --ok-bg:#e3f4ea; --bad:#b4342b; --bad-bg:#fbe7e5; --pend:#8a6a00; --pend-bg:#fbf1d2;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11161d; --panel:#18202a; --ink:#e6ebf1; --muted:#9aa6b4; --line:#2b3542;
+  --accent:#6ea6ec; --accent-ink:#0b1320; --hl:#5a4a0a; --hl-ink:#fff3c4;
+  --ok:#6fd39a; --ok-bg:#163525; --bad:#f08a80; --bad-bg:#3a1b19; --pend:#e8c766; --pend-bg:#3a3010; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11161d; --panel:#18202a; --ink:#e6ebf1; --muted:#9aa6b4; --line:#2b3542;
+  --accent:#6ea6ec; --accent-ink:#0b1320; --hl:#5a4a0a; --hl-ink:#fff3c4;
+  --ok:#6fd39a; --ok-bg:#163525; --bad:#f08a80; --bad-bg:#3a1b19; --pend:#e8c766; --pend-bg:#3a3010; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px;max-width:1280px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header h1{font-size:20px;font-weight:600;margin:0;text-wrap:balance}
+header p{margin:4px 0 0;color:var(--muted);max-width:75ch}
+.status{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px}
+.status b{color:var(--ink)}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;flex:1 1 160px;min-width:120px}
+.bar i{display:block;height:100%;background:var(--accent);width:0}
+.grid{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:1fr}}
+nav{background:var(--panel);border:1px solid var(--line);border-radius:8px;max-height:78vh;overflow:auto}
+@media (max-width:860px){nav{max-height:240px}}
+nav h2{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0;padding:10px 12px 4px;font-weight:600}
+nav h2 small{text-transform:none;letter-spacing:0;font-weight:400}
+nav button{all:unset;box-sizing:border-box;display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:8px;align-items:center;width:100%;padding:7px 12px;cursor:pointer;border-top:1px solid var(--line);font-size:13px}
+nav button:hover{background:var(--bg)}
+nav button[aria-current="true"]{background:var(--bg);box-shadow:inset 3px 0 0 var(--accent)}
+nav button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+nav .rid{font-family:var(--mono);font-size:12px;color:var(--muted)}
+nav .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip{font-size:11px;font-weight:600;padding:2px 7px;border-radius:999px;white-space:nowrap}
+.chip.pend{background:var(--pend-bg);color:var(--pend)} .chip.ok{background:var(--ok-bg);color:var(--ok)} .chip.bad{background:var(--bad-bg);color:var(--bad)}
+main{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.eyebrow{font-family:var(--mono);font-size:12px;color:var(--muted)}
+main h2{font-size:19px;margin:2px 0 0;font-weight:600;text-wrap:balance}
+.meta{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--muted)}
+.meta code{font-family:var(--mono);color:var(--ink);background:var(--bg);padding:1px 5px;border-radius:4px}
+.biz{background:var(--bg);border-radius:6px;padding:10px 12px;font-size:14px}
+.biz b{font-weight:600}
+dl{display:grid;grid-template-columns:150px minmax(0,1fr);gap:6px 14px;margin:0;font-size:14px}
+@media (max-width:560px){dl{grid-template-columns:1fr}}
+dt{color:var(--muted)} dd{margin:0}
+blockquote{margin:0;border-left:3px solid var(--accent);padding:8px 12px;background:var(--bg);border-radius:0 6px 6px 0;font-size:14px}
+blockquote .src{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+mark{background:var(--hl);color:var(--hl-ink);padding:0 2px;border-radius:2px}
+details{border:1px solid var(--line);border-radius:6px}
+summary{cursor:pointer;padding:8px 12px;font-size:13px;color:var(--muted)}
+.full{padding:0 12px 12px;font-size:13.5px;max-height:420px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
+.full h4{margin:10px 0 4px;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.decide{border-top:1px solid var(--line);padding-top:14px;display:flex;flex-direction:column;gap:10px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{font:inherit;font-size:14px;padding:7px 14px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);font-weight:600}
+textarea{font:inherit;font-size:14px;width:100%;box-sizing:border-box;min-height:56px;border:1px solid var(--line);border-radius:6px;padding:8px;background:var(--panel);color:var(--ink)}
+.hint{font-size:12px;color:var(--muted)}
+.msg{font-size:13px;min-height:1.2em}
+.msg.err{color:var(--bad)} .msg.ok{color:var(--ok)}
+a{color:var(--accent)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Hidden-opportunity label review</h1>
+    <p>Each notice below carries a relevance label written by AI reviewers. Nobody has checked them. For each one, read the source text and either accept the proposed label or choose the correct one. Your decisions are saved for Agent 4 to score the benchmark. Start with the G items.</p>
+  </header>
+  <div class="status" id="status"><span>Loading saved decisions…</span></div>
+  <div class="grid">
+    <nav id="queue" aria-label="Review queue"></nav>
+    <main id="detail" aria-live="polite"></main>
+  </div>
+</div>
+
+<script>
+const ITEMS = __DATA__;
+const GROUPS = [
+  ['gate-unseen','G · Evidence the AI reviewers did not see','Decides whether the gate’s false positives are real'],
+  ['recovered','R · The 11 recovered opportunities','From the audit demonstration'],
+  ['random','S · 30 random labeled notices','Seeded hash draw, reproducible'],
+];
+const LABEL_HELP = {FIT:'Main work bought is this business’s service', PARTIAL:'A stated component of a larger job (could prime or sub that part)', NO:'Something else, or no evidence of the service'};
+const decisions = {};            // review_id -> saved doc
+let db = null, user = null, current = ITEMS[0].id, draft = {};
+
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function highlight(text, quote){
+  const t = esc(text); if(!quote) return t;
+  const q = esc(quote.slice(0, 120)).trim(); if(q.length < 20) return t;
+  const i = t.indexOf(q); if(i < 0) return t;
+  // extend to the full quoted sentence length if present
+  const full = esc(quote); const j = t.indexOf(full);
+  return j >= 0 ? t.slice(0,j)+'<mark>'+full+'</mark>'+t.slice(j+full.length) : t.slice(0,i)+'<mark>'+q+'</mark>'+t.slice(i+q.length);
+}
+function chipFor(id){
+  const d = decisions[id];
+  if(!d) return '<span class="chip pend">To review</span>';
+  return d.decision === 'accept' ? `<span class="chip ok">Accepted</span>` : `<span class="chip bad">Changed to ${esc(d.human_label)}</span>`;
+}
+function renderStatus(){
+  const done = ITEMS.filter(i => decisions[i.id]).length;
+  const acc = ITEMS.filter(i => decisions[i.id]?.decision === 'accept').length;
+  const g = ITEMS.filter(i => i.kind==='gate-unseen'); const gd = g.filter(i => decisions[i.id]).length;
+  document.getElementById('status').innerHTML =
+    `<span><b>${done}</b> of ${ITEMS.length} reviewed</span><span class="bar" aria-hidden="true"><i style="width:${100*done/ITEMS.length}%"></i></span>`+
+    `<span>G items <b>${gd}/${g.length}</b></span><span>Accepted <b>${acc}</b> · Changed <b>${done-acc}</b></span>`+
+    (db ? '' : '<span>Saving is unavailable in this view. Decisions will not be kept.</span>');
+}
+function renderQueue(){
+  const q = document.getElementById('queue'); let h='';
+  for(const [k,label,sub] of GROUPS){
+    h += `<h2>${esc(label)}<br><small>${esc(sub)}</small></h2>`;
+    for(const it of ITEMS.filter(i => i.kind===k)){
+      h += `<button type="button" data-id="${it.id}" aria-current="${it.id===current}"><span class="rid">${it.id}</span><span class="t">${esc(it.title)}</span>${chipFor(it.id)}</button>`;
+    }
+  }
+  q.innerHTML = h;
+  q.querySelectorAll('button').forEach(b => b.onclick = () => select(b.dataset.id));
+}
+function select(id){ current = id; draft = {}; renderQueue(); renderDetail(); document.getElementById('detail').scrollIntoView({block:'nearest'}); }
+function renderDetail(){
+  const it = ITEMS.find(i => i.id===current); const d = decisions[it.id];
+  const choice = draft.label ?? (d ? d.human_label : null);
+  const notes = draft.notes ?? (d?.notes || '');
+  const quoteSrc = it.kind==='gate-unseen' ? 'Sentence the evidence gate quoted (outside the excerpt the AI reviewers saw)' : (it.note ? it.note : 'Scope excerpt');
+  document.getElementById('detail').innerHTML = `
+    <div><div class="eyebrow">${it.id} · ${esc(it.biz)} · benchmark item ${esc(it.item)}</div>
+      <h2>${esc(it.title)}</h2></div>
+    <div class="meta"><span>Solicitation <code>${esc(it.sol||'none')}</code></span><span>NAICS <code>${esc(it.naics||'none')}</code></span><span>PSC <code>${esc(it.psc||'none')}</code></span><span>${esc(it.agency)}</span><a href="${esc(it.url)}" target="_blank" rel="noopener">Open on SAM.gov</a></div>
+    <div class="biz"><b>The business:</b> ${esc(it.desc)}</div>
+    <blockquote><span class="src">${esc(quoteSrc)}</span>${esc(it.quote)}</blockquote>
+    <dl>
+      <dt>Ordinary search</dt><dd>${esc(it.why)}</dd>
+      <dt>Meaning search</dt><dd>${esc(it.sem)}</dd>
+      <dt>AI reviewers</dt><dd>Reviewer 1 said ${esc(it.r1)}, reviewer 2 said ${esc(it.r2)}${it.adj?`, adjudicated ${esc(it.adj)}`:''}.</dd>
+    </dl>
+    <details ${it.kind==='gate-unseen'?'open':''}><summary>Full source text from the notice (description and SOW as cached by Mindy)</summary>
+      <div class="full"><h4>Description</h4>${highlight(it.descr||'(none)', it.quote)}${it.sow?`<h4>SOW / attachment text</h4>${highlight(it.sow, it.quote)}`:''}</div></details>
+    <section class="decide" aria-label="Your decision">
+      <div class="row"><span>Proposed label: <b>${esc(it.proposed)}</b> <span class="hint">(${esc(LABEL_HELP[it.proposed]||'')})</span></span></div>
+      <div class="row">
+        <button class="btn primary" id="acceptBtn" type="button">Accept ${esc(it.proposed)}</button>
+        <span class="hint">or set the correct label:</span>
+        ${['FIT','PARTIAL','NO'].map(l=>`<button class="btn" type="button" data-l="${l}" aria-pressed="${choice===l}" title="${esc(LABEL_HELP[l])}">${l}</button>`).join('')}
+      </div>
+      <label class="hint" for="notes">Notes (optional)</label>
+      <textarea id="notes" placeholder="What decided it">${esc(notes)}</textarea>
+      <div class="row"><button class="btn" id="saveBtn" type="button">Save decision</button><button class="btn" id="nextBtn" type="button">Next item</button><span class="msg" id="msg">${d?`Saved: ${d.decision==='accept'?'accepted':'changed to '+esc(d.human_label)}`:''}</span></div>
+      <div class="hint">Keys: A accept · 1 FIT · 2 PARTIAL · 3 NO · S save · N next</div>
+    </section>`;
+  document.getElementById('notes').oninput = e => draft.notes = e.target.value;
+  document.querySelectorAll('[data-l]').forEach(b => b.onclick = () => { draft.label = b.dataset.l; renderDetailKeep(); });
+  document.getElementById('acceptBtn').onclick = () => save(it, it.proposed);
+  document.getElementById('saveBtn').onclick = () => { const l = draft.label ?? d?.human_label; if(!l){ msg('Choose FIT, PARTIAL or NO, or press Accept.', true); return;} save(it, l); };
+  document.getElementById('nextBtn').onclick = next;
+}
+function renderDetailKeep(){ const n = draft.notes; renderDetail(); if(n!==undefined) document.getElementById('notes').value = n; }
+function msg(t, err){ const m = document.getElementById('msg'); if(m){ m.textContent = t; m.className = 'msg ' + (err?'err':'ok'); } }
+function next(){ const i = ITEMS.findIndex(x => x.id===current); const after = ITEMS.slice(i+1).concat(ITEMS.slice(0,i+1)); const n = after.find(x => !decisions[x.id]) || ITEMS[(i+1)%ITEMS.length]; select(n.id); }
+let saving = false;
+async function save(it, label){
+  if(!db){ msg('Saving is unavailable in this view, so this decision was not kept.', true); return; }
+  if(saving) return; saving = true; msg('Saving…');
+  const notes = (draft.notes ?? decisions[it.id]?.notes ?? '').slice(0, 2000);
+  const doc = { review_id: it.id, item_id: it.item, business: it.biz, notice_id: it.url.split('/opp/')[1]?.split('/')[0] || '',
+    proposed_label: it.proposed, human_label: label, decision: label===it.proposed ? 'accept' : 'change', notes,
+    reviewer_id: user ? await user.id().catch(()=>null) : null, saved_at: new Date().toISOString() };
+  try { await db.collection('reviews').doc(it.id).set(doc); decisions[it.id] = doc; draft = {}; renderStatus(); renderQueue(); msg(label===it.proposed?'Accepted and saved.':`Saved as ${label}.`); }
+  catch(e){ msg(e?.code==='not_granted' || e?.code==='permission_denied' ? 'You can view this page but not save decisions. Ask the owner for edit access.' : 'Could not save. Check your connection and press Save again.', true); }
+  finally { saving = false; }
+}
+document.addEventListener('keydown', e => {
+  if(e.target.tagName==='TEXTAREA' || e.metaKey || e.ctrlKey || e.altKey) return;
+  const it = ITEMS.find(i => i.id===current);
+  if(e.key==='a'||e.key==='A') save(it, it.proposed);
+  else if(e.key==='1'){ draft.label='FIT'; renderDetailKeep(); }
+  else if(e.key==='2'){ draft.label='PARTIAL'; renderDetailKeep(); }
+  else if(e.key==='3'){ draft.label='NO'; renderDetailKeep(); }
+  else if(e.key==='s'||e.key==='S') document.getElementById('saveBtn')?.click();
+  else if(e.key==='n'||e.key==='N') next();
+});
+renderStatus(); renderQueue(); renderDetail();
+(async () => {
+  const c = window.claude; if(!c?.use){ renderStatus(); return; }
+  [db, user] = await Promise.all([c.use('db'), c.use('user')]);
+  if(!db){ renderStatus(); return; }
+  const timer = setTimeout(() => { document.getElementById('status').insertAdjacentHTML('beforeend','<span>Saved decisions are taking a while to load.</span>'); }, 10000);
+  db.collection('reviews').onSnapshot(snap => {
+    clearTimeout(timer);
+    for(const k of Object.keys(decisions)) delete decisions[k];
+    snap.docs.forEach(d => { const v = d.data(); if(v) decisions[d.id] = v; });
+    renderStatus(); renderQueue();
+  }, () => { clearTimeout(timer); document.getElementById('status').insertAdjacentHTML('beforeend','<span>Could not load saved decisions.</span>'); });
+})();
+</script>

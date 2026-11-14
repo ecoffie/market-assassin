@@ -1,0 +1,3152 @@
+{
+ "query": "We maintain HVAC systems.",
+ "trade_term_list": "hvac",
+ "trade_similarity": 0.7235,
+ "rules_version": "evidence-rules-v2",
+ "plan_status": "ok",
+ "released_counts_unchanged": {
+  "DIRECT_MATCH": 113,
+  "RELATED_MARKET_CANDIDATE": 0,
+  "other": 98,
+  "matched_total": 211
+ },
+ "lane": {
+  "candidates": 109,
+  "shown": 71,
+  "uncertain_not_shown": 33,
+  "other_rows_eligible_for_scope_basis": 98
+ },
+ "timing_ms": {
+  "plan": 1399,
+  "load_vectors": 1212,
+  "rank_and_gate": 429,
+  "total": 3040
+ },
+ "shown": [
+  {
+   "title": "Vertical Transportation Equipment (VTE)",
+   "solicitation_number": "FA480127Q0006",
+   "notice_id": "aa10a072356e4780a1939557b270ea0e",
+   "naics_code": "561210",
+   "psc_code": "J039",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2026-11-17T18:17:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Work conducted on VTE will be in accordance with the American Society of Mechanical Engineers (ASME), National Fire Protection Association Standards (NFPA), Unified Facilities Criteria (UFC) 3-600-01, Fire Protection Engineering for Facilities, including the most recent publications of all guidance, instructions and standards listed in Appendix B, as well as all Occupational Safety and Health Admi",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "semantic",
+    "body_terms"
+   ],
+   "semantic_rank": 16,
+   "semantic_score": 0.4258,
+   "sam_url": "https://sam.gov/opp/aa10a072356e4780a1939557b270ea0e/view"
+  },
+  {
+   "title": "CRAC Units Replacement for MCE 1211 at GFAFB, ND",
+   "solicitation_number": "FA465927QM001",
+   "notice_id": "28d5fb2c970b45f6a2ace9384f20f600",
+   "naics_code": "236220",
+   "psc_code": "N099",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2026-11-24T19:30:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "PREVENTATIVE MAINTENANCE (PM): The contractor shall perform all scheduled PM services within industry standards of the American Society of Heating, Refrigerating and Air-Conditioning Engineers (ASHRAE) guidelines and OEM specifications.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "heating",
+     "kind": "profile"
+    },
+    {
+     "term": "air conditioning",
+     "kind": "profile"
+    },
+    {
+     "term": "Heating contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "semantic",
+    "body_terms"
+   ],
+   "semantic_rank": 23,
+   "semantic_score": 0.4121,
+   "sam_url": "https://sam.gov/opp/28d5fb2c970b45f6a2ace9384f20f600/view"
+  },
+  {
+   "title": "J041--RFQ SDVOSB Set-Aside  CHILLER TUBE CLEANING SERVICES",
+   "solicitation_number": "36C24727Q0073",
+   "notice_id": "5976c44429454e0790be5c6276f95b92",
+   "naics_code": "561210",
+   "psc_code": "J041",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-27T13:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "PRIME_CANDIDATE",
+   "scope_sentence": "Request for Quote: 36C24727Q0073 The Department of Veterans Affairs, Columbia Healthcare System, WJB Dorn VA Medical Center, requires one-time chiller tube cleaning services for two chillers located in the facility s Chiller Plant.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "chiller",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "semantic",
+    "body_terms"
+   ],
+   "semantic_rank": 56,
+   "semantic_score": 0.3818,
+   "sam_url": "https://sam.gov/opp/5976c44429454e0790be5c6276f95b92/view"
+  },
+  {
+   "title": "REPLACE RADIANT HEATING SYSTEM AND EXHAUST FAN, BLDG. 362 DAM NECK ANNEX, VIRGINIA BEACH, VA",
+   "solicitation_number": "N4008527R0037",
+   "notice_id": "4d280588d2ae46059755a777c7dbeb1e",
+   "naics_code": "236220",
+   "psc_code": "Z2AZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE NAVY",
+   "response_deadline": "2026-12-07T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "PRIME_CANDIDATE",
+   "scope_sentence": "PIEE DESCRIPTION: REPLACE RADIANT HEATING SYSTEM AND EXHAUST FAN, BLDG.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "heating",
+     "kind": "profile"
+    },
+    {
+     "term": "Heating contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 101,
+   "semantic_score": 0.3634,
+   "sam_url": "https://sam.gov/opp/4d280588d2ae46059755a777c7dbeb1e/view"
+  },
+  {
+   "title": "Non-personal services Seawater Pump Renovation",
+   "solicitation_number": "1305M327Q0034",
+   "notice_id": "f070889d4f8249b8bb550a7b8c1566ce",
+   "naics_code": "236220",
+   "psc_code": "Z2JZ",
+   "agency": "COMMERCE, DEPARTMENT OF / NATIONAL OCEANIC AND ATMOSPHERIC ADMINISTRATION",
+   "response_deadline": "2026-12-07T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Total Dynamic Head (TDH): 10 Feet 2.3.2 Pump Mechanical Specifications The contractor shall supply and install:",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 104,
+   "semantic_score": 0.3628,
+   "sam_url": "https://sam.gov/opp/f070889d4f8249b8bb550a7b8c1566ce/view"
+  },
+  {
+   "title": "Y1DZ--REPLACE CHILLED WATER PUMP AT THE BOILER PLANT",
+   "solicitation_number": "36C24227R0009_1",
+   "notice_id": "e01164faaa7a45b8ad15a638375edb72",
+   "naics_code": "236220",
+   "psc_code": "Y1DZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-17T15:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "PRIME_CANDIDATE",
+   "scope_sentence": "Please see the following page for the solicitation 36C24227R0009 Amendment 0001 regarding Replace Chilled Water Pump at the Boiler Plant JJP VAMC Bronx, NY.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "boiler",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 149,
+   "semantic_score": 0.3496,
+   "sam_url": "https://sam.gov/opp/e01164faaa7a45b8ad15a638375edb72/view"
+  },
+  {
+   "title": "Y1DZ--REPLACE CHILLED WATER PUMP AT THE BOILER PLANT",
+   "solicitation_number": "36C24227R0009_1",
+   "notice_id": "084edbea5893482f8bab456268879131",
+   "naics_code": "236220",
+   "psc_code": "Y1DZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-17T15:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "PRIME_CANDIDATE",
+   "scope_sentence": "Please see the following page for the solicitation 36C24227R0009 Amendment 0002 regarding Replace Chilled Water Pump at the Boiler Plant JJP VAMC Bronx, NY.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "boiler",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 155,
+   "semantic_score": 0.3489,
+   "sam_url": "https://sam.gov/opp/084edbea5893482f8bab456268879131/view"
+  },
+  {
+   "title": "Mather Fueling System Repairs",
+   "solicitation_number": "PANNWD26P028176",
+   "notice_id": "47f719370de349e9a86e2e1d8ca6b636",
+   "naics_code": "237120",
+   "psc_code": "Y1GC",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-04T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Includes all work to install a sampling gauge hatch on a manway, install a clock type mechanical gauge on a manway, recoat the exterior of the tank, replace the collision barriers, add a catwalk that extends across the entirety of the tank, and replace the audible and visual alarms.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237120 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 177,
+   "semantic_score": 0.3458,
+   "sam_url": "https://sam.gov/opp/47f719370de349e9a86e2e1d8ca6b636/view"
+  },
+  {
+   "title": "Mather Fueling System Repairs",
+   "solicitation_number": "PANNWD26P028176",
+   "notice_id": "749571a8773e4c51bf2d53495be7c41d",
+   "naics_code": "237120",
+   "psc_code": "Y1GC",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-20T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Includes all work to install a sampling gauge hatch on a manway, install a clock type mechanical gauge on a manway, recoat the exterior of the tank, replace the collision barriers, add a catwalk that extends across the entirety of the tank, and replace the audible and visual alarms.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237120 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 178,
+   "semantic_score": 0.3458,
+   "sam_url": "https://sam.gov/opp/749571a8773e4c51bf2d53495be7c41d/view"
+  },
+  {
+   "title": "Mather Fueling System Repairs",
+   "solicitation_number": "PANNWD26P028176",
+   "notice_id": "c1db70a0897e40c99faa13096f8cffab",
+   "naics_code": "237120",
+   "psc_code": "Y1GC",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-20T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Includes all work to install a sampling gauge hatch on a manway, install a clock type mechanical gauge on a manway, recoat the exterior of the tank, replace the collision barriers, add a catwalk that extends across the entirety of the tank, and replace the audible and visual alarms.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237120 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 179,
+   "semantic_score": 0.3458,
+   "sam_url": "https://sam.gov/opp/c1db70a0897e40c99faa13096f8cffab/view"
+  },
+  {
+   "title": "Z1DA--550-20-121 Demo Old Boiler Plant B100 (CON)",
+   "solicitation_number": "36C25227B0002",
+   "notice_id": "3cf3900c479c4dde8bb8b9ecd2de88ef",
+   "naics_code": "236220",
+   "psc_code": "Z1DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-18T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "PRIME_CANDIDATE",
+   "scope_sentence": "Solicitation: 36C25227B0002 Project: 550-20-121: Demo Old Boiler Plant B100 (CON) Location: VA Illiana Health Care System (VAIHCS) 1900 East Main Street Danville, IL 61832 VA Illiana Health Care System (VAIHCS) has a requirement to demolish old boiler plant in Building 100 in accordance with the project drawings and specifications.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "boiler",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 228,
+   "semantic_score": 0.3395,
+   "sam_url": "https://sam.gov/opp/3cf3900c479c4dde8bb8b9ecd2de88ef/view"
+  },
+  {
+   "title": "Z1DA--550-20-121 Demo Old Boiler Plant B100 (CON)",
+   "solicitation_number": "36C25227B0002",
+   "notice_id": "c81ce2acfdf6410aa1e7124791276f8e",
+   "naics_code": "236220",
+   "psc_code": "Z1DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-18T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "PRIME_CANDIDATE",
+   "scope_sentence": "Solicitation: 36C25227B0002 Project: 550-20-121: Demo Old Boiler Plant B100 (CON) Location: VA Illiana Health Care System (VAIHCS) 1900 East Main Street Danville, IL 61832 VA Illiana Health Care System (VAIHCS) has a requirement to demolish old boiler plant in Building 100 in accordance with the project drawings and specifications.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "boiler",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 229,
+   "semantic_score": 0.3395,
+   "sam_url": "https://sam.gov/opp/c81ce2acfdf6410aa1e7124791276f8e/view"
+  },
+  {
+   "title": "Increase Emergency Power",
+   "solicitation_number": "36C24126Q0707",
+   "notice_id": "7cf2475364cb4cb5a6c821dcfcce484c",
+   "naics_code": "236220",
+   "psc_code": "Z2DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-18T20:30:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "It is expected that the following disciplines will be required for the construction of this project: civil, mechanical, electrical, architectural, fire protection, structural and plumbing.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 283,
+   "semantic_score": 0.3331,
+   "sam_url": "https://sam.gov/opp/7cf2475364cb4cb5a6c821dcfcce484c/view"
+  },
+  {
+   "title": "Y1DA--590-27-120 Replace Pneumatic Tube System",
+   "solicitation_number": "36C24627R0010",
+   "notice_id": "d8ac6ae5c05148dbb7910659d9da053a",
+   "naics_code": "236220",
+   "psc_code": "Y1DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-16T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Work includes design and engineering, investigation and verification of existing conditions, removal and disposal of the existing pneumatic tube system and associated equipment, and procurement and installation of a new system in designated areas of Building 110, including the Blood Draw area, Mechanical Room, Interstitial Room, Emergency Department, and Laboratory.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 334,
+   "semantic_score": 0.3299,
+   "sam_url": "https://sam.gov/opp/d8ac6ae5c05148dbb7910659d9da053a/view"
+  },
+  {
+   "title": "HAWAII REGION O&M IDIQ MATOC",
+   "solicitation_number": "W9127827SSN1",
+   "notice_id": "cf9ce1007bfb4155827ad833a2ff2633",
+   "naics_code": "236220",
+   "psc_code": "Z1DA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-23T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The intent of the O&M with Repair and Minor Construction contracts are to provide quick response for performing O&M, repair and minor construction relating, but not limited, to the architectural, mechanical, electrical, instrumentation, security and safety areas of military healthcare and research laboratory facilities in a cost-effective manner.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 338,
+   "semantic_score": 0.3299,
+   "sam_url": "https://sam.gov/opp/cf9ce1007bfb4155827ad833a2ff2633/view"
+  },
+  {
+   "title": "Wilson Hall Floor 16 Electric and Elevator Machine Rooms Fire Rating and Mechanical Upgrade",
+   "solicitation_number": "385515GMK",
+   "notice_id": "18a86d7d75cc4237b498eba70d56eb9e",
+   "naics_code": "236220",
+   "psc_code": "Z2AZ",
+   "agency": "ENERGY, DEPARTMENT OF / ENERGY, DEPARTMENT OF",
+   "response_deadline": "2026-11-17T21:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "PRIME_CANDIDATE",
+   "scope_sentence": "Fermilab has a new requirement for Wilson Hall Floor 16 Electric and Elevator Machine Rooms Fire Rating and Mechanical Upgrade located at Batavia, IL.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 474,
+   "semantic_score": 0.3217,
+   "sam_url": "https://sam.gov/opp/18a86d7d75cc4237b498eba70d56eb9e/view"
+  },
+  {
+   "title": "Wilson Hall Floor 16 Electric and Elevator Machine Rooms Fire Rating and Mechanical Upgrade",
+   "solicitation_number": "385515GMK",
+   "notice_id": "cc1c2c683bb4452694de197f0844ce30",
+   "naics_code": "236220",
+   "psc_code": "Z2AZ",
+   "agency": "ENERGY, DEPARTMENT OF / ENERGY, DEPARTMENT OF",
+   "response_deadline": "2026-11-17T21:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "PRIME_CANDIDATE",
+   "scope_sentence": "Fermilab has a new requirement for Wilson Hall Floor 16 Electric and Elevator Machine Rooms Fire Rating and Mechanical Upgrade located at Batavia, IL.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 475,
+   "semantic_score": 0.3217,
+   "sam_url": "https://sam.gov/opp/cc1c2c683bb4452694de197f0844ce30/view"
+  },
+  {
+   "title": "Gas Line Repair",
+   "solicitation_number": "GasLineRepair",
+   "notice_id": "bd183f1fac734a10bc7bbe0975c4f21c",
+   "naics_code": "237120",
+   "psc_code": "J047",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2026-11-17T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "New material installation shall conform to manufacturers requirements, and to regulations and standards set by 49 CFR 192, the American Petroleum Institute (API), the American Gas Association, and the American Society of Mechanical Engineers (ASME).",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237120 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 509,
+   "semantic_score": 0.3197,
+   "sam_url": "https://sam.gov/opp/bd183f1fac734a10bc7bbe0975c4f21c/view"
+  },
+  {
+   "title": "Fort Leonard Wood BASOPS Solicitation",
+   "solicitation_number": "W5168W26RA011",
+   "notice_id": "227a156fbe324765902e265897ff6f68",
+   "naics_code": "561210",
+   "psc_code": "S216",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2027-01-15T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "(6) functional areas covered under this PWS: Grounds Maintenance, Pavement Clearance (Snow, Ice, and Sand Removal), Facility Maintenance, Facility Maintenance - Horizontal, Heating and Cooling Services, and Army Cemetery.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "heating",
+     "kind": "profile"
+    },
+    {
+     "term": "Heating contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 794,
+   "semantic_score": 0.3055,
+   "sam_url": "https://sam.gov/opp/227a156fbe324765902e265897ff6f68/view"
+  },
+  {
+   "title": "FCC Allenwood - Replace Heating Loop - 27Z2BH9",
+   "solicitation_number": "15B20127PR000166",
+   "notice_id": "9c3d18528e344fd2a323509324fa6c0b",
+   "naics_code": "237110",
+   "psc_code": "Y1FA",
+   "agency": "JUSTICE, DEPARTMENT OF / FEDERAL PRISON SYSTEM / BUREAU OF PRISONS",
+   "response_deadline": "2026-11-20T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "PRIME_CANDIDATE",
+   "scope_sentence": "Replace Heating Loop - 27Z2BH9 FCC Allenwood Allenwood, Pennsylvania This is a Sources Sought Notice .",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "heating",
+     "kind": "profile"
+    },
+    {
+     "term": "Heating contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 877,
+   "semantic_score": 0.3016,
+   "sam_url": "https://sam.gov/opp/9c3d18528e344fd2a323509324fa6c0b/view"
+  },
+  {
+   "title": "Renovate Building 1203-DOAS/AHU and Fire Suppression Water System, March Air Reserve Base, California",
+   "solicitation_number": "W912QR27BA001",
+   "notice_id": "1711cf832a3245baa4c5410b8165b514",
+   "naics_code": "236220",
+   "psc_code": "Z2NB",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-15T15:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "A description of the construction project is as follows: This project will address the mechanical system deficiencies and the sprinkled water supply line into Building 1203 (34,281 SF) at March Air Reserve Base, CA.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 922,
+   "semantic_score": 0.2999,
+   "sam_url": "https://sam.gov/opp/1711cf832a3245baa4c5410b8165b514/view"
+  },
+  {
+   "title": "Integrated Design Build Initial Outfitting (iDBIO) Multiple Award Task Order (MATOC) 6.0 Design Build (DB) Construction in Support of Defense Health Agency (DHA)",
+   "solicitation_number": "W9127S27RA018",
+   "notice_id": "e73fa64ec5f54ac48743fc1520be8155",
+   "naics_code": "236220",
+   "psc_code": "Z2DA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2027-01-07T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Work may include mechanical (to include medical gas and plumbing), electrical, fire protection, architectural (to include building envelope), conveying systems, structural (to include antiterrorism/force protection), and civil/site infrastructure.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 937,
+   "semantic_score": 0.2993,
+   "sam_url": "https://sam.gov/opp/e73fa64ec5f54ac48743fc1520be8155/view"
+  },
+  {
+   "title": "DHS HSI Schwartz 2nd Floor Carpet Replacement",
+   "solicitation_number": "47PD5527Q0010",
+   "notice_id": "c40dbc1f3f8d405bb1db80d80e4c50cb",
+   "naics_code": "236220",
+   "psc_code": "Z2AA",
+   "agency": "GENERAL SERVICES ADMINISTRATION / PUBLIC BUILDINGS SERVICE",
+   "response_deadline": "2026-12-05T00:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The Contractor shall also be responsible for relocating any electrical and/or mechanical building system components necessary to perform this work.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 978,
+   "semantic_score": 0.2979,
+   "sam_url": "https://sam.gov/opp/c40dbc1f3f8d405bb1db80d80e4c50cb/view"
+  },
+  {
+   "title": "Ford Island Hawaii Roll Up Door",
+   "solicitation_number": "Ford_Island_Hawaii_Roll_Up_Door",
+   "notice_id": "581a214ae19346afad259fa9942838b2",
+   "naics_code": "236220",
+   "psc_code": "Z2JZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE NAVY",
+   "response_deadline": "2026-12-01T23:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Relocation of an existing air-conditioning unit and associated ductwork to accommodate installation and operation of new equipment.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "air conditioning",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1043,
+   "semantic_score": 0.2957,
+   "sam_url": "https://sam.gov/opp/581a214ae19346afad259fa9942838b2/view"
+  },
+  {
+   "title": "ANGKOR SENTINEL 27 BASE LIFE SUPPORT FACILITY REHAB SERVICES",
+   "solicitation_number": "W91QVP-26-AS27-BLS",
+   "notice_id": "1e19076d91554ce4a457b8f8fa23f346",
+   "naics_code": "561210",
+   "psc_code": "S216",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-20T23:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Repair or replace air-conditioning systems;",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "air conditioning",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1056,
+   "semantic_score": 0.2949,
+   "sam_url": "https://sam.gov/opp/1e19076d91554ce4a457b8f8fa23f346/view"
+  },
+  {
+   "title": "Z1DA--36C25227B0026 Remodel ENT Procedure Rooms  CON 537-19-109",
+   "solicitation_number": "36C25227B0007",
+   "notice_id": "14da32519d2f4187b272992532c7cc55",
+   "naics_code": "236220",
+   "psc_code": "Z1DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-24T16:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Work involves comprehensive general construction, including demolition, alterations, mechanical, electrical, plumbing, fire protection, and med gases, all to be executed in accordance with the contract specifications and design drawings, in two phases, with work scheduled between 5 pm and 5 am.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1353,
+   "semantic_score": 0.2857,
+   "sam_url": "https://sam.gov/opp/14da32519d2f4187b272992532c7cc55/view"
+  },
+  {
+   "title": "USCG Station Cape Charles Sewage Lift Station Repairs",
+   "solicitation_number": "70ZL1927QELIZ0002",
+   "notice_id": "22c2e5738b374b93819697fb415270c7",
+   "naics_code": "237110",
+   "psc_code": "Z",
+   "agency": "HOMELAND SECURITY, DEPARTMENT OF / US COAST GUARD",
+   "response_deadline": "2026-12-02T00:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "2.5.4 Provide and install a new ventilation system for the vault, extending to a location approved by the COR.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "ventilation",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1375,
+   "semantic_score": 0.2851,
+   "sam_url": "https://sam.gov/opp/22c2e5738b374b93819697fb415270c7/view"
+  },
+  {
+   "title": "Z2DA--FY27 NRM - VISN CSI Base  Fluoroscopy Room C216o Prep - 539-CSI-208",
+   "solicitation_number": "36C25027B0007",
+   "notice_id": "5b6593d8f02240d1af17e97e903f6fd0",
+   "naics_code": "236220",
+   "psc_code": "Z2DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-20T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Work includes architectural, mechanical, electrical, plumbing and other trades as shown and specified in project drawings and specifications.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1382,
+   "semantic_score": 0.285,
+   "sam_url": "https://sam.gov/opp/5b6593d8f02240d1af17e97e903f6fd0/view"
+  },
+  {
+   "title": "VA Canandaigua Phase III Presolicitation Notice ",
+   "solicitation_number": "W912P427BATBD",
+   "notice_id": "a349848dfbf545818cac91b4eaa89873",
+   "naics_code": "236220",
+   "psc_code": "Y1AA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-16T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Building 1 consists of the full interior demolition, Mechanical, Electrical, and Plumbing (MEP) removal to structure, and exterior shell improvements.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1671,
+   "semantic_score": 0.2776,
+   "sam_url": "https://sam.gov/opp/a349848dfbf545818cac91b4eaa89873/view"
+  },
+  {
+   "title": "DHS HSI Schwartz 2nd Floor Carpet Replacement",
+   "solicitation_number": "47PD5527Q0010",
+   "notice_id": "3675ba38b0674995bf133a52f77c9fc6",
+   "naics_code": "236220",
+   "psc_code": "Z2AA",
+   "agency": "GENERAL SERVICES ADMINISTRATION / PUBLIC BUILDINGS SERVICE",
+   "response_deadline": "2026-12-05T00:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The Contractor shall also be responsible for relocating any electrical and/or mechanical building system components necessary to perform this work.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1752,
+   "semantic_score": 0.2753,
+   "sam_url": "https://sam.gov/opp/3675ba38b0674995bf133a52f77c9fc6/view"
+  },
+  {
+   "title": "NMAH: 2027 Install Emergency Generator",
+   "solicitation_number": "33330227RF0010025 ",
+   "notice_id": "6543257e0c4e49059daf554deecf5134",
+   "naics_code": "236220",
+   "psc_code": "Z1JA",
+   "agency": "SMITHSONIAN INSTITUTION / SMITHSONIAN INSTITUTION",
+   "response_deadline": "2027-02-10T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The project also includes all necessary work to support the installation, including routing a new natural gas line through the building, and performing all associated structural, mechanical, electrical, plumbing, security, hazardous material abatement, and architectural modifications required to ensure full functionality, seamless integration with existing systems, and future serviceability and ma",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1825,
+   "semantic_score": 0.2735,
+   "sam_url": "https://sam.gov/opp/6543257e0c4e49059daf554deecf5134/view"
+  },
+  {
+   "title": "USCG Station Milford Haven Water Treatment Repairs and Equipment Replacement",
+   "solicitation_number": "70ZL1927QELIZ0001",
+   "notice_id": "2868af209deb4016b0adf6365fade660",
+   "naics_code": "237110",
+   "psc_code": "Z2NE",
+   "agency": "HOMELAND SECURITY, DEPARTMENT OF / US COAST GUARD",
+   "response_deadline": "2026-12-01T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "STATEMENT OF WORK (SOW) FOR USCG STA Milford Haven Water Treatment Plant Mechanical Overhaul & Equipment Replacement",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1837,
+   "semantic_score": 0.2732,
+   "sam_url": "https://sam.gov/opp/2868af209deb4016b0adf6365fade660/view"
+  },
+  {
+   "title": "36C25627R0012_SOLICITATION_NOTICE_REPLACE PERIMETER SECURITY FENCE",
+   "solicitation_number": "36C25627R0012_SOLICITATION",
+   "notice_id": "f31b5c7a119a4fd28bc966e52981d952",
+   "naics_code": "236220",
+   "psc_code": "Y1DZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-17T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Work includes general construction, architectural, mechanical, electrical, structural work, repair, removal, maintenance, checking equipment, and certain other items as required by construction documents provided.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2092,
+   "semantic_score": 0.2662,
+   "sam_url": "https://sam.gov/opp/f31b5c7a119a4fd28bc966e52981d952/view"
+  },
+  {
+   "title": "FY23-28 General Construction Services BPA - W911S223S8000",
+   "solicitation_number": "W911S223S8000",
+   "notice_id": "35f133fcffdd4dd8853907bb75bb00ed",
+   "naics_code": "236220",
+   "psc_code": "Z2QA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2027-12-01T04:59:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The Statement of Work (SOW) for each Call will include tasks in a variety of areas to include, but not limited to civil, electrical, mechanical, and structural.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2109,
+   "semantic_score": 0.2657,
+   "sam_url": "https://sam.gov/opp/35f133fcffdd4dd8853907bb75bb00ed/view"
+  },
+  {
+   "title": "Tinker AFB 2026 Multiple Award Construction Contract (MACC)",
+   "solicitation_number": "FA8137-26-R-0040",
+   "notice_id": "8cb419e483fd4f74a5c6d6388379bcae",
+   "naics_code": "236210",
+   "psc_code": "Z2JZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2026-11-30T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "AMERICAN SOCIETY OF HEATING, REFRIGERATING AND AIR-CONDITIONING ENGINEERS (ASHRAE) ASHRAE 52.2 (2017) Method of Testing General Ventilation Air-Cleaning Devices for Removal Efficiency by Particle Size AMERICAN SOCIETY OF SAFETY PROFESSIONALS (ASSP) ANSI/ASSP A10.34 (2021) Protection of the Public on or Adjacent to Construction Sites ANSI/ASSP A10.44 (2020) Control of Energy Sources (Lockout/Tagout",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "heating",
+     "kind": "profile"
+    },
+    {
+     "term": "ventilation",
+     "kind": "profile"
+    },
+    {
+     "term": "air conditioning",
+     "kind": "profile"
+    },
+    {
+     "term": "Heating contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    },
+    {
+     "term": "Heating, ventilation and air-conditioning (HVAC) contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2476,
+   "semantic_score": 0.2582,
+   "sam_url": "https://sam.gov/opp/8cb419e483fd4f74a5c6d6388379bcae/view"
+  },
+  {
+   "title": "Demolition of an existing building, Site Improvements and construction of a Modular Office Building at the US Merchant Marine Academy Campus, Kings Point, NY",
+   "solicitation_number": "W912DS26BA033",
+   "notice_id": "70e17b8d56924e50990d7143eb9a4947",
+   "naics_code": "236220",
+   "psc_code": "Y1AA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-07T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "It will house open offices with cubicles, six private offices, two conference rooms, four single-user bathrooms, a kitchenette/pantry room, lactation room, storage closets, and a mechanical room.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2590,
+   "semantic_score": 0.256,
+   "sam_url": "https://sam.gov/opp/70e17b8d56924e50990d7143eb9a4947/view"
+  },
+  {
+   "title": "Wilson Hall Floor 16 Electric and Elevator Machine Rooms Fire Rating and Mechanical Upgrade",
+   "solicitation_number": "385515GMK",
+   "notice_id": "65747435c0224a859780416b36f2d6bf",
+   "naics_code": "236220",
+   "psc_code": "Z2AZ",
+   "agency": "ENERGY, DEPARTMENT OF / ENERGY, DEPARTMENT OF",
+   "response_deadline": "2026-12-09T21:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "PRIME_CANDIDATE",
+   "scope_sentence": "************************************************************************************************************************* Fermilab has a new requirement for Wilson Hall Floor 16 Electric and Elevator Machine Rooms Fire Rating and Mechanical Upgrade located at Batavia, IL.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2735,
+   "semantic_score": 0.2529,
+   "sam_url": "https://sam.gov/opp/65747435c0224a859780416b36f2d6bf/view"
+  },
+  {
+   "title": "Thomas J O Brien Lock and Dam Major Rehabilitation - Construction, Chicago, Cook County, Illinois",
+   "solicitation_number": "PANGLR26P0000029409",
+   "notice_id": "06f5c17bf598488189c38470d5386767",
+   "naics_code": "237990",
+   "psc_code": "Z2KA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-27T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "As the requiring activity, USACE Chicago District delivers comprehensive engineering, design, and construction management to execute structural, mechanical, and electrical revitalization, ensuring long-term operational reliability and structural integrity.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2955,
+   "semantic_score": 0.2481,
+   "sam_url": "https://sam.gov/opp/06f5c17bf598488189c38470d5386767/view"
+  },
+  {
+   "title": "SOLICITATION NOTICE- Massena NY Virtual Law Enforcement Training Facility- Construction",
+   "solicitation_number": "47PC5326R0029",
+   "notice_id": "849c884b31f14251bd3e9ffa64adbc29",
+   "naics_code": "236220",
+   "psc_code": "Y1AA",
+   "agency": "GENERAL SERVICES ADMINISTRATION / PUBLIC BUILDINGS SERVICE",
+   "response_deadline": "2026-11-21T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The contract work incorporates site demolition/excavation/grading/planting/paving, general construction, electrical, mechanical, plumbing, hard-wall partitions, security, and telecommunication work to meet United States Customs and Border Protection (CBP) requirements as follows: 1) Selective demolition of Architectural, Mechanical and Electrical systems, construction, and finishes at nearby Build",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3061,
+   "semantic_score": 0.2463,
+   "sam_url": "https://sam.gov/opp/849c884b31f14251bd3e9ffa64adbc29/view"
+  },
+  {
+   "title": "Department Of Energy - National Nuclear Security Administration Joint Cyber Facility Construction Solicitation",
+   "solicitation_number": "47PB5427R0003",
+   "notice_id": "e87be19f02de482e99c7ad4ca3402fa8",
+   "naics_code": "236220",
+   "psc_code": "Z2JZ",
+   "agency": "GENERAL SERVICES ADMINISTRATION / PUBLIC BUILDINGS SERVICE",
+   "response_deadline": "2026-12-07T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "This requirement for a new turnkey JCF consists of approximately 23,688 square feet of combined office and support space, including approximately 16,000 square feet of finished office workspace and 7,688 square feet of existing mechanical and electrical rooms supporting the space.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3347,
+   "semantic_score": 0.2412,
+   "sam_url": "https://sam.gov/opp/e87be19f02de482e99c7ad4ca3402fa8/view"
+  },
+  {
+   "title": "Travis AFB MACC",
+   "solicitation_number": "FA4427SourcesSought",
+   "notice_id": "f84b488f5a424ca483597c1f0a5eb272",
+   "naics_code": "236210",
+   "psc_code": null,
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2026-12-11T00:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "These tasks will span a broad range of trades, including carpentry, demolition, mechanical, electrical, plumbing, concrete masonry, welding, and paving.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3560,
+   "semantic_score": 0.2376,
+   "sam_url": "https://sam.gov/opp/f84b488f5a424ca483597c1f0a5eb272/view"
+  },
+  {
+   "title": "Bonners Ferry Road Grading",
+   "solicitation_number": "1240BD27Q0001",
+   "notice_id": "d2cd86bb205d4a3bb36f2d0876b90719",
+   "naics_code": "237310",
+   "psc_code": "Z1LB",
+   "agency": "AGRICULTURE, DEPARTMENT OF / FOREST SERVICE",
+   "response_deadline": "2027-10-20T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Equipment used to perform this work shall meet applicable safety standards and shall be in good mechanical condition.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237310 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3589,
+   "semantic_score": 0.237,
+   "sam_url": "https://sam.gov/opp/d2cd86bb205d4a3bb36f2d0876b90719/view"
+  },
+  {
+   "title": "Jacksonville Harbor Maintenance Dredging",
+   "solicitation_number": "W912PM27BA003",
+   "notice_id": "45625a5945a04961a65256a485ccd9be",
+   "naics_code": "237990",
+   "psc_code": "Z1KF",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-31T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Jacksonville Harbor: The Jacksonville Harbor, FL - FY27 O and M Contract (non-fed sponsor Jacksonville Port Authority (JAXPORT)) for maintenance dredging typically requires hopper and pipeline/mechanical dredge(s) depending on work location in the~ 20-mile federal channel.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3605,
+   "semantic_score": 0.2369,
+   "sam_url": "https://sam.gov/opp/45625a5945a04961a65256a485ccd9be/view"
+  },
+  {
+   "title": "Jacksonville Harbor Maintenance Dredging",
+   "solicitation_number": "W912PM27BA003",
+   "notice_id": "b96e603c6ee94dfaa317ef1913a9fa46",
+   "naics_code": "237990",
+   "psc_code": "Z1KF",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-03T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Jacksonville Harbor: The Jacksonville Harbor, FL - FY27 O and M Contract (non-fed sponsor Jacksonville Port Authority (JAXPORT)) for maintenance dredging typically requires hopper and pipeline/mechanical dredge(s) depending on work location in the~ 20-mile federal channel.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3606,
+   "semantic_score": 0.2369,
+   "sam_url": "https://sam.gov/opp/b96e603c6ee94dfaa317ef1913a9fa46/view"
+  },
+  {
+   "title": "Construction Services for Confined Aquatic Disposal Cell Construction and Maintenance Dredging of the Providence River Federal Navigation Project, Providence, Rhode Island.",
+   "solicitation_number": "W912WJ27X1CUP",
+   "notice_id": "f0c0e79824604daf8c7b49c8cbc166bd",
+   "naics_code": "237990",
+   "psc_code": null,
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-03T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The work of this project involves new Confined Aquatic Disposal (CAD) Cell dredging at Edgewood Shoals and maintenance dredging of the Federal Navigation Project (FNP) at Providence River, Providence, Rhode Island of predominantly fine-grained materials by mechanical means.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3718,
+   "semantic_score": 0.2354,
+   "sam_url": "https://sam.gov/opp/f0c0e79824604daf8c7b49c8cbc166bd/view"
+  },
+  {
+   "title": "Construction Services for Confined Aquatic Disposal Cell Construction and Maintenance Dredging of the Providence River Federal Navigation Project, Providence, Rhode Island.",
+   "solicitation_number": "W912WJ27X1CUP",
+   "notice_id": "a426eaa48dd345d08ade07b924e9c4a4",
+   "naics_code": "237990",
+   "psc_code": null,
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-26T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The work of this project involves new Confined Aquatic Disposal (CAD) Cell dredging at Edgewood Shoals and maintenance dredging of the Federal Navigation Project (FNP) at Providence River, Providence, Rhode Island of predominantly fine-grained materials by mechanical means.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3720,
+   "semantic_score": 0.2354,
+   "sam_url": "https://sam.gov/opp/a426eaa48dd345d08ade07b924e9c4a4/view"
+  },
+  {
+   "title": "Facility Readiness and Maintenance Execution (FRAME) Request for Proposal (RFP) - DRAFT",
+   "solicitation_number": "FA461027R0001",
+   "notice_id": "f71aad73670b4b7e9b23c5c650adee08",
+   "naics_code": "561210",
+   "psc_code": "Z1AZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2027-02-01T00:30:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The scope of work involves facility infrastructure and systems (including water and gas mains, roads, generators, power distribution, HVAC, waste systems, and roofing) alongside the execution of distinct sustainment projects and standby support for urgent repairs during select launch operations to ensure maximum operational readiness.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "hvac",
+     "kind": "profile"
+    },
+    {
+     "term": "HVAC (heating, ventilation and air-conditioning) contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3786,
+   "semantic_score": 0.2344,
+   "sam_url": "https://sam.gov/opp/f71aad73670b4b7e9b23c5c650adee08/view"
+  },
+  {
+   "title": "Construction Services for the Gate 7 Parking Garage St. Elizabeths West Campus",
+   "solicitation_number": "47PB5126R0038 ",
+   "notice_id": "b186c45b95294ce7a599f20bb542fff2",
+   "naics_code": "236220",
+   "psc_code": "Y1AZ",
+   "agency": "GENERAL SERVICES ADMINISTRATION / PUBLIC BUILDINGS SERVICE",
+   "response_deadline": "2026-11-23T21:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "uding structural framing, parking decks, ramps, stairs, elevators, roof assemblies, and related structural components Mechanically ventilated parking garage systems, including ventilation equipment, shafts, ductwork, louvers or openings, controls, electrical power, life-safety interfaces, testing, balancing, and commissioning support Exterior fa ade and building envelope construction, including a ",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "ventilation",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3954,
+   "semantic_score": 0.2316,
+   "sam_url": "https://sam.gov/opp/b186c45b95294ce7a599f20bb542fff2/view"
+  },
+  {
+   "title": "General Construction Services for Elevator Modernization at the Thurgood Marshall U.S. Courthouse, New York, NY",
+   "solicitation_number": "47PB5126R0018",
+   "notice_id": "a4ca821173344d1ebdf7b47031c09260",
+   "naics_code": "236220",
+   "psc_code": "Y1AA",
+   "agency": "GENERAL SERVICES ADMINISTRATION / PUBLIC BUILDINGS SERVICE",
+   "response_deadline": "2026-12-04T21:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "This project will include scope to modernize seventeen (17) elevators, as well as upgrade mechanical, electrical and fire protection equipment within the elevator machine rooms.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 4032,
+   "semantic_score": 0.2302,
+   "sam_url": "https://sam.gov/opp/a4ca821173344d1ebdf7b47031c09260/view"
+  },
+  {
+   "title": "Solicitation:  Construct Combat Rescue Helicopter Flight Simulator Facility at Moffett ANGB",
+   "solicitation_number": "W50S8X26BA011",
+   "notice_id": "e323b5748db4496680bee238d37b6fdd",
+   "naics_code": "236220",
+   "psc_code": "Y1AZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-27T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "ecure tele-communication rooms, latrine facilities and mechanical, electrical and utility support rooms utilizing conventional design and construction.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 4127,
+   "semantic_score": 0.2286,
+   "sam_url": "https://sam.gov/opp/e323b5748db4496680bee238d37b6fdd/view"
+  },
+  {
+   "title": "Solicitation:  Construct Combat Rescue Helicopter Flight Simulator Facility at Moffett ANGB",
+   "solicitation_number": "W50S8X26BA011",
+   "notice_id": "5dfe3be29797483cb34ebea03b77c74d",
+   "naics_code": "236220",
+   "psc_code": "Y1AZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-27T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "ecure tele-communication rooms, latrine facilities and mechanical, electrical and utility support rooms utilizing conventional design and construction.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 4149,
+   "semantic_score": 0.2283,
+   "sam_url": "https://sam.gov/opp/5dfe3be29797483cb34ebea03b77c74d/view"
+  },
+  {
+   "title": "General Construction Services for Elevator Modernization at the Thurgood Marshall U.S. Courthouse, New York, NY",
+   "solicitation_number": "47PB5126R0018",
+   "notice_id": "82054a01032d4fb4b1202ed23f7c7373",
+   "naics_code": "236220",
+   "psc_code": "Y1AA",
+   "agency": "GENERAL SERVICES ADMINISTRATION / PUBLIC BUILDINGS SERVICE",
+   "response_deadline": "2026-12-04T21:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "This project will include scope to modernize seventeen (17) elevators, as well as upgrade mechanical, electrical and fire protection equipment within the elevator machine rooms.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 4249,
+   "semantic_score": 0.2269,
+   "sam_url": "https://sam.gov/opp/82054a01032d4fb4b1202ed23f7c7373/view"
+  },
+  {
+   "title": "Great Lakes Restoration Initiative (GLRI) Monguagon Creek Upper Trenton Channel (MCUTC)",
+   "solicitation_number": "W911XK27BA006",
+   "notice_id": "67428bcce0ed40d7a5a00f7c78950776",
+   "naics_code": "237990",
+   "psc_code": "Y1KF",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-10T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Army Corps of Engineers (USACE) Detroit District is seeking contractors with the capability to provide environmental (mechanical) dredging and placement of contaminated sediment construction services in the Monguagon Creek Upper Trenton Channel (MCUTC) located in Riverview, Michigan.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 4423,
+   "semantic_score": 0.224,
+   "sam_url": "https://sam.gov/opp/67428bcce0ed40d7a5a00f7c78950776/view"
+  },
+  {
+   "title": "General Construction Services for Elevator Modernization at the Thurgood Marshall U.S. Courthouse, New York, NY",
+   "solicitation_number": "47PB5126R0018",
+   "notice_id": "943734c4f5ab4cfbba8deec8fb97bd35",
+   "naics_code": "236220",
+   "psc_code": "Y1AA",
+   "agency": "GENERAL SERVICES ADMINISTRATION / PUBLIC BUILDINGS SERVICE",
+   "response_deadline": "2026-12-04T21:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "This project will include scope to modernize seventeen (17) elevators, as well as upgrade mechanical, electrical and fire protection equipment within the elevator machine rooms.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 4432,
+   "semantic_score": 0.224,
+   "sam_url": "https://sam.gov/opp/943734c4f5ab4cfbba8deec8fb97bd35/view"
+  },
+  {
+   "title": "Fort Yates Pharmacy USP Renovation",
+   "solicitation_number": "75H70127R00001",
+   "notice_id": "4a78e3c980984b8fa4ba17ccd7abad33",
+   "naics_code": "236220",
+   "psc_code": "Y1DA",
+   "agency": "HEALTH AND HUMAN SERVICES, DEPARTMENT OF / INDIAN HEALTH SERVICE",
+   "response_deadline": "2026-11-24T04:59:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Work includes phased renovations, temporary pharmacy setup, equipment relocation, conversion of existing spaces for pharmacy and storage uses, replacement of the outpatient pharmacy air handler, security installations, and a facility-wide building automation interface upgrade.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "air handler",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 4434,
+   "semantic_score": 0.2239,
+   "sam_url": "https://sam.gov/opp/4a78e3c980984b8fa4ba17ccd7abad33/view"
+  },
+  {
+   "title": "Demolition of an existing building, Site Improvements and construction of a Modular Office Building at the US Merchant Marine Academy Campus, Kings Point, NY",
+   "solicitation_number": "W912DS27BA004",
+   "notice_id": "6a6249a47b71404eb8a2a7d838a5ed8a",
+   "naics_code": "236220",
+   "psc_code": "Y1AA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-07T06:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "It will house open offices with cubicles, six private offices, two conference rooms, four single-user bathrooms, a kitchenette/pantry room, lactation room, storage closets, and a mechanical room.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 4602,
+   "semantic_score": 0.2211,
+   "sam_url": "https://sam.gov/opp/6a6249a47b71404eb8a2a7d838a5ed8a/view"
+  },
+  {
+   "title": "Demolition of an existing building, Site Improvements and construction of a Modular Office Building at the US Merchant Marine Academy Campus, Kings Point, NY",
+   "solicitation_number": "W912DS27BA004",
+   "notice_id": "74ce082cc2f34be4926ac48ccf9cf9a5",
+   "naics_code": "236220",
+   "psc_code": "Y1AA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-07T06:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "It will house open offices with cubicles, six private offices, two conference rooms, four single-user bathrooms, a kitchenette/pantry room, lactation room, storage closets, and a mechanical room.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 4610,
+   "semantic_score": 0.221,
+   "sam_url": "https://sam.gov/opp/74ce082cc2f34be4926ac48ccf9cf9a5/view"
+  },
+  {
+   "title": "GAOA Grizzly Bear Campground",
+   "solicitation_number": "127EAX27Q0004",
+   "notice_id": "34ef2f096eb94bf9b887f2009b9f4674",
+   "naics_code": "237990",
+   "psc_code": "Z1PA",
+   "agency": "AGRICULTURE, DEPARTMENT OF / FOREST SERVICE",
+   "response_deadline": "2026-11-20T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Pump House \u2013 Floor Plan, Elevations, Section General Concrete Notes Structural Site Plan Typical Concrete Details Mechanical/Plumbing Site Demolition Plan Mechanical/Plumbing Site Plan Mechanical/Plumbing Enlarged Site Plan Mechanical/Plumbing Enlarged Site Plan Mechanical Details Existing Sewage Vault Mechanical Details Pumphouse Water Meter and Disinfection Piping Mechanical Details Hydrant Deta",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 5307,
+   "semantic_score": 0.2115,
+   "sam_url": "https://sam.gov/opp/34ef2f096eb94bf9b887f2009b9f4674/view"
+  },
+  {
+   "title": "GAOA Grizzly Bear Campground",
+   "solicitation_number": "127EAX27Q0004",
+   "notice_id": "6bee8edb96c446d59b9e699525d896d7",
+   "naics_code": "237990",
+   "psc_code": "Z1PA",
+   "agency": "AGRICULTURE, DEPARTMENT OF / FOREST SERVICE",
+   "response_deadline": "2026-11-20T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Pump House \u2013 Floor Plan, Elevations, Section General Concrete Notes Structural Site Plan Typical Concrete Details Mechanical/Plumbing Site Demolition Plan Mechanical/Plumbing Site Plan Mechanical/Plumbing Enlarged Site Plan Mechanical/Plumbing Enlarged Site Plan Mechanical Details Existing Sewage Vault Mechanical Details Pumphouse Water Meter and Disinfection Piping Mechanical Details Hydrant Deta",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 5309,
+   "semantic_score": 0.2115,
+   "sam_url": "https://sam.gov/opp/6bee8edb96c446d59b9e699525d896d7/view"
+  },
+  {
+   "title": "SPECIAL MISSIONS TRAINING CENTER LIVE-FIRE MARITIME/URBAN TRAINING SYSTEM",
+   "solicitation_number": "70ZL7126R622000001",
+   "notice_id": "b20bf7a9a2cb430aa34cdb11208235e5",
+   "naics_code": "236220",
+   "psc_code": null,
+   "agency": "HOMELAND SECURITY, DEPARTMENT OF / US COAST GUARD",
+   "response_deadline": "2026-11-15T16:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The anticipated effort includes: Complete facility design and engineering, including ballistic, structural, civil, architectural, mechanical, electrical, fire/life-safety, safety, and training-system interfaces.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 5804,
+   "semantic_score": 0.2063,
+   "sam_url": "https://sam.gov/opp/b20bf7a9a2cb430aa34cdb11208235e5/view"
+  },
+  {
+   "title": "Base Maintenance for Fort Leonard Wood, Missouri",
+   "solicitation_number": "W911S726CA003",
+   "notice_id": "906d1c357bde48a3af8921cd7078d6ee",
+   "naics_code": "561210",
+   "psc_code": "M1AZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-18T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Scheduled Maintenance and Repair of Boiler Plants C.5.5.3.5 Exercising of Valves C.5.5.3.6 Co-Generation Units C.5.5.4.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "boiler",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 5938,
+   "semantic_score": 0.2048,
+   "sam_url": "https://sam.gov/opp/906d1c357bde48a3af8921cd7078d6ee/view"
+  },
+  {
+   "title": "P084 NEXT GENERATION TORPEDO INTEGRATION LAB, NAVAL STATION NEWPORT, NEWPORT RI",
+   "solicitation_number": "N4008526R0178",
+   "notice_id": "10f70c33abea45f190c9ee9f7544f2ca",
+   "naics_code": "236220",
+   "psc_code": "Y1JB",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE NAVY",
+   "response_deadline": "2026-11-17T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The project includes all pertinent site preparations and site improvements, including underground stormwater retention system, mechanical and electrical utilities, telecommunications, landscaping, drainage, parking and exterior lighting.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6117,
+   "semantic_score": 0.203,
+   "sam_url": "https://sam.gov/opp/10f70c33abea45f190c9ee9f7544f2ca/view"
+  },
+  {
+   "title": "Demolition of an existing building, Site Improvements and construction of a Modular Office Building at the US Merchant Marine Academy Campus, Kings Point, NY",
+   "solicitation_number": "W912DS27BA004",
+   "notice_id": "7d8b5a7b096145c4bffbfdd6559aaf49",
+   "naics_code": "236220",
+   "psc_code": "Y1AA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-07T07:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "It will house open offices with cubicles, six private offices, two conference rooms, four single-user bathrooms, a kitchenette/pantry room, lactation room, storage closets, and a mechanical room.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6437,
+   "semantic_score": 0.1999,
+   "sam_url": "https://sam.gov/opp/7d8b5a7b096145c4bffbfdd6559aaf49/view"
+  },
+  {
+   "title": "Virtual Industry Day for FY27 USACE Enterprise Dredge Delivery Center National Small Business MATOC",
+   "solicitation_number": "W912PM27RA007",
+   "notice_id": "51300997c7d34c61b35e883625b21dca",
+   "naics_code": "237990",
+   "psc_code": "Z1KF",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2027-01-12T21:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Individual projects are typically annual requirements and may utilize mechanical, hydraulic, or a combination of dredging equipment and techniques with activities to include but not limited to maintenance and new work dredging, dredged material placement, and other activities such as Confined Disposal Facility (CDF), Dredged Material Disposal Facility (DMDF), or upland placement site maintenance, ",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 6938,
+   "semantic_score": 0.1934,
+   "sam_url": "https://sam.gov/opp/51300997c7d34c61b35e883625b21dca/view"
+  },
+  {
+   "title": "Pre Solicitation Notice: FY27 Maintenance Dredging Yokohama North Dock",
+   "solicitation_number": "W912HV26Z0015PSN",
+   "notice_id": "1288db1579914acd86018c9c70c3fbc2",
+   "naics_code": "237990",
+   "psc_code": "Z1KF",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-16T06:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Scope of work includes, but is not limited to, conventional hydraulic or mechanical dredging methods and transportation and disposal of dredged material.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7569,
+   "semantic_score": 0.1859,
+   "sam_url": "https://sam.gov/opp/1288db1579914acd86018c9c70c3fbc2/view"
+  },
+  {
+   "title": "Annual Maintenance Dredging of Morehead City Inner Harbor",
+   "solicitation_number": "W912PM26BA004",
+   "notice_id": "1efe2b5d5b0e42ebb347cb04f720592d",
+   "naics_code": "237990",
+   "psc_code": "Z1KF",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-12-31T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The work will completed via mechanical or hydraulic dredge.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 8158,
+   "semantic_score": 0.1777,
+   "sam_url": "https://sam.gov/opp/1efe2b5d5b0e42ebb347cb04f720592d/view"
+  },
+  {
+   "title": "ANGKOR SENTINEL 27 BASE LIFE SUPPORT FACILITY REHAB SERVICES",
+   "solicitation_number": "W91QVP-26-AS27-BLS",
+   "notice_id": "8636ca1f8a914ccca738bee046a4b010",
+   "naics_code": "561210",
+   "psc_code": "S216",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-20T23:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Repair or replace air-conditioning systems;",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "air conditioning",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 8365,
+   "semantic_score": 0.1748,
+   "sam_url": "https://sam.gov/opp/8636ca1f8a914ccca738bee046a4b010/view"
+  },
+  {
+   "title": "Request for Information (RFI) - Local Construction Subcontractors for Spangdahlem AB MACC",
+   "solicitation_number": null,
+   "notice_id": "17e68d89f9b243eaba61ebc41933d88c",
+   "naics_code": "236220",
+   "psc_code": null,
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2027-04-30T14:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Areas of interest include, but are not limited to: General Construction & Carpentry Electrical (High and Low Voltage) Plumbing & Pipefitting Heating, Ventilation, and Air Conditioning (HVAC) Roofing (Commercial and Industrial) Concrete, Masonry, and Paving Civil & Site Work (Excavation, Grading) Painting and specialized coatings Fire Protection & Suppression Systems Environmental Remediation & Aba",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "hvac",
+     "kind": "profile"
+    },
+    {
+     "term": "heating",
+     "kind": "profile"
+    },
+    {
+     "term": "ventilation",
+     "kind": "profile"
+    },
+    {
+     "term": "air conditioning",
+     "kind": "profile"
+    },
+    {
+     "term": "Heating contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    },
+    {
+     "term": "HVAC (heating, ventilation and air-conditioning) contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    },
+    {
+     "term": "Plumbing and heating contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 8796,
+   "semantic_score": 0.1678,
+   "sam_url": "https://sam.gov/opp/17e68d89f9b243eaba61ebc41933d88c/view"
+  },
+  {
+   "title": "ANGKOR SENTINEL 27 BASE LIFE SUPPORT FACILITY REHAB SERVICES",
+   "solicitation_number": "W91QVP-26-AS27-BLS",
+   "notice_id": "cf8a3ba528dd415597455cf230e83e99",
+   "naics_code": "561210",
+   "psc_code": "S216",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-20T23:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Repair or replace air-conditioning systems;",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "air conditioning",
+     "kind": "profile"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 561210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 8805,
+   "semantic_score": 0.1677,
+   "sam_url": "https://sam.gov/opp/cf8a3ba528dd415597455cf230e83e99/view"
+  },
+  {
+   "title": "Repair Naval Reserve Training Facility B3370",
+   "solicitation_number": "DKGV-1137999",
+   "notice_id": "b89905b1181243d28240b965587cf27a",
+   "naics_code": "236220",
+   "psc_code": "Z2AA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2029-04-01T16:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "The project scope is to replace the HVAC equipment in attempts to eliminate the recent mold growth inside the facility and incidental related work.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "hvac",
+     "kind": "profile"
+    },
+    {
+     "term": "HVAC (heating, ventilation and air-conditioning) contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 9006,
+   "semantic_score": 0.1642,
+   "sam_url": "https://sam.gov/opp/b89905b1181243d28240b965587cf27a/view"
+  },
+  {
+   "title": "Y1DA--NRM-CONST | 561-18-140 Main Kitchen Upgrade Construction |  FY27 NRM",
+   "solicitation_number": "36C24227B0011",
+   "notice_id": "97f268e14dc24b6aaedd867ef11fdc19",
+   "naics_code": "236220",
+   "psc_code": "Y1DA",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-20T15:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "SUB_SCOPE",
+   "scope_sentence": "Work includes, but is not limited to, architectural, structural, mechanical, electrical etc.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "body sentence states the trade with a requirement cue",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": null,
+   "semantic_score": null,
+   "sam_url": "https://sam.gov/opp/97f268e14dc24b6aaedd867ef11fdc19/view"
+  }
+ ],
+ "uncertain": [
+  {
+   "title": "ID-KOOSKIA NFH-Repair Electrical Service to Mechan",
+   "solicitation_number": "140FF027Q0019",
+   "notice_id": "02dd08fa68b342a1ad4971fc81de1fcb",
+   "naics_code": "236220",
+   "psc_code": "Z2MZ",
+   "agency": "INTERIOR, DEPARTMENT OF THE / DEPARTMENTAL OFFICES",
+   "response_deadline": "2026-11-17T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "ID-KOOSKIA NFH-Repair Electrical Service to Mechanical Bldg.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": null,
+   "semantic_score": null,
+   "sam_url": "https://sam.gov/opp/02dd08fa68b342a1ad4971fc81de1fcb/view"
+  },
+  {
+   "title": "Mike Monroney Aeronautical Center (MMAC) Industrial Waste Water Treatment Plant Upgrades",
+   "solicitation_number": "6973GH-27-R-00005",
+   "notice_id": "06021f150569427787bbbf1174e39e6f",
+   "naics_code": "237110",
+   "psc_code": "Y1ND",
+   "agency": "TRANSPORTATION, DEPARTMENT OF / FEDERAL AVIATION ADMINISTRATION",
+   "response_deadline": "2026-11-19T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "3.3 UTILITY SERVICES AND MECHANICAL/ELECTRICAL SYSTEMS A.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2411,
+   "semantic_score": 0.2594,
+   "sam_url": "https://sam.gov/opp/06021f150569427787bbbf1174e39e6f/view"
+  },
+  {
+   "title": "FCI Three Rivers-Replace Generators, Transformers, and Electrical Infrastructure",
+   "solicitation_number": "15BNAS27Q00000002",
+   "notice_id": "0a0fb82a30d241799bf318d08ce45a95",
+   "naics_code": "236220",
+   "psc_code": "Z2NZ",
+   "agency": "JUSTICE, DEPARTMENT OF / FEDERAL PRISON SYSTEM / BUREAU OF PRISONS",
+   "response_deadline": "2026-11-30T16:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "If you have any questions, please contact Jason McNeill, Mechanical Engineer, at email [email] or call at [phone].",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1735,
+   "semantic_score": 0.2755,
+   "sam_url": "https://sam.gov/opp/0a0fb82a30d241799bf318d08ce45a95/view"
+  },
+  {
+   "title": "INDUSTRY DAY ANNOUNCEMENT (LIMA, PERU): DAY 2 \u2014 CONSTRUCTION",
+   "solicitation_number": "W51DQV27Z1CV9",
+   "notice_id": "0a21ec2b4cdb4bfaa095b65fbb1f868b",
+   "naics_code": "236220",
+   "psc_code": null,
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-18T21:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "Design-Build technical parameters, civil and structural works, industrial warehousing, and specialized mechanical/electrical/plumbing (MEP) systems.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7133,
+   "semantic_score": 0.1909,
+   "sam_url": "https://sam.gov/opp/0a21ec2b4cdb4bfaa095b65fbb1f868b/view"
+  },
+  {
+   "title": "Mike Monroney Aeronautical Center (MMAC) Industrial Waste Water Treatment Plant Upgrades",
+   "solicitation_number": "6973GH-27-R-00005",
+   "notice_id": "0b6e2f047d394bd3861f36f6e94d30ba",
+   "naics_code": "237110",
+   "psc_code": "Y1ND",
+   "agency": "TRANSPORTATION, DEPARTMENT OF / FEDERAL AVIATION ADMINISTRATION",
+   "response_deadline": "2026-11-19T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "3.3 UTILITY SERVICES AND MECHANICAL/ELECTRICAL SYSTEMS A.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2505,
+   "semantic_score": 0.2576,
+   "sam_url": "https://sam.gov/opp/0b6e2f047d394bd3861f36f6e94d30ba/view"
+  },
+  {
+   "title": "Pensacola Harbor Navigation Channel Maintenance Dredging",
+   "solicitation_number": "W9127827BA002",
+   "notice_id": "11ffa88a09634d9fbb977f3bdd069c72",
+   "naics_code": "237990",
+   "psc_code": "Y1KF",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-20T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "This requirement is for hydraulic cutterhead pipeline dredges, trailing suction hopper dredges, and/or mechanical dredges with scows.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7217,
+   "semantic_score": 0.19,
+   "sam_url": "https://sam.gov/opp/11ffa88a09634d9fbb977f3bdd069c72/view"
+  },
+  {
+   "title": "Central Utility Building Addition and Renovation Construction, UIP Subproject 1-CUB",
+   "solicitation_number": "RFP-376508-CD",
+   "notice_id": "14034cd5817d49c38056351ef936d097",
+   "naics_code": "236210",
+   "psc_code": "Z2EZ",
+   "agency": "ENERGY, DEPARTMENT OF / ENERGY, DEPARTMENT OF",
+   "response_deadline": "2026-11-17T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "These systems serve both comfort cooling and heating needs, as well as process cooling and utility requirements.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "heating",
+     "kind": "profile"
+    },
+    {
+     "term": "Heating contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2125,
+   "semantic_score": 0.2654,
+   "sam_url": "https://sam.gov/opp/14034cd5817d49c38056351ef936d097/view"
+  },
+  {
+   "title": "88th RD US ARMY RESERVE CENTER MONCLOVA, OH CONSTRUCT STORAGE BUILDING AND REPAIR MEP LOTS",
+   "solicitation_number": "W912EK27BA011",
+   "notice_id": "1ba6bd54228444fe91bd10ab7d007971",
+   "naics_code": "236220",
+   "psc_code": "Z2QA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-20T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "mechanical work, electrical work, placement of aggregate;",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2570,
+   "semantic_score": 0.2563,
+   "sam_url": "https://sam.gov/opp/1ba6bd54228444fe91bd10ab7d007971/view"
+  },
+  {
+   "title": "Tinker AFB 2026 Multiple Award Construction Contract (MACC)",
+   "solicitation_number": "FA8137-26-R-0040",
+   "notice_id": "2266c7aa6a8741c6a6ddb08c8b1496aa",
+   "naics_code": "236210",
+   "psc_code": "Z2JZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE AIR FORCE",
+   "response_deadline": "2026-11-16T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "20 11.5.4 Mechanical............................................................................................................",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2168,
+   "semantic_score": 0.2647,
+   "sam_url": "https://sam.gov/opp/2266c7aa6a8741c6a6ddb08c8b1496aa/view"
+  },
+  {
+   "title": "FCI Three Rivers-Replace Generators, Transformers, and Electrical Infrastructure",
+   "solicitation_number": "15BNAS27Q00000002",
+   "notice_id": "24432d7473274c3db10a05c60b8f5b05",
+   "naics_code": "236220",
+   "psc_code": "Z2NZ",
+   "agency": "JUSTICE, DEPARTMENT OF / FEDERAL PRISON SYSTEM / BUREAU OF PRISONS",
+   "response_deadline": "2026-11-30T16:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "If you have any questions, please contact Jason McNeill, Mechanical Engineer, at email [email] or call at [phone].",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1736,
+   "semantic_score": 0.2755,
+   "sam_url": "https://sam.gov/opp/24432d7473274c3db10a05c60b8f5b05/view"
+  },
+  {
+   "title": "FCI Three Rivers-Replace Generators, Transformers, and Electrical Infrastructure",
+   "solicitation_number": "15BNAS27Q00000002",
+   "notice_id": "253aac88c88d49fd8a36bcf9abff4b0b",
+   "naics_code": "236220",
+   "psc_code": "Z2NZ",
+   "agency": "JUSTICE, DEPARTMENT OF / FEDERAL PRISON SYSTEM / BUREAU OF PRISONS",
+   "response_deadline": "2026-11-30T16:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "If you have any questions, please contact Jason McNeill, Mechanical Engineer, at email [email] or call at [phone].",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1737,
+   "semantic_score": 0.2755,
+   "sam_url": "https://sam.gov/opp/253aac88c88d49fd8a36bcf9abff4b0b/view"
+  },
+  {
+   "title": "Z--ID-KOOSKIA NFH-Repair Electrical Service to Mechan",
+   "solicitation_number": "140FF027Q0019",
+   "notice_id": "32485cb68ade49fdb853c5f8374ca074",
+   "naics_code": "236220",
+   "psc_code": "Z2MZ",
+   "agency": "INTERIOR, DEPARTMENT OF THE / DEPARTMENTAL OFFICES",
+   "response_deadline": "2026-11-17T18:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "ID-KOOSKIA NFH-Repair Electrical Service to Mechanical Bldg.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": null,
+   "semantic_score": null,
+   "sam_url": "https://sam.gov/opp/32485cb68ade49fdb853c5f8374ca074/view"
+  },
+  {
+   "title": "INDUSTRY DAY ANNOUNCEMENT (LIMA, PERU): DAY 2 \u2014 CONSTRUCTION",
+   "solicitation_number": "W51DQV27Z1CV9",
+   "notice_id": "45ffd98b9b724296b9653bb2a7d8cfa1",
+   "naics_code": "236220",
+   "psc_code": null,
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-18T21:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "Design-Build technical parameters, civil and structural works, industrial warehousing, and specialized mechanical/electrical/plumbing (MEP) systems.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7134,
+   "semantic_score": 0.1909,
+   "sam_url": "https://sam.gov/opp/45ffd98b9b724296b9653bb2a7d8cfa1/view"
+  },
+  {
+   "title": " JOINT BASE LEWIS MCCHORD MULTI DOMAIN TASK FORCE BUILDINGS 3223-3224, WASHINGTON",
+   "solicitation_number": "W912DW27RA014",
+   "notice_id": "49dc1ea06c9a4452b28dffd5dbd6d794",
+   "naics_code": "236220",
+   "psc_code": "Y1AZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-30T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "THE BASEMENT AREA WITH A MAIN UTILITY MECHANICAL AND ELECTRICAL ROOM EXTENDS PARTIALLY UNDER BOTH THE HAMMER HEAD AND THE HAMMER HANDLE.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2656,
+   "semantic_score": 0.2546,
+   "sam_url": "https://sam.gov/opp/49dc1ea06c9a4452b28dffd5dbd6d794/view"
+  },
+  {
+   "title": "Y1PZ--Project 629-25-104 ED Suicide Risk Mitigation Fence",
+   "solicitation_number": "36C25626R0117",
+   "notice_id": "4ba55c09fda442edac0c51895c5340ea",
+   "naics_code": "236220",
+   "psc_code": "Y1PZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-23T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "American Society of Heating, Refrigerating, and Air-Conditioning Engineers (ASHRAE) 3.8.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "heating",
+     "kind": "profile"
+    },
+    {
+     "term": "air conditioning",
+     "kind": "profile"
+    },
+    {
+     "term": "Heating contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2279,
+   "semantic_score": 0.2625,
+   "sam_url": "https://sam.gov/opp/4ba55c09fda442edac0c51895c5340ea/view"
+  },
+  {
+   "title": "Central Utility Building Addition and Renovation Construction, UIP Subproject 1-CUB",
+   "solicitation_number": "RFP-376508-CD",
+   "notice_id": "4e7d0c4832764a279ed8191c8f4e789d",
+   "naics_code": "236210",
+   "psc_code": "Z2EZ",
+   "agency": "ENERGY, DEPARTMENT OF / ENERGY, DEPARTMENT OF",
+   "response_deadline": "2026-12-17T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "These systems serve both comfort cooling and heating needs, as well as process cooling and utility requirements.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "heating",
+     "kind": "profile"
+    },
+    {
+     "term": "Heating contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2428,
+   "semantic_score": 0.259,
+   "sam_url": "https://sam.gov/opp/4e7d0c4832764a279ed8191c8f4e789d/view"
+  },
+  {
+   "title": "INDUSTRY DAY ANNOUNCEMENT (LIMA, PERU): DAY 2 \u2014 CONSTRUCTION",
+   "solicitation_number": "W51DQV27Z1CV9",
+   "notice_id": "566aa12714d7450c806b1c897f2beaa7",
+   "naics_code": "236220",
+   "psc_code": null,
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-18T21:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "Design-Build technical parameters, civil and structural works, industrial warehousing, and specialized mechanical/electrical/plumbing (MEP) systems.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7081,
+   "semantic_score": 0.1915,
+   "sam_url": "https://sam.gov/opp/566aa12714d7450c806b1c897f2beaa7/view"
+  },
+  {
+   "title": "INDUSTRY DAY ANNOUNCEMENT (LIMA, PERU): DAY 2 \u2014 CONSTRUCTION",
+   "solicitation_number": "W51DQV27Z1CV9",
+   "notice_id": "5b17c4d41cf6443dacb219acebc154e1",
+   "naics_code": "236220",
+   "psc_code": null,
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-18T21:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "Design-Build technical parameters, civil and structural works, industrial warehousing, and specialized mechanical/electrical/plumbing (MEP) systems.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7082,
+   "semantic_score": 0.1915,
+   "sam_url": "https://sam.gov/opp/5b17c4d41cf6443dacb219acebc154e1/view"
+  },
+  {
+   "title": "88th RD US ARMY RESERVE CENTER MONCLOVA, OH CONSTRUCT STORAGE BUILDING AND REPAIR MEP LOTS",
+   "solicitation_number": "W912EK27BA011",
+   "notice_id": "5f4a2fec90724d4fb051e800a1fd5d8b",
+   "naics_code": "236220",
+   "psc_code": "Z2QA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-20T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "mechanical work, electrical work, placement of aggregate;",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2761,
+   "semantic_score": 0.2526,
+   "sam_url": "https://sam.gov/opp/5f4a2fec90724d4fb051e800a1fd5d8b/view"
+  },
+  {
+   "title": "Pensacola Harbor Navigation Channel Maintenance Dredging",
+   "solicitation_number": "W9127827BA002",
+   "notice_id": "6a5e6ba38cac4f33a896f424b409a83f",
+   "naics_code": "237990",
+   "psc_code": "Y1KF",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-20T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "This requirement is for hydraulic cutterhead pipeline dredges, trailing suction hopper dredges, and/or mechanical dredges with scows.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7207,
+   "semantic_score": 0.1901,
+   "sam_url": "https://sam.gov/opp/6a5e6ba38cac4f33a896f424b409a83f/view"
+  },
+  {
+   "title": "88th RD US ARMY RESERVE CENTER MONCLOVA, OH CONSTRUCT STORAGE BUILDING AND REPAIR MEP LOTS",
+   "solicitation_number": "W912EK27BA011",
+   "notice_id": "6a82397510894b1ab59fd1ae19b06fd6",
+   "naics_code": "236220",
+   "psc_code": "Z2QA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-20T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "mechanical work, electrical work, placement of aggregate;",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2571,
+   "semantic_score": 0.2563,
+   "sam_url": "https://sam.gov/opp/6a82397510894b1ab59fd1ae19b06fd6/view"
+  },
+  {
+   "title": "88th RD US ARMY RESERVE CENTER MONCLOVA, OH CONSTRUCT STORAGE BUILDING AND REPAIR MEP LOTS",
+   "solicitation_number": "W912EK27BA011",
+   "notice_id": "754a3041738c44e298d272d61b560918",
+   "naics_code": "236220",
+   "psc_code": "Z2QA",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-20T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "mechanical work, electrical work, placement of aggregate;",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3190,
+   "semantic_score": 0.2439,
+   "sam_url": "https://sam.gov/opp/754a3041738c44e298d272d61b560918/view"
+  },
+  {
+   "title": "The Mission and Installation Contracting Command (MICC), Fort Campbell, KY, is issuing this Special Notice to identify small business concerns interested in receiving future request for quotations for various construction and related facility-support.",
+   "solicitation_number": "MICCFTCINNOVATION",
+   "notice_id": "7d1f1804fc6c4070bb1ec592b7c99a41",
+   "naics_code": "236220",
+   "psc_code": "Z2JZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2027-09-16T17:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "Carpentry, masonry, welding, roofing, painting, electrical, plumbing, and heating, ventilation, and air conditioning (HVAC) work;",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "hvac",
+     "kind": "profile"
+    },
+    {
+     "term": "heating",
+     "kind": "profile"
+    },
+    {
+     "term": "ventilation",
+     "kind": "profile"
+    },
+    {
+     "term": "air conditioning",
+     "kind": "profile"
+    },
+    {
+     "term": "Heating contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    },
+    {
+     "term": "HVAC (heating, ventilation and air-conditioning) contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    },
+    {
+     "term": "Plumbing and heating contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 4103,
+   "semantic_score": 0.229,
+   "sam_url": "https://sam.gov/opp/7d1f1804fc6c4070bb1ec592b7c99a41/view"
+  },
+  {
+   "title": "Mike Monroney Aeronautical Center (MMAC) Industrial Waste Water Treatment Plant Upgrades",
+   "solicitation_number": "6973GH-27-R-00005",
+   "notice_id": "8e80294e8a9e4b2a82522ba6dfad9b43",
+   "naics_code": "237110",
+   "psc_code": "Y1ND",
+   "agency": "TRANSPORTATION, DEPARTMENT OF / FEDERAL AVIATION ADMINISTRATION",
+   "response_deadline": "2026-11-19T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "3.3 UTILITY SERVICES AND MECHANICAL/ELECTRICAL SYSTEMS A.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3084,
+   "semantic_score": 0.2459,
+   "sam_url": "https://sam.gov/opp/8e80294e8a9e4b2a82522ba6dfad9b43/view"
+  },
+  {
+   "title": " JOINT BASE LEWIS MCCHORD MULTI DOMAIN TASK FORCE BUILDINGS 3223-3224, WASHINGTON",
+   "solicitation_number": "W912DW27RA014",
+   "notice_id": "b2c06a784e814c938de30fa33eb5bd54",
+   "naics_code": "236220",
+   "psc_code": "Y1AZ",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-30T19:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "THE BASEMENT AREA WITH A MAIN UTILITY MECHANICAL AND ELECTRICAL ROOM EXTENDS PARTIALLY UNDER BOTH THE HAMMER HEAD AND THE HAMMER HANDLE.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 2640,
+   "semantic_score": 0.2549,
+   "sam_url": "https://sam.gov/opp/b2c06a784e814c938de30fa33eb5bd54/view"
+  },
+  {
+   "title": "Central Utility Building Addition and Renovation Construction, UIP Subproject 1-CUB",
+   "solicitation_number": "RFP-376508-CD",
+   "notice_id": "b3e96254b8dc47f48e58f2821e5100ad",
+   "naics_code": "236210",
+   "psc_code": "Z2EZ",
+   "agency": "ENERGY, DEPARTMENT OF / ENERGY, DEPARTMENT OF",
+   "response_deadline": "2026-11-17T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "These systems serve both comfort cooling and heating needs, as well as process cooling and utility requirements.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "heating",
+     "kind": "profile"
+    },
+    {
+     "term": "Heating contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236210 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1322,
+   "semantic_score": 0.2865,
+   "sam_url": "https://sam.gov/opp/b3e96254b8dc47f48e58f2821e5100ad/view"
+  },
+  {
+   "title": "Mike Monroney Aeronautical Center (MMAC) Industrial Waste Water Treatment Plant Upgrades",
+   "solicitation_number": "6973GH-27-R-00005",
+   "notice_id": "b5c4fee1baa64396b4584aa5e91d2487",
+   "naics_code": "237110",
+   "psc_code": "Y1ND",
+   "agency": "TRANSPORTATION, DEPARTMENT OF / FEDERAL AVIATION ADMINISTRATION",
+   "response_deadline": "2026-11-19T22:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "3.3 UTILITY SERVICES AND MECHANICAL/ELECTRICAL SYSTEMS A.",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237110 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3085,
+   "semantic_score": 0.2459,
+   "sam_url": "https://sam.gov/opp/b5c4fee1baa64396b4584aa5e91d2487/view"
+  },
+  {
+   "title": "FY27 NRM  Replace Flooring in McClellan  VA Northern California Health Care System  McClellan CA  Project 612A4 27 020",
+   "solicitation_number": "36C26127Q0047",
+   "notice_id": "b8205e6e69db41bc85611de60bbe9566",
+   "naics_code": "236220",
+   "psc_code": "Z1AZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-17T23:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "88 AND 98 PARKING LOTS 04.28.2026 5342 Dudley Boulevard McClellan Park, CA 95652 Revisions: Date: 209 98 ARNOLD AVE DUDLEY BLVD Feet 1:1000 200 100 0 50 949 PALM ST PEACEKEEPER WAY WATT AVE O'MALLEY AVE ARNOLD AVE -- 1 of 18 -- UP MECHANICAL ROOM 200 SF STAIRS 1H27 EXTENT OF BUILDING ABOVE LOADING MECHANICAL B 1/8\" = 1'-0\" 1 Basement Project Number Building Number Drawing Number Project Title Loca",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 226,
+   "semantic_score": 0.3398,
+   "sam_url": "https://sam.gov/opp/b8205e6e69db41bc85611de60bbe9566/view"
+  },
+  {
+   "title": "FY27 NRM  Replace Flooring in McClellan  VA Northern California Health Care System  McClellan CA  Project 612A4 27 020",
+   "solicitation_number": "36C26127Q0047",
+   "notice_id": "bfc14294001d4d5dbb20fe49a288b687",
+   "naics_code": "236220",
+   "psc_code": "Z1AZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-11-17T23:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "88 AND 98 PARKING LOTS 04.28.2026 5342 Dudley Boulevard McClellan Park, CA 95652 Revisions: Date: 209 98 ARNOLD AVE DUDLEY BLVD Feet 1:1000 200 100 0 50 949 PALM ST PEACEKEEPER WAY WATT AVE O'MALLEY AVE ARNOLD AVE -- 1 of 18 -- UP MECHANICAL ROOM 200 SF STAIRS 1H27 EXTENT OF BUILDING ABOVE LOADING MECHANICAL B 1/8\" = 1'-0\" 1 Basement Project Number Building Number Drawing Number Project Title Loca",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 225,
+   "semantic_score": 0.3398,
+   "sam_url": "https://sam.gov/opp/bfc14294001d4d5dbb20fe49a288b687/view"
+  },
+  {
+   "title": "FCI Three Rivers-Replace Generators, Transformers, and Electrical Infrastructure",
+   "solicitation_number": "15BNAS27Q00000002",
+   "notice_id": "dbbad4746c0847de9046bee6a8519c03",
+   "naics_code": "236220",
+   "psc_code": "Z2NZ",
+   "agency": "JUSTICE, DEPARTMENT OF / FEDERAL PRISON SYSTEM / BUREAU OF PRISONS",
+   "response_deadline": "2026-11-30T16:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "If you have any questions, please contact Jason McNeill, Mechanical Engineer, at email [email] or call at [phone].",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 5711,
+   "semantic_score": 0.2073,
+   "sam_url": "https://sam.gov/opp/dbbad4746c0847de9046bee6a8519c03/view"
+  },
+  {
+   "title": "FY27 NRM  Replace Flooring in McClellan  VA Northern California Health Care System  McClellan CA  Project 612A4 27 020",
+   "solicitation_number": "36C26127Q0047",
+   "notice_id": "def2d19916684484b1124c4881e53737",
+   "naics_code": "236220",
+   "psc_code": "Z1AZ",
+   "agency": "VETERANS AFFAIRS, DEPARTMENT OF / VETERANS AFFAIRS, DEPARTMENT OF",
+   "response_deadline": "2026-12-02T23:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "88 AND 98 PARKING LOTS 04.28.2026 5342 Dudley Boulevard McClellan Park, CA 95652 Revisions: Date: 209 98 ARNOLD AVE DUDLEY BLVD Feet 1:1000 200 100 0 50 949 PALM ST PEACEKEEPER WAY WATT AVE O'MALLEY AVE ARNOLD AVE -- 1 of 18 -- UP MECHANICAL ROOM 200 SF STAIRS 1H27 EXTENT OF BUILDING ABOVE LOADING MECHANICAL B 1/8\" = 1'-0\" 1 Basement Project Number Building Number Drawing Number Project Title Loca",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 3538,
+   "semantic_score": 0.238,
+   "sam_url": "https://sam.gov/opp/def2d19916684484b1124c4881e53737/view"
+  },
+  {
+   "title": "FCI Three Rivers-Replace Generators, Transformers, and Electrical Infrastructure",
+   "solicitation_number": "15BNAS27Q00000002",
+   "notice_id": "f77d72e60f034ada84b9ef3801fec239",
+   "naics_code": "236220",
+   "psc_code": "Z2NZ",
+   "agency": "JUSTICE, DEPARTMENT OF / FEDERAL PRISON SYSTEM / BUREAU OF PRISONS",
+   "response_deadline": "2026-11-30T16:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "If you have any questions, please contact Jason McNeill, Mechanical Engineer, at email [email] or call at [phone].",
+   "sentence_source": "sow",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 236220 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 1738,
+   "semantic_score": 0.2755,
+   "sam_url": "https://sam.gov/opp/f77d72e60f034ada84b9ef3801fec239/view"
+  },
+  {
+   "title": "Pensacola Harbor Navigation Channel Maintenance Dredging",
+   "solicitation_number": "W9127827BA002",
+   "notice_id": "fc9b95dfcf634f8fa6833351a04c9557",
+   "naics_code": "237990",
+   "psc_code": "Y1KF",
+   "agency": "DEPT OF DEFENSE / DEPT OF THE ARMY",
+   "response_deadline": "2026-11-20T20:00:00+00:00",
+   "posted_date": null,
+   "evidence_class": "SCOPE_EVIDENCE",
+   "role": "UNCERTAIN",
+   "scope_sentence": "This requirement is for hydraulic cutterhead pipeline dredges, trailing suction hopper dredges, and/or mechanical dredges with scows.",
+   "sentence_source": "description",
+   "matched_terms": [
+    {
+     "term": "Mechanical contractors",
+     "kind": "census",
+     "census_naics": "238220"
+    }
+   ],
+   "evidence_reason": "term present but no requirement cue in the sentence",
+   "why_ordinary_retrieval_missed": "Released FIND Open plan for this description did not retrieve it (no direct/related code match and its visible title/description lack the query concepts); filed under 237990 (umbrella code).",
+   "retrieved_via": [
+    "body_terms"
+   ],
+   "semantic_rank": 7218,
+   "semantic_score": 0.19,
+   "sam_url": "https://sam.gov/opp/fc9b95dfcf634f8fa6833351a04c9557/view"
+  }
+ ]
+}
