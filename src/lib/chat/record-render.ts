@@ -115,7 +115,8 @@ const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFi
 function money(v: unknown): string {
   const n = num(v);
   if (n == null) return '';
-  return `$${Math.round(n).toLocaleString('en-US')}`;
+  const r = Math.round(n);
+  return r < 0 ? `-$${Math.abs(r).toLocaleString('en-US')}` : `$${r.toLocaleString('en-US')}`;
 }
 
 function clip(s: string, n: number): string {
@@ -193,14 +194,14 @@ let REQUESTED_LABELS: string[] = [];
 /** The requested capability the record's OWN description names (semantic relevance, positive evidence). */
 export function describedRequestedWork(description: string, requestedLabels: string[]): string | null {
   if (!description || !requestedLabels.length) return null;
-  const labels = interpretCapabilityNaics(description).items.map((it) => it.label);
+  const labels = interpretCapabilityNaics(description.replace(/_/g, ' ')).items.map((it) => it.label);
   return labels.find((l) => requestedLabels.includes(l)) ?? null;
 }
 
 /** A different capability the record's OWN description names (positive evidence only, from Mindy's lexicon). */
 export function describedOtherWork(description: string, requestedLabels: string[]): string | null {
   if (!description || !requestedLabels.length) return null;
-  const labels = interpretCapabilityNaics(description).items.map((it) => it.label);
+  const labels = interpretCapabilityNaics(description.replace(/_/g, ' ')).items.map((it) => it.label);
   if (!labels.length || labels.some((l) => requestedLabels.includes(l))) return null;
   return labels[0];
 }
@@ -223,7 +224,7 @@ function recordLine(n: number, r: Rec & { _kind: string }): string {
   const conflict = describedPlaceConflict(str(r.description), st);
   const otherWork = describedOtherWork(str(r.description), REQUESTED_LABELS);
   const confirms = describedRequestedWork(str(r.description), REQUESTED_LABELS);
-  const basis = REQUESTED_LABELS.length ? (confirms ? ` · description confirms: ${confirms}` : otherWork ? '' : ' · industry-code match') : '';
+  const basis = confirms ? ` · description confirms: ${confirms}` : '';
 
   return `${n}. ${id} · ${who} · ${agency} · ${place} · ends ${end} · ${kind}${value ? ` · obligated ${value}` : ''}${desc ? ` · ${desc}` : ''}${conflict ? ` · CHECK: the description names ${conflict}, which is not in the reported place-of-performance state ${st}; this record may not belong to the requested place` : ''}${basis}${otherWork ? ` · CHECK: the description describes ${otherWork} work, not the work requested` : ''}`;
 }
@@ -270,8 +271,7 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
     for (const r of records) { const a = title(str(r.awarding_agency)) || 'agency not recorded'; byAgency.set(a, (byAgency.get(a) ?? 0) + 1); }
     lines.push(`By awarding agency: ${[...byAgency.entries()].sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1)).map(([a, n]) => `${a} ${n}`).join('; ')}.`);
     if (REQUESTED_LABELS.length) {
-      const confirmed = records.filter((r) => describedRequestedWork(str(r.description), REQUESTED_LABELS)).length;
-      lines.push(`${confirmed} of ${records.length} retrieved records have a description that confirms the requested work; the others match by industry code only (the code is the agency's classification, not a check of the work).`);
+      lines.push('Records tagged "description confirms" name the requested work in their own description (Mindy\'s term match). Untagged records match by industry code; the term match did not confirm their work, which does not mean the work differs.');
     }
     const flaggedRecs = records.filter((r) => describedPlaceConflict(str(r.description), str(r.place_of_performance_state)) || describedOtherWork(str(r.description), REQUESTED_LABELS));
     const flagged = flaggedRecs.length;
@@ -435,7 +435,7 @@ export function renderStatusChecks(result: Rec): RenderedRecords | null {
     lines.push('');
     lines.push(`${total - checks.length} more matching award${total - checks.length === 1 ? ' was' : 's were'} not status-checked; this is not the full list.`);
   }
-  lines.push('Status is as reported to USASpending: a recent extension, option exercise or follow-on award can take weeks to appear (Defense about 90 days).');
+  lines.push('Status is as reported to USASpending: a recent extension, option exercise or follow-on award may not appear yet.');
   if (meta.lag_note) lines.push(freshnessSentence(meta));
   const ids = checks.map((c) => str(c.award_id));
   return {
@@ -470,19 +470,24 @@ export function renderBuyingOffices(result: Rec): RenderedRecords | null {
     lines.push(`No buying offices found (${parts.join(' · ') || 'no filters'}). Source: USASpending prime awards.`);
   } else {
     const officeCount = num(totals?.office_count) ?? offices.length;
-    lines.push(`${officeCount} buying office${officeCount === 1 ? '' : 's'} bought this work (${parts.join(' · ')}), ${money(totals?.obligated)} obligated across ${num(totals?.award_count) ?? '?'} awards. Source: USASpending prime awards; location is where the work was performed, not where the office sits.`);
-    lines.push('These are federal government contracting offices (the buyers of this work), not companies.');
+    lines.push(`${officeCount} contracting office${officeCount === 1 ? '' : 's'} ${officeCount === 1 ? 'has' : 'have'} obligations for this work (${parts.join(' · ')}), ${money(totals?.obligated)} obligated across ${num(totals?.award_count) ?? '?'} awards. Source: USASpending prime awards; location is where the work was performed, not where the office sits.`);
+    lines.push('These are federal government contracting offices (buyers), not companies. Office totals are net of deobligations.');
     lines.push(offices.length < officeCount ? `Showing the top ${offices.length} of ${officeCount} by obligated dollars.` : `Showing all ${officeCount}, by obligated dollars.`);
     lines.push('Ranked by obligations under the industry (NAICS) codes shown; a code can include other work than the words you used, so check the example awards listed for each office.');
-    if (meta.as_of) lines.push(`Award data loaded through ${str(meta.as_of)}; the most recent months may be incomplete because agencies report with a delay (Defense about 90 days).`);
+    if (meta.as_of || meta.lag_note) lines.push(`Data freshness: ${meta.as_of ? `latest action loaded ${str(meta.as_of)}` : ''}${meta.as_of && meta.lag_note ? '; ' : ''}${meta.lag_note ? str(meta.lag_note) : ''}.`.replace(/\.\.$/, '.'));
     lines.push('');
-    offices.forEach((o, i) => {
+    const buyers = offices.filter((o) => (num(o.obligated) ?? 0) > 0);
+    const nonBuyers = offices.filter((o) => (num(o.obligated) ?? 0) <= 0);
+    buyers.forEach((o, i) => {
       const customers = (Array.isArray(o.top_funding_offices) ? (o.top_funding_offices as Rec[]) : []).slice(0, 3).map((f) => `${title(str(f.name))} ${money(f.obligated)}`).filter((x) => x.trim());
       const places = (Array.isArray(o.top_places) ? (o.top_places as Rec[]) : []).slice(0, 3).map((p) => [title(str(p.city)), str(p.state)].filter(Boolean).join(', ')).filter(Boolean);
       const examples = (Array.isArray(o.example_awards) ? (o.example_awards as Rec[]) : []).slice(0, 2).map((e) => `${str(e.piid) || str(e.award_id)} ${money(e.obligated)}`).filter((x) => x.trim());
-      const net = num(o.obligated) ?? 0;
-      lines.push(`${i + 1}. ${str(o.office_name) || 'office name not reported'}${o.office_code ? ` (${str(o.office_code)})` : ''} · ${[title(str(o.agency)), title(str(o.sub_agency))].filter(Boolean).join(' / ')} · ${money(o.obligated)} (${str(o.share_pct)}%) · ${num(o.award_count) ?? 0} awards${customers.length ? ` · customers: ${customers.join('; ')}` : ''}${places.length ? ` · work performed in ${places.join('; ')}` : ''}${examples.length ? ` · example awards: ${examples.join('; ')}` : ''}${net <= 0 ? ' · CHECK: net obligations are zero or negative (deobligations), so this is not evidence of buying in this window' : ''}`);
+      lines.push(`${i + 1}. ${str(o.office_name) || 'office name not reported'}${o.office_code ? ` (${str(o.office_code)})` : ''} · ${[title(str(o.agency)), title(str(o.sub_agency))].filter(Boolean).join(' / ')} · ${money(o.obligated)} (${str(o.share_pct)}%) · ${num(o.award_count) ?? 0} awards${customers.length ? ` · customers: ${customers.join('; ')}` : ''}${places.length ? ` · work performed in ${places.join('; ')}` : ''}${examples.length ? ` · example awards (obligations in this window): ${examples.join('; ')}` : ''}`);
     });
+    if (nonBuyers.length) {
+      lines.push('');
+      lines.push(`Also returned, with zero or negative net obligations in this window (deobligations, so not evidence of buying): ${nonBuyers.map((o) => `${str(o.office_name)}${o.office_code ? ` (${str(o.office_code)})` : ''} ${money(o.obligated)}`).join('; ')}.`);
+    }
   }
   const notes = Array.isArray(result.notes) ? (result.notes as unknown[]).map(str).filter(Boolean) : [];
   if (notes.length) { lines.push(''); notes.slice(0, 3).forEach((n) => lines.push(n)); }
@@ -624,13 +629,13 @@ export function renderVehicleMix(result: Rec): RenderedRecords | null {
   const rl = [['all schedules', r('all_schedules')], ['all BPAs', r('all_bpas')], ['all IDIQs and GWACs', r('all_idiqs_and_gwacs')]].filter(([, v]) => v).map(([k, v]) => `${k} ${money((v as Rec).obligated)} (${str((v as Rec).share_pct)}%)`);
   if (rl.length) { lines.push(''); lines.push(`Rollups: ${rl.join('; ')}.`); }
   const vmeta = (result._meta && typeof result._meta === 'object' ? result._meta : {}) as Rec;
-  if (vmeta.as_of) lines.push(`Award data loaded through ${str(vmeta.as_of)}; the most recent months may be incomplete because agencies report with a delay (Defense about 90 days).`);
+  if (vmeta.as_of || vmeta.lag_note) lines.push(`Data freshness: ${vmeta.as_of ? `latest action loaded ${str(vmeta.as_of)}` : ''}${vmeta.as_of && vmeta.lag_note ? '; ' : ''}${vmeta.lag_note ? str(vmeta.lag_note) : ''}.`.replace(/\.\.$/, '.'));
   lines.push(`Classification: of the dollars linked to a vehicle, ${str(cls.verified_share_of_parented_pct)}% were verified from USASpending vehicle records. Of all dollars, ${str(cls.heuristic_share_of_total_pct)}% were typed from contract-number patterns and ${str(cls.unresolved_share_of_total_pct)}% could not be classified.`);
   const n = buckets.length;
   return { tool: VEHICLE_MIX_TOOL, text: lines.join('\n'), total: n, retrieved: n, from: 1, to: n, shown: n, exhaustive: true, ids: [], allowedCounts: [n, num(result.total_award_count) ?? 0], standalone: 0, orders: 0 };
 }
 
-const MAGNITUDE_RE = /\b(substantial(ly)?|significant(ly)?|major|minor|slight(ly)?|frequent(ly)?|prevalent|dominant|dominat\w*|primarily|predominantly|mostly|most of|the bulk|largest share|key player|heavily|considerabl[ey]|notabl[ey] large|large(ly)?|small(er)? share|a lot of|many of|numerous|common(ly)?|typical(ly)?|often|rarely|popular)\b/i;
+const MAGNITUDE_RE = /\b(substantial(ly)?|significant(ly)?|major|minor|slight(ly)?|frequent(ly)?|prevalent|dominant|dominat\w*|primarily|predominantly|mostly|most of|the bulk|largest share|key player|heavily|considerabl[ey]|notabl[ey] large|large(ly)?|small(er)? share|a lot of|many of|numerous|common(ly)?|typical(ly)?|often|rarely|popular|majority|minority|half|bulk)\b/i;
 const SUPERLATIVE_RE = /\b(most|least|latest|newest|oldest|earliest|recent|largest|biggest|smallest|highest|lowest|top|leading|prominent|notabl[ey]|key|main|primary|first|only|all of|every)\b/i;
 const APPROX_MONEY_RE = /\b(approximately|approx\.?|about|around|roughly|nearly|almost|over|under|more than|less than|some)\s+\$/i;
 
