@@ -211,7 +211,7 @@ has no customer-visible change from either PR.
 notice. Seven owners drop off the list (owners 4, 9, 11, 12, 13, 14, 16): every one of their watches is
 either Open-off (Coming Soon only, unchanged) or returns the same count; their filter cleanup needs no notice. Owners
 whose notice covers changes from BOTH PRs: 5 and 7 (different watches), 10 and 15 (the same watch, `027283a9` / `332eef89`).
-Two owners' notices (owners 32 and 34) are HELD until the unexpected expansions below are decided.
+Two owners' notices (owners 32 and 34) are HELD until the unexpected expansions below are decided. (Saved search text is not quoted next to a watch in this public file; it is in the private key.)
 
 ### Watches that go silent (Open, today > 0 → 0)
 
@@ -228,14 +228,14 @@ change. The 11 Agent 2 pauses stop alerts by design and are not counted here.
 
 | Watch | Owner | Today | Both | Assessment (sampled the notices it would gain) |
 |---|---|---|---|---|
-| `3ed7a107` | 32 | 6 | 10 | **unexpected**: "texas" gains Fort Benning GA, Fort Stewart GA, Fort Leonard Wood MO and an Alaska FAA notice. Canonical reads Texas as a state and the state filter matches place of performance OR buying-office state (Army MICC and FAA regional offices sit in Texas). |
+| `3ed7a107` | 32 | 6 | 10 | **unexpected**: a single place-name search gains Fort Benning GA, Fort Stewart GA, Fort Leonard Wood MO and an Alaska FAA notice. Canonical reads Texas as a state and the state filter matches place of performance OR buying-office state (Army MICC and FAA regional offices sit in Texas). |
 | `c2adcce1` | 32 | 6 | 10 | **unexpected**: same as `3ed7a107` |
-| `0e41b9aa` | 34 | 24 | 25 | **unexpected**: "janitorial custodial grounds turf waste removal" is a 6-word capability list that admits on any one word; gains MQ-9 instructor services, wet-blade hours, child care |
+| `0e41b9aa` | 34 | 24 | 25 | **unexpected**: a 6-word facilities-services capability list that admits on any one word; gains MQ-9 instructor services, wet-blade hours, child care |
 | `994c599e` | 5 | 0 | 77 | expected: IT NAICS watch whose exclusion-only text made legacy return 0 |
 | `02b35d34` | 24 | 0 | 18 | expected: Air Force now recognized as a buyer |
 | `9da3488e` | 24 | 0 | 16 | expected: Army now recognized |
 | `caf96deb` | 24 | 0 | 21 | expected: Veterans Affairs now recognized |
-| `e9f648f6` | 28 | 2 | 39 | expected: "filters" + 333998; gains are fluid filter elements |
+| `e9f648f6` | 28 | 2 | 39 | expected: a product word + its NAICS; gains are that product |
 
 The three unexpected expansions come from moving alerts onto the Map's canonical engine (#2043): the Map already shows
 these results for the same search today. They are shared-planner behaviour (geography definition; capability-list
@@ -315,3 +315,48 @@ or notify them explicitly that their results will include these. Their gains are
 (owner 20) "both" goes 1 → 0; the 1 was a Federal Housing Finance Agency notice matched through the word "housing". With
 C1 it joins "goes silent": a HUD watch with no HUD notice in the window under its filters. Its notice text should use the
 "Matches → 0" block.
+
+## 7. Round 4 update (2026-11-14): C1 live, any-word correction measured, held owners
+
+**C1 released.** PR #2045 merged as `cff898226`, production deployment `dpl_HPJ8TnsJD4GngFS5nTEmfZkqcLD7`
+(market-assassin-j8osmhxz5). Effect on the 60 watches once #2043 is active: `61d1ca1f` (owner 20) 1 → 0, as in §6. The
+legacy alert evaluator (flag off, today) does not use this matching, so no current alert changed.
+
+**Any-word correction (draft PR #2047, not merged).** Over all 186 alerting watches under #2043's canonical recipe, one
+count changes: `0e41b9aa` (owner 34) 25 → 19. Its 6 removed notices are the unrelated ones listed in §6 (MQ-9 instructor
+services, wet-blade flight hours, child care, aircraft test stands). Its direct matches go 6 → 3; it still alerts. The
+other 59 of the 60 are unchanged.
+
+**Updated combined "after" for the held and changed rows** (both PRs + C1 live + #2047 if merged):
+
+| Watch | Owner | Today | After #2040 + #2043 (+ C1) | After also #2047 |
+|---|---|---|---|---|
+| `61d1ca1f` | 20 | 8,885 | 0 | 0 |
+| `0e41b9aa` | 34 | 24 | 25 | 19 |
+| `3ed7a107` | 32 | 6 | 10 | 10 |
+| `c2adcce1` | 32 | 6 | 10 | 10 |
+
+The notification list is unchanged: 27 of 34 owners. Owners 32 and 34 stay HELD.
+
+### Held owners: plain-language explanation (draft, NOT sent; no criteria changed)
+
+Owner 32 (two watches searching a state by name):
+
+> Your saved search for Texas will start following the Opportunity Map. On the Map, a Texas search shows notices for
+> work performed in Texas and notices issued by buying offices located in Texas, because many federal notices do not
+> say where the work will be done. Some of those offices buy for other states: for example, an Army contracting office
+> in Texas runs base operations contracts at Fort Benning (Georgia), Fort Stewart (Georgia) and Fort Leonard Wood
+> (Missouri). With this change your alert would have shown about 10 notices over the last 30 days instead of 6, and
+> some of the new ones are for work outside Texas. If you only want work performed in Texas, reply and we will help
+> you set that up; nothing changes until you tell us.
+
+Owner 34 (one facilities-services watch with six service words):
+
+> Your saved search lists several services. Until now, a notice could match on any one of those words, so some alerts
+> were unrelated (for example, aircraft instructor services and a child-care program). We are correcting this so that
+> very common words only count when they appear together with another word from your search. Over the last 30 days
+> your alert would have shown 19 notices instead of 25, and the 6 removed were the unrelated ones. Your saved search
+> itself does not change.
+
+Both explanations are drafts for approval. The owner-34 text assumes #2047 is merged before activation; if it is not,
+that owner keeps the §6 behaviour and the text must not be sent.
