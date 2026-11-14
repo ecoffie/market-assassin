@@ -44,7 +44,7 @@ import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/cha
 import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, type PlannerTarget } from '@/lib/chat/planner-config';
 import { capabilityPlannerNote } from '@/lib/market/capability-naics';
 import { guardUnstatedStates } from '@/lib/chat/stated-filters';
-import { prepareChatToolArgs, renderExpiringRecords, checkSummaryAgainstRecords, EXPIRING_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
+import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
 
@@ -596,9 +596,12 @@ export async function POST(request: NextRequest) {
               turnTrace.tool_executions = results.map((r) => r.record);
               // PR E: verified record lists are rendered from the tool data, not reproduced by the model.
               for (const r of results) {
-                if (r.record.tool !== EXPIRING_TOOL || r.record.status !== 'success') continue;
+                if (r.record.status !== 'success' || (r.record.tool !== EXPIRING_TOOL && r.record.tool !== PAST_CONTRACTS_TOOL)) continue;
                 try {
-                  const rendered = renderExpiringRecords(JSON.parse(r.content), { offset: displayOffsets.get(r.tool_call_id) ?? 0 });
+                  const parsed = JSON.parse(r.content);
+                  const rendered = r.record.tool === EXPIRING_TOOL
+                    ? renderExpiringRecords(parsed, { offset: displayOffsets.get(r.tool_call_id) ?? 0 })
+                    : renderStatusChecks(parsed);
                   if (rendered) renderedRecords.push(rendered);
                 } catch (renderErr) {
                   console.error('[chat] record render failed:', renderErr);
@@ -654,6 +657,7 @@ export async function POST(request: NextRequest) {
               'VERIFIED RECORD LIST: the records below were rendered from the tool data and have ALREADY been shown to the user verbatim, directly above your reply. '
               + 'Do NOT list, repeat or renumber the records, and do not restate identifiers, dates or amounts that are not in this list. '
               + 'Write 2 to 6 sentences of analysis: what stands out (soonest end dates, agencies, incumbents, task orders versus contracts, anything not applied). '
+              + 'For a status list: if several awards match, do not treat one as THE contract unless the records identify it; say which are active and which expired (with end dates) and name any successor candidate. '
               + 'If you state the total, use exactly the count in the list header. If the header says the list is not complete, say so and tell the user how to continue (call the same tool with the same filters plus display_offset).\n\n'
               + renderedRecords.map((r) => r.text).join('\n\n'),
           });

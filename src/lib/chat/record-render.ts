@@ -248,3 +248,71 @@ export function checkSummaryAgainstRecords(summary: string, rendered: RenderedRe
   if (anyRecords && NONE_CLAIM.test(summary)) problems.push('claimed there were none while verified records exist');
   return problems;
 }
+
+export const PAST_CONTRACTS_TOOL = 'search_past_contracts';
+
+function successorText(succ: unknown): string {
+  const s = (succ && typeof succ === 'object' ? succ : null) as Rec | null;
+  if (!s) return 'successor not checked';
+  const state = str(s.state);
+  if (state === 'candidates') {
+    const cands = (Array.isArray(s.candidates) ? s.candidates : []) as Rec[];
+    const items = cands.slice(0, 3).map((c) => {
+      const ev = (c.evidence && typeof c.evidence === 'object' ? c.evidence : {}) as Rec;
+      const label = str(c.confidence) || str(c.likelihood);
+      const office = str(ev.same_piid_office_prefix);
+      return `${str(c.awardId) || str(c.award_id)} · ${title(str(c.recipientName))}${c.description ? ` · ${clip(str(c.description), 60)}` : ''}${c.startDate ? ` · started ${str(c.startDate)}` : ''}${office ? ` · same office ${office}` : ''}${label ? ` (${label})` : ''}`;
+    });
+    return `possible successor${cands.length === 1 ? '' : 's'} found: ${items.join('; ')}`;
+  }
+  if (state === 'none_found') return `successor checked, none found${s.note ? ` (${clip(str(s.note), 120)})` : ''}`;
+  if (state === 'unavailable') return 'successor check unavailable (source error, not a none)';
+  return 'successor not checked (award still active or not near its end)';
+}
+
+/**
+ * Render search_past_contracts results that carry status_checks ("is it still active / who replaced
+ * it"): every checked award with its status, end date and successor result, plus the count of
+ * matches that were not checked. Returns null when the result has no status_checks.
+ */
+export function renderStatusChecks(result: Rec): RenderedRecords | null {
+  const checks = Array.isArray(result?.status_checks) ? (result.status_checks as Rec[]) : null;
+  const meta = (result?._meta && typeof result._meta === 'object' ? result._meta : {}) as Rec;
+  if (!checks) return null;
+  const awards = (Array.isArray(result.awards) ? result.awards : []) as Rec[];
+  const byId = new Map(awards.map((a) => [str(a.awardId), a]));
+  const total = Math.max(num(meta.total) ?? awards.length, awards.length);
+  const af = (meta.applied_filters && typeof meta.applied_filters === 'object' ? meta.applied_filters : {}) as Rec;
+  const fparts: string[] = [];
+  const val = (v: unknown) => (v && typeof v === 'object' ? str((v as Rec).value ?? (v as Rec).name) : str(v));
+  if (af.keyword) fparts.push(`keyword "${val(af.keyword)}"`);
+  if (af.piid_prefix) fparts.push(`number starting ${val(af.piid_prefix)}`);
+  if (af.agency) fparts.push(`agency ${val(af.agency)}`);
+  if (af.state) fparts.push(`place of performance ${val(af.state)}`);
+  if (af.naics) fparts.push(`NAICS ${val(af.naics)}`);
+  const lines: string[] = [];
+  lines.push(`${total} award${total === 1 ? '' : 's'} match (${fparts.join(' · ') || 'no filters'}). Source: USASpending. Status checked for ${checks.length}:`);
+  lines.push('');
+  checks.forEach((c, i) => {
+    const a = byId.get(str(c.award_id)) ?? {};
+    const st = str(c.status);
+    const days = num(c.days_until_end);
+    const end = str(c.end_date) || 'end date not reported';
+    const statusText = st === 'expired'
+      ? `EXPIRED: ended ${end}${days != null ? ` (${Math.abs(days)} days ago)` : ''}`
+      : st === 'active'
+        ? `ACTIVE: ends ${end}${days != null ? ` (${days} days left)` : ''}`
+        : st === 'not_started' ? `not started yet (ends ${end})` : `status unknown${c.error ? ` (${clip(str(c.error), 60)})` : ''}`;
+    lines.push(`${i + 1}. ${str(c.award_id)} · ${title(str(a.recipientName)) || 'recipient not reported'}${a.description ? ` · ${clip(str(a.description), 70)}` : ''} · ${statusText} · ${successorText(c.successor)}`);
+  });
+  if (total > checks.length) {
+    lines.push('');
+    lines.push(`${total - checks.length} more matching award${total - checks.length === 1 ? ' was' : 's were'} not status-checked; this is not the full list.`);
+  }
+  if (meta.lag_note) lines.push(str(meta.lag_note));
+  const ids = checks.map((c) => str(c.award_id));
+  return {
+    tool: PAST_CONTRACTS_TOOL, text: lines.join('\n'), total, retrieved: awards.length, from: checks.length ? 1 : 0, to: checks.length,
+    shown: checks.length, exhaustive: total === checks.length, ids, allowedCounts: Array.from(new Set([total, awards.length, checks.length])), standalone: checks.length, orders: 0,
+  };
+}

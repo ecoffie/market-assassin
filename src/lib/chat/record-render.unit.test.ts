@@ -4,7 +4,7 @@
  * summaries that contradict the verified counts.
  */
 import { describe, it, expect } from 'vitest';
-import { renderExpiringRecords, collectExpiringRecords, checkSummaryAgainstRecords, prepareChatToolArgs, CHAT_FETCH_LIMIT } from './record-render';
+import { renderExpiringRecords, renderStatusChecks, collectExpiringRecords, checkSummaryAgainstRecords, prepareChatToolArgs, CHAT_FETCH_LIMIT } from './record-render';
 
 const rec = (piid: string, end: string, extra: Record<string, unknown> = {}) => ({
   contract_id: `CONT_${piid}`, piid, incumbent_name: 'ALLPRO STAFFNET LLC', awarding_agency: 'Department of Veterans Affairs',
@@ -128,5 +128,34 @@ describe('chat argument preparation', () => {
   it('leaves other tools and unparseable arguments untouched', () => {
     expect(prepareChatToolArgs('search_contractors', '{"x":1}')).toEqual({ args: '{"x":1}', displayOffset: 0 });
     expect(prepareChatToolArgs('get_expiring_contracts', '{"naics":')).toEqual({ args: '{"naics":', displayOffset: 0 });
+  });
+});
+
+describe('status checks (search_past_contracts include_status)', () => {
+  const result = {
+    awards: [
+      { awardId: 'N0018921F3006', recipientName: 'MAGELLAN FEDERAL', description: 'ID card administration Millington' },
+      { awardId: 'N0018925CZ092', recipientName: 'CHENEGA ANALYTIC BUSINESS SOLUTIONS', description: 'identification card services' },
+      { awardId: 'N0018920CZ037', recipientName: 'CHENEGA', description: 'id card' },
+    ],
+    status_checks: [
+      { award_id: 'N0018921F3006', status: 'expired', days_until_end: -105, end_date: '2026-07-31', successor: { state: 'candidates', candidates: [{ awardId: 'N0018926FD111', recipientName: 'GEMINI TECH SERVICES LLC', description: 'MNCC ICA CONUS ID SERVICES', startDate: '2026-07-16', evidence: { same_piid_office_prefix: 'N00189' } }] } },
+      { award_id: 'N0018925CZ092', status: 'active', days_until_end: 259, end_date: '2027-07-31', successor: { state: 'not_checked' } },
+    ],
+    _meta: { total: 3, applied_filters: { keyword: { value: 'identification card' }, agency: { name: 'Department of the Navy' }, state: { value: 'TN' } } },
+  };
+  it('renders every checked award with status, end date and successor; never picks one', () => {
+    const r = renderStatusChecks(result)!;
+    expect(r.text).toMatch(/^3 awards match \(keyword "identification card" · agency Department of the Navy · place of performance TN\)/);
+    expect(r.text).toMatch(/N0018921F3006 · Magellan Federal · .* · EXPIRED: ended 2026-07-31 \(105 days ago\) · possible successor found: N0018926FD111 · Gemini Tech Services LLC/);
+    expect(r.text).toMatch(/N0018925CZ092 · .* · ACTIVE: ends 2027-07-31 \(259 days left\)/);
+    expect(r.text).toMatch(/1 more matching award was not status-checked; this is not the full list\./);
+  });
+  it('a failed successor check is not a none', () => {
+    const r = renderStatusChecks({ ...result, status_checks: [{ award_id: 'X1', status: 'expired', days_until_end: -3, end_date: '2026-11-11', successor: { state: 'unavailable' } }], _meta: { total: 1 } })!;
+    expect(r.text).toMatch(/successor check unavailable \(source error, not a none\)/);
+  });
+  it('returns null without status_checks', () => {
+    expect(renderStatusChecks({ awards: [], _meta: {} })).toBeNull();
   });
 });
