@@ -411,3 +411,16 @@ describe('anonymous saves use the same plan and the same customer copy', () => {
     expect(r.btn.textContent).toMatch(/Narrow the map first/);
   });
 });
+
+describe('the default map (Open Now + Coming Soon, nothing else) is never saved as a whole-market alert', () => {
+  beforeEach(() => { mockFrom.mockReset(); });
+  it('the real service refuses it as no_narrowing, and the Map offers the profile market', async () => {
+    // Default map boots with all three horizons; F1 narrows the saved payload to Open + Coming Soon.
+    const r = run({ horizons: { open: true, recompete: true, forecast: true }, filt: { setAside: 'all', strategy: [] } });
+    const body = r.calls[0].body;
+    expect((body.filters as Record<string, unknown>).horizons).toEqual({ open: true, recompete: false, forecast: true });
+    const { res } = await service(body);
+    expect(res.ok).toBe(false);
+    if (!res.ok) { expect(res.code).toBe('invalid_filters'); expect(res.reason).toBe('no_narrowing'); }
+  });
+});

@@ -17,8 +17,21 @@ describe('saved-search filter validation', () => {
     expect(res.ok).toBe(true);
   });
 
-  it('accepts forecast-only horizon', () => {
-    expect(savedSearchHasNarrowingFilter({ horizons: { forecast: true } })).toBe(true);
+  it('accepts a forecast-only horizon (Open explicitly off)', () => {
+    expect(savedSearchHasNarrowingFilter({ horizons: { open: false, forecast: true } })).toBe(true);
+    expect(savedSearchHasNarrowingFilter({ horizons: { open: 'false', forecast: true } })).toBe(true);
+  });
+
+  // 2026-11-14: "Open + Coming Soon" with nothing else is the whole Open market. The cron reads a missing
+  // `open` as ON, so { forecast: true } alone also emails every Open opportunity. This test used to assert
+  // that shape was narrowing. 8 account watches were alerting on the entire Open market that way.
+  it('rejects Open + Coming Soon (or Coming Back) with nothing else: that is the whole Open market', () => {
+    expect(savedSearchHasNarrowingFilter({ horizons: { forecast: true } })).toBe(false);
+    expect(savedSearchHasNarrowingFilter({ horizons: { open: true, forecast: true, recompete: false } })).toBe(false);
+    expect(savedSearchHasNarrowingFilter({ horizons: { open: true, forecast: true, recompete: true } })).toBe(false);
+    const r = validateSavedSearchFilters({ horizons: { open: true, forecast: true, recompete: false } });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe('no_narrowing');
   });
 
   it('accepts scope=profile', () => {

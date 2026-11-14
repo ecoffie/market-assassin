@@ -129,10 +129,22 @@ function strategyKeys(filters: SavedSearchFilters): string[] {
   return strategyParts(filters.strategy).filter((k) => STRATEGY_KEY_SET.has(k));
 }
 
+/**
+ * Horizons narrow only when Open is OFF (2026-11-14). A Coming Soon-only (or Coming Back-only) watch is a
+ * deliberate choice of corpus and stays allowed: forecasts have no other push channel. But "Open + Coming
+ * Soon" with nothing else is the whole Open market. The old rule counted ANY forecast/recompete flag as
+ * narrowing, so a save from the default map (all horizons on, narrowed to Open + Coming Soon) passed as a
+ * whole-market alert. Read-only audit that day: 8 account watches were alerting on the entire Open market
+ * this way. `horizons.open` absent means Open is on (the cron's own reading).
+ */
 function horizonsNarrow(filters: SavedSearchFilters): boolean {
   const h = filters.horizons;
   if (!h || typeof h !== 'object' || Array.isArray(h)) return false;
   const rec = h as Record<string, unknown>;
+  // Same reading of "off" as the cron (alert-scope.ts isOffFlag): false, 0, "0", "false", "no".
+  const openOff = rec.open === false || rec.open === 0
+    || (typeof rec.open === 'string' && ['0', 'false', 'no'].includes(rec.open.trim().toLowerCase()));
+  if (!openOff) return false;
   return rec.forecast === true || rec.recompete === true;
 }
 
@@ -267,7 +279,7 @@ export function validateSavedSearchFilters(raw: unknown): ValidateFiltersResult 
     return {
       ok: false,
       error:
-        'At least one narrowing filter is required (naics, agency, q, state, set-aside, strategy, scope=profile, or forecast horizon). Cannot schedule a watch for the entire federal market.',
+        'At least one narrowing filter is required (naics, agency, q, state, set-aside, strategy, scope=profile, or a Coming Soon-only horizon with Open off). Open + Coming Soon with nothing else is the entire Open market. Cannot schedule a watch for the entire federal market.',
       reason: 'no_narrowing',
       keys: [],
     };
