@@ -266,6 +266,39 @@ orders by `(recipient_uei, page_number)` and refuses a read with duplicate or mi
 fire-and-forget, `dispatched`). Idle with no claimable job (about 1 s, no BigQuery). New source
 versions come from `awards-refresh` (11:00 UTC daily) after each weekly ingest.
 
+## Final 404 audit: 2026-11-14 03:17 UTC (after the rebuild and worker schedule)
+Same 1,000 URLs, same crawler. Per-URL results (status, final URL, robots, canonical,
+self-canonical, tab state, top-12,000 membership):
+`docs/seo-recovery/gsc-404-classification-2026-11-14-final.csv`. The audit made no
+BigQuery lookups: the contractor cold budget stayed at 196 and the contracts budget (already
+past 200) only counted refusals (678 → 688).
+
+| Result | Profile | Contracts | NAICS tab | Agencies tab | Total |
+|---|---|---|---|---|---|
+| 200 indexable | 466 | 407 | 0 | 0 | **873** |
+| 200 noindex (intentional) | 30 thin contractor | 0 | 64 rows not cached | 17 rows not cached | **111** |
+| ...of which reached by 308 to canonical | 18 | 8 | 5 | 3 | **34** |
+| Genuine 404 | 4 | 2 | 1 | 0 | **7** |
+| False 404 | 0 | 0 | 0 | 0 | **0** |
+| Temporary 5xx | 0 | 9 | 0 | 0 | **9** |
+
+Every 200 is self-canonical.
+
+**All 9 temporary 5xx are `/contracts` pages of contractors outside the current top 12,000**
+(`hess-construction-company-llc`, `abt-associates-international-inc`,
+`bellamy-management-services-llc`, `american-contractor-and-technology-inc`,
+`alliant-alliance-llc`, `first-care-ohio-llc`, `linfield-hunter-and-junius-inc`,
+`chatmon-vjr-jv-llc`, `standard-bent-glass-llc`). **This is a regression from the promotion:**
+all 9 were 200 at 01:35 UTC and all 9 are in the retired 2026-08-28 generation. Their rank fell
+below 12,000 between the August and November rollups, so the new build excluded them. In total,
+**251 contractors in the old generation are absent from the new one** (2,638 were added, so
+the size check could not see it). Without a table row, their `/contracts` pages depend on KV and
+the render-time contracts budget (already spent each day by about 00:30 UTC).
+
+Candidate fix (not done, needs approval): keep any contractor present in the live generation
+eligible for the next build ("sticky" eligibility, at most 251 more today), and make validation
+report contractors dropped against live. A rollback would restore the 251 but drop 2,638.
+
 ## Single-award contractors noindexed by the thin-profile rule (policy review, no change)
 The profile rule noindexes `total_obligated < $25K || award_count < 2`
 (`src/app/contractors/[slug]/page.tsx`). That treats a single high-value award as low value.
