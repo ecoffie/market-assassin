@@ -11,6 +11,7 @@
 import { searchAwardsByLocation, normalizePiidPrefix, type AwardRow, type StateScope } from '@/lib/usaspending/awards-search';
 import { assessPublicationLag, fetchUsaSpendingLastUpdated } from '@/lib/usaspending/freshness';
 import { usaSpendingAwardingAgencyFilter } from '@/lib/usaspending/awarding-agency-filter';
+import { officeRemainder, looksLikeOffice, resolveAwardingOffices } from '@/lib/usaspending/office-resolve';
 import type { IgnoredArg } from '@/lib/mcp/result-contract';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import { mcpFlags } from '@/lib/mcp/flags';
@@ -118,12 +119,48 @@ export async function searchPastContracts(input: PastContractsToolInput): Promis
   // Freshness is only fetched when a date window was asked for (best-effort; null on failure).
   const asOfPromise: Promise<string | null> = hasWindow ? fetchUsaSpendingLastUpdated() : Promise.resolve(null);
 
+  // Office part of the agency phrase ("USACE Memphis District"): resolve it to awarding-office codes
+  // and filter by contract-number prefix server-side, instead of silently widening to the agency.
+  let officePrefix: string | undefined;
+  let officeApplied: Record<string, unknown> | null = null;
+  if (!piidPrefix && input.agency) {
+    const remainder = officeRemainder(input.agency);
+    if (looksLikeOffice(input.agency, remainder)) {
+      const subtier = usaSpendingAwardingAgencyFilter(input.agency);
+      const r = await resolveAwardingOffices(input.agency, subtier.tier === 'subtier' ? subtier.name : null);
+      if (r.offices.length) {
+        officeApplied = { requested: r.remainder, candidates: r.offices.map((o) => `${o.code} ${o.name}`) };
+      } else {
+        ignored.push({
+          arg: 'agency', value: String(r.remainder), reason: 'unsupported_value',
+          detail: `the office "${r.remainder}" could not be resolved to an awarding office${r.error ? ` (${r.error})` : ''}; results cover the whole agency, not that office`,
+        });
+      }
+      if (r.offices.length) {
+        // Try each candidate code (most offices have one contracting code); keep the first with awards.
+        for (const o of r.offices) {
+          const probe = await searchAwardsByLocation({
+            state, stateScope: requestedScope, naics: input.naics, psc: input.psc, agency: input.agency, recipient: input.recipient,
+            minValue: input.min_value, dateFrom: input.date_from, dateTo: input.date_to, includeIdv: input.include_idv, limit: 1,
+            keyword, piidPrefix: normalizePiidPrefix(o.code) ?? undefined,
+          });
+          if (probe.awards.length) { officePrefix = normalizePiidPrefix(o.code) ?? undefined; officeApplied = { ...(officeApplied ?? {}), code: o.code, name: o.name }; break; }
+        }
+        if (!officePrefix) {
+          ignored.push({ arg: 'agency', value: String(r.remainder), reason: 'unsupported_value', detail: `office candidates ${r.offices.map((o) => o.code).join(', ')} had no awards in scope; results cover the whole agency` });
+          officeApplied = null;
+        }
+      }
+    }
+  }
+  const effectivePrefix = piidPrefix ?? officePrefix;
+
   const runSearch = (stateScope: StateScope) => searchAwardsByLocation({
     state, stateScope,
     naics: input.naics, psc: input.psc, agency: input.agency, recipient: input.recipient,
     minValue: input.min_value, dateFrom: input.date_from, dateTo: input.date_to,
     includeIdv: input.include_idv, limit: input.limit,
-    keyword, piidPrefix,
+    keyword, piidPrefix: effectivePrefix,
   });
 
   let scope = requestedScope;
@@ -173,6 +210,7 @@ export async function searchPastContracts(input: PastContractsToolInput): Promis
   if (input.include_idv) applied.include_idv = true;
   if (res.textFilters?.keyword) applied.keyword = res.textFilters.keyword;
   if (res.textFilters?.piid_prefix) applied.piid_prefix = res.textFilters.piid_prefix;
+  if (officeApplied) applied.office = officeApplied;
   if (res.textFilters?.scanned_rows !== undefined) {
     applied.prefix_scan = { scanned_rows: res.textFilters.scanned_rows, truncated: !!res.textFilters.scan_truncated };
   }
