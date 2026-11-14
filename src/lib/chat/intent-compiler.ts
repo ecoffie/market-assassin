@@ -33,7 +33,16 @@ export interface CompiledIntent {
   capabilityLabels: string[];
   /** The customer asked for all / every / a complete list. */
   completeness: boolean;
+  /** Agencies the customer named without an office ("the Navy ... contract"). */
+  agencyPhrases: string[];
+  /** The customer's own words for this turn (free-text tool inputs must come from these). */
+  requestText: string;
+  /** Everything the customer wrote in this conversation (pasted descriptions or past performance count). */
+  customerText: string;
 }
+
+/** Agency names a customer uses. Matched case-sensitively for acronyms so "va" in prose never counts. */
+const AGENCY_RE = /\b(Army Corps of Engineers|Corps of Engineers|USACE|Department of Defense|DoD|Navy|NAVSUP|NAVFAC|Army|Air Force|Marine Corps|Space Force|Coast Guard|Defense Logistics Agency|DLA|General Services Administration|GSA|NASA|Department of Homeland Security|DHS|FEMA|Department of Veterans Affairs|Veterans Affairs|VA|Health and Human Services|HHS|Department of Energy|DOE|State Department|Department of State|Department of the Treasury|IRS|USDA|Department of Justice|DOJ|FBI|NIH|CDC|EPA|Department of Transportation|FAA|SBA|Department of the Interior)\b/g;
 
 const MONTHS: Record<string, number> = { january: 1, february: 2, march: 3, april: 4, may: 5, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12 };
 
@@ -58,7 +67,7 @@ function explicitStatesIn(text: string): string[] {
   return out;
 }
 
-export function compileIntent(text: string, now: Date = new Date()): CompiledIntent {
+export function compileIntent(text: string, now: Date = new Date(), customerText: string = text): CompiledIntent {
   const src = String(text || '');
   const explicit = explicitStatesIn(src);
   const implied = [...impliedStates(src)].filter((s) => !explicit.includes(s));
@@ -85,8 +94,13 @@ export function compileIntent(text: string, now: Date = new Date()): CompiledInt
     capabilityCodes: cap.typedCodes.length ? cap.typedCodes : cap.codes,
     capabilityLabels: cap.items.map((i) => i.label),
     completeness: /\b(all|every|complete\s+list|full\s+list)\b/i.test(src),
+    agencyPhrases: offices.length ? [] : Array.from(new Set([...src.matchAll(AGENCY_RE)].map((m) => m[1]))),
+    requestText: src.trim(),
+    customerText: String(customerText || src).trim(),
   };
 }
+
+const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
 export interface Enforcement { args: string; applied: string[]; unapplied: string[] }
 
@@ -115,6 +129,14 @@ export function enforceIntent(toolName: string, rawArgs: string, intent: Compile
         delete a.state; delete a.state_scope; applied.push('no state filter (the named office is the scope)');
       }
     }
+    // A named agency the planner left off the search is applied (R10: "Navy" dropped, so a
+    // government-wide list was presented as the answer). One named agency only; never replaces one the
+    // planner chose, which may be the same agency in other words.
+    if (!office && intent.agencyPhrases.length === 1 && !String(a.agency ?? '').trim() && !String(a.piid_prefix ?? '').trim()) {
+      a.agency = intent.agencyPhrases[0]; applied.push(`agency "${intent.agencyPhrases[0]}" from your request`);
+    } else if (!office && intent.agencyPhrases.length > 1 && !String(a.agency ?? '').trim()) {
+      unapplied.push(`agencies ${intent.agencyPhrases.join(', ')} (this search takes one agency; none was applied)`);
+    }
     if (intent.sinceDate && a.date_from !== intent.sinceDate) { a.date_from = intent.sinceDate; applied.push(`awards with activity since ${intent.sinceDate} (from "since")`); }
   }
 
@@ -136,10 +158,30 @@ export function enforceIntent(toolName: string, rawArgs: string, intent: Compile
     }
   }
 
+  // Keyword derivation describes the CUSTOMER's business: its free text must be the customer's words,
+  // never a description or past performance the planner wrote (R6: keywords credited as "your
+  // description" came from planner-invented text).
+  if (toolName === 'derive_company_keywords' && intent.requestText) {
+    const said = norm(intent.customerText || intent.requestText);
+    const custom = (v: unknown) => { const items = listOf(v); return items.length > 0 && items.every((t) => said.includes(norm(t))); };
+    if (a.description != null && !custom(a.description)) { a.description = intent.requestText; applied.push('your own words as the company description'); }
+    for (const k of ['past_performance', 'capabilities']) {
+      if (a[k] != null && !custom(a[k])) { delete a[k]; applied.push(`no ${k.replace('_', ' ')} (you did not provide any)`); }
+    }
+  }
+
   if (toolName === 'search_sam_opportunities' && intent.explicitStates.length) {
     const have = listOf(a.state).map((s) => normalizeStateCode(s)).filter((x): x is string => !!x);
     const missing = intent.explicitStates.filter((s) => !have.includes(s));
     if (missing.length) { a.state = Array.from(new Set([...have, ...intent.explicitStates])).join(','); applied.push(`states ${intent.explicitStates.join(', ')} from your request`); }
+  }
+
+  // A city or metro the customer named, searched through its state on a tool with no city filter:
+  // say the search covers the whole state (acc4 R5: "Millington" shown only as "place of performance TN").
+  if (['search_past_contracts', 'get_expiring_contracts', 'search_sam_opportunities'].includes(toolName) && intent.impliedStates.length && !office) {
+    const st = listOf(a.state).map((x) => normalizeStateCode(x)).filter((x): x is string => !!x);
+    const viaCity = st.filter((x) => intent.impliedStates.includes(x));
+    if (viaCity.length && a.city == null && a.cities == null) unapplied.push(`the city or area you named (this search covers all of ${viaCity.join(', ')}; it cannot filter to a city)`);
   }
 
   if (office && !['search_past_contracts', 'get_buying_offices', 'find_opportunities'].includes(toolName) && a.agency !== undefined && String(a.agency) !== office) {

@@ -253,7 +253,7 @@ describe('independent-review fixes', () => {
       _meta: meta({ total: 2 }),
     })!;
     expect(r.text).toMatch(/By awarding agency: Department of Justice 1; Department of Veterans Affairs 1\./);
-    expect(r.text).toMatch(/1 record carries a description that names a place outside the reported state or describes different work/);
+    expect(r.text).toMatch(/Mindy marked 1 record CHECK because the description names a place outside the reported state or describes different work\. This check only catches wording it recognizes/);
   });
   it('plain award search: every award with dates, the date-filter meaning, not-the-full-list and data status', () => {
     const r = renderStatusChecks({
@@ -309,7 +309,9 @@ describe('successor search limits are disclosed', () => {
 describe('run-E review: place conflicts from the record text', () => {
   it('flags scope words and a trailing out-of-state place; leaves in-state and unknown names alone', () => {
     expect(describedPlaceConflict('THIS TASK ORDER PROVIDES NATIONWIDE TRANSPORTATION OF UNACCOMPANIED MINORS', 'TX')).toMatch(/nationwide/);
-    expect(describedPlaceConflict('PROTECTIVE SECURITY OFFICER (PSO) SERVICES THROUGHOUT THE SOUTHERN BORDER', 'TX')).toMatch(/southern border/);
+    // acc4 R11: the southern border includes Texas, so a TX record is not a conflict; a TN one is.
+    expect(describedPlaceConflict('PROTECTIVE SECURITY OFFICER (PSO) SERVICES THROUGHOUT THE SOUTHERN BORDER', 'TX')).toBeNull();
+    expect(describedPlaceConflict('PROTECTIVE SECURITY OFFICER (PSO) SERVICES THROUGHOUT THE SOUTHERN BORDER', 'TN')).toMatch(/southern border/);
     // Names without a place cue are never guessed (Jacobs Creek Job Corps is in TN; a guess flagged it as out of state).
     expect(describedPlaceConflict('JOB CORPS PRIORITY 3 SUPPORT SERVICES NON-CLINICAL COLLBRAN', 'TX')).toBeNull();
     expect(describedPlaceConflict('JOB CORPS PRIORITY 3 SUPPORT SERVICES JACOBS CREEK', 'TN')).toBeNull();
@@ -413,5 +415,19 @@ describe('truth gate: closing sentences must be next-step guidance', () => {
   });
   it('drops hedged suggestions that carry assumptions ("Consider", "If you are interested")', () => {
     expect(lintAnalysis('If you\'re interested in pursuing similar opportunities, consider reaching out to the listed contractors.', 'FALLBACK').text).toBe('FALLBACK');
+  });
+});
+
+import { freshnessSentence as fs4, renderKeywords as rk4 } from './record-render';
+describe('acceptance attempt 4 fixes', () => {
+  it('names DoD in the delay sentence instead of "this agency"', () => {
+    const t = fs4({ lag_note: 'contract actions by DoD (including Navy, Army, Air Force) are published with a ~90-day delay; data is current through about 2026-08-15.' });
+    expect(t).toMatch(/^Defense \(DoD, including Navy, Army and Air Force\) contract actions reach USASpending/);
+    expect(t).not.toMatch(/this agency/i);
+  });
+  it('labels word-matched labor categories as word matches, not titles for this work', () => {
+    const r = rk4({ keyword_sources: [{ keyword: 'staffing', sources: [{ type: 'input_text' }] }], occupational_titles: [{ keyword: 'industrial engineer', sources: [{ type: 'gsa_calc' }] }] })!;
+    expect(r.text).toMatch(/share a word with your description\. These are word matches/);
+    expect(r.text).not.toMatch(/used for this work/);
   });
 });

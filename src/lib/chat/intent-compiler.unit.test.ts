@@ -80,3 +80,38 @@ describe('dedupeToolCalls (attempt 4: the planner split one question into identi
     expect(r.keep.map((c) => c.id)).toEqual(['a', 'b', 'c']);
   });
 });
+
+describe('acceptance attempt 4 fixes (enforceIntent)', () => {
+  it('R10: a named agency the planner left off is applied', () => {
+    const r = enforce('search_past_contracts', { naics: '541611', date_from: '2026-10-01', date_to: '2026-10-31' }, 'Who won the Navy business management support services contract in October 2026?');
+    expect(r.a.agency).toBe('Navy');
+    expect(r.applied).toContain('agency "Navy" from your request');
+  });
+  it('R10: an agency the planner already chose is not replaced; "Army Corps of Engineers" is one agency', () => {
+    expect(enforce('search_past_contracts', { agency: 'Department of the Navy' }, 'Navy awards').applied).toEqual([]);
+    expect(compileIntent('Army Corps of Engineers awards in Tennessee', NOW).agencyPhrases).toEqual(['Army Corps of Engineers']);
+  });
+  it('R6: keyword inputs are the customer\'s words; invented past performance is dropped', () => {
+    const q = 'Keywords for a light industrial, clerical and warehouse staffing firm in Memphis';
+    const a = enforce('derive_company_keywords', { description: 'A staffing company providing temp workers', past_performance: [{ title: 'Provided staffing solutions' }], limit: 12 }, q);
+    expect(a.a).toEqual({ description: q, limit: 12 });
+    const b = enforce('derive_company_keywords', { description: 'staffing firm', limit: 12 }, q);
+    expect(b.a).toEqual({ description: 'staffing firm', limit: 12 });
+  });
+  it('keeps past performance the customer pasted earlier in the conversation', () => {
+    const intent = compileIntent('Now derive my keywords', NOW, 'We provided warehouse staffing to DLA Memphis\nNow derive my keywords');
+    const r = enforceIntent('derive_company_keywords', JSON.stringify({ description: 'Now derive my keywords', past_performance: ['provided warehouse staffing to DLA Memphis'] }), intent);
+    expect(JSON.parse(r.args).past_performance).toEqual(['provided warehouse staffing to DLA Memphis']);
+  });
+});
+
+describe('city named, state searched', () => {
+  it('R5: discloses that a city became a whole-state search', () => {
+    const r = enforce('search_past_contracts', { keyword: 'ID card', state: 'TN' }, 'Is the Navy ID card administration order in Millington still active?');
+    expect(r.unapplied.join(' ')).toMatch(/covers all of TN; it cannot filter to a city/);
+  });
+  it('says nothing when the customer named the state itself', () => {
+    const r = enforce('get_expiring_contracts', { naics: '561612', state: 'TX', months_window: 12 }, 'Which agencies buy security guard services in the San Antonio area, and which of the current guard contracts in Texas expire in the next 12 months?');
+    expect(r.unapplied).toEqual([]);
+  });
+});
