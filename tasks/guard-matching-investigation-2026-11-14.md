@@ -113,6 +113,32 @@ names guard posts) are plausible subcontract scope: exactly the case Agent 4's s
 
 Ships as its own PR, separate from #2048 (C2), #2043 (alerts) and any performance change.
 
+## 4b. Agent 4's blind scoring of A and A+B (v4, research/data-core-hidden-opp-benchmark-v1 @ 3301cb3a0)
+
+Uses the exact sets in `tasks/guard-matching-2026-11-14/`. 1,059 blind AI-labelled pairs, 93% reviewer agreement,
+supporting sentence shown.
+
+| Guards | Production | A | A+B |
+|---|---|---|---|
+| Matched | 476 | 273 | 13 |
+| Precision | ~2% | 1 of 25 sampled | 7 of 13 |
+| Relevant among a random 25 removed rows | | 0 | 0 |
+| Relevant protective-services notices retrieved (of 12) | 7 | 6 | 5 |
+| Guard-coded notices retrieved (of 12) | 4 | 4 | 4 |
+| Top-20 relevant | 2 | 3 | 7 of 13 |
+
+**Correction to section 3:** "zero target loss on 36 searches" measured only trades with a NAICS target. Parts has
+none, and blind labels found A drops two PARTIAL parts rows ("Replace Door Control Unit", "417 SCMS Landing Gear Depot
+Support") whose only "defense" was "Department of Defense", plus one disputed guard row ("Israel S&RTS"). B drops one
+PARTIAL ("REPLACE OR CHILLERS"). Five relevant protective notices are retrieved by no variant (Protective Security
+Officer Services LA x2, INSCOM ACES x3): code recall (561612/S206) or protective phrases are needed.
+
+Agent 4 also found retrieval defects in this lane (each verified with matchesText / eligibilityLabel): "We supply
+industrial valves." becomes ALL(valves · supply · industrial) (0 of 23 code-floor valve notices); "like" in
+"fasteners like bolts…" becomes a concept; "We clean commercial office buildings." does not match "Custodial" /
+"Janitorial"; `cap.direct` is literal (no codes) for all 14 phrasings; the 500-row deadline window never ranks 687
+janitorial matches. Logged for prioritisation; not started.
+
 ## 5. Cross-check with Agent 4's post-#2050 evaluation (branch research/data-core-hidden-opp-benchmark-v1, dd21f980e)
 
 Agent 4 independently counted 136 of the 476 guard rows as Coast Guard / Marine Security Guard collisions (my
