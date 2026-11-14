@@ -109,9 +109,31 @@ export const CYBER_DIRECT_RE =
 export const PHYSICAL_SECURITY_RE =
   /\b(physical\s+security|access[\s-]?control|security\s+doors?|guard\s+services|perimeter\s+security|security\s+fence|locksmith|security\s+guard)\b/i;
 
-const PHRASE_PRESET: Array<{ match: RegExp; name: string }> = [
+/**
+ * Phrase → industry preset. The preset's codes are always RETRIEVED. When `directNaics` is set, only
+ * those codes are DIRECT evidence for the phrase; the rest of the preset family is the related
+ * market (retrieved and shown, labelled RELATED_MARKET_CANDIDATE, never counted as the requested
+ * work). Without it, every preset code is direct (construction and IT services: the family IS the work).
+ *
+ * Why (2026-11-14, Ask Mindy production test): "janitorial services in Florida" returned
+ * "Bombing Range Operation" (NAICS 561210, PSC M1PZ) and "AFCAP VI" (561210, PSC S216) labelled
+ * "Direct match — the record itself establishes relevance". Neither record mentions janitorial work;
+ * 561210 is Facilities Support Services, part of the Facilities & Maintenance family.
+ */
+const PHRASE_PRESET: Array<{ match: RegExp; name: string; directNaics?: string[]; alsoDirect?: Array<{ match: RegExp; naics: string[] }>; relatedReason?: string }> = [
   { match: /\bconstruction\b/i, name: 'Construction' },
-  { match: /\bjanitorial\b|\bcustodial\b/i, name: 'Facilities & Maintenance' },
+  {
+    match: /\bjanitorial\b|\bcustodial\b/i,
+    name: 'Facilities & Maintenance',
+    directNaics: ['561720'],
+    alsoDirect: [
+      { match: /\b(landscaping|grounds maintenance|lawn care|mowing)\b/i, naics: ['561730'] },
+      { match: /\b(facilities support|facility support|base operations|facilities management|facility management)\b/i, naics: ['561210'] },
+    ],
+    relatedReason:
+      'Facilities support and landscaping contracts sit in the same industry family and can include janitorial work, '
+      + 'but they are not janitorial contracts. Rows retrieved only by these codes are RELATED_MARKET_CANDIDATE.',
+  },
   { match: /\bit\s+services\b|\binformation\s+technology\b/i, name: 'IT Services' },
 ];
 
@@ -278,10 +300,28 @@ export function interpretCapability(phrase: string): CapabilityInterpretation {
     if (!row.match.test(requested)) continue;
     const preset = getIndustryPreset(row.name);
     if (!preset) continue;
+    const reason = `Customer phrase maps to the “${preset.name}” industry preset.`;
+    const direct = pinFromPreset(preset, reason, [requested]);
+    if (row.directNaics?.length) {
+      // Family members the customer named in the same phrase are direct too
+      // ("custodial and landscaping" asks for landscaping as well).
+      const named = (row.alsoDirect ?? []).filter((a) => a.match.test(requested)).flatMap((a) => a.naics);
+      const directSet = new Set([...row.directNaics, ...named]);
+      const relatedNaics = direct.naics.filter((c) => !directSet.has(c));
+      return {
+        requested,
+        kind: 'industry_preset',
+        direct: { ...direct, naics: direct.naics.filter((c) => directSet.has(c)) },
+        related_market: relatedNaics.length
+          ? { source: preset.name, naics: relatedNaics, psc: [], terms: [], reason: row.relatedReason || reason }
+          : null,
+        excluded,
+      };
+    }
     return {
       requested,
       kind: 'industry_preset',
-      direct: pinFromPreset(preset, `Customer phrase maps to the “${preset.name}” industry preset.`, [requested]),
+      direct,
       related_market: null,
       excluded,
     };

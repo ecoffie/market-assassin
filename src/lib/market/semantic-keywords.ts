@@ -21,7 +21,7 @@
 import { embedText, cosineSimilarity } from './embeddings';
 
 // Words that carry no search signal in GovCon scope text.
-const STOP = new Set([
+export const STOP = new Set([
   'the', 'and', 'for', 'with', 'this', 'that', 'shall', 'will', 'are', 'was', 'has',
   'have', 'all', 'any', 'other', 'including', 'such', 'per', 'each', 'from', 'into',
   'their', 'these', 'those', 'which', 'under', 'over', 'within', 'between', 'provide',
@@ -80,7 +80,7 @@ function edgesAreSignal(tokens: string[]): boolean {
 }
 
 /** Extract candidate keyword phrases (1-3 word, signal-bearing) from text. */
-function candidatePhrases(text: string): string[] {
+export function candidatePhrases(text: string): string[] {
   const words = clean(text).split(' ').filter(Boolean);
   const out = new Set<string>();
 

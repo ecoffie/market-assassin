@@ -7605,3 +7605,15 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 **SEO.** AI assistant for federal contracting research / GovCon AI chat / Mindy Ask Mindy.
 
 **Proof.** `src/lib/chat/chat-tool-policy.ts`, `src/lib/chat/chat-tool-executor.ts`, and their unit tests; execution rows in `mcp_call_log` with channel `app_chat`.
+
+## "None" now means none: every Mindy lookup says what it checked (2026-11-14)
+
+**What.** Every Mindy data lookup, in Ask Mindy and through AI agents connected over MCP, now reports what kind of answer it is: results, a verified zero, a filter it could not apply, an incomplete list, or a source that was unavailable. The expiring-contracts lookup now accepts several states and NAICS codes at once ("Tennessee, Mississippi or Arkansas"; "5613, 5611, 4931"), understands state names, and lists every task order ending in the window at the top of the result instead of only inside its parent vehicle.
+
+**Why it matters.** The most damaging research error is a confident "there is nothing" when the filter simply did not run. A contractor who hears "no staffing contracts expiring in Tennessee" walks away from real recompetes. Mindy now refuses to call a dropped filter a zero, and an AI agent using Mindy gets the same signal in machine-readable form.
+
+**Honest scope.** The contract reports what a lookup did; it does not make a source more complete than it is. A list capped by the row limit is labeled incomplete rather than expanded automatically. An unrecognized state or code is reported back, never guessed.
+
+**SEO.** expiring federal contracts by state / recompete contracts Tennessee / federal contracts expiring in the next 18 months / AI federal contract research accuracy.
+
+**Proof.** `src/lib/mcp/result-contract.ts` (shared contract) and `src/mcp/tools/expiring-contracts.ts`. Live read-only check on production data (2026-11-14): NAICS 561320 in Tennessee went from zero listed records (nine orders hidden under vehicles) to nine listed, including 36C24927N0097 (ends 2027-03-31) and 15JA4522F00000022 (ends 2027-09-07); the three-state staffing search returns 28 records with zero out-of-state rows.

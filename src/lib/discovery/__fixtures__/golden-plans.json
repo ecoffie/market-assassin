@@ -960,9 +960,7 @@
       "capability_kind": "industry_preset",
       "direct": {
         "naics": [
-          "561210",
-          "561720",
-          "561730"
+          "561720"
         ],
         "psc": [],
         "terms": [
@@ -970,7 +968,13 @@
           "janitorial"
         ]
       },
-      "related": null,
+      "related": {
+        "naics": [
+          "561210",
+          "561730"
+        ],
+        "psc": []
+      },
       "term_of_art_naics": []
     },
     "buyers": [],
@@ -1006,7 +1010,7 @@
         "ops": [
           {
             "op": "or",
-            "expr": "title.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",naics_code.eq.561210,naics_code.eq.561720,naics_code.eq.561730"
+            "expr": "title.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",naics_code.eq.561720,naics_code.eq.561210,naics_code.eq.561730"
           }
         ]
       },
@@ -1030,12 +1034,12 @@
           },
           {
             "op": "or",
-            "expr": "naics_code.eq.561210,naics_code.eq.561720,naics_code.eq.561730"
+            "expr": "naics_code.eq.561720,naics_code.eq.561210,naics_code.eq.561730"
           }
         ],
         "naics": [
-          "561210",
           "561720",
+          "561210",
           "561730"
         ]
       },
@@ -1576,9 +1580,7 @@
       "capability_kind": "industry_preset",
       "direct": {
         "naics": [
-          "561210",
-          "561720",
-          "561730"
+          "561720"
         ],
         "psc": [],
         "terms": [
@@ -1586,7 +1588,13 @@
           "janitorial"
         ]
       },
-      "related": null,
+      "related": {
+        "naics": [
+          "561210",
+          "561730"
+        ],
+        "psc": []
+      },
       "term_of_art_naics": []
     },
     "buyers": [
@@ -1649,7 +1657,7 @@
         "ops": [
           {
             "op": "or",
-            "expr": "title.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",naics_code.eq.561210,naics_code.eq.561720,naics_code.eq.561730"
+            "expr": "title.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",naics_code.eq.561720,naics_code.eq.561210,naics_code.eq.561730"
           },
           {
             "op": "or",
@@ -1677,7 +1685,7 @@
           },
           {
             "op": "or",
-            "expr": "naics_code.eq.561210,naics_code.eq.561720,naics_code.eq.561730"
+            "expr": "naics_code.eq.561720,naics_code.eq.561210,naics_code.eq.561730"
           },
           {
             "op": "or",
@@ -1685,8 +1693,8 @@
           }
         ],
         "naics": [
-          "561210",
           "561720",
+          "561210",
           "561730"
         ]
       },
@@ -4822,9 +4830,7 @@
       "capability_kind": "industry_preset",
       "direct": {
         "naics": [
-          "561210",
-          "561720",
-          "561730"
+          "561720"
         ],
         "psc": [],
         "terms": [
@@ -4832,7 +4838,13 @@
           "janitorial"
         ]
       },
-      "related": null,
+      "related": {
+        "naics": [
+          "561210",
+          "561730"
+        ],
+        "psc": []
+      },
       "term_of_art_naics": []
     },
     "buyers": [
@@ -4892,7 +4904,7 @@
         "ops": [
           {
             "op": "or",
-            "expr": "title.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",naics_code.eq.561210,naics_code.eq.561720,naics_code.eq.561730"
+            "expr": "title.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",naics_code.eq.561720,naics_code.eq.561210,naics_code.eq.561730"
           },
           {
             "op": "or",
@@ -4920,7 +4932,7 @@
           },
           {
             "op": "or",
-            "expr": "naics_code.eq.561210,naics_code.eq.561720,naics_code.eq.561730"
+            "expr": "naics_code.eq.561720,naics_code.eq.561210,naics_code.eq.561730"
           },
           {
             "op": "or",
@@ -4928,8 +4940,8 @@
           }
         ],
         "naics": [
-          "561210",
           "561720",
+          "561210",
           "561730"
         ]
       },

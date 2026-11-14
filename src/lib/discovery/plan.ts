@@ -297,7 +297,9 @@ export function buildDiscoveryPlan(input: DiscoveryInput, policy: SurfacePolicy,
       rVia = 'industry_preset';
       capNaics = retrievalNaics(cap);
       if (!psc.length) for (const p of retrievalPsc(cap)) capOr.push(`psc_code.eq.${p}`);
-      if (cap.related_market) {
+      // Cyber only: its related IT family needs the direct terms as a text path. An industry preset's
+      // related family is retrieved by code alone, as it was before the direct/related split.
+      if (cap.related_market && cap.kind === 'cyber_with_related_it') {
         for (const t of cap.direct.terms) {
           const e = textPredicate(buildTextMatcher(`"${t}"`), RECOMPETE_TERM_COLS);
           if (e) capOr.push(e);
