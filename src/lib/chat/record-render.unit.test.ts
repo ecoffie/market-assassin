@@ -4,7 +4,7 @@
  * summaries that contradict the verified counts.
  */
 import { describe, it, expect } from 'vitest';
-import { renderExpiringRecords, renderStatusChecks, collectExpiringRecords, checkSummaryAgainstRecords, prepareChatToolArgs, CHAT_FETCH_LIMIT } from './record-render';
+import { renderExpiringRecords, renderStatusChecks, renderBuyingOffices, collectExpiringRecords, checkSummaryAgainstRecords, prepareChatToolArgs, CHAT_FETCH_LIMIT } from './record-render';
 
 const rec = (piid: string, end: string, extra: Record<string, unknown> = {}) => ({
   contract_id: `CONT_${piid}`, piid, incumbent_name: 'ALLPRO STAFFNET LLC', awarding_agency: 'Department of Veterans Affairs',
@@ -157,5 +157,28 @@ describe('status checks (search_past_contracts include_status)', () => {
   });
   it('returns null without status_checks', () => {
     expect(renderStatusChecks({ awards: [], _meta: {} })).toBeNull();
+  });
+});
+
+describe('buying offices', () => {
+  const res = {
+    scope: { state: 'TN', naics: ['5613', '5611'], cities: ['MEMPHIS', 'MILLINGTON'], window: 'FY2024-FY2026' },
+    offices: [
+      { office_name: 'NAVSUP FLT LOG CTR NORFOLK', office_code: 'N00189', agency: 'Department of Defense', sub_agency: 'Department of the Navy', obligated: 58880000.12, share_pct: 89.6, award_count: 12, top_funding_offices: [{ name: 'NAVY PERSONNEL COMMAND', obligated: 50000000 }], top_places: [{ city: 'MILLINGTON', state: 'TN', obligated: 58880000 }] },
+      { office_name: 'W07V ENDIST MEMPHIS', office_code: 'W912EQ', agency: 'Department of Defense', sub_agency: 'Department of the Army', obligated: 1093000, share_pct: 1.7, award_count: 4, top_places: [{ city: 'MEMPHIS', state: 'TN', obligated: 1093000 }] },
+    ],
+    totals: { obligated: 65723500.81, award_count: 74, office_count: 10 },
+    notes: [],
+    _meta: { applied_filters: { metro: { core_city: 'MEMPHIS', radius_miles: 30 } } },
+  };
+  it('renders offices with codes, exact dollars, customers and place of performance, and says it is the top N of M', () => {
+    const r = renderBuyingOffices(res)!;
+    expect(r.text).toMatch(/^10 buying offices bought this work \(NAICS 5613, 5611 · work performed in TN · Memphis metro \(cities within 30 miles\) · FY2024-FY2026\), \$65,723,501 obligated across 74 awards/);
+    expect(r.text).toMatch(/Showing the top 2 of 10 by obligated dollars\./);
+    expect(r.text).toMatch(/1\. NAVSUP FLT LOG CTR NORFOLK \(N00189\) · Department Of Defense \/ Department Of The Navy|1\. NAVSUP FLT LOG CTR NORFOLK \(N00189\) · Department of Defense \/ Department of the Navy/);
+    expect(r.text).toMatch(/customers: Navy Personnel Command \$50,000,000 · work performed in Millington, TN/);
+  });
+  it('no offices is stated with its filters', () => {
+    expect(renderBuyingOffices({ ...res, offices: [], totals: null })!.text).toMatch(/^No buying offices found \(NAICS 5613, 5611/);
   });
 });

@@ -316,3 +316,48 @@ export function renderStatusChecks(result: Rec): RenderedRecords | null {
     shown: checks.length, exhaustive: total === checks.length, ids, allowedCounts: Array.from(new Set([total, awards.length, checks.length])), standalone: checks.length, orders: 0,
   };
 }
+
+export const BUYING_OFFICES_TOOL = 'get_buying_offices';
+
+/**
+ * Render get_buying_offices: each office with its code, agency, exact obligated dollars and share,
+ * the customers (funding offices) behind it, and where the work was performed. Amounts are shown
+ * exactly as returned (no rounding by a model). Returns null when there are no offices to show.
+ */
+export function renderBuyingOffices(result: Rec): RenderedRecords | null {
+  const offices = Array.isArray(result?.offices) ? (result.offices as Rec[]) : null;
+  const meta = (result?._meta && typeof result._meta === 'object' ? result._meta : {}) as Rec;
+  if (!offices) return null;
+  const scope = (result.scope && typeof result.scope === 'object' ? result.scope : {}) as Rec;
+  const totals = (result.totals && typeof result.totals === 'object' ? result.totals : null) as Rec | null;
+  const af = (meta.applied_filters && typeof meta.applied_filters === 'object' ? meta.applied_filters : {}) as Rec;
+  const metro = (af.metro && typeof af.metro === 'object' ? af.metro : null) as Rec | null;
+  const parts: string[] = [];
+  if (Array.isArray(scope.naics) && scope.naics.length) parts.push(`NAICS ${(scope.naics as unknown[]).map(str).join(', ')}`);
+  if (scope.state) parts.push(`work performed in ${str(scope.state)}`);
+  if (metro) parts.push(`${title(str(metro.core_city))} metro (cities within ${str(metro.radius_miles)} miles)`);
+  else if (Array.isArray(scope.cities) && scope.cities.length) parts.push(`cities ${(scope.cities as unknown[]).map((c) => title(str(c))).join(', ')}`);
+  if (scope.window) parts.push(str(scope.window));
+  const lines: string[] = [];
+  if (!offices.length) {
+    lines.push(`No buying offices found (${parts.join(' · ') || 'no filters'}). Source: USASpending prime awards.`);
+  } else {
+    const officeCount = num(totals?.office_count) ?? offices.length;
+    lines.push(`${officeCount} buying office${officeCount === 1 ? '' : 's'} bought this work (${parts.join(' · ')}), ${money(totals?.obligated)} obligated across ${num(totals?.award_count) ?? '?'} awards. Source: USASpending prime awards; location is where the work was performed, not where the office sits.`);
+    lines.push(offices.length < officeCount ? `Showing the top ${offices.length} of ${officeCount} by obligated dollars.` : `Showing all ${officeCount}, by obligated dollars.`);
+    lines.push('');
+    offices.forEach((o, i) => {
+      const customers = (Array.isArray(o.top_funding_offices) ? (o.top_funding_offices as Rec[]) : []).slice(0, 3).map((f) => `${title(str(f.name))} ${money(f.obligated)}`).filter((x) => x.trim());
+      const places = (Array.isArray(o.top_places) ? (o.top_places as Rec[]) : []).slice(0, 3).map((p) => [title(str(p.city)), str(p.state)].filter(Boolean).join(', ')).filter(Boolean);
+      lines.push(`${i + 1}. ${str(o.office_name) || 'office name not reported'}${o.office_code ? ` (${str(o.office_code)})` : ''} · ${[title(str(o.agency)), title(str(o.sub_agency))].filter(Boolean).join(' / ')} · ${money(o.obligated)} (${str(o.share_pct)}%) · ${num(o.award_count) ?? 0} awards${customers.length ? ` · customers: ${customers.join('; ')}` : ''}${places.length ? ` · work performed in ${places.join('; ')}` : ''}`);
+    });
+  }
+  const notes = Array.isArray(result.notes) ? (result.notes as unknown[]).map(str).filter(Boolean) : [];
+  if (notes.length) { lines.push(''); notes.slice(0, 3).forEach((n) => lines.push(n)); }
+  const total = num(totals?.office_count) ?? offices.length;
+  return {
+    tool: BUYING_OFFICES_TOOL, text: lines.join('\n'), total, retrieved: offices.length, from: offices.length ? 1 : 0, to: offices.length,
+    shown: offices.length, exhaustive: offices.length === total, ids: offices.map((o) => str(o.office_code) || str(o.office_name)),
+    allowedCounts: Array.from(new Set([total, offices.length, num(totals?.award_count) ?? -1].filter((n) => n >= 0))), standalone: offices.length, orders: 0,
+  };
+}

@@ -44,7 +44,7 @@ import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/cha
 import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, type PlannerTarget } from '@/lib/chat/planner-config';
 import { capabilityPlannerNote } from '@/lib/market/capability-naics';
 import { guardUnstatedStates } from '@/lib/chat/stated-filters';
-import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
+import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
 
@@ -167,8 +167,10 @@ Tool-use rules:
 - Is a contract still active / who replaced it: call search_past_contracts ONCE with include_status=true plus a keyword from the description in formal wording ("identification card", not "ID card"), the agency and the state implied by the place (or piid_prefix / the number the user gave). Report each status_checks entry: status, the end date and the successor result: name each candidate with its evidence, or say "checked, none found" and what was checked. Do not ask the user for a contract number first.
 - If a result has _meta.lag_note, say the data is current through that date and recent awards may not be published yet. Never say no award was made.
 - Contacts at a company: call get_sblo_contact. If it has no named liaison but returns registered_points_of_contact, name those people with their titles, say they are the firm's registered SAM points of contact (not a designated small business liaison) as of the as_of date, and never state an email or phone the tool did not return.
-- Who buys a kind of work in a city or metro: call get_buying_offices with the state, the core city plus nearby suburbs in cities, and the NAICS. Name each contracting office with its code, the customer agencies in top_funding_offices, the obligated dollars, and where the work is performed; never say the office is located in the city.
+- Who buys a kind of work in a city or metro: call get_buying_offices with the state, the core city in city (it expands to the metro automatically), and the NAICS. Name each contracting office with its code, the customer agencies in top_funding_offices, the obligated dollars, and where the work is performed; never say the office is located in the city.
 - How much spending runs through schedules, BPAs or IDIQs: call get_vehicle_spend_mix and give dollars and percent for each bucket, plus the verified, heuristic and unresolved shares. unavailable or scope_too_broad is not a zero: say so and narrow the window.
+- Keywords for a company: call derive_company_keywords with brand_exclude set to the company name the user gave. Present keywords and occupational_titles, and cite each one's keyword_sources. Never list a city, state or company name as a keyword.
+- Labor rates: call get_pricing_intel and quote rate_summary.statement exactly, giving every price point (aggressive, competitive, premium) with its population and n. Competitive is the market median; never present a per-title median as the market median.
 - Every tool result carries _meta.result_state and _meta.ignored_args. Only result_state "none_found" with an empty ignored_args is a verified zero: only then may you say nothing matched. "filter_not_applied" or "partial": name each ignored argument and say that part was NOT checked (for example: "I could not filter by city, so this covers all of Tennessee"); never present the result as complete or as a zero. "unavailable": the data could not be retrieved; never call it none. "not_reported": the tool gives no status; judge from the rows it returned (zero rows means nothing matched those filters) and still name any ignored arguments.
 - When a tool returns grounded=false / count 0 / found false, say so plainly — NEVER invent a pursuit, opportunity, contract, company, agency, deadline, dollar, contact, or term. Ground every specific ONLY in what the tool actually returned.
 - When OPEN solicitations run thin, do NOT fall back to "keep an eye on SAM.gov" / "check SAM.gov for updates" / "monitor the panel" — you have forecast + recompete tools; call them and surface (clearly labeled) FORECAST and RECOMPETE results instead. "Go check SAM yourself" is never an acceptable answer for something a tool covers.
@@ -598,12 +600,12 @@ export async function POST(request: NextRequest) {
               turnTrace.tool_executions = results.map((r) => r.record);
               // PR E: verified record lists are rendered from the tool data, not reproduced by the model.
               for (const r of results) {
-                if (r.record.status !== 'success' || (r.record.tool !== EXPIRING_TOOL && r.record.tool !== PAST_CONTRACTS_TOOL)) continue;
+                if (r.record.status !== 'success' || ![EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL].includes(r.record.tool)) continue;
                 try {
                   const parsed = JSON.parse(r.content);
                   const rendered = r.record.tool === EXPIRING_TOOL
                     ? renderExpiringRecords(parsed, { offset: displayOffsets.get(r.tool_call_id) ?? 0 })
-                    : renderStatusChecks(parsed);
+                    : r.record.tool === BUYING_OFFICES_TOOL ? renderBuyingOffices(parsed) : renderStatusChecks(parsed);
                   if (rendered) renderedRecords.push(rendered);
                 } catch (renderErr) {
                   console.error('[chat] record render failed:', renderErr);
@@ -659,6 +661,7 @@ export async function POST(request: NextRequest) {
               'VERIFIED RECORD LIST: the records below were rendered from the tool data and have ALREADY been shown to the user verbatim, directly above your reply. '
               + 'Do NOT list, repeat or renumber the records, and do not restate identifiers, dates or amounts that are not in this list. '
               + 'Write 2 to 6 sentences of analysis: what stands out (soonest end dates, agencies, incumbents, task orders versus contracts, anything not applied). '
+              + 'Do not restate per-record details from the list; if you refer to one, use the list\'s exact wording and numbers (no rounding), and never write "no ... contracts" unless a list line says none were found. '
               + 'For a status list: if several awards match, do not treat one as THE contract unless the records identify it; say which are active and which expired (with end dates) and name any successor candidate. '
               + 'If you state the total, use exactly the count in the list header. If the header says the list is not complete, say so and tell the user how to continue (call the same tool with the same filters plus display_offset).\n\n'
               + renderedRecords.map((r) => r.text).join('\n\n'),
