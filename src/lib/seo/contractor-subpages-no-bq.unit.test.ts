@@ -1,5 +1,9 @@
 /**
- * No public contractor sub-page route can reach BigQuery.
+ * No public contractor sub-page route can reach BigQuery for its ROWS.
+ *
+ * The contractor itself resolves through resolveContractorForPage() (2026-11-13), whose only
+ * BigQuery path is the shared, fail-closed daily cold budget (src/lib/seo/seo-unavailable.ts),
+ * exactly as on the profile and /contracts pages. The tab tables below stay cache-only.
  *
  * Behavioural: with a completely cold KV cache, the REAL readers the pages use return
  * 'unavailable' and never invoke the BigQuery client. Source: the pages, the sitemap tab gate and

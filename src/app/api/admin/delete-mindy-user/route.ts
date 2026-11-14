@@ -23,6 +23,7 @@ import {
 // change-email re-key lib so the two can never drift (the 2026-07-05
 // vault-omission lesson). Behavior here is unchanged: same 19 tables, same order.
 import { USER_EMAIL_TABLES } from '@/lib/mindy/user-scoped-tables';
+import { minimizeCallLogDiagnostics } from '@/lib/mindy/call-log-minimize';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -141,12 +142,15 @@ export async function POST(request: NextRequest) {
   const tableDeletes = await Promise.all(USER_EMAIL_TABLES.map(t => deleteRows(supabase, t, email)));
   // Vault tables + Storage files via the shared lib (closes the audit gap).
   const vaultResult = await deleteAllVaultData(supabase, email);
+  // Tool-call log: kept as the transaction record, diagnostic fields cleared (privacy §7).
+  const callLog = await minimizeCallLogDiagnostics(supabase, email);
   const totalRowsDeleted =
     tableDeletes.reduce((sum, r) => sum + r.rows, 0) + vaultResult.totalRowsDeleted;
   const tableErrors = [
     ...tableDeletes.filter(r => r.error),
     ...vaultResult.tables.filter(t => t.error).map(t => ({ table: t.table, rows: t.rows, error: t.error })),
     ...(vaultResult.storage.error ? [{ table: 'vault-assets (storage)', rows: 0, error: vaultResult.storage.error }] : []),
+    ...(callLog.error ? [{ table: 'mcp_call_log (minimize)', rows: 0, error: callLog.error }] : []),
   ];
 
   const authResult = await deleteSupabaseAuthUser(supabase, email);
@@ -157,6 +161,7 @@ export async function POST(request: NextRequest) {
     tableDeletes,
     vaultDeletes: vaultResult.tables,
     vaultStorageFilesDeleted: vaultResult.storage.files,
+    callLogMinimized: callLog,
     totalRowsDeleted,
     tableErrors: tableErrors.length > 0 ? tableErrors : undefined,
     supabaseAuth: authResult,

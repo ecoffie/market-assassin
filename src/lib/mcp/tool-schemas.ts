@@ -180,6 +180,15 @@ const TOOL_META: Readonly<Record<string, ToolMeta>> = {
   search_sbir: { title: 'Search SBIR' },
 };
 
+/**
+ * The write classification for a tool, or undefined for a read-only tool. Ask Mindy's
+ * chat tool policy (src/lib/chat/chat-tool-policy.ts) reads this so a write is classified
+ * in exactly ONE place — this map — and a newly added write tool is caught fail-closed.
+ */
+export function toolWriteKind(name: string): 'destructive' | 'additive' | undefined {
+  return TOOL_META[name]?.write;
+}
+
 /** Fallback title for a tool added to the registry but not yet in TOOL_META. */
 function fallbackTitle(name: string): string {
   return name.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');

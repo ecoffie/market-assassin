@@ -13,14 +13,10 @@ import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
-import {
-  getRollupBySlug,
-  resolveCanonicalSlug,
-  getAllAgenciesForRecipientWithState,
-  SUBPAGE_MIN_ROWS,
-} from '@/lib/bigquery/recipients';
+import { getAllAgenciesForRecipientWithState, SUBPAGE_MIN_ROWS } from '@/lib/bigquery/recipients';
 import { decideSubpage } from '@/lib/seo/subpage-contract';
-import { serveableCanonical } from '@/lib/seo/canonical-redirect';
+import { resolveContractorForPage } from '@/lib/seo/contractor-page-data';
+import { SeoTemporarilyUnavailableError } from '@/lib/seo/seo-unavailable';
 import { SubpageLayout } from '@/components/contractors/SubpageLayout';
 
 const SITE_URL = 'https://getmindy.ai';
@@ -49,18 +45,31 @@ interface PageProps {
 
 /**
  * One load per request, shared by generateMetadata and the page body, so `robots`, the
- * description and the rendered table can never disagree. Cache-only (no BigQuery).
+ * description and the rendered table can never disagree.
+ *
+ * The contractor itself resolves through resolveContractorForPage(), the same found /
+ * redirect / not_found / unavailable decision the profile and /contracts pages use (cached
+ * first, then at most one unit of the daily cold budget, de-duplicated across metadata and
+ * body). The old cache-only rollup read 404'd every alias and every cold contractor here.
+ * The tab's ROWS stay cache-only: a cold row key renders the honest "being refreshed"
+ * state with noindex (subpage-contract.ts), never a BigQuery scan.
  */
 const loadAgenciesSubpage = cache(async (slug: string) => {
-  const recipient = await getRollupBySlug(slug);
-  if (!recipient) return null;
+  const resolution = await resolveContractorForPage(slug);
+  if (resolution.kind !== 'found') return { resolution, loaded: null };
+  const recipient = resolution.recipient;
   const { rows, state } = await getAllAgenciesForRecipientWithState(recipient.child_ueis, recipient.rollup_uei);
-  return { recipient, rows, decision: decideSubpage(state, rows.length, SUBPAGE_MIN_ROWS) };
+  return {
+    resolution,
+    loaded: { recipient, rows, decision: decideSubpage(state, rows.length, SUBPAGE_MIN_ROWS) },
+  };
 });
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const loaded = await loadAgenciesSubpage(slug);
+  const { loaded } = await loadAgenciesSubpage(slug);
+  // Redirect / not_found / unavailable never render as a page: the body redirects, 404s or
+  // throws the 5xx. Metadata only needs a placeholder for those.
   if (!loaded) return { title: 'Contractor Not Found | Mindy' };
   const { recipient, decision } = loaded;
 
@@ -91,12 +100,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ContractorAgenciesPage({ params }: PageProps) {
   const { slug } = await params;
-  const loaded = await loadAgenciesSubpage(slug);
-  if (!loaded) {
-    const canonical = await serveableCanonical(await resolveCanonicalSlug(slug));
-    if (canonical) permanentRedirect(`/contractors/${canonical}/agencies`);
-    notFound();
+  const { resolution, loaded } = await loadAgenciesSubpage(slug);
+  if (resolution.kind === 'redirect') permanentRedirect(`/contractors/${resolution.slug}/agencies`);
+  if (resolution.kind === 'not_found') notFound();
+  if (resolution.kind === 'unavailable') {
+    // Unknown, not absent: 5xx (not cached by ISR, retried, warm queued). Never a 404.
+    throw new SeoTemporarilyUnavailableError(`agencies ${slug}: ${resolution.reason}`);
   }
+  if (!loaded) notFound(); // unreachable: 'found' always loads
   const { recipient, rows: agencies, decision } = loaded;
   if (recipient.canonical_slug !== slug) {
     permanentRedirect(`/contractors/${recipient.canonical_slug}/agencies`);

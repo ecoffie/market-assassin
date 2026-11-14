@@ -55,7 +55,7 @@ export function offerFromSubscription(sub: SubLike, planName: string | null, bil
   return {
     subscriptionId: sub.id,
     tier,
-    // tier-display-ok: fallback plan LABEL when Stripe has no name; gates nothing
+    // tier-display-ok: fallback plan NAME for the upgrade card; not an entitlement or access gate
     planName: planName || price?.nickname || (tier === 'team' ? 'Mindy Team' : 'Mindy Pro'),
     amount: typeof price?.unit_amount === 'number' ? price.unit_amount / 100 : null,
     interval: price?.recurring?.interval ?? null,
