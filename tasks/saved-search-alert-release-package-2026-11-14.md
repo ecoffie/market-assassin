@@ -1,6 +1,8 @@
 # Saved-search alert release package — reconciliation, notices, rollback (Agent 3, 2026-11-14)
 
-**Status: prepared, NOT approved.** `SAVED_SEARCH_OPEN_CANONICAL` stays off. No migration applied, no notice sent, no
+**Status: prepared, NOT approved.** Round 3 (2026-11-14): the combined #2040 + #2043 recount over all 60 watches is §6 and
+supersedes the "after" column in §2; the release sequence (§3) and rollback (§5) are updated for three separately
+reviewable changes: alert parity (#2043), agency correction (C1, #2045), C2 presentation (not built). `SAVED_SEARCH_OPEN_CANONICAL` stays off. No migration applied, no notice sent, no
 watch modified. Owners are numbered (same numbering as Agent 2's remediation table for its 17 owners; 18+ added here).
 The number → email key is held privately outside this public repo (`~/docs/agent3/alert-parity-owner-key-2026-11-14.json`).
 
@@ -94,18 +96,29 @@ because both sides ignore it. One meaning across Map and alerts requires #2040's
 "After both" for #2040-only rows is Agent 2's measured figure (their table); for #2043 rows it is the canonical
 evaluator (those watches carry no key #2040 changes). Re-measure all rows on merged code before any notice.
 
-## 3. Release sequence (each step needs its own approval)
+## 3. Release sequence (each step needs its own approval; updated round 3)
 
-1. Merge #2040; run Agent 2's 15 corrections (dry run → approval → write, with the per-record snapshot in §5).
-2. Decide the search-accuracy corrections (`fix/agent3-search-accuracy`, `tasks/search-accuracy-assessment-2026-11-14.md`).
-   C2 changes janitorial-type watches again; deciding it BEFORE notices avoids a second notice to the same owners.
-3. Merge #2043 (inert). Apply `20261114_saved_search_open_engine.sql` via the runner; `db:check` the column.
-4. Prod preview with both changes: recompute "after" for all 60 rows; regenerate notices from those numbers.
-5. `/email-audit` on the 34 recipients (caps, suppressions, recent sends). Approval of final copy + list.
-6. Send ONE consolidated notice per owner, at least 3 days before activation.
-7. Flip `SAVED_SEARCH_OPEN_CANONICAL=true` + redeploy; pause Agent 2's 11 at the same time.
-8. Watch 3 daily runs: transitioned searches send 0 on day 1, then only genuinely new notices; no
-   `search_needs_refinement` among existing searches; per-owner send counts in the expected band.
+Three changes, each separately reviewable and releasable: **#2040** (map save + Agent 2's remediation), **#2043** (alert
+parity, flag-gated), **C1 / #2045** (agency matching). **C2** (related-market presentation) is design review only.
+
+1. **#2040**: merge; run Agent 2's 15 corrections (dry run → approval → write, per-record snapshot in §5). No customer
+   impact on its own for 12 of 15 (see §6: Open-off or same count).
+2. **C1 / #2045**: after Agent 1's compatibility review and Eric's approval, merge + deploy. It changes the Map, MCP and
+   Ask Mindy immediately (narrowing only). With the #2043 flag off it does not change alerts (the legacy evaluator does
+   not use `resolveBuyer`). Measured over all 186 alerting watches, C1 changes the plan of exactly one: `61d1ca1f`
+   (owner 20, a HUD agency watch), whose combined count goes 1 → 0 because its one remaining match is a Federal Housing
+   Finance Agency notice. Release C1 before the notices so that owner is told the true figure (0, not 1).
+3. **C2**: decide before notices. Today it touches 1 alerting watch (`0e41b9aa`); deciding first avoids a second notice.
+4. **#2043**: merge (inert). Apply `20261114_saved_search_open_engine.sql` via the runner; `db:check` the column.
+5. Prod preview on the deployed code (`?mode=preview&openEngine=canonical`): every one of the 60 rows must match §6
+   within normal daily drift; any row off by more is re-investigated before notices. Regenerate notice numbers from it.
+6. Resolve the 3 unexpected expansions (§6) for owners 32 and 34: disclose the Texas reading, decide the capability-list
+   rule, or notify explicitly.
+7. `/email-audit` on the 27 recipients (caps, suppressions, recent sends). Approval of final copy + list.
+8. Send ONE consolidated notice per owner, at least 3 days before activation.
+9. Flip `SAVED_SEARCH_OPEN_CANONICAL=true` + redeploy; pause Agent 2's 11 at the same time.
+10. Watch 3 daily runs: transitioned searches send 0 on day 1, then only genuinely new notices; no
+    `search_needs_refinement` among existing searches; per-owner send counts in the expected band.
 
 ## 4. Customer notices (drafts, not sent; one email per owner, one block per affected search)
 
@@ -151,7 +164,154 @@ to the search. The typo row is a recommendation: nothing is changed without the 
 | Stored filters of Agent 2's 15 corrections | #2040 remediation | Full `filters` JSON per watch | Restore the exact JSON per id (one row each), then the cron evaluates the restored filters on its next run. |
 | Pause of Agent 2's 11 | #2040 remediation | `alerts_enabled`, `alert_frequency` per watch | Re-enable per id. Note: re-enabling restores whole-market alerts. |
 | Typo correction (1 watch) | only after the owner says yes | `filters` JSON | Restore JSON. |
+| Agency matching (C1, #2045) | code deploy | none needed (no data written) | Revert the PR + redeploy. Map, MCP and Ask Mindy agency results return to the previous matching on the next request. No stored data to restore. |
+| C2 presentation | not built | n/a | Would be a code revert; retrieval and labels are unchanged by design, so nothing is lost. |
 | Notices | email | n/a | Cannot be recalled. Mitigation: send only after the prod preview numbers are final; a correction email goes only to owners whose numbers were wrong. |
 
 Trigger to roll back: any transitioned search sending on day 1; a send-volume spike for any owner; a
 `search_needs_refinement` on an existing search; an owner reporting missing notices that the Map shows.
+
+## 6. Combined impact recount: #2040 + #2043 together (round 3, 2026-11-14)
+
+**Method (read-only).** A local scratch merge of `main` + #2040 (`33aa35eb5`) + #2043 (`2aa4abb3d`), never pushed. Per
+watch, Open horizon, the alert cron's exact query (`savedSearchOpenEvaluation`, 30-day posted window):
+
+- **today** = legacy evaluator on the stored filters (what alerts use now)
+- **#2043 only** = canonical evaluator on the stored filters
+- **#2040 only** = legacy evaluator on Agent 2's corrected filters
+- **both** = canonical evaluator on Agent 2's corrected filters
+
+"Corrected filters" = the stored filters passed through #2040's own `__watchFilterPlan` (the real `WATCH_SCOPE_JS`,
+evaluated in a sandbox): `setAsideMulti` → `setAside`, `noticeMulti` → `noticeType` merged, map-only keys (contract value,
+FSC, strategy where map-only) removed. Applied only to Agent 2's 15 corrections; Agent 2's 11 pauses are shown as paused.
+Script: `scripts/_recount-combined.ts` in the scratch merge (kept privately with the results; it needs both PRs' code).
+
+**Coming Soon (forecasts) is unchanged by both PRs.** The forecast query reads only `q`, `agency`, `naics`, `state`
+(`SAVED_SEARCH_FORECAST_KEYS`, `fetchForecastMatches`); neither PR changes those keys. So a watch with Open switched off
+has no customer-visible change from either PR.
+
+**Counts moved since the first table** (live data): the whole-market figure is now 9,198, not 9,193.
+
+### Summary
+
+| Outcome after both | Watches |
+|---|---|
+| Paused (Agent 2) | 11 |
+| Goes silent on Open | 3 |
+| Expands, UNEXPECTED | 3 |
+| 0 → matches | 4 |
+| More matches | 1 |
+| Changed (gains and losses) | 12 |
+| Narrower | 14 |
+| No visible change | 7 |
+| No visible change (Open off; Coming Soon only) | 5 |
+| **Total** | **60** |
+
+**Owner notification list, reconciled.** 27 of 34 owners have a customer-visible change and need a
+notice. Seven owners drop off the list (owners 4, 9, 11, 12, 13, 14, 16): every one of their watches is
+either Open-off (Coming Soon only, unchanged) or returns the same count; their filter cleanup needs no notice. Owners
+whose notice covers changes from BOTH PRs: 5 and 7 (different watches), 10 and 15 (the same watch, `027283a9` / `332eef89`).
+Two owners' notices (owners 32 and 34) are HELD until the unexpected expansions below are decided.
+
+### Watches that go silent (Open, today > 0 → 0)
+
+| Watch | Owner | Today | #2043 only | #2040 only | Both | Verified |
+|---|---|---|---|---|---|---|
+| `332eef89` | 15 | 1 | 0 | 1 | 0 | misspelled "janitoral": loses its one correct notice (real undermatch; typo recommendation, never auto-applied) |
+| `b4e40d05` | 18 | 26 | 0 | 26 | 0 | 26 legacy hits all judged unrelated by blind labeling |
+| `b032f39f` | 20 | 8,885 | 0 | 8,885 | 0 | buyer has 0 notices in the window (checked directly); legacy matched the whole market |
+
+`c75b5e65` (owner 4) drops 8 → 0 on Open once its set-asides apply, but its Open horizon is off, so the customer sees no
+change. The 11 Agent 2 pauses stop alerts by design and are not counted here.
+
+### Watches that expand
+
+| Watch | Owner | Today | Both | Assessment (sampled the notices it would gain) |
+|---|---|---|---|---|
+| `3ed7a107` | 32 | 6 | 10 | **unexpected**: "texas" gains Fort Benning GA, Fort Stewart GA, Fort Leonard Wood MO and an Alaska FAA notice. Canonical reads Texas as a state and the state filter matches place of performance OR buying-office state (Army MICC and FAA regional offices sit in Texas). |
+| `c2adcce1` | 32 | 6 | 10 | **unexpected**: same as `3ed7a107` |
+| `0e41b9aa` | 34 | 24 | 25 | **unexpected**: "janitorial custodial grounds turf waste removal" is a 6-word capability list that admits on any one word; gains MQ-9 instructor services, wet-blade hours, child care |
+| `994c599e` | 5 | 0 | 77 | expected: IT NAICS watch whose exclusion-only text made legacy return 0 |
+| `02b35d34` | 24 | 0 | 18 | expected: Air Force now recognized as a buyer |
+| `9da3488e` | 24 | 0 | 16 | expected: Army now recognized |
+| `caf96deb` | 24 | 0 | 21 | expected: Veterans Affairs now recognized |
+| `e9f648f6` | 28 | 2 | 39 | expected: "filters" + 333998; gains are fluid filter elements |
+
+The three unexpected expansions come from moving alerts onto the Map's canonical engine (#2043): the Map already shows
+these results for the same search today. They are shared-planner behaviour (geography definition; capability-list
+matching, assessment R2/R3), not a defect in either PR. Recommendation: do not activate for
+these 3 watches' owners until the geography wording is disclosed to them (Texas) and the capability-list rule is decided;
+or notify them explicitly that their results will include these. Their gains are a small share of their results
+(3ed7a107/c2adcce1: 7 gained of 10; 0e41b9aa: 3 gained of 25).
+
+### Per-watch table (60)
+
+| Watch | Owner | PR | Open emailed | Today | #2043 only | #2040 only | Both | +/- vs today | Outcome | Notice |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `3df4e769` | 1 | #2040 | yes | 9,198 | 9,198 | — | — | — | Paused (Agent 2) | required |
+| `6dda3cd3` | 1 | #2040 | yes | 9,198 | 9,198 | — | — | — | Paused (Agent 2) | required |
+| `d8794f46` | 2 | #2040 | yes | 9,198 | 9,198 | — | — | — | Paused (Agent 2) | required |
+| `54fd0605` | 3 | #2040 | yes | 9,198 | 9,198 | — | — | — | Paused (Agent 2) | required |
+| `1b018df4` | 5 | #2040 | yes | 9,198 | 9,198 | — | — | — | Paused (Agent 2) | required |
+| `88d24ae2` | 6 | #2040 | yes | 9,198 | 9,198 | — | — | — | Paused (Agent 2) | required |
+| `02dc20b6` | 7 | #2040 | yes | 9,198 | 9,198 | — | — | — | Paused (Agent 2) | required |
+| `64eb46b6` | 7 | #2040 | yes | 9,198 | 9,198 | — | — | — | Paused (Agent 2) | required |
+| `749d017b` | 8 | #2040 | yes | 9,198 | 9,198 | — | — | — | Paused (Agent 2) | required |
+| `ae5ddb00` | 8 | #2040 | yes | 9,198 | 9,198 | — | — | — | Paused (Agent 2) | required |
+| `4f3df70a` | 17 | #2040 | yes | 9,198 | 9,198 | — | — | — | Paused (Agent 2) | required |
+| `332eef89` | 15 | both | yes | 1 | 0 | 1 | 0 | +0 / -1 | Goes silent on Open | required |
+| `b4e40d05` | 18 | #2043 | yes | 26 | 0 | 26 | 0 | +0 / -26 | Goes silent on Open | required |
+| `b032f39f` | 20 | #2043 | yes | 8,885 | 0 | 8,885 | 0 | +0 / -3,000 | Goes silent on Open | required |
+| `3ed7a107` | 32 | #2043 | yes | 6 | 10 | 6 | 10 | +7 / -3 | Expands, UNEXPECTED | HOLD (fix first) |
+| `c2adcce1` | 32 | #2043 | yes | 6 | 10 | 6 | 10 | +7 / -3 | Expands, UNEXPECTED | HOLD (fix first) |
+| `0e41b9aa` | 34 | #2043 | yes | 24 | 25 | 24 | 25 | +3 / -2 | Expands, UNEXPECTED | HOLD (fix first) |
+| `994c599e` | 5 | #2043 | yes | 0 | 77 | 0 | 77 | +77 / -0 | 0 → matches | required |
+| `02b35d34` | 24 | #2043 | yes | 0 | 18 | 0 | 18 | +18 / -0 | 0 → matches | required |
+| `9da3488e` | 24 | #2043 | yes | 0 | 16 | 0 | 16 | +16 / -0 | 0 → matches | required |
+| `caf96deb` | 24 | #2043 | yes | 0 | 21 | 0 | 21 | +21 / -0 | 0 → matches | required |
+| `e9f648f6` | 28 | #2043 | yes | 2 | 39 | 2 | 39 | +37 / -0 | More matches | required |
+| `bf35f82a` | 18 | #2043 | yes | 451 | 118 | 451 | 118 | +3 / -336 | Changed (gains and losses) | required |
+| `3e2511ad` | 19 | #2043 | yes | 7,929 | 20 | 7,929 | 20 | +8 / -2,988 | Changed (gains and losses) | required |
+| `386e228b` | 20 | #2043 | yes | 8,885 | 189 | 8,885 | 189 | +126 / -2,937 | Changed (gains and losses) | required |
+| `9ca2d2de` | 20 | #2043 | yes | 8,885 | 260 | 8,885 | 260 | +161 / -2,901 | Changed (gains and losses) | required |
+| `e00435f7` | 21 | #2043 | yes | 2,678 | 35 | 2,678 | 35 | +17 / -2,660 | Changed (gains and losses) | required |
+| `741adbff` | 22 | #2043 | yes | 169 | 87 | 169 | 87 | +8 / -90 | Changed (gains and losses) | required |
+| `e4460582` | 22 | #2043 | yes | 21 | 19 | 21 | 19 | +1 / -3 | Changed (gains and losses) | required |
+| `03a84411` | 23 | #2043 | yes | 51 | 43 | 51 | 43 | +7 / -15 | Changed (gains and losses) | required |
+| `22a140c6` | 23 | #2043 | yes | 51 | 43 | 51 | 43 | +7 / -15 | Changed (gains and losses) | required |
+| `0bf23482` | 26 | #2043 | yes | 258 | 121 | 258 | 121 | +62 / -199 | Changed (gains and losses) | required |
+| `55f30f29` | 30 | #2043 | yes | 57 | 37 | 57 | 37 | +9 / -29 | Changed (gains and losses) | required |
+| `ba24fc15` | 31 | #2043 | yes | 675 | 390 | 675 | 390 | +112 / -397 | Changed (gains and losses) | required |
+| `434b1e74` | 1 | #2040 | yes | 830 | 830 | 123 | 123 | +0 / -707 | Narrower | required |
+| `0678583e` | 7 | #2043 | yes | 115 | 3 | 115 | 3 | +0 / -112 | Narrower | required |
+| `c3f908e3` | 7 | #2043 | yes | 8,885 | 1 | 8,885 | 1 | +0 / -2,999 | Narrower | required |
+| `e9c0f9be` | 7 | #2043 | yes | 2,573 | 6 | 2,573 | 6 | +0 / -2,567 | Narrower | required |
+| `ff372605` | 7 | #2043 | yes | 594 | 40 | 594 | 40 | +0 / -554 | Narrower | required |
+| `027283a9` | 10 | both | yes | 1,610 | 665 | 543 | 1,208 | +0 / -402 | Narrower | required |
+| `4dcfa6ea` | 19 | #2043 | yes | 201 | 14 | 201 | 14 | +0 / -187 | Narrower | required |
+| `61d1ca1f` | 20 | #2043 | yes | 8,885 | 1 | 8,885 | 1 | +0 / -2,999 | Narrower | required |
+| `fdcc7cf8` | 25 | #2043 | yes | 87 | 22 | 87 | 22 | +0 / -65 | Narrower | required |
+| `574a9289` | 26 | #2043 | yes | 24 | 1 | 24 | 1 | +0 / -23 | Narrower | required |
+| `c4988fe6` | 27 | #2043 | yes | 848 | 830 | 848 | 830 | +0 / -18 | Narrower | required |
+| `fc24136b` | 29 | #2043 | yes | 2,067 | 143 | 2,067 | 143 | +0 / -1,924 | Narrower | required |
+| `08096951` | 31 | #2043 | yes | 258 | 28 | 258 | 28 | +0 / -230 | Narrower | required |
+| `ff7ba678` | 33 | #2043 | yes | 32 | 6 | 32 | 6 | +0 / -26 | Narrower | required |
+| `5e4bcd5a` | 5 | #2040 | yes | 3 | 3 | 3 | 3 | +0 / -0 | No visible change | not needed |
+| `ab8bb3c8` | 8 | #2040 | yes | 3 | 3 | 3 | 3 | +0 / -0 | No visible change | not needed |
+| `c11fcdb7` | 9 | #2040 | yes | 0 | 0 | 0 | 0 | +0 / -0 | No visible change | not needed |
+| `32acc010` | 12 | #2040 | yes | 1,637 | 1,637 | 1,637 | 1,637 | +0 / -0 | No visible change | not needed |
+| `9860bcf9` | 12 | #2040 | yes | 109 | 109 | 109 | 109 | +0 / -0 | No visible change | not needed |
+| `fa66531f` | 14 | #2040 | yes | 0 | 0 | 0 | 0 | +0 / -0 | No visible change | not needed |
+| `39fbb6e0` | 16 | #2040 | yes | 0 | 0 | 0 | 0 | +0 / -0 | No visible change | not needed |
+| `c75b5e65` | 4 | #2040 | no | 8 | 8 | 0 | 0 | +0 / -8 | No visible change (Open off; Coming Soon only) | not needed |
+| `1c3b715a` | 11 | #2040 | no | 240 | 240 | 240 | 240 | +0 / -0 | No visible change (Open off; Coming Soon only) | not needed |
+| `4692743e` | 13 | #2040 | no | 131 | 131 | 5 | 5 | +0 / -126 | No visible change (Open off; Coming Soon only) | not needed |
+| `5b867c2f` | 13 | #2040 | no | 85 | 85 | 5 | 5 | +0 / -80 | No visible change (Open off; Coming Soon only) | not needed |
+| `7d3a2556` | 13 | #2040 | no | 9,198 | 9,198 | 9,198 | 9,198 | +0 / -0 | No visible change (Open off; Coming Soon only) | not needed |
+
++/- counts compare notice ids and are capped at 3,000 ids per side, so a whole-market "today" shows at most -3,000.
+
+**With C1 (#2045) added to the merge** (recount re-run with C1's `buyer.ts` + aliases): 59 of 60 rows identical. `61d1ca1f`
+(owner 20) "both" goes 1 → 0; the 1 was a Federal Housing Finance Agency notice matched through the word "housing". With
+C1 it joins "goes silent": a HUD watch with no HUD notice in the window under its filters. Its notice text should use the
+"Matches → 0" block.
