@@ -162,7 +162,10 @@ const idInEvidence = (evText: string, id: string) => lc(evText).replace(/-/g, ''
 
 /** Exact dollar amounts ≥ $1,000 written with digits (e.g. $1,302,252.96). */
 export function extractAmounts(text: string): string[] {
-  return [...text.matchAll(/\$\s?(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?)(?!\s*(?:[KMB]|million|billion|thousand)\b)/gi)].map((m) => m[1].replace(/,/g, ''));
+  // The sign is part of the amount: "-$6,047" (a net deobligation) is -6047, not 6047. Accepts a hyphen,
+  // a Unicode minus or an en dash before or right after "$". Positive amounts are unchanged.
+  return [...text.matchAll(/([-\u2212\u2013])?\$\s?([-\u2212\u2013])?(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?)(?!\s*(?:[KMB]|million|billion|thousand)\b)/gi)]
+    .map((m) => `${m[1] || m[2] ? '-' : ''}${m[3].replace(/,/g, '')}`);
 }
 
 /**
@@ -180,7 +183,8 @@ function evidenceMoney(evText: string): number[] {
 }
 function amountInEvidence(evText: string, amt: string): boolean {
   const flat = evText.replace(/(\d),(?=\d{3})/g, '$1');
-  if (amt.includes('.') && new RegExp(`(^|[^0-9.])${escapeRe(amt)}([^0-9]|$)`).test(flat)) return true;
+  // Exact-decimal match keeps the sign: "-6047.22" never matches a positive "6047.22" and vice versa.
+  if (amt.includes('.') && new RegExp(amt.startsWith('-') ? `(^|[^0-9.])${escapeRe(amt)}([^0-9]|$)` : `(^|[^0-9.-])${escapeRe(amt)}([^0-9]|$)`).test(flat)) return true;
   const n = Number(amt);
   return evidenceMoney(evText).some((x) => Math.abs(x - n) < 1);
 }

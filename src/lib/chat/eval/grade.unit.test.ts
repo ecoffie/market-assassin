@@ -199,3 +199,20 @@ describe('grader cases from the second re-review', () => {
   });
 });
 
+
+describe('negative amounts keep their sign (deobligations are valid records)', () => {
+  const ev = (excerpt: string): ToolEvidence[] => [{ tool: 't', status: 'success', args: {}, result_excerpt: excerpt }];
+  const evNeg = ev('{"offices":[{"office_name":"USA76","obligated":-6047.22}]}');
+  it('"-$6,047" is supported by evidence -6047.22', () => {
+    expect(grade({ id: 'N', prompt: 'x' }, 'U.S. Attorneys Office -$6,047.', evNeg, TODAY).failures.filter((f) => f.startsWith('unsupported_amount'))).toEqual([]);
+  });
+  it('a positive "$6,047" is NOT supported by a negative evidence value', () => {
+    expect(grade({ id: 'N', prompt: 'x' }, 'U.S. Attorneys Office $6,047.', evNeg, TODAY).failures).toContain('unsupported_amount:$6047');
+  });
+  it('"-$6,047" is NOT supported by a positive evidence value', () => {
+    expect(grade({ id: 'N', prompt: 'x' }, 'Office -$6,047.', ev('{"obligated":6047.22}'), TODAY).failures).toContain('unsupported_amount:$-6047');
+  });
+  it('extractAmounts keeps the sign for hyphen, Unicode minus and $-prefix forms', () => {
+    expect(extractAmounts('USA76 -$6,047; MRPBS \u2212$86,086; BOA $-175,231; W912EQ24P0035 $1,302,253.')).toEqual(['-6047', '-86086', '-175231', '1302253']);
+  });
+});
