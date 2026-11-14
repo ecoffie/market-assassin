@@ -1651,7 +1651,12 @@ const COMPANY_KEYWORDS_TOOL_DEF = {
       'ranked by MEANING. NAICS is the wrong discovery key; a company\'s real vocabulary finds the market its codes miss. ' +
       'Pass a description and/or past-performance scope descriptions (the richest signal). Returns ranked keywords to ' +
       'feed an opportunity search. Uses semantic embeddings (no BigQuery); fails soft to lexical order if embeddings are ' +
-      'down (_meta.ranked says which). grounded=false = not enough input text — do NOT invent keywords.',
+      'down (_meta.ranked says which). grounded=false = not enough input text — do NOT invent keywords. ' +
+      'City/state names and the company name are never returned as keywords (excluded_terms lists them). Besides ' +
+      'phrases from the input, candidates come from grounded market sources: naics_vocabulary for the given or ' +
+      'inferred NAICS, GSA CALC+ awarded labor-category titles, and occupational phrases in SAM solicitation text. ' +
+      'keyword_sources names the source (and count) of every keyword; occupational_titles lists the job titles ' +
+      'buyers price and staff.',
     parameters: {
       type: 'object',
       properties: {
@@ -1660,6 +1665,9 @@ const COMPANY_KEYWORDS_TOOL_DEF = {
         capabilities: { type: 'array', items: { type: 'string' }, description: 'Capability / service descriptions.' },
         code_titles: { type: 'array', items: { type: 'string' }, description: 'NAICS/PSC title text the caller already knows (optional).' },
         limit: { type: 'number', description: 'Max keywords (default 12, max 25).' },
+        brand_exclude: { type: 'array', items: { type: 'string' }, description: "The company's own name / brand / other proper nouns to keep out of the keywords (e.g. [\"Superb Staffing\"]). Only brand-distinctive words are removed; capability words like \"staffing\" stay." },
+        naics: { type: 'array', items: { type: 'string' }, description: 'Optional 6-digit NAICS codes for the market sources. Inferred from the description when omitted (naics_used says how).' },
+        include_market_terms: { type: 'boolean', description: 'Add grounded market terms (vocabulary, CALC labor categories, solicitation text). Default true.' },
       },
     },
   },
@@ -2733,6 +2741,9 @@ async function dispatchMcpTool(
       capabilities: Array.isArray(args.capabilities) ? (args.capabilities as string[]) : undefined,
       code_titles: Array.isArray(args.code_titles) ? (args.code_titles as string[]) : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
+      brand_exclude: Array.isArray(args.brand_exclude) ? (args.brand_exclude as string[]) : undefined,
+      naics: Array.isArray(args.naics) ? (args.naics as string[]) : undefined,
+      include_market_terms: typeof args.include_market_terms === 'boolean' ? args.include_market_terms : true,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

@@ -21,11 +21,19 @@
  *   npx tsx scripts/build-naics-vocabulary.ts --limit=20      # dry-run, 20 codes
  *   npx tsx scripts/build-naics-vocabulary.ts --go            # WRITE, all codes
  *   npx tsx scripts/build-naics-vocabulary.ts --go --resume   # skip done codes
+ *   npx tsx scripts/build-naics-vocabulary.ts --codes=561320,493110 --sample=stratified
+ *       # dry-run on named codes, no scratch cache; compares stored vs rebuilt terms
+ *
+ * --sample=stratified: PASS 1 normally takes the top 300 awards BY DOLLARS, so one high-dollar
+ * segment can own a code's vocabulary (561320 = clinical staffing; light-industrial and clerical
+ * temp-help awards are many but small and never reach the top 300). Stratified takes 100 top-by-
+ * dollars + 200 most recent, so the many-small-awards segments are represented too.
  */
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import { createClient } from '@supabase/supabase-js';
 import naicsData from '../src/data/naics-codes.json';
+import { isBoilerplateVocabTerm } from '../src/lib/market/vocabulary-stoplist';
 dotenv.config({ path: '.env.local' });
 
 // Cache PASS-1 descriptions to a scratch file so scoring can be iterated without
@@ -35,6 +43,9 @@ const REFETCH = process.argv.includes('--refetch');
 
 const GO = process.argv.includes('--go');
 const RESUME = process.argv.includes('--resume');
+const CODES_ARG = ((process.argv.find((a) => a.startsWith('--codes=')) || '').split('=')[1] || '')
+  .split(',').map((c) => c.trim()).filter(Boolean);
+const STRATIFIED = process.argv.includes('--sample=stratified');
 const LIMIT = Number((process.argv.find((a) => a.startsWith('--limit=')) || '').split('=')[1]) || 0;
 const CONCURRENCY = 2;   // polite to USASpending (higher throttled ~90% of codes)
 
@@ -88,14 +99,14 @@ interface TermStat { term: string; df: number; kind: 'word' | 'bigram' }
 // Fetch one page with retry on throttle/error. Returns {rows, hasNext, ok} — `ok`
 // distinguishes a genuine empty (this NAICS has no awards) from a failed fetch
 // (throttled), so the caller only caches REAL results, never a throttle as "empty".
-async function fetchPage(naics: string, page: number): Promise<{ rows: string[]; hasNext: boolean; ok: boolean }> {
+async function fetchPage(naics: string, page: number, sort: 'Award Amount' | 'Start Date' = 'Award Amount'): Promise<{ rows: string[]; hasNext: boolean; ok: boolean }> {
   for (let attempt = 0; attempt < 4; attempt++) {
     try {
       const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_award/', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           filters: { naics_codes: [naics], time_period: [{ start_date: '2024-10-01', end_date: '2025-09-30' }], award_type_codes: ['A', 'B', 'C', 'D'] },
-          fields: ['Description', 'Award Amount'], sort: 'Award Amount', order: 'desc', limit: 100, page,
+          fields: ['Description', 'Award Amount', 'Start Date'], sort, order: 'desc', limit: 100, page,
         }),
       });
       if (res.status === 429 || res.status >= 500) { await new Promise((r) => setTimeout(r, 2000 * (attempt + 1))); continue; }
@@ -111,6 +122,19 @@ async function fetchPage(naics: string, page: number): Promise<{ rows: string[];
 // Returns null on a FAILED fetch (so the caller retries later / doesn't cache it),
 // or the descriptions (possibly []) on success.
 async function fetchDescriptions(naics: string): Promise<string[] | null> {
+  if (STRATIFIED) {
+    // 1 page top-by-dollars + 2 pages most recent, deduped by text.
+    const seen = new Set<string>();
+    const out: string[] = [];
+    const plan: Array<['Award Amount' | 'Start Date', number]> = [['Award Amount', 1], ['Start Date', 1], ['Start Date', 2]];
+    for (const [sort, page] of plan) {
+      const { rows, ok } = await fetchPage(naics, page, sort);
+      if (!ok) return null;
+      for (const r of rows) if (!seen.has(r)) { seen.add(r); out.push(r); }
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    return out;
+  }
   const out: string[] = [];
   for (let page = 1; page <= 3; page++) {
     const { rows, hasNext, ok } = await fetchPage(naics, page);
@@ -130,13 +154,14 @@ function rawTerms(descs: string[]): Map<string, TermStat> {
     const seenW = new Set<string>();
     const seenB = new Set<string>();
     for (const w of ws) {
-      if (STOP.has(w) || GEO.has(w) || VERB_ONLY.has(w)) continue;   // verbs dropped as standalone
+      if (STOP.has(w) || GEO.has(w) || VERB_ONLY.has(w) || isBoilerplateVocabTerm(w)) continue;   // verbs + funding boilerplate dropped
       if (!seenW.has(w)) { seenW.add(w); wordDf.set(w, (wordDf.get(w) || 0) + 1); }
     }
     for (let i = 0; i < ws.length - 1; i++) {
       const a = ws[i], b = ws[i + 1];
       if ((STOP.has(a) && STOP.has(b)) || GEO.has(a) || GEO.has(b)) continue;
       const bg = `${a} ${b}`;
+      if (isBoilerplateVocabTerm(bg)) continue;   // "base obligated", "perform warehousing"
       if (!seenB.has(bg)) { seenB.add(bg); bigramDf.set(bg, (bigramDf.get(bg) || 0) + 1); }
     }
   }
@@ -161,7 +186,8 @@ async function pool<T, R>(items: T[], n: number, fn: (t: T, i: number) => Promis
 }
 
 async function main() {
-  const codes = (LIMIT ? CODES.slice(0, LIMIT) : CODES);
+  const codes = CODES_ARG.length ? CODES_ARG : (LIMIT ? CODES.slice(0, LIMIT) : CODES);
+  if (CODES_ARG.length && GO) throw new Error('--codes is a dry-run comparison mode; it cannot be combined with --go');
   console.log(`\n=== NAICS vocabulary backfill  (${GO ? 'WRITE' : 'DRY-RUN'}) ===`);
   console.log(`Codes: ${codes.length} of ${CODES.length} six-digit NAICS\n`);
 
@@ -180,7 +206,7 @@ async function main() {
   // run until it genuinely returns data (or is confirmed award-less). This is what
   // makes the fetch trustworthy despite USASpending throttling.
   let descByCode: Record<string, string[]> = {};
-  if (!REFETCH && fs.existsSync(CACHE_FILE)) {
+  if (!CODES_ARG.length && !REFETCH && fs.existsSync(CACHE_FILE)) {
     descByCode = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
     // drop cached EMPTIES so they get re-fetched (they may have been throttle-empties)
     for (const k of Object.keys(descByCode)) if (!descByCode[k]?.length) delete descByCode[k];
@@ -194,9 +220,9 @@ async function main() {
       const d = await fetchDescriptions(code);
       if (d === null) { failed++; }            // throttled — leave uncached, retries next run
       else if (d.length) { descByCode[code] = d; }  // cache only real data
-      if (++f % 100 === 0) { console.log(`  … ${f}/${missing.length} (${failed} throttled)`); fs.writeFileSync(CACHE_FILE, JSON.stringify(descByCode)); }
+      if (++f % 100 === 0) { console.log(`  … ${f}/${missing.length} (${failed} throttled)`); if (!CODES_ARG.length) fs.writeFileSync(CACHE_FILE, JSON.stringify(descByCode)); }
     });
-    fs.writeFileSync(CACHE_FILE, JSON.stringify(descByCode));
+    if (!CODES_ARG.length) fs.writeFileSync(CACHE_FILE, JSON.stringify(descByCode));
     if (failed) console.log(`  ⚠️  ${failed} codes throttled this run — re-run to pick them up.`);
   }
 
@@ -222,7 +248,29 @@ async function main() {
   // real corpus (~198) makes "system/building/maintenance appear in >40% of REAL
   // codes → drop" work as the probe validated.
   const codesWithTerms = perCode.filter((p) => p.terms.size > 0);
-  const N = codesWithTerms.length || 1;
+  let N = codesWithTerms.length || 1;
+  // --codes mode scores a handful of codes, so their own cross-code counts mean nothing.
+  // Use the STORED table as the cross-NAICS reference (read-only): N = codes in the table,
+  // naicsWithTerm = how many stored codes carry each term. An approximation (the table keeps
+  // only the top 40 terms per code), stated in the output.
+  if (CODES_ARG.length) {
+    const ref = new Map<string, Set<string>>();
+    const codesInTable = new Set<string>();
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await sb.from('naics_vocabulary').select('code, term').eq('code_type', 'naics').range(from, from + 999);
+      if (error) throw new Error(`reference read failed: ${error.message}`);
+      for (const r of (data || []) as { code: string; term: string }[]) {
+        codesInTable.add(r.code);
+        if (!ref.has(r.term)) ref.set(r.term, new Set());
+        ref.get(r.term)!.add(r.code);
+      }
+      if (!data || data.length < 1000) break;
+    }
+    N = codesInTable.size || 1;
+    naicsWithTerm.clear();
+    for (const [term, set] of ref) naicsWithTerm.set(term, set.size);
+    console.log(`Cross-NAICS reference (stored table, approximate): ${N} codes, ${ref.size} distinct terms`);
+  }
   // GENERIC threshold calibrated against the full 1,032-code corpus (not the tiny
   // probe). Measured cleanly separates noise from signal: filler like replace(17%),
   // building(22%), project(31%), repair(32%), construction(15%) all sit at 15-32%
@@ -259,6 +307,22 @@ async function main() {
   const sampleCode = perCode.find((p) => p.code === '238220') || perCode[0];
   const sampleRows = rows.filter((r) => r.code === sampleCode?.code).slice(0, 12);
   console.log(`  Sample (${sampleCode?.code}): ${sampleRows.map((r) => r.term).join(', ')}\n`);
+
+  if (CODES_ARG.length) {
+    // Comparison report: stored rows vs what this run would write, per named code.
+    for (const code of CODES_ARG) {
+      const { data, error } = await sb.from('naics_vocabulary').select('term, df').eq('code_type', 'naics').eq('code', code).order('weight', { ascending: false });
+      if (error) throw new Error(`stored read failed: ${error.message}`);
+      const stored = ((data || []) as { term: string; df: number }[]).map((r) => r.term);
+      const rebuilt = rows.filter((r) => r.code === code).map((r) => r.term);
+      const boiler = stored.filter((t) => isBoilerplateVocabTerm(t));
+      console.log(`\n[${code}] awards sampled: ${perCode.find((p) => p.code === code)?.n ?? 0} (${STRATIFIED ? 'stratified' : 'top-by-dollars'})`);
+      console.log(`  stored rows: ${stored.length}; boilerplate among them (hidden on read now): ${boiler.length} -> ${boiler.join(', ') || 'none'}`);
+      console.log(`  rebuilt rows: ${rebuilt.length}`);
+      console.log(`  would ADD:    ${rebuilt.filter((t) => !stored.includes(t)).join(', ') || 'none'}`);
+      console.log(`  would REMOVE: ${stored.filter((t) => !rebuilt.includes(t)).join(', ') || 'none'}`);
+    }
+  }
 
   if (!GO) {
     console.log('ℹ️  DRY-RUN — nothing written. Re-run with --go to write.\n');

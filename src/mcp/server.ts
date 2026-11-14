@@ -1406,17 +1406,23 @@ server.registerTool(
       'by MEANING. NAICS is the wrong discovery key; a company\'s real vocabulary finds the market its codes miss. Pass a ' +
       'description and/or past-performance scope descriptions (the richest signal). Returns ranked keywords to feed an ' +
       'opportunity search. Semantic embeddings (no BigQuery); fails soft to lexical order if embeddings are down ' +
-      '(_meta.ranked). grounded=false = not enough input text — do NOT invent keywords.',
+      '(_meta.ranked). grounded=false = not enough input text — do NOT invent keywords. City/state names and the ' +
+      'company name are never returned as keywords (excluded_terms). Candidates also come from grounded market ' +
+      'sources (naics_vocabulary, GSA CALC+ labor-category titles, SAM solicitation text); keyword_sources names the ' +
+      'source and count of every keyword.',
     inputSchema: {
       description: z.string().optional().describe('What the company does — one-liner / pitch / capability summary.'),
       past_performance: z.array(z.string()).optional().describe('Past-performance scope descriptions (richest signal).'),
       capabilities: z.array(z.string()).optional().describe('Capability / service descriptions.'),
       code_titles: z.array(z.string()).optional().describe('NAICS/PSC title text the caller already knows (optional).'),
       limit: z.number().int().min(1).max(25).optional().describe('Max keywords (default 12).'),
+      brand_exclude: z.array(z.string()).optional().describe("The company's own name / brand / proper nouns to keep out of the keywords. Only brand-distinctive words are removed."),
+      naics: z.array(z.string()).optional().describe('Optional 6-digit NAICS codes for the market sources. Inferred when omitted.'),
+      include_market_terms: z.boolean().optional().describe('Add grounded market terms (vocabulary, CALC labor categories, solicitation text). Default true.'),
     },
   },
-  async ({ description, past_performance, capabilities, code_titles, limit }) => {
-    const result = await deriveCompanyKeywords({ description, past_performance, capabilities, code_titles, limit });
+  async ({ description, past_performance, capabilities, code_titles, limit, brand_exclude, naics, include_market_terms }) => {
+    const result = await deriveCompanyKeywords({ description, past_performance, capabilities, code_titles, limit, brand_exclude, naics, include_market_terms: include_market_terms ?? true });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );
