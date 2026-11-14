@@ -7,6 +7,7 @@
  * no multiple-award-IDIQ vehicle rollup, no snapshot resilience. Just "the top-N
  * contracts expiring within a window that match NAICS/agency/state/value".
  */
+import { federalToday, addMonthsIso } from '@/lib/dates/federal-day';
 import { createClient } from '@supabase/supabase-js';
 import { getNaics } from '@/lib/codes/lookup';
 import { annotateRecompeteRow, type RecompeteRowAnnotations } from '@/lib/recompete/annotate';
@@ -66,6 +67,8 @@ export interface ExpiringContractsInput {
   agency?: string;
   /** 2-letter place-of-performance state. */
   state?: string;
+  /** Clock override for deterministic tests; defaults to now. */
+  now?: Date;
   /**
    * Several 2-letter place-of-performance states, OR'd (`IN (...)`). When present this takes
    * precedence over `state`; callers must pass validated 2-letter codes (the MCP tool normalizes
@@ -193,17 +196,15 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
   const months = Math.min(Math.max(Number(input.monthsWindow) || 18, 1), 60);
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-  const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
-  const maxDate = new Date(today);
-  maxDate.setMonth(maxDate.getMonth() + months);
-  const maxStr = maxDate.toISOString().split('T')[0];
+  // One date basis (federal business day, US Eastern) for the window, the status overlay and
+  // award status; see src/lib/dates/federal-day.ts.
+  const today = input.now ?? new Date();
+  const todayStr = federalToday(today);
+  const maxStr = addMonthsIso(todayStr, months);
   const minMonthsIn = Number(input.minMonthsWindow);
   let afterStr = todayStr;
   if (Number.isFinite(minMonthsIn) && minMonthsIn > 0) {
-    const d = new Date(today);
-    d.setMonth(d.getMonth() + Math.min(minMonthsIn, months));
-    afterStr = d.toISOString().split('T')[0];
+    afterStr = addMonthsIso(todayStr, Math.min(minMonthsIn, months));
   }
   const appliedWindow = { after: afterStr, through: maxStr, as_of: todayStr, months };
 
@@ -354,7 +355,7 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
   rawContracts = merged.rows;
   const collapsed = primary.collapsed + merged.collapsed;
 
-  const now = new Date();
+  const now = input.now ?? new Date();
   const contracts = rawContracts.map((c) => {
     // set_aside_type is NULL on every recompete row (the sync omits it); the backfill (2026-07-29)
     // recovered it into set_aside_enriched from BQ awards.set_aside. Coalesce so every downstream

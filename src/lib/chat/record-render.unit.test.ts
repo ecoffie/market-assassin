@@ -27,7 +27,7 @@ describe('every record, once, in order', () => {
       _meta: meta({ total: 3 }),
     })!;
     expect(r.ids).toEqual(['U1', 'S1', '36C24927N0097']); // soonest end first
-    expect(r.text).toMatch(/36C24927N0097 · Allpro Staffnet LLC · Department of Veterans Affairs · Memphis, TN · ends 2027-03-31 · task\/delivery order under 36C24918D0001/);
+    expect(r.text).toMatch(/36C24927N0097 · Allpro Staffnet LLC · Department of Veterans Affairs · Memphis, TN · ends 2027-03-31 · order under 36C24918D0001/);
     expect(r.text).toMatch(/Showing all 3/);
     expect(r.exhaustive).toBe(true);
   });
@@ -147,7 +147,7 @@ describe('status checks (search_past_contracts include_status)', () => {
   it('renders every checked award with status, end date and successor; never picks one', () => {
     const r = renderStatusChecks(result)!;
     expect(r.text).toMatch(/^3 awards match \(keyword "identification card" · agency Department of the Navy · place of performance TN\)/);
-    expect(r.text).toMatch(/N0018921F3006 · Magellan Federal · .* · EXPIRED: ended 2026-07-31 \(105 days ago\) · possible successor found: N0018926FD111 · Gemini Tech Services LLC/);
+    expect(r.text).toMatch(/N0018921F3006 · Magellan Federal · .* · EXPIRED: ended 2026-07-31 \(105 days ago\) · candidate successor \(unconfirmed; USASpending does not link follow-ons\): N0018926FD111 · Gemini Tech Services LLC/);
     expect(r.text).toMatch(/N0018925CZ092 · .* · ACTIVE: ends 2027-07-31 \(259 days left\)/);
     expect(r.text).toMatch(/1 more matching award was not status-checked; this is not the full list\./);
   });
@@ -336,8 +336,8 @@ describe('different work: positive evidence only', () => {
     expect(describedOtherWork('ADMINISTRATIVE CLERK', ['clerical and administrative support'])).toBeNull();
   });
   it('an office resting on a CHECK record says so (no contradiction between halves of one answer)', () => {
-    const exp = { flaggedIds: ['70T05026F5900N004'] } as never;
-    const offices = { text: 'offices', officeExamples: [{ office: 'MISSION ESSENTIALS (70T050)', ids: ['70T05026F5900N004'] }, { office: 'OTHER (X1)', ids: ['A1'] }] } as never;
+    const exp = { flaggedIds: ['70T05026F5900N004'], ids: ['70T05026F5900N004'] } as never;
+    const offices = { text: 'offices', ids: [], officeExamples: [{ office: 'MISSION ESSENTIALS (70T050)', ids: ['70T05026F5900N004'] }, { office: 'OTHER (X1)', ids: ['A1'] }] } as never;
     crossCheckOffices([exp, offices]);
     expect((offices as { text: string }).text).toMatch(/CHECK: MISSION ESSENTIALS \(70T050\): example award 70T05026F5900N004 is marked CHECK/);
     expect((offices as { text: string }).text).not.toMatch(/OTHER \(X1\)/);
@@ -348,5 +348,21 @@ describe('run-G review: buying offices show the example awards they reference', 
   it('lists up to two example awards per office', () => {
     const r = renderBuyingOffices({ scope: { state: 'TN', naics: ['5613'] }, offices: [{ office_name: 'NCO 9', office_code: '36C249', obligated: 100, share_pct: 50, award_count: 2, example_awards: [{ piid: '36C24926N0041', obligated: 60 }, { piid: '36C24925P0001', obligated: 40 }, { piid: 'X3', obligated: 1 }] }], totals: { obligated: 200, award_count: 4, office_count: 2 }, notes: [], _meta: {} })!;
     expect(r.text).toMatch(/example awards: 36C24926N0041 \$60; 36C24925P0001 \$40$/m);
+  });
+});
+
+describe('Phase B: semantic relevance vs industry-code match', () => {
+  it('tags each record by its basis and counts them in the header; never calls a code-only record suspect', () => {
+    const r = renderExpiringRecords({
+      contracts: [rec('S1', '2027-01-01', { description: 'TEMPORARY LABORATORY STAFFING' }), rec('S2', '2027-01-02', { description: 'FACT WITNESS CLERK' })],
+      _meta: meta({ total: 2 }),
+    }, { requestedLabels: ['temporary staffing', 'clerical and administrative support'] })!;
+    expect(r.text).toMatch(/S1 · [^\n]*description confirms: temporary staffing/);
+    expect(r.text).toMatch(/S2 · [^\n]*industry-code match(?![^\n]*CHECK)/);
+    expect(r.text).toMatch(/1 of 2 retrieved records have a description that confirms the requested work/);
+  });
+  it('a zero or negative net office is flagged, not presented as a buyer', () => {
+    const r = renderBuyingOffices({ scope: { naics: ['561612'] }, offices: [{ office_name: 'X', office_code: 'X1', obligated: -1200, share_pct: -1, award_count: 1 }], totals: { obligated: 100, award_count: 5, office_count: 3 }, notes: [], _meta: {} })!;
+    expect(r.text).toMatch(/CHECK: net obligations are zero or negative/);
   });
 });

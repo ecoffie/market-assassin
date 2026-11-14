@@ -44,6 +44,7 @@ import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/cha
 import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, type PlannerTarget } from '@/lib/chat/planner-config';
 import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
 import { guardUnstatedStates } from '@/lib/chat/stated-filters';
+import { compileIntent, enforceIntent } from '@/lib/chat/intent-compiler';
 import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, lintAnalysis, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
@@ -416,6 +417,11 @@ export async function POST(request: NextRequest) {
         // forecast-vs-open, instead of a RAG essay telling him to check SAM himself.
         // P1-F: the same customer words always map to the same NAICS (deterministic lexicon), so
         // the planner does not re-guess codes on every turn.
+        // One request-level timestamp; the compiled intent is the source of truth for scope.
+        const requestNow = new Date();
+        const intent = compileIntent(message, requestNow);
+        const scopeApplied = new Set<string>();
+        const scopeUnapplied = new Set<string>();
         const capabilityNote = capabilityPlannerNote(message);
         const capabilityPhrases = interpretCapabilityNaics(message).items.flatMap((it) => [it.phrase, it.label]);
         const capabilityLabels = interpretCapabilityNaics(message).items.map((it) => it.label);
@@ -586,8 +592,12 @@ export async function POST(request: NextRequest) {
                 const id = tc.id || `call_${i}`;
                 const prepared = prepareChatToolArgs(String(tc.function?.name || ''), String(tc.function?.arguments ?? ''));
                 if (prepared.displayOffset) displayOffsets.set(id, prepared.displayOffset);
+                // Phase A: constraints the customer stated are enforced on the model's arguments.
+                const enforced = enforceIntent(String(tc.function?.name || ''), prepared.args, intent);
+                for (const n of enforced.applied) { turnTrace.notices.push(`intent_applied:${tc.function?.name}:${n}`); scopeApplied.add(n); }
+                for (const n of enforced.unapplied) { turnTrace.notices.push(`intent_unapplied:${tc.function?.name}:${n}`); scopeUnapplied.add(n); }
                 // Stated filters only: drop a state the conversation never implied (deterministic).
-                const guarded = guardUnstatedStates(prepared.args, conversationText);
+                const guarded = guardUnstatedStates(enforced.args, conversationText);
                 for (const r of guarded.removed) turnTrace.notices.push(`unstated_filter_removed:${tc.function?.name}:${r}`);
                 return { ...tc, id, type: 'function' as const, function: { ...tc.function, arguments: guarded.args } };
               });
@@ -742,7 +752,11 @@ export async function POST(request: NextRequest) {
 
         let assistantContent = '';
         if (renderedRecords.length) {
-          const recordBlock = `${renderedRecords.map((r) => r.text).join('\n\n')}\n\n`;
+          const scopeLines = [
+            scopeApplied.size ? `From your request: ${[...scopeApplied].join('; ')}.` : '',
+            scopeUnapplied.size ? `Could not apply: ${[...scopeUnapplied].join('; ')}. The results below do not reflect ${scopeUnapplied.size === 1 ? 'it' : 'them'}.` : '',
+          ].filter(Boolean).join('\n');
+          const recordBlock = `${scopeLines ? `${scopeLines}\n\n` : ''}${renderedRecords.map((r) => r.text).join('\n\n')}\n\n`;
           assistantContent = recordBlock;
           send({ type: 'token', content: recordBlock });
           turnTrace.notices.push('records_rendered');

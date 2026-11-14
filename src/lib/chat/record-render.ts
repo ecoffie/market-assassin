@@ -190,6 +190,13 @@ export function relevanceStems(phrases: string[]): string[] {
 let RELEVANCE_STEMS: string[] = [];
 let REQUESTED_LABELS: string[] = [];
 
+/** The requested capability the record's OWN description names (semantic relevance, positive evidence). */
+export function describedRequestedWork(description: string, requestedLabels: string[]): string | null {
+  if (!description || !requestedLabels.length) return null;
+  const labels = interpretCapabilityNaics(description).items.map((it) => it.label);
+  return labels.find((l) => requestedLabels.includes(l)) ?? null;
+}
+
 /** A different capability the record's OWN description names (positive evidence only, from Mindy's lexicon). */
 export function describedOtherWork(description: string, requestedLabels: string[]): string | null {
   if (!description || !requestedLabels.length) return null;
@@ -209,14 +216,16 @@ function recordLine(n: number, r: Rec & { _kind: string }): string {
   const kind = r._kind === 'contract'
     ? 'contract'
     : r._kind === 'order'
-      ? `task/delivery order under ${str(r.parent_vehicle_piid) || 'its parent vehicle'}`
-      : 'task/delivery order (parent vehicle not recorded)';
+      ? `order under ${str(r.parent_vehicle_piid) || 'its parent vehicle'}`
+      : 'order (parent vehicle not recorded)';
   const desc = clip(str(r.description), 180);
   const value = money(r.total_obligation);
   const conflict = describedPlaceConflict(str(r.description), st);
   const otherWork = describedOtherWork(str(r.description), REQUESTED_LABELS);
+  const confirms = describedRequestedWork(str(r.description), REQUESTED_LABELS);
+  const basis = REQUESTED_LABELS.length ? (confirms ? ` · description confirms: ${confirms}` : otherWork ? '' : ' · industry-code match') : '';
 
-  return `${n}. ${id} · ${who} · ${agency} · ${place} · ends ${end} · ${kind}${value ? ` · obligated ${value}` : ''}${desc ? ` · ${desc}` : ''}${conflict ? ` · CHECK: the description names ${conflict}, which is not in the reported place-of-performance state ${st}; this record may not belong to the requested place` : ''}${otherWork ? ` · CHECK: the description describes ${otherWork} work, not the work requested` : ''}`;
+  return `${n}. ${id} · ${who} · ${agency} · ${place} · ends ${end} · ${kind}${value ? ` · obligated ${value}` : ''}${desc ? ` · ${desc}` : ''}${conflict ? ` · CHECK: the description names ${conflict}, which is not in the reported place-of-performance state ${st}; this record may not belong to the requested place` : ''}${basis}${otherWork ? ` · CHECK: the description describes ${otherWork} work, not the work requested` : ''}`;
 }
 
 /**
@@ -254,12 +263,16 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
     lines.push(`No expiring contracts or task orders match (${filters}). Source: Mindy recompete data (USASpending).`);
   } else {
     lines.push(`${total} expiring record${total === 1 ? '' : 's'} match (${filters}). Source: Mindy recompete data (USASpending)${meta.window && (meta.window as Rec).as_of ? `, as of ${str((meta.window as Rec).as_of)}` : ''}.`);
-    lines.push(`${standalone} standalone contract${standalone === 1 ? '' : 's'} and ${orders} task/delivery order${orders === 1 ? '' : 's'} were retrieved.`);
+    lines.push(`${standalone} standalone contract${standalone === 1 ? '' : 's'} and ${orders} order${orders === 1 ? '' : 's'} under a vehicle (task orders, delivery orders or BPA calls) were retrieved.`);
     const af0 = (meta.applied_filters && typeof meta.applied_filters === 'object' ? meta.applied_filters : {}) as Rec;
     if (af0.naics) lines.push('Matched by industry (NAICS) code: the code is how the agency classified each contract and can include other work than the words you used, so check each description. Place of performance is as USASpending reports it.');
     const byAgency = new Map<string, number>();
     for (const r of records) { const a = title(str(r.awarding_agency)) || 'agency not recorded'; byAgency.set(a, (byAgency.get(a) ?? 0) + 1); }
     lines.push(`By awarding agency: ${[...byAgency.entries()].sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1)).map(([a, n]) => `${a} ${n}`).join('; ')}.`);
+    if (REQUESTED_LABELS.length) {
+      const confirmed = records.filter((r) => describedRequestedWork(str(r.description), REQUESTED_LABELS)).length;
+      lines.push(`${confirmed} of ${records.length} retrieved records have a description that confirms the requested work; the others match by industry code only (the code is the agency's classification, not a check of the work).`);
+    }
     const flaggedRecs = records.filter((r) => describedPlaceConflict(str(r.description), str(r.place_of_performance_state)) || describedOtherWork(str(r.description), REQUESTED_LABELS));
     const flagged = flaggedRecs.length;
     flaggedIdsOut = flaggedRecs.map((r) => str(r.piid) || str(r.contract_id));
@@ -365,11 +378,11 @@ function successorCore(s: Rec): string {
     const cands = (Array.isArray(s.candidates) ? s.candidates : []) as Rec[];
     const items = cands.slice(0, 3).map((c) => {
       const ev = (c.evidence && typeof c.evidence === 'object' ? c.evidence : {}) as Rec;
-      const label = str(c.confidence) || str(c.likelihood);
+      const label = str(c.strength) || str(c.confidence) || str(c.likelihood);
       const office = str(ev.same_piid_office_prefix);
       return `${str(c.awardId) || str(c.award_id)} · ${title(str(c.recipientName))}${c.description ? ` · ${clip(str(c.description), 60)}` : ''}${c.startDate ? ` · started ${str(c.startDate)}` : ''}${office ? ` · same office ${office}` : ''}${label ? ` (${label})` : ''}`;
     });
-    return `possible successor${cands.length === 1 ? '' : 's'} found: ${items.join('; ')}`;
+    return `candidate successor${cands.length === 1 ? '' : 's'} (unconfirmed; USASpending does not link follow-ons): ${items.join('; ')}`;
   }
   if (state === 'none_found') return `successor checked, none found${s.note ? ` (${clip(str(s.note), 120)})` : ''}`;
   if (state === 'unavailable') return 'successor check unavailable (source error, not a none)';
@@ -467,7 +480,8 @@ export function renderBuyingOffices(result: Rec): RenderedRecords | null {
       const customers = (Array.isArray(o.top_funding_offices) ? (o.top_funding_offices as Rec[]) : []).slice(0, 3).map((f) => `${title(str(f.name))} ${money(f.obligated)}`).filter((x) => x.trim());
       const places = (Array.isArray(o.top_places) ? (o.top_places as Rec[]) : []).slice(0, 3).map((p) => [title(str(p.city)), str(p.state)].filter(Boolean).join(', ')).filter(Boolean);
       const examples = (Array.isArray(o.example_awards) ? (o.example_awards as Rec[]) : []).slice(0, 2).map((e) => `${str(e.piid) || str(e.award_id)} ${money(e.obligated)}`).filter((x) => x.trim());
-      lines.push(`${i + 1}. ${str(o.office_name) || 'office name not reported'}${o.office_code ? ` (${str(o.office_code)})` : ''} · ${[title(str(o.agency)), title(str(o.sub_agency))].filter(Boolean).join(' / ')} · ${money(o.obligated)} (${str(o.share_pct)}%) · ${num(o.award_count) ?? 0} awards${customers.length ? ` · customers: ${customers.join('; ')}` : ''}${places.length ? ` · work performed in ${places.join('; ')}` : ''}${examples.length ? ` · example awards: ${examples.join('; ')}` : ''}`);
+      const net = num(o.obligated) ?? 0;
+      lines.push(`${i + 1}. ${str(o.office_name) || 'office name not reported'}${o.office_code ? ` (${str(o.office_code)})` : ''} · ${[title(str(o.agency)), title(str(o.sub_agency))].filter(Boolean).join(' / ')} · ${money(o.obligated)} (${str(o.share_pct)}%) · ${num(o.award_count) ?? 0} awards${customers.length ? ` · customers: ${customers.join('; ')}` : ''}${places.length ? ` · work performed in ${places.join('; ')}` : ''}${examples.length ? ` · example awards: ${examples.join('; ')}` : ''}${net <= 0 ? ' · CHECK: net obligations are zero or negative (deobligations), so this is not evidence of buying in this window' : ''}`);
     });
   }
   const notes = Array.isArray(result.notes) ? (result.notes as unknown[]).map(str).filter(Boolean) : [];
@@ -645,13 +659,14 @@ export function lintAnalysis(text: string, fallback = 'Review each record and it
 /** Cross-check within one answer: an office whose example award is a CHECK record says so. */
 export function crossCheckOffices(rendered: RenderedRecords[]): void {
   const flagged = new Set(rendered.flatMap((r) => r.flaggedIds ?? []));
+  const shown = new Set(rendered.flatMap((r) => r.ids));
   if (!flagged.size) return;
   for (const r of rendered) {
     if (!r.officeExamples) continue;
     const notes = r.officeExamples
       .map((o) => ({ office: o.office, hits: o.ids.filter((id) => flagged.has(id)) }))
       .filter((o) => o.hits.length)
-      .map((o) => `${o.office}: example award ${o.hits.join(', ')} is marked CHECK in the expiring list (it may not be guard work in this place), so treat this office's ranking with caution`);
+      .map((o) => `${o.office}: example award ${o.hits.map((h) => (shown.has(h) ? h : `${h} (in the expiring results but not among the rows shown)`)).join(', ')} is marked CHECK there (it may not be the requested work in this place), so treat this office's ranking with caution`);
     if (notes.length) r.text += `\n\nCHECK: ${notes.join('; ')}.`;
   }
 }
