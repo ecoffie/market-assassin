@@ -157,11 +157,13 @@ async function parity() {
     const ids = Object.keys(k.items).map((it) => it.split(':')[1]);
     const rows: Row[] = [];
     for (let i = 0; i < ids.length; i += 50) {
+      // unranged-ok: bounded by .in() of at most 50 notice ids
       const { data, error } = await db.from('sam_opportunities').select(['notice_id', ...OPEN_TEXT_COLS].join(',')).in('notice_id', ids.slice(i, i + 50));
       if (error) throw new Error(error.message); rows.push(...(data as unknown as Row[]));
     }
     const sqlIds = new Set<string>();
     for (let i = 0; i < ids.length; i += 50) {
+      // unranged-ok: bounded by .in() of at most 50 notice ids
       let q = db.from('sam_opportunities').select('notice_id').in('notice_id', ids.slice(i, i + 50));
       if (pred) q = q.or(pred); if (excl) q = q.or(excl);
       const { data, error } = await q; if (error) throw new Error(`${id}: ${error.message}`);
