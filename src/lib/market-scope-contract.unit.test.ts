@@ -67,9 +67,14 @@ describe('C5 — scope=profile is honoured or skipped, never silently widened', 
     expect(SRC).not.toContain("from('user_profiles')");
   });
 
-  it('passes the profile into parseMapFilters, which is the only way it applies', () => {
-    expect(SRC).toContain('profileOpts);');
-    expect(SRC).toMatch(/parseMapFilters\(/);
+  it('passes the profile into the Open evaluator, which is the only way it applies', () => {
+    // Hop 1: the cron hands the resolved profile to the shared saved-search Open evaluator (2026-11-14).
+    expect(SRC).toMatch(/savedSearchOpenEvaluation\(savedFilters, profileOpts, openEngine\)/);
+    // Hop 2: that evaluator threads it into BOTH engines' parsers (legacy parseMapFilters, canonical
+    // mapsOpenRequest). Behaviour is proven in open-evaluator.unit.test.ts (profile scope cases).
+    const EV = strip(read('src/lib/saved-searches/open-evaluator.ts'));
+    expect(EV).toMatch(/parseMapFilters\(raw, profile\)/);
+    expect(EV).toMatch(/mapsOpenRequest\(savedFilterGetter\(savedFilters\), profile\)/);
   });
 
   it('SKIPS rather than running unscoped when the profile has no codes', () => {
