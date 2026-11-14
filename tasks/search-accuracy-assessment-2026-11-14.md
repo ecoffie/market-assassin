@@ -184,3 +184,37 @@ notices would make the figures exact.
    the related family under the canonical plan. Approaches 2/3 would only change that watch (once #2043 is active) plus
    Map/MCP janitorial searches. It must be counted in the combined #2040 + #2043 reconciliation before any activation
    request.
+
+## C2 review by Agent 1 (round 3, 2026-11-14; read-only review, nothing implemented)
+
+Eric approved the direction for review: keep shared retrieval and related-market retrieval as released; keep confirmed
+direct matches distinct; do not count unconfirmed related-market notices as matches on the Map or in alert emails; keep
+related markets discoverable; never silently discard notices or change alert criteria.
+
+**Agent 1's verdict: consistent with the Phase 1 evidence rules, and stronger, under these conditions.**
+1. Related-market rows are always shown with their own count ("41 matches · 103 related-market notices"), never dropped.
+2. A search with 0 direct and N related never reads as "0 matches" alone; the related count is on the same line.
+3. Labels come from the same classification as MCP, not from page or email text.
+4. Surfaces call `labelOpenRow` (or one shared exported function built on it). Do NOT hand-roll the SQL equivalent: the
+   0-row difference was measured on one query, and `labelOpenRow` depends on plan, capability and company anchor, so a
+   second classifier would drift (the #245 Spending-by-Agency failure). If cost matters: SQL narrows retrieval, then
+   `labelOpenRow` classifies; or a test asserts SQL == labeller across a preset matrix.
+5. Each surface names its basis ("matches = direct matches; related shown separately") and a test pins
+   direct + related (+ other) == MCP total for the same plan.
+6. **Delivery, not just presentation:** if an alert sends only when "new matches" > 0, counting only DIRECT_MATCH changes
+   SENDING. Measure affected watches and get Eric's explicit OK before shipping.
+
+**Measured for condition 6 (live, read-only).** Of 186 alerting watches, 1 resolves to the janitorial preset with the
+related family (`0e41b9aa`). Its 25 canonical Open matches in the 30-day window, classified by `labelOpenRow`:
+DIRECT_MATCH 6, RELATED_MARKET_CANDIDATE 3, WEAK_NON_MARKET 16. It would still receive email (6 direct), so no watch
+stops receiving alerts today.
+
+**Two findings this surfaced (for Eric and Agent 1):**
+- The invariant needs THREE groups, not two: Open results also carry WEAK_NON_MARKET (16 of 25 here). A surface that
+  shows "matches + related" must also say what happens to the weak rows.
+- For a capability-list query (6 words, any-word admission) the labeller's DIRECT_MATCH includes clearly irrelevant
+  notices (MQ-9 instructor services, electrical deficiency corrections) because visible text carries one of the words.
+  C2 is only as good as the labeller on such queries; this is the assessment's R2/R3 problem and should be decided
+  with C3 (sentence/capability-list handling), not papered over by C2.
+
+**Status:** design approved for review; Agent 1 conditions recorded; not implemented, not deployed.
