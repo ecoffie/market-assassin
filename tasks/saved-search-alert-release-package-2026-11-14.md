@@ -360,3 +360,24 @@ Owner 34 (one facilities-services watch with six service words):
 
 Both explanations are drafts for approval. The owner-34 text assumes #2047 is merged before activation; if it is not,
 that owner keeps the §6 behaviour and the text must not be sent.
+
+## 8. Live recount after C1 and #2047 are in production (2026-11-14, ~17:45Z)
+
+Read-only, local scratch merge of `main` (c344af64b: C1 + #2047) + #2040 + #2043, same method as §6. Results private in
+`~/docs/agent3/combined-recount-60-live-2026-11-14.json`.
+
+| Outcome after both PRs | Watches |
+|---|---|
+| Paused (Agent 2) | 11 |
+| Narrower | 13 |
+| Changed (gains and losses) | 12 |
+| 0 → matches | 4 |
+| More matches | 1 |
+| Goes silent on Open | 4 (`332eef89`, `b4e40d05`, `61d1ca1f`, `b032f39f`) |
+| Held (unexpected expansion / pending explanation) | 3 (`3ed7a107`, `c2adcce1` owner 32: 6 → 10 each; `0e41b9aa` owner 34: 24 → 19) |
+| No customer-visible change | 12 (7 same count, 5 Open-off) |
+
+28 of 60 rows moved since §6, all by daily corpus drift of 1–4 notices except the two expected changes (`61d1ca1f`
+1 → 0 from C1; `0e41b9aa` 25 → 19 from #2047). Notification list unchanged: 27 of 34 owners; owners 4, 9, 11, 12, 13,
+14, 16 need none. Owners 32 and 34 stay held; their §7 drafts are unchanged except owner 34's figure is now 24 → 19.
+Nothing sent, no watch changed, #2043 flag OFF, migration not applied.
