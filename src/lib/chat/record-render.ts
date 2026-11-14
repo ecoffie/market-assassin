@@ -66,7 +66,13 @@ export function describedPlaceConflict(description: string, popState: string): s
     /\b([A-Z][A-Z.' -]{2,28}?)\s+(?:INTERNATIONAL AIRPORT|JOB CORPS(?: CENTER)?)\b/g,
   ];
   const scope = up.match(/\b(NATIONWIDE|NATION-WIDE|CONUS|THROUGHOUT THE (?:SOUTHERN|NORTHERN) BORDER|MULTIPLE STATES|ALL STATES|THROUGHOUT THE UNITED STATES)\b/);
-  if (scope) return `${scope[1].toLowerCase()} (work beyond one state)`;
+  // A border region that includes the reported state is not a conflict (R11: a San Antonio guard
+  // award "throughout the southern border" was wrongly marked).
+  const BORDER: Record<string, string[]> = {
+    'THROUGHOUT THE SOUTHERN BORDER': ['CA', 'AZ', 'NM', 'TX'],
+    'THROUGHOUT THE NORTHERN BORDER': ['WA', 'ID', 'MT', 'ND', 'MN', 'WI', 'MI', 'OH', 'PA', 'NY', 'VT', 'NH', 'ME', 'AK'],
+  };
+  if (scope && !(BORDER[scope[1]]?.includes(popState.toUpperCase()))) return `${scope[1].toLowerCase()} (work beyond one state)`;
   const map = cityStateMap();
   for (const re of cues) {
     for (const m of up.matchAll(re)) {
@@ -276,7 +282,7 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
     const flaggedRecs = records.filter((r) => describedPlaceConflict(str(r.description), str(r.place_of_performance_state)) || describedOtherWork(str(r.description), REQUESTED_LABELS));
     const flagged = flaggedRecs.length;
     flaggedIdsOut = flaggedRecs.map((r) => str(r.piid) || str(r.contract_id));
-    if (flagged) lines.push(`${flagged} record${flagged === 1 ? ' carries' : 's carry'} a description that names a place outside the reported state or describes different work (marked CHECK); the count above includes them as reported by USASpending.`);
+    if (flagged) lines.push(`Mindy marked ${flagged} record${flagged === 1 ? '' : 's'} CHECK because the description names a place outside the reported state or describes different work. This check only catches wording it recognizes, so an unmarked record can still describe other work; the count above includes every record as reported by USASpending.`);
     const exhaustiveNow = from === 1 && to === total && retrieved === total;
     lines.push(exhaustiveNow
       ? `Showing all ${total}, soonest end date first.`
@@ -550,7 +556,7 @@ export function renderKeywords(result: Rec): RenderedRecords | null {
   const extraOcc = occ.filter((o) => !kwSet.has(str(o.keyword).toLowerCase()));
   if (extraOcc.length) {
     lines.push('');
-    lines.push(`Job titles buyers use for this work (${extraOcc.length} more), from GSA CALC labor categories and SAM solicitation text:`);
+    lines.push(`Related job titles (${extraOcc.length} more) from GSA CALC labor categories and SAM solicitation text that share a word with your description. These are word matches; Mindy has not confirmed that each title is this kind of work:`);
     extraOcc.forEach((o, i) => lines.push(`${kws.length + i + 1}. ${str(o.keyword)} · ${src(o) || 'source not reported'}`));
   }
   const ex = (result.excluded_terms && typeof result.excluded_terms === 'object' ? result.excluded_terms : null) as Rec | null;
@@ -573,7 +579,10 @@ export function freshnessSentence(meta: Rec): string {
   const delay = note.match(/~?(\d+)-day delay/i)?.[1];
   const loaded = str(meta.as_of) || note.match(/last loaded (\d{4}-\d{2}-\d{2})/i)?.[1] || '';
   if (!through) return note ? 'Recent awards may not be published yet, so this list may be incomplete.' : '';
-  return `This agency's contract actions reach USASpending with about a ${delay || '90'}-day delay, so this data is reliably current through about ${through} only${loaded ? ` (last loaded ${loaded})` : ''}; awards made after that may not appear yet. For newer awards, check SAM.gov award notices or the agency's announcements.`;
+  // Name whose actions are delayed from the note itself, never "this agency" (R10: a DoD delay
+  // sentence over a list with no DoD awards read as applying to the list's agencies).
+  const who = /\bDoD\b|Defense/i.test(note) ? 'Defense (DoD, including Navy, Army and Air Force) contract actions reach' : 'Contract actions for this search reach';
+  return `${who} USASpending with about a ${delay || '90'}-day delay, so that data is reliably current through about ${through} only${loaded ? ` (last loaded ${loaded})` : ''}; awards made after that may not appear yet. For newer awards, check SAM.gov award notices or the agency's announcements.`;
 }
 
 export const VEHICLE_MIX_TOOL = 'get_vehicle_spend_mix';

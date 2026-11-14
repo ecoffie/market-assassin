@@ -419,7 +419,7 @@ export async function POST(request: NextRequest) {
         // the planner does not re-guess codes on every turn.
         // One request-level timestamp; the compiled intent is the source of truth for scope.
         const requestNow = new Date();
-        const intent = compileIntent(message, requestNow);
+        const intent = compileIntent(message, requestNow, [...history.filter((h) => h.role === 'user').map((h) => String(h.content || '')), message].join('\n'));
         const scopeApplied = new Set<string>();
         const scopeUnapplied = new Set<string>();
         const capabilityNote = capabilityPlannerNote(message);
