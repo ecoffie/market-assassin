@@ -194,8 +194,17 @@ async function main() {
   let skip = new Set<string>();
   if (GO && RESUME) {
     // resumable: codes already present in the table are skipped
-    const { data } = await sb.from('naics_vocabulary').select('code').eq('code_type', 'naics');
-    skip = new Set((data || []).map((r: { code: string }) => r.code));
+    // naics_vocabulary holds many term rows per code, so this read exceeds PostgREST's silent 1,000-row
+    // cap; page it, or resume re-processes (and rewrites) codes that are already populated.
+    const seen: string[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await sb.from('naics_vocabulary').select('code').eq('code_type', 'naics').order('code').range(from, from + 999);
+      if (error) throw new Error(`resume read failed: ${error.message}`);
+      const page = (data || []) as { code: string }[];
+      seen.push(...page.map((r) => r.code));
+      if (page.length < 1000) break;
+    }
+    skip = new Set(seen);
     console.log(`Resume: ${skip.size} codes already populated — skipping.\n`);
   }
   const todo = codes.filter((c) => !skip.has(c));
@@ -311,7 +320,8 @@ async function main() {
   if (CODES_ARG.length) {
     // Comparison report: stored rows vs what this run would write, per named code.
     for (const code of CODES_ARG) {
-      const { data, error } = await sb.from('naics_vocabulary').select('term, df').eq('code_type', 'naics').eq('code', code).order('weight', { ascending: false });
+      // One code's terms (tens of rows); bounded explicitly so the comparison can never be silently capped.
+      const { data, error } = await sb.from('naics_vocabulary').select('term, df').eq('code_type', 'naics').eq('code', code).order('weight', { ascending: false }).range(0, 4999);
       if (error) throw new Error(`stored read failed: ${error.message}`);
       const stored = ((data || []) as { term: string; df: number }[]).map((r) => r.term);
       const rebuilt = rows.filter((r) => r.code === code).map((r) => r.term);
