@@ -222,7 +222,7 @@ describe('freshness: empty recent-window search', () => {
   it('states the lag note verbatim and says it is not a verified zero', () => {
     const r = renderStatusChecks({ awards: [], _meta: { result_state: 'partial', as_of: '2026-11-13', lag_note: 'Contract actions by this agency are published with a ~90-day delay, so the data is only reliably current through about 2026-08-15. Treat an empty or thin result as "not yet published", NOT as "no award was made".' } })!;
     expect(r.text).toMatch(/NOT a verified zero/);
-    expect(r.text).toMatch(/reliably current only through about 2026-08-15 \(last loaded 2026-11-13\)/);
+    expect(r.text).toMatch(/reliably current through about 2026-08-15 only \(last loaded 2026-11-13\)/);
     expect(r.text).not.toMatch(/no award was made|Treat an empty/);
   });
   it('an empty search with no lag note renders nothing (the model reports the verified zero)', () => {

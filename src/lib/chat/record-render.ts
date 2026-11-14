@@ -513,7 +513,7 @@ export function freshnessSentence(meta: Rec): string {
   const delay = note.match(/~?(\d+)-day delay/i)?.[1];
   const loaded = str(meta.as_of) || note.match(/last loaded (\d{4}-\d{2}-\d{2})/i)?.[1] || '';
   if (!through) return note ? 'Recent awards may not be published yet, so this list may be incomplete.' : '';
-  return `This agency's contract actions reach USASpending with about a ${delay || '90'}-day delay, so this data is reliably current only through about ${through}${loaded ? ` (last loaded ${loaded})` : ''}; awards made after that may not appear yet.`;
+  return `This agency's contract actions reach USASpending with about a ${delay || '90'}-day delay, so this data is reliably current through about ${through} only${loaded ? ` (last loaded ${loaded})` : ''}; awards made after that may not appear yet.`;
 }
 
 export const VEHICLE_MIX_TOOL = 'get_vehicle_spend_mix';
