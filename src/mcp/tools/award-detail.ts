@@ -15,6 +15,14 @@
  */
 import { fetchAwardDetail, resolvePiidToId, type AwardDetail } from '@/lib/usaspending/award-detail';
 import { mcpFlags } from '@/lib/mcp/flags';
+import {
+  computeAwardStatus,
+  probeSuccessor,
+  SUCCESSOR_PROBE_WITHIN_DAYS,
+  type AwardStatus,
+  type AwardStatusResult,
+  type SuccessorProbe,
+} from '@/lib/usaspending/award-status';
 
 export interface AwardDetailInput {
   /** Contract number (PIID), e.g. "140F0822D0024". */
@@ -26,6 +34,20 @@ export interface AwardDetailInput {
 export interface AwardDetailResult {
   queried: { piid?: string; id?: string };
   award: AwardDetail | null;
+  /**
+   * Computed against TODAY from the current period-of-performance end (inclusive). 'unknown' when
+   * there is no award or no end date.
+   */
+  status: AwardStatus;
+  /** Whole days from today to the end date; negative once expired; null when unknown. */
+  days_until_end: number | null;
+  status_basis: AwardStatusResult['status_basis'] | null;
+  /**
+   * Likely follow-on probe, run when the award is expired or ends within
+   * SUCCESSOR_PROBE_WITHIN_DAYS. state: candidates | none_found (checked, with what was checked) |
+   * not_checked | unavailable (source error, NOT a "none").
+   */
+  successor: SuccessorProbe | null;
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
   _meta: {
     grounded: boolean; // an award was resolved + fetched
@@ -34,7 +56,11 @@ export interface AwardDetailResult {
   };
 }
 
-export async function getAwardDetail(input: AwardDetailInput): Promise<AwardDetailResult> {
+export async function getAwardDetail(
+  input: AwardDetailInput,
+  opts: { now?: Date; fetcher?: typeof fetch } = {},
+): Promise<AwardDetailResult> {
+  const now = opts.now ?? new Date();
   const piid = String(input.piid ?? '').trim();
   const rawId = String(input.id ?? '').trim();
   let degraded = false;
@@ -50,9 +76,35 @@ export async function getAwardDetail(input: AwardDetailInput): Promise<AwardDeta
   }
 
   const grounded = !!award;
+  const statusResult = award ? computeAwardStatus(award, now) : null;
+  let successor: SuccessorProbe | null = null;
+  if (award && statusResult) {
+    const days = statusResult.days_until_end;
+    const due = statusResult.status === 'expired' || (days !== null && days <= SUCCESSOR_PROBE_WITHIN_DAYS);
+    if (due) {
+      try {
+        successor = await probeSuccessor(award, statusResult.status_basis.end_date_used, now, opts.fetcher ?? fetch);
+      } catch (err) {
+        console.error('[mcp:get_award_detail] successor probe failed:', err);
+        successor = null;
+      }
+    } else {
+      successor = {
+        state: 'not_checked',
+        candidates: [],
+        checked: { piid_office_prefix: null, naics: null, psc: null, start_window: null, award_types: '', rows_seen: 0, same_office_same_code_rows: 0, truncated: false },
+        method: '',
+        note: `Award is active with more than ${SUCCESSOR_PROBE_WITHIN_DAYS} days remaining; no successor probe run.`,
+      };
+    }
+  }
   const result: AwardDetailResult = {
     queried: { ...(piid ? { piid } : {}), ...(rawId ? { id: rawId } : {}) },
     award,
+    status: statusResult?.status ?? 'unknown',
+    days_until_end: statusResult?.days_until_end ?? null,
+    status_basis: statusResult?.status_basis ?? null,
+    successor,
     _meta: { grounded, degraded, resolved_id: id },
   };
 
@@ -61,7 +113,7 @@ export async function getAwardDetail(input: AwardDetailInput): Promise<AwardDeta
       summary: degraded
         ? `USASpending could not be reached for ${piid || rawId || 'this award'} (temporary error) — retry; do NOT state the award doesn't exist.`
         : grounded
-        ? `${award!.recipientName} holds ${award!.awardId} — ${award!.ceiling ? `ceiling $${award!.ceiling.toLocaleString()}` : 'ceiling n/a'}${award!.popPotentialEnd ? `, expires ${award!.popPotentialEnd}` : ''}${award!.parentIdvPiid ? `, under vehicle ${award!.parentIdvPiid}` : ''}.`
+        ? `${award!.recipientName} holds ${award!.awardId} — ${award!.ceiling ? `ceiling $${award!.ceiling.toLocaleString()}` : 'ceiling n/a'}${award!.popPotentialEnd ? `, expires ${award!.popPotentialEnd}` : ''}${award!.parentIdvPiid ? `, under vehicle ${award!.parentIdvPiid}` : ''}. Status: ${result.status}${result.days_until_end !== null ? ` (${result.days_until_end} days to end)` : ''}.${successor ? ` Successor probe: ${successor.state}.` : ''}`
         : `No USASpending award matched ${piid || rawId}. Do not invent award figures.`,
       how_to_use: grounded
         ? 'Cite obligated→ceiling as the prize size, the parent IDV as the gate to compete, and popPotentialEnd as the recompete window. All figures trace to the returned award object.'

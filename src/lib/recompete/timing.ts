@@ -17,6 +17,7 @@
  * end (remaining clock). It is not the capture-start date and is never derived
  * from estimated_recompete_date.
  */
+import { federalToday } from '@/lib/dates/federal-day';
 
 /** Capture-start lead. Matches the DB trigger and the forecast PRD. */
 export const RECOMPETE_CAPTURE_LEAD_MONTHS = 12;
@@ -102,7 +103,7 @@ export function overlayRecompeteTiming(
   const capture = captureStartDateFromPopEnd(popEnd);
   const lead = leadTimeMonthsFromPopEnd(popEnd, now);
   if (capture == null || lead == null) return null;
-  const today = now.toISOString().slice(0, 10);
+  const today = federalToday(now);
   return {
     capture_start_date: capture,
     capture_start_basis: CAPTURE_START_BASIS,

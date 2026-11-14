@@ -42,6 +42,10 @@ import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/ti
 // preflight, per-tool error capture, execution log). Never import runMcpTool here.
 import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/chat-tool-executor';
 import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, type PlannerTarget } from '@/lib/chat/planner-config';
+import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
+import { guardUnstatedStates } from '@/lib/chat/stated-filters';
+import { compileIntent, enforceIntent, dedupeToolCalls } from '@/lib/chat/intent-compiler';
+import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, renderSbloContact, lintAnalysis, deterministicNextSteps, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, SBLO_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
 
@@ -158,6 +162,17 @@ Tool-use rules:
 - Some tools take a notice_id or RFP text (proposal tools) — if the user hasn't given one, ask for the solicitation number/text rather than guessing.
 - If a tool returns a "slow down"/rate_limited note, relay it briefly and suggest they try again shortly — do NOT retry it yourself.
 - A tool result with ok:false and an error_category (state "unavailable") means that data COULD NOT BE RETRIEVED. Say the lookup was unavailable or not permitted from chat. NEVER describe it as "none", "no contracts", or zero.
+- Filters cover the whole request. get_expiring_contracts accepts several NAICS codes and several states comma-separated in ONE call: when the user names several kinds of work or several states, pass them all there (for example "janitorial and landscaping" -> naics "561720,561730"; "VA, MD and DC" -> state "VA,MD,DC"). Other tools take ONE NAICS code and ONE state per call unless their own description says they accept lists: call them once per code or state instead of joining values. Never drop part of what the user asked for.
+- Expiring-contract records are rendered for the user by the system from the tool data (every record, or a stated page with the total). When the user asks to continue a list (for example "show expiring records 21 to 40"), call get_expiring_contracts again with exactly the same filters as the previous search plus display_offset = the first requested record number minus 1. Never present a subset as the full list.
+- Only pass search filters the user stated or clearly implied. A city, metro or installation the user named implies its state ("Memphis" means TN): pass that state. Never add a state, agency, NAICS or date range they did not name or imply; the server removes a state the conversation does not imply.
+- Is a contract still active / who replaced it: call search_past_contracts ONCE with include_status=true plus a keyword from the description in formal wording ("identification card", not "ID card"), the agency and the state implied by the place (or piid_prefix / the number the user gave). Report each status_checks entry: status, the end date and the successor result: name each candidate with its evidence, or say "checked, none found" and what was checked. Do not ask the user for a contract number first.
+- If a result has _meta.lag_note, say the data is current through that date and recent awards may not be published yet. Never say no award was made.
+- Contacts at a company: call get_sblo_contact. If it has no named liaison but returns registered_points_of_contact, name those people with their titles, say they are the firm's registered SAM points of contact (not a designated small business liaison) as of the as_of date, and never state an email or phone the tool did not return.
+- Who buys a kind of work in a city or metro: call get_buying_offices with the state, the core city in city (it expands to the metro automatically), and the NAICS. Name each contracting office with its code, the customer agencies in top_funding_offices, the obligated dollars, and where the work is performed; never say the office is located in the city.
+- How much spending runs through schedules, BPAs or IDIQs: call get_vehicle_spend_mix and give dollars and percent for each bucket, plus the verified, heuristic and unresolved shares. unavailable or scope_too_broad is not a zero: say so and narrow the window.
+- Keywords for a company: call derive_company_keywords with brand_exclude set to the company name the user gave. Present keywords and occupational_titles, and cite each one's keyword_sources. Never list a city, state or company name as a keyword.
+- Labor rates: call get_pricing_intel and quote rate_summary.statement exactly, giving every price point (aggressive, competitive, premium) with its population and n. Competitive is the market median; never present a per-title median as the market median.
+- Every tool result carries _meta.result_state and _meta.ignored_args. Only result_state "none_found" with an empty ignored_args is a verified zero: only then may you say nothing matched. "filter_not_applied" or "partial": name each ignored argument and say that part was NOT checked (for example: "I could not filter by city, so this covers all of Tennessee"); never present the result as complete or as a zero. "unavailable": the data could not be retrieved; never call it none. "not_reported": the tool gives no status; judge from the rows it returned (zero rows means nothing matched those filters) and still name any ignored arguments.
 - When a tool returns grounded=false / count 0 / found false, say so plainly — NEVER invent a pursuit, opportunity, contract, company, agency, deadline, dollar, contact, or term. Ground every specific ONLY in what the tool actually returned.
 - When OPEN solicitations run thin, do NOT fall back to "keep an eye on SAM.gov" / "check SAM.gov for updates" / "monitor the panel" — you have forecast + recompete tools; call them and surface (clearly labeled) FORECAST and RECOMPETE results instead. "Go check SAM yourself" is never an acceptable answer for something a tool covers.
 - DO NOT PAD A THIN RESULT. If the user asked for cyber/cloud work and the tools returned two real matches, return two and say the set is thin — never stretch to fill a list with items that only loosely touch the ask. Listing a security-system repair or an air-traffic-control system under "cyber and cloud" makes every other result look equally unreliable. Three precise matches beat seven padded ones, and a user can act on "that's all there is right now"; they cannot act on a list they have to re-filter themselves.
@@ -400,8 +415,20 @@ export async function POST(request: NextRequest) {
         // the FINAL streamed answer (so "how do I write a cap statement" keeps its teaching
         // corpus). Verified: AJ's exact prompt now fires get_agency_forecasts + labels
         // forecast-vs-open, instead of a RAG essay telling him to check SAM himself.
+        // P1-F: the same customer words always map to the same NAICS (deterministic lexicon), so
+        // the planner does not re-guess codes on every turn.
+        // One request-level timestamp; the compiled intent is the source of truth for scope.
+        const requestNow = new Date();
+        const intent = compileIntent(message, requestNow, [...history.filter((h) => h.role === 'user').map((h) => String(h.content || '')), message].join('\n'));
+        const scopeApplied = new Set<string>();
+        const scopeUnapplied = new Set<string>();
+        const capabilityNote = capabilityPlannerNote(message);
+        const capabilityPhrases = interpretCapabilityNaics(message).items.flatMap((it) => [it.phrase, it.label]);
+        const capabilityLabels = interpretCapabilityNaics(message).items.map((it) => it.label);
+        // What the customer has said in this conversation (for the stated-filters guard).
+        const conversationText = [...history.filter((h) => h.role === 'user').map((h) => String(h.content || '')), message].join('\n');
         const toolRoundMessages: Array<{ role: string; content: string }> = [
-          { role: 'system', content: systemPrompt },
+          { role: 'system', content: capabilityNote ? `${systemPrompt}\n\n${capabilityNote}` : systemPrompt },
         ];
         for (const h of history) {
           if (h.role === 'user' || h.role === 'assistant') {
@@ -440,6 +467,7 @@ export async function POST(request: NextRequest) {
           answer: { provider: string; model: string; finish_reason: string | null; fallback: boolean } | null;
           notices: string[];
         } = { planner: null, planner_attempts: [], tools_offered: 0, tool_executions: [], answer: null, notices: [] };
+        if (capabilityNote) turnTrace.notices.push('capability_interpreted');
         const notify = (code: string, text: string) => {
           turnTrace.notices.push(code);
           send({ type: 'notice', code, message: text });
@@ -447,6 +475,9 @@ export async function POST(request: NextRequest) {
         let plannerUnavailable = false;
         // Index of an assistant tool_calls turn whose results have not all been appended yet.
         let pendingToolTurnIdx: number | null = null;
+        const renderedRecords: RenderedRecords[] = [];
+        // Option B: true while every tool result this turn was shown as a verified list.
+        let allResultsRendered = true;
         try {
           const tier0Runtime = makeTier0Tools(getSupabase(), auth.email!);
           const executor = createChatToolExecutor({
@@ -558,16 +589,72 @@ export async function POST(request: NextRequest) {
             if (u) toolUsageForCost = { prompt_tokens: u.prompt_tokens, completion_tokens: u.completion_tokens };
             if (Array.isArray(rawCalls) && rawCalls.length > 0) {
               // Every call gets a stable id so each result pairs with its call.
-              const toolCalls = rawCalls.map((tc, i) => ({ ...tc, id: tc.id || `call_${i}`, type: 'function' as const }));
+              const displayOffsets = new Map<string, number>();
+              const scopeNotesByCall = new Map<string, { applied: string[]; unapplied: string[] }>();
+              const toolCalls = rawCalls.map((tc, i) => {
+                const id = tc.id || `call_${i}`;
+                const prepared = prepareChatToolArgs(String(tc.function?.name || ''), String(tc.function?.arguments ?? ''));
+                if (prepared.displayOffset) displayOffsets.set(id, prepared.displayOffset);
+                // Phase A: constraints the customer stated are enforced on the model's arguments.
+                const enforced = enforceIntent(String(tc.function?.name || ''), prepared.args, intent);
+                for (const n of enforced.applied) turnTrace.notices.push(`intent_applied:${tc.function?.name}:${n}`);
+                for (const n of enforced.unapplied) turnTrace.notices.push(`intent_unapplied:${tc.function?.name}:${n}`);
+                // Customer-facing notes are kept per call and shown only for calls that run (a skipped
+                // duplicate's notes would describe a search the customer never sees).
+                scopeNotesByCall.set(id, enforced);
+                // Stated filters only: drop a state the conversation never implied (deterministic).
+                const guarded = guardUnstatedStates(enforced.args, conversationText);
+                for (const r of guarded.removed) turnTrace.notices.push(`unstated_filter_removed:${tc.function?.name}:${r}`);
+                return { ...tc, id, type: 'function' as const, function: { ...tc.function, arguments: guarded.args } };
+              });
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               pendingToolTurnIdx = (messages as any[]).push({ role: 'assistant', content: choice.content ?? null, tool_calls: toolCalls }) - 1;
-              const results = await executor.executeRound(toolCalls, { provider: first.provider, model: first.model });
-              for (const r of results) {
+              const withPage = (raw: string, page: number) => { try { return JSON.stringify({ ...JSON.parse(raw || '{}'), __page: page }); } catch { return `${raw}|${page}`; } };
+              // The same search planned twice (identical after enforcement, or a code subset of another
+              // call) runs and renders once; the duplicate gets a pointer so every call has a result.
+              const dedupe = dedupeToolCalls(toolCalls.map((tc) => ({ id: tc.id, name: String(tc.function?.name || ''), args: withPage(String(tc.function.arguments ?? ''), displayOffsets.get(tc.id) ?? 0) })));
+              const keepIds = new Set(dedupe.keep.map((k) => k.id));
+              for (const d of dedupe.duplicates) turnTrace.notices.push(`duplicate_call_skipped:${d.id}:same_as:${d.of}`);
+              for (const id of keepIds) {
+                const notes = scopeNotesByCall.get(id);
+                for (const n of notes?.applied ?? []) scopeApplied.add(n);
+                for (const n of notes?.unapplied ?? []) scopeUnapplied.add(n);
+              }
+              const results = await executor.executeRound(toolCalls.filter((tc) => keepIds.has(tc.id)), { provider: first.provider, model: first.model });
+              for (const tc of toolCalls) {
+                const r = results.find((x) => x.tool_call_id === tc.id);
+                const dup = dedupe.duplicates.find((d) => d.id === tc.id);
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (messages as any[]).push({ role: 'tool', tool_call_id: r.tool_call_id, content: r.content });
+                if (r) (messages as any[]).push({ role: 'tool', tool_call_id: r.tool_call_id, content: r.content });
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                else if (dup) (messages as any[]).push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify({ duplicate_of: dup.of, note: 'Same search as another call in this turn; its results are shown once.' }) });
               }
               pendingToolTurnIdx = null;
               turnTrace.tool_executions = results.map((r) => r.record);
+              // PR E: verified record lists are rendered from the tool data, not reproduced by the model.
+              for (const r of results) {
+                const renderers: Record<string, (p: Record<string, unknown>) => RenderedRecords | null> = {
+                  [EXPIRING_TOOL]: (p) => renderExpiringRecords(p, { offset: displayOffsets.get(r.tool_call_id) ?? 0, relevancePhrases: capabilityPhrases, requestedLabels: capabilityLabels }),
+                  [PAST_CONTRACTS_TOOL]: renderStatusChecks,
+                  [BUYING_OFFICES_TOOL]: renderBuyingOffices,
+                  [PRICING_TOOL]: renderPricing,
+                  [KEYWORDS_TOOL]: renderKeywords,
+                  [VEHICLE_MIX_TOOL]: renderVehicleMix,
+                  [SBLO_TOOL]: renderSbloContact,
+                };
+                const renderer = renderers[r.record.tool];
+                if (r.record.status !== 'success' || !renderer) { allResultsRendered = false; continue; }
+                try {
+                  const parsed = JSON.parse(r.content);
+                  const rendered = renderer(parsed);
+                  if (rendered) renderedRecords.push(rendered);
+                  else allResultsRendered = false;
+                } catch (renderErr) {
+                  allResultsRendered = false;
+                  console.error('[chat] record render failed:', renderErr);
+                }
+              }
+              crossCheckOffices(renderedRecords);
               if (TRACE_EVENTS) {
                 send({
                   type: 'trace',
@@ -610,6 +697,19 @@ export async function POST(request: NextRequest) {
           void recordLlmUsage({ userEmail: auth.email, tool: 'chat_tool_round', provider: toolProvider, model: toolModel, usage: toolUsageForCost || undefined });
         }
         // ── end Tier-0 tool round ──
+        if (renderedRecords.length) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (messages as any[]).push({
+            role: 'system',
+            content:
+              'VERIFIED RECORD LIST: the records below were rendered from the tool data and have ALREADY been shown to the user verbatim, directly above your reply. '
+              + 'Do NOT list, repeat or renumber the records, and do not restate identifiers, dates or amounts that are not in this list. '
+              + 'WHAT EACH LIST IS: a buying-offices list is federal government offices that buy this work (prospective customers, never partners or competitors); an expiring or past-award list is contracts with the incumbent companies holding them; a keyword list is search terms; a rate list is GSA schedule ceiling rates; a vehicle list is spending by contract vehicle; a contact list is the people the record names, with its own label of whether they are a designated small business liaison. '
+              + 'Write 1 to 3 short sentences of NEXT-STEP guidance only: what the customer should look at or do next with these records (for example review the CHECK lines, open a solicitation, check SAM.gov for awards newer than the data, ask for the next page). '
+              + 'Do not state any number, date, dollar amount, name, ranking, superlative, trend or characterization, and do not restate or summarize the records: the list carries every fact and warning, and sentences that add facts are removed before display.\n\n'
+              + renderedRecords.map((r) => r.text).join('\n\n'),
+          });
+        }
 
         // Mindy Chat is the FLAGSHIP user-facing experience — every answer is read,
         // so grounded-Q&A quality is worth the model spend here (Eric, Jul 2: "the
@@ -675,6 +775,17 @@ export async function POST(request: NextRequest) {
         }
 
         let assistantContent = '';
+        if (renderedRecords.length) {
+          const scopeLines = [
+            scopeApplied.size ? `From your request: ${[...scopeApplied].join('; ')}.` : '',
+            scopeUnapplied.size ? `Could not apply: ${[...scopeUnapplied].join('; ')}. The results below do not reflect ${scopeUnapplied.size === 1 ? 'it' : 'them'}.` : '',
+          ].filter(Boolean).join('\n');
+          const recordBlock = `${scopeLines ? `${scopeLines}\n\n` : ''}${renderedRecords.map((r) => r.text).join('\n\n')}\n\n`;
+          assistantContent = recordBlock;
+          send({ type: 'token', content: recordBlock });
+          turnTrace.notices.push('records_rendered');
+        }
+        const modelTextStart = assistantContent.length;
         let tokensUsed: number | null = null;
         // Full usage object (prompt/completion split) for cost attribution.
         let usageForCost: { prompt_tokens?: number; completion_tokens?: number } | null = null;
@@ -704,7 +815,8 @@ export async function POST(request: NextRequest) {
               if (typeof fr === 'string' && fr) finishReason = fr;
               if (typeof delta === 'string' && delta.length > 0) {
                 assistantContent += delta;
-                send({ type: 'token', content: delta });
+                // With a verified list on screen, the analysis is checked before it is shown (see below).
+                if (!renderedRecords.length) send({ type: 'token', content: delta });
               }
               if (parsed?.usage?.total_tokens) {
                 tokensUsed = parsed.usage.total_tokens;
@@ -737,6 +849,37 @@ export async function POST(request: NextRequest) {
         // the retrieved chunks weren't its sources, so chips would mislead.
         // No RAG corpus anymore → no teaching/podcast citation chips. Ask Mindy answers from the
         // Data Core tools; those surface their own structured results, not knowledge-base chips.
+        if (renderedRecords.length) {
+          // Deterministic analysis check: drop unsupported magnitude words and approximated amounts.
+          const anyShown = renderedRecords.some((r) => r.shown > 0);
+          const anyCheck = renderedRecords.some((r) => r.text.includes('CHECK:'));
+          // Option B (rel2 R9): when every result is a verified list, the closing is built from those lists
+          // only; the model's closing is not shown (it could refer to things the answer does not show).
+          const deterministic = allResultsRendered ? deterministicNextSteps(renderedRecords) : '';
+          const linted = deterministic ? { text: deterministic, dropped: [] as string[] } : lintAnalysis(
+            assistantContent.slice(modelTextStart),
+            anyCheck
+              ? 'Review the records marked CHECK above before pursuing them.'
+              : anyShown
+                ? 'The figures above come directly from the source data for this question.'
+                : 'Nothing verified was found for this search; check SAM.gov award notices or the agency\'s announcements for newer information.',
+          );
+          if (linted.dropped.length) {
+            turnTrace.notices.push(`analysis_sentences_dropped:${linted.dropped.length}`);
+            console.warn('[chat] analysis sentences dropped:', linted.dropped);
+          }
+          assistantContent = assistantContent.slice(0, modelTextStart) + linted.text;
+          send({ type: 'token', content: linted.text });
+          const problems = checkSummaryAgainstRecords(assistantContent.slice(modelTextStart), renderedRecords);
+          if (problems.length) {
+            const totals = renderedRecords.map((r) => r.total).join(' and ');
+            const correction = `\n\nCount check: the verified record count for this search is ${totals}; the list above is authoritative.`;
+            assistantContent += correction;
+            send({ type: 'token', content: correction });
+            turnTrace.notices.push('summary_count_corrected');
+            console.warn('[chat] summary contradicted verified records:', problems);
+          }
+        }
         turnTrace.answer = { provider: usedProvider, model: usedModel, finish_reason: finishReason, fallback: answerFallback };
         if (finishReason === 'length') {
           turnTrace.notices.push('truncated');
