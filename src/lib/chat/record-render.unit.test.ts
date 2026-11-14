@@ -4,7 +4,7 @@
  * summaries that contradict the verified counts.
  */
 import { describe, it, expect } from 'vitest';
-import { renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, describedStateConflict, collectExpiringRecords, checkSummaryAgainstRecords, prepareChatToolArgs, CHAT_FETCH_LIMIT } from './record-render';
+import { renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, describedStateConflict, lintAnalysis, collectExpiringRecords, checkSummaryAgainstRecords, prepareChatToolArgs, CHAT_FETCH_LIMIT } from './record-render';
 
 const rec = (piid: string, end: string, extra: Record<string, unknown> = {}) => ({
   contract_id: `CONT_${piid}`, piid, incumbent_name: 'ALLPRO STAFFNET LLC', awarding_agency: 'Department of Veterans Affairs',
@@ -220,9 +220,10 @@ describe('pricing and keywords', () => {
 
 describe('freshness: empty recent-window search', () => {
   it('states the lag note verbatim and says it is not a verified zero', () => {
-    const r = renderStatusChecks({ awards: [], _meta: { result_state: 'partial', as_of: '2026-11-13', lag_note: 'Contract actions by this agency are published with a ~90-day delay, so the data is only reliably current through about 2026-08-15.' } })!;
+    const r = renderStatusChecks({ awards: [], _meta: { result_state: 'partial', as_of: '2026-11-13', lag_note: 'Contract actions by this agency are published with a ~90-day delay, so the data is only reliably current through about 2026-08-15. Treat an empty or thin result as "not yet published", NOT as "no award was made".' } })!;
     expect(r.text).toMatch(/NOT a verified zero/);
-    expect(r.text).toMatch(/only reliably current through about 2026-08-15/);
+    expect(r.text).toMatch(/reliably current only through about 2026-08-15 \(last loaded 2026-11-13\)/);
+    expect(r.text).not.toMatch(/no award was made|Treat an empty/);
   });
   it('an empty search with no lag note renders nothing (the model reports the verified zero)', () => {
     expect(renderStatusChecks({ awards: [], _meta: {} })).toBeNull();
@@ -254,7 +255,7 @@ describe('independent-review fixes', () => {
     expect(r.text).toMatch(/Showing 1 of 14 \(largest first\); this is not the full list\./);
     expect(r.text).toMatch(/Date filter: .*started earlier can appear/);
     expect(r.text).toMatch(/W912EQ17P0020 · Grand Slam · chefs · 2017-03-03 to 2017-04-21/);
-    expect(r.text).toMatch(/Data status: partial\. data current through about 2026-08-15/);
+    expect(r.text).toMatch(/Data status: may be incomplete\./);
   });
   it('vehicle mix: every bucket with dollars and share, plus rollups and classification quality', () => {
     const r = renderVehicleMix({
@@ -266,5 +267,19 @@ describe('independent-review fixes', () => {
     expect(r.text).toMatch(/\$2,712,483,325 obligated across 12941 awards\. Every bucket is listed/);
     expect(r.text).toMatch(/2\. Standalone contracts: \$503,000,000 \(18\.6%\)/);
     expect(r.text).toMatch(/Rollups: all schedules \$921,000,000 \(33\.98%\)/);
+  });
+});
+
+describe('lintAnalysis', () => {
+  it('drops magnitude words without a number and approximated dollars; keeps checkable sentences', () => {
+    const r = lintAnalysis('The USACE Memphis District awarded 12 contracts since 2019. GT Services LLC appears frequently as a recipient. The most recent award, to The J Group, is valued at approximately $1.3 million. GT Services holds 4 of the 12 awards.');
+    expect(r.text).toBe('The USACE Memphis District awarded 12 contracts since 2019. GT Services holds 4 of the 12 awards.');
+    expect(r.dropped).toHaveLength(2);
+  });
+  it('keeps a magnitude word when the sentence carries its number', () => {
+    expect(lintAnalysis('Navy offices hold the largest share at 89.6%.').dropped).toEqual([]);
+  });
+  it('never returns empty text', () => {
+    expect(lintAnalysis('Spending is substantial.').text).toBe('The verified list above is the result for this question.');
   });
 });

@@ -44,7 +44,7 @@ import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/cha
 import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, type PlannerTarget } from '@/lib/chat/planner-config';
 import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
 import { guardUnstatedStates } from '@/lib/chat/stated-filters';
-import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
+import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, lintAnalysis, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
 
@@ -781,7 +781,8 @@ export async function POST(request: NextRequest) {
               if (typeof fr === 'string' && fr) finishReason = fr;
               if (typeof delta === 'string' && delta.length > 0) {
                 assistantContent += delta;
-                send({ type: 'token', content: delta });
+                // With a verified list on screen, the analysis is checked before it is shown (see below).
+                if (!renderedRecords.length) send({ type: 'token', content: delta });
               }
               if (parsed?.usage?.total_tokens) {
                 tokensUsed = parsed.usage.total_tokens;
@@ -815,6 +816,14 @@ export async function POST(request: NextRequest) {
         // No RAG corpus anymore → no teaching/podcast citation chips. Ask Mindy answers from the
         // Data Core tools; those surface their own structured results, not knowledge-base chips.
         if (renderedRecords.length) {
+          // Deterministic analysis check: drop unsupported magnitude words and approximated amounts.
+          const linted = lintAnalysis(assistantContent.slice(modelTextStart));
+          if (linted.dropped.length) {
+            turnTrace.notices.push(`analysis_sentences_dropped:${linted.dropped.length}`);
+            console.warn('[chat] analysis sentences dropped:', linted.dropped);
+          }
+          assistantContent = assistantContent.slice(0, modelTextStart) + linted.text;
+          send({ type: 'token', content: linted.text });
           const problems = checkSummaryAgainstRecords(assistantContent.slice(modelTextStart), renderedRecords);
           if (problems.length) {
             const totals = renderedRecords.map((r) => r.total).join(' and ');

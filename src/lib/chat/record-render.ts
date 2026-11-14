@@ -309,7 +309,7 @@ export function renderStatusChecks(result: Rec): RenderedRecords | null {
   // freshness note verbatim (a model paraphrase can lose the date it is current through).
   const awardsList = Array.isArray(result?.awards) ? (result.awards as Rec[]) : [];
   if (!checks && !awardsList.length && meta.lag_note) {
-    const text = `No awards were found for this search in the requested window, and that is NOT a verified zero. Data freshness: ${str(meta.lag_note)}${meta.as_of ? ` (USASpending last loaded ${str(meta.as_of)})` : ''}`;
+    const text = `No awards were found for this search in the requested window, and that is NOT a verified zero. ${freshnessSentence(meta)}`;
     return { tool: PAST_CONTRACTS_TOOL, text, total: 0, retrieved: 0, from: 0, to: 0, shown: 0, exhaustive: false, ids: [], allowedCounts: [0], standalone: 0, orders: 0 };
   }
   if (!checks) return renderAwardList(result);
@@ -343,7 +343,7 @@ export function renderStatusChecks(result: Rec): RenderedRecords | null {
     lines.push('');
     lines.push(`${total - checks.length} more matching award${total - checks.length === 1 ? ' was' : 's were'} not status-checked; this is not the full list.`);
   }
-  if (meta.lag_note) lines.push(str(meta.lag_note));
+  if (meta.lag_note) lines.push(freshnessSentence(meta));
   const ids = checks.map((c) => str(c.award_id));
   return {
     tool: PAST_CONTRACTS_TOOL, text: lines.join('\n'), total, retrieved: awards.length, from: checks.length ? 1 : 0, to: checks.length,
@@ -446,6 +446,20 @@ export function renderKeywords(result: Rec): RenderedRecords | null {
   return { tool: KEYWORDS_TOOL, text: lines.join('\n'), total, retrieved: total, from: total ? 1 : 0, to: total, shown: total, exhaustive: true, ids: [], allowedCounts: [total, kws.length, extraOcc.length], standalone: total, orders: 0 };
 }
 
+
+/**
+ * Customer-facing freshness sentence. The tool's lag_note is written for the model ("Treat an empty
+ * result as ... NOT as 'no award was made'") and must not be shown verbatim; only its facts are.
+ */
+export function freshnessSentence(meta: Rec): string {
+  const note = str(meta.lag_note);
+  const through = note.match(/current through (?:about )?(\d{4}-\d{2}-\d{2})/i)?.[1];
+  const delay = note.match(/~?(\d+)-day delay/i)?.[1];
+  const loaded = str(meta.as_of) || note.match(/last loaded (\d{4}-\d{2}-\d{2})/i)?.[1] || '';
+  if (!through) return note ? 'Recent awards may not be published yet, so this list may be incomplete.' : '';
+  return `This agency's contract actions reach USASpending with about a ${delay || '90'}-day delay, so this data is reliably current only through about ${through}${loaded ? ` (last loaded ${loaded})` : ''}; awards made after that may not appear yet.`;
+}
+
 export const VEHICLE_MIX_TOOL = 'get_vehicle_spend_mix';
 
 /** search_past_contracts WITHOUT status checks: every returned award with dates and amount, count vs total, filters, date-filter meaning, lag. */
@@ -476,7 +490,7 @@ export function renderAwardList(result: Rec): RenderedRecords | null {
   });
   const ig = ignoredLine(meta);
   if (ig) { lines.push(''); lines.push(ig); }
-  if (meta.lag_note || str(meta.result_state) === 'partial') { lines.push(''); lines.push(`Data status: ${str(meta.result_state) || 'partial'}.${meta.lag_note ? ` ${str(meta.lag_note)}` : ''}`); }
+  if (meta.lag_note || str(meta.result_state) === 'partial') { lines.push(''); lines.push(`Data status: ${str(meta.result_state) === 'partial' ? 'may be incomplete' : str(meta.result_state) || 'may be incomplete'}.${meta.lag_note ? ` ${freshnessSentence(meta)}` : ''}`); }
   return { tool: PAST_CONTRACTS_TOOL, text: lines.join('\n'), total, retrieved: awards.length, from: 1, to: awards.length, shown: awards.length, exhaustive: awards.length === total, ids: awards.map((a) => str(a.awardId)), allowedCounts: Array.from(new Set([total, awards.length])), standalone: awards.length, orders: 0 };
 }
 
@@ -499,4 +513,29 @@ export function renderVehicleMix(result: Rec): RenderedRecords | null {
   lines.push(`Classification: ${str(cls.verified_share_of_parented_pct)}% of vehicle-linked dollars verified from USASpending vehicle records; ${str(cls.heuristic_share_of_total_pct)}% typed from contract-number patterns; ${str(cls.unresolved_share_of_total_pct)}% unresolved.`);
   const n = buckets.length;
   return { tool: VEHICLE_MIX_TOOL, text: lines.join('\n'), total: n, retrieved: n, from: 1, to: n, shown: n, exhaustive: true, ids: [], allowedCounts: [n, num(result.total_award_count) ?? 0], standalone: 0, orders: 0 };
+}
+
+const MAGNITUDE_RE = /\b(substantial(ly)?|significant(ly)?|major|minor|slight(ly)?|frequent(ly)?|prevalent|dominant|dominat\w*|primarily|predominantly|mostly|most of|the bulk|largest share|key player|heavily|considerabl[ey]|notabl[ey] large|large(ly)?|small(er)? share|a lot of|many of|numerous|common(ly)?|typical(ly)?|often|rarely|popular)\b/i;
+const APPROX_MONEY_RE = /\b(approximately|approx\.?|about|around|roughly|nearly|almost|over|under|more than|less than|some)\s+\$/i;
+
+/**
+ * Deterministic check of the model's analysis when a verified list was rendered. Drops sentences that
+ * use a magnitude/frequency word with no number in the same sentence, or approximate a dollar figure
+ * (the list shows the exact one). Returns the kept text and what was dropped (for the trace).
+ */
+export function lintAnalysis(text: string): { text: string; dropped: string[] } {
+  const src = String(text || '').trim();
+  if (!src) return { text: '', dropped: [] };
+  const sentences = src.split(/(?<=[.!?])\s+|\n+/);
+  const kept: string[] = [];
+  const dropped: string[] = [];
+  for (const raw of sentences) {
+    const s = raw.trim();
+    if (!s) continue;
+    const hasNumber = /\d/.test(s);
+    if ((MAGNITUDE_RE.test(s) && !hasNumber) || APPROX_MONEY_RE.test(s)) { dropped.push(s); continue; }
+    kept.push(s);
+  }
+  const out = kept.join(' ').replace(/\s+\n/g, '\n').trim();
+  return { text: out || 'The verified list above is the result for this question.', dropped };
 }
