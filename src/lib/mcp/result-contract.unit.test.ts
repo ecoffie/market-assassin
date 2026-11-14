@@ -90,3 +90,19 @@ describe('annotateResultContract', () => {
     expect(r._meta).toEqual({ result_state: 'not_reported', ignored_args: [] });
   });
 });
+
+describe('agrees with the billing/outcome classifier (review fixes)', () => {
+  it('Tier-1/Tier-2 tools with only a numeric count get a real state, not not_reported', () => {
+    expect((annotateResultContract({ count: 0, rows: [] } as Record<string, unknown>, {}, params)._meta as { result_state: string }).result_state).toBe('none_found');
+    expect((annotateResultContract({ count: 4, rows: [1] } as Record<string, unknown>, {}, params)._meta as { result_state: string }).result_state).toBe('results');
+  });
+  it('billable_candidate (uncorroborated candidates, grounded=false) is partial, never a verified zero', () => {
+    const r = annotateResultContract({ _meta: { grounded: false, billing_outcome: 'billable_candidate' } }, {}, params);
+    expect(r._meta).toMatchObject({ result_state: 'partial', incomplete_reason: 'candidates returned but not corroborated' });
+  });
+  it('an enum value the tool normalized and reports as applied is not flagged', () => {
+    const p2 = { properties: { stage: { type: 'string', enum: ['MARKET_RESEARCH', 'SOLICITATION'] } } };
+    const r = annotateResultContract({ _meta: { grounded: true, applied_filters: { stage: 'MARKET_RESEARCH' } } }, { stage: 'market research' }, p2);
+    expect(r._meta).toMatchObject({ result_state: 'results', ignored_args: [] });
+  });
+});
