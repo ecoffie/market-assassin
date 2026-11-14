@@ -422,6 +422,7 @@ export function renderStatusChecks(result: Rec): RenderedRecords | null {
     lines.push('');
     lines.push(`${total - checks.length} more matching award${total - checks.length === 1 ? ' was' : 's were'} not status-checked; this is not the full list.`);
   }
+  lines.push('Status is as reported to USASpending: a recent extension, option exercise or follow-on award can take weeks to appear (Defense about 90 days).');
   if (meta.lag_note) lines.push(freshnessSentence(meta));
   const ids = checks.map((c) => str(c.award_id));
   return {
@@ -457,14 +458,16 @@ export function renderBuyingOffices(result: Rec): RenderedRecords | null {
   } else {
     const officeCount = num(totals?.office_count) ?? offices.length;
     lines.push(`${officeCount} buying office${officeCount === 1 ? '' : 's'} bought this work (${parts.join(' · ')}), ${money(totals?.obligated)} obligated across ${num(totals?.award_count) ?? '?'} awards. Source: USASpending prime awards; location is where the work was performed, not where the office sits.`);
+    lines.push('These are federal government contracting offices (the buyers of this work), not companies.');
     lines.push(offices.length < officeCount ? `Showing the top ${offices.length} of ${officeCount} by obligated dollars.` : `Showing all ${officeCount}, by obligated dollars.`);
-    lines.push('Ranked by obligations under the industry (NAICS) codes shown; a code can include other work than the words you used, so check the example awards.');
+    lines.push('Ranked by obligations under the industry (NAICS) codes shown; a code can include other work than the words you used, so check the example awards listed for each office.');
     if (meta.as_of) lines.push(`Award data loaded through ${str(meta.as_of)}; the most recent months may be incomplete because agencies report with a delay (Defense about 90 days).`);
     lines.push('');
     offices.forEach((o, i) => {
       const customers = (Array.isArray(o.top_funding_offices) ? (o.top_funding_offices as Rec[]) : []).slice(0, 3).map((f) => `${title(str(f.name))} ${money(f.obligated)}`).filter((x) => x.trim());
       const places = (Array.isArray(o.top_places) ? (o.top_places as Rec[]) : []).slice(0, 3).map((p) => [title(str(p.city)), str(p.state)].filter(Boolean).join(', ')).filter(Boolean);
-      lines.push(`${i + 1}. ${str(o.office_name) || 'office name not reported'}${o.office_code ? ` (${str(o.office_code)})` : ''} · ${[title(str(o.agency)), title(str(o.sub_agency))].filter(Boolean).join(' / ')} · ${money(o.obligated)} (${str(o.share_pct)}%) · ${num(o.award_count) ?? 0} awards${customers.length ? ` · customers: ${customers.join('; ')}` : ''}${places.length ? ` · work performed in ${places.join('; ')}` : ''}`);
+      const examples = (Array.isArray(o.example_awards) ? (o.example_awards as Rec[]) : []).slice(0, 2).map((e) => `${str(e.piid) || str(e.award_id)} ${money(e.obligated)}`).filter((x) => x.trim());
+      lines.push(`${i + 1}. ${str(o.office_name) || 'office name not reported'}${o.office_code ? ` (${str(o.office_code)})` : ''} · ${[title(str(o.agency)), title(str(o.sub_agency))].filter(Boolean).join(' / ')} · ${money(o.obligated)} (${str(o.share_pct)}%) · ${num(o.award_count) ?? 0} awards${customers.length ? ` · customers: ${customers.join('; ')}` : ''}${places.length ? ` · work performed in ${places.join('; ')}` : ''}${examples.length ? ` · example awards: ${examples.join('; ')}` : ''}`);
     });
   }
   const notes = Array.isArray(result.notes) ? (result.notes as unknown[]).map(str).filter(Boolean) : [];
