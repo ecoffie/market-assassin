@@ -466,3 +466,10 @@ describe('acc6c review fixes', () => {
     expect(r.text).not.toMatch(/that share a word with your description/);
   });
 });
+
+describe('acc7b R10: no location sentence when no location was asked', () => {
+  it('omits the widened-location sentence without a state filter', () => {
+    const r = rsc5({ awards: [], _meta: { auto_widened: true, applied_filters: { keyword: { value: 'x' } } } })!;
+    expect(r.text).not.toMatch(/widest location scope|company location/i);
+  });
+});

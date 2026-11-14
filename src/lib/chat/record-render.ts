@@ -420,12 +420,12 @@ export function renderStatusChecks(result: Rec): RenderedRecords | null {
     // acc6 R5: an empty result without a lag note was left to the model, which wrote "there are no
     // current awards". An empty search is reported with its filters and never as proof of none.
     const searched = awardFilterParts((meta.applied_filters && typeof meta.applied_filters === 'object' ? meta.applied_filters : {}) as Rec);
-    const text = `No awards matched this search${searched.length ? ` (${searched.join(' · ')})` : ''}. This is NOT proof that no such contract exists: a keyword search matches only those words in award records, and an award described differently, recorded under another agency or location, or not yet published would not appear.${meta.auto_widened ? ' The search was also retried with the widest location scope.' : ''}`;
+    const text = `No awards matched this search${searched.length ? ` (${searched.join(' · ')})` : ''}. This is NOT proof that no such contract exists: a keyword search matches only those words in award records, and an award described differently, recorded under another agency or location, or not yet published would not appear.${meta.auto_widened && (meta.applied_filters as Rec | undefined)?.state ? ' Both place of performance and company location were checked for that state.' : ''}`;
     return { tool: PAST_CONTRACTS_TOOL, text, total: 0, retrieved: 0, from: 0, to: 0, shown: 0, exhaustive: false, ids: [], allowedCounts: [0], standalone: 0, orders: 0 };
   }
   if (!checks && !awardsList.length && meta.lag_note) {
     const searched = awardFilterParts((meta.applied_filters && typeof meta.applied_filters === 'object' ? meta.applied_filters : {}) as Rec);
-    const text = `No awards were found for this search${searched.length ? ` (${searched.join(' · ')})` : ' in the requested window'}, and that is NOT a verified zero.${meta.auto_widened ? ' The search was also retried with the widest location scope and still found nothing.' : ''} ${freshnessSentence(meta)}`;
+    const text = `No awards were found for this search${searched.length ? ` (${searched.join(' · ')})` : ' in the requested window'}, and that is NOT a verified zero.${meta.auto_widened && (meta.applied_filters as Rec | undefined)?.state ? ' Both place of performance and company location were checked for that state.' : ''} ${freshnessSentence(meta)}`;
     return { tool: PAST_CONTRACTS_TOOL, text, total: 0, retrieved: 0, from: 0, to: 0, shown: 0, exhaustive: false, ids: [], allowedCounts: [0], standalone: 0, orders: 0 };
   }
   if (!checks) return renderAwardList(result);

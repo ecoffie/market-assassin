@@ -154,7 +154,7 @@ export function enforceIntent(toolName: string, rawArgs: string, intent: Compile
       const have = listOf(a.naics);
       const covered = (c: string) => have.some((h) => /^\d+$/.test(h) && (c.startsWith(h) || h.startsWith(c)));
       const missing = intent.capabilityCodes.filter((c) => !covered(c));
-      if (missing.length) { a.naics = [...have, ...missing].join(','); applied.push(`industry codes ${missing.join(', ')} for the work you named`); }
+      if (missing.length) { a.naics = [...have, ...missing].join(','); applied.push(`industry codes ${[...have, ...missing].join(', ')} for the work you named (${missing.join(', ')} added by Mindy)`); }
     }
   }
 
@@ -164,7 +164,10 @@ export function enforceIntent(toolName: string, rawArgs: string, intent: Compile
   if (toolName === 'derive_company_keywords' && intent.requestText) {
     const said = norm(intent.customerText || intent.requestText);
     const custom = (v: unknown) => { const items = listOf(v); return items.length > 0 && items.every((t) => said.includes(norm(t))); };
-    if (a.description != null && !custom(a.description)) { a.description = intent.requestText; applied.push('your own words as the company description'); }
+    // A fragment of this turn's request ("warehouse staffing") narrows the description the customer
+    // gave; use the whole request so one keyword list covers everything they named (acc7b R6).
+    const fragment = a.description != null && norm(intent.requestText).includes(norm(String(a.description))) && norm(String(a.description)) !== norm(intent.requestText);
+    if (a.description != null && (!custom(a.description) || fragment)) { a.description = intent.requestText; applied.push('your own words as the company description'); }
     for (const k of ['past_performance', 'capabilities']) {
       if (a[k] != null && !custom(a[k])) { delete a[k]; applied.push(`no ${k.replace('_', ' ')} (you did not provide any)`); }
     }
@@ -206,11 +209,16 @@ export function dedupeToolCalls<T extends { id: string; name: string; args: stri
     const places = Array.from(new Set([...listOf(a.city), ...listOf(a.cities)].map((x) => x.toUpperCase()))).sort();
     const rest: Record<string, unknown> = {};
     for (const k of Object.keys(a).sort()) {
-      if (['naics', 'city', 'cities'].includes(k)) continue;
+      // limit changes how many rows are shown, not which records match; every rendered block discloses
+      // "showing X of Y", so it does not make two searches different (acc7c R4).
+      if (['naics', 'city', 'cities', 'limit'].includes(k)) continue;
       // State lists compare as sets: "TN,MS,AR" and "MS,TN,AR" are the same search (acc6c R1).
       rest[k] = ['state', 'states'].includes(k) ? listOf(a[k]).map((x) => normalizeStateCode(x) ?? x.toUpperCase()).sort().join(',') : a[k];
     }
     if (places.length) rest.__places = places;
+    // get_buying_offices: an omitted metro radius means the tool default (DEFAULT_METRO_RADIUS_MILES = 30
+    // in lib/bigquery/award-scope.ts), so "city X" and "cities [X], radius 30" are the same search (acc7 R4).
+    if (c.name === 'get_buying_offices' && places.length === 1 && Number(rest.metro_radius_miles ?? 30) === 30) delete rest.metro_radius_miles;
     return { naics, rest: JSON.stringify(rest) };
   };
   const normed = calls.map((c) => ({ c, n: norm(c) }));
