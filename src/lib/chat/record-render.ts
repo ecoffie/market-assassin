@@ -648,6 +648,7 @@ export function renderVehicleMix(result: Rec): RenderedRecords | null {
 }
 
 const MAGNITUDE_RE = /\b(substantial(ly)?|significant(ly)?|major|minor|slight(ly)?|frequent(ly)?|prevalent|dominant|dominat\w*|primarily|predominantly|mostly|most of|the bulk|largest share|key player|heavily|considerabl[ey]|notabl[ey] large|large(ly)?|small(er)? share|a lot of|many of|numerous|common(ly)?|typical(ly)?|often|rarely|popular|majority|minority|half|bulk)\b/i;
+const IMPERATIVE_RE = /^(review|check|open|ask|contact|compare|look|visit|search|verify|confirm|request|read|use|reach|track|save|monitor)\b/i;
 const SUPERLATIVE_RE = /\b(most|least|latest|newest|oldest|earliest|recent|largest|biggest|smallest|highest|lowest|top|leading|prominent|notabl[ey]|key|main|primary|first|only|all of|every)\b/i;
 const APPROX_MONEY_RE = /\b(approximately|approx\.?|about|around|roughly|nearly|almost|over|under|more than|less than|some)\s+\$/i;
 
@@ -663,8 +664,12 @@ export function lintAnalysis(text: string, fallback = 'Review each record and it
   const kept: string[] = [];
   const dropped: string[] = [];
   for (const raw of sentences) {
-    const s = raw.trim();
+    const s = raw.trim().replace(/^(?:next|then|also),?\s+/i, (m) => m);
     if (!s) continue;
+    // Next-step guidance is imperative. A declarative sentence ("You have...", "These offices...",
+    // "If you're interested...") summarizes or characterizes the records, which is the list's job.
+    const core = s.replace(/^(?:next|then|also),?\s+/i, '');
+    if (!IMPERATIVE_RE.test(core)) { dropped.push(s); continue; }
     const hasNumber = /\d/.test(s);
     if (hasNumber || /\$/.test(s) || MAGNITUDE_RE.test(s) || SUPERLATIVE_RE.test(s) || APPROX_MONEY_RE.test(s)) { dropped.push(s); continue; }
     kept.push(s);
