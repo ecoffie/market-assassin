@@ -810,7 +810,13 @@ export async function POST(request: NextRequest) {
         // Data Core tools; those surface their own structured results, not knowledge-base chips.
         if (renderedRecords.length) {
           // Deterministic analysis check: drop unsupported magnitude words and approximated amounts.
-          const linted = lintAnalysis(assistantContent.slice(modelTextStart));
+          const anyShown = renderedRecords.some((r) => r.shown > 0);
+          const linted = lintAnalysis(
+            assistantContent.slice(modelTextStart),
+            anyShown
+              ? 'Review each record and its CHECK lines above before pursuing it.'
+              : 'Nothing verified was found for this search; check SAM.gov award notices or the agency\'s announcements for newer information.',
+          );
           if (linted.dropped.length) {
             turnTrace.notices.push(`analysis_sentences_dropped:${linted.dropped.length}`);
             console.warn('[chat] analysis sentences dropped:', linted.dropped);
