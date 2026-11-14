@@ -10,6 +10,15 @@ import type { DiscoveryPlan } from '@/lib/discovery';
 
 export type EvidenceGroup = 'direct' | 'related' | 'other';
 
+/**
+ * Release control for every C2 output (same contract as SAVED_SEARCH_OPEN_CANONICAL): only the literal 'true' turns it
+ * on. OFF = find_opportunities output byte-identical to before C2. Lives here (not evidence-groups.ts) so
+ * find-opportunities.ts can read it without a circular import.
+ */
+export function evidenceGroupsEnabled(env: string | undefined = process.env.OPEN_EVIDENCE_GROUPS): boolean {
+  return env === 'true';
+}
+
 /** The only mapping. A related-market notice is never "direct"; anything not DIRECT or RELATED is "other". */
 export function evidenceGroupOf(cls: OpenRelevanceClass): EvidenceGroup {
   if (cls === 'DIRECT_MATCH') return 'direct';

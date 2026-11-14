@@ -66,7 +66,8 @@ wiring them into the Map UI is a separate, reviewable change.
 ## 3. Release controls
 
 `OPEN_EVIDENCE_GROUPS` env flag, same contract as the other canonical flags (only the literal `'true'` turns it on).
-OFF = API responses byte-identical to today (tested). No migration, no data write, no alert change.
+OFF = API responses byte-identical to today (tested, including `find_opportunities`: slice 2's two fields are absent
+while the flag is off; `find-evidence-totals.unit.test.ts`). No migration, no data write, no alert change.
 
 ## 4. Implementation slices
 

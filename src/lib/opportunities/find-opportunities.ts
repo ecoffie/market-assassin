@@ -9,7 +9,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { recompeteRowAnnotations } from '@/lib/recompete/annotate';
 import { parseAwardLineage, NOT_ORDER_UNDER_VEHICLE_OR } from '@/lib/recompete/award-lineage';
 import { dedupeRecompeteRows, type DedupeableRecompeteRow } from '@/lib/recompete/dedupe-orders';
-import { evidenceMarket, openEvidenceSummary, type EvidenceCountsScope, type EvidenceTotals } from './evidence-group-map';
+import { evidenceMarket, evidenceGroupsEnabled, openEvidenceSummary, type EvidenceCountsScope, type EvidenceTotals } from './evidence-group-map';
 import {
   interpretMarket,
   evidenceWhy,
@@ -938,8 +938,8 @@ async function queryOpenNow(
         'Canonical discovery eligibility (word-bounded). Ranked DIRECT_MATCH → RELATED_MARKET_CANDIDATE → other, then by how many of the query’s concepts a notice carries, then deadline. Geography: place of performance OR buying-office state.'
         + (p.company ? ' Company-anchored: rows recalled only by the company’s registered PSC/NAICS rank after related-market rows and are never DIRECT_MATCH. eligibility is a separate screen.' : ''),
       evidence_counts,
-      evidence_counts_scope: evidence.scope,
-      evidence_totals: evidence.totals,
+      // Release control: OPEN_EVIDENCE_GROUPS (literal 'true'). Off = output byte-identical to before C2.
+      ...(evidenceGroupsEnabled() ? { evidence_counts_scope: evidence.scope, evidence_totals: evidence.totals } : {}),
       ...(p.company ? { eligibility_counts: eligibilityCounts(items, p.company) } : {}),
       ...(stageInfo ? { stage: { ...stageInfo, returned_by_signal: stageSignalCounts(items) } } : {}),
     };

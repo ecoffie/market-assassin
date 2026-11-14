@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { findOpportunities } from './find-opportunities';
 import { openEvidenceSummary, evidenceMarket, evidenceCapability } from './evidence-group-map';
 import { buildDiscoveryPlan } from '@/lib/discovery/plan';
@@ -83,7 +83,23 @@ const OPEN = [
   notice({ title: 'Aircraft test stand', naics_code: '334515', description: 'janitorial services incidental' }),
 ];
 
-describe('find_opportunities open_now carries the scope and the totals', () => {
+describe('release control: OPEN_EVIDENCE_GROUPS off = output unchanged', () => {
+  const prev = process.env.OPEN_EVIDENCE_GROUPS;
+  afterEach(() => { if (prev === undefined) delete process.env.OPEN_EVIDENCE_GROUPS; else process.env.OPEN_EVIDENCE_GROUPS = prev; });
+  it.each([undefined, 'false', '1', 'TRUE'])('flag %s: no evidence_counts_scope / evidence_totals keys', async (v) => {
+    if (v === undefined) delete process.env.OPEN_EVIDENCE_GROUPS; else process.env.OPEN_EVIDENCE_GROUPS = v;
+    const res = await findOpportunities({ query: 'janitorial services' }, { client: fakeClient({ sam_opportunities: OPEN, recompete_opportunities: [], agency_forecasts: [] }) });
+    const o = res.horizons.open_now as unknown as Record<string, unknown>;
+    expect('evidence_counts_scope' in o).toBe(false);
+    expect('evidence_totals' in o).toBe(false);
+    expect(o.evidence_counts).toBeDefined(); // the existing field is untouched
+  });
+});
+
+describe('find_opportunities open_now carries the scope and the totals (flag on)', () => {
+  const prev = process.env.OPEN_EVIDENCE_GROUPS;
+  beforeEach(() => { process.env.OPEN_EVIDENCE_GROUPS = 'true'; });
+  afterEach(() => { if (prev === undefined) delete process.env.OPEN_EVIDENCE_GROUPS; else process.env.OPEN_EVIDENCE_GROUPS = prev; });
   it('small result: totals complete and sum to matched_count; evidence_counts unchanged', async () => {
     const res = await findOpportunities({ query: 'janitorial services' }, { client: fakeClient({ sam_opportunities: OPEN, recompete_opportunities: [], agency_forecasts: [] }) });
     const o = res.horizons.open_now;

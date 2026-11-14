@@ -17,12 +17,7 @@ import type { MarketInterpretation } from './market-interpretation';
 import type { DiscoveryPlan } from '@/lib/discovery';
 
 import { evidenceGroupOf, type EvidenceGroup } from './evidence-group-map';
-export { evidenceGroupOf, evidenceCapability, evidenceMarket, openEvidenceSummary, type EvidenceGroup } from './evidence-group-map';
-
-/** Same flag contract as SAVED_SEARCH_OPEN_CANONICAL / SAVED_SEARCH_FORECAST_CANONICAL. */
-export function evidenceGroupsEnabled(env: string | undefined = process.env.OPEN_EVIDENCE_GROUPS): boolean {
-  return env === 'true';
-}
+export { evidenceGroupOf, evidenceCapability, evidenceMarket, openEvidenceSummary, evidenceGroupsEnabled, type EvidenceGroup } from './evidence-group-map';
 
 /** Columns `labelOpenRow` reads for an Open row. */
 export const EVIDENCE_COLS = 'notice_id,title,description,naics_code,psc_code,department,sub_tier,solicitation_number,response_deadline';

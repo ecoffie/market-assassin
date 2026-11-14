@@ -15,7 +15,8 @@ Authoritative counts (never trust a grep — tools register via two paths: expli
 
 ## November 2026 — find_opportunities: honest evidence scope + full-result groups (no tool or credit change)
 
-**`find_opportunities` `horizons.open_now`** gains two additive fields; `evidence_counts` is unchanged.
+**`find_opportunities` `horizons.open_now`** gains two additive fields; `evidence_counts` is unchanged. Both ship behind
+`OPEN_EVIDENCE_GROUPS` (only the literal `'true'` turns them on); while it is off the output is byte-identical to before.
 - **`evidence_counts_scope`** says what `evidence_counts` covers: `{ unit: 'rows', rows_classified, window_limit: 500,
   order: 'response_deadline', classes: ['DIRECT_MATCH','RELATED_MARKET_CANDIDATE'], covers_full_result }`. Before this,
   an agent could read `evidence_counts` (classified over the 500-row deadline-ordered window, "other" never counted) as
