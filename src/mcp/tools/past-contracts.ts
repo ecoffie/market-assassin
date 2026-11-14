@@ -8,9 +8,14 @@
  * orders) and get_contractor_award_history (a single named firm). credits: 5
  * (live USASpending search). `_meta` always ships; `_ai_hint` OFF by default.
  */
-import { searchAwardsByLocation, type AwardRow, type StateScope } from '@/lib/usaspending/awards-search';
+import { searchAwardsByLocation, normalizePiidPrefix, type AwardRow, type StateScope } from '@/lib/usaspending/awards-search';
+import { assessPublicationLag, fetchUsaSpendingLastUpdated } from '@/lib/usaspending/freshness';
+import { usaSpendingAwardingAgencyFilter } from '@/lib/usaspending/awarding-agency-filter';
+import type { IgnoredArg } from '@/lib/mcp/result-contract';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import { mcpFlags } from '@/lib/mcp/flags';
+
+import { getAwardDetail } from './award-detail';
 
 export interface PastContractsToolInput {
   state?: string;
@@ -25,6 +30,16 @@ export interface PastContractsToolInput {
   date_to?: string;
   include_idv?: boolean;
   limit?: number;
+  /** Free-text keyword / phrase (USASpending keyword search over description, award id, recipient). */
+  keyword?: string;
+  /** Contract-number prefix, e.g. an office DoDAAC like "W912EQ" or "N00189". */
+  piid_prefix?: string;
+  /**
+   * Also report status (active / expired), days to end and a likely-successor check for the top
+   * matches (up to STATUS_CHECK_MAX), in the same call. "Is X still active / who replaced it" in
+   * one step instead of a second get_award_detail call per award.
+   */
+  include_status?: boolean;
 }
 
 export interface PastContractsToolResult {
@@ -39,6 +54,15 @@ export interface PastContractsToolResult {
     date_filter: string;
     do_not: string;
   };
+  /** Present when include_status was requested: one entry per checked award (top matches). */
+  status_checks?: Array<{
+    award_id: string;
+    status: string;
+    days_until_end: number | null;
+    end_date: string | null;
+    successor: unknown;
+    error?: string;
+  }>;
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
   _meta: {
     grounded: boolean;
@@ -49,6 +73,15 @@ export interface PastContractsToolResult {
     /** True when the default 'pop' scope returned 0 and we auto-retried the widest scope (FM-05). */
     auto_widened?: boolean;
     requests_fired: number;
+    /** Every filter that shaped the query, with the value actually sent (and how text filters ran). */
+    applied_filters?: Record<string, unknown>;
+    ignored_args?: IgnoredArg[];
+    /** USASpending's own last-load date (only fetched when a date window was requested). */
+    as_of?: string | null;
+    /** Set when the requested window falls inside the DoD publication lag. */
+    lag_note?: string;
+    incomplete_reason?: string;
+    result_state?: 'partial';
     /**
      * Field honesty for USASpending gaps. naicsCode/pscCode are SOURCE only;
      * queried_* carry the filter. recipientState is HQ — popState is place of
@@ -64,16 +97,33 @@ export interface PastContractsToolResult {
   };
 }
 
+/** Awards checked for status/successor when include_status is set (each check is a detail fetch). */
+export const STATUS_CHECK_MAX = 3;
+
 export async function searchPastContracts(input: PastContractsToolInput): Promise<PastContractsToolResult> {
   const requestedScope: StateScope = input.state_scope ?? 'pop';
   // Accept "Florida" or "FL"; drop an unrecognized value rather than filter on junk.
   const state = input.state ? normalizeStateCode(input.state) ?? undefined : undefined;
+  const ignored: IgnoredArg[] = [];
+  if (input.state && !state) {
+    ignored.push({ arg: 'state', value: String(input.state), reason: 'invalid_value', detail: 'not a recognized US state; no state filter was applied' });
+  }
+  const keyword = typeof input.keyword === 'string' && input.keyword.trim() ? input.keyword.trim() : undefined;
+  const piidPrefix = input.piid_prefix ? normalizePiidPrefix(input.piid_prefix) ?? undefined : undefined;
+  if (input.piid_prefix && !piidPrefix) {
+    ignored.push({ arg: 'piid_prefix', value: String(input.piid_prefix), reason: 'invalid_value', detail: 'expected 2-17 letters/digits (e.g. "W912EQ"); no prefix filter was applied' });
+  }
+
+  const hasWindow = !!(input.date_from || input.date_to);
+  // Freshness is only fetched when a date window was asked for (best-effort; null on failure).
+  const asOfPromise: Promise<string | null> = hasWindow ? fetchUsaSpendingLastUpdated() : Promise.resolve(null);
 
   const runSearch = (stateScope: StateScope) => searchAwardsByLocation({
     state, stateScope,
     naics: input.naics, psc: input.psc, agency: input.agency, recipient: input.recipient,
     minValue: input.min_value, dateFrom: input.date_from, dateTo: input.date_to,
     includeIdv: input.include_idv, limit: input.limit,
+    keyword, piidPrefix,
   });
 
   let scope = requestedScope;
@@ -105,6 +155,38 @@ export async function searchPastContracts(input: PastContractsToolInput): Promis
     if (v !== undefined && v !== '') queried[k] = v as string | number | boolean;
   }
 
+  if (keyword) queried.keyword = keyword;
+  if (piidPrefix) queried.piid_prefix = piidPrefix;
+
+  // Everything that shaped the query, as sent (P1 result contract).
+  const applied: Record<string, unknown> = {};
+  if (state) applied.state = { value: state, scope };
+  if (input.naics) applied.naics = input.naics;
+  if (input.psc) applied.psc = String(input.psc).trim().toUpperCase();
+  if (input.agency) applied.agency = usaSpendingAwardingAgencyFilter(input.agency);
+  if (input.recipient) applied.recipient = input.recipient;
+  if (input.min_value !== undefined) applied.min_value = input.min_value;
+  if (hasWindow) {
+    applied.date_from = input.date_from || '2000-01-01';
+    applied.date_to = input.date_to || new Date().toISOString().slice(0, 10);
+  }
+  if (input.include_idv) applied.include_idv = true;
+  if (res.textFilters?.keyword) applied.keyword = res.textFilters.keyword;
+  if (res.textFilters?.piid_prefix) applied.piid_prefix = res.textFilters.piid_prefix;
+  if (res.textFilters?.scanned_rows !== undefined) {
+    applied.prefix_scan = { scanned_rows: res.textFilters.scanned_rows, truncated: !!res.textFilters.scan_truncated };
+  }
+
+  const asOf = await asOfPromise;
+  const lag = assessPublicationLag({ dateFrom: input.date_from, dateTo: input.date_to, agency: input.agency, asOf });
+  const incompleteReasons: string[] = [];
+  if (lag.applies && lag.note) incompleteReasons.push(lag.note);
+  if (res.textFilters?.scan_truncated) {
+    incompleteReasons.push(
+      `The piid_prefix population was larger than the ${res.textFilters.scanned_rows} rows scanned for the keyword match (largest awards first); smaller matching awards may be missing. Narrow with a date window or drop the keyword.`,
+    );
+  }
+
   const result: PastContractsToolResult = {
     queried,
     awards: res.awards,
@@ -124,6 +206,13 @@ export async function searchPastContracts(input: PastContractsToolInput): Promis
       state_scope: scope,
       ...(autoWidened ? { auto_widened: true } : {}),
       requests_fired: res.requestsFired,
+      applied_filters: applied,
+      ...(ignored.length ? { ignored_args: ignored } : {}),
+      ...(hasWindow ? { as_of: asOf } : {}),
+      ...(lag.applies && lag.note ? { lag_note: lag.note } : {}),
+      ...(incompleteReasons.length ? { incomplete_reason: incompleteReasons.join(' ') } : {}),
+      // A window inside the publication lag is never a verified zero, even with 0 rows.
+      ...(incompleteReasons.length ? { result_state: 'partial' as const } : {}),
       field_status: {
         naics: 'source_or_empty',
         psc: 'source_or_empty',
@@ -144,6 +233,8 @@ export async function searchPastContracts(input: PastContractsToolInput): Promis
         ? 'USASpending award search errored — retry; do not state there are no awards.'
         : grounded
         ? `${autoWidened ? '(auto-widened to state_scope:"both" — the default place-of-performance scope returned 0) ' : ''}${res.count} of ~${res.totalEstimate} awards ${where} ${state ?? 'the filtered scope'}. Top: ${top.recipientName} — $${Math.round(top.awardAmount).toLocaleString()} (${top.agency}).`
+        : lag.applies
+        ? `No published awards matched yet. ${lag.note}`
         : `No awards matched${autoWidened ? ' even after auto-widening to state_scope:"both"' : ''}. Broaden the NAICS/PSC or widen the date range.`,
       how_to_use: grounded
         ? 'Historical prime awards (already awarded, not open bids). recipientName = who won; popState = where the work is done; use get_award_detail on generatedId for the full record, or get_contractor_award_history on a recipient to size them up.'
@@ -155,6 +246,26 @@ export async function searchPastContracts(input: PastContractsToolInput): Promis
         'date_from/date_to select which awards return, by transaction activity — an award whose period of performance already ENDED can still appear in a later window.',
       ],
     };
+  }
+  if (input.include_status && result.awards.length) {
+    result.status_checks = await Promise.all(
+      result.awards.slice(0, STATUS_CHECK_MAX).map(async (row) => {
+        try {
+          const d = await getAwardDetail({ piid: row.awardId });
+          return {
+            award_id: row.awardId,
+            status: d.status,
+            days_until_end: d.days_until_end,
+            end_date: d.status_basis?.end_date_used ?? null,
+            successor: d.successor,
+          };
+        } catch (err) {
+          return { award_id: row.awardId, status: 'unknown', days_until_end: null, end_date: null, successor: null, error: String((err as Error)?.message || err).slice(0, 120) };
+        }
+      }),
+    );
+    if (result._meta.applied_filters) (result._meta.applied_filters as Record<string, unknown>).include_status = true;
+    else result._meta.applied_filters = { include_status: true };
   }
   return result;
 }
