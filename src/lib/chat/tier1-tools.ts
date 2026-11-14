@@ -62,7 +62,7 @@ export const TIER1_TOOL_DEFS = [
           },
           naics: {
             type: 'string',
-            description: 'Optional 6-digit NAICS code to narrow the search, e.g. "541512".',
+            description: 'Optional NAICS to narrow the search: one code or a comma-separated list (OR), e.g. "541512" or "561720,561730"; fewer than 6 digits is a prefix. A value that is not a code returns an error, never an empty result.',
           },
           set_aside: {
             type: 'string',
@@ -71,7 +71,7 @@ export const TIER1_TOOL_DEFS = [
           },
           state: {
             type: 'string',
-            description: 'Optional state to filter by location — matches place of performance OR the buying office (SAM often omits place-of-performance, so office state is included for coverage). Accepts a 2-letter code ("FL") or full name ("Florida").',
+            description: 'Optional state to filter by location — matches place of performance OR the buying office (SAM often omits place-of-performance, so office state is included for coverage). Accepts a 2-letter code ("FL"), a full name ("Florida") or a comma-separated list ("VA,MD,DC", OR). An unrecognized state returns an error instead of searching every state.',
           },
           limit: {
             type: 'number',
@@ -245,7 +245,16 @@ export function makeTier1Tools(db: Tier1Db) {
   async function searchSam(args: { keyword?: unknown; naics?: unknown; set_aside?: unknown; state?: unknown; limit?: unknown; offset?: unknown }): Promise<Record<string, unknown>> {
     const keyword = typeof args?.keyword === 'string' ? args.keyword.trim() : '';
     if (!keyword) return { ok: false, error: 'keyword_required', count: 0, items: [], has_more: false, offset: 0, limit: SAM_LIMIT_DEFAULT };
-    const naics = typeof args?.naics === 'string' ? args.naics.trim() : '';
+    // NAICS: one code or a list ("561720,561730" / array). Each 2-6 digits (prefix when < 6).
+    // A token that is not a code is an error, never a silent zero (the review found a comma list
+    // exact-matched into 0 rows, and Ask Mindy read that as "none").
+    const naicsTokens = (Array.isArray(args?.naics) ? args.naics : typeof args?.naics === 'string' ? [args.naics] : [])
+      .flatMap((v) => String(v ?? '').split(/[,;\s]+/)).map((t) => t.trim()).filter(Boolean);
+    const badNaics = naicsTokens.filter((t) => !/^\d{2,6}$/.test(t));
+    if (badNaics.length) {
+      return { ok: false, error: 'invalid_naics', message: `"${badNaics.join(', ')}" is not a NAICS code (2 to 6 digits).`, count: 0, items: [] };
+    }
+    const naicsCodes = Array.from(new Set(naicsTokens));
     const setAside = typeof args?.set_aside === 'string' ? args.set_aside.trim() : '';
     const limit = resolveSamLimit(args?.limit);
     const offset = resolveSamOffset(args?.offset);
@@ -253,7 +262,15 @@ export function makeTier1Tools(db: Tier1Db) {
     // Location: match place-of-performance OR buying-office state. SAM omits
     // pop_state on ~64% of rows, so office_address.state widens coverage. A
     // state arg that doesn't resolve to a real code is ignored (still search).
-    const st = typeof args?.state === 'string' ? normalizeStateCode(args.state) : null;
+    // One state or a list ("VA, MD and DC" / array). An unrecognized state is an error: dropping
+    // it would silently search every state and present that as the asked-for location.
+    const stateTokens = (Array.isArray(args?.state) ? args.state : typeof args?.state === 'string' ? [args.state] : [])
+      .flatMap((v) => String(v ?? '').split(/\s*[,;\/&]\s*|\s+(?:or|and)\s+/i)).map((t) => t.trim()).filter(Boolean);
+    const stateCodes = Array.from(new Set(stateTokens.map((t) => normalizeStateCode(t)).filter((c): c is string => !!c)));
+    const badStates = stateTokens.filter((t) => !normalizeStateCode(t));
+    if (badStates.length) {
+      return { ok: false, error: 'unknown_state', message: `"${badStates.join(', ')}" is not a US state or territory we recognize.`, count: 0, items: [] };
+    }
 
     // Active + not-yet-closed. FTS via the GIN-indexed generated tsvector
     // (websearch = supports quoted phrases / OR).
@@ -282,9 +299,14 @@ export function makeTier1Tools(db: Tier1Db) {
     // scoping (NAICS / set-aside / state). Only the text match + ordering differ.
     const withFilters = (base: SamQuery): SamQuery => {
       let x = base.eq('active', true).gte('response_deadline', todayIso);
-      if (naics) x = x.eq('naics_code', naics);
+      if (naicsCodes.length === 1) {
+        const c = naicsCodes[0];
+        x = c.length < 6 ? x.or(`naics_code.like.${c}%`) : x.eq('naics_code', c);
+      } else if (naicsCodes.length > 1) {
+        x = x.or(naicsCodes.map((c) => (c.length < 6 ? `naics_code.like.${c}%` : `naics_code.eq.${c}`)).join(','));
+      }
       if (setAsideCodes) x = x.in('set_aside_code', setAsideCodes);
-      if (st) x = x.or(`pop_state.eq.${st},office_address->>state.eq.${st}`);
+      if (stateCodes.length) x = x.or(stateCodes.flatMap((st) => [`pop_state.eq.${st}`, `office_address->>state.eq.${st}`]).join(','));
       return x;
     };
 
@@ -370,9 +392,9 @@ export function makeTier1Tools(db: Tier1Db) {
         has_more: false,
         offset,
         limit,
-        note: `No open SAM opportunities matched "${keyword}"${naics ? ` in NAICS ${naics}` : ''}${
+        note: `No open SAM opportunities matched "${keyword}"${naicsCodes.length ? ` in NAICS ${naicsCodes.join(', ')}` : ''}${
           setAsideCodes ? ` with set-aside ${setAside} (${setAsideCodes.join('/')})` : ''
-        }${st ? ` in ${st} (place of performance or buying office)` : ''} right now.`,
+        }${stateCodes.length ? ` in ${stateCodes.join(', ')} (place of performance or buying office)` : ''} right now.`,
       };
     }
     const page = rows.slice(offset, offset + limit);
