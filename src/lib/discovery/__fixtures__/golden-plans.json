@@ -1,6 +1,6 @@
 {
   "5413": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -132,7 +132,7 @@
     "notes": []
   },
   "541320": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -264,7 +264,7 @@
     "notes": []
   },
   "pam": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -411,7 +411,7 @@
     "notes": []
   },
   "ai governance": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -572,7 +572,7 @@
     "notes": []
   },
   "artificial intelligence governance": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -733,7 +733,7 @@
     "notes": []
   },
   "cybersecurity": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -907,7 +907,7 @@
     "notes": []
   },
   "janitorial": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -1067,7 +1067,7 @@
     "notes": []
   },
   "market research": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -1225,7 +1225,7 @@
     "notes": []
   },
   "zzzxxyyqqq": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -1373,7 +1373,7 @@
     "notes": []
   },
   "veterans affairs": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -1524,7 +1524,7 @@
     "notes": []
   },
   "agency=VA janitorial": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -1716,7 +1716,7 @@
     "notes": []
   },
   "management": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -1863,7 +1863,7 @@
     "notes": []
   },
   "drones": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -2025,7 +2025,7 @@
     "notes": []
   },
   "\"ai governance\"": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -2153,7 +2153,7 @@
     "notes": []
   },
   "8a": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -2283,7 +2283,7 @@
     "notes": []
   },
   "follow-on support": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -2430,7 +2430,7 @@
     "notes": []
   },
   "Show me USDA opportunities": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -2585,7 +2585,7 @@
     ]
   },
   "SDVOSB cybersecurity opportunities in Virginia": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -2788,7 +2788,7 @@
     ]
   },
   "cyber cloud compliance network server": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -3009,7 +3009,7 @@
     ]
   },
   "cyber, cloud": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -3201,7 +3201,7 @@
     "notes": []
   },
   "Pro Audio": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -3360,7 +3360,7 @@
     "notes": []
   },
   "541512 -computers": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -3520,7 +3520,7 @@
     "notes": []
   },
   "-computers": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -3646,7 +3646,7 @@
     "notes": []
   },
   "agency=USDA": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -3791,7 +3791,7 @@
     "notes": []
   },
   "agency=VA": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -3937,7 +3937,7 @@
     "notes": []
   },
   "Naval facilities in Nevada": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -4104,7 +4104,7 @@
     "notes": []
   },
   "software license": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -4281,7 +4281,7 @@
     "notes": []
   },
   "software licenses": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -4458,7 +4458,7 @@
     "notes": []
   },
   "agency=NOAA": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -4612,7 +4612,7 @@
     "notes": []
   },
   "agency=FAA": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -4765,7 +4765,7 @@
     "notes": []
   },
   "agency=HUD janitorial": {
-    "version": 3,
+    "version": 4,
     "pipeline": [
       "structured_intent",
       "concept_classification",

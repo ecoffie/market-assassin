@@ -100,6 +100,15 @@ export const DISCOVERY_SUPPORTING: ReadonlySet<string> = new Set([
 export const DISCOVERY_QUALIFIERS: ReadonlySet<string> = new Set(['market']);
 
 /**
+ * Pronouns never name a market and never establish eligibility (Agent 3, 2026-11-14). They still COUNT toward the
+ * query's shape (a typed sentence stays the capability list it was), but they are moved to rank-only, so they can
+ * neither admit a record nor be required as a partner. Live defect this closes: "We provide security guards." made
+ * "we" (2.9% of notices) a partner word, so the trade word needed "we" in the same notice and 0 of 13 open guard
+ * notices (561612) came back, while Navy parts notices containing "we" and "Coast Guard" did.
+ */
+export const PRONOUNS: ReadonlySet<string> = new Set(['i', 'me', 'my', 'we', 'us', 'our', 'ours', 'you', 'your', 'they', 'their']);
+
+/**
  * Recognized concepts — ONE unit whose forms are interchangeable. `acronyms` match case-sensitively.
  * `cybersecurity` mirrors MCP's own CYBER_DIRECT_RE (`cyber(?:\s*security)?`): with word boundaries
  * alone, "cyber" stopped matching "cybersecurity" — 249 active notices say cybersecurity, 25 say cyber
@@ -264,7 +273,29 @@ function capabilityListTiers(distinctive: Concept[]): { common: Concept[]; admit
 }
 
 function alternativeOf(text: string): Alternative | null {
-  const concepts = conceptsOf(text);
+  const all = conceptsOf(text);
+  if (!all.length) return null;
+  const pronouns = all.filter((c) => PRONOUNS.has(c.label));
+  // Shape is decided on every concept (unchanged); pronouns are then removed from eligibility and only rank.
+  const alt = alternativeOfConcepts(all);
+  if (!alt || !pronouns.length) return alt;
+  const isPronoun = (c: Concept) => PRONOUNS.has(c.label);
+  const eligible = alt.eligible.filter((c) => !isPronoun(c));
+  if (!eligible.length) {
+    // Only a pronoun could admit: decide on the other words alone (fail-narrow if they are all broad); a query made
+    // of nothing but pronouns keeps its own words.
+    const rest = all.filter((c) => !isPronoun(c));
+    return rest.length ? alternativeOfConcepts(rest) : alt;
+  }
+  const partnerRequired = (alt.partnerRequired || []).filter((l) => !PRONOUNS.has(l));
+  const solo = eligible.filter((c) => !partnerRequired.includes(c.label));
+  // A partner word that lost its only partner (the pronoun) admits alone again, as a lone partner word always does.
+  const keepPartners = solo.length || partnerRequired.length > 1 ? partnerRequired : [];
+  const { partnerRequired: _drop, ...rest } = alt;
+  return { ...rest, eligible, rankOnly: [...alt.rankOnly, ...alt.eligible.filter(isPronoun)], ...(keepPartners.length ? { partnerRequired: keepPartners } : {}) };
+}
+
+function alternativeOfConcepts(concepts: Concept[]): Alternative | null {
   if (!concepts.length) return null;
   const distinctive = concepts.filter((c) => c.cls === 'distinctive');
   const qualifiers = concepts.filter((c) => c.cls === 'qualifier');
