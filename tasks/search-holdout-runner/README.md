@@ -90,4 +90,6 @@ Applying it to a newer snapshot is approximate.
 | tag | commit | (a) matched sets | (b) top 20 in order | (c) two runs | time |
 |---|---|---|---|---|---|
 | search-rc2-2026-11-14 | 065451a66 | 28/28 identical to `matched-sets-rc2-classification.json` (`rc2`) | 28/28 identical | byte-identical | ~10.5 s |
-| search-rc1-2026-11-14 | 8c4ba2ea1 | see the RC1 row below | | | |
+| search-rc1-2026-11-14 | 8c4ba2ea1 | 28/28 identical (`rc1`) | 28/28 identical | — | ~10.5 s |
+
+Cutoff check: the same Nov 14 file at cutoff `2026-12-12T00:00:00Z` keeps 1,020 notices (only those with deadlines after Dec 12).
