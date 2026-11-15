@@ -217,10 +217,10 @@ export async function cachedOpenRetrieval(args: {
  * builds exactly today's query; nothing in this module runs.
  */
 /**
- * HARD-DISABLED on this branch (Agent 5, 2026-11-15). This is the UNHARDENED seam: it self-disables after every SAM sync,
- * builds per instance from the DB, and runs unbounded verification (Agent 5's cache review #1-#5). The fixes live on
- * agent3/cache-hardening. Setting OPEN_SNAPSHOT_RETRIEVAL=true here does NOTHING; only cache-hardening, once merged
- * and its infrastructure approved by Eric, flips SNAPSHOT_SEAM_RELEASED to true.
+ * HARD-DISABLED (Agent 5, 2026-11-15). On agent3/cache-hardening-on-rc3 the review fixes #1-#5 ARE present (RC3 +
+ * agent3/cache-hardening), but the seam stays unreleased: Eric has not approved the infrastructure (private bucket,
+ * build-open-snapshot cron row, snapshot_changed_at trigger) or the preview measurement (#7). Setting
+ * OPEN_SNAPSHOT_RETRIEVAL=true does NOTHING. Flip SNAPSHOT_SEAM_RELEASED only after those approvals, in its own commit.
  */
 const SNAPSHOT_SEAM_RELEASED = false;
 let seamAllowedForTests = false;
