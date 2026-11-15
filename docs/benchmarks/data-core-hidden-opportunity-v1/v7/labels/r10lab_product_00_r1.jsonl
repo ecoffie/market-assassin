@@ -1,0 +1,6 @@
+{"id":"r10-0000","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5905011247152 RESISTOR,VARIABLE,WIRE; approved sources listed"}
+{"id":"r10-0001","label":"FIT","role":"PRIME","restriction":"UNCLEAR","evidence":"Actuator NSN 1680-01-329-7411 C-130 spares; qualified sources listed, qualification not required"}
+{"id":"r10-0003","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Spares procurement GEARBOX, ACCESSORY F108 NSN 2840011394075 new manufacture"}
+{"id":"r10-0004","label":"FIT","role":"SUB","restriction":"SOLE_SOURCE","evidence":"6515 MRI-compatible IV infusion pump; limited source contract with Iramed"}
+{"id":"r10-0005","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"Housing, Mechanical NSN 1650-00-133-9481 B-52; contractor must be approved source"}
+{"id":"r10-0006","label":"PARTIAL","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 1005013928600 BOLT,BREECH weapon part, neighboring family; approved source 8KP69"}

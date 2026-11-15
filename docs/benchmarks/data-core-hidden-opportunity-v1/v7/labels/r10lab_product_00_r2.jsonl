@@ -1,0 +1,6 @@
+{"id": "r10-0000", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5905011247152 RESISTOR,VARIABLE,WIRE; Approved sources are 25413, 78286, 94603"}
+{"id": "r10-0001", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "Spares: Actuator, Electro-Mech NSN 1680-01-329-7411, C-130 oil cooler door actuator"}
+{"id": "r10-0003", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Spares Procurement of GEARBOX, ACCESSORY D, F108 NSN 2840011394075, P/N 305-100-208-0"}
+{"id": "r10-0004", "label": "FIT", "role": "PRIME", "restriction": "SOLE_SOURCE", "evidence": "FSC 6515 MRI-compatible IV infusion pump; limited source contract with Iramed Corporation"}
+{"id": "r10-0005", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "Spares: Housing, Mechanical NSN 1650-00-133-9481, B-52 CSD; contractor must be approved source"}
+{"id": "r10-0006", "label": "NO", "role": "NONE", "restriction": "APPROVED_SOURCE", "evidence": "NSN 1005013928600 BOLT,BREECH is a FSC 1005 weapon part, not fastener"}

@@ -136,8 +136,18 @@ checkouts, on arm64 Node 24, against the fixture snapshot (`2026-11-15T00:52:58.
 | Cutoff | A later cutoff only removes rows (matched sets are subsets). The open count, 3,887 at Nov 25, matches an independent recount |
 | Dump | Read-only; 9,698 rows with `created_at`; the completeness check passed; the result ran offline |
 
+**Route parity, spot-checked by Agent 4 (2026-11-15).** `route-parity.mts` (`agent3/holdout-runner` @ `df02a53d1`) calls the product function
+`findOpportunities()` in-process at the tag, against a fake database client that answers from the same snapshot. Results:
+
+| Check | Result |
+|---|---|
+| RC2 on the fixture | **28/28 identical**: count, 500-row window, top-20 order, classes 28/28, no route errors |
+| RC2 on Agent 4's own Nov 15 12:00 dump (with `created_at`) | 28/28 identical |
+| Negative control (Agent 4's own tampering) | Two ranks swapped in one phrasing and one matched id dropped in another. Exactly those 2 of 28 were reported as DIFF, so the check is not vacuous |
+
 Limits:
-- This proves the runner reproduces Agent 3's FIND emulation (`eval.mts`). It does not independently prove that emulation matches the live FIND route.
+- **Remaining bound:** the in-memory filter evaluation (JS regex for Postgres `~*`) is not Postgres. That rests on the earlier 17/17 live bench. The Map route is not covered.
+- This proves the runner reproduces Agent 3's FIND emulation (`eval.mts`), and that the emulation equals `findOpportunities()` over the same rows.
 - The runner must live inside a checkout so it can import `@supabase/supabase-js`.
 - The Dec 12 snapshot is a `dump` taken on Dec 12 and stored in `~/mindy-bench-sealed/`.
 

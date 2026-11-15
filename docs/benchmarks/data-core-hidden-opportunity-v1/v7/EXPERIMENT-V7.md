@@ -102,3 +102,31 @@ RC3 changes vs RC2:
 Three options: (a) keep the raw top-20 (guards fails by construction unless search shows fewer, better results); (b) measure relevance over the results actually shown, so a search
 that returns 13 strong rows is judged on 13 (as in the v4 Fix A+B case); (c) measure over distinct solicitation families. The frozen definition is (a). Changing it
 is Eric's decision and must happen before Dec 12.
+
+## Addendum 2: long-list family guard (`agent3/long-list-family-guard` @ `38cd537ad`, off the RC3 line; NOT tagged, not a holdout candidate unless Eric approves)
+
+**Method.**
+- Top-20 lists were produced by Agent 3's validated holdout runner, run from Agent 4's own checkout on the fixture snapshot (`runner_flg_longlist_guard.json`).
+- Only 7 top-20 items lacked labels. Their text came from the same snapshot, with no database call. Two blind reviewers labelled them and agreed on 6 of 7.
+- Script: `scripts/r10.py`. Results: `results/r10_eval.json`.
+
+**The change.** One list word in a title now counts as DIRECT only inside the business's own code family. Matched sets are identical to RC3 on all 28 phrasings, so this is a ranking and classification change only.
+
+| Pooled, raw top-20 | RC2 | RC3 | Family guard |
+|---|---|---|---|
+| Short | 67–74% | 71–79% | **71–79%** (identical to RC3) |
+| Long | 62–66% | 61–66% | **67–74%** |
+| Long businesses below 40% | nursing, steel, parts, IT | nursing, guards, steel, IT | **nursing, guards, steel, IT** (unchanged) |
+
+- **Improved (long, lower bound vs RC3):**
+  - parts 11 → **17** (RC1 was 18)
+  - aircraft 14 → 18
+  - paving 12 → 14
+  - medical 13 → 15
+  - steel 4 → 6
+  - janitorial 11 → 12
+- **No business is lower on any phrasing.** Short is unchanged.
+- **What it doesn't fix:**
+  - The four long below-40% businesses remain. Nursing (5) and IT (7) are far off. Steel (6) is short of 8.
+  - Guards (7) is the duplicate and too-few-families case raised in Addendum 1.
+- Diagnostic only: AI labels, in-sample on the fixture.

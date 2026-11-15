@@ -1,0 +1,1347 @@
+{
+ "note": "AI labels, in-sample, diagnostic only. Raw top-20 = frozen measure; distinct family supplementary.",
+ "phrasings": {
+  "janitorial|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 2,
+    "hi": 3,
+    "families": 16,
+    "fam_lo": 1,
+    "fam_hi": 2
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 17,
+    "families": 16,
+    "fam_lo": 14,
+    "fam_hi": 14
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 15
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 15
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 1216,
+    "rc3": 1216,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "janitorial|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 7,
+    "families": 18,
+    "fam_lo": 6,
+    "fam_hi": 6
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 13,
+    "hi": 13,
+    "families": 11,
+    "fam_lo": 7,
+    "fam_hi": 7
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 11,
+    "hi": 13,
+    "families": 20,
+    "fam_lo": 11,
+    "fam_hi": 13
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 14,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 14
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 567,
+    "rc3": 567,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "nursing|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 8,
+    "families": 14,
+    "fam_lo": 6,
+    "fam_hi": 7
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 8,
+    "families": 14,
+    "fam_lo": 6,
+    "fam_hi": 7
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 8,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 8,
+    "fam_hi": 9
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 8,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 8,
+    "fam_hi": 9
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 47,
+    "rc3": 47,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "nursing|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 2,
+    "hi": 4,
+    "families": 15,
+    "fam_lo": 2,
+    "fam_hi": 3
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 6,
+    "families": 15,
+    "fam_lo": 5,
+    "fam_hi": 5
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 5,
+    "hi": 6,
+    "families": 20,
+    "fam_lo": 5,
+    "fam_hi": 6
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 5,
+    "hi": 6,
+    "families": 20,
+    "fam_lo": 5,
+    "fam_hi": 6
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 344,
+    "rc3": 344,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "hvac|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 17,
+    "families": 15,
+    "fam_lo": 11,
+    "fam_hi": 12
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 19,
+    "families": 15,
+    "fam_lo": 13,
+    "fam_hi": 14
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 279,
+    "rc3": 279,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "hvac|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 16,
+    "families": 18,
+    "fam_lo": 14,
+    "fam_hi": 14
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 17,
+    "families": 17,
+    "fam_lo": 13,
+    "fam_hi": 14
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 16,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 16
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 16,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 16
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 723,
+    "rc3": 723,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "guards|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 2,
+    "hi": 2,
+    "families": 18,
+    "fam_lo": 2,
+    "fam_hi": 2
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 10,
+    "hi": 12,
+    "families": 15,
+    "fam_lo": 6,
+    "fam_hi": 8
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 8,
+    "families": 20,
+    "fam_lo": 6,
+    "fam_hi": 8
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 8,
+    "families": 20,
+    "fam_lo": 6,
+    "fam_hi": 8
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 485,
+    "rc3": 485,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "guards|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 4,
+    "hi": 4,
+    "families": 16,
+    "fam_lo": 4,
+    "fam_hi": 4
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 11,
+    "hi": 13,
+    "families": 14,
+    "fam_lo": 7,
+    "fam_hi": 9
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 9
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 9
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 112,
+    "rc3": 112,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "steelbldg|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 3,
+    "hi": 4,
+    "families": 14,
+    "fam_lo": 3,
+    "fam_hi": 4
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 7,
+    "families": 18,
+    "fam_lo": 5,
+    "fam_hi": 6
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 15
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 15
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 583,
+    "rc3": 583,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "steelbldg|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 3,
+    "hi": 5,
+    "families": 17,
+    "fam_lo": 3,
+    "fam_hi": 5
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 2,
+    "hi": 3,
+    "families": 16,
+    "fam_lo": 2,
+    "fam_hi": 2
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 4,
+    "hi": 4,
+    "families": 20,
+    "fam_lo": 4,
+    "fam_hi": 4
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 7,
+    "families": 20,
+    "fam_lo": 6,
+    "fam_hi": 7
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 1562,
+    "rc3": 1562,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "grounds|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 12,
+    "families": 17,
+    "fam_lo": 10,
+    "fam_hi": 10
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 17,
+    "families": 15,
+    "fam_lo": 13,
+    "fam_hi": 13
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 17
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 17
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 85,
+    "rc3": 85,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "grounds|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 14,
+    "families": 16,
+    "fam_lo": 9,
+    "fam_hi": 11
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 20,
+    "families": 12,
+    "fam_lo": 9,
+    "fam_hi": 12
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 18
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 18
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 170,
+    "rc3": 170,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "paving|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 17,
+    "families": 15,
+    "fam_lo": 12,
+    "fam_hi": 13
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 17,
+    "families": 15,
+    "fam_lo": 12,
+    "fam_hi": 13
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 160,
+    "rc3": 160,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "paving|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 19,
+    "families": 15,
+    "fam_lo": 13,
+    "fam_hi": 14
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 17,
+    "families": 16,
+    "fam_lo": 11,
+    "fam_hi": 13
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 14,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 14
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 17
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 631,
+    "rc3": 631,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "parts|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 8,
+    "families": 13,
+    "fam_lo": 5,
+    "fam_hi": 6
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 8,
+    "families": 13,
+    "fam_lo": 5,
+    "fam_hi": 6
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 9
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 9
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 1265,
+    "rc3": 1265,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "parts|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 18,
+    "fam_hi": 18
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 6,
+    "families": 13,
+    "fam_lo": 5,
+    "fam_hi": 5
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 11,
+    "hi": 11,
+    "families": 20,
+    "fam_lo": 11,
+    "fam_hi": 11
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 17
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 1759,
+    "rc3": 1759,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "fasteners|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 8,
+    "families": 17,
+    "fam_lo": 7,
+    "fam_hi": 7
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 400,
+    "rc3": 400,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "fasteners|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 5,
+    "hi": 5,
+    "families": 17,
+    "fam_lo": 5,
+    "fam_hi": 5
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 19,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 19,
+    "fam_hi": 19
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 19,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 19,
+    "fam_hi": 19
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 19,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 19,
+    "fam_hi": 20
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 906,
+    "rc3": 906,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "electrical|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 7,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 7
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 19,
+    "hi": 19,
+    "families": 19,
+    "fam_lo": 18,
+    "fam_hi": 18
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 19,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 19,
+    "fam_hi": 19
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 19,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 19,
+    "fam_hi": 19
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 1250,
+    "rc3": 1250,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "electrical|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 9,
+    "hi": 9,
+    "families": 19,
+    "fam_lo": 8,
+    "fam_hi": 8
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 19,
+    "fam_lo": 19,
+    "fam_hi": 19
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 1163,
+    "rc3": 1163,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "valves|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 811,
+    "rc3": 811,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "valves|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 16,
+    "families": 17,
+    "fam_lo": 12,
+    "fam_hi": 13
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 18,
+    "families": 16,
+    "fam_lo": 13,
+    "fam_hi": 14
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 1543,
+    "rc3": 1543,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "aircraft|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 4,
+    "hi": 7,
+    "families": 18,
+    "fam_lo": 4,
+    "fam_hi": 7
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 18
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 18
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 18
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 880,
+    "rc3": 880,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "aircraft|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 0,
+    "hi": 1,
+    "families": 19,
+    "fam_lo": 0,
+    "fam_hi": 1
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 14,
+    "families": 19,
+    "fam_lo": 13,
+    "fam_hi": 13
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 14,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 14
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 18,
+    "fam_hi": 18
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 1426,
+    "rc3": 1426,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "medical|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 5,
+    "hi": 6,
+    "families": 13,
+    "fam_lo": 5,
+    "fam_hi": 6
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 20,
+    "families": 18,
+    "fam_lo": 13,
+    "fam_hi": 18
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 20
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 20
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 134,
+    "rc3": 134,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "medical|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 5,
+    "hi": 7,
+    "families": 19,
+    "fam_lo": 5,
+    "fam_hi": 7
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 17,
+    "families": 17,
+    "fam_lo": 13,
+    "fam_hi": 14
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 13,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 13,
+    "fam_hi": 17
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 19
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 1290,
+    "rc3": 1290,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "ithardware|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 0,
+    "hi": 0,
+    "families": 20,
+    "fam_lo": 0,
+    "fam_hi": 0
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 2,
+    "hi": 4,
+    "families": 13,
+    "fam_lo": 2,
+    "fam_hi": 3
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 13,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 13,
+    "fam_hi": 15
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 13,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 13,
+    "fam_hi": 15
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 544,
+    "rc3": 544,
+    "added": 0,
+    "removed": 0
+   }
+  },
+  "ithardware|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 1,
+    "hi": 2,
+    "families": 20,
+    "fam_lo": 1,
+    "fam_hi": 2
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 2,
+    "hi": 3,
+    "families": 17,
+    "fam_lo": 2,
+    "fam_hi": 3
+   },
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 7,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 7
+   },
+   "flg": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 7,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 7
+   },
+   "flg_matched_vs_rc3": {
+    "flg": 1584,
+    "rc3": 1584,
+    "added": 0,
+    "removed": 0
+   }
+  }
+ },
+ "pooled_short_rc1": {
+  "raw": [
+   0.379,
+   0.425
+  ],
+  "n": 280,
+  "below_40": [
+   "janitorial",
+   "nursing",
+   "guards",
+   "steelbldg",
+   "parts",
+   "fasteners",
+   "electrical",
+   "aircraft",
+   "medical",
+   "ithardware"
+  ]
+ },
+ "pooled_short_rc2": {
+  "raw": [
+   0.671,
+   0.736
+  ],
+  "n": 280,
+  "below_40": [
+   "nursing",
+   "steelbldg",
+   "parts",
+   "ithardware"
+  ]
+ },
+ "pooled_short_rc3": {
+  "raw": [
+   0.714,
+   0.789
+  ],
+  "n": 280,
+  "below_40": [
+   "guards",
+   "parts"
+  ]
+ },
+ "pooled_short_flg": {
+  "raw": [
+   0.714,
+   0.789
+  ],
+  "n": 280,
+  "below_40": [
+   "guards",
+   "parts"
+  ]
+ },
+ "pooled_long_rc1": {
+  "raw": [
+   0.407,
+   0.454
+  ],
+  "n": 280,
+  "below_40": [
+   "janitorial",
+   "nursing",
+   "guards",
+   "steelbldg",
+   "fasteners",
+   "aircraft",
+   "medical",
+   "ithardware"
+  ]
+ },
+ "pooled_long_rc2": {
+  "raw": [
+   0.618,
+   0.664
+  ],
+  "n": 280,
+  "below_40": [
+   "nursing",
+   "steelbldg",
+   "parts",
+   "ithardware"
+  ]
+ },
+ "pooled_long_rc3": {
+  "raw": [
+   0.607,
+   0.664
+  ],
+  "n": 280,
+  "below_40": [
+   "nursing",
+   "guards",
+   "steelbldg",
+   "ithardware"
+  ]
+ },
+ "pooled_long_flg": {
+  "raw": [
+   0.668,
+   0.736
+  ],
+  "n": 280,
+  "below_40": [
+   "nursing",
+   "guards",
+   "steelbldg",
+   "ithardware"
+  ]
+ }
+}
