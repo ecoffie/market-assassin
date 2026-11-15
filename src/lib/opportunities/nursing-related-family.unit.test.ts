@@ -29,3 +29,12 @@ describe('nurse staffing: adjacent clinical-service codes retrieve as RELATED, n
     expect(interpretCapability('We clean commercial office buildings.').related_market).toBeNull();
   });
 });
+
+describe('the RELATED reason fits the code type', () => {
+  it('a service code talks about adjacent work, a product code about the item', async () => {
+    const { productCodeWhy } = await import('./match-evidence');
+    expect(productCodeWhy('nurse staffing', { psc_code: 'Q201' })).toMatch(/service code Q201/);
+    expect(productCodeWhy('nurse staffing', { psc_code: 'Q201' })).not.toMatch(/item/);
+    expect(productCodeWhy('industrial valves', { psc_code: '4820' })).toMatch(/does not name the item/);
+  });
+});

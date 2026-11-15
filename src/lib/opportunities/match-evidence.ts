@@ -152,6 +152,11 @@ export function relatedCodeWhy(phrase: string, row: { naics_code?: string | null
 }
 
 export function productCodeWhy(phrase: string, row: { psc_code?: string | null }): string {
+  // Service codes start with a letter (Q201, S206); product (FSC) codes with a digit. A service notice has no "item".
+  if (row.psc_code && /^[A-Z]/i.test(row.psc_code)) {
+    return `Related-market candidate for “${phrase}”: filed under service code ${row.psc_code}, an adjacent kind of work, `
+      + `but the notice does not say it includes ${phrase}. Read the scope before treating it as your work.`;
+  }
   const code = row.psc_code ? `product code ${row.psc_code}` : 'its product code';
   return `Related-market candidate for “${phrase}”: filed under ${code}, but the notice does not name the item. `
     + `Check the item, part number and any approved-source restriction before treating it as ${phrase}.`;
