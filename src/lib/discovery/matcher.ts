@@ -100,6 +100,24 @@ export const DISCOVERY_SUPPORTING: ReadonlySet<string> = new Set([
 export const DISCOVERY_QUALIFIERS: ReadonlySet<string> = new Set(['market']);
 
 /**
+ * WHO THE CUSTOMER IS, not what is bought (Agent 3, 2026-11-14; Agent 4 v4 benchmark). Market-segment adjectives
+ * ("industrial valves", "commercial office buildings", "industrial and defense replacement parts") and the
+ * company's own role ("we are a valve supplier / fastener distributor / IT hardware reseller") describe the seller
+ * or the buyer, the same class as /try's CONTEXT_TERMS ("company", "contractor", "government"). As required words
+ * they deleted the market: a DLA valve notice reads "VALVE,GATE", never "industrial". Handled like pronouns: they
+ * still count toward the query's shape (reclassifying them shrank "We clean commercial office buildings." into
+ * ALL(clean · buildings) and lost 9 of 15 relevant janitorial notices, measured), then rank only. A query made of
+ * nothing else still means its own words.
+ */
+export const DISCOVERY_SEGMENT_WORDS: ReadonlySet<string> = new Set([
+  'industrial', 'commercial', 'residential', 'institutional', 'military', 'defense', 'defence',
+]);
+export const DISCOVERY_ROLE_WORDS: ReadonlySet<string> = new Set([
+  'supplier', 'suppliers', 'distributor', 'distributors', 'reseller', 'resellers', 'vendor', 'vendors', 'dealer',
+  'dealers', 'wholesaler', 'wholesalers',
+]);
+
+/**
  * Pronouns never name a market and never establish eligibility (Agent 3, 2026-11-14). They still COUNT toward the
  * query's shape (a typed sentence stays the capability list it was), but they are moved to rank-only, so they can
  * neither admit a record nor be required as a partner. Live defect this closes: "We provide security guards." made
@@ -301,14 +319,40 @@ function capabilityListTiers(distinctive: Concept[]): { common: Concept[]; admit
   return { common: [...common, ...overflow], admit: kept, partnerRequired };
 }
 
+/**
+ * SENTENCE-FRAME VERBS (Agent 3, 2026-11-14; Agent 4 v4 benchmark). A sentence's commerce verb describes the act of
+ * selling, not the thing sold: "We supply industrial valves." was ALL(valves · supply · industrial), so a valve
+ * notice also had to say "supply", and 0 of 23 relevant valve notices under PSC 4810/4820 came back. The verb is
+ * framing ONLY in subject position ("we supply", "I sell", "we source and deliver"); everywhere else it keeps its
+ * meaning ("office supply", "medical supplies", "power supply" are untouched). Framed verbs are handled exactly like
+ * pronouns: they count toward the query's shape, then rank only.
+ */
+export const FRAME_VERBS: ReadonlySet<string> = new Set([
+  'supply', 'supplies', 'provide', 'provides', 'offer', 'offers', 'sell', 'sells', 'resell', 'resells', 'deliver',
+  'delivers', 'distribute', 'distributes', 'furnish', 'furnishes', 'source', 'sources',
+]);
+const FRAME_SUBJECT = String.raw`(?:we|i|they)(?:\s+(?:also|currently|can|will|now))*`;
+const FRAME_VERB_ALT = [...FRAME_VERBS].join('|');
+const FRAME_RE = new RegExp(String.raw`\b${FRAME_SUBJECT}\s+((?:${FRAME_VERB_ALT})(?:\s*(?:,|and|or|&)\s*(?:${FRAME_VERB_ALT}))*)\b`, 'g');
+
+/** The frame verbs a text uses in subject position ("we supply …"), lower-cased. Everywhere else a verb keeps its meaning. */
+export function framedVerbs(text: string): Set<string> {
+  const t = String(text || '').toLowerCase().replace(/[^a-z0-9,&\s-]/g, ' ').replace(/\s+/g, ' ');
+  const out = new Set<string>();
+  for (const m of t.matchAll(FRAME_RE)) for (const w of m[1].split(/[\s,&]+/)) if (FRAME_VERBS.has(w)) out.add(w);
+  return out;
+}
+
 function alternativeOf(text: string): Alternative | null {
   const all = conceptsOf(text);
   if (!all.length) return null;
-  const pronouns = all.filter((c) => FUNCTION_WORDS.has(c.label));
-  // Shape is decided on every concept (unchanged); pronouns are then removed from eligibility and only rank.
+  const framed = framedVerbs(text);
+  const isPronoun = (c: Concept) => FUNCTION_WORDS.has(c.label) || framed.has(c.label)
+    || DISCOVERY_SEGMENT_WORDS.has(c.label) || DISCOVERY_ROLE_WORDS.has(c.label);
+  const pronouns = all.filter(isPronoun);
+  // Shape is decided on every concept (unchanged); pronouns and framed verbs are then removed from eligibility.
   const alt = alternativeOfConcepts(all);
   if (!alt || !pronouns.length) return alt;
-  const isPronoun = (c: Concept) => FUNCTION_WORDS.has(c.label);
   const eligible = alt.eligible.filter((c) => !isPronoun(c));
   if (!eligible.length) {
     // Only a pronoun could admit: decide on the other words alone (fail-narrow if they are all broad); a query made
@@ -316,7 +360,7 @@ function alternativeOf(text: string): Alternative | null {
     const rest = all.filter((c) => !isPronoun(c));
     return rest.length ? alternativeOfConcepts(rest) : alt;
   }
-  const partnerRequired = (alt.partnerRequired || []).filter((l) => !FUNCTION_WORDS.has(l));
+  const partnerRequired = (alt.partnerRequired || []).filter((l) => !all.some((c) => c.label === l && isPronoun(c)));
   const solo = eligible.filter((c) => !partnerRequired.includes(c.label));
   // A partner word that lost its only partner (the pronoun) admits alone again, as a lone partner word always does.
   const keepPartners = solo.length || partnerRequired.length > 1 ? partnerRequired : [];
@@ -349,6 +393,45 @@ function alternativeOfConcepts(concepts: Concept[]): Alternative | null {
 }
 
 /**
+ * LIST PARSING (Agent 3, 2026-11-14; Agent 4 v4 benchmark). Commas, semicolons and "or" already separate
+ * alternatives. Two list shapes were not understood and are now, ONLY when the text is already a list (a separator
+ * or an example word is present; "repair and maintenance" or "salt and pepper" alone are untouched) and only for a
+ * single sentence of at most LIST_MAX_WORDS words:
+ *   1. Example words introduce items, they are not search words: "fasteners like bolts, screws and nuts" made "like"
+ *      a concept and could not admit "53--SCREW,CAP,SOCKET HE". `like` / `such as` / `including` / `e.g.` /
+ *      `for example` split the text, and the words themselves are dropped.
+ *   2. The final "and" of a comma list separates its last two items: "bolts, screws and nuts" is three items, not
+ *      bolts | ALL(screws · nuts).
+ * Not done, measured: sharing the last item's head noun ("medical, dental and laboratory supplies" → medical
+ * supplies | dental supplies | …) halved code-floor recall (41 → 21 of 88 PSC 65 notices) at the same labelled
+ * precision, because product notices name the item ("6515--SYRINGE"), not the category word.
+ */
+const LIST_MAX_WORDS = 15;
+const LIST_SEP_RE = /\s*[,;]\s*|\s+or\s+/i;
+const EXAMPLE_RE = /\s+(?:like|such\s+as|including|e\.?\s?g\.?|for\s+example)\s+/i;
+export function listItems(text: string): string[] {
+  const clean = (xs: string[]) => xs.map((x) => x.trim()).filter(Boolean);
+  const isList = LIST_SEP_RE.test(text) || EXAMPLE_RE.test(text);
+  if (!isList) return clean([text]);
+  // Multi-sentence paragraphs keep today's comma split: their trailing clauses ("identified by NSN and part number",
+  // "for industrial, marine and military systems") became one-word items that admitted alone ("number", "systems"),
+  // 4,000+ matches on four of the benchmark paragraphs (measured). Paragraphs belong to sentence handling.
+  const sentences = text.split(/[.!?]+(?:\s+|$)/).filter((x) => x.trim()).length;
+  if (sentences > 1 || normalizeQuery(text).split(' ').length > LIST_MAX_WORDS) return clean(text.split(LIST_SEP_RE));
+  const out: string[] = [];
+  for (const chunk of clean(text.split(EXAMPLE_RE))) {
+    const parts = clean(chunk.split(LIST_SEP_RE));
+    if (parts.length >= 2) {
+      const last = parts.pop() as string;
+      const items = clean(last.split(/\s+(?:and|&)\s+/i));
+      parts.push(...items);
+    }
+    out.push(...parts);
+  }
+  return out;
+}
+
+/**
  * Build the matcher from RESIDUAL text (structured intent already removed) plus exclusions.
  * Pure. The ONLY function that tokenizes discovery text.
  */
@@ -367,7 +450,7 @@ export function buildTextMatcher(residual: string, exclusions: string[] = []): T
   }
 
   const normalized = normalizeQuery(trimmed);
-  const parts = trimmed.split(/\s*[,;]\s*|\s+or\s+/i).map((s) => s.trim()).filter(Boolean);
+  const parts = listItems(trimmed);
   const built = parts.map(alternativeOf).filter(Boolean) as Alternative[];
   // A comma-separated part made ONLY of function words ("…, so that is what we do.") names no market: drop it when the
   // query has another part, so it can never admit on "so" / "that" / "we". A query with nothing else keeps its words.
