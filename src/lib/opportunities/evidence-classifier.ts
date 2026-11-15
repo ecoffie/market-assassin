@@ -32,7 +32,7 @@ import { conceptHit, phraseRegex, jsRegex, framedVerbs, type Alternative, type C
 export type EvidenceCls = 'DIRECT_MATCH' | 'RELATED_MARKET_CANDIDATE' | 'WEAK_NON_MARKET';
 export type EvidenceBasis =
   | 'title_item' | 'own_trade_code' | 'description_only' | 'product_code_only' | 'related_family_code'
-  | 'boilerplate_only' | 'agency_or_program_name' | 'repair_notice_for_parts' | 'no_evidence' | 'single_list_word' | 'modifier_words_only';
+  | 'boilerplate_only' | 'agency_or_program_name' | 'repair_notice_for_parts' | 'no_evidence' | 'single_list_word' | 'modifier_words_only' | 'service_notice_for_supplier';
 export interface EvidenceVerdict { cls: EvidenceCls; basis: EvidenceBasis }
 
 /**
@@ -83,7 +83,7 @@ const REPAIR_TITLE = /\b(repair|repairs|overhaul|refurbish\w*|rebuild|in\s+repai
  * carcass(es) to complete a teardown & evaluation (TD&E)", "the full repair effort", "requirements for repair",
  * "Repair Turn Around Time" — "NRP,KEYBOARD,DATA E" / "ASSEMBLY, KEYBOARD" / "SERVER,AUTOMATIC DA" were DIRECT for a reseller.
  */
-const REPAIR_DESC = /\b(?:this\s+(?:solicitation|requirement|procurement)\s+is\s+for\s+(?:the\s+)?repair|repair\s+(?:upgrade|requirements?|and\s+overhaul|and\s+return|services?\s+(?:for|of|to))|return(?:ed)?\s+(?:the\s+)?(?:\S+\s+){0,6}?to\s+(?:rfi|ready\s+for\s+issue|serviceable)|overhaul\s+(?:and\s+repair|of\s+the)|in\s+repair\/modification|articles\s+to\s+be\s+furnished\s+hereunder\s+shall\s+be\s+repaired|criteria\s+for\s+(?:the\s+)?repair|teardown\s*(?:&|and)\s*evaluation|receipt\s+of\s+(?:the\s+)?carcass|full\s+repair\s+effort|requirements\s+for\s+repair\b|repair\s+turn\s*-?\s*around\s+time)/i;
+const REPAIR_DESC = /\b(?:this\s+(?:solicitation|requirement|procurement|rfq|rfp|order)\s+is\s+for\s+(?:the\s+)?repair|repair\s+(?:upgrade|requirements?|and\s+overhaul|and\s+return|services?\s+(?:for|of|to))|return(?:ed)?\s+(?:the\s+)?(?:\S+\s+){0,6}?to\s+(?:rfi|ready\s+for\s+issue|serviceable)|overhaul\s+(?:and\s+repair|of\s+the)|in\s+repair\/modification|articles\s+to\s+be\s+furnished\s+hereunder\s+shall\s+be\s+repaired|criteria\s+for\s+(?:the\s+)?repair|teardown\s*(?:&|and)\s*evaluation|receipt\s+of\s+(?:the\s+)?carcass|full\s+repair\s+effort|requirements\s+for\s+repair\b|repair\s+turn\s*-?\s*around\s+time)/i;
 const REPAIR_DESC_WINDOW = 5000;
 const REPAIR_INTENT = /\b(repair|repairs|overhaul|refurbish\w*|rebuild|maintain|maintenance|mro|service\s+and\s+repair)\b/i;
 
@@ -146,6 +146,10 @@ function modifierLabels(query: string, concepts: Concept[]): Set<string> {
   const outside = q.replace(MODIFIER_CLAUSE, ' ');
   return new Set(concepts.filter((c) => conceptHit(c, inClauses) && !conceptHit(c, outside)).map((c) => c.label));
 }
+/** A business that sells goods: "we supply / sell / distribute …" or "supplier / distributor / reseller …" (never "provide"). */
+function isSupplierQuery(query: string): boolean {
+  return [...framedVerbs(query)].some((v) => GOODS_VERBS.has(v)) || SUPPLIER_ROLE.test(query);
+}
 function familyAgrees(psc: string, query: string, cap: CapabilityInterpretation): boolean {
   if (!psc) return true;
   const products = cap.codePresets?.products || [];
@@ -206,8 +210,11 @@ export function classifyOpenEvidence(
   const fullTitle = maskOrgNames(String(row.title || ''), query);
   const desc = maskOrgNames(String(row.description || ''), query);
 
-  // Parts-only seller vs a repair notice.
-  if (products.length && !trades.length && !REPAIR_INTENT.test(query)
+  // Parts-only seller vs a repair notice. P1 (2026-11-15): also a literal parts supplier ("We supply industrial and
+  // defense replacement parts."), not only product presets.
+  const rawQ = String(plan.raw || query || '');
+  const partsSupplier = !trades.length && isSupplierQuery(rawQ) && /\bparts?\b/i.test(rawQ);
+  if ((products.length || partsSupplier) && !trades.length && !REPAIR_INTENT.test(query)
     && (REPAIR_TITLE.test(String(row.title || '')) || /^[JK]/.test(psc) || REPAIR_DESC.test(String(row.description || '').slice(0, REPAIR_DESC_WINDOW)))) {
     return { cls: 'WEAK_NON_MARKET', basis: 'repair_notice_for_parts' };
   }
@@ -244,6 +251,11 @@ export function classifyOpenEvidence(
   const inDesc = customerHit(plan, `${fullTitle} \n ${desc}`) || vocabHit(cap, `${fullTitle} \n ${desc}`);
   if (inDesc) {
     if (modifierWordsOnly(plan, cap, query, `${fullTitle} \n ${desc}`)) return { cls: 'WEAK_NON_MARKET', basis: 'modifier_words_only' };
+    // P2 (2026-11-15; parts short: "Window Replacement", "Hydrant Repair/Replacement", "Wire Rope Replacement Services"
+    // were RELATED for a parts supplier on "replacement … parts" in their requirement text). A supplier whose words appear
+    // only in the requirement text of a SERVICE / construction notice (PSC starting with a letter) is not being asked for
+    // goods: NOT RELEVANT. A missing code is not evidence against (unchanged).
+    if (!trades.length && psc && /^[A-Z]/i.test(psc) && isSupplierQuery(rawQ)) return { cls: 'WEAK_NON_MARKET', basis: 'service_notice_for_supplier' };
     // N2b: a trade, a long description, and requirement text that never uses the trade's own vocabulary: the shared words
     // are the generic ones every notice in that sector carries ("healthcare", "clinical", "medical" in VA boilerplate).
     if (trades.length && longQuery(plan, query) && (cap.direct.vocab || []).length && !vocabHit(cap, `${fullTitle} \n ${desc}`)) {
