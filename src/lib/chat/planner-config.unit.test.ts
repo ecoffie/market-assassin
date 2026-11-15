@@ -73,7 +73,8 @@ describe('chat route wiring (source assertions)', () => {
 
   it('applies the private-data provider allow-list to the planner and the answer fallback', () => {
     expect(code).toMatch(/resolved\.filter\(\(t\) => providerApprovedForPrivate\(t\.provider\)\)/);
-    expect(code).toMatch(/!groqRes && !providerApprovedForPrivate\('groq'\)/);
+    // B2: every answer model (primary and fallbacks) passes the same allow-list.
+    expect(code).toMatch(/resolveAnswerChain\(process\.env, \{ primaryModel: chatModel \}\)\s*\.filter\(\(t\) => \{\s*if \(providerApprovedForPrivate\(t\.provider\)\) return true;/);
   });
 
   it('streams verification traces only behind ASK_MINDY_TRACE_EVENTS', () => {

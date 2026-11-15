@@ -75,3 +75,50 @@ export function resolvePlannerChain(env: Env, opts: { overBudget: boolean }): Pl
 export function anthropicSupportsForcedToolChoice(model: string): boolean {
   return !/(sonnet-5-5|opus-5-5|fable-5-1|mythos-5-1)/i.test(model);
 }
+
+/**
+ * Answer-step (streaming, no tools) model chain — B2.
+ *
+ * The old answer fallback was Groq `llama-3.1-8b-instant`, chosen in May for quota reasons.
+ * It is no longer a supported backup: it never passed the grounded-answer checks, and with
+ * no key configured the route used to refuse EVERY chat turn up front, even when the primary
+ * was healthy.
+ *
+ * Default chain: the configured OpenAI chat model, then `openai:gpt-4o-mini` — the model
+ * already used for over-budget users, already on the private-data approved list, and already
+ * compatibility-tested for the tool round. CHAT_ANSWER_FALLBACKS (comma list of
+ * provider:model, providers openai|groq) replaces the default fallbacks when set; set it to
+ * the literal 'none' for no fallback. Groq runs only when listed explicitly.
+ */
+export type AnswerProvider = 'openai' | 'groq';
+export interface AnswerTarget { provider: AnswerProvider; model: string }
+
+export const DEFAULT_ANSWER_FALLBACK: AnswerTarget = { provider: 'openai', model: 'gpt-4o-mini' };
+
+export const ANSWER_ENDPOINTS: Record<AnswerProvider, string> = {
+  openai: 'https://api.openai.com/v1/chat/completions',
+  groq: 'https://api.groq.com/openai/v1/chat/completions',
+};
+
+export function answerKey(env: Env, t: AnswerTarget): string | undefined {
+  return t.provider === 'openai' ? env.OPENAI_API_KEY : env.GROQ_API_KEY;
+}
+
+export function resolveAnswerChain(env: Env, opts: { primaryModel: string }): AnswerTarget[] {
+  const raw = env.CHAT_ANSWER_FALLBACKS;
+  const fallbacks: AnswerTarget[] = raw === 'none'
+    ? []
+    : raw
+      ? raw.split(',').map((s) => s.trim()).filter(Boolean).map((s) => {
+        const i = s.indexOf(':');
+        return i > 0 ? { provider: s.slice(0, i) as AnswerProvider, model: s.slice(i + 1) } : null;
+      }).filter((t): t is AnswerTarget => !!t && (t.provider === 'openai' || t.provider === 'groq') && !!t.model)
+      : [DEFAULT_ANSWER_FALLBACK];
+  const seen = new Set<string>();
+  return [{ provider: 'openai' as const, model: opts.primaryModel }, ...fallbacks].filter((t) => {
+    const k = `${t.provider}:${t.model}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return !!answerKey(env, t);
+  });
+}

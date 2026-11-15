@@ -15,6 +15,7 @@
  * render as a small footer under that bubble.
  */
 
+import { customerErrorMessage, CUSTOMER_ERROR_MESSAGES } from '@/lib/chat/customer-errors';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Menu, MessageCircle, BookOpen, Lock, FileText } from 'lucide-react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
@@ -184,8 +185,14 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
         return;
       }
       if (!res.ok || !res.body) {
-        const errBody = await res.text().catch(() => '');
-        throw new Error(`Chat ${res.status}: ${errBody.slice(0, 200) || 'no response body'}`);
+        // B2: the response body is never shown (it can carry server or provider detail).
+        console.error('[MindyChat] chat request failed', res.status);
+        setMessages(prev => prev.map(m =>
+          m.id === assistantMsg.id
+            ? { ...m, content: customerErrorMessage('service_unavailable'), errored: true, isStreaming: false }
+            : m
+        ));
+        return;
       }
 
       const reader = res.body.getReader();
@@ -224,7 +231,8 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
             } else if (evt.type === 'error') {
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id
-                  ? { ...m, content: m.content || `Sorry — ${evt.message || 'something broke'}.`, errored: true, isStreaming: false }
+                  // B2: only messages from the fixed customer-safe table are displayed verbatim.
+                  ? { ...m, content: m.content || (CUSTOMER_ERROR_MESSAGES.includes(evt.message) ? evt.message : customerErrorMessage('answer_unavailable')), errored: true, isStreaming: false }
                   : m
               ));
             } else if (evt.type === 'done') {
@@ -255,10 +263,10 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
           .catch(() => { /* no chips on failure */ });
       }
     } catch (err) {
-      const errMsg = (err as Error)?.message || 'Stream failed';
+      console.error('[MindyChat] stream failed', err);
       setMessages(prev => prev.map(m =>
         m.id === assistantMsg.id
-          ? { ...m, content: m.content || `Couldn't reach Mindy: ${errMsg}`, errored: true, isStreaming: false }
+          ? { ...m, content: m.content || customerErrorMessage('connection_failed'), errored: true, isStreaming: false }
           : m
       ));
     } finally {
