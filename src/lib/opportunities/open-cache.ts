@@ -161,3 +161,114 @@ export async function cachedOpenRetrieval(args: {
   rows.sort((a, b) => String(a.response_deadline ?? '9999').localeCompare(String(b.response_deadline ?? '9999')));
   return { status: 'ok', count, rows: rows.slice(0, windowLimit), coverage: { snapshot_built_at: at, snapshot_age_ms: age, candidates: ids.length, delta_rows: dHead.count as number } };
 }
+
+// ── Integration seam (development; default OFF) ──────────────────────────────────────────────────────────────────
+/**
+ * OPEN_SNAPSHOT_RETRIEVAL: literal 'true' only (same contract as the repo's other release flags). OFF = every caller
+ * builds exactly today's query; nothing in this module runs.
+ */
+export function openSnapshotEnabled(): boolean { return process.env.OPEN_SNAPSHOT_RETRIEVAL === 'true'; }
+
+type Call = { m: string; a: unknown[] };
+const FILTER_METHODS = new Set(['or', 'is', 'eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in', 'ilike', 'like', 'not', 'filter']);
+
+/**
+ * A query builder that looks like the Supabase one for the chains FIND and the Map use on the open plan
+ * (.or / .is / .eq / … / .order / .limit / .range, awaited). It records the chain and, when awaited, runs it as:
+ *   live verification of the snapshot candidates (structured filters + the recorded chain, unchanged rows only, by id)
+ *   ∪ the live delta (full plan + recorded chain, rows changed since the snapshot),
+ * then merges counts and rows in the recorded order. An unknown method throws (never silently ignored).
+ */
+export class CachedOpenQuery {
+  private calls: Call[] = [];
+  private orders: Array<{ col: string; ascending: boolean; nullsFirst: boolean }> = [];
+  private lim: number | null = null;
+  private rng: [number, number] | null = null;
+  constructor(private ctx: { client: any; plan: DiscoveryPlan; ids: string[]; at: string; select: string; opts?: { count?: 'exact'; head?: boolean } }) {
+    return new Proxy(this, {
+      get(t, prop: string) {
+        if (prop in t) return (t as any)[prop];
+        if (FILTER_METHODS.has(prop)) return (...a: unknown[]) => { t.calls.push({ m: prop, a }); return t as any; };
+        throw new Error(`CachedOpenQuery: unsupported method ${String(prop)}`);
+      },
+    });
+  }
+  order(col: string, o: { ascending?: boolean; nullsFirst?: boolean } = {}) { this.orders.push({ col, ascending: o.ascending !== false, nullsFirst: !!o.nullsFirst }); return this; }
+  limit(n: number) { this.lim = n; return this; }
+  range(a: number, b: number) { this.rng = [a, b]; return this; }
+  private replay(q: any) {
+    let x = q; for (const c of this.calls) x = x[c.m](...c.a);
+    for (const o of this.orders) x = x.order(o.col, { ascending: o.ascending, nullsFirst: o.nullsFirst });
+    const take = this.rng ? this.rng[1] + 1 : this.lim;
+    return take != null ? x.limit(take) : x;
+  }
+  async run(): Promise<{ data: any[] | null; count: number | null; error: { message: string } | null }> {
+    const { client, plan, ids, at, select, opts } = this.ctx;
+    const base = () => client.from('sam_opportunities').select(select, opts);
+    const chunks: string[][] = []; for (let i = 0; i < ids.length; i += ID_CHUNK) chunks.push(ids.slice(i, i + ID_CHUNK));
+    const parts = await Promise.all([
+      this.replay(applyOpenPlan(base(), plan).or(changedSinceExpr(at))),
+      ...chunks.map((c) => this.replay(unchangedSince(structured(base(), plan).in('notice_id', c), at))),
+    ]);
+    const err = parts.find((p: any) => p.error);
+    if (err) return { data: null, count: null, error: err.error };
+    const count = opts?.count ? parts.reduce((n: number | null, p: any) => (n == null || p.count == null ? null : n + p.count), 0) : null;
+    if (opts?.head) return { data: null, count, error: null };
+    let rows = parts.flatMap((p: any) => p.data || []);
+    if (this.orders.length) {
+      rows.sort((a: any, b: any) => {
+        for (const o of this.orders) {
+          const x = a[o.col], y = b[o.col];
+          if (x == null || y == null) { if (x == null && y == null) continue; return (x == null ? 1 : -1) * (o.nullsFirst ? -1 : 1); }
+          const c = String(x).localeCompare(String(y)); if (c) return o.ascending ? c : -c;
+        }
+        return 0;
+      });
+    }
+    if (this.rng) rows = rows.slice(this.rng[0], this.rng[1] + 1); else if (this.lim != null) rows = rows.slice(0, this.lim);
+    return { data: rows, count, error: null };
+  }
+  then(res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) { return this.run().then(res, rej); }
+}
+
+export type OpenQueryFactory = {
+  path: 'sql' | 'snapshot';
+  reason: string | null;
+  snapshotAgeMs: number | null;
+  query: (select: string, opts?: { count?: 'exact'; head?: boolean }) => any;
+};
+
+/**
+ * Decide ONCE per request whether this plan's open queries may use the snapshot. Any doubt → today's SQL path, with the
+ * reason recorded (so a surface can disclose it). Callers swap `applyOpenPlan(client.from(src).select(c, o), plan)` for
+ * `factory.query(c, o)`; every chained filter, order and limit is preserved.
+ */
+export async function openQueryFactory(client: any, plan: DiscoveryPlan, snapshot: OpenSnapshot | null, now = new Date()): Promise<OpenQueryFactory> {
+  const sql = (reason: string | null): OpenQueryFactory => ({ path: 'sql', reason, snapshotAgeMs: null, query: (c, o) => applyOpenPlan(client.from('sam_opportunities').select(c, o), plan) });
+  if (!openSnapshotEnabled()) return sql(null);
+  if (!snapshot) return sql('no snapshot');
+  const age = now.getTime() - Date.parse(snapshot.builtAt);
+  if (!(age >= 0) || age > SNAPSHOT_MAX_AGE_MS) return sql(`snapshot age ${Math.round(age / 60000)} min`);
+  let pass: (r: Record<string, unknown>) => boolean;
+  try { pass = compileOps(plan.horizons.open.ops); } catch (e) { return sql((e as Error).message); }
+  const changed = await client.from('sam_opportunities').select('notice_id', { count: 'exact', head: true }).eq('active', true).or(changedSinceExpr(snapshot.builtAt));
+  if (changed.error || changed.count == null) return sql('changed-row count unavailable');
+  if (changed.count > DELTA_MAX) return sql(`${changed.count} rows changed since the snapshot`);
+  const ids = snapshot.rows.filter(pass).map((r) => r.notice_id as string);
+  return { path: 'snapshot', reason: null, snapshotAgeMs: age, query: (c, o) => new CachedOpenQuery({ client, plan, ids, at: snapshot.builtAt, select: c, opts: o }) };
+}
+
+// ── Snapshot holder: one build at a time per process (concurrent requests share it) ─────────────────────────────
+let current: OpenSnapshot | null = null;
+let building: Promise<OpenSnapshot> | null = null;
+/** The current snapshot if fresh; otherwise starts ONE background build and returns null (callers use SQL meanwhile). */
+export function currentOpenSnapshot(client: any, now = new Date()): OpenSnapshot | null {
+  const fresh = current && now.getTime() - Date.parse(current.builtAt) <= SNAPSHOT_MAX_AGE_MS;
+  if (!fresh && !building) {
+    building = buildOpenSnapshot(client).then((s) => { current = s; return s; }).finally(() => { building = null; });
+    building.catch(() => {}); // a failed build leaves `current` as it was; the age check keeps refusing a stale one
+  }
+  return fresh ? current : null;
+}
+/** Test seam. */
+export function __setOpenSnapshotForTests(s: OpenSnapshot | null) { current = s; building = null; }

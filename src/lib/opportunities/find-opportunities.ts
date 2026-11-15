@@ -8,6 +8,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { classifySearchFailure } from './search-failure';
 import { classifyOpenEvidence, type EvidenceBasis } from './evidence-classifier';
+import { openSnapshotEnabled, openQueryFactory, currentOpenSnapshot } from './open-cache';
 import { recompeteRowAnnotations } from '@/lib/recompete/annotate';
 import { parseAwardLineage, NOT_ORDER_UNDER_VEHICLE_OR } from '@/lib/recompete/award-lineage';
 import { dedupeRecompeteRows, type DedupeableRecompeteRow } from '@/lib/recompete/dedupe-orders';
@@ -192,6 +193,8 @@ export interface HorizonResult {
   allowed_handoffs: HandoffKey[];
   semantics_note: string | null;
   evidence_counts?: EvidenceCounts | null;
+  /** Open now, only when OPEN_SNAPSHOT_RETRIEVAL is on: which path answered and why (open-cache.ts). */
+  retrieval?: { path: 'sql' | 'snapshot'; reason: string | null; snapshot_age_ms: number | null };
   /** Coming Soon only: forecast publisher coverage when it is not complete (canonical plan). */
   coverage?: { state: 'partial' | 'unestablished'; gaps: ForecastCoverageGap[] };
   /** Coming Back only: task/delivery orders the plan matched and excluded (null = count unavailable). Internal. */
@@ -880,10 +883,19 @@ async function queryOpenNow(
     const cap = p.market.capability;
     const COLS =
       'notice_id, title, department, sub_tier, naics_code, psc_code, description, set_aside_code, set_aside_description, notice_type, response_deadline, ui_link, solicitation_number, pop_state, pop_city, office_address, map_lat, updated_at';
+    // Cached open retrieval (open-cache.ts; OPEN_SNAPSHOT_RETRIEVAL, default OFF). OFF → `openQ` is exactly
+    // applyOpenPlan(client.from(source).select(…), p.plan). Company-anchored searches always use SQL (their union is a
+    // second plan). Any doubt (no / old snapshot, too many changed rows, uncacheable op) → SQL, reason recorded.
+    const openSrc = p.basePlan || !openSnapshotEnabled()
+      ? null
+      : await openQueryFactory(client, p.plan, currentOpenSnapshot(client));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const openQ = (cols: string, opts?: { count?: 'exact'; head?: boolean }): any =>
+      openSrc ? openSrc.query(cols, opts) : applyOpenPlan(client.from(source).select(cols, opts), p.plan);
 
     // Candidate window: deadline-ordered, capped (OPEN_FETCH_CAP measured), then ranked.
     const fetchCap = Math.max(limit, OPEN_FETCH_CAP);
-    const { data, count, error } = await inStage(applyOpenPlan(client.from(source).select(COLS, { count: 'exact' }), p.plan))
+    const { data, count, error } = await inStage(openQ(COLS, { count: 'exact' }))
       .order('response_deadline', { ascending: true, nullsFirst: false })
       .limit(fetchCap);
     if (error) {
@@ -895,7 +907,7 @@ async function queryOpenNow(
 
     let unmapped: number | null = null;
     {
-      const { count: uc, error: ue } = await inStage(applyOpenPlan(client.from(source).select('notice_id', { count: 'exact', head: true }), p.plan)).is('map_lat', null);
+      const { count: uc, error: ue } = await inStage(openQ('notice_id', { count: 'exact', head: true })).is('map_lat', null);
       if (!ue) unmapped = uc ?? null;
     }
 
@@ -904,7 +916,7 @@ async function queryOpenNow(
     let stageInfo: HorizonStage | null = null;
     if (stage) {
       let excluded: number | null = null;
-      const { count: xc, error: xe } = await applyOpenPlan(client.from(source).select('notice_id', { count: 'exact', head: true }), p.plan).or(unknownStageOrExpr());
+      const { count: xc, error: xe } = await openQ('notice_id', { count: 'exact', head: true }).or(unknownStageOrExpr());
       if (!xe && typeof xc === 'number') excluded = xc;
       stageInfo = {
         group: stage,
@@ -994,6 +1006,8 @@ async function queryOpenNow(
         'Canonical discovery eligibility (word-bounded). Ranked DIRECT_MATCH → RELATED_MARKET_CANDIDATE → other, then by how many of the query’s concepts a notice carries, then deadline. Geography: place of performance OR buying-office state.'
         + (p.company ? ' Company-anchored: rows recalled only by the company’s registered PSC/NAICS rank after related-market rows and are never DIRECT_MATCH. eligibility is a separate screen.' : ''),
       evidence_counts,
+      // Flag on only: which retrieval path answered, and how old the snapshot was (never silent about the cache).
+      ...(openSrc ? { retrieval: { path: openSrc.path, reason: openSrc.reason, snapshot_age_ms: openSrc.snapshotAgeMs } } : {}),
       ...(p.company ? { eligibility_counts: eligibilityCounts(items, p.company) } : {}),
       ...(stageInfo ? { stage: { ...stageInfo, returned_by_signal: stageSignalCounts(items) } } : {}),
     };
