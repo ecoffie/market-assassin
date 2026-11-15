@@ -137,12 +137,24 @@ export function openCodeWindowPsc(cap: CapabilityInterpretation): string[] {
 }
 
 /**
+ * NAICS CODE-RECALL SUB-WINDOW (Agent 3, 2026-11-15; guards/steel diagnosis, CANDIDATE F1 — not on any tag).
+ * Same mechanism as openCodeWindowPsc, for a TRADE preset's own specific 6-digit NAICS. Steel long (Nov 14 fixture):
+ * the long description's text matcher admits 1,022 notices ("steel", "structural", "panels": steel plate, poles, aircraft
+ * panels), the 500-row deadline window closes on 2026-12-01, and four roofing notices filed under 238160 (two Direct for
+ * both AI reviewers) are never ranked. A subset of the matched set; the matched set and its count do not change.
+ */
+export function openCodeWindowNaics(cap: CapabilityInterpretation): string[] {
+  if (cap.kind !== 'industry_preset' || !(cap.codePresets?.trades || []).length) return [];
+  return [...new Set((cap.direct.naics || []).filter((c) => /^[0-9]{6}$/.test(c)))];
+}
+
+/**
  * Index of the plan's positive-retrieval OR (text ∪ vocabulary ∪ codes) — the ONLY open op carrying the preset codes'
  * psc conditions. null unless exactly one op qualifies, so a caller can fall back to the full plan.
  */
-export function retrievalOpIndex(ops: ReadonlyArray<{ op: string; expr?: string }>, codes: string[]): number | null {
+export function retrievalOpIndex(ops: ReadonlyArray<{ op: string; expr?: string }>, codes: string[], condsOf: (c: string[]) => string[] = pscMatchConds): number | null {
   if (!codes.length) return null;
-  const conds = pscMatchConds(codes);
+  const conds = condsOf(codes);
   const hits = ops.map((o, k) => (o.op === 'or' && conds.every((c) => (o.expr || '').split(',').includes(c)) ? k : -1)).filter((k) => k >= 0);
   return hits.length === 1 ? hits[0] : null;
 }

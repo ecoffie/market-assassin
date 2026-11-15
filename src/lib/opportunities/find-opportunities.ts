@@ -12,6 +12,7 @@ import { openSnapshotEnabled, openQueryFactory, currentOpenSnapshot } from './op
 import { recompeteRowAnnotations } from '@/lib/recompete/annotate';
 import { parseAwardLineage, NOT_ORDER_UNDER_VEHICLE_OR } from '@/lib/recompete/award-lineage';
 import { dedupeRecompeteRows, type DedupeableRecompeteRow } from '@/lib/recompete/dedupe-orders';
+import { naicsMatchConds } from '@/lib/opportunities/map-filters';
 import {
   interpretMarket,
   evidenceWhy,
@@ -23,6 +24,7 @@ import {
   OPEN_FETCH_CAP,
   OPEN_CODE_WINDOW_CAP,
   openCodeWindowPsc,
+  openCodeWindowNaics,
   retrievalOpIndex,
   classifyOpenRecord,
   type OpenRelevanceClass,
@@ -741,7 +743,11 @@ export function labelOpenRow(
   const typed = codeIn(plan.naics, row.naics_code) || codeIn(plan.psc, row.psc_code);
   const specific = codeIn(cap.direct.naics.filter((c) => c.length === 6), row.naics_code)
     || codeIn(openDirectPsc(cap).filter((c) => c.length >= 4), row.psc_code);
-  if (typed || specific) {
+  if (!typed && specific && codeOnlyTitleFails(row, cap)) {
+    // CANDIDATE F3: the trade's own code, but the title names no object of that trade (gutter maintenance, a vault toilet,
+    // a portable-shelter floor under 238160/332311). RELATED by code, never DIRECT.
+    cls = 'RELATED_MARKET_CANDIDATE'; basis.push('related_market_code');
+  } else if (typed || specific) {
     cls = 'DIRECT_MATCH'; basis.push('buy_side_code');
   } else {
     const query = String(plan.intent?.residual || '');
@@ -759,6 +765,22 @@ export function labelOpenRow(
     ? (basis[0] === 'product_code' ? 0 : basis[0] === 'description_text' || basis[0] === 'single_list_word' ? 0.1 : 0.2) : 0;
   const tier = cls === 'WEAK_NON_MARKET' && company ? OPEN_TIER.COMPANY_CODE : OPEN_TIER[cls] + relatedOffset;
   return { cls, basis, tier };
+}
+
+/**
+ * CANDIDATE F3 (guards/steel diagnosis, 2026-11-15; not on any tag). Per trade preset: for a code-only DIRECT, the title
+ * must name an object of the trade. Steel only so far — measured on the Nov 14 fixture, every code-only title it removes
+ * is Not relevant for both AI reviewers, and it removes none they call Direct.
+ */
+const CODE_ONLY_TITLE: Record<string, RegExp> = {
+  steel_buildings_roofing: /\b(?:re-?roof\w*|roof\w*|buildings?|sheds?|hangars?|barns?|structures?|steel|metal|canopy|canopies|pavilions?|warehouses?)\b/i,
+};
+function codeOnlyTitleFails(row: Record<string, unknown>, cap: MarketInterpretation['capability']): boolean {
+  const ids = cap.codePresets?.trades || [];
+  const res = ids.map((id) => CODE_ONLY_TITLE[id]).filter(Boolean) as RegExp[];
+  if (!res.length) return false;
+  const t = String(row.title || '');
+  return !res.some((re) => re.test(t));
 }
 
 /**
@@ -974,6 +996,18 @@ async function queryOpenNow(
         ? applyOpenPlan(client.from(source).select(COLS), { ...p.plan, horizons: { ...p.plan.horizons, open: { ...p.plan.horizons.open, ops: p.plan.horizons.open.ops.filter((_o, k) => k !== ri) } } })
         : openQ(COLS);
       const cw = await inStage(subQ).in('psc_code', codeWin)
+        .order('response_deadline', { ascending: true, nullsFirst: false })
+        .limit(OPEN_CODE_WINDOW_CAP);
+      if (!cw.error) rows = unionRows(rows, (cw.data || []) as Array<Record<string, unknown>>, 'notice_id');
+    }
+    // CANDIDATE F1 (guards/steel diagnosis): the same sub-window for a trade preset's own 6-digit NAICS.
+    const codeWinN = openCodeWindowNaics(cap);
+    if (codeWinN.length && (data || []).length >= fetchCap) {
+      const ri = retrievalOpIndex(p.plan.horizons.open.ops, codeWinN, naicsMatchConds);
+      const subQ = !openSrc && ri != null
+        ? applyOpenPlan(client.from(source).select(COLS), { ...p.plan, horizons: { ...p.plan.horizons, open: { ...p.plan.horizons.open, ops: p.plan.horizons.open.ops.filter((_o, k) => k !== ri) } } })
+        : openQ(COLS);
+      const cw = await inStage(subQ).in('naics_code', codeWinN)
         .order('response_deadline', { ascending: true, nullsFirst: false })
         .limit(OPEN_CODE_WINDOW_CAP);
       if (!cw.error) rows = unionRows(rows, (cw.data || []) as Array<Record<string, unknown>>, 'notice_id');
