@@ -22,7 +22,7 @@ def labels():
         L.update(r6['load_labels'](f'{V7}/labels/r10_meta.json', V7 + '/labels/r10lab_*_r{k}.jsonl'))
     if os.path.exists(f'{V7}/labels/r11_meta.json'):
         L.update(r6['load_labels'](f'{V7}/labels/r11_meta.json', V7 + '/labels/r11lab_*_r{k}.jsonl'))
-    for rnd in ('r12', 'r13', 'r14', 'r15', 'r15b'):
+    for rnd in ('r12', 'r13', 'r14', 'r15', 'r15b', 'r17'):
         if os.path.exists(f'{V7}/labels/{rnd}_meta.json'):
             L.update(r6['load_labels'](f'{V7}/labels/{rnd}_meta.json', V7 + f'/labels/{rnd}lab_*_r' + '{k}.jsonl'))
     for k, lab in g['g']['ADJ'].items():
