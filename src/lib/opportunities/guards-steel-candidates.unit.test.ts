@@ -39,3 +39,22 @@ describe('F3 · steel code-only DIRECT needs a trade object in the title', () =>
     expect(labelOpenRow({ title: 'PANDHA-26-P-0000 046239 Security Support Services', naics_code: '561612', psc_code: 'R430', description: '' }, plan, cap(q), null).cls).toBe('DIRECT_MATCH');
   });
 });
+
+describe('Steel wording rank (Eric 2026-11-15, dev only): RELATED with steel-building wording ranks above other RELATED, never DIRECT', () => {
+  it('a 236220 job with "pre-engineered metal buildings" is RELATED at tier 1.05; the same job without it stays 1.1; other trades unaffected', async () => {
+    const { labelOpenRow } = await import('./find-opportunities');
+    const { buildDiscoveryPlan } = await import('@/lib/discovery/plan');
+    const { MCP_POLICY } = await import('@/lib/discovery/policy');
+    const plan = buildDiscoveryPlan({ query: STEEL_LONG }, MCP_POLICY, { today: '2026-11-15', fiscalYear: 2027 });
+    const job = { title: 'F-15 Aerospace Ground Equipment (AGE) Facility', naics_code: '236220', psc_code: 'Y1JZ' };
+    const up = labelOpenRow({ ...job, description: 'Construct two pre-engineered metal buildings with standing seam roofs and steel framing.' }, plan, cap(STEEL_LONG), null);
+    expect(up.cls).toBe('RELATED_MARKET_CANDIDATE');
+    expect(up.tier).toBeCloseTo(1.05);
+    const plain = labelOpenRow({ ...job, description: 'Construct an equipment facility with steel framing and wall panels.' }, plan, cap(STEEL_LONG), null);
+    expect(plain.tier).toBeGreaterThan(up.tier);
+    const q = 'We maintain HVAC systems.';
+    const hplan = buildDiscoveryPlan({ query: q }, MCP_POLICY, { today: '2026-11-15', fiscalYear: 2027 });
+    const h = labelOpenRow({ title: 'Renovate building', naics_code: '236220', psc_code: 'Y1JZ', description: 'HVAC upgrades and a new standing seam metal roof.' }, hplan, cap(q), null);
+    expect(h.tier).not.toBeCloseTo(1.05);
+  });
+});

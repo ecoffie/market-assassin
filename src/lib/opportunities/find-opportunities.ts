@@ -762,8 +762,27 @@ export function labelOpenRow(
   // Within RELATED (RC2): an in-code product row outranks a description-only mention, which outranks a family code.
   const relatedOffset = cls === 'RELATED_MARKET_CANDIDATE'
     ? (basis[0] === 'product_code' ? 0 : basis[0] === 'description_text' || basis[0] === 'single_list_word' ? 0.1 : 0.2) : 0;
-  const tier = cls === 'WEAK_NON_MARKET' && company ? OPEN_TIER.COMPANY_CODE : OPEN_TIER[cls] + relatedOffset;
+  const wordingUp = cls === 'RELATED_MARKET_CANDIDATE' && relatedWordingHit(row, cap);
+  const tier = cls === 'WEAK_NON_MARKET' && company ? OPEN_TIER.COMPANY_CODE
+    : OPEN_TIER[cls] + (wordingUp ? RELATED_WORDING_OFFSET : relatedOffset);
   return { cls, basis, tier };
+}
+
+/**
+ * STEEL WORDING RANK (Eric, 2026-11-15; development only, research 06e9503e2). A RELATED row whose title or description
+ * carries real steel-building wording ranks above every other RELATED, code-only and filler row (tier 1.05). It is NOT
+ * relabelled DIRECT: description wording alone was measured at 5 of 16 Direct. Title + description only, the columns FIND
+ * Open selects (never sow_text), so the runner and the route see the same text. Steel preset only.
+ */
+const RELATED_WORDING_OFFSET = 0.05;
+const RELATED_WORDING: Record<string, RegExp> = {
+  steel_buildings_roofing: /\bpre-?engineered\s+(?:metal|steel)\s+buildings?\b|\bstanding[\s-]+seam\b|\bmetal\s+roof(?:ing)?\b|\bsteel\s+buildings?\b|\bred[\s-]+iron\b/i,
+};
+function relatedWordingHit(row: Record<string, unknown>, cap: MarketInterpretation['capability']): boolean {
+  const res = (cap.codePresets?.trades || []).map((id) => RELATED_WORDING[id]).filter(Boolean) as RegExp[];
+  if (!res.length) return false;
+  const t = `${String(row.title || '')}\n${String(row.description || '')}`;
+  return res.some((re) => re.test(t));
 }
 
 /**
