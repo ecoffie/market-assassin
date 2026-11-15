@@ -756,7 +756,9 @@ export function labelOpenRow(
   if (company) basis.push(company);
   // Within RELATED (RC2): an in-code product row outranks a description-only mention, which outranks a family code.
   const relatedOffset = cls === 'RELATED_MARKET_CANDIDATE'
-    ? (basis[0] === 'product_code' ? 0 : basis[0] === 'description_text' || basis[0] === 'single_list_word' ? 0.1 : 0.2) : 0;
+    ? (basis[0] === 'product_code'
+      ? ((cap.related_market?.lowPsc || []).includes(String(row.psc_code || '')) ? 0.15 : 0) // V-ranked: low related codes rank below text matches
+      : basis[0] === 'description_text' || basis[0] === 'single_list_word' ? 0.1 : 0.2) : 0;
   const tier = cls === 'WEAK_NON_MARKET' && company ? OPEN_TIER.COMPANY_CODE : OPEN_TIER[cls] + relatedOffset;
   return { cls, basis, tier };
 }

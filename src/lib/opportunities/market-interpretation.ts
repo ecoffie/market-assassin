@@ -32,6 +32,8 @@ export interface TaxonomyPin {
   psc: string[];
   terms: string[];
   reason: string;
+  /** Related codes that retrieve but rank in a LOWER related tier (V-ranked, 2026-11-15). Absent elsewhere. */
+  lowPsc?: string[];
   /**
    * Retrieval vocabulary (trade / product presets only, 2026-11-14): phrases that ADD recall as exact phrases over
    * `vocabCols`, in the same `.or()` as the text matcher and the codes. Never narrows, never replaces the customer's
@@ -257,7 +259,7 @@ export function dualBuyerOrExpr(depCol: string, subCol: string, needles: string[
  *  - Codes: SAM PSC/FSC manual and NAICS 2022, specific codes only (no 2-digit FSC group, no NAICS family).
  */
 /** relatedPsc (trades only): adjacent codes that RETRIEVE a notice as RELATED (never DIRECT), like a product preset's codes. */
-type CodePreset = { id: string; label: string; match: RegExp; naics: string[]; psc: string[]; vocab: string[]; relatedPsc?: string[] };
+type CodePreset = { id: string; label: string; match: RegExp; naics: string[]; psc: string[]; vocab: string[]; relatedPsc?: string[]; relatedPscLow?: string[] };
 export const TRADE_PRESETS: CodePreset[] = [
   {
     id: 'guards', label: 'Security guard services',
@@ -297,6 +299,9 @@ export const TRADE_PRESETS: CodePreset[] = [
     // 52 open notices on the Nov 14 snapshot). RELATED only: Q401 stays the trade's only DIRECT code. Not Q301 (lab
     // testing), Q702 (lab services), Q999 (catch-all) — fewer staffing buys, more noise.
     relatedPsc: ['Q201', 'Q403', 'Q501', 'Q511', 'Q518', 'Q519', 'Q701'],
+    // V-ranked (Agent 4 v7 Addendum 5): still retrieved, but ranked below the clean codes and below requirement-text
+    // matches, so they cannot displace them: Q201 (24 rows, 9 NO/NO), Q403 and Q511 (mostly split / NO).
+    relatedPscLow: ['Q201', 'Q403', 'Q511'],
   },
   {
     // RC3 (Agent 4 v7: steel buildings below 40%; steel PRODUCTS — plates, poles, scrap — were DIRECT on "steel").
@@ -413,6 +418,7 @@ function codePresetInterpretation(
           source: trades.map((t) => t.label).join(' + '),
           naics: [],
           psc: uniq(trades.flatMap((t) => t.relatedPsc || [])),
+          ...(trades.some((t) => t.relatedPscLow?.length) ? { lowPsc: uniq(trades.flatMap((t) => t.relatedPscLow || [])) } : {}),
           terms: [],
           reason: 'Filed under an adjacent service code. The code retrieves the notice; it does not establish that the work is what you provide.',
         }

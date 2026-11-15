@@ -38,3 +38,14 @@ describe('the RELATED reason fits the code type', () => {
     expect(productCodeWhy('industrial valves', { psc_code: '4820' })).toMatch(/does not name the item/);
   });
 });
+
+describe('V-ranked: low related codes stay retrieved but rank below clean codes and text matches', () => {
+  it('Q201 ranks in a lower related tier than Q518; both are RELATED', () => {
+    const q201 = label('Jacobs Creek JCC Medical Services', 'Q201');
+    const q518 = label('Occupational Therapy Services', 'Q518');
+    expect(q201.cls).toBe('RELATED_MARKET_CANDIDATE');
+    expect(q201.tier).toBeGreaterThan(q518.tier);
+    expect(q201.tier).toBeGreaterThan(1.1); // below description-text matches
+    expect(q201.tier).toBeLessThan(1.2);
+  });
+});
