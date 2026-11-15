@@ -79,3 +79,23 @@ describe('#1 an overflow requests a rebuild: single-flight and rate-limited', ()
     expect(src).toMatch(/requestOpenSnapshotRebuild\(client, now\); return sql\(/);
   });
 });
+
+describe('#2 change marker: legacy writer stamps by default; the DB-stamped column only when selected', () => {
+  it('defaults to the four writer stamps; OPEN_SNAPSHOT_CHANGE_MARKER=snapshot_changed_at selects the trigger column', async () => {
+    const { changeCols, CHANGE_COLS } = await import('./open-cache');
+    const prev = process.env.OPEN_SNAPSHOT_CHANGE_MARKER;
+    delete process.env.OPEN_SNAPSHOT_CHANGE_MARKER;
+    expect(changeCols()).toEqual(CHANGE_COLS);
+    process.env.OPEN_SNAPSHOT_CHANGE_MARKER = 'snapshot_changed_at';
+    expect(changeCols()).toEqual(['snapshot_changed_at']);
+    if (prev === undefined) delete process.env.OPEN_SNAPSHOT_CHANGE_MARKER; else process.env.OPEN_SNAPSHOT_CHANGE_MARKER = prev;
+  });
+  it('the draft trigger covers every snapshot column plus active (a row entering the open set is a change)', async () => {
+    const { SNAPSHOT_COLS } = await import('./open-cache');
+    const sql = fs.readFileSync(path.join(__dirname, '../../../tasks/search-stabilization-2026-11-14/migration-draft/snapshot_changed_at.up.sql'), 'utf8');
+    for (const c of SNAPSHOT_COLS.filter((c) => c !== 'notice_id')) expect(sql, c).toMatch(new RegExp(`NEW\\.${c} IS DISTINCT FROM OLD\\.${c}`));
+    expect(sql).toMatch(/NEW\.active IS DISTINCT FROM OLD\.active/);
+    expect(fs.existsSync(path.join(__dirname, '../../../supabase/migrations'))).toBe(true);
+    expect(fs.readdirSync(path.join(__dirname, '../../../supabase/migrations')).some((f) => f.includes('snapshot_changed_at'))).toBe(false); // never auto-applied
+  });
+});

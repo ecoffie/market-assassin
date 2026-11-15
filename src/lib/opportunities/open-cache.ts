@@ -31,6 +31,17 @@ export interface OpenSnapshot { builtAt: string; rows: SnapshotRow[]; count: num
 
 /** Change markers: every enabled writer of a text column stamps one of these (audited 2026-11-14). */
 export const CHANGE_COLS = ['synced_at', 'description_checked_at', 'sow_checked_at', 'updated_at'] as const;
+/**
+ * Agent 5 review #2: with the DRAFT migration (tasks/search-stabilization-2026-11-14/migration-draft/, NOT applied) a
+ * database trigger stamps `snapshot_changed_at` only on a real change to a snapshot column, `active` or the deadline.
+ * OPEN_SNAPSHOT_CHANGE_MARKER=snapshot_changed_at switches to that single marker: complete by construction, and an
+ * unchanged sync upsert is no longer a "change" (also fixes #1 at the source). Unset = today's writer stamps. If the
+ * variable is set but the column does not exist, the change-count query errors and the caller uses SQL (never a guess).
+ * A snapshot must be built AFTER the trigger exists (changes before it were never stamped).
+ */
+export function changeCols(): readonly string[] {
+  return process.env.OPEN_SNAPSHOT_CHANGE_MARKER === 'snapshot_changed_at' ? ['snapshot_changed_at'] : CHANGE_COLS;
+}
 export const SNAPSHOT_MAX_AGE_MS = 6 * 3600_000;
 export const DELTA_MAX = 1500;
 const ID_CHUNK = 150;
@@ -130,8 +141,8 @@ export function compileOps(ops: Op[]): (row: Record<string, unknown>) => boolean
   return (row) => checks.every((c) => c(row));
 }
 
-const unchangedSince = (q: any, at: string) => CHANGE_COLS.reduce((acc, c) => acc.or(`${c}.lte.${at},${c}.is.null`), q);
-const changedSinceExpr = (at: string) => CHANGE_COLS.map((c) => `${c}.gt.${at}`).join(',');
+const unchangedSince = (q: any, at: string) => changeCols().reduce((acc, c) => acc.or(`${c}.lte.${at},${c}.is.null`), q);
+const changedSinceExpr = (at: string) => changeCols().map((c) => `${c}.gt.${at}`).join(',');
 function structured(q: any, plan: DiscoveryPlan): any {
   const mf = plan.horizons.open.mapFilters;
   return applyMapFilters(q, parseMapFilters((k) => (k === 'q' || k === 'search' || k === 'agency' ? null : mf[k] ?? null)));
