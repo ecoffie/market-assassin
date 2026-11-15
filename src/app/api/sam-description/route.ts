@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
       const cleaned = samHtmlToText(cached).slice(0, MAX_DESCRIPTION_LENGTH);
       void supabase
         .from('sam_opportunities')
-        .update({ description: cleaned })
+        .update({ description: cleaned, description_checked_at: new Date().toISOString() }) // change marker for open-cache.ts
         .eq('notice_id', noticeId)
         .then((res) => {
           if (res.error) console.warn('[sam-description] cache rewrite failed:', res.error.message);
@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
       }
       void supabase
         .from('sam_opportunities')
-        .update({ description: cleaned })
+        .update({ description: cleaned, description_checked_at: new Date().toISOString() }) // change marker for open-cache.ts
         .eq('notice_id', noticeId)
         .then((res) => {
           if (res.error) console.warn('[sam-description] cache write failed:', res.error.message);
