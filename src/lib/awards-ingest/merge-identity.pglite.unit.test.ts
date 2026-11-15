@@ -72,7 +72,7 @@ beforeAll(async () => {
     CREATE TABLE awards (${AWARDS_COLUMNS.map((c) => `${c.target} ${PG_TYPE[c.type]}`).join(', ')});
     CREATE TABLE staging (${STAGING_SOURCES.map((c) => `${c} text`).join(', ')});
   `);
-});
+}, 60_000); // PGlite (WASM Postgres) boot: same budget as the other *.pglite tests; 10s default timed out under load
 
 beforeEach(async () => {
   await db.exec('TRUNCATE awards; TRUNCATE staging;');

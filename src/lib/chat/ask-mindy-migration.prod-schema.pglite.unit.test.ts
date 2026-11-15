@@ -99,7 +99,7 @@ beforeAll(async () => {
   };
   await db.exec(FORWARD);
   await db.exec(FORWARD); // idempotent
-});
+}, 60_000); // PGlite (WASM Postgres) boot: same budget as the other *.pglite tests; 10s default timed out under load
 
 describe('forward migration on the live production schema', () => {
   it('adds exactly the documented columns, all nullable, appended after the existing ones', async () => {

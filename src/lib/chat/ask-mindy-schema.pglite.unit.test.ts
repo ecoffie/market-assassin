@@ -33,7 +33,7 @@ beforeAll(async () => {
   await db.exec(`INSERT INTO mcp_call_log (user_email, tool_name, status, credits_charged) VALUES ('legacy@x.com', 'search_contractors', 'success', 10)`);
   await db.exec(mig('20261114_ask_mindy_execution_trace.sql'));
   await db.exec(mig('20261114_ask_mindy_execution_trace.sql')); // idempotent re-apply
-});
+}, 60_000); // PGlite (WASM Postgres) boot: same budget as the other *.pglite tests; 10s default timed out under load
 
 describe('20261114_ask_mindy_execution_trace', () => {
   it('adds the trace columns, all nullable', async () => {

@@ -76,7 +76,7 @@ beforeAll(async () => {
   await provision(db);
   await db.exec(MIGRATION);
   await db.exec(MIGRATION); // idempotent re-apply
-});
+}, 60_000); // PGlite (WASM Postgres) boot: same budget as the other *.pglite tests; 10s default timed out under load
 
 describe('ops_incidents claim protocol on real Postgres', () => {
   it('overlapping passes → exactly one message; repeat → silent; recovery → one message', async () => {
