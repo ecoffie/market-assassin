@@ -1,0 +1,39 @@
+{
+ "rule": "RUBRIC-ADDENDUM-2026-11-14.md ruling 1 (repair is not supply for a parts-only seller)",
+ "date": "2026-11-14",
+ "items": [
+  {
+   "id": "r5-0206",
+   "biz": "parts",
+   "notice_id": "5bf74eea7fb84e4ba29fe5618b2d953d",
+   "ai": [
+    "FIT",
+    "FIT"
+   ],
+   "adjudicated": "NO",
+   "evidence": "This is an EAF REPAIR requirement for the items listed in this solicitation"
+  },
+  {
+   "id": "r5-0254",
+   "biz": "parts",
+   "notice_id": "bd914bbb3425478aa128c3e15d7b462b",
+   "ai": [
+    "FIT",
+    "FIT"
+   ],
+   "adjudicated": "NO",
+   "evidence": "This is an EAF REPAIR requirement for the items listed in this solicitation"
+  },
+  {
+   "id": "r6-0070",
+   "biz": "aircraft",
+   "notice_id": "df2e38fa731748249229a633db1e290a",
+   "ai": [
+    "FIT",
+    "FIT"
+   ],
+   "adjudicated": "NO",
+   "evidence": "Articles to be furnished hereunder shall be repaired, tested and inspected"
+  }
+ ]
+}

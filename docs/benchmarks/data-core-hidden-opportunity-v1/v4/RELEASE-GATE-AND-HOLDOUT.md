@@ -105,6 +105,8 @@ per business; the counts above are complete). Representative misses, each traced
 
 ### 2.4 What humans label
 
+> **Superseded 2026-11-14 for staffing and sample size:** see `HOLDOUT-REVIEWER-PLAN.md` (Eric as expert reviewer, two tiers, ≈ 150 preliminary judgments, independent 20% verification). The pool, snapshot and gate definitions below still apply.
+
 | Set | Per business | Purpose |
 |---|---|---|
 | T: top 20 of each variant, de-duplicated | ≤ 40 (usually about 25) | top-20 precision |
