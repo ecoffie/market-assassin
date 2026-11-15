@@ -430,3 +430,12 @@ describe('map "ask about this view": no place the customer did not give (2026-11
     expect(state.executedArgs[0]).toMatchObject({ state: 'TN', city: 'Memphis' });
   });
 });
+
+describe('incumbent wording rule (2026-11-15 smoke: "it appears there is no incumbent")', () => {
+  it('the answer model is told to name an incumbent only when identified and never to claim absence', async () => {
+    await ask('Who is the incumbent on solicitation 70Z08726QKEYWEST?');
+    const system = String(state.answerMessages[0]?.[0]?.content ?? '');
+    expect(system).toContain('name one only when _meta.incumbent_finding is "identified"');
+    expect(system).toContain('Never say "there is no incumbent"');
+  });
+});
