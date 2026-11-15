@@ -37,7 +37,9 @@ import { resolvePayer } from '@/lib/mcp/payer';
 import {
   CREDIT_PURCHASE_REASONS, COMPLIMENTARY_REASONS, DAY_MS, HISTORICALLY_AMBIGUOUS_REASONS,
   MCP_SUB_ANNUAL_WINDOW_DAYS, MCP_SUB_MONTHLY_WINDOW_DAYS, NEUTRAL_REASONS, PAID_FUNDING_REASONS,
-  REQUIRES_PAID_INVOICE,
+  REQUIRES_PAID_INVOICE, PAID_STATUS_POLICY, CHARGE_WINDOW_MONTHLY_DAYS, CHARGE_WINDOW_ANNUAL_DAYS,
+  CHARGE_LOOKBACK_DAYS, APP_TIER_NO_MIRROR_WINDOW_DAYS, APP_TIER_STALE_MIRROR_WINDOW_DAYS,
+  type PaidStatusPolicy,
 } from './paid-reasons';
 
 export * from './paid-reasons';
@@ -94,11 +96,18 @@ export interface LedgerGrant { reason: string; created_at: string }
 export interface SubscriptionFact {
   status: string;
   plan_amount: number | null;
+  plan_interval?: string | null;
+  current_period_start?: string | null;
   trial_end: string | null;
   current_period_end: string | null;
   ended_at: string | null;
 }
-export interface ChargeFact { amount: number; amount_refunded: number | null; status: string; refunded: boolean | null }
+export interface ChargeFact {
+  amount: number; amount_refunded: number | null; status: string; refunded: boolean | null;
+  /** An invoice charge (subscription billing), not a one-off payment. */
+  invoice_id?: string | null;
+  created_at?: string | null;
+}
 export interface PrepaidFact { access_starts_on: string; access_ends_on: string }
 
 /** All inputs; `null` for a store means the read FAILED (not "empty"). */
@@ -107,6 +116,8 @@ export interface PaidStatusFacts {
   ledgerGrants: LedgerGrant[] | null;
   ledgerTruncated?: boolean;
   subscriptions: SubscriptionFact[] | null;
+  /** The subscription or charge read hit its row cap. */
+  stripeTruncated?: boolean;
   charges: ChargeFact[] | null;
   prepaid: PrepaidFact[] | null;
   trialEndsAt: string | null | undefined;
@@ -132,7 +143,23 @@ function subIsLive(s: SubscriptionFact): boolean {
   return s.status === 'active' || s.status === 'past_due';
 }
 
-export function classifyPaidStatus(f: PaidStatusFacts): PaidStatus {
+/**
+ * A charge counts as the paid invoice for subscription `s` only when it is a succeeded,
+ * unrefunded INVOICE charge made inside the subscription's current period (or, when the
+ * period start is not mirrored, within one billing interval). One old unrelated charge can
+ * no longer make a coupon or stale subscription read as paid.
+ */
+function chargePaysFor(c: ChargeFact, s: SubscriptionFact, now: number): boolean {
+  if (c.status !== 'succeeded' || c.refunded || c.amount - (c.amount_refunded ?? 0) <= 0) return false;
+  if (!c.invoice_id) return false;
+  const at = ts(c.created_at);
+  if (!Number.isFinite(at)) return false;
+  const windowDays = s.plan_interval === 'year' ? CHARGE_WINDOW_ANNUAL_DAYS : CHARGE_WINDOW_MONTHLY_DAYS;
+  const start = Number.isFinite(ts(s.current_period_start)) ? ts(s.current_period_start) - 3 * DAY_MS : now - windowDays * DAY_MS;
+  return at >= start && at <= now + DAY_MS;
+}
+
+export function classifyPaidStatus(f: PaidStatusFacts, policy: PaidStatusPolicy = PAID_STATUS_POLICY): PaidStatus {
   const now = f.now;
   const failures: string[] = [];
   if (f.ledgerGrants === null) failures.push('mcp_credit_ledger');
@@ -162,11 +189,12 @@ export function classifyPaidStatus(f: PaidStatusFacts): PaidStatus {
   const charges = f.charges!;
 
   // --- Stripe facts
-  const paidCharge = charges.some((c) =>
-    c.status === 'succeeded' && !c.refunded && c.amount - (c.amount_refunded ?? 0) > 0);
   const liveNonTrial = subs.find((s) => subIsLive(s) && (s.plan_amount ?? 0) > 0 && !subIsTrialing(s, now));
+  const paidCharge = !!liveNonTrial && charges.some((c) => chargePaysFor(c, liveNonTrial, now));
   const trialingSub = subs.find((s) => subIsTrialing(s, now) && !s.ended_at && s.status !== 'canceled');
   const anyLiveSub = subs.some((s) => subIsLive(s) || subIsTrialing(s, now));
+  // A trial on some other plan must not keep an ended paid plan "live".
+  const anyLivePaidSub = subs.some((s) => subIsLive(s) && (s.plan_amount ?? 0) > 0 && !subIsTrialing(s, now));
   const mirrorHasSubs = subs.length > 0;
 
   // --- Ledger facts
@@ -181,14 +209,16 @@ export function classifyPaidStatus(f: PaidStatusFacts): PaidStatus {
   // A ledger window only stands in for Stripe when the mirror has NO subscription for
   // this customer. If the mirror holds subscriptions and none is live, the plan ended —
   // e.g. an annual plan cancelled after its period, whose last grant is <370 days old.
-  const mcpSubLive = (mcpMonthlyLive || mcpAnnualLive) && (!mirrorHasSubs || anyLiveSub);
+  const mcpSubLive = (mcpMonthlyLive || mcpAnnualLive) && (!mirrorHasSubs || anyLivePaidSub);
+  const latestAppTier = Math.max(latest('app_tier_pro'), latest('app_tier_team'));
 
   const activePaidSub = !!liveNonTrial && (paidCharge || hadMcpSub);
   if (activePaidSub) sources.add('stripe_subscription_paid');
   if (mcpSubLive) sources.add('mcp_subscription_ledger');
   if (hadAppTier) sources.add(activePaidSub || paidCharge ? 'app_tier_ledger_corroborated' : 'unverified_app_tier');
 
-  const creditPurchase = ledger.some((g) => CREDIT_PURCHASE_REASONS.has(g.reason));
+  const creditPurchase = ledger.some((g) =>
+    CREDIT_PURCHASE_REASONS.has(g.reason) || (policy.adminGrantIsPaid && g.reason === 'admin_grant'));
   if (creditPurchase) sources.add('credit_purchase');
 
   const today = new Date(now).toISOString().slice(0, 10);
@@ -208,6 +238,7 @@ export function classifyPaidStatus(f: PaidStatusFacts): PaidStatus {
 
   const known = new Set<string>([
     ...PAID_FUNDING_REASONS, ...HISTORICALLY_AMBIGUOUS_REASONS, ...COMPLIMENTARY_REASONS, ...NEUTRAL_REASONS,
+    ...(policy.adminGrantIsPaid ? ['admin_grant'] : []),
   ]);
   const promotionalReasons = [...reasons].filter((r) => !known.has(r)).sort();
   if (promotionalReasons.length) sources.add('promotional_credits');
@@ -236,11 +267,20 @@ export function classifyPaidStatus(f: PaidStatusFacts): PaidStatus {
   //  - a pro_monthly row with nothing else: historically written for paying Pro, for
   //    lifetime/bundle buyers AND for comp, so it can be neither paid nor free here.
   const ambiguousOnly = sources.has('ambiguous_pro_monthly') && !complimentaryRegistry && !complimentaryLedger;
+  //  - a recent app_tier_* grant the mirror cannot account for: the Stripe customer email
+  //    can differ from the login email, and the mirror syncs daily (an old helper allowed
+  //    these accounts, so calling them expired would block a paying customer).
+  const appTierUnexplained = !trialing && !anyLivePaidSub && Number.isFinite(latestAppTier) && (
+    !mirrorHasSubs
+      ? latestAppTier >= now - APP_TIER_NO_MIRROR_WINDOW_DAYS * DAY_MS
+      : latestAppTier >= now - APP_TIER_STALE_MIRROR_WINDOW_DAYS * DAY_MS);
   const unestablished = !paidFunding && (
     f.ledgerTruncated ? 'mcp_credit_ledger_truncated'
-      : liveNonTrial && !paidCharge && !hadMcpSub ? 'paid_invoice_not_mirrored'
-        : ambiguousOnly && !trialing ? 'ambiguous_pro_monthly'
-          : null);
+      : f.stripeTruncated ? 'stripe_mirror_truncated'
+        : liveNonTrial && !paidCharge && !hadMcpSub ? 'paid_invoice_not_mirrored'
+          : appTierUnexplained ? (mirrorHasSubs ? 'app_tier_mirror_stale' : 'app_tier_no_mirrored_subscription')
+            : ambiguousOnly && !trialing ? 'ambiguous_pro_monthly'
+              : null);
   if (unestablished) {
     return {
       kind: 'unknown', sources: [...sources], paidFunding: null,
@@ -272,13 +312,14 @@ export type Read<T> = { ok: true; value: T } | { ok: false };
 
 export interface PaidStatusReader {
   ledgerGrants(email: string, cap: number): Promise<Read<LedgerGrant[]>>;
-  subscriptionsAndCharges(email: string): Promise<Read<{ subscriptions: SubscriptionFact[]; charges: ChargeFact[] }>>;
+  subscriptionsAndCharges(email: string): Promise<Read<{ subscriptions: SubscriptionFact[]; charges: ChargeFact[]; truncated?: boolean }>>;
   prepaid(email: string): Promise<Read<PrepaidFact[]>>;
   trialEndsAt(email: string): Promise<Read<string | null>>;
   poolFunded(email: string): Promise<Read<boolean>>;
 }
 
 export const LEDGER_CAP = 1000;
+export const STRIPE_ROW_CAP = 200;
 
 /** Escape PostgREST ILIKE wildcards so an email matches literally (case-insensitive). */
 function ilikeLiteral(s: string): string {
@@ -304,18 +345,22 @@ export const supabasePaidStatusReader: PaidStatusReader = {
     if (cErr) return { ok: false };
     const ids = (customers ?? []).map((c) => (c as { id: string }).id);
     if (!ids.length) return { ok: true, value: { subscriptions: [], charges: [] } };
+    const since = new Date(Date.now() - CHARGE_LOOKBACK_DAYS * DAY_MS).toISOString();
     const [subRes, chRes] = await Promise.all([
       db.from('stripe_subscriptions')
-        .select('status, plan_amount, trial_end, current_period_end, ended_at')
-        .in('customer_id', ids).limit(200),
+        .select('status, plan_amount, plan_interval, trial_end, current_period_start, current_period_end, ended_at')
+        .in('customer_id', ids).limit(STRIPE_ROW_CAP),
       db.from('stripe_charges')
-        .select('amount, amount_refunded, status, refunded')
-        .in('customer_id', ids).eq('status', 'succeeded').gt('amount', 0).limit(200),
+        .select('amount, amount_refunded, status, refunded, invoice_id, created_at')
+        .in('customer_id', ids).eq('status', 'succeeded').gt('amount', 0).gte('created_at', since)
+        .order('created_at', { ascending: false }).limit(STRIPE_ROW_CAP),
     ]);
     if (subRes.error || chRes.error) return { ok: false };
+    const subscriptions = (subRes.data ?? []) as SubscriptionFact[];
+    const charges = (chRes.data ?? []) as ChargeFact[];
     return {
       ok: true,
-      value: { subscriptions: (subRes.data ?? []) as SubscriptionFact[], charges: (chRes.data ?? []) as ChargeFact[] },
+      value: { subscriptions, charges, truncated: subscriptions.length >= STRIPE_ROW_CAP || charges.length >= STRIPE_ROW_CAP },
     };
   },
   async prepaid(email) {
@@ -378,6 +423,7 @@ export async function resolvePaidStatus(
     ledgerGrants: ledger.ok ? ledger.value : null,
     ledgerTruncated: ledger.ok && ledger.value.length >= LEDGER_CAP,
     subscriptions: stripe.ok ? stripe.value.subscriptions : null,
+    stripeTruncated: stripe.ok && !!stripe.value.truncated,
     charges: stripe.ok ? stripe.value.charges : null,
     prepaid: prepaid.ok ? prepaid.value : null,
     trialEndsAt: trial.ok ? trial.value : null,

@@ -59,6 +59,46 @@ export const CREDIT_PURCHASE_REASONS = new Set(['stripe_topup', 'auto_recharge']
  */
 export const HISTORICALLY_AMBIGUOUS_REASONS: readonly string[] = ['pro_monthly', 'pro_monthly_supplement'];
 
+/**
+ * PROMOTIONAL ledger reasons, named so the policy is readable. Classification stays
+ * fail-closed: ANY reason not listed as paid, ambiguous, complimentary or neutral is also
+ * treated as promotional, including reasons added after this file was written.
+ * admin_grant is here by default (a manual grant is not proof of payment); flip
+ * PAID_STATUS_POLICY.adminGrantIsPaid to change that.
+ */
+export const PROMOTIONAL_REASONS = new Set([
+  'signup_grant', 'referral', 'trial_promo', 'event_bonus', 'trial_upgrade_bonus', 'admin_grant',
+]);
+
+/**
+ * Owner policy, one line each. These are the decisions still open with the owner; each is
+ * a single edit here and is covered by a test in paid-status.unit.test.ts.
+ *   adminGrantIsPaid    a manual admin grant counts as bought credits (default: no)
+ *   admitComplimentary  staff / advocate / comp accounts may call proprietary tools,
+ *                       though they never count as paid (default: yes)
+ *   unknownAllows       when paid status cannot be established, the guard allows the call
+ *                       (fail open, as the guard always has) (default: yes)
+ */
+export interface PaidStatusPolicy { adminGrantIsPaid: boolean; admitComplimentary: boolean; unknownAllows: boolean }
+export const PAID_STATUS_POLICY: Readonly<PaidStatusPolicy> = Object.freeze({
+  adminGrantIsPaid: false,
+  admitComplimentary: true,
+  unknownAllows: true,
+});
+
+/** How recent a charge must be to count for a live subscription when its period start is unknown. */
+export const CHARGE_WINDOW_MONTHLY_DAYS = 40;
+export const CHARGE_WINDOW_ANNUAL_DAYS = 370;
+/** Only charges this recent are read at all. */
+export const CHARGE_LOOKBACK_DAYS = 400;
+/**
+ * A recent app_tier_* grant that the Stripe mirror cannot account for (no subscription
+ * under this email, or none live) is UNKNOWN, not expired: the customer's Stripe email can
+ * differ from the login email, and the mirror syncs daily.
+ */
+export const APP_TIER_NO_MIRROR_WINDOW_DAYS = 370;
+export const APP_TIER_STALE_MIRROR_WINDOW_DAYS = 40;
+
 /** Complimentary allowances: access, never payment. */
 export const COMPLIMENTARY_REASONS = new Set(['comp_monthly', 'comp_grant', 'comp_reset']);
 

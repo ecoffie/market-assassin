@@ -22,8 +22,10 @@
 import { resolvePayer } from './payer';
 import { getWriteClient } from '@/lib/supabase/server-clients';
 import { MCP_CHANNEL_OR_FILTER } from './channel-filter';
+import { after } from 'next/server';
 import {
-  paidStatusResolverEnabled, paidStatusShadowEnabled, resolvePaidStatus, type PaidStatus,
+  paidStatusResolverEnabled, paidStatusShadowEnabled, resolvePaidStatus, PAID_STATUS_POLICY,
+  type PaidStatus, type PaidStatusPolicy,
 } from '@/lib/entitlements/paid-status';
 import { subjectKey } from '@/lib/entitlements/shadow';
 
@@ -107,15 +109,18 @@ async function legacyHasPaidStanding(userEmail: string): Promise<boolean> {
  *   - unknown (a read failed) → allowed: the guard fails open, as it always has.
  *   - trial / promotional_only / expired / none → requires paid credits.
  */
-export function proprietaryStandingFrom(status: PaidStatus): boolean {
-  if (status.kind === 'unknown') return true;
-  return status.paidFunding === true || status.complimentaryAccess;
+export function proprietaryStandingFrom(status: PaidStatus, policy: PaidStatusPolicy = PAID_STATUS_POLICY): boolean {
+  if (status.kind === 'unknown') return policy.unknownAllows;
+  if (status.paidFunding === true) return true;
+  return policy.admitComplimentary && status.complimentaryAccess;
 }
 
 /** Shadow compare: logs a disagreement only, with a keyed hash — never the email. */
 function shadowCompare(userEmail: string, legacy: boolean): void {
   if (!paidStatusShadowEnabled()) return;
-  void resolvePaidStatus(userEmail).then((status) => {
+  // Shadow-only reads (about 6 per proprietary call) happen after the response, and only
+  // while PAID_STATUS_SHADOW is on. after() keeps the serverless function alive for them.
+  const task = () => resolvePaidStatus(userEmail).then((status) => {
     const next = proprietaryStandingFrom(status);
     if (next !== legacy) {
       console.info('[mcp:extraction-guard] paid-status shadow disagreement', JSON.stringify({
@@ -123,6 +128,7 @@ function shadowCompare(userEmail: string, legacy: boolean): void {
       }));
     }
   }).catch(() => { /* shadow never affects the call */ });
+  try { after(task); } catch { void task(); /* outside a request scope (scripts/tests) */ }
 }
 
 /** Layer A: does this account have the standing to call proprietary tools? */
