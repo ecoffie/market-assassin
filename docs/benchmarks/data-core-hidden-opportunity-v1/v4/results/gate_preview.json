@@ -1,0 +1,601 @@
+{
+ "note": "AI labels, in-sample, Nov 14 snapshot. Preview only; does not satisfy the release gate.",
+ "variants": {
+  "base": {
+   "pooled_top20": [
+    0.364,
+    0.421
+   ],
+   "pooled_top20_pass": false,
+   "businesses_below_40_lower_bound": [
+    "janitorial",
+    "nursing",
+    "guards",
+    "steelbldg",
+    "parts",
+    "fasteners",
+    "medical",
+    "ithardware"
+   ],
+   "pooled_code_recall": 0.336,
+   "pooled_code_recall_pass": false,
+   "businesses_below_50_recall": [
+    "guards",
+    "grounds",
+    "fasteners",
+    "electrical",
+    "valves",
+    "aircraft",
+    "medical",
+    "ithardware"
+   ],
+   "rows": [
+    {
+     "business": "janitorial",
+     "cat": "service",
+     "top_n": 20,
+     "top_lo": 2,
+     "top_hi": 3,
+     "top_pass_floor": false,
+     "recall_found": 17,
+     "recall_relevant": 25,
+     "recall": 0.68,
+     "recall_pass": true
+    },
+    {
+     "business": "nursing",
+     "cat": "service",
+     "top_n": 20,
+     "top_lo": 6,
+     "top_hi": 8,
+     "top_pass_floor": false,
+     "recall_found": 6,
+     "recall_relevant": 8,
+     "recall": 0.75,
+     "recall_pass": true
+    },
+    {
+     "business": "hvac",
+     "cat": "service",
+     "top_n": 20,
+     "top_lo": 16,
+     "top_hi": 17,
+     "top_pass_floor": true,
+     "recall_found": 11,
+     "recall_relevant": 20,
+     "recall": 0.55,
+     "recall_pass": true
+    },
+    {
+     "business": "guards",
+     "cat": "service",
+     "top_n": 20,
+     "top_lo": 2,
+     "top_hi": 2,
+     "top_pass_floor": false,
+     "recall_found": 4,
+     "recall_relevant": 12,
+     "recall": 0.33,
+     "recall_pass": false
+    },
+    {
+     "business": "steelbldg",
+     "cat": "service",
+     "top_n": 20,
+     "top_lo": 3,
+     "top_hi": 4,
+     "top_pass_floor": false,
+     "recall_found": 6,
+     "recall_relevant": 11,
+     "recall": 0.55,
+     "recall_pass": true
+    },
+    {
+     "business": "grounds",
+     "cat": "service",
+     "top_n": 20,
+     "top_lo": 12,
+     "top_hi": 13,
+     "top_pass_floor": true,
+     "recall_found": 5,
+     "recall_relevant": 23,
+     "recall": 0.22,
+     "recall_pass": false
+    },
+    {
+     "business": "paving",
+     "cat": "service",
+     "top_n": 20,
+     "top_lo": 15,
+     "top_hi": 17,
+     "top_pass_floor": true,
+     "recall_found": 16,
+     "recall_relevant": 21,
+     "recall": 0.76,
+     "recall_pass": true
+    },
+    {
+     "business": "parts",
+     "cat": "product",
+     "top_n": 20,
+     "top_lo": 5,
+     "top_hi": 6,
+     "top_pass_floor": false,
+     "recall_found": 0,
+     "recall_relevant": 0,
+     "recall": null,
+     "recall_pass": null
+    },
+    {
+     "business": "fasteners",
+     "cat": "product",
+     "top_n": 20,
+     "top_lo": 7,
+     "top_hi": 8,
+     "top_pass_floor": false,
+     "recall_found": 6,
+     "recall_relevant": 25,
+     "recall": 0.24,
+     "recall_pass": false
+    },
+    {
+     "business": "electrical",
+     "cat": "product",
+     "top_n": 20,
+     "top_lo": 9,
+     "top_hi": 9,
+     "top_pass_floor": true,
+     "recall_found": 2,
+     "recall_relevant": 24,
+     "recall": 0.08,
+     "recall_pass": false
+    },
+    {
+     "business": "valves",
+     "cat": "product",
+     "top_n": 20,
+     "top_lo": 10,
+     "top_hi": 13,
+     "top_pass_floor": true,
+     "recall_found": 0,
+     "recall_relevant": 23,
+     "recall": 0.0,
+     "recall_pass": false
+    },
+    {
+     "business": "aircraft",
+     "cat": "product",
+     "top_n": 20,
+     "top_lo": 9,
+     "top_hi": 11,
+     "top_pass_floor": true,
+     "recall_found": 4,
+     "recall_relevant": 21,
+     "recall": 0.19,
+     "recall_pass": false
+    },
+    {
+     "business": "medical",
+     "cat": "product",
+     "top_n": 20,
+     "top_lo": 6,
+     "top_hi": 7,
+     "top_pass_floor": false,
+     "recall_found": 4,
+     "recall_relevant": 24,
+     "recall": 0.17,
+     "recall_pass": false
+    },
+    {
+     "business": "ithardware",
+     "cat": "product",
+     "top_n": 20,
+     "top_lo": 0,
+     "top_hi": 0,
+     "top_pass_floor": false,
+     "recall_found": 0,
+     "recall_relevant": 4,
+     "recall": 0.0,
+     "recall_pass": false
+    }
+   ]
+  },
+  "A": {
+   "pooled_top20": [
+    0.375,
+    0.436
+   ],
+   "pooled_top20_pass": false,
+   "businesses_below_40_lower_bound": [
+    "janitorial",
+    "nursing",
+    "guards",
+    "steelbldg",
+    "parts",
+    "fasteners",
+    "medical",
+    "ithardware"
+   ],
+   "pooled_code_recall": 0.336,
+   "pooled_code_recall_pass": false,
+   "businesses_below_50_recall": [
+    "guards",
+    "grounds",
+    "fasteners",
+    "electrical",
+    "valves",
+    "aircraft",
+    "medical",
+    "ithardware"
+   ],
+   "rows": [
+    {
+     "business": "janitorial",
+     "cat": "service",
+     "top_n": 20,
+     "top_lo": 2,
+     "top_hi": 3,
+     "top_pass_floor": false,
+     "recall_found": 17,
+     "recall_relevant": 25,
+     "recall": 0.68,
+     "recall_pass": true
+    },
+    {
+     "business": "nursing",
+     "cat": "service",
+     "top_n": 20,
+     "top_lo": 6,
+     "top_hi": 8,
+     "top_pass_floor": false,
+     "recall_found": 6,
+     "recall_relevant": 8,
+     "recall": 0.75,
+     "recall_pass": true
+    },
+    {
+     "business": "hvac",
+     "cat": "service",
+     "top_n": 20,
+     "top_lo": 16,
+     "top_hi": 17,
+     "top_pass_floor": true,
+     "recall_found": 11,
+     "recall_relevant": 20,
+     "recall": 0.55,
+     "recall_pass": true
+    },
+    {
+     "business": "guards",
+     "cat": "service",
+     "top_n": 20,
+     "top_lo": 3,
+     "top_hi": 3,
+     "top_pass_floor": false,
+     "recall_found": 4,
+     "recall_relevant": 12,
+     "recall": 0.33,
+     "recall_pass": false
+    },
+    {
+     "business": "steelbldg",
+     "cat": "service",
+     "top_n": 20,
+     "top_lo": 3,
+     "top_hi": 4,
+     "top_pass_floor": false,
+     "recall_found": 6,
+     "recall_relevant": 11,
+     "recall": 0.55,
+     "recall_pass": true
+    },
+    {
+     "business": "grounds",
+     "cat": "service",
+     "top_n": 20,
+     "top_lo": 12,
+     "top_hi": 13,
+     "top_pass_floor": true,
+     "recall_found": 5,
+     "recall_relevant": 23,
+     "recall": 0.22,
+     "recall_pass": false
+    },
+    {
+     "business": "paving",
+     "cat": "service",
+     "top_n": 20,
+     "top_lo": 15,
+     "top_hi": 17,
+     "top_pass_floor": true,
+     "recall_found": 16,
+     "recall_relevant": 21,
+     "recall": 0.76,
+     "recall_pass": true
+    },
+    {
+     "business": "parts",
+     "cat": "product",
+     "top_n": 20,
+     "top_lo": 7,
+     "top_hi": 9,
+     "top_pass_floor": false,
+     "recall_found": 0,
+     "recall_relevant": 0,
+     "recall": null,
+     "recall_pass": null
+    },
+    {
+     "business": "fasteners",
+     "cat": "product",
+     "top_n": 20,
+     "top_lo": 7,
+     "top_hi": 8,
+     "top_pass_floor": false,
+     "recall_found": 6,
+     "recall_relevant": 25,
+     "recall": 0.24,
+     "recall_pass": false
+    },
+    {
+     "business": "electrical",
+     "cat": "product",
+     "top_n": 20,
+     "top_lo": 9,
+     "top_hi": 9,
+     "top_pass_floor": true,
+     "recall_found": 2,
+     "recall_relevant": 24,
+     "recall": 0.08,
+     "recall_pass": false
+    },
+    {
+     "business": "valves",
+     "cat": "product",
+     "top_n": 20,
+     "top_lo": 10,
+     "top_hi": 13,
+     "top_pass_floor": true,
+     "recall_found": 0,
+     "recall_relevant": 23,
+     "recall": 0.0,
+     "recall_pass": false
+    },
+    {
+     "business": "aircraft",
+     "cat": "product",
+     "top_n": 20,
+     "top_lo": 9,
+     "top_hi": 11,
+     "top_pass_floor": true,
+     "recall_found": 4,
+     "recall_relevant": 21,
+     "recall": 0.19,
+     "recall_pass": false
+    },
+    {
+     "business": "medical",
+     "cat": "product",
+     "top_n": 20,
+     "top_lo": 6,
+     "top_hi": 7,
+     "top_pass_floor": false,
+     "recall_found": 4,
+     "recall_relevant": 24,
+     "recall": 0.17,
+     "recall_pass": false
+    },
+    {
+     "business": "ithardware",
+     "cat": "product",
+     "top_n": 20,
+     "top_lo": 0,
+     "top_hi": 0,
+     "top_pass_floor": false,
+     "recall_found": 0,
+     "recall_relevant": 4,
+     "recall": 0.0,
+     "recall_pass": false
+    }
+   ]
+  },
+  "C": {
+   "pooled_top20": [
+    0.399,
+    0.462
+   ],
+   "pooled_top20_pass": false,
+   "businesses_below_40_lower_bound": [
+    "janitorial",
+    "nursing",
+    "steelbldg",
+    "parts",
+    "fasteners",
+    "medical",
+    "ithardware"
+   ],
+   "pooled_code_recall": 0.336,
+   "pooled_code_recall_pass": false,
+   "businesses_below_50_recall": [
+    "guards",
+    "grounds",
+    "fasteners",
+    "electrical",
+    "valves",
+    "aircraft",
+    "medical",
+    "ithardware"
+   ],
+   "rows": [
+    {
+     "business": "janitorial",
+     "cat": "service",
+     "top_n": 20,
+     "top_lo": 2,
+     "top_hi": 3,
+     "top_pass_floor": false,
+     "recall_found": 17,
+     "recall_relevant": 25,
+     "recall": 0.68,
+     "recall_pass": true
+    },
+    {
+     "business": "nursing",
+     "cat": "service",
+     "top_n": 20,
+     "top_lo": 6,
+     "top_hi": 8,
+     "top_pass_floor": false,
+     "recall_found": 6,
+     "recall_relevant": 8,
+     "recall": 0.75,
+     "recall_pass": true
+    },
+    {
+     "business": "hvac",
+     "cat": "service",
+     "top_n": 20,
+     "top_lo": 16,
+     "top_hi": 17,
+     "top_pass_floor": true,
+     "recall_found": 11,
+     "recall_relevant": 20,
+     "recall": 0.55,
+     "recall_pass": true
+    },
+    {
+     "business": "guards",
+     "cat": "service",
+     "top_n": 13,
+     "top_lo": 7,
+     "top_hi": 7,
+     "top_pass_floor": true,
+     "recall_found": 4,
+     "recall_relevant": 12,
+     "recall": 0.33,
+     "recall_pass": false
+    },
+    {
+     "business": "steelbldg",
+     "cat": "service",
+     "top_n": 20,
+     "top_lo": 3,
+     "top_hi": 4,
+     "top_pass_floor": false,
+     "recall_found": 6,
+     "recall_relevant": 11,
+     "recall": 0.55,
+     "recall_pass": true
+    },
+    {
+     "business": "grounds",
+     "cat": "service",
+     "top_n": 20,
+     "top_lo": 12,
+     "top_hi": 13,
+     "top_pass_floor": true,
+     "recall_found": 5,
+     "recall_relevant": 23,
+     "recall": 0.22,
+     "recall_pass": false
+    },
+    {
+     "business": "paving",
+     "cat": "service",
+     "top_n": 20,
+     "top_lo": 15,
+     "top_hi": 17,
+     "top_pass_floor": true,
+     "recall_found": 16,
+     "recall_relevant": 21,
+     "recall": 0.76,
+     "recall_pass": true
+    },
+    {
+     "business": "parts",
+     "cat": "product",
+     "top_n": 20,
+     "top_lo": 7,
+     "top_hi": 9,
+     "top_pass_floor": false,
+     "recall_found": 0,
+     "recall_relevant": 0,
+     "recall": null,
+     "recall_pass": null
+    },
+    {
+     "business": "fasteners",
+     "cat": "product",
+     "top_n": 20,
+     "top_lo": 7,
+     "top_hi": 8,
+     "top_pass_floor": false,
+     "recall_found": 6,
+     "recall_relevant": 25,
+     "recall": 0.24,
+     "recall_pass": false
+    },
+    {
+     "business": "electrical",
+     "cat": "product",
+     "top_n": 20,
+     "top_lo": 9,
+     "top_hi": 9,
+     "top_pass_floor": true,
+     "recall_found": 2,
+     "recall_relevant": 24,
+     "recall": 0.08,
+     "recall_pass": false
+    },
+    {
+     "business": "valves",
+     "cat": "product",
+     "top_n": 20,
+     "top_lo": 10,
+     "top_hi": 13,
+     "top_pass_floor": true,
+     "recall_found": 0,
+     "recall_relevant": 23,
+     "recall": 0.0,
+     "recall_pass": false
+    },
+    {
+     "business": "aircraft",
+     "cat": "product",
+     "top_n": 20,
+     "top_lo": 9,
+     "top_hi": 11,
+     "top_pass_floor": true,
+     "recall_found": 4,
+     "recall_relevant": 21,
+     "recall": 0.19,
+     "recall_pass": false
+    },
+    {
+     "business": "medical",
+     "cat": "product",
+     "top_n": 20,
+     "top_lo": 6,
+     "top_hi": 7,
+     "top_pass_floor": false,
+     "recall_found": 4,
+     "recall_relevant": 24,
+     "recall": 0.17,
+     "recall_pass": false
+    },
+    {
+     "business": "ithardware",
+     "cat": "product",
+     "top_n": 20,
+     "top_lo": 0,
+     "top_hi": 0,
+     "top_pass_floor": false,
+     "recall_found": 0,
+     "recall_relevant": 4,
+     "recall": 0.0,
+     "recall_pass": false
+    }
+   ]
+  }
+ }
+}
