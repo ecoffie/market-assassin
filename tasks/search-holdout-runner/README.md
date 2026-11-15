@@ -138,3 +138,12 @@ reported DIFF (overlap 5/20). So the comparison does detect a mismatch; it is no
 filter evaluation equals Postgres. That part rests on two things: the shared regex translation, and the cache benchmark's
 live comparison against SQL (`harness/cache-bench.mts`, 17/17 identical count and window wherever SQL completed).
 The Map route (`/api/app/opportunity-map`) is a different surface and is not covered here.
+
+## Runner 1.1.0 (2026-11-15): code-recall sub-window
+
+Tags that export `openCodeWindowPsc` (from `agent3/it-window-evidence` onward) append the product preset's own coded
+notices when the 500-row deadline window is full, exactly as `queryOpenNow` does. The output gains `code_window_ids`, and
+route parity compares those rows too.
+
+Tags without the export (RC1, RC2, RC3 preview) are unaffected. Runner 1.1.0 still reproduces RC1 and RC2 against
+`matched-sets-rc2-classification.json` (28/28), and RC3's top 20 and matched sets are unchanged from runner 1.0.0.

@@ -26,7 +26,7 @@ import zlib from 'zlib';
 import crypto from 'crypto';
 import { execFileSync } from 'child_process';
 
-const RUNNER_VERSION = '1.0.0';
+const RUNNER_VERSION = '1.1.0';
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 function args(argv: string[]) {
@@ -97,7 +97,7 @@ async function run(o: Record<string, string | boolean>) {
   ]);
   const { buildDiscoveryPlan, OPEN_TEXT_COLS } = planM; const { MCP_POLICY } = policyM;
   const { matchesText, phraseRegex, jsRegex } = matcherM; const { rankRecords } = rankM;
-  const { interpretMarket } = interpM; const { openRetrievalNaics, openRetrievalPsc } = relM;
+  const { interpretMarket } = interpM; const { openRetrievalNaics, openRetrievalPsc, openCodeWindowPsc, OPEN_CODE_WINDOW_CAP } = relM;
   const { labelOpenRow, demoteDuplicateVersions } = findM;
   const fy = Number(today.slice(0, 4)) + (Number(today.slice(5, 7)) >= 10 ? 1 : 0);
   const ctx = { today, fiscalYear: fy };
@@ -112,8 +112,20 @@ async function run(o: Record<string, string | boolean>) {
     const vcols: string[] = cap.direct.vocabCols || ['title'];
     const matched = rows.filter((r) => codeIn(tn, r.naics_code, 6) || codeIn(tp, r.psc_code, 4)
       || vocab.some((re: RegExp) => vcols.some((c) => re.test(String(r[c] || '')))) || matchesText(plan.matcher, cols.map((c) => r[c])));
-    const win = [...matched].sort((a, b) => String(a.response_deadline || '9999').localeCompare(String(b.response_deadline || '9999'))
-      || String(a.notice_id).localeCompare(String(b.notice_id))).slice(0, 500);
+    const byDeadline = (a: Row, b: Row) => String(a.response_deadline || '9999').localeCompare(String(b.response_deadline || '9999'))
+      || String(a.notice_id).localeCompare(String(b.notice_id));
+    const win = [...matched].sort(byDeadline).slice(0, 500);
+    // Tags that export openCodeWindowPsc (code-recall sub-window, 2026-11-15) append the product preset's own coded
+    // notices, deadline-ordered and capped, when the deadline window is full — exactly as queryOpenNow does.
+    let codeWindowIds: string[] = [];
+    if (typeof openCodeWindowPsc === 'function' && win.length >= 500) {
+      const codes = new Set<string>(openCodeWindowPsc(cap));
+      if (codes.size) {
+        const inWin = new Set(win.map((r) => r.notice_id));
+        const extra = matched.filter((r) => codes.has(String(r.psc_code || ''))).sort(byDeadline).slice(0, OPEN_CODE_WINDOW_CAP).filter((r) => !inWin.has(r.notice_id));
+        win.push(...extra); codeWindowIds = extra.map((r) => String(r.notice_id));
+      }
+    }
     const sc = new Map(rankRecords(plan, win, ['title', 'description', 'department']).map((s: Row) => [s.row, s]));
     let ranked = win.map((row, i) => ({ i, row, label: labelOpenRow(row, plan, cap, null), s: sc.get(row) as Row | undefined }))
       .sort((a, b) => a.label.tier - b.label.tier || (b.s?.breadth ?? 0) - (a.s?.breadth ?? 0) || (b.s?.score ?? 0) - (a.s?.score ?? 0) || a.i - b.i);
@@ -124,12 +136,13 @@ async function run(o: Record<string, string | boolean>) {
       matched_count: matched.length,
       matched: matched.map((r) => String(r.notice_id)).sort(),
       window_count: win.length,
+      code_window_ids: codeWindowIds,
       top20: ranked.slice(0, 20).map((x, k) => ({ rank: k + 1, notice_id: String(x.row.notice_id), cls: x.label.cls, tier: x.label.tier, basis: x.label.basis ?? [] })),
     };
   });
 
   const out = stable({
-    runner: { name: 'mindy-search-holdout-runner', version: RUNNER_VERSION, emulation: 'eval.mts FIND Open (500 by deadline, ties by notice_id; tier>breadth>score>position)' },
+    runner: { name: 'mindy-search-holdout-runner', version: RUNNER_VERSION, emulation: 'eval.mts FIND Open (500 by deadline, ties by notice_id; + code-recall sub-window when the tag has it; tier>breadth>score>position)' },
     src: { commit, tags, dirty },
     snapshot: {
       file: path.basename(snapPath), file_sha256: sha256(raw), snapshot_at: snap.snapshot_at ?? null,

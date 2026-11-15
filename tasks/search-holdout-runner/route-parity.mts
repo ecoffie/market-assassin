@@ -99,7 +99,7 @@ function leaf(n: Leaf, r: Row): boolean {
 const node = (n: Node, r: Row): boolean => ('lg' in n ? (n.lg === 'and' ? n.items.every((x) => node(x, r)) : n.items.some((x) => node(x, r))) : leaf(n, r));
 
 // ── Fake Supabase client over the snapshot. Records the deadline window each phrasing's route reads. ──
-let captured: { window: string[] | null; count: number | null } = { window: null, count: null };
+let captured: { window: string[] | null; count: number | null; extra?: string[] } = { window: null, count: null };
 function fakeClient() {
   return {
     from(table: string) {
@@ -128,6 +128,7 @@ function fakeClient() {
           }
           if (lim != null) out = out.slice(0, lim);
           if (!head && order?.col === 'response_deadline' && lim && lim >= 500 && captured.window === null) captured = { window: out.map((r) => String(r.notice_id)), count };
+          else if (!head && order?.col === 'response_deadline' && captured.window && !wantCount) captured.extra = [...(captured.extra || []), ...out.map((r) => String(r.notice_id)).filter((id) => !captured.window!.includes(id) && !(captured.extra || []).includes(id))];
           return res({ data: head ? null : out, count: wantCount ? count : null, error: null });
         } catch (e) {
           if (e instanceof MissingColumn) return res({ data: null, count: null, error: { message: `column ${e.message} not in snapshot`, code: 'PARITY_MISSING_COLUMN' } });
@@ -155,12 +156,15 @@ for (const { business, phrasing, query } of list) {
   const runTop = (rr.top20 as Row[]).map((t) => t.notice_id);
   const routeCls = ((h.items || []) as Row[]).slice(0, 20).map((it) => it.evidence_class ?? 'WEAK_NON_MARKET');
   const runCls = (rr.top20 as Row[]).map((t) => t.cls);
-  const winSame = !!captured.window && captured.window.length === rWin.length && captured.window.every((x, i) => x === rWin[i]);
+  const rExtra = (rr.code_window_ids as string[] | undefined) || [];
+  const extra = captured.extra || [];
+  const winSame = !!captured.window && captured.window.length === rWin.length && captured.window.every((x, i) => x === rWin[i])
+    && extra.length === rExtra.length && extra.every((x, i) => x === rExtra[i]);
   const winOverlap = captured.window ? captured.window.filter((x) => new Set(rWin).has(x)).length : 0;
   const r = {
     business, phrasing, status: h.status, route_count: captured.count ?? h.count ?? null, runner_matched: rr.matched_count,
     count_same: (captured.count ?? null) === rr.matched_count,
-    window_same: winSame, window_overlap: winOverlap, window_sizes: [captured.window?.length ?? null, rWin.length],
+    window_same: winSame, window_overlap: winOverlap, window_sizes: [captured.window?.length ?? null, rWin.length], code_window: [extra.length, rExtra.length],
     top20_same_order: routeTop.length === runTop.length && routeTop.every((x, i) => x === runTop[i]),
     top20_overlap: routeTop.filter((x) => runTop.includes(x)).length,
     classes_same: routeCls.length === runCls.length && routeCls.every((x, i) => x === runCls[i]),
