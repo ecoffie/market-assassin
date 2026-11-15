@@ -305,6 +305,20 @@ export const PRODUCT_PRESETS: CodePreset[] = [
     vocab: ['airframe', 'landing gear', 'aircraft'],
   },
   {
+    // IT HARDWARE (RC3, Eric 2026-11-14: "IT hardware still produces almost no relevant top-20"). Root cause: no preset
+    // fired, so "IT" became the information-technology concept and IT SERVICES were DIRECT; and the benchmark floor
+    // (7A/7B/7G) is mostly software. Codes: the hardware-bearing IT product PSCs only (SAM PSC manual: compute 7B20–22,
+    // data center 7C20–21, end user / print / mobile 7E20–21, digital network 7G21, platform 7H20, security products
+    // 7J20, storage 7K20). NOT 7A (perpetual-license software), 7F (management tools), 7G20 (analog voice), 7G22
+    // (satellite/RF) or D-series IT services. Codes retrieve; DIRECT needs the item in the title (RC2 product rule).
+    id: 'it_hardware', label: 'IT hardware',
+    match: /\b(?:computer|it|information\s+technology)\s+(?:hardware|equipment)\b|\b(?:laptops?|desktops?|workstations?|servers|peripherals|networking\s+(?:equipment|hardware)|storage\s+(?:arrays?|hardware))\b/i,
+    naics: [],
+    psc: ['7B20', '7B21', '7B22', '7C20', '7C21', '7E20', '7E21', '7G21', '7H20', '7J20', '7K20'],
+    vocab: ['computer', 'computers', 'laptop', 'laptops', 'desktop', 'desktops', 'server', 'servers', 'workstation', 'workstations',
+      'monitor', 'monitors', 'keyboard', 'printer', 'printers', 'router', 'routers', 'docking station', 'tablet', 'tablets', 'storage array', 'hard drive'],
+  },
+  {
     // Pharmaceuticals ONLY when the customer explicitly sells / distributes / supplies them (Eric, 2026-11-14). A generic
     // "medical supplies" search never reaches FSC 6505. "drug testing" or "drug-free workplace" do not match.
     id: 'pharmaceuticals', label: 'Pharmaceuticals',
@@ -319,6 +333,14 @@ export const PRODUCT_PRESETS: CodePreset[] = [
     vocab: ['syringe', 'catheter', 'gauze', 'bandage', 'suture', 'reagent', 'surgical'],
   },
 ];
+
+/**
+ * Product presets whose item words also name other things ("computer" / "monitor" are avionics and instrument items too:
+ * "66--COMPUTER,FLIGHT CON", "61--ELEC POWER MONITOR"). For these, a title item word is DIRECT only when it is one of the
+ * preset's own item nouns (never the customer's category word, e.g. "IT") AND the notice is filed in one of the preset's
+ * PSC families (first two characters). Everything else stays retrieved, as RELATED. Measured: RC3 IT-hardware top-20.
+ */
+export const STRICT_ITEM_PRESETS: Readonly<Record<string, string[]>> = { it_hardware: ['7B', '7C', '7E', '7G', '7H', '7J', '7K'] };
 
 const isQuoted = (s: string) => /^["\u201c].*["\u201d]$/.test(s.trim());
 

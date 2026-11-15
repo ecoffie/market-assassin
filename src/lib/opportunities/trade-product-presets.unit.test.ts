@@ -55,7 +55,7 @@ describe('products: specific FSC codes retrieve; only item evidence makes DIRECT
     expect(cap.related_market?.psc).toEqual(['4810', '4820']);
     expect(cap.direct.psc).toEqual([]);
     expect(openRetrievalPsc(cap)).toEqual(expect.arrayContaining(['4810', '4820']));
-    for (const p of PRODUCT_PRESETS) for (const c of p.psc) expect(c).toMatch(/^\d{4}$/);
+    for (const p of PRODUCT_PRESETS) for (const c of p.psc) expect(c).toMatch(/^[0-9][0-9A-Z][0-9]{2}$/); // specific 4-char PSC (IT: 7B22), never a 2-char group
     for (const t of TRADE_PRESETS) for (const c of t.naics) expect(c).toMatch(/^\d{6}$/);
   });
   it('a code-only row is RELATED (basis product_code), never DIRECT', () => {

@@ -25,7 +25,7 @@
  *  contractor). If the customer offers repair, it is evaluated normally.
  */
 import aliasData from '@/data/agency-aliases.json';
-import type { CapabilityInterpretation } from './market-interpretation';
+import { STRICT_ITEM_PRESETS, type CapabilityInterpretation } from './market-interpretation';
 import type { DiscoveryPlan } from '@/lib/discovery';
 import { conceptHit, phraseRegex, jsRegex, type Alternative } from '@/lib/discovery/matcher';
 
@@ -128,10 +128,15 @@ export function classifyOpenEvidence(
   // A product search needs the item itself: a product notice, AND either the preset's own item code or the term in the
   // DLA noun slot ("NN--NOUN,MODIFIER"). "17--TOWBAR,AIRCRAFT" (ground equipment, FSC 1730) names aircraft only as a
   // modifier: RELATED, not DIRECT (benchmark labels: NO / PARTIAL).
+  const strictFamilies = products.flatMap((id) => STRICT_ITEM_PRESETS[id] || []);
   const productDirect = () => {
     if (!productNotice) return false;
     if (codeIn(cap.related_market?.psc || [], psc)) return true;
     const noun = String(row.title || '').replace(/^\d{2}--/, '').split(',')[0];
+    // Strict presets (IT hardware): only the preset's item nouns, and only inside its PSC families.
+    if (strictFamilies.length && products.every((id) => STRICT_ITEM_PRESETS[id])) {
+      return strictFamilies.some((f) => psc.startsWith(f)) && vocabHit(cap, noun);
+    }
     return vocabHit(cap, noun) || customerHit(plan, noun);
   };
   if (inHead && (!products.length || productDirect())) return { cls: 'DIRECT_MATCH', basis: 'title_item' };
