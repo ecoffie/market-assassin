@@ -298,7 +298,7 @@ export const TRADE_PRESETS: CodePreset[] = [
     // testing), Q702 (lab services), Q999 (catch-all) — fewer staffing buys, more noise.
     // V-narrow (Agent 4 v7 Addendum 5): only the clean codes — Q501 anesthesia/locum, Q518 therapy, Q701 lab staffing
     // (6 FIT/FIT of 11, 1 NO). Q201 (24 rows, 9 NO/NO: BOP comprehensive medical, TRICARE, TSA) and Q403/Q511 left out.
-    relatedPsc: ['Q501', 'Q518', 'Q701'],
+    relatedPsc: ['Q501', 'Q518', 'Q519', 'Q701'], // + Q519 psychology (optional commit)
   },
   {
     // RC3 (Agent 4 v7: steel buildings below 40%; steel PRODUCTS — plates, poles, scrap — were DIRECT on "steel").
