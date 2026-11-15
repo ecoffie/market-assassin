@@ -410,6 +410,20 @@ describe('map "ask about this view": no place the customer did not give (2026-11
     expect(shown).not.toContain('on your map');
   });
 
+  it('map industry filter: labeled "from your map\'s industry filter", never "for the work you named" or "chosen by Mindy"', async () => {
+    state.toolContent = JSON.stringify({ contracts: [{ piid: 'A1', description: 'Office building renovation', place_of_performance_state: 'CA', period_of_performance_current_end: '2027-06-30', total_obligation: 900000 }], expiring_orders_in_window: [], _meta: { total: 1, applied_filters: { naics: ['236220'] } } });
+    state.plannerCalls = [{ id: 'c1', function: { name: 'get_expiring_contracts', arguments: JSON.stringify({ months_window: 12 }) } }];
+    const q = '[Current map view \u2014 40 Open Now opps in view; NAICS 236220. Location: the map is filtered to CA. Answer for THIS view when the question is about "these"/"this"/"here": use this location, not the user\'s saved profile locations, and do not choose a city the user did not name.]\n\nWhich contracts expire in the next 12 months here?';
+    const { raw } = await ask(q);
+    const shown = raw.split('\n').filter((l) => l.startsWith('data:')).map((l) => JSON.parse(l.slice(5))).filter((e) => e.type === 'token').map((e) => e.content).join('');
+    expect(state.executedArgs[0]).toMatchObject({ naics: '236220', state: 'CA' });
+    expect(shown).toContain("Industry codes 236220 from your map's industry filter.");
+    expect(shown).toContain("Scoped to your map's state filter: CA.");
+    expect(shown).not.toMatch(/for the work you named/);
+    expect(shown).not.toMatch(/chosen by Mindy/);
+    expect(shown).not.toMatch(/From your request:/);
+  });
+
   it('a city the customer typed is kept', async () => {
     state.plannerCalls = [{ id: 'c1', function: { name: 'search_sam_opportunities', arguments: JSON.stringify({ state: 'TN', city: 'Memphis' }) } }];
     await ask('Which offices buy janitorial services in Memphis, TN?');

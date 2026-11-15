@@ -34,6 +34,8 @@ export interface CompiledIntent {
   /** "next 18 months" -> 18; "next year" -> 12. */
   windowMonths: number | null;
   capabilityCodes: string[];
+  /** Where capabilityCodes came from: the customer's words, or the map's industry (NAICS) filter. */
+  capabilitySource: 'request' | 'map_filter' | null;
   capabilityLabels: string[];
   /** The customer asked for all / every / a complete list. */
   completeness: boolean;
@@ -81,6 +83,12 @@ export function splitViewPreamble(text: string): { view: string | null; rest: st
   const m = String(text || '').match(VIEW_PREAMBLE_RE);
   return m ? { view: m[0], rest: String(text).slice(m[0].length) } : { view: null, rest: String(text || '') };
 }
+/** NAICS codes the map's industry filter put in the preamble ("…; NAICS 236220; …" or "NAICS 236220,238210"). */
+function viewNaicsIn(view: string | null): string[] {
+  if (!view) return [];
+  const m = view.match(/\bNAICS ((?:\d{2,6})(?:\s*,\s*\d{2,6})*)/);
+  return m ? Array.from(new Set(m[1].split(/\s*,\s*/))) : [];
+}
 function viewStatesIn(view: string | null): { states: string[]; source: 'map_filter' | 'map_area' | null } {
   if (!view) return { states: [], source: null };
   const filter = view.match(/Location: the map is filtered to ([A-Z]{2})\./);
@@ -110,7 +118,10 @@ export function compileIntent(text: string, now: Date = new Date(), customerText
   if (nm) windowMonths = Number(nm[1]);
   else if (/\b(?:next|coming)\s+(?:year|12\s+months)\b/i.test(src)) windowMonths = 12;
   else if (/\b(?:next|coming)\s+two\s+years\b/i.test(src)) windowMonths = 24;
-  const cap = interpretCapabilityNaics(src);
+  // Industry codes: the customer's words first; the map's industry filter only when they gave none.
+  const cap = interpretCapabilityNaics(rest);
+  const customerCodes = cap.typedCodes.length ? cap.typedCodes : cap.codes;
+  const viewNaics = customerCodes.length ? [] : viewNaicsIn(view);
   return {
     requestTime: now.toISOString(),
     federalDate: federalToday(now),
@@ -121,7 +132,8 @@ export function compileIntent(text: string, now: Date = new Date(), customerText
     officePhrases: offices,
     sinceDate,
     windowMonths,
-    capabilityCodes: cap.typedCodes.length ? cap.typedCodes : cap.codes,
+    capabilityCodes: customerCodes.length ? customerCodes : viewNaics,
+    capabilitySource: customerCodes.length ? 'request' : viewNaics.length ? 'map_filter' : null,
     capabilityLabels: cap.items.map((i) => i.label),
     completeness: /\b(all|every|complete\s+list|full\s+list)\b/i.test(src),
     agencyPhrases: offices.length ? [] : Array.from(new Set([...src.matchAll(AGENCY_RE)].map((m) => m[1]))),
@@ -141,7 +153,7 @@ export interface Enforcement { args: string; applied: string[]; unapplied: strin
  */
 /** True for an applied note whose scope came from the map view, not the customer's words. */
 export function isMapScopeNote(note: string): boolean {
-  return /^scoped to (the states on your map|your map's state filter):/.test(note);
+  return /^scoped to (the states on your map|your map's state filter):/.test(note) || / from your map's industry filter$/.test(note);
 }
 
 function applyStates(a: Record<string, unknown>, intent: CompiledIntent, applied: string[]): void {
@@ -205,7 +217,12 @@ export function enforceIntent(toolName: string, rawArgs: string, intent: Compile
       const have = listOf(a.naics);
       const covered = (c: string) => have.some((h) => /^\d+$/.test(h) && (c.startsWith(h) || h.startsWith(c)));
       const missing = intent.capabilityCodes.filter((c) => !covered(c));
-      if (missing.length) { a.naics = [...have, ...missing].join(','); applied.push(`industry codes ${[...have, ...missing].join(', ')} for the work you named (${missing.join(', ')} added by Mindy)`); }
+      if (missing.length) {
+        a.naics = [...have, ...missing].join(',');
+        applied.push(intent.capabilitySource === 'map_filter'
+          ? `industry codes ${[...have, ...missing].join(', ')} from your map's industry filter`
+          : `industry codes ${[...have, ...missing].join(', ')} for the work you named (${missing.join(', ')} added by Mindy)`);
+      }
     }
   }
 

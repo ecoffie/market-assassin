@@ -51,7 +51,7 @@ import { inferredCodeDisclosure } from '@/lib/chat/code-disclosure';
 import { getNaics } from '@/lib/codes/lookup';
 import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
 import { guardUnstatedStates, guardUnstatedCities } from '@/lib/chat/stated-filters';
-import { compileIntent, enforceIntent, dedupeToolCalls, isMapScopeNote } from '@/lib/chat/intent-compiler';
+import { compileIntent, enforceIntent, dedupeToolCalls, isMapScopeNote, splitViewPreamble } from '@/lib/chat/intent-compiler';
 import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, renderSbloContact, lintAnalysis, deterministicNextSteps, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, SBLO_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
@@ -563,7 +563,8 @@ export async function POST(request: NextRequest) {
         const scopeApplied = new Set<string>();
         const scopeUnapplied = new Set<string>();
         let scopeInferred: string | null = null;
-        const capabilityNote = capabilityPlannerNote(message);
+        // The map's view preamble is not the customer's words: "the user typed NAICS …" must not cite it.
+        const capabilityNote = capabilityPlannerNote(splitViewPreamble(message).rest);
         const capabilityPhrases = interpretCapabilityNaics(message).items.flatMap((it) => [it.phrase, it.label]);
         const capabilityLabels = interpretCapabilityNaics(message).items.map((it) => it.label);
         // What the customer has said in this conversation (for the stated-filters guard).
@@ -817,7 +818,9 @@ export async function POST(request: NextRequest) {
               // reports it APPLIED (src/lib/chat/code-disclosure.ts).
               scopeInferred = inferredCodeDisclosure(
                 results.map((r) => ({ name: r.record.tool, status: r.record.status, content: r.content })),
-                interpretCapabilityNaics(intent.customerText).typedCodes,
+                // Not "chosen by Mindy": codes the customer typed, and codes the map's industry filter supplied.
+                [...interpretCapabilityNaics(intent.customerText.split('\n').map((l) => splitViewPreamble(l).rest).join('\n')).typedCodes,
+                  ...(intent.capabilitySource === 'map_filter' ? intent.capabilityCodes : [])],
                 (c) => getNaics(c)?.title ?? null,
               );
               if (scopeInferred) turnTrace.notices.push('inferred_codes_disclosed');
