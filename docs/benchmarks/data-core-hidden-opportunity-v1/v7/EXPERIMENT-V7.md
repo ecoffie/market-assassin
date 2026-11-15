@@ -255,9 +255,16 @@ All of them are now labelled. The 382 new items were labelled by two blind revie
 
   V-narrow matches or beats the full family on the lower bound and carries fewer split or NO rows. It is the recommended variant.
 
-## Addendum 7: RC3 candidate evaluation, `agent3/rc3-candidate` @ `23dcfae03` (untagged; all-in + S1 + P1/P2 + V-narrow)
+## Addendum 7: RC3 candidate evaluation, `agent3/rc3-candidate` @ **`5c5098165`** (untagged; all-in + S1 + P1/P2 + V-narrow + cache seam hard-disabled)
 
 **One SHA, one set of numbers, for Eric's approval.** Diagnostic only: AI labels, in-sample, Nov 14 fixture. **Not the human holdout and not a certification.**
+
+**The SHA to tag is `5c5098165`.** It is one commit on top of `23dcfae03` and touches only `open-cache.ts` and its test. The numbers below were measured on `23dcfae03`. Agent 4 re-ran the runner on its own checkout of `5c5098165`:
+- the output is identical to `23dcfae03` in every field except `src.commit`
+- the rerun is byte-identical (sha256 `7ecb47f77ed9fd34…`, `src.commit` `5c50981653a7…`, not dirty)
+- route parity is 28/28
+
+So every number in this addendum applies to `5c5098165` unchanged.
 
 **Independent checks, from Agent 4's own checkout under the shared lock:**
 
@@ -301,4 +308,4 @@ All of them are now labelled. The 382 new items were labelled by two blind revie
 5. Nursing: the Related strictness also governs its clinical-service rows.
 6. These numbers are AI labels on the snapshot the fixes were designed against. The Dec 12 human holdout, the protocol in `v4/HOLDOUT-PROTOCOL-ADAPTIVE.md`, is what certifies. The candidate must be tagged by Dec 5 to be evaluated on it.
 
-Files: `runner_rc3_candidate.json`, `scripts/r16.py`, `results/r16_eval.json`.
+Files: `runner_rc3_candidate.json` (23dcfae03), `runner_rc3_candidate_final.json` (5c5098165), `scripts/r16.py`, `results/r16_eval.json`.
