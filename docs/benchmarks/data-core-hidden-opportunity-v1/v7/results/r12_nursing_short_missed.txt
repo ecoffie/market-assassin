@@ -1,0 +1,14 @@
+13 missed solicitations (both reviewers relevant), short phrasing, d56ebc307 matched set
+11d3fe0a484e4263b0e812bd09df8058 | 1282A727Q0002 | PSC Q201 | NAICS 621111 | PARTIAL/FIT | Jacobs Creek JCC Medical Services
+913372def0604204ac3f13f402110269 | 1282A727Q0003 | PSC Q201 | NAICS 621111 | PARTIAL/FIT | Flatwoods JCC Medical Services
+981f5c958cad4dfa98d2754afca32d4b | 140A2326Q0243 | PSC Q518 | NAICS 621340 | FIT/FIT | Q--Occupational Therapy Services
+8d1437201c494df9a3b322c07a9b0495 | 140A2327Q0295 | PSC Q518 | NAICS 621340 | PARTIAL/PARTIAL | Q--Physical Therapy Services
+b3536d75610940e09c79d59438f87156 | 140A2327Q0296 | PSC Q519 | NAICS 621330 | PARTIAL/PARTIAL | Q--Clinical Psychologist Services
+08d28d7cfab34f8484b67acf79bc0e60 | 140A2327Q0298 | PSC Q518 | NAICS 621340 | FIT/FIT | Q--Professional Services, Isleta and T'siya Schools
+40b67734ea4446b2948a11cd3335cb07 | 15BGCS27Q51800001 | PSC Q511 | NAICS 621320 | PARTIAL/PARTIAL | Optometrist Services - OAX
+839e89b4397d46a59c6fac10aeb01fd1 | 36C10X27R0001 | PSC Q403 | NAICS 621111 | PARTIAL/PARTIAL | Q403-RFP Medical Disability Examinations-Next Generation (MDE-NG)
+f2603d5e2ba041afb371e8afe8b620b0 | 36C24927Q0035 | PSC Q501 | NAICS 621111 | FIT/FIT | Q501--Locum - Anesthesiology Physician Services - 621  5-YR w/Orders 4
+cc96953a2c544b5aae32bbe732b3a0f7 | 36C26127Q0131 | PSC Q701 | NAICS 561320 | FIT/FIT | Q701--7 Full Time Equivalent Medical Technologists   - Clinical Labora
+8d744ff018a94f9587e5bc4e283de77e | 7571MN27R00010 | PSC None | NAICS 621999 | FIT/FIT | Federal Occupational Health (FOH) National Staffing Support Services-7
+5c17ca637c664fb3bd9ac9fa33ca55e8 | FA4484OHASJBMDL | PSC V225 | NAICS 621910 | PARTIAL/PARTIAL | JB MDL Open House and Air Show (OHAS) Emergency Medical Services
+f797135a0cb7411c8e392b242948f597 | PANHCA26P0000033222 | PSC Q518 | NAICS 611430 | FIT/FIT | Athletic Trainer (AT) Support  personal services - Europe

@@ -1,0 +1,35 @@
+{"id": "r13-0000", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "RELAY,ROTARY under FSC 5945 relays and solenoids supply buy"}
+{"id": "r13-0001", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB, FSC 5998 circuit card assembly supply buy"}
+{"id": "r13-0002", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB, FSC 5998 circuit card assembly supply buy"}
+{"id": "r13-0003", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB, FSC 5998 circuit card assembly supply buy"}
+{"id": "r13-0004", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB, FSC 5998 circuit card assembly supply buy"}
+{"id": "r13-0005", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Parts kit for 1/2 inch Ball Valve, one Ball and two Seats"}
+{"id": "r13-0006", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "QUILL ASSY,AIRCRAFT under FSC 1680 aircraft components"}
+{"id": "r13-0007", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "Hemochron Signature Elite reagents, supplies, consumables, compatible with Werfen instruments"}
+{"id": "r13-0008", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "VALVE, GLOBE per Derbyshire Marine Products drawing M3141-2005"}
+{"id": "r13-0009", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Parts Kit for 1/2 inch Ball Valve, one Ball and mating Seats"}
+{"id": "r13-0010", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB, FSC 5998 circuit card assembly supply buy"}
+{"id": "r13-0011", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PARTS KIT,BALL VALV under FSC 4820 valves"}
+{"id": "r13-0012", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5935-017185180 CONNECTOR,PLUG,ELECTRICAL; approved source GE and Amphenol"}
+{"id": "r13-0013", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "TURBINE, AIRCRAFT COOLING NSN 1660007983210 PN 552115"}
+{"id": "r13-0015", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Parts Kit for 2 1/2 x 3 inch Ball Valve, one Ball"}
+{"id": "r13-0016", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "INTERFACE UNIT, AUT; DLA military spare, no drawings, not commercial IT"}
+{"id": "r13-0017", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "59--CABLE ASSEMBLY SET under FSC 5995 cable assemblies"}
+{"id": "r13-0018", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB FBW SFCC, FSC 5998 circuit card supply"}
+{"id": "r13-0019", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CONNECTOR,PLUG,ELEC under FSC 5935 electrical connectors"}
+{"id": "r13-0020", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB, FSC 5998 circuit card assembly supply buy"}
+{"id": "r13-0021", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB, FSC 5998 circuit card assembly supply buy"}
+{"id": "r13-0022", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Parts Kit for 1/2 and 1/4 Inch Ball Valve, one Ball"}
+{"id": "r13-0023", "label": "NO", "role": "NONE", "restriction": "APPROVED_SOURCE", "evidence": "70--INTERFACE UNIT,DATA flight critical part, only previously approved sources solicited"}
+{"id": "r13-0024", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Complete Globe In-Line Stop Check Valve per NAVSHIPS Drawing 803-2177934"}
+{"id": "r13-0026", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PARTS KIT,BALL VALV; valve balls machine finished, FSC 4820"}
+{"id": "r13-0027", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Each CIRCUIT CARD ASSEMB 100% tested per CAGE 0KPC5 drawing"}
+{"id": "r13-0028", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB, FSC 5998 circuit card assembly supply buy"}
+{"id": "r13-0030", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Parts kit for 3/4 inch Ball Valve, one Ball and two Seats"}
+{"id": "r13-0031", "label": "PARTIAL", "role": "PRIME", "restriction": "NONE", "evidence": "NX EQ Autotransfusion Units, brand name or equal, FSC 6515 equipment"}
+{"id": "r13-0032", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "TURBINE, AIRCRAFT COOLING NSN 1660014608886 PN 2204330-4-2"}
+{"id": "r13-0033", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "WASHER,FLAT under FSC 5310 washers"}
+{"id": "r13-0034", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Technology licensing opportunity for ThermaSpin viscometer; no product purchase"}
+{"id": "r13-0035", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB, FSC 5998 circuit card assembly supply buy"}
+{"id": "r13-0036", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "SEAT,VALVE under FSC 4820 valve parts"}
+{"id": "r13-0037", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "RFQ for early infant diagnosis test kits, reagents and consumables"}

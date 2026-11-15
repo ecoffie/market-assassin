@@ -149,3 +149,30 @@ All of them are now labelled. The 382 new items were labelled by two blind revie
   - Counting Direct only, 6 exist, so no ranking reaches 8/20.
   - Six borderline Related solicitations go to Eric's 5-minute spot-check (`~/mindy-release-private/guards-related-spotcheck.md`, key sealed).
 - AI labels, diagnostic only. The pool is keyword- and code-bounded, so a relevant notice outside it would be missed. Counts are therefore near-census lower bounds.
+
+## Addendum 4: rc3-guard-window @ `8b2b594e1` (combined + NAVSUP repair demotion + cheap code window) and n2-modifier-text @ `74b9dec43` (N2/N2b)
+
+**Method.**
+- Both branches were run with runner 1.1.0 from Agent 4's checkouts on the fixture snapshot. Route parity is 28/28 on both.
+- 39 new top-20 items were labelled by two blind reviewers, who agreed relevant-vs-not on 36 of 39.
+- **Every number below rests on two-reviewer labels.** Round 11's single-reviewer IT items are not used.
+- Script: `scripts/r13.py`. Results: `results/r13_eval.json`.
+
+| Pooled, raw top-20 | RC3 | `8b2b594e1` | `74b9dec43` (N2b) |
+|---|---|---|---|
+| Short | 71–79% | 72–80% | 72–80% |
+| Long | 61–66% | 73–79% | **74–80%** |
+| Short businesses below 40% | guards, parts | guards, parts | guards, parts |
+| Long businesses below 40% | nursing, guards, steel, IT | nursing, guards, steel | **guards, steel** |
+
+- **IT after repair demotion:**
+  - short 15–19, long 16–19 relevant of 20 (RC3: 13–15 and 7).
+  - It still clears 8/20 comfortably. Agent 3's DIRECT 20 → 13 is a change in the class label shown, not in relevance.
+  - The repair rows that left (NRP keyboard, keyboard repair, the N00104 server and others) were NO for both reviewers.
+- **N2b, nursing long:** 5–6 → **9–10**, which crosses 8/20. Nursing short stays at 8–9, borderline.
+- No other business moved between `8b2b594e1` and `74b9dec43`. Cheap code window matched sets are identical to the earlier code-window branch.
+- **Still failing:**
+  - guards, short and long: duplicates and a scarce Direct supply (Addendum 3)
+  - parts, short: 7–9
+  - steel, long: 6–7
+- Diagnostic only: AI labels, in-sample, fixture snapshot.

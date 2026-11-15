@@ -1,0 +1,35 @@
+{"id": "r13-0000", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "RELAY,ROTARY, PSC 5945, Navy solicitation"}
+{"id": "r13-0001", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB, PSC 5998 solicitation"}
+{"id": "r13-0002", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB, PSC 5998 solicitation"}
+{"id": "r13-0003", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB, PSC 5998 solicitation"}
+{"id": "r13-0004", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSY, PSC 5998 solicitation"}
+{"id": "r13-0005", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PARTS KIT,BALL VALVE, PSC 4820"}
+{"id": "r13-0006", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "QUILL ASSY,AIRCRAFT, PSC 1680, aircraft component"}
+{"id": "r13-0007", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "Hemochron Signature Elite reagents and consumables, lab reagents supply"}
+{"id": "r13-0008", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "VALVE,GLOBE, PSC 4820"}
+{"id": "r13-0009", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PARTS KIT,BALL VALVE, PSC 4820"}
+{"id": "r13-0010", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB, PSC 5998 solicitation"}
+{"id": "r13-0011", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PARTS KIT,BALL VALVE, PSC 4820"}
+{"id": "r13-0012", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5935-017185180 CONNECTOR,PLUG,ELECTRICAL; approved source GE or Amphenol"}
+{"id": "r13-0013", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "TURBINE, AIRCRAFT COOLING NSN 1660007983210, PSC 1660"}
+{"id": "r13-0015", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PARTS KIT,BALL VALVE, PSC 4820"}
+{"id": "r13-0016", "label": "PARTIAL", "role": "PRIME", "restriction": "NONE", "evidence": "INTERFACE UNIT, AUTOMATIC, PSC 7E20; neighbouring IT hardware item"}
+{"id": "r13-0017", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "59--CABLE ASSEMBLY SET, PSC 5995"}
+{"id": "r13-0018", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB, PSC 5998 solicitation"}
+{"id": "r13-0019", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CONNECTOR,PLUG,ELEC, PSC 5935"}
+{"id": "r13-0020", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB, PSC 5998 solicitation"}
+{"id": "r13-0021", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB, PSC 5998 solicitation"}
+{"id": "r13-0022", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PARTS KIT,BALL VALVE, PSC 4820"}
+{"id": "r13-0023", "label": "PARTIAL", "role": "SUB", "restriction": "APPROVED_SOURCE", "evidence": "70--INTERFACE UNIT,DATA NSN 7010; neighbouring IT item; approved sources only"}
+{"id": "r13-0024", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "48--VALVE,STOP-CHECK, PSC 4820"}
+{"id": "r13-0026", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PARTS KIT,BALL VALVE, PSC 4820; weld repair is only a test item"}
+{"id": "r13-0027", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB, PSC 5998 solicitation"}
+{"id": "r13-0028", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB, PSC 5998 solicitation"}
+{"id": "r13-0030", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PARTS KIT,BALL VALVE, PSC 4820, SUBSAFE markings"}
+{"id": "r13-0031", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "6515 NX EQ Autotransfusion Units; brand name or equal medical equipment"}
+{"id": "r13-0032", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "TURBINE, AIRCRAFT COOLING NSN 1660014608886, PSC 1660"}
+{"id": "r13-0033", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "WASHER,FLAT, PSC 5310 fastener"}
+{"id": "r13-0034", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Technology licensing opportunity for ThermaSpin viscometer, not a supply purchase"}
+{"id": "r13-0035", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB, PSC 5998 solicitation"}
+{"id": "r13-0036", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "SEAT,VALVE, PSC 4820, valve part"}
+{"id": "r13-0037", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Early infant diagnosis test kits and related reagents and consumables"}
