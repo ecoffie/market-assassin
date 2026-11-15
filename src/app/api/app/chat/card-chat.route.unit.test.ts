@@ -21,6 +21,7 @@ const state: {
   answerMessages: Array<Array<{ role: string; content: string }>>;
   inserts: Array<{ table: string; row: Record<string, unknown> }>;
   allowedToolNames: unknown;
+  authMethod: string | undefined;
 } = {} as never;
 
 // In-memory turn store with the SQL functions' semantics (claim / complete = save + debit once / fail).
@@ -61,7 +62,7 @@ const failCardTurn = vi.fn(async (p: { turnId: string; claimToken: string; reaso
 });
 const charges = () => completeCardTurn.mock.calls.filter(([p]) => p.credits > 0).length;
 
-vi.mock('@/lib/api-auth', () => ({ verifyUserOwnsEmail: async (_r: unknown, email: string) => ({ authenticated: true, email }) }));
+vi.mock('@/lib/api-auth', () => ({ verifyUserOwnsEmail: async (_r: unknown, email: string) => ({ authenticated: true, email, method: state.authMethod }) }));
 vi.mock('@/lib/access/resolve-access', () => ({ hasProAccess: async () => state.pro }));
 vi.mock('@/lib/proposal/loaders', () => ({ loadBidderProfile: async () => null, formatProfileForPrompt: () => '' }));
 vi.mock('@/lib/llm/usage-cost', () => ({ isUserOverBudget: async () => false, recordLlmUsage: async () => {} }));
@@ -116,7 +117,7 @@ beforeEach(() => {
       description: 'Provide janitorial services.', sow_text: null, ui_link: 'https://sam.gov/opp/x/view', active: true,
     },
     recordError: false, sessions: {}, answer: 'The response deadline is 2026-12-04 (SAM.gov notice W912PL26Q0042).', answerFails: false, finishReason: 'stop',
-    plannerMessages: [], answerMessages: [], inserts: [], allowedToolNames: null,
+    plannerMessages: [], answerMessages: [], inserts: [], allowedToolNames: null, authMethod: 'session',
   });
   turns.clear(); tokenSeq = 0;
   claimCardTurn.mockClear(); completeCardTurn.mockClear(); failCardTurn.mockClear();
@@ -153,6 +154,54 @@ async function post(body: Record<string, unknown>) {
 }
 const TURN = '0a0a0a0a-1111-4222-8333-444444444444';
 const card = { context: { kind: 'opportunity', notice_id: NID }, turn_id: TURN };
+
+describe('production-route acceptance allowlist (MAP_CARD_CHAT_ALLOWLIST, global flag OFF)', () => {
+  beforeEach(() => { vi.stubEnv('MAP_CARD_CHAT_ENABLED', ''); vi.spyOn(console, 'info').mockImplementation(() => {}); });
+
+  it('a session-verified synthetic account on the list gets a card answer, charged once, with an audit line', async () => {
+    vi.stubEnv('MAP_CARD_CHAT_ALLOWLIST', `other@example.com, ${ME.toUpperCase()}`);
+    const { res, events } = await post(card);
+    expect(res.status).toBe(200);
+    expect(events.some((e) => e.type === 'error')).toBe(false);
+    expect(charges()).toBe(1);
+    const audit = vi.mocked(console.info).mock.calls.find((c) => c[0] === '[card-chat:allowlist]');
+    expect(audit).toBeTruthy();
+    expect(JSON.parse(String(audit![1]))).toMatchObject({ email: ME, notice_id: NID, turn_id: TURN });
+  });
+  it('replay of a saved answer stays free on the allowlist path', async () => {
+    vi.stubEnv('MAP_CARD_CHAT_ALLOWLIST', ME);
+    await post(card);
+    const { events } = await post({ ...card, replay_only: true });
+    expect(events.some((e) => e.type === 'replayed')).toBe(true);
+    expect(charges()).toBe(1);
+  });
+  it('an ordinary account NOT on the list is refused exactly as today (403 pro_required, no turn)', async () => {
+    vi.stubEnv('MAP_CARD_CHAT_ALLOWLIST', 'tester@example.com');
+    const { res } = await post(card);
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ error: 'pro_required' });
+    expect(claimCardTurn).not.toHaveBeenCalled();
+  });
+  it('a signed-link (query token) identity never qualifies, even when listed', async () => {
+    vi.stubEnv('MAP_CARD_CHAT_ALLOWLIST', ME);
+    state.authMethod = 'token';
+    const { res } = await post(card);
+    expect(res.status).toBe(403);
+    expect(claimCardTurn).not.toHaveBeenCalled();
+  });
+  it('a real (non-example.com) address in the variable is ignored', async () => {
+    vi.stubEnv('MAP_CARD_CHAT_ALLOWLIST', 'customer@realco.com');
+    const { res } = await (async () => { vi.resetModules(); const { POST } = await import('./route');
+      const req = new Request('https://getmindy.ai/api/app/chat', { method: 'POST', body: JSON.stringify({ email: 'customer@realco.com', message: 'When is it due?', ...card }) });
+      return { res: await POST(req as never) }; })();
+    expect(res.status).toBe(403);
+    expect(claimCardTurn).not.toHaveBeenCalled();
+  });
+  it('unset list = today: no bypass for anyone', async () => {
+    const { res } = await post(card);
+    expect(res.status).toBe(403);
+  });
+});
 
 describe('access', () => {
   it('flag off: a free account with context is refused exactly as before (403 pro_required)', async () => {

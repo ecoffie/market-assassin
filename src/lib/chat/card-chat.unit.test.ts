@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   isCardChatEnabled, cardChatTurnCredits, parseOpportunityContext, cardChatAccess, isBillableTurn,
   buildOpportunityContextBlock, describeDeadline, CARD_CHAT_TOOLS, type OpportunityRecord,
+  cardChatGate, parseCardChatAllowlist, CARD_CHAT_ALLOWLIST_MAX,
 } from './card-chat';
 import { listMcpTools } from '@/lib/mcp/tool-registry';
 import { TIER0_TOOL_NAMES } from './tier0-tools';
@@ -147,5 +148,36 @@ describe('CARD_CHAT_TOOLS — a narrowing list of real, chat-allowed tools', () 
     for (const n of ['schedule_market_search', 'delete_market_schedule', 'generate_market_report', 'draft_proposal', 'add_contacts_to_crm']) {
       expect(CARD_CHAT_TOOLS.has(n)).toBe(false);
     }
+  });
+});
+
+describe('cardChatGate (production-route acceptance allowlist)', () => {
+  const S = { email: 'tester@example.com', authMethod: 'session' };
+  it('global flag on: everyone, via global (allowlist irrelevant)', () => {
+    expect(cardChatGate({ email: 'x@realco.com', authMethod: 'token' }, { MAP_CARD_CHAT_ENABLED: 'true' })).toEqual({ enabled: true, via: 'global' });
+  });
+  it('flag off + listed + session → allowlist', () => {
+    expect(cardChatGate(S, { MAP_CARD_CHAT_ALLOWLIST: ' Tester@Example.com ,b@example.com' })).toEqual({ enabled: true, via: 'allowlist' });
+  });
+  it('flag off + not listed → off', () => {
+    expect(cardChatGate(S, { MAP_CARD_CHAT_ALLOWLIST: 'b@example.com' }).enabled).toBe(false);
+  });
+  it('signed-link token, missing method or missing email never qualify', () => {
+    const env = { MAP_CARD_CHAT_ALLOWLIST: 'tester@example.com' };
+    expect(cardChatGate({ ...S, authMethod: 'token' }, env).enabled).toBe(false);
+    expect(cardChatGate({ ...S, authMethod: undefined }, env).enabled).toBe(false);
+    expect(cardChatGate({ email: null, authMethod: 'session' }, env).enabled).toBe(false);
+  });
+  it('only synthetic example.com entries are honoured; lookalike domains rejected', () => {
+    const r = parseCardChatAllowlist('a@example.com,c@realco.com,d@example.com.evil.io,e@notexample.com,junk');
+    expect([...r.emails]).toEqual(['a@example.com']);
+    expect(r.rejected).toBe(4);
+    expect(cardChatGate({ email: 'c@realco.com', authMethod: 'session' }, { MAP_CARD_CHAT_ALLOWLIST: 'c@realco.com' }).enabled).toBe(false);
+  });
+  it(`caps the list at ${CARD_CHAT_ALLOWLIST_MAX}`, () => {
+    const raw = Array.from({ length: 15 }, (_, i) => `t${i}@example.com`).join(',');
+    const r = parseCardChatAllowlist(raw);
+    expect(r.emails.size).toBe(CARD_CHAT_ALLOWLIST_MAX);
+    expect(r.rejected).toBe(5);
   });
 });
