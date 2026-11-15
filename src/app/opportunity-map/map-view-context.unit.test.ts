@@ -83,8 +83,8 @@ function boot(ctx: Record<string, unknown>) {
   w.__mindyViewCtx = () => ctx;
   const calls: Array<Record<string, unknown>> = [];
   const pending: Promise<unknown>[] = [];
-  w.fetch = vi.fn((_u: string, init: { body: string }) => {
-    calls.push(JSON.parse(init.body));
+  w.fetch = vi.fn((u: string, init: { body: string }) => {
+    if (u === '/api/app/chat') calls.push(JSON.parse(init.body)); // the follow-up suggestions call is not the chat turn
     const enc = new NodeTextEncoder();
     const text = [{ type: 'token', content: 'ok' }, { type: 'done' }].map((e) => `data: ${JSON.stringify(e)}\n\n`).join('');
     const pr = Promise.resolve({ status: 200, ok: true, body: new ReadableStream({ start(c) { c.enqueue(enc.encode(text)); c.close(); } }), json: async () => ({}) });

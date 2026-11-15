@@ -5,6 +5,7 @@
  * is rebuilt.
  */
 import { isCardChatEnabled } from '@/lib/chat/card-chat';
+import { SAFE_MARKDOWN_SCRIPT } from '@/lib/chat/safe-markdown';
 import { NextRequest, NextResponse } from 'next/server';
 import { PLAYERS_HEADER_TEXT_JS, PROVEN_PLAYERS_LABEL, PROVEN_PLAYERS_DESCRIPTION } from '@/lib/players/copy';
 import { getMapOpportunities, SET_GROUPS } from '@/lib/opportunities/map-data';
@@ -10845,7 +10846,13 @@ const ASK_MINDY_CSS =
   + '.amk-msg{max-width:90%;font:400 13.5px/1.55 Inter,system-ui,sans-serif}'
   + '.amk-msg.u{align-self:flex-end;background:#2563eb;color:#fff;padding:9px 13px;border-radius:14px 14px 3px 14px}'
   + '.amk-msg.a{align-self:flex-start;color:#1e2230;width:100%}'
-  + '.amk-msg.a .bub{background:#f5f8fb;border:1px solid #e6ebf0;padding:12px 14px;border-radius:12px;white-space:pre-wrap}'
+  + '.amk-msg.a .bub{background:#f5f8fb;border:1px solid #e6ebf0;padding:12px 14px;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}'
+  // Rendered answers (window.__mindyMd: escaped first, then a safe markdown subset). 2026-11-15.
+  + '.amk-msg.a .bub.md{white-space:normal}.amk-msg.a .bub.md p{margin:0 0 8px}.amk-msg.a .bub.md p:last-child{margin-bottom:0}'
+  + '.amk-msg.a .bub.md ul,.amk-msg.a .bub.md ol{margin:4px 0 8px;padding-left:20px}.amk-msg.a .bub.md li{margin:2px 0}'
+  + '.amk-msg.a .bub.md .md-h{font-weight:700;margin:10px 0 4px;color:#111c26}.amk-msg.a .bub.md .md-h1{font-size:15.5px}.amk-msg.a .bub.md .md-h2{font-size:14.5px}.amk-msg.a .bub.md .md-h3{font-size:13.5px}.amk-msg.a .bub.md .md-h:first-child{margin-top:0}'
+  + '.amk-msg.a .bub.md code{font:12.5px ui-monospace,Menlo,monospace;background:#eef2f7;border-radius:4px;padding:1px 4px}'
+  + '.amk-msg.a .bub a,.amk-src a{color:#2563eb;overflow-wrap:anywhere;word-break:break-word}'
   // Follow-up ACTION chips under an answer (the vision\'s "What agencies use Azure? / Add to pipeline").
   + '.amk-act{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}'
   + '.amk-act button{font:600 11.5px Inter;color:#2563eb;background:#eaf1fe;border:1px solid #d3e2fc;border-radius:8px;padding:6px 11px;cursor:pointer;text-align:left}'
@@ -10864,7 +10871,7 @@ const ASK_MINDY_CSS =
   + '.amk-send:disabled{opacity:.45;cursor:default}.amk-send svg{width:18px;height:18px}'
   + '.amk-up{text-align:center;padding:30px 20px}.amk-up h4{font:800 16px Inter;margin:0 0 6px;color:#111c26}.amk-up p{font:500 13px Inter;color:#6b7787;margin:0 0 14px}'
   + '.amk-up a{display:inline-block;background:#0a8f57;color:#fff;text-decoration:none;border-radius:10px;padding:10px 20px;font:700 13px Inter}'
-  + '@media(prefers-color-scheme:dark){.amk{background:#111823}.amk-hd{border-color:#202b39}.amk-hd h3{color:#eaf1f8}.amk-msg.a{color:#eaf1f8}.amk-msg.a .bub{background:#0d141d;border-color:#202b39}.amk-chips button{background:#0d141d;border-color:#202b39;color:#cdd8e4}.amk-foot{border-color:#202b39}.amk-in textarea{background:#0d141d;border-color:#202b39;color:#eaf1f8}.amk-empty b,.amk-up h4{color:#eaf1f8}.amk-act button{background:#122033;border-color:#1f3a5c}}';
+  + '@media(prefers-color-scheme:dark){.amk{background:#111823}.amk-hd{border-color:#202b39}.amk-hd h3{color:#eaf1f8}.amk-msg.a{color:#eaf1f8}.amk-msg.a .bub{background:#0d141d;border-color:#202b39}.amk-msg.a .bub.md .md-h{color:#eaf1f8}.amk-msg.a .bub.md code{background:#18222f}.amk-msg.a .bub a{color:#7fb0ff}.amk-chips button{background:#0d141d;border-color:#202b39;color:#cdd8e4}.amk-foot{border-color:#202b39}.amk-in textarea{background:#0d141d;border-color:#202b39;color:#eaf1f8}.amk-empty b,.amk-up h4{color:#eaf1f8}.amk-act button{background:#122033;border-color:#1f3a5c}}';
 
 const ASK_MINDY_HTML =
   '<div class="amk-ov" id="amkOv"></div>'
@@ -10890,6 +10897,13 @@ const ASK_MINDY_JS = `<script>(function(){
   var ov=document.getElementById('amkOv'), drawer=document.getElementById('amk'), body=document.getElementById('amkBody'), input=document.getElementById('amkIn'), send=document.getElementById('amkSend'), ctxEl=document.getElementById('amkCtx');
   if(!ov||!drawer||!body) return;
   function esc(x){ return (x==null?'':String(x)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  // Answer text \\u2192 the bubble. window.__mindyMd (src/lib/chat/safe-markdown.ts) ESCAPES the model text first
+  // and only then writes its own markup for a small markdown subset, so innerHTML never receives raw model
+  // text. Without it (script missing) the text is shown as plain text, never as HTML.
+  function paint(bub,text){
+    if(typeof window.__mindyMd==='function'){ try{ bub.innerHTML=window.__mindyMd(text); bub.classList.add('md'); return; }catch(e){} }
+    bub.classList.remove('md'); bub.textContent=text;
+  }
   function tok(){ try{return localStorage.getItem('mi_beta_auth_token');}catch(e){return null;} }
   function email(){ try{ var t=tok()||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){ return ''; } }
   var sessionId='', history=[], busy=false;
@@ -11004,7 +11018,7 @@ const ASK_MINDY_JS = `<script>(function(){
   if(input){ input.addEventListener('input',function(){ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,120)+'px'; });
     input.addEventListener('keydown',function(e){ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); ask(input.value); } }); }
   if(send)send.onclick=function(){ ask(input?input.value:''); };
-  function addMsg(role, text){ var d=document.createElement('div'); d.className='amk-msg '+(role==='user'?'u':'a'); d.innerHTML=(role==='user')?esc(text):('<div class="bub"></div>'); if(role!=='user')d.querySelector('.bub').textContent=text||''; body.appendChild(d); body.scrollTop=body.scrollHeight; return d; }
+  function addMsg(role, text){ var d=document.createElement('div'); d.className='amk-msg '+(role==='user'?'u':'a'); d.innerHTML=(role==='user')?esc(text):('<div class="bub"></div>'); if(role!=='user'){ var bb=d.querySelector('.bub'); if(text) paint(bb,text); else bb.textContent=''; } body.appendChild(d); body.scrollTop=body.scrollHeight; return d; }
   function upsell(){ body.innerHTML='<div class="amk-up"><h4>\\ud83d\\udd12 Ask Mindy is a Pro feature</h4><p>Get grounded, real-data answers on set-asides, agencies, opportunities, teaming and proposals \\u2014 with sources.</p><a href="/market-intelligence">Upgrade to Pro</a></div>'; }
   // opts (card chat only): turnId = reuse this question's id (retry/reopen); replay = only fetch the saved answer.
   function ask(q,opts){
@@ -11023,7 +11037,7 @@ const ASK_MINDY_JS = `<script>(function(){
     addMsg('user', q);
     var aEl=addMsg('assistant',''); var bub=aEl.querySelector('.bub');
     bub.innerHTML='<span class="amk-typing"><i></i><i></i><i></i></span>';
-    busy=true; if(send)send.disabled=true;
+    busy=true; if(send)send.disabled=true; clearFollowups();
     var acc='', started=false, gotDone=false, gotError=false;
     // Prepend the grounded view context to the MESSAGE (not shown to the user) so the answer
     // is about "these"/"here" — the map\\u2019s real filters + count, never fabricated.
@@ -11066,7 +11080,7 @@ const ASK_MINDY_JS = `<script>(function(){
           parts.forEach(function(p){ var line=p.split('\\n').filter(function(l){return l.indexOf('data:')===0;}).map(function(l){return l.slice(5).trim();}).join(''); if(!line)return;
             var ev; try{ ev=JSON.parse(line); }catch(e){ return; }
             if(ev.type==='session'){ sessionId=ev.sessionId||sessionId; }
-            else if(ev.type==='token'){ if(!started){ bub.textContent=''; started=true; } acc+=(ev.content||''); bub.textContent=acc; body.scrollTop=body.scrollHeight; }
+            else if(ev.type==='token'){ if(!started){ bub.textContent=''; started=true; } acc+=(ev.content||''); paint(bub,acc); body.scrollTop=body.scrollHeight; }
             // citations event is now always empty (RAG corpus removed 2026-08-02) \\u2014 ignored.
             else if(ev.type==='error'){ gotError=true; if(!started)bub.textContent=(ev.message||'Something went wrong.'); }
             else if(ev.type==='done'){ gotDone=true; }
@@ -11084,7 +11098,7 @@ const ASK_MINDY_JS = `<script>(function(){
           if(turnId&&oppCtx===cardAtSend){ pendingTurn=null; }
           if(!started&&!acc&&!gotError)bub.textContent='Mindy had no answer for that \\u2014 try rephrasing.';
           if(!(turnId&&gotError&&!acc)){ history.push({role:'user',content:q}); history.push({role:'assistant',content:acc}); }
-          saveCard(); if(acc&&!oppCtx)followups(aEl); busy=false; if(send)send.disabled=false; body.scrollTop=body.scrollHeight; }
+          saveCard(); if(acc)paint(bub,acc); if(acc&&!oppCtx)followups(aEl,q,acc); busy=false; if(send)send.disabled=false; body.scrollTop=body.scrollHeight; }
         return pump().catch(function(){ if(turnId){ if(oppCtx===cardAtSend)offerRetry('The connection dropped before the answer finished.'); release(); return; } bub.textContent='Connection failed. Check your network and try again.'; release(); });
       })
       .catch(function(){ if(turnId){ offerRetry('Connection failed before the answer arrived.'); release(); return; } bub.textContent='Connection failed. Check your network and try again.'; busy=false; if(send)send.disabled=false; });
@@ -11096,17 +11110,25 @@ const ASK_MINDY_JS = `<script>(function(){
       +'Mindy Pro includes Ask Mindy without per-answer credits, plus deeper research. <a href="/market-intelligence">See Pro</a>';
     try{ if(window.__track) window.__track('tool_use','card_chat_credits_wall',{balance:bal}); }catch(e){}
   }
-  // Follow-up ACTION chips under an answer (the vision\\u2019s bottom row). Data-core next steps only.
-  function followups(aEl){
-    var c=viewCtx();
-    var acts=[];
-    if(c.count>0){ acts.push(['Who are the contacts?','Who are the buying-office contacts for opportunities in this view? Give names and emails.']);
-      acts.push(['Set-aside breakdown','What is the set-aside breakdown for this view?']); }
-    acts.push(['Write a capability statement','Draft a short capability statement tailored to the agencies in this view.']);
-    acts.push(['Add to my pipeline','How do I add one of these to my pipeline to track it?']);
-    var wrap=document.createElement('div'); wrap.className='amk-act';
-    acts.slice(0,4).forEach(function(a){ var b=document.createElement('button'); b.textContent=a[0]; b.onclick=function(){ ask(a[1]); }; wrap.appendChild(b); });
-    aEl.appendChild(wrap); body.scrollTop=body.scrollHeight;
+  // Follow-up chips: ONLY under the latest answer, and DERIVED from that question + answer by the same
+  // endpoint the /app panel uses (POST /api/app/chat/suggestions). The old version appended the same four
+  // fixed chips under every answer (2026-11-15). No chips when the endpoint returns none or fails.
+  function clearFollowups(){ var old=body.querySelectorAll('.amk-act.amk-fu'); for(var i=0;i<old.length;i++){ if(old[i].parentNode)old[i].parentNode.removeChild(old[i]); } }
+  function followups(aEl,q,answer){
+    clearFollowups();
+    var t=tok(), em=email(); if(!t||!em)return;
+    var mine=aEl;
+    fetch('/api/app/chat/suggestions',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},body:JSON.stringify({email:em,message:q,answer:String(answer||'').slice(0,6000)})})
+      .then(function(r){ return r.ok?r.json():null; })
+      .then(function(d){
+        var list=(d&&Array.isArray(d.suggestions))?d.suggestions.filter(function(x){ return typeof x==='string'&&x.trim(); }).slice(0,3):[];
+        if(!list.length||!mine.parentNode||mine!==body.lastElementChild||busy)return; // a newer question is already showing
+        clearFollowups();
+        var wrap=document.createElement('div'); wrap.className='amk-act amk-fu';
+        list.forEach(function(s){ var b=document.createElement('button'); b.textContent=s; b.onclick=function(){ clearFollowups(); ask(s); }; wrap.appendChild(b); });
+        mine.appendChild(wrap); body.scrollTop=body.scrollHeight;
+      })
+      .catch(function(){});
   }
 })();
 </script>`;
@@ -11474,7 +11496,7 @@ export async function GET(request: NextRequest) {
     // <div>, so anything after it gets parsed INTO that hidden .lgm-ov (display:none) and the
     // fixed FAB/drawer compute to 0×0. Leading the body keeps the mobile chrome a direct <body> child.
     // MARKET_FEEDBACK_JS precedes VIEWPORT_JS so window.__mf exists before the first fetch round reports to it.
-    const bodyInject = MOBILE_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + DIBBS_FLAG_JS + WATCH_SCOPE_SCRIPT + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + CARD_CHAT_FLAG_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + ACCOUNT_MENU_JS + ZHEAD_HEIGHT_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
+    const bodyInject = MOBILE_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + DIBBS_FLAG_JS + WATCH_SCOPE_SCRIPT + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + CARD_CHAT_FLAG_JS + SAFE_MARKDOWN_SCRIPT + ASK_MINDY_JS + LOGIN_MODAL_JS + ACCOUNT_MENU_JS + ZHEAD_HEIGHT_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Code→name for the State picker (50 states + DC). Already a shared constant — the Filters

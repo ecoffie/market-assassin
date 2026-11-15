@@ -22,6 +22,7 @@ import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 import { UpgradeModal } from '../UpgradeModal';
 import { DEFAULT_STARTER_PROMPTS } from '@/lib/chat/starter-prompts';
+import { renderSafeMarkdown } from '@/lib/chat/safe-markdown';
 
 interface MindyChatPanelProps {
   email: string | null;
@@ -56,13 +57,32 @@ interface ChatMessage {
 // mindy_chat_messages still have them. Cleaning at render keeps the
 // chat history readable without a backfill migration. Also collapses
 // any trailing space or double-space the strip leaves behind.
-function renderMessageContent(content: string) {
+export function renderMessageContent(content: string, asMarkdown = false) {
   const cleaned = content
     .replace(/\s*\[→\s*[^\]]+\]\s*/g, ' ')
     .replace(/ {2,}/g, ' ')
     .replace(/ ([.,;:!?])/g, '$1');
-  return <span className="whitespace-pre-wrap">{cleaned}</span>;
+  if (!asMarkdown) return <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">{cleaned}</span>;
+  // Assistant answers: the shared SAFE renderer (src/lib/chat/safe-markdown.ts) HTML-escapes the model text
+  // first and only then writes its own markup for a small markdown subset (http(s) links only), so this
+  // innerHTML never contains unescaped model text. Before 2026-11-15 the raw **, ###, - and [text](url)
+  // showed literally.
+  return (
+    <div
+      className={MD_CLASSES}
+      dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(cleaned) }}
+    />
+  );
 }
+
+const MD_CLASSES = [
+  'mindy-md [overflow-wrap:anywhere] break-words',
+  '[&_p]:my-0 [&_p+p]:mt-2.5 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5',
+  '[&_strong]:font-semibold [&_strong]:text-slate-50 [&_em]:italic',
+  '[&_.md-h]:font-semibold [&_.md-h]:text-slate-50 [&_.md-h]:mt-3 [&_.md-h]:mb-1 [&_.md-h:first-child]:mt-0 [&_.md-h1]:text-[16px] [&_.md-h2]:text-[15px] [&_.md-h3]:text-[14.5px]',
+  '[&_a]:text-purple-300 [&_a]:underline [&_a]:underline-offset-2 hover:[&_a]:text-purple-200 [&_a]:break-words',
+  '[&_code]:font-mono [&_code]:text-[13px] [&_code]:bg-white/5 [&_code]:rounded [&_code]:px-1',
+].join(' ');
 
 export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -552,7 +572,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                   )}
                   <div className={`text-[14.5px] leading-relaxed ${msg.errored ? 'text-red-300' : msg.role === 'user' ? 'text-slate-100' : 'text-slate-200'}`}>
                     {msg.content
-                      ? renderMessageContent(msg.content)
+                      ? renderMessageContent(msg.content, msg.role === 'assistant' && !msg.errored)
                       : msg.isStreaming
                         ? <span className="text-faint italic">Thinking…</span>
                         : null}
