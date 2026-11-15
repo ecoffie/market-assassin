@@ -123,4 +123,22 @@ substitute for human judgment. That would need his explicit approval, and Agent 
 - **A headless runner at each tag:** a script Agent 4 can execute against the Dec 12 snapshot that emits the matched set and top-20 for the 14 phrasings, so Agent 3
   never handles the snapshot output. The v6/v7 matched sets were produced by Agent 3, so this is new.
 
+**Runner validated by Agent 4 (2026-11-15).** Agent 3's runner `agent3/holdout-runner` @ `c47a0f68d` (`tasks/search-holdout-runner/runner.mts`) was run from Agent 4's own detached
+checkouts, on arm64 Node 24, against the fixture snapshot (`2026-11-15T00:52:58.895Z`, 9,701 open; gz sha256 `6cc0bf79…`). It was compared with Agent 4's own script, not the runner's `verify`.
+
+| Check | Result |
+|---|---|
+| (a) Matched sets | RC1 `8c4ba2ea1` 28/28, RC2 `065451a66` 28/28, RC3 preview `34aad5828` 28/28, all identical to the v7 files |
+| (b) Top-20, in order | 28/28 for all three |
+| (c) Determinism | RC2 rerun byte-identical (output sha256 `713f7c65…`) |
+| (d) Identity | `src.commit` and `src.tags` present. A modified tracked file is refused |
+| v7 input files | `a3_matched_sets_rc2_classification.json` and `a3_matched_sets_rc3_preview.json` are byte-identical to the files committed at the tags |
+| Cutoff | A later cutoff only removes rows (matched sets are subsets). The open count, 3,887 at Nov 25, matches an independent recount |
+| Dump | Read-only; 9,698 rows with `created_at`; the completeness check passed; the result ran offline |
+
+Limits:
+- This proves the runner reproduces Agent 3's FIND emulation (`eval.mts`). It does not independently prove that emulation matches the live FIND route.
+- The runner must live inside a checkout so it can import `@supabase/supabase-js`.
+- The Dec 12 snapshot is a `dump` taken on Dec 12 and stored in `~/mindy-bench-sealed/`.
+
 Nothing in this protocol starts until Eric approves it. No production changes, merges, migrations or feature activations.
