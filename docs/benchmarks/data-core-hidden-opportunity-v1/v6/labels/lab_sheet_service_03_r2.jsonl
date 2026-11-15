@@ -1,0 +1,35 @@
+{"id": "r6-0404", "label": "FIT", "role": "PRIME", "evidence": "Janitorial/cleaning services at U.S. Embassy office building and warehouse"}
+{"id": "r6-0406", "label": "PARTIAL", "role": "SUB", "evidence": "Decommissioning removes sidewalks, asphalt pavement, parking lots; earth moving included"}
+{"id": "r6-0417", "label": "FIT", "role": "PRIME", "evidence": "Snow plowing and shoveling services at Westville Lake, NAICS 561730"}
+{"id": "r6-0425", "label": "FIT", "role": "PRIME", "evidence": "Snow plowing and shoveling services at Westville Lake, NAICS 561730"}
+{"id": "r6-0429", "label": "NO", "role": "NONE", "evidence": "Herbicide spraying of 720 acres unimproved rangeland, not facility grounds"}
+{"id": "r6-0435", "label": "FIT", "role": "PRIME", "evidence": "Heating system leak repair at visitor center, NAICS 238220"}
+{"id": "r6-0441", "label": "NO", "role": "NONE", "evidence": "Maintenance, repair and preservation of steel-hulled vessel YON-325"}
+{"id": "r6-0442", "label": "PARTIAL", "role": "SUB", "evidence": "Army Reserve Center construction includes walks, curbs and gutters, storm drainage, paving"}
+{"id": "r6-0447", "label": "FIT", "role": "PRIME", "evidence": "Roadway resurfacing with asphalt concrete pavement, full depth reclamation, ditch grading"}
+{"id": "r6-0451", "label": "FIT", "role": "PRIME", "evidence": "Aseptic Janitorial/Custodial Services White River Junction solicitation"}
+{"id": "r6-0452", "label": "FIT", "role": "PRIME", "evidence": "Secured janitorial services for three buildings at MCB Quantico, 8(a)"}
+{"id": "r6-0453", "label": "FIT", "role": "PRIME", "evidence": "Turn key chiller replacement purchase and install, NAICS 238220"}
+{"id": "r6-0459", "label": "PARTIAL", "role": "SUB", "evidence": "Athletic facility design-build includes site development, paving, sidewalks, storm drainage"}
+{"id": "r6-0465", "label": "FIT", "role": "PRIME", "evidence": "Replace chilled water pump at the boiler plant, VAMC Bronx"}
+{"id": "r6-0471", "label": "NO", "role": "NONE", "evidence": "Medical linen rental and laundry service, not nurse staffing"}
+{"id": "r6-0475", "label": "FIT", "role": "PRIME", "evidence": "Snow plowing and shoveling services at Westville Lake, NAICS 561730"}
+{"id": "r6-0479", "label": "PARTIAL", "role": "SUB", "evidence": "Live-fire training system RFI lists steel weather cover among components"}
+{"id": "r6-0482", "label": "FIT", "role": "PRIME", "evidence": "Project to Replace Boilers 4 and 5 at VA Medical Center"}
+{"id": "r6-0485", "label": "NO", "role": "NONE", "evidence": "Barracks design-build industry day; no cleaning services procured"}
+{"id": "r6-0495", "label": "NO", "role": "NONE", "evidence": "Lab equipment purchase: induction heater with recirculating water chiller"}
+{"id": "r6-0498", "label": "NO", "role": "NONE", "evidence": "Radiant heating panel replacement, not steel building or metal roofing"}
+{"id": "r6-0503", "label": "NO", "role": "NONE", "evidence": "Lean/HRO transformation consulting and coaching, not clinical staffing"}
+{"id": "r6-0504", "label": "NO", "role": "NONE", "evidence": "Industrial wastewater treatment plant upgrade construction"}
+{"id": "r6-0505", "label": "PARTIAL", "role": "PRIME", "evidence": "Lease temporary desiccant climate units with chiller and chilled water pump"}
+{"id": "r6-0509", "label": "NO", "role": "NONE", "evidence": "Supplemental cancer insurance pilot for TRICARE beneficiaries"}
+{"id": "r6-0512", "label": "NO", "role": "NONE", "evidence": "Nonappropriated fund public accountant special audits, not cleaning"}
+{"id": "r6-0515", "label": "NO", "role": "NONE", "evidence": "Web-based ordering system eMarketplace RFI; Diplomatic Security is an agency name"}
+{"id": "r6-0524", "label": "PARTIAL", "role": "SUB", "evidence": "BASOPS functional areas include Grounds Maintenance and snow, ice removal"}
+{"id": "r6-0528", "label": "PARTIAL", "role": "SUB", "evidence": "HQ renovation includes modernization and replacement of HVAC systems"}
+{"id": "r6-0536", "label": "NO", "role": "NONE", "evidence": "Telemedicine tele-emergency and TeleSANE support service, not on-site nurse placement"}
+{"id": "r6-0537", "label": "PARTIAL", "role": "SUB", "evidence": "Building modernization includes complete mechanical/HVAC installation for climate control"}
+{"id": "r6-0553", "label": "NO", "role": "NONE", "evidence": "Retail space lease; security board is a plywood backboard"}
+{"id": "r6-0557", "label": "FIT", "role": "PRIME", "evidence": "Barstow/Dumont Janitorial Services, small business NAICS 561720"}
+{"id": "r6-0558", "label": "FIT", "role": "PRIME", "evidence": "IDIQ mowing and maintenance services for Burnsville Lake"}
+{"id": "r6-0560", "label": "NO", "role": "NONE", "evidence": "Repair of sanitary waste piping, plumbing not HVAC"}

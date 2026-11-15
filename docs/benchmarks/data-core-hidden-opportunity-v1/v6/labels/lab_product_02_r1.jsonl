@@ -1,0 +1,35 @@
+{"id":"r6-0087","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"RELAY ASSEMBLY PSC 5945 Navy solicitation"}
+{"id":"r6-0089","label":"NO","role":"NONE","restriction":"NONE","evidence":"CABLE ASSEMBLY,SPEC, IN REPAIR/MODIFICATION OF; item inducted and repaired"}
+{"id":"r6-0090","label":"NO","role":"NONE","restriction":"NONE","evidence":"OSCILLATOR,NONCRYST, IN REPAIR/MODIFICATION OF; overhaul and repair SOW"}
+{"id":"r6-0091","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"VALVE,REGULATING,FL requirements for manufacture or refurbishment"}
+{"id":"r6-0092","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"59--PRINTED CIRCUIT BOA PSC 5998 solicitation"}
+{"id":"r6-0093","label":"NO","role":"NONE","restriction":"NONE","evidence":"sole source IDIQ with JHU/APL NC3 engineering guidance"}
+{"id":"r6-0094","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820010089469 SEAT,VALVE Approved source is 35795 NC008649"}
+{"id":"r6-0095","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"6550--VISN 4 Coagulation Testing advanced testing and monitoring of coagulation"}
+{"id":"r6-0096","label":"NO","role":"NONE","restriction":"NONE","evidence":"Equipment Transportation Services motorized vehicle runs for dental instruments"}
+{"id":"r6-0099","label":"FIT","role":"PRIME","restriction":"UNCLEAR","evidence":"LOGIC, SUBASSEMBLY procurement of 1 each NSN 5963 LLCYB5851; Government does not own drawings"}
+{"id":"r6-0100","label":"NO","role":"NONE","restriction":"NONE","evidence":"FY27 FCI Loretto Subsistence Dry Goods peanut butter, not fasteners"}
+{"id":"r6-0101","label":"NO","role":"NONE","restriction":"NONE","evidence":"VALVE,GATE REPAIR UPGRADE REQUIREMENTS return to Ready For Issue condition"}
+{"id":"r6-0102","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820011872829 VALVE,REGULATING,FLUID Approved source is 86184 74694B"}
+{"id":"r6-0103","label":"NO","role":"NONE","restriction":"NONE","evidence":"TSA Occupational Health and Medical Services IDIQ, services not replacement parts"}
+{"id":"r6-0105","label":"NO","role":"NONE","restriction":"NONE","evidence":"CABLE ASSEMBLY,SPEC PSC 6150, not computer hardware"}
+{"id":"r6-0106","label":"NO","role":"NONE","restriction":"NONE","evidence":"43--HEAD,FLUID FILTER PSC 4330, not fasteners"}
+{"id":"r6-0107","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"Ultrasound Diagnostic System, Hand Carried prototype PSC 6515 RPP"}
+{"id":"r6-0108","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"REMOTE INTERFACE UN PSC 5998 solicitation"}
+{"id":"r6-0110","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PARTS KIT BALL VALV Parts kit for a size 2 1/2 Ball valves"}
+{"id":"r6-0111","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"RELAY ASSEMBLY PSC 5945 Navy solicitation"}
+{"id":"r6-0112","label":"NO","role":"NONE","restriction":"NONE","evidence":"Renovate Building 1 first floor A/E design services SF 330"}
+{"id":"r6-0115","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 4820011163792 LOCKING DEVICE,VALVE Qty 412"}
+{"id":"r6-0117","label":"NO","role":"NONE","restriction":"NONE","evidence":"Industry Day Lima Peru Day 1 A/E services"}
+{"id":"r6-0118","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"61--CABLE ASSEMBLY,SPEC PSC 6150 replacement parts solicitation"}
+{"id":"r6-0121","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820011643285 VALVE,AIR,PROTECTION Approved sources 56161 10512053"}
+{"id":"r6-0122","label":"PARTIAL","role":"SUB","restriction":"APPROVED_SOURCE","evidence":"ACTUATOR,ELECTRO-ME NSN 7R-1680 requires Government source approval, acquisition/repair"}
+{"id":"r6-0123","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Request for Information DNA Buccal Collection Kits PSC 6640 laboratory supplies"}
+{"id":"r6-0125","label":"FIT","role":"PRIME","restriction":"QPL","evidence":"NSN 5945013347956 RELAY,ELECTROMAGNETIC This is a qualified products list (QPL) item"}
+{"id":"r6-0126","label":"FIT","role":"PRIME","restriction":"BRAND_NAME","evidence":"Brand-Name Only requirement Nordson Medical Quest MPS 3 Console and Controller"}
+{"id":"r6-0127","label":"NO","role":"NONE","restriction":"NONE","evidence":"Service Plan for InVita UDI Tracker Software Platform"}
+{"id":"r6-0129","label":"NO","role":"NONE","restriction":"NONE","evidence":"Aircraft Electrical Component Test Stand procurement and installation"}
+{"id":"r6-0132","label":"NO","role":"NONE","restriction":"NONE","evidence":"VALVE ASSEMBLY,ENVI REPAIR UPGRADE REQUIREMENTS return to Ready For Issue"}
+{"id":"r6-0133","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"KEYBOARD,DATA ENTRY PSC 5999 solicitation"}
+{"id":"r6-0134","label":"NO","role":"NONE","restriction":"NONE","evidence":"Hydrant Repair/Replacement supply and install fire hydrant"}
+{"id":"r6-0136","label":"NO","role":"NONE","restriction":"NONE","evidence":"Cooling Tower, Roofing, and Structural Construction"}

@@ -1,0 +1,35 @@
+{"id":"r6-0044","label":"FIT","role":"PRIME","restriction":"SOLE_SOURCE","evidence":"sole source contract with WERFEN USA GEM Premier 5000 analyzer reagent rental"}
+{"id":"r6-0046","label":"NO","role":"NONE","restriction":"NONE","evidence":"PUMP,AXIAL PISTONS PSC 4320, pump not a valve"}
+{"id":"r6-0047","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PARTS KIT,BALL VALV PSC 4820 Navy solicitation"}
+{"id":"r6-0048","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"vendor shall supply Transfusion Service with red blood cell reagents"}
+{"id":"r6-0050","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PLATE ASSEMBLY,STAU PSC 5340 Navy supply solicitation"}
+{"id":"r6-0051","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CAP,VALVE Bonnet for a size 3 inch Ball Valve NAVSEA Drawing"}
+{"id":"r6-0052","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 6150015315870 CABLE ASSEMBLY,SPECIAL Approved source is 63760"}
+{"id":"r6-0053","label":"NO","role":"NONE","restriction":"NONE","evidence":"MANIFOLD ASSEMBLY replacement parts, IN REPAIR/MODIFICATION OF"}
+{"id":"r6-0057","label":"NO","role":"NONE","restriction":"NONE","evidence":"Pine Bluff Arsenal Testing, Lab and Engineering Services"}
+{"id":"r6-0058","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 1560-004212077 DUCT ASSEMBLY, BLEED AIR solicitation will be issued as unrestricted"}
+{"id":"r6-0059","label":"NO","role":"NONE","restriction":"NONE","evidence":"STEM ASSY PSC 4820 valve part, not fasteners"}
+{"id":"r6-0060","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"RFQ Smart-ABI+ wireless system Diagnostic Laboratory Equipment PSC 6640"}
+{"id":"r6-0061","label":"NO","role":"NONE","restriction":"NONE","evidence":"BARDA Vaccine Medical Countermeasures development contractor RFP"}
+{"id":"r6-0062","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"B-52 APQ-166 Magnetron/Electron Tube NSN 5960-01-318-0987 qualification requirements"}
+{"id":"r6-0063","label":"NO","role":"NONE","restriction":"NONE","evidence":"PARTS KIT,BALL VALV Navy ship valve, not aircraft part"}
+{"id":"r6-0064","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CONTROL VALVE,AIRCR PSC 1680 solicitation"}
+{"id":"r6-0065","label":"FIT","role":"SUB","restriction":"SOLE_SOURCE","evidence":"F-15 L/H Ramp NSN 1560-01-621-1723FX solicit only one source, The Boeing Company"}
+{"id":"r6-0066","label":"NO","role":"NONE","restriction":"NONE","evidence":"VALVE,SOLENOID requirements for repair and contract quality requirements"}
+{"id":"r6-0068","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 6150014462500 WIRING HARNESS,BRANCHE RFQ"}
+{"id":"r6-0069","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 4820015541270 VALVE,GLOBE Line 0001 Qty 11"}
+{"id":"r6-0070","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"FUEL CELL 1680-01-494-3009 ITEMS REQUIRE GOVERNMENT SOURCE APPROVAL PRIOR TO AWARD"}
+{"id":"r6-0071","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"61--CABLE ASSEMBLY,SPEC PSC 6150 Navy total small business set-aside"}
+{"id":"r6-0072","label":"NO","role":"NONE","restriction":"NONE","evidence":"CABLE ASSEMBLY,SPEC PSC 6150 not aircraft airframe or landing gear part"}
+{"id":"r6-0073","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"53--KEY PSC 5315 Navy supply solicitation"}
+{"id":"r6-0074","label":"NO","role":"NONE","restriction":"NONE","evidence":"CABLE ASSEMBLY,SPEC PSC 6150 not computer hardware"}
+{"id":"r6-0075","label":"NO","role":"NONE","restriction":"NONE","evidence":"IDIQ Pest Management Services Recompete at MacDill AFB"}
+{"id":"r6-0076","label":"NO","role":"NONE","restriction":"NONE","evidence":"WHEEL HALF,AIRCRAFT, IN REPAIR/MODIFICATION OF; repair inducted"}
+{"id":"r6-0077","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4810014751335 BODY,VALVE Approved sources are 66822 40005-1"}
+{"id":"r6-0079","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"requirements for manufacture of VALVE,SAFETY RELIEF MK-91 MOD-3"}
+{"id":"r6-0080","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 6150015136173 CABLE ASSEMBLY,SPECIAL Qty 5 RFQ"}
+{"id":"r6-0081","label":"FIT","role":"PRIME","restriction":"QPL","evidence":"NSN 5962012489475 MICROCIRCUIT,DIGITAL This is a qualified products list (QPL) item"}
+{"id":"r6-0082","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"59--WIRING HARNESS PSC 5995 Navy solicitation"}
+{"id":"r6-0084","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Torque Tube Assembl PSC 1680 See attached RFQ"}
+{"id":"r6-0085","label":"NO","role":"NONE","restriction":"NONE","evidence":"36--CANISTER PSC 3655, not IT hardware"}
+{"id":"r6-0086","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820009808475 VALVE,CHECK Approved sources 06239 M4014-3-4"}

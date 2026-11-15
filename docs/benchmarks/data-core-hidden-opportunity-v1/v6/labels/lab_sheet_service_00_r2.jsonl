@@ -1,0 +1,35 @@
+{"id": "r6-0002", "label": "NO", "role": "NONE", "evidence": "Office space lease; janitorial included by lessor in full-service lease"}
+{"id": "r6-0008", "label": "PARTIAL", "role": "SUB", "evidence": "Design-build facility includes installation of HVAC systems among MEP lines of effort"}
+{"id": "r6-0016", "label": "NO", "role": "NONE", "evidence": "Navy supply buy of head window assembly part, not cleaning"}
+{"id": "r6-0019", "label": "FIT", "role": "PRIME", "evidence": "Army Enterprise HVAC Modernization and Lifecycle Sustainment Maintenance Plan FY27-FY31"}
+{"id": "r6-0026", "label": "NO", "role": "NONE", "evidence": "Revenue cycle and charge description master support, not nurse staffing"}
+{"id": "r6-0029", "label": "NO", "role": "NONE", "evidence": "Golden Dome missile defense technology CSO, no guard services"}
+{"id": "r6-0040", "label": "NO", "role": "NONE", "evidence": "Vehicle auction and marshalling services, not office cleaning"}
+{"id": "r6-0041", "label": "NO", "role": "NONE", "evidence": "Replace 150kVA diesel generator, no steel building or roofing"}
+{"id": "r6-0043", "label": "NO", "role": "NONE", "evidence": "Remove and replace powder-coated steel shower partitions, not buildings or roofing"}
+{"id": "r6-0045", "label": "NO", "role": "NONE", "evidence": "Repair of sanitary waste piping, plumbing not HVAC"}
+{"id": "r6-0049", "label": "FIT", "role": "PRIME", "evidence": "Remove three heating boilers and install three new boilers with controls"}
+{"id": "r6-0054", "label": "NO", "role": "NONE", "evidence": "Lease proposals for commercial office space; guard only in boilerplate"}
+{"id": "r6-0055", "label": "PARTIAL", "role": "SUB", "evidence": "MACC multi-trade maintenance, repair, construction lists HVAC among trades"}
+{"id": "r6-0056", "label": "PARTIAL", "role": "PRIME", "evidence": "BPA for air conditioning equipment and components supplies and services"}
+{"id": "r6-0067", "label": "NO", "role": "NONE", "evidence": "Supplemental cancer insurance pilot for TRICARE beneficiaries"}
+{"id": "r6-0078", "label": "NO", "role": "NONE", "evidence": "Nonappropriated fund public accountant special audits, not cleaning"}
+{"id": "r6-0083", "label": "NO", "role": "NONE", "evidence": "Motorized vehicle runs transporting dental and medical instruments"}
+{"id": "r6-0088", "label": "NO", "role": "NONE", "evidence": "DLA commercial solutions opening framework for technology solution briefs"}
+{"id": "r6-0097", "label": "NO", "role": "NONE", "evidence": "Triennial circuit breaker and feeder testing, electrical NAICS 238210"}
+{"id": "r6-0098", "label": "PARTIAL", "role": "PRIME", "evidence": "Replace powerhouse hot water tanks, mechanical plant equipment replacement"}
+{"id": "r6-0104", "label": "PARTIAL", "role": "SUB", "evidence": "Facilities O&M includes building and grounds maintenance component"}
+{"id": "r6-0109", "label": "NO", "role": "NONE", "evidence": "Contaminated soil disposal and trucking, not medical staffing"}
+{"id": "r6-0113", "label": "NO", "role": "NONE", "evidence": "Nonappropriated fund public accountant special audits, not cleaning"}
+{"id": "r6-0114", "label": "NO", "role": "NONE", "evidence": "Base operations support facility maintenance; no steel erection or metal roofing stated"}
+{"id": "r6-0116", "label": "NO", "role": "NONE", "evidence": "Shuttle bus service; heating and air conditioning refers to bus climate control"}
+{"id": "r6-0119", "label": "NO", "role": "NONE", "evidence": "Refurbish CO2 scrubber and burner equipment on a submarine"}
+{"id": "r6-0120", "label": "FIT", "role": "PRIME", "evidence": "Janitorial/cleaning services at U.S. Embassy office building and warehouse"}
+{"id": "r6-0124", "label": "NO", "role": "NONE", "evidence": "Demolish old boiler plant with asbestos abatement, demolition not HVAC maintenance"}
+{"id": "r6-0128", "label": "NO", "role": "NONE", "evidence": "Drone as first responder sUAS dock systems RFI"}
+{"id": "r6-0130", "label": "NO", "role": "NONE", "evidence": "Medical linen rental and laundry service, not nurse staffing"}
+{"id": "r6-0131", "label": "PARTIAL", "role": "SUB", "evidence": "Utility construction includes repairing or restoring landscaping disturbed by construction"}
+{"id": "r6-0135", "label": "FIT", "role": "PRIME", "evidence": "Aseptic Janitorial/Custodial Services White River Junction solicitation"}
+{"id": "r6-0143", "label": "FIT", "role": "SUB", "evidence": "Custodial Services requirement set aside as AbilityOne direct award"}
+{"id": "r6-0145", "label": "FIT", "role": "PRIME", "evidence": "RFQ for Boiler Controls Inspection and Testing"}
+{"id": "r6-0146", "label": "NO", "role": "NONE", "evidence": "Preventive maintenance of solar panels and inverters"}

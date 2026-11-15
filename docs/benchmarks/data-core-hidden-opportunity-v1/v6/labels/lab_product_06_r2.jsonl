@@ -1,0 +1,35 @@
+{"id": "r6-0275", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "BLADE,COMPRESSOR,AI, IN REPAIR/MODIFICATION OF; Government does not own the data"}
+{"id": "r6-0278", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "VALVE, 4\" IPS, GATE, BRONZE BODY, NICKEL ALLOY TRIM, COMM. FLANGED"}
+{"id": "r6-0279", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "VALVE,FUEL SYSTEM NSN: 2915-00-626-3123OJ / PN: 6814762 / AMC: 2B"}
+{"id": "r6-0280", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Construction of Chilled Water Plant and Site Utility Upgrades at VA Medical Center"}
+{"id": "r6-0281", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 4820014794626 VALVE,FLOW CONTROL ... Approved source is 35795 Y101912617"}
+{"id": "r6-0282", "label": "NO", "role": "NONE", "restriction": "UNCLEAR", "evidence": "CYLINDER ASSEMBLY, CCRP asset refurbishing DOP; valve body mentioned only for serialization"}
+{"id": "r6-0283", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Mobile Boilers rental, preventive maintenance and repair; set screws mentioned in checklist"}
+{"id": "r6-0288", "label": "NO", "role": "NONE", "restriction": "OEM_ONLY", "evidence": "LIGHT,LANDING,AIRCR can only be repaired from Original Equipment Manufacturer (OEM)"}
+{"id": "r6-0289", "label": "FIT", "role": "PRIME", "restriction": "SOLE_SOURCE", "evidence": "Latch Assembly PSC 1615; only one source, OEM Sikorsky Aircraft Corporation"}
+{"id": "r6-0290", "label": "NO", "role": "NONE", "restriction": "APPROVED_SOURCE", "evidence": "SERVOVALVE,CLUTCH, IN REPAIR/MODIFICATION OF; only previously approved source(s) solicited"}
+{"id": "r6-0291", "label": "NO", "role": "NONE", "restriction": "UNCLEAR", "evidence": "48--MANIFOLD ASSEMBLY - AND SIMILAR REPLACEMENT PARTS, IN REPAIR/MODIFICATION OF"}
+{"id": "r6-0292", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 4820012510619 VALVE,FOOT ... Approved source is 96046 35351"}
+{"id": "r6-0294", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "17--TOWBAR,AIRCRAFT PSC 1730 ground handling equipment, not aircraft spares"}
+{"id": "r6-0296", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "Complete 4 inch swing check valve assembly per Emerson Crosby Drawing DS-B-90380"}
+{"id": "r6-0297", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "15--ROD END ASSEMBLY, PSC 1560, RFQ for a FMS spares buy"}
+{"id": "r6-0298", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "CIRCUIT CARD ASSEMB, IN REPAIR/MODIFICATION OF; Government does not own the data"}
+{"id": "r6-0300", "label": "NO", "role": "NONE", "restriction": "UNCLEAR", "evidence": "contains the requirements for repair ... for the VALVE,BUTTERFLY"}
+{"id": "r6-0302", "label": "NO", "role": "NONE", "restriction": "UNCLEAR", "evidence": "SERVER,AUTOMATIC DA PSC 7E20 IT hardware, not equipment spare part"}
+{"id": "r6-0303", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Supply & Install 1 Fire hydrant & valve; construction NAICS 237110"}
+{"id": "r6-0304", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "16--VALVE,ECS, PSC 1660 supply solicitation"}
+{"id": "r6-0305", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "requirements for manufacture ... for the VALVE,SAFETY RELIEF; total small business set-aside"}
+{"id": "r6-0306", "label": "NO", "role": "NONE", "restriction": "UNCLEAR", "evidence": "COMPUTER,FUEL MANAG; item shall be inducted and repaired by the contractor"}
+{"id": "r6-0307", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 5305007175593 SCREW,MACHINE: Line 0001 Qty 228"}
+{"id": "r6-0308", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Second Quarter Subsistence, FY 2027 (Kosher, Meat, Frozen, and Dry)"}
+{"id": "r6-0310", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "31--BEARING UNIT PLAIN; laboratory reports of raw material only"}
+{"id": "r6-0311", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "IDIQ for MISCELLANEOUS PAVING CONSTRUCTION SERVICES at Dugway Proving Ground"}
+{"id": "r6-0314", "label": "FIT", "role": "PRIME", "restriction": "SOLE_SOURCE", "evidence": "NSN 7H-4820-011728194 VALVE,REGULATING,FL; negotiate with only one source FAR 6.302-1"}
+{"id": "r6-0315", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "36--CANISTER PSC 3655 supply solicitation, total small business set-aside"}
+{"id": "r6-0316", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5320016300267 RIVET,BLIND ... Approved source is 11815 CR7773S-05-13"}
+{"id": "r6-0318", "label": "NO", "role": "NONE", "restriction": "UNCLEAR", "evidence": "KNOB - AND OTHER REPLACEMENT PARTS; Repair Turnaround Time (RTAT) definition"}
+{"id": "r6-0319", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "TAILPIECE,VALVE PSC 4820, not computer hardware or IT equipment"}
+{"id": "r6-0320", "label": "NO", "role": "NONE", "restriction": "UNCLEAR", "evidence": "66--SENSOR,AMBIENT TEMP, IN REPAIR/MODIFICATION OF"}
+{"id": "r6-0321", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "ARCTICS II Virtual Industry Day, range communications and support services"}
+{"id": "r6-0322", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "1 HP MOTOR, PSC 2920 supply solicitation, accelerated delivery encouraged"}
+{"id": "r6-0323", "label": "NO", "role": "NONE", "restriction": "UNCLEAR", "evidence": "CIRCUIT CARD ASSEMB; This is a repair requirement for the item(s)"}

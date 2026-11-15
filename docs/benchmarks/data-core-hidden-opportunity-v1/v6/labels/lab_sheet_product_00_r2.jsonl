@@ -1,0 +1,35 @@
+{"id":"r6-0000","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"TITLE: CABLE ASSEMBLY,SPEC with PSC/FSC 6150 electrical wire and cable assemblies"}
+{"id":"r6-0001","label":"NO","role":"NONE","restriction":"NONE","evidence":"GOCO Aircraft and Ground Fuel Services, Bulk Fuel Storage and Distribution Services"}
+{"id":"r6-0003","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"5935-01-678-7255 SWA5 MK48 Torpedo Receptacle (Ethernet), FSC 5935 connectors"}
+{"id":"r6-0004","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"TITLE: Heat Exchanger, FSC 1660 aircraft air conditioning and pressurizing components"}
+{"id":"r6-0005","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"48--VALVE,BALL 1.000NPS; Complete 1 inch Ball Valve per NAVSEA drawing"}
+{"id":"r6-0006","label":"NO","role":"NONE","restriction":"OEM_ONLY","evidence":"Repair and Maintenance Service Plan... all labor, genuine replacement parts, lubricants"}
+{"id":"r6-0007","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"6515 Prosthetic STX 671 O2 Equipment; HOME OXYGEN SUPPLIES"}
+{"id":"r6-0009","label":"PARTIAL","role":"SUB","restriction":"SOLE_SOURCE","evidence":"intends to award... noncompetitive basis to TA Instruments-Waters LLC, Differential Scanning Calorimeter"}
+{"id":"r6-0010","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"53--HELICAL SPRING, FSC 5360 springs, Navy spare part solicitation"}
+{"id":"r6-0011","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5310011376955 NUT,PLAIN,EXTENDED WAS; Approved sources are 56878 FNW12-524"}
+{"id":"r6-0012","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CIRCUIT CARD ASSEMB, FSC 5998; soldered electrical and electronic assemblies per J-STD-001"}
+{"id":"r6-0013","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 6150014900632 CABLE ASSEMBLY,THERMOC; Approved source is 00060 26012-000"}
+{"id":"r6-0014","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5305015412554 SCREW,CAP,SOCKET HEAD; Approved sources are 17283 92-22-3100A"}
+{"id":"r6-0015","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820014091232 VALVE,CHECK; Approved source is 86184 1407901G"}
+{"id":"r6-0017","label":"NO","role":"NONE","restriction":"NONE","evidence":"CONSTRUCTION PROJECT: Industrial Wastewater Treatment Plant Upgrades at Mike Monroney"}
+{"id":"r6-0018","label":"NO","role":"NONE","restriction":"NONE","evidence":"NRP,FWD AIRSTAIR... IN REPAIR/MODIFICATION OF; item shall be inducted and repaired"}
+{"id":"r6-0020","label":"NO","role":"NONE","restriction":"NONE","evidence":"59--CIRCUIT CARD ASSEMB, IN REPAIR/MODIFICATION OF; This RFQ is for repair"}
+{"id":"r6-0021","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5320017242668 RIVET,BLIND; Approved source is 11815 CR3853-4-6"}
+{"id":"r6-0022","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN: 2840-01-357-1941PR NOUN: AUGMENTOR NOZZLE SE TOP DRAWING: 9538M95G05"}
+{"id":"r6-0023","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820011136739 VALVE,REGULATOR; Approved source is 28510 GAI73-2990-0227"}
+{"id":"r6-0024","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5305011550063 SCREW,CAP,HEXAGON HEAD; Approved source is 56161 10501627"}
+{"id":"r6-0025","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"6515--Reprocessed Non-Critical Single Use Devices; MSPV medical and surgical supplies consumables"}
+{"id":"r6-0027","label":"NO","role":"NONE","restriction":"NONE","evidence":"Locum - Anesthesiology Physician Services at Quillen VA Medical Center"}
+{"id":"r6-0028","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"TITLE: DAMPER ASSY, FSC 1615 helicopter rotor and drive components"}
+{"id":"r6-0030","label":"NO","role":"NONE","restriction":"NONE","evidence":"43--PUMP,CENTRIFUGAL - AND SIMILAR REPLACEMENT PARTS, IN REPAIR/MODIFICATION OF"}
+{"id":"r6-0031","label":"NO","role":"NONE","restriction":"UNCLEAR","evidence":"BD Biosciences Service Contract for the BD FACS ARIA FUSION, labor and parts"}
+{"id":"r6-0032","label":"NO","role":"NONE","restriction":"NONE","evidence":"Switchgear (Automatic Transfer Switch (ATS) Investigation and Repair service"}
+{"id":"r6-0033","label":"NO","role":"NONE","restriction":"NONE","evidence":"Senior Leader Logistics Symposium 2027 Industry Engagement, informational special notice"}
+{"id":"r6-0034","label":"NO","role":"NONE","restriction":"NONE","evidence":"Industry Day: Callao Naval Base Infrastructure Modernization - Construction NAICS 236220"}
+{"id":"r6-0035","label":"NO","role":"NONE","restriction":"UNCLEAR","evidence":"Fire Suppression System Installation and Obsolete Fire Bottle Replacement; Redacted J&A"}
+{"id":"r6-0036","label":"NO","role":"NONE","restriction":"NONE","evidence":"53--HELICAL SPRING, FSC 5360, not computer hardware or IT equipment"}
+{"id":"r6-0037","label":"NO","role":"NONE","restriction":"NONE","evidence":"medical-grade linen rental and laundry services for Branch Health Clinic Everett"}
+{"id":"r6-0038","label":"NO","role":"NONE","restriction":"NONE","evidence":"DISPLAY UNIT,HELMET; item shall be inducted and repaired by the contractor"}
+{"id":"r6-0039","label":"NO","role":"NONE","restriction":"NONE","evidence":"59--CIRCUIT CARD ASSEMB, IN REPAIR/MODIFICATION OF, repair solicitation"}
+{"id":"r6-0042","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"32 EA of NSN 1560-01-205-8437WF, F-16 Flaperon airframe structural component"}

@@ -1,0 +1,35 @@
+{"id":"r6-0469","label":"NO","role":"NONE","restriction":"NONE","evidence":"LIGHT,LANDING,AIRCR IN REPAIR/MODIFICATION OF; return items to RFI condition"}
+{"id":"r6-0470","label":"NO","role":"NONE","restriction":"NONE","evidence":"DISK,VALVE FSC 4820; fasteners mentioned only in marking clause"}
+{"id":"r6-0472","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"repair, test, evaluation, and calibration of Aircraft Oxygen System Test Set; Eaton only one source"}
+{"id":"r6-0473","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"66--REAGENT POWDER, FSC 6640 laboratory supply solicitation"}
+{"id":"r6-0474","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"sole source repair requirement to GE AVIATION SYSTEMS, ACTUATOR,MECHANICAL"}
+{"id":"r6-0476","label":"NO","role":"NONE","restriction":"NONE","evidence":"fabricated components for the Storage Ring Embedded Floor Plates ALS-U"}
+{"id":"r6-0477","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PARTS KIT,BALL VALV, FSC 4820 Navy replacement parts kit"}
+{"id":"r6-0478","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"6515--PROSTHETICS-DRIVE iFILL AND CYLIND, Home Oxygen"}
+{"id":"r6-0480","label":"NO","role":"NONE","restriction":"NONE","evidence":"NRP,KEYBOARD,DATA E repair price, Repair Turn Around Time"}
+{"id":"r6-0481","label":"NO","role":"NONE","restriction":"NONE","evidence":"NIH Scientific & Technical Expertise professional services, NAICS 541990"}
+{"id":"r6-0483","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"DELTA-P IND ASSY, FSC 4820 valve class, indicator assembly"}
+{"id":"r6-0484","label":"NO","role":"NONE","restriction":"NONE","evidence":"43--HEAD,FLUID FILTER ship part, not IT hardware"}
+{"id":"r6-0486","label":"NO","role":"NONE","restriction":"NONE","evidence":"Supplement 303 Ham Products, Boneless, Fully Cooked"}
+{"id":"r6-0487","label":"NO","role":"NONE","restriction":"NONE","evidence":"CYLINDER,COMPRESSED FSC 8120; fasteners only in marking clause"}
+{"id":"r6-0488","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"INTERFACE UNIT, AUT replacement part; No drawings or technical data available"}
+{"id":"r6-0489","label":"NO","role":"NONE","restriction":"NONE","evidence":"VALVE,CHECK FSC 4820, not IT hardware"}
+{"id":"r6-0490","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"VAVLE,HOT SIDE TEM FSC 1680; offers from non government-approved sources"}
+{"id":"r6-0491","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5310005749544 NUT,SLEEVE; Approved sources are 29183 6-68024-1"}
+{"id":"r6-0492","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"1 1/2 inch Ball Valve per Naval Ship Systems Command Drawing 845-4558773"}
+{"id":"r6-0493","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"Hubbell Water Heater, proof of Brand Name OEM authorized reseller status"}
+{"id":"r6-0494","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"DISK,VALVE FSC 4820 valve part, Navy QTY 31"}
+{"id":"r6-0496","label":"PARTIAL","role":"PRIME","restriction":"UNCLEAR","evidence":"KitCheck RFID Tags, RFID Tag Readers, Barcode Reader plus software fee"}
+{"id":"r6-0497","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CCA,EPS CONTROL circuit card assembly, NAICS 334412"}
+{"id":"r6-0499","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"16--FIBER OPTIC ADAPTER - AND OTHER REPLACEMENT PARTS"}
+{"id":"r6-0500","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"REPAIR UPGRADE REQUIREMENTS return CELL,FUEL,AIRCRAFT to RFI; government source approval"}
+{"id":"r6-0501","label":"NO","role":"NONE","restriction":"NONE","evidence":"Construction of Chilled Water Plant and Site Utility Upgrades"}
+{"id":"r6-0502","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 6150017338617 CABLE ASSEMBLY,SPEC; Approved sources are 07482 2110M89P06"}
+{"id":"r6-0506","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Parts Kit for a size 1/4 inch Ball Valve, Ball and mating Seats"}
+{"id":"r6-0507","label":"NO","role":"NONE","restriction":"NONE","evidence":"Oilless Breathing Air Compressor 165 ACFM screw compressor"}
+{"id":"r6-0508","label":"NO","role":"NONE","restriction":"NONE","evidence":"PARTS KIT,BALL VALV naval ship valve part, not aircraft"}
+{"id":"r6-0510","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"NSN 2640015650383 VALVE EXTENSION,TIRE; Approved source is 4TVG2"}
+{"id":"r6-0511","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CIRCUIT CARD ASSEMB solicitation, Navy"}
+{"id":"r6-0513","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"WIRING BD ASSY FSC 5998 replacement assembly, LPTA"}
+{"id":"r6-0514","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"REPAIR UPGRADE return FUEL CELL,AIRCRAFT to RFI; government source approval"}
+{"id":"r6-0516","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 5305016499792 SCREW,CAP,HEXAGON HEAD Qty 1065; all responsible sources"}

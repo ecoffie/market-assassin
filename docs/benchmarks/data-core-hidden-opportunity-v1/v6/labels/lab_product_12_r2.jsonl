@@ -1,0 +1,8 @@
+{"id":"r6-0559","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"FRAME,SEAT,AIRCRAFT IN REPAIR/MODIFICATION; sole source basis with Sikorsky Aircraft"}
+{"id":"r6-0562","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820014836063 SEAT,VALVE; Approved sources are 99517 V1E10502"}
+{"id":"r6-0563","label":"NO","role":"NONE","restriction":"NONE","evidence":"continued sustainment of the RDS version 2.X baseline"}
+{"id":"r6-0564","label":"NO","role":"NONE","restriction":"NONE","evidence":"VALVE,PRESS REDUCIN FSC 2915, not IT hardware"}
+{"id":"r6-0565","label":"NO","role":"NONE","restriction":"NONE","evidence":"Dockside Repairs of USCGC HAMILTON: ship repair, maintenance, modifications"}
+{"id":"r6-0567","label":"NO","role":"NONE","restriction":"NONE","evidence":"30--CLUTCH ASSEMBLY,FRI, IN REPAIR/MODIFICATION OF"}
+{"id":"r6-0568","label":"NO","role":"NONE","restriction":"NONE","evidence":"59--CIRCUIT CARD ASSEMB, IN REPAIR/MODIFICATION OF; overhaul to RFI"}
+{"id":"r6-0569","label":"FIT","role":"PRIME","restriction":"QPL","evidence":"NSN 5945014587422 RELAY,ELECTROMAGNETIC; qualified products list (QPL) item"}

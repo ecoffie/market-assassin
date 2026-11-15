@@ -111,6 +111,7 @@ per business; the counts above are complete). Representative misses, each traced
 | F: code-floor census, or a random 30 if more than 30 | ≤ 30 | recall within codes |
 | M: random 15 of the candidate's matched set outside its top 20 | 15 | retrieval precision of the full set |
 | X: rows the candidate removes relative to production, random 15 | ≤ 15 | relevant work lost by the fix |
+| O: off-code recall pool (added 2026-11-14 after v6): relevant notices outside the business's codes, from the union of variants plus a blind probe, random 15 | 15 | recall the code list cannot guarantee; once code recall exists, the code-floor leg passes by construction |
 
 About 1,000 items before overlap, about 800 after. Expect 6–8 hours of human time at roughly 30 seconds an item.
 **To reduce it:** AI pre-labels everything with two blind reviewers (as in v4). Humans label all of T and F (the gate legs; about 700) plus every

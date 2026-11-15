@@ -1,0 +1,35 @@
+{"id":"r6-0324","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"New Manufacture Regulating Valve NSN 4820008604396; Qualified Sources: Aero International"}
+{"id":"r6-0326","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CIRCUIT CARD ASSEMB PSC 5998 solicitation; soldering IPC J-STD-001 requirements"}
+{"id":"r6-0327","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NVision POLARIS (Brand Name or Equal) PSC 6640 laboratory equipment"}
+{"id":"r6-0328","label":"NO","role":"NONE","restriction":"NONE","evidence":"VALVE,SOLENOID, IN REPAIR/MODIFICATION OF NSN 7R-4810-013193027-EL"}
+{"id":"r6-0330","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Leco CS-844 and ONH-836 supplies or equivalent; PSC 6640 lab supplies"}
+{"id":"r6-0331","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NUT, SELF-LKG PSC 5310; Contractor provides additional fastener per heat/lot"}
+{"id":"r6-0333","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"sole-source contract to REPAIR 29 RELAY ASSEMBLY units to SECHAN ELECTRONICS"}
+{"id":"r6-0334","label":"NO","role":"NONE","restriction":"NONE","evidence":"Small-form Factor Computer, NeuroWorks SleepWorks software upgrade and HL7 implementation"}
+{"id":"r6-0336","label":"NO","role":"NONE","restriction":"NONE","evidence":"synthesis and distribution of drugs of abuse and related compounds (research service)"}
+{"id":"r6-0338","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"Clinical Laboratory Coagulation Equipment/Supply cost-per-reportable-result IDIQ; supplies and inventory"}
+{"id":"r6-0339","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"MCS2 Sensor Modules & Power Supplies, No Equivalents or Substitutions"}
+{"id":"r6-0340","label":"NO","role":"NONE","restriction":"NONE","evidence":"BLOWER,ENGINE,EAPS, IN REPAIR/MODIFICATION OF; contractor supplies parts for required repairs"}
+{"id":"r6-0341","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820012079289 VALVE,LINEAR,DIRECTION Qty 32; Approved source is 09990"}
+{"id":"r6-0342","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"sUAS charging connector/interface; seeking information about current product offerings"}
+{"id":"r6-0344","label":"NO","role":"NONE","restriction":"NONE","evidence":"USAG Pressure Washing non-personal services contract at Fort Bragg"}
+{"id":"r6-0345","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CAP,VALVE PSC 4820 solicitation with drawings and specifications"}
+{"id":"r6-0347","label":"NO","role":"NONE","restriction":"UNCLEAR","evidence":"For the repair of 3 units NSN 5999016517373 DATA TRANSFER UNIT"}
+{"id":"r6-0348","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NANO-AEROSOL HYGROSCOPICITY CLOUD CONDENSATION ANALYZER PSC 6640 sources sought"}
+{"id":"r6-0351","label":"NO","role":"NONE","restriction":"NONE","evidence":"Eddyville Quarters Window Replacement; remove and install new windows (construction)"}
+{"id":"r6-0353","label":"NO","role":"NONE","restriction":"NONE","evidence":"PUMP,AXIAL PISTONS IN REPAIR/MODIFICATION OF; inducted and repaired by contractor"}
+{"id":"r6-0355","label":"NO","role":"NONE","restriction":"NONE","evidence":"HEAT EXCHANGER,AIR; repair shop travelers, parts inspection data before and after repair"}
+{"id":"r6-0356","label":"NO","role":"NONE","restriction":"NONE","evidence":"ED Suicide Risk Mitigation Fence construction services"}
+{"id":"r6-0357","label":"NO","role":"NONE","restriction":"NONE","evidence":"Medical Linen Rental and Laundry Service"}
+{"id":"r6-0359","label":"NO","role":"NONE","restriction":"NONE","evidence":"PARTS KIT,BALL VALV per Naval Sea Systems Command Drawing; naval valve parts, not aircraft"}
+{"id":"r6-0360","label":"FIT","role":"PRIME","restriction":"SOLE_SOURCE","evidence":"Replacement Hydraulic Accumulator Bank & Panel; sole source to ABBOTT VALVE & FITTING"}
+{"id":"r6-0362","label":"NO","role":"NONE","restriction":"NONE","evidence":"CAP,VALVE Bonnet for 3 inch Ball Valve per NAVSEA drawing; not aircraft component"}
+{"id":"r6-0363","label":"NO","role":"NONE","restriction":"NONE","evidence":"Commercial Solutions Opening JADC2 sensor hardware and software development"}
+{"id":"r6-0365","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"SERVOCYLINDER ASSEM, IN REPAIR/MODIFICATION OF; Only previously approved sources solicited"}
+{"id":"r6-0366","label":"NO","role":"NONE","restriction":"NONE","evidence":"6505 VA Loma Linda FDG sources sought, NAICS 325412 pharmaceutical"}
+{"id":"r6-0369","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NRP,CYLINDER,ACTUAT NSN 7R-1650-016221417-QF; requires engineering source approval"}
+{"id":"r6-0370","label":"NO","role":"NONE","restriction":"NONE","evidence":"VALVE,BALL PSC 4820 per drawings; not IT hardware"}
+{"id":"r6-0372","label":"NO","role":"NONE","restriction":"NONE","evidence":"LSEQ MK 6 Mod 1 launch sequencer and LRUs for MK 41 VLS weapon system"}
+{"id":"r6-0374","label":"NO","role":"NONE","restriction":"NONE","evidence":"Parts Kit for 1/4 inch Ball Valve, Ball and Seats per NAVSEA Drawing"}
+{"id":"r6-0375","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 4820016416404 VALVE,BALL; All responsible sources may submit a quote"}
+{"id":"r6-0376","label":"NO","role":"NONE","restriction":"NONE","evidence":"BONNET,VALVE PSC 4820; fasteners only mentioned for marking"}

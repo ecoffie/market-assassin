@@ -1,0 +1,8 @@
+{"id":"r6-0559","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"FRAME,SEAT,AIRCRAFT IN REPAIR/MODIFICATION; sole source Sikorsky, repair to Ready For Issue"}
+{"id":"r6-0562","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820014836063 SEAT,VALVE Approved sources are 99517 V1E10502 ITEM 21"}
+{"id":"r6-0563","label":"NO","role":"NONE","restriction":"NONE","evidence":"Radio Distribution System RFI; sustainment, software updates and repair services"}
+{"id":"r6-0564","label":"NO","role":"NONE","restriction":"NONE","evidence":"VALVE,PRESS REDUCIN PSC 2915 Navy ship part, not IT equipment"}
+{"id":"r6-0565","label":"NO","role":"NONE","restriction":"NONE","evidence":"USCGC HAMILTON Dockside Repairs ship repair and maintenance services"}
+{"id":"r6-0567","label":"NO","role":"NONE","restriction":"NONE","evidence":"CLUTCH ASSEMBLY,FRI IN REPAIR/MODIFICATION OF PSC 3010 repair work"}
+{"id":"r6-0568","label":"NO","role":"NONE","restriction":"NONE","evidence":"CIRCUIT CARD ASSEMB IN REPAIR/MODIFICATION; overhaul and repair to Ready for Issue"}
+{"id":"r6-0569","label":"FIT","role":"PRIME","restriction":"QPL","evidence":"NSN 5945014587422 RELAY,ELECTROMAGNETIC Qty 286 This is a qualified products list (QPL) item"}

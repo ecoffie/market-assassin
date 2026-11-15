@@ -1,0 +1,35 @@
+{"id":"r6-0423","label":"FIT","role":"PRIME","restriction":"SOLE_SOURCE","evidence":"ANION GUARD COLUMN PSC 6640 NSN 1H-6640-016544351-X3 one source FAR 6.302-1"}
+{"id":"r6-0424","label":"PARTIAL","role":"PRIME","restriction":"BRAND_NAME","evidence":"Nanopositioners and Motion Controllers PSC 6640 on brand name only basis"}
+{"id":"r6-0426","label":"NO","role":"NONE","restriction":"NONE","evidence":"Verizon Dedicated T1 Circuit and TLS Line Service telecommunications service"}
+{"id":"r6-0427","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 2840015822796NZ ROTOR,COMPRESSOR P/N 4089065-701 Rotor and Stator Assembly"}
+{"id":"r6-0428","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"48--VLV, REGUL PRESSURE PSC 4820 supply solicitation"}
+{"id":"r6-0430","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"STEM,FLUID VALVE PSC 4820 replacement part supply, small business set-aside"}
+{"id":"r6-0431","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"ACTUATOR,HYDRAULIC AND SIMILAR REPLACEMENT PARTS PSC 4810"}
+{"id":"r6-0432","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"43--HEAD,FLUID FILTER PSC 4330 supply solicitation"}
+{"id":"r6-0433","label":"FIT","role":"SUB","restriction":"SOLE_SOURCE","evidence":"MH-65 SPARE PARTS Sole Source basis to Airbus Helicopters, OEM traceability required"}
+{"id":"r6-0434","label":"NO","role":"NONE","restriction":"NONE","evidence":"Environmental remediation services at Eglin, Hurlburt and Tyndall; no product supply"}
+{"id":"r6-0436","label":"FIT","role":"PRIME","restriction":"UNCLEAR","evidence":"PRINTED WIRING BOARD KC-46 NSN 5998016525319KT PN 285T0458-203"}
+{"id":"r6-0437","label":"FIT","role":"PRIME","restriction":"BRAND_NAME","evidence":"Temperature Sensors P/N STLM20DD9F limited source/brand name STMicroelectronics"}
+{"id":"r6-0438","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"59--CABLE ASSEMBLY NSN 1H-5930-015466868-D4 QTY 11 EA small business set-aside"}
+{"id":"r6-0439","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"Industrial Computed Tomography (CT) Scanner System, PSC 6640 lab equipment"}
+{"id":"r6-0440","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"16--SOCKET RCPT HOUSING PSC 1680 new manufacture spare parts"}
+{"id":"r6-0443","label":"NO","role":"NONE","restriction":"NONE","evidence":"Install Above Ground Fuel Tanks construction contract at FMC Rochester"}
+{"id":"r6-0444","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PARTS KIT,BALL VALV PSC 4820 supply solicitation"}
+{"id":"r6-0445","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"DISK,VALVE PSC 4820 quantity 31 supply solicitation"}
+{"id":"r6-0446","label":"NO","role":"NONE","restriction":"NONE","evidence":"53--KEY PSC 5315 hardware item, not IT equipment"}
+{"id":"r6-0448","label":"NO","role":"NONE","restriction":"NONE","evidence":"R602 Medical Courier Services pickup and delivery of specimens; service only"}
+{"id":"r6-0449","label":"NO","role":"NONE","restriction":"NONE","evidence":"Replace Electrical Panels & Expand Distribution construction project VAMC Indianapolis"}
+{"id":"r6-0450","label":"NO","role":"NONE","restriction":"NONE","evidence":"STEM for 2 Inch ball valve, Newport News Shipbuilding drawings; marine valve part"}
+{"id":"r6-0454","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 1660-99-133-7851FW PN 3478W000-001 Concentrator, Oxygen PSC 1660"}
+{"id":"r6-0455","label":"NO","role":"NONE","restriction":"NONE","evidence":"PLATE ASSEMBLY,STAU PSC 5340 ship hardware, not IT equipment"}
+{"id":"r6-0456","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Proposed procurement for NSN 4820004830682 VALVE,CHECK Qty 165"}
+{"id":"r6-0457","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"Brand Name or Equal NETZSCH Dilatometer DIL 502 Expedis Supreme PSC 6640"}
+{"id":"r6-0458","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5305015015747 SCREW,CAP,HEXAGON HEAD Approved source is 75Q65 61367AX"}
+{"id":"r6-0460","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4810015590794 VALVE,LINEAR,DIRECTION Approved sources are 1CC11 K-00148"}
+{"id":"r6-0461","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820015229560 VALVE,BALL Approved source is 11859 D2479PJ-E"}
+{"id":"r6-0462","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"High-Temperature Chamber Furnace 100 kW PSC 6640 laboratory equipment"}
+{"id":"r6-0463","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5998012591868 CIRCUIT CARD ASSEMBLY Approved source is 63183 1358-AD2-08050"}
+{"id":"r6-0464","label":"NO","role":"NONE","restriction":"NONE","evidence":"CHOPPER ASSEMBLY, IN REPAIR/MODIFICATION OF NSN 7R-1680-016216686-EY repair work"}
+{"id":"r6-0466","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5998991318340 CIRCUIT CARD ASSEMBLY Approved sources are U4122 65801806"}
+{"id":"r6-0467","label":"NO","role":"NONE","restriction":"NONE","evidence":"Residential Reentry Center services in Tennessee counties; home confinement"}
+{"id":"r6-0468","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820012244578 VALVE,CHECK Approved source is 11859 D3948"}

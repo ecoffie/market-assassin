@@ -1,0 +1,35 @@
+{"id":"r6-0377","label":"NO","role":"NONE","restriction":"NONE","evidence":"Site Utility Infrastructure water source, storage and distribution upgrade (construction)"}
+{"id":"r6-0378","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"ISBC VME120 NSN 7H-5998-017079097 Qty 120; approved source GENERAL MICRO SYSTEMS"}
+{"id":"r6-0379","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"16--AUX RACK MAINFRAME PSC 1680 aircraft accessories solicitation"}
+{"id":"r6-0381","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5998010736017 CIRCUIT CARD ASSEMB Qty 8; Approved source is 99167"}
+{"id":"r6-0382","label":"NO","role":"NONE","restriction":"NONE","evidence":"VALVE,ECS, IN REPAIR/MODIFICATION OF; return items to Ready For Issue condition"}
+{"id":"r6-0385","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"F-16 Transparencies polycarbonate canopy; PPG Aerospace sole qualified source, not fasteners"}
+{"id":"r6-0386","label":"NO","role":"NONE","restriction":"NONE","evidence":"PARTS KIT,BALL VALV PSC 4820; not IT hardware"}
+{"id":"r6-0388","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Medical Gas Cylinders Type I-DOT 3AA Steel; OXYGEN, USP filled cylinder NSN 6505-00-132-5181"}
+{"id":"r6-0390","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"FIBER OPTIC ADAPTER AND OTHER REPLACEMENT PARTS PSC 4920 solicitation"}
+{"id":"r6-0391","label":"NO","role":"NONE","restriction":"NONE","evidence":"HOSE ASSEMBLY Austin hose R1606; industrial hose, not medical supplies"}
+{"id":"r6-0394","label":"NO","role":"NONE","restriction":"NONE","evidence":"OVERHAUL/UPGRADE LANDING GEAR FIXED amendment; overhaul service"}
+{"id":"r6-0395","label":"NO","role":"NONE","restriction":"NONE","evidence":"Fire Suppression System Maintenance and Kitchen Exhaust Cleaning services"}
+{"id":"r6-0396","label":"FIT","role":"PRIME","restriction":"BRAND_NAME","evidence":"Roller, Seat NSN 1680-01-HS3-1880 P/N KPD5637 Qty 500; brand name basis Kamatics"}
+{"id":"r6-0397","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4810002222737 PISTON,VALVE Qty 37; Approved source is 81982 83840"}
+{"id":"r6-0398","label":"PARTIAL","role":"PRIME","restriction":"BRAND_NAME","evidence":"acquire, deliver, install four Multilab Series II Roodra Vascular Systems; Unetix required"}
+{"id":"r6-0399","label":"NO","role":"NONE","restriction":"NONE","evidence":"Aircraft Electrical Component Test Stand procurement and installation; not medical supplies"}
+{"id":"r6-0401","label":"NO","role":"NONE","restriction":"NONE","evidence":"CYLINDER,COMPRESSED PSC 8120; fasteners only mentioned for marking"}
+{"id":"r6-0402","label":"NO","role":"NONE","restriction":"NONE","evidence":"ELECTRONIC COMPONEN; repair price, Repair Turn Around Time, teardown and evaluation"}
+{"id":"r6-0403","label":"NO","role":"NONE","restriction":"NONE","evidence":"36--CANISTER per NAVSEA SS521-AM-MMA-010 Navy part number; not aircraft part"}
+{"id":"r6-0405","label":"FIT","role":"PRIME","restriction":"UNCLEAR","evidence":"C-5 PANEL, FILLET FAIRING NSN 1560-008394561; data restricted to DD2345 certified contractors"}
+{"id":"r6-0407","label":"NO","role":"NONE","restriction":"NONE","evidence":"requirements for repair ... for the VALVE,RELIEF,PRESSU"}
+{"id":"r6-0408","label":"NO","role":"NONE","restriction":"QPL","evidence":"MODULE,TEMP ALARM; Repair T&E proposal, Qualification Requirements clause"}
+{"id":"r6-0409","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"FUSELAGE PSC 1560; items require Government source approval prior to award"}
+{"id":"r6-0410","label":"NO","role":"NONE","restriction":"NONE","evidence":"ELECTRONIC COMPONEN repaired under this contract per repair/overhaul standard practices"}
+{"id":"r6-0411","label":"NO","role":"NONE","restriction":"NONE","evidence":"Surgical Instrument Maintenance preventive maintenance and repair services"}
+{"id":"r6-0412","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"BONNET,VALVE for inlet valve assembly per VACCO Valves drawing V3D10096"}
+{"id":"r6-0413","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"SUPPORT,BEARING PSC 1680 solicitation with FMS delivery instructions"}
+{"id":"r6-0414","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"sole source purchase order to ASK SAGE for ENTERPRISE-YEARLY digital tokens"}
+{"id":"r6-0415","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"sole source Dentrix Enterprise proprietary technical support and maintenance services"}
+{"id":"r6-0416","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 1005004775786 KIT,CONTROL-VALVE Qty 67; Approved source is 99643 MC8095"}
+{"id":"r6-0418","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"OEM direct replacement parts and components for Helo Hanger Door; contractor furnishes all materials"}
+{"id":"r6-0419","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4810015291588 VALVE,SOLENOID Qty 11; Approved source is 99657"}
+{"id":"r6-0420","label":"NO","role":"NONE","restriction":"NONE","evidence":"Construction of Chilled Water Plant and Site Utility Upgrades"}
+{"id":"r6-0421","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"61--CABLE ASSEMBLY,SPEC AND SIMILAR REPLACEMENT PARTS PSC 6150; first article approval"}
+{"id":"r6-0422","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"MOTOR-PUMP,HYDRAULI PSC 4320; supply the item, part number substitution codes"}

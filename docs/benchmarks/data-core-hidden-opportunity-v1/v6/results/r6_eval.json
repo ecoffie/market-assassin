@@ -1,0 +1,1859 @@
+{
+ "labels": {
+  "new": 570,
+  "unlabelled": 0,
+  "agree_exact": 535,
+  "agree_relevant": 549
+ },
+ "phrasings": {
+  "janitorial|short": {
+   "cat": "service",
+   "sizes": {
+    "baseline": 1186,
+    "rc": 1216,
+    "added": 30,
+    "removed": 0
+   },
+   "added": {
+    "n": 30,
+    "lo": 19,
+    "hi": 19,
+    "ci_lo": [
+     0.46,
+     0.78
+    ],
+    "ci_hi": [
+     0.46,
+     0.78
+    ]
+   },
+   "est_relevant_added": [
+    19,
+    19
+   ],
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 2,
+    "hi": 3,
+    "ci_lo": [
+     0.03,
+     0.3
+    ],
+    "ci_hi": [
+     0.05,
+     0.36
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 2
+   },
+   "top20_irrelevant_direct": [
+    "4a8816c5e9554e87962ce1589d0ff126",
+    "50a4447cea054d92aa54f6e936ad1898",
+    "5d29d8b653d84fa0a3fddc2d67790020",
+    "66957d99cff4487bbbf5290808255b7f",
+    "d01261cbdd774cc183ca4aa6d81e8126",
+    "ccb7a86d45a342aeb30085adb96b66b9",
+    "6e32322598474887aaa575a061b8f3ce",
+    "58e86f111e8441b8b28c0998f0faa2c4",
+    "6feb428ac9604194911858c83efaebef",
+    "beb85d56d7d04bf6ae33797f9597c423",
+    "10f9a49cd2f34e9ca3b60c23353a84cb",
+    "280468eda6144d2094c0818dfbe398ba",
+    "32611396cf6b45a39be97c2b102093c9",
+    "55de359f31574c9884887861ea211f2a",
+    "b3ae455976d94198a6d4344a5bd2ca78",
+    "ebae27c253664eeead81df6041fe423c",
+    "fa24050b593a4b5fb9a4bc3f595138b0"
+   ],
+   "restrictions_among_relevant_added": {}
+  },
+  "janitorial|long": {
+   "cat": "service",
+   "sizes": {
+    "baseline": 567,
+    "rc": 567,
+    "added": 0,
+    "removed": 0
+   },
+   "added": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_added": null,
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 7,
+    "hi": 7,
+    "ci_lo": [
+     0.18,
+     0.57
+    ],
+    "ci_hi": [
+     0.18,
+     0.57
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 7
+   },
+   "top20_irrelevant_direct": [
+    "80f12d55b60544b1b7e44cd4934ed666",
+    "837a61b6cb6e4c48911189781921c4ea",
+    "f2679d302225400abd198d1f2f0fb719",
+    "e7e93a880b5f4104877fca7b54f468e9",
+    "d320771268834fd59f6e97f3cd4c0365",
+    "122d538999234fe0b7e9c9108209b9ef",
+    "02c645d3dcaa4fb098718dd23913fd62",
+    "30a598004ffc4283b1f6477d0d955df7",
+    "6a1d150417384f069f18c49287ce57ac",
+    "bb2215b4819b483383bac794053f8461",
+    "31b5a4f8286042ce9653ae61dd1becf3",
+    "0aa9434aea704fe6a33608de1eb080f8",
+    "55de359f31574c9884887861ea211f2a"
+   ],
+   "restrictions_among_relevant_added": {}
+  },
+  "nursing|short": {
+   "cat": "service",
+   "sizes": {
+    "baseline": 46,
+    "rc": 46,
+    "added": 0,
+    "removed": 0
+   },
+   "added": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_added": null,
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 6,
+    "hi": 8,
+    "ci_lo": [
+     0.15,
+     0.52
+    ],
+    "ci_hi": [
+     0.22,
+     0.61
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 6
+   },
+   "top20_irrelevant_direct": [
+    "cab4f08197944b5e8b222d991a7d70b8",
+    "85b83d408f1f422885991142c2734b45",
+    "c81c11dcc8204c7a9e490d7dc6b1d754",
+    "2c74cfbc93714c7e82530f050e58e02a",
+    "ab69f409193545d4923dbd2dd594ef86",
+    "0bb5e286dc2a482cacececbf1f9e15c8",
+    "e48796139b264825931f38fb0332fa0c",
+    "1016443d95d5412bbdfb8e23ce514e71",
+    "1b8d7b8228d4449788d2a0095df3c132",
+    "2efd7af339a048958c2575f112228cdf",
+    "8771a116b6154477ae98f9db3a15787e",
+    "e6ef04ccf9964c3481faf0778d5118bf"
+   ],
+   "restrictions_among_relevant_added": {}
+  },
+  "nursing|long": {
+   "cat": "service",
+   "sizes": {
+    "baseline": 344,
+    "rc": 344,
+    "added": 0,
+    "removed": 0
+   },
+   "added": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_added": null,
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 2,
+    "hi": 4,
+    "ci_lo": [
+     0.03,
+     0.3
+    ],
+    "ci_hi": [
+     0.08,
+     0.42
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 2
+   },
+   "top20_irrelevant_direct": [
+    "275a7249361c46a4847f2042d30273ef",
+    "1b8d7b8228d4449788d2a0095df3c132",
+    "2efd7af339a048958c2575f112228cdf",
+    "21927b96f232461c9ecb2d8b14f92757",
+    "8771a116b6154477ae98f9db3a15787e",
+    "e6ef04ccf9964c3481faf0778d5118bf",
+    "205c96ff889240b6b41bcca895b902dd",
+    "ac7b1d037eea40a591ec1beea2cb135e",
+    "d320771268834fd59f6e97f3cd4c0365",
+    "229820ce72ee4c8baba47431ef2b5d5d",
+    "2eba5a034bb84f4a97cd0348408f5731",
+    "4d28c3436eee4a9db55066fd22e1f384",
+    "88fe3a88f49242d789cd8d204d2b42d2",
+    "bca6bacbe39b447fa33d67f8984b419a",
+    "198f948febf44171971e34a0e1bc4f75",
+    "0bb5e286dc2a482cacececbf1f9e15c8"
+   ],
+   "restrictions_among_relevant_added": {}
+  },
+  "hvac|short": {
+   "cat": "service",
+   "sizes": {
+    "baseline": 211,
+    "rc": 279,
+    "added": 68,
+    "removed": 0
+   },
+   "added": {
+    "n": 30,
+    "lo": 11,
+    "hi": 18,
+    "ci_lo": [
+     0.22,
+     0.54
+    ],
+    "ci_hi": [
+     0.42,
+     0.75
+    ]
+   },
+   "est_relevant_added": [
+    25,
+    41
+   ],
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 16,
+    "hi": 17,
+    "ci_lo": [
+     0.58,
+     0.92
+    ],
+    "ci_hi": [
+     0.64,
+     0.95
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 16
+   },
+   "top20_irrelevant_direct": [
+    "80f12d55b60544b1b7e44cd4934ed666",
+    "37836979a951480f981d6cfa43274ebd",
+    "fe55df3f1a75416f8dac41214550e0eb"
+   ],
+   "restrictions_among_relevant_added": {}
+  },
+  "hvac|long": {
+   "cat": "service",
+   "sizes": {
+    "baseline": 701,
+    "rc": 723,
+    "added": 22,
+    "removed": 0
+   },
+   "added": {
+    "n": 20,
+    "lo": 3,
+    "hi": 9,
+    "ci_lo": [
+     0.05,
+     0.36
+    ],
+    "ci_hi": [
+     0.26,
+     0.66
+    ]
+   },
+   "est_relevant_added": [
+    3,
+    10
+   ],
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 16,
+    "hi": 16,
+    "ci_lo": [
+     0.58,
+     0.92
+    ],
+    "ci_hi": [
+     0.58,
+     0.92
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 16
+   },
+   "top20_irrelevant_direct": [
+    "80f12d55b60544b1b7e44cd4934ed666",
+    "1772a7eaddbe41dcb477950d424ac80b",
+    "43a1a5e26166498e95de1136d2b196a9",
+    "a33e7528096c443a9d5489849d1bf843"
+   ],
+   "restrictions_among_relevant_added": {}
+  },
+  "guards|short": {
+   "cat": "service",
+   "sizes": {
+    "baseline": 476,
+    "rc": 485,
+    "added": 9,
+    "removed": 0
+   },
+   "added": {
+    "n": 9,
+    "lo": 6,
+    "hi": 8,
+    "ci_lo": [
+     0.35,
+     0.88
+    ],
+    "ci_hi": [
+     0.56,
+     0.98
+    ]
+   },
+   "est_relevant_added": [
+    6,
+    8
+   ],
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 2,
+    "hi": 2,
+    "ci_lo": [
+     0.03,
+     0.3
+    ],
+    "ci_hi": [
+     0.03,
+     0.3
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 2
+   },
+   "top20_irrelevant_direct": [
+    "4806009d43ca4bdf8f49b35dd2efa66c",
+    "8ef069449ca14442b6eb85bfa448ce44",
+    "27a5d9ebe68640fd9cd52e889f70d147",
+    "3d9ba715b1834053a0b5b125fb723563",
+    "51ef97706881437ca7bef12a9760fca2",
+    "3a3e4c9b9ab646e79cdb90abf831a858",
+    "9e81de51647b47f3bc3712117814300b",
+    "b9ed32a87d164c478d2660fa1a3cfcb7",
+    "c12044745d8f42a181cf3adecdfafd83",
+    "a17f45b08e854ddcb919981a151df919",
+    "1772deeb57ad42788b71a244e4485e5e",
+    "502461101394447581abb27486cb618a",
+    "9d5262e193c34ced839229f7a71b2d5e",
+    "8b78eba8c3304c9aa52d4f2398a2a2ae",
+    "0c2420e19e284f4d8b9746a6cb80b151",
+    "ee62f46c0fe2419b86d95740c000d6c0",
+    "ccee9263c2cd4119bda8658f54db3fba",
+    "81607c4f25ac49099cac99a3f1222ae9"
+   ],
+   "restrictions_among_relevant_added": {}
+  },
+  "guards|long": {
+   "cat": "service",
+   "sizes": {
+    "baseline": 103,
+    "rc": 112,
+    "added": 9,
+    "removed": 0
+   },
+   "added": {
+    "n": 9,
+    "lo": 3,
+    "hi": 5,
+    "ci_lo": [
+     0.12,
+     0.65
+    ],
+    "ci_hi": [
+     0.27,
+     0.81
+    ]
+   },
+   "est_relevant_added": [
+    3,
+    5
+   ],
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 4,
+    "hi": 4,
+    "ci_lo": [
+     0.08,
+     0.42
+    ],
+    "ci_hi": [
+     0.08,
+     0.42
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 4
+   },
+   "top20_irrelevant_direct": [
+    "f39b03d3f6e740859fd44ed3307425f3",
+    "9f7ab62779184022bf0a0d72f6824d34",
+    "e58882226ac24f9292963c67a3b4e3ca",
+    "7027b971109a43a8b657bba5d7127be3",
+    "06021f150569427787bbbf1174e39e6f",
+    "0b6e2f047d394bd3861f36f6e94d30ba",
+    "b5c4fee1baa64396b4584aa5e91d2487",
+    "b44026882ad144629634ab6643a9f0d8",
+    "2c9536a8ae43424b8054966d528211c4",
+    "02c645d3dcaa4fb098718dd23913fd62",
+    "15448bdcf4fc4884b1ceeb3281d89e43",
+    "6150c7f02584434a9ea90adeb8260b15",
+    "4806009d43ca4bdf8f49b35dd2efa66c",
+    "8ef069449ca14442b6eb85bfa448ce44",
+    "27a5d9ebe68640fd9cd52e889f70d147",
+    "26c3522acb504c759aabeb7d660b0c7a"
+   ],
+   "restrictions_among_relevant_added": {}
+  },
+  "steelbldg|short": {
+   "cat": "service",
+   "sizes": {
+    "baseline": 571,
+    "rc": 571,
+    "added": 0,
+    "removed": 0
+   },
+   "added": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_added": null,
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 3,
+    "hi": 4,
+    "ci_lo": [
+     0.05,
+     0.36
+    ],
+    "ci_hi": [
+     0.08,
+     0.42
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 3
+   },
+   "top20_irrelevant_direct": [
+    "122d538999234fe0b7e9c9108209b9ef",
+    "d3229ae3e4544a80b2e540685b5bb791",
+    "fe69d91d0e5e48b5b612600f844c1085",
+    "142d5737ba4841ab980c641a9f221eed",
+    "feb723bfdff045959950c9939e81fc92",
+    "175630fcf28e40fa8b4e0cb041275ab3",
+    "b2a1517738814dcd975e2dd7303926cd",
+    "60361120b1a345448645f332a129b8f9",
+    "f031c02daf014776af04589cdf449546",
+    "9dd384ff00b14dee90912bdb9e276f73",
+    "a3940f0817bf4406881d4f4c85759cee",
+    "409f6db2fc3b4d16b6dbc6bea9944cab",
+    "368875530f44437da80fecccf8771e34",
+    "78f30d15189a41de97da991d90b85120",
+    "889b960037f64c288fd031fb8d5c49e3",
+    "b2b1451f15c44612a7284357613b5601"
+   ],
+   "restrictions_among_relevant_added": {}
+  },
+  "steelbldg|long": {
+   "cat": "service",
+   "sizes": {
+    "baseline": 1562,
+    "rc": 1562,
+    "added": 0,
+    "removed": 0
+   },
+   "added": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_added": null,
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 3,
+    "hi": 5,
+    "ci_lo": [
+     0.05,
+     0.36
+    ],
+    "ci_hi": [
+     0.11,
+     0.47
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 3
+   },
+   "top20_irrelevant_direct": [
+    "80f12d55b60544b1b7e44cd4934ed666",
+    "d3229ae3e4544a80b2e540685b5bb791",
+    "fe69d91d0e5e48b5b612600f844c1085",
+    "563ad32b6efe454ab2231a1079643a71",
+    "73ef69429d584050b6182c8fcea97620",
+    "799dfea5a692453783d4007737a8b198",
+    "ad97fd3e6161498590a9ecef96cb3795",
+    "974f9b5eb51f4ade85b43f47c548e773",
+    "222cf78e24d84a3d9a16527ada1214ec",
+    "3cd7ece12a724e6a9ef67d2e47d3e5eb",
+    "2f67303ae5b44492976687458cc24460",
+    "feb723bfdff045959950c9939e81fc92",
+    "306bbb227dd04ea1b9e6516cc0f1ab8a",
+    "889b960037f64c288fd031fb8d5c49e3",
+    "b2b1451f15c44612a7284357613b5601"
+   ],
+   "restrictions_among_relevant_added": {}
+  },
+  "grounds|short": {
+   "cat": "service",
+   "sizes": {
+    "baseline": 47,
+    "rc": 85,
+    "added": 38,
+    "removed": 0
+   },
+   "added": {
+    "n": 30,
+    "lo": 22,
+    "hi": 24,
+    "ci_lo": [
+     0.56,
+     0.86
+    ],
+    "ci_hi": [
+     0.63,
+     0.9
+    ]
+   },
+   "est_relevant_added": [
+    28,
+    30
+   ],
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 12,
+    "hi": 12,
+    "ci_lo": [
+     0.39,
+     0.78
+    ],
+    "ci_hi": [
+     0.39,
+     0.78
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 12
+   },
+   "top20_irrelevant_direct": [
+    "1b989e6076e54cb79f497b595f652e27",
+    "7372ea425c44447ca5b81d6815c2d808",
+    "aba580e5d9e64b4b8fd0d010cc294fc7",
+    "bcc22f885c4049fdadf2333ec4237992",
+    "306bbb227dd04ea1b9e6516cc0f1ab8a",
+    "839fd925fdea49619b7724fea8b2b128",
+    "cc2cd8560f184ec8a3cc1198c51f5784",
+    "eca517d17a514c219eb3a8619cbdbe84"
+   ],
+   "restrictions_among_relevant_added": {}
+  },
+  "grounds|long": {
+   "cat": "service",
+   "sizes": {
+    "baseline": 135,
+    "rc": 170,
+    "added": 35,
+    "removed": 0
+   },
+   "added": {
+    "n": 20,
+    "lo": 17,
+    "hi": 20,
+    "ci_lo": [
+     0.64,
+     0.95
+    ],
+    "ci_hi": [
+     0.84,
+     1.0
+    ]
+   },
+   "est_relevant_added": [
+    30,
+    35
+   ],
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 12,
+    "hi": 14,
+    "ci_lo": [
+     0.39,
+     0.78
+    ],
+    "ci_hi": [
+     0.48,
+     0.85
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 12
+   },
+   "top20_irrelevant_direct": [
+    "306bbb227dd04ea1b9e6516cc0f1ab8a",
+    "cc2cd8560f184ec8a3cc1198c51f5784",
+    "aba580e5d9e64b4b8fd0d010cc294fc7",
+    "bcc22f885c4049fdadf2333ec4237992",
+    "1b989e6076e54cb79f497b595f652e27",
+    "7372ea425c44447ca5b81d6815c2d808"
+   ],
+   "restrictions_among_relevant_added": {}
+  },
+  "paving|short": {
+   "cat": "service",
+   "sizes": {
+    "baseline": 160,
+    "rc": 160,
+    "added": 0,
+    "removed": 0
+   },
+   "added": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_added": null,
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 15,
+    "hi": 17,
+    "ci_lo": [
+     0.53,
+     0.89
+    ],
+    "ci_hi": [
+     0.64,
+     0.95
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 15
+   },
+   "top20_irrelevant_direct": [
+    "ac7b1d037eea40a591ec1beea2cb135e",
+    "822a7aba509c4f559c382b78df4dac6f",
+    "e379c02f4bda4630b05adc3b9e5148d7"
+   ],
+   "restrictions_among_relevant_added": {}
+  },
+  "paving|long": {
+   "cat": "service",
+   "sizes": {
+    "baseline": 631,
+    "rc": 631,
+    "added": 0,
+    "removed": 0
+   },
+   "added": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_added": null,
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 18,
+    "hi": 19,
+    "ci_lo": [
+     0.7,
+     0.97
+    ],
+    "ci_hi": [
+     0.76,
+     0.99
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 18
+   },
+   "top20_irrelevant_direct": [
+    "306bbb227dd04ea1b9e6516cc0f1ab8a"
+   ],
+   "restrictions_among_relevant_added": {}
+  },
+  "parts|short": {
+   "cat": "product",
+   "sizes": {
+    "baseline": 81,
+    "rc": 1265,
+    "added": 1184,
+    "removed": 0
+   },
+   "added": {
+    "n": 30,
+    "lo": 9,
+    "hi": 9,
+    "ci_lo": [
+     0.17,
+     0.48
+    ],
+    "ci_hi": [
+     0.17,
+     0.48
+    ]
+   },
+   "est_relevant_added": [
+    355,
+    355
+   ],
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 7,
+    "hi": 8,
+    "ci_lo": [
+     0.18,
+     0.57
+    ],
+    "ci_hi": [
+     0.22,
+     0.61
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 7
+   },
+   "top20_irrelevant_direct": [
+    "55ae4075954a4febb305aaa4e79cf9dc",
+    "7dd1d5e6db174c9b8be54b5b0915549f",
+    "383dfd2f7791468dadf6627e344a5a0a",
+    "6c989b3fea524307996fa18d0e3e7426",
+    "bac0c583136841e6849d4ad0ea38ce8f",
+    "cb7425fdf9304332945cf90e4fafd0d1",
+    "ecbf01d886c34a9ea99cb5f658e06744",
+    "6d3179bb5e9b4e47bc78fa63f7f563b7",
+    "76015089e3dc4094b5d8a58e9744f9b7",
+    "982444e2ae534c23ac0ab6654da3a5ed",
+    "13158a2091a1464f8680ceb75df6b30a",
+    "e4e143949bed4bb49e51387e0016d16d"
+   ],
+   "restrictions_among_relevant_added": {
+    "SOLE_SOURCE": 1,
+    "UNCLEAR": 1,
+    "OEM_ONLY": 1
+   }
+  },
+  "parts|long": {
+   "cat": "product",
+   "sizes": {
+    "baseline": 1759,
+    "rc": 1759,
+    "added": 0,
+    "removed": 0
+   },
+   "added": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_added": null,
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 18,
+    "hi": 18,
+    "ci_lo": [
+     0.7,
+     0.97
+    ],
+    "ci_hi": [
+     0.7,
+     0.97
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 18
+   },
+   "top20_irrelevant_direct": [
+    "806fd0a6ae9c43a287d921b3419c74b4",
+    "e68e785aba644062a75a2f4560ab930a"
+   ],
+   "restrictions_among_relevant_added": {}
+  },
+  "fasteners|short": {
+   "cat": "product",
+   "sizes": {
+    "baseline": 245,
+    "rc": 400,
+    "added": 155,
+    "removed": 0
+   },
+   "added": {
+    "n": 30,
+    "lo": 18,
+    "hi": 18,
+    "ci_lo": [
+     0.42,
+     0.75
+    ],
+    "ci_hi": [
+     0.42,
+     0.75
+    ]
+   },
+   "est_relevant_added": [
+    93,
+    93
+   ],
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 7,
+    "hi": 8,
+    "ci_lo": [
+     0.18,
+     0.57
+    ],
+    "ci_hi": [
+     0.22,
+     0.61
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 7
+   },
+   "top20_irrelevant_direct": [
+    "142d5737ba4841ab980c641a9f221eed",
+    "175630fcf28e40fa8b4e0cb041275ab3",
+    "9186b40952e344bbaa27aa130453379a",
+    "409f6db2fc3b4d16b6dbc6bea9944cab",
+    "368875530f44437da80fecccf8771e34",
+    "8917358fdc6a4a1aae2f8bf6ca1d7f6c",
+    "b734453e328c4b469a578a98e2bc1f62",
+    "2b9ff8ed265b49258bf73433f552b315",
+    "feb723bfdff045959950c9939e81fc92",
+    "2b8e93b57c9042deb0e2cce01ac06287",
+    "6de1f5b004f94effa797d1cc72ee9676",
+    "f2d5ae34e0444676933ee03022d90ad3"
+   ],
+   "restrictions_among_relevant_added": {
+    "APPROVED_SOURCE": 9
+   }
+  },
+  "fasteners|long": {
+   "cat": "product",
+   "sizes": {
+    "baseline": 905,
+    "rc": 906,
+    "added": 1,
+    "removed": 0
+   },
+   "added": {
+    "n": 1,
+    "lo": 1,
+    "hi": 1,
+    "ci_lo": [
+     0.21,
+     1.0
+    ],
+    "ci_hi": [
+     0.21,
+     1.0
+    ]
+   },
+   "est_relevant_added": [
+    1,
+    1
+   ],
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 5,
+    "hi": 5,
+    "ci_lo": [
+     0.11,
+     0.47
+    ],
+    "ci_hi": [
+     0.11,
+     0.47
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 5
+   },
+   "top20_irrelevant_direct": [
+    "175630fcf28e40fa8b4e0cb041275ab3",
+    "142d5737ba4841ab980c641a9f221eed",
+    "2b8e93b57c9042deb0e2cce01ac06287",
+    "8917358fdc6a4a1aae2f8bf6ca1d7f6c",
+    "b734453e328c4b469a578a98e2bc1f62",
+    "e552b5583bcb45df94e1c4cbc57babc2",
+    "feb723bfdff045959950c9939e81fc92",
+    "1f05ff1cadc34328a761cb215f176e25",
+    "48083798de0c42a087a5b8a291aaabcf",
+    "605d5a40c3b042e59a2d3d773a486a73",
+    "e19ec55a771e4b5c91574ee8998755e7",
+    "b2a1517738814dcd975e2dd7303926cd",
+    "60361120b1a345448645f332a129b8f9",
+    "04b1e2360a304c968c779f356422fb25",
+    "1982d0e91da74a809a7d05d345fc20ef"
+   ],
+   "restrictions_among_relevant_added": {
+    "SOLE_SOURCE": 1
+   }
+  },
+  "electrical|short": {
+   "cat": "product",
+   "sizes": {
+    "baseline": 803,
+    "rc": 1250,
+    "added": 447,
+    "removed": 0
+   },
+   "added": {
+    "n": 30,
+    "lo": 25,
+    "hi": 25,
+    "ci_lo": [
+     0.66,
+     0.93
+    ],
+    "ci_hi": [
+     0.66,
+     0.93
+    ]
+   },
+   "est_relevant_added": [
+    372,
+    372
+   ],
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 7,
+    "hi": 7,
+    "ci_lo": [
+     0.18,
+     0.57
+    ],
+    "ci_hi": [
+     0.18,
+     0.57
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 7
+   },
+   "top20_irrelevant_direct": [
+    "712681bb097845d88fc3a47d7aee105e",
+    "2cc3d2ae900545ca84b4bd2e76c4e1c8",
+    "1e960c05b9714e3aa252d65cb866b86d",
+    "3c462fb17ce14ad199a7565c9555aaf0",
+    "6136400fae7943b285c23d28a37b0132",
+    "7d721d20d79142858be4ddd63b153fb8",
+    "bc5fc7c4b8a1447b9c0dbea87ce7f111",
+    "769e7021c09444ef942325ad392d8628",
+    "da72b3c7b2e34500aa9c05827572e6c8",
+    "50e9263d1a414f6da7bbb0a3f4b89e01",
+    "b80b04dd1d214e0290ba9e15cb7d9eed",
+    "1a6cb3c242be485396abd8e109017d75",
+    "375da5bfbbdb46e6bbbfda3177dcd1bf"
+   ],
+   "restrictions_among_relevant_added": {
+    "QPL": 2,
+    "APPROVED_SOURCE": 11,
+    "UNCLEAR": 2,
+    "BRAND_NAME": 1
+   }
+  },
+  "electrical|long": {
+   "cat": "product",
+   "sizes": {
+    "baseline": 916,
+    "rc": 1163,
+    "added": 247,
+    "removed": 0
+   },
+   "added": {
+    "n": 20,
+    "lo": 16,
+    "hi": 16,
+    "ci_lo": [
+     0.58,
+     0.92
+    ],
+    "ci_hi": [
+     0.58,
+     0.92
+    ]
+   },
+   "est_relevant_added": [
+    198,
+    198
+   ],
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 9,
+    "hi": 9,
+    "ci_lo": [
+     0.26,
+     0.66
+    ],
+    "ci_hi": [
+     0.26,
+     0.66
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 9
+   },
+   "top20_irrelevant_direct": [
+    "50e9263d1a414f6da7bbb0a3f4b89e01",
+    "fd54681dc9df433c925986385767ccf1",
+    "4cd36ff623b7401796c61b3d0314fcc5",
+    "da1016da323347ebbd299b7907405183",
+    "3c462fb17ce14ad199a7565c9555aaf0",
+    "6136400fae7943b285c23d28a37b0132",
+    "769e7021c09444ef942325ad392d8628",
+    "b80b04dd1d214e0290ba9e15cb7d9eed",
+    "1a6cb3c242be485396abd8e109017d75",
+    "7deec0016b2f4ac0904034f78de1d1c0",
+    "d95d55fc9cde45fe8b144879dd7bcef2"
+   ],
+   "restrictions_among_relevant_added": {
+    "APPROVED_SOURCE": 5,
+    "OEM_ONLY": 1,
+    "QPL": 1
+   }
+  },
+  "valves|short": {
+   "cat": "product",
+   "sizes": {
+    "baseline": 43,
+    "rc": 811,
+    "added": 768,
+    "removed": 0
+   },
+   "added": {
+    "n": 30,
+    "lo": 21,
+    "hi": 22,
+    "ci_lo": [
+     0.52,
+     0.83
+    ],
+    "ci_hi": [
+     0.56,
+     0.86
+    ]
+   },
+   "est_relevant_added": [
+    538,
+    563
+   ],
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 20,
+    "hi": 20,
+    "ci_lo": [
+     0.84,
+     1.0
+    ],
+    "ci_hi": [
+     0.84,
+     1.0
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 20
+   },
+   "top20_irrelevant_direct": [],
+   "restrictions_among_relevant_added": {
+    "APPROVED_SOURCE": 10,
+    "UNCLEAR": 2
+   }
+  },
+  "valves|long": {
+   "cat": "product",
+   "sizes": {
+    "baseline": 1181,
+    "rc": 1543,
+    "added": 362,
+    "removed": 0
+   },
+   "added": {
+    "n": 20,
+    "lo": 16,
+    "hi": 16,
+    "ci_lo": [
+     0.58,
+     0.92
+    ],
+    "ci_hi": [
+     0.58,
+     0.92
+    ]
+   },
+   "est_relevant_added": [
+    290,
+    290
+   ],
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 14,
+    "hi": 16,
+    "ci_lo": [
+     0.48,
+     0.85
+    ],
+    "ci_hi": [
+     0.58,
+     0.92
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 14
+   },
+   "top20_irrelevant_direct": [
+    "2ebd9361696b4e1cac85af2b236e4484",
+    "7ae7bbad11694bc8b2826ad1b463b20a",
+    "22ab3183b37748babd2161d4311dd859",
+    "c022fe2e94f74f9e89ac41806d452a3f"
+   ],
+   "restrictions_among_relevant_added": {
+    "APPROVED_SOURCE": 12,
+    "SOLE_SOURCE": 1,
+    "UNCLEAR": 1
+   }
+  },
+  "aircraft|short": {
+   "cat": "product",
+   "sizes": {
+    "baseline": 472,
+    "rc": 880,
+    "added": 408,
+    "removed": 0
+   },
+   "added": {
+    "n": 30,
+    "lo": 23,
+    "hi": 25,
+    "ci_lo": [
+     0.59,
+     0.88
+    ],
+    "ci_hi": [
+     0.66,
+     0.93
+    ]
+   },
+   "est_relevant_added": [
+    313,
+    340
+   ],
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 4,
+    "hi": 7,
+    "ci_lo": [
+     0.08,
+     0.42
+    ],
+    "ci_hi": [
+     0.18,
+     0.57
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 4
+   },
+   "top20_irrelevant_direct": [
+    "2c0c50d5aa9e421cbc3c4e0512c95d3e",
+    "b4ccc68f4b9e420cbbae4d0efd055063",
+    "bce04b46735746d582e115b3421e4869",
+    "e68e785aba644062a75a2f4560ab930a",
+    "102eebb4727d471da850ee8516dc51c8",
+    "ef4a98b4a5014d67a02242036521511c",
+    "b7348ca6584640f98043e0c05b5a7166",
+    "a1f0c31b0c824655b7aa459c1846f490",
+    "08c8e9f6e6d04c08acf37cfee8931406",
+    "18f600bcc623405d95a0cfe0506657c0",
+    "4d7e950ae1bb436da249f71d09776f90",
+    "51ee4a40dbe0455d90ab9df928abe390",
+    "be0a77b17d8643478bff4211bc96d4ff"
+   ],
+   "restrictions_among_relevant_added": {
+    "UNCLEAR": 5,
+    "APPROVED_SOURCE": 7,
+    "SOLE_SOURCE": 3,
+    "BRAND_NAME": 1
+   }
+  },
+  "aircraft|long": {
+   "cat": "product",
+   "sizes": {
+    "baseline": 951,
+    "rc": 1426,
+    "added": 475,
+    "removed": 0
+   },
+   "added": {
+    "n": 20,
+    "lo": 14,
+    "hi": 15,
+    "ci_lo": [
+     0.48,
+     0.85
+    ],
+    "ci_hi": [
+     0.53,
+     0.89
+    ]
+   },
+   "est_relevant_added": [
+    332,
+    356
+   ],
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 0,
+    "hi": 1,
+    "ci_lo": [
+     -0.0,
+     0.16
+    ],
+    "ci_hi": [
+     0.01,
+     0.24
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 0
+   },
+   "top20_irrelevant_direct": [
+    "1c2f59eac5224d20bd0ccceb699c366e",
+    "769e7021c09444ef942325ad392d8628",
+    "002f6c74feb54d31abd3b598f4b40e82",
+    "22ab3183b37748babd2161d4311dd859",
+    "a149e9a996714229b1a8776734bfd9e1",
+    "dce53b7fd4354a5884c060fea3bb7ee4",
+    "7eea07e258df4a119d6495ad668a7705",
+    "7fa29757f2e14bdda362f5e85d44fe8a",
+    "cb5530f764844b6381f9e42ee0d322f5",
+    "f2544006700f4d4a95bb165bf7206c87",
+    "9cc8c1f7b95a4ef589de5dd47f669b9b",
+    "e68e785aba644062a75a2f4560ab930a",
+    "1e275772db4c46798ec37879cfff315f",
+    "1e960c05b9714e3aa252d65cb866b86d",
+    "1f05ff1cadc34328a761cb215f176e25",
+    "3c462fb17ce14ad199a7565c9555aaf0",
+    "48083798de0c42a087a5b8a291aaabcf",
+    "6136400fae7943b285c23d28a37b0132",
+    "91cce0f6f08e4a1eb7199523f6c7d6d6"
+   ],
+   "restrictions_among_relevant_added": {
+    "UNCLEAR": 3,
+    "SOLE_SOURCE": 3,
+    "APPROVED_SOURCE": 5,
+    "QPL": 1,
+    "OEM_ONLY": 1
+   }
+  },
+  "medical|short": {
+   "cat": "product",
+   "sizes": {
+    "baseline": 156,
+    "rc": 459,
+    "added": 353,
+    "removed": 50
+   },
+   "added": {
+    "n": 30,
+    "lo": 3,
+    "hi": 3,
+    "ci_lo": [
+     0.03,
+     0.26
+    ],
+    "ci_hi": [
+     0.03,
+     0.26
+    ]
+   },
+   "est_relevant_added": [
+    35,
+    35
+   ],
+   "removed": {
+    "n": 25,
+    "lo": 1,
+    "hi": 1,
+    "ci_lo": [
+     0.01,
+     0.2
+    ],
+    "ci_hi": [
+     0.01,
+     0.2
+    ]
+   },
+   "est_relevant_removed": [
+    2,
+    2
+   ],
+   "removed_relevant": [
+    {
+     "id": "49ba0cfa8666413092be7c229462c0b4",
+     "labels": [
+      "FIT",
+      "FIT"
+     ]
+    }
+   ],
+   "top20": {
+    "n": 20,
+    "lo": 4,
+    "hi": 5,
+    "ci_lo": [
+     0.08,
+     0.42
+    ],
+    "ci_hi": [
+     0.11,
+     0.47
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 4
+   },
+   "top20_irrelevant_direct": [
+    "779c68c2d2a542e3838e8787321b3a50",
+    "3505c1f7e0584df499030ca75a30294e",
+    "41668ce1529143579cb8c1737dddc69b",
+    "6d967fe9e77e45adbee8dbaca09bcd21",
+    "15e5632de5c84743ad880decbf8282c1",
+    "275a7249361c46a4847f2042d30273ef",
+    "cbe19b3b86a24b3c9caf45e8a8b4301b",
+    "a1b1f2db2fcf4f1f9d108530ea86d6e8",
+    "6b737426904c430588cd25358b0929d2",
+    "3781186f30d54472b6346b73c35d2c9a",
+    "baae97d2c0ab4a71a96c1221cbda0268",
+    "6cb51aa2495e45d7bb2fcb21a9e70a7e",
+    "a63ab723a93d4ac5952e6b64222262ab",
+    "b281bcc54c1945c8b370286bfdb053e0",
+    "48998ea0cb79404f91c1c590d40ec72f"
+   ],
+   "restrictions_among_relevant_added": {
+    "UNCLEAR": 1
+   }
+  },
+  "medical|long": {
+   "cat": "product",
+   "sizes": {
+    "baseline": 1228,
+    "rc": 1290,
+    "added": 62,
+    "removed": 0
+   },
+   "added": {
+    "n": 20,
+    "lo": 15,
+    "hi": 19,
+    "ci_lo": [
+     0.53,
+     0.89
+    ],
+    "ci_hi": [
+     0.76,
+     0.99
+    ]
+   },
+   "est_relevant_added": [
+    46,
+    59
+   ],
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 5,
+    "hi": 7,
+    "ci_lo": [
+     0.11,
+     0.47
+    ],
+    "ci_hi": [
+     0.18,
+     0.57
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 5
+   },
+   "top20_irrelevant_direct": [
+    "275a7249361c46a4847f2042d30273ef",
+    "21927b96f232461c9ecb2d8b14f92757",
+    "15e5632de5c84743ad880decbf8282c1",
+    "f2603d5e2ba041afb371e8afe8b620b0",
+    "a74c3141bda14e1eb30c799ef218ffda",
+    "80f12d55b60544b1b7e44cd4934ed666",
+    "229820ce72ee4c8baba47431ef2b5d5d",
+    "2eba5a034bb84f4a97cd0348408f5731",
+    "c8c03910e90c4b9ca39e9f90cc420d87",
+    "194287c9a6064212b90075422408dc48",
+    "4d28c3436eee4a9db55066fd22e1f384",
+    "1772a7eaddbe41dcb477950d424ac80b",
+    "779c68c2d2a542e3838e8787321b3a50"
+   ],
+   "restrictions_among_relevant_added": {
+    "SOLE_SOURCE": 2,
+    "UNCLEAR": 3,
+    "BRAND_NAME": 3
+   }
+  },
+  "ithardware|short": {
+   "cat": "product",
+   "sizes": {
+    "baseline": 467,
+    "rc": 425,
+    "added": 0,
+    "removed": 42
+   },
+   "added": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_added": null,
+   "removed": {
+    "n": 25,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": [
+     0.0,
+     0.13
+    ],
+    "ci_hi": [
+     0.0,
+     0.13
+    ]
+   },
+   "est_relevant_removed": [
+    0,
+    0
+   ],
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": [
+     -0.0,
+     0.16
+    ],
+    "ci_hi": [
+     -0.0,
+     0.16
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 0
+   },
+   "top20_irrelevant_direct": [
+    "5cc099a662c74ba1a59532a34d6f03e2",
+    "af64aac30933462a938619a6596b072c",
+    "b89e7d9df42245668a708071ff95a9d4",
+    "79e07c2848754a239dfc921d70c10869",
+    "b1d52c019f67454aba0f160b38770640",
+    "7e4f9c40da6a4beea7788bc8bd352146",
+    "ed778955667243fd87a3f80f90c23430",
+    "2f0234bc23b24e25acf8c88eae31db6f",
+    "a1b1f2db2fcf4f1f9d108530ea86d6e8",
+    "4c1137de64dc4f1c80fffadb9a716cf2",
+    "11970aad794f4182913cf7dee0da7044",
+    "70d9c7ba736b41dea26a2672d22813e9",
+    "fa59c8d3be7b4ea98fb6372bc9f99ccc",
+    "153ef88ae65d4f8dacc7360b30b1c140",
+    "c139f837e3274a168f3587ec4286c280",
+    "53a58db2211d460b9f4bd525b62ef8cb",
+    "01abfcd59aa2485da011bcfca18f2dd4",
+    "149561aa369144778b606984461e66af",
+    "1711b7ebb7e5452c9f748043be4c40e7",
+    "2c9536a8ae43424b8054966d528211c4"
+   ],
+   "restrictions_among_relevant_added": {}
+  },
+  "ithardware|long": {
+   "cat": "product",
+   "sizes": {
+    "baseline": 1501,
+    "rc": 1501,
+    "added": 0,
+    "removed": 0
+   },
+   "added": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_added": null,
+   "removed": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant": [],
+   "top20": {
+    "n": 20,
+    "lo": 1,
+    "hi": 2,
+    "ci_lo": [
+     0.01,
+     0.24
+    ],
+    "ci_hi": [
+     0.03,
+     0.3
+    ]
+   },
+   "top20_direct": {
+    "n": 20,
+    "relevant_lo": 1
+   },
+   "top20_irrelevant_direct": [
+    "80f12d55b60544b1b7e44cd4934ed666",
+    "002f6c74feb54d31abd3b598f4b40e82",
+    "142d5737ba4841ab980c641a9f221eed",
+    "1e275772db4c46798ec37879cfff315f",
+    "1e960c05b9714e3aa252d65cb866b86d",
+    "1f05ff1cadc34328a761cb215f176e25",
+    "22ab3183b37748babd2161d4311dd859",
+    "3c462fb17ce14ad199a7565c9555aaf0",
+    "48083798de0c42a087a5b8a291aaabcf",
+    "563ad32b6efe454ab2231a1079643a71",
+    "6136400fae7943b285c23d28a37b0132",
+    "91cce0f6f08e4a1eb7199523f6c7d6d6",
+    "a149e9a996714229b1a8776734bfd9e1",
+    "c4220170aff44e40803f8e8da751dc39",
+    "cce02139fdb54c57b2d536917b709682",
+    "dce53b7fd4354a5884c060fea3bb7ee4",
+    "e552b5583bcb45df94e1c4cbc57babc2",
+    "ef4b3122f3924f1dbb2fe5c5263e284a"
+   ],
+   "restrictions_among_relevant_added": {}
+  }
+ },
+ "gate_preview_short": {
+  "pooled_top20": [
+   0.375,
+   0.421
+  ],
+  "below_40": [
+   "janitorial|short",
+   "nursing|short",
+   "guards|short",
+   "steelbldg|short",
+   "parts|short",
+   "fasteners|short",
+   "electrical|short",
+   "aircraft|short",
+   "medical|short",
+   "ithardware|short"
+  ]
+ }
+}

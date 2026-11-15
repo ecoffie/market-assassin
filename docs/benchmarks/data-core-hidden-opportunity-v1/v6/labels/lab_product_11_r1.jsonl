@@ -1,0 +1,35 @@
+{"id":"r6-0517","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4810014205675 VALVE ASSEMBLY Approved source is 86184 302M 7485801A"}
+{"id":"r6-0518","label":"NO","role":"NONE","restriction":"NONE","evidence":"Provide pest control services for USCG Base Portsmouth, NAICS 561710"}
+{"id":"r6-0519","label":"NO","role":"NONE","restriction":"NONE","evidence":"53--KEY PSC 5315 hardware item, not aircraft part"}
+{"id":"r6-0520","label":"NO","role":"NONE","restriction":"NONE","evidence":"fabrication of Portable Liquid Nitrogen Circulation Heater skid, custom equipment"}
+{"id":"r6-0521","label":"NO","role":"NONE","restriction":"NONE","evidence":"ACTUATOR,ELECTROMEC IN REPAIR/MODIFICATION; overhaul and repair to Ready for Issue"}
+{"id":"r6-0522","label":"NO","role":"NONE","restriction":"NONE","evidence":"Utilities Privatization of the Water System at USAG-Hawaii; utility ownership"}
+{"id":"r6-0523","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"Wideband and Narrowband Global SATCOM Sustainment sole-source engineering to Boeing"}
+{"id":"r6-0525","label":"NO","role":"NONE","restriction":"NONE","evidence":"Design and construction of addition to aircraft paint shop and media blast booth"}
+{"id":"r6-0526","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5305014790679 SCREW,CAP,HEXAGON HEAD Approved source is 75Q65 3271564"}
+{"id":"r6-0527","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"16--DRIVE UNIT,HYDRAULI PSC 1650; offers from non government-approved sources"}
+{"id":"r6-0529","label":"NO","role":"NONE","restriction":"NONE","evidence":"Lightning Protection Update B71N construction project at Sheridan VA Medical Center"}
+{"id":"r6-0530","label":"NO","role":"NONE","restriction":"NONE","evidence":"VALVE,SOLENOID IN REPAIR/MODIFICATION; items inducted and repaired by contractor"}
+{"id":"r6-0531","label":"FIT","role":"SUB","restriction":"APPROVED_SOURCE","evidence":"PANEL ASSY,SIDE,AIR NSN 7R-1680-015636080-V2; only previously approved sources solicited"}
+{"id":"r6-0532","label":"NO","role":"NONE","restriction":"NONE","evidence":"USCG Station at Cape Disappointment pier and infrastructure construction sources sought"}
+{"id":"r6-0533","label":"NO","role":"NONE","restriction":"NONE","evidence":"VALVE,PRESS REDUCIN PSC 2915; fastener mention only a marking clause"}
+{"id":"r6-0534","label":"PARTIAL","role":"PRIME","restriction":"BRAND_NAME","evidence":"Brand-Name Lonza 4D-Nucleofector System PSC 6640; authorized distributors/resellers sought"}
+{"id":"r6-0535","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"DOOR,AIRCRAFT PSC 1560 supply solicitation DLA"}
+{"id":"r6-0538","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"TAILPIECE,VALVE PSC 4820 supply solicitation, small business set-aside"}
+{"id":"r6-0539","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"FUEL CELL,AIRCRAFT repair requirements return to Ready For Issue; source approval required"}
+{"id":"r6-0540","label":"NO","role":"NONE","restriction":"NONE","evidence":"CG Station Burlington Replacement Water Heaters removal and installation service"}
+{"id":"r6-0541","label":"NO","role":"NONE","restriction":"NONE","evidence":"Ross Springs Waterline Replacement HDPE pipeline construction"}
+{"id":"r6-0542","label":"NO","role":"NONE","restriction":"NONE","evidence":"FCI Beckley Subsistence/Kosher/Halal food; peanut butter nuts not fasteners"}
+{"id":"r6-0543","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5310013438342 WASHER,SPLIT Approved source is 66503 4943-014"}
+{"id":"r6-0544","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820015628838 LAMELLAR VALVE Approved source is 1KWT0 037157"}
+{"id":"r6-0545","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"STEM,FLUID VALVE PSC 4820 supply, total small business set-aside"}
+{"id":"r6-0546","label":"PARTIAL","role":"SUB","restriction":"SOLE_SOURCE","evidence":"BRACE, AIRCRAFT GROUND SERVICING NSN 1730-01-473-3572 sole source Northrop Grumman OEM"}
+{"id":"r6-0547","label":"NO","role":"NONE","restriction":"NONE","evidence":"ARSR4 Collector Power Supply Test Station design and build with test software"}
+{"id":"r6-0548","label":"NO","role":"NONE","restriction":"NONE","evidence":"STEM,FLUID VALVE PSC 4820 Navy ship part, not IT equipment"}
+{"id":"r6-0549","label":"NO","role":"NONE","restriction":"NONE","evidence":"RFQ Shuttle Services for VA Central California; charter bus drivers"}
+{"id":"r6-0550","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"12-Foot Pull-Behind Tractor Grader, Johnson 1200RS or equal; relief valve only a feature"}
+{"id":"r6-0551","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5995017085137 CABLE ASSEMBLY,SPECIAL Approved source is 7QAK7 12193-0420-A30"}
+{"id":"r6-0552","label":"NO","role":"NONE","restriction":"NONE","evidence":"KEYBOARD,DATA ENTRY IN REPAIR/MODIFICATION; overhaul and repair to Ready for Issue"}
+{"id":"r6-0554","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"NRP,FWD AIRSTAIR IN REPAIR/MODIFICATION; Government source approval required prior to award"}
+{"id":"r6-0555","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"NSN 2540011888704 WINDOW WASHER ASSEMBLY vehicle part, not fasteners"}
+{"id":"r6-0556","label":"FIT","role":"SUB","restriction":"QPL","evidence":"FILTER ELEMENT, FLUID NSN 1650-00-484-6918 QPL item MIL-PRF-83860D approved QPL sources PTI, Pall"}

@@ -1,0 +1,35 @@
+{"id":"r6-0044","label":"PARTIAL","role":"SUB","restriction":"SOLE_SOURCE","evidence":"sole source contract with WERFEN USA LLC for Blood Gas Analyzer GEM Premier 5000"}
+{"id":"r6-0046","label":"NO","role":"NONE","restriction":"NONE","evidence":"PUMP,AXIAL PISTONS, FSC 4320 pumps, not a valve"}
+{"id":"r6-0047","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PARTS KIT,BALL VALV, FSC 4820 spare parts kit per contract drawings"}
+{"id":"r6-0048","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"vendor shall supply the Transfusion Service with red blood cells reagents"}
+{"id":"r6-0050","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PLATE ASSEMBLY,STAU, FSC 5340 hardware assembly for Navy equipment"}
+{"id":"r6-0051","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CAP,VALVE; Bonnet for a size 3 inch Ball Valve per NAVSEA Drawing"}
+{"id":"r6-0052","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 6150015315870 CABLE ASSEMBLY,SPECIAL; Approved source is 63760 114E7173G01"}
+{"id":"r6-0053","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"MANIFOLD ASSEMBLY IN REPAIR/MODIFICATION; Government does not own the data"}
+{"id":"r6-0057","label":"NO","role":"NONE","restriction":"NONE","evidence":"surface water, sediment, and fish tissue sampling; toxicity testing services"}
+{"id":"r6-0058","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"DUCT ASSEMBLY, BLEED AIR NSN 1560-004212077 MANUFACTURED BY... ARROWHEAD PRODUCTS CORP"}
+{"id":"r6-0059","label":"NO","role":"NONE","restriction":"NONE","evidence":"STEM ASSY, FSC 4820 valve part, fasteners only mentioned in marking clause"}
+{"id":"r6-0060","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"RFQ: Smart-ABI+ wireless system; Supply: Diagnostic Laboratory Equipment"}
+{"id":"r6-0061","label":"NO","role":"NONE","restriction":"NONE","evidence":"produce antigen and vaccines against influenza virus; must hold influenza vaccine license"}
+{"id":"r6-0062","label":"PARTIAL","role":"SUB","restriction":"OEM_ONLY","evidence":"NSN 5960-01-318-0987, PN VMX-1849; CPI... original manufacturer; data not owned"}
+{"id":"r6-0063","label":"NO","role":"NONE","restriction":"NONE","evidence":"Parts Kit for a size 2 inch Ball Valve per Electric Boat drawing"}
+{"id":"r6-0064","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CONTROL VALVE,AIRCR, FSC 1680 miscellaneous aircraft accessories and components"}
+{"id":"r6-0065","label":"FIT","role":"SUB","restriction":"SOLE_SOURCE","evidence":"F-15 L/H Ramp NSN 1560-01-621-1723FX; negotiate with only one source, The Boeing Company"}
+{"id":"r6-0066","label":"NO","role":"NONE","restriction":"NONE","evidence":"contains the requirements for repair... for the VALVE,SOLENOID"}
+{"id":"r6-0068","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 6150014462500 WIRING HARNESS,BRANCHE; All responsible sources may submit a quote"}
+{"id":"r6-0069","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 4820015541270 VALVE,GLOBE; All responsible sources may submit a quote"}
+{"id":"r6-0070","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"FUEL CELL,AFT SPONS 1680-01-494-3009; REQUIRE GOVERNMENT SOURCE APPROVAL PRIOR TO AWARD"}
+{"id":"r6-0071","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"61--CABLE ASSEMBLY,SPEC, FSC 6150, total small business set-aside"}
+{"id":"r6-0072","label":"NO","role":"NONE","restriction":"NONE","evidence":"61--CABLE ASSEMBLY,SPEC FSC 6150 electrical cable, not aircraft airframe part"}
+{"id":"r6-0073","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"53--KEY, FSC 5315 nails, keys and pins spare part"}
+{"id":"r6-0074","label":"NO","role":"NONE","restriction":"NONE","evidence":"61--CABLE ASSEMBLY,SPEC, ship part, not computer hardware or IT equipment"}
+{"id":"r6-0075","label":"NO","role":"NONE","restriction":"NONE","evidence":"IDIQ Pest Management Services; execute the Integrated Pest Management Plan"}
+{"id":"r6-0076","label":"NO","role":"NONE","restriction":"NONE","evidence":"16--WHEEL HALF,AIRCRAFT, IN REPAIR/MODIFICATION OF; inducted and repaired"}
+{"id":"r6-0077","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4810014751335 BODY,VALVE; Approved sources are 66822 40005-1"}
+{"id":"r6-0079","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"requirements for manufacture... for the VALVE,SAFETY RELIEF, part of MK-91"}
+{"id":"r6-0080","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 6150015136173 CABLE ASSEMBLY,SPECIAL; All responsible sources may submit a quote"}
+{"id":"r6-0081","label":"FIT","role":"PRIME","restriction":"QPL","evidence":"NSN 5962012489475 MICROCIRCUIT,DIGITAL; This is a qualified products list (QPL) item"}
+{"id":"r6-0082","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"59--WIRING HARNESS, FSC 5995 cable, cord and wire assemblies"}
+{"id":"r6-0084","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Torque Tube Assembl, FSC 1680 aircraft components; See attached RFQ"}
+{"id":"r6-0085","label":"NO","role":"NONE","restriction":"NONE","evidence":"36--CANISTER, FSC 3655, not computer hardware or IT equipment"}
+{"id":"r6-0086","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820009808475 VALVE,CHECK; Approved sources are 06239 M4014-3-4"}

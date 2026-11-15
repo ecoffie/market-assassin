@@ -1,0 +1,35 @@
+{"id":"r6-0137","label":"NO","role":"NONE","restriction":"NONE","evidence":"PARTS KIT,BALL VALV size 1/4 inch, NAVSEA drawing; ship valve not aircraft part"}
+{"id":"r6-0138","label":"NO","role":"NONE","restriction":"NONE","evidence":"59--CABLE ASSEMBLY; electrical item, not medical supplies"}
+{"id":"r6-0139","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5935010262237 CONNECTOR,RECEPTACLE; Approved sources are 72429 50325"}
+{"id":"r6-0140","label":"NO","role":"NONE","restriction":"NONE","evidence":"CAP,VALVE PSC 4820; not IT hardware"}
+{"id":"r6-0141","label":"FIT","role":"PRIME","restriction":"UNCLEAR","evidence":"ShroudSegmentTurb_End_Item_F100 NSN 2840013214450 PN 4076790-01"}
+{"id":"r6-0142","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5935015521213 ADAPTER,CONNECTOR; Approved source is 34222 44095-30P-969"}
+{"id":"r6-0144","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 1630011726184 WHEEL,LANDING GEAR; Approved sources are 0B9R9 7-311221001-3"}
+{"id":"r6-0147","label":"PARTIAL","role":"PRIME","restriction":"UNCLEAR","evidence":"PSC 6640 laboratory equipment; title Brand Name or Equal, item not stated"}
+{"id":"r6-0148","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Parts Kit for a size 2 inch Ball Valve, Ball and mating Seats"}
+{"id":"r6-0149","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NRP,SERVOCYLINDER,A PSC 1650 aircraft hydraulic component"}
+{"id":"r6-0150","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"VALVE,PRESS REDUCIN PSC 2915 Navy solicitation, spare part"}
+{"id":"r6-0151","label":"NO","role":"NONE","restriction":"NONE","evidence":"GSA Fleet Lease Vehicle Marshalling Services; service, no IT hardware"}
+{"id":"r6-0153","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820013516138 VALVE,VENT; Approved sources are 1XKR3 C7887-3"}
+{"id":"r6-0154","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 6150014126544 CABLE ASSEMBLY,SPECIAL; Approved source is 64678"}
+{"id":"r6-0155","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Contractor shall manufacture five 3FT 133.33 amp cables with cam-lock ends"}
+{"id":"r6-0156","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"DISK ASSEMBLY,FLUID PSC 4820 Navy supply solicitation"}
+{"id":"r6-0157","label":"NO","role":"NONE","restriction":"NONE","evidence":"Ultrasound Diagnostic System prototype proposals; not consumables supply"}
+{"id":"r6-0160","label":"NO","role":"NONE","restriction":"NONE","evidence":"Triennial Circuit Breaker and Feeder Testing; testing service"}
+{"id":"r6-0161","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 0Q-5355-017396916-SX KNOB; requires Government source approval"}
+{"id":"r6-0162","label":"NO","role":"NONE","restriction":"NONE","evidence":"FY27 FCI LORETTO QUARTERLY SUBSISTENCE Meat"}
+{"id":"r6-0163","label":"NO","role":"NONE","restriction":"NONE","evidence":"Environmental Services for Evaluation of Dredged Material; sampling services"}
+{"id":"r6-0164","label":"NO","role":"NONE","restriction":"NONE","evidence":"PARTS KIT,BALL VALV; fasteners only mentioned in marking clause"}
+{"id":"r6-0166","label":"NO","role":"NONE","restriction":"NONE","evidence":"61--CABLE ASSEMBLY,SPEC PSC 6150; no aircraft application stated"}
+{"id":"r6-0169","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CHASSIS PSC 5998 commercial item procurement, quantity 3 units"}
+{"id":"r6-0170","label":"NO","role":"NONE","restriction":"NONE","evidence":"Replace Flooring in McClellan VA; construction project"}
+{"id":"r6-0172","label":"PARTIAL","role":"PRIME","restriction":"BRAND_NAME","evidence":"Biomek i3 Automated Liquid Handling System; Brand Name restriction PSC 6640"}
+{"id":"r6-0173","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"ANALOG BOARD PSC 5998 Navy solicitation reopened for quotes"}
+{"id":"r6-0174","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 6150016699920 WIRING HARNESS,BRANCHE Qty 16"}
+{"id":"r6-0175","label":"NO","role":"NONE","restriction":"NONE","evidence":"Emergency Department Registered Nurse Services; staffing service"}
+{"id":"r6-0176","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PARTS KIT,BALL VALV PSC 4820 Navy spare part solicitation"}
+{"id":"r6-0177","label":"NO","role":"NONE","restriction":"NONE","evidence":"HCHV CRS Transitional Housing Sources Sought; housing services"}
+{"id":"r6-0178","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 6150016494656 CABLE ASSEMBLY,SPECIAL; Approved source is 1UB81"}
+{"id":"r6-0181","label":"NO","role":"NONE","restriction":"NONE","evidence":"30--GEAR, PINION PSC 3020; no aircraft application stated"}
+{"id":"r6-0182","label":"NO","role":"NONE","restriction":"NONE","evidence":"43--HEAD,FLUID FILTER PSC 4330; not an aircraft component per text"}
+{"id":"r6-0183","label":"NO","role":"NONE","restriction":"NONE","evidence":"STEM ASSY PSC 4820; fasteners only mentioned in marking clause"}

@@ -1,0 +1,35 @@
+{"id":"r6-0469","label":"NO","role":"NONE","restriction":"NONE","evidence":"LIGHT,LANDING,AIRCR IN REPAIR/MODIFICATION; contractor to return items to Ready For Issue condition"}
+{"id":"r6-0470","label":"NO","role":"NONE","restriction":"NONE","evidence":"DISK,VALVE PSC 4820; fastener mention is only a marking clause"}
+{"id":"r6-0472","label":"NO","role":"NONE","restriction":"OEM_ONLY","evidence":"repair, test, evaluation and calibration of Aircraft Oxygen System Test Set; Eaton OEM only"}
+{"id":"r6-0473","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"66--REAGENT POWDER PSC 6640 supply solicitation"}
+{"id":"r6-0474","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"sole source repair requirement to GE AVIATION SYSTEMS; Repair of NSN 7RH 1680 014262842"}
+{"id":"r6-0476","label":"NO","role":"NONE","restriction":"NONE","evidence":"Fabricated Components for Embedded Floor Plates ALS-U project; custom fabrication, not lab supplies"}
+{"id":"r6-0477","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PARTS KIT,BALL VALV PSC 4820 supply solicitation"}
+{"id":"r6-0478","label":"FIT","role":"PRIME","restriction":"UNCLEAR","evidence":"6515 PROSTHETICS DRIVE iFILL AND CYLIND; Home Oxygen medical supplies"}
+{"id":"r6-0480","label":"NO","role":"NONE","restriction":"NONE","evidence":"NRP,KEYBOARD,DATA E 7E20 repair pricing, teardown and repair turn around time"}
+{"id":"r6-0481","label":"NO","role":"NONE","restriction":"NONE","evidence":"NIH Scientific & Technical Expertise professional services labor categories sources sought"}
+{"id":"r6-0483","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"DELTA-P IND ASSY PSC 4820 valve-class item, indicator assembly"}
+{"id":"r6-0484","label":"NO","role":"NONE","restriction":"NONE","evidence":"43--HEAD,FLUID FILTER PSC 4330 not IT equipment"}
+{"id":"r6-0486","label":"NO","role":"NONE","restriction":"NONE","evidence":"Supplement 303 Ham Products AMS food purchase specification"}
+{"id":"r6-0487","label":"NO","role":"NONE","restriction":"NONE","evidence":"CYLINDER,COMPRESSED PSC 8120; fastener mention only marking clause"}
+{"id":"r6-0488","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"INTERFACE UNIT, AUT 7E20; supply item, part number substitution codes, no drawings available"}
+{"id":"r6-0489","label":"NO","role":"NONE","restriction":"NONE","evidence":"VALVE,CHECK PSC 4820 Navy drawing item, not IT hardware"}
+{"id":"r6-0490","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"VAVLE,HOT SIDE TEM PSC 1680; offers from non-government-approved sources deemed ineligible"}
+{"id":"r6-0491","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5310005749544 NUT,SLEEVE Qty 230 Approved sources are 29183 6-68024-1"}
+{"id":"r6-0492","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"VALVE,BALL 1 1/2 inch Ball Valve per Naval Ship Systems Command Drawing 845-4558773"}
+{"id":"r6-0493","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"HUBBELL WATER HEATER Model EMV 119 Gal, not IT equipment"}
+{"id":"r6-0494","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"DISK,VALVE PSC 4820 quantity 31 supply solicitation"}
+{"id":"r6-0496","label":"NO","role":"NONE","restriction":"NONE","evidence":"KitCheck RFID Tag System for Crash Carts; medication scanning software subscription, not IT hardware resale"}
+{"id":"r6-0497","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CCA,EPS CONTROL circuit card assembly, small business NAICS 334412"}
+{"id":"r6-0499","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"16--FIBER OPTIC ADAPTER - AND OTHER REPLACEMENT PARTS PSC 4920"}
+{"id":"r6-0500","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"CELL,FUEL,AIRCRAFT repair requirements to return items to RFI; government source approval required"}
+{"id":"r6-0501","label":"NO","role":"NONE","restriction":"NONE","evidence":"Construction of Chilled Water Plant and Site Utility Upgrades at VA Medical Center"}
+{"id":"r6-0502","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 6150017338617 CABLE ASSEMBLY,SPEC Approved sources are 07482 2110M89P06"}
+{"id":"r6-0506","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Parts Kit for a size 1/4 inch Ball Valve consisting of one Ball and two Seats"}
+{"id":"r6-0507","label":"NO","role":"NONE","restriction":"NONE","evidence":"Oilless Breathing Air Compressor 40 HP screw compressor, not fasteners"}
+{"id":"r6-0508","label":"NO","role":"NONE","restriction":"NONE","evidence":"PARTS KIT,BALL VALV PSC 4820 Navy SUBSAFE valve kit, not aircraft part"}
+{"id":"r6-0510","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"NSN 2640015650383 VALVE EXTENSION,TIRE tire accessory, not industrial valve"}
+{"id":"r6-0511","label":"FIT","role":"PRIME","restriction":"UNCLEAR","evidence":"CIRCUIT CARD ASSEMB PSC 7E20; title only, no description text"}
+{"id":"r6-0513","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"WIRING BD ASSY PSC 5998 supply solicitation, part number substitution codes"}
+{"id":"r6-0514","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"FUEL CELL,AIRCRAFT repair requirements return to Ready For Issue; government source approval required"}
+{"id":"r6-0516","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 5305016499792 SCREW,CAP,HEXAGON HEAD Qty 1065"}

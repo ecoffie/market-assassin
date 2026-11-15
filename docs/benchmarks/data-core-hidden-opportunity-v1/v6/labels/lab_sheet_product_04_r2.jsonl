@@ -1,0 +1,35 @@
+{"id": "r6-0184", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "ASSORTED CAP SCREWS, FSC Code is 5305, NAICS 332722"}
+{"id": "r6-0185", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 4820005806422 VALVE,ANGLE; all responsible sources may submit a quote"}
+{"id": "r6-0187", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "NSN 7H-4810-014847259 ACTUATOR,HYDRAULIC; Government does not own the data"}
+{"id": "r6-0188", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 4820007752388 VALVE,REGULATING,FLUID; source controlled drawing item"}
+{"id": "r6-0190", "label": "FIT", "role": "PRIME", "restriction": "SOLE_SOURCE", "evidence": "NSN 7R-1680-017159712-P8 SONOBUOY ROTARY; data needed to acquire competitively not available"}
+{"id": "r6-0191", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 4810013564487 VALVE,LINEAR,DIRECT; Approved sources are 0FHH8 9DD000240"}
+{"id": "r6-0192", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "remove and install new windows in the Eddyville Quarters, construction"}
+{"id": "r6-0193", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB, IN REPAIR/MODIFICATION OF; This RFQ is for repair"}
+{"id": "r6-0197", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Public Address System Maintenance, Testing and Repair services RFI"}
+{"id": "r6-0198", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 1560-01-646-5441 PANEL, STRUCTURAL, AIRCRAFT; Approved sources are H&R Parts"}
+{"id": "r6-0200", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 4820003694997 PARTS KIT,VALVE; Approved source is 86090 80857"}
+{"id": "r6-0202", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 5995014635352 WIRING HARNESS,BRANCHE; all responsible sources may submit"}
+{"id": "r6-0203", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "PARTS KIT,BALL VALV, FSC 4820 ship part, not IT hardware"}
+{"id": "r6-0204", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 4820005294717 VALVE,SHUTTLE; Approved sources are 26044 95768"}
+{"id": "r6-0206", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 4820015139993 VALVE,FLOAT; all responsible sources may submit a quote"}
+{"id": "r6-0207", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "DISK,VALVE disc assembly per Vacco drawing V3E10048, FSC 4820 Navy"}
+{"id": "r6-0209", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "VALVE,REGULATING,FL IN REPAIR/MODIFICATION; negotiate with only one source FAR 6.302-1"}
+{"id": "r6-0211", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "non-personal services contract to provide comprehensive pressure washing services"}
+{"id": "r6-0212", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 7R-1560-017232762-H5 BALANCE WEIGHT,STAB; requires Government source approval"}
+{"id": "r6-0213", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Complete pressure reducing valve assembly per Marotta drawing 281770-0001"}
+{"id": "r6-0216", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Specialty Pharmacy Pharmaceutical Prime Vendor, specialty medications distribution RFI"}
+{"id": "r6-0217", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "N055 Questions and Answers, flooring BPA Tarkett sheet vinyl installation"}
+{"id": "r6-0218", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "VALVE, 4\" IPS, GATE, BRONZE BODY, NICKEL ALLOY TRIM, NSN 4820-01-049-3195"}
+{"id": "r6-0219", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "53--HELICAL SPRING, FSC 5360 Navy, not aircraft part"}
+{"id": "r6-0220", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "NSN 2840-01-278-3281NZ SUPPORT, TURBINE COM, drawing 4074639"}
+{"id": "r6-0221", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "61--CABLE ASSEMBLY,SPEC, FSC 6150, not a valve"}
+{"id": "r6-0222", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "CI Blackbodies, FSC 6685 instruments, NAICS 334513"}
+{"id": "r6-0223", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PANEL,CONTROL,ELECT, FSC 1680 aircraft accessories and components"}
+{"id": "r6-0225", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "REMOVABLE CONE,SPEC, FSC 6640 laboratory equipment and supplies"}
+{"id": "r6-0226", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "DISK,VALVE, FSC 4820 ship part, not IT hardware"}
+{"id": "r6-0227", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CHASSIS, VME, 12 SL, FSC 5998 electronic assembly, NAICS 334412"}
+{"id": "r6-0228", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 6150991338571 CABLE ASSEMBLY,SPEC; Approved source is K0824 PE20310"}
+{"id": "r6-0229", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "GSA Fleet Lease Vehicle Auction & Marshalling Services Idaho Falls"}
+{"id": "r6-0230", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "on-site maintenance, repair, technical support for Electronic Security Systems"}
+{"id": "r6-0231", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "WHEEL HALF,AIRCRAFT, IN REPAIR/MODIFICATION OF; item inducted and repaired"}

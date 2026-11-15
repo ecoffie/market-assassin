@@ -1,0 +1,35 @@
+{"id":"r6-0287","label":"FIT","role":"PRIME","evidence":"CFO janitorial services per statement of work, 5 year"}
+{"id":"r6-0293","label":"NO","role":"NONE","evidence":"Solar panel and inverter maintenance; panel washing is not office cleaning"}
+{"id":"r6-0295","label":"PARTIAL","role":"SUB","evidence":"Museum facility maintenance with custodial crew for deep cleaning and floor care"}
+{"id":"r6-0299","label":"NO","role":"NONE","evidence":"Modular child development center RFI; HVAC only supply chain question"}
+{"id":"r6-0301","label":"PARTIAL","role":"SUB","evidence":"Hangar with structural steel framing, steel roof trusses, insulated metal roof"}
+{"id":"r6-0309","label":"NO","role":"NONE","evidence":"Vehicle auction and marshalling services, not janitorial"}
+{"id":"r6-0312","label":"FIT","role":"PRIME","evidence":"Custodial services at Fleet Activities Sasebo IDIQ"}
+{"id":"r6-0313","label":"NO","role":"NONE","evidence":"Holiday decoration install and removal, not grounds maintenance"}
+{"id":"r6-0317","label":"NO","role":"NONE","evidence":"Supply of air conditioning pipe parts by NSN"}
+{"id":"r6-0325","label":"PARTIAL","role":"SUB","evidence":"Caretaker services include facility upkeep, grounds maintenance and site security"}
+{"id":"r6-0329","label":"PARTIAL","role":"SUB","evidence":"Reserve center MILCON with site paving, curbs, gutters, storm drainage supporting facilities"}
+{"id":"r6-0332","label":"FIT","role":"PRIME","evidence":"Road resurfacing with asphalt pavement, full depth reclamation, culverts, drainage"}
+{"id":"r6-0335","label":"PARTIAL","role":"SUB","evidence":"Caretaker services include facility upkeep, grounds maintenance and site security"}
+{"id":"r6-0337","label":"NO","role":"NONE","evidence":"Office space lease; janitorial only a lease evaluation factor"}
+{"id":"r6-0343","label":"NO","role":"NONE","evidence":"Telemedicine emergency clinical support, not nurse staffing placement"}
+{"id":"r6-0346","label":"NO","role":"NONE","evidence":"Retail space lease for career center"}
+{"id":"r6-0349","label":"NO","role":"NONE","evidence":"Title only: portable air conditioners purchase, no maintenance service"}
+{"id":"r6-0350","label":"FIT","role":"PRIME","evidence":"Tree clearing and felling services at Eufaula Lake, NAICS 561730"}
+{"id":"r6-0352","label":"NO","role":"NONE","evidence":"Title 'Operations Mechanical BPA' only; no HVAC scope stated"}
+{"id":"r6-0354","label":"NO","role":"NONE","evidence":"Title 'Repair Mechanical Systems IDIQ' only; HVAC not stated"}
+{"id":"r6-0358","label":"NO","role":"NONE","evidence":"Repair leaking site water main, not HVAC"}
+{"id":"r6-0361","label":"NO","role":"NONE","evidence":"Ceramic ball kit supply item"}
+{"id":"r6-0364","label":"PARTIAL","role":"SUB","evidence":"OCONUS support services including janitorial among logistics and travel services"}
+{"id":"r6-0367","label":"NO","role":"NONE","evidence":"HVAC repair/replace and interior work, not steel building or roofing"}
+{"id":"r6-0368","label":"PARTIAL","role":"SUB","evidence":"Natural resources support incl. vegetation establishment, replanting, irrigation support"}
+{"id":"r6-0371","label":"NO","role":"NONE","evidence":"Ceramic ball kit supply item"}
+{"id":"r6-0373","label":"NO","role":"NONE","evidence":"Vehicle auction and marshalling services, not janitorial"}
+{"id":"r6-0380","label":"NO","role":"NONE","evidence":"Sanitary waste piping repair is plumbing, not HVAC"}
+{"id":"r6-0383","label":"NO","role":"NONE","evidence":"Flooring installation and debris removal Q&A, not office cleaning"}
+{"id":"r6-0384","label":"NO","role":"NONE","evidence":"Command center renovation RFI; visitor escort mention only"}
+{"id":"r6-0387","label":"NO","role":"NONE","evidence":"Infectious disease staff training, not nurse placement"}
+{"id":"r6-0389","label":"FIT","role":"PRIME","evidence":"Ballfield turf, infield, aeration and topdressing maintenance at Coast Guard Academy"}
+{"id":"r6-0392","label":"PARTIAL","role":"SUB","evidence":"New maintenance building must be provided with HVAC and air conditioning"}
+{"id":"r6-0393","label":"NO","role":"NONE","evidence":"Replace powerhouse hot water tanks; not HVAC equipment maintenance"}
+{"id":"r6-0400","label":"NO","role":"NONE","evidence":"Wastewater treatment plant upgrades, no guard services"}

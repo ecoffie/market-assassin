@@ -1,0 +1,35 @@
+{"id":"r6-0404","label":"FIT","role":"PRIME","evidence":"Janitorial/cleaning services at U.S. Embassy office building and warehouse"}
+{"id":"r6-0406","label":"PARTIAL","role":"SUB","evidence":"Campground decommissioning includes removing asphalt pavement, sidewalks, parking lots"}
+{"id":"r6-0417","label":"FIT","role":"PRIME","evidence":"Snow plowing and shoveling services at Westville Lake"}
+{"id":"r6-0425","label":"FIT","role":"PRIME","evidence":"Snow plowing and shoveling services at Westville Lake"}
+{"id":"r6-0429","label":"NO","role":"NONE","evidence":"Herbicide spraying of 720 acres unimproved rangeland, not facility grounds"}
+{"id":"r6-0435","label":"FIT","role":"PRIME","evidence":"Heating system leak repair, NAICS 238220 plumbing, heating, air-conditioning"}
+{"id":"r6-0441","label":"NO","role":"NONE","evidence":"Naval vessel hull maintenance; steel is hull type"}
+{"id":"r6-0442","label":"PARTIAL","role":"SUB","evidence":"Reserve center MILCON with paving, curbs, gutters, storm drainage supporting facilities"}
+{"id":"r6-0447","label":"FIT","role":"PRIME","evidence":"Road resurfacing with asphalt pavement, full depth reclamation, culverts, drainage"}
+{"id":"r6-0451","label":"FIT","role":"PRIME","evidence":"Aseptic janitorial/custodial services White River Junction"}
+{"id":"r6-0452","label":"FIT","role":"PRIME","evidence":"Secured janitorial services three buildings MCB Quantico, NAICS 561720 (8(a))"}
+{"id":"r6-0453","label":"FIT","role":"PRIME","evidence":"Turnkey chiller replacement, purchase and install, NAICS 238220"}
+{"id":"r6-0459","label":"PARTIAL","role":"SUB","evidence":"Athletic facility design-build with paving, sidewalks, storm drainage, landscaping site work"}
+{"id":"r6-0465","label":"FIT","role":"PRIME","evidence":"Replace chilled water pump at VAMC Bronx boiler plant"}
+{"id":"r6-0471","label":"NO","role":"NONE","evidence":"Medical linen rental and laundry service"}
+{"id":"r6-0475","label":"FIT","role":"PRIME","evidence":"Snow plowing and shoveling services at Westville Lake"}
+{"id":"r6-0479","label":"NO","role":"NONE","evidence":"Live-fire training system RFI; steel weather cover is a minor item"}
+{"id":"r6-0482","label":"FIT","role":"PRIME","evidence":"Replace Boilers 4 and 5 at VA Medical Center"}
+{"id":"r6-0485","label":"NO","role":"NONE","evidence":"Barracks design-build industry day; no cleaning"}
+{"id":"r6-0495","label":"NO","role":"NONE","evidence":"Purchase of induction heater with lab water chiller equipment"}
+{"id":"r6-0498","label":"NO","role":"NONE","evidence":"Radiant heating panel replacement, not steel building or roofing"}
+{"id":"r6-0503","label":"NO","role":"NONE","evidence":"Lean transformation consulting, not nurse staffing"}
+{"id":"r6-0504","label":"NO","role":"NONE","evidence":"Wastewater treatment plant upgrades, no guard services"}
+{"id":"r6-0505","label":"NO","role":"NONE","evidence":"Lease of temporary desiccant dehumidification equipment, not HVAC maintenance"}
+{"id":"r6-0509","label":"NO","role":"NONE","evidence":"Supplemental cancer insurance pilot RFI"}
+{"id":"r6-0512","label":"NO","role":"NONE","evidence":"Nonappropriated fund public accountant audits"}
+{"id":"r6-0515","label":"NO","role":"NONE","evidence":"Web ordering eMarketplace platform RFI for clothing"}
+{"id":"r6-0524","label":"PARTIAL","role":"SUB","evidence":"BASOPS includes grounds maintenance, snow removal and heating and cooling functional areas"}
+{"id":"r6-0528","label":"PARTIAL","role":"SUB","evidence":"HQ renovation design-build includes HVAC replacement and building roof replacement"}
+{"id":"r6-0536","label":"NO","role":"NONE","evidence":"Telemedicine emergency clinical support, not nurse staffing placement"}
+{"id":"r6-0537","label":"PARTIAL","role":"SUB","evidence":"Building modernization includes complete mechanical/HVAC installation"}
+{"id":"r6-0553","label":"NO","role":"NONE","evidence":"Retail space lease; security board is wall-mounted plywood"}
+{"id":"r6-0557","label":"FIT","role":"PRIME","evidence":"Barstow/Dumont janitorial services, NAICS 561720 small business set-aside"}
+{"id":"r6-0558","label":"FIT","role":"PRIME","evidence":"IDIQ mowing and maintenance services at Burnsville Lake"}
+{"id":"r6-0560","label":"NO","role":"NONE","evidence":"Sanitary waste piping repair is plumbing, not HVAC"}

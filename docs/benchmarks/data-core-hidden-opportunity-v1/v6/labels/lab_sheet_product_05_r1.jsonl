@@ -1,0 +1,35 @@
+{"id":"r6-0232","label":"NO","role":"NONE","restriction":"NONE","evidence":"BALL KIT, CERAMIC PSC 4820; not IT hardware"}
+{"id":"r6-0233","label":"NO","role":"NONE","restriction":"NONE","evidence":"Commodity Specification for Dried Fruits; food specification notice"}
+{"id":"r6-0234","label":"NO","role":"NONE","restriction":"NONE","evidence":"PWA DCI 5998; This RFQ is for repair"}
+{"id":"r6-0235","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820014532786 VALVE,RELIEF,PRESSURE; Approved source is 96124 750500-1"}
+{"id":"r6-0236","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820011879890 KIT,OVERHAUL,VALVE; Approved source is 99447 P1437-2"}
+{"id":"r6-0238","label":"FIT","role":"PRIME","restriction":"SOLE_SOURCE","evidence":"NSN 7H-4810-016044064-PP ACTUATOR; approved source Honeywell, only one source FAR 6.302-1"}
+{"id":"r6-0240","label":"NO","role":"NONE","restriction":"NONE","evidence":"Elevator Maintenance & Related Services; maintenance service"}
+{"id":"r6-0241","label":"NO","role":"NONE","restriction":"NONE","evidence":"Ross Springs Waterline Replacement; construction project"}
+{"id":"r6-0242","label":"NO","role":"NONE","restriction":"NONE","evidence":"Electrical Projects Progressive Design Build RFI; substation construction"}
+{"id":"r6-0244","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PARTS KIT,BALL VALV PSC 4820 Navy spare part solicitation"}
+{"id":"r6-0247","label":"NO","role":"NONE","restriction":"NONE","evidence":"59--COUPLER,ANTENNA, IN REPAIR/MODIFICATION OF; repair service"}
+{"id":"r6-0248","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 4820015541201 VALVE,GLOBE Qty 16"}
+{"id":"r6-0249","label":"NO","role":"NONE","restriction":"NONE","evidence":"FCI WIL 2nd Quarter Subsistence; food requirements"}
+{"id":"r6-0250","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4810013717741 VALVE,REGULATING,FL; Approved source is 99643 70397-6"}
+{"id":"r6-0251","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"D-Department Control System Parts/Supplies BPA PSC 5999, small business"}
+{"id":"r6-0254","label":"NO","role":"NONE","restriction":"UNCLEAR","evidence":"USNS COMFORT 24VDC Rectifier and 400 Hz Converter; shipboard power, not aircraft part"}
+{"id":"r6-0255","label":"NO","role":"NONE","restriction":"NONE","evidence":"T-38 Accessory Drive Gearbox Remanufacture; overhaul service"}
+{"id":"r6-0256","label":"NO","role":"NONE","restriction":"NONE","evidence":"VALVE,REGULATING,FL, IN REPAIR/MODIFICATION OF; repair service"}
+{"id":"r6-0257","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820016969162 VALVE ASSEMBLY; Approved source is 7KXG7 401000-110NT8QT"}
+{"id":"r6-0258","label":"FIT","role":"PRIME","restriction":"SOLE_SOURCE","evidence":"NSN 1660015075069 COMPENSATOR ASSEMBL B-52; item is sole source to Hamilton Sundstrand"}
+{"id":"r6-0259","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 5310009738781 NUT,SELF-LOCKING,BARRE Qty 261"}
+{"id":"r6-0260","label":"NO","role":"NONE","restriction":"NONE","evidence":"DRYDOCK REPAIRS FOR THE CGC ANVIL; ship repair service"}
+{"id":"r6-0261","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5998015096163 CIRCUIT CARD ASSEMBLY; Approved source is 3S966 PCP-0292"}
+{"id":"r6-0262","label":"NO","role":"NONE","restriction":"NONE","evidence":"NIH STEAM scientific labor categories; professional services"}
+{"id":"r6-0263","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5995013587463 CABLE ASSEMBLY,PRINTED; Approved source is 81413 333442-101"}
+{"id":"r6-0264","label":"PARTIAL","role":"PRIME","restriction":"BRAND_NAME","evidence":"Philips VS30 batteries and HS-1RS RFID Barcode Scanner; must be exact same"}
+{"id":"r6-0265","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820012699542 VALVE,CHECK; source controlled drawing item"}
+{"id":"r6-0266","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"requirements for manufacture of the VALVE ASSEMBLY PSC 4820"}
+{"id":"r6-0267","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820014906003 VALVE,SAFETY RELIEF; Approved sources are 1KWT0 062090"}
+{"id":"r6-0268","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4810014647801 COVER PLATE,VALVE; Approved source is 1QZK3 060-21-01"}
+{"id":"r6-0269","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"Contracted Residential Services; sole source contract with Veterans Changing Services"}
+{"id":"r6-0270","label":"NO","role":"NONE","restriction":"NONE","evidence":"Parts kit for size 1/2 inch Ball Valve; ship valve not aircraft part"}
+{"id":"r6-0271","label":"NO","role":"NONE","restriction":"NONE","evidence":"INTERFACE UNIT,AUTO PSC 7E20; item type not an identified component"}
+{"id":"r6-0273","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"purchase of one Control power Transformer and three Transformer fuses including installation"}
+{"id":"r6-0274","label":"NO","role":"NONE","restriction":"NONE","evidence":"Turnout Buildings construction; valves only a lump-sum construction line"}

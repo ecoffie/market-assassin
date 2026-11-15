@@ -1,0 +1,35 @@
+{"id":"r6-0423","label":"FIT","role":"PRIME","restriction":"SOLE_SOURCE","evidence":"66--ANION GUARD COLUMN, NSN 6640-016544351, negotiate with only one source"}
+{"id":"r6-0424","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"Nanopositioners and Motion Controllers on brand name only basis"}
+{"id":"r6-0426","label":"NO","role":"NONE","restriction":"NONE","evidence":"Verizon Dedicated T1 Circuit and TLS Line Service"}
+{"id":"r6-0427","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 2840015822796NZ ROTOR,COMPRESSOR,AI P/N 4089065-701 Tinker AFB"}
+{"id":"r6-0428","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"48--VLV, REGUL PRESSURE, FSC 4820 valve solicitation"}
+{"id":"r6-0430","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"STEM,FLUID VALVE, FSC 4820 Navy replacement part solicitation"}
+{"id":"r6-0431","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"48--ACTUATOR,HYDRAULIC-- AND SIMILAR REPLACEMENT PARTS"}
+{"id":"r6-0432","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"43--HEAD,FLUID FILTER, FSC 4330 Navy spare part"}
+{"id":"r6-0433","label":"FIT","role":"PRIME","restriction":"SOLE_SOURCE","evidence":"MH-65 SPARE PARTS, Sole Source basis to Airbus Helicopters, Inc."}
+{"id":"r6-0434","label":"NO","role":"NONE","restriction":"NONE","evidence":"performance-based environmental remediation activities at IRP and MMRP sites"}
+{"id":"r6-0436","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PRINTED WIRING BOARD KC-46 NSN 5998016525319KT PN 285T0458-203"}
+{"id":"r6-0437","label":"FIT","role":"PRIME","restriction":"BRAND_NAME","evidence":"limited source/brand name Temperature Sensors P/N STLM20DD9F STMicroelectronics"}
+{"id":"r6-0438","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"59--CABLE ASSEMBLY NSN 1H-5930-015466868-D4, QTY 11 EA"}
+{"id":"r6-0439","label":"NO","role":"NONE","restriction":"NONE","evidence":"brand-new, non-refurbished Industrial Computed Tomography (CT) Scanner System"}
+{"id":"r6-0440","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"16--SOCKET RCPT HOUSING, made new manufacture spare parts"}
+{"id":"r6-0443","label":"NO","role":"NONE","restriction":"NONE","evidence":"construction contract Install above ground fuel tanks at FMC Rochester"}
+{"id":"r6-0444","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PARTS KIT,BALL VALV, FSC 4820 Navy solicitation"}
+{"id":"r6-0445","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"DISK,VALVE, FSC 4820 Navy solicitation QTY 31"}
+{"id":"r6-0446","label":"NO","role":"NONE","restriction":"NONE","evidence":"53--KEY, FSC 5315 ship part, not IT hardware"}
+{"id":"r6-0448","label":"NO","role":"NONE","restriction":"NONE","evidence":"medical courier services pickup, transportation, and delivery of laboratory specimens"}
+{"id":"r6-0449","label":"NO","role":"NONE","restriction":"NONE","evidence":"Replace Electrical Panels & Expand Distribution construction at VAMC"}
+{"id":"r6-0450","label":"NO","role":"NONE","restriction":"NONE","evidence":"Stem for size 2 Inch ball valve per Newport News Shipbuilding Drawings"}
+{"id":"r6-0454","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 1660-99-133-7851FW PN 3478W000-001 Concentrator, Oxygen"}
+{"id":"r6-0455","label":"NO","role":"NONE","restriction":"NONE","evidence":"PLATE ASSEMBLY,STAU FSC 5340 ship hardware, not IT"}
+{"id":"r6-0456","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 4820004830682 VALVE,CHECK Qty 165; all responsible sources may quote"}
+{"id":"r6-0457","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Brand Name or Equal NETZSCH Dilatometer DIL 502 Expedis Supreme"}
+{"id":"r6-0458","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5305015015747 SCREW,CAP,HEXAGON HEAD; Approved source is 75Q65 61367AX"}
+{"id":"r6-0460","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4810015590794 VALVE,LINEAR,DIRECTION; Approved sources are 1CC11 K-00148"}
+{"id":"r6-0461","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820015229560 VALVE,BALL; Approved source is 11859 D2479PJ-E"}
+{"id":"r6-0462","label":"NO","role":"NONE","restriction":"NONE","evidence":"100 kW High-Temperature Chamber Furnace with installation at NETL"}
+{"id":"r6-0463","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5998012591868 CIRCUIT CARD ASSEMBLY; Approved source is 63183 1358-AD2-08050"}
+{"id":"r6-0464","label":"NO","role":"NONE","restriction":"NONE","evidence":"16--CHOPPER ASSEMBLY,ED, IN REPAIR/MODIFICATION OF"}
+{"id":"r6-0466","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5998991318340 CIRCUIT CARD ASSEMBLY; Approved sources are U4122 65801806"}
+{"id":"r6-0467","label":"NO","role":"NONE","restriction":"NONE","evidence":"RRC Services residential reentry and home confinement"}
+{"id":"r6-0468","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820012244578 VALVE,CHECK; Approved source is 11859 D3948"}

@@ -1,0 +1,35 @@
+{"id":"r6-0000","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CABLE ASSEMBLY,SPEC PSC 6150 wire and cable assembly"}
+{"id":"r6-0001","label":"NO","role":"NONE","restriction":"NONE","evidence":"GOCO fuel services at NAS Corpus Christi, services not medical supplies"}
+{"id":"r6-0003","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"5935-01-678-7255 SWA5 MK48 Torpedo Receptacle (Ethernet) connector"}
+{"id":"r6-0004","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Heat Exchanger PSC 1660 aircraft component solicitation"}
+{"id":"r6-0005","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"48--VALVE,BALL 1.000NPS PSC 4820 Complete 1 inch Ball Valve"}
+{"id":"r6-0006","label":"NO","role":"NONE","restriction":"NONE","evidence":"Mercedes Actros service contract, repair and maintenance service plan"}
+{"id":"r6-0007","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"6515 Prosthetic O2 Equipment HOME OXYGEN SUPPLIES"}
+{"id":"r6-0009","label":"FIT","role":"PRIME","restriction":"SOLE_SOURCE","evidence":"Differential Scanning Calorimeter PSC 6640 notice of intent to sole source"}
+{"id":"r6-0010","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"53--HELICAL SPRING PSC 5360 Navy supply solicitation"}
+{"id":"r6-0011","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5310011376955 NUT,PLAIN,EXTENDED Approved sources 56878 FNW12-524"}
+{"id":"r6-0012","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CIRCUIT CARD ASSEMB PSC 5998 solicitation"}
+{"id":"r6-0013","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 6150014900632 CABLE ASSEMBLY,THERMOC Approved source 00060"}
+{"id":"r6-0014","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5305015412554 SCREW,CAP,SOCKET HEAD Approved sources 17283"}
+{"id":"r6-0015","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820014091232 VALVE,CHECK Approved source 86184 1407901G"}
+{"id":"r6-0017","label":"NO","role":"NONE","restriction":"NONE","evidence":"Industrial Wastewater Treatment Plant Upgrades construction project"}
+{"id":"r6-0018","label":"NO","role":"NONE","restriction":"NONE","evidence":"NRP airstair replacement parts, IN REPAIR/MODIFICATION OF; repair inducted"}
+{"id":"r6-0020","label":"NO","role":"NONE","restriction":"NONE","evidence":"CIRCUIT CARD ASSEMB, IN REPAIR/MODIFICATION; This RFQ is for repair"}
+{"id":"r6-0021","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5320017242668 RIVET,BLIND Approved source 11815 CR3853-4-6"}
+{"id":"r6-0022","label":"FIT","role":"PRIME","restriction":"UNCLEAR","evidence":"NSN 2840-01-357-1941 AUGMENTOR NOZZLE SE TOP special notice"}
+{"id":"r6-0023","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820011136739 VALVE,REGULATOR Approved source 28510"}
+{"id":"r6-0024","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5305011550063 SCREW,CAP,HEXAGON HEAD Approved source 56161 10501627"}
+{"id":"r6-0025","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"6515--Reprocessed Non-Critical Single Use Devices MSPV supplies RFQ"}
+{"id":"r6-0027","label":"NO","role":"NONE","restriction":"NONE","evidence":"Locum Anesthesiology Physician Services sources sought"}
+{"id":"r6-0028","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"DAMPER ASSY PSC 1615 solicitation, warranty of supplies"}
+{"id":"r6-0030","label":"NO","role":"NONE","restriction":"NONE","evidence":"PUMP,CENTRIFUGAL replacement parts, IN REPAIR/MODIFICATION OF"}
+{"id":"r6-0031","label":"NO","role":"NONE","restriction":"NONE","evidence":"Service Contract for the BD FACS ARIA FUSION maintenance"}
+{"id":"r6-0032","label":"NO","role":"NONE","restriction":"NONE","evidence":"Switchgear and ATS Investigation and Repair Service"}
+{"id":"r6-0033","label":"NO","role":"NONE","restriction":"NONE","evidence":"Senior Leader Logistics Symposium industry engagement special notice"}
+{"id":"r6-0034","label":"NO","role":"NONE","restriction":"NONE","evidence":"Industry Day Lima Peru construction, Callao Naval Base"}
+{"id":"r6-0035","label":"NO","role":"NONE","restriction":"NONE","evidence":"Fire Suppression System Installation and Obsolete Fire Bottle Replacement services"}
+{"id":"r6-0036","label":"NO","role":"NONE","restriction":"NONE","evidence":"53--HELICAL SPRING, not computer hardware"}
+{"id":"r6-0037","label":"NO","role":"NONE","restriction":"NONE","evidence":"Medical Linen Rental and Laundry Service"}
+{"id":"r6-0038","label":"NO","role":"NONE","restriction":"NONE","evidence":"DISPLAY UNIT,HELMET firm fixed price repair purchase orders"}
+{"id":"r6-0039","label":"NO","role":"NONE","restriction":"NONE","evidence":"59--CIRCUIT CARD ASSEMB, IN REPAIR/MODIFICATION OF"}
+{"id":"r6-0042","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"F-16 Flaperon 32 EA of NSN 1560-01-205-8437WF"}
