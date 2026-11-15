@@ -257,7 +257,7 @@ export function dualBuyerOrExpr(depCol: string, subCol: string, needles: string[
  *  - Codes: SAM PSC/FSC manual and NAICS 2022, specific codes only (no 2-digit FSC group, no NAICS family).
  */
 /** relatedPsc (trades only): adjacent codes that RETRIEVE a notice as RELATED (never DIRECT), like a product preset's codes. */
-type CodePreset = { id: string; label: string; match: RegExp; naics: string[]; psc: string[]; vocab: string[]; relatedPsc?: string[] };
+type CodePreset = { id: string; label: string; match: RegExp; naics: string[]; psc: string[]; vocab: string[]; relatedPsc?: string[]; vocabInDescription?: boolean };
 export const TRADE_PRESETS: CodePreset[] = [
   {
     id: 'guards', label: 'Security guard services',
@@ -357,6 +357,16 @@ export const PRODUCT_PRESETS: CodePreset[] = [
     vocab: ['pharmaceutical', 'pharmaceuticals', 'injector', 'tablets', 'capsules'],
   },
   {
+    // P2 (2026-11-15, expert misses; dev only): Eric judged DLA NSN item buys Direct for a replacement-parts supplier
+    // ("48--VALVE,THROTTLE", "31--BEARING,BALL,ANNULA"); they never say "replacement parts", only "NSN …". No codes (P1,
+    // FSC 10-59, flooded the window and was rejected): vocabulary only, searched in title AND description.
+    id: 'replacement_parts', label: 'Replacement and spare parts',
+    match: /\b(?:replacement|spare|repair)\s+parts\b/i,
+    naics: [], psc: [],
+    vocab: ['replacement parts', 'spare parts', 'repair parts', 'nsn', 'national stock number'],
+    vocabInDescription: true,
+  },
+  {
     id: 'medical_supplies', label: 'Medical, dental and laboratory supplies',
     match: /\b(?:medical|surgical|dental|laboratory|lab)\b[^.]{0,40}\b(?:supplies|consumables)\b/i,
     naics: [], psc: ['6510', '6515', '6520', '6532', '6540', '6545', '6550', '6640'],
@@ -401,7 +411,7 @@ function codePresetInterpretation(
       reason: `Customer phrase names ${names}. Trade codes are the trade's own; product codes only retrieve.`,
       ...(tradeVocab.length || productVocab.length ? { vocab: uniq([...tradeVocab, ...productVocab]) } : {}),
       // Product item nouns live in the TITLE (DLA "NOUN,MODIFIER"); a trade phrase may be in the description.
-      vocabCols: trades.length ? ['title', 'description'] : ['title'],
+      vocabCols: trades.length || products.some((p) => p.vocabInDescription) ? ['title', 'description'] : ['title'],
     },
     related_market: products.length
       ? {
