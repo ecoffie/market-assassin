@@ -72,7 +72,9 @@ node scripts/ask-mindy-b2-browser-acceptance.mjs \
   --expect-email <synthetic Pro test account> --budget-usd 5
 ```
 1. Opens a visible Chrome-for-Testing window with a throwaway profile at `<preview>/app`.
-2. A person signs in with the synthetic Pro account through the normal Mindy login.
+2. A person signs in with the synthetic Pro account through the normal Mindy login — or `--credentials-file <600 JSON>`
+   types the email + password into that same normal form, submitted once. If the login answers `mfaRequired`, the run
+   stops at once (no retry, no code read or entered). The password is never printed, logged or written.
 3. The script checks inside the page that the session is `--expect-email`, and refuses to run otherwise.
 4. All 8 questions run from inside the page with the page's own session, under 4 configurations selected by the
    preview-only header `x-ask-mindy-staging-config` (`current`, `terra`, `fallback-luna`, `fallback-groq`;

@@ -7,6 +7,7 @@
  * charge for failures or Pro, free replay of a saved answer, and session ownership.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { customerErrorMessage } from '@/lib/chat/customer-errors';
 
 const NID = '6ba812a7e0284f79bc44c4932777c340';
 const ME = 'free@example.com';
@@ -425,7 +426,10 @@ describe('B2 × charge-once (integration with #2049)', () => {
     const { events } = await post(card);
     const err = events.find((e) => e.type === 'error');
     expect(err?.code).toBe('answer_unavailable');
-    expect(JSON.stringify(events)).not.toMatch(/model_decommissioned|req_LEAK|404/);
+    // The customer sees the fixed message, exactly. (A bare /404/ over the whole event stream
+    // also matched random turn UUIDs, ~0.7% of runs.)
+    expect(err?.message).toBe(customerErrorMessage('answer_unavailable'));
+    expect(JSON.stringify(events)).not.toMatch(/model_decommissioned|req_LEAK|AI 404|"status":404/);
     expect(completeCardTurn).not.toHaveBeenCalled();
     expect(turns.get(TURN)?.status).toBe('failed');
   });

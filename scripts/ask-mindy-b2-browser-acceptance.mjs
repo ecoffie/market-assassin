@@ -5,11 +5,19 @@
  *   node scripts/ask-mindy-b2-browser-acceptance.mjs \
  *     --base https://market-assassin-git-fix-ask-mindy-b2-eric-coffies-projects.vercel.app \
  *     --expect-email <synthetic Pro test account> \
+ *     [--credentials-file <path to {"email","password"} JSON, chmod 600>]
  *     [--configs current,terra,fallback-luna,fallback-groq] [--budget-usd 5] [--out results.json]
  *
  * How authentication works (no forged tokens, no signing secrets):
  *  1. Opens a VISIBLE Chrome-for-Testing window with a fresh, throwaway profile at <base>/app.
- *  2. A person signs in through Mindy's normal login flow in that window.
+ *  2. A person signs in through Mindy's normal login flow in that window — OR, with
+ *     --credentials-file, the script types the email + password into that SAME normal sign-in form.
+ *     The form is submitted exactly ONCE (no retries). If the login answers mfaRequired (the page
+ *     switches to the emailed-code step), the run STOPS immediately: no code is read, entered or
+ *     worked around. The login response is never read in Node (it carries the session token);
+ *     the mfaRequired outcome is detected from the page's own code step.
+ *     The password is read from the file only to type it into the form; it is never printed,
+ *     logged, written, or included in an error message.
  *  3. The script waits until the page holds a session, checks (in the page) that its account is
  *     --expect-email, and refuses to run otherwise.
  *  4. Every question is sent FROM THE PAGE with the page's own session headers. The token is read
@@ -20,7 +28,7 @@
  * header (src/lib/chat/staging-model-config.ts) — honored only on a traced preview, never production.
  * Refuses production hosts. Stops before the next question once estimated spend reaches --budget-usd.
  */
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import puppeteer from 'puppeteer';
@@ -33,6 +41,43 @@ const configs = String(arg('configs', 'current,terra,fallback-luna,fallback-groq
 const budget = Number(arg('budget-usd', '5'));
 const out = arg('out', 'ask-mindy-b2-browser-acceptance.json');
 const PER_TURN_RESERVE_USD = 0.25; // never start a turn that could cross the cap
+const credentialsFile = arg('credentials-file', '');
+
+// Reads {email, password}. Refuses a file readable by group/other, or one naming another account.
+// Never echoes the password: every error below names the file, not its contents.
+function loadCredentials(path) {
+  const mode = statSync(path).mode & 0o777;
+  if (mode & 0o077) throw new Error(`Refusing ${path}: permissions ${mode.toString(8)}; must be 600.`);
+  let c; try { c = JSON.parse(readFileSync(path, 'utf8')); } catch { throw new Error(`Could not parse ${path} as JSON.`); }
+  const email = String(c?.email || '').toLowerCase().trim();
+  const password = typeof c?.password === 'string' ? c.password : '';
+  if (!email || !password) throw new Error(`${path} must contain "email" and "password".`);
+  if (email !== expectEmail) throw new Error(`${path} names a different account than --expect-email; refusing.`);
+  return { email, password };
+}
+
+// Types into Mindy's normal sign-in form. Returns nothing; the session check below decides success.
+async function typeIntoSignInForm(page, creds) {
+  // The /app sign-in may open on another step (e.g. a magic-link view); offer the password form.
+  const pw = await page.waitForSelector('input[name="password"]', { visible: true, timeout: 20000 }).catch(() => null);
+  if (!pw) {
+    const clicked = await page.evaluate(() => {
+      const b = [...document.querySelectorAll('button')].find((x) => /password/i.test(x.textContent || ''));
+      if (b) { b.click(); return true; } return false;
+    });
+    if (!clicked) throw new Error('Normal sign-in form (email + password) not found on the page.');
+    await page.waitForSelector('input[name="password"]', { visible: true, timeout: 15000 });
+  }
+  const emailInput = await page.$('form input[name="email"]');
+  if (!emailInput) throw new Error('Sign-in email field not found.');
+  await emailInput.click({ clickCount: 3 }); await emailInput.type(creds.email, { delay: 15 });
+  const pwInput = await page.$('form input[name="password"]');
+  await pwInput.click({ clickCount: 3 }); await pwInput.type(creds.password, { delay: 15 });
+  await page.evaluate(() => { const i = document.querySelector('form input[name="password"]'); i?.closest('form')?.requestSubmit(); });
+}
+
+// Runs IN THE PAGE. True when the normal flow is asking for the emailed one-time code.
+function pageWantsSecondFactor() { return !!document.querySelector('input[autocomplete="one-time-code"]'); }
 
 if (!base || !expectEmail) { console.error('Usage: --base <preview url> --expect-email <synthetic Pro account>'); process.exit(2); }
 if (/getmindy\.ai|govcongiants\.com/i.test(base) || !/\.vercel\.app$/i.test(new URL(base).host)) {
@@ -87,15 +132,32 @@ async function pageBalance(email) {
 }
 
 async function main() {
+  const creds = credentialsFile ? loadCredentials(credentialsFile) : null;
   const profile = mkdtempSync(join(tmpdir(), 'ask-mindy-b2-profile-'));
   const browser = await puppeteer.launch({ headless: false, userDataDir: profile, defaultViewport: null, args: ['--no-first-run', '--no-default-browser-check'] });
   try {
     const page = (await browser.pages())[0] || await browser.newPage();
     await page.goto(`${base}/app`, { waitUntil: 'domcontentloaded' });
-    console.log(`\nSign in as ${expectEmail} in the browser window that just opened (normal Mindy login). Waiting up to 10 minutes…`);
-    let email = null;
-    for (let i = 0; i < 300 && !email; i++) { await new Promise((r) => setTimeout(r, 2000)); email = await page.evaluate(pageSessionEmail).catch(() => null); }
-    if (!email) throw new Error('No session after 10 minutes.');
+    if (creds) {
+      console.log(`\nSigning in as ${expectEmail} through the normal sign-in form (credentials file; password not shown)…`);
+      await typeIntoSignInForm(page, creds);
+    } else {
+      console.log(`\nSign in as ${expectEmail} in the browser window that just opened (normal Mindy login). Waiting up to 10 minutes…`);
+    }
+    let email = null; let secondFactorNoted = false;
+    const polls = creds ? 45 : 300; // credentials: one submit, ~90s to settle; manual: 10 minutes
+    for (let i = 0; i < polls && !email; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      email = await page.evaluate(pageSessionEmail).catch(() => null);
+      if (!email && await page.evaluate(pageWantsSecondFactor).catch(() => false)) {
+        if (creds) throw new Error('STOP: login answered mfaRequired (emailed-code step shown) after the single sign-in attempt. Not retried, no code read or entered.');
+        if (!secondFactorNoted) { secondFactorNoted = true; console.log('Second factor requested: enter the emailed 6-digit code in the browser window. Waiting…'); }
+      }
+    }
+    if (!email) {
+      const shownError = creds ? await page.evaluate(() => [...document.querySelectorAll('[class*="red"]')].map((e) => e.textContent?.trim()).filter(Boolean).slice(0, 2).join(' | ')).catch(() => '') : '';
+      throw new Error(creds ? `No session after the single sign-in attempt; not retried.${shownError ? ` Page said: ${shownError.slice(0, 160)}` : ''}` : (secondFactorNoted ? 'Second factor not completed within 10 minutes; stopping.' : 'No session after 10 minutes.'));
+    }
     if (email !== expectEmail) throw new Error(`Signed in as a different account than --expect-email; refusing to run.`);
     console.log(`Session detected for ${email}. Running ${configs.length} configuration(s) × ${QUESTIONS.length} questions, cap $${budget}.\n`);
     const balanceBefore = await page.evaluate(pageBalance, email);
