@@ -56,3 +56,29 @@ recommended ahead of J.
 ## 5. What stays failing
 
 Gate A2 (long paragraphs return results) fails until J or E ships. The "too long" message is honest handling, not a pass.
+
+## 6. Integration (RC3 branch, development only; flag `OPEN_SNAPSHOT_RETRIEVAL` off)
+
+Built: `open-cache.ts` (`buildOpenSnapshot`, `compileOps`, `CachedOpenQuery`, `openQueryFactory`, `currentOpenSnapshot`) and
+FIND wiring (`queryOpenNow` → `openQ`). Commits `cf8a04690`, `ea5870d46`.
+
+| Requirement (Eric) | How it is met | Evidence |
+|---|---|---|
+| No migration | none; one route now stamps `description_checked_at` | `cf8a04690` |
+| Source freshness + notice identity | rows always come from the live DB (by id); snapshot only proposes candidates | integration tests |
+| Customer filters | the plan's own ops (closed parser) in memory; structured filters + caller chains run live | parity on 17/17 live searches |
+| Never substitute stale / incomplete | complete-or-refuse build; age ≤ 6 h; > 1,500 changed rows → SQL; changed rows always via SQL | unit + integration tests |
+| Timeout vs partial vs zero | cache unavailable → SQL (timeout → "too long"); part error → error; genuine zero → 0 | tests |
+| Updates / deletes / new notices | delta (stamped changes) + by-id verification (deletes) | integration tests |
+| Concurrency / failures | single-flight build; 20 parallel queries; verify error, overflow, unknown method | integration tests |
+| Latency | 0.9–2.5 s on all 28 phrasings (SQL: 1.3–6 s, 11 timeouts) | `harness/cache-bench.mts` |
+| Memory / cost | parse 0.25 s, +~220 MB heap (RSS 470 MB measured); 20.5 MB gzip per build; ~3–4 builds/day | measured |
+
+**Agent 5's first review (2026-11-14), pending full review after their P0:** store a cron-built snapshot in a PRIVATE
+Supabase Storage bucket (service-role only; assert the policy, since default grants recently exposed objects); a
+`cron_jobs` row after each SAM sync, verified via `cron_job_runs.http_status` and recording age + row count; Map viewport
+wiring in a separate PR after FIND is proven; confirm function memory for ~0.5 GB. Blocker: the matcher path is the one
+#2043 would make alerts inherit, so Agent 4 must evaluate the same SHA, and the flag stays off.
+
+**Not built (needs approval):** the storage bucket and its policy, the `cron_jobs` row, the snapshot-writer cron route,
+Map wiring, any flag flip.
