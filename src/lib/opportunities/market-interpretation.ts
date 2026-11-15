@@ -282,7 +282,8 @@ export const TRADE_PRESETS: CodePreset[] = [
     id: 'hvac', label: 'HVAC maintenance and repair',
     match: /\b(hvac|heating,?\s+ventilation|air\s+conditioning|chillers?|boilers?)\b/i,
     naics: ['238220'], psc: ['J041'],
-    vocab: ['hvac', 'chiller', 'chillers', 'boiler', 'boilers', 'air conditioning'],
+    // H1 (2026-11-15, expert misses): Eric-Direct CRAC replacement says "Computer Room Air Conditioner", never "air conditioning".
+    vocab: ['hvac', 'chiller', 'chillers', 'boiler', 'boilers', 'air conditioning', 'air conditioner', 'air conditioners'],
   },
   {
     // RC3 (Agent 4 v7: nursing below 40% on both forms; incidental "Nursing Practice Oversight Course", nurse-call
