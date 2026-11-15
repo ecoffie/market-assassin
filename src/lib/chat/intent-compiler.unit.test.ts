@@ -190,3 +190,34 @@ describe('map-view preamble states (2026-11-15)', () => {
     expect(splitViewPreamble('Which agencies buy the most?')).toEqual({ view: null, rest: 'Which agencies buy the most?' });
   });
 });
+
+describe('map industry filter in the view preamble (2026-11-15 follow-up)', () => {
+  const VIEW_NAICS = '[Current map view — 40 Open Now opps in view; NAICS 236220. Location: the map is filtered to CA. Answer ...]\n\n';
+
+  it('NAICS from the map filter is the MAP\'s, not the customer\'s', () => {
+    const c = compileIntent(`${VIEW_NAICS}Which contracts expire in the next 12 months here?`);
+    expect(c).toMatchObject({ capabilityCodes: ['236220'], capabilitySource: 'map_filter' });
+  });
+  it('a comma list in the filter is kept whole', () => {
+    const c = compileIntent('[Current map view — 9 opps in view; NAICS 236220,238210. Location: unknown ...]\n\nWhat expires soon here?');
+    expect(c.capabilityCodes).toEqual(['236220', '238210']);
+  });
+  it('enforced note says "from your map\'s industry filter", never "for the work you named"', () => {
+    const e = enforceIntent('get_expiring_contracts', '{"months_window":12}', compileIntent(`${VIEW_NAICS}Which contracts expire in the next 12 months here?`));
+    expect(JSON.parse(e.args).naics).toBe('236220');
+    expect(e.applied).toContain("industry codes 236220 from your map's industry filter");
+    expect(e.applied.join(' ')).not.toMatch(/for the work you named/);
+    expect(isMapScopeNote("industry codes 236220 from your map's industry filter")).toBe(true);
+  });
+  it('codes the customer typed keep "for the work you named" and win over the map', () => {
+    const c = compileIntent(`${VIEW_NAICS}Which NAICS 561720 contracts expire in the next 12 months?`);
+    expect(c).toMatchObject({ capabilityCodes: ['561720'], capabilitySource: 'request' });
+    const e = enforceIntent('get_expiring_contracts', '{"months_window":12}', c);
+    expect(e.applied.join(' ')).toMatch(/industry codes 561720 for the work you named/);
+    expect(isMapScopeNote(e.applied.find((n) => n.startsWith('industry codes'))!)).toBe(false);
+  });
+  it('without a preamble nothing changes', () => {
+    expect(compileIntent('Which NAICS 561720 contracts expire soon?')).toMatchObject({ capabilityCodes: ['561720'], capabilitySource: 'request' });
+    expect(compileIntent('How do I write a capability statement?')).toMatchObject({ capabilityCodes: [], capabilitySource: null });
+  });
+});
