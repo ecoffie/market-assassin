@@ -21,6 +21,8 @@ import {
 } from '@/lib/opportunities/market-interpretation';
 import {
   OPEN_FETCH_CAP,
+  OPEN_CODE_WINDOW_CAP,
+  openCodeWindowPsc,
   classifyOpenRecord,
   type OpenRelevanceClass,
   openEvidenceWhy,
@@ -951,7 +953,17 @@ async function queryOpenNow(
         .limit(fetchCap);
       if (!base.error) baseRows = (base.data || []) as Array<Record<string, unknown>>;
     }
-    const rows = unionRows(baseRows, (data || []) as Array<Record<string, unknown>>, 'notice_id');
+    let rows = unionRows(baseRows, (data || []) as Array<Record<string, unknown>>, 'notice_id');
+    // Code-recall sub-window (open-relevance.ts openCodeWindowPsc): the product preset's own coded notices, drawn
+    // separately (same plan, same stage, AND psc_code in the preset's codes, so a subset of the matched set) and appended
+    // after the deadline window. If it fails, the deadline window alone is used, exactly as before.
+    const codeWin = openCodeWindowPsc(cap);
+    if (codeWin.length && (data || []).length >= fetchCap) {
+      const cw = await inStage(openQ(COLS)).in('psc_code', codeWin)
+        .order('response_deadline', { ascending: true, nullsFirst: false })
+        .limit(OPEN_CODE_WINDOW_CAP);
+      if (!cw.error) rows = unionRows(rows, (cw.data || []) as Array<Record<string, unknown>>, 'notice_id');
+    }
     if (!rows.length) {
       const e = emptyHorizon(source, OPEN_HANDOFFS, consumed, unsupported, asOf, stage ? `No matching open ${STAGE_GROUP_LABEL[stage]} notices under these filters.` : 'No matching open solicitations under these filters.', unmapped);
       return stageInfo ? { ...e, stage: { ...stageInfo, returned_by_signal: { structured_notice_type: 0, title_keyword: 0 } } } : e;

@@ -121,6 +121,21 @@ export function openProductPsc(cap: CapabilityInterpretation): string[] {
   return [...(cap.related_market?.psc || [])];
 }
 
+/**
+ * CODE-RECALL SUB-WINDOW (Agent 3, 2026-11-15; IT long diagnosis). FIND draws its candidates as the first
+ * OPEN_FETCH_CAP matched notices by deadline and ranks AFTER that. On a long description the text matcher admits so much
+ * ("monitors" → "monitoring" in requirement text: 492 rows) that the window closed after 5 days of deadlines and 58 of 77
+ * IT-coded notices never reached ranking. For a product preset, the notices filed under its OWN specific FSC codes are
+ * therefore also drawn as a separately capped set and appended to the candidates. They are already in the matched set
+ * (code recall is part of it), so the matched set and the count do not change; only which matched rows get ranked.
+ * Product presets only; specific 4-character codes only.
+ */
+export const OPEN_CODE_WINDOW_CAP = 200;
+export function openCodeWindowPsc(cap: CapabilityInterpretation): string[] {
+  if (!(cap.codePresets?.products || []).length) return [];
+  return [...new Set(openProductPsc(cap).filter((c) => /^[0-9A-Z]{4}$/.test(c)))];
+}
+
 export function pscMatchConds(codes: string[]): string[] {
   return codes
     .map((c) => String(c).trim())
