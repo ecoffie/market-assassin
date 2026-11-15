@@ -32,6 +32,8 @@ own code. It is research tooling only and is not wired into the app.
 
 ## Commands
 
+> **The runner file must sit inside a checkout that has `node_modules`** (this branch's worktree, or a copy placed inside the tag checkout). Run from a copy outside any checkout, `dump` cannot resolve `@supabase/supabase-js`. Agent 4 hit this during validation, 2026-11-15.
+
 Run each command from inside the tag checkout, so that its `tsconfig.json` resolves the `@/…` imports:
 
 ```bash
