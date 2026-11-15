@@ -46,7 +46,7 @@ describe('renderSafeMarkdown: XSS', () => {
     const b = dom.window.document.getElementById('b')!;
     const bad: string[] = [];
     b.querySelectorAll('*').forEach((el) => {
-      if (!['P', 'BR', 'STRONG', 'EM', 'CODE', 'UL', 'OL', 'LI', 'A', 'DIV'].includes(el.tagName)) bad.push(`tag ${el.tagName}`);
+      if (!['P', 'BR', 'STRONG', 'EM', 'CODE', 'UL', 'OL', 'LI', 'A', 'DIV', 'TABLE', 'THEAD', 'TBODY', 'TR', 'TH', 'TD'].includes(el.tagName)) bad.push(`tag ${el.tagName}`);
       for (const attr of Array.from(el.attributes)) {
         if (/^on/i.test(attr.name)) bad.push(`attr ${attr.name}`);
         if (attr.name === 'href' && !/^https?:\/\//i.test(attr.value)) bad.push(`href ${attr.value}`);
@@ -74,6 +74,11 @@ describe('renderSafeMarkdown: XSS', () => {
     ['entity smuggling', '[x](&#106;avascript:alert(1))'],
     ['placeholder smuggling', 'a\u00000\u0000b [x](https://ok.gov)'],
     ['backtick break-out', '`</code><script>alert(1)</script>`'],
+    ['table cell script', '| a | b |\n|---|---|\n| <script>alert(1)</script> | <img src=x onerror=alert(1)> |'],
+    ['table cell javascript: link', '| a |\n|---|\n| [x](javascript:alert(1)) |'],
+    ['table header markup', '| <svg onload=alert(1)> | b |\n|---|---|\n| 1 | 2 |'],
+    ['table cell attribute injection', '| [x](https://ok.gov/" onclick="alert(1)) |\n|---|\n| y |'],
+    ['table closing-tag break-out', '| </td></tr></table><script>alert(1)</script> |\n|---|\n| y |'],
   ])('%s produces no executable markup', (_n, payload) => {
     const html = md(payload);
     expect(dangerous(html)).toEqual([]);
@@ -94,5 +99,40 @@ describe('SAFE_MARKDOWN_SCRIPT (the browser copy the map page ships)', () => {
     for (const s of ['### H\n- **a** [x](https://sam.gov/x)', '<script>alert(1)</script>', '[x](javascript:alert(1))']) {
       expect(browserMd(s)).toBe(md(s));
     }
+  });
+});
+
+describe('renderSafeMarkdown: GFM tables', () => {
+  it('a recompete table renders with a header and body rows; cells keep inline formatting and links', () => {
+    const t = 'Coming back:\n\n| Holder | Value | Ends | Notice |\n|---|---:|:---:|---|\n| **Acme Facility** | $1.2M | 2027-03-31 | [SAM](https://sam.gov/opp/1/view) |\n| Beta LLC | $400K | 2027-06-30 | \u2014 |\n\nafter';
+    const html = md(t);
+    expect(html).toBe('<p>Coming back:</p><div class="md-table"><table><thead><tr><th>Holder</th><th>Value</th><th>Ends</th><th>Notice</th></tr></thead><tbody>'
+      + '<tr><td><strong>Acme Facility</strong></td><td>$1.2M</td><td>2027-03-31</td><td><a href="https://sam.gov/opp/1/view" target="_blank" rel="noopener noreferrer">SAM</a></td></tr>'
+      + '<tr><td>Beta LLC</td><td>$400K</td><td>2027-06-30</td><td>\u2014</td></tr></tbody></table></div><p>after</p>');
+  });
+  it('rows without outer pipes, and short rows padded to the header width', () => {
+    expect(md('A | B\n--- | ---\n1 | 2\n| 3 |')).toBe('<div class="md-table"><table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr><tr><td>3</td><td></td></tr></tbody></table></div>');
+    // A line with no pipe at all ends the table (it is prose, not a row).
+    expect(md('| A |\n|---|\n| 1 |\nplain line')).toBe('<div class="md-table"><table><thead><tr><th>A</th></tr></thead><tbody><tr><td>1</td></tr></tbody></table></div><p>plain line</p>');
+  });
+  it('a header with no body rows still renders the header', () => {
+    expect(md('| A | B |\n|---|---|')).toBe('<div class="md-table"><table><thead><tr><th>A</th><th>B</th></tr></thead><tbody></tbody></table></div>');
+  });
+  it('a line with a pipe but no separator row is prose, not a table', () => {
+    expect(md('Open now | Coming back | Coming soon')).toBe('<p>Open now | Coming back | Coming soon</p>');
+  });
+  it('extra cells beyond the header are dropped (column count = header)', () => {
+    expect(md('| A |\n|---|\n| 1 | 2 | 3 |')).toBe('<div class="md-table"><table><thead><tr><th>A</th></tr></thead><tbody><tr><td>1</td></tr></tbody></table></div>');
+  });
+  it('a table followed by a list keeps both', () => {
+    const html = md('| A |\n|---|\n| 1 |\n\n- next');
+    expect(html).toContain('</table></div><ul><li>next</li></ul>');
+  });
+  it('the browser copy renders tables identically', () => {
+    const dom = new JSDOM('<!doctype html><body></body>', { runScripts: 'outside-only' });
+    dom.window.eval(SAFE_MARKDOWN_SCRIPT.replace(/^<script>/, '').replace(/<\/script>$/, ''));
+    const browserMd = (dom.window as unknown as { __mindyMd: (s: string) => string }).__mindyMd;
+    const t = '| Holder | Value |\n|---|---|\n| **Acme** | $1M |';
+    expect(browserMd(t)).toBe(md(t));
   });
 });

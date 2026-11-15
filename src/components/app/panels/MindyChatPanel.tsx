@@ -82,6 +82,10 @@ const MD_CLASSES = [
   '[&_.md-h]:font-semibold [&_.md-h]:text-slate-50 [&_.md-h]:mt-3 [&_.md-h]:mb-1 [&_.md-h:first-child]:mt-0 [&_.md-h1]:text-[16px] [&_.md-h2]:text-[15px] [&_.md-h3]:text-[14.5px]',
   '[&_a]:text-purple-300 [&_a]:underline [&_a]:underline-offset-2 hover:[&_a]:text-purple-200 [&_a]:break-words',
   '[&_code]:font-mono [&_code]:text-[13px] [&_code]:bg-white/5 [&_code]:rounded [&_code]:px-1',
+  // GFM tables (e.g. Coming back recompetes): scroll sideways on narrow screens instead of overflowing.
+  '[&_.md-table]:my-3 [&_.md-table]:overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_table]:text-[13px]',
+  '[&_th]:text-left [&_th]:font-semibold [&_th]:text-slate-100 [&_th]:border-b [&_th]:border-white/15 [&_th]:px-2 [&_th]:py-1.5 [&_th]:whitespace-nowrap',
+  '[&_td]:border-b [&_td]:border-white/5 [&_td]:px-2 [&_td]:py-1.5 [&_td]:align-top',
 ].join(' ');
 
 export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChatPanelProps) {
