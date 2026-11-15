@@ -1,0 +1,741 @@
+{
+ "note": "AI labels, in-sample, diagnostic only; rubric addendum 2026-11-14 applied",
+ "phrasings": {
+  "janitorial|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 2,
+    "hi": 3,
+    "direct": 20,
+    "direct_rel_lo": 2,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 17,
+    "direct": 18,
+    "direct_rel_lo": 17,
+    "classes": {
+     "DIRECT_MATCH": 18,
+     "RELATED_MARKET_CANDIDATE": 2
+    }
+   }
+  },
+  "janitorial|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 7,
+    "direct": 20,
+    "direct_rel_lo": 7,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 13,
+    "hi": 13,
+    "direct": 20,
+    "direct_rel_lo": 13,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   }
+  },
+  "nursing|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 8,
+    "direct": 20,
+    "direct_rel_lo": 6,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 8,
+    "direct": 7,
+    "direct_rel_lo": 2,
+    "classes": {
+     "DIRECT_MATCH": 7,
+     "RELATED_MARKET_CANDIDATE": 13
+    }
+   }
+  },
+  "nursing|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 2,
+    "hi": 4,
+    "direct": 20,
+    "direct_rel_lo": 2,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 6,
+    "direct": 20,
+    "direct_rel_lo": 6,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   }
+  },
+  "hvac|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 17,
+    "direct": 20,
+    "direct_rel_lo": 16,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 19,
+    "direct": 20,
+    "direct_rel_lo": 18,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   }
+  },
+  "hvac|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 16,
+    "direct": 20,
+    "direct_rel_lo": 16,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 17,
+    "direct": 20,
+    "direct_rel_lo": 16,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   }
+  },
+  "guards|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 2,
+    "hi": 2,
+    "direct": 20,
+    "direct_rel_lo": 2,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 10,
+    "hi": 12,
+    "direct": 13,
+    "direct_rel_lo": 10,
+    "classes": {
+     "DIRECT_MATCH": 13,
+     "RELATED_MARKET_CANDIDATE": 7
+    }
+   }
+  },
+  "guards|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 4,
+    "hi": 4,
+    "direct": 20,
+    "direct_rel_lo": 4,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 11,
+    "hi": 13,
+    "direct": 13,
+    "direct_rel_lo": 10,
+    "classes": {
+     "DIRECT_MATCH": 13,
+     "RELATED_MARKET_CANDIDATE": 7
+    }
+   }
+  },
+  "steelbldg|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 3,
+    "hi": 4,
+    "direct": 20,
+    "direct_rel_lo": 3,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 7,
+    "direct": 15,
+    "direct_rel_lo": 4,
+    "classes": {
+     "DIRECT_MATCH": 15,
+     "RELATED_MARKET_CANDIDATE": 5
+    }
+   }
+  },
+  "steelbldg|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 3,
+    "hi": 5,
+    "direct": 20,
+    "direct_rel_lo": 3,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 2,
+    "hi": 3,
+    "direct": 20,
+    "direct_rel_lo": 2,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   }
+  },
+  "grounds|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 12,
+    "direct": 20,
+    "direct_rel_lo": 12,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 17,
+    "direct": 20,
+    "direct_rel_lo": 17,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   }
+  },
+  "grounds|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 14,
+    "direct": 20,
+    "direct_rel_lo": 12,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 20,
+    "direct": 20,
+    "direct_rel_lo": 17,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   }
+  },
+  "paving|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 17,
+    "direct": 20,
+    "direct_rel_lo": 15,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 17,
+    "direct": 3,
+    "direct_rel_lo": 3,
+    "classes": {
+     "DIRECT_MATCH": 3,
+     "RELATED_MARKET_CANDIDATE": 17
+    }
+   }
+  },
+  "paving|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 19,
+    "direct": 20,
+    "direct_rel_lo": 18,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 17,
+    "direct": 20,
+    "direct_rel_lo": 15,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   }
+  },
+  "parts|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 8,
+    "direct": 20,
+    "direct_rel_lo": 7,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 8,
+    "direct": 14,
+    "direct_rel_lo": 7,
+    "classes": {
+     "DIRECT_MATCH": 14,
+     "RELATED_MARKET_CANDIDATE": 6
+    }
+   }
+  },
+  "parts|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 18,
+    "direct": 20,
+    "direct_rel_lo": 18,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 6,
+    "direct": 20,
+    "direct_rel_lo": 6,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   }
+  },
+  "fasteners|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 8,
+    "direct": 20,
+    "direct_rel_lo": 7,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "direct": 20,
+    "direct_rel_lo": 20,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   }
+  },
+  "fasteners|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 5,
+    "hi": 5,
+    "direct": 20,
+    "direct_rel_lo": 5,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 19,
+    "hi": 19,
+    "direct": 20,
+    "direct_rel_lo": 19,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   }
+  },
+  "electrical|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 7,
+    "direct": 20,
+    "direct_rel_lo": 7,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 19,
+    "hi": 19,
+    "direct": 20,
+    "direct_rel_lo": 19,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   }
+  },
+  "electrical|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 9,
+    "hi": 9,
+    "direct": 20,
+    "direct_rel_lo": 9,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "direct": 20,
+    "direct_rel_lo": 20,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   }
+  },
+  "valves|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "direct": 20,
+    "direct_rel_lo": 20,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "direct": 20,
+    "direct_rel_lo": 20,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   }
+  },
+  "valves|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 16,
+    "direct": 20,
+    "direct_rel_lo": 14,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 18,
+    "direct": 20,
+    "direct_rel_lo": 16,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   }
+  },
+  "aircraft|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 4,
+    "hi": 7,
+    "direct": 20,
+    "direct_rel_lo": 4,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 18,
+    "direct": 20,
+    "direct_rel_lo": 16,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   }
+  },
+  "aircraft|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 0,
+    "hi": 1,
+    "direct": 20,
+    "direct_rel_lo": 0,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 14,
+    "direct": 20,
+    "direct_rel_lo": 14,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   }
+  },
+  "medical|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 5,
+    "hi": 6,
+    "direct": 20,
+    "direct_rel_lo": 5,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 20,
+    "direct": 4,
+    "direct_rel_lo": 4,
+    "classes": {
+     "DIRECT_MATCH": 4,
+     "RELATED_MARKET_CANDIDATE": 16
+    }
+   }
+  },
+  "medical|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 5,
+    "hi": 7,
+    "direct": 20,
+    "direct_rel_lo": 5,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 17,
+    "direct": 14,
+    "direct_rel_lo": 11,
+    "classes": {
+     "DIRECT_MATCH": 14,
+     "RELATED_MARKET_CANDIDATE": 6
+    }
+   }
+  },
+  "ithardware|short": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 0,
+    "hi": 0,
+    "direct": 20,
+    "direct_rel_lo": 0,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 2,
+    "hi": 4,
+    "direct": 20,
+    "direct_rel_lo": 2,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   }
+  },
+  "ithardware|long": {
+   "rc1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 1,
+    "hi": 2,
+    "direct": 20,
+    "direct_rel_lo": 1,
+    "classes": {
+     "DIRECT_MATCH": 20
+    }
+   },
+   "rc2": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 2,
+    "hi": 3,
+    "direct": 18,
+    "direct_rel_lo": 2,
+    "classes": {
+     "DIRECT_MATCH": 18,
+     "RELATED_MARKET_CANDIDATE": 2
+    }
+   }
+  }
+ },
+ "pooled_short_rc1": {
+  "lo": 0.379,
+  "hi": 0.425,
+  "n": 280,
+  "below_40": [
+   "janitorial|short",
+   "nursing|short",
+   "guards|short",
+   "steelbldg|short",
+   "parts|short",
+   "fasteners|short",
+   "electrical|short",
+   "aircraft|short",
+   "medical|short",
+   "ithardware|short"
+  ]
+ },
+ "pooled_short_rc2": {
+  "lo": 0.671,
+  "hi": 0.736,
+  "n": 280,
+  "below_40": [
+   "nursing|short",
+   "steelbldg|short",
+   "parts|short",
+   "ithardware|short"
+  ]
+ },
+ "pooled_long_rc1": {
+  "lo": 0.407,
+  "hi": 0.454,
+  "n": 280,
+  "below_40": [
+   "janitorial|long",
+   "nursing|long",
+   "guards|long",
+   "steelbldg|long",
+   "fasteners|long",
+   "aircraft|long",
+   "medical|long",
+   "ithardware|long"
+  ]
+ },
+ "pooled_long_rc2": {
+  "lo": 0.618,
+  "hi": 0.664,
+  "n": 280,
+  "below_40": [
+   "nursing|long",
+   "steelbldg|long",
+   "parts|long",
+   "ithardware|long"
+  ]
+ }
+}

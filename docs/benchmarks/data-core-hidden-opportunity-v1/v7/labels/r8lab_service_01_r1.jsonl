@@ -1,0 +1,23 @@
+{"id":"r8-0111","label":"NO","role":"NONE","evidence":"License to AHA databases; staffing only a data field"}
+{"id":"r8-0116","label":"NO","role":"NONE","evidence":"4 ton Bard HVAC unit purchase, not maintenance service"}
+{"id":"r8-0118","label":"NO","role":"NONE","evidence":"Annual pharmacy wall-to-wall inventory services, not construction"}
+{"id":"r8-0122","label":"NO","role":"NONE","evidence":"Q&A on pharmacy inventory services, unrelated to steel or roofing"}
+{"id":"r8-0126","label":"NO","role":"NONE","evidence":"Repair structural integrity of wall; Tinker MAC BOA holders only"}
+{"id":"r8-0129","label":"NO","role":"NONE","evidence":"Hospital laundry and dry-cleaning services, not nurse staffing"}
+{"id":"r8-0131","label":"NO","role":"NONE","evidence":"Repair security wall at USP Lewisburg, not steel building or roofing"}
+{"id":"r8-0132","label":"NO","role":"NONE","evidence":"Roofing and paint materials only, installation not required"}
+{"id":"r8-0133","label":"NO","role":"NONE","evidence":"NSN structural aircraft panel supply with approved sources"}
+{"id":"r8-0135","label":"NO","role":"NONE","evidence":"Replace carpet and base boards, installation not cleaning"}
+{"id":"r8-0138","label":"FIT","role":"PRIME","evidence":"Conduct concrete and civil site repairs per repair list and irrigation plans"}
+{"id":"r8-0142","label":"NO","role":"NONE","evidence":"40FT class 3 steel pole product purchase"}
+{"id":"r8-0146","label":"NO","role":"NONE","evidence":"VA hospital construction bed tower; no nurse staffing requirement"}
+{"id":"r8-0150","label":"NO","role":"NONE","evidence":"Precast IDF concrete bunker assembly across overseas sites"}
+{"id":"r8-0151","label":"FIT","role":"PRIME","evidence":"Interior and exterior window cleaning plus glazing maintenance at FBI CJIS"}
+{"id":"r8-0152","label":"FIT","role":"PRIME","evidence":"Custodial services routine and periodic cleaning, carpets shampoo, windows"}
+{"id":"r8-0160","label":"NO","role":"NONE","evidence":"NSN structural aircraft panel supply item"}
+{"id":"r8-0161","label":"NO","role":"NONE","evidence":"Plenum chamber and air-handling mold cleaning, not nurse staffing"}
+{"id":"r8-0162","label":"FIT","role":"PRIME","evidence":"Snow plowing, shoveling and sanding at Blackwater Dam, NAICS 561730"}
+{"id":"r8-0165","label":"FIT","role":"PRIME","evidence":"Carpet cleaning services for buildings at Lackland AFB"}
+{"id":"r8-0173","label":"PARTIAL","role":"SUB","evidence":"Facilities total maintenance including operation and maintenance of heating, ventilation and cooling systems"}
+{"id":"r8-0174","label":"NO","role":"NONE","evidence":"Roof and paint materials only, installation is not required"}
+{"id":"r8-0177","label":"NO","role":"NONE","evidence":"20-- window assembly NSN supply item, not window cleaning"}

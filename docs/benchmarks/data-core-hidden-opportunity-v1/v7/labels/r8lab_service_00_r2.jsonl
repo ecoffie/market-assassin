@@ -1,0 +1,35 @@
+{"id":"r8-0000","label":"PARTIAL","role":"SUB","evidence":"Roofing Replacement section: contractor shall design the new roofing system"}
+{"id":"r8-0002","label":"NO","role":"NONE","evidence":"Repair structural integrity B1134 post and north wall; no steel building or roofing stated"}
+{"id":"r8-0006","label":"NO","role":"NONE","evidence":"Replace Flooring construction project; flooring installation, not janitorial cleaning"}
+{"id":"r8-0008","label":"FIT","role":"PRIME","evidence":"design built construction for POV parking lot extension at Schenectady USARC"}
+{"id":"r8-0010","label":"NO","role":"NONE","evidence":"13-8Mo stainless steel welding wire spools, a supply purchase"}
+{"id":"r8-0016","label":"NO","role":"NONE","evidence":"Replace Flooring at VA McClellan; construction flooring replacement, not cleaning"}
+{"id":"r8-0017","label":"NO","role":"NONE","evidence":"Wall-to-wall pharmacy inventory services; unrelated to steel buildings"}
+{"id":"r8-0018","label":"NO","role":"NONE","evidence":"40FT CLASS 3 STEEL POLE supply item"}
+{"id":"r8-0019","label":"NO","role":"NONE","evidence":"Corrosion-Resistant Steel raw materials purchase, not construction"}
+{"id":"r8-0021","label":"NO","role":"NONE","evidence":"Replace Flooring at VA McClellan construction requirement, not janitorial"}
+{"id":"r8-0023","label":"NO","role":"NONE","evidence":"Welding electrodes and rods specification notice, not construction"}
+{"id":"r8-0029","label":"NO","role":"NONE","evidence":"replace approximately 6000 square feet of carpet; installation not cleaning"}
+{"id":"r8-0030","label":"NO","role":"NONE","evidence":"NSN aircraft structural panel supply to DLA depot"}
+{"id":"r8-0039","label":"NO","role":"NONE","evidence":"Medical gas cylinders Type I-DOT 3AA steel supply"}
+{"id":"r8-0040","label":"NO","role":"NONE","evidence":"Stock replenishment of stainless steel plates, material supply"}
+{"id":"r8-0041","label":"NO","role":"NONE","evidence":"Sale of scrap railroad steel to buyer"}
+{"id":"r8-0042","label":"NO","role":"NONE","evidence":"Construction of new VA bed tower; no nurse staffing procured"}
+{"id":"r8-0043","label":"FIT","role":"PRIME","evidence":"complete window washing services, NAICS 561720, PSC S201 custodial janitorial"}
+{"id":"r8-0048","label":"PARTIAL","role":"PRIME","evidence":"Replace Roof Building 347; built-up bituminous roofing, not metal roofing"}
+{"id":"r8-0054","label":"FIT","role":"PRIME","evidence":"Janitorial services for general office cleaning, restrooms, carpet shampoo"}
+{"id":"r8-0055","label":"NO","role":"NONE","evidence":"Stabilizer bar damper assembly for Pave Hawk helicopter, aircraft part"}
+{"id":"r8-0056","label":"FIT","role":"PRIME","evidence":"Army Enterprise HVAC Modernization and Lifecycle Sustainment Maintenance CSO"}
+{"id":"r8-0057","label":"NO","role":"NONE","evidence":"DLA supply solicitation for a CHILLER item, not maintenance service"}
+{"id":"r8-0062","label":"PARTIAL","role":"PRIME","evidence":"loading dock concrete repair; treads and risers damaged"}
+{"id":"r8-0067","label":"FIT","role":"PRIME","evidence":"requirement for carpet cleaning services for buildings at Lackland AFB"}
+{"id":"r8-0069","label":"NO","role":"NONE","evidence":"Levee raising and concrete channel repair flood project; no paving stated"}
+{"id":"r8-0071","label":"FIT","role":"PRIME","evidence":"daily cleaning of 5,437 square feet of office space and restrooms"}
+{"id":"r8-0077","label":"NO","role":"NONE","evidence":"Construct Parking Garage West Lot Addition; structure, no paving detail"}
+{"id":"r8-0088","label":"FIT","role":"PRIME","evidence":"Army Enterprise HVAC modernization and lifecycle sustainment maintenance solutions"}
+{"id":"r8-0089","label":"NO","role":"NONE","evidence":"NSN duct assembly air conditioning-heating part, qty 1 supply"}
+{"id":"r8-0095","label":"PARTIAL","role":"PRIME","evidence":"Concrete Pads in buildings 220 and 299; concrete placement work"}
+{"id":"r8-0099","label":"NO","role":"NONE","evidence":"Repair Parking Garage Structural Concrete; structural, plumbing, general construction"}
+{"id":"r8-0102","label":"FIT","role":"PRIME","evidence":"repairs to cracks or degraded asphalt, seal, new striping parking lots"}
+{"id":"r8-0107","label":"NO","role":"NONE","evidence":"EHR data site for CDC influenza surveillance network, not staffing"}
+{"id":"r8-0108","label":"NO","role":"NONE","evidence":"Pre-clinical animal models of infectious diseases research"}

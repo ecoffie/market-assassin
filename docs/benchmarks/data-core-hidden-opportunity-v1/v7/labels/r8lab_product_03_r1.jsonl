@@ -1,0 +1,19 @@
+{"id":"r8-0156","label":"PARTIAL","role":"SUB","restriction":"SOLE_SOURCE","evidence":"sole-source LTCs to GE Aviation; repair coverage and spare parts for 1,012 NSN"}
+{"id":"r8-0157","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5340012663350 BOLT,BARREL; Approved source is 39428 1441A12"}
+{"id":"r8-0158","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"Safety Gloves for DLA Distribution San Joaquin, PSC 4240; notice cancelled; safety not medical gloves"}
+{"id":"r8-0159","label":"NO","role":"NONE","restriction":"NONE","evidence":"groundwater monitoring services, collect water samples from monitoring wells"}
+{"id":"r8-0163","label":"NO","role":"NONE","restriction":"NONE","evidence":"T-38 CFS 505 Drill Fixture Assemblies sources sought; shop tooling, PSC 3455"}
+{"id":"r8-0164","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"IT solution including workstations, monitors, and geospatial software licenses, with installation services"}
+{"id":"r8-0166","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 6150-01-480-0437 Cable Assembly Spec; Sources: WOVEN ELECTRONICS, DUCOMMUN LABARGE"}
+{"id":"r8-0167","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"6550--Blood Type IVD Reagents, PSC 6550 combined synopsis/solicitation"}
+{"id":"r8-0168","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Acquire Tab, Trim, Aircraft parts, PSC 1560"}
+{"id":"r8-0169","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"Replacement Hydraulic Accumulator Bank & Panel for NASA facility; sole source ABBOTT VALVE & FITTING"}
+{"id":"r8-0170","label":"NO","role":"NONE","restriction":"NONE","evidence":"NAVAIR Depot Maintenance System IT Program functional requirements and software lifecycle support RFP"}
+{"id":"r8-0171","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 5320002135238 RIVET,SOLID Qty 1850; All responsible sources may submit a quote"}
+{"id":"r8-0172","label":"FIT","role":"PRIME","restriction":"OEM_ONLY","evidence":"NUT - BUSHINGS; Brand Name Sole Source Solicitation, must provide OEM parts directly"}
+{"id":"r8-0175","label":"NO","role":"NONE","restriction":"OEM_ONLY","evidence":"Hydraulic Fluid Bulk Dispensing Unit P/N 101803-100MOD2 ground equipment; OEM or authorized distributor with Letter of Authorization"}
+{"id":"r8-0176","label":"FIT","role":"PRIME","restriction":"UNCLEAR","evidence":"NSN 1560-015165233 WINDSHIELD PANEL,AIRCRAFT; OTHER THAN FULL AND OPEN COMPETITION"}
+{"id":"r8-0178","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5998015677477 CIRCUIT CARD ASSEMBLY; Approved sources are 0AT62, 7Y333, 830P9"}
+{"id":"r8-0179","label":"FIT","role":"PRIME","restriction":"QPL","evidence":"NSN 5945005772206 RELAY,ELECTROMAGNETIC; This is a qualified products list (QPL) item"}
+{"id":"r8-0180","label":"NO","role":"NONE","restriction":"NONE","evidence":"Industry Day Architecture and Engineering services; medical warehouse only a building description"}
+{"id":"r8-0181","label":"NO","role":"NONE","restriction":"NONE","evidence":"tracked self-propelled 155mm howitzer system MTC-T prototype Other Transaction"}

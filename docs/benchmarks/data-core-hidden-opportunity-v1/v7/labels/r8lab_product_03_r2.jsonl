@@ -1,0 +1,19 @@
+{"id":"r8-0156","label":"PARTIAL","role":"SUB","restriction":"SOLE_SOURCE","evidence":"procurement of repair coverage and spare parts; Sole-source Long Term Contracts to GE"}
+{"id":"r8-0157","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5340012663350 BOLT,BARREL Qty 83; Approved source is 39428 1441A12"}
+{"id":"r8-0158","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"Safety Gloves for DLA Distribution San Joaquin, FSC 4240 (Cancelled)"}
+{"id":"r8-0159","label":"NO","role":"NONE","restriction":"NONE","evidence":"contractor to perform groundwater monitoring services in Wabasha County"}
+{"id":"r8-0163","label":"NO","role":"NONE","restriction":"NONE","evidence":"T-38 CFS 505 Drill Fixture Assemblies, PSC 3455 Cutting Tools for Machine Tools"}
+{"id":"r8-0164","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"IT solution including workstations, monitors, and geospatial analysis software licenses"}
+{"id":"r8-0166","label":"FIT","role":"PRIME","restriction":"UNCLEAR","evidence":"NSN 6150-01-480-0437 cable assembly; Sources: WOVEN ELECTRONICS P/N 2U02062-102"}
+{"id":"r8-0167","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"6550--Blood Type IVD Reagents"}
+{"id":"r8-0168","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Acquire Tab, Trim, Aircraft parts, FSC 1560"}
+{"id":"r8-0169","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"Replacement Hydraulic Accumulator Bank & Panel; sole source to ABBOTT VALVE & FITTING"}
+{"id":"r8-0170","label":"NO","role":"NONE","restriction":"NONE","evidence":"NDMS IT Program Functional Requirements and Software Lifecycle Support RFP"}
+{"id":"r8-0171","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 5320002135238 RIVET,SOLID Qty 1850"}
+{"id":"r8-0172","label":"PARTIAL","role":"PRIME","restriction":"OEM_ONLY","evidence":"NUT - BUSHINGS; Brand Name Sole Source Solicitation for OEM parts"}
+{"id":"r8-0175","label":"NO","role":"NONE","restriction":"OEM_ONLY","evidence":"Hydraulic Fluid Bulk Dispensing Unit P/N 101803-100MOD2; OEM or authorized distributor"}
+{"id":"r8-0176","label":"FIT","role":"PRIME","restriction":"UNCLEAR","evidence":"NSN 1560-015165233 WINDSHIELD PANEL,AIRCRAFT; OTHER THAN FULL AND OPEN COMPETITION"}
+{"id":"r8-0178","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5998015677477 CIRCUIT CARD ASSEMBLY Qty 3; Approved sources are 0AT62"}
+{"id":"r8-0179","label":"FIT","role":"PRIME","restriction":"QPL","evidence":"NSN 5945005772206 RELAY,ELECTROMAGNETIC; qualified products list (QPL) item"}
+{"id":"r8-0180","label":"NO","role":"NONE","restriction":"NONE","evidence":"Industry Day: Architecture & Engineering (A/E) Services, Callao Naval Base"}
+{"id":"r8-0181","label":"NO","role":"NONE","restriction":"NONE","evidence":"seeking a mature tracked self-propelled 155mm howitzer system, MTC-T"}

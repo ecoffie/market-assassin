@@ -1,0 +1,35 @@
+{"id":"r8-0000","label":"PARTIAL","role":"SUB","evidence":"Cooling tower replacement with explicit roofing replacement and structural construction components"}
+{"id":"r8-0002","label":"NO","role":"NONE","evidence":"Repair structural integrity of post and wall; MAC BOA holders only"}
+{"id":"r8-0006","label":"NO","role":"NONE","evidence":"Construction project to replace flooring, not cleaning services"}
+{"id":"r8-0008","label":"FIT","role":"PRIME","evidence":"Design-build POV parking lot extension construction at Schenectady USARC"}
+{"id":"r8-0010","label":"NO","role":"NONE","evidence":"Purchase of stainless steel welding wire spools, a product"}
+{"id":"r8-0016","label":"NO","role":"NONE","evidence":"Construction to replace flooring at VA McClellan, not janitorial"}
+{"id":"r8-0017","label":"NO","role":"NONE","evidence":"Wall-to-wall pharmacy inventory services, unrelated to steel or roofing"}
+{"id":"r8-0018","label":"NO","role":"NONE","evidence":"40FT class 3 steel pole is a product purchase"}
+{"id":"r8-0019","label":"NO","role":"NONE","evidence":"Corrosion-resistant steel raw materials purchase"}
+{"id":"r8-0021","label":"NO","role":"NONE","evidence":"Replace flooring construction project, not cleaning services"}
+{"id":"r8-0023","label":"NO","role":"NONE","evidence":"MIL-DTL-19933F welding electrodes and rods specification, product"}
+{"id":"r8-0029","label":"NO","role":"NONE","evidence":"Replace 6000 sq ft of carpet, installation not cleaning"}
+{"id":"r8-0030","label":"NO","role":"NONE","evidence":"NSN aircraft structural panel supply item"}
+{"id":"r8-0039","label":"NO","role":"NONE","evidence":"Medical gas cylinders, steel only as cylinder type"}
+{"id":"r8-0040","label":"NO","role":"NONE","evidence":"Stock replenishment of stainless steel plates, material purchase"}
+{"id":"r8-0041","label":"NO","role":"NONE","evidence":"Sale of scrap railroad steel by Red River Army Depot"}
+{"id":"r8-0042","label":"NO","role":"NONE","evidence":"Hospital construction bed tower; no nurse staffing requirement"}
+{"id":"r8-0043","label":"FIT","role":"PRIME","evidence":"Window washing services, NAICS 561720 Janitorial, VA Bedford"}
+{"id":"r8-0048","label":"FIT","role":"PRIME","evidence":"Replace Roof at Building 347 Menlo Park, roofing replacement construction"}
+{"id":"r8-0054","label":"FIT","role":"PRIME","evidence":"Janitorial services for Blackduck Ranger District office, NAICS 561720"}
+{"id":"r8-0055","label":"NO","role":"NONE","evidence":"Helicopter stabilizer bar damper assembly NSN part, pave only in name"}
+{"id":"r8-0056","label":"FIT","role":"PRIME","evidence":"Army Enterprise HVAC modernization and lifecycle sustainment maintenance"}
+{"id":"r8-0057","label":"NO","role":"NONE","evidence":"Chiller equipment supply item with mercury contamination clauses"}
+{"id":"r8-0062","label":"FIT","role":"PRIME","evidence":"Loading dock concrete repair, damaged treads and risers"}
+{"id":"r8-0067","label":"FIT","role":"PRIME","evidence":"Carpet cleaning services for four buildings at Lackland AFB"}
+{"id":"r8-0069","label":"PARTIAL","role":"SUB","evidence":"Raising levees and repairing concrete channel; grading earthwork component"}
+{"id":"r8-0071","label":"FIT","role":"PRIME","evidence":"Janitorial services for Pagosa Ranger District, NAICS 561720"}
+{"id":"r8-0077","label":"NO","role":"NONE","evidence":"Construct parking garage addition, structure not paving or site work"}
+{"id":"r8-0088","label":"FIT","role":"PRIME","evidence":"Army Enterprise HVAC modernization and sustainment maintenance plan"}
+{"id":"r8-0089","label":"NO","role":"NONE","evidence":"NSN duct assembly air conditioning-heating part purchase"}
+{"id":"r8-0095","label":"FIT","role":"PRIME","evidence":"Concrete pads in buildings 220 and 299, concrete placement"}
+{"id":"r8-0099","label":"PARTIAL","role":"SUB","evidence":"Repair parking garage structural concrete, building construction NAICS 236220"}
+{"id":"r8-0102","label":"FIT","role":"PRIME","evidence":"Repair asphalt cracks, seal and stripe parking lots at VAMC"}
+{"id":"r8-0107","label":"NO","role":"NONE","evidence":"CDC influenza surveillance network EHR site, not staffing"}
+{"id":"r8-0108","label":"NO","role":"NONE","evidence":"NIAID pre-clinical animal models of infectious diseases research"}

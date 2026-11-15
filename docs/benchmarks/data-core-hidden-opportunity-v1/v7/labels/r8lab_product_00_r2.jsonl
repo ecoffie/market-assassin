@@ -1,0 +1,35 @@
+{"id":"r8-0001","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 1R-1560-015663336 FLOOR, AIRCRAFT; only previously approved sources solicited"}
+{"id":"r8-0003","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5998016845554 CIRCUIT CARD ASSEMBLY; approved sources 0CDN3, 20183"}
+{"id":"r8-0004","label":"NO","role":"NONE","restriction":"NONE","evidence":"management and supply of aircraft coatings and sealants, not aircraft parts"}
+{"id":"r8-0005","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 1095017248902 ELECTRICAL INDUCTOR; approved source is 4H618"}
+{"id":"r8-0007","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"BRAND NAME ONLY Honor Alert Liberty Fall Detection device, FSC 6350 alarm"}
+{"id":"r8-0009","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"Repair of the F-16 Oxygen Monitor; sole source award to Eaton"}
+{"id":"r8-0011","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 1R-1560-015439902 DOOR, AIRCRAFT requires engineering source approval"}
+{"id":"r8-0012","label":"NO","role":"NONE","restriction":"NONE","evidence":"AMC/A6 IT Needs CSO with AOIs; no hardware item identified"}
+{"id":"r8-0013","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5945013442357 RELAY,ELECTROMAGNETIC; approved sources 58657, 81755"}
+{"id":"r8-0014","label":"NO","role":"NONE","restriction":"NONE","evidence":"Communications, network, cybersecurity and IT services CSO, PSC DG01"}
+{"id":"r8-0015","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CIRCUIT CARD ASSEMBLY NSN 5998015862136 P/N 13016536, qty 63"}
+{"id":"r8-0020","label":"NO","role":"NONE","restriction":"NONE","evidence":"NAVAIR depot maintenance system IT software lifecycle support RFP"}
+{"id":"r8-0022","label":"FIT","role":"PRIME","restriction":"SOLE_SOURCE","evidence":"Door, Aircraft; sole source BOA call to OEM Sikorsky"}
+{"id":"r8-0024","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"condensation pump and motor assemblies replacement; equivalent products may be submitted"}
+{"id":"r8-0025","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 1420000152070 VALVE ASSY,PILOT; approved source is 62983 261416"}
+{"id":"r8-0026","label":"NO","role":"NONE","restriction":"NONE","evidence":"Marine Corps Education Command IT Support Services, PSC DG01"}
+{"id":"r8-0027","label":"FIT","role":"PRIME","restriction":"UNCLEAR","evidence":"CHASSIS,ELECTRICAL FSC 5975 electrical hardware supply solicitation"}
+{"id":"r8-0028","label":"NO","role":"NONE","restriction":"NONE","evidence":"design-build construction of active vehicle barriers and guard booths"}
+{"id":"r8-0031","label":"NO","role":"NONE","restriction":"NONE","evidence":"Industry day for Callao Naval Base construction; medical warehouse is a building"}
+{"id":"r8-0032","label":"FIT","role":"PRIME","restriction":"SOLE_SOURCE","evidence":"Dell Latitude 5430 Rugged Laptops; single source B&M Distribution, brand-name-only"}
+{"id":"r8-0033","label":"FIT","role":"PRIME","restriction":"UNCLEAR","evidence":"EXTINGUISHER, FIRE, AIRCRAFT NSN 1680015954096 PN 472555-4"}
+{"id":"r8-0034","label":"NO","role":"NONE","restriction":"NONE","evidence":"SeaPort-NxG task order for IT Support Services, PSC DA01"}
+{"id":"r8-0035","label":"FIT","role":"PRIME","restriction":"UNCLEAR","evidence":"SWITCH,WAVEGUIDE supply solicitation; drawings or technical data not available"}
+{"id":"r8-0036","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5998015088882 CIRCUIT CARD ASSEMBLY; approved source is 28199 B-1925"}
+{"id":"r8-0037","label":"FIT","role":"PRIME","restriction":"UNCLEAR","evidence":"HYDRAULIC OIL COOLER F-15 NSN 1650012288118 PN UA538795-3"}
+{"id":"r8-0038","label":"FIT","role":"PRIME","restriction":"OEM_ONLY","evidence":"Switch, Thermostatic NSN 5930-01-324-6220; Kidde authorized distributor traceability required"}
+{"id":"r8-0044","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"NSN 5935015326234 RJ45 8-PIN MODULAR PLUG connector, not fastener"}
+{"id":"r8-0045","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 6150-01-555-9778 CABLE ASSEMBLY F-16; approved source Safran, Jo-Kell"}
+{"id":"r8-0046","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 2510016786658 TURRET,COMBAT VEHICLE; all responsible sources may quote"}
+{"id":"r8-0047","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5330014828563 WASHER ASSORTMENT; approved source is 7EK50"}
+{"id":"r8-0049","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5320-014147199 PIN-RIVET; approved source LISI Aerospace HL112VAP-6-8"}
+{"id":"r8-0050","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"MAIN FLANGE BOLTS, FSC 5306, total small business set-aside"}
+{"id":"r8-0051","label":"NO","role":"NONE","restriction":"NONE","evidence":"National menu dressing and condiments food items, FSC 8950"}
+{"id":"r8-0052","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820009688398 VALVE,REGULATING,FLUID; approved sources 79RG9, 99643"}
+{"id":"r8-0053","label":"FIT","role":"PRIME","restriction":"OEM_ONLY","evidence":"proprietary reagents for Roche immunostainers; Roche is the only source"}

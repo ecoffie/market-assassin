@@ -1,0 +1,35 @@
+{"id":"r8-0058","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Request for Quotation (RFQ) for Seed Lab Equipment, PSC 6640, unrestricted all responsible sources"}
+{"id":"r8-0059","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"POWER UNIT,AIRCRAFT PSC 2840 aircraft spare; FMS spares solicitation"}
+{"id":"r8-0060","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5998015019986 CIRCUIT CARD ASSEMBLY; Approved sources are 43KC3, 59618"}
+{"id":"r8-0061","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"BALL KIT, CERAMIC PSC 4820 valve parts, fixed-price supplies solicitation"}
+{"id":"r8-0063","label":"FIT","role":"PRIME","restriction":"SOLE_SOURCE","evidence":"Illumina NovaSeq 6000 S4 Reagent Kits; intends sole source contract to Illumina Inc."}
+{"id":"r8-0064","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"BALL KIT, CERAMIC PSC 4820 valve parts, fixed-price supplies solicitation"}
+{"id":"r8-0065","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"Remote Operated Vehicle, sole source to BLUE ROBOTICS INC; whole vehicle not spare part"}
+{"id":"r8-0066","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 2590012698719 WINCH,DRUM,VEHICLE MOU; Approved sources are 08302 05455"}
+{"id":"r8-0068","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 6240-01-058-5061 LAMP, INCANDESCENT FA-18; ONLY APPROVED SOURCES OF SUPPLY CARLEY, GRIMES"}
+{"id":"r8-0070","label":"NO","role":"NONE","restriction":"NONE","evidence":"CNECTS communications and IT services consolidation industry day, no hardware item"}
+{"id":"r8-0072","label":"NO","role":"NONE","restriction":"NONE","evidence":"Network Cabling and IT Room Improvements; installation statement of work, NAICS 238210"}
+{"id":"r8-0073","label":"NO","role":"NONE","restriction":"NONE","evidence":"vehicle lease, onboard video surveillance, telematics, maintenance and support services RFI"}
+{"id":"r8-0074","label":"NO","role":"NONE","restriction":"QPL","evidence":"NSN 6110012467177 ELEC POWER MONITOR; This is a qualified products list (QPL) item"}
+{"id":"r8-0075","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"Baxter/Hill-Rom Helux Pro Surgical Light System, Brand Name or Equal, PSC 6640"}
+{"id":"r8-0076","label":"NO","role":"NONE","restriction":"NONE","evidence":"perform Generator Monitoring as defined in this Performance Work Statement; commercial services"}
+{"id":"r8-0078","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"Safety Gloves for DLA Distribution San Joaquin, PSC 4240; safety not medical gloves"}
+{"id":"r8-0079","label":"NO","role":"NONE","restriction":"NONE","evidence":"tracked self-propelled 155mm howitzer system MTC-T prototype Other Transaction"}
+{"id":"r8-0080","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"NSN 5999016189507 CONTROL,MONITOR MODULE; Approved source is 34712 F094513"}
+{"id":"r8-0081","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 1680 PAM,AIRCRAFT,MATERI; only source(s) previously approved by the Government solicited"}
+{"id":"r8-0082","label":"NO","role":"NONE","restriction":"NONE","evidence":"Vehicle Lift System mobile column type PSC 4910 shop equipment, Brand Name or Equal"}
+{"id":"r8-0083","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"NSN 2030011406800 HYDRAULIC POWER MOD, USS PRINCETON CG 59; Approved source is 07309"}
+{"id":"r8-0084","label":"NO","role":"NONE","restriction":"NONE","evidence":"on-base parcel delivery services market research; cold-chain mentioned only incidentally"}
+{"id":"r8-0085","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Request for Information - DNA Buccal Collection Kits, PSC 6640 laboratory supplies"}
+{"id":"r8-0086","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PACKING NUT PSC 4730 solicitation, MIL-I-45208 quality, total small business set-aside"}
+{"id":"r8-0087","label":"NO","role":"NONE","restriction":"NONE","evidence":"Border Security IT Technical Services; develop and implement technological solutions"}
+{"id":"r8-0090","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"NSN 6110011593666 MONITOR-CONTROL BOX; Approved source is 51802 HAN6094-1"}
+{"id":"r8-0091","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"16--FOOTREST,AIRCRAFT S NSN 1R-1680; requires Government source approval, flight critical"}
+{"id":"r8-0092","label":"NO","role":"NONE","restriction":"NONE","evidence":"Request for Whitepapers modernize Test Site 2 Aerospace Vehicle Survivability Facility"}
+{"id":"r8-0093","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CABLE ASSEMBLY,SPEC PSC 6150 solicitation, Lowest Price Technically Acceptable"}
+{"id":"r8-0094","label":"NO","role":"NONE","restriction":"NONE","evidence":"tracked self-propelled 155mm howitzer system MTC-T prototype Other Transaction"}
+{"id":"r8-0096","label":"NO","role":"NONE","restriction":"NONE","evidence":"IT Life Cycle Support Services IDIQ contractor support to operate and maintain IT systems"}
+{"id":"r8-0097","label":"NO","role":"NONE","restriction":"NONE","evidence":"tracked self-propelled 155mm howitzer system MTC-T prototype Other Transaction"}
+{"id":"r8-0098","label":"NO","role":"NONE","restriction":"NONE","evidence":"PERCUSSION CONSUMABLES acoustic drumheads, sticks, mallets, symphonic cymbals; not medical"}
+{"id":"r8-0100","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"SET SCREW PSC 5305 solicitation, fixed-price supplies"}
+{"id":"r8-0101","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"BPA PSC 7E20 IT and Telecom Workspace, Print, Productivity Tool (HW/Perpetual SW), supplies and services"}
