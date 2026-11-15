@@ -1,0 +1,9 @@
+{"id":"r15-0000","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PSC 5995 WIRING HARNESS supply solicitation; replacement component, repair-records text is only incidental"}
+{"id":"r15-0001","label":"NO","role":"NONE","restriction":"NONE","evidence":"USCG Station at Cape Disappointment sources sought; pile/float construction work, not parts supply"}
+{"id":"r15-0002","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"STR FLG END FTG, PSC 4730 fittings, inspection of supplies FOB destination"}
+{"id":"r15-0003","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"MAIN FLANGE BOLTS, PSC 5306 bolts, supply under MIL-I-45208 inspection"}
+{"id":"r15-0004","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"66--SYSTEM ASSEMBLY,SUB, PSC 6605 assembly, material receiving report, fixed-price supplies"}
+{"id":"r15-0006","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"COOLER, COOLANT; procurement of 1 each NSN 2930 LLCYC5333 with part number substitution codes"}
+{"id":"r15-0007","label":"NO","role":"NONE","restriction":"NONE","evidence":"RFI for complete live-fire training facility design, fabrication, installation; not replacement parts supply"}
+{"id":"r15-0008","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PARTS KIT,BALL VALV, PSC 4820; replacement parts kit with re-useable parts clause"}
+{"id":"r15-0009","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"70--INTERFACE UNIT,DATA, PSC 7E20 supply item, inspection of supplies fixed-price"}

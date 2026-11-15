@@ -1,0 +1,3590 @@
+{
+ "note": "AI labels, in-sample, diagnostic only. Raw top-20 = frozen measure; distinct family supplementary.",
+ "phrasings": {
+  "janitorial|short": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 15
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 15
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 15
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 15
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 15
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 15
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 15
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 15
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 15
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 1216,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvn19": {
+     "n": 1216,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvr": {
+     "n": 1216,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "s1": {
+     "n": 1216,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "ps": {
+     "n": 1216,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "allin": {
+     "n": 1216,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    }
+   }
+  },
+  "janitorial|long": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 11,
+    "hi": 13,
+    "families": 20,
+    "fam_lo": 11,
+    "fam_hi": 13
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 14,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 14
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 14,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 14
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 14,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 14
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 14,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 14
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 14,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 14
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 14,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 14
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 14,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 14
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 14,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 14
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 567,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvn19": {
+     "n": 567,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvr": {
+     "n": 567,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "s1": {
+     "n": 567,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "ps": {
+     "n": 567,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "allin": {
+     "n": 567,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    }
+   }
+  },
+  "nursing|short": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 8,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 8,
+    "fam_hi": 9
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 8,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 8,
+    "fam_hi": 9
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 11,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 11,
+    "fam_hi": 15
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 13,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 13
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 11,
+    "hi": 13,
+    "families": 20,
+    "fam_lo": 11,
+    "fam_hi": 13
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 11,
+    "hi": 13,
+    "families": 20,
+    "fam_lo": 11,
+    "fam_hi": 13
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 11,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 11,
+    "fam_hi": 15
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 11,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 11,
+    "fam_hi": 15
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 11,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 11,
+    "fam_hi": 15
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 58,
+     "added": 11,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvn19": {
+     "n": 61,
+     "added": 14,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvr": {
+     "n": 92,
+     "added": 45,
+     "removed": 0,
+     "code_window": 0
+    },
+    "s1": {
+     "n": 92,
+     "added": 45,
+     "removed": 0,
+     "code_window": 0
+    },
+    "ps": {
+     "n": 92,
+     "added": 45,
+     "removed": 0,
+     "code_window": 0
+    },
+    "allin": {
+     "n": 92,
+     "added": 45,
+     "removed": 0,
+     "code_window": 0
+    }
+   }
+  },
+  "nursing|long": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 5,
+    "hi": 6,
+    "families": 20,
+    "fam_lo": 5,
+    "fam_hi": 6
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 9,
+    "hi": 10,
+    "families": 20,
+    "fam_lo": 9,
+    "fam_hi": 10
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 10,
+    "hi": 13,
+    "families": 20,
+    "fam_lo": 10,
+    "fam_hi": 13
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 13,
+    "hi": 14,
+    "families": 20,
+    "fam_lo": 13,
+    "fam_hi": 14
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 13,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 13,
+    "fam_hi": 15
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 14,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 14
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 10,
+    "hi": 13,
+    "families": 20,
+    "fam_lo": 10,
+    "fam_hi": 13
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 10,
+    "hi": 13,
+    "families": 20,
+    "fam_lo": 10,
+    "fam_hi": 13
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 10,
+    "hi": 13,
+    "families": 20,
+    "fam_lo": 10,
+    "fam_hi": 13
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 350,
+     "added": 6,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvn19": {
+     "n": 351,
+     "added": 7,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvr": {
+     "n": 379,
+     "added": 35,
+     "removed": 0,
+     "code_window": 0
+    },
+    "s1": {
+     "n": 379,
+     "added": 35,
+     "removed": 0,
+     "code_window": 0
+    },
+    "ps": {
+     "n": 379,
+     "added": 35,
+     "removed": 0,
+     "code_window": 0
+    },
+    "allin": {
+     "n": 379,
+     "added": 35,
+     "removed": 0,
+     "code_window": 0
+    }
+   }
+  },
+  "hvac|short": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 279,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvn19": {
+     "n": 279,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvr": {
+     "n": 279,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "s1": {
+     "n": 279,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "ps": {
+     "n": 279,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "allin": {
+     "n": 279,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    }
+   }
+  },
+  "hvac|long": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 16,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 16
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 16,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 16
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 16,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 16
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 16,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 16
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 16,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 16
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 16,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 16
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 16,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 16
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 16,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 16
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 16,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 16
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 723,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvn19": {
+     "n": 723,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvr": {
+     "n": 723,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "s1": {
+     "n": 723,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "ps": {
+     "n": 723,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "allin": {
+     "n": 723,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    }
+   }
+  },
+  "guards|short": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 8,
+    "families": 20,
+    "fam_lo": 6,
+    "fam_hi": 8
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 8,
+    "families": 20,
+    "fam_lo": 6,
+    "fam_hi": 8
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 8,
+    "families": 20,
+    "fam_lo": 6,
+    "fam_hi": 8
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 8,
+    "families": 20,
+    "fam_lo": 6,
+    "fam_hi": 8
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 8,
+    "families": 20,
+    "fam_lo": 6,
+    "fam_hi": 8
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 8,
+    "families": 20,
+    "fam_lo": 6,
+    "fam_hi": 8
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 8,
+    "families": 20,
+    "fam_lo": 6,
+    "fam_hi": 8
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 8,
+    "families": 20,
+    "fam_lo": 6,
+    "fam_hi": 8
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 8,
+    "families": 20,
+    "fam_lo": 6,
+    "fam_hi": 8
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 485,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvn19": {
+     "n": 485,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvr": {
+     "n": 485,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "s1": {
+     "n": 485,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "ps": {
+     "n": 485,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "allin": {
+     "n": 485,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    }
+   }
+  },
+  "guards|long": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 9
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 9
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 9
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 9
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 9
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 9
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 9
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 9
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 9
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 112,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvn19": {
+     "n": 112,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvr": {
+     "n": 112,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "s1": {
+     "n": 112,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "ps": {
+     "n": 112,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "allin": {
+     "n": 112,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    }
+   }
+  },
+  "steelbldg|short": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 15
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 15
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 15
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 15
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 15
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 15
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 15
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 15
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 15
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 583,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvn19": {
+     "n": 583,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvr": {
+     "n": 583,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "s1": {
+     "n": 583,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "ps": {
+     "n": 583,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "allin": {
+     "n": 583,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    }
+   }
+  },
+  "steelbldg|long": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 4,
+    "hi": 4,
+    "families": 20,
+    "fam_lo": 4,
+    "fam_hi": 4
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 7,
+    "families": 20,
+    "fam_lo": 6,
+    "fam_hi": 7
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 7,
+    "families": 20,
+    "fam_lo": 6,
+    "fam_hi": 7
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 7,
+    "families": 20,
+    "fam_lo": 6,
+    "fam_hi": 7
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 7,
+    "families": 20,
+    "fam_lo": 6,
+    "fam_hi": 7
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 7,
+    "families": 20,
+    "fam_lo": 6,
+    "fam_hi": 7
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 11,
+    "hi": 12,
+    "families": 20,
+    "fam_lo": 11,
+    "fam_hi": 12
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 11,
+    "hi": 12,
+    "families": 20,
+    "fam_lo": 11,
+    "fam_hi": 12
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 6,
+    "hi": 7,
+    "families": 20,
+    "fam_lo": 6,
+    "fam_hi": 7
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 1562,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvn19": {
+     "n": 1562,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvr": {
+     "n": 1562,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "s1": {
+     "n": 1022,
+     "added": 2,
+     "removed": 542,
+     "code_window": 0
+    },
+    "ps": {
+     "n": 1022,
+     "added": 2,
+     "removed": 542,
+     "code_window": 0
+    },
+    "allin": {
+     "n": 1562,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    }
+   }
+  },
+  "grounds|short": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 17
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 17
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 17
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 17
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 17
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 17
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 17
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 17
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 17
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 85,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvn19": {
+     "n": 85,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvr": {
+     "n": 85,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "s1": {
+     "n": 85,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "ps": {
+     "n": 85,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "allin": {
+     "n": 85,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    }
+   }
+  },
+  "grounds|long": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 18
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 18
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 18
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 18
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 18
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 18
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 18
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 18
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 18
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 170,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvn19": {
+     "n": 170,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvr": {
+     "n": 170,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "s1": {
+     "n": 170,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "ps": {
+     "n": 170,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "allin": {
+     "n": 170,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    }
+   }
+  },
+  "paving|short": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 160,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvn19": {
+     "n": 160,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvr": {
+     "n": 160,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "s1": {
+     "n": 160,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "ps": {
+     "n": 160,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "allin": {
+     "n": 160,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    }
+   }
+  },
+  "paving|long": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 12,
+    "hi": 14,
+    "families": 20,
+    "fam_lo": 12,
+    "fam_hi": 14
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 17
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 17
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 17
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 17
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 17
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 17
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 17
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 17
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 631,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvn19": {
+     "n": 631,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvr": {
+     "n": 631,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "s1": {
+     "n": 631,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "ps": {
+     "n": 631,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "allin": {
+     "n": 631,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    }
+   }
+  },
+  "parts|short": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 9
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 9
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 9
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 9
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 9
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 9
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 9
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 17
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 9,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 9
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 1265,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvn19": {
+     "n": 1265,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvr": {
+     "n": 1265,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "s1": {
+     "n": 1265,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "ps": {
+     "n": 1265,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "allin": {
+     "n": 1265,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    }
+   }
+  },
+  "parts|long": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 11,
+    "hi": 11,
+    "families": 20,
+    "fam_lo": 11,
+    "fam_hi": 11
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 17
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 17
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 17
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 17
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 17
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 17
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 19,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 19,
+    "fam_hi": 19
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 17
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 1759,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvn19": {
+     "n": 1759,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvr": {
+     "n": 1759,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "s1": {
+     "n": 1759,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "ps": {
+     "n": 1759,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "allin": {
+     "n": 1759,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    }
+   }
+  },
+  "fasteners|short": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 400,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvn19": {
+     "n": 400,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvr": {
+     "n": 400,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "s1": {
+     "n": 400,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "ps": {
+     "n": 400,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "allin": {
+     "n": 400,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    }
+   }
+  },
+  "fasteners|long": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 19,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 19,
+    "fam_hi": 19
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 906,
+     "added": 0,
+     "removed": 0,
+     "code_window": 21
+    },
+    "nvn19": {
+     "n": 906,
+     "added": 0,
+     "removed": 0,
+     "code_window": 21
+    },
+    "nvr": {
+     "n": 906,
+     "added": 0,
+     "removed": 0,
+     "code_window": 21
+    },
+    "s1": {
+     "n": 906,
+     "added": 0,
+     "removed": 0,
+     "code_window": 21
+    },
+    "ps": {
+     "n": 906,
+     "added": 0,
+     "removed": 0,
+     "code_window": 21
+    },
+    "allin": {
+     "n": 906,
+     "added": 0,
+     "removed": 0,
+     "code_window": 21
+    }
+   }
+  },
+  "electrical|short": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 19,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 19,
+    "fam_hi": 19
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 19,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 19,
+    "fam_hi": 19
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 19,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 19,
+    "fam_hi": 19
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 19,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 19,
+    "fam_hi": 19
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 19,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 19,
+    "fam_hi": 19
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 19,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 19,
+    "fam_hi": 19
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 19,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 19,
+    "fam_hi": 19
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 19,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 19,
+    "fam_hi": 19
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 19,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 19,
+    "fam_hi": 19
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 1250,
+     "added": 0,
+     "removed": 0,
+     "code_window": 145
+    },
+    "nvn19": {
+     "n": 1250,
+     "added": 0,
+     "removed": 0,
+     "code_window": 145
+    },
+    "nvr": {
+     "n": 1250,
+     "added": 0,
+     "removed": 0,
+     "code_window": 145
+    },
+    "s1": {
+     "n": 1250,
+     "added": 0,
+     "removed": 0,
+     "code_window": 145
+    },
+    "ps": {
+     "n": 1250,
+     "added": 0,
+     "removed": 0,
+     "code_window": 145
+    },
+    "allin": {
+     "n": 1250,
+     "added": 0,
+     "removed": 0,
+     "code_window": 145
+    }
+   }
+  },
+  "electrical|long": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 1163,
+     "added": 0,
+     "removed": 0,
+     "code_window": 142
+    },
+    "nvn19": {
+     "n": 1163,
+     "added": 0,
+     "removed": 0,
+     "code_window": 142
+    },
+    "nvr": {
+     "n": 1163,
+     "added": 0,
+     "removed": 0,
+     "code_window": 142
+    },
+    "s1": {
+     "n": 1163,
+     "added": 0,
+     "removed": 0,
+     "code_window": 142
+    },
+    "ps": {
+     "n": 1163,
+     "added": 0,
+     "removed": 0,
+     "code_window": 142
+    },
+    "allin": {
+     "n": 1163,
+     "added": 0,
+     "removed": 0,
+     "code_window": 142
+    }
+   }
+  },
+  "valves|short": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 811,
+     "added": 0,
+     "removed": 0,
+     "code_window": 75
+    },
+    "nvn19": {
+     "n": 811,
+     "added": 0,
+     "removed": 0,
+     "code_window": 75
+    },
+    "nvr": {
+     "n": 811,
+     "added": 0,
+     "removed": 0,
+     "code_window": 75
+    },
+    "s1": {
+     "n": 811,
+     "added": 0,
+     "removed": 0,
+     "code_window": 75
+    },
+    "ps": {
+     "n": 811,
+     "added": 0,
+     "removed": 0,
+     "code_window": 75
+    },
+    "allin": {
+     "n": 811,
+     "added": 0,
+     "removed": 0,
+     "code_window": 75
+    }
+   }
+  },
+  "valves|long": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 17,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 17,
+    "fam_hi": 18
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 20,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 20,
+    "fam_hi": 20
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 1543,
+     "added": 0,
+     "removed": 0,
+     "code_window": 157
+    },
+    "nvn19": {
+     "n": 1543,
+     "added": 0,
+     "removed": 0,
+     "code_window": 157
+    },
+    "nvr": {
+     "n": 1543,
+     "added": 0,
+     "removed": 0,
+     "code_window": 157
+    },
+    "s1": {
+     "n": 1543,
+     "added": 0,
+     "removed": 0,
+     "code_window": 157
+    },
+    "ps": {
+     "n": 1543,
+     "added": 0,
+     "removed": 0,
+     "code_window": 157
+    },
+    "allin": {
+     "n": 1543,
+     "added": 0,
+     "removed": 0,
+     "code_window": 157
+    }
+   }
+  },
+  "aircraft|short": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 18
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 18
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 18
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 18
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 18
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 18
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 18
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 18
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 18
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 880,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvn19": {
+     "n": 880,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvr": {
+     "n": 880,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "s1": {
+     "n": 880,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "ps": {
+     "n": 880,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "allin": {
+     "n": 880,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    }
+   }
+  },
+  "aircraft|long": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 14,
+    "hi": 14,
+    "families": 20,
+    "fam_lo": 14,
+    "fam_hi": 14
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 18,
+    "fam_hi": 18
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 18,
+    "fam_hi": 18
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 18,
+    "fam_hi": 18
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 18,
+    "fam_hi": 18
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 18,
+    "fam_hi": 18
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 18,
+    "fam_hi": 18
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 18,
+    "fam_hi": 18
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 18,
+    "families": 20,
+    "fam_lo": 18,
+    "fam_hi": 18
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 1426,
+     "added": 0,
+     "removed": 0,
+     "code_window": 58
+    },
+    "nvn19": {
+     "n": 1426,
+     "added": 0,
+     "removed": 0,
+     "code_window": 58
+    },
+    "nvr": {
+     "n": 1426,
+     "added": 0,
+     "removed": 0,
+     "code_window": 58
+    },
+    "s1": {
+     "n": 1426,
+     "added": 0,
+     "removed": 0,
+     "code_window": 58
+    },
+    "ps": {
+     "n": 1426,
+     "added": 0,
+     "removed": 0,
+     "code_window": 58
+    },
+    "allin": {
+     "n": 1426,
+     "added": 0,
+     "removed": 0,
+     "code_window": 58
+    }
+   }
+  },
+  "medical|short": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 20
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 20
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 20
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 20
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 20
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 20
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 20
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 20
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 20,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 20
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 134,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvn19": {
+     "n": 134,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "nvr": {
+     "n": 134,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "s1": {
+     "n": 134,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "ps": {
+     "n": 134,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    },
+    "allin": {
+     "n": 134,
+     "added": 0,
+     "removed": 0,
+     "code_window": 0
+    }
+   }
+  },
+  "medical|long": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 13,
+    "hi": 17,
+    "families": 20,
+    "fam_lo": 13,
+    "fam_hi": 17
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 18,
+    "fam_hi": 19
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 18,
+    "fam_hi": 19
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 18,
+    "fam_hi": 19
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 18,
+    "fam_hi": 19
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 18,
+    "fam_hi": 19
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 18,
+    "fam_hi": 19
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 18,
+    "fam_hi": 19
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 18,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 18,
+    "fam_hi": 19
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 1290,
+     "added": 0,
+     "removed": 0,
+     "code_window": 42
+    },
+    "nvn19": {
+     "n": 1290,
+     "added": 0,
+     "removed": 0,
+     "code_window": 42
+    },
+    "nvr": {
+     "n": 1290,
+     "added": 0,
+     "removed": 0,
+     "code_window": 42
+    },
+    "s1": {
+     "n": 1290,
+     "added": 0,
+     "removed": 0,
+     "code_window": 42
+    },
+    "ps": {
+     "n": 1290,
+     "added": 0,
+     "removed": 0,
+     "code_window": 42
+    },
+    "allin": {
+     "n": 1290,
+     "added": 0,
+     "removed": 0,
+     "code_window": 42
+    }
+   }
+  },
+  "ithardware|short": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 13,
+    "hi": 15,
+    "families": 20,
+    "fam_lo": 13,
+    "fam_hi": 15
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 19
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 19
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 19
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 19
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 19
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 19
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 19
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 15,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 15,
+    "fam_hi": 19
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 555,
+     "added": 11,
+     "removed": 0,
+     "code_window": 9
+    },
+    "nvn19": {
+     "n": 555,
+     "added": 11,
+     "removed": 0,
+     "code_window": 9
+    },
+    "nvr": {
+     "n": 555,
+     "added": 11,
+     "removed": 0,
+     "code_window": 9
+    },
+    "s1": {
+     "n": 555,
+     "added": 11,
+     "removed": 0,
+     "code_window": 9
+    },
+    "ps": {
+     "n": 555,
+     "added": 11,
+     "removed": 0,
+     "code_window": 9
+    },
+    "allin": {
+     "n": 555,
+     "added": 11,
+     "removed": 0,
+     "code_window": 9
+    }
+   }
+  },
+  "ithardware|long": {
+   "rc3": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 7,
+    "hi": 7,
+    "families": 20,
+    "fam_lo": 7,
+    "fam_hi": 7
+   },
+   "n2b": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 19
+   },
+   "nrs": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 19
+   },
+   "nvn": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 19
+   },
+   "nvn19": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 19
+   },
+   "nvr": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 19
+   },
+   "s1": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 19
+   },
+   "ps": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 19
+   },
+   "allin": {
+    "n": 20,
+    "labelled": 20,
+    "lo": 16,
+    "hi": 19,
+    "families": 20,
+    "fam_lo": 16,
+    "fam_hi": 19
+   },
+   "matched_vs_rc3": {
+    "nvn": {
+     "n": 1595,
+     "added": 11,
+     "removed": 0,
+     "code_window": 58
+    },
+    "nvn19": {
+     "n": 1595,
+     "added": 11,
+     "removed": 0,
+     "code_window": 58
+    },
+    "nvr": {
+     "n": 1595,
+     "added": 11,
+     "removed": 0,
+     "code_window": 58
+    },
+    "s1": {
+     "n": 1595,
+     "added": 11,
+     "removed": 0,
+     "code_window": 58
+    },
+    "ps": {
+     "n": 1595,
+     "added": 11,
+     "removed": 0,
+     "code_window": 58
+    },
+    "allin": {
+     "n": 1595,
+     "added": 11,
+     "removed": 0,
+     "code_window": 58
+    }
+   }
+  }
+ },
+ "pooled_short_rc3": {
+  "raw": [
+   0.714,
+   0.789
+  ],
+  "n": 280,
+  "below_40": [
+   "guards",
+   "parts"
+  ]
+ },
+ "pooled_short_n2b": {
+  "raw": [
+   0.721,
+   0.804
+  ],
+  "n": 280,
+  "below_40": [
+   "guards",
+   "parts"
+  ]
+ },
+ "pooled_short_nrs": {
+  "raw": [
+   0.732,
+   0.825
+  ],
+  "n": 280,
+  "below_40": [
+   "guards",
+   "parts"
+  ]
+ },
+ "pooled_short_nvn": {
+  "raw": [
+   0.736,
+   0.818
+  ],
+  "n": 280,
+  "below_40": [
+   "guards",
+   "parts"
+  ]
+ },
+ "pooled_short_nvn19": {
+  "raw": [
+   0.732,
+   0.818
+  ],
+  "n": 280,
+  "below_40": [
+   "guards",
+   "parts"
+  ]
+ },
+ "pooled_short_nvr": {
+  "raw": [
+   0.732,
+   0.818
+  ],
+  "n": 280,
+  "below_40": [
+   "guards",
+   "parts"
+  ]
+ },
+ "pooled_short_s1": {
+  "raw": [
+   0.732,
+   0.825
+  ],
+  "n": 280,
+  "below_40": [
+   "guards",
+   "parts"
+  ]
+ },
+ "pooled_short_ps": {
+  "raw": [
+   0.757,
+   0.854
+  ],
+  "n": 280,
+  "below_40": [
+   "guards"
+  ]
+ },
+ "pooled_short_allin": {
+  "raw": [
+   0.732,
+   0.825
+  ],
+  "n": 280,
+  "below_40": [
+   "guards",
+   "parts"
+  ]
+ },
+ "pooled_long_rc3": {
+  "raw": [
+   0.607,
+   0.664
+  ],
+  "n": 280,
+  "below_40": [
+   "nursing",
+   "guards",
+   "steelbldg",
+   "ithardware"
+  ]
+ },
+ "pooled_long_n2b": {
+  "raw": [
+   0.739,
+   0.8
+  ],
+  "n": 280,
+  "below_40": [
+   "guards",
+   "steelbldg"
+  ]
+ },
+ "pooled_long_nrs": {
+  "raw": [
+   0.743,
+   0.811
+  ],
+  "n": 280,
+  "below_40": [
+   "guards",
+   "steelbldg"
+  ]
+ },
+ "pooled_long_nvn": {
+  "raw": [
+   0.754,
+   0.814
+  ],
+  "n": 280,
+  "below_40": [
+   "guards",
+   "steelbldg"
+  ]
+ },
+ "pooled_long_nvn19": {
+  "raw": [
+   0.754,
+   0.818
+  ],
+  "n": 280,
+  "below_40": [
+   "guards",
+   "steelbldg"
+  ]
+ },
+ "pooled_long_nvr": {
+  "raw": [
+   0.75,
+   0.814
+  ],
+  "n": 280,
+  "below_40": [
+   "guards",
+   "steelbldg"
+  ]
+ },
+ "pooled_long_s1": {
+  "raw": [
+   0.761,
+   0.829
+  ],
+  "n": 280,
+  "below_40": [
+   "guards"
+  ]
+ },
+ "pooled_long_ps": {
+  "raw": [
+   0.768,
+   0.836
+  ],
+  "n": 280,
+  "below_40": [
+   "guards"
+  ]
+ },
+ "pooled_long_allin": {
+  "raw": [
+   0.743,
+   0.811
+  ],
+  "n": 280,
+  "below_40": [
+   "guards",
+   "steelbldg"
+  ]
+ }
+}

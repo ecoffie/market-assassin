@@ -215,3 +215,42 @@ All of them are now labelled. The 382 new items were labelled by two blind revie
 - **View:** Q518, Q501 and Q701 are clean (6 FIT/FIT of 11, 1 NO). Q201 is the noise source: comprehensive-medical buys are provider or facility contracts, not staffing.
   - Narrowing to Q501/Q518/Q701 (plus Q519) would keep most of the FIT gain.
   - It would give up the Q201 PARTIALs, which count toward the bar only if Eric counts Related for this trade. Short would then likely sit near 8–11, not 11–15.
+
+## Addendum 6: nursing variants, parts/steel fixes (S1, P1/P2), all-in head
+
+**Method.**
+- Run with runner 1.1.0, route parity 28/28 on every head.
+- 10 new top-20 items were labelled by two reviewers, who agreed on 9 of 10. Script: `scripts/r15.py`. Results: `results/r15_eval.json`.
+- **Heads:**
+  - nursing V-narrow (Q501/Q518/Q701) `43a1c6ca7`
+  - V-narrow plus Q519 `96b283535`
+  - V-ranked `522b82da2`
+  - S1 `f94a01444`
+  - S1 plus P1/P2 `4a89f74f6`
+  - all-in `e4cee694a`. It does not contain the nursing variants or S1/P1/P2, so its scores equal `5d48336e1`.
+
+| Pooled, raw | all-in `e4cee694a` | S1 + P1/P2 `4a89f74f6` |
+|---|---|---|
+| Short | 73–83% | **76–85%** |
+| Long | 74–81% | **77–84%** |
+| Short businesses below 40% | guards, parts | **guards** |
+| Long businesses below 40% | guards, steel | **guards** |
+
+- **Steel long (S1):** 6–7 → **11–12**. It clears 8/20.
+- **Parts (P1/P2):** short 7–9 → **14–17**, which clears 8/20. Long 17 → 19.
+- **No business is lower** than `5d48336e1` under any head.
+- **S1 drop check.** Steel long's matched set falls from 1,562 to 1,022 (542 dropped).
+  - All 37 labelled-relevant steel notices are still matched.
+  - None of the 542 had been labelled, so two reviewers labelled a sample of 30: every title-keyword hit (6, including the hangar builds) plus 24 random. All 30 came back NO/NO.
+  - Bound on the random part: under 12% relevant (95% upper, 0 of 24).
+  - Caveat: the hangar and new-building notices likely include steel erection but never say so. The rubric counts only stated work, so a human SME could call those Related.
+- **Nursing variants (relevant of the top 20):**
+
+| Variant | Short | Long |
+|---|---|---|
+| Full family | 11–15 | 10–13 |
+| **V-narrow** | **12–13** | **13–14** |
+| V-narrow + Q519 | 11–13 | 13–15 |
+| V-ranked | 11–13 | 12–14 |
+
+  V-narrow matches or beats the full family on the lower bound and carries fewer split or NO rows. It is the recommended variant.
