@@ -28,6 +28,7 @@
  * Gated: consumers switch to this only when PAID_STATUS_RESOLVER=true (literal 'true',
  * like every repo flag). Default OFF = every consumer keeps its old definition.
  */
+import { kv } from '@vercel/kv';
 import { getWriteClient } from '@/lib/supabase/server-clients';
 import { getStaffRole } from '@/lib/api-auth';
 import { isAdvocateAccount } from '@/lib/mindy/advocate-accounts';
@@ -50,7 +51,7 @@ export * from './paid-reasons';
 
 export type PaidStatusKind =
   | 'active_paid'      // live paid subscription, live MCP plan, or a funded team pool
-  | 'prepaid'          // live off-Stripe prepaid term (invoice / wire / bundle)
+  | 'prepaid'          // live off-Stripe prepaid term (invoice / wire / bundle), or a lifetime / bundle purchase
   | 'paid_credits'     // bought credits (top-up / auto-recharge), no live subscription
   | 'complimentary'    // staff / advocate / comp — access yes, paid no
   | 'trial'            // trialing; a $0 trial invoice is still a trial
@@ -66,6 +67,7 @@ export type PaidSource =
   | 'unverified_app_tier'
   | 'credit_purchase'
   | 'prepaid'
+  | 'lifetime_purchase'
   | 'pool'
   | 'trial'
   | 'staff'
@@ -124,6 +126,11 @@ export interface PaidStatusFacts {
   /** undefined when the trial read failed. */
   trialReadOk?: boolean;
   poolFunded: boolean | null;
+  /**
+   * A lifetime / bundle purchase that is live right now (owner 2026-11-15: lifetime bundle
+   * members are paid). undefined = not read (treated as no); null = the read FAILED.
+   */
+  lifetimeMember?: boolean | null;
   isStaff: boolean;
   isAdvocate: boolean;
   isComp: boolean;
@@ -168,6 +175,7 @@ export function classifyPaidStatus(f: PaidStatusFacts, policy: PaidStatusPolicy 
   if (f.prepaid === null) failures.push('mcp_prepaid_entitlements');
   if (f.trialReadOk === false) failures.push('trial_ends_at');
   if (f.poolFunded === null) failures.push('payer');
+  if (f.lifetimeMember === null) failures.push('lifetime_purchase');
 
   const sources = new Set<PaidSource>();
   if (f.isStaff) sources.add('staff');
@@ -225,6 +233,10 @@ export function classifyPaidStatus(f: PaidStatusFacts, policy: PaidStatusPolicy 
   const prepaidLive = f.prepaid!.some((p) => p.access_starts_on <= today && today <= p.access_ends_on);
   if (prepaidLive) sources.add('prepaid');
 
+  // Lifetime / bundle buyers paid once for permanent access: paid, like a prepaid term.
+  const lifetime = f.lifetimeMember === true;
+  if (lifetime) sources.add('lifetime_purchase');
+
   if (f.poolFunded) sources.add('pool');
 
   const profileTrial = Number.isFinite(ts(f.trialEndsAt ?? null)) && ts(f.trialEndsAt ?? null) >= now;
@@ -250,7 +262,7 @@ export function classifyPaidStatus(f: PaidStatusFacts, policy: PaidStatusPolicy 
   // --- Headline kind (precedence)
   let kind: PaidStatusKind;
   if (activePaidSub || mcpSubLive || f.poolFunded) kind = 'active_paid';
-  else if (prepaidLive) kind = 'prepaid';
+  else if (prepaidLive || lifetime) kind = 'prepaid';
   else if (creditPurchase) kind = 'paid_credits';
   else if (complimentaryRegistry || complimentaryLedger) kind = 'complimentary';
   else if (trialing) kind = 'trial';
@@ -316,6 +328,8 @@ export interface PaidStatusReader {
   prepaid(email: string): Promise<Read<PrepaidFact[]>>;
   trialEndsAt(email: string): Promise<Read<string | null>>;
   poolFunded(email: string): Promise<Read<boolean>>;
+  /** Optional so older readers keep working: absent = not read (counted as no). */
+  lifetimeMember?(email: string): Promise<Read<boolean>>;
 }
 
 export const LEDGER_CAP = 1000;
@@ -385,6 +399,29 @@ export const supabasePaidStatusReader: PaidStatusReader = {
     if (payer.kind === 'unavailable') return { ok: false };
     return { ok: true, value: payer.kind === 'pool' };
   },
+  /**
+   * Same attribution rule as R2 (entitlements/sources.ts): customer_classifications is a
+   * point-in-time Stripe snapshot, so a 'lifetime' row counts only while a Pro grant is
+   * live right now (KV briefings:{email} or an unexpired user_profiles.access_briefings).
+   * A cancelled or churned row therefore never makes an account paid.
+   */
+  async lifetimeMember(email) {
+    const db = getWriteClient();
+    const [cls, prof] = await Promise.all([
+      db.from('customer_classifications').select('briefings_access, briefings_expiry').eq('email', email).maybeSingle(),
+      db.from('user_profiles').select('access_briefings, briefings_expires_at').eq('email', email).maybeSingle(),
+    ]);
+    if (cls.error || prof.error) return { ok: false };
+    const c = cls.data as { briefings_access?: string | null; briefings_expiry?: string | null } | null;
+    const now = Date.now();
+    const live = (iso: string | null | undefined) => !iso || Date.parse(iso) >= now;
+    if (c?.briefings_access !== 'lifetime' || !live(c.briefings_expiry)) return { ok: true, value: false };
+    const p = prof.data as { access_briefings?: boolean | null; briefings_expires_at?: string | null } | null;
+    if (p?.access_briefings && live(p.briefings_expires_at)) return { ok: true, value: true };
+    let kvGrant: unknown;
+    try { kvGrant = await kv.get(`briefings:${email}`); } catch { return { ok: false }; }
+    return { ok: true, value: !!kvGrant };
+  },
 };
 
 async function safe<T>(p: () => Promise<Read<T>>): Promise<Read<T>> {
@@ -411,12 +448,13 @@ export async function resolvePaidStatus(
       poolFunded: false, isStaff: false, isAdvocate: false, isComp: false,
     });
   }
-  const [ledger, stripe, prepaid, trial, pool] = await Promise.all([
+  const [ledger, stripe, prepaid, trial, pool, lifetime] = await Promise.all([
     safe(() => reader.ledgerGrants(email, LEDGER_CAP)),
     safe(() => reader.subscriptionsAndCharges(email)),
     safe(() => reader.prepaid(email)),
     safe(() => reader.trialEndsAt(email)),
     safe(() => reader.poolFunded(email)),
+    reader.lifetimeMember ? safe(() => reader.lifetimeMember!(email)) : Promise.resolve(undefined),
   ]);
   return classifyPaidStatus({
     now,
@@ -429,6 +467,7 @@ export async function resolvePaidStatus(
     trialEndsAt: trial.ok ? trial.value : null,
     trialReadOk: trial.ok,
     poolFunded: pool.ok ? pool.value : null,
+    lifetimeMember: lifetime === undefined ? undefined : lifetime.ok ? lifetime.value : null,
     isStaff, isAdvocate, isComp,
   });
 }
