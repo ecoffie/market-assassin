@@ -1,0 +1,31 @@
+{"id":"r9-0045","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"VLV,DIAPH CONTROL, FSC 4820 valve supply"}
+{"id":"r9-0046","label":"NO","role":"NONE","restriction":"UNCLEAR","evidence":"return COMPUTER,FUEL MANAG to Ready For Issue condition - repair"}
+{"id":"r9-0048","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"online access to SEDOL data, sole source London Stock Exchange Group"}
+{"id":"r9-0050","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PARTS KIT,BALL VALV, FSC 4820, small business set-aside"}
+{"id":"r9-0051","label":"FIT","role":"PRIME","restriction":"UNCLEAR","evidence":"purchase equipment to upgrade Infoblox DDI Grid, NAICS 423430"}
+{"id":"r9-0052","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"DISK DRIVE UNIT, PSC 7E20"}
+{"id":"r9-0054","label":"NO","role":"NONE","restriction":"UNCLEAR","evidence":"DISPLAY UNIT, IN REPAIR/MODIFICATION OF - repair turnaround pricing"}
+{"id":"r9-0058","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"INTERFACE UNIT,DATA, PSC 7E20"}
+{"id":"r9-0060","label":"NO","role":"NONE","restriction":"NONE","evidence":"Industry Day for Callao Naval Base construction"}
+{"id":"r9-0062","label":"NO","role":"NONE","restriction":"UNCLEAR","evidence":"PROCESSOR,DISPLAY items to be overhauled, upgraded, repaired"}
+{"id":"r9-0063","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"procurement of classroom equipment, PSC 7B20"}
+{"id":"r9-0064","label":"NO","role":"NONE","restriction":"UNCLEAR","evidence":"TEST DEVICE,INTERFACE, PSC 7K20; details only in attachment"}
+{"id":"r9-0065","label":"NO","role":"NONE","restriction":"NONE","evidence":"modular ergonomic workstations and supporting office furniture, FSC 7110"}
+{"id":"r9-0066","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"STEM,FLUID VALVE, FSC 4820 valve part"}
+{"id":"r9-0067","label":"FIT","role":"PRIME","restriction":"UNCLEAR","evidence":"Wacom Cintiq Pro 27, PSC 7E20, small business set-aside"}
+{"id":"r9-0068","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"DISK DRIVE UNIT, PSC 7E20"}
+{"id":"r9-0069","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"SAGE Premier All Access Package library subscription, sole source LYRASIS"}
+{"id":"r9-0070","label":"NO","role":"NONE","restriction":"UNCLEAR","evidence":"INTERFACE UNIT,AUTO - repair price includes complete repair of material"}
+{"id":"r9-0071","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"TERMINAL,DATA PROCE supply, PSC 7E20"}
+{"id":"r9-0072","label":"PARTIAL","role":"SUB","restriction":"SOLE_SOURCE","evidence":"correlation system kit includes Compact PC and LCD Monitor; sole source CSI"}
+{"id":"r9-0073","label":"NO","role":"NONE","restriction":"NONE","evidence":"Shuttle Bus Service transporting employees between parking lots"}
+{"id":"r9-0075","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"WV Communications Command Panel with Voice Channels, sole source"}
+{"id":"r9-0076","label":"NO","role":"NONE","restriction":"NONE","evidence":"flooring overlay with welded seam resilient sheet flooring"}
+{"id":"r9-0079","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"MONITOR, TELEVISION; approved source LG Electronics P/N 27BA450-B"}
+{"id":"r9-0081","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"600 tablets similar or equal to Samsung Galaxy, cases, chargers"}
+{"id":"r9-0082","label":"NO","role":"NONE","restriction":"NONE","evidence":"two complete armored SUVs - vehicles, not replacement parts"}
+{"id":"r9-0084","label":"NO","role":"NONE","restriction":"NONE","evidence":"Radiant Heating Panel Replacement, PSC J045 repair service"}
+{"id":"r9-0085","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"Cybersecurity Documentation for MK 66 HUTT, sole source"}
+{"id":"r9-0086","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"CONVERTER,ANALOG TO digital, PSC 7E20"}
+{"id":"r9-0087","label":"NO","role":"NONE","restriction":"UNCLEAR","evidence":"CIRCUIT CARD ASSEMB, no description; component not IT hardware line"}
+{"id":"r9-0088","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"Printer Supplies BPA for U.S. Embassy Hanoi, FSC 7510"}

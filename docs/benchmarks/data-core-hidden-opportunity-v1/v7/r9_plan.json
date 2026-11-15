@@ -1,0 +1,181 @@
+{
+ "janitorial|short": {
+  "added": 0,
+  "added_sample": []
+ },
+ "janitorial|long": {
+  "added": 0,
+  "added_sample": []
+ },
+ "nursing|short": {
+  "added": 1,
+  "added_sample": [
+   "22ace9883f444f5694d4d2113ddca59e"
+  ]
+ },
+ "nursing|long": {
+  "added": 0,
+  "added_sample": []
+ },
+ "hvac|short": {
+  "added": 0,
+  "added_sample": []
+ },
+ "hvac|long": {
+  "added": 0,
+  "added_sample": []
+ },
+ "guards|short": {
+  "added": 0,
+  "added_sample": []
+ },
+ "guards|long": {
+  "added": 0,
+  "added_sample": []
+ },
+ "steelbldg|short": {
+  "added": 12,
+  "added_sample": [
+   "faa8aac4b1a14663b0d3e313fc7cbd39",
+   "c27b048bc9da4521b4d3749d630b4438",
+   "2bd5e12e31604255a22317f1be085ba6",
+   "6229ec758d05403a95dcb40422f194dd",
+   "2fbd9c805d9d4ee4a4ee4907555badc6",
+   "f151911bb4d6459eb12d3c0e9b18f0d3",
+   "17b47b0fd9ea40b999bfb9fa007b6d4b",
+   "ada6d118165a47d4aa4dd1981aef8b74",
+   "c3daacd708a04bca8f8519633fa5556c",
+   "2f67303ae5b44492976687458cc24460",
+   "746f6b48cca54b538deea71db90d3bfa",
+   "4d90db4cfe8b4958a0868dabe59c7035"
+  ]
+ },
+ "steelbldg|long": {
+  "added": 0,
+  "added_sample": []
+ },
+ "grounds|short": {
+  "added": 0,
+  "added_sample": []
+ },
+ "grounds|long": {
+  "added": 0,
+  "added_sample": []
+ },
+ "paving|short": {
+  "added": 0,
+  "added_sample": []
+ },
+ "paving|long": {
+  "added": 0,
+  "added_sample": []
+ },
+ "parts|short": {
+  "added": 0,
+  "added_sample": []
+ },
+ "parts|long": {
+  "added": 0,
+  "added_sample": []
+ },
+ "fasteners|short": {
+  "added": 0,
+  "added_sample": []
+ },
+ "fasteners|long": {
+  "added": 0,
+  "added_sample": []
+ },
+ "electrical|short": {
+  "added": 0,
+  "added_sample": []
+ },
+ "electrical|long": {
+  "added": 0,
+  "added_sample": []
+ },
+ "valves|short": {
+  "added": 0,
+  "added_sample": []
+ },
+ "valves|long": {
+  "added": 0,
+  "added_sample": []
+ },
+ "aircraft|short": {
+  "added": 0,
+  "added_sample": []
+ },
+ "aircraft|long": {
+  "added": 0,
+  "added_sample": []
+ },
+ "medical|short": {
+  "added": 0,
+  "added_sample": []
+ },
+ "medical|long": {
+  "added": 0,
+  "added_sample": []
+ },
+ "ithardware|short": {
+  "added": 119,
+  "added_sample": [
+   "747a836a44644d0dbf75683fff5ab55a",
+   "d0fa5e6b126a405eac9920b18931ff09",
+   "cb37240c92e646429a41b36a1d242b34",
+   "a8ea5e68f336425c83780dfee900c43d",
+   "482048e56dbf469bbcb81c4e70a320db",
+   "7e36a35559874307821781b3ff308913",
+   "6bb4cb10b49644faa217029ff36b6a3d",
+   "a3a50381ce94446d9d8a1f3de2b5c8e1",
+   "d12586d4289e4c1b84b1caf8bf541ec7",
+   "4f5b73aac65b4cf59d5e076ddf159206",
+   "6983ef64eae84b6789638a6497ae12c9",
+   "ec9153cff9294b378fa1cdbd798d1e20",
+   "cf6074f8928849978475ac1dccac93dc",
+   "71dffb70dc044e1d8d6e9fe0e368e4a6",
+   "c733fdc3d36b4667a27d573388518e5a",
+   "f0cae2e3d69b4a38ac2d77a8b7c28f3e",
+   "0044da9efa804297bf4fb63767f04c39",
+   "f1fe4767c7694aa2801188b6a4d1035c",
+   "dae4b0136b564cd2a179627ec3c5050f",
+   "b6a95458815e46838b573c4270a9e74a",
+   "3368677092ce4e14b327cea3302b8a00",
+   "d939b25293454121bfe784d31b4643d8",
+   "a8037d5023134e149aafe9182733c305",
+   "d2f94daa4668458d9bdb554febbe1e22",
+   "bddf73ee652e44a0b97bd4023d42c2dd",
+   "89ee4a241a704baeacd8d94c3a8ba3e4",
+   "4add6c7b2e5c4748bae31eeb742fcbc0",
+   "8d833c337f7b4f1a9e0b5fab7d241d4c",
+   "8a2789cee43a4cf2984c8dae3b4b88a6",
+   "f3df0331e7a04923a41f12b121c074b8"
+  ]
+ },
+ "ithardware|long": {
+  "added": 83,
+  "added_sample": [
+   "09809b2087954c19aec0cbfb7accaf3b",
+   "54a3c45eb1584d4ba29250e8ade148ae",
+   "a8ea5e68f336425c83780dfee900c43d",
+   "a8037d5023134e149aafe9182733c305",
+   "d12586d4289e4c1b84b1caf8bf541ec7",
+   "0cb9968c28364f9882d3bf0cfe6b2e0c",
+   "b219dc5d9add4578b68caa9fe98b742a",
+   "a8d6368d77a34b2287c9c9bfec81afcd",
+   "7df6fd1792324173a2068f1c5f0095bd",
+   "78c13ce4b3d4431eb5032f970935cfa8",
+   "0f94563e1cdb4105ba2d8e66e35f11ab",
+   "e533baa63b274223a8352456e040ac42",
+   "fe7ff42f0bce4d70a8878e28bf1f5215",
+   "cf6074f8928849978475ac1dccac93dc",
+   "881a500a1e25426dae29beb431903b8a",
+   "c2841205d8e444fd84ddf1d84773c8af",
+   "d2f94daa4668458d9bdb554febbe1e22",
+   "e1f7e2169be44ea89e0ec4af777976f1",
+   "5d74304ff75846808d167850608650dc",
+   "c43415e9274d4762bda92b183cf72097"
+  ]
+ }
+}

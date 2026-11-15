@@ -1,0 +1,23 @@
+{"id":"r9-0003","label":"NO","role":"NONE","evidence":"Concrete Shield Blocks are a product purchase, not paving work"}
+{"id":"r9-0004","label":"NO","role":"NONE","evidence":"Carpet removal and replacement plus stripe repainting, a new construction requirement, not janitorial"}
+{"id":"r9-0009","label":"PARTIAL","role":"PRIME","evidence":"Roof Replacement project at USPS P&DC; roofing type not stated as metal"}
+{"id":"r9-0011","label":"PARTIAL","role":"PRIME","evidence":"Correct Storm Water Drainage construction; drainage is one of their listed services"}
+{"id":"r9-0015","label":"NO","role":"NONE","evidence":"Emergency department renovation construction project, no nurse staffing bought"}
+{"id":"r9-0017","label":"NO","role":"NONE","evidence":"Residential withdrawal management facility services; medical staffing only a capability question"}
+{"id":"r9-0020","label":"NO","role":"NONE","evidence":"Framed acrylic artwork and warranty, not steel buildings or roofing"}
+{"id":"r9-0025","label":"PARTIAL","role":"PRIME","evidence":"Trash and Recycling Removal Services; trash removal is a listed duty, scope vague"}
+{"id":"r9-0032","label":"NO","role":"NONE","evidence":"ECG management system support; healthcare facilities list only, no staff placement"}
+{"id":"r9-0040","label":"NO","role":"NONE","evidence":"Acid Mine Drainage Remediation Project, environmental remediation not paving"}
+{"id":"r9-0047","label":"NO","role":"NONE","evidence":"Aluminum pocket plate fabrication for reactor, unrelated product"}
+{"id":"r9-0049","label":"FIT","role":"PRIME","evidence":"Turnkey procurement and erection of two relocatable metal building hangars"}
+{"id":"r9-0053","label":"PARTIAL","role":"PRIME","evidence":"Trash and Garbage Removal Services; scope unstated, trash removal listed duty"}
+{"id":"r9-0055","label":"NO","role":"NONE","evidence":"Design and construction repair of Army Reserve Center; no metal roofing or steel erection stated"}
+{"id":"r9-0056","label":"PARTIAL","role":"SUB","evidence":"Additional site work, including paving and utilities, is also required"}
+{"id":"r9-0057","label":"FIT","role":"PRIME","evidence":"Pavement rehabilitation: milling, patching, asphalt overlay, pavement marking"}
+{"id":"r9-0059","label":"FIT","role":"PRIME","evidence":"Maintenance Shop HVAC/Heat Replacement construction bid"}
+{"id":"r9-0061","label":"PARTIAL","role":"SUB","evidence":"Bridge repair including reconstruction of asphalt concrete pavement and aggregate base"}
+{"id":"r9-0074","label":"NO","role":"NONE","evidence":"Trash hauling with roll-off compactor pulls, waste hauling not office cleaning"}
+{"id":"r9-0077","label":"FIT","role":"PRIME","evidence":"Complete mechanical replacement of HVAC systems, air handler and condensing unit"}
+{"id":"r9-0078","label":"NO","role":"NONE","evidence":"Fully-adhered EPDM membrane roof system, not metal roofing"}
+{"id":"r9-0080","label":"PARTIAL","role":"SUB","evidence":"Replaces failing standing seam metal roof within larger repair project"}
+{"id":"r9-0083","label":"NO","role":"NONE","evidence":"VALVE,CHECK material purchase, not guard services"}

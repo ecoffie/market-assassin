@@ -1,0 +1,31 @@
+{"id":"r9-0045","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"48--VLV,DIAPH CONTROL, PSC 4820 valve"}
+{"id":"r9-0046","label":"NO","role":"NONE","restriction":"NONE","evidence":"Return COMPUTER,FUEL MANAG to Ready For Issue condition; repair"}
+{"id":"r9-0048","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"Online SEDOL data access single source to London Stock Exchange Group"}
+{"id":"r9-0050","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PARTS KIT,BALL VALV, PSC 4820, Navy solicitation"}
+{"id":"r9-0051","label":"FIT","role":"PRIME","restriction":"UNCLEAR","evidence":"Upgrade equipment for Infoblox DDI Grid, NAICS 423430 computer wholesalers"}
+{"id":"r9-0052","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"DISK DRIVE UNIT under PSC 7E20"}
+{"id":"r9-0054","label":"NO","role":"NONE","restriction":"NONE","evidence":"DISPLAY UNIT, IN REPAIR/MODIFICATION OF; repair unit price"}
+{"id":"r9-0058","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"INTERFACE UNIT,DATA under PSC 7E20, Navy solicitation"}
+{"id":"r9-0060","label":"NO","role":"NONE","restriction":"NONE","evidence":"Industry day for Peru naval base construction, no products bought"}
+{"id":"r9-0062","label":"NO","role":"NONE","restriction":"NONE","evidence":"PROCESSOR,DISPLAY A, IN REPAIR/MODIFICATION OF; items overhauled and repaired"}
+{"id":"r9-0063","label":"NO","role":"NONE","restriction":"NONE","evidence":"Classroom equipment for Embassy Yerevan, no IT items specified"}
+{"id":"r9-0064","label":"NO","role":"NONE","restriction":"NONE","evidence":"TEST DEVICE,INTERFACE; See attachment, no item detail"}
+{"id":"r9-0065","label":"NO","role":"NONE","restriction":"NONE","evidence":"Modular ergonomic workstations and office furniture, PSC 7110"}
+{"id":"r9-0066","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"STEM,FLUID VALVE, PSC 4820, NAVSUP solicitation"}
+{"id":"r9-0067","label":"FIT","role":"PRIME","restriction":"BRAND_NAME","evidence":"Wacom Cintiq Pro 27 pen display, PSC 7E20, small business set-aside"}
+{"id":"r9-0068","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"DISK DRIVE UNIT under PSC 7E20 DLA solicitation"}
+{"id":"r9-0069","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"Sole source LYRASIS SAGE library package, information service"}
+{"id":"r9-0070","label":"NO","role":"NONE","restriction":"NONE","evidence":"INTERFACE UNIT,AUTO; include all costs of complete repair of material"}
+{"id":"r9-0071","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"TERMINAL,DATA PROCE under PSC 7E20 DLA solicitation"}
+{"id":"r9-0072","label":"PARTIAL","role":"SUB","restriction":"SOLE_SOURCE","evidence":"Digital image correlation system including compact PCs and LCD monitors; sole source"}
+{"id":"r9-0073","label":"NO","role":"NONE","restriction":"NONE","evidence":"Shuttle bus services for VA, transportation service"}
+{"id":"r9-0075","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"WV Communications command panel; sole source to WV Communications"}
+{"id":"r9-0076","label":"NO","role":"NONE","restriction":"NONE","evidence":"Flooring overlay with welded seam sheet vinyl, construction work"}
+{"id":"r9-0079","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN5820-016988270 MONITOR, TELEVISION; approved source LG Electronics"}
+{"id":"r9-0081","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"600 tablets similar or equal to Samsung Galaxy, cases and chargers"}
+{"id":"r9-0082","label":"NO","role":"NONE","restriction":"NONE","evidence":"Two armored SUVs, complete vehicles not replacement parts"}
+{"id":"r9-0084","label":"NO","role":"NONE","restriction":"NONE","evidence":"Radiant Heating Panel Replacement at VA medical center, facility work"}
+{"id":"r9-0085","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"Cybersecurity documentation for MK 66 target, sole source unrestricted"}
+{"id":"r9-0086","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"70--CONVERTER,ANALOG TO under PSC 7E20, DLA solicitation"}
+{"id":"r9-0087","label":"PARTIAL","role":"PRIME","restriction":"UNCLEAR","evidence":"CIRCUIT CARD ASSEMB under PSC 7E20; no notice text"}
+{"id":"r9-0088","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"Printer supplies BPA for U.S. Embassy Hanoi, PSC 7510"}

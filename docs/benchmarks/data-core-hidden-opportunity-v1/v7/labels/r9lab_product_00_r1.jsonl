@@ -1,0 +1,35 @@
+{"id":"r9-0000","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"CLC Genomics Workbench software sole source to Qiagen"}
+{"id":"r9-0001","label":"NO","role":"NONE","restriction":"NONE","evidence":"Commercial Solution Opening for satellite Digital IF subsystem"}
+{"id":"r9-0002","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"Supercomputer administration and maintenance services, sole source to HPE"}
+{"id":"r9-0005","label":"NO","role":"NONE","restriction":"NONE","evidence":"Salesforce subscription licenses and maintenance renewal, software"}
+{"id":"r9-0006","label":"NO","role":"NONE","restriction":"NONE","evidence":"Service and preventive maintenance of Canon Colorwave printer"}
+{"id":"r9-0007","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"SERVER,AUTOMATIC DA under PSC 7E20 DLA solicitation"}
+{"id":"r9-0008","label":"PARTIAL","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"Docking station NSN 5820017388657; Approved source is 06AE7"}
+{"id":"r9-0010","label":"NO","role":"NONE","restriction":"NONE","evidence":"COMPUTER,ENGINE NSN 6620-01-561-6852, engine instrument not IT hardware"}
+{"id":"r9-0012","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"Rolls Royce engine manual web access, sole source Rolls-Royce PLC"}
+{"id":"r9-0013","label":"NO","role":"NONE","restriction":"NONE","evidence":"KEYBOARD,DATA ENTRY, IN REPAIR/MODIFICATION OF, repair unit price quoted"}
+{"id":"r9-0014","label":"NO","role":"NONE","restriction":"UNCLEAR","evidence":"DISPLAY UNIT in repair; Government lacks data rights for other sources"}
+{"id":"r9-0016","label":"NO","role":"NONE","restriction":"NONE","evidence":"SERVER,AUTOMATIC DA; monetary limitation repair purchase orders, repair of material"}
+{"id":"r9-0018","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"MONITOR under PSC 7E20 DLA solicitation"}
+{"id":"r9-0019","label":"NO","role":"NONE","restriction":"NONE","evidence":"Nano-Aerosol Analyzer lab instrument, PSC 6640, not IT hardware"}
+{"id":"r9-0021","label":"NO","role":"NONE","restriction":"NONE","evidence":"KEYBOARD,DATA ENTRY in repair/modification; items overhauled and repaired"}
+{"id":"r9-0022","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PANEL PC under PSC 7E20 DLA solicitation"}
+{"id":"r9-0023","label":"NO","role":"NONE","restriction":"NONE","evidence":"GPS ground segment monitor station service, sustainment RFI"}
+{"id":"r9-0024","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Deliver, install, train on HP L730 64 inch Latex Printer"}
+{"id":"r9-0026","label":"NO","role":"NONE","restriction":"NONE","evidence":"SERVER,AUTOMATIC DA; include all costs of complete repair of material"}
+{"id":"r9-0027","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"Oxygen Monitor, Acft NSN 1660-01-473-3548; OC-ALC source approval required"}
+{"id":"r9-0028","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Computer, Digital NSN 7021-01-652-8356, PSC 7B22"}
+{"id":"r9-0029","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"70--INTERFACE UNIT,DATA under PSC 7E20, Navy solicitation"}
+{"id":"r9-0030","label":"NO","role":"NONE","restriction":"NONE","evidence":"Return COMPUTER,FUEL MANAG to Ready For Issue condition; repair requirement"}
+{"id":"r9-0031","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"70--IDE DRIVE ASSY under PSC 7E20 storage drive"}
+{"id":"r9-0033","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"HVAC/R repair parts, components, refrigerant and replacement equipment, PSC 4130"}
+{"id":"r9-0034","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"Power Control Assembly NSN 1680-01-258-5608; engineering source approval, qualified source Honeywell"}
+{"id":"r9-0035","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"COMPUTER,TABLET, PSC 7B22, DLA solicitation"}
+{"id":"r9-0036","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"Sole source repair of PN 266A640-530 NSN to Lockheed Martin"}
+{"id":"r9-0037","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"Provide and install hoist carriage assembly; sole source to OEM George Koch Sons"}
+{"id":"r9-0038","label":"NO","role":"NONE","restriction":"NONE","evidence":"Industry day announcement for A/E services in Peru"}
+{"id":"r9-0039","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"Perishable tooling for aileron hinge repair; sole source J&S Tool"}
+{"id":"r9-0041","label":"NO","role":"NONE","restriction":"NONE","evidence":"Live-fire maritime/urban training facility design and construction RFI"}
+{"id":"r9-0042","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"CIRCUIT CARD ASSEMBLY NSN 5998016125278; Approved source is 1HAR9"}
+{"id":"r9-0043","label":"NO","role":"NONE","restriction":"NONE","evidence":"Metal printer alterations completed onboard ships, service work"}
+{"id":"r9-0044","label":"PARTIAL","role":"PRIME","restriction":"UNCLEAR","evidence":"DISPLAY,SMALL PSC 7E20; proprietary design, contractor drawings required"}

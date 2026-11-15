@@ -65,3 +65,40 @@ plus labels reused from v3–v6. `RUBRIC-ADDENDUM-2026-11-14` rulings and adjudi
 - Human labels may differ, especially on the "related" calls. This preview certifies nothing.
 
 Files: `a3_matched_sets_rc2_classification.json` (Agent 3's file), `labels/` (both reviewers plus `r8_meta.json`), `results/r8_eval.json`, `scripts/r8.py`, `scripts/fetch_rows.mts`.
+
+## Addendum: RC3 development preview (`agent3/search-rc3` @ `34aad5828`, NOT tagged, not a holdout candidate unless Eric approves)
+
+89 new items (two reviewers, 82 of 89 agree on relevant-vs-not). Script: `scripts/r9.py`; results: `results/r9_eval.json`.
+RC3 changes vs RC2:
+- IT hardware: hardware PSCs plus a strict item rule.
+- Duplicate solicitation versions demoted behind the first of each family (nothing dropped).
+- Nursing on Q401 only.
+- Steel on 238120 / 238160 / 332311.
+
+**The raw top-20 is the frozen gate measure.** "Distinct family" is shown for every candidate as a supplementary view.
+
+| Pooled | RC1 | RC2 | RC3 |
+|---|---|---|---|
+| Short, raw | 38–42% | 67–74% | **71–79%** |
+| Long, raw | 41–45% | 62–66% | 61–66% |
+| Short businesses below 40% | 10 | 4 | **2**: guards, replacement parts |
+| Long businesses below 40% | 8 | 4 | **4**: nursing, guards, steel, IT hardware |
+
+- **Fixed or improved:**
+  - IT hardware short: 2–4 → **13–15**
+  - steel short: 6–7 → **12–15**
+  - parts long: 6 → 11 (RC1 was 18)
+  - nursing short: 8–9, borderline 40–45%
+- **Retrieval additions:**
+  - IT hardware short +119 at 11–12 of 30 relevant
+  - IT long +83 at 6–9 of 20
+  - steel +12 at 8 of 12
+  - Nothing removed.
+- **Guards 10–12 → 6–8 is a measurement artifact, not lost work.** The number of distinct relevant guard solicitations in the top-20 is the same, 6, under RC2 and RC3.
+  RC2 looked better only because duplicate copies of relevant notices (ACES ×2, PSO LA) filled extra slots. Janitorial short is the same (14 distinct relevant in both).
+- **Regressions to check:** paving long 15–17 → 12–14 (RC1 was 18–19), medical long 16–17 → 13–17.
+
+**A protocol question this raises for Eric:** when fewer than 8 distinct relevant opportunities exist in the window (guards has about 6–7), a 20-slot top-20 *cannot* reach 40% without duplicates.
+Three options: (a) keep the raw top-20 (guards fails by construction unless search shows fewer, better results); (b) measure relevance over the results actually shown, so a search
+that returns 13 strong rows is judged on 13 (as in the v4 Fix A+B case); (c) measure over distinct solicitation families. The frozen definition is (a). Changing it
+is Eric's decision and must happen before Dec 12.
