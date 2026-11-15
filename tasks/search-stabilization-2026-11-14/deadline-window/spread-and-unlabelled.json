@@ -1,0 +1,510 @@
+{
+ "spread": [
+  {
+   "business": "aircraft",
+   "phrasing": 0,
+   "before": " 0.7/  5.3/  15.1  10",
+   "after": " 5.8/ 16.2/  33.8   0"
+  },
+  {
+   "business": "aircraft",
+   "phrasing": 1,
+   "before": " 0.7/  5.3/   8.8  10",
+   "after": " 5.8/ 10.8/  17.8   0"
+  },
+  {
+   "business": "electrical",
+   "phrasing": 0,
+   "before": " 1.8/  9.3/  25.8   8",
+   "after": " 5.8/ 17.8/  25.8   0"
+  },
+  {
+   "business": "electrical",
+   "phrasing": 1,
+   "before": " 1.7/ 12.8/  22.8   5",
+   "after": " 5.8/ 16.3/  29.8   0"
+  },
+  {
+   "business": "fasteners",
+   "phrasing": 0,
+   "before": " 1.8/  9.8/ 727.2   6",
+   "after": " 5.4/ 12.0/ 727.2   0"
+  },
+  {
+   "business": "fasteners",
+   "phrasing": 1,
+   "before": " 1.8/  9.8/ 727.2   7",
+   "after": " 5.8/ 12.8/ 727.2   0"
+  },
+  {
+   "business": "grounds",
+   "phrasing": 0,
+   "before": " 1.6/  5.8/  43.8   9",
+   "after": " 1.8/ 10.1/  43.8   4"
+  },
+  {
+   "business": "grounds",
+   "phrasing": 1,
+   "before": " 1.6/  7.4/  43.8   7",
+   "after": " 1.8/ 10.1/  43.8   4"
+  },
+  {
+   "business": "guards",
+   "phrasing": 0,
+   "before": " 1.8/  8.4/  51.7   9",
+   "after": " 3.2/  8.4/  51.7   3"
+  },
+  {
+   "business": "guards",
+   "phrasing": 1,
+   "before": " 3.2/  8.8/1781.5   5",
+   "after": " 3.2/  8.8/1781.5   3"
+  },
+  {
+   "business": "hvac",
+   "phrasing": 0,
+   "before": " 1.5/  7.8/ 726.5   8",
+   "after": " 5.3/ 17.8/ 726.5   0"
+  },
+  {
+   "business": "hvac",
+   "phrasing": 1,
+   "before": " 1.3/  5.8/  15.9   9",
+   "after": " 5.8/ 18.2/ 727.2   0"
+  },
+  {
+   "business": "ithardware",
+   "phrasing": 0,
+   "before": " 1.7/ 13.3/ 727.2   5",
+   "after": " 1.7/ 15.8/ 727.2   4"
+  },
+  {
+   "business": "ithardware",
+   "phrasing": 1,
+   "before": " 1.7/ 13.3/ 727.2   5",
+   "after": " 1.7/ 15.8/ 727.2   4"
+  },
+  {
+   "business": "janitorial",
+   "phrasing": 0,
+   "before": " 1.2/  4.0/   5.9  13",
+   "after": " 1.7/  9.2/  17.6   4"
+  },
+  {
+   "business": "janitorial",
+   "phrasing": 1,
+   "before": " 1.2/  5.3/  22.8  10",
+   "after": " 5.7/ 16.0/  29.7   0"
+  },
+  {
+   "business": "medical",
+   "phrasing": 0,
+   "before": " 1.6/  5.7/ 727.2   9",
+   "after": " 3.6/  7.4/ 727.2   1"
+  },
+  {
+   "business": "medical",
+   "phrasing": 1,
+   "before": " 1.5/  5.8/ 137.9   8",
+   "after": " 1.5/  7.2/ 137.9   5"
+  },
+  {
+   "business": "nursing",
+   "phrasing": 0,
+   "before": " 1.2/  9.9/ 325.5   7",
+   "after": " 1.7/ 15.7/ 325.5   3"
+  },
+  {
+   "business": "nursing",
+   "phrasing": 1,
+   "before": " 1.2/  8.8/ 325.5   8",
+   "after": " 1.7/ 15.7/ 325.5   3"
+  },
+  {
+   "business": "parts",
+   "phrasing": 0,
+   "before": " 0.7/  1.0/   1.0  20",
+   "after": " 7.9/  8.1/   8.8   0"
+  },
+  {
+   "business": "parts",
+   "phrasing": 1,
+   "before": " 0.7/  1.0/   1.0  20",
+   "after": " 7.9/  8.8/   8.8   0"
+  },
+  {
+   "business": "paving",
+   "phrasing": 0,
+   "before": " 1.8/ 15.7/  60.9   5",
+   "after": " 3.7/ 16.2/1113.9   1"
+  },
+  {
+   "business": "paving",
+   "phrasing": 1,
+   "before": " 0.8/  5.9/  22.9   6",
+   "after": " 0.8/ 11.3/  60.9   2"
+  },
+  {
+   "business": "steelbldg",
+   "phrasing": 0,
+   "before": " 1.8/  8.8/  26.8   5",
+   "after": " 1.8/  8.8/  87.8   5"
+  },
+  {
+   "business": "steelbldg",
+   "phrasing": 1,
+   "before": " 1.7/  4.9/   9.0  11",
+   "after": " 1.8/  8.3/  26.8   5"
+  },
+  {
+   "business": "valves",
+   "phrasing": 0,
+   "before": " 0.9/  1.0/   1.0  20",
+   "after": " 5.8/  5.8/   6.7   0"
+  },
+  {
+   "business": "valves",
+   "phrasing": 1,
+   "before": " 1.5/  5.8/  19.8   6",
+   "after": " 5.8/  7.3/  19.8   0"
+  }
+ ],
+ "unlabelled_after": [
+  [
+   "aircraft",
+   "0897305878f649978820d79dbf50cbb4"
+  ],
+  [
+   "aircraft",
+   "0aeaf457d633418bbf91fa1a26a81e8b"
+  ],
+  [
+   "aircraft",
+   "1c91b938017a4780b04638d875c67f27"
+  ],
+  [
+   "aircraft",
+   "48bc2ec019e946179663f9e2f5892c91"
+  ],
+  [
+   "aircraft",
+   "6d75103ebdf846d69d0c5dd438ad86b8"
+  ],
+  [
+   "aircraft",
+   "8a25321b9ccb496aa2e96d1f613d024a"
+  ],
+  [
+   "aircraft",
+   "b1098c5b170b46238b91606b50e3955f"
+  ],
+  [
+   "aircraft",
+   "c1da0f87a6824e30ba98eaacde3f9c65"
+  ],
+  [
+   "aircraft",
+   "cbbef1c2431c4f70bc22768f68c38931"
+  ],
+  [
+   "aircraft",
+   "d8ef5b00f30a455492b4ae614f0aad1a"
+  ],
+  [
+   "electrical",
+   "84fc3a914f6a412dbd0a34b91bb5a872"
+  ],
+  [
+   "electrical",
+   "982d28c8086f45b8954684a4479fc7c1"
+  ],
+  [
+   "electrical",
+   "a4c059e6d35649558355df132fb5b106"
+  ],
+  [
+   "electrical",
+   "cf99d65f925d45af9a9aa4afdb65bf4a"
+  ],
+  [
+   "electrical",
+   "f7f07a3048d74069808b11607501567f"
+  ],
+  [
+   "fasteners",
+   "35abff95437a435cb43c6d6597c10ad5"
+  ],
+  [
+   "fasteners",
+   "4d830cc291bc4558b3098794fab2c1c2"
+  ],
+  [
+   "fasteners",
+   "83e9ad29c81d4986a1e4490ad88bcd4d"
+  ],
+  [
+   "fasteners",
+   "9b4fe7a81924430c96ad942aba7e3195"
+  ],
+  [
+   "fasteners",
+   "b7d4b20c6cbc4eea87178b00997fd728"
+  ],
+  [
+   "fasteners",
+   "c2b1a678ab7445d29751cbc8a3ebc6ba"
+  ],
+  [
+   "fasteners",
+   "f1dd8bd8a93c48608589eba804ded93b"
+  ],
+  [
+   "guards",
+   "0c80f5806c04434cb6ab93d7185ddad8"
+  ],
+  [
+   "guards",
+   "10f90ad806894809ab1a6bacf2672d62"
+  ],
+  [
+   "guards",
+   "2e892294e99c4862aa5b2956dd939511"
+  ],
+  [
+   "guards",
+   "37da44f7a29043eeaafc86c4b3b984a9"
+  ],
+  [
+   "guards",
+   "43a1a5e26166498e95de1136d2b196a9"
+  ],
+  [
+   "guards",
+   "4886e81c7b5448bbbc12bbe7f09da1fd"
+  ],
+  [
+   "guards",
+   "affc0c4279054a929ff87137e85386bd"
+  ],
+  [
+   "hvac",
+   "15e0eca52e1442979bf48c58956547e3"
+  ],
+  [
+   "hvac",
+   "3f7acea6fbde4b528ac78ce4030e0dff"
+  ],
+  [
+   "ithardware",
+   "15b34cb21fbe4852865b8bfb88f0592a"
+  ],
+  [
+   "janitorial",
+   "9789f6e26420475dbac732a61b875895"
+  ],
+  [
+   "janitorial",
+   "b5e40cbc14e246c49ef8dd5577d266e2"
+  ],
+  [
+   "janitorial",
+   "e1b450638246481d91b462a5e5b1daba"
+  ],
+  [
+   "medical",
+   "447e854dc5bd475b81d763b134d29452"
+  ],
+  [
+   "medical",
+   "4a7705c78889440c96848383dbfdaeb7"
+  ],
+  [
+   "medical",
+   "8eb0ea7110504ca7bcc6eb99ffeb6296"
+  ],
+  [
+   "parts",
+   "21838dabe2bf4832b4472bd6fb9239cb"
+  ],
+  [
+   "parts",
+   "229a12b5a9694de48036bc107c10e855"
+  ],
+  [
+   "parts",
+   "22e8a60e9c274c50a393345152e008e0"
+  ],
+  [
+   "parts",
+   "3521fab47be148b6ad8d68fa49ca93fa"
+  ],
+  [
+   "parts",
+   "3535be6be1f6435bbc5db7ebf2d4bf6d"
+  ],
+  [
+   "parts",
+   "39665282862c418d93179fa77139fe2f"
+  ],
+  [
+   "parts",
+   "3b253671e02f4b54bc6d8b90ebd9d998"
+  ],
+  [
+   "parts",
+   "3e2f0225701d427ea6e3ef71c6411761"
+  ],
+  [
+   "parts",
+   "4107ba641c7147c89e512d8a10e50701"
+  ],
+  [
+   "parts",
+   "4ac1b10bd02b4ff2add6444c64abd9d5"
+  ],
+  [
+   "parts",
+   "548e74200c3a4d47ab6de813f194dee1"
+  ],
+  [
+   "parts",
+   "5d14e9a1e70d46679312a2d07a360e71"
+  ],
+  [
+   "parts",
+   "5e6a14101d8f4bd4bc8cd7ad7d48ab9c"
+  ],
+  [
+   "parts",
+   "642fa78f42ae46908d5cdfe4e03f124d"
+  ],
+  [
+   "parts",
+   "84f8cd14800e403d991a8b9f8d7383b1"
+  ],
+  [
+   "parts",
+   "8b7ba3e81afb4215a2603083abfbc752"
+  ],
+  [
+   "parts",
+   "8d03a04ff87240ae9c22f7860ff32b29"
+  ],
+  [
+   "parts",
+   "947ebd94683e455d8eac9199801086d9"
+  ],
+  [
+   "parts",
+   "96e88a959b564956a62b13bbb272b2be"
+  ],
+  [
+   "parts",
+   "b22d070c46714bf69eafc9050e0dd8d7"
+  ],
+  [
+   "parts",
+   "c3506773fe9b46beadce3228d5875acb"
+  ],
+  [
+   "parts",
+   "dbb5f434879340da9581eca1350f2bab"
+  ],
+  [
+   "parts",
+   "e74cc85434434ec0a336453b66dbf77a"
+  ],
+  [
+   "parts",
+   "e81385de740144a6a3671fa48bf35c1f"
+  ],
+  [
+   "parts",
+   "efd5cc58fe7647f59de48fca117fe06d"
+  ],
+  [
+   "parts",
+   "f8c1da603815423e9a736fe9ccfe1581"
+  ],
+  [
+   "paving",
+   "1ba6bd54228444fe91bd10ab7d007971"
+  ],
+  [
+   "paving",
+   "3003948ae80248a0b83d74a8d4bdde2c"
+  ],
+  [
+   "paving",
+   "7387226da74d4cd1bb78e490649d5ae0"
+  ],
+  [
+   "paving",
+   "79b69696ceed4090b5e4db5a94cb31be"
+  ],
+  [
+   "paving",
+   "7a8fe9615a8542bdb9b7b76bb80fc1ce"
+  ],
+  [
+   "paving",
+   "8a2ca3b233514d55ba3d8aed7c51356c"
+  ],
+  [
+   "steelbldg",
+   "6543257e0c4e49059daf554deecf5134"
+  ],
+  [
+   "valves",
+   "1389970d210c41008c8c778bd4013ca3"
+  ],
+  [
+   "valves",
+   "19437ec06e5340e995e94dd7035a7fb4"
+  ],
+  [
+   "valves",
+   "19d94b78fb0f4657970508c4c4627556"
+  ],
+  [
+   "valves",
+   "1fd62006a305477387a36944c73d945f"
+  ],
+  [
+   "valves",
+   "321a49d910f44c15b7b0c7f600b05a86"
+  ],
+  [
+   "valves",
+   "70d5341d793a41e78dbcfd35c12995f9"
+  ],
+  [
+   "valves",
+   "8a69c009b85848f6916e89b8049dbf8e"
+  ],
+  [
+   "valves",
+   "903b478a76554e4cac304c7ceadc91cd"
+  ],
+  [
+   "valves",
+   "a7f5b6b5106c43b9876d8f33c3bc44af"
+  ],
+  [
+   "valves",
+   "bba1b9b52d8f4d41b58995f54d556bb4"
+  ],
+  [
+   "valves",
+   "dc0c7c08aa9f473abd6e5f31cd3d3131"
+  ],
+  [
+   "valves",
+   "e0751fc3b6d64c51b3a572caec8b8b31"
+  ],
+  [
+   "valves",
+   "f2544006700f4d4a95bb165bf7206c87"
+  ]
+ ]
+}

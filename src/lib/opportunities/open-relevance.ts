@@ -137,6 +137,27 @@ export function openCodeWindowPsc(cap: CapabilityInterpretation): string[] {
 }
 
 /**
+ * LEAD-TIME WINDOW + SOON DEMOTION (Eric, 2026-11-15: "that's too short of time for long searches; people need at least
+ * 5 to 7 days minimum"; development only). FIND Open ranks only the first OPEN_FETCH_CAP matched notices by deadline, so a
+ * broad search (parts ~5,500 matched, steel ~1,000) ranked only bids closing within a day or two.
+ *  - Retrieval: when that window is full, the same plan is drawn a second time restricted to deadlines at least
+ *    OPEN_LEAD_DAYS out (capped, deadline-ordered) and appended. A subset of the matched set; the count does not change.
+ *  - Ranking: a bid closing in under OPEN_SOON_DAYS gets +OPEN_SOON_PENALTY on its tier. A Direct bid closing soon then
+ *    sorts after Direct bids with time to respond, but still above Related ones. Nothing is hidden (no-self-filter rule);
+ *    a deadline filter still returns it.
+ */
+export const OPEN_LEAD_DAYS = 7;
+export const OPEN_LEAD_WINDOW_CAP = 500;
+export const OPEN_SOON_DAYS = 5;
+export const OPEN_SOON_PENALTY = 0.5;
+const DAY_MS = 86_400_000;
+export function openLeadFrom(now: Date): string { return new Date(now.getTime() + OPEN_LEAD_DAYS * DAY_MS).toISOString(); }
+export function openSoonPenalty(row: Record<string, unknown>, now: Date): number {
+  const d = Date.parse(String(row.response_deadline || ''));
+  return Number.isFinite(d) && d - now.getTime() < OPEN_SOON_DAYS * DAY_MS ? OPEN_SOON_PENALTY : 0;
+}
+
+/**
  * Index of the plan's positive-retrieval OR (text ∪ vocabulary ∪ codes) — the ONLY open op carrying the preset codes'
  * psc conditions. null unless exactly one op qualifies, so a caller can fall back to the full plan.
  */

@@ -23,6 +23,9 @@ import {
   OPEN_FETCH_CAP,
   OPEN_CODE_WINDOW_CAP,
   openCodeWindowPsc,
+  openLeadFrom,
+  openSoonPenalty,
+  OPEN_LEAD_WINDOW_CAP,
   retrievalOpIndex,
   classifyOpenRecord,
   type OpenRelevanceClass,
@@ -1008,6 +1011,15 @@ async function queryOpenNow(
         .limit(OPEN_CODE_WINDOW_CAP);
       if (!cw.error) rows = unionRows(rows, (cw.data || []) as Array<Record<string, unknown>>, 'notice_id');
     }
+    // Lead-time window (open-relevance.ts openLeadFrom; Eric 2026-11-15): when the deadline window is full, also draw the
+    // first OPEN_LEAD_WINDOW_CAP matched bids closing at least OPEN_LEAD_DAYS out. On failure, the window is as before.
+    const rankNow = new Date();
+    if ((data || []).length >= fetchCap) {
+      const lw = await inStage(openQ(COLS)).gte('response_deadline', openLeadFrom(rankNow))
+        .order('response_deadline', { ascending: true, nullsFirst: false })
+        .limit(OPEN_LEAD_WINDOW_CAP);
+      if (!lw.error) rows = unionRows(rows, (lw.data || []) as Array<Record<string, unknown>>, 'notice_id');
+    }
     if (!rows.length) {
       const e = emptyHorizon(source, OPEN_HANDOFFS, consumed, unsupported, asOf, stage ? `No matching open ${STAGE_GROUP_LABEL[stage]} notices under these filters.` : 'No matching open solicitations under these filters.', unmapped);
       return stageInfo ? { ...e, stage: { ...stageInfo, returned_by_signal: { structured_notice_type: 0, title_keyword: 0 } } } : e;
@@ -1021,7 +1033,7 @@ async function queryOpenNow(
         const label = labelOpenRow(r, p.plan, cap, anchor);
         return { i, row: r, cls: label.cls, label, s: scores.get(r) };
       })
-      .sort((a, b) => a.label.tier - b.label.tier
+      .sort((a, b) => (a.label.tier + openSoonPenalty(a.row, rankNow)) - (b.label.tier + openSoonPenalty(b.row, rankNow))
         || (b.s?.breadth ?? 0) - (a.s?.breadth ?? 0)
         || (b.s?.score ?? 0) - (a.s?.score ?? 0)
         || a.i - b.i);
