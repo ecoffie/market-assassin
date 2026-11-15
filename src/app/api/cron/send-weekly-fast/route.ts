@@ -21,6 +21,7 @@ import { hashNaicsProfile } from '@/lib/briefings/naics-profile-hash';
 import { createEmailTrackingToken, generateTrackingPixel } from '@/lib/engagement';
 import { sanitizeBriefingCalendar } from '@/lib/briefings/calendar-sanitize';
 import { sanitizeWeeklyOpportunities } from '@/lib/briefings/opportunity-sanitize';
+import { isInternalTestAccount } from '@/lib/mindy/campaign-exclusions';
 
 const BATCH_SIZE = 200; // Increased for better coverage
 const BRAND_COLOR = '#1e3a8a';
@@ -309,6 +310,10 @@ function getSupabase() {
     const audienceResolution = await resolveBriefingAudience(getSupabase());
     let usersToProcess = audienceResolution.users.filter(u => u.naics_codes.length > 0);
     activeCohortId = audienceResolution.activeCohort?.id || null;
+
+    // Internal test accounts never receive a scheduled briefing; an explicit
+    // ?email= QA run below can still reach one on purpose.
+    if (!testEmail) usersToProcess = usersToProcess.filter(u => !isInternalTestAccount(u.email));
 
     if (testEmail) {
       usersToProcess = usersToProcess.filter(u => u.email === testEmail.toLowerCase());

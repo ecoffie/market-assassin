@@ -15,6 +15,7 @@ import { distinctiveKeywords } from '@/lib/market/keyword-sanitize';
 import { reportCronOutcome } from '@/lib/cron-self-report';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 import { resolveBriefingAudience } from '@/lib/briefings/delivery/rollout';
+import { isInternalTestAccount } from '@/lib/mindy/campaign-exclusions';
 import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, mindyDashboardUrlFor, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 import {
   getAlertEmailCta,
@@ -300,6 +301,8 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
       console.error('[Weekly Alerts] Error fetching users:', usersError);
       return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
     }
+    // Internal test accounts never receive the scheduled customer digest.
+    allUsers = allUsers.filter((u) => !isInternalTestAccount(u.user_email));
 
     if (!allUsers || allUsers.length === 0) {
       console.log('[Weekly Alerts] No active alert users found');

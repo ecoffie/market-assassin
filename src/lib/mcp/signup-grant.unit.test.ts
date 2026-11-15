@@ -138,6 +138,20 @@ describe('the welcome email tracks the real grant', () => {
     });
   });
 
+  it('grants an internal test account its credits but sends no welcome email', async () => {
+    rpc.mockResolvedValue({ data: [{ granted: 100, balance: 100 }], error: null });
+    const { grantSignupCreditsIfFirst } = await load();
+
+    vi.stubEnv('INTERNAL_TEST_EMAILS', 'qa-tester@example.test');
+    try {
+      const granted = await grantSignupCreditsIfFirst('QA-Tester@Example.test');
+      expect(granted).toBe(100);
+      expect(sendCreditWelcomeEmail).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('does NOT re-send on the idempotent no-op', async () => {
     rpc.mockResolvedValue({ data: [{ granted: 0, balance: 500 }], error: null });
     const { grantSignupCreditsIfFirst } = await load();

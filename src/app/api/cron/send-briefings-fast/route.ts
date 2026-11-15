@@ -31,6 +31,7 @@ import {
 import { sendEmail } from '@/lib/send-email';
 import { logToolError, recordToolSuccess, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import { createEmailTrackingToken } from '@/lib/engagement';
+import { isInternalTestAccount } from '@/lib/mindy/campaign-exclusions';
 
 // Process up to 200 users per cron run (~150ms each = 30 seconds total)
 // Increased from 100 to ensure all 958+ users are covered in 10 cron runs
@@ -99,6 +100,10 @@ export async function GET(request: NextRequest) {
     const audienceResolution = await resolveBriefingAudience(getSupabase());
     let usersToProcess = audienceResolution.users;
     const activeCohortId = audienceResolution.activeCohort?.id || null;
+
+    // Internal test accounts never receive a scheduled briefing; an explicit
+    // ?email= QA run below can still reach one on purpose.
+    if (!testEmail) usersToProcess = usersToProcess.filter(u => !isInternalTestAccount(u.email));
 
     // Filter to test email if specified
     if (testEmail) {
