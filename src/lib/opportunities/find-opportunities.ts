@@ -12,7 +12,6 @@ import { openSnapshotEnabled, openQueryFactory, currentOpenSnapshot } from './op
 import { recompeteRowAnnotations } from '@/lib/recompete/annotate';
 import { parseAwardLineage, NOT_ORDER_UNDER_VEHICLE_OR } from '@/lib/recompete/award-lineage';
 import { dedupeRecompeteRows, type DedupeableRecompeteRow } from '@/lib/recompete/dedupe-orders';
-import { naicsMatchConds } from '@/lib/opportunities/map-filters';
 import {
   interpretMarket,
   evidenceWhy,
@@ -1003,7 +1002,7 @@ async function queryOpenNow(
     // CANDIDATE F1 (guards/steel diagnosis): the same sub-window for a trade preset's own 6-digit NAICS.
     const codeWinN = openCodeWindowNaics(cap);
     if (codeWinN.length && (data || []).length >= fetchCap) {
-      const ri = retrievalOpIndex(p.plan.horizons.open.ops, codeWinN, naicsMatchConds);
+      const ri = retrievalOpIndex(p.plan.horizons.open.ops, codeWinN, 'naics');
       const subQ = !openSrc && ri != null
         ? applyOpenPlan(client.from(source).select(COLS), { ...p.plan, horizons: { ...p.plan.horizons, open: { ...p.plan.horizons.open, ops: p.plan.horizons.open.ops.filter((_o, k) => k !== ri) } } })
         : openQ(COLS);

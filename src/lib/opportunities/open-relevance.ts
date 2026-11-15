@@ -152,9 +152,9 @@ export function openCodeWindowNaics(cap: CapabilityInterpretation): string[] {
  * Index of the plan's positive-retrieval OR (text ∪ vocabulary ∪ codes) — the ONLY open op carrying the preset codes'
  * psc conditions. null unless exactly one op qualifies, so a caller can fall back to the full plan.
  */
-export function retrievalOpIndex(ops: ReadonlyArray<{ op: string; expr?: string }>, codes: string[], condsOf: (c: string[]) => string[] = pscMatchConds): number | null {
+export function retrievalOpIndex(ops: ReadonlyArray<{ op: string; expr?: string }>, codes: string[], kind: 'psc' | 'naics' = 'psc'): number | null {
   if (!codes.length) return null;
-  const conds = condsOf(codes);
+  const conds = kind === 'naics' ? naicsMatchConds(codes) : pscMatchConds(codes);
   const hits = ops.map((o, k) => (o.op === 'or' && conds.every((c) => (o.expr || '').split(',').includes(c)) ? k : -1)).filter((k) => k >= 0);
   return hits.length === 1 ? hits[0] : null;
 }
