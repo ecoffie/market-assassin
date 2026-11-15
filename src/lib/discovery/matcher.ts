@@ -460,8 +460,15 @@ export function listItems(text: string): string[] {
       // the 528 rows bare "medical" added (medical services, VA construction, CDC guards).
       const tail = parts[parts.length - 1];
       const head = normalizeQuery(tail).split(' ').filter(Boolean).pop();
+      // Each shared item is a PHRASE (adjacent words, via the hyphenated-compound path), not two words anywhere: Agent 4's
+      // v6 blind sample found ALL(medical · supplies) at 3/30 relevant (a sleep-lab computer, pressure washing) because
+      // the two words sat paragraphs apart in long descriptions.
       if (head && coreWordCount(tail) >= 2 && parts.slice(0, -1).every((x) => coreWordCount(x) === 1)) {
-        for (let i = 0; i < parts.length - 1; i++) if (!new RegExp(`\\b${head}\\b`, 'i').test(parts[i])) parts[i] = `${parts[i]} ${head}`;
+        const asPhrase = (x: string) => x.replace(/([a-z0-9]+)\s+([a-z0-9]+)\s*[.!?]*$/i, '$1-$2');
+        for (let i = 0; i < parts.length - 1; i++) {
+          if (!new RegExp(`\\b${head}\\b`, 'i').test(parts[i])) parts[i] = asPhrase(`${parts[i]} ${head}`);
+        }
+        parts[parts.length - 1] = asPhrase(parts[parts.length - 1]);
       }
     }
     out.push(...parts);

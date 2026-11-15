@@ -60,7 +60,11 @@ describe('cause 3: lists are items, and example words are not search words', () 
   });
   it('a shared head noun is distributed; a bare modifier never becomes a concept', () => {
     // Agent 4 v5 blind sample: bare "medical" added 528 rows, 0 of 30 relevant.
-    expect(shape('We supply medical, dental and laboratory supplies.')).toBe('all(medical·supplies) | all(dental·supplies) | all(laboratory·supplies)');
+    // ...and each shared item is an adjacent PHRASE (v6: two words anywhere scored 3/30 relevant).
+    expect(shape('We supply medical, dental and laboratory supplies.')).toBe('all(medical supplies) | all(dental supplies) | all(laboratory supplies)');
+    const q = m('We supply medical, dental and laboratory supplies.');
+    expect(matchesText(q, ['Medical supplies for the VA clinic'])).toBe(true);
+    expect(matchesText(q, ['Sleep lab computer. The vendor shall deliver all supplies. Medical center, building 4'])).toBe(false);
     expect(matchesText(m('We supply medical, dental and laboratory supplies.'), ['Z1DZ--Replace Dental Vacuum Piping'])).toBe(false);
   });
   it('is untouched without a list: "repair and maintenance", "salt and pepper"', () => {
