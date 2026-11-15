@@ -34,6 +34,8 @@ export type MatchBasis =
   | 'buyer_name'
   /** The row's NAICS is in the capability's related market (same industry family), not its direct codes. */
   | 'related_market_code'
+  /** Retrieved only by a product preset's FSC code (2026-11-14); the record does not name the item. */
+  | 'product_code'
   | CompanyRecallBasis;
 
 /** Coming back classes: the two FIND evidence classes + the holder-name signal. */
@@ -140,6 +142,12 @@ export function relatedCodeWhy(phrase: string, row: { naics_code?: string | null
   const code = row.naics_code ? `NAICS ${row.naics_code}${title ? ` ${title}` : ''}` : 'its industry code';
   return `Related-market candidate for “${phrase}”: this contract is in the same industry family (${code}), `
     + `but the record does not say it includes ${phrase}. Check the scope before treating it as ${phrase} work.`;
+}
+
+export function productCodeWhy(phrase: string, row: { psc_code?: string | null }): string {
+  const code = row.psc_code ? `product code ${row.psc_code}` : 'its product code';
+  return `Related-market candidate for “${phrase}”: filed under ${code}, but the notice does not name the item. `
+    + `Check the item, part number and any approved-source restriction before treating it as ${phrase}.`;
 }
 
 export function buyerNameWhy(phrase: string): string {

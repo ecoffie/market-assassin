@@ -22,7 +22,8 @@ import {
   type OpenRelevanceClass,
   openEvidenceWhy,
   openEvidenceCounts,
-  openRetrievalPsc,
+  openDirectPsc,
+  openProductPsc,
 } from '@/lib/opportunities/open-relevance';
 // Canonical Mindy Discovery (2026-09-22, Phase B): MCP is the first production consumer.
 // Meaning + eligibility come from the plan; this file owns only MCP surface policy + presentation.
@@ -61,6 +62,7 @@ import {
   holderSignalWhy,
   buyerNameWhy,
   relatedCodeWhy,
+  productCodeWhy,
   companyCodeWhy,
   type ComingBackClass,
   type MatchBasis,
@@ -721,8 +723,9 @@ export function labelOpenRow(
   if (cls === 'DIRECT_MATCH') {
     if (plan.matcher.mode === 'none') basis.push('structured_scope');
     else {
+      // DIRECT by code only for DIRECT codes; a product preset's FSC (openRetrievalPsc's related part) never proves it.
       const codeHit = codeIn([...cap.direct.naics, ...plan.naics], row.naics_code)
-        || codeIn([...openRetrievalPsc(cap), ...plan.psc], row.psc_code);
+        || codeIn([...openDirectPsc(cap), ...plan.psc], row.psc_code);
       const keepId = plan.matcher.mode === 'code';
       const stripped = { ...row, department: '', sub_tier: '', solicitation_number: keepId ? row.solicitation_number : '' };
       if (codeHit) basis.push('buy_side_code');
@@ -733,6 +736,9 @@ export function labelOpenRow(
     // A related-family code the customer TYPED is what they asked for: direct, as on Coming back.
     if (codeIn(plan.naics, row.naics_code)) { cls = 'DIRECT_MATCH'; basis.push('buy_side_code'); }
     else basis.push('related_market_code');
+  } else if (cls === 'RELATED_MARKET_CANDIDATE' && codeIn(openProductPsc(cap), row.psc_code)) {
+    if (codeIn(plan.psc, row.psc_code)) { cls = 'DIRECT_MATCH'; basis.push('buy_side_code'); }
+    else basis.push('product_code');
   }
   const company = companyRecallBasis(row, anchor);
   if (company) basis.push(company);
@@ -743,6 +749,7 @@ export function labelOpenRow(
 function openWhy(label: OpenLabel, phrase: string, row: Record<string, unknown>): string {
   if (label.basis[0] === 'buyer_name') return buyerNameWhy(phrase);
   if (label.basis[0] === 'related_market_code') return relatedCodeWhy(phrase, row as { naics_code?: string; naics_description?: string });
+  if (label.basis[0] === 'product_code') return productCodeWhy(phrase, row as { psc_code?: string });
   const company = label.basis.find((b) => b === 'company_registered_psc' || b === 'company_registered_naics') as
     | 'company_registered_psc' | 'company_registered_naics' | undefined;
   if (label.cls === 'WEAK_NON_MARKET' && company) return companyCodeWhy(company, row as { naics_code?: string; psc_code?: string });

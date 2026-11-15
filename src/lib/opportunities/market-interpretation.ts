@@ -32,6 +32,13 @@ export interface TaxonomyPin {
   psc: string[];
   terms: string[];
   reason: string;
+  /**
+   * Retrieval vocabulary (trade / product presets only, 2026-11-14): phrases that ADD recall as exact phrases over
+   * `vocabCols`, in the same `.or()` as the text matcher and the codes. Never narrows, never replaces the customer's
+   * own words. Absent on every other interpretation (no behaviour change).
+   */
+  vocab?: string[];
+  vocabCols?: Array<'title' | 'description'>;
 }
 
 export interface CapabilityInterpretation {
@@ -227,6 +234,126 @@ export function dualBuyerOrExpr(depCol: string, subCol: string, needles: string[
   return [dep, sub].filter(Boolean).join(',');
 }
 
+
+/**
+ * TRADE and PRODUCT presets (Agent 3, 2026-11-14; Eric approved "next phase" 2026-11-14; Agent 4 v4 benchmark).
+ *
+ * Measured problem: 0 of 14 benchmark phrasings reached any code. 9 of 13 guard-coded notices never say "guard"
+ * ("Protective Security Officer Services"); DLA product titles name the ITEM ("48--VLV, REGUL PRESSURE",
+ * "59--RELAY,THERMAL"), never the category the customer types ("valves", "electrical components").
+ *
+ * Rules (each is a test in trade-product-presets.unit.test.ts):
+ *  - SERVICES: the trade's OWN codes only (6-digit NAICS + its PSC). No related family: the janitorial preset's related
+ *    family cost 93% → 43% alert precision (#2043 eval). Own-code rows are DIRECT, as for every preset.
+ *  - PRODUCTS: specific 4-digit FSC codes RETRIEVE but never prove relevance: a code-only row is
+ *    RELATED_MARKET_CANDIDATE (basis `product_code`). DIRECT needs item evidence in the record (the customer's words or
+ *    the item noun / DLA abbreviation in the title).
+ *  - Additive only: the customer's text predicate, exclusions, buyer, state and set-aside constraints are unchanged
+ *    (they AND in the plan). A "quoted" query is a literal request and never reaches these tables.
+ *  - Consulted only when no existing interpretation (cyber, physical security, PHRASE_PRESET) claimed the phrase,
+ *    except guards, which the physical-security branch hands here so it keeps its "not cyber" note.
+ *  - Codes: SAM PSC/FSC manual and NAICS 2022, specific codes only (no 2-digit FSC group, no NAICS family).
+ */
+type CodePreset = { id: string; label: string; match: RegExp; naics: string[]; psc: string[]; vocab: string[] };
+export const TRADE_PRESETS: CodePreset[] = [
+  {
+    id: 'guards', label: 'Security guard services',
+    match: /\b(security\s+guards?|guard\s+services?|guard\s+force|security\s+officers?|protective\s+(?:security\s+)?officers?|(?:un)?armed\s+guards?|protective\s+services)\b/i,
+    naics: ['561612'], psc: ['S206'],
+    vocab: ['security guard', 'guard services', 'guard service', 'protective security officer', 'security officer services', 'guard force'],
+  },
+  {
+    id: 'janitorial_cleaning', label: 'Janitorial services',
+    // "janitorial" / "custodial" are claimed by PHRASE_PRESET first; this row bridges plain "cleaning" phrasing.
+    match: /\b(?:commercial|office|building|facility)\s+cleaning\b|\bcleaning\s+(?:services?|company|contractor)\b|\bclean(?:ing)?\s+(?:\w+\s+){0,2}(?:offices?|buildings?|facilit(?:y|ies))\b/i,
+    naics: ['561720'], psc: ['S201'],
+    vocab: ['janitorial', 'custodial'],
+  },
+  {
+    id: 'grounds', label: 'Landscaping and grounds maintenance',
+    match: /\b(landscaping|landscape\s+maintenance|grounds\s+maintenance|grounds\s*keeping|lawn\s+(?:care|maintenance)|mowing)\b/i,
+    naics: ['561730'], psc: ['S208'],
+    vocab: ['grounds maintenance', 'landscaping', 'landscape maintenance', 'mowing'],
+  },
+  {
+    id: 'hvac', label: 'HVAC maintenance and repair',
+    match: /\b(hvac|heating,?\s+ventilation|air\s+conditioning|chillers?|boilers?)\b/i,
+    naics: ['238220'], psc: ['J041'],
+    vocab: ['hvac', 'chiller', 'chillers', 'boiler', 'boilers', 'air conditioning'],
+  },
+];
+export const PRODUCT_PRESETS: CodePreset[] = [
+  { id: 'valves', label: 'Valves', match: /\bvalves?\b/i, naics: [], psc: ['4810', '4820'], vocab: ['valve', 'valves', 'vlv'] },
+  {
+    id: 'fasteners', label: 'Fasteners', match: /\b(fasteners?|bolts?|screws?|rivets?)\b/i, naics: [],
+    psc: ['5305', '5306', '5307', '5310', '5315', '5320', '5325'],
+    vocab: ['screw', 'screws', 'bolt', 'bolts', 'nut', 'washer', 'rivet', 'rivets', 'fastener', 'fasteners'],
+  },
+  {
+    id: 'electrical_components', label: 'Electrical and electronic components',
+    match: /\belectr(?:ical|onic)\s+(?:and\s+electr(?:ical|onic)\s+)?(?:components?|parts)\b|\b(connectors?|relays?|resistors?|capacitors?|circuit\s+cards?)\b/i,
+    naics: [],
+    psc: ['5905', '5910', '5915', '5920', '5925', '5930', '5935', '5940', '5945', '5950', '5955', '5960', '5961', '5962', '5963', '5975', '5977', '5995', '5998', '5999'],
+    vocab: ['connector', 'relay', 'resistor', 'capacitor', 'circuit card', 'circuit card assembly', 'microcircuit', 'semiconductor', 'transistor', 'cable assembly', 'wiring harness'],
+  },
+  {
+    id: 'aircraft_components', label: 'Aircraft parts and components',
+    match: /\b(?:aircraft|aerospace|airframe|aviation)\s+(?:parts|components|spares)\b|\blanding\s+gear\b|\bairframe\b/i,
+    naics: [], psc: ['1560', '1610', '1615', '1620', '1630', '1650', '1660', '1680', '2840'],
+    vocab: ['airframe', 'landing gear', 'aircraft'],
+  },
+  {
+    id: 'medical_supplies', label: 'Medical, dental and laboratory supplies',
+    match: /\b(?:medical|surgical|dental|laboratory|lab)\b[^.]{0,40}\b(?:supplies|consumables)\b/i,
+    naics: [], psc: ['6510', '6515', '6520', '6532', '6540', '6545', '6550', '6640'],
+    vocab: ['syringe', 'catheter', 'gauze', 'bandage', 'suture', 'reagent', 'surgical'],
+  },
+];
+
+const isQuoted = (s: string) => /^["\u201c].*["\u201d]$/.test(s.trim());
+
+/** Trade presets the phrase names (services; own codes; DIRECT). Empty for quoted text. */
+export function tradePresetsFor(requested: string): CodePreset[] {
+  return isQuoted(requested) ? [] : TRADE_PRESETS.filter((t) => t.match.test(requested));
+}
+/** Product presets the phrase names (FSC recall; code-only = related). Empty for quoted text. */
+export function productPresetsFor(requested: string): CodePreset[] {
+  return isQuoted(requested) ? [] : PRODUCT_PRESETS.filter((t) => t.match.test(requested));
+}
+
+function codePresetInterpretation(
+  requested: string, trades: CodePreset[], products: CodePreset[], excluded: CapabilityInterpretation['excluded'],
+): CapabilityInterpretation {
+  const names = [...trades, ...products].map((p) => p.label).join(' + ');
+  const uniq = (xs: string[]) => [...new Set(xs)];
+  const tradeVocab = uniq(trades.flatMap((t) => t.vocab));
+  const productVocab = uniq(products.flatMap((t) => t.vocab));
+  return {
+    requested,
+    kind: 'industry_preset',
+    direct: {
+      source: names,
+      naics: uniq(trades.flatMap((t) => t.naics)),
+      psc: uniq(trades.flatMap((t) => t.psc)),
+      terms: uniq([requested, ...tradeVocab, ...productVocab]),
+      reason: `Customer phrase names ${names}. Trade codes are the trade's own; product codes only retrieve.`,
+      ...(tradeVocab.length || productVocab.length ? { vocab: uniq([...tradeVocab, ...productVocab]) } : {}),
+      // Product item nouns live in the TITLE (DLA "NOUN,MODIFIER"); a trade phrase may be in the description.
+      vocabCols: trades.length ? ['title', 'description'] : ['title'],
+    },
+    related_market: products.length
+      ? {
+        source: products.map((p) => p.label).join(' + '),
+        naics: [],
+        psc: uniq(products.flatMap((p) => p.psc)),
+        terms: [],
+        reason: 'Filed under the product code for this item class. The code retrieves the notice; it does not establish that the item is what you sell.',
+      }
+      : null,
+    excluded,
+  };
+}
+
 export function interpretCapability(phrase: string): CapabilityInterpretation {
   const requested = String(phrase || '').trim();
   const excluded: CapabilityInterpretation['excluded'] = [];
@@ -236,6 +363,8 @@ export function interpretCapability(phrase: string): CapabilityInterpretation {
       phrase: 'physical security / access control',
       reason: 'Physical security is not cybersecurity. Generic “security” does not enter the cyber market.',
     });
+    const guards = tradePresetsFor(requested).filter((t) => t.id === 'guards');
+    if (guards.length) return codePresetInterpretation(requested, guards, [], excluded);
     return {
       requested,
       kind: 'literal',
@@ -326,6 +455,10 @@ export function interpretCapability(phrase: string): CapabilityInterpretation {
       excluded,
     };
   }
+
+  const trades = tradePresetsFor(requested);
+  const products = productPresetsFor(requested);
+  if (trades.length || products.length) return codePresetInterpretation(requested, trades, products, excluded);
 
   return {
     requested,

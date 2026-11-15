@@ -112,7 +112,13 @@ export function openRetrievalNaics(cap: CapabilityInterpretation): string[] {
 }
 
 export function openRetrievalPsc(cap: CapabilityInterpretation): string[] {
-  return openDirectPsc(cap);
+  // Product presets (2026-11-14) put their FSC codes in related_market.psc: retrieved, never DIRECT by code alone.
+  return [...openDirectPsc(cap), ...(cap.related_market?.psc || [])];
+}
+
+/** Product-preset FSC codes: retrieve only (a code-only row is RELATED_MARKET_CANDIDATE, basis product_code). */
+export function openProductPsc(cap: CapabilityInterpretation): string[] {
+  return [...(cap.related_market?.psc || [])];
 }
 
 export function pscMatchConds(codes: string[]): string[] {
@@ -215,6 +221,7 @@ export function classifyOpenRecord(
   if (cap.related_market && codeIn(cap.related_market.naics, row.naics_code)) {
     return 'RELATED_MARKET_CANDIDATE';
   }
+  if (codeIn(openProductPsc(cap), row.psc_code)) return 'RELATED_MARKET_CANDIDATE';
   return 'WEAK_NON_MARKET';
 }
 

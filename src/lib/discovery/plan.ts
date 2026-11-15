@@ -24,7 +24,7 @@ import { interpretMarket, retrievalNaics, retrievalPsc, type MarketInterpretatio
 import { openRetrievalNaics, openRetrievalPsc, pscMatchConds } from '@/lib/opportunities/open-relevance';
 import { resolveForecastAgencies } from '@/lib/forecasts/agency-identity';
 import { extractStructuredIntent, type StructuredIntent } from './intent';
-import { buildTextMatcher, textPredicate, exclusionPredicate, isCodeLike, type TextMatcher } from './matcher';
+import { buildTextMatcher, textPredicate, exclusionPredicate, isCodeLike, productIdentifier, type TextMatcher } from './matcher';
 import { resolveBuyer, buyerPredicate, type ResolvedBuyer } from './buyer';
 import type { SurfacePolicy } from './policy';
 
@@ -187,8 +187,10 @@ export function buildDiscoveryPlan(input: DiscoveryInput, policy: SurfacePolicy,
   // ── 1 · STRUCTURED INTENT ───────────────────────────────────────────────────────────────
   // A bare code/set-aside token ("541320", "R408", "8a") is owned by resolveQueryIntent, as today.
   // A fully "quoted" query is an explicit literal request — nothing inside it is reinterpreted.
-  const bare = isCodeLike(raw) ? resolveQueryIntent(raw) : null;
-  const quoted = /^["“].+["”]$/.test(raw);
+  // An NSN / part number is one identifier: no NAICS/PSC/word extraction inside it (productIdentifier).
+  const ident = productIdentifier(raw);
+  const bare = isCodeLike(raw) && !ident ? resolveQueryIntent(raw) : null;
+  const quoted = /^["“].+["”]$/.test(raw) || !!ident;
   const empty: StructuredIntent = { agencies: [], states: [], setAsides: [], naics: [], psc: [], exclusions: [], horizonHint: null, stripped: [], residual: '' };
   const si: StructuredIntent = bare && bare.kind !== 'keyword' ? empty
     : quoted ? { ...empty, residual: raw }
@@ -271,7 +273,9 @@ export function buildDiscoveryPlan(input: DiscoveryInput, policy: SurfacePolicy,
   if (lexicalPositive) {
     const tn = openRetrievalNaics(cap);
     const tp = openRetrievalPsc(cap);
-    const parts = [textPredicate(matcher, OPEN_TEXT_COLS), ...naicsMatchConds(tn), ...pscMatchConds(tp), ...companyConds].filter(Boolean) as string[];
+    // Trade / product preset vocabulary (2026-11-14): additive exact phrases in the SAME .or() (never narrows).
+    const vocab = (cap.direct.vocab || []).map((v) => textPredicate(buildTextMatcher(`"${v}"`), cap.direct.vocabCols || ['title']));
+    const parts = [textPredicate(matcher, OPEN_TEXT_COLS), ...vocab, ...naicsMatchConds(tn), ...pscMatchConds(tp), ...companyConds].filter(Boolean) as string[];
     oOps.push({ op: 'or', expr: parts.join(',') || 'notice_id.is.null' });
     oVia = tn.length || tp.length ? 'text_or_taxonomy' : 'text';
     if (companyConds.length) oVia += '_or_company_codes';
