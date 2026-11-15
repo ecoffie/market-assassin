@@ -30,6 +30,7 @@ const state: {
   answerThrows: boolean;
   answerMessages: Array<Array<{ role: string; content: string }>>;
   plannerModels: string[];
+  extraOffered: string[];
   plannerBodies: Array<Record<string, unknown>>;
   plannerFailModels: Set<string>;
 } = {} as never;
@@ -45,7 +46,7 @@ vi.mock('@/lib/entitlements/shadow', () => ({ shadowEntitlement: () => {} }));
 vi.mock('@/lib/chat/tier0-tools', () => ({ makeTier0Tools: () => ({ execute: async () => ({}) }), TIER0_TOOL_DEFS: [], TIER0_TOOL_NAMES: new Set() }));
 vi.mock('@/lib/chat/chat-tool-executor', () => ({
   createChatToolExecutor: () => ({
-    offeredToolDefs: () => ['get_expiring_contracts', 'search_sam_opportunities'].map((name) => ({ type: 'function', function: { name, description: name, parameters: { type: 'object', properties: {} } } })),
+    offeredToolDefs: () => ['get_expiring_contracts', 'search_sam_opportunities', ...(state.extraOffered ?? [])].map((name) => ({ type: 'function', function: { name, description: name, parameters: { type: 'object', properties: {} } } })),
     executeRound: async (calls: ToolCall[]) => {
       state.executed.push(calls.map((c) => c.function.name));
       for (const c of calls) state.executedArgs.push({ tool: c.function.name, ...JSON.parse(c.function.arguments || '{}') });
@@ -84,7 +85,7 @@ function sse(text: string) {
 beforeEach(() => {
   Object.assign(state, {
     plannerCalls: [], offered: [], executed: [], executedArgs: [], toolContent: '{"ok":true,"results":[]}', toolStatus: 'success',
-    answerModels: [], answerUrls: [], failModels: new Set(), answerThrows: false, answerMessages: [], plannerModels: [], plannerBodies: [], plannerFailModels: new Set(),
+    answerModels: [], answerUrls: [], failModels: new Set(), answerThrows: false, answerMessages: [], plannerModels: [], plannerBodies: [], plannerFailModels: new Set(), extraOffered: [],
   });
   profile.block = '';
   budget.over = false;
@@ -488,5 +489,63 @@ describe('incumbent wording rule (2026-11-15 smoke: "it appears there is no incu
     const system = String(state.answerMessages[0]?.[0]?.content ?? '');
     expect(system).toContain('name one only when _meta.incumbent_finding is "identified"');
     expect(system).toContain('Never say "there is no incumbent"');
+  });
+});
+
+describe('F1: a CURRENT_FIND question uses find_opportunities across three horizons (same contract as the MCP)', () => {
+  const ERIC_Q = '[Current map view \u2014 995+ Open Now opps in view; in OH, VA, PA, DC. Location: the map area is in OH, VA, PA, DC, NC, AL (plotted pins in view, most first: OH 868, VA 90, PA 27, DC 2, NC 2, AL 1). Answer for THIS view when the question is about "these"/"this"/"here": use this location, not the user\'s saved profile locations, and do not choose a city the user did not name.]\n\nWhat open opportunities are there for janitorial services in Florida?';
+
+  it("Eric's side-by-side question: only find_opportunities is offered (not the open-only search), and horizons the planner turned off come back", async () => {
+    state.extraOffered = ['find_opportunities'];
+    state.plannerCalls = [{ id: 'c1', function: { name: 'find_opportunities', arguments: JSON.stringify({ query: 'janitorial services', location: 'Florida', advanced: { naics: '561720' }, horizons: { open_now: true, coming_back: false, coming_soon: false } }) } }];
+    await ask(ERIC_Q);
+    expect(state.offered[0]).toEqual(['find_opportunities']);
+    expect(state.executed).toEqual([['find_opportunities']]);
+    // Same input Claude sends via the MCP: the customer's words, all three horizons, 25 rows, no planner-chosen NAICS.
+    expect(state.executedArgs[0]).toEqual({ tool: 'find_opportunities', query: 'janitorial services', location: 'Florida', horizons: { open_now: true, coming_back: true, coming_soon: true }, limit_per_horizon: 25 });
+    const system = String(state.answerMessages[0]?.[0]?.content ?? '');
+    expect(system).toContain('FINDING OPPORTUNITIES (same contract as the Mindy MCP)');
+    expect(system).toContain('Present three sections in this order: Open now, Coming back, Coming soon');
+  });
+
+  it('a follow-up refinement ("What about in Florida?") gets the same three-horizon FIND input', async () => {
+    state.extraOffered = ['find_opportunities'];
+    state.plannerCalls = [{ id: 'c1', function: { name: 'find_opportunities', arguments: JSON.stringify({ query: 'security guard', location: 'Florida' }) } }];
+    vi.resetModules();
+    const { POST } = await import('./route');
+    await (await POST(new Request('https://getmindy.ai/api/app/chat', { method: 'POST', body: JSON.stringify({ email: ME, message: 'What about in Florida?', history: [{ role: 'user', content: 'What security guard opportunities are open right now?' }, { role: 'assistant', content: 'Here are open security guard opportunities.' }] }) }) as never)).text();
+    expect(state.offered[0]).toEqual(['find_opportunities']);
+    expect(state.executedArgs[0]).toMatchObject({ query: 'security guard', location: 'Florida', limit_per_horizon: 25 });
+  });
+
+  it('an answer that leaves out horizons is completed from the find_opportunities summary (counts only, never rows)', async () => {
+    state.extraOffered = ['find_opportunities'];
+    state.toolContent = JSON.stringify({ horizons: {}, summary: { open_now: { status: 'grounded', matched_count: 9 }, coming_back: { status: 'grounded', matched_count: 80, direct_match: 44, related_market_candidate: 36 }, coming_soon: { status: 'unavailable', matched_count: null } }, _meta: { grounded: true } });
+    state.plannerCalls = [{ id: 'c1', function: { name: 'find_opportunities', arguments: JSON.stringify({ query: 'janitorial services', location: 'Florida' }) } }];
+    const { events } = await ask(ERIC_Q); // the stub answer is "Review the records above." (no horizon headings)
+    const shown = events.filter((e) => e.type === 'token').map((e) => e.content).join('');
+    expect(shown).toContain('**Open now:** 9 open notices matched the search');
+    expect(shown).toContain('**Coming back:** 80 expiring contracts matched (44 direct, 36 related-market, not confirmed); these are not open solicitations.');
+    expect(shown).toContain('**Coming soon:** could not be checked this time (not a zero).');
+  });
+
+  it('an explicit open-only request keeps the open-only search and its horizons', async () => {
+    state.extraOffered = ['find_opportunities'];
+    state.plannerCalls = [{ id: 'c1', function: { name: 'search_sam_opportunities', arguments: JSON.stringify({ keyword: 'janitorial', state: 'FL' }) } }];
+    await ask('Show me only open solicitations for janitorial in FL');
+    expect(state.offered[0]).toEqual(expect.arrayContaining(['search_sam_opportunities', 'find_opportunities']));
+    expect(state.executed).toEqual([['search_sam_opportunities']]);
+  });
+
+  it('a recompete question is unchanged: every tool still offered', async () => {
+    state.extraOffered = ['find_opportunities'];
+    await ask('Which security guard contracts are expiring in the next 12 months?');
+    expect(state.offered[0]).toEqual(['get_expiring_contracts', 'search_sam_opportunities', 'find_opportunities']);
+  });
+
+  it('the map view preamble alone does not make a question a FIND ("Open Now opps in view" is not the customer\'s words)', async () => {
+    state.extraOffered = ['find_opportunities'];
+    await ask(ERIC_Q.replace('What open opportunities are there for janitorial services in Florida?', 'Which agencies spend the most on facilities here?'));
+    expect(state.offered[0]).toEqual(['get_expiring_contracts', 'search_sam_opportunities', 'find_opportunities']);
   });
 });

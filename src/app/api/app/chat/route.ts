@@ -46,7 +46,9 @@ import { fitMessages, inputBudget, type MsgKind } from '@/lib/chat/token-budget'
 import { stagingModelConfig, STAGING_CONFIG_HEADER } from '@/lib/chat/staging-model-config';
 import { customerErrorMessage } from '@/lib/chat/customer-errors';
 import { boundToolResult, perResultBudget } from '@/lib/chat/bound-tool-result';
-import { filterToolsForQuestion } from '@/lib/chat/tool-selection';
+import { filterToolsForTurn, enforceFindArgs, SAM_ONLY_TOOL } from '@/lib/chat/tool-selection';
+import { CURRENT_FIND_CHAT_CONTRACT } from '@/lib/mcp/potato-journey';
+import { missingHorizonFooter, type FindResultLite } from '@/lib/chat/find-completeness';
 import { inferredCodeDisclosure } from '@/lib/chat/code-disclosure';
 import { getNaics } from '@/lib/codes/lookup';
 import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
@@ -519,7 +521,10 @@ export async function POST(request: NextRequest) {
         const profile = await loadBidderProfile(auth.email!);
         const userProfileBlock = formatProfileForPrompt(profile);
         const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-        const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace('{today}', today).replace('{userProfile}', userProfileBlock);
+        // F1: the CURRENT_FIND contract (shared with the MCP host's P2 rule). Not for card chat, which answers
+        // about one opportunity with its own tool allowlist.
+        const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace('{today}', today).replace('{userProfile}', userProfileBlock)
+          + (cardCtx ? '' : `\n\n${CURRENT_FIND_CHAT_CONTRACT}`);
 
         const messages: Array<{ role: string; content: string }> = [
           { role: 'system', content: systemPrompt },
@@ -545,6 +550,8 @@ export async function POST(request: NextRequest) {
         const userTurnIdx = (messages as any[]).push({ role: 'user', content: userTurn }) - 1;
         // B2: full tool results by tool_call_id, so the token-budget step re-bounds from the originals.
         const toolOriginals = new Map<string, string>();
+        // F1: the find_opportunities summary, so a CURRENT_FIND answer always covers all three horizons.
+        let findResult: FindResultLite | null = null;
 
         // ── TOOL-ROUND message list — the CLEAN question, NO RAG context ──
         // (Andre @ CypherIntel 2026-07-30) The RAG teaching corpus was stapled onto
@@ -641,10 +648,15 @@ export async function POST(request: NextRequest) {
           // Offered tools are filtered by the chat tool policy (blocked tools are never shown).
           // B2: an open-opportunity question is not offered the expiring-contracts tool (it returns
           // awarded contracts, not open solicitations). See src/lib/chat/tool-selection.ts.
-          const toolOffer = filterToolsForQuestion(executor.offeredToolDefs(), message);
+          // F1: classified on the CUSTOMER's words (the map view preamble is not theirs). A CURRENT_FIND question
+          // is not offered the open-only search_sam_opportunities when find_opportunities is offered.
+          const priorCustomerText = [...history].reverse().find((h) => h.role === 'user')?.content;
+          const toolOffer = filterToolsForTurn(executor.offeredToolDefs(), splitViewPreamble(message).rest, priorCustomerText ? splitViewPreamble(String(priorCustomerText)).rest : null);
+          // Industry codes the CUSTOMER typed (a planner-chosen code is not passed to find_opportunities).
+          const customerTypedCodes = interpretCapabilityNaics(splitViewPreamble(message).rest).typedCodes;
           const ALL_TOOL_DEFS = toolOffer.defs;
           const notOfferedThisTurn = new Set(toolOffer.removed);
-          for (const n of toolOffer.removed) turnTrace.notices.push(`tool_not_offered:${n}:open_opportunity_question`);
+          for (const n of toolOffer.removed) turnTrace.notices.push(`tool_not_offered:${n}:${n === SAM_ONLY_TOOL ? 'current_find_uses_three_horizons' : 'open_opportunity_question'}`);
           turnTrace.tools_offered = ALL_TOOL_DEFS.length;
 
           // OpenAI {type:'function',function:{name,description,parameters}} →
@@ -779,7 +791,10 @@ export async function POST(request: NextRequest) {
                 const guardedStates = guardUnstatedStates(enforced.args, conversationText);
                 // ...and a city the conversation never named (2026-11-15: a map-view turn ran on city=Birmingham).
                 const guardedCities = guardUnstatedCities(guardedStates.args, conversationText);
-                const guarded = { args: guardedCities.args, removed: [...guardedStates.removed, ...guardedCities.removed] };
+                // F1: a find_opportunities call on a CURRENT_FIND turn keeps all three horizons unless the customer limited it.
+                const findArgs = enforceFindArgs(String(tc.function?.name || ''), guardedCities.args, toolOffer.intent, toolOffer.openOnly, customerTypedCodes);
+                for (const c of findArgs.changes) turnTrace.notices.push(`find_args_enforced:${c}`);
+                const guarded = { args: findArgs.args, removed: [...guardedStates.removed, ...guardedCities.removed] };
                 for (const r of guarded.removed) turnTrace.notices.push(`unstated_filter_removed:${tc.function?.name}:${r}`);
                 return { ...tc, id, type: 'function' as const, function: { ...tc.function, arguments: guarded.args } };
               });
@@ -805,6 +820,9 @@ export async function POST(request: NextRequest) {
                 const dup = dedupe.duplicates.find((d) => d.id === tc.id);
                 if (r) {
                   toolOriginals.set(r.tool_call_id, r.content);
+                  if (r.record.tool === 'find_opportunities' && r.record.status === 'success') {
+                    try { const p = JSON.parse(r.content) as FindResultLite; if (p && typeof p === 'object') findResult = p; } catch { /* unparseable: no footer */ }
+                  }
                   const bounded = boundToolResult(r.content, perResultCap);
                   if (bounded.truncated) turnTrace.notices.push(`tool_result_bounded:${r.record.tool}:${bounded.originalChars}->${bounded.content.length}`);
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1115,6 +1133,17 @@ export async function POST(request: NextRequest) {
             send({ type: 'token', content: correction });
             turnTrace.notices.push('summary_count_corrected');
             console.warn('[chat] summary contradicted verified records:', problems);
+          }
+        }
+        // F1: any horizon the answer left out is appended from the tool's own summary (status + counts only).
+        if (findResult && assistantContent.trim()) {
+          // Any horizon the answer did not cover (counts only; rows are never added back deterministically:
+          // the tool's text match lets noise through, e.g. "Marine Security Guard Residence" cooking services).
+          const footer = missingHorizonFooter(assistantContent, findResult.summary);
+          if (footer) {
+            assistantContent += footer;
+            send({ type: 'token', content: footer });
+            turnTrace.notices.push('find_horizons_completed_from_summary');
           }
         }
         turnTrace.answer = { provider: usedProvider, model: usedModel, finish_reason: finishReason, fallback: answerFallback };

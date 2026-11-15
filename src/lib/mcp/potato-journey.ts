@@ -29,6 +29,24 @@ export const P2_FIRST_TURN_INSTRUCTIONS = [
   'POSITION / deep dive: do not ask market map vs access-path plan vs capability statement before diagnosis. Recommend the next useful output from evidence. A full research artifact is an opt-in payoff AFTER first value + refine — not onboarding.',
 ].join('\n');
 
+/**
+ * The CURRENT_FIND contract for Ask Mindy chat (F1, 2026-11-15). The same rule the MCP host gets in
+ * P2_FIRST_TURN_INSTRUCTIONS (call find_opportunities ONCE; present Open now / Coming back / Coming soon),
+ * worded for a chat answer instead of a host. Imported by the chat route's system prompt; a parity test
+ * (current-find-contract.unit.test.ts) pins that both say the same load-bearing things so they cannot drift.
+ * Chat ALSO enforces it deterministically (src/lib/chat/tool-selection.ts filterToolsForTurn /
+ * enforceFindHorizons); this text is what the answer model follows when presenting the result.
+ */
+export const CURRENT_FIND_CHAT_CONTRACT = [
+  'FINDING OPPORTUNITIES (same contract as the Mindy MCP):',
+  '- Classify first. A solicitation number or notice id: call lookup_solicitation. A question about a past bid ("the bid we submitted", "what happened to"): call lookup_solicitation. Any other "what opportunities / what\'s available / where\'s the money / I sell X" question is a CURRENT FIND.',
+  '- CURRENT FIND: call find_opportunities ONCE with the customer\'s words (query = what they sell; location / agency only if they named or implied one). Cover all three horizons unless they asked for open solicitations ONLY. The word "open" in "open opportunities" is not that restriction.',
+  '- Open now: list every open notice that is genuinely the work asked for (up to 10; amendments of one notice count once), nearest deadline first, each with its notice type (solicitation, presolicitation, sources sought, special notice), deadline and link. Skip rows whose title only shares a word with the request (for example "Marine Security Guard Residence" cooking services for a guard question).',
+  '- Present three sections in this order: Open now, Coming back, Coming soon. Each is grounded (list what it found), empty (say nothing matched), or unavailable (say it could not be checked). Never turn unavailable into zero, and never call an empty Open result a market-wide zero when Coming back or Coming soon found work.',
+  '- Coming back items are contracts ending soon (likely recompetes): name the current holder, value, end date and set-aside, and say they are expiring contracts, not open solicitations. When there are more than five direct matches, show them as a table sorted by value with at least 10 rows when the tool returned that many (up to 15), and give the total counts the tool reported (direct and related separately).',
+  '- Use the tool\'s own counts and its presentation.host_rules. Drop rows that are not the work the customer asked about (for example a building lease for a cleaning question). When the tool returned related-market Open now notices in the same field (for example facilities support or base operations for a janitorial question), list up to 3 under "Related: possible subcontracting targets (scope not confirmed)"; never present them as matches, and skip unrelated ones. Never invent an opportunity, holder, value or date.',
+].join('\n');
+
 export const POTATO_JOURNEY_INSTRUCTIONS = [
   P2_FIRST_TURN_INSTRUCTIONS,
   '',
