@@ -1,0 +1,247 @@
+[
+ {
+  "label": "A mcp plan monthly only",
+  "facts": {
+   "now": "2026-11-14T12:00:00Z",
+   "ledgerGrants": [
+    {
+     "reason": "mcp_sub_monthly",
+     "created_at": "2026-11-01T00:00:00Z"
+    }
+   ],
+   "subscriptions": [],
+   "charges": [],
+   "prepaid": [],
+   "trialEndsAt": null,
+   "trialReadOk": true,
+   "poolFunded": false,
+   "isStaff": false,
+   "isAdvocate": false,
+   "isComp": false
+  }
+ },
+ {
+  "label": "B admin grant only",
+  "facts": {
+   "now": "2026-11-14T12:00:00Z",
+   "ledgerGrants": [
+    {
+     "reason": "admin_grant",
+     "created_at": "2026-11-01T00:00:00Z"
+    },
+    {
+     "reason": "signup_grant",
+     "created_at": "2026-11-01T00:00:00Z"
+    }
+   ],
+   "subscriptions": [],
+   "charges": [],
+   "prepaid": [],
+   "trialEndsAt": null,
+   "trialReadOk": true,
+   "poolFunded": false,
+   "isStaff": false,
+   "isAdvocate": false,
+   "isComp": false
+  }
+ },
+ {
+  "label": "C comp monthly (advocate)",
+  "facts": {
+   "now": "2026-11-14T12:00:00Z",
+   "ledgerGrants": [
+    {
+     "reason": "comp_monthly",
+     "created_at": "2026-11-01T00:00:00Z"
+    }
+   ],
+   "subscriptions": [],
+   "charges": [],
+   "prepaid": [],
+   "trialEndsAt": null,
+   "trialReadOk": true,
+   "poolFunded": false,
+   "isStaff": false,
+   "isAdvocate": true,
+   "isComp": false
+  }
+ },
+ {
+  "label": "D $0 pro trial",
+  "facts": {
+   "now": "2026-11-14T12:00:00Z",
+   "ledgerGrants": [
+    {
+     "reason": "app_tier_pro",
+     "created_at": "2026-11-01T00:00:00Z"
+    }
+   ],
+   "subscriptions": [
+    {
+     "status": "trialing",
+     "plan_amount": 14900,
+     "trial_end": "2026-11-20T00:00:00Z",
+     "current_period_end": "2026-11-20T00:00:00Z",
+     "ended_at": null
+    }
+   ],
+   "charges": [],
+   "prepaid": [],
+   "trialEndsAt": null,
+   "trialReadOk": true,
+   "poolFunded": false,
+   "isStaff": false,
+   "isAdvocate": false,
+   "isComp": false
+  }
+ },
+ {
+  "label": "E annual cancelled after period",
+  "facts": {
+   "now": "2026-11-14T12:00:00Z",
+   "ledgerGrants": [
+    {
+     "reason": "mcp_sub_annual",
+     "created_at": "2026-05-01T00:00:00Z"
+    }
+   ],
+   "subscriptions": [
+    {
+     "status": "canceled",
+     "plan_amount": 59000,
+     "trial_end": null,
+     "current_period_end": "2026-11-01T00:00:00Z",
+     "ended_at": "2026-11-01T00:00:00Z"
+    }
+   ],
+   "charges": [],
+   "prepaid": [],
+   "trialEndsAt": null,
+   "trialReadOk": true,
+   "poolFunded": false,
+   "isStaff": false,
+   "isAdvocate": false,
+   "isComp": false
+  }
+ },
+ {
+  "label": "F prepaid term",
+  "facts": {
+   "now": "2026-11-14T12:00:00Z",
+   "ledgerGrants": [],
+   "subscriptions": [],
+   "charges": [],
+   "prepaid": [
+    {
+     "access_starts_on": "2026-10-01",
+     "access_ends_on": "2027-03-31"
+    }
+   ],
+   "trialEndsAt": null,
+   "trialReadOk": true,
+   "poolFunded": false,
+   "isStaff": false,
+   "isAdvocate": false,
+   "isComp": false
+  }
+ },
+ {
+  "label": "G auto-recharge only",
+  "facts": {
+   "now": "2026-11-14T12:00:00Z",
+   "ledgerGrants": [
+    {
+     "reason": "auto_recharge",
+     "created_at": "2026-11-01T00:00:00Z"
+    }
+   ],
+   "subscriptions": [],
+   "charges": [],
+   "prepaid": [],
+   "trialEndsAt": null,
+   "trialReadOk": true,
+   "poolFunded": false,
+   "isStaff": false,
+   "isAdvocate": false,
+   "isComp": false
+  }
+ },
+ {
+  "label": "H paid pro (charged)",
+  "facts": {
+   "now": "2026-11-14T12:00:00Z",
+   "ledgerGrants": [
+    {
+     "reason": "app_tier_pro",
+     "created_at": "2026-11-01T00:00:00Z"
+    }
+   ],
+   "subscriptions": [
+    {
+     "status": "active",
+     "plan_amount": 14900,
+     "trial_end": null,
+     "current_period_end": "2026-12-01T00:00:00Z",
+     "ended_at": null
+    }
+   ],
+   "charges": [
+    {
+     "amount": 14900,
+     "amount_refunded": 0,
+     "status": "succeeded",
+     "refunded": false
+    }
+   ],
+   "prepaid": [],
+   "trialEndsAt": null,
+   "trialReadOk": true,
+   "poolFunded": false,
+   "isStaff": false,
+   "isAdvocate": false,
+   "isComp": false
+  }
+ },
+ {
+  "label": "I signup only",
+  "facts": {
+   "now": "2026-11-14T12:00:00Z",
+   "ledgerGrants": [
+    {
+     "reason": "signup_grant",
+     "created_at": "2026-11-01T00:00:00Z"
+    }
+   ],
+   "subscriptions": [],
+   "charges": [],
+   "prepaid": [],
+   "trialEndsAt": null,
+   "trialReadOk": true,
+   "poolFunded": false,
+   "isStaff": false,
+   "isAdvocate": false,
+   "isComp": false
+  }
+ },
+ {
+  "label": "J legacy pro_monthly only",
+  "facts": {
+   "now": "2026-11-14T12:00:00Z",
+   "ledgerGrants": [
+    {
+     "reason": "pro_monthly",
+     "created_at": "2026-11-01T00:00:00Z"
+    }
+   ],
+   "subscriptions": [],
+   "charges": [],
+   "prepaid": [],
+   "trialEndsAt": null,
+   "trialReadOk": true,
+   "poolFunded": false,
+   "isStaff": false,
+   "isAdvocate": false,
+   "isComp": false
+  }
+ }
+]
