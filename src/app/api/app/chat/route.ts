@@ -50,8 +50,8 @@ import { filterToolsForQuestion } from '@/lib/chat/tool-selection';
 import { inferredCodeDisclosure } from '@/lib/chat/code-disclosure';
 import { getNaics } from '@/lib/codes/lookup';
 import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
-import { guardUnstatedStates } from '@/lib/chat/stated-filters';
-import { compileIntent, enforceIntent, dedupeToolCalls } from '@/lib/chat/intent-compiler';
+import { guardUnstatedStates, guardUnstatedCities } from '@/lib/chat/stated-filters';
+import { compileIntent, enforceIntent, dedupeToolCalls, isMapScopeNote } from '@/lib/chat/intent-compiler';
 import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, renderSbloContact, lintAnalysis, deterministicNextSteps, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, SBLO_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
@@ -774,7 +774,10 @@ export async function POST(request: NextRequest) {
                 // duplicate's notes would describe a search the customer never sees).
                 scopeNotesByCall.set(id, enforced);
                 // Stated filters only: drop a state the conversation never implied (deterministic).
-                const guarded = guardUnstatedStates(enforced.args, conversationText);
+                const guardedStates = guardUnstatedStates(enforced.args, conversationText);
+                // ...and a city the conversation never named (2026-11-15: a map-view turn ran on city=Birmingham).
+                const guardedCities = guardUnstatedCities(guardedStates.args, conversationText);
+                const guarded = { args: guardedCities.args, removed: [...guardedStates.removed, ...guardedCities.removed] };
                 for (const r of guarded.removed) turnTrace.notices.push(`unstated_filter_removed:${tc.function?.name}:${r}`);
                 return { ...tc, id, type: 'function' as const, function: { ...tc.function, arguments: guarded.args } };
               });
@@ -1001,8 +1004,12 @@ export async function POST(request: NextRequest) {
 
         let assistantContent = '';
         if (renderedRecords.length) {
+          // Scope the MAP supplied is labeled as the map's, never as "from your request" (2026-11-15 review).
+          const fromRequest = [...scopeApplied].filter((n) => !isMapScopeNote(n));
+          const fromMap = [...scopeApplied].filter((n) => isMapScopeNote(n));
           const scopeLines = [
-            scopeApplied.size ? `From your request: ${[...scopeApplied].join('; ')}.` : '',
+            fromRequest.length ? `From your request: ${fromRequest.join('; ')}.` : '',
+            ...fromMap.map((n) => `${n.charAt(0).toUpperCase()}${n.slice(1)}.`),
             scopeInferred ? `${scopeInferred}.` : '',
             scopeUnapplied.size ? `Could not apply: ${[...scopeUnapplied].join('; ')}. The results below do not reflect ${scopeUnapplied.size === 1 ? 'it' : 'them'}.` : '',
           ].filter(Boolean).join('\n');

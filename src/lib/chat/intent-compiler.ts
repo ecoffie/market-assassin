@@ -19,8 +19,12 @@ import { federalToday } from '@/lib/dates/federal-day';
 export interface CompiledIntent {
   requestTime: string;
   federalDate: string;
-  /** States the customer named (name or capitalized code). */
+  /** States the customer named (name or capitalized code) in their own words. */
   explicitStates: string[];
+  /** States the map view supplied (the Opportunity Map "ask about this view" preamble), not the customer's words. */
+  viewStates: string[];
+  /** Where viewStates came from: the map's state filter, or the states of the pins in view. */
+  viewStateSource: 'map_filter' | 'map_area' | null;
   /** States implied only by a city or metro the customer named. */
   impliedStates: string[];
   /** Named buying offices, e.g. "USACE Memphis District". */
@@ -67,9 +71,33 @@ function explicitStatesIn(text: string): string[] {
   return out;
 }
 
+/**
+ * The map's "ask about this view" preamble ("[Current map view — …]\n\n" at the start of the message) is
+ * machine text, not the customer's words. States it supplies are reported as the map's, never as "from
+ * your request" (2026-11-15 review: a note must not say the customer asked for something they did not).
+ */
+const VIEW_PREAMBLE_RE = /^\s*\[Current map view [\s\S]*?\]\s*(?:\n|$)/;
+export function splitViewPreamble(text: string): { view: string | null; rest: string } {
+  const m = String(text || '').match(VIEW_PREAMBLE_RE);
+  return m ? { view: m[0], rest: String(text).slice(m[0].length) } : { view: null, rest: String(text || '') };
+}
+function viewStatesIn(view: string | null): { states: string[]; source: 'map_filter' | 'map_area' | null } {
+  if (!view) return { states: [], source: null };
+  const filter = view.match(/Location: the map is filtered to ([A-Z]{2})\./);
+  if (filter && normalizeStateCode(filter[1])) return { states: [filter[1]], source: 'map_filter' };
+  const area = view.match(/Location: the map area is in ([A-Z]{2}(?:, [A-Z]{2})*) \(/);
+  if (area) {
+    const states = area[1].split(', ').filter((c) => !!normalizeStateCode(c));
+    if (states.length) return { states, source: 'map_area' };
+  }
+  return { states: [], source: null };
+}
+
 export function compileIntent(text: string, now: Date = new Date(), customerText: string = text): CompiledIntent {
   const src = String(text || '');
-  const explicit = explicitStatesIn(src);
+  const { view, rest } = splitViewPreamble(src);
+  const explicit = explicitStatesIn(rest);
+  const fromView = viewStatesIn(view);
   const implied = [...impliedStates(src)].filter((s) => !explicit.includes(s));
   const offices = Array.from(new Set([...src.matchAll(OFFICE_RE)].map((m) => m[1].replace(/\s+/g, ' ').trim())));
   let sinceDate: string | null = null;
@@ -87,6 +115,8 @@ export function compileIntent(text: string, now: Date = new Date(), customerText
     requestTime: now.toISOString(),
     federalDate: federalToday(now),
     explicitStates: explicit,
+    viewStates: explicit.length ? [] : fromView.states,
+    viewStateSource: explicit.length ? null : fromView.source,
     impliedStates: implied,
     officePhrases: offices,
     sinceDate,
@@ -103,6 +133,31 @@ export function compileIntent(text: string, now: Date = new Date(), customerText
 const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
 export interface Enforcement { args: string; applied: string[]; unapplied: string[] }
+
+/**
+ * Add the states that scope this request to a state-filtered search, and say where they came from:
+ * the customer's own words ("from your request") or the map view ("scoped to the states on your map").
+ * The customer's words win: a state they typed replaces the map's (viewStates is empty then).
+ */
+/** True for an applied note whose scope came from the map view, not the customer's words. */
+export function isMapScopeNote(note: string): boolean {
+  return /^scoped to (the states on your map|your map's state filter):/.test(note);
+}
+
+function applyStates(a: Record<string, unknown>, intent: CompiledIntent, applied: string[]): void {
+  const fromRequest = intent.explicitStates.length > 0;
+  const states = fromRequest ? intent.explicitStates : intent.viewStates;
+  if (!states.length) return;
+  const have = listOf(a.state).map((s) => normalizeStateCode(s)).filter((x): x is string => !!x);
+  const missing = states.filter((s) => !have.includes(s));
+  if (!missing.length) return;
+  a.state = Array.from(new Set([...have, ...states])).join(',');
+  applied.push(fromRequest
+    ? `states ${states.join(', ')} from your request`
+    : intent.viewStateSource === 'map_filter'
+      ? `scoped to your map's state filter: ${states.join(', ')}`
+      : `scoped to the states on your map: ${states.join(', ')}`);
+}
 
 const listOf = (v: unknown): string[] =>
   (Array.isArray(v) ? v : v == null ? [] : [v]).flatMap((x) => String(x ?? '').split(/\s*[,;/&]\s*|\s+(?:or|and)\s+/i)).map((t) => t.trim()).filter(Boolean);
@@ -145,11 +200,7 @@ export function enforceIntent(toolName: string, rawArgs: string, intent: Compile
       if (intent.windowMonths <= 60) { a.months_window = intent.windowMonths; applied.push(`${intent.windowMonths}-month window from your request`); }
       else unapplied.push(`a ${intent.windowMonths}-month window (the tool's maximum is 60)`);
     }
-    if (intent.explicitStates.length) {
-      const have = listOf(a.state).map((s) => normalizeStateCode(s)).filter((x): x is string => !!x);
-      const missing = intent.explicitStates.filter((s) => !have.includes(s));
-      if (missing.length) { a.state = Array.from(new Set([...have, ...intent.explicitStates])).join(','); applied.push(`states ${intent.explicitStates.join(', ')} from your request`); }
-    }
+    applyStates(a, intent, applied);
     if (intent.capabilityCodes.length) {
       const have = listOf(a.naics);
       const covered = (c: string) => have.some((h) => /^\d+$/.test(h) && (c.startsWith(h) || h.startsWith(c)));
@@ -173,11 +224,7 @@ export function enforceIntent(toolName: string, rawArgs: string, intent: Compile
     }
   }
 
-  if (toolName === 'search_sam_opportunities' && intent.explicitStates.length) {
-    const have = listOf(a.state).map((s) => normalizeStateCode(s)).filter((x): x is string => !!x);
-    const missing = intent.explicitStates.filter((s) => !have.includes(s));
-    if (missing.length) { a.state = Array.from(new Set([...have, ...intent.explicitStates])).join(','); applied.push(`states ${intent.explicitStates.join(', ')} from your request`); }
-  }
+  if (toolName === 'search_sam_opportunities') applyStates(a, intent, applied);
 
   // A city or metro the customer named, searched through its state on a tool with no city filter:
   // say the search covers the whole state (acc4 R5: "Millington" shown only as "place of performance TN").

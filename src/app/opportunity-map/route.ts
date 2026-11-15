@@ -1736,9 +1736,35 @@ const VIEWPORT_JS = `<script>
   // the current viewport, and every active filter. Every field is a REAL number/value
   // off the map's own state — the drawer never fabricates the context line, and it
   // threads the same filters into the chat so answers are about THIS view.
+  // viewStates: WHERE the view is. Without it the preamble carried only a count, and Ask Mindy filled
+  // the location from the user's saved profile (2026-11-15: a Mid-Atlantic view answered about the
+  // "Birmingham metro"). Counted from the plotted pins inside the current map bounds: each pin's own
+  // 2-letter state (pin.state, else the trailing ", ST" of pin.loc). Top 6 by pin count; [] when
+  // nothing is plotted or the map is not ready (the preamble then says no location is known).
+  function pinState(p){
+    var s=String((p&&p.state)||'').trim().toUpperCase();
+    if(s.length!==2&&p&&p.loc){ var parts=String(p.loc).split(','); s=parts.length>1?String(parts[parts.length-1]||'').trim().toUpperCase():''; }
+    return (s.length===2&&s.charCodeAt(0)>=65&&s.charCodeAt(0)<=90&&s.charCodeAt(1)>=65&&s.charCodeAt(1)<=90)?s:'';
+  }
+  window.__mindyViewStates = function(pins, bounds){
+    var m={}, out=[];
+    if(!bounds||typeof bounds.contains!=='function'||!pins||!pins.length) return out;
+    for(var i=0;i<pins.length;i++){
+      var p=pins[i]; if(!p||typeof p.lat!=='number'||typeof p.lng!=='number') continue;
+      if(!bounds.contains([p.lat,p.lng])) continue;
+      var s=pinState(p); if(!s) continue;
+      m[s]=(m[s]||0)+1;
+    }
+    for(var k in m) if(Object.prototype.hasOwnProperty.call(m,k)) out.push({state:k,pins:m[k]});
+    out.sort(function(a,b){ return b.pins-a.pins || (a.state<b.state?-1:1); });
+    return out.slice(0,6);
+  };
   window.__mindyViewCtx = function(){
     function pick(){ for(var i=0;i<arguments.length;i++){ var v=arguments[i]; if(v!=null&&v!=='') return v; } return ''; }
+    var viewStates=[];
+    try{ if(typeof map!=='undefined'&&map&&map.getBounds) viewStates=window.__mindyViewStates(typeof OPPS!=='undefined'?OPPS:[], map.getBounds()); }catch(e){ viewStates=[]; }
     return {
+      viewStates: viewStates,
       count: (typeof INVIEW==='number'&&INVIEW>0)?INVIEW:(typeof TOTAL==='number'?TOTAL:0),
       capped: !!CAPPED,
       q: (Q||'').trim(),
@@ -10900,7 +10926,19 @@ const ASK_MINDY_JS = `<script>(function(){
     if(c.psc) p.push('PSC '+c.psc);
     if(c.setAside) p.push(String(c.setAside).split(',')[0]);
     if(c.agency) p.push(c.agency);
+    if(!c.state && c.viewStates && c.viewStates.length) p.push('in '+c.viewStates.slice(0,4).map(function(v){ return v.state; }).join(', '));
     return p;
+  }
+  // WHERE the view is, for the model. A state filter wins; else the states of the plotted pins in view;
+  // else say the location is unknown. Never leave it blank: a blank location let the planner substitute
+  // the user's saved profile states and invent a city (2026-11-15 Birmingham-for-Mid-Atlantic defect).
+  function ctxLocation(c){
+    if(c.state) return 'Location: the map is filtered to '+c.state+'.';
+    // "in VA, MD, PA": the server's intent compiler reads a 2-letter code after "in"/"," as a named state
+    // (an ambiguous code such as VA, PA or DE counts only in that form), so every state in view is read
+    // the same way and scopes the view's searches. Pin counts follow, for the model's context only.
+    if(c.viewStates && c.viewStates.length) return 'Location: the map area is in '+c.viewStates.map(function(v){ return v.state; }).join(', ')+' (plotted pins in view, most first: '+c.viewStates.map(function(v){ return v.state+' '+v.pins; }).join(', ')+').';
+    return 'Location: unknown for this view. If the question needs a place, ask which state or city before searching.';
   }
   function renderCtx(){ if(!ctxEl)return;
     if(oppCtx){ ctxEl.innerHTML='<span class="dim">About:</span> '+esc(oppCtx.title||'this opportunity')+(oppCtx.deadline?' <span class="dim">\\u00b7 due '+esc(String(oppCtx.deadline).slice(0,10))+'</span>':''); return; }
@@ -10908,7 +10946,7 @@ const ASK_MINDY_JS = `<script>(function(){
     ctxEl.innerHTML='<span class="dim">Context:</span> '+parts.map(esc).join(' \\u00b7 '); }
   // Threaded to the chat so answers are about THIS view — a compact, factual preface (no invented numbers).
   function ctxPreamble(){ var c=viewCtx(); var parts=ctxParts(c); if(!parts.length)return '';
-    return '[Current map view \\u2014 '+parts.join('; ')+'. Answer for THIS view when the question is about "these"/"this"/"here".]\\n\\n'; }
+    return '[Current map view \\u2014 '+parts.join('; ')+'. '+ctxLocation(c)+' Answer for THIS view when the question is about "these"/"this"/"here": use this location, not the user\\'s saved profile locations, and do not choose a city the user did not name.]\\n\\n'; }
   function setOpen(o){ ov.classList.toggle('show',o); drawer.classList.toggle('show',o); drawer.setAttribute('aria-hidden',o?'false':'true'); if(o){ renderCtx(); if(!body.children.length){ if(oppCtx)greetCard(); else greet(); } setTimeout(function(){ input&&input.focus(); },220); } }
   function greetCard(){
     var chips=[['What does it require?','Summarize what this solicitation requires: scope, deliverables, and key dates.'],

@@ -21,6 +21,7 @@ const state: {
   plannerCalls: ToolCall[];
   offered: string[][];
   executed: string[][];
+  executedArgs: Array<Record<string, unknown>>;
   toolContent: string;
   toolStatus: 'success' | 'failed';
   answerModels: string[];
@@ -45,6 +46,7 @@ vi.mock('@/lib/chat/chat-tool-executor', () => ({
     offeredToolDefs: () => ['get_expiring_contracts', 'search_sam_opportunities'].map((name) => ({ type: 'function', function: { name, description: name, parameters: { type: 'object', properties: {} } } })),
     executeRound: async (calls: ToolCall[]) => {
       state.executed.push(calls.map((c) => c.function.name));
+      for (const c of calls) state.executedArgs.push({ tool: c.function.name, ...JSON.parse(c.function.arguments || '{}') });
       return calls.map((c) => ({
         tool_call_id: c.id,
         content: state.toolStatus === 'failed'
@@ -79,7 +81,7 @@ function sse(text: string) {
 
 beforeEach(() => {
   Object.assign(state, {
-    plannerCalls: [], offered: [], executed: [], toolContent: '{"ok":true,"results":[]}', toolStatus: 'success',
+    plannerCalls: [], offered: [], executed: [], executedArgs: [], toolContent: '{"ok":true,"results":[]}', toolStatus: 'success',
     answerModels: [], answerUrls: [], failModels: new Set(), answerThrows: false, answerMessages: [], plannerModels: [],
   });
   profile.block = '';
@@ -365,5 +367,52 @@ describe('B2: preview-only staging model selector', () => {
     const { POST } = await import('./route');
     await (await POST(new Request('https://x/api/app/chat', { method: 'POST', headers: { 'x-ask-mindy-staging-config': 'gpt-6-astra' }, body: JSON.stringify({ email: ME, message: 'How do I write a capability statement?' }) }) as never)).text();
     expect(state.answerModels).toEqual(['gpt-4o']);
+  });
+});
+
+describe('map "ask about this view": no place the customer did not give (2026-11-15 Birmingham defect)', () => {
+  const VIEW_Q = '[Current map view \u2014 853+ Open Now opps in view. Location: the map area is in VA, MD, PA (plotted pins in view, most first: VA 312, MD 140, PA 90). Answer for THIS view when the question is about "these"/"this"/"here": use this location, not the user\'s saved profile locations, and do not choose a city the user did not name.]\n\nWhich agencies buy the most in this view?';
+
+  it('a planner call with a profile state and an invented city runs on the view states, with no city', async () => {
+    state.plannerCalls = [{ id: 'c1', function: { name: 'search_sam_opportunities', arguments: JSON.stringify({ state: 'AL', city: 'Birmingham', metro_radius_miles: 30, naics: ['2362'] }) } }];
+    await ask(VIEW_Q);
+    expect(state.executedArgs).toHaveLength(1);
+    expect(state.executedArgs[0]).not.toHaveProperty('city');
+    expect(state.executedArgs[0]).not.toHaveProperty('metro_radius_miles');
+    // The profile state AL is gone; the search is scoped to every state in view (none dropped).
+    expect(String(state.executedArgs[0].state).split(',').sort()).toEqual(['MD', 'PA', 'VA']);
+  });
+
+  it('a state the view preamble names is kept', async () => {
+    state.plannerCalls = [{ id: 'c1', function: { name: 'search_sam_opportunities', arguments: JSON.stringify({ state: 'VA', naics: ['2362'] }) } }];
+    await ask(VIEW_Q);
+    expect(String(state.executedArgs[0].state).split(',').sort()).toEqual(['MD', 'PA', 'VA']);
+  });
+
+  it('the customer sees the map scope labeled as the MAP\'s, never "From your request"', async () => {
+    state.toolContent = JSON.stringify({ contracts: [{ piid: 'A1', description: 'Janitorial services', place_of_performance_state: 'VA', period_of_performance_current_end: '2027-06-30', total_obligation: 500000 }], expiring_orders_in_window: [], _meta: { total: 1 } });
+    state.plannerCalls = [{ id: 'c1', function: { name: 'get_expiring_contracts', arguments: JSON.stringify({ naics: '561720', months_window: 12 }) } }];
+    const recompeteQ = VIEW_Q.replace('Which agencies buy the most in this view?', 'Which janitorial contracts expire in the next 12 months in this view?');
+    const { raw } = await ask(recompeteQ);
+    const shown = raw.split('\n').filter((l) => l.startsWith('data:')).map((l) => JSON.parse(l.slice(5))).filter((e) => e.type === 'token').map((e) => e.content).join('');
+    expect(String(state.executedArgs[0].state).split(',').sort()).toEqual(['MD', 'PA', 'VA']);
+    expect(shown).toContain('Scoped to the states on your map: VA, MD, PA.');
+    expect(shown).not.toMatch(/From your request:[^\n]*states/);
+    expect(shown).not.toMatch(/states VA, MD, PA from your request/);
+  });
+
+  it('a state the customer typed is still labeled "From your request"', async () => {
+    state.toolContent = JSON.stringify({ contracts: [{ piid: 'A1', description: 'Janitorial services', place_of_performance_state: 'TX', period_of_performance_current_end: '2027-06-30', total_obligation: 500000 }], expiring_orders_in_window: [], _meta: { total: 1 } });
+    state.plannerCalls = [{ id: 'c1', function: { name: 'get_expiring_contracts', arguments: JSON.stringify({ naics: '561720', months_window: 12 }) } }];
+    const { raw } = await ask('Which janitorial contracts expire in the next 12 months in TX?');
+    const shown = raw.split('\n').filter((l) => l.startsWith('data:')).map((l) => JSON.parse(l.slice(5))).filter((e) => e.type === 'token').map((e) => e.content).join('');
+    expect(shown).toMatch(/From your request: [^\n]*states TX from your request/);
+    expect(shown).not.toContain('on your map');
+  });
+
+  it('a city the customer typed is kept', async () => {
+    state.plannerCalls = [{ id: 'c1', function: { name: 'search_sam_opportunities', arguments: JSON.stringify({ state: 'TN', city: 'Memphis' }) } }];
+    await ask('Which offices buy janitorial services in Memphis, TN?');
+    expect(state.executedArgs[0]).toMatchObject({ state: 'TN', city: 'Memphis' });
   });
 });
