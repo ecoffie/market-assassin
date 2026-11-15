@@ -121,12 +121,27 @@ describe('failures are explicit, never empty', () => {
     const q = (await openQueryFactory(fakeDb(base0()), plan, snap(base0()), NOW)).query('notice_id') as unknown as Record<string, () => unknown>;
     expect(() => q.textSearch()).toThrow(/unsupported method/);
   });
-  it('no snapshot yet: the holder starts one build and returns null (callers use SQL meanwhile)', () => {
+  it('no snapshot yet (db source): the holder starts one build and returns null (callers use SQL meanwhile)', () => {
+    const prev = process.env.OPEN_SNAPSHOT_SOURCE; process.env.OPEN_SNAPSHOT_SOURCE = 'db';
     let builds = 0;
     const client = { from: () => { builds++; throw new Error('db down'); } };
     expect(currentOpenSnapshot(client, NOW)).toBeNull();
     expect(currentOpenSnapshot(client, NOW)).toBeNull();
     expect(builds).toBe(1); // single-flight: the second call does not start a second build
+    if (prev === undefined) delete process.env.OPEN_SNAPSHOT_SOURCE; else process.env.OPEN_SNAPSHOT_SOURCE = prev;
+  });
+  it('no snapshot yet (default storage source): ONE download, never a DB build per instance (review #3)', async () => {
+    __setOpenSnapshotForTests(null);
+    let dbReads = 0; let downloads = 0;
+    const client = {
+      from: () => { dbReads++; throw new Error('must not build from the DB'); },
+      storage: { getBucket: async () => ({ data: { public: false }, error: null }), from: () => ({ download: async () => { downloads++; return { data: null, error: { message: 'not found' } }; } }) },
+    };
+    expect(currentOpenSnapshot(client, NOW)).toBeNull();
+    expect(currentOpenSnapshot(client, NOW)).toBeNull();
+    await new Promise((r) => setTimeout(r, 5));
+    expect(dbReads).toBe(0);
+    expect(downloads).toBe(1);
   });
 });
 function base0() { return [R('a', '48--VALVE,CHECK'), R('c', 'Snow removal')]; }

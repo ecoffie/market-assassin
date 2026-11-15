@@ -23,6 +23,7 @@ import { parseLogicList } from '@/lib/discovery/sql';
 import { applyOpenPlan } from '@/lib/discovery/apply';
 import { parseMapFilters, applyMapFilters } from '@/lib/opportunities/map-filters';
 import type { DiscoveryPlan, Op } from '@/lib/discovery';
+import { loadOpenSnapshot, supabaseSnapshotStore } from './open-snapshot-store';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export const SNAPSHOT_COLS = ['notice_id', 'title', 'description', 'sow_text', 'department', 'sub_tier', 'solicitation_number', 'naics_code', 'psc_code', 'set_aside_code', 'set_aside_description', 'response_deadline'] as const;
@@ -31,9 +32,40 @@ export interface OpenSnapshot { builtAt: string; rows: SnapshotRow[]; count: num
 
 /** Change markers: every enabled writer of a text column stamps one of these (audited 2026-11-14). */
 export const CHANGE_COLS = ['synced_at', 'description_checked_at', 'sow_checked_at', 'updated_at'] as const;
+/**
+ * Agent 5 review #2: with the DRAFT migration (tasks/search-stabilization-2026-11-14/migration-draft/, NOT applied) a
+ * database trigger stamps `snapshot_changed_at` only on a real change to a snapshot column, `active` or the deadline.
+ * OPEN_SNAPSHOT_CHANGE_MARKER=snapshot_changed_at switches to that single marker: complete by construction, and an
+ * unchanged sync upsert is no longer a "change" (also fixes #1 at the source). Unset = today's writer stamps. If the
+ * variable is set but the column does not exist, the change-count query errors and the caller uses SQL (never a guess).
+ * A snapshot must be built AFTER the trigger exists (changes before it were never stamped).
+ */
+export function changeCols(): readonly string[] {
+  return process.env.OPEN_SNAPSHOT_CHANGE_MARKER === 'snapshot_changed_at' ? ['snapshot_changed_at'] : CHANGE_COLS;
+}
+/**
+ * CUT-OVER RULE (Agent 5, trigger review). Rows existing when the trigger is installed keep NULL (= unchanged), so a
+ * snapshot built BEFORE the install could miss every change made before it. With the DB marker selected, the operator
+ * records the install time in OPEN_SNAPSHOT_MARKER_SINCE (ISO); a snapshot built before it — or ANY snapshot while that
+ * variable is missing or invalid — is refused (the caller uses SQL, and the holder loads a fresh one).
+ */
+export function snapshotPredatesMarker(snapshot: OpenSnapshot): string | null {
+  if (process.env.OPEN_SNAPSHOT_CHANGE_MARKER !== 'snapshot_changed_at') return null;
+  const since = Date.parse(process.env.OPEN_SNAPSHOT_MARKER_SINCE || '');
+  if (isNaN(since)) return 'change marker selected but OPEN_SNAPSHOT_MARKER_SINCE (trigger install time) is not set';
+  return Date.parse(snapshot.builtAt) < since ? `snapshot built ${snapshot.builtAt} before the change trigger (${new Date(since).toISOString()})` : null;
+}
 export const SNAPSHOT_MAX_AGE_MS = 6 * 3600_000;
 export const DELTA_MAX = 1500;
 const ID_CHUNK = 150;
+/** Agent 5 review #4: at most this many verification requests in flight per search (a broad plan was ~65 at once). */
+export const VERIFY_CONCURRENCY = 6;
+async function mapLimited<T, R>(xs: T[], limit: number, f: (x: T) => PromiseLike<R>): Promise<R[]> {
+  const out = new Array<R>(xs.length); let next = 0;
+  const worker = async () => { for (;;) { const i = next++; if (i >= xs.length) return; out[i] = await f(xs[i]); } };
+  await Promise.all(Array.from({ length: Math.min(limit, xs.length) }, worker));
+  return out;
+}
 
 /** Build a COMPLETE snapshot or throw. Read-only. */
 export async function buildOpenSnapshot(client: any, now = new Date()): Promise<OpenSnapshot> {
@@ -59,6 +91,19 @@ export async function buildOpenSnapshot(client: any, now = new Date()): Promise<
 // ── In-memory evaluation of the plan's own ops (same expressions PostgREST runs) ─────────────────────────────────
 type Node = ReturnType<typeof parseLogicList>[number];
 const reCache = new Map<string, RegExp>();
+/**
+ * CLOSED REGEX GRAMMAR (Agent 5 review #5, 2026-11-15). Postgres ARE (~*) and JS RegExp agree only on a subset. The
+ * planner emits exactly: word boundaries \m \M, groups ( ), alternation |, ? and +, the classes [-\s] and [-/_. ],
+ * and ASCII literals. Measured on all 28 benchmark phrasings + 14 edge queries under both policies. Anything else
+ * (another escape, ., *, {n}, ^, $, a POSIX class, a non-ASCII letter whose case folding may differ) throws, which
+ * makes the plan uncacheable: the caller runs today's SQL path. Never a guess.
+ */
+const ALLOWED_TOKENS = /\\m|\\M|\[-\\s\]|\[-\/_\. \]|[()|?+]/g;
+const ALLOWED_LITERALS = /^[A-Za-z0-9 '&,#_\/-]*$/;
+export function assertEmittedRegex(pattern: string): void {
+  const rest = pattern.replace(ALLOWED_TOKENS, '');
+  if (!ALLOWED_LITERALS.test(rest)) throw new Error(`open-cache: regex construct outside the planner grammar: ${JSON.stringify(pattern).slice(0, 80)}`);
+}
 function pgRegex(pattern: string, ci: boolean): RegExp {
   const k = `${ci ? 'i' : 's'}:${pattern}`;
   let re = reCache.get(k);
@@ -94,6 +139,8 @@ export function compileOps(ops: Op[]): (row: Record<string, unknown>) => boolean
       const nodes = parseLogicList(o.expr);
       const cols = new Set<string>(); const walk = (n: Node) => ('lg' in n ? n.items.forEach(walk) : cols.add((n as any).col)); nodes.forEach(walk);
       for (const c of cols) if (!known.has(c)) throw new Error(`open-cache: column ${c} not in snapshot`);
+      const pats: string[] = []; const walkRe = (n: Node) => ('lg' in n ? n.items.forEach(walkRe) : ((n as any).op === 'imatch' || (n as any).op === 'match') && pats.push((n as any).val)); nodes.forEach(walkRe);
+      for (const p of pats) assertEmittedRegex(p);
       return (r: Record<string, unknown>) => nodes.some((n) => nodeHit(n, r));
     }
     if (!known.has(o.col)) throw new Error(`open-cache: column ${o.col} not in snapshot`);
@@ -107,8 +154,8 @@ export function compileOps(ops: Op[]): (row: Record<string, unknown>) => boolean
   return (row) => checks.every((c) => c(row));
 }
 
-const unchangedSince = (q: any, at: string) => CHANGE_COLS.reduce((acc, c) => acc.or(`${c}.lte.${at},${c}.is.null`), q);
-const changedSinceExpr = (at: string) => CHANGE_COLS.map((c) => `${c}.gt.${at}`).join(',');
+const unchangedSince = (q: any, at: string) => changeCols().reduce((acc, c) => acc.or(`${c}.lte.${at},${c}.is.null`), q);
+const changedSinceExpr = (at: string) => changeCols().map((c) => `${c}.gt.${at}`).join(',');
 function structured(q: any, plan: DiscoveryPlan): any {
   const mf = plan.horizons.open.mapFilters;
   return applyMapFilters(q, parseMapFilters((k) => (k === 'q' || k === 'search' || k === 'agency' ? null : mf[k] ?? null)));
@@ -130,6 +177,8 @@ export async function cachedOpenRetrieval(args: {
   if (!snapshot) return { status: 'cache_unavailable', reason: 'no snapshot' };
   const age = now.getTime() - Date.parse(snapshot.builtAt);
   if (!(age >= 0) || age > SNAPSHOT_MAX_AGE_MS) return { status: 'cache_unavailable', reason: `snapshot age ${Math.round(age / 60000)} min` };
+  const predates = snapshotPredatesMarker(snapshot);
+  if (predates) return { status: 'cache_unavailable', reason: predates };
   let pass: (r: Record<string, unknown>) => boolean;
   try { pass = compileOps(plan.horizons.open.ops); } catch (e) { return { status: 'cache_unavailable', reason: (e as Error).message }; }
   const ids = snapshot.rows.filter(pass).map((r) => r.notice_id as string);
@@ -139,7 +188,7 @@ export async function cachedOpenRetrieval(args: {
   const dHead = await applyOpenPlan(client.from('sam_opportunities').select('notice_id', { count: 'exact', head: true }), plan).or(changedSinceExpr(at));
   const changedHead = await client.from('sam_opportunities').select('notice_id', { count: 'exact', head: true }).eq('active', true).or(changedSinceExpr(at));
   if (changedHead.error || changedHead.count == null) return { status: 'cache_unavailable', reason: `changed-row count unavailable (${changedHead.error?.message ?? 'null'})` };
-  if (changedHead.count > DELTA_MAX) return { status: 'cache_unavailable', reason: `${changedHead.count} rows changed since the snapshot (> ${DELTA_MAX})` };
+  if (changedHead.count > DELTA_MAX) { requestOpenSnapshotRebuild(client, now); return { status: 'cache_unavailable', reason: `${changedHead.count} rows changed since the snapshot (> ${DELTA_MAX}; rebuild requested)` }; }
   if (dHead.error || dHead.count == null) return { status: 'cache_unavailable', reason: `delta count unavailable (${dHead.error?.message ?? 'null'})` };
   const delta = await applyOpenPlan(client.from('sam_opportunities').select(select), plan).or(changedSinceExpr(at))
     .order('response_deadline', { ascending: true, nullsFirst: false }).limit(windowLimit);
@@ -150,10 +199,10 @@ export async function cachedOpenRetrieval(args: {
   const rows: Array<Record<string, unknown>> = [...(delta.data || [])];
   const chunks: string[][] = [];
   for (let i = 0; i < ids.length; i += ID_CHUNK) chunks.push(ids.slice(i, i + ID_CHUNK));
-  const results = await Promise.all(chunks.map(async (c) => {
+  const results = await mapLimited<string[], any>(chunks, VERIFY_CONCURRENCY, (c) => {
     const q = unchangedSince(structured(client.from('sam_opportunities').select(select, { count: 'exact' }), plan).in('notice_id', c), at);
     return q.order('response_deadline', { ascending: true, nullsFirst: false }).limit(windowLimit);
-  }));
+  });
   for (const r of results) {
     if (r.error || r.count == null) return { status: 'cache_unavailable', reason: `verify failed (${r.error?.message ?? 'count null'})` };
     count += r.count; rows.push(...(r.data || []));
@@ -218,10 +267,9 @@ export class CachedOpenQuery {
     const { client, plan, ids, at, select, opts } = this.ctx;
     const base = () => client.from('sam_opportunities').select(select, opts);
     const chunks: string[][] = []; for (let i = 0; i < ids.length; i += ID_CHUNK) chunks.push(ids.slice(i, i + ID_CHUNK));
-    const parts = await Promise.all([
-      this.replay(applyOpenPlan(base(), plan).or(changedSinceExpr(at))),
-      ...chunks.map((c) => this.replay(unchangedSince(structured(base(), plan).in('notice_id', c), at))),
-    ]);
+    const delta = Promise.resolve(this.replay(applyOpenPlan(base(), plan).or(changedSinceExpr(at)))); // starts now, alongside verification
+    const verified = await mapLimited<string[], any>(chunks, VERIFY_CONCURRENCY, (c) => this.replay(unchangedSince(structured(base(), plan).in('notice_id', c), at)));
+    const parts = [await delta, ...verified];
     const err = parts.find((p: any) => p.error);
     if (err) return { data: null, count: null, error: err.error };
     const count = opts?.count ? parts.reduce((n: number | null, p: any) => (n == null || p.count == null ? null : n + p.count), 0) : null;
@@ -261,26 +309,52 @@ export async function openQueryFactory(client: any, plan: DiscoveryPlan, snapsho
   if (!snapshot) return sql('no snapshot');
   const age = now.getTime() - Date.parse(snapshot.builtAt);
   if (!(age >= 0) || age > SNAPSHOT_MAX_AGE_MS) return sql(`snapshot age ${Math.round(age / 60000)} min`);
+  const predates = snapshotPredatesMarker(snapshot);
+  if (predates) { requestOpenSnapshotRebuild(client, now); return sql(predates); }
   let pass: (r: Record<string, unknown>) => boolean;
   try { pass = compileOps(plan.horizons.open.ops); } catch (e) { return sql((e as Error).message); }
   const changed = await client.from('sam_opportunities').select('notice_id', { count: 'exact', head: true }).eq('active', true).or(changedSinceExpr(snapshot.builtAt));
   if (changed.error || changed.count == null) return sql('changed-row count unavailable');
-  if (changed.count > DELTA_MAX) return sql(`${changed.count} rows changed since the snapshot`);
+  if (changed.count > DELTA_MAX) { requestOpenSnapshotRebuild(client, now); return sql(`${changed.count} rows changed since the snapshot (rebuild requested)`); }
   const ids = snapshot.rows.filter(pass).map((r) => r.notice_id as string);
   return { path: 'snapshot', reason: null, snapshotAgeMs: age, query: (c, o) => new CachedOpenQuery({ client, plan, ids, at: snapshot.builtAt, select: c, opts: o }) };
 }
 
-// ── Snapshot holder: one build at a time per process (concurrent requests share it) ─────────────────────────────
+// ── Snapshot holder: one load at a time per process (concurrent requests share it) ─────────────────────────────
 let current: OpenSnapshot | null = null;
-let building: Promise<OpenSnapshot> | null = null;
-/** The current snapshot if fresh; otherwise starts ONE background build and returns null (callers use SQL meanwhile). */
+let building: Promise<OpenSnapshot | null> | null = null;
+/**
+ * Where an instance gets its snapshot (Agent 5 review #3). Default 'storage': download the file the build-open-snapshot
+ * cron wrote to the private bucket (one DB build per sync, not per instance). 'db' (OPEN_SNAPSHOT_SOURCE=db): build from
+ * the database in-process — development and benchmarks only.
+ */
+export function snapshotSource(): 'storage' | 'db' { return process.env.OPEN_SNAPSHOT_SOURCE === 'db' ? 'db' : 'storage'; }
+function startLoad(client: any): void {
+  building = (snapshotSource() === 'db' ? buildOpenSnapshot(client) : loadOpenSnapshot(supabaseSnapshotStore(client)))
+    .then((s) => { if (s && (!current || Date.parse(s.builtAt) > Date.parse(current.builtAt))) current = s; return s; })
+    .finally(() => { building = null; });
+  building.catch(() => {}); // a failed load leaves `current` as it was; the age check keeps refusing a stale one
+}
+/** The current snapshot if fresh; otherwise starts ONE background load and returns null (callers use SQL meanwhile). */
 export function currentOpenSnapshot(client: any, now = new Date()): OpenSnapshot | null {
-  const fresh = current && now.getTime() - Date.parse(current.builtAt) <= SNAPSHOT_MAX_AGE_MS;
-  if (!fresh && !building) {
-    building = buildOpenSnapshot(client).then((s) => { current = s; return s; }).finally(() => { building = null; });
-    building.catch(() => {}); // a failed build leaves `current` as it was; the age check keeps refusing a stale one
-  }
+  const fresh = current && now.getTime() - Date.parse(current.builtAt) <= SNAPSHOT_MAX_AGE_MS && !snapshotPredatesMarker(current);
+  if (!fresh && !building) startLoad(client);
   return fresh ? current : null;
 }
+/**
+ * Agent 5 review #1 (measured: the 09:00Z sync stamped synced_at on 8,025 of 9,702 open rows, so every sync pushed the
+ * delta past DELTA_MAX and the cache refused for up to 6 h). An overflow now requests a rebuild: at most one build in
+ * flight per process, and at most one overflow-triggered build per REBUILD_MIN_INTERVAL_MS (a sync that keeps stamping
+ * cannot cause a rebuild storm). Until the new snapshot lands, callers keep using SQL, exactly as before.
+ */
+export const REBUILD_MIN_INTERVAL_MS = 10 * 60_000;
+let lastOverflowRebuild = 0;
+export function requestOpenSnapshotRebuild(client: any, now = new Date()): boolean {
+  if (building || now.getTime() - lastOverflowRebuild < REBUILD_MIN_INTERVAL_MS) return false;
+  lastOverflowRebuild = now.getTime();
+  // storage source: re-download (the cron writes a fresh file after each sync); db source: rebuild in-process.
+  startLoad(client);
+  return true;
+}
 /** Test seam. */
-export function __setOpenSnapshotForTests(s: OpenSnapshot | null) { current = s; building = null; }
+export function __setOpenSnapshotForTests(s: OpenSnapshot | null) { current = s; building = null; lastOverflowRebuild = 0; }
