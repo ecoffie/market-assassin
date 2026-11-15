@@ -28,13 +28,15 @@ const state: {
   failModels: Set<string>;
   answerThrows: boolean;
   answerMessages: Array<Array<{ role: string; content: string }>>;
+  plannerModels: string[];
 } = {} as never;
+const budget = { over: false };
 
 vi.mock('@/lib/api-auth', () => ({ verifyUserOwnsEmail: async (_r: unknown, email: string) => ({ authenticated: true, email }) }));
 vi.mock('@/lib/access/resolve-access', () => ({ hasProAccess: async () => true }));
 const profile = { block: '' };
 vi.mock('@/lib/proposal/loaders', () => ({ loadBidderProfile: async () => null, formatProfileForPrompt: () => profile.block }));
-vi.mock('@/lib/llm/usage-cost', () => ({ isUserOverBudget: async () => false, recordLlmUsage: async () => {} }));
+vi.mock('@/lib/llm/usage-cost', () => ({ isUserOverBudget: async () => budget.over, recordLlmUsage: async () => {} }));
 vi.mock('@/lib/chat/provider-events', () => ({ recordProviderEvent: async () => {} }));
 vi.mock('@/lib/entitlements/shadow', () => ({ shadowEntitlement: () => {} }));
 vi.mock('@/lib/chat/tier0-tools', () => ({ makeTier0Tools: () => ({ execute: async () => ({}) }), TIER0_TOOL_DEFS: [], TIER0_TOOL_NAMES: new Set() }));
@@ -78,15 +80,17 @@ function sse(text: string) {
 beforeEach(() => {
   Object.assign(state, {
     plannerCalls: [], offered: [], executed: [], toolContent: '{"ok":true,"results":[]}', toolStatus: 'success',
-    answerModels: [], answerUrls: [], failModels: new Set(), answerThrows: false, answerMessages: [],
+    answerModels: [], answerUrls: [], failModels: new Set(), answerThrows: false, answerMessages: [], plannerModels: [],
   });
   profile.block = '';
+  budget.over = false;
   vi.stubEnv('OPENAI_API_KEY', 'ok');
   vi.stubEnv('GROQ_API_KEY', 'gk');
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://x.supabase.co'); vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'srk');
   vi.stubGlobal('fetch', vi.fn(async (url: string, init: { body: string }) => {
     const b = JSON.parse(init.body);
     if (!b.stream) {
+      state.plannerModels.push(b.model);
       state.offered.push((b.tools ?? []).map((t: { function?: { name?: string } }) => String(t.function?.name)));
       return new Response(JSON.stringify({ choices: [{ message: { content: null, tool_calls: state.plannerCalls.length ? state.plannerCalls : undefined } }] }), { status: 200 });
     }
@@ -221,6 +225,56 @@ describe('B2: whole-request token budget', () => {
       expect(b).not.toHaveProperty('max_tokens');
     }
     expect(bodies.some((b) => b.model === 'gpt-6.1-terra')).toBe(true);
+  });
+});
+
+describe('B2: over-budget users (LLM_OPENAI_MODEL || gpt-4o-mini, unchanged by this release)', () => {
+  it('with the proposed release env, an over-budget user plans and answers on gpt-4o-mini; luna is the answer fallback', async () => {
+    budget.over = true;
+    vi.stubEnv('CHAT_OPENAI_MODEL', 'gpt-6.1-terra'); vi.stubEnv('CHAT_ANSWER_FALLBACKS', 'openai:gpt-6-luna');
+    state.plannerCalls = [{ id: 'c1', function: { name: 'search_sam_opportunities', arguments: '{}' } }];
+    await ask('What janitorial opportunities are open in Florida right now?');
+    expect(state.plannerModels).toEqual(['gpt-4o-mini']);
+    expect(state.answerModels).toEqual(['gpt-4o-mini']);
+    state.answerModels = []; state.plannerModels = [];
+    state.failModels = new Set(['gpt-4o-mini']);
+    await ask('What janitorial opportunities are open in Florida right now?');
+    expect(state.answerModels).toEqual(['gpt-4o-mini', 'gpt-6-luna']);
+  });
+
+  it('Incident A guard: an over-budget user with a huge tool result never sends gpt-4o-mini more than its 128K window', async () => {
+    budget.over = true;
+    const results = Array.from({ length: 3000 }, (_, i) => ({ notice_id: `N${i}`, title: `T${i}`, description: 'x'.repeat(1500) }));
+    state.toolContent = JSON.stringify({ ok: true, results }); // ~4.6M chars, far past 128K tokens
+    state.plannerCalls = [{ id: 'c1', function: { name: 'get_expiring_contracts', arguments: '{}' } }];
+    await ask('Which janitorial contracts are expiring in the next 24 months?');
+    expect(state.answerModels[0]).toBe('gpt-4o-mini');
+    for (const msgs of state.answerMessages) {
+      // 3 chars/token is the guard's conservative estimate; real tokenization is ≥ 3.5 chars/token for this text.
+      expect(JSON.stringify(msgs).length / 3).toBeLessThan(100_000);
+    }
+    // The Incident A shape: a fixed part the per-result bound cannot shrink pushes the whole request past
+    // the window. The whole-request guard must refuse to send it (not let gpt-4o-mini 400 on it).
+    state.answerModels = [];
+    profile.block = 'p'.repeat(330_000); // ≈110K estimated tokens on its own
+    const { events } = await ask('Which janitorial contracts are expiring in the next 24 months?');
+    expect(state.answerModels).toEqual([]);
+    expect(events.find((e) => e.type === 'error')?.code).toBe('request_too_large');
+  });
+
+  it('the preview-only over-budget-terra config reproduces that path on a traced preview, and is ignored on production', async () => {
+    vi.stubEnv('ASK_MINDY_TRACE_EVENTS', 'true'); vi.stubEnv('VERCEL_ENV', 'preview');
+    state.plannerCalls = [{ id: 'c1', function: { name: 'search_sam_opportunities', arguments: '{}' } }];
+    const mk = () => new Request('https://x/api/app/chat', { method: 'POST', headers: { 'x-ask-mindy-staging-config': 'over-budget-terra' }, body: JSON.stringify({ email: ME, message: 'What janitorial opportunities are open in Florida right now?' }) });
+    vi.resetModules();
+    await (await (await import('./route')).POST(mk() as never)).text();
+    expect(state.plannerModels).toEqual(['gpt-4o-mini']);
+    expect(state.answerModels).toEqual(['gpt-4o-mini']);
+    state.plannerModels = []; state.answerModels = [];
+    vi.stubEnv('VERCEL_ENV', 'production');
+    vi.resetModules();
+    await (await (await import('./route')).POST(mk() as never)).text();
+    expect(state.plannerModels).toEqual(['gpt-4o']); // header ignored: real (not over-budget) default
   });
 });
 

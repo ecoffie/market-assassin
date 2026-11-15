@@ -130,6 +130,76 @@ machine error code; never provider text). Production emits nothing.
 - Cross-provider fallback: Groq is **not viable** on the on-demand tier. Either upgrade Groq to Dev tier and re-run
   `fallback-groq` only, or accept that an account-wide OpenAI outage (Incident B) shows the fixed error message.
 
+## 9. Controlled release plan (prepared 2026-11-15; nothing executed)
+
+### 9.1 Model verification on the PRODUCTION OpenAI org
+- I queried the Production `OPENAI_API_KEY` directly; the key was never printed and the env file was shredded. The org is `gcg-xxfrzf`, the same org the staging runs used.
+- `GET /v1/models/gpt-6.1-terra`: 200, created 2026-10-13. `GET /v1/models/gpt-6-luna`: 200, created 2026-09-14.
+- No dated snapshots exist for either model; only the aliases are listed. A model change by OpenAI would therefore happen under the same ID. Re-check the deprecations page before each release.
+- Deprecations page (fetched 2026-11-15): neither model is deprecated. Both appear only as replacement targets.
+- `gpt-4o` / `gpt-4o-mini` (snapshots `-2024-08-06`, `-2024-11-20`, `-2024-07-18`) shut down **2027-01-14**.
+
+### 9.2 Route compatibility
+- **terra as planner:** the `terra` and `fallback-*` staging configs used terra as the tool planner on every turn (32 turns). Requests go through `openAiChatParams`: `reasoning_effort:'none'` plus `max_completion_tokens`, no `temperature` or `max_tokens`. A route test asserts this.
+- **If the terra planner fails and `CHAT_PLANNER_FALLBACKS` is unset:** the chain is terra only. The turn continues with no live data, shows the `tools_unavailable` notice, the answer step still runs (terra, then luna), and the turn is not billable.
+- **Planner fallback recommendation:** set `CHAT_PLANNER_FALLBACKS=openai:gpt-4o`. It is already in `TOOL_COMPATIBLE_PLANNERS`, so this is a configuration change only.
+  - `gpt-6-luna` is NOT in `TOOL_COMPATIBLE_PLANNERS`, and luna has not been tested as a planner through the route. Add it with a route test, then switch the planner fallback to it before 2027-01-14.
+  - Same-provider caveat: no planner fallback survives an OpenAI account-wide outage (Incident B). Groq is not being upgraded.
+
+### 9.3 Over-budget users
+Over-budget users plan and answer on `LLM_OPENAI_MODEL || gpt-4o-mini`. `LLM_OPENAI_MODEL` is not set in Production, so they use `gpt-4o-mini`. This release does not change it.
+- **After the release env change:** an over-budget user plans on gpt-4o-mini and answers on gpt-4o-mini, falling back to gpt-6-luna (`CHAT_ANSWER_FALLBACKS` applies to them too). A route test covers this.
+- **Incident A guard (route test, mutation-proven):** a request that cannot fit gpt-4o-mini's 128K window is never sent. The customer gets the fixed `request_too_large` message.
+  - With the whole-request guard loosened, gpt-4o-mini is called and the test fails.
+  - A 4.6M-char tool result is bounded below the budget before sending.
+- **Preview-only config `over-budget-terra`:** reproduces this path live without writing a budget record. It is ignored on production, which a test confirms. A live run needs a staging account (the grant was removed).
+- **Quality:** gpt-4o-mini as answer model passed 8/8 automatic checks in `fallback-mini`, but was the weakest at relevance (§8).
+- **2027-01-14 risk:** over-budget users depend on the gpt-4o-mini alias, which resolves to a snapshot that shuts down then. Before then, Eric should set `LLM_OPENAI_MODEL=gpt-6-luna` (planner and answer). That needs a luna planner route test first, and this variable is shared with other tools.
+
+### 9.4 Cost tracking fix shipped in this PR (release blocker found during prep)
+`src/lib/llm/usage-cost.ts` had no GPT-6 prices. Every terra or luna call would have been logged at **$0**, which silently disables the per-user $15/month budget cap and makes the cost dashboard show chat as free.
+- Added: astra 10/50, sol 2/10, terra 1/5, luna 0.10/0.50, gpt-oss-120b 0.15/0.60 (USD per 1M tokens).
+- Unit tests check every routable model is priced.
+- This is internal LLM cost telemetry, not customer pricing.
+
+### 9.5 Env changes — **Production only**
+Set each value with `printf` (no trailing newline): `printf 'gpt-6.1-terra' | vercel env add CHAT_OPENAI_MODEL production`
+
+| Name | Value | Note |
+|---|---|---|
+| `CHAT_OPENAI_MODEL` | `gpt-6.1-terra` | planner and answer primary |
+| `CHAT_ANSWER_FALLBACKS` | `openai:gpt-6-luna` | replaces the code default (gpt-4o-mini) |
+| `CHAT_PLANNER_FALLBACKS` | `openai:gpt-4o` | recommended interim (§9.2); remove or replace with luna before 2027-01-14 |
+
+Unchanged: `LLM_OPENAI_MODEL` (shared), `CHAT_CLAUDE_*` (Claude planner stays disabled), any Groq setting, card chat.
+
+### 9.6 Order (two steps, so code and model changes can be rolled back separately)
+1. **Merge #2053, then the production deploy reaches READY.** No env change yet. Production then runs the B2 code with today's models: gpt-4o, with gpt-4o-mini as answer fallback. Staging validated this as `current` and `fallback-mini`.
+2. Verify it live (§9.7 A).
+3. **Add the three env vars (Production), then redeploy the current production deployment.** Use `vercel redeploy` or the dashboard Redeploy; no empty commit. Env vars only bind on a new build. Wait for READY.
+4. Verify it live (§9.7 B).
+
+### 9.7 Live re-verification
+Production emits no trace by design, so verification combines a signed-in session with database rows. A person must sign in with a real Pro or staff account: production enforces the emailed second factor for paid accounts, and the synthetic example.com account cannot receive it. **No new test account is needed.**
+
+**A. After the merge deploy (today's models)**
+- `curl --compressed -L https://getmindy.ai/` returns 200. Sign in at `/app`, open Ask Mindy, ask:
+  1. "What security guard opportunities are open right now?" Expect real SAM links, no expiring-contracts list, no raw error text.
+  2. "Which security guard contracts are expiring in the next 12 months?" Expect the record list and the "Industry codes chosen by Mindy" disclosure.
+  3. "How do I write a capability statement?"
+- `llm_usage_log` (last 15 min, that user): `tool='chat_tool_round'` and `tool='chat'` rows with `model='gpt-4o'` and `cost_usd > 0`.
+- `tool_errors` (`tool='ask_mindy'`, last 15 min): no `answer_failure`.
+
+**B. After the env change and redeploy**
+- Repeat the same 3 questions.
+- `llm_usage_log`: `model='gpt-6.1-terra'` for both `chat_tool_round` and `chat`, with `cost_usd > 0`. This also proves §9.4 is live.
+- No `answer_failure` in `tool_errors`. Time to first token similar to staging (about 2.5–6s).
+
+### 9.8 Rollback
+- **Model change only (step 3):** use Vercel Instant Rollback to the step-1 deployment, which is immediate. Then `vercel env rm` the three vars (Production) so the next build doesn't bring them back.
+- **Code (step 1):** use Vercel Instant Rollback to the pre-merge production deployment. Then open a `git revert -m 1 <merge sha>` PR so `main` matches.
+- No migrations, no data writes and no flag changes are involved, so a rollback has no data step.
+
 ## Go / no-go
 
 | Gate | State |

@@ -11,7 +11,14 @@ import { createClient } from '@supabase/supabase-js';
 type TokenUsage = { prompt_tokens?: number; completion_tokens?: number };
 
 // $ per 1M tokens [input, output]. Keyed by model substring (matched loosely).
+// GPT-6 family (OpenAI pricing, 2026-11-14). These MUST be priced: an unpriced model costs $0 here,
+// which silently disables the per-user budget cap and zeroes the cost dashboard for that model.
 const MODEL_PRICES: Array<{ match: RegExp; in: number; out: number }> = [
+  { match: /gpt-6(\.\d+)?-astra/i,      in: 10.0, out: 50.0 },
+  { match: /gpt-6(\.\d+)?-sol/i,        in: 2.00, out: 10.0 },
+  { match: /gpt-6(\.\d+)?-terra/i,      in: 1.00, out: 5.00 },
+  { match: /gpt-6(\.\d+)?-luna/i,       in: 0.10, out: 0.50 },
+  { match: /gpt-oss-120b/i,              in: 0.15, out: 0.60 },
   { match: /gpt-4o-mini|gpt-4\.1-mini/i, in: 0.15, out: 0.60 },
   { match: /gpt-4o|gpt-4\.1\b/i,         in: 2.50, out: 10.0 },
   { match: /claude.*opus/i,              in: 15.0, out: 75.0 },

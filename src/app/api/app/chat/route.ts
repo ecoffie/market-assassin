@@ -579,9 +579,9 @@ export async function POST(request: NextRequest) {
         }
         toolRoundMessages.push({ role: 'user', content: message });
 
-        const overBudgetEarly = await isUserOverBudget(email).catch(() => false);
         // Preview-only per-request model configuration (staging acceptance); null on production by construction.
         const staging = stagingModelConfig(request.headers.get(STAGING_CONFIG_HEADER), TRACE_EVENTS);
+        const overBudgetEarly = staging?.config.overBudget ?? await isUserOverBudget(email).catch(() => false);
         const modelEnv: Record<string, string | undefined> = staging ? { ...process.env, ...staging.config.env } : process.env;
         const chatModelEarly = overBudgetEarly
           ? (modelEnv.LLM_OPENAI_MODEL || 'gpt-4o-mini')

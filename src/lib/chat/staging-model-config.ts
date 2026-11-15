@@ -18,6 +18,8 @@ export interface StagingModelConfig {
   env: Record<string, string>;
   /** Override for the answer chain's first model (planner is unaffected). */
   answerPrimary?: string;
+  /** Treat the request as an over-budget user's (planner + answer = LLM_OPENAI_MODEL || gpt-4o-mini). */
+  overBudget?: boolean;
 }
 
 export const STAGING_MODEL_CONFIGS: Readonly<Record<string, StagingModelConfig>> = {
@@ -30,6 +32,9 @@ export const STAGING_MODEL_CONFIGS: Readonly<Record<string, StagingModelConfig>>
   // Interim code-default fallback (what #2053 ships with no env change): current primary, the answer
   // primary fails for real, gpt-4o-mini must answer.
   'fallback-mini': { env: { CHAT_ANSWER_FALLBACKS: 'openai:gpt-4o-mini' }, answerPrimary: FORCED_FAILURE_MODEL },
+  // The proposed release config as an OVER-BUDGET user sees it: planner and answer primary fall to
+  // LLM_OPENAI_MODEL || gpt-4o-mini (unchanged by this release), answer fallback gpt-6-luna.
+  'over-budget-terra': { env: { CHAT_OPENAI_MODEL: 'gpt-6.1-terra', CHAT_ANSWER_FALLBACKS: 'openai:gpt-6-luna' }, overBudget: true },
   // Independent-provider fallback: the answer primary fails for real, Groq gpt-oss-120b must answer.
   'fallback-groq': { env: { CHAT_OPENAI_MODEL: 'gpt-6.1-terra', CHAT_ANSWER_FALLBACKS: 'groq:openai/gpt-oss-120b' }, answerPrimary: FORCED_FAILURE_MODEL },
 };
