@@ -64,6 +64,8 @@ const ACCOUNT_MENU_BASE_CSS =
   + '.mindy-cred:hover{border-color:#1b3a6b;color:#1b3a6b}'
   + '.mindy-upg{font:700 14px Inter,system-ui,sans-serif;color:#fff!important;text-decoration:none;white-space:nowrap;padding:8px 16px;border-radius:999px;background:#1b3a6b}'
   + '.mindy-upg:hover{background:#14294a}'
+  + '.mindy-plan{font:700 13px Inter,system-ui,sans-serif;color:#1b3a6b;text-decoration:none;white-space:nowrap;padding:6px 12px;border:1px solid #c9d6ea;border-radius:999px;background:#eef3fb}'
+  + '.mindy-plan:hover{border-color:#1b3a6b}'
   + '@media(max-width:640px){.mindy-cred{display:none}}'
   + '.mindy-anon-link{font:600 14px Inter,system-ui,sans-serif;color:var(--ink,#111c26);text-decoration:none;white-space:nowrap;cursor:pointer}'
   + '.mindy-anon-link:hover{text-decoration:underline;text-underline-offset:3px}'
@@ -205,7 +207,11 @@ export const ACCOUNT_MENU_JS = '<script>'
   // Upgrade next to it". Hides this header's /pricing links and puts "<n> credits" (→ billing) and
   // Upgrade (→ /pricing, which shows the current plan) before the avatar. Team/Enterprise get "Add
   // credits" instead of Upgrade. credits:null (unreadable) shows no number — never a fake 0.
-  + 'function paintPlan(d){if(document.getElementById("mindyCred"))return;var p=wrap.parentNode;if(!p)return;var scope=wrap.closest("header")||p;scope.querySelectorAll(\'a[href="/pricing"]\').forEach(function(a){if(!a.closest("#mindyAcctMenu"))a.style.display="none";});var top=d.plan==="team"||d.plan==="enterprise";if(typeof d.credits==="number"){var c=document.createElement("a");c.id="mindyCred";c.className="mindy-cred";c.href="/app?panel=settings&section=credits&tab=billing";c.title="Your Mindy credits";c.textContent=Number(d.credits).toLocaleString()+" credits";p.insertBefore(c,wrap);}var u=document.createElement("a");u.id="mindyUpg";u.className="mindy-upg";u.href=top?"/app?panel=settings&section=credits&tab=billing":"/pricing";u.textContent=top?"Add credits":"Upgrade";p.insertBefore(u,wrap);}'
+  // Pro (2026-11-15): a Pro account was shown "Upgrade" because only team/enterprise were exempt. Pro is
+  // plan "pro" (resolvePlan, promoted by resolveAccess — the hasProAccess verdict) OR proFeatures true
+  // (isProEmail, the requirePro gate's verdict: Pro, Team, trial, staff). Pro gets a quiet "Pro" badge
+  // (→ billing) and no Upgrade button. Display only; no entitlement logic changes.
+  + 'function paintPlan(d){if(document.getElementById("mindyCred"))return;var p=wrap.parentNode;if(!p)return;var scope=wrap.closest("header")||p;scope.querySelectorAll(\'a[href="/pricing"]\').forEach(function(a){if(!a.closest("#mindyAcctMenu"))a.style.display="none";});var top=d.plan==="team"||d.plan==="enterprise";if(typeof d.credits==="number"){var c=document.createElement("a");c.id="mindyCred";c.className="mindy-cred";c.href="/app?panel=settings&section=credits&tab=billing";c.title="Your Mindy credits";c.textContent=Number(d.credits).toLocaleString()+" credits";p.insertBefore(c,wrap);}var pro=!top&&(d.plan==="pro"||d.proFeatures===true);if(pro){var b=document.createElement("a");b.id="mindyPlan";b.className="mindy-plan";b.href="/app?panel=settings&section=credits&tab=billing";b.title="Your plan";b.textContent="Pro";p.insertBefore(b,wrap);return;}var u=document.createElement("a");u.id="mindyUpg";u.className="mindy-upg";u.href=top?"/app?panel=settings&section=credits&tab=billing":"/pricing";u.textContent=top?"Add credits":"Upgrade";p.insertBefore(u,wrap);}'
   + 'if(!t||tokExpired(t)){paintSignedOut();return;}'
   + 'if(em){paintInitial("",em);renderHeader("");}'
   + 'var meHdrs={"x-mi-auth-token":t};if(em)meHdrs["x-user-email"]=em;'

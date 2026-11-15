@@ -51,7 +51,8 @@ describe('account menu destinations', () => {
     //     /app?panel=settings&section=credits is the same bridge (the header credits chip adds &tab=billing).
     //   • /app?next= — the sign-in button's FALLBACK, used only if openSignInModal is absent.
     //     The modal is the primary path; this is the defensive branch, not a destination.
-    const appLinks = (menu().match(/href="\/app[^"]*"/g) || []).sort();
+    // Unique destinations: the header Pro badge (2026-11-15) reuses the credits chip's billing bridge.
+    const appLinks = Array.from(new Set(menu().match(/href="\/app[^"]*"/g) || [])).sort();
     expect(appLinks).toEqual(['href="/app?next="', 'href="/app?panel=settings"', 'href="/app?panel=settings&section=credits"', 'href="/app?panel=settings&section=credits&tab=billing"']);
   });
 
