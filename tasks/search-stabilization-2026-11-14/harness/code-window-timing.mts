@@ -8,7 +8,9 @@ import { MCP_POLICY } from '@/lib/discovery/policy';
 import { applyOpenPlan } from '@/lib/discovery/apply';
 import { interpretMarket } from '@/lib/opportunities/market-interpretation';
 import { openCodeWindowPsc, OPEN_CODE_WINDOW_CAP, OPEN_FETCH_CAP } from '@/lib/opportunities/open-relevance';
-const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+// .env.local values are quoted and end with a literal "\\n" (the vercel env pull gotcha); shell sourcing keeps the "\\n".
+const clean = (v: string | undefined) => String(v || '').trim().replace(/^["']|["']$/g, '').replace(/(\\n)+$/, '').trim();
+const db = createClient(clean(process.env.NEXT_PUBLIC_SUPABASE_URL), clean(process.env.SUPABASE_SERVICE_ROLE_KEY), { auth: { persistSession: false } });
 const COLS = 'notice_id, title, department, sub_tier, naics_code, psc_code, description, set_aside_code, set_aside_description, notice_type, response_deadline, ui_link, solicitation_number, pop_state, pop_city, office_address, map_lat, updated_at';
 const Q = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const med = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
