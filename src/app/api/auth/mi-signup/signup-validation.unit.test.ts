@@ -20,6 +20,11 @@ vi.mock('@supabase/supabase-js', () => ({
 vi.mock('dns/promises', () => ({ resolveMx: vi.fn(async () => [{ exchange: 'mx.example.com', priority: 10 }]) }));
 vi.mock('@/lib/send-email', () => ({ sendEmail: (...a: unknown[]) => sendEmail(...a) }));
 vi.mock('@/lib/resilience/signup-queue', () => ({ enqueuePendingSignup: (...a: unknown[]) => enqueuePendingSignup(...a) }));
+// Funnel logging has its own test (signup-logging.unit.test.ts); keep `insert` meaning signup_attribution here.
+vi.mock('@/lib/signup-events', async (orig) => ({
+  ...(await orig<typeof import('@/lib/signup-events')>()),
+  logSignupEvent: vi.fn(async () => null), logSignupFailed: vi.fn(async () => null), logExistingAccountRedirect: vi.fn(async () => null),
+}));
 vi.mock('@/lib/mindy/lead-attribution', () => ({
   normalizeAttribution: () => ({}),
   pushLeadToGhl: vi.fn(),

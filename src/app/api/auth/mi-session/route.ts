@@ -4,6 +4,7 @@ import { verifyUserSession } from '@/lib/api-auth';
 import { createMIAuthSessionToken } from '@/lib/two-factor-session';
 import { scheduleAttributionClaim } from '@/lib/attribution/claim-from-request';
 import { scheduleRegistrationGrant } from '@/lib/mcp/registration-grant';
+import { scheduleAccountVerified } from '@/lib/signup-events';
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,6 +24,8 @@ export async function POST(request: NextRequest) {
     scheduleAttributionClaim(request, auth.email, auth.createdAt ?? null);
     // One introductory credit grant per account, at registration (off until the cutover is set).
     scheduleRegistrationGrant(auth.email, auth.createdAt ?? null);
+    // First verified sign-in of a new account (Google, Microsoft, magic link, /app bootstrap).
+    scheduleAccountVerified(auth.email, auth.createdAt ?? null, `session_${auth.provider || auth.method || 'unknown'}`);
     const authenticatedAt = new Date().toISOString();
 
     return NextResponse.json({
