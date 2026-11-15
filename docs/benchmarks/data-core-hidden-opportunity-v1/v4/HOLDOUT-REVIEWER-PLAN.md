@@ -68,7 +68,7 @@ a deferred business is "not yet evaluated", never a pass by omission.**
 
 | Precondition | Owner | Status |
 |---|---|---|
-| Frozen release-candidate SHA | Agent 3 | Requested in `HANDOFF-TO-AGENT3-MISSED-NOTICES.md` |
+| Frozen release-candidate SHA | Agent 3 | **Met 2026-11-14:** tag `search-rc1-2026-11-14` → `8c4ba2ea1` (annotated; `src/` identical to `761b8d73b` = rc2_phrase, no PSC 6505; classification and ranking unchanged). Verified by Agent 4. On the v4 phrasings (AI labels) it still fails top-20 (≈ 38–42%, v6), so the holdout is expected to confirm that gap unless an rc2 tag with classification and ranking work is frozen first |
 | Reviewer assignments approved (option A or B, named people) | Eric | **Awaiting decision** |
 | Labelling protocol and sampling sufficiency verified | Agent 4 | Protocol frozen; sufficiency rule above. Dry run on pre-freeze notices before Dec 12 |
 | Mac Studio benchmark environment independently configured | Eric/infra (credentials), Agent 4 (harness) | Harness made portable (`ENVIRONMENT.md`); the Studio still has no `.env.local` of its own |
