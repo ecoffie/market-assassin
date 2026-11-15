@@ -246,26 +246,47 @@ function haversineMiles(a: [number, number], b: [number, number]): number {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-/**
- * Deterministic metro expansion: every city in Mindy's US city list within `radiusMiles` of the
- * core city (in the given states when provided; the core city itself is resolved in those states).
- * Returns null when the core city is not in the list (caller keeps the exact city only).
- */
-export function expandMetroCities(core: string, states: string[], radiusMiles = DEFAULT_METRO_RADIUS_MILES): { cities: string[]; center: string } | null {
+/** States in Mindy's US city list that have a city with this exact name (sorted). */
+export function metroCoreStates(core: string): string[] {
   const coords = cityCoordsData as unknown as Record<string, [number, number]>;
   const c = core.toUpperCase().replace(/\s+/g, ' ').trim();
-  const centerKey = (states.length ? states : Object.keys(coords).filter((k) => k.startsWith(`${c}|`)).map((k) => k.split('|')[1]))
-    .map((s) => `${c}|${s}`)
-    .find((k) => coords[k]);
+  return Object.keys(coords).filter((k) => k.startsWith(`${c}|`)).map((k) => k.split('|')[1]).sort();
+}
+
+/**
+ * Deterministic metro expansion: every city in Mindy's US city list within `radiusMiles` of the
+ * core city, ALWAYS inside one resolved state.
+ *
+ * The expansion returns bare city NAMES and the award query matches names, so the caller must also
+ * filter on the returned `state`. Without a state the old version picked the first state holding
+ * the core city and returned its suburbs' names unpinned, which then matched same-name cities
+ * nationwide ("Birmingham metro" included Leeds MA, Fairfield PA, Cordova AK; 2026-11-15).
+ *
+ * - With `states`: the core city is resolved in those states (first hit), suburbs kept in them.
+ * - Without `states`: expands only when exactly ONE state has a city with this name, and pins to it.
+ *   An ambiguous name (Birmingham: AL, IA, MI, NJ, OH) returns null; see metroCoreStates.
+ * Returns null when the core city is not in the list or is ambiguous (caller keeps the exact city).
+ */
+export function expandMetroCities(core: string, states: string[], radiusMiles = DEFAULT_METRO_RADIUS_MILES): { cities: string[]; center: string; state: string } | null {
+  const coords = cityCoordsData as unknown as Record<string, [number, number]>;
+  const c = core.toUpperCase().replace(/\s+/g, ' ').trim();
+  let candidates = states;
+  if (!states.length) {
+    const holding = metroCoreStates(c);
+    if (holding.length !== 1) return null;
+    candidates = holding;
+  }
+  const centerKey = candidates.map((s) => `${c}|${s}`).find((k) => coords[k]);
   if (!centerKey) return null;
   const center = coords[centerKey];
-  const allow = states.length ? new Set(states) : null;
+  const centerState = centerKey.split('|')[1];
+  const allow = new Set(states.length ? states : [centerState]);
   const out: string[] = [];
   for (const [key, pt] of Object.entries(coords)) {
     const [city, st] = key.split('|');
-    if (allow && !allow.has(st)) continue;
+    if (!allow.has(st)) continue;
     if (!Array.isArray(pt) || haversineMiles(center, pt) > radiusMiles) continue;
     if (!out.includes(city)) out.push(city);
   }
-  return { cities: out.sort(), center: centerKey };
+  return { cities: out.sort(), center: centerKey, state: centerState };
 }
