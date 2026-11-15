@@ -48,3 +48,28 @@ Tests:
 3. The `snapshot_changed_at` trigger migration (draft here), then `OPEN_SNAPSHOT_CHANGE_MARKER=snapshot_changed_at`.
 4. A preview measurement (#7).
 5. The FIND flag on a preview, then production. The Map comes in a separate PR.
+
+## RC3 integration + local evidence (Agent 3, 2026-11-15)
+
+Branch `agent3/cache-hardening-on-rc3` = RC3 `5c5098165` + `agent3/cache-hardening` (a54e07391). The merge was clean.
+`SNAPSHOT_SEAM_RELEASED` **stays false**. Infrastructure and the preview are not approved; flip it only after they are,
+in its own commit. The 40 cache tests pass.
+
+**Evaluator parity (`cache-parity/parity.mts`, offline).** For each of the 28 benchmark phrasings, `compileOps` over the
+Nov 14 fixture (9,701 open rows) selects **exactly** the runner's matched set: **28/28 SAME, 0 uncacheable**. The runner
+equals the real `find_opportunities` path (route parity 28/28), so the snapshot evaluator answers the same retrieval as
+SQL on every benchmark query.
+
+**Local cost (laptop proxy, NOT the Vercel number for #7):**
+- snapshot file: 9,701 rows, 20.5 MB gzipped;
+- writer serialize + sha256: about 1.2 s;
+- reader gunzip + parse + verify: about 0.36 s;
+- **heap +375 MB** for the parsed rows.
+
+**The heap is the risk to measure first on a preview.** On a 1 GB function, the snapshot alone would take over a third of
+memory. Options to measure before the flag:
+- a narrower row shape: drop `sow_text` from the snapshot, at the cost of uncacheable plans that search it;
+- a larger function memory;
+- interned strings.
+
+None of these is built. They are decisions for after the preview.
