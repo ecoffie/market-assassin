@@ -23,6 +23,7 @@ import {
   OPEN_FETCH_CAP,
   OPEN_CODE_WINDOW_CAP,
   openCodeWindowPsc,
+  retrievalOpIndex,
   classifyOpenRecord,
   type OpenRelevanceClass,
   openEvidenceWhy,
@@ -962,7 +963,15 @@ async function queryOpenNow(
     // after the deadline window. If it fails, the deadline window alone is used, exactly as before.
     const codeWin = openCodeWindowPsc(cap);
     if (codeWin.length && (data || []).length >= fetchCap) {
-      const cw = await inStage(openQ(COLS)).in('psc_code', codeWin)
+      // Cheap form (SQL path): the preset's codes are already branches of the plan's single retrieval OR, so a notice
+      // under one of them satisfies it. Dropping that OR (the expensive text clause) and adding psc_code IN codes selects
+      // exactly the same rows; every other op (exclusions, buyer, set-aside, map filters, stage) still applies.
+      // Proven equal to the full form on all 28 benchmark phrasings by the route-parity check.
+      const ri = retrievalOpIndex(p.plan.horizons.open.ops, codeWin);
+      const subQ = !openSrc && ri != null
+        ? applyOpenPlan(client.from(source).select(COLS), { ...p.plan, horizons: { ...p.plan.horizons, open: { ...p.plan.horizons.open, ops: p.plan.horizons.open.ops.filter((_o, k) => k !== ri) } } })
+        : openQ(COLS);
+      const cw = await inStage(subQ).in('psc_code', codeWin)
         .order('response_deadline', { ascending: true, nullsFirst: false })
         .limit(OPEN_CODE_WINDOW_CAP);
       if (!cw.error) rows = unionRows(rows, (cw.data || []) as Array<Record<string, unknown>>, 'notice_id');
