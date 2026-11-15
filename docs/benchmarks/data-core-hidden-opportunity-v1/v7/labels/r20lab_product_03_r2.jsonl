@@ -1,0 +1,5 @@
+{"id": "r20-0079", "label": "PARTIAL", "role": "PRIME", "restriction": "NONE", "evidence": "Sources Sought for new Microscopes, FSC 6640 lab instruments"}
+{"id": "r20-0080", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "FAIRING,AIRCRAFT FSC 1560; FAA-certified parts with Form 8130 required"}
+{"id": "r20-0081", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PARTS KIT,BALL VALV FSC 4820 Navy valve parts kit supply"}
+{"id": "r20-0082", "label": "FIT", "role": "PRIME", "restriction": "SOLE_SOURCE", "evidence": "DIP LOOP CAB 46FT NSN 5995-016851442 spares determined sole source"}
+{"id": "r20-0083", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "B-52 PANEL, STRUCTURAL NSN 1560-016465154; sources of supply listed"}

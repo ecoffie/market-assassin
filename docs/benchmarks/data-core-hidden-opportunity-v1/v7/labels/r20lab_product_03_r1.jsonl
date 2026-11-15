@@ -1,0 +1,5 @@
+{"id":"r20-0079","label":"PARTIAL","role":"PRIME","restriction":"UNCLEAR","evidence":"Sources Sought for new Microscopes, FSC 6640; lab equipment not supplies, details attached"}
+{"id":"r20-0080","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"FAIRING,AIRCRAFT FSC 1560 DLA solicitation, 9100 quality, FMS delivery"}
+{"id":"r20-0081","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PARTS KIT,BALL VALV FSC 4820 Navy supply solicitation"}
+{"id":"r20-0082","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"DIP LOOP CAB NSN 7H-5995-016851442; sole source, only ISEA-approved sources considered"}
+{"id":"r20-0083","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"B-52 PANEL, STRUCTURAL NSN 1560-016465154; sources of supply listed by CAGE"}

@@ -1,0 +1,20 @@
+{"id":"r20-0000","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Proposed procurement for NSN 3990015729483 CARGO SET,VEHICLE, RFQ, all responsible sources"}
+{"id":"r20-0003","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"30--CLUTCH ASSY, Navy fixed-price supply solicitation, FSC 3010"}
+{"id":"r20-0005","label":"FIT","role":"PRIME","restriction":"SOLE_SOURCE","evidence":"Compensator assembly NSN 1660015075069, sole source to Hamilton Sundstrand, B-52 spares"}
+{"id":"r20-0007","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"BLADE,ROTARY RUDDER NSN 7R-1615; requires engineering source approval, approved sources only"}
+{"id":"r20-0008","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"53--SCREW,MACHINE FSC 5305; flat head screw manufacture specification"}
+{"id":"r20-0009","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Servovalve, Hydraulic NSN 1650-00-609-8372, spares for C/KC135 flaps"}
+{"id":"r20-0010","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"New Manufacture VALVE, LINEAR, DIRECT NSN 4810011482014HS; Qualified Sources: Eaton Aerospace"}
+{"id":"r20-0011","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"F-16 DUCT, ASSEMBLY, AIR NSN 1660-012096386, 100% small business set aside"}
+{"id":"r20-0013","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"PIN-RIVET NSN 5320014759324; Approved source is 9K475 MGPB-E12-26"}
+{"id":"r20-0014","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"TANK,FUEL,AIRCRAFT FSC 1560 supply solicitation with 9100 quality requirement"}
+{"id":"r20-0015","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"48--VALVE,THROTTLE FSC 4820 Navy supply solicitation"}
+{"id":"r20-0016","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Fairing, Aircraft (Nose Dome) NSN 1560-00-735-3588, aluminum airframe part for B-52"}
+{"id":"r20-0017","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CIRCUIT CARD ASSEMB, DLA solicitation; business sells circuit cards by NSN"}
+{"id":"r20-0018","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"59--CIRCUIT CARD ASSEMB NSN 7G-5998-016767909; A/RMC source approval, specialized test"}
+{"id":"r20-0020","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"PIN-RIVET NSN 5320004488245; Approved sources are 06725 HL20PB6-15; others"}
+{"id":"r20-0022","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CB SAFETY DEV GEN 2, FSC 5925 circuit breaker supply, first article testing"}
+{"id":"r20-0024","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"MODERATOR,CIC TOP FSC 4470, Navy supply solicitation for a component"}
+{"id":"r20-0025","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"VALVE, GLOBE W/ ACT FSC 4820, Navy supply solicitation"}
+{"id":"r20-0026","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Parts Kit for a size 1/4 inch Ball Valve, ball and two seats"}
+{"id":"r20-0027","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CABLE ASSEMBLY,SPEC FSC 6150 Navy supply solicitation"}

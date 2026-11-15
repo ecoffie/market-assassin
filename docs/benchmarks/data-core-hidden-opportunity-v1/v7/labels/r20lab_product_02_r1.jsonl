@@ -1,0 +1,20 @@
+{"id":"r20-0053","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"47--PIPE, 8IN FSC 4710 Navy fixed-price supply solicitation"}
+{"id":"r20-0054","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"53--SEAL,PLAIN FSC 5330 Navy supply solicitation"}
+{"id":"r20-0056","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"B-1 Fluid Filter Body NSN 1650012046227; Qualified Sources: Pall Aeropower Corporation"}
+{"id":"r20-0057","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"STEM,FLUID VALVE FSC 4820 Navy supply solicitation, valve part"}
+{"id":"r20-0058","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CIRCUIT CARD ASSEMB FSC 5998 DLA supply solicitation"}
+{"id":"r20-0059","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"48--VALVE,RELIEF,PRESSU FSC 4820 Navy supply solicitation"}
+{"id":"r20-0060","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"950 Humidifier Heater base, Sensor Cartridge, Expiratory Heater Wire Adapter or Equal"}
+{"id":"r20-0061","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"BOLT,MACHINE NSN 5306014803141; Approved source is 73342 29537405"}
+{"id":"r20-0062","label":"NO","role":"NONE","restriction":"NONE","evidence":"Industry demonstration of Cargo UAS systems for Marine Corps; not a parts buy"}
+{"id":"r20-0063","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PARTS KIT,SPECIALIZED NSN 2590015396378 Qty 73 KT, RFQ"}
+{"id":"r20-0064","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"B-52 SUPPORT, ENGINE MOUNT NSN 1560-008310804; sources of supply listed by CAGE"}
+{"id":"r20-0069","label":"FIT","role":"SUB","restriction":"APPROVED_SOURCE","evidence":"F-16 PANEL, INDICATING NSN 6220-01-473-2116; ONLY businesses proposing four named sources considered"}
+{"id":"r20-0070","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CAP,VALVE FSC 4820 Navy supply solicitation, valve part"}
+{"id":"r20-0071","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"PIN-RIVET NSN 5320012834707; Approved sources are 06725 AIC-L-807-8-17P and others"}
+{"id":"r20-0072","label":"FIT","role":"PRIME","restriction":"UNCLEAR","evidence":"NEW MANUFACTURE OF VALVE,REGULATING FSC 4810; details only in attached amendment"}
+{"id":"r20-0073","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"VALVE,DIAPHRAGM CON FSC 4820; quantity reduced from 10 EA to 8 EA"}
+{"id":"r20-0074","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"B-52 Regulating Valve NSN 4820008604396; Qualified Sources: Aero International; qualification required"}
+{"id":"r20-0075","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PARTS KIT,FLOOR,VEHICU NSN 2510014709032, all responsible sources may quote"}
+{"id":"r20-0077","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"48--VALVE,REGULATING,FL FSC 4820 Navy supply solicitation"}
+{"id":"r20-0078","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"VALVE,ROTARY,SELECT FSC 4810 DLA supply solicitation, ISO 9000"}

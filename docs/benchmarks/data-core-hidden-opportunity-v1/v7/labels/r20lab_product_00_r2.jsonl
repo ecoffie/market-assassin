@@ -1,0 +1,20 @@
+{"id": "r20-0000", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 3990015729483 CARGO SET,VEHICLE, qty 11, DLA RFQ for vehicle component"}
+{"id": "r20-0003", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Navy solicitation for CLUTCH ASSY, FSC 3010 replacement assembly"}
+{"id": "r20-0005", "label": "FIT", "role": "PRIME", "restriction": "SOLE_SOURCE", "evidence": "COMPENSATOR ASSEMBL NSN 1660015075069 for B-52; sole source Hamilton Sundstrand"}
+{"id": "r20-0007", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "BLADE,ROTARY RUDDER NSN 1615-017082535, only previously approved sources solicited"}
+{"id": "r20-0008", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "SCREW,MACHINE FSC 5305; specification for manufacture of Screw, Flat Head; EAF Spares"}
+{"id": "r20-0009", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Servovalve, Hydraulic NSN 1650-00-609-8372 spares for KC-135 wing flaps"}
+{"id": "r20-0010", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "Direct Linear Valve NSN 4810011482014HS spares for B-1; Qualified Sources: Eaton"}
+{"id": "r20-0011", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "F-16 DUCT, ASSEMBLY, AIR NSN 1660-012096386, five-year IQ contract"}
+{"id": "r20-0013", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5320014759324 PIN-RIVET qty 29437; approved source 9K475 MGPB-E12-26"}
+{"id": "r20-0014", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "TANK,FUEL,AIRCRAFT FSC 1560 supply solicitation; aircraft fuel system component"}
+{"id": "r20-0015", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Navy solicitation for VALVE,THROTTLE FSC 4820, supply part number item"}
+{"id": "r20-0016", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Fairing, Aircraft (Nose Dome) NSN 1560-00-735-3588/3589 spares for B-52"}
+{"id": "r20-0017", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB supply solicitation SPRMM1-26-Q-KH42 under EAF authority"}
+{"id": "r20-0018", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "59--CIRCUIT CARD ASSEMB NSN 5998-016767909 qty 12; special test facilities, AMC 3-5"}
+{"id": "r20-0020", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5320004488245 PIN-RIVET qty 2201; approved sources HL20PB6-15 listed"}
+{"id": "r20-0022", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CB SAFETY DEV GEN 2, FSC 5925 circuit breaker device, first article testing"}
+{"id": "r20-0024", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "MODERATOR,CIC TOP FSC 4470 naval reactor component supply solicitation"}
+{"id": "r20-0025", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "VALVE, GLOBE W/ ACT FSC 4820 Navy supply solicitation"}
+{"id": "r20-0026", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PARTS KIT,BALL VALV FSC 4820, valve parts kit per drawing EB-4147"}
+{"id": "r20-0027", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CABLE ASSEMBLY,SPEC FSC 6150 Navy supply solicitation, qty to W25G1U/W62G2T"}

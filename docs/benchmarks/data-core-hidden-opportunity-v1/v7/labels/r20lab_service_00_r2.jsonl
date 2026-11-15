@@ -1,0 +1,19 @@
+{"id":"r20-0001","label":"NO","role":"NONE","evidence":"Personnel for operations and maintenance of USCGC STORIS cutter; no guard services"}
+{"id":"r20-0002","label":"NO","role":"NONE","evidence":"Navy supply buy for ball valve parts kit; security appears only in clauses"}
+{"id":"r20-0004","label":"NO","role":"NONE","evidence":"Install two emergency generators on roof; no steel building or roofing scope"}
+{"id":"r20-0006","label":"NO","role":"NONE","evidence":"Exterior pressure washing of facilities, bridges, tanks; not office janitorial work"}
+{"id":"r20-0012","label":"PARTIAL","role":"SUB","evidence":"Trenching with backfill and asphalt base course to restore disturbed areas"}
+{"id":"r20-0019","label":"NO","role":"NONE","evidence":"Navy ball valve parts kit supply; security only in clause boilerplate"}
+{"id":"r20-0021","label":"FIT","role":"PRIME","evidence":"Front entrance sidewalk to be repaired at Tohaali Community School"}
+{"id":"r20-0023","label":"NO","role":"NONE","evidence":"FAA research BAA topics on asphalt overlays; research, not paving work"}
+{"id":"r20-0034","label":"PARTIAL","role":"SUB","evidence":"Option: concrete pad plus new asphalt pavement for access and egress"}
+{"id":"r20-0036","label":"NO","role":"NONE","evidence":"Navy ball valve parts kit supply; security prohibitions clause only"}
+{"id":"r20-0045","label":"NO","role":"NONE","evidence":"Trash collection services, NAICS 562111 waste collection, not building janitorial"}
+{"id":"r20-0046","label":"NO","role":"NONE","evidence":"Navy ball valve parts kit supply solicitation; no guard services"}
+{"id":"r20-0052","label":"PARTIAL","role":"SUB","evidence":"Storage building construction includes placement of asphalt and concrete, earthwork"}
+{"id":"r20-0055","label":"FIT","role":"PRIME","evidence":"Basic Contract Item 1 Maintenance Shop HVAC/Heat Replacement, lump sum"}
+{"id":"r20-0065","label":"NO","role":"NONE","evidence":"Navy ball valve parts kit supply; security appears only in clause titles"}
+{"id":"r20-0066","label":"NO","role":"NONE","evidence":"Navy supply buy for poppet nut; no security guard services"}
+{"id":"r20-0067","label":"FIT","role":"PRIME","evidence":"Outdated HVAC system shall be replaced with a new HVAC system"}
+{"id":"r20-0068","label":"FIT","role":"PRIME","evidence":"Concrete slab placement at Malheur NWR; concrete flatwork within paving trade"}
+{"id":"r20-0076","label":"NO","role":"NONE","evidence":"Trash collection services NAICS 562111; security mention is employee-removal clause"}

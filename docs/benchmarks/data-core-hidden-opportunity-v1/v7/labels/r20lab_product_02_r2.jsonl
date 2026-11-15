@@ -1,0 +1,20 @@
+{"id": "r20-0053", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "47--PIPE, 8IN FSC 4710 Navy supply solicitation for pipe component"}
+{"id": "r20-0054", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "53--SEAL,PLAIN FSC 5330 Navy supply solicitation"}
+{"id": "r20-0056", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "B-1 Fluid Filter Body NSN 1650012046227 spares; qualified source Pall Aeropower"}
+{"id": "r20-0057", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "STEM,FLUID VALVE FSC 4820 Navy SUBSAFE valve part solicitation"}
+{"id": "r20-0058", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB FSC 5998 DLA supply solicitation"}
+{"id": "r20-0059", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "48--VALVE,RELIEF,PRESSU; Relief Valve Assembly Level I/SOC item"}
+{"id": "r20-0060", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Humidifier Heater base, Sensor Cartridge, Expiratory Heater for VA medical center"}
+{"id": "r20-0061", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5306014803141 BOLT,MACHINE qty 46; approved source 73342 29537405"}
+{"id": "r20-0062", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Cargo UAS industry technology demonstration, not purchase of aircraft parts"}
+{"id": "r20-0063", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 2590015396378 PARTS KIT,SPECIALIZED qty 73 KT, DLA automated IDC"}
+{"id": "r20-0064", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "B-52 SUPPORT, ENGINE MOUNT NSN 1560-008310804, five-year IQ contract"}
+{"id": "r20-0069", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 6220-01-473-2116 PANEL, INDICATING for F-16; only listed sources considered"}
+{"id": "r20-0070", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CAP,VALVE FSC 4820 Navy valve part per drawing 5486333"}
+{"id": "r20-0071", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5320012834707 PIN-RIVET qty 37; approved sources AIC-L-807-8-17P etc"}
+{"id": "r20-0072", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "NEW MANUFACTURE OF VALVE,REGULATING,FL FSC 4810; see attached amendment"}
+{"id": "r20-0073", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "requirements for manufacture of the VALVE,DIAPHRAGM CON, FSC 4820"}
+{"id": "r20-0074", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "B-52 Regulating Valve NSN 4820008604396 spares; qualified source Aero International"}
+{"id": "r20-0075", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 2510014709032 PARTS KIT,FLOOR,VEHICU qty 27 KT DLA RFQ"}
+{"id": "r20-0077", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "48--VALVE,REGULATING,FL FSC 4820 Navy supply solicitation"}
+{"id": "r20-0078", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "VALVE,ROTARY,SELECT FSC 4810 DLA supply solicitation"}

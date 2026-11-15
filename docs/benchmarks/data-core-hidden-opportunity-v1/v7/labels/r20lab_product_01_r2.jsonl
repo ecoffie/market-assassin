@@ -1,0 +1,20 @@
+{"id": "r20-0028", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "Valve, Linear, Direct NSN 4820-01-208-4595 for M1 Abrams; source controlled to Kidde"}
+{"id": "r20-0029", "label": "PARTIAL", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "COVER,AIRCRAFT ENGINE NSN 1730016469037; ground equipment cover, approved source 1LE67"}
+{"id": "r20-0030", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB FSC 5998 supply solicitation from DLA SPRMM1"}
+{"id": "r20-0031", "label": "PARTIAL", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "PULLER,BEARING CUP FSC 4910 maintenance tool; requires engineering source approval"}
+{"id": "r20-0032", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "53--ANODE ASSY15-1,3.0 FSC 5340 Navy supply solicitation"}
+{"id": "r20-0033", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "CIRCUIT CARD ASSEMB FSC 5998 Navy supply solicitation"}
+{"id": "r20-0035", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "KC-135 Cylinder Assembly NSN 1680008951058RK spares; qualified sources Boeing, Downey"}
+{"id": "r20-0037", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "VALVE, BACK PRESS FSC 4820 Navy supply solicitation"}
+{"id": "r20-0038", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Spares procurement of Screw Assembly Panel NSN 5305-01-620-5044 for AH-64"}
+{"id": "r20-0039", "label": "PARTIAL", "role": "PRIME", "restriction": "SOLE_SOURCE", "evidence": "purchase two Illumina MiSeq i100 lab instruments; intent to sole-source Illumina"}
+{"id": "r20-0040", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "SEAL RING,NUCLEAR C FSC 4470 Navy supply solicitation"}
+{"id": "r20-0041", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Technology licensing opportunity for LANL Scan-to-Sample, not hardware purchase"}
+{"id": "r20-0042", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5325015050583 STUD,TURNLOCK FASTENER qty 156; approved source 1S002 20288"}
+{"id": "r20-0043", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "STEM,FLUID VALVE FSC 4820 Navy solicitation; valve part, no body text"}
+{"id": "r20-0044", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PARTS KIT,BALL VALV FSC 4820, valve parts kit per drawings"}
+{"id": "r20-0047", "label": "PARTIAL", "role": "PRIME", "restriction": "NONE", "evidence": "SLING,AIRCRAFT MAINTEN NSN 1730013066973; maintenance handling equipment, not spare part"}
+{"id": "r20-0048", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PARTS KIT,BALL VALV FSC 4820, drawing 6405407 valve parts kit"}
+{"id": "r20-0049", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 2510015212739 PARTS KIT,FLOOR,VEHICU qty 14 DLA RFQ"}
+{"id": "r20-0050", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PANEL,CONTROL,ELECTRICAL-ELECTRONIC EQ NSN 1680-014732355 for C-17, qty 119"}
+{"id": "r20-0051", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "VALVE, LINEAR, DIRECT NSN 4810-00-818-0440HS qty 2; OEM Hydro-Aire named"}

@@ -1,0 +1,19 @@
+{"id":"r20-0001","label":"NO","role":"NONE","evidence":"Cutter operations and maintenance personnel (mooring, anchoring); not facility guard posts"}
+{"id":"r20-0002","label":"NO","role":"NONE","evidence":"Parts kit, ball valve supply; no guard services"}
+{"id":"r20-0004","label":"NO","role":"NONE","evidence":"Install emergency generators in museum; no steel building or metal roofing work"}
+{"id":"r20-0006","label":"NO","role":"NONE","evidence":"Exterior pressure washing of buildings, bridges, tanks; not office janitorial"}
+{"id":"r20-0012","label":"NO","role":"NONE","evidence":"Embassy trenching, conduit, ground-well installation; asphalt only incidental restoration material"}
+{"id":"r20-0019","label":"NO","role":"NONE","evidence":"Parts kit ball valve supply; no guard services"}
+{"id":"r20-0021","label":"FIT","role":"PRIME","evidence":"Repair school front entrance sidewalk, small-business set-aside, $25K-$100K"}
+{"id":"r20-0023","label":"NO","role":"NONE","evidence":"FAA research BAA; pavement topics are research studies, not paving work"}
+{"id":"r20-0034","label":"PARTIAL","role":"SUB","evidence":"Option line: construct concrete pad plus new asphalt pavement within munitions facility build"}
+{"id":"r20-0036","label":"NO","role":"NONE","evidence":"Parts kit ball valve supply; no guard services"}
+{"id":"r20-0045","label":"PARTIAL","role":"PRIME","evidence":"Trash collection services at Coast Guard station; trash removal is one listed duty"}
+{"id":"r20-0046","label":"NO","role":"NONE","evidence":"Parts kit ball valve supply; no guard services"}
+{"id":"r20-0052","label":"PARTIAL","role":"SUB","evidence":"Construction includes placement of asphalt, concrete, aggregate, earthwork, repair of lots"}
+{"id":"r20-0055","label":"FIT","role":"PRIME","evidence":"Maintenance Shop HVAC/Heat Replacement construction bid schedule"}
+{"id":"r20-0065","label":"NO","role":"NONE","evidence":"Parts kit ball valve supply; no guard services"}
+{"id":"r20-0066","label":"NO","role":"NONE","evidence":"Nut, poppet supply item; no guard services"}
+{"id":"r20-0067","label":"FIT","role":"PRIME","evidence":"Replace outdated HVAC system with new HVAC for tree cooler"}
+{"id":"r20-0068","label":"PARTIAL","role":"PRIME","evidence":"Title only: concrete slab placement at wildlife refuge; sparse detail"}
+{"id":"r20-0076","label":"PARTIAL","role":"PRIME","evidence":"Trash collection services for Coast Guard sector; trash removal is one listed duty"}

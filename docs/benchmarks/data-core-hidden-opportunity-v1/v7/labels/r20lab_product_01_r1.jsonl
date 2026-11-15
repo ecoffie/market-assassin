@@ -1,0 +1,20 @@
+{"id":"r20-0028","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"Sources Sought for Valve, Linear, Direct NSN 4820-01-208-4595; data source controlled to Kidde"}
+{"id":"r20-0029","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"COVER,AIRCRAFT ENGINE NSN 1730016469037; source controlled drawing item, approved source 1LE67"}
+{"id":"r20-0030","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CIRCUIT CARD ASSEMB FSC 5998 supply solicitation, no source limits stated"}
+{"id":"r20-0031","label":"PARTIAL","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"PULLER,BEARING CUP FSC 4910 is a tool, not a part; engineering source approval"}
+{"id":"r20-0032","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"53--ANODE ASSY15-1,3.0 FSC 5340 Navy fixed-price supply solicitation"}
+{"id":"r20-0033","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CIRCUIT CARD ASSEMB FSC 5998 Navy supply solicitation"}
+{"id":"r20-0035","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"KC-135 Cylinder Assembly NSN 1680008951058RK; Qualified Sources: Boeing, Downey Manufacturing"}
+{"id":"r20-0037","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"VALVE, BACK PRESS FSC 4820 Navy supply solicitation"}
+{"id":"r20-0038","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Screw Assembly Panel AH-64, NSN 5305-01-620-5044, 118-590 EA spares"}
+{"id":"r20-0039","label":"PARTIAL","role":"SUB","restriction":"SOLE_SOURCE","evidence":"Notice of Intent: two Illumina MiSeq i100 instruments, sole source Illumina; lab equipment not supplies"}
+{"id":"r20-0040","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"SEAL RING,NUCLEAR C FSC 4470 Navy supply solicitation"}
+{"id":"r20-0041","label":"NO","role":"NONE","restriction":"NONE","evidence":"Technology licensing opportunity Scan-to-Sample from Los Alamos; not an IT hardware purchase"}
+{"id":"r20-0042","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"STUD,TURNLOCK FASTENER NSN 5325015050583; Approved source is 1S002 20288"}
+{"id":"r20-0043","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"STEM,FLUID VALVE FSC 4820 Navy solicitation; valve part"}
+{"id":"r20-0044","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PARTS KIT,BALL VALV FSC 4820 Navy supply solicitation"}
+{"id":"r20-0047","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"SLING,AIRCRAFT MAINTEN NSN 1730013066973; ground handling equipment, neighbouring family"}
+{"id":"r20-0048","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PARTS KIT,BALL VALV FSC 4820 Navy supply solicitation"}
+{"id":"r20-0049","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PARTS KIT,FLOOR,VEHICU NSN 2510015212739 vehicle replacement parts kit, RFQ"}
+{"id":"r20-0050","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PANEL,CONTROL,ELECTRICAL-ELECTRONIC EQ KC-135 NSN 1680-014732355, small business set-aside"}
+{"id":"r20-0051","label":"FIT","role":"PRIME","restriction":"OEM_ONLY","evidence":"VALVE, LINEAR, DIRECT NSN 4810-00-818-0440HS; OEM: Hydro-Aire Aerospace Corp."}
