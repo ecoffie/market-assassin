@@ -23,6 +23,7 @@ import { parseLogicList } from '@/lib/discovery/sql';
 import { applyOpenPlan } from '@/lib/discovery/apply';
 import { parseMapFilters, applyMapFilters } from '@/lib/opportunities/map-filters';
 import type { DiscoveryPlan, Op } from '@/lib/discovery';
+import { loadOpenSnapshot, supabaseSnapshotStore } from './open-snapshot-store';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export const SNAPSHOT_COLS = ['notice_id', 'title', 'description', 'sow_text', 'department', 'sub_tier', 'solicitation_number', 'naics_code', 'psc_code', 'set_aside_code', 'set_aside_description', 'response_deadline'] as const;
@@ -184,7 +185,7 @@ export async function cachedOpenRetrieval(args: {
   const rows: Array<Record<string, unknown>> = [...(delta.data || [])];
   const chunks: string[][] = [];
   for (let i = 0; i < ids.length; i += ID_CHUNK) chunks.push(ids.slice(i, i + ID_CHUNK));
-  const results = await mapLimited(chunks, VERIFY_CONCURRENCY, (c) => {
+  const results = await mapLimited<string[], any>(chunks, VERIFY_CONCURRENCY, (c) => {
     const q = unchangedSince(structured(client.from('sam_opportunities').select(select, { count: 'exact' }), plan).in('notice_id', c), at);
     return q.order('response_deadline', { ascending: true, nullsFirst: false }).limit(windowLimit);
   });
@@ -241,7 +242,7 @@ export class CachedOpenQuery {
     const base = () => client.from('sam_opportunities').select(select, opts);
     const chunks: string[][] = []; for (let i = 0; i < ids.length; i += ID_CHUNK) chunks.push(ids.slice(i, i + ID_CHUNK));
     const delta = Promise.resolve(this.replay(applyOpenPlan(base(), plan).or(changedSinceExpr(at)))); // starts now, alongside verification
-    const verified = await mapLimited(chunks, VERIFY_CONCURRENCY, (c) => this.replay(unchangedSince(structured(base(), plan).in('notice_id', c), at)));
+    const verified = await mapLimited<string[], any>(chunks, VERIFY_CONCURRENCY, (c) => this.replay(unchangedSince(structured(base(), plan).in('notice_id', c), at)));
     const parts = [await delta, ...verified];
     const err = parts.find((p: any) => p.error);
     if (err) return { data: null, count: null, error: err.error };
@@ -291,16 +292,25 @@ export async function openQueryFactory(client: any, plan: DiscoveryPlan, snapsho
   return { path: 'snapshot', reason: null, snapshotAgeMs: age, query: (c, o) => new CachedOpenQuery({ client, plan, ids, at: snapshot.builtAt, select: c, opts: o }) };
 }
 
-// ── Snapshot holder: one build at a time per process (concurrent requests share it) ─────────────────────────────
+// ── Snapshot holder: one load at a time per process (concurrent requests share it) ─────────────────────────────
 let current: OpenSnapshot | null = null;
-let building: Promise<OpenSnapshot> | null = null;
-/** The current snapshot if fresh; otherwise starts ONE background build and returns null (callers use SQL meanwhile). */
+let building: Promise<OpenSnapshot | null> | null = null;
+/**
+ * Where an instance gets its snapshot (Agent 5 review #3). Default 'storage': download the file the build-open-snapshot
+ * cron wrote to the private bucket (one DB build per sync, not per instance). 'db' (OPEN_SNAPSHOT_SOURCE=db): build from
+ * the database in-process — development and benchmarks only.
+ */
+export function snapshotSource(): 'storage' | 'db' { return process.env.OPEN_SNAPSHOT_SOURCE === 'db' ? 'db' : 'storage'; }
+function startLoad(client: any): void {
+  building = (snapshotSource() === 'db' ? buildOpenSnapshot(client) : loadOpenSnapshot(supabaseSnapshotStore(client)))
+    .then((s) => { if (s && (!current || Date.parse(s.builtAt) > Date.parse(current.builtAt))) current = s; return s; })
+    .finally(() => { building = null; });
+  building.catch(() => {}); // a failed load leaves `current` as it was; the age check keeps refusing a stale one
+}
+/** The current snapshot if fresh; otherwise starts ONE background load and returns null (callers use SQL meanwhile). */
 export function currentOpenSnapshot(client: any, now = new Date()): OpenSnapshot | null {
   const fresh = current && now.getTime() - Date.parse(current.builtAt) <= SNAPSHOT_MAX_AGE_MS;
-  if (!fresh && !building) {
-    building = buildOpenSnapshot(client).then((s) => { current = s; return s; }).finally(() => { building = null; });
-    building.catch(() => {}); // a failed build leaves `current` as it was; the age check keeps refusing a stale one
-  }
+  if (!fresh && !building) startLoad(client);
   return fresh ? current : null;
 }
 /**
@@ -314,8 +324,8 @@ let lastOverflowRebuild = 0;
 export function requestOpenSnapshotRebuild(client: any, now = new Date()): boolean {
   if (building || now.getTime() - lastOverflowRebuild < REBUILD_MIN_INTERVAL_MS) return false;
   lastOverflowRebuild = now.getTime();
-  building = buildOpenSnapshot(client).then((s) => { current = s; return s; }).finally(() => { building = null; });
-  building.catch(() => {});
+  // storage source: re-download (the cron writes a fresh file after each sync); db source: rebuild in-process.
+  startLoad(client);
   return true;
 }
 /** Test seam. */
