@@ -91,3 +91,74 @@ claimed. Needed from Agent 4: blind scoring of `step1_3` additions (especially t
 `harness/dump.mts` (snapshot), `harness/eval.mts` (FIND retrieval emulation + scoring; reproduces production matched counts
 for all 14 v4 phrasings), `harness/saved-search-shapes.mts` (customer-impact diff; output contains customer text, keep outside
 the repo), `harness/timing.mts`, `harness/words.mts`.
+
+---
+
+# Phase 2 (approved 2026-11-14): results
+
+Release-candidate commit for Agent 4 scoring: **`1b7f3c129`** (retrieval). Later commits add safe failure handling
+(`293155b98`) and the DIBBS notice (`9ea12caed`); neither changes retrieval.
+
+## A. Pre-push gate findings
+
+| Failure | Classification | Evidence | Action |
+|---|---|---|---|
+| `merge-identity.pglite` "Hook timed out in 10000ms" | **Resource contention, nondeterministic** | load average 17–28 on 16 cores; passes alone (13/13, setup ~2.8 s); full `npm run test:unit` passes on main `8bb887bd4` (12,043) and on this branch | `c168e0bdc`: the 4 pglite hooks lacking the repo's explicit 60 s setup budget get it (8 others already had it) + a guard test (red without the fix, green with it). No assertion changed. |
+| design-token drift (34 files) | **Existing on main, non-blocking** | identical failure on main; the gate prints "not blocking" | none (out of scope; not weakened) |
+| Anything caused by this branch | **none found** | | |
+
+Node on this Mac Studio is the x64 build under Rosetta, which slows the WebAssembly Postgres boot; worth fixing machine-side.
+
+## B. Retrieval changes in the candidate
+
+1. Sentence fixes now apply only to a single sentence of <= 15 words (paragraphs match exactly as production); the
+   shared head noun is restored ("medical, dental and laboratory supplies" → medical supplies | dental supplies | …).
+   Both corrections follow Agent 4's blind v5 scoring (bare "medical" added 528 rows at 0/30 relevant; paragraph
+   demotion lost ≈70 relevant DLA item buys).
+2. Product retrieval: specific 4-digit FSC codes (valves 4810/4820; fasteners 5305–5325; electrical 20 codes in 59xx;
+   aircraft 1560/1610/1615/1620/1630/1650/1660/1680/2840; medical 6510/6515/6520/6532/6540/6545/6550/6640) retrieve, but a
+   code-only row is RELATED (basis `product_code`, its own explanation). DIRECT needs item evidence: the customer's
+   words or the item noun / DLA abbreviation in the title ("VLV").
+3. NSN / part number: one identifier, matched in every separator form; "4820-01-249-1348" was NAICS 4820 + 5678 + words.
+4. Service retrieval: guards 561612/S206 (+ protective-officer vocabulary), plain "cleaning" phrasing → 561720/S201
+   (+ janitorial/custodial), grounds 561730/S208, HVAC 238220/J041. Own codes only, no related family.
+   Quoted queries never reach a preset; exclusions, buyer, state and set-aside constraints still AND.
+
+## C. Measured results vs production (offline; Agent 4 labels; harness/eval.mts)
+
+| Business (short phrasing) | Relevant found (lo) | Within-code recall | Added rows (labelled rel / irrelevant / unlabelled) | Relevant removed |
+|---|---|---|---|---|
+| Valves | 10 → **28/28** | 10 → **245/245** | +768 (23 / 2 / 743) | 0 |
+| Fasteners | 13 → **32/32** | 10 → **39/39** | +155 (19 / 0 / 136) | 0 |
+| Aircraft | 26 → **42/42** | 163 → **496/610** | +408 (17 / 4 / 387) | 0 |
+| Electrical | 16 → 24/37 | 96 → 463/843 | +447 (9 / 0 / 438) | 0 |
+| Medical | 9 → 15/20 | 16 → 55/88 | +353 (9 / 0 / 344) | 0 (−50 unlabelled) |
+| Guards | 5 → **11/11** | 4 → **13/13** | +9 (8 / 1 / 0) | 0 |
+| Grounds | 15 → **30/30** | 6 → **37/37** | +38 (18 / 2 / 18) | 0 |
+| HVAC | 21 → **27/27** | 29 → **69/69** | +68 (9 / 5 / 54) | 0 |
+| Janitorial | 15 → **23/23** | 27 → **44/44** | +30 (8 / 0 / 22) | 0 |
+| Replacement parts | unchanged 17/17 | no floor | +1,184 unlabelled (step 1) | 0 |
+| Nursing, steel, paving, IT hardware | unchanged | unchanged | 0 | 0 (IT −42 unlabelled) |
+
+- Agent 4's missed set: **120 of 160 recovered** on short phrasings (38 at b449c043c); 134 on paragraphs.
+- **Paragraphs lose nothing** now (the v5 losses came from demotion in paragraphs, which is reverted).
+- Approved-source / sourcing restrictions among recovered relevant rows are listed per business in the matched-set file's
+  eval output (`vs_baseline.added_relevant_restricted`); they are surfaced, never filtered.
+- Customer impact: alert crons do not use this interpretation (unchanged). 2 of 57 alerting saved searches with text
+  reach a new preset and would show more rows only when opened on the Map: +25 and +30 (no removals).
+- Tests: discovery/opportunities/beginner/saved-searches/mi-dashboard/mcp: 2,325 passed; map: 1,370 passed; tsc clean.
+
+**Top-20 precision is not established.** Valves and aircraft top-10s are clean item buys; guards, janitorial,
+electrical and medical top-10s are still led by rows that are DIRECT only because a customer word appears
+(Coast Guard notices, grease-trap cleaning), ranked above the new own-code rows. That is classification/ranking,
+deliberately not changed in this phase. Agent 4's blind top-20 scoring of `rc_top20_ranked` is the measure.
+
+## D. Release-gate status
+
+| Gate | Status |
+|---|---|
+| >= 60% relevant in top 20 | **Not met / unmeasured** (ranking unchanged; needs Agent 4) |
+| No business below 40% | **Not met** (guards, janitorial, IT hardware top-20 were 0–3 relevant in production) |
+| >= 50% within-code recall | Met in-sample for 9 of 13 measured businesses; electrical 55%, medical 63%; IT hardware 9% (floor is mostly software); nursing 50%, steel 53%, paving 71% unchanged. **In-sample only.** |
+| Human-reviewed fresh holdout | **Not run** (sealed; Dec 12 snapshot) |
+| A2 long queries | **Failing** (safe message only; see LONG-QUERY-DESIGN.md) |
