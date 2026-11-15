@@ -256,7 +256,8 @@ export function dualBuyerOrExpr(depCol: string, subCol: string, needles: string[
  *    except guards, which the physical-security branch hands here so it keeps its "not cyber" note.
  *  - Codes: SAM PSC/FSC manual and NAICS 2022, specific codes only (no 2-digit FSC group, no NAICS family).
  */
-type CodePreset = { id: string; label: string; match: RegExp; naics: string[]; psc: string[]; vocab: string[] };
+/** relatedPsc (trades only): adjacent codes that RETRIEVE a notice as RELATED (never DIRECT), like a product preset's codes. */
+type CodePreset = { id: string; label: string; match: RegExp; naics: string[]; psc: string[]; vocab: string[]; relatedPsc?: string[] };
 export const TRADE_PRESETS: CodePreset[] = [
   {
     id: 'guards', label: 'Security guard services',
@@ -289,7 +290,13 @@ export const TRADE_PRESETS: CodePreset[] = [
     id: 'nurse_staffing', label: 'Nurse staffing',
     match: /\b(?:nurses|nursing\s+(?:staff|staffing|services|assistants)|registered\s+nurses?|licensed\s+practical\s+nurses?|clinical\s+staff(?:ing)?|medical\s+staffing|healthcare\s+staffing)\b/i,
     naics: [], psc: ['Q401'],
-    vocab: ['nursing services', 'nurse staffing', 'nurse staff', 'registered nurse', 'registered nurses', 'licensed practical nurse', 'nursing assistant', 'nursing assistants', 'medical staffing', 'clinical staffing'],
+    vocab: ['nursing services', 'nurse staffing', 'nurse staff', 'registered nurse', 'registered nurses', 'licensed practical nurse', 'nursing assistant', 'nursing assistants', 'medical staffing', 'clinical staffing',
+      // 2026-11-15 (Agent 4 v7: nursing short retrieved 10 of 23 relevant): staffing models a nurse-staffing firm fills.
+      'healthcare staffing', 'locum'],
+    // Clinical services a healthcare staffing firm staffs (Agent 4 v7: 11 of the 13 short-phrasing misses are under these;
+    // 52 open notices on the Nov 14 snapshot). RELATED only: Q401 stays the trade's only DIRECT code. Not Q301 (lab
+    // testing), Q702 (lab services), Q999 (catch-all) — fewer staffing buys, more noise.
+    relatedPsc: ['Q201', 'Q403', 'Q501', 'Q511', 'Q518', 'Q519', 'Q701'],
   },
   {
     // RC3 (Agent 4 v7: steel buildings below 40%; steel PRODUCTS — plates, poles, scrap — were DIRECT on "steel").
@@ -397,7 +404,15 @@ function codePresetInterpretation(
         terms: [],
         reason: 'Filed under the product code for this item class. The code retrieves the notice; it does not establish that the item is what you sell.',
       }
-      : null,
+      : trades.some((t) => t.relatedPsc?.length)
+        ? {
+          source: trades.map((t) => t.label).join(' + '),
+          naics: [],
+          psc: uniq(trades.flatMap((t) => t.relatedPsc || [])),
+          terms: [],
+          reason: 'Filed under an adjacent service code. The code retrieves the notice; it does not establish that the work is what you provide.',
+        }
+        : null,
     excluded,
     codePresets: { trades: trades.map((t) => t.id), products: products.map((p) => p.id) },
   };
