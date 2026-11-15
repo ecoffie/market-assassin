@@ -51,7 +51,7 @@ import { inferredCodeDisclosure } from '@/lib/chat/code-disclosure';
 import { getNaics } from '@/lib/codes/lookup';
 import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
 import { guardUnstatedStates, guardUnstatedCities } from '@/lib/chat/stated-filters';
-import { compileIntent, enforceIntent, dedupeToolCalls } from '@/lib/chat/intent-compiler';
+import { compileIntent, enforceIntent, dedupeToolCalls, isMapScopeNote } from '@/lib/chat/intent-compiler';
 import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, renderSbloContact, lintAnalysis, deterministicNextSteps, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, SBLO_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
@@ -1004,8 +1004,12 @@ export async function POST(request: NextRequest) {
 
         let assistantContent = '';
         if (renderedRecords.length) {
+          // Scope the MAP supplied is labeled as the map's, never as "from your request" (2026-11-15 review).
+          const fromRequest = [...scopeApplied].filter((n) => !isMapScopeNote(n));
+          const fromMap = [...scopeApplied].filter((n) => isMapScopeNote(n));
           const scopeLines = [
-            scopeApplied.size ? `From your request: ${[...scopeApplied].join('; ')}.` : '',
+            fromRequest.length ? `From your request: ${fromRequest.join('; ')}.` : '',
+            ...fromMap.map((n) => `${n.charAt(0).toUpperCase()}${n.slice(1)}.`),
             scopeInferred ? `${scopeInferred}.` : '',
             scopeUnapplied.size ? `Could not apply: ${[...scopeUnapplied].join('; ')}. The results below do not reflect ${scopeUnapplied.size === 1 ? 'it' : 'them'}.` : '',
           ].filter(Boolean).join('\n');

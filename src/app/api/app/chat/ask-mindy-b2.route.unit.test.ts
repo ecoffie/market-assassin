@@ -389,6 +389,27 @@ describe('map "ask about this view": no place the customer did not give (2026-11
     expect(String(state.executedArgs[0].state).split(',').sort()).toEqual(['MD', 'PA', 'VA']);
   });
 
+  it('the customer sees the map scope labeled as the MAP\'s, never "From your request"', async () => {
+    state.toolContent = JSON.stringify({ contracts: [{ piid: 'A1', description: 'Janitorial services', place_of_performance_state: 'VA', period_of_performance_current_end: '2027-06-30', total_obligation: 500000 }], expiring_orders_in_window: [], _meta: { total: 1 } });
+    state.plannerCalls = [{ id: 'c1', function: { name: 'get_expiring_contracts', arguments: JSON.stringify({ naics: '561720', months_window: 12 }) } }];
+    const recompeteQ = VIEW_Q.replace('Which agencies buy the most in this view?', 'Which janitorial contracts expire in the next 12 months in this view?');
+    const { raw } = await ask(recompeteQ);
+    const shown = raw.split('\n').filter((l) => l.startsWith('data:')).map((l) => JSON.parse(l.slice(5))).filter((e) => e.type === 'token').map((e) => e.content).join('');
+    expect(String(state.executedArgs[0].state).split(',').sort()).toEqual(['MD', 'PA', 'VA']);
+    expect(shown).toContain('Scoped to the states on your map: VA, MD, PA.');
+    expect(shown).not.toMatch(/From your request:[^\n]*states/);
+    expect(shown).not.toMatch(/states VA, MD, PA from your request/);
+  });
+
+  it('a state the customer typed is still labeled "From your request"', async () => {
+    state.toolContent = JSON.stringify({ contracts: [{ piid: 'A1', description: 'Janitorial services', place_of_performance_state: 'TX', period_of_performance_current_end: '2027-06-30', total_obligation: 500000 }], expiring_orders_in_window: [], _meta: { total: 1 } });
+    state.plannerCalls = [{ id: 'c1', function: { name: 'get_expiring_contracts', arguments: JSON.stringify({ naics: '561720', months_window: 12 }) } }];
+    const { raw } = await ask('Which janitorial contracts expire in the next 12 months in TX?');
+    const shown = raw.split('\n').filter((l) => l.startsWith('data:')).map((l) => JSON.parse(l.slice(5))).filter((e) => e.type === 'token').map((e) => e.content).join('');
+    expect(shown).toMatch(/From your request: [^\n]*states TX from your request/);
+    expect(shown).not.toContain('on your map');
+  });
+
   it('a city the customer typed is kept', async () => {
     state.plannerCalls = [{ id: 'c1', function: { name: 'search_sam_opportunities', arguments: JSON.stringify({ state: 'TN', city: 'Memphis' }) } }];
     await ask('Which offices buy janitorial services in Memphis, TN?');

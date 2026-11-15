@@ -3,7 +3,7 @@
  * tool arguments. One test per demonstrated failure (independent reviews 2026-11-14).
  */
 import { describe, it, expect } from 'vitest';
-import { compileIntent, enforceIntent } from './intent-compiler';
+import { compileIntent, enforceIntent, isMapScopeNote, splitViewPreamble } from './intent-compiler';
 
 const NOW = new Date('2026-11-14T03:30:00Z'); // 10:30 PM Eastern on 2026-11-13
 const enforce = (tool: string, args: Record<string, unknown>, text: string) => {
@@ -158,8 +158,35 @@ describe('acc7 R4: buying-office calls that differ only by the default radius', 
 });
 
 describe('map-view preamble states (2026-11-15)', () => {
-  it('every state in "the map area is in VA, MD, PA" is read as named, including ambiguous VA/PA', () => {
-    const t = '[Current map view — 853+ Open Now opps in view. Location: the map area is in VA, MD, PA (plotted pins in view, most first: VA 312, MD 140, PA 90). Answer for THIS view ...]\n\nWhich agencies buy the most in this view?';
-    expect([...compileIntent(t).explicitStates].sort()).toEqual(['MD', 'PA', 'VA']);
+  const VIEW = '[Current map view \u2014 853+ Open Now opps in view. Location: the map area is in VA, MD, PA (plotted pins in view, most first: VA 312, MD 140, PA 90). Answer for THIS view ...]\n\n';
+
+  it('states from the view preamble are the MAP\'s, not the customer\'s words', () => {
+    const c = compileIntent(`${VIEW}Which agencies buy the most in this view?`);
+    expect(c.explicitStates).toEqual([]);
+    expect([...c.viewStates].sort()).toEqual(['MD', 'PA', 'VA']);
+    expect(c.viewStateSource).toBe('map_area');
+  });
+  it('a map state filter is reported as the filter', () => {
+    const c = compileIntent('[Current map view \u2014 40 Open Now opps in view; CA. Location: the map is filtered to CA. Answer ...]\n\nWho buys here?');
+    expect(c).toMatchObject({ explicitStates: [], viewStates: ['CA'], viewStateSource: 'map_filter' });
+  });
+  it('a state the customer typed wins over the map', () => {
+    const c = compileIntent(`${VIEW}Show me janitorial work in Texas instead`);
+    expect(c).toMatchObject({ explicitStates: ['TX'], viewStates: [], viewStateSource: null });
+  });
+  it('enforced notes say where the scope came from', () => {
+    const map = enforceIntent('search_sam_opportunities', '{"keyword":"janitorial"}', compileIntent(`${VIEW}Janitorial work here?`));
+    expect(JSON.parse(map.args).state.split(',').sort()).toEqual(['MD', 'PA', 'VA']);
+    expect(map.applied).toEqual(['scoped to the states on your map: VA, MD, PA']);
+    expect(map.applied.join(' ')).not.toMatch(/from your request/);
+    expect(isMapScopeNote(map.applied[0])).toBe(true);
+    const filt = enforceIntent('search_sam_opportunities', '{"keyword":"janitorial"}', compileIntent('[Current map view \u2014 40 opps in view; CA. Location: the map is filtered to CA. Answer ...]\n\nJanitorial work here?'));
+    expect(filt.applied).toEqual(["scoped to your map's state filter: CA"]);
+    const typed = enforceIntent('search_sam_opportunities', '{"keyword":"janitorial"}', compileIntent('Janitorial work in TN, MS or AR'));
+    expect(typed.applied).toEqual(['states AR, MS, TN from your request']);
+    expect(isMapScopeNote(typed.applied[0])).toBe(false);
+  });
+  it('a message without the preamble is unaffected', () => {
+    expect(splitViewPreamble('Which agencies buy the most?')).toEqual({ view: null, rest: 'Which agencies buy the most?' });
   });
 });
