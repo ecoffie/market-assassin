@@ -36,6 +36,13 @@ export type MatchBasis =
   | 'related_market_code'
   /** Retrieved only by a product preset's FSC code (2026-11-14); the record does not name the item. */
   | 'product_code'
+  /** RC2 evidence classifier: the words appear only in the requirement text, not the title (RELATED). */
+  | 'description_text'
+  /** RC2: kept and shown last (NOT RELEVANT) — see evidence-classifier.ts. */
+  | 'boilerplate_only'
+  | 'agency_or_program_name'
+  | 'repair_notice_for_parts'
+  | 'no_evidence'
   | CompanyRecallBasis;
 
 /** Coming back classes: the two FIND evidence classes + the holder-name signal. */
@@ -148,6 +155,17 @@ export function productCodeWhy(phrase: string, row: { psc_code?: string | null }
   const code = row.psc_code ? `product code ${row.psc_code}` : 'its product code';
   return `Related-market candidate for “${phrase}”: filed under ${code}, but the notice does not name the item. `
     + `Check the item, part number and any approved-source restriction before treating it as ${phrase}.`;
+}
+
+export function descriptionOnlyWhy(phrase: string): string {
+  return `Related to “${phrase}”: the requirement text mentions it, but the title (what is being bought) does not. Read the scope before treating it as ${phrase} work.`;
+}
+
+export function notRelevantWhy(phrase: string, basis: 'boilerplate_only' | 'agency_or_program_name' | 'repair_notice_for_parts' | 'no_evidence'): string {
+  if (basis === 'repair_notice_for_parts') return `Probably not a fit for “${phrase}”: this notice buys a repair or overhaul, not the part. It matters only if you also do repair work.`;
+  if (basis === 'boilerplate_only') return `Probably not a fit for “${phrase}”: the item bought is something else; the words appear only in standard contract terms.`;
+  if (basis === 'agency_or_program_name') return `Probably not a fit for “${phrase}”: the words appear only in an agency or program name, not in what is being bought.`;
+  return `Probably not a fit for “${phrase}”: nothing in the title or requirement establishes this work.`;
 }
 
 export function buyerNameWhy(phrase: string): string {

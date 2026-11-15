@@ -42,10 +42,14 @@ describe('Open: labels', () => {
     const l = labelOpenRow(open({ title: 'USCG Sector Key West Recurring Janitorial Services', naics_code: '561720', psc_code: 'S201' }), p, cap);
     expect(l.cls).toBe('DIRECT_MATCH');
   });
-  it('a facilities-support notice that says janitorial in its text is DIRECT on text', () => {
+  it('a facilities-support notice that says janitorial only in its text is RELATED, not DIRECT (RC2 evidence rule)', () => {
+    // RC2 (Eric, 2026-11-14): DIRECT means the notice procures what the business offers. The title buys base operations
+    // support; janitorial is one item of its scope, a plausible adjacent opportunity. It stays retrieved and labelled.
     const l = labelOpenRow(open({ title: 'Base operations support', description: 'Includes janitorial services for 12 buildings', naics_code: '561210' }), p, cap);
-    expect(l.cls).toBe('DIRECT_MATCH');
-    expect(l.basis[0]).toBe('buy_side_text');
+    expect(l.cls).toBe('RELATED_MARKET_CANDIDATE');
+    const titled = labelOpenRow(open({ title: 'Janitorial Services, Building 12', naics_code: '561210' }), p, cap);
+    expect(titled.cls).toBe('DIRECT_MATCH');
+    expect(titled.basis[0]).toBe('buy_side_text');
   });
   it('landscaping (561730) with no janitorial text is RELATED', () => {
     expect(labelOpenRow(open({ title: 'Grounds maintenance', naics_code: '561730' }), p, cap).cls).toBe('RELATED_MARKET_CANDIDATE');

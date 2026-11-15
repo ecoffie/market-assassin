@@ -7,6 +7,7 @@
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { classifySearchFailure } from './search-failure';
+import { classifyOpenEvidence, type EvidenceBasis } from './evidence-classifier';
 import { recompeteRowAnnotations } from '@/lib/recompete/annotate';
 import { parseAwardLineage, NOT_ORDER_UNDER_VEHICLE_OR } from '@/lib/recompete/award-lineage';
 import { dedupeRecompeteRows, type DedupeableRecompeteRow } from '@/lib/recompete/dedupe-orders';
@@ -64,6 +65,8 @@ import {
   buyerNameWhy,
   relatedCodeWhy,
   productCodeWhy,
+  descriptionOnlyWhy,
+  notRelevantWhy,
   companyCodeWhy,
   type ComingBackClass,
   type MatchBasis,
@@ -713,7 +716,57 @@ export interface OpenLabel {
  * (Code-mode queries keep solicitation_number — the user typed an identifier.) Rows recalled only by
  * the company's registered PSC/NAICS stay non-DIRECT and are labelled company_registered_*.
  */
+/**
+ * Open-row label. RC2 (Eric approved 2026-11-14): evidence-based classification (evidence-classifier.ts) for text /
+ * preset searches. A notice is DIRECT only when it procures what the business offers; agency names, boilerplate and
+ * broad family codes never make it DIRECT. Unchanged paths: cyber (its own classifier), structured-only searches, and a
+ * code the customer TYPED or a SPECIFIC direct code (6-digit NAICS / 4-char PSC), which stay DIRECT by code.
+ */
 export function labelOpenRow(
+  row: Record<string, unknown>,
+  plan: DiscoveryPlan,
+  cap: MarketInterpretation['capability'],
+  anchor?: CompanyAnchor | null,
+): OpenLabel {
+  if (cap.kind === 'cyber_with_related_it' || plan.matcher.mode === 'none') return legacyOpenLabel(row, plan, cap, anchor);
+  const basis: MatchBasis[] = [];
+  let cls: OpenRelevanceClass;
+  const typed = codeIn(plan.naics, row.naics_code) || codeIn(plan.psc, row.psc_code);
+  const specific = codeIn(cap.direct.naics.filter((c) => c.length === 6), row.naics_code)
+    || codeIn(openDirectPsc(cap).filter((c) => c.length >= 4), row.psc_code);
+  if (typed || specific) {
+    cls = 'DIRECT_MATCH'; basis.push('buy_side_code');
+  } else {
+    const query = String(plan.intent?.residual || '');
+    const v = classifyOpenEvidence(row, plan, cap, query);
+    cls = v.cls;
+    const broadFamily = codeIn(cap.direct.naics.filter((c) => c.length < 6), row.naics_code)
+      || codeIn(openDirectPsc(cap).filter((c) => c.length < 4), row.psc_code);
+    if (cls === 'WEAK_NON_MARKET' && broadFamily && v.basis !== 'repair_notice_for_parts') { cls = 'RELATED_MARKET_CANDIDATE'; basis.push('related_market_code'); }
+    else basis.push(EVIDENCE_TO_BASIS[v.basis]);
+  }
+  const company = companyRecallBasis(row, anchor);
+  if (company) basis.push(company);
+  // Within RELATED (RC2): an in-code product row outranks a description-only mention, which outranks a family code.
+  const relatedOffset = cls === 'RELATED_MARKET_CANDIDATE'
+    ? (basis[0] === 'product_code' ? 0 : basis[0] === 'description_text' ? 0.1 : 0.2) : 0;
+  const tier = cls === 'WEAK_NON_MARKET' && company ? OPEN_TIER.COMPANY_CODE : OPEN_TIER[cls] + relatedOffset;
+  return { cls, basis, tier };
+}
+
+const EVIDENCE_TO_BASIS: Record<EvidenceBasis, MatchBasis> = {
+  title_item: 'buy_side_text',
+  own_trade_code: 'buy_side_code',
+  description_only: 'description_text',
+  product_code_only: 'product_code',
+  related_family_code: 'related_market_code',
+  boilerplate_only: 'boilerplate_only',
+  agency_or_program_name: 'agency_or_program_name',
+  repair_notice_for_parts: 'repair_notice_for_parts',
+  no_evidence: 'no_evidence',
+};
+
+function legacyOpenLabel(
   row: Record<string, unknown>,
   plan: DiscoveryPlan,
   cap: MarketInterpretation['capability'],
@@ -751,6 +804,9 @@ function openWhy(label: OpenLabel, phrase: string, row: Record<string, unknown>)
   if (label.basis[0] === 'buyer_name') return buyerNameWhy(phrase);
   if (label.basis[0] === 'related_market_code') return relatedCodeWhy(phrase, row as { naics_code?: string; naics_description?: string });
   if (label.basis[0] === 'product_code') return productCodeWhy(phrase, row as { psc_code?: string });
+  if (label.basis[0] === 'description_text') return descriptionOnlyWhy(phrase);
+  if (label.basis[0] === 'boilerplate_only' || label.basis[0] === 'agency_or_program_name'
+    || label.basis[0] === 'repair_notice_for_parts' || label.basis[0] === 'no_evidence') return notRelevantWhy(phrase, label.basis[0]);
   const company = label.basis.find((b) => b === 'company_registered_psc' || b === 'company_registered_naics') as
     | 'company_registered_psc' | 'company_registered_naics' | undefined;
   if (label.cls === 'WEAK_NON_MARKET' && company) return companyCodeWhy(company, row as { naics_code?: string; psc_code?: string });
