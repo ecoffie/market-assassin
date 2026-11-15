@@ -79,8 +79,11 @@ const REPAIR_TITLE = /\b(repair|repairs|overhaul|refurbish\w*|rebuild|in\s+repai
  * repaired", "criteria for repair and testing", "return ... to RFI"). Measured on the benchmark labels: 57 of 746 rows
  * both reviewers marked NO match; 3 of 458 rows marked relevant match, and all 3 state a repair requirement in their own
  * text (the reviewers missed it), so they are sent back for adjudication rather than treated as false positives.
+ * 2026-11-15 (Agent 4 v7, IT top 5): NAVSUP Mechanicsburg repair buys say it as "Vendor shall have 90 days after receipt of
+ * carcass(es) to complete a teardown & evaluation (TD&E)", "the full repair effort", "requirements for repair",
+ * "Repair Turn Around Time" — "NRP,KEYBOARD,DATA E" / "ASSEMBLY, KEYBOARD" / "SERVER,AUTOMATIC DA" were DIRECT for a reseller.
  */
-const REPAIR_DESC = /\b(?:this\s+(?:solicitation|requirement|procurement)\s+is\s+for\s+(?:the\s+)?repair|repair\s+(?:upgrade|requirements?|and\s+overhaul|and\s+return|services?\s+(?:for|of|to))|return(?:ed)?\s+(?:the\s+)?(?:\S+\s+){0,6}?to\s+(?:rfi|ready\s+for\s+issue|serviceable)|overhaul\s+(?:and\s+repair|of\s+the)|in\s+repair\/modification|articles\s+to\s+be\s+furnished\s+hereunder\s+shall\s+be\s+repaired|criteria\s+for\s+(?:the\s+)?repair)/i;
+const REPAIR_DESC = /\b(?:this\s+(?:solicitation|requirement|procurement)\s+is\s+for\s+(?:the\s+)?repair|repair\s+(?:upgrade|requirements?|and\s+overhaul|and\s+return|services?\s+(?:for|of|to))|return(?:ed)?\s+(?:the\s+)?(?:\S+\s+){0,6}?to\s+(?:rfi|ready\s+for\s+issue|serviceable)|overhaul\s+(?:and\s+repair|of\s+the)|in\s+repair\/modification|articles\s+to\s+be\s+furnished\s+hereunder\s+shall\s+be\s+repaired|criteria\s+for\s+(?:the\s+)?repair|teardown\s*(?:&|and)\s*evaluation|receipt\s+of\s+(?:the\s+)?carcass|full\s+repair\s+effort|requirements\s+for\s+repair\b|repair\s+turn\s*-?\s*around\s+time)/i;
 const REPAIR_DESC_WINDOW = 5000;
 const REPAIR_INTENT = /\b(repair|repairs|overhaul|refurbish\w*|rebuild|maintain|maintenance|mro|service\s+and\s+repair)\b/i;
 

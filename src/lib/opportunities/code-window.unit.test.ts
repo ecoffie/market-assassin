@@ -45,3 +45,17 @@ describe('C · DLA hardware nouns are item evidence only inside the IT hardware 
     expect(l('12--DISPLAY UNIT,HELMET', '1240')).not.toBe('DIRECT_MATCH');
   });
 });
+
+describe('NAVSUP repair buys are not a reseller\'s sale (Agent 4 v7, IT top 5)', () => {
+  it('"receipt of carcass(es) … teardown & evaluation" → NOT RELEVANT for a reseller; a plain item buy stays DIRECT', async () => {
+    const { labelOpenRow } = await import('./find-opportunities');
+    const { buildDiscoveryPlan } = await import('@/lib/discovery/plan');
+    const { MCP_POLICY } = await import('@/lib/discovery/policy');
+    const plan = buildDiscoveryPlan({ query: IT_LONG }, MCP_POLICY, { today: '2026-11-15', fiscalYear: 2027 });
+    const desc = 'CONTACT INFORMATION|4|… 4. Vendor shall have ;90; days after receipt of carcass(es) to complete a teardown & evaluation (TD&E) of the carcass(es) and submit a Firm-Fixed Price (FFP) quote for the full repair effort.';
+    const l = labelOpenRow({ title: 'NRP,KEYBOARD,DATA E', psc_code: '7E20', description: desc }, plan, cap(IT_LONG), null);
+    expect(l.cls).toBe('WEAK_NON_MARKET');
+    expect(l.basis[0]).toBe('repair_notice_for_parts');
+    expect(labelOpenRow({ title: 'KEYBOARD,DATA ENTRY', psc_code: '7E20', description: 'Delivery orders and modifications related to the instant procurement are issued by the Government.' }, plan, cap(IT_LONG), null).cls).toBe('DIRECT_MATCH');
+  });
+});
