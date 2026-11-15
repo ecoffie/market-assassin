@@ -1,0 +1,35 @@
+{"id":"r5-0210","label":"NO","role":"NONE","restriction":"NONE","evidence":"St. Lucie South Jetty Repair Industry Day, heavy civil construction, no valves"}
+{"id":"r5-0211","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"KIT,CCA,CONROLLER PSC 5998 supply the item, manufacturer part number"}
+{"id":"r5-0212","label":"NO","role":"NONE","restriction":"NONE","evidence":"59--JUNCTION BOX PSC 5975; nuts only mentioned in a certificate clause"}
+{"id":"r5-0213","label":"NO","role":"NONE","restriction":"NONE","evidence":"Base life support and facility rehabilitation services, no IT hardware purchase"}
+{"id":"r5-0214","label":"NO","role":"NONE","restriction":"NONE","evidence":"Broad Agency Announcement biomedical research and diving equipment development"}
+{"id":"r5-0215","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"TERMINAL,DATA PROCE PSC 7E20; approved source for this procurement"}
+{"id":"r5-0216","label":"NO","role":"NONE","restriction":"NONE","evidence":"FCI Fairton Second Quarter Subsistence (Kosher, Meat, Frozen, Dry) food"}
+{"id":"r5-0217","label":"NO","role":"NONE","restriction":"NONE","evidence":"Upgrade Substation Building 2 construction; spare parts only a documentation list"}
+{"id":"r5-0218","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"C-130 Aft Emergency Exit Door Assembly; Lockheed escape hatches only approved hatches"}
+{"id":"r5-0219","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"Brand Name Polymedco iFOBT laboratory test, PSC 6640"}
+{"id":"r5-0220","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"48--VALVE,LINEAR,DIRECT manufacture or refurbishment PSC 4820"}
+{"id":"r5-0221","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"Wheelchair Van Repair Services, repair service not IT hardware"}
+{"id":"r5-0222","label":"NO","role":"NONE","restriction":"NONE","evidence":"iDBIO MATOC design-build construction of healthcare facilities"}
+{"id":"r5-0223","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"GOVERNOR,MOTOR PSC 6110 DLA spare part, manufacturer's part number"}
+{"id":"r5-0224","label":"NO","role":"NONE","restriction":"NONE","evidence":"IDIQ inland and coastal vessels engineering services, naval architecture"}
+{"id":"r5-0225","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"sole source MyCrashCarts.com software subscription and support services only"}
+{"id":"r5-0226","label":"NO","role":"NONE","restriction":"NONE","evidence":"HOUSING,LOADER,AFT PSC 1005 weapons component, not medical supplies"}
+{"id":"r5-0227","label":"NO","role":"NONE","restriction":"NONE","evidence":"FY27 FCI LORETTO 2nd QTR Bread quarterly subsistence"}
+{"id":"r5-0228","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"regulated natural-gas distribution service sole-source to Delta Utilities"}
+{"id":"r5-0229","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5305013289226 SCREW,CLOSE TOLERANCE; Approved sources are 06725 AIC1700-3-10"}
+{"id":"r5-0230","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"Dell EMC Data Domain Maintenance Renewal, BRAND NAME ONLY maintenance"}
+{"id":"r5-0231","label":"NO","role":"NONE","restriction":"NONE","evidence":"TRANSMITTER,PRESSUR PSC 6685 pressure instrument, not medical supply"}
+{"id":"r5-0232","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"CS High NRE FY27 MQ-9 Cloudsurfer pod engineering, GA-ASI only source"}
+{"id":"r5-0233","label":"NO","role":"NONE","restriction":"NONE","evidence":"USARC Yellow Ribbon Child Care services sources sought"}
+{"id":"r5-0234","label":"NO","role":"NONE","restriction":"NONE","evidence":"Correct Stormwater Drainage construction project, Salem VAMC"}
+{"id":"r5-0235","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 4820014839044 VALVE,Y Line 0001 Qty 26; all responsible sources may quote"}
+{"id":"r5-0236","label":"NO","role":"NONE","restriction":"NONE","evidence":"16--CYLINDER AND VALVE PSC 1660 aircraft component, not medical supplies"}
+{"id":"r5-0237","label":"NO","role":"NONE","restriction":"NONE","evidence":"Graphite Furnace Atomic Absorption Spectrometer lab instrument, not IT hardware"}
+{"id":"r5-0238","label":"NO","role":"NONE","restriction":"NONE","evidence":"Demo Old Boiler Plant B100 demolition construction"}
+{"id":"r5-0239","label":"NO","role":"NONE","restriction":"NONE","evidence":"Purchase Potential Government Working Dogs (OCONUS) PSC 8820"}
+{"id":"r5-0240","label":"NO","role":"NONE","restriction":"NONE","evidence":"CIRCUIT CARD ASSY PSC 5998 electronic part, not medical supplies"}
+{"id":"r5-0241","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5310007021865 NUT,SELF-LOCKING; source controlled drawing item, approved sources"}
+{"id":"r5-0242","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Socket Head Cap Screws FSC 5305, 100% small business set-aside RFQ"}
+{"id":"r5-0243","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"FILTER ASSEMBLY,FLU PSC 4330 DLA solicitation, quotes due 20 Nov"}
+{"id":"r5-0244","label":"NO","role":"NONE","restriction":"NONE","evidence":"Design-Build Renovation of Building 164 Outdoor Recreation Center"}

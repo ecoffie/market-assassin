@@ -1,0 +1,35 @@
+{"id": "r5-0105", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Replace Boiler Stack construction; no aircraft parts bought"}
+{"id": "r5-0106", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "fabrication, supply and delivery of DC and AC preferred systems switchgear"}
+{"id": "r5-0107", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "steam filter replacement and calibration services; labor-based service"}
+{"id": "r5-0108", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Assorted Cap Screws FSC 5305 RFQ SPMYM327Q1106"}
+{"id": "r5-0109", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "replace cattle shade fabric installation labor"}
+{"id": "r5-0110", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Building 141 generator replacement construction"}
+{"id": "r5-0111", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "New lease for VA clinic space"}
+{"id": "r5-0112", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Maritime Security Advisor personal services contract"}
+{"id": "r5-0113", "label": "PARTIAL", "role": "PRIME", "restriction": "BRAND_NAME", "evidence": "Brand Name requirement authorized resellers of AXIS, GENETEC, HPE, Corning"}
+{"id": "r5-0114", "label": "FIT", "role": "PRIME", "restriction": "QPL", "evidence": "NSN 4820006820610 VALVE,CHECK qualified products list (QPL) item"}
+{"id": "r5-0115", "label": "PARTIAL", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "MODULE ASSEMBLY,UHF FSC 7G20 security clearance DD Form 254"}
+{"id": "r5-0116", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5305008869330 SCREW,ADJUSTING; Approved sources are 05812 589559-1"}
+{"id": "r5-0117", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Medical Technologists staffing services, not supplies"}
+{"id": "r5-0118", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "subsistence and other food related items for prison"}
+{"id": "r5-0119", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 5310009824908 NUT,SELF-LOCKING,HE RFQ Qty 245"}
+{"id": "r5-0120", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Manufacturing of machined and composite parts sources sought"}
+{"id": "r5-0121", "label": "NO", "role": "NONE", "restriction": "OEM_ONLY", "evidence": "Authorized Distributors of Keysight Technologies calibration standards"}
+{"id": "r5-0122", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "XMITTER,PRECSIONTRM FSC 6320 manufacturer's part number substitution Navy"}
+{"id": "r5-0123", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "BLADE,TURBINE ENGIN FSC 2835 DLA solicitation"}
+{"id": "r5-0124", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Replacement cattle dip vat drip pad construction"}
+{"id": "r5-0125", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Vertical Transportation Equipment maintenance, repair and inspection services"}
+{"id": "r5-0126", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "29--PUMP,FUEL,JET ENGIN not medical supplies"}
+{"id": "r5-0127", "label": "NO", "role": "NONE", "restriction": "SOLE_SOURCE", "evidence": "FRAME,SEAT,AIRCRAFT IN REPAIR/MODIFICATION; sole source Sikorsky"}
+{"id": "r5-0128", "label": "NO", "role": "NONE", "restriction": "APPROVED_SOURCE", "evidence": "BARREL,SUBCALIBER repair; Add CAGE 3W544 as approved source"}
+{"id": "r5-0129", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "NSN 1440-01-319-8871 linear electro-mechanical actuator; DD 2345 certification"}
+{"id": "r5-0130", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "CHASSIS,ELECTRICAL IN REPAIR/MODIFICATION OF repair service"}
+{"id": "r5-0131", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "11 magnetic contactors NSN 6110-01-043-2504; JCP certification to see TDP"}
+{"id": "r5-0132", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "53--SCREW,MACHINE is fasteners, not medical supplies"}
+{"id": "r5-0133", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "SHELL AY(PRT SIDE) FSC 3130 not medical supplies"}
+{"id": "r5-0134", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Digital torque multiplier NSN 5120-01-708-0605 not IT hardware"}
+{"id": "r5-0135", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Weight Handling Equipment maintenance and repair services"}
+{"id": "r5-0136", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Access Road Repair construction"}
+{"id": "r5-0137", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Replace radiant heating system construction"}
+{"id": "r5-0138", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "Seismic Retrofit of Building 16 construction"}
+{"id": "r5-0139", "label": "NO", "role": "NONE", "restriction": "NONE", "evidence": "ANGKOR SENTINEL 27 catering services"}

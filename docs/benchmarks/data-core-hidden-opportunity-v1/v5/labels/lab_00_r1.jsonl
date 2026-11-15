@@ -1,0 +1,35 @@
+{"id":"r5-0000","label":"NO","role":"NONE","restriction":"NONE","evidence":"GSA fleet vehicle auction and marshalling services, no IT hardware"}
+{"id":"r5-0001","label":"NO","role":"NONE","restriction":"NONE","evidence":"HVAC replacement packaged heat pump installation, not defense or industrial spare parts"}
+{"id":"r5-0002","label":"NO","role":"NONE","restriction":"NONE","evidence":"Prefab booster pump station construction; no valve item procurement stated"}
+{"id":"r5-0003","label":"NO","role":"NONE","restriction":"NONE","evidence":"DARPA research agreement with University of Texas consortium, not supplies"}
+{"id":"r5-0004","label":"FIT","role":"PRIME","restriction":"UNCLEAR","evidence":"16--CYLINDER ASSEMBLY, PSC 1660, FAA-Certified parts only, supplies solicitation"}
+{"id":"r5-0005","label":"NO","role":"NONE","restriction":"NONE","evidence":"Precast single vault toilet purchase and installation, not replacement parts"}
+{"id":"r5-0006","label":"FIT","role":"PRIME","restriction":"UNCLEAR","evidence":"TRANSMITTER,PRESSUR PSC 6685, manufacturer part number, qualification requirements clause"}
+{"id":"r5-0007","label":"NO","role":"NONE","restriction":"NONE","evidence":"MODULE, YIG/SW PSC 5865 electronics, not medical supplies"}
+{"id":"r5-0008","label":"NO","role":"NONE","restriction":"NONE","evidence":"Marine Corps academic support training services contract"}
+{"id":"r5-0009","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CHARGER,BATTERY PSC 6125 DLA supplies solicitation, manufacturer part number"}
+{"id":"r5-0010","label":"NO","role":"NONE","restriction":"NONE","evidence":"St. Lucie jetty repair industry day special notice, construction"}
+{"id":"r5-0011","label":"FIT","role":"SUB","restriction":"SOLE_SOURCE","evidence":"TR-333 Hydrophone Audio Transformers, OECO LLC sole source, approved supplier list"}
+{"id":"r5-0012","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"REPAIR DELIVERY ORDER of DOOR,ACCESS,AIRCRAF; government source approval required"}
+{"id":"r5-0013","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Title VALVE, PSC 2915, DLA solicitation SPRTA127R0091"}
+{"id":"r5-0014","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 3040005935024 NUT,COUPLING,FLEXIBLE; Approved source is 79318 09B17"}
+{"id":"r5-0015","label":"NO","role":"NONE","restriction":"NONE","evidence":"Halal meals solicitation for FMC Carswell food service"}
+{"id":"r5-0016","label":"PARTIAL","role":"SUB","restriction":"NONE","evidence":"Cutter dockside repair; parts list includes Relief Valves NSN: 015616471"}
+{"id":"r5-0017","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 2541-016706560 ARMOR,TRANSPARENT,VEHICULAR WINDOW, Approved Source(s) TDP Rev B"}
+{"id":"r5-0018","label":"NO","role":"NONE","restriction":"NONE","evidence":"Wall-to-wall pharmacy inventory services, not parts supply"}
+{"id":"r5-0019","label":"NO","role":"NONE","restriction":"NONE","evidence":"Charter vessel longline fishery survey sources sought"}
+{"id":"r5-0020","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"SAFETY MANUAL SWITC PSC 1005, DLA supplies solicitation, part number substitution"}
+{"id":"r5-0021","label":"NO","role":"NONE","restriction":"NONE","evidence":"New Fiber Optic Cable installation at Luke AFB, construction services"}
+{"id":"r5-0022","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"Pearson neuropsychological testing kits, sole-source, not IT hardware"}
+{"id":"r5-0023","label":"NO","role":"NONE","restriction":"NONE","evidence":"Fabricated components to LBNL drawings for ALS-U floor plates"}
+{"id":"r5-0024","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"AN/AAQ-44A FLIR kits sole-source to Raytheon, not valves"}
+{"id":"r5-0025","label":"NO","role":"NONE","restriction":"NONE","evidence":"Hardwood basketball court floor refinishing services"}
+{"id":"r5-0026","label":"NO","role":"NONE","restriction":"NONE","evidence":"Tony Grove Dam reconstruction construction project"}
+{"id":"r5-0027","label":"NO","role":"NONE","restriction":"UNCLEAR","evidence":"POWER SUPPLY 6120 request repair quote, Return to Manufacturer Authorization"}
+{"id":"r5-0028","label":"NO","role":"NONE","restriction":"NONE","evidence":"Retail space lease for Armed Forces Career Center, Delano CA"}
+{"id":"r5-0029","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5340010356520 LOCKING PLATE,NUT AND; Approved sources 0B9R9, 73842"}
+{"id":"r5-0030","label":"NO","role":"NONE","restriction":"NONE","evidence":"Demolish Old Boiler Plant B100 construction at VA Danville"}
+{"id":"r5-0031","label":"NO","role":"NONE","restriction":"NONE","evidence":"Base life support facility rehabilitation services, no hardware purchase"}
+{"id":"r5-0032","label":"NO","role":"NONE","restriction":"NONE","evidence":"Bronze pipe FITTING ASSY Navy flange for shipyard, not aircraft parts"}
+{"id":"r5-0033","label":"NO","role":"NONE","restriction":"NONE","evidence":"ORD OneStream Implementation Services software, sources sought"}
+{"id":"r5-0034","label":"NO","role":"NONE","restriction":"NONE","evidence":"GUIDE computational drug engineering collaboration, research not supplies"}

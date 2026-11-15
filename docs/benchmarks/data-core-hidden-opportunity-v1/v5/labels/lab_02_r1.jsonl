@@ -1,0 +1,35 @@
+{"id":"r5-0070","label":"NO","role":"NONE","restriction":"NONE","evidence":"Booster pump station construction; gravel surfacing replacement, no spare parts buy"}
+{"id":"r5-0071","label":"NO","role":"NONE","restriction":"NONE","evidence":"CABLE ASSEMBLY,SPEC PSC 6150 electrical item, not medical supplies"}
+{"id":"r5-0072","label":"NO","role":"NONE","restriction":"NONE","evidence":"CIRCUIT CARD ASSEMB PSC 5965 repair purchase order, not medical supplies"}
+{"id":"r5-0073","label":"NO","role":"NONE","restriction":"NONE","evidence":"NRP,HANDSET ASSEMBL PSC 4920 aircraft maintenance equipment, not medical supplies"}
+{"id":"r5-0074","label":"NO","role":"NONE","restriction":"NONE","evidence":"Laser shooting range simulator and police training kits for Serbia"}
+{"id":"r5-0075","label":"NO","role":"NONE","restriction":"NONE","evidence":"Preventive maintenance and repair services for HVAC water chillers"}
+{"id":"r5-0076","label":"NO","role":"NONE","restriction":"NONE","evidence":"MCJROTC residential leadership and STEM camp services"}
+{"id":"r5-0077","label":"PARTIAL","role":"PRIME","restriction":"OEM_ONLY","evidence":"Aruba Software and Hardware Maintenance, 233 CLINs part numbers, authorized reseller of HPE"}
+{"id":"r5-0078","label":"NO","role":"NONE","restriction":"UNCLEAR","evidence":"30--GEAR, PINION PSC 3020; nuts only mentioned in generic certificate clause"}
+{"id":"r5-0079","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"BEARING, SLEEVE NSN 3120, Thordon Bearings, Brand Name Only; not fasteners"}
+{"id":"r5-0080","label":"NO","role":"NONE","restriction":"QPL","evidence":"QPL-24688 polyimide foam insulation qualification sources sought, not components"}
+{"id":"r5-0081","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820014819698 VALVE,REGULATOR; Approved source is 8W625 803-1385925-6"}
+{"id":"r5-0082","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"AMLCD,19 INCH PSC 5821 Navy solicitation, manufacturer part number substitution"}
+{"id":"r5-0083","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"TRAY ASSEMBLY,PROCE PSC 5998 electronic assembly, MIL-STD-130 marking, DLA solicitation"}
+{"id":"r5-0084","label":"NO","role":"NONE","restriction":"OEM_ONLY","evidence":"DIOM Training PSC R408 services; only OEM or authorized resellers, only one source"}
+{"id":"r5-0085","label":"NO","role":"NONE","restriction":"UNCLEAR","evidence":"PROCESSOR,SIGNAL IN REPAIR/MODIFICATION OF; NSN 0R-5895 repair order"}
+{"id":"r5-0086","label":"NO","role":"NONE","restriction":"NONE","evidence":"Chemical Waste Disposal services at Richmond VA Medical Center"}
+{"id":"r5-0087","label":"NO","role":"NONE","restriction":"UNCLEAR","evidence":"PARTS KIT,BALL VALV IN REPAIR/MODIFICATION OF; refurbishment per TDP, SUBSAFE markings"}
+{"id":"r5-0088","label":"NO","role":"NONE","restriction":"NONE","evidence":"Cockpit voice and flight data recorders for C-130/C-17/C-5, avionics not IT hardware"}
+{"id":"r5-0089","label":"NO","role":"NONE","restriction":"NONE","evidence":"GSA fleet vehicle auction and marshalling services, no IT hardware"}
+{"id":"r5-0090","label":"NO","role":"NONE","restriction":"NONE","evidence":"Distributed wind turbine competitiveness R&D project, not spare parts"}
+{"id":"r5-0091","label":"NO","role":"NONE","restriction":"NONE","evidence":"Industry day for Callao Naval Base construction in Peru"}
+{"id":"r5-0092","label":"PARTIAL","role":"PRIME","restriction":"NONE","evidence":"TAHEF 542 System Components CLINs with Part # 53X-01-101 machined parts per SOW"}
+{"id":"r5-0093","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"Service contract Carl Zeiss LSM 900 microscope maintenance, sole-source"}
+{"id":"r5-0094","label":"NO","role":"NONE","restriction":"NONE","evidence":"Replace Electrical Panels and Expand Distribution construction at VAMC"}
+{"id":"r5-0095","label":"NO","role":"NONE","restriction":"UNCLEAR","evidence":"66--INERTIAL MEASURING, IN REPAIR/MODIFICATION OF; repair service for instruments"}
+{"id":"r5-0096","label":"NO","role":"NONE","restriction":"NONE","evidence":"LAMP, LED PSC 6240, medium screw base bulb, not fastening hardware"}
+{"id":"r5-0097","label":"NO","role":"NONE","restriction":"NONE","evidence":"Dredged Material Containment Area construction sources sought"}
+{"id":"r5-0098","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5330-01-488-9259 RETAINER, RING, AIRCRAFT; Source Approval Request required"}
+{"id":"r5-0099","label":"NO","role":"NONE","restriction":"NONE","evidence":"John Day Dam Tainter Valve repairs TV3 and TV4 construction work"}
+{"id":"r5-0100","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"Crash cart tracking software subscription sole source to My Crash Carts LLC"}
+{"id":"r5-0101","label":"NO","role":"NONE","restriction":"UNCLEAR","evidence":"58--TUNER,RADIO FREQUEN, IN REPAIR/MODIFICATION OF; repair service"}
+{"id":"r5-0102","label":"NO","role":"NONE","restriction":"NONE","evidence":"Passenger transportation services for national VA events"}
+{"id":"r5-0103","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"SPOILER,WING REPAIR DELIVERY ORDER; items require Government source approval"}
+{"id":"r5-0104","label":"NO","role":"NONE","restriction":"NONE","evidence":"Marine Corps e-Learning Ecosystem support services RFI"}

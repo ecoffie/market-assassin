@@ -1,0 +1,25 @@
+{"id":"r5-0280","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820010450940 VALVE,HYDRAULIC Qty 103; Approved sources are 21392 A2540"}
+{"id":"r5-0281","label":"NO","role":"NONE","restriction":"NONE","evidence":"61--POWER SUPPLY FSC 6120, not medical supplies"}
+{"id":"r5-0282","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"required system is the Unetix Multilab II Roorda vascular system"}
+{"id":"r5-0283","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 5305007195235 SCREW,CAP,HEXAGON H Qty 1794; all responsible sources"}
+{"id":"r5-0284","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"48--VALVE,GLOBE: Complete 1-Inch In-line Stop Check Valve per NAVSHIPS drawing"}
+{"id":"r5-0285","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"Brand Name Polymedco iFOBT Cost Per Reportable Result lab testing"}
+{"id":"r5-0286","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"MANUFACTURE OF 3 EA VALVE, BUTTERFLY, NSN 4820 016589524, P/N 803-7106793"}
+{"id":"r5-0287","label":"NO","role":"NONE","restriction":"NONE","evidence":"roof assessment and repair services at IHS facilities"}
+{"id":"r5-0288","label":"NO","role":"NONE","restriction":"NONE","evidence":"CGC FREDERICK HATCH underwater hull cleaning and zinc anode renewal service"}
+{"id":"r5-0289","label":"NO","role":"NONE","restriction":"NONE","evidence":"Replace Roof at Building 347 Menlo Park construction"}
+{"id":"r5-0290","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NOZZLE,VALVE FSC 4820 T408-GE-400 spare, NAICS 332919"}
+{"id":"r5-0291","label":"NO","role":"NONE","restriction":"NONE","evidence":"FAIRLEAD COVER P/N 7538383 NSN 5840 014379612, not component line"}
+{"id":"r5-0292","label":"NO","role":"NONE","restriction":"NONE","evidence":"Industry Day for A/E services, Callao Naval Base infrastructure modernization"}
+{"id":"r5-0293","label":"NO","role":"NONE","restriction":"NONE","evidence":"QUARTERLY SUBSISTENCE - Dairy for FCI Loretto, FSC 8910"}
+{"id":"r5-0294","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"ALIGNMENT TOOL,ELEC FSC 5120; non government-approved sources technically unacceptable"}
+{"id":"r5-0295","label":"NO","role":"NONE","restriction":"OEM_ONLY","evidence":"VA San Diego Bed Covers BPA; OEM or authorized distributor letter required"}
+{"id":"r5-0296","label":"NO","role":"NONE","restriction":"NONE","evidence":"Southbound Shuttle Stop construction, Bryce Canyon shuttle bus stops and crosswalk"}
+{"id":"r5-0297","label":"NO","role":"NONE","restriction":"NONE","evidence":"WASHER,FLAT FSC 5310 Navy hardware, no aircraft part context"}
+{"id":"r5-0298","label":"NO","role":"NONE","restriction":"NONE","evidence":"USAFA Ambulance Services per Performance Work Statement, PSC V225"}
+{"id":"r5-0299","label":"NO","role":"NONE","restriction":"NONE","evidence":"IDIQ for Contractor Operated Civil Engineer Supply Store (COCESS) at Ellsworth"}
+{"id":"r5-0300","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820011932715 VALVE ASSEMBLY,BACK Qty 20; Approved sources are 79227"}
+{"id":"r5-0301","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"16--CYLINDER AND VALVE FSC 1660 aircraft component, AS9100 quality"}
+{"id":"r5-0302","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 4820015502911 VALVE,GATE Qty 107; all responsible sources may submit"}
+{"id":"r5-0303","label":"NO","role":"NONE","restriction":"NONE","evidence":"annual inspection, testing, and maintenance of fire protection systems"}
+{"id":"r5-0304","label":"FIT","role":"SUB","restriction":"SOLE_SOURCE","evidence":"RUGGED TACTILE PANEL PC 7K20; supplied exclusively by Milcots LLC, no reseller"}

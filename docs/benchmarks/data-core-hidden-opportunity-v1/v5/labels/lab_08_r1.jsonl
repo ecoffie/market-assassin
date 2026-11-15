@@ -1,0 +1,25 @@
+{"id":"r5-0280","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820010450940 VALVE,HYDRAULIC Qty 103; Approved sources are 21392 A2540"}
+{"id":"r5-0281","label":"NO","role":"NONE","restriction":"NONE","evidence":"61--POWER SUPPLY PSC 6120 electrical item, not medical supplies"}
+{"id":"r5-0282","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"MultiLab Series II Roodra Vascular System; only known compatible vascular system"}
+{"id":"r5-0283","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 5305007195235 SCREW,CAP,HEXAGON H Qty 1794; all responsible sources may quote"}
+{"id":"r5-0284","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"48--VALVE,GLOBE 1-Inch In-line Stop Check Valve per NAVSHIPS drawing 2177934"}
+{"id":"r5-0285","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"Brand Name Polymedco iFOBT laboratory test, PSC 6640"}
+{"id":"r5-0286","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"manufacture of 3 EA VALVE, BUTTERFLY NSN 4820 016589524, 100% small business set-aside"}
+{"id":"r5-0287","label":"NO","role":"NONE","restriction":"NONE","evidence":"Roof Assessment and Repair at Albuquerque Area Indian Health Service facilities"}
+{"id":"r5-0288","label":"NO","role":"NONE","restriction":"NONE","evidence":"CGC FREDERICK HATCH U/W HULL CLEANING AND OPTIONAL ZINC REPAIR"}
+{"id":"r5-0289","label":"NO","role":"NONE","restriction":"NONE","evidence":"Replace Roof at Building 347 Menlo Park, construction"}
+{"id":"r5-0290","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NOZZLE,VALVE PSC 4820 DLA solicitation, no drawings available for this RFQ"}
+{"id":"r5-0291","label":"NO","role":"NONE","restriction":"NONE","evidence":"58--FAIRLEAD COVER NSN 5840 014379612, radar equipment cover, not listed components"}
+{"id":"r5-0292","label":"NO","role":"NONE","restriction":"NONE","evidence":"Industry Day Architecture and Engineering services, Callao Naval Base Peru"}
+{"id":"r5-0293","label":"NO","role":"NONE","restriction":"NONE","evidence":"FY27 FCI LORETTO 2nd QTR Dairy quarterly subsistence"}
+{"id":"r5-0294","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"ALIGNMENT TOOL,ELEC PSC 5120; not government-approved sources deemed unacceptable"}
+{"id":"r5-0295","label":"NO","role":"NONE","restriction":"OEM_ONLY","evidence":"VA San Diego Bed Covers BPA; contractor shall be OEM or authorized distributor"}
+{"id":"r5-0296","label":"NO","role":"NONE","restriction":"NONE","evidence":"BRCA 310427 Southbound Shuttle Stop construction, Bryce Canyon"}
+{"id":"r5-0297","label":"NO","role":"NONE","restriction":"NONE","evidence":"WASHER,FLAT PSC 5310 generic hardware, not aircraft component"}
+{"id":"r5-0298","label":"NO","role":"NONE","restriction":"NONE","evidence":"USAFA Ambulance Services, commercial service PSC V225"}
+{"id":"r5-0299","label":"NO","role":"NONE","restriction":"NONE","evidence":"Ellsworth AFB COCESS contractor operated supply store IDIQ, funds not available"}
+{"id":"r5-0300","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820011932715 VALVE ASSEMBLY,BACK Qty 20; Approved sources are 79227 0122774"}
+{"id":"r5-0301","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"16--CYLINDER AND VALVE PSC 1660, FMS delivery, AS9100 quality requirement"}
+{"id":"r5-0302","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 4820015502911 VALVE,GATE Qty 107; all responsible sources may quote"}
+{"id":"r5-0303","label":"NO","role":"NONE","restriction":"NONE","evidence":"Coast Guard Air Station Port Angeles Annual Fire Protection System Inspection"}
+{"id":"r5-0304","label":"FIT","role":"SUB","restriction":"SOLE_SOURCE","evidence":"RUGGED TACTILE PANEL PC 7K20; Only One Source Milcots, no third-party reseller"}

@@ -19,7 +19,12 @@ function parse(file: string): BenchEnv {
   for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
     const m = /^\s*(?:export\s+)?([A-Z0-9_]+)\s*=\s*(.*)\s*$/.exec(line);
     if (!m) continue;
-    out[m[1]] = m[2].replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1');
+    let v = m[2];
+    // dotenv semantics: double-quoted values expand \n; single-quoted are literal. Credentials are then trimmed, because
+    // `vercel env pull` writes values set with `echo` as "...\n", which would otherwise fail auth.
+    if (/^".*"$/.test(v)) v = v.slice(1, -1).replace(/\\n/g, '\n');
+    else if (/^'.*'$/.test(v)) v = v.slice(1, -1);
+    out[m[1]] = v.trim();
   }
   return out;
 }

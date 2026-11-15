@@ -1,0 +1,35 @@
+{"id":"r5-0035","label":"NO","role":"NONE","restriction":"OEM_ONLY","evidence":"RADOME BAND CLAMPS PSC 5985; hardware clamps, not IT equipment; authorized distributor required"}
+{"id":"r5-0036","label":"NO","role":"NONE","restriction":"NONE","evidence":"Shipyard haul-out, blocking and relaunch of USCG 64-foot boat, services"}
+{"id":"r5-0037","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"CIRCUIT CARD ASSEMB PSC 5998 DLA solicitation, manufacturer part number substitution"}
+{"id":"r5-0038","label":"NO","role":"NONE","restriction":"NONE","evidence":"Environmental sampling services for evaluation of dredged material, sources sought"}
+{"id":"r5-0039","label":"NO","role":"NONE","restriction":"NONE","evidence":"Stevedoring and Related Terminal Services at Ashdod and Haifa ports"}
+{"id":"r5-0040","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 5305015099849 SCREW,CAP,SOCKET HEAD Qty 14 EA RFQ"}
+{"id":"r5-0041","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"Emergency temporary mobile oxygen trailer, sole source to Boyer Commercial Construction"}
+{"id":"r5-0042","label":"NO","role":"NONE","restriction":"NONE","evidence":"Security door demo and replacement construction services at NBVC Point Mugu"}
+{"id":"r5-0043","label":"NO","role":"NONE","restriction":"NONE","evidence":"Renovate Wards 2K/2B for Optometry clinic, construction"}
+{"id":"r5-0044","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"PUMP UNIT,ROTARY PSC 4320 DLA solicitation, manufacturer part number"}
+{"id":"r5-0045","label":"NO","role":"NONE","restriction":"NONE","evidence":"Remove and replace chiller in Building 104, construction"}
+{"id":"r5-0046","label":"NO","role":"NONE","restriction":"NONE","evidence":"Denver P&DC roof replacement construction project"}
+{"id":"r5-0047","label":"NO","role":"NONE","restriction":"NONE","evidence":"ELECTRONIC COMPONEN PSC 5998 repair purchase order, not medical supplies"}
+{"id":"r5-0048","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"brand-name WaterLinked Sonar Systems and Doppler Velocity Logs, not valves"}
+{"id":"r5-0049","label":"NO","role":"NONE","restriction":"NONE","evidence":"Correct Storm Water Drainage construction project at Salem VAMC"}
+{"id":"r5-0050","label":"NO","role":"NONE","restriction":"NONE","evidence":"MSG cook food service for Marine Detachment Geneva"}
+{"id":"r5-0051","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"ACCELEROMETER,MECHA PSC 6610 Navy supplies solicitation, FOB destination"}
+{"id":"r5-0052","label":"NO","role":"NONE","restriction":"NONE","evidence":"SERVER,AUTOMATIC DA PSC 7E20 Navy repair purchase order, not medical supplies"}
+{"id":"r5-0053","label":"NO","role":"NONE","restriction":"NONE","evidence":"QUARTERLY SUBSISTENCE Bread for FCI Loretto"}
+{"id":"r5-0054","label":"NO","role":"NONE","restriction":"NONE","evidence":"Removal and disposal of Vertical Tank Storage carousels, service"}
+{"id":"r5-0055","label":"NO","role":"NONE","restriction":"NONE","evidence":"66--INERTIAL MEASURING PSC 6605 navigation instrument, not listed component family"}
+{"id":"r5-0056","label":"NO","role":"NONE","restriction":"NONE","evidence":"Naval architecture and marine engineering services IDIQ, A-E selection"}
+{"id":"r5-0057","label":"FIT","role":"PRIME","restriction":"QPL","evidence":"NSN 4820009950739 VALVE,SAFETY RELIEF; This is a qualified products list (QPL) item"}
+{"id":"r5-0058","label":"NO","role":"NONE","restriction":"NONE","evidence":"TOWED BODY ASSEMBLY PSC 7G20 ADP/special item, not medical supplies"}
+{"id":"r5-0059","label":"NO","role":"NONE","restriction":"NONE","evidence":"KC-46 software integration sustainment RFI, lead system integrator"}
+{"id":"r5-0060","label":"NO","role":"NONE","restriction":"NONE","evidence":"Plant 42 Commercial Internet Services, telecom service"}
+{"id":"r5-0061","label":"NO","role":"NONE","restriction":"NONE","evidence":"Precast single vault toilet purchase and installation"}
+{"id":"r5-0062","label":"NO","role":"NONE","restriction":"NONE","evidence":"Replace Dental Vacuum Piping construction requirement"}
+{"id":"r5-0063","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"MODULE ASSEMBLY,RIM PSC 5998 electronic assembly, MIL-STD-130 marking, DLA solicitation"}
+{"id":"r5-0064","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"MODULE ASSEMBLY,UHF DLA solicitation; electronic assembly with ESD control requirements"}
+{"id":"r5-0065","label":"NO","role":"NONE","restriction":"NONE","evidence":"Deep Pit Furnace complete electric heat treat furnace; valves only internal component"}
+{"id":"r5-0066","label":"NO","role":"NONE","restriction":"NONE","evidence":"Water treatment plant contract operator personnel services"}
+{"id":"r5-0067","label":"NO","role":"NONE","restriction":"NONE","evidence":"Correct Storm Water Drainage construction; valves only mentioned incidentally"}
+{"id":"r5-0068","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 4720-01-385-8066 HOSE ASSEMBLY,METAL manufacture 110 EA per TDP"}
+{"id":"r5-0069","label":"NO","role":"NONE","restriction":"NONE","evidence":"Replace Dental Vacuum Piping construction, SDVOSB set-aside"}

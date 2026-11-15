@@ -1,0 +1,730 @@
+{
+ "labels": {
+  "new_items": 305,
+  "missing": 0,
+  "agree_exact": 299,
+  "agree_relevant": 301
+ },
+ "phrasings": {
+  "parts|short": {
+   "sizes": {
+    "baseline": 81,
+    "step1_3": 1265,
+    "added": 1184,
+    "removed": 0
+   },
+   "added_precision": {
+    "n": 30,
+    "lo": 6,
+    "hi": 7,
+    "ci_lo": [
+     0.1,
+     0.37
+    ],
+    "ci_hi": [
+     0.12,
+     0.41
+    ]
+   },
+   "est_relevant_added": [
+    237,
+    276
+   ],
+   "removed_relevant": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant_rows": []
+  },
+  "parts|long": {
+   "sizes": {
+    "baseline": 1759,
+    "step1_3": 2019,
+    "added": 423,
+    "removed": 163
+   },
+   "added_precision": {
+    "n": 20,
+    "lo": 10,
+    "hi": 10,
+    "ci_lo": [
+     0.3,
+     0.7
+    ],
+    "ci_hi": [
+     0.3,
+     0.7
+    ]
+   },
+   "est_relevant_added": [
+    212,
+    212
+   ],
+   "removed_relevant": {
+    "n": 25,
+    "lo": 11,
+    "hi": 11,
+    "ci_lo": [
+     0.27,
+     0.63
+    ],
+    "ci_hi": [
+     0.27,
+     0.63
+    ]
+   },
+   "est_relevant_removed": [
+    72,
+    72
+   ],
+   "removed_relevant_rows": [
+    {
+     "id": "fe965536149443c8bd48a403a062c486",
+     "labels": [
+      "FIT",
+      "FIT"
+     ]
+    },
+    {
+     "id": "1a15df6e93a542338e599374feab54a2",
+     "labels": [
+      "FIT",
+      "FIT"
+     ]
+    },
+    {
+     "id": "f8a26aa65b304a9b82e5ef5086f0d825",
+     "labels": [
+      "FIT",
+      "FIT"
+     ]
+    },
+    {
+     "id": "9a779cde2b6d4a3798540a7b1a4e6fcb",
+     "labels": [
+      "FIT",
+      "FIT"
+     ]
+    },
+    {
+     "id": "c583486e68354a108768085b37f806ae",
+     "labels": [
+      "FIT",
+      "FIT"
+     ]
+    },
+    {
+     "id": "a9c0266b04a34de697def0965a69d467",
+     "labels": [
+      "FIT",
+      "FIT"
+     ]
+    },
+    {
+     "id": "8be91e001f7b4084b0148dd4415d7321",
+     "labels": [
+      "FIT",
+      "PARTIAL"
+     ]
+    },
+    {
+     "id": "e9593fe32ac74724ad5780fe7d2a55fc",
+     "labels": [
+      "FIT",
+      "FIT"
+     ]
+    },
+    {
+     "id": "aadc7027bb054a49b9d49a53be636308",
+     "labels": [
+      "FIT",
+      "FIT"
+     ]
+    },
+    {
+     "id": "fa2582e7e2bc4ea395e92850134a791a",
+     "labels": [
+      "FIT",
+      "FIT"
+     ]
+    },
+    {
+     "id": "45944e605f994242b53c78215f31a40b",
+     "labels": [
+      "PARTIAL",
+      "FIT"
+     ]
+    }
+   ]
+  },
+  "fasteners|short": {
+   "sizes": {
+    "baseline": 245,
+    "step1_3": 376,
+    "added": 131,
+    "removed": 0
+   },
+   "added_precision": {
+    "n": 30,
+    "lo": 14,
+    "hi": 15,
+    "ci_lo": [
+     0.3,
+     0.64
+    ],
+    "ci_hi": [
+     0.33,
+     0.67
+    ]
+   },
+   "est_relevant_added": [
+    61,
+    66
+   ],
+   "removed_relevant": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant_rows": []
+  },
+  "electrical|long": {
+   "sizes": {
+    "baseline": 916,
+    "step1_3": 898,
+    "added": 0,
+    "removed": 18
+   },
+   "added_precision": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_added": null,
+   "removed_relevant": {
+    "n": 18,
+    "lo": 6,
+    "hi": 6,
+    "ci_lo": [
+     0.16,
+     0.56
+    ],
+    "ci_hi": [
+     0.16,
+     0.56
+    ]
+   },
+   "est_relevant_removed": [
+    6,
+    6
+   ],
+   "removed_relevant_rows": [
+    {
+     "id": "c4b604aba43442e99b8eaea84dc79757",
+     "labels": [
+      "FIT",
+      "FIT"
+     ]
+    },
+    {
+     "id": "e81e13068d3a4f6fa503f544e50b965e",
+     "labels": [
+      "FIT",
+      "FIT"
+     ]
+    },
+    {
+     "id": "9233be3c7a15459a89dcfe09dc875b7f",
+     "labels": [
+      "FIT",
+      "FIT"
+     ]
+    },
+    {
+     "id": "30209f2d9d8c4a3ba9fe59935741c771",
+     "labels": [
+      "PARTIAL",
+      "PARTIAL"
+     ]
+    },
+    {
+     "id": "1a8da10f5276419ca602b00dce067dcc",
+     "labels": [
+      "FIT",
+      "FIT"
+     ]
+    },
+    {
+     "id": "8df12170d0ec45b192ca0dfd1795f396",
+     "labels": [
+      "FIT",
+      "FIT"
+     ]
+    }
+   ]
+  },
+  "valves|short": {
+   "sizes": {
+    "baseline": 43,
+    "step1_3": 768,
+    "added": 725,
+    "removed": 0
+   },
+   "added_precision": {
+    "n": 30,
+    "lo": 19,
+    "hi": 21,
+    "ci_lo": [
+     0.46,
+     0.78
+    ],
+    "ci_hi": [
+     0.52,
+     0.83
+    ]
+   },
+   "est_relevant_added": [
+    459,
+    508
+   ],
+   "removed_relevant": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant_rows": []
+  },
+  "valves|long": {
+   "sizes": {
+    "baseline": 1181,
+    "step1_3": 1263,
+    "added": 82,
+    "removed": 0
+   },
+   "added_precision": {
+    "n": 20,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": [
+     -0.0,
+     0.16
+    ],
+    "ci_hi": [
+     -0.0,
+     0.16
+    ]
+   },
+   "est_relevant_added": [
+    0,
+    0
+   ],
+   "removed_relevant": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant_rows": []
+  },
+  "aircraft|long": {
+   "sizes": {
+    "baseline": 951,
+    "step1_3": 889,
+    "added": 0,
+    "removed": 62
+   },
+   "added_precision": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_added": null,
+   "removed_relevant": {
+    "n": 25,
+    "lo": 0,
+    "hi": 1,
+    "ci_lo": [
+     0.0,
+     0.13
+    ],
+    "ci_hi": [
+     0.01,
+     0.2
+    ]
+   },
+   "est_relevant_removed": [
+    0,
+    2
+   ],
+   "removed_relevant_rows": [
+    {
+     "id": "83eb8ae1faf64e9ba42f961713f940c6",
+     "labels": [
+      "PARTIAL",
+      "NO"
+     ]
+    }
+   ]
+  },
+  "medical|short": {
+   "sizes": {
+    "baseline": 156,
+    "step1_3": 684,
+    "added": 528,
+    "removed": 0
+   },
+   "added_precision": {
+    "n": 30,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": [
+     -0.0,
+     0.11
+    ],
+    "ci_hi": [
+     -0.0,
+     0.11
+    ]
+   },
+   "est_relevant_added": [
+    0,
+    0
+   ],
+   "removed_relevant": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_removed": null,
+   "removed_relevant_rows": []
+  },
+  "medical|long": {
+   "sizes": {
+    "baseline": 1228,
+    "step1_3": 751,
+    "added": 54,
+    "removed": 531
+   },
+   "added_precision": {
+    "n": 20,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": [
+     -0.0,
+     0.16
+    ],
+    "ci_hi": [
+     -0.0,
+     0.16
+    ]
+   },
+   "est_relevant_added": [
+    0,
+    0
+   ],
+   "removed_relevant": {
+    "n": 25,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": [
+     0.0,
+     0.13
+    ],
+    "ci_hi": [
+     0.0,
+     0.13
+    ]
+   },
+   "est_relevant_removed": [
+    0,
+    0
+   ],
+   "removed_relevant_rows": []
+  },
+  "ithardware|short": {
+   "sizes": {
+    "baseline": 467,
+    "step1_3": 425,
+    "added": 0,
+    "removed": 42
+   },
+   "added_precision": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_added": null,
+   "removed_relevant": {
+    "n": 25,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": [
+     0.0,
+     0.13
+    ],
+    "ci_hi": [
+     0.0,
+     0.13
+    ]
+   },
+   "est_relevant_removed": [
+    0,
+    0
+   ],
+   "removed_relevant_rows": []
+  },
+  "ithardware|long": {
+   "sizes": {
+    "baseline": 1501,
+    "step1_3": 1451,
+    "added": 0,
+    "removed": 50
+   },
+   "added_precision": {
+    "n": 0,
+    "lo": 0,
+    "hi": 0,
+    "ci_lo": null,
+    "ci_hi": null
+   },
+   "est_relevant_added": null,
+   "removed_relevant": {
+    "n": 25,
+    "lo": 4,
+    "hi": 4,
+    "ci_lo": [
+     0.06,
+     0.35
+    ],
+    "ci_hi": [
+     0.06,
+     0.35
+    ]
+   },
+   "est_relevant_removed": [
+    8,
+    8
+   ],
+   "removed_relevant_rows": [
+    {
+     "id": "3f1abc6cd10d46bb87695db476c07d57",
+     "labels": [
+      "PARTIAL",
+      "PARTIAL"
+     ]
+    },
+    {
+     "id": "4ed712fb9b2c42c18f7c0c13eab65366",
+     "labels": [
+      "FIT",
+      "FIT"
+     ]
+    },
+    {
+     "id": "51629cc9931f4080bba68e2bb0310ee5",
+     "labels": [
+      "PARTIAL",
+      "PARTIAL"
+     ]
+    },
+    {
+     "id": "ec9153cff9294b378fa1cdbd798d1e20",
+     "labels": [
+      "FIT",
+      "FIT"
+     ]
+    }
+   ]
+  }
+ },
+ "recall": {
+  "janitorial": {
+   "code_floor": {
+    "relevant": 22,
+    "baseline": 14,
+    "step1_3": 14
+   },
+   "known_relevant": {
+    "n": 23,
+    "baseline": 15,
+    "step1_3": 15
+   }
+  },
+  "nursing": {
+   "code_floor": {
+    "relevant": 3,
+    "baseline": 1,
+    "step1_3": 1
+   },
+   "known_relevant": {
+    "n": 6,
+    "baseline": 4,
+    "step1_3": 4
+   }
+  },
+  "hvac": {
+   "code_floor": {
+    "relevant": 16,
+    "baseline": 7,
+    "step1_3": 7
+   },
+   "known_relevant": {
+    "n": 32,
+    "baseline": 23,
+    "step1_3": 23
+   }
+  },
+  "guards": {
+   "code_floor": {
+    "relevant": 9,
+    "baseline": 1,
+    "step1_3": 1
+   },
+   "known_relevant": {
+    "n": 14,
+    "baseline": 6,
+    "step1_3": 6
+   }
+  },
+  "steelbldg": {
+   "code_floor": {
+    "relevant": 7,
+    "baseline": 2,
+    "step1_3": 2
+   },
+   "known_relevant": {
+    "n": 11,
+    "baseline": 5,
+    "step1_3": 5
+   }
+  },
+  "grounds": {
+   "code_floor": {
+    "relevant": 23,
+    "baseline": 5,
+    "step1_3": 5
+   },
+   "known_relevant": {
+    "n": 34,
+    "baseline": 16,
+    "step1_3": 16
+   }
+  },
+  "paving": {
+   "code_floor": {
+    "relevant": 21,
+    "baseline": 16,
+    "step1_3": 16
+   },
+   "known_relevant": {
+    "n": 50,
+    "baseline": 44,
+    "step1_3": 44
+   }
+  },
+  "parts": {
+   "code_floor": {
+    "relevant": 0,
+    "baseline": 0,
+    "step1_3": 0
+   },
+   "known_relevant": {
+    "n": 19,
+    "baseline": 19,
+    "step1_3": 19
+   }
+  },
+  "fasteners": {
+   "code_floor": {
+    "relevant": 25,
+    "baseline": 6,
+    "step1_3": 20
+   },
+   "known_relevant": {
+    "n": 33,
+    "baseline": 14,
+    "step1_3": 28
+   }
+  },
+  "electrical": {
+   "code_floor": {
+    "relevant": 24,
+    "baseline": 2,
+    "step1_3": 2
+   },
+   "known_relevant": {
+    "n": 42,
+    "baseline": 20,
+    "step1_3": 20
+   }
+  },
+  "valves": {
+   "code_floor": {
+    "relevant": 23,
+    "baseline": 0,
+    "step1_3": 18
+   },
+   "known_relevant": {
+    "n": 36,
+    "baseline": 13,
+    "step1_3": 31
+   }
+  },
+  "aircraft": {
+   "code_floor": {
+    "relevant": 21,
+    "baseline": 4,
+    "step1_3": 4
+   },
+   "known_relevant": {
+    "n": 45,
+    "baseline": 28,
+    "step1_3": 28
+   }
+  },
+  "medical": {
+   "code_floor": {
+    "relevant": 24,
+    "baseline": 4,
+    "step1_3": 10
+   },
+   "known_relevant": {
+    "n": 33,
+    "baseline": 13,
+    "step1_3": 19
+   }
+  },
+  "ithardware": {
+   "code_floor": {
+    "relevant": 4,
+    "baseline": 0,
+    "step1_3": 0
+   },
+   "known_relevant": {
+    "n": 7,
+    "baseline": 2,
+    "step1_3": 2
+   }
+  }
+ }
+}

@@ -1,0 +1,35 @@
+{"id":"r5-0210","label":"NO","role":"NONE","restriction":"NONE","evidence":"Industry day for St. Lucie South Jetty Rehabilitation, heavy civil construction"}
+{"id":"r5-0211","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"KIT,CCA,CONROLLER FSC 5998 DLA spare part solicitation by part number"}
+{"id":"r5-0212","label":"NO","role":"NONE","restriction":"NONE","evidence":"59--JUNCTION BOX FSC 5975, not a fastener buy"}
+{"id":"r5-0213","label":"NO","role":"NONE","restriction":"NONE","evidence":"AS27 Base Life Support and Facility Rehabilitation Services, PSC S216"}
+{"id":"r5-0214","label":"NO","role":"NONE","restriction":"NONE","evidence":"BAA for Biomedical Research and Diving Equipment Development, R&D proposals"}
+{"id":"r5-0215","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"TERMINAL,DATA PROCE FSC 7E20; authorized as an approved source"}
+{"id":"r5-0216","label":"NO","role":"NONE","restriction":"NONE","evidence":"Second Quarter Subsistence (Kosher, Meat, Frozen, and Dry) FSC 8945"}
+{"id":"r5-0217","label":"NO","role":"NONE","restriction":"NONE","evidence":"Upgrade Substation Building 2 construction, replace electrical substations at VAMC"}
+{"id":"r5-0218","label":"NO","role":"NONE","restriction":"OEM_ONLY","evidence":"C-130 Aft Emergency Exit Door Assembly; Lockheed escape hatches only approved"}
+{"id":"r5-0219","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"Brand Name Polymedco iFOBT Cost Per Reportable Result lab testing"}
+{"id":"r5-0220","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"48--VALVE,LINEAR,DIRECT FSC 4820 manufacture or refurbishment requirements"}
+{"id":"r5-0221","label":"NO","role":"NONE","restriction":"NONE","evidence":"Wheelchair Van Repair Services sources sought, PSC J025"}
+{"id":"r5-0222","label":"NO","role":"NONE","restriction":"NONE","evidence":"iDBIO MATOC Design Build construction for health facilities, PSC Z2DA"}
+{"id":"r5-0223","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"GOVERNOR,MOTOR FSC 6110 DLA spare part solicitation"}
+{"id":"r5-0224","label":"NO","role":"NONE","restriction":"NONE","evidence":"IDIQ for vessel engineering services, naval architecture, marine engineering A-E"}
+{"id":"r5-0225","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"sole source MyCrashCarts.com software subscription; physical crash carts already purchased"}
+{"id":"r5-0226","label":"NO","role":"NONE","restriction":"NONE","evidence":"HOUSING,LOADER,AFT FSC 1005 gun component, not medical supplies"}
+{"id":"r5-0227","label":"NO","role":"NONE","restriction":"NONE","evidence":"QUARTERLY SUBSISTENCE - Bread for FCI Loretto, FSC 8920"}
+{"id":"r5-0228","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"sole-source regulated natural-gas distribution service to Delta Utilities"}
+{"id":"r5-0229","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5305013289226 SCREW,CLOSE TOLERANCE Qty 200; Approved sources are 06725"}
+{"id":"r5-0230","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"Dell EMC Data Domain Maintenance Renewal, BRAND NAME ONLY, PSC DA10"}
+{"id":"r5-0231","label":"NO","role":"NONE","restriction":"NONE","evidence":"TRANSMITTER,PRESSUR FSC 6685 pressure instrument, not medical supply"}
+{"id":"r5-0232","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"order to GA-ASI for Cloudsurfer pod integration, only one responsible source"}
+{"id":"r5-0233","label":"NO","role":"NONE","restriction":"NONE","evidence":"child care services for USARC Yellow Ribbon Program"}
+{"id":"r5-0234","label":"NO","role":"NONE","restriction":"NONE","evidence":"Correct Storm Water Drainage construction project at Salem VAMC"}
+{"id":"r5-0235","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"NSN 4820014839044 VALVE,Y Qty 26; all responsible sources may submit"}
+{"id":"r5-0236","label":"NO","role":"NONE","restriction":"NONE","evidence":"16--CYLINDER AND VALVE FSC 1660 aircraft equipment, not medical"}
+{"id":"r5-0237","label":"NO","role":"NONE","restriction":"NONE","evidence":"Graphite Furnace Atomic Absorption Spectrometer PSC 6640 lab instrument, not IT"}
+{"id":"r5-0238","label":"NO","role":"NONE","restriction":"NONE","evidence":"Demolish Old Boiler Plant B100 construction at VA Danville"}
+{"id":"r5-0239","label":"NO","role":"NONE","restriction":"NONE","evidence":"BPA for Military and Government Working Dogs, FSC 8820"}
+{"id":"r5-0240","label":"NO","role":"NONE","restriction":"NONE","evidence":"CIRCUIT CARD ASSY FSC 5998 electronic assembly, not medical"}
+{"id":"r5-0241","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 5310007021865 NUT,SELF-LOCKING; source controlled drawing item, approved sources"}
+{"id":"r5-0242","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Socket Head Cap Screws, FSC Code is 5305, small business set-aside"}
+{"id":"r5-0243","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"FILTER ASSEMBLY,FLU FSC 4330 DLA spare part solicitation"}
+{"id":"r5-0244","label":"NO","role":"NONE","restriction":"NONE","evidence":"Design-Build Renovation of Building 164 Outdoor Recreation Center"}

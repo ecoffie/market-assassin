@@ -1,0 +1,35 @@
+{"id":"r5-0245","label":"NO","role":"NONE","restriction":"NONE","evidence":"MODULE ASSEMBLY,RIM: quote a firm fixed price for the full repair"}
+{"id":"r5-0246","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"sole source Life Technologies maintenance and repair of QuantStudio 12K Flex"}
+{"id":"r5-0247","label":"NO","role":"NONE","restriction":"NONE","evidence":"RFI for Thermal Protection Systems for railroad tank cars"}
+{"id":"r5-0248","label":"NO","role":"NONE","restriction":"NONE","evidence":"RF Roof Replacement construction, remove and replace existing built-up roofs"}
+{"id":"r5-0249","label":"NO","role":"NONE","restriction":"OEM_ONLY","evidence":"Air Compressor Maintenance and Repair; vendor must be OEM parts authorized distributor"}
+{"id":"r5-0250","label":"NO","role":"NONE","restriction":"NONE","evidence":"30--CLUTCH ASSY FSC 3010, not a fastener buy"}
+{"id":"r5-0251","label":"NO","role":"NONE","restriction":"NONE","evidence":"USDA Commodity Requirements Corn Products for domestic programs"}
+{"id":"r5-0252","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"Auto Desk AEC Annual Subscription Renewal, manufacturer sole source, authorized distributors"}
+{"id":"r5-0253","label":"NO","role":"NONE","restriction":"NONE","evidence":"Rehabilitate Chalmette National Cemetery construction project specifications"}
+{"id":"r5-0254","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"MOTOR, HYDRAULIC FSC 1650 supply solicitation, total small business set-aside"}
+{"id":"r5-0255","label":"NO","role":"NONE","restriction":"NONE","evidence":"NETSAFA educational and training services task order, PSC U099"}
+{"id":"r5-0256","label":"NO","role":"NONE","restriction":"NONE","evidence":"Preservation, Hull, Mechanical, Electrical Repairs of USS SOMERSET trailerable boats"}
+{"id":"r5-0257","label":"NO","role":"NONE","restriction":"NONE","evidence":"59--JUNCTION BOX FSC 5975, not a fastener buy"}
+{"id":"r5-0258","label":"NO","role":"NONE","restriction":"NONE","evidence":"Replace Flooring RM140 B76 construction at Bath VA Medical Center"}
+{"id":"r5-0259","label":"NO","role":"NONE","restriction":"NONE","evidence":"Automated Blood Culture Analyzers and Bottles for four VA medical centers"}
+{"id":"r5-0260","label":"NO","role":"NONE","restriction":"APPROVED_SOURCE","evidence":"NSN 3040-01-437-5635 Connecting Link Rigid; Approved Source(s) General Electric"}
+{"id":"r5-0261","label":"NO","role":"NONE","restriction":"NONE","evidence":"community-based outpatient substance use disorder and mental health treatment services"}
+{"id":"r5-0262","label":"NO","role":"NONE","restriction":"NONE","evidence":"Closure Protective Covers built to Government Drawings, PSC 1355 torpedo components"}
+{"id":"r5-0263","label":"NO","role":"NONE","restriction":"NONE","evidence":"CIRCUIT BREAKER FSC 5925, not medical supplies"}
+{"id":"r5-0264","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"59--ISBC VME120 FSC 5998 supply, total small business set-aside"}
+{"id":"r5-0265","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 6150-01-657-8209 CABLE ASSEMBLY; ONLY VENDORS from approved sources of supply"}
+{"id":"r5-0266","label":"NO","role":"NONE","restriction":"NONE","evidence":"DISPLAY,SMALL FSC 7E20 FBW SFCC unit, not component line"}
+{"id":"r5-0267","label":"NO","role":"NONE","restriction":"NONE","evidence":"Bread, Dairy, and Egg items delivered to FCC Allenwood"}
+{"id":"r5-0268","label":"NO","role":"NONE","restriction":"NONE","evidence":"RFP for Comprehensive Medical Services at FCI Pekin, PSC Q201"}
+{"id":"r5-0269","label":"NO","role":"NONE","restriction":"NONE","evidence":"59--CIRCUIT CARD ASSEMB, IN REPAIR/MODIFICATION OF, repair contract"}
+{"id":"r5-0270","label":"NO","role":"NONE","restriction":"NONE","evidence":"E-6B Mercury Depot Maintenance Repair and Overhaul RFP, PSC J015"}
+{"id":"r5-0271","label":"NO","role":"NONE","restriction":"NONE","evidence":"Kitchen Exhaust Cleaning, Fire Suppression System and Fire Extinguisher Service"}
+{"id":"r5-0272","label":"NO","role":"NONE","restriction":"NONE","evidence":"36--CANISTER FSC 3655, not a fastener buy"}
+{"id":"r5-0273","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"Lenel OnGuard brand name; contract is for software and programming only"}
+{"id":"r5-0274","label":"NO","role":"NONE","restriction":"NONE","evidence":"construction of new bed tower, clinical expansion, parking garage VA St. Louis"}
+{"id":"r5-0275","label":"NO","role":"NONE","restriction":"NONE","evidence":"RFP for Medical Disability Examinations Next Generation (MDE-NG) services"}
+{"id":"r5-0276","label":"NO","role":"NONE","restriction":"NONE","evidence":"CABLE ASSEMBLY,INTE firm fixed price repair purchase order, not valves"}
+{"id":"r5-0277","label":"NO","role":"NONE","restriction":"NONE","evidence":"48--VALVE REGULATING SY, IN REPAIR/MODIFICATION OF, repair contract"}
+{"id":"r5-0278","label":"FIT","role":"PRIME","restriction":"APPROVED_SOURCE","evidence":"NSN 4820015468284 VALVE,CHECK Qty 12; Approved sources are 91816"}
+{"id":"r5-0279","label":"NO","role":"NONE","restriction":"SOLE_SOURCE","evidence":"sole source PowerScribe 360 post warranty maintenance, software licenses"}
