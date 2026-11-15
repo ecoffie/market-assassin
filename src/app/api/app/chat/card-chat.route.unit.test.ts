@@ -2,8 +2,9 @@
  * Ask Mindy on opportunity cards — the real /api/app/chat handler with services mocked.
  *
  * Pins, end to end through the route: the flag gate, free-vs-Pro access, the record loaded server-side
- * (never from the client), exactly one debit for a successful free card turn, no debit for failures or Pro,
- * and session ownership.
+ * (never from the client), exactly one charge per question for a successful free card turn (through the
+ * turn store: src/lib/chat/card-chat-turns.ts, whose SQL is proven in card-chat-turns.sql.unit.test.ts), no
+ * charge for failures or Pro, free replay of a saved answer, and session ownership.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
@@ -15,14 +16,50 @@ const state: {
   balance: number | null; balanceError: boolean;
   record: Record<string, unknown> | null; recordError: boolean;
   sessions: Record<string, string>;
-  answer: string; answerFails: boolean;
+  answer: string; answerFails: boolean; finishReason: string;
   plannerMessages: Array<Array<{ role: string; content: string }>>;
   answerMessages: Array<Array<{ role: string; content: string }>>;
   inserts: Array<{ table: string; row: Record<string, unknown> }>;
   allowedToolNames: unknown;
 } = {} as never;
 
-const debitCredits = vi.fn(async (_e: string, amount: number) => ({ ok: (state.balance ?? 0) >= amount, newBalance: (state.balance ?? 0) - amount }));
+// In-memory turn store with the SQL functions' semantics (claim / complete = save + debit once / fail).
+type Turn = { user: string; notice: string; q: string; status: 'in_progress' | 'completed' | 'failed'; token: string | null; answer?: string; sources?: unknown[]; session: string | null; charged: number };
+const turns = new Map<string, Turn>();
+let tokenSeq = 0;
+const claimCardTurn = vi.fn(async (p: { turnId: string; email: string; noticeId: string; sessionId: string | null; question: string; replayOnly: boolean }) => {
+  const t = turns.get(p.turnId);
+  if (!t) {
+    if (p.replayOnly) return { outcome: 'not_completed', sessionId: null };
+    const token = `tok-${++tokenSeq}`;
+    turns.set(p.turnId, { user: p.email, notice: p.noticeId, q: p.question, status: 'in_progress', token, session: p.sessionId, charged: 0 });
+    return { outcome: 'claimed', claimToken: token, sessionId: p.sessionId };
+  }
+  if (t.user !== p.email || t.notice !== p.noticeId || t.q !== p.question) return { outcome: 'mismatch', sessionId: null };
+  if (t.status === 'completed') return { outcome: 'completed', answer: t.answer, citedSources: t.sources, sessionId: t.session, creditsCharged: t.charged };
+  if (t.status === 'in_progress') return { outcome: 'in_progress', sessionId: t.session };
+  if (p.replayOnly) return { outcome: 'not_completed', sessionId: t.session };
+  t.status = 'in_progress'; t.token = `tok-${++tokenSeq}`;
+  return { outcome: 'claimed', claimToken: t.token, sessionId: t.session ?? p.sessionId };
+});
+const completeCardTurn = vi.fn(async (p: { turnId: string; claimToken: string; answer: string; citedSources: unknown[]; credits: number }) => {
+  const t = turns.get(p.turnId)!;
+  if (t.status === 'completed') return { outcome: 'already_completed', creditsCharged: t.charged, newBalance: null };
+  if (t.token !== p.claimToken) return { outcome: 'lost_claim', creditsCharged: 0, newBalance: null };
+  let outcome = 'not_billable'; let newBalance: number | null = null;
+  if (p.credits > 0) {
+    const ok = (state.balance ?? 0) >= p.credits;
+    if (ok) state.balance = (state.balance ?? 0) - p.credits;
+    outcome = ok ? 'charged' : 'insufficient_balance'; newBalance = state.balance; t.charged = ok ? p.credits : 0;
+  }
+  Object.assign(t, { status: 'completed', token: null, answer: p.answer, sources: p.citedSources });
+  return { outcome, creditsCharged: t.charged, newBalance };
+});
+const failCardTurn = vi.fn(async (p: { turnId: string; claimToken: string; reason: string }) => {
+  const t = turns.get(p.turnId);
+  if (t && t.status === 'in_progress' && t.token === p.claimToken) { t.status = 'failed'; t.token = null; }
+});
+const charges = () => completeCardTurn.mock.calls.filter(([p]) => p.credits > 0).length;
 
 vi.mock('@/lib/api-auth', () => ({ verifyUserOwnsEmail: async (_r: unknown, email: string) => ({ authenticated: true, email }) }));
 vi.mock('@/lib/access/resolve-access', () => ({ hasProAccess: async () => state.pro }));
@@ -30,7 +67,10 @@ vi.mock('@/lib/proposal/loaders', () => ({ loadBidderProfile: async () => null, 
 vi.mock('@/lib/llm/usage-cost', () => ({ isUserOverBudget: async () => false, recordLlmUsage: async () => {} }));
 vi.mock('@/lib/chat/provider-events', () => ({ recordProviderEvent: async () => {} }));
 vi.mock('@/lib/entitlements/shadow', () => ({ shadowEntitlement: () => {} }));
-vi.mock('@/lib/mcp/credits', () => ({ debitCredits: (...a: [string, number]) => debitCredits(...a) }));
+vi.mock('@/lib/chat/card-chat-turns', async (orig) => ({
+  ...(await orig<object>()),
+  claimCardTurn: (p: never) => claimCardTurn(p), completeCardTurn: (p: never) => completeCardTurn(p), failCardTurn: (p: never) => failCardTurn(p),
+}));
 vi.mock('@/lib/chat/chat-tool-executor', () => ({
   createChatToolExecutor: (opts: { allowedToolNames?: unknown }) => {
     state.allowedToolNames = opts.allowedToolNames ?? null;
@@ -60,7 +100,7 @@ function sseBody(text: string) {
   const enc = new TextEncoder();
   const chunks = [
     `data: ${JSON.stringify({ choices: [{ delta: { content: text }, finish_reason: null }] })}\n\n`,
-    `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 } })}\n\n`,
+    `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: state.finishReason }], usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 } })}\n\n`,
     'data: [DONE]\n\n',
   ];
   return new ReadableStream({ start(c) { for (const ch of chunks) c.enqueue(enc.encode(ch)); c.close(); } });
@@ -75,10 +115,11 @@ beforeEach(() => {
       naics_code: '561720', psc_code: 'S201', posted_date: '2026-11-01', response_deadline: '2026-12-04', pop_city: null, pop_state: 'CA',
       description: 'Provide janitorial services.', sow_text: null, ui_link: 'https://sam.gov/opp/x/view', active: true,
     },
-    recordError: false, sessions: {}, answer: 'The response deadline is 2026-12-04 (SAM.gov notice W912PL26Q0042).', answerFails: false,
+    recordError: false, sessions: {}, answer: 'The response deadline is 2026-12-04 (SAM.gov notice W912PL26Q0042).', answerFails: false, finishReason: 'stop',
     plannerMessages: [], answerMessages: [], inserts: [], allowedToolNames: null,
   });
-  debitCredits.mockClear();
+  turns.clear(); tokenSeq = 0;
+  claimCardTurn.mockClear(); completeCardTurn.mockClear(); failCardTurn.mockClear();
   vi.stubEnv('MAP_CARD_CHAT_ENABLED', 'true');
   vi.stubEnv('GROQ_API_KEY', 'gk'); vi.stubEnv('OPENAI_API_KEY', 'ok');
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://x.supabase.co'); vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'srk');
@@ -110,7 +151,8 @@ async function post(body: Record<string, unknown>) {
   }
   return { res, events };
 }
-const card = { context: { kind: 'opportunity', notice_id: NID } };
+const TURN = '0a0a0a0a-1111-4222-8333-444444444444';
+const card = { context: { kind: 'opportunity', notice_id: NID }, turn_id: TURN };
 
 describe('access', () => {
   it('flag off: a free account with context is refused exactly as before (403 pro_required)', async () => {
@@ -118,7 +160,7 @@ describe('access', () => {
     const { res } = await post(card);
     expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({ error: 'pro_required' });
-    expect(debitCredits).not.toHaveBeenCalled();
+    expect(completeCardTurn).not.toHaveBeenCalled();
   });
   it('free account without a card context: 403 pro_required (general chat stays Pro)', async () => {
     const { res } = await post({});
@@ -147,7 +189,7 @@ describe('access', () => {
 
 describe('context comes from the server record, never the client', () => {
   it('the planner and the answer both receive the record block; client text is not a source', async () => {
-    await post({ context: { kind: 'opportunity', notice_id: NID, title: 'FAKE TITLE', deadline: '2099-01-01' } });
+    await post({ ...card, context: { kind: 'opportunity', notice_id: NID, title: 'FAKE TITLE', deadline: '2099-01-01' } });
     const answerSys = state.answerMessages[0].filter((m) => m.role === 'system').map((m) => m.content).join('\n');
     const plannerSys = state.plannerMessages[0].filter((m) => m.role === 'system').map((m) => m.content).join('\n');
     for (const s of [answerSys, plannerSys]) {
@@ -172,35 +214,118 @@ describe('context comes from the server record, never the client', () => {
 });
 
 describe('credits: exactly once for a successful free card turn, never for failures or Pro', () => {
-  it('successful free card turn → one debit of 10, credits event before done', async () => {
+  it('successful free card turn → saved and charged 10 in one completion, credits event before done', async () => {
     const { events } = await post(card);
-    expect(debitCredits).toHaveBeenCalledTimes(1);
-    expect(debitCredits).toHaveBeenCalledWith(ME, 10, { reason: 'card_chat_turn', toolName: 'ask_mindy_card' });
+    expect(completeCardTurn).toHaveBeenCalledTimes(1);
+    expect(completeCardTurn.mock.calls[0][0]).toMatchObject({ turnId: TURN, credits: 10, answer: expect.stringContaining('2026-12-04') });
+    expect((completeCardTurn.mock.calls[0][0] as { citedSources: Array<{ title: string }> }).citedSources[0].title).toBe('SAM.gov notice W912PL26Q0042');
     const types = events.map((e) => e.type);
     expect(types.indexOf('credits')).toBeGreaterThan(-1);
     expect(types.indexOf('credits')).toBeLessThan(types.indexOf('done'));
     expect(events.find((e) => e.type === 'credits')).toMatchObject({ charged: 10, balance: 90 });
   });
-  it('the model fails to answer → no debit', async () => {
-    state.answerFails = true;
-    await post(card);
-    expect(debitCredits).not.toHaveBeenCalled();
+  it('a billable card question without a turn id is refused before any model call (400)', async () => {
+    const { res } = await post({ context: card.context });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: 'turn_id_required' });
+    expect(fetch).not.toHaveBeenCalled();
   });
-  it('an empty answer → no debit', async () => {
-    state.answer = '';
+  it.each([
+    ['the model fails to answer', () => { state.answerFails = true; }],
+    ['an empty answer', () => { state.answer = ''; }],
+  ])('%s → no charge; the turn is marked failed (free, re-askable)', async (_n, arrange) => {
+    arrange();
     await post(card);
-    expect(debitCredits).not.toHaveBeenCalled();
+    expect(completeCardTurn).not.toHaveBeenCalled();
+    expect(turns.get(TURN)?.status).toBe('failed');
   });
-  it('Pro on a card → answered, never debited', async () => {
+  it('an incomplete (length-cut) answer → no charge', async () => {
+    state.finishReason = 'length';
+    await post(card);
+    expect(completeCardTurn).not.toHaveBeenCalled();
+    expect(failCardTurn.mock.calls[0][0]).toMatchObject({ reason: 'incomplete:length' });
+  });
+  it('Pro on a card → answered and saved for replay, never charged', async () => {
     state.pro = true;
     const { events } = await post(card);
     expect(events.some((e) => e.type === 'token')).toBe(true);
-    expect(debitCredits).not.toHaveBeenCalled();
+    expect(completeCardTurn.mock.calls[0][0]).toMatchObject({ credits: 0 });
+    expect(charges()).toBe(0);
+    expect(events.some((e) => e.type === 'credits')).toBe(false);
   });
-  it('a debit refused by the ledger (race to zero) reports 0 charged and never goes negative', async () => {
-    debitCredits.mockImplementationOnce(async () => ({ ok: false, newBalance: 3 }));
+  it('a debit refused by the ledger (race to zero) reports 0 charged', async () => {
+    completeCardTurn.mockImplementationOnce(async () => ({ outcome: 'insufficient_balance', creditsCharged: 0, newBalance: 3 }));
     const { events } = await post(card);
     expect(events.find((e) => e.type === 'credits')).toMatchObject({ charged: 0, balance: 3 });
+  });
+  it('the turn store is down → 503 before any model call, nothing charged', async () => {
+    claimCardTurn.mockImplementationOnce(async () => { throw new Error('db down'); });
+    const { res } = await post(card);
+    expect(res.status).toBe(503);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it('completion fails (unknown outcome) → reported as nothing charged; the turn is released', async () => {
+    completeCardTurn.mockImplementationOnce(async () => { throw new Error('timeout'); });
+    const { events } = await post(card);
+    expect(events.some((e) => e.type === 'credits')).toBe(false);
+    expect(failCardTurn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('charge once per question: retry, refresh, reopen, duplicates, follow-ups', () => {
+  it('retrying a completed question replays the saved answer: no model call, no charge, no balance check', async () => {
+    const first = await post(card);
+    const firstText = first.events.filter((e) => e.type === 'token').map((e) => e.content).join('');
+    (fetch as unknown as { mockClear: () => void }).mockClear();
+    state.balance = 0; // even with nothing left, the paid answer comes back
+    const again = await post(card);
+    expect(again.res.status).toBe(200);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(again.events.filter((e) => e.type === 'token').map((e) => e.content).join('')).toBe(firstText);
+    expect(again.events.find((e) => e.type === 'citations')).toMatchObject({ sources: [{ title: 'SAM.gov notice W912PL26Q0042' }] });
+    expect(again.events.some((e) => e.type === 'replayed')).toBe(true);
+    expect(again.events.find((e) => e.type === 'session')).toMatchObject({ sessionId: first.events.find((e) => e.type === 'session')!.sessionId });
+    expect(charges()).toBe(1);
+  });
+  it('reopen/refresh probe (replay_only): saved answer if complete, 404 if not, never runs the model', async () => {
+    const none = await post({ ...card, replay_only: true });
+    expect(none.res.status).toBe(404);
+    expect(await none.res.json()).toMatchObject({ error: 'turn_not_completed' });
+    expect(fetch).not.toHaveBeenCalled();
+    await post(card);
+    (fetch as unknown as { mockClear: () => void }).mockClear();
+    const replay = await post({ ...card, replay_only: true });
+    expect(replay.events.some((e) => e.type === 'replayed')).toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(charges()).toBe(1);
+  });
+  it('a duplicate while the first is still answering → 409 turn_in_progress, no model call', async () => {
+    turns.set(TURN, { user: ME, notice: NID, q: 'When is it due?', status: 'in_progress', token: 'other', session: null, charged: 0 });
+    const { res } = await post(card);
+    expect(res.status).toBe(409);
+    expect(res.headers.get('retry-after')).toBe('3');
+    expect(await res.json()).toMatchObject({ error: 'turn_in_progress' });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it('the same turn id with a different question is refused (409), never answered with the other answer', async () => {
+    await post(card);
+    const { res } = await post({ ...card, message: 'Who is the contracting officer?' });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: 'turn_mismatch' });
+  });
+  it('a genuine follow-up (new turn id) is a new billable turn', async () => {
+    await post(card);
+    await post({ ...card, turn_id: '0b0b0b0b-1111-4222-8333-444444444444', message: 'Is it set aside?' });
+    expect(charges()).toBe(2);
+    expect(state.balance).toBe(80);
+  });
+  it('a failed turn retried with the same id runs again and is charged once', async () => {
+    state.answerFails = true;
+    await post(card);
+    state.answerFails = false;
+    const { events } = await post(card);
+    expect(events.find((e) => e.type === 'credits')).toMatchObject({ charged: 10 });
+    expect(charges()).toBe(1);
   });
 });
 
@@ -227,34 +352,47 @@ describe('conversation continuity and ownership', () => {
 });
 
 describe('no duplicate charge on a dropped connection', () => {
-  it('the browser disconnects mid-answer → the turn is not charged (so a retry costs once)', async () => {
+  async function open(signal?: AbortSignal) {
     vi.resetModules();
     const { POST } = await import('./route');
-    const req = new Request('https://getmindy.ai/api/app/chat', { method: 'POST', body: JSON.stringify({ email: ME, message: 'When is it due?', ...card }) });
-    const res = await POST(req as never);
+    const req = new Request('https://getmindy.ai/api/app/chat', { method: 'POST', ...(signal ? { signal } : {}), body: JSON.stringify({ email: ME, message: 'When is it due?', ...card }) });
+    return POST(req as never);
+  }
+  it('the browser disconnects before the answer completes → not charged, turn released (a retry costs once)', async () => {
+    const res = await open();
     const reader = res.body!.getReader();
     await reader.read();            // the session event arrives
     await reader.cancel();          // the visitor's connection drops
     await new Promise((r) => setTimeout(r, 30));
-    expect(debitCredits).not.toHaveBeenCalled();
+    expect(charges()).toBe(0);
+    expect(turns.get(TURN)?.status).toBe('failed');
   });
   it('production case: the request is aborted while the stream keeps being read → not charged', async () => {
     // On Vercel (2026-11-14) a closed browser did not make enqueue throw; the response stream kept
-    // being drained and only the request signal reported the disconnect. That turn was charged.
-    vi.resetModules();
-    const { POST } = await import('./route');
+    // being drained and only the request signal reported the disconnect.
     const ac = new AbortController();
-    const req = new Request('https://getmindy.ai/api/app/chat', { method: 'POST', signal: ac.signal, body: JSON.stringify({ email: ME, message: 'When is it due?', ...card }) });
-    const res = await POST(req as never);
+    const res = await open(ac.signal);
     const reader = res.body!.getReader();
     await reader.read();            // the session event arrives
     ac.abort();                     // the visitor's connection drops; the platform keeps reading
     for (;;) { const { done } = await reader.read(); if (done) break; }
     await new Promise((r) => setTimeout(r, 30));
-    expect(debitCredits).not.toHaveBeenCalled();
+    expect(charges()).toBe(0);
   });
-  it('a retry after the drop is charged exactly once', async () => {
+  it('the disconnect is not detected and the answer completes → charged once, saved; the reopen replays it free', async () => {
+    await post(card);                                 // completed server-side; assume the browser never saw it
+    expect(charges()).toBe(1);
+    const reopen = await post({ ...card, replay_only: true });
+    expect(reopen.events.some((e) => e.type === 'replayed')).toBe(true);
+    expect(charges()).toBe(1);
+  });
+  it('a retry after a dropped connection is charged exactly once', async () => {
+    const res = await open();
+    const reader = res.body!.getReader();
+    await reader.read(); await reader.cancel();
+    await new Promise((r) => setTimeout(r, 30));
     await post(card);
-    expect(debitCredits).toHaveBeenCalledTimes(1);
+    await post(card);                                 // and again: a replay
+    expect(charges()).toBe(1);
   });
 });

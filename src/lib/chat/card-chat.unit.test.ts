@@ -72,8 +72,8 @@ describe('isBillableTurn — only successful answers with live data cost credits
     ['provider error', { finishReason: 'error' }],
     ['content filter', { finishReason: 'content_filter' }],
   ])('%s → free', (_n, patch) => { expect(isBillableTurn({ ...ok, ...patch })).toBe(false); });
-  it('a length-truncated answer still delivered text and is billable', () => {
-    expect(isBillableTurn({ ...ok, finishReason: 'length' })).toBe(true);
+  it.each([['length'], [null]])('an incomplete answer (finish %s) is free (approved rule 2026-11-14)', (fr) => {
+    expect(isBillableTurn({ ...ok, finishReason: fr })).toBe(false);
   });
 });
 
