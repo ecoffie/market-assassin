@@ -1,5 +1,5 @@
 import json,csv,os,re,html
-B='/Users/ericcoffie/Market Assasin/market-assassin/.claude/worktrees/data-core-benchmark/docs/benchmarks/data-core-hidden-opportunity-v1'
+B=os.environ.get('MINDY_BENCH_DIR') or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # benchmark root, relative to this script
 N={json.loads(l)['notice_id']:json.loads(l) for l in open(B+'/notices.jsonl')}
 rows=list(csv.DictReader(open(B+'/review/review_sheet.csv')))
 order={'gate-unseen':0,'recovered':1,'random':2}

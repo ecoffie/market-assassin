@@ -1,7 +1,7 @@
 import fs from 'fs';
-const MA='/Users/ericcoffie/Market Assasin/market-assassin';
-const env = Object.fromEntries(fs.readFileSync(MA+'/.env.local','utf8').split('\n').filter(l=>/^[A-Z_]+=/.test(l)).map(l=>{const i=l.indexOf('=');return [l.slice(0,i), l.slice(i+1).replace(/^"|"$/g,'')]}));
-for (const k of ['NEXT_PUBLIC_SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY']) process.env[k]=env[k];
+const { loadBenchEnv, exportToProcess } = await import(new URL('./bench-env.mts', import.meta.url).href); // runtime-resolved: portable, and outside tsc's import rules
+const env = loadBenchEnv(['NEXT_PUBLIC_SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'], process.cwd());
+exportToProcess(env, ['NEXT_PUBLIC_SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY']);
 const WT=process.cwd();
 const { findOpportunities } = await import(WT+'/src/lib/opportunities/find-opportunities.ts');
 const { matchesText } = await import(WT+'/src/lib/discovery/matcher.ts');

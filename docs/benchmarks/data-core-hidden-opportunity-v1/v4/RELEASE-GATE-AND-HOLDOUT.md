@@ -133,12 +133,11 @@ For each business and each variant: top-20 relevant (FIT+PARTIAL and FIT-only) w
 precision of the full matched set, relevant rows lost versus production, off-code relevant notices found, DIRECT precision and recall
 (classification), and product restrictions. Gate verdict per leg, **pass/fail named per business**, then pooled.
 
-### 2.7 Before Snapshot 1 (owner)
+### 2.7 Before Snapshot 1 (owner). Reviewer plan: `HOLDOUT-REVIEWER-PLAN.md`; missed-notice handoff: `HANDOFF-TO-AGENT3-MISSED-NOTICES.md`
 
 - [ ] Agent 3 names the candidate SHA (Agent 3)
 - [ ] An independent human reviewer is named, plus a second for the 15% overlap (Eric)
-- [ ] `harness_r4.mts` reads `.env.local` from a hardcoded MacBook path (`/Users/ericcoffie/Market Assasin/market-assassin`).
-  Point it at the Studio checkout's env, and add the post-freeze pool filter (Agent 4, offline)
+- [x] Harness made portable: no machine path; credentials via `scripts/bench-env.mts` (fails closed). See `ENVIRONMENT.md` (2026-11-14, after acceptance)
 - [ ] The Studio checkout `/Users/ericcoffie/mindy-studio` has no `.env.local` and no `node_modules`. Today's read-only counts
   borrowed `~/Projects/market-assassin/.env.local`. Provision the Studio env with `npm run env:link-worktree` (Eric/infra)
 - [ ] The query-vector cache (`vcache_v4.json`) and the 120 MB corpus capture stayed on the MacBook and were never committed. Re-embedding the 14 phrasings is 14 calls, within the approved embedding budget

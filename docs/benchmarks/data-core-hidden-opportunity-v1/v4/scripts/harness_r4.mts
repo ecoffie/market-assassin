@@ -1,9 +1,10 @@
 // A4 round 4 (read-only): production FIND Open capture + in-memory retrieval emulation over the full open SAM.gov corpus,
 // validated against production; then Fix A (org-name masking, no department text recall) and Fix A+B (guard phrase).
 import fs from 'fs';
-const MA='/Users/ericcoffie/Market Assasin/market-assassin';
-const env = Object.fromEntries(fs.readFileSync(MA+'/.env.local','utf8').split('\n').filter(l=>/^[A-Z_]+=/.test(l)).map(l=>{const i=l.indexOf('=');return [l.slice(0,i), l.slice(i+1).replace(/^"|"$/g,'')]}));
-for (const k of ['NEXT_PUBLIC_SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','OPENAI_API_KEY']) process.env[k]=env[k];
+const { loadBenchEnv, exportToProcess } = await import(new URL('./bench-env.mts', import.meta.url).href); // runtime-resolved: portable, and outside tsc's import rules
+// Credentials: see ENVIRONMENT.md. Run from the evaluation worktree (cwd = the checkout whose src/ is evaluated).
+const env = loadBenchEnv(['NEXT_PUBLIC_SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'], process.cwd(), ['OPENAI_API_KEY']);
+exportToProcess(env, ['NEXT_PUBLIC_SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','OPENAI_API_KEY']);
 const WT=process.cwd(); const OUT=process.argv[2];
 const { findOpportunities, labelOpenRow } = await import(WT+'/src/lib/opportunities/find-opportunities.ts');
 const { matchesText } = await import(WT+'/src/lib/discovery/matcher.ts');
@@ -16,9 +17,10 @@ const { embedText } = await import(WT+'/src/lib/market/embeddings.ts');
 const { createClient } = await import(WT+'/node_modules/@supabase/supabase-js/dist/index.mjs');
 const sb = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {auth:{persistSession:false}});
 const Q = JSON.parse(fs.readFileSync(OUT+'/queries_v4.json','utf8'));
+if(!fs.existsSync(OUT+'/a3_matched_sets.json')) throw new Error('a3_matched_sets.json missing in '+OUT+': copy Agent 3\'s committed matched-sets file (org_names + sets) there first');
 const A3 = JSON.parse(fs.readFileSync(OUT+'/a3_matched_sets.json','utf8'));
 // 1. query vectors (cached; new phrasings embedded once)
-const vcPath=OUT+'/vcache_v4.json'; const old=JSON.parse(fs.readFileSync(OUT+'/../vcache.json','utf8'));
+const vcPath=OUT+'/vcache_v4.json'; const old=fs.existsSync(OUT+'/../vcache.json')? JSON.parse(fs.readFileSync(OUT+'/../vcache.json','utf8')) : {};
 const vc:Record<string,number[]> = fs.existsSync(vcPath)? JSON.parse(fs.readFileSync(vcPath,'utf8')) : {};
 let embedded=0;
 for (const b of Object.keys(Q)) for (const q of Q[b].q) { if (vc[q]) continue; if (old[q]) { vc[q]=old[q]; continue; } vc[q]=await embedText(q); embedded++; }
