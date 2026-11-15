@@ -116,7 +116,34 @@ export interface SolicitationIncumbentResult {
     notice_ids?: string[];
     incumbent_certainty?: IncumbentCertainty;
     incumbent_reason?: string;
+    /** What the incumbent lookup established. Only 'identified' names an incumbent. */
+    incumbent_finding: IncumbentFinding;
+    /** Present whenever no incumbent is identified: what that does and does not mean. */
+    absence_note?: string;
   };
+}
+
+/**
+ * The incumbent lookup's outcome, machine-readable and always present (MCP and Ask Mindy).
+ *
+ * 'not_found' is a SEARCH result, not a fact about the contract: a production answer turned "no prior
+ * awards reported" into "it appears there is no incumbent at this time" (2026-11-15 smoke). Work can be
+ * new, or the predecessor can be recorded under another number, title or code. Never state absence.
+ */
+export type IncumbentFinding = 'identified' | 'candidate_not_confirmed' | 'not_found' | 'search_failed' | 'notice_not_found';
+
+export const INCUMBENT_ABSENCE_NOTES: Record<Exclude<IncumbentFinding, 'identified'>, string> = {
+  candidate_not_confirmed: 'A prior award looks similar but the evidence does not identify it as the incumbent. Say the incumbent could not be confirmed; do not name the candidate as the incumbent, and do not say there is no incumbent.',
+  not_found: 'No prior award was found on USASpending for this solicitation. That is a search result, not proof there is no incumbent: the work may be new, or the predecessor contract may be recorded under another number, title or code. Say Mindy could not identify an incumbent; never say there is no incumbent or that the work is new.',
+  search_failed: 'The prior-award search failed, so whether there is an incumbent is unknown. Say the lookup was unavailable; never say there is no incumbent.',
+  notice_not_found: 'The solicitation itself was not found, so no incumbent could be looked up. Never say there is no incumbent.',
+};
+
+export function incumbentFinding(p: { noticeFound: boolean; degraded: boolean; grounded: boolean; candidate: boolean }): IncumbentFinding {
+  if (p.grounded) return 'identified';
+  if (!p.noticeFound) return p.degraded ? 'search_failed' : 'notice_not_found';
+  if (p.candidate) return 'candidate_not_confirmed';
+  return p.degraded ? 'search_failed' : 'not_found';
 }
 
 function isUuid(s: string): boolean {
@@ -776,6 +803,11 @@ export async function resolveSolicitationIncumbent(query: string): Promise<Solic
       notice_ids: notice?.notice_ids,
       incumbent_certainty: grounding.certainty,
       incumbent_reason: grounding.reason,
+      ...findingMeta(incumbentFinding({ noticeFound: !!notice, degraded: noticeDegraded || predDegraded, grounded: grounding.grounded, candidate: !!incumbent })),
     },
   };
+}
+
+function findingMeta(finding: IncumbentFinding): { incumbent_finding: IncumbentFinding; absence_note?: string } {
+  return finding === 'identified' ? { incumbent_finding: finding } : { incumbent_finding: finding, absence_note: INCUMBENT_ABSENCE_NOTES[finding] };
 }

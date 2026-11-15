@@ -10,6 +10,7 @@
 import {
   resolveSolicitationIncumbent,
   type SolicitationIncumbentResult,
+  INCUMBENT_ABSENCE_NOTES,
 } from '@/lib/usaspending/solicitation-incumbent';
 import { solicitationStatusLabel } from '@/lib/sam/resolve-solicitation';
 import { mcpFlags } from '@/lib/mcp/flags';
@@ -41,6 +42,8 @@ export async function getSolicitationIncumbent(
         grounded_incumbent: false,
         degraded: false,
         notice_source: null,
+        incumbent_finding: 'notice_not_found',
+        absence_note: INCUMBENT_ABSENCE_NOTES.notice_not_found,
       },
     };
   }
