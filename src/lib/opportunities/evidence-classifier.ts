@@ -32,7 +32,7 @@ import { conceptHit, phraseRegex, jsRegex, framedVerbs, type Alternative, type C
 export type EvidenceCls = 'DIRECT_MATCH' | 'RELATED_MARKET_CANDIDATE' | 'WEAK_NON_MARKET';
 export type EvidenceBasis =
   | 'title_item' | 'own_trade_code' | 'description_only' | 'product_code_only' | 'related_family_code'
-  | 'boilerplate_only' | 'agency_or_program_name' | 'repair_notice_for_parts' | 'no_evidence' | 'single_list_word';
+  | 'boilerplate_only' | 'agency_or_program_name' | 'repair_notice_for_parts' | 'no_evidence' | 'single_list_word' | 'modifier_words_only';
 export interface EvidenceVerdict { cls: EvidenceCls; basis: EvidenceBasis }
 
 /**
@@ -124,7 +124,9 @@ function vocabHit(cap: CapabilityInterpretation, text: string): boolean {
  * Short queries and trade presets are untouched (trades already require their own vocabulary or code).
  */
 export const LIST_QUERY_WORDS = 15;
-const MODIFIER_CLAUSE = /\b(?:for|to|in\s+support\s+of|used\s+(?:in|on|by))\b([^.:;]*)/gi;
+// "in" / "at" name WHERE the work happens ("staff in hospitals, clinics and medical facilities", "at federal facilities"),
+// except after verbs/nouns that take "in" as their object ("specialize in", "experience in", "expertise in").
+const MODIFIER_CLAUSE = /\b(?:for|to|in\s+support\s+of|used\s+(?:in|on|by)|(?<!\b(?:specializ\w*|speciali[sz]e|experience[ds]?|expertise|expert|experts|engaged|involved|work|working|works|business|interested|focus|focused|focuses|certified|trained|skilled|leader|leaders)\s)(?:in|at))\b([^.:;]*)/gi;
 const SUPPLIER_ROLE = /\b(supplier|distributor|reseller|vendor|dealer|wholesaler)s?\b/i;
 /** "provide" / "offer" frame services as often as goods ("we provide janitorial services"), so they never mark a supplier. */
 const GOODS_VERBS = new Set(['supply', 'supplies', 'sell', 'sells', 'resell', 'resells', 'distribute', 'distributes', 'furnish', 'furnishes', 'source', 'sources', 'deliver', 'delivers']);
@@ -155,6 +157,24 @@ function familyAgrees(psc: string, query: string, cap: CapabilityInterpretation)
   const supplier = [...framedVerbs(query)].some((v) => GOODS_VERBS.has(v)) || SUPPLIER_ROLE.test(query);
   return supplier ? /^\d/.test(psc) : /^[A-Z]/i.test(psc);
 }
+/**
+ * N2 (Agent 3, 2026-11-15; nursing diagnosis + Agent 4 v7: nursing long 5/12 relevant reach the top 20). In a long
+ * description, words that appear only in a "for … / to … / in … / at …" clause say WHERE or FOR WHOM the work is done
+ * ("clinical staff in hospitals, clinics and medical facilities"), not what is sold. Text evidence made ONLY of such
+ * words is not evidence of the business: soil disposal, solar-panel maintenance and Lean consulting at a hospital were
+ * RELATED for a nurse-staffing firm and filled ranks 4-20. Such a row is NOT RELEVANT (kept, shown last, with a reason).
+ */
+const longQuery = (plan: DiscoveryPlan, residual: string) => String(plan.raw || residual || '').trim().split(/\s+/).length > LIST_QUERY_WORDS;
+function modifierWordsOnly(plan: DiscoveryPlan, cap: CapabilityInterpretation, residual: string, text: string): boolean {
+  const query = String(plan.raw || residual || '');
+  if (query.trim().split(/\s+/).length <= LIST_QUERY_WORDS || !text.trim() || vocabHit(cap, text)) return false;
+  const concepts = queryConcepts(plan);
+  const mods = modifierLabels(query, concepts);
+  if (!mods.size) return false;
+  const hits = concepts.filter((c) => conceptHit(c, text));
+  return hits.length > 0 && hits.every((c) => mods.has(c.label));
+}
+
 /** null = the guard does not apply; otherwise the verdict that replaces DIRECT. */
 function longListGuard(row: Record<string, unknown>, plan: DiscoveryPlan, cap: CapabilityInterpretation, residual: string, head: string): EvidenceVerdict | null {
   // Sentence structure ("for …" clauses, subject verbs) is read from the query AS TYPED: the residual has its periods and
@@ -216,13 +236,19 @@ export function classifyOpenEvidence(
   }
   // A trade search whose only title evidence is the customer's generic word ("clean" in "grease trap cleaning",
   // "guards" in "Coast Guard ...") is RELATED, not DIRECT: the trade's own vocabulary or code must appear.
-  if (trades.length && customerHit(plan, head)) return { cls: 'RELATED_MARKET_CANDIDATE', basis: 'description_only' };
+  if (trades.length && customerHit(plan, head) && !modifierWordsOnly(plan, cap, query, head)) return { cls: 'RELATED_MARKET_CANDIDATE', basis: 'description_only' };
   // product code with no item evidence
   if (codeIn(cap.related_market?.psc || [], psc)) return { cls: 'RELATED_MARKET_CANDIDATE', basis: 'product_code_only' };
   if (cap.related_market && codeIn(cap.related_market.naics, row.naics_code)) return { cls: 'RELATED_MARKET_CANDIDATE', basis: 'related_family_code' };
   // 2 · requirement text
   const inDesc = customerHit(plan, `${fullTitle} \n ${desc}`) || vocabHit(cap, `${fullTitle} \n ${desc}`);
   if (inDesc) {
+    if (modifierWordsOnly(plan, cap, query, `${fullTitle} \n ${desc}`)) return { cls: 'WEAK_NON_MARKET', basis: 'modifier_words_only' };
+    // N2b: a trade, a long description, and requirement text that never uses the trade's own vocabulary: the shared words
+    // are the generic ones every notice in that sector carries ("healthcare", "clinical", "medical" in VA boilerplate).
+    if (trades.length && longQuery(plan, query) && (cap.direct.vocab || []).length && !vocabHit(cap, `${fullTitle} \n ${desc}`)) {
+      return { cls: 'WEAK_NON_MARKET', basis: 'modifier_words_only' };
+    }
     if (products.length && productNotice) return { cls: 'WEAK_NON_MARKET', basis: 'boilerplate_only' };
     return { cls: 'RELATED_MARKET_CANDIDATE', basis: 'description_only' };
   }

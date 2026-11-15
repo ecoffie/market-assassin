@@ -45,6 +45,8 @@ export type MatchBasis =
   | 'no_evidence'
   /** Long-list guard (2026-11-15): one list word in the title, but the notice's code family is not the business's (RELATED). */
   | 'single_list_word'
+  /** N2 (2026-11-15): the text shares only where / for-whom words with a long description (NOT RELEVANT). */
+  | 'modifier_words_only'
   | CompanyRecallBasis;
 
 /** Coming back classes: the two FIND evidence classes + the holder-name signal. */
@@ -168,7 +170,8 @@ export function singleListWordWhy(phrase: string, row: { psc_code?: string | nul
   return `Related to “${phrase}”: the title shares a word with your description, but what is being bought${code} is a different kind of product or service. Check it before treating it as your work.`;
 }
 
-export function notRelevantWhy(phrase: string, basis: 'boilerplate_only' | 'agency_or_program_name' | 'repair_notice_for_parts' | 'no_evidence'): string {
+export function notRelevantWhy(phrase: string, basis: 'boilerplate_only' | 'agency_or_program_name' | 'repair_notice_for_parts' | 'no_evidence' | 'modifier_words_only'): string {
+  if (basis === 'modifier_words_only') return `Probably not a fit for “${phrase}”: the notice shares only where-or-for-whom words with your description (for example the kind of facility), not the work itself.`;
   if (basis === 'repair_notice_for_parts') return `Probably not a fit for “${phrase}”: this notice buys a repair or overhaul, not the part. It matters only if you also do repair work.`;
   if (basis === 'boilerplate_only') return `Probably not a fit for “${phrase}”: the item bought is something else; the words appear only in standard contract terms.`;
   if (basis === 'agency_or_program_name') return `Probably not a fit for “${phrase}”: the words appear only in an agency or program name, not in what is being bought.`;

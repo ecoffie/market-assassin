@@ -788,6 +788,7 @@ const EVIDENCE_TO_BASIS: Record<EvidenceBasis, MatchBasis> = {
   repair_notice_for_parts: 'repair_notice_for_parts',
   no_evidence: 'no_evidence',
   single_list_word: 'single_list_word',
+  modifier_words_only: 'modifier_words_only',
 };
 
 function legacyOpenLabel(
@@ -831,7 +832,7 @@ function openWhy(label: OpenLabel, phrase: string, row: Record<string, unknown>)
   if (label.basis[0] === 'description_text') return descriptionOnlyWhy(phrase);
   if (label.basis[0] === 'single_list_word') return singleListWordWhy(phrase, row as { psc_code?: string });
   if (label.basis[0] === 'boilerplate_only' || label.basis[0] === 'agency_or_program_name'
-    || label.basis[0] === 'repair_notice_for_parts' || label.basis[0] === 'no_evidence') return notRelevantWhy(phrase, label.basis[0]);
+    || label.basis[0] === 'repair_notice_for_parts' || label.basis[0] === 'no_evidence' || label.basis[0] === 'modifier_words_only') return notRelevantWhy(phrase, label.basis[0]);
   const company = label.basis.find((b) => b === 'company_registered_psc' || b === 'company_registered_naics') as
     | 'company_registered_psc' | 'company_registered_naics' | undefined;
   if (label.cls === 'WEAK_NON_MARKET' && company) return companyCodeWhy(company, row as { naics_code?: string; psc_code?: string });
