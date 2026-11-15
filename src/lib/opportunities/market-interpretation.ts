@@ -47,6 +47,8 @@ export interface CapabilityInterpretation {
   direct: TaxonomyPin;
   related_market: TaxonomyPin | null;
   excluded: Array<{ phrase: string; reason: string }>;
+  /** Which trade / product presets produced this interpretation (RC2 evidence classifier reads it). Absent otherwise. */
+  codePresets?: { trades: string[]; products: string[] };
 }
 
 export interface MarketInterpretation {
@@ -303,6 +305,14 @@ export const PRODUCT_PRESETS: CodePreset[] = [
     vocab: ['airframe', 'landing gear', 'aircraft'],
   },
   {
+    // Pharmaceuticals ONLY when the customer explicitly sells / distributes / supplies them (Eric, 2026-11-14). A generic
+    // "medical supplies" search never reaches FSC 6505. "drug testing" or "drug-free workplace" do not match.
+    id: 'pharmaceuticals', label: 'Pharmaceuticals',
+    match: /\b(?:sell|sells|supply|supplies|distribute|distributes|distributor\s+of|provide|provides|wholesale\w*|source)\b[^.]{0,40}?\b(?:pharmaceuticals?|drugs|medications?|medicines)\b|\b(?:pharmaceutical|drug|medication)\s+(?:distributor|supplier|wholesaler)s?\b/i,
+    naics: [], psc: ['6505'],
+    vocab: ['pharmaceutical', 'pharmaceuticals', 'injector', 'tablets', 'capsules'],
+  },
+  {
     id: 'medical_supplies', label: 'Medical, dental and laboratory supplies',
     match: /\b(?:medical|surgical|dental|laboratory|lab)\b[^.]{0,40}\b(?:supplies|consumables)\b/i,
     naics: [], psc: ['6510', '6515', '6520', '6532', '6540', '6545', '6550', '6640'],
@@ -351,6 +361,7 @@ function codePresetInterpretation(
       }
       : null,
     excluded,
+    codePresets: { trades: trades.map((t) => t.id), products: products.map((p) => p.id) },
   };
 }
 
