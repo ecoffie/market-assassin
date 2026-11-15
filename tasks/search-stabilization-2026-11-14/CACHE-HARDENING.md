@@ -61,10 +61,11 @@ equals the real `find_opportunities` path (route parity 28/28), so the snapshot 
 SQL on every benchmark query.
 
 **Local cost (laptop proxy, NOT the Vercel number for #7):**
-- snapshot file: 9,701 rows, 20.5 MB gzipped;
-- writer serialize + sha256: about 1.2 s;
-- reader gunzip + parse + verify: about 0.36 s;
-- **heap +375 MB** for the parsed rows.
+Rows are projected to `SNAPSHOT_COLS`, two runs each:
+- snapshot file: 9,701 rows, 20.4 MB gzipped;
+- writer serialize + sha256: about 1.5 s;
+- reader gunzip + parse + verify: about 0.4 s;
+- **heap +371–372 MB** for the parsed rows (the verify step's JSON re-stringify included).
 
 **The heap is the risk to measure first on a preview.** On a 1 GB function, the snapshot alone would take over a third of
 memory. Options to measure before the flag:

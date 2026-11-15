@@ -7,7 +7,7 @@
 import fs from 'fs';
 import { buildDiscoveryPlan } from '@/lib/discovery/plan';
 import { MCP_POLICY } from '@/lib/discovery/policy';
-import { compileOps } from '@/lib/opportunities/open-cache';
+import { compileOps, SNAPSHOT_COLS } from '@/lib/opportunities/open-cache';
 import { serializeOpenSnapshot, parseOpenSnapshot } from '@/lib/opportunities/open-snapshot-store';
 const [corpusP, phrP, runP, today] = process.argv.slice(2);
 globalThis.fetch = (() => { throw new Error('network disabled'); }) as never;
@@ -35,7 +35,8 @@ for (const r of runner.results) {
   console.log(`${(r.business + '#' + r.phrasing).padEnd(14)} runner ${String(exp.length).padStart(5)} cache ${String(ids?.length ?? '-').padStart(5)} ${ok ? 'SAME' : why ? 'UNCACHEABLE ' + why : `DIFF +${extra} -${missing}`}`);
 }
 console.log(`\nparity ${same}/${runner.results.length} (uncacheable ${uncacheable})`);
-const t0 = performance.now(); const snap = { builtAt: new Date().toISOString(), count: rows.length, rows: rows as never };
+const proj = rows.map((x) => Object.fromEntries(SNAPSHOT_COLS.map((c) => [c, (x[c] ?? null) as string | null])));
+const t0 = performance.now(); const snap = { builtAt: new Date().toISOString(), count: proj.length, rows: proj as never };
 const { bytes } = serializeOpenSnapshot(snap); const t1 = performance.now();
 if (global.gc) global.gc(); const h0 = process.memoryUsage().heapUsed;
 const back = parseOpenSnapshot(bytes); const t2 = performance.now(); const h1 = process.memoryUsage().heapUsed;
