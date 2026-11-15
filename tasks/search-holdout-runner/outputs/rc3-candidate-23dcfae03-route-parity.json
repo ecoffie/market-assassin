@@ -1,0 +1,625 @@
+{
+ "src": {
+  "commit": "23dcfae03b8016a9eb3047bf70cfaf744c9595f3"
+ },
+ "cutoff": "2026-11-15T00:52:58.895Z",
+ "rows_open_at_cutoff": 9701,
+ "results": [
+  {
+   "business": "janitorial",
+   "phrasing": 0,
+   "status": "grounded",
+   "route_count": 1216,
+   "runner_matched": 1216,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 500,
+   "window_sizes": [
+    500,
+    500
+   ],
+   "code_window": [
+    0,
+    0
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "janitorial",
+   "phrasing": 1,
+   "status": "grounded",
+   "route_count": 567,
+   "runner_matched": 567,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 500,
+   "window_sizes": [
+    500,
+    500
+   ],
+   "code_window": [
+    0,
+    0
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "nursing",
+   "phrasing": 0,
+   "status": "grounded",
+   "route_count": 58,
+   "runner_matched": 58,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 58,
+   "window_sizes": [
+    58,
+    58
+   ],
+   "code_window": [
+    0,
+    0
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "nursing",
+   "phrasing": 1,
+   "status": "grounded",
+   "route_count": 350,
+   "runner_matched": 350,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 350,
+   "window_sizes": [
+    350,
+    350
+   ],
+   "code_window": [
+    0,
+    0
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "hvac",
+   "phrasing": 0,
+   "status": "grounded",
+   "route_count": 279,
+   "runner_matched": 279,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 279,
+   "window_sizes": [
+    279,
+    279
+   ],
+   "code_window": [
+    0,
+    0
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "hvac",
+   "phrasing": 1,
+   "status": "grounded",
+   "route_count": 723,
+   "runner_matched": 723,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 500,
+   "window_sizes": [
+    500,
+    500
+   ],
+   "code_window": [
+    0,
+    0
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "guards",
+   "phrasing": 0,
+   "status": "grounded",
+   "route_count": 485,
+   "runner_matched": 485,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 485,
+   "window_sizes": [
+    485,
+    485
+   ],
+   "code_window": [
+    0,
+    0
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "guards",
+   "phrasing": 1,
+   "status": "grounded",
+   "route_count": 112,
+   "runner_matched": 112,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 112,
+   "window_sizes": [
+    112,
+    112
+   ],
+   "code_window": [
+    0,
+    0
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "steelbldg",
+   "phrasing": 0,
+   "status": "grounded",
+   "route_count": 583,
+   "runner_matched": 583,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 500,
+   "window_sizes": [
+    500,
+    500
+   ],
+   "code_window": [
+    0,
+    0
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "steelbldg",
+   "phrasing": 1,
+   "status": "grounded",
+   "route_count": 1022,
+   "runner_matched": 1022,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 500,
+   "window_sizes": [
+    500,
+    500
+   ],
+   "code_window": [
+    0,
+    0
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "grounds",
+   "phrasing": 0,
+   "status": "grounded",
+   "route_count": 85,
+   "runner_matched": 85,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 85,
+   "window_sizes": [
+    85,
+    85
+   ],
+   "code_window": [
+    0,
+    0
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "grounds",
+   "phrasing": 1,
+   "status": "grounded",
+   "route_count": 170,
+   "runner_matched": 170,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 170,
+   "window_sizes": [
+    170,
+    170
+   ],
+   "code_window": [
+    0,
+    0
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "paving",
+   "phrasing": 0,
+   "status": "grounded",
+   "route_count": 160,
+   "runner_matched": 160,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 160,
+   "window_sizes": [
+    160,
+    160
+   ],
+   "code_window": [
+    0,
+    0
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "paving",
+   "phrasing": 1,
+   "status": "grounded",
+   "route_count": 631,
+   "runner_matched": 631,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 500,
+   "window_sizes": [
+    500,
+    500
+   ],
+   "code_window": [
+    0,
+    0
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "parts",
+   "phrasing": 0,
+   "status": "grounded",
+   "route_count": 1265,
+   "runner_matched": 1265,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 500,
+   "window_sizes": [
+    500,
+    500
+   ],
+   "code_window": [
+    0,
+    0
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "parts",
+   "phrasing": 1,
+   "status": "grounded",
+   "route_count": 1759,
+   "runner_matched": 1759,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 500,
+   "window_sizes": [
+    500,
+    500
+   ],
+   "code_window": [
+    0,
+    0
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "fasteners",
+   "phrasing": 0,
+   "status": "grounded",
+   "route_count": 400,
+   "runner_matched": 400,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 400,
+   "window_sizes": [
+    400,
+    400
+   ],
+   "code_window": [
+    0,
+    0
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "fasteners",
+   "phrasing": 1,
+   "status": "grounded",
+   "route_count": 906,
+   "runner_matched": 906,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 500,
+   "window_sizes": [
+    500,
+    500
+   ],
+   "code_window": [
+    21,
+    21
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "electrical",
+   "phrasing": 0,
+   "status": "grounded",
+   "route_count": 1250,
+   "runner_matched": 1250,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 500,
+   "window_sizes": [
+    500,
+    500
+   ],
+   "code_window": [
+    145,
+    145
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "electrical",
+   "phrasing": 1,
+   "status": "grounded",
+   "route_count": 1163,
+   "runner_matched": 1163,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 500,
+   "window_sizes": [
+    500,
+    500
+   ],
+   "code_window": [
+    142,
+    142
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "valves",
+   "phrasing": 0,
+   "status": "grounded",
+   "route_count": 811,
+   "runner_matched": 811,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 500,
+   "window_sizes": [
+    500,
+    500
+   ],
+   "code_window": [
+    75,
+    75
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "valves",
+   "phrasing": 1,
+   "status": "grounded",
+   "route_count": 1543,
+   "runner_matched": 1543,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 500,
+   "window_sizes": [
+    500,
+    500
+   ],
+   "code_window": [
+    157,
+    157
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "aircraft",
+   "phrasing": 0,
+   "status": "grounded",
+   "route_count": 880,
+   "runner_matched": 880,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 500,
+   "window_sizes": [
+    500,
+    500
+   ],
+   "code_window": [
+    0,
+    0
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "aircraft",
+   "phrasing": 1,
+   "status": "grounded",
+   "route_count": 1426,
+   "runner_matched": 1426,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 500,
+   "window_sizes": [
+    500,
+    500
+   ],
+   "code_window": [
+    58,
+    58
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "medical",
+   "phrasing": 0,
+   "status": "grounded",
+   "route_count": 134,
+   "runner_matched": 134,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 134,
+   "window_sizes": [
+    134,
+    134
+   ],
+   "code_window": [
+    0,
+    0
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "medical",
+   "phrasing": 1,
+   "status": "grounded",
+   "route_count": 1290,
+   "runner_matched": 1290,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 500,
+   "window_sizes": [
+    500,
+    500
+   ],
+   "code_window": [
+    42,
+    42
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "ithardware",
+   "phrasing": 0,
+   "status": "grounded",
+   "route_count": 555,
+   "runner_matched": 555,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 500,
+   "window_sizes": [
+    500,
+    500
+   ],
+   "code_window": [
+    9,
+    9
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  },
+  {
+   "business": "ithardware",
+   "phrasing": 1,
+   "status": "grounded",
+   "route_count": 1595,
+   "runner_matched": 1595,
+   "count_same": true,
+   "window_same": true,
+   "window_overlap": 500,
+   "window_sizes": [
+    500,
+    500
+   ],
+   "code_window": [
+    58,
+    58
+   ],
+   "top20_same_order": true,
+   "top20_overlap": 20,
+   "classes_same": true,
+   "route_error": null
+  }
+ ]
+}
