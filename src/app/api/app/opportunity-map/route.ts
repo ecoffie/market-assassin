@@ -29,6 +29,7 @@ import { isRepeatBuyer } from '@/lib/opportunities/repeat-buyer';
 import { loadDodaacEarlySignal } from '@/lib/gov-contacts/dodaac-directory';
 import { normalizeStateCode, US_STATE_NAMES } from '@/lib/utils/us-states';
 import { wantsMarketCounts } from '@/lib/opportunities/map-counts-mode';
+import { classifySearchFailure } from '@/lib/opportunities/search-failure';
 
 export const dynamic = 'force-dynamic';
 
@@ -182,7 +183,7 @@ export async function GET(request: NextRequest) {
         opps: merged,
       });
     } catch (e) {
-      return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
+      return searchFailureResponse(e);
     }
   }
 
@@ -498,6 +499,12 @@ export async function GET(request: NextRequest) {
       pins: merged,
     });
   } catch (e) {
-    return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
+    return searchFailureResponse(e);
   }
+}
+
+/** A failed search is reported as a failure with a reason, never as an empty result (search-failure.ts). */
+function searchFailureResponse(e: unknown) {
+  const f = classifySearchFailure(e);
+  return NextResponse.json({ success: false, error_code: f.code, error: f.message }, { status: f.status });
 }

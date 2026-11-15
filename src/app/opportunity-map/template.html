@@ -1689,12 +1689,18 @@ function drawFeed(){
 // NOTHING rendered yet (first load — the full page no longer ships a placeholder list): a failure must not
 // read as a market of zero. Replace the feed's "No opportunities match" and the header's "0 results" with the
 // failure itself; the next good fetch re-renders both.
-function _showFetchError(){
+function _showFetchError(info){
   var feed=document.getElementById('feed'); if(!feed)return;
-  if(document.getElementById('fetchErr'))return; // already shown — don't stack
+  var prev=document.getElementById('fetchErr');
+  var tooLong=!!(info&&info.reason==='search_too_long');
+  if(prev){ if(!tooLong)return; prev.remove(); } // already shown — don't stack (a too-long notice replaces it)
   var haveCards=!!feed.querySelector('.card');
   var b=document.createElement('div'); b.id='fetchErr'; b.className='empty';
-  b.innerHTML='<h4>Couldn’t load this view</h4>'
+  var esc=function(t){ return String(t||'').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); };
+  b.innerHTML=tooLong
+    ? '<h4>Search too long to run</h4><p>'+esc(info.message||'Shorten the search and try again. These are not zero results.')+'</p>'
+      +(haveCards?'<p>The cards below are from your previous search, not this one.</p>':'')
+    : '<h4>Couldn’t load this view</h4>'
     +(haveCards?'<p>The map hit a network hiccup. Your results are still here — try again.</p>'
                :'<p>Mindy couldn’t reach the opportunity data. This is a loading error, not zero results — try again.</p>')
     +'<button onclick="if(window.__mapRefetch)window.__mapRefetch()">Retry</button>';

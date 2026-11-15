@@ -63,14 +63,14 @@ describe('Fetch failure is not a fake empty result', () => {
   });
 
   it('the banner helpers exist in template.html and paint an honest retry, not "No opportunities match"', () => {
-    expect(tmpl).toContain('function _showFetchError()');
+    expect(tmpl).toContain('function _showFetchError(info)'); // optional reason (search_too_long), 2026-11-14
     expect(tmpl).toContain('function _clearFetchError()');
     // it inserts a banner rather than replacing the feed (keeps already-rendered cards)
     expect(tmpl).toMatch(/feed\.insertBefore\(b, feed\.firstChild\)/);
     // and offers a retry wired to the live refetch
     expect(tmpl).toContain('window.__mapRefetch');
     // it must NOT reuse the misleading empty-state copy
-    const showFn = tmpl.slice(tmpl.indexOf('function _showFetchError()'), tmpl.indexOf('function _clearFetchError()'));
+    const showFn = tmpl.slice(tmpl.indexOf('function _showFetchError('), tmpl.indexOf('function _clearFetchError()'));
     expect(showFn).not.toContain('No opportunities match');
   });
 });

@@ -2674,7 +2674,7 @@ const VIEWPORT_JS = `<script>
     var reqUrl=url+(truth?'&counts=0':'');
     try{ window.__btrace&&window.__btrace('request',{m:m,counts:!truth}); }catch(e){}
     var pr=fetch(reqUrl,ctrl?{signal:ctrl.signal}:undefined).then(function(r){return r.json();}).then(function(d){
-      if(!d||!d.success)return {failed:true};
+      if(!d||!d.success)return {failed:true,reason:(d&&d.error_code)||null,message:(d&&d.error_code==='search_too_long'&&d.error)||null};
       var t=(truth&&d.countsSkipped)?truth.t:_truthOf(d);
       // An UNKNOWN count (the count query failed → null) is not market truth: caching it would send counts=0 on
       // every pan for HZ_TTL_MS and freeze the header at "unknown". Leave it uncached so the next round re-asks.
@@ -2967,7 +2967,7 @@ const VIEWPORT_JS = `<script>
       _loadHorizon(m,url).then(function(r){
         if(gen!==_fetchGen)return;            // superseded — an older action never paints
         if(!r||r.aborted)return;
-        round.parts[m]=r.failed?{m:m,pins:[],total:0,capped:false,inview:0,unplaced:[],unplacedTotal:0,unmappedTotal:0,failed:true}:_partFrom(m,r.d,r.t);
+        round.parts[m]=r.failed?{m:m,pins:[],total:0,capped:false,inview:0,unplaced:[],unplacedTotal:0,unmappedTotal:0,failed:true,reason:r.reason||null,message:r.message||null}:_partFrom(m,r.d,r.t);
         if(!r.failed)_lastPainted[m]={sig:round.sigs[m],d:r.d,t:r.t};
         // Scope banner from THIS round's answer — cached, joined or network alike (the pins cache key is
         // the full URL, scope included, so a cached entry can only describe its own scope).
@@ -3021,6 +3021,10 @@ const VIEWPORT_JS = `<script>
     var _allFailed = parts.length>0 && parts.every(function(p){return p&&p.failed;});
     var _haveRender = (typeof OPPS!=='undefined' && OPPS && OPPS.length>0);
     if(_allFailed&&loading.length)return;     // the rest may still succeed — don't judge yet
+    // A search that was TOO LONG to run (statement timeout, classified server-side) says so even over earlier
+    // results — otherwise the user reads the previous search's cards as the answer to the new one.
+    var _tooLong=null; parts.forEach(function(p){ if(!_tooLong&&p&&p.reason==='search_too_long')_tooLong=p; });
+    if(_allFailed&&_tooLong){ if(typeof _showFetchError==='function')_showFetchError(_tooLong); return; }
     if(_allFailed){ if(!_haveRender && typeof _showFetchError==='function')_showFetchError(); return; }
     if(typeof _clearFetchError==='function')_clearFetchError();
     var merged=[],tot=0,cap=false,inv=0;
