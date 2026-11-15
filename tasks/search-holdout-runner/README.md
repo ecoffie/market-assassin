@@ -95,3 +95,46 @@ Applying it to a newer snapshot is approximate.
 | search-rc1-2026-11-14 | 8c4ba2ea1 | 28/28 identical (`rc1`) | 28/28 identical | — | ~10.5 s |
 
 Cutoff check: the same Nov 14 file at cutoff `2026-12-12T00:00:00Z` keeps 1,020 notices (only those with deadlines after Dec 12).
+
+## Route parity: does the emulation equal the real tool? (`route-parity.mts`)
+
+The runner reproduces `eval.mts`. This check calls the product code path itself:
+`findOpportunities()`, which the MCP tool `find_opportunities` wraps (`src/mcp/tools/find-opportunities.ts`). It runs
+in-process at the same tag, against the same snapshot:
+
+- **Database:** a fake Supabase client answers from the snapshot. There is no network, no production call and no credit
+  spend; `fetch` throws.
+- **Time:** frozen at the cutoff.
+- **Horizons:** only Open now is requested, with `limit_per_horizon: 25`.
+- **Filters:** evaluated in memory by the script's own PostgREST parser, independent of any tag.
+  - Postgres `~*` is approximated by a JS regex with `\m`/`\M` → `\b`, the same translation production's `jsRegex` uses.
+  - SQL NULL logic is respected.
+  - A filter on a column the snapshot lacks returns an error. It is never guessed.
+
+It compares three things per phrasing:
+1. the route's total count against the runner's `matched_count`;
+2. the route's 500-row deadline window against the runner's window (the matched set, by deadline, ties broken by
+   `notice_id`);
+3. the route's top 20 against the runner's, both order and class.
+
+```bash
+cd <tag checkout> && npx tsx <runner>/route-parity.mts --src . --snapshot <file> \
+  --phrasings <runner>/fixtures/queries_v4.json --cutoff <ISO> --runner-result <runner output for that tag> [--out parity.json]
+```
+
+### Fixture result (2026-11-15, Nov 14 snapshot, 9,701 notices)
+
+| version | commit | count | window | top 20 order | classes |
+|---|---|---|---|---|---|
+| search-rc1-2026-11-14 | 8c4ba2ea1 | 28/28 | 28/28 | 28/28 | 28/28 |
+| search-rc2-2026-11-14 | 065451a66 | 28/28 | 28/28 | 28/28 | 28/28 |
+| RC3 preview (untagged) | 34aad5828 | 28/28 | 28/28 | 28/28 | 28/28 |
+| long-list guard (untagged) | 38cd537ad | 28/28 | 28/28 | 28/28 | 28/28 |
+
+**Sensitivity.** A first run that passed the wrong limit field got the route's default 5 items. Every phrasing then
+reported DIFF (overlap 5/20). So the comparison does detect a mismatch; it is not vacuous.
+
+**Bound.** This proves the runner equals the tool's own logic over the same rows. It does not prove that the in-memory
+filter evaluation equals Postgres. That part rests on two things: the shared regex translation, and the cache benchmark's
+live comparison against SQL (`harness/cache-bench.mts`, 17/17 identical count and window wherever SQL completed).
+The Map route (`/api/app/opportunity-map`) is a different surface and is not covered here.
