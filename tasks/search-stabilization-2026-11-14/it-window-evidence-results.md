@@ -79,9 +79,29 @@ Many new rows are unlabelled. Agent 4's v7 labels decide.
   - The query is the same plan with `psc_code IN (≤20 codes)`, ordered by deadline, LIMIT 200.
   - No count, and no extra query for any other search.
 - **Extra rows:** up to 200 more candidates are labelled and ranked in memory, for 700 at most instead of 500.
-- **Latency: NOT MEASURED.** `harness/code-window-timing.mts` is ready (read-only, 3 runs per phrasing, median). Every
-  call was rejected with "Invalid API key": both local `.env.local` files hold the same service key, and it appears to
-  have been rotated. It needs a current read-only key before A can be costed. Agent 3 did not try to obtain credentials.
+- **Latency, measured 2026-11-15** on production `sam_opportunities`: read-only SELECTs, sequential, median of 3,
+  `harness/code-window-timing.mts`.
+  - The earlier "Invalid API key" was the `.env.local` gotcha (values quoted, ending in a literal `\\n`). The key was
+    never rotated.
+
+  | phrasing | main window query (count + 500 rows) | code sub-window query |
+  |---|---|---|
+  | electrical #0 | 2,160 ms | **+842 ms** (200 rows) |
+  | valves #0 | 1,883 ms | **+935 ms** (200 rows) |
+  | valves #1 | 7,732 ms | **+1,098 ms** (200 rows) |
+  | aircraft #0 | 2,294 ms | **+725 ms** (200 rows) |
+  | IT short | 3,878 ms | **+642 ms** (77 rows) |
+  | fasteners #0, medical #0 | 5,541 / 4,276 ms | window not full live (400 / 134 rows), so no sub-query |
+  | long: fasteners, electrical, aircraft, medical, IT | statement timeout (8 s) | not reached: the main query fails first and FIND returns `search_too_long` |
+
+- **Reading the timing:**
+  - When it fires, A adds **0.6–1.1 s** of sequential DB time to a FIND Open call.
+  - On today's production, the long product phrasings that most need A already time out on the main query. A cannot
+    help them until long queries are served (the cached open retrieval, flag off).
+  - The live corpus has moved since the Nov 14 snapshot, so which phrasings trigger A differs slightly.
+- **Cheaper variant (not built):** the sub-query re-applies the whole text plan, and the text OR is the expensive part.
+  The structural filters plus `psc_code IN codes`, without the text OR, select the same rows, because preset-code recall
+  is already a branch of that OR. That should cost a fraction. It needs its own parity proof before use.
 
 ## score-all (raw lo-hi/labelled; dist relevant/labelled of distinct, top 20)
 
