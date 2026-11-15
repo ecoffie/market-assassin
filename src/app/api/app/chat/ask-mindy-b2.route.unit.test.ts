@@ -32,7 +32,8 @@ const state: {
 
 vi.mock('@/lib/api-auth', () => ({ verifyUserOwnsEmail: async (_r: unknown, email: string) => ({ authenticated: true, email }) }));
 vi.mock('@/lib/access/resolve-access', () => ({ hasProAccess: async () => true }));
-vi.mock('@/lib/proposal/loaders', () => ({ loadBidderProfile: async () => null, formatProfileForPrompt: () => '' }));
+const profile = { block: '' };
+vi.mock('@/lib/proposal/loaders', () => ({ loadBidderProfile: async () => null, formatProfileForPrompt: () => profile.block }));
 vi.mock('@/lib/llm/usage-cost', () => ({ isUserOverBudget: async () => false, recordLlmUsage: async () => {} }));
 vi.mock('@/lib/chat/provider-events', () => ({ recordProviderEvent: async () => {} }));
 vi.mock('@/lib/entitlements/shadow', () => ({ shadowEntitlement: () => {} }));
@@ -79,6 +80,7 @@ beforeEach(() => {
     plannerCalls: [], offered: [], executed: [], toolContent: '{"ok":true,"results":[]}', toolStatus: 'success',
     answerModels: [], answerUrls: [], failModels: new Set(), answerThrows: false, answerMessages: [],
   });
+  profile.block = '';
   vi.stubEnv('OPENAI_API_KEY', 'ok');
   vi.stubEnv('GROQ_API_KEY', 'gk');
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://x.supabase.co'); vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'srk');
@@ -185,5 +187,39 @@ describe('B2: tool selection and bounded results', () => {
     expect(events.some((e) => e.type === 'notice' && e.code === 'lookup_failed')).toBe(true);
     const toolMsg = state.answerMessages[0].find((m) => m.role === 'tool')!;
     expect(toolMsg.content).toMatch(/Do not treat it as an empty result/);
+  });
+});
+
+describe('B2: whole-request token budget', () => {
+  it('an over-budget request is never sent to any model; the customer gets the fixed too-large message', async () => {
+    profile.block = 'p'.repeat(400_000); // ~133K estimated tokens of instructions: over the 100K policy cap
+    const { events, raw } = await ask('How do I write a capability statement?');
+    expect(state.answerModels).toEqual([]); // no answer call was made
+    expect(state.offered).toEqual([]);      // no planner call was made either
+    expect(events.find((e) => e.type === 'error')?.code).toBe('request_too_large');
+    expect(raw).not.toMatch(/est \d+|budget \d+|tokens/);
+  });
+
+  it('a large but fittable request is sent within budget', async () => {
+    const results = Array.from({ length: 2000 }, (_, i) => ({ notice_id: `N${i}`, title: `T${i}`, description: 'x'.repeat(1500) }));
+    state.toolContent = JSON.stringify({ ok: true, results });
+    state.plannerCalls = [{ id: 'c1', function: { name: 'search_sam_opportunities', arguments: '{"query":"janitorial"}' } }];
+    await ask('What janitorial opportunities are open in Florida right now?');
+    expect(state.answerModels).toEqual(['gpt-4o']);
+    expect(JSON.stringify(state.answerMessages[0]).length / 3).toBeLessThan(100_000);
+  });
+
+  it('a GPT-6 primary is called with reasoning_effort none and max_completion_tokens', async () => {
+    vi.stubEnv('CHAT_OPENAI_MODEL', 'gpt-6.1-terra');
+    const bodies: Array<Record<string, unknown>> = [];
+    const orig = globalThis.fetch as unknown as (u: string, i: { body: string }) => Promise<Response>;
+    vi.stubGlobal('fetch', vi.fn(async (u: string, init: { body: string }) => { bodies.push(JSON.parse(init.body)); return orig(u, init); }));
+    await ask('How do I write a capability statement?');
+    for (const b of bodies.filter((x) => x.model === 'gpt-6.1-terra')) {
+      expect(b).toMatchObject({ reasoning_effort: 'none' });
+      expect(b).not.toHaveProperty('temperature');
+      expect(b).not.toHaveProperty('max_tokens');
+    }
+    expect(bodies.some((b) => b.model === 'gpt-6.1-terra')).toBe(true);
   });
 });

@@ -122,3 +122,21 @@ export function resolveAnswerChain(env: Env, opts: { primaryModel: string }): An
     return !!answerKey(env, t);
   });
 }
+
+/**
+ * OpenAI Chat Completions parameters per model family (B2).
+ *
+ * gpt-4o / gpt-4o-mini (snapshots shut down Jan 14, 2027 per OpenAI's deprecations page) take
+ * `temperature` + `max_tokens`. The GPT-5/GPT-6 reasoning families take `max_completion_tokens`,
+ * and OpenAI documents that function calling on Chat Completions for gpt-6-luna works only with
+ * `reasoning_effort: 'none'`. `temperature` is omitted for those families until a live
+ * compatibility run proves it is accepted (an unsupported parameter is a 400, i.e. an outage).
+ */
+export function isReasoningFamily(model: string): boolean {
+  return /^(gpt-5|gpt-6|o\d)/i.test(model);
+}
+
+export function openAiChatParams(model: string, opts: { temperature: number; maxTokens: number }): Record<string, unknown> {
+  if (isReasoningFamily(model)) return { max_completion_tokens: opts.maxTokens, reasoning_effort: 'none' };
+  return { temperature: opts.temperature, max_tokens: opts.maxTokens };
+}

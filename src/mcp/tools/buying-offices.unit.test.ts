@@ -70,6 +70,8 @@ describe('get_buying_offices', () => {
     expect(r.offices[0].share_pct).toBeCloseTo(89.58, 1);
     expect(r.totals).toMatchObject({ obligated: 65_723_500.81, award_count: 74, office_count: 17 });
     expect(r._meta.as_of).toBe('2026-09-30');
+    // Ported Defense lag: emitted from the tool's own rows (a Navy office is listed), with the evidence named.
+    expect(r._meta.defense_lag).toMatchObject({ applies: true, lag_days: 90, window_end: '2026-09-30', evidence: expect.stringContaining('NAVSUP') });
     expect(r.scope.location_basis).toBe('place_of_performance');
     // Cities are reported both ways: matched, and requested-but-empty.
     expect(r.cities_matched?.map((c) => c.city)).toEqual(['MEMPHIS', 'MILLINGTON']);

@@ -149,4 +149,13 @@ describe('classification rules', () => {
     expect(resolveAgency('VA').name).toBe('Department of Veterans Affairs');
     expect(resolveAgency('Department of the Navy').name).toBe('Department of the Navy');
   });
+
+  it('Defense lag: only when the applied agency filter is Defense (no agency breakdown = no evidence)', async () => {
+    const va = await getVehicleSpendMix({ naics: '561320', agency: 'VA' }, { bq: bqDeps().d, lookupParentTypes: lookup }, NOW);
+    expect(va._meta.defense_lag ?? null).toBeNull();
+    const none = await getVehicleSpendMix({ naics: '561320' }, { bq: bqDeps().d, lookupParentTypes: lookup }, NOW);
+    expect(none._meta.defense_lag ?? null).toBeNull();
+    const dod = await getVehicleSpendMix({ naics: '561320', agency: 'Department of Defense' }, { bq: bqDeps().d, lookupParentTypes: lookup }, NOW);
+    expect(dod._meta.defense_lag).toMatchObject({ applies: true, lag_days: 90, evidence: expect.stringContaining('agency filter') });
+  });
 });

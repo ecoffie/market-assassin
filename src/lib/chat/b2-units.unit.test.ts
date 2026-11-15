@@ -102,3 +102,105 @@ describe('customer error messages', () => {
     for (const m of CUSTOMER_ERROR_MESSAGES) expect(m).not.toMatch(/\b(openai|groq|anthropic|gpt|llama|claude|api|error \d|\d{3}|stack|token)\b/i);
   });
 });
+
+import { fitMessages, inputBudget, contextWindow, estimateRequestTokens, type MsgKind } from './token-budget';
+import { openAiChatParams } from './planner-config';
+
+describe('token budget', () => {
+  it('context windows: known families, and unknown models never guessed upward', () => {
+    expect(contextWindow('gpt-4o')).toBe(128_000);
+    expect(contextWindow('gpt-6-luna')).toBe(1_050_000);
+    expect(contextWindow('mystery-model')).toBe(128_000);
+    expect(inputBudget('gpt-4o', 2048)).toBe(100_000); // policy cap below 128K - headroom
+    expect(inputBudget('gpt-4o', 2048, 500_000)).toBe(128_000 - 2048 - 2_000);
+  });
+
+  it('counts tools, tool_calls and every message', () => {
+    const base = estimateRequestTokens([{ role: 'user', content: 'x'.repeat(300) }]);
+    expect(estimateRequestTokens([{ role: 'user', content: 'x'.repeat(300) }], [{ big: 'y'.repeat(3000) }])).toBeGreaterThan(base + 900);
+  });
+
+  const msgs = () => [
+    { role: 'system', content: 's'.repeat(3000) },
+    { role: 'user', content: 'h'.repeat(30_000) }, { role: 'assistant', content: 'h'.repeat(30_000) },
+    { role: 'user', content: 'what janitorial opportunities are open?' },
+    { role: 'assistant', content: null, tool_calls: [{ id: 't1' }] },
+    { role: 'tool', tool_call_id: 't1', content: '{}' },
+    { role: 'system', content: 'VERIFIED RECORD LIST: ' + 'r'.repeat(40_000) },
+  ];
+  const kinds: MsgKind[] = ['system', 'history', 'history', 'user', 'tool_call', 'tool', 'records'];
+
+  it('fits as-is when under budget', () => {
+    const f = fitMessages(msgs(), kinds, { budget: 1_000_000 });
+    expect(f).toMatchObject({ fits: true, droppedHistory: 0 });
+  });
+
+  it('drops oldest history first and keeps the current question and the system prompt', () => {
+    const f = fitMessages(msgs(), kinds, { budget: 25_000 });
+    expect(f.fits).toBe(true);
+    expect(f.droppedHistory).toBeGreaterThanOrEqual(1);
+    expect(f.messages[0].role).toBe('system');
+    expect(f.messages.some((m) => m.content === 'what janitorial opportunities are open?')).toBe(true);
+  });
+
+  it('re-bounds tool results from the FULL original, with a shown-of-total report', () => {
+    const full = JSON.stringify({ ok: true, results: Array.from({ length: 500 }, (_, i) => ({ id: i, d: 'z'.repeat(400) })) });
+    const m = msgs(); m[5].content = full.slice(0, 60_000); // an already-bounded copy
+    const f = fitMessages(m, kinds, { budget: 20_000, toolOriginals: new Map([['t1', full]]) });
+    expect(f.toolCapChars).not.toBeNull();
+    const p = JSON.parse(String(f.messages.find((x) => x.role === 'tool')!.content));
+    expect(p._truncation.lists[0]).toMatchObject({ path: 'results', total: 500 });
+  });
+
+  it('reports fits=false rather than sending a request that cannot fit', () => {
+    const f = fitMessages([{ role: 'system', content: 's'.repeat(600_000) }, { role: 'user', content: 'q' }], ['system', 'user'], { budget: 100_000 });
+    expect(f.fits).toBe(false);
+  });
+});
+
+describe('openAiChatParams', () => {
+  it('gpt-4o family keeps temperature + max_tokens', () => {
+    expect(openAiChatParams('gpt-4o-mini', { temperature: 0, maxTokens: 1024 })).toEqual({ temperature: 0, max_tokens: 1024 });
+  });
+  it('GPT-6 family: max_completion_tokens + reasoning_effort none (required for function calling on Chat Completions)', () => {
+    expect(openAiChatParams('gpt-6-luna', { temperature: 0, maxTokens: 1024 })).toEqual({ max_completion_tokens: 1024, reasoning_effort: 'none' });
+  });
+});
+
+import { inferredCodeDisclosure } from './code-disclosure';
+import { warehouseDefenseLag } from '@/lib/usaspending/freshness';
+import { defenseLagSentence } from './record-render';
+
+describe('ported: strict-filter code disclosure', () => {
+  const ok = (name: string, naics: unknown) => ({ name, status: 'success', content: JSON.stringify({ _meta: { applied_filters: { naics } } }) });
+  const t = (c: string) => (c === '561720' ? 'Janitorial Services' : null);
+  it('discloses codes a strict-filter tool reports it APPLIED', () => {
+    expect(inferredCodeDisclosure([ok('get_expiring_contracts', ['561720'])], [], t))
+      .toBe('Industry codes chosen by Mindy for the work you described (you did not give any): 561720 Janitorial Services. Results are limited to these codes, so work filed under other codes is not included');
+  });
+  it('never for a keyword tool, a failed call, a typed code, or codes the tool did not report applying', () => {
+    expect(inferredCodeDisclosure([ok('derive_company_keywords', ['561720'])], [], t)).toBeNull();
+    expect(inferredCodeDisclosure([{ ...ok('get_expiring_contracts', ['561720']), status: 'failed' }], [], t)).toBeNull();
+    expect(inferredCodeDisclosure([ok('get_expiring_contracts', ['561720'])], ['561720'], t)).toBeNull();
+    expect(inferredCodeDisclosure([ok('get_buying_offices', undefined)], [], t)).toBeNull();
+  });
+  it('a prefix code is described as a family', () => {
+    expect(inferredCodeDisclosure([ok('get_buying_offices', '5617')], [], t)).toMatch(/5617 \(all codes starting 5617\)/);
+  });
+});
+
+describe('ported: evidence-gated Defense lag', () => {
+  const NOW = new Date('2026-11-14T00:00:00Z');
+  it('null without evidence, even when the window is recent', () => {
+    expect(warehouseDefenseLag({ fyTo: 2026, defenseEvidence: null, now: NOW })).toBeNull();
+  });
+  it('null when the window ends before the cutoff', () => {
+    expect(warehouseDefenseLag({ fyTo: 2025, defenseEvidence: 'x', now: NOW })).toBeNull();
+  });
+  it('applies with evidence and a recent window; the renderer shows only the tool note', () => {
+    const dl = warehouseDefenseLag({ fyTo: 2026, defenseEvidence: 'Defense office in results: X', now: NOW })!;
+    expect(dl).toMatchObject({ applies: true, window_end: '2026-09-30', dod_complete_through: '2026-08-15' });
+    expect(defenseLagSentence({ defense_lag: dl })).toBe(dl.note);
+    expect(defenseLagSentence({})).toBeNull();
+  });
+});

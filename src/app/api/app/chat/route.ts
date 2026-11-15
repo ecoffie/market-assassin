@@ -41,10 +41,13 @@ import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/ti
 // Tools run ONLY through the chat tool executor (policy check at offer AND execution,
 // preflight, per-tool error capture, execution log). Never import runMcpTool here.
 import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/chat-tool-executor';
-import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, resolveAnswerChain, answerKey, ANSWER_ENDPOINTS, type PlannerTarget } from '@/lib/chat/planner-config';
+import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, resolveAnswerChain, answerKey, ANSWER_ENDPOINTS, openAiChatParams, type PlannerTarget } from '@/lib/chat/planner-config';
+import { fitMessages, inputBudget, type MsgKind } from '@/lib/chat/token-budget';
 import { customerErrorMessage } from '@/lib/chat/customer-errors';
 import { boundToolResult, perResultBudget } from '@/lib/chat/bound-tool-result';
 import { filterToolsForQuestion } from '@/lib/chat/tool-selection';
+import { inferredCodeDisclosure } from '@/lib/chat/code-disclosure';
+import { getNaics } from '@/lib/codes/lookup';
 import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
 import { guardUnstatedStates } from '@/lib/chat/stated-filters';
 import { compileIntent, enforceIntent, dedupeToolCalls } from '@/lib/chat/intent-compiler';
@@ -527,7 +530,9 @@ export async function POST(request: NextRequest) {
         // messages is heterogeneous once tools enter (assistant tool_calls +
         // role:'tool' results), so type it loosely for the tool round.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (messages as any[]).push({ role: 'user', content: userTurn });
+        const userTurnIdx = (messages as any[]).push({ role: 'user', content: userTurn }) - 1;
+        // B2: full tool results by tool_call_id, so the token-budget step re-bounds from the originals.
+        const toolOriginals = new Map<string, string>();
 
         // ── TOOL-ROUND message list — the CLEAN question, NO RAG context ──
         // (Andre @ CypherIntel 2026-07-30) The RAG teaching corpus was stapled onto
@@ -546,6 +551,7 @@ export async function POST(request: NextRequest) {
         const intent = compileIntent(message, requestNow, [...history.filter((h) => h.role === 'user').map((h) => String(h.content || '')), message].join('\n'));
         const scopeApplied = new Set<string>();
         const scopeUnapplied = new Set<string>();
+        let scopeInferred: string | null = null;
         const capabilityNote = capabilityPlannerNote(message);
         const capabilityPhrases = interpretCapabilityNaics(message).items.flatMap((it) => [it.phrase, it.label]);
         const capabilityLabels = interpretCapabilityNaics(message).items.map((it) => it.label);
@@ -648,10 +654,18 @@ export async function POST(request: NextRequest) {
 
           // One planner attempt. Returns the OpenAI-shaped JSON, or the failure details.
           const callPlanner = async (t: PlannerTarget): Promise<{ ok: true; json: unknown } | { ok: false; status: number | null; detail: string }> => {
+            // B2: whole-request budget for the planner (instructions + history + question + tool
+            // catalog + output headroom). Oldest history goes first; a request that still cannot
+            // fit is never sent.
+            const plannerKinds: MsgKind[] = toolRoundMessages.map((m, i) => (i === toolRoundMessages.length - 1 ? 'user' : m.role === 'system' ? 'system' : 'history'));
+            const plannerFit = fitMessages(toolRoundMessages, plannerKinds, { budget: inputBudget(t.model, TOOL_ROUND_MAX_TOKENS), tools: ALL_TOOL_DEFS });
+            if (plannerFit.droppedHistory) turnTrace.notices.push(`planner_history_dropped:${plannerFit.droppedHistory}`);
+            if (!plannerFit.fits) return { ok: false, status: null, detail: `request_too_large: est ${plannerFit.estimate} > budget ${plannerFit.budget} tokens` };
+            const plannerMessages = plannerFit.messages;
             try {
               if (t.provider === 'anthropic') {
-                const sys = toolRoundMessages.find((m) => m.role === 'system')?.content || '';
-                const convo = toolRoundMessages
+                const sys = plannerMessages.find((m) => m.role === 'system')?.content || '';
+                const convo = plannerMessages
                   .filter((m) => m.role === 'user' || m.role === 'assistant')
                   .map((m) => ({ role: m.role, content: m.content }));
                 const forced = OPP_INTENT && anthropicSupportsForcedToolChoice(t.model);
@@ -671,7 +685,7 @@ export async function POST(request: NextRequest) {
               const r = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST', headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  model: t.model, messages: toolRoundMessages, temperature: 0, max_tokens: TOOL_ROUND_MAX_TOKENS,
+                  model: t.model, messages: plannerMessages, ...openAiChatParams(t.model, { temperature: 0, maxTokens: TOOL_ROUND_MAX_TOKENS }),
                   // OPP_INTENT (Andre fix) → 'required' so an opportunity search can't decline the tool.
                   tools: ALL_TOOL_DEFS, tool_choice: OPP_INTENT ? 'required' : 'auto',
                 }),
@@ -768,6 +782,7 @@ export async function POST(request: NextRequest) {
                 const r = results.find((x) => x.tool_call_id === tc.id);
                 const dup = dedupe.duplicates.find((d) => d.id === tc.id);
                 if (r) {
+                  toolOriginals.set(r.tool_call_id, r.content);
                   const bounded = boundToolResult(r.content, perResultCap);
                   if (bounded.truncated) turnTrace.notices.push(`tool_result_bounded:${r.record.tool}:${bounded.originalChars}->${bounded.content.length}`);
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -778,6 +793,14 @@ export async function POST(request: NextRequest) {
               }
               pendingToolTurnIdx = null;
               turnTrace.tool_executions = results.map((r) => r.record);
+              // Ported release-hardening R6/R10: disclose codes Mindy chose, from what each strict-filter tool
+              // reports it APPLIED (src/lib/chat/code-disclosure.ts).
+              scopeInferred = inferredCodeDisclosure(
+                results.map((r) => ({ name: r.record.tool, status: r.record.status, content: r.content })),
+                interpretCapabilityNaics(intent.customerText).typedCodes,
+                (c) => getNaics(c)?.title ?? null,
+              );
+              if (scopeInferred) turnTrace.notices.push('inferred_codes_disclosed');
               // PR E: verified record lists are rendered from the tool data, not reproduced by the model.
               for (const r of results) {
                 const renderers: Record<string, (p: Record<string, unknown>) => RenderedRecords | null> = {
@@ -870,14 +893,14 @@ export async function POST(request: NextRequest) {
         // cheaper model. Protects the $149 margin now that chat leads with gpt-4o.
         // (Resolved once above for the tool round; reuse to avoid a second budget read.)
         const chatModel = chatModelEarly;
-        const streamFrom = (url: string, key: string, model: string) => fetch(url, {
+        const streamFrom = (url: string, key: string, model: string, msgs: unknown[]) => fetch(url, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
           // stream_options.include_usage → OpenAI/Groq emit a final usage-only
           // chunk after the deltas. Without it, a streaming call returns NO usage
           // object, so cost attribution (esp. gpt-4o Chat) would log $0. The extra
           // frame is usage-only (empty choices) and the SSE parser already tolerates it.
-          body: JSON.stringify({ model, messages, temperature: TEMPERATURE, max_tokens: MAX_TOKENS, stream: true, stream_options: { include_usage: true } }),
+          body: JSON.stringify({ model, messages: msgs, ...openAiChatParams(model, { temperature: TEMPERATURE, maxTokens: MAX_TOKENS }), stream: true, stream_options: { include_usage: true } }),
         });
 
         // B2: explicit answer chain (primary, then supported fallbacks), each provider checked
@@ -894,12 +917,31 @@ export async function POST(request: NextRequest) {
         let usedProvider = '';
         let usedModel = '';
         let answerFallback = false;
+        // B2: whole-request token budget for the answer call (see token-budget.ts).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const answerKinds: MsgKind[] = (messages as any[]).map((m, i) => {
+          if (m.role === 'tool') return 'tool';
+          if (m.tool_calls) return 'tool_call';
+          if (m.role === 'system') return String(m.content || '').startsWith('VERIFIED RECORD LIST') ? 'records' : i < userTurnIdx ? 'system' : 'note';
+          return i < userTurnIdx ? 'history' : 'user';
+        });
+        let answerTooLarge = false;
         for (let i = 0; i < answerChain.length && !groqRes; i++) {
           const t = answerChain[i];
           let r: Response | null = null;
           let detail = '';
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const fit = fitMessages(messages as any[], answerKinds, { budget: inputBudget(t.model, MAX_TOKENS), toolOriginals });
+          if (fit.droppedHistory) turnTrace.notices.push(`answer_history_dropped:${fit.droppedHistory}`);
+          if (fit.toolCapChars) turnTrace.notices.push(`answer_tools_rebounded:${fit.toolCapChars}`);
+          if (fit.recordsShortened) turnTrace.notices.push('answer_records_copy_shortened');
+          if (!fit.fits) {
+            answerTooLarge = true;
+            void recordProviderEvent({ kind: answerChain[i + 1] ? 'answer_fallback' : 'answer_failure', provider: t.provider, model: t.model, status: null, detail: `request_too_large: est ${fit.estimate} > budget ${fit.budget} tokens (not sent)`, userEmail: auth.email! });
+            continue;
+          }
           try {
-            r = await streamFrom(ANSWER_ENDPOINTS[t.provider], answerKey(process.env, t) || '', t.model);
+            r = await streamFrom(ANSWER_ENDPOINTS[t.provider], answerKey(process.env, t) || '', t.model, fit.messages);
           } catch (e) {
             detail = String((e as Error)?.message || e).slice(0, 300);
           }
@@ -919,7 +961,9 @@ export async function POST(request: NextRequest) {
           void recordProviderEvent({ kind: 'answer_failure', provider: 'none', model: 'none', detail: 'no answer model configured (missing provider key)', userEmail: auth.email! });
         }
         if (!groqRes || !groqRes.body) {
-          send({ type: 'error', code: 'answer_unavailable', message: customerErrorMessage('answer_unavailable') });
+          const kind = answerTooLarge ? 'request_too_large' : 'answer_unavailable';
+          turnTrace.notices.push(kind);
+          send({ type: 'error', code: kind, message: customerErrorMessage(kind) });
           send({ type: 'done' });
           closeStream();
           return;
@@ -929,6 +973,7 @@ export async function POST(request: NextRequest) {
         if (renderedRecords.length) {
           const scopeLines = [
             scopeApplied.size ? `From your request: ${[...scopeApplied].join('; ')}.` : '',
+            scopeInferred ? `${scopeInferred}.` : '',
             scopeUnapplied.size ? `Could not apply: ${[...scopeUnapplied].join('; ')}. The results below do not reflect ${scopeUnapplied.size === 1 ? 'it' : 'them'}.` : '',
           ].filter(Boolean).join('\n');
           const recordBlock = `${scopeLines ? `${scopeLines}\n\n` : ''}${renderedRecords.map((r) => r.text).join('\n\n')}\n\n`;

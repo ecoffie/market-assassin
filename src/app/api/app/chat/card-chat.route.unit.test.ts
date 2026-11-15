@@ -396,3 +396,52 @@ describe('no duplicate charge on a dropped connection', () => {
     expect(charges()).toBe(1);
   });
 });
+
+describe('B2 × charge-once (integration with #2049)', () => {
+  const ANSWER = 'The response deadline is 2026-12-04 (SAM.gov notice W912PL26Q0042).';
+  function stubAnswer(failModels: Set<string>, opts: { throwMidStream?: boolean } = {}) {
+    const models: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (_u: string, init: { body: string }) => {
+      const b = JSON.parse(init.body);
+      if (!b.stream) return new Response(JSON.stringify({ choices: [{ message: { content: 'no tools needed' } }] }), { status: 200 });
+      models.push(b.model);
+      if (failModels.has(b.model)) return new Response('{"error":{"message":"model_decommissioned req_LEAK"}}', { status: 404 });
+      if (opts.throwMidStream) return new Response(new ReadableStream({ start(c) { c.error(new Error('socket hang up req_LEAK')); } }), { status: 200 });
+      return new Response(sseBody(ANSWER), { status: 200 });
+    }));
+    return models;
+  }
+
+  it('primary fails, supported fallback answers → charged exactly once, no error shown', async () => {
+    const models = stubAnswer(new Set(['gpt-4o']));
+    const { events } = await post(card);
+    expect(models).toEqual(['gpt-4o', 'gpt-4o-mini']);
+    expect(charges()).toBe(1);
+    expect(events.some((e) => e.type === 'error')).toBe(false);
+  });
+
+  it('every answer model fails → fixed customer message, no charge, turn free and re-askable', async () => {
+    stubAnswer(new Set(['gpt-4o', 'gpt-4o-mini']));
+    const { events } = await post(card);
+    const err = events.find((e) => e.type === 'error');
+    expect(err?.code).toBe('answer_unavailable');
+    expect(JSON.stringify(events)).not.toMatch(/model_decommissioned|req_LEAK|404/);
+    expect(completeCardTurn).not.toHaveBeenCalled();
+    expect(turns.get(TURN)?.status).toBe('failed');
+  });
+
+  it('a thrown stream error → fixed message, no charge, turn failed; a retry then answers and charges once', async () => {
+    stubAnswer(new Set(), { throwMidStream: true });
+    const first = await post(card);
+    expect(first.events.find((e) => e.type === 'error')?.code).toBe('stream_failed');
+    expect(JSON.stringify(first.events)).not.toMatch(/req_LEAK|socket hang up/);
+    expect(turns.get(TURN)?.status).toBe('failed');
+    stubAnswer(new Set());
+    await post(card);
+    expect(charges()).toBe(1);
+    // A third request for the same question replays the saved copy for free.
+    const replay = await post(card);
+    expect(replay.events.some((e) => e.type === 'replayed')).toBe(true);
+    expect(charges()).toBe(1);
+  });
+});

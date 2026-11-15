@@ -38,6 +38,7 @@ import {
 } from '@/lib/bigquery/award-scope';
 import { runScopedAggregate, type ScopedAggregateDeps } from '@/lib/bigquery/scoped-aggregate';
 import type { IgnoredArg } from '@/lib/mcp/result-contract';
+import { isDodAgency, warehouseDefenseLag, type WarehouseDefenseLag } from '@/lib/usaspending/freshness';
 
 const AWARDS_TABLE = '`market-assasin.usaspending.awards`';
 const NOT_REPORTED = '(not reported)';
@@ -109,6 +110,8 @@ export interface BuyingOfficesResult {
     ignored_args: IgnoredArg[];
     as_of: string | null;
     lag_note: string;
+    /** Defense publication lag, only when a Defense office is in the returned rows; null otherwise. */
+    defense_lag?: WarehouseDefenseLag | null;
     result_state?: 'unavailable' | 'not_reported';
     validation_error?: string;
     incomplete_reason?: string;
@@ -505,6 +508,16 @@ export async function getBuyingOffices(
       degraded: false,
       count: offices.length,
       as_of: first ? bqDateString(first.as_of) : null,
+      // Evidence: a Defense office (or a Defense awarding office) in the rows this tool returned.
+      defense_lag: (() => {
+        const dod = offices.find((o) => isDodAgency(o.agency) || isDodAgency(o.sub_agency)
+          || (o.top_awarding_offices ?? []).some((t) => isDodAgency(t.agency)));
+        return warehouseDefenseLag({
+          fyFrom: fy.window.fy_from, fyTo: fy.window.fy_to, dateFrom: fy.window.date_from, dateTo: fy.window.date_to,
+          asOf: first ? bqDateString(first.as_of) : null, now,
+          defenseEvidence: dod ? `Defense office in results: ${dod.office_name || dod.agency || 'unnamed'}` : null,
+        });
+      })(),
     },
   };
   if (cities.length) {
