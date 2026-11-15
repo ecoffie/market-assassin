@@ -5,7 +5,7 @@ import {
 } from './framework';
 
 const NOW = new Date('2026-11-14T12:00:00Z');
-const d = (day: number, hour = 12) => new Date(Date.parse('2026-09-01T00:00:00Z') + day * 86_400_000 + hour * 3_600_000).toISOString();
+const d = (day: number, hour = 12) => new Date(Date.parse('2026-10-01T00:00:00Z') + day * 86_400_000 + hour * 3_600_000).toISOString();
 
 function acct(over: Partial<AccountActivity> = {}): AccountActivity {
   return {
@@ -126,5 +126,105 @@ describe('report', () => {
     expect(r.byEra.early_launch.all.accounts).toBe(2);
     expect(r.byEra.stabilized.all.accounts).toBe(0);
     expect(r.byEra.early_launch.byExperience.no_activity.accounts).toBe(2);
+  });
+});
+
+describe('mature windows (item 1)', () => {
+  it('7-day rates exclude accounts younger than 7×24h and report them as immature', () => {
+    const now = new Date('2026-11-14T12:00:00Z');
+    const young = acct({ createdAt: '2026-11-10T09:00:00Z', appEvents: [{ at: '2026-11-10T10:00:00Z', openedOpportunity: false }] });
+    const oldOpened = acct({ appEvents: [{ at: d(1), openedOpportunity: true }], tracked: [d(1)] });
+    const g = groupMetrics([young, oldOpened].map((a) => accountFacts(a, now, null)));
+    expect(g.cohort.immature7d).toBe(1);
+    expect(g.firstValue7d).toEqual({ n: 1, of: 1, rate: 100 });
+    expect(g.tracked7d).toEqual({ n: 1, of: 1, rate: 100 });
+    expect(g.signedIn.of).toBe(2); // not a windowed metric: every account
+  });
+
+  it('an account is mature at exactly 7×24h, not before', () => {
+    const created = '2026-11-01T23:30:00Z';
+    expect(accountFacts(acct({ createdAt: created }), new Date('2026-11-08T23:29:59Z'), null).mature7d).toBe(false);
+    expect(accountFacts(acct({ createdAt: created }), new Date('2026-11-08T23:30:00Z'), null).mature7d).toBe(true);
+  });
+
+  it('the 7-day window is 7×24h from createdAt, not from UTC midnight (a late-evening signup gets no extra day)', () => {
+    const created = '2026-10-01T23:30:00Z';
+    // 7d 1h after signup: inside the old UTC-day window (day index 7), outside the exact one.
+    const f = accountFacts(acct({ createdAt: created, tracked: ['2026-10-09T00:30:00Z'] }), NOW, null);
+    expect(f.tracked7d).toBe(false);
+    expect(accountFacts(acct({ createdAt: created, tracked: ['2026-10-08T23:29:00Z'] }), NOW, null).tracked7d).toBe(true);
+    // Two events on two different UTC days but within the first 24h are ONE active day.
+    const s = accountFacts(acct({ createdAt: created, appEvents: [{ at: '2026-10-01T23:40:00Z', openedOpportunity: false }, { at: '2026-10-02T10:00:00Z', openedOpportunity: false }] }), NOW, null);
+    expect(s.secondDay7d).toBe(false);
+  });
+
+  it('days 15-30 need the whole window observed (31×24h)', () => {
+    const created = '2026-10-14T13:00:00Z';
+    expect(accountFacts(acct({ createdAt: created }), new Date('2026-11-14T12:59:00Z'), null).retained15to30).toBeNull();
+    expect(accountFacts(acct({ createdAt: created }), new Date('2026-11-14T13:00:00Z'), null).retained15to30).toBe(false);
+  });
+});
+
+describe('telemetry outage (item 7)', () => {
+  it('a window overlapping 2026-08-21 → 2026-09-27T00:42:12Z is partial: excluded from engagement rates, counted', () => {
+    const inOutage = acct({ createdAt: '2026-09-20T10:00:00Z' }); // 7d window ends 09-27T10:00, after outage end
+    const after = acct({ createdAt: '2026-09-27T01:00:00Z', appEvents: [{ at: '2026-09-28T00:00:00Z', openedOpportunity: true }] });
+    const fIn = accountFacts(inOutage, NOW, null);
+    expect(fIn.telemetryGap7d).toBe(true);
+    expect(fIn.telemetryCompleteSinceSignup).toBe(false);
+    expect(accountFacts(after, NOW, null).telemetryGap7d).toBe(false);
+    const g = groupMetrics([fIn, accountFacts(after, NOW, null)]);
+    expect(g.cohort.telemetryGap7d).toBe(1);
+    expect(g.firstValue7d).toEqual({ n: 1, of: 1, rate: 100 }); // not 50%
+    expect(g.milestone.of).toBe(1);
+    expect(g.tracked7d.of).toBe(2); // table-based: unaffected by the outage
+    expect(g.returnValue.of).toBe(1);
+  });
+
+  it('days 15-30 overlapping the outage are left out of retention', () => {
+    const f = accountFacts(acct({ createdAt: '2026-09-01T00:00:00Z', appEvents: [{ at: '2026-09-20T00:00:00Z', openedOpportunity: false }] }), NOW, null);
+    expect(f.telemetryGap15to30).toBe(true);
+    const g = groupMetrics([f]);
+    expect(g.retained15to30.rate).toBeNull();
+    expect(g.cohort.telemetryGap15to30).toBe(1);
+  });
+});
+
+describe('tracking durability (item 7)', () => {
+  it('a track event counts for ever/7-day tracked when the pipeline row was deleted, but never inflates counts', () => {
+    const f = accountFacts(acct({ trackedEvents: [d(1)], appEvents: [{ at: d(1), openedOpportunity: false }, { at: d(3), openedOpportunity: false }] }), NOW, null);
+    expect(f.everTracked).toBe(true);
+    expect(f.tracked7d).toBe(true);
+    expect(f.trackedCount7d).toBe(0);
+    expect(f.milestone).toBe(true);
+  });
+});
+
+describe('first meaningful search (item 5)', () => {
+  const since = new Date(d(-1));
+  it('results > 0 within 7 days; unknown before the count existed', () => {
+    const hit = acct({ searches: [{ at: d(2), results: 12 }] });
+    const zero = acct({ searches: [{ at: d(2), results: 0 }, { at: d(3), results: null }] });
+    expect(accountFacts(hit, NOW, null, { searchMeasuredSince: since }).meaningfulSearch7d).toBe(true);
+    expect(accountFacts(zero, NOW, null, { searchMeasuredSince: since }).meaningfulSearch7d).toBe(false);
+    expect(accountFacts(hit, NOW, null, { searchMeasuredSince: new Date(d(5)) }).meaningfulSearch7d).toBeNull();
+    expect(accountFacts(hit, NOW, null).meaningfulSearch7d).toBeNull();
+    const g = groupMetrics([accountFacts(acct(), NOW, null)]);
+    expect(g.meaningfulSearch7d).toBeNull(); // never 0% when nothing is measurable
+  });
+});
+
+describe('Ask Mindy success (item 6)', () => {
+  it('card or main chat; unknown when a source is unavailable and nothing was seen', () => {
+    expect(accountFacts(acct({ mainChatAnswers: [d(1)] }), NOW, null).askMindy7d).toBe(true);
+    expect(accountFacts(acct({ cardAnswers: null, mainChatAnswers: [d(1)] }), NOW, null).askMindy7d).toBe(true);
+    expect(accountFacts(acct({ cardAnswers: [], mainChatAnswers: null }), NOW, null).askMindy7d).toBeNull();
+    expect(accountFacts(acct({ cardAnswers: [], mainChatAnswers: [] }), NOW, null).askMindy7d).toBe(false);
+    const g = groupMetrics([
+      accountFacts(acct({ mainChatAnswers: [d(1)] }), NOW, null),
+      accountFacts(acct({ mainChatAnswers: null }), NOW, null),
+    ]);
+    expect(g.askMindy7d).toEqual({ n: 1, of: 1, rate: 100 });
+    expect(g.mainChatAnswer7d).toEqual({ n: 1, of: 1, rate: 100 });
   });
 });

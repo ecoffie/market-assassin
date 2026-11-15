@@ -2697,7 +2697,17 @@ const VIEWPORT_JS = `<script>
   // in _loadHorizon, so no work is wasted.
   function _actionNow(){ _fetchGen++; if(window.__mf)window.__mf.ack(); }
   window.__mapActionNow=_actionNow;
+  // SEARCH RESULT COUNT (activation, 2026-11-14). The search bar lives in another <script> IIFE and
+  // cannot see rounds, so each round publishes its outcome here: gen = rounds dispatched, settledGen =
+  // the newest round that finished, results = its match total (null when a horizon could not report
+  // one; an unknown is never 0). pendingDispatch = a fetchView was requested and no round has started
+  // since. A round that fails outright, is held (?ss= restore) or is suppressed never settles here; the
+  // search bar then reports results as unknown (null) after its 20 s wait.
+  var _sr={gen:0,settledGen:0,results:null,pendingDispatch:false}; window.__searchRoundState=_sr;
+  function _srStart(){ _sr.pendingDispatch=false; return ++_sr.gen; }
+  function _srSettle(g,n){ if(g!==_sr.gen)return; _sr.settledGen=g; _sr.results=(typeof n==='number'&&isFinite(n))?n:null; }
   function fetchView(opts){
+    _sr.pendingDispatch=true;
     if(!_fvT0)_fvT0=_nowMs();
     // MAPS P1 (2026-09-24): every call that is not a pan/zoom settling is a USER ACTION — acknowledge it NOW
     // (market-feedback.ts), and let one frame paint that acknowledgement before the dispatch work runs.
@@ -2842,12 +2852,13 @@ const VIEWPORT_JS = `<script>
       }
       var P=window.__players||{companies:true,buyers:true};
       var _pen=['companies','buyers'].filter(function(t){return P[t]!==false;});
-      if(_pen.length===0){ OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; render(); return; }
+      if(_pen.length===0){ OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; _srSettle(_srStart(),0); render(); return; }
       // TRUTH STATES (Players repair 2026-10-04): each type reports success_nonzero | success_zero |
       // unavailable | coverage_incomplete. ONLY an auth denial (401/403) is "denied" and may show the
       // gate copy — a 500, a BigQuery quota failure or a network error is UNAVAILABLE: never 0 Players
       // and never sales copy. See src/lib/players/truth.ts.
       var _anyDenied=false, _allDenied=true, _proLocked=false;
+      var _csr=_srStart();
       Promise.all(_pen.map(function(t){
         return fetch(_buildContactUrl(t),{headers:ch}).then(function(r){
           var denied=(r.status===401||r.status===403||r.status===402);
@@ -2890,6 +2901,7 @@ const VIEWPORT_JS = `<script>
           try{ if(typeof updateHeader==='function')updateHeader(); }catch(e){}
           return; }
         OPPS=merged; TOTAL=tot; CAPPED=false; INVIEW=merged.length;
+        _srSettle(_csr, parts.every(function(p){ return typeof p.total==='number'; })?tot:null);
         if(typeof window.__syncPlayerCounts==='function')window.__syncPlayerCounts();
         render();
         // Nothing to draw and the answer is NOT a measured zero → say what actually happened.
@@ -2949,7 +2961,7 @@ const VIEWPORT_JS = `<script>
     var _hl=(window.__mapMode!=='dla'&&window.__hierarchyLimit)?window.__hierarchyLimit(FILT):null;
     if(_hl){ _enabled=_enabled.filter(function(m){ return _hl.supported.indexOf(m)>-1; }); }
     if(window.__renderHierarchyLimit)window.__renderHierarchyLimit(_hl);
-    if(_enabled.length===0){ _fetchGen++; if(window.__mf)window.__mf.idle(); window.__roundEnabled=[]; OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; render(); return; }
+    if(_enabled.length===0){ _fetchGen++; if(window.__mf)window.__mf.idle(); window.__roundEnabled=[]; OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; _srSettle(_srStart(),0); render(); return; }
     // Horizons no longer part of this view: their in-flight requests can never paint — abort them.
     ['open','recompete','forecast'].forEach(function(k){
       if(_enabled.indexOf(k)===-1&&_hzInflight[k]){ try{ if(_hzInflight[k].ctrl)_hzInflight[k].ctrl.abort(); }catch(e){} delete _hzInflight[k]; }
@@ -2959,6 +2971,7 @@ const VIEWPORT_JS = `<script>
     try{ window.__btrace&&window.__btrace('round',{gen:gen,enabled:_enabled.join(','),bbox:bbox()}); }catch(e){}
     var round={gen:gen,enabled:_enabled,parts:{},sigs:{},pending:_enabled.length,painted:false,paintTimer:0,
       perf:{action:t0,dispatch:_nowMs(),horizons:{},firstPaint:null,settled:null}};
+    round.srGen=_srStart();
     _enabled.forEach(function(m){
       var url=_buildOppUrl(m); round.sigs[m]=_intentSig(url);
       // Scope banner (#1692): a round asking the Awarded horizon a DIFFERENT intent than it last painted
@@ -3087,6 +3100,7 @@ const VIEWPORT_JS = `<script>
     if(!round.painted){ round.painted=true; round.perf.firstPaint=Math.round(_nowMs()-round.perf.action); }
     if(!settled)return;
     // SETTLED — everything below may move the map (a new round), so it waits for the last horizon.
+    _srSettle(round.srGen, (window.__mapMatchTotals&&window.__mapMatchTotals.totalKnown)?TOTAL:null);
     round.perf.settled=Math.round(_nowMs()-round.perf.action);
     round.perf.dispatch=Math.round(round.perf.dispatch-round.perf.action);
     try{ window.__mapPerf.push(round.perf); if(window.__mapPerf.length>40)window.__mapPerf.shift(); }catch(e){}
@@ -10483,11 +10497,33 @@ const SEARCH_PANEL_JS = `<script>(function(){
   // Persist an actual submitted search to user_search_history (fire-and-forget, non-blocking).
   // search_type:'zip' is deliberate — it is a valid type that is NOT in the profile columnMap,
   // so a map keyword search accrues history WITHOUT polluting the user's alert keywords.
-  var _lastCap='';
-  function captureSearch(q){ q=(q||'').trim(); if(!q||q.toLowerCase()===_lastCap) return; _lastCap=q.toLowerCase();
+  // ONE map_search PER SUBMITTED SEARCH, WITH ITS RESULT COUNT (activation, 2026-11-14). It used to
+  // fire at submit time with no count, and the natural-language path (__applySearchFilters) fired
+  // nothing at all, so "first meaningful search" (a submitted search with results > 0) could not be
+  // measured. Now every submit (keyword or parsed intent) opens ONE pending search, deduped on the
+  // lowercased text as before, and it is emitted when the round it caused settles:
+  //   results = the round's match total, or null when unknown (a failed horizon, or no settled round
+  //   within 20 s). Never 0 for unknown. query (text) is still sent only for the keyword path, as before;
+  //   the intent path sends query_len only. filters ride along via _track's _mapState (unchanged).
+  var _lastCap='', _pend=null, _pendT=0;
+  function _srNow(){ try{ return performance.now(); }catch(e){ return Date.now(); } }
+  function _emitSearch(n){ var p=_pend; if(!p) return; _pend=null; clearTimeout(_pendT);
+    var m={query_len:p.len, via:p.via, results:(typeof n==='number')?n:null};
+    if(p.query) m.query=p.query;
+    try{ if(window.__track) window.__track('tool_use','map_search',m); }catch(e){} }
+  function _waitResults(){ var p=_pend; if(!p) return; var el=_srNow()-p.t0, s=window.__searchRoundState;
+    if(el>=20000){ _emitSearch(null); return; }
+    if(el>=300 && s && s.gen>0 && !s.pendingDispatch && s.settledGen===s.gen){ _emitSearch(s.results); return; }
+    _pendT=setTimeout(_waitResults,250); }
+  function beginSearch(q,via){ q=(q||'').trim(); if(!q||q.toLowerCase()===_lastCap) return false; _lastCap=q.toLowerCase();
+    if(_pend) _emitSearch(null);   // a newer submit supersedes: the older one's count is unknown, never dropped
+    _pend={len:q.length, via:via, query:(via==='keyword')?q.slice(0,80):'', t0:_srNow()};
+    _pendT=setTimeout(_waitResults,300);
+    return true; }
+  function captureSearch(q){ q=(q||'').trim(); if(!beginSearch(q,'keyword')) return;
     // What people TYPE on a map — the gap between browsing and searching, which is the
     // whole premise of principle 01. The query text is stored; it is a market term, not PII.
-    try{ if(window.__track) window.__track('tool_use','map_search',{query:q.slice(0,80)}); }catch(e){}
+    // (map_search itself is emitted by beginSearch once the round settles, with its result count.)
     // Expose the live query so a cards_shown impression can say whether the feed the user
     // saw was browsed-into or searched-into. Those are different products (principle 01).
     try{ window.__lastQuery=q; }catch(e){}
@@ -10756,6 +10792,7 @@ const SEARCH_PANEL_JS = `<script>(function(){
   input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); clearTimeout(acTimer); acSeq++; /* the last keystroke's suggestions must not reopen after the submit */ setTimeout(function(){ if(q){ pushRecent(q);
         var intent=null; try{ intent=parseSearchIntent(q); }catch(err){ intent=null; }
         if(intent && typeof window.__applySearchFilters==='function' && window.__applySearchFilters(intent)){
+          beginSearch(q,'intent'); // the natural-language path now emits map_search too (no query text)
           var zi=document.getElementById('zsearchInput'); if(zi)zi.value=(typeof window.__lastAppliedKeyword==='string'?window.__lastAppliedKeyword:intent.keyword); // reflect the ACTUAL applied keyword (Players keeps the agency word)
         } else { captureSearch(q); }
       } close(); },0); } if(e.key==='Escape'){ close(); input.blur(); } });
