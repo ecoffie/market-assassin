@@ -72,7 +72,8 @@ describe('the event records what we actually need', () => {
 describe('telemetry failure is never the user\'s problem', () => {
   it('an anonymous visitor is a recorded state, not a dropped one', () => {
     // Dropping anonymous events would bias the very measurement we want.
-    expect(route).toContain("reason: 'anonymous'");
+    // (2026-11-14: identity now comes only from a verified session; no session = 'anonymous'.)
+    expect(route).toContain("'unverified' : 'anonymous'");
   });
 
   it('a logEngagement failure is surfaced in logs, not swallowed silently', () => {

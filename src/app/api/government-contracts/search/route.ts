@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logEngagement, EventTypes } from '@/lib/engagement';
+import { resolveMcpEmail } from '@/lib/mcp/session-identity';
 import {
   getStateFromZip,
   getBorderingStates,
@@ -37,7 +38,10 @@ const FIELDS = [
 ];
 
 interface SearchRequestBody {
-  /** Optional — set by the Opportunity Hunter email gate purely for usage attribution. */
+  /**
+   * Sent by the Opportunity Hunter email gate. IGNORED for attribution since 2026-11-14: usage is recorded only
+   * under a verified session identity (see the search_completed block).
+   */
   userEmail?: string;
   businessFormation?: string;
   naicsCode?: string;
@@ -204,7 +208,6 @@ export async function POST(request: NextRequest) {
       zipCode,
       goodsOrServices,
       veteranStatus,
-      userEmail
     } = body;
 
     console.log('Government contract search request:', body);
@@ -606,9 +609,13 @@ export async function POST(request: NextRequest) {
     // page is not use; running a search is. Fire-and-forget so telemetry can never break it.
     // AWAITED for the same reason as the report route: a floating promise races the
     // serverless function's own teardown. This one happened to win; that is luck, not design.
-    if (userEmail && userEmail.includes('@')) {
+    // IDENTITY FROM THE VERIFIED SESSION ONLY (2026-11-14): a body-supplied userEmail is unverified (anyone
+    // could attribute searches to any account), so without a valid session nothing is recorded. The search
+    // itself is still served.
+    const verifiedEmail = await resolveMcpEmail(request).catch(() => null);
+    if (verifiedEmail) {
       await logEngagement({
-        userEmail: userEmail.toLowerCase().trim(),
+        userEmail: verifiedEmail,
         eventType: EventTypes.TOOL_USE,
         eventSource: 'opportunity-hunter',
         metadata: {

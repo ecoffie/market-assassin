@@ -19,7 +19,13 @@ type RowDef = { label: string; hint: string; get: (g: GroupMetrics) => Rate | nu
 const ROWS: RowDef[] = [
   { section: 'Registration', label: 'Accounts', hint: 'auth.users created in window', get: (g) => g.accounts },
   { label: 'Ever signed in', hint: '', get: (g) => g.signedIn },
+  { section: 'Who is measured', label: 'Too new for 7-day metrics', hint: 'younger than 7×24h; in no 7-day rate yet', get: (g) => g.cohort.immature7d },
+  { label: 'Telemetry outage, days 0–7', hint: 'left out of engagement rates (partial, not low)', get: (g) => g.cohort.telemetryGap7d },
+  { label: 'Telemetry outage, days 15–30', hint: 'left out of retention', get: (g) => g.cohort.telemetryGap15to30 },
   { section: 'First value (proxy)', label: 'Opened an opportunity ≤7d', hint: 'opening is not proof of relevance', get: (g) => g.firstValue7d },
+  { label: 'Meaningful search ≤7d', hint: 'submitted Map search with results > 0; null = not measured yet', get: (g) => g.meaningfulSearch7d },
+  { label: 'Successful Ask Mindy ≤7d', hint: 'card or main chat answer; unknown accounts left out', get: (g) => g.askMindy7d },
+  { label: '… main chat answer ≤7d', hint: 'complete, not truncated, no failed lookup', get: (g) => g.mainChatAnswer7d },
   { section: 'Accumulated value (proxy)', label: 'Kept work ≤7d', hint: 'tracked, watch, or saved card answer', get: (g) => g.accumulated7d },
   { label: 'Tracked ≥1 ≤7d', hint: '', get: (g) => g.tracked7d },
   { label: 'Tracked ≥3 ≤7d', hint: '', get: (g) => g.tracked3plus7d },
@@ -27,9 +33,9 @@ const ROWS: RowDef[] = [
   { label: 'Ever tracked', hint: '', get: (g) => g.everTracked },
   { label: 'Median hours to first tracked', hint: '', get: (g) => g.medianHoursToFirstTracked },
   { section: 'Return', label: 'Second active day ≤7d', hint: 'NOT value, NOT retention', get: (g) => g.secondDay7d },
-  { label: 'Return value (proxy)', hint: 'change on tracked work → came back ≤7d', get: (g) => g.returnValue },
+  { label: 'Return value (proxy)', hint: 'change on tracked work → came back ≤7d; accounts created after the outage', get: (g) => g.returnValue },
   { label: 'Hypothesis milestone', hint: 'tracked ≥1 + second day, ≤7d', get: (g) => g.milestone },
-  { label: 'Active days 15–30', hint: 'only accounts observed 30+ days', get: (g) => g.retained15to30 },
+  { label: 'Active days 15–30', hint: 'only accounts observed 31×24h, outside the outage', get: (g) => g.retained15to30 },
   { label: '… with milestone', hint: '', get: (g) => g.retained15to30Milestone },
   { label: '… without milestone', hint: '', get: (g) => g.retained15to30NoMilestone },
   { section: 'Paid', label: 'Paying on day one', hint: 'not conversions', get: (g) => g.paidAtSignup },
@@ -50,7 +56,10 @@ export default function ActivationPage() {
   const [days, setDays] = useState(120);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<{ report: ActivationReport; notes: string[]; sources: { cardChatAvailable: boolean } } | null>(null);
+  const [data, setData] = useState<{
+    report: ActivationReport; notes: string[];
+    sources: { cardChatAvailable: boolean; mainChatAvailable: boolean; mainChatUntraced: number; searchMeasuredSince: string | null; bulkPipelineRowsSkipped: number };
+  } | null>(null);
 
   async function load(e?: FormEvent) {
     e?.preventDefault();
@@ -118,6 +127,10 @@ export default function ActivationPage() {
           <ul className="mt-6 text-xs text-slate-600 list-disc pl-5 max-w-3xl">
             {data.notes.map((n) => <li key={n}>{n}</li>)}
             {!data.sources.cardChatAvailable && <li>Card-chat answers: source not deployed yet (shown as no data).</li>}
+            {!data.sources.mainChatAvailable && <li>Main Ask Mindy answers: trace not available yet (shown as no data).</li>}
+            {data.sources.mainChatUntraced > 0 && <li>{data.sources.mainChatUntraced.toLocaleString()} main-chat answers have no trace (written before it existed): success unknown, not counted.</li>}
+            <li>Meaningful search measured since: {data.sources.searchMeasuredSince ?? 'not yet (no Map search with a result count recorded)'}.</li>
+            {data.sources.bulkPipelineRowsSkipped > 0 && <li>{data.sources.bulkPipelineRowsSkipped.toLocaleString()} bulk-imported pipeline rows ignored (not user tracking).</li>}
           </ul>
         </>
       )}

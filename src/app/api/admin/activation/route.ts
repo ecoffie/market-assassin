@@ -30,13 +30,18 @@ export async function GET(request: NextRequest) {
   const from = new Date(now.getTime() - days * 86_400_000);
   try {
     // Service client: auth.admin.listUsers needs it. Every call below is a SELECT.
-    const { accounts, cardChatAvailable } = await loadActivationData(getWriteClient(), { from, to: now });
-    const report = buildActivationReport(accounts, { now, from, to: now, baselineStart: activationBaselineStart() });
+    const { accounts, ...sources } = await loadActivationData(getWriteClient(), { from, to: now });
+    const report = buildActivationReport(accounts, {
+      now, from, to: now, baselineStart: activationBaselineStart(),
+      searchMeasuredSince: sources.searchMeasuredSince ? new Date(sources.searchMeasuredSince) : null,
+    });
     return NextResponse.json({
       success: true,
       report,
-      sources: { cardChatAvailable },
+      sources,
       notes: [
+        'Every 7-day window is the account\'s first 7×24h from createdAt. Accounts younger than that are not in any 7-day denominator yet (cohort.immature7d).',
+        'Accounts whose window overlaps the 2026-08-21 → 2026-09-27T00:42:12Z telemetry outage are left out of engagement-based rates (cohort.telemetryGap*): their numbers would be partial, not low.',
         'Early-launch era = before Mindy Stabilization Complete. A diagnostic baseline only: do not use it for pricing or business-model decisions.',
         'First value, accumulated value and return value are behavioural PROXIES. Relevance and usefulness are not directly measured.',
         'A second-day return is not value and not durable retention.',

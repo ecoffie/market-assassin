@@ -481,9 +481,12 @@ export default function OpportunityHunterPage() {
     }, 3000);
 
     try {
+      // Usage is attributed server-side only to a VERIFIED session, so send the signed session token if present.
+      let miToken = '';
+      try { miToken = localStorage.getItem('mi_beta_auth_token') || ''; } catch { /* storage blocked */ }
       const response = await fetch('/api/government-contracts/search', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(miToken ? { 'x-mi-auth-token': miToken } : {}) },
         // INSTRUMENTATION INTEGRITY: Opportunity Hunter was one of the two genuinely blind
         // product surfaces — a live 1,680-line tool emitting ZERO engagement events, so its 0
         // in Feature Usage could not be distinguished from "nobody uses it". Every user passes

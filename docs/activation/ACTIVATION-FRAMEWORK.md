@@ -22,6 +22,8 @@ The dashboard enforces this: `ACTIVATION_BASELINE_START` is unset, so every acco
 
 ## 2. Historical MCP behaviour (early-launch diagnostics)
 
+> **Superseded definitions.** This table was measured with the first loader, before the corrections in §9: every in-app `link_click` counted as an email click, card opens were missed, in-app Ask Mindy tool calls counted as MCP use, 7-day windows started at UTC midnight and included accounts younger than 7 days, and accounts overlapping the 2026-08-21 → 09-27 telemetry outage were counted at face value. Most of this cohort overlaps the outage. Re-measure with the corrected loader before quoting any figure below; treat it as directional only.
+
 Accounts registered 2026-08-16 → 10-14 (auth.users, staff/comp/advocate/test excluded), 1,107 accounts, measured by the dashboard loader against production (read-only, 2026-11-14):
 
 | Experience | Accounts | First value ≤7d (proxy) | Tracked ≤7d | Milestone | Active days 15–30 | …with milestone | …without |
@@ -75,7 +77,9 @@ Required measurements and where they are:
 
 | Requirement | Dashboard field |
 |---|---|
-| Registration → first tracked opportunity | `everTracked` |
+| Registration → first tracked opportunity | `everTracked` (pipeline minus bulk imports, saved opportunities, plus durable `pursuit_started` / `save_to_pipeline` events) |
+| First meaningful search | `meaningfulSearch7d` (submitted Map search with results > 0; only accounts created after `searchMeasuredSince`) |
+| First successful Ask Mindy answer | `askMindy7d` = card chat (`card_chat_turns` completed) or main chat (`mainChatAnswer7d`, see §9) |
 | Time to first tracked opportunity | `medianHoursToFirstTracked` |
 | Tracking adoption within 7 days | `tracked7d`, `tracked3plus7d` |
 | Return on a second day | `secondDay7d` (labelled: not value, not retention) |
@@ -120,3 +124,30 @@ Required measurements and where they are:
 | 6 | (Separate approval) Build treatment screens behind the flag; set `TRACK_FIRST_EXPERIMENT_STARTS_AT` + `TRACK_FIRST_EXPERIMENT_ENABLED=true` | Set the flag to anything but `true`: enrolment stops immediately; already-assigned accounts keep their label for analysis and see control onboarding |
 
 Not part of this phase: the weekly digest, any alert delivery change, credit allowances, pricing, trial timing.
+
+## 9. Measurement corrections (2026-11-14)
+
+| # | Problem | Correction | Where |
+|---|---|---|---|
+| 1 | 7-day rates divided by every account, including ones created < 7 days ago; the window started at UTC midnight (up to ~8.9 days) | Windows are exact 24-hour steps from `createdAt`. A 7-day metric includes an account only once it is 7×24h old (`cohort.immature7d` reports the rest); days 15-30 need 31×24h | `framework.ts` |
+| 2 | Every `link_click` counted as an email click; in-app clicks (source_feed, sidebar, market_intel_dashboard, opportunity_map) are thousands of rows | Email click = `link_click` whose `event_source` is an email tracking-token type (`EMAIL_CLICK_SOURCES`: daily_alert, weekly_alert, daily_briefing, weekly_deep_dive, weekly_deep_dive_retry, admin_briefing, legacy weekly_briefing / pursuit_brief). `daily_alerts` (plural) is the in-app Alerts panel and is an app event | `load.ts` |
+| 3 | Card opens were missed (the card tracker stores the name in `metadata.kind`) | `kind` is read; `popup_open`, `click`, `cta_click` count as opening an opportunity. **Removed:** `pin_clicked` (logged even when no popup opens) and `office_viewed` (a buying office, not an opportunity) | `load.ts` |
+| 4 | In-app Ask Mindy tool calls (`mcp_call_log.channel='app_chat'`) counted as MCP use | `app_chat` successes are app activity; MCP calls carry `channel` chatgpt / claude | `load.ts` |
+| 5 | First meaningful search was not measured; the natural-language search path emitted nothing and no result count was recorded | The Map emits one `map_search` per submitted search (keyword and parsed intent), with `results`, `query_len`, `via` and the usual `filters`, after the round it caused settles. `results` is null when unknown (failed horizon, or no settled round within 20 s), never 0. Dedup on the lowercased text is unchanged. `searchMeasuredSince` (the first event carrying `via`) is derived from the data, so older accounts are "not measured", not 0% | `opportunity-map/route.ts`, `load.ts`, `framework.ts` |
+| 6 | Only card chat counted as a successful Ask Mindy | Main chat is read from `mindy_chat_messages.trace` (see below) | `load.ts` |
+| 7 | Outage-era accounts read as low numbers; deleted pursuits erase "ever tracked"; bulk imports counted as tracking | Windows overlapping 2026-08-21 → 2026-09-27T00:42:12Z are left out of engagement-based rates and counted in `cohort.telemetryGap*`; return value covers only accounts created after the outage. `pursuit_started` / `save_to_pipeline` events back up "ever tracked" / "tracked ≤7d" (never counts). `user_pipeline.source='base44_import'` rows are skipped | `framework.ts`, `load.ts` |
+| 8 | `/api/welcome/choice` and `/api/government-contracts/search` attributed activity to a body-supplied email with no auth | Both record activity only for a verified session (`resolveMcpEmail`: signed MI token or Supabase session); otherwise nothing is recorded and the response is unchanged. Clients now send `x-mi-auth-token` when signed in | both routes, `welcome/choice-link.tsx`, `opportunity-hunter/page.tsx` |
+
+**Denominators.** All accounts: signed in, ever tracked, median hours to first track, paid, credit wall. Mature (7×24h): tracked ≤7d, tracked ≥3, kept work, card / main chat / any Ask Mindy answer. Mature and outside the outage: first value, meaningful search, second day, milestone. Created after the outage: return value. Observed 31×24h and outside the outage: days 15-30.
+
+**Known blind spot (deleted pursuits).** `user_pipeline` rows are hard deleted and `pipeline_history` / `pursuit_change_log` cascade with them. The engagement events are the only durable trace; a track from a surface that emits neither event and was later deleted is still invisible. A durable fix (soft delete, or an append-only `pursuit_events` row on create) needs approval.
+
+**Main Ask Mindy success: what the loader reads, and the follow-up.** Since migration `20261114_ask_mindy_execution_trace`, the chat route persists a per-turn `trace` on the assistant message with `answer.finish_reason` and `notices`. The loader counts an assistant message as a successful answer when: trace present, no `trace.context` (card turns are counted from `card_chat_turns`), content non-empty, `finish_reason === 'stop'`, and no `truncated` / `tools_unavailable` / `lookup_failed` notice. Rows without a trace are reported as `mainChatUntraced` (unknown), never as failures. Limits that need a route change, deferred until PR #2053 (card-chat billing, same file) merges:
+1. **The write is unawaited** (`persistExchange(...).catch()` after the stream closes). A serverless teardown can drop it, so main-chat success is a FLOOR. Fix: `await` the persist (or `waitUntil`) before closing.
+2. **Failures are not persisted.** The error path (`catch (err)` in the stream) writes no row, so a failed answer is indistinguishable from no question. Fix: persist the assistant row with `trace.outcome = 'error'` (and the user row) on every path.
+3. **A client disconnect is not in the trace** for main chat (`streamCut` only reaches card turns). Fix: push `client_disconnected` into `turnTrace.notices` when `streamCut`.
+4. **Add an explicit outcome.** Write `trace.outcome: 'answered' | 'truncated' | 'tools_unavailable' | 'error' | 'client_disconnected' | 'empty'` computed by the same rule as `isBillableTurn`, so the loader stops re-deriving it. When it ships, `isSuccessfulMainChatAnswer` should prefer `trace.outcome` and keep the current rule for older rows.
+
+**Effect on other dashboards.** `/admin/map-funnel` does not read `map_search`, so it is unaffected. `map_search` now fires after the search round settles (up to ~20 s later) instead of at submit, and natural-language searches now produce it, so raw `map_search` counts rise. Opportunity Hunter `search_completed` and `/welcome` choices are no longer attributed for visitors without a verified session, so those counts drop to verified users only.
+
+**Rollback.** Revert the PR: the loader, dashboard and two routes return to their previous behaviour; the Map emitter returns to submit-time `map_search` without a count. No schema or data change to undo.

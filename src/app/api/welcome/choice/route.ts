@@ -17,6 +17,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { logEngagement, EventTypes, EventSources } from '@/lib/engagement';
+import { resolveMcpEmail } from '@/lib/mcp/session-identity';
 
 /** The three doors, plus leaving without choosing. Anything else is rejected. */
 const CHOICES = ['explore_map', 'connect_mcp', 'personalize_company', 'left_without_choosing'] as const;
@@ -30,10 +31,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'unknown choice' }, { status: 400 });
     }
 
-    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
-    // Anonymous is a legitimate state here — /welcome is reachable before we know who a
-    // visitor is, and dropping those events would bias the very measurement we want.
-    if (!email) return NextResponse.json({ success: true, recorded: false, reason: 'anonymous' });
+    // IDENTITY FROM THE VERIFIED SESSION ONLY (2026-11-14). This used to take `email` from the
+    // request body with no auth, so anyone could write onboarding activity onto any account and
+    // skew activation metrics. A body email is now ignored; without a valid session token the
+    // choice is not recorded (the response is still 200 — nothing on /welcome is a gate).
+    const email = await resolveMcpEmail(request);
+    if (!email) {
+      // 'anonymous' = no session at all (a legitimate state on /welcome); 'unverified' = a claimed
+      // identity (body email or an invalid token) that could not be verified. Neither is recorded.
+      const claimed = typeof body.email === 'string' && body.email.trim() !== ''
+        || !!(request.headers.get('x-mi-auth-token') || request.headers.get('x-mi-2fa-token') || request.headers.get('authorization'));
+      return NextResponse.json({ success: true, recorded: false, reason: claimed ? 'unverified' : 'anonymous' });
+    }
 
     const res = await logEngagement({
       userEmail: email,
