@@ -12,7 +12,7 @@ import { matchesText, phraseRegex, jsRegex } from '@/lib/discovery/matcher';
 import { rankRecords } from '@/lib/discovery/rank';
 import { interpretMarket } from '@/lib/opportunities/market-interpretation';
 import { openRetrievalNaics, openRetrievalPsc } from '@/lib/opportunities/open-relevance';
-import { labelOpenRow } from '@/lib/opportunities/find-opportunities';
+import { labelOpenRow, demoteDuplicateVersions } from '@/lib/opportunities/find-opportunities';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 const [corpusPath, benchDir, outPath, basePath] = process.argv.slice(2);
@@ -56,6 +56,8 @@ for (const [biz, cfg] of Object.entries<Row>(Q)) {
     const sc = new Map(rankRecords(plan as never, win, ['title', 'description', 'department']).map((s: Row) => [s.row, s]));
     const ranked = win.map((row, i) => ({ i, row, label: labelOpenRow(row, plan as never, cap, null), s: sc.get(row) as Row | undefined }))
       .sort((a, b) => a.label.tier - b.label.tier || (b.s?.breadth ?? 0) - (a.s?.breadth ?? 0) || (b.s?.score ?? 0) - (a.s?.score ?? 0) || a.i - b.i);
+    const ranked2 = typeof demoteDuplicateVersions === 'function' ? demoteDuplicateVersions(ranked, (x) => x.row) : ranked;
+    ranked.splice(0, ranked.length, ...ranked2);
     const top20 = ranked.slice(0, 20).map((x) => String(x.row.notice_id));
     const R = rel[biz] || {};
     const relLo = Object.keys(R).filter((k) => R[k].v === 'lo'), relHi = Object.keys(R).filter((k) => R[k].v !== 'no');

@@ -757,6 +757,22 @@ export function labelOpenRow(
   return { cls, basis, tier };
 }
 
+/**
+ * RC3 (Agent 4 v7 blind top-20: one solicitation's versions filled the list — MTC-T ×5, ACP ×2, TS2 ×2). Rows sharing a
+ * solicitation family key (normalized solicitation number; else normalized title) keep only their FIRST position; the
+ * rest move after every first-of-family row, in their original order. Ranking only: every row is kept.
+ */
+export function demoteDuplicateVersions<T>(ranked: T[], rowOf: (x: T) => Record<string, unknown>): T[] {
+  const key = (r: Record<string, unknown>) => {
+    const sol = String(r.solicitation_number || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (sol.length >= 6) return `s:${sol}`;
+    return `t:${String(r.title || '').toLowerCase().replace(/^(amendment|amd|mod)\s*\d*\s*[-:–—]?\s*/i, '').replace(/[^a-z0-9]+/g, ' ').trim()}`;
+  };
+  const seen = new Set<string>(); const first: T[] = []; const later: T[] = [];
+  for (const x of ranked) { const k = key(rowOf(x)); (seen.has(k) ? later : first).push(x); seen.add(k); }
+  return [...first, ...later];
+}
+
 const EVIDENCE_TO_BASIS: Record<EvidenceBasis, MatchBasis> = {
   title_item: 'buy_side_text',
   own_trade_code: 'buy_side_code',
@@ -953,6 +969,9 @@ async function queryOpenNow(
         || (b.s?.breadth ?? 0) - (a.s?.breadth ?? 0)
         || (b.s?.score ?? 0) - (a.s?.score ?? 0)
         || a.i - b.i);
+    // RC3: versions of one solicitation (original + amendments) must not fill the list. Later versions keep their
+    // label and are moved behind the first of their family; nothing is dropped (demoteDuplicateVersions).
+    ranked.splice(0, ranked.length, ...demoteDuplicateVersions(ranked, (x) => x.row));
     const evidence_counts: EvidenceCounts = openEvidenceCounts(ranked);
     if (p.company) evidence_counts.COMPANY_REGISTERED_CODE = ranked.filter((x) => x.label.tier === OPEN_TIER.COMPANY_CODE).length;
     const sliced = ranked.slice(0, limit);

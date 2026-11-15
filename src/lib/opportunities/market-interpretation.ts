@@ -283,6 +283,22 @@ export const TRADE_PRESETS: CodePreset[] = [
     naics: ['238220'], psc: ['J041'],
     vocab: ['hvac', 'chiller', 'chillers', 'boiler', 'boilers', 'air conditioning'],
   },
+  {
+    // RC3 (Agent 4 v7: nursing below 40% on both forms; incidental "Nursing Practice Oversight Course", nurse-call
+    // construction were DIRECT). Own code: PSC Q401 Medical–Nursing. NOT 561320 (all temporary help) — too broad.
+    id: 'nurse_staffing', label: 'Nurse staffing',
+    match: /\b(?:nurses|nursing\s+(?:staff|staffing|services|assistants)|registered\s+nurses?|licensed\s+practical\s+nurses?|clinical\s+staff(?:ing)?|medical\s+staffing|healthcare\s+staffing)\b/i,
+    naics: [], psc: ['Q401'],
+    vocab: ['nursing services', 'nurse staffing', 'nurse staff', 'registered nurse', 'registered nurses', 'licensed practical nurse', 'nursing assistant', 'nursing assistants', 'medical staffing', 'clinical staffing'],
+  },
+  {
+    // RC3 (Agent 4 v7: steel buildings below 40%; steel PRODUCTS — plates, poles, scrap — were DIRECT on "steel").
+    // Own codes: 238120 structural steel, 238160 roofing contractors, 332311 prefabricated metal buildings.
+    id: 'steel_buildings_roofing', label: 'Steel buildings and metal roofing',
+    match: /\b(?:(?:pre-?engineered\s+)?(?:steel|metal)\s+buildings?|metal\s+roof(?:ing|s)?|roofing|standing\s+seam)\b/i,
+    naics: ['238120', '238160', '332311'], psc: [],
+    vocab: ['pre-engineered metal building', 'pre-engineered steel building', 'metal building', 'steel building', 'steel structure', 'roofing', 'roof replacement', 'reroof', 're-roof', 'metal roof', 'standing seam'],
+  },
 ];
 export const PRODUCT_PRESETS: CodePreset[] = [
   { id: 'valves', label: 'Valves', match: /\bvalves?\b/i, naics: [], psc: ['4810', '4820'], vocab: ['valve', 'valves', 'vlv'] },
