@@ -63,16 +63,31 @@ thrown stream → fixed message, no charge, turn failed · retry → charged onc
   returned rows; vehicle mix: only an explicit Defense agency filter (no agency breakdown = no evidence).
   Known bound: an unfiltered vehicle-mix total gets no Defense caveat.
 
-## 7. Live staging acceptance — BLOCKED ON CREDENTIALS
+## 7. Live staging acceptance — authenticated procedure (ready; needs a person to sign in)
 
-Script: `scripts/ask-mindy-b2-acceptance.mjs` (refuses production hosts, never prints the token, hard
-`--budget-usd` cap, 8 questions incl. the security-guard incident shape). Needs, from Eric:
-1. `ASK_MINDY_TRACE_EVENTS=true` on the **Preview** environment (scoped to branch `fix/ask-mindy-b2`).
-2. A Pro test account + its auth token, handed over outside the transcript.
-3. OpenAI account credits confirmed (Incident B).
-   Previews may sit behind Vercel Deployment Protection; if so, a protection-bypass token for automation is also needed.
-4. Approval to run each model configuration (current / gpt-6.1-terra primary / gpt-6-luna and Groq gpt-oss-120b fallbacks),
-   estimated ≤ $1 per configuration at list prices.
+**Automated (preferred):** `scripts/ask-mindy-b2-browser-acceptance.mjs`
+```
+node scripts/ask-mindy-b2-browser-acceptance.mjs \
+  --base https://market-assassin-git-fix-ask-mindy-b2-eric-coffies-projects.vercel.app \
+  --expect-email <synthetic Pro test account> --budget-usd 5
+```
+1. Opens a visible Chrome-for-Testing window with a throwaway profile at `<preview>/app`.
+2. A person signs in with the synthetic Pro account through the normal Mindy login.
+3. The script checks inside the page that the session is `--expect-email`, and refuses to run otherwise.
+4. All 8 questions run from inside the page with the page's own session, under 4 configurations selected by the
+   preview-only header `x-ask-mindy-staging-config` (`current`, `terra`, `fallback-luna`, `fallback-groq`;
+   `src/lib/chat/staging-model-config.ts`, ignored unless tracing is on, so never on production).
+5. Outputs per turn: tools, result sizes, notices (bounding, budget, fallback), answer model, latency, cost from
+   trace usage, and credit events. Also reports the credit balance before and after. The throwaway profile is deleted.
+   The token never leaves the browser.
+
+**Manual fallback (no automation):** sign in on the preview alias in any browser, open Ask Mindy, and ask the 8
+questions in `scripts/ask-mindy-b2-acceptance.mjs` (`QUESTIONS`). For each, record: does the answer cite records
+shown above it; was an expiring-contracts list shown for an *open* question (fail); any raw provider text (fail);
+time to first token; credit balance before/after on `/mcp/account`. The manual path cannot select model configurations
+or report token cost.
+
+Prerequisites from Eric: an authorized synthetic Pro test account, and its sign-in done by a person on the preview.
 
 ## Go / no-go
 

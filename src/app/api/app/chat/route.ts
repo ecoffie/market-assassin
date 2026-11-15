@@ -43,6 +43,7 @@ import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/ti
 import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/chat-tool-executor';
 import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, resolveAnswerChain, answerKey, ANSWER_ENDPOINTS, openAiChatParams, type PlannerTarget } from '@/lib/chat/planner-config';
 import { fitMessages, inputBudget, type MsgKind } from '@/lib/chat/token-budget';
+import { stagingModelConfig, STAGING_CONFIG_HEADER } from '@/lib/chat/staging-model-config';
 import { customerErrorMessage } from '@/lib/chat/customer-errors';
 import { boundToolResult, perResultBudget } from '@/lib/chat/bound-tool-result';
 import { filterToolsForQuestion } from '@/lib/chat/tool-selection';
@@ -569,9 +570,12 @@ export async function POST(request: NextRequest) {
         toolRoundMessages.push({ role: 'user', content: message });
 
         const overBudgetEarly = await isUserOverBudget(email).catch(() => false);
+        // Preview-only per-request model configuration (staging acceptance); null on production by construction.
+        const staging = stagingModelConfig(request.headers.get(STAGING_CONFIG_HEADER), TRACE_EVENTS);
+        const modelEnv: Record<string, string | undefined> = staging ? { ...process.env, ...staging.config.env } : process.env;
         const chatModelEarly = overBudgetEarly
-          ? (process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini')
-          : (process.env.CHAT_OPENAI_MODEL || 'gpt-4o');
+          ? (modelEnv.LLM_OPENAI_MODEL || 'gpt-4o-mini')
+          : (modelEnv.CHAT_OPENAI_MODEL || 'gpt-4o');
 
         // ── Mindy Chat v2: Data Core tool round (PRD-mindy-chat-data-core §5a) ──
         // ONE non-streamed pre-flight call offering the Data Core tools:
@@ -600,6 +604,7 @@ export async function POST(request: NextRequest) {
         } = { planner: null, planner_attempts: [], tools_offered: 0, tool_executions: [], answer: null, notices: [],
               ...(cardCtx ? { context: { kind: 'opportunity' as const, notice_id: cardCtx.noticeId } } : {}) };
         if (capabilityNote) turnTrace.notices.push('capability_interpreted');
+        if (staging) turnTrace.notices.push(`staging_model_config:${staging.name}`);
         const notify = (code: string, text: string) => {
           turnTrace.notices.push(code);
           send({ type: 'notice', code, message: text });
@@ -699,7 +704,7 @@ export async function POST(request: NextRequest) {
 
           // Explicit planner chain (gpt-4o default; Claude only behind CHAT_CLAUDE_ENABLED;
           // fallbacks only to compatibility-tested planners). Every failure is recorded.
-          const resolved = resolvePlannerChain(process.env, { overBudget: overBudgetEarly });
+          const resolved = resolvePlannerChain(modelEnv, { overBudget: overBudgetEarly });
           const chain = resolved.filter((t) => providerApprovedForPrivate(t.provider));
           for (const t of resolved) {
             if (!chain.includes(t)) {
@@ -906,7 +911,7 @@ export async function POST(request: NextRequest) {
         // B2: explicit answer chain (primary, then supported fallbacks), each provider checked
         // against the private-data approved list. Provider error text goes to recordProviderEvent
         // only; the customer sees a fixed message from customer-errors.ts.
-        const answerChain = resolveAnswerChain(process.env, { primaryModel: chatModel })
+        const answerChain = resolveAnswerChain(modelEnv, { primaryModel: staging?.config.answerPrimary ?? chatModel })
           .filter((t) => {
             if (providerApprovedForPrivate(t.provider)) return true;
             void recordProviderEvent({ kind: 'answer_failure', provider: t.provider, model: t.model, detail: 'answer model skipped: provider not on the approved list for private data', userEmail: auth.email! });
@@ -941,7 +946,7 @@ export async function POST(request: NextRequest) {
             continue;
           }
           try {
-            r = await streamFrom(ANSWER_ENDPOINTS[t.provider], answerKey(process.env, t) || '', t.model, fit.messages);
+            r = await streamFrom(ANSWER_ENDPOINTS[t.provider], answerKey(modelEnv, t) || '', t.model, fit.messages);
           } catch (e) {
             detail = String((e as Error)?.message || e).slice(0, 300);
           }

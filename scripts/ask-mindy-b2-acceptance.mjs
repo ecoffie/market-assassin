@@ -15,9 +15,10 @@
  */
 import { writeFileSync } from 'node:fs';
 
-const PRICES = { // USD per 1M tokens: [input, output]
+export const PRICES = { // USD per 1M tokens: [input, output]
   'gpt-4o': [2.5, 10], 'gpt-4o-mini': [0.15, 0.6],
   'gpt-6-luna': [0.1, 0.5], 'gpt-6.1-terra': [1, 5], 'gpt-6.1-sol': [2, 10],
+  'openai/gpt-oss-120b': [0.15, 0.6],
 };
 
 export const QUESTIONS = [
@@ -60,7 +61,7 @@ async function ask(base, email, token, item) {
   return out;
 }
 
-function cost(u) {
+export function cost(u) {
   let usd = 0;
   for (const step of [u?.planner, u?.answer]) {
     if (!step?.usage) continue;
@@ -70,7 +71,7 @@ function cost(u) {
   return usd;
 }
 
-function judge(r, expect) {
+export function judge(r, expect) {
   const names = r.tools.map((t) => t.split(':')[0]);
   const fails = [];
   if (r.errors.length) fails.push(`errors: ${r.errors.join(' | ')}`);

@@ -56,7 +56,10 @@ describe('chat route wiring (source assertions)', () => {
   });
 
   it('selects the planner through resolvePlannerChain and records provider events', () => {
-    expect(code).toMatch(/resolvePlannerChain\(process\.env/);
+    expect(code).toMatch(/resolvePlannerChain\(modelEnv/);
+    // modelEnv is process.env unless the preview-only staging selector applies (never on production).
+    expect(code).toMatch(/const modelEnv: Record<string, string \| undefined> = staging \? \{ \.\.\.process\.env, \.\.\.staging\.config\.env \} : process\.env;/);
+    expect(code).toMatch(/stagingModelConfig\(request\.headers\.get\(STAGING_CONFIG_HEADER\), TRACE_EVENTS\)/);
     expect(code).toMatch(/recordProviderEvent\(/);
     expect(code).not.toMatch(/CHAT_CLAUDE_MODEL \|\| 'claude-sonnet-5'/);
   });
@@ -74,7 +77,7 @@ describe('chat route wiring (source assertions)', () => {
   it('applies the private-data provider allow-list to the planner and the answer fallback', () => {
     expect(code).toMatch(/resolved\.filter\(\(t\) => providerApprovedForPrivate\(t\.provider\)\)/);
     // B2: every answer model (primary and fallbacks) passes the same allow-list.
-    expect(code).toMatch(/resolveAnswerChain\(process\.env, \{ primaryModel: chatModel \}\)\s*\.filter\(\(t\) => \{\s*if \(providerApprovedForPrivate\(t\.provider\)\) return true;/);
+    expect(code).toMatch(/resolveAnswerChain\(modelEnv, \{ primaryModel: staging\?\.config\.answerPrimary \?\? chatModel \}\)\s*\.filter\(\(t\) => \{\s*if \(providerApprovedForPrivate\(t\.provider\)\) return true;/);
   });
 
   it('streams verification traces only behind ASK_MINDY_TRACE_EVENTS', () => {

@@ -233,3 +233,38 @@ describe('B2: staging usage trace', () => {
     expect((await ask('How do I write a capability statement?')).events.some((e) => e.type === 'trace_usage')).toBe(false);
   });
 });
+
+describe('B2: preview-only staging model selector', () => {
+  it('is ignored without the trace gate (and therefore always on production)', async () => {
+    vi.resetModules();
+    const { POST } = await import('./route');
+    const mk = () => new Request('https://x/api/app/chat', { method: 'POST', headers: { 'x-ask-mindy-staging-config': 'fallback-groq' }, body: JSON.stringify({ email: ME, message: 'How do I write a capability statement?' }) });
+    await (await POST(mk() as never)).text();
+    expect(state.answerModels).toEqual(['gpt-4o']); // default config, header ignored
+    vi.stubEnv('ASK_MINDY_TRACE_EVENTS', 'true'); vi.stubEnv('VERCEL_ENV', 'production');
+    state.answerModels = [];
+    vi.resetModules();
+    await (await (await import('./route')).POST(mk() as never)).text();
+    expect(state.answerModels).toEqual(['gpt-4o']);
+  });
+
+  it('on a traced preview, fallback-groq forces a real primary failure and Groq answers', async () => {
+    vi.stubEnv('ASK_MINDY_TRACE_EVENTS', 'true'); vi.stubEnv('VERCEL_ENV', 'preview');
+    state.failModels = new Set(['mindy-staging-forced-failure']);
+    vi.resetModules();
+    const { POST } = await import('./route');
+    const res = await POST(new Request('https://x/api/app/chat', { method: 'POST', headers: { 'x-ask-mindy-staging-config': 'fallback-groq' }, body: JSON.stringify({ email: ME, message: 'How do I write a capability statement?' }) }) as never);
+    const raw = await res.text();
+    expect(state.answerModels).toEqual(['mindy-staging-forced-failure', 'openai/gpt-oss-120b']);
+    expect(state.answerUrls[1]).toMatch(/^https:\/\/api\.groq\.com\//);
+    expect(raw).toMatch(/"fallback":true/);
+  });
+
+  it('an unknown config name is ignored', async () => {
+    vi.stubEnv('ASK_MINDY_TRACE_EVENTS', 'true'); vi.stubEnv('VERCEL_ENV', 'preview');
+    vi.resetModules();
+    const { POST } = await import('./route');
+    await (await POST(new Request('https://x/api/app/chat', { method: 'POST', headers: { 'x-ask-mindy-staging-config': 'gpt-6-astra' }, body: JSON.stringify({ email: ME, message: 'How do I write a capability statement?' }) }) as never)).text();
+    expect(state.answerModels).toEqual(['gpt-4o']);
+  });
+});
