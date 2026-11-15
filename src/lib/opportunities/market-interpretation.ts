@@ -495,6 +495,10 @@ export function interpretCapability(phrase: string): CapabilityInterpretation {
 
   for (const row of PHRASE_PRESET) {
     if (!row.match.test(requested)) continue;
+    // S1 (2026-11-15; Agent 4 v7: steel long 6-7/20). The bare word "construction" ("We are a construction contractor.
+    // We erect pre-engineered steel buildings …") claimed the broad Construction family (NAICS 236/237/238) ahead of the
+    // trade the sentence names. A matching trade preset is more specific: it wins over that broad keyword row.
+    if (row.name === 'Construction' && !row.directNaics?.length && tradePresetsFor(requested).length) continue;
     const preset = getIndustryPreset(row.name);
     if (!preset) continue;
     const reason = `Customer phrase maps to the “${preset.name}” industry preset.`;
