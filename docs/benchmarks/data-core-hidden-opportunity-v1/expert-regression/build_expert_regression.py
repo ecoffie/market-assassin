@@ -1,6 +1,7 @@
 # Expert-labelled regression set v1: every prior human judgment by Eric (the project owner), re-keyed to the current rubric.
 # Sources: labels.jsonl (human_* fields, committed 41b6e3be6, 2026-11-14) == the v1 review page's `reviews` collection (47/47 identical, re-checked 2026-11-15).
 # DEVELOPMENT material: on the research branch since 2026-11-14 and readable by Agent 3. Never part of the sealed holdout.
+# ONE-TIME builder (already run 2026-11-15). Refuses to overwrite the store.
 # Run: python3 -I docs/benchmarks/data-core-hidden-opportunity-v1/expert-regression/build_expert_regression.py
 import json, csv, os, sys, io, re, contextlib
 B = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); V7 = f'{B}/v7'
@@ -37,7 +38,9 @@ for x in sorted(H, key=lambda x: x['human_review_id']):
         exposure='DEVELOPMENT: research branch since 41b6e3be6 (2026-11-14), readable by Agent 3',
         v7_ai_labels=ai['l'] if ai else None, v7_ai_disagrees=(ai['lo'] != (x['human_label'] != 'NO')) if ai else None,
         in_top20={rc: n in top.get((rc, b), set()) for rc in ('rc1', 'rc2', 'rc3')}, calibration_item=CAL.get(n)))
-with open(f'{B}/expert-regression/expert_regression_v1.jsonl', 'w') as f:
+if os.path.exists(f'{B}/expert-regression/expert_labels.jsonl') and '--force-rebuild' not in sys.argv:
+    sys.exit('expert_labels.jsonl already exists: it is the permanent append-only store (later rulings live in it). Use expert.add_labels(); never rebuild.')
+with open(f'{B}/expert-regression/expert_labels.jsonl', 'w') as f:
     for r in out: f.write(json.dumps(r, sort_keys=True) + '\n')
 import collections
 print('items', len(out), collections.Counter(r['status'] for r in out), collections.Counter(r['eric_label'] for r in out))

@@ -17,7 +17,7 @@
 | Missing or unusable | **0 missing.** The 278 other v1 rows were never human-reviewed: they are AI-only and were never claimed as his |
 | Exposed to Agent 3 | **All 47.** They have been on the research branch since 2026-11-14, which Agent 3 can read. `HUMAN-REVIEW-RESULTS.md` (same commit) shaped the gate-sentence design both agents adopted. No code at the RC3 tag reads them: there are no references outside `docs/benchmarks`. Agent 3's `tests/fixtures/anyword-matching-2026-11-14/labels.json` (403 keys) is Agent 3's own blind labelling of different query keys, not Eric's |
 
-**Dataset:** `expert_regression_v1.jsonl` (47 rows, built by `build_expert_regression.py`).
+**Dataset:** `expert_labels.jsonl` (47 rows, built by `build_expert_regression.py`).
 Each row carries the notice and solicitation IDs, both business phrasings, Eric's raw and mapped labels, notes, timestamp, sample type (S random / R recovered / G gate), status, exposure, the v7 AI labels, and RC1/RC2/RC3 top-20 membership.
 It is **development material only**. It is never mixed into the sealed holdout (`~/mindy-bench-sealed/`).
 
@@ -63,8 +63,15 @@ The overall 60% now counts **Direct only** (Eric's RC3 brief). On the AI preview
 ## Eric's decisions (2026-11-15, recorded by Agent 4)
 
 1. **Fail-first staging approved.** Judge guards and steel buildings first, and stop if either fails (once the independent reviewer confirms).
-2. **S30/C15: Not relevant.** Ruling 1 is upheld: a repair/modification notice is not relevant for a parts-only supplier. `expert_regression_v1.jsonl` now has **47 reusable** (18 Direct, 10 Related, 19 Not relevant). The sealed calibration key C15 is now NO, and its kind is corrected to product.
+2. **S30/C15: Not relevant.** Ruling 1 is upheld: a repair/modification notice is not relevant for a parts-only supplier. `expert_labels.jsonl` now has **47 reusable** (18 Direct, 10 Related, 19 Not relevant). The sealed calibration key C15 is now NO, and its kind is corrected to product.
 3. **Recall gate counts Direct only.** All three gates are now Direct-only: overall ≥ 60%, per business ≥ 40%, within-code recall ≥ 50%. Related is reported separately.
 4. **Guards is judged on the Dec 12 snapshot.** RC3 can be decided in December. If Dec 12 holds fewer than 20 distinct guard solicitations in RC3's top 20, the floor is ceil(40% × distinct shown). The thin volume is reported with the result.
 
 Still open: the independent reviewer (name, pay ≈ $110–150), confirming the 8 product practice answers, and the optional guards spot-check.
+
+## Now in use (2026-11-15)
+
+- **Permanent store:** `expert_labels.jsonl`, append-only. The one-time builder refuses to overwrite it.
+- **The scorer uses it.** `v7/scripts/r16.labels()` applies Eric's labels last. `check_expert.py precedence` gives 47/47 from Eric, 0 violations. No previously reported RC number changes, because neither AI disagreement is in a top 20.
+- **No re-asking:** `expert.filter_new()` is required before any human review sheet. The guards spot-check and the 8 product calibration items have zero overlap.
+- **Regression check:** `check_expert.py candidate`. On RC3, none of Eric's Not-relevant notices reach the top 20, but 5 of his Direct notices (3 parts, 1 nursing, 1 HVAC) are never retrieved by any version. See `README.md`.

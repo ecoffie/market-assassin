@@ -27,6 +27,9 @@ def labels():
             L.update(r6['load_labels'](f'{V7}/labels/{rnd}_meta.json', V7 + f'/labels/{rnd}lab_*_r' + '{k}.jsonl'))
     for k, lab in g['g']['ADJ'].items():
         if k in L: L[k] = dict(L[k], lo=lab != 'NO', hi=lab != 'NO', l=[lab, lab])
+    # Precedence rule (Eric, 2026-11-15): Eric's own labels override rulings/adjudications and AI. Applied LAST.
+    sys.path.insert(0, os.path.join(os.path.dirname(V7), 'expert-regression')); import expert
+    L, _, _ = expert.apply_expert(L)
     return L
 def rows_for(p, v3):
     b = v3['business']; key = (b, v3['phrasing'])
