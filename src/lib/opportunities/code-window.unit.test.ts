@@ -31,3 +31,17 @@ describe('which searches get a code-recall sub-window', () => {
     expect(OPEN_CODE_WINDOW_CAP).toBeLessThanOrEqual(250);
   });
 });
+
+describe('C · DLA hardware nouns are item evidence only inside the IT hardware families', () => {
+  it('"DISK DRIVE UNIT" (7E20) and "PANEL PC" (7E20) are DIRECT; the same noun outside 7x is not', async () => {
+    const { labelOpenRow } = await import('./find-opportunities');
+    const { buildDiscoveryPlan } = await import('@/lib/discovery/plan');
+    const { MCP_POLICY } = await import('@/lib/discovery/policy');
+    const plan = buildDiscoveryPlan({ query: IT_LONG }, MCP_POLICY, { today: '2026-11-15', fiscalYear: 2027 });
+    const l = (title: string, psc: string) => labelOpenRow({ title, psc_code: psc, description: '' }, plan, cap(IT_LONG), null).cls;
+    expect(l('DISK DRIVE UNIT', '7E20')).toBe('DIRECT_MATCH');
+    expect(l('PANEL PC', '7E20')).toBe('DIRECT_MATCH');
+    expect(l('58--INTERFACE UNIT,COMMUNI', '5895')).not.toBe('DIRECT_MATCH');
+    expect(l('12--DISPLAY UNIT,HELMET', '1240')).not.toBe('DIRECT_MATCH');
+  });
+});

@@ -332,7 +332,11 @@ export const PRODUCT_PRESETS: CodePreset[] = [
     naics: [],
     psc: ['7B20', '7B21', '7B22', '7C20', '7C21', '7E20', '7E21', '7G21', '7H20', '7J20', '7K20'],
     vocab: ['computer', 'computers', 'laptop', 'laptops', 'desktop', 'desktops', 'server', 'servers', 'workstation', 'workstations',
-      'monitor', 'monitors', 'keyboard', 'printer', 'printers', 'router', 'routers', 'docking station', 'tablet', 'tablets', 'storage array', 'hard drive'],
+      'monitor', 'monitors', 'keyboard', 'printer', 'printers', 'router', 'routers', 'docking station', 'tablet', 'tablets', 'storage array', 'hard drive',
+      // DLA item nouns for computer hardware (2026-11-15, IT long diagnosis): specific multi-word nouns only. Each appears
+      // in ≤12 open titles, so retrieval barely moves; DIRECT still requires a 7x PSC (STRICT_ITEM_PRESETS). Generic
+      // words ("switch" 139 titles, "storage" 37, "display" 32 — pressure switches, storage batteries) are deliberately out.
+      'disk drive', 'display unit', 'interface unit', 'panel pc', 'drive assy'],
   },
   {
     // Pharmaceuticals ONLY when the customer explicitly sells / distributes / supplies them (Eric, 2026-11-14). A generic
