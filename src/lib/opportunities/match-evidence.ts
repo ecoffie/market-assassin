@@ -43,6 +43,8 @@ export type MatchBasis =
   | 'agency_or_program_name'
   | 'repair_notice_for_parts'
   | 'no_evidence'
+  /** Long-list guard (2026-11-15): one list word in the title, but the notice's code family is not the business's (RELATED). */
+  | 'single_list_word'
   | CompanyRecallBasis;
 
 /** Coming back classes: the two FIND evidence classes + the holder-name signal. */
@@ -159,6 +161,11 @@ export function productCodeWhy(phrase: string, row: { psc_code?: string | null }
 
 export function descriptionOnlyWhy(phrase: string): string {
   return `Related to “${phrase}”: the requirement text mentions it, but the title (what is being bought) does not. Read the scope before treating it as ${phrase} work.`;
+}
+
+export function singleListWordWhy(phrase: string, row: { psc_code?: string | null }): string {
+  const code = row.psc_code ? ` (code ${row.psc_code})` : '';
+  return `Related to “${phrase}”: the title shares a word with your description, but what is being bought${code} is a different kind of product or service. Check it before treating it as your work.`;
 }
 
 export function notRelevantWhy(phrase: string, basis: 'boilerplate_only' | 'agency_or_program_name' | 'repair_notice_for_parts' | 'no_evidence'): string {

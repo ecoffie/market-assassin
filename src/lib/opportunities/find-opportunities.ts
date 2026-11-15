@@ -69,6 +69,7 @@ import {
   relatedCodeWhy,
   productCodeWhy,
   descriptionOnlyWhy,
+  singleListWordWhy,
   notRelevantWhy,
   companyCodeWhy,
   type ComingBackClass,
@@ -754,7 +755,7 @@ export function labelOpenRow(
   if (company) basis.push(company);
   // Within RELATED (RC2): an in-code product row outranks a description-only mention, which outranks a family code.
   const relatedOffset = cls === 'RELATED_MARKET_CANDIDATE'
-    ? (basis[0] === 'product_code' ? 0 : basis[0] === 'description_text' ? 0.1 : 0.2) : 0;
+    ? (basis[0] === 'product_code' ? 0 : basis[0] === 'description_text' || basis[0] === 'single_list_word' ? 0.1 : 0.2) : 0;
   const tier = cls === 'WEAK_NON_MARKET' && company ? OPEN_TIER.COMPANY_CODE : OPEN_TIER[cls] + relatedOffset;
   return { cls, basis, tier };
 }
@@ -785,6 +786,7 @@ const EVIDENCE_TO_BASIS: Record<EvidenceBasis, MatchBasis> = {
   agency_or_program_name: 'agency_or_program_name',
   repair_notice_for_parts: 'repair_notice_for_parts',
   no_evidence: 'no_evidence',
+  single_list_word: 'single_list_word',
 };
 
 function legacyOpenLabel(
@@ -826,6 +828,7 @@ function openWhy(label: OpenLabel, phrase: string, row: Record<string, unknown>)
   if (label.basis[0] === 'related_market_code') return relatedCodeWhy(phrase, row as { naics_code?: string; naics_description?: string });
   if (label.basis[0] === 'product_code') return productCodeWhy(phrase, row as { psc_code?: string });
   if (label.basis[0] === 'description_text') return descriptionOnlyWhy(phrase);
+  if (label.basis[0] === 'single_list_word') return singleListWordWhy(phrase, row as { psc_code?: string });
   if (label.basis[0] === 'boilerplate_only' || label.basis[0] === 'agency_or_program_name'
     || label.basis[0] === 'repair_notice_for_parts' || label.basis[0] === 'no_evidence') return notRelevantWhy(phrase, label.basis[0]);
   const company = label.basis.find((b) => b === 'company_registered_psc' || b === 'company_registered_naics') as

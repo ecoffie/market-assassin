@@ -27,12 +27,12 @@
 import aliasData from '@/data/agency-aliases.json';
 import { STRICT_ITEM_PRESETS, type CapabilityInterpretation } from './market-interpretation';
 import type { DiscoveryPlan } from '@/lib/discovery';
-import { conceptHit, phraseRegex, jsRegex, type Alternative } from '@/lib/discovery/matcher';
+import { conceptHit, phraseRegex, jsRegex, framedVerbs, type Alternative, type Concept } from '@/lib/discovery/matcher';
 
 export type EvidenceCls = 'DIRECT_MATCH' | 'RELATED_MARKET_CANDIDATE' | 'WEAK_NON_MARKET';
 export type EvidenceBasis =
   | 'title_item' | 'own_trade_code' | 'description_only' | 'product_code_only' | 'related_family_code'
-  | 'boilerplate_only' | 'agency_or_program_name' | 'repair_notice_for_parts' | 'no_evidence';
+  | 'boilerplate_only' | 'agency_or_program_name' | 'repair_notice_for_parts' | 'no_evidence' | 'single_list_word';
 export interface EvidenceVerdict { cls: EvidenceCls; basis: EvidenceBasis }
 
 /**
@@ -101,6 +101,75 @@ function customerHit(plan: DiscoveryPlan, text: string): boolean {
 function vocabHit(cap: CapabilityInterpretation, text: string): boolean {
   return (cap.direct.vocab || []).some((v) => jsRegex(phraseRegex(v.toLowerCase())).test(text));
 }
+/**
+ * LONG-LIST FAMILY GUARD (Agent 3, 2026-11-15; diagnosis on Agent 4's v7 RC3 preview). In a long description of the
+ * business (more than LIST_QUERY_WORDS words) every list word is an eligible alternative, so one of them in the title head
+ * made a notice DIRECT whatever it bought: "mill and pave asphalt" put "Chemically Milled Plate" (FSC 9650) and an HH-60
+ * "PAVE HAWK" damper (FSC 1615) on top of paving; "consumables such as … dressings" put "PERCUSSION CONSUMABLES"
+ * (FSC 7720) and a menu of "DRESSING AND CONDIMENTS" (FSC 8950) on top of medical supplies; "parts … for … vehicles"
+ * put whole-vehicle buys on top of a parts supplier.
+ *
+ * In a long query only, when the title head carries none of the preset's own vocabulary:
+ *  - a head that matches only MODIFIER words (words that appear in the query only inside a "for … / to …" clause, which
+ *    names who the work or items are for, not what is sold) is RELATED;
+ *  - a head that matches exactly ONE list word is DIRECT only if the notice's code family agrees with the business:
+ *    a product preset's own FSC groups; otherwise a work business (construction / services) needs a service code, and
+ *    a supplier ("we supply / sell / distribute …", "supplier", "distributor"; never "provide" / "offer", which frame
+ *    services just as often) needs a product code. R&D codes (A…) never
+ *    agree unless the business says it does research. A missing code agrees (unknown is not evidence against).
+ * Two or more list words in the head stay DIRECT. Rows are never dropped; this only moves them from DIRECT to RELATED.
+ * Short queries and trade presets are untouched (trades already require their own vocabulary or code).
+ */
+export const LIST_QUERY_WORDS = 15;
+const MODIFIER_CLAUSE = /\b(?:for|to|in\s+support\s+of|used\s+(?:in|on|by))\b([^.:;]*)/gi;
+const SUPPLIER_ROLE = /\b(supplier|distributor|reseller|vendor|dealer|wholesaler)s?\b/i;
+/** "provide" / "offer" frame services as often as goods ("we provide janitorial services"), so they never mark a supplier. */
+const GOODS_VERBS = new Set(['supply', 'supplies', 'sell', 'sells', 'resell', 'resells', 'distribute', 'distributes', 'furnish', 'furnishes', 'source', 'sources', 'deliver', 'delivers']);
+const RESEARCH_INTENT = /\b(research|r&d|development|prototyp\w*|engineering\s+services?)\b/i;
+
+function queryConcepts(plan: DiscoveryPlan): Concept[] {
+  const m = plan.matcher;
+  if (m.mode !== 'lexical') return [];
+  const seen = new Map<string, Concept>();
+  for (const a of m.alternatives) for (const c of a.eligible) if (!seen.has(c.label)) seen.set(c.label, c);
+  return [...seen.values()];
+}
+/** List words that occur in the query only inside "for … / to …" clauses (who it is for, not what is sold). */
+function modifierLabels(query: string, concepts: Concept[]): Set<string> {
+  const q = String(query || '');
+  const inClauses = [...q.matchAll(MODIFIER_CLAUSE)].map((x) => x[1]).join(' \n ');
+  const outside = q.replace(MODIFIER_CLAUSE, ' ');
+  return new Set(concepts.filter((c) => conceptHit(c, inClauses) && !conceptHit(c, outside)).map((c) => c.label));
+}
+function familyAgrees(psc: string, query: string, cap: CapabilityInterpretation): boolean {
+  if (!psc) return true;
+  const products = cap.codePresets?.products || [];
+  if (products.length) {
+    const groups = new Set([...(cap.related_market?.psc || []), ...products.flatMap((id) => STRICT_ITEM_PRESETS[id] || [])].map((c) => c.slice(0, 2)));
+    return groups.has(psc.slice(0, 2));
+  }
+  if (/^A/i.test(psc)) return RESEARCH_INTENT.test(query);
+  const supplier = [...framedVerbs(query)].some((v) => GOODS_VERBS.has(v)) || SUPPLIER_ROLE.test(query);
+  return supplier ? /^\d/.test(psc) : /^[A-Z]/i.test(psc);
+}
+/** null = the guard does not apply; otherwise the verdict that replaces DIRECT. */
+function longListGuard(row: Record<string, unknown>, plan: DiscoveryPlan, cap: CapabilityInterpretation, residual: string, head: string): EvidenceVerdict | null {
+  // Sentence structure ("for …" clauses, subject verbs) is read from the query AS TYPED: the residual has its periods and
+  // colons stripped, so a "for" clause would run to the end of the paragraph and swallow the whole list.
+  const query = String(plan.raw || residual || '');
+  if (query.trim().split(/\s+/).length <= LIST_QUERY_WORDS) return null;
+  if ((cap.codePresets?.trades || []).length || vocabHit(cap, head)) return null;
+  const concepts = queryConcepts(plan);
+  if (!concepts.length) return null;
+  const mods = modifierLabels(query, concepts);
+  const hits = concepts.filter((c) => conceptHit(c, head));
+  const core = hits.filter((c) => !mods.has(c.label));
+  const relatedV: EvidenceVerdict = { cls: 'RELATED_MARKET_CANDIDATE', basis: 'single_list_word' };
+  if (hits.length && !core.length) return relatedV;
+  if (core.length === 1 && !familyAgrees(String(row.psc_code || ''), query, cap)) return relatedV;
+  return null;
+}
+
 const codeIn = (list: string[], v: unknown) => { const s = String(v || '').trim(); return !!s && list.some((c) => (c.length < 6 ? s.startsWith(c) : s === c)); };
 
 export function classifyOpenEvidence(
@@ -139,7 +208,9 @@ export function classifyOpenEvidence(
     }
     return vocabHit(cap, noun) || customerHit(plan, noun);
   };
-  if (inHead && (!products.length || productDirect())) return { cls: 'DIRECT_MATCH', basis: 'title_item' };
+  if (inHead && (!products.length || productDirect())) {
+    return longListGuard(row, plan, cap, query, head) || { cls: 'DIRECT_MATCH', basis: 'title_item' };
+  }
   // A trade search whose only title evidence is the customer's generic word ("clean" in "grease trap cleaning",
   // "guards" in "Coast Guard ...") is RELATED, not DIRECT: the trade's own vocabulary or code must appear.
   if (trades.length && customerHit(plan, head)) return { cls: 'RELATED_MARKET_CANDIDATE', basis: 'description_only' };
