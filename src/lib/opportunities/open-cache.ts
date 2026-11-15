@@ -167,7 +167,19 @@ export async function cachedOpenRetrieval(args: {
  * OPEN_SNAPSHOT_RETRIEVAL: literal 'true' only (same contract as the repo's other release flags). OFF = every caller
  * builds exactly today's query; nothing in this module runs.
  */
-export function openSnapshotEnabled(): boolean { return process.env.OPEN_SNAPSHOT_RETRIEVAL === 'true'; }
+/**
+ * HARD-DISABLED on this branch (Agent 5, 2026-11-15). This is the UNHARDENED seam: it self-disables after every SAM sync,
+ * builds per instance from the DB, and runs unbounded verification (Agent 5's cache review #1-#5). The fixes live on
+ * agent3/cache-hardening. Setting OPEN_SNAPSHOT_RETRIEVAL=true here does NOTHING; only cache-hardening, once merged
+ * and its infrastructure approved by Eric, flips SNAPSHOT_SEAM_RELEASED to true.
+ */
+const SNAPSHOT_SEAM_RELEASED = false;
+let seamAllowedForTests = false;
+/** Test seam: lets the seam's own unit tests exercise it. Never call from application code. */
+export function __allowUnhardenedSeamForTests(on: boolean) { seamAllowedForTests = on; }
+export function openSnapshotEnabled(): boolean {
+  return (SNAPSHOT_SEAM_RELEASED || seamAllowedForTests) && process.env.OPEN_SNAPSHOT_RETRIEVAL === 'true';
+}
 
 type Call = { m: string; a: unknown[] };
 const FILTER_METHODS = new Set(['or', 'is', 'eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in', 'ilike', 'like', 'not', 'filter']);

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { openQueryFactory, CachedOpenQuery, currentOpenSnapshot, __setOpenSnapshotForTests, DELTA_MAX, type OpenSnapshot } from './open-cache';
+import { openQueryFactory, CachedOpenQuery, currentOpenSnapshot, __setOpenSnapshotForTests, __allowUnhardenedSeamForTests, openSnapshotEnabled, DELTA_MAX, type OpenSnapshot } from './open-cache';
 import { buildDiscoveryPlan } from '@/lib/discovery/plan';
 import { MAPS_POLICY } from '@/lib/discovery/policy';
 
@@ -49,8 +49,8 @@ function fakeDb(db: Row[], opts: { failVerify?: boolean } = {}) {
   return client;
 }
 const snap = (rows: Row[]): OpenSnapshot => ({ builtAt: AT, count: rows.length, rows: rows as never });
-const on = () => { process.env.OPEN_SNAPSHOT_RETRIEVAL = 'true'; };
-afterEach(() => { delete process.env.OPEN_SNAPSHOT_RETRIEVAL; __setOpenSnapshotForTests(null); });
+const on = () => { process.env.OPEN_SNAPSHOT_RETRIEVAL = 'true'; __allowUnhardenedSeamForTests(true); };
+afterEach(() => { delete process.env.OPEN_SNAPSHOT_RETRIEVAL; __allowUnhardenedSeamForTests(false); __setOpenSnapshotForTests(null); });
 
 describe('flag OFF: exactly today\'s query', () => {
   it('the factory returns the SQL path and never touches the snapshot', async () => {
@@ -130,3 +130,14 @@ describe('failures are explicit, never empty', () => {
   });
 });
 function base0() { return [R('a', '48--VALVE,CHECK'), R('c', 'Snow removal')]; }
+
+describe('rc3-candidate: the unhardened seam cannot be switched on by the flag alone', () => {
+  it('OPEN_SNAPSHOT_RETRIEVAL=true without the hardening release leaves FIND on SQL', async () => {
+    __allowUnhardenedSeamForTests(false);
+    process.env.OPEN_SNAPSHOT_RETRIEVAL = 'true';
+    expect(openSnapshotEnabled()).toBe(false);
+    const f = await openQueryFactory(fakeDb(base0()), plan, snap(base0()), NOW);
+    expect(f.path).toBe('sql');
+    expect(f.reason).toBeNull();
+  });
+});
