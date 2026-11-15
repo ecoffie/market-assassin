@@ -532,6 +532,8 @@ export function renderBuyingOffices(result: Rec): RenderedRecords | null {
     lines.push(`${offices.length < officeCount ? `Showing the top ${offices.length} of ${officeCount}` : `Showing all ${officeCount}`} by net obligations: ${positive} with positive net obligations are listed below${offices.length - positive ? `, and ${offices.length - positive} with zero or negative net obligations are listed separately` : ''}.`);
     lines.push('Ranked by obligations under the industry (NAICS) codes shown; a code can include other work than the words you used, so check the example awards listed for each office.');
     if (meta.as_of || meta.lag_note) lines.push(`Data freshness: ${meta.as_of ? `latest action loaded ${str(meta.as_of)}` : ''}${meta.as_of && meta.lag_note ? '; ' : ''}${meta.lag_note ? str(meta.lag_note) : ''}.`.replace(/\.\.$/, '.'));
+    const dodLag = defenseLagSentence(meta);
+    if (dodLag) lines.push(dodLag);
     lines.push('');
     const buyers = offices.filter((o) => (num(o.obligated) ?? 0) > 0);
     const nonBuyers = offices.filter((o) => (num(o.obligated) ?? 0) <= 0);
@@ -645,6 +647,15 @@ function awardFilterParts(af: Rec): string[] {
   return parts;
 }
 
+/**
+ * Defense publication lag for warehouse-backed totals: the tool's own _meta.defense_lag.note, shown as
+ * given. Never computed here — a renderer-computed caveat would state a date the evidence does not contain.
+ */
+export function defenseLagSentence(meta: Rec): string | null {
+  const dl = (meta.defense_lag && typeof meta.defense_lag === 'object' ? meta.defense_lag : null) as Rec | null;
+  return dl && dl.applies === true && str(dl.note) ? str(dl.note) : null;
+}
+
 export const SBLO_TOOL = 'get_sblo_contact';
 
 /**
@@ -736,6 +747,8 @@ export function renderVehicleMix(result: Rec): RenderedRecords | null {
   if (rl.length) { lines.push(''); lines.push(`Rollups: ${rl.join('; ')}.`); }
   const vmeta = (result._meta && typeof result._meta === 'object' ? result._meta : {}) as Rec;
   if (vmeta.as_of || vmeta.lag_note) lines.push(`Data freshness: ${vmeta.as_of ? `latest action loaded ${str(vmeta.as_of)}` : ''}${vmeta.as_of && vmeta.lag_note ? '; ' : ''}${vmeta.lag_note ? str(vmeta.lag_note) : ''}.`.replace(/\.\.$/, '.'));
+  const vDod = defenseLagSentence(vmeta);
+  if (vDod) lines.push(vDod);
   lines.push(`Classification: of the dollars linked to a vehicle, ${str(cls.verified_share_of_parented_pct)}% were verified from USASpending vehicle records. Of all dollars, ${str(cls.heuristic_share_of_total_pct)}% were typed from contract-number patterns and ${str(cls.unresolved_share_of_total_pct)}% could not be classified.`);
   const n = buckets.length;
   return { tool: VEHICLE_MIX_TOOL, text: lines.join('\n'), total: n, retrieved: n, from: 1, to: n, shown: n, exhaustive: true, ids: [], allowedCounts: [n, num(result.total_award_count) ?? 0], standalone: 0, orders: 0 };

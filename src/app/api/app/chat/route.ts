@@ -41,7 +41,14 @@ import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/ti
 // Tools run ONLY through the chat tool executor (policy check at offer AND execution,
 // preflight, per-tool error capture, execution log). Never import runMcpTool here.
 import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/chat-tool-executor';
-import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, type PlannerTarget } from '@/lib/chat/planner-config';
+import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, resolveAnswerChain, answerKey, ANSWER_ENDPOINTS, openAiChatParams, type PlannerTarget } from '@/lib/chat/planner-config';
+import { fitMessages, inputBudget, type MsgKind } from '@/lib/chat/token-budget';
+import { stagingModelConfig, STAGING_CONFIG_HEADER } from '@/lib/chat/staging-model-config';
+import { customerErrorMessage } from '@/lib/chat/customer-errors';
+import { boundToolResult, perResultBudget } from '@/lib/chat/bound-tool-result';
+import { filterToolsForQuestion } from '@/lib/chat/tool-selection';
+import { inferredCodeDisclosure } from '@/lib/chat/code-disclosure';
+import { getNaics } from '@/lib/codes/lookup';
 import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
 import { guardUnstatedStates } from '@/lib/chat/stated-filters';
 import { compileIntent, enforceIntent, dedupeToolCalls } from '@/lib/chat/intent-compiler';
@@ -75,14 +82,8 @@ import { parseTurnId, claimCardTurn, completeCardTurn, failCardTurn, type ClaimR
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// Swapped from llama-3.3-70b-versatile to 8b-instant 2026-05-28 after
-// the 70b TPD ceiling (100K tokens/day) ran out — chat throughput got
-// blocked while the metadata extraction batch competed for the same
-// budget. The 8b model is in a separate quota bucket and is roughly
-// 2x faster. We trade a small amount of nuance for reliability under
-// Free tier. Flip back to 70b once Dev Tier reopens OR the rolling
-// 24h window clears AND metadata extraction is done.
-const GROQ_MODEL = 'llama-3.1-8b-instant';
+// B2: the answer-step model chain lives in resolveAnswerChain (planner-config.ts). The old
+// Groq llama-3.1-8b-instant backup is retired; Groq runs only if CHAT_ANSWER_FALLBACKS lists it.
 const TEMPERATURE = 0.3;          // citation-faithful per #117 spec
 // Raised 1024 → 2048 (2026-11-13, Ask Mindy Phase 0): 1024 cut long answers mid-sentence
 // with no signal. A cut answer is now also flagged to the user (finish_reason 'length').
@@ -130,6 +131,16 @@ interface CitedSource {
   doc_type: string;
   source_path: string | null;
   document_id: string | null;
+}
+
+/** A provider's machine error code (e.g. `rate_limit_exceeded`), never its free-text message. */
+export function providerErrorCode(body: string, res: Response | null): string | null {
+  if (!res) return 'network_error';
+  try {
+    const e = JSON.parse(body)?.error;
+    const c = String(e?.code ?? e?.type ?? '');
+    return /^[A-Za-z0-9_.-]{1,64}$/.test(c) ? c : null;
+  } catch { return null; }
 }
 
 function sseEvent(obj: unknown): string {
@@ -434,13 +445,8 @@ export async function POST(request: NextRequest) {
     cardRecord = rec as unknown as OpportunityRecord;
   }
 
-  const groqKey = process.env.GROQ_API_KEY;
-  if (!groqKey) {
-    return new Response(JSON.stringify({ error: 'Server misconfigured: GROQ_API_KEY missing' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  // B2: no Groq key is required any more (Groq is no longer the default fallback). Missing
+  // provider keys are handled per turn and surface as a customer-safe message, never config text.
 
   // A supplied session id is honored only if it is new or already belongs to this user: persistExchange
   // used to append to ANY existing session id, so a reused id could write into another user's thread.
@@ -535,7 +541,9 @@ export async function POST(request: NextRequest) {
         // messages is heterogeneous once tools enter (assistant tool_calls +
         // role:'tool' results), so type it loosely for the tool round.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (messages as any[]).push({ role: 'user', content: userTurn });
+        const userTurnIdx = (messages as any[]).push({ role: 'user', content: userTurn }) - 1;
+        // B2: full tool results by tool_call_id, so the token-budget step re-bounds from the originals.
+        const toolOriginals = new Map<string, string>();
 
         // ── TOOL-ROUND message list — the CLEAN question, NO RAG context ──
         // (Andre @ CypherIntel 2026-07-30) The RAG teaching corpus was stapled onto
@@ -554,6 +562,7 @@ export async function POST(request: NextRequest) {
         const intent = compileIntent(message, requestNow, [...history.filter((h) => h.role === 'user').map((h) => String(h.content || '')), message].join('\n'));
         const scopeApplied = new Set<string>();
         const scopeUnapplied = new Set<string>();
+        let scopeInferred: string | null = null;
         const capabilityNote = capabilityPlannerNote(message);
         const capabilityPhrases = interpretCapabilityNaics(message).items.flatMap((it) => [it.phrase, it.label]);
         const capabilityLabels = interpretCapabilityNaics(message).items.map((it) => it.label);
@@ -570,11 +579,13 @@ export async function POST(request: NextRequest) {
         }
         toolRoundMessages.push({ role: 'user', content: message });
 
-        const openaiKeyEarly = process.env.OPENAI_API_KEY;
-        const overBudgetEarly = await isUserOverBudget(email).catch(() => false);
+        // Preview-only per-request model configuration (staging acceptance); null on production by construction.
+        const staging = stagingModelConfig(request.headers.get(STAGING_CONFIG_HEADER), TRACE_EVENTS);
+        const overBudgetEarly = staging?.config.overBudget ?? await isUserOverBudget(email).catch(() => false);
+        const modelEnv: Record<string, string | undefined> = staging ? { ...process.env, ...staging.config.env } : process.env;
         const chatModelEarly = overBudgetEarly
-          ? (process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini')
-          : (process.env.CHAT_OPENAI_MODEL || 'gpt-4o');
+          ? (modelEnv.LLM_OPENAI_MODEL || 'gpt-4o-mini')
+          : (modelEnv.CHAT_OPENAI_MODEL || 'gpt-4o');
 
         // ── Mindy Chat v2: Data Core tool round (PRD-mindy-chat-data-core §5a) ──
         // ONE non-streamed pre-flight call offering the Data Core tools:
@@ -598,11 +609,14 @@ export async function POST(request: NextRequest) {
           tools_offered: number;
           tool_executions: ChatExecutionRecord[];
           answer: { provider: string; model: string; finish_reason: string | null; fallback: boolean } | null;
+          /** Failed answer attempts: status + provider error code only (never the provider's message). */
+          answer_attempts: Array<{ provider: string; model: string; status: number | null; code: string | null }>;
           notices: string[];
           context?: { kind: 'opportunity'; notice_id: string };
-        } = { planner: null, planner_attempts: [], tools_offered: 0, tool_executions: [], answer: null, notices: [],
+        } = { planner: null, planner_attempts: [], tools_offered: 0, tool_executions: [], answer: null, answer_attempts: [], notices: [],
               ...(cardCtx ? { context: { kind: 'opportunity' as const, notice_id: cardCtx.noticeId } } : {}) };
         if (capabilityNote) turnTrace.notices.push('capability_interpreted');
+        if (staging) turnTrace.notices.push(`staging_model_config:${staging.name}`);
         const notify = (code: string, text: string) => {
           turnTrace.notices.push(code);
           send({ type: 'notice', code, message: text });
@@ -623,7 +637,12 @@ export async function POST(request: NextRequest) {
             ...(cardCtx ? { allowedToolNames: CARD_CHAT_TOOLS } : {}),
           });
           // Offered tools are filtered by the chat tool policy (blocked tools are never shown).
-          const ALL_TOOL_DEFS = executor.offeredToolDefs();
+          // B2: an open-opportunity question is not offered the expiring-contracts tool (it returns
+          // awarded contracts, not open solicitations). See src/lib/chat/tool-selection.ts.
+          const toolOffer = filterToolsForQuestion(executor.offeredToolDefs(), message);
+          const ALL_TOOL_DEFS = toolOffer.defs;
+          const notOfferedThisTurn = new Set(toolOffer.removed);
+          for (const n of toolOffer.removed) turnTrace.notices.push(`tool_not_offered:${n}:open_opportunity_question`);
           turnTrace.tools_offered = ALL_TOOL_DEFS.length;
 
           // OpenAI {type:'function',function:{name,description,parameters}} →
@@ -652,10 +671,18 @@ export async function POST(request: NextRequest) {
 
           // One planner attempt. Returns the OpenAI-shaped JSON, or the failure details.
           const callPlanner = async (t: PlannerTarget): Promise<{ ok: true; json: unknown } | { ok: false; status: number | null; detail: string }> => {
+            // B2: whole-request budget for the planner (instructions + history + question + tool
+            // catalog + output headroom). Oldest history goes first; a request that still cannot
+            // fit is never sent.
+            const plannerKinds: MsgKind[] = toolRoundMessages.map((m, i) => (i === toolRoundMessages.length - 1 ? 'user' : m.role === 'system' ? 'system' : 'history'));
+            const plannerFit = fitMessages(toolRoundMessages, plannerKinds, { budget: inputBudget(t.model, TOOL_ROUND_MAX_TOKENS), tools: ALL_TOOL_DEFS });
+            if (plannerFit.droppedHistory) turnTrace.notices.push(`planner_history_dropped:${plannerFit.droppedHistory}`);
+            if (!plannerFit.fits) return { ok: false, status: null, detail: `request_too_large: est ${plannerFit.estimate} > budget ${plannerFit.budget} tokens` };
+            const plannerMessages = plannerFit.messages;
             try {
               if (t.provider === 'anthropic') {
-                const sys = toolRoundMessages.find((m) => m.role === 'system')?.content || '';
-                const convo = toolRoundMessages
+                const sys = plannerMessages.find((m) => m.role === 'system')?.content || '';
+                const convo = plannerMessages
                   .filter((m) => m.role === 'user' || m.role === 'assistant')
                   .map((m) => ({ role: m.role, content: m.content }));
                 const forced = OPP_INTENT && anthropicSupportsForcedToolChoice(t.model);
@@ -675,7 +702,7 @@ export async function POST(request: NextRequest) {
               const r = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST', headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  model: t.model, messages: toolRoundMessages, temperature: 0, max_tokens: TOOL_ROUND_MAX_TOKENS,
+                  model: t.model, messages: plannerMessages, ...openAiChatParams(t.model, { temperature: 0, maxTokens: TOOL_ROUND_MAX_TOKENS }),
                   // OPP_INTENT (Andre fix) → 'required' so an opportunity search can't decline the tool.
                   tools: ALL_TOOL_DEFS, tool_choice: OPP_INTENT ? 'required' : 'auto',
                 }),
@@ -689,7 +716,7 @@ export async function POST(request: NextRequest) {
 
           // Explicit planner chain (gpt-4o default; Claude only behind CHAT_CLAUDE_ENABLED;
           // fallbacks only to compatibility-tested planners). Every failure is recorded.
-          const resolved = resolvePlannerChain(process.env, { overBudget: overBudgetEarly });
+          const resolved = resolvePlannerChain(modelEnv, { overBudget: overBudgetEarly });
           const chain = resolved.filter((t) => providerApprovedForPrivate(t.provider));
           for (const t of resolved) {
             if (!chain.includes(t)) {
@@ -719,7 +746,14 @@ export async function POST(request: NextRequest) {
             turnTrace.planner = { provider: first.provider, model: first.model };
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const choice = (first.json as any)?.choices?.[0]?.message;
-            const rawCalls = (choice?.tool_calls ?? []) as Array<{ id?: string; function?: { name?: string; arguments?: string } }>;
+            const plannedCalls = (choice?.tool_calls ?? []) as Array<{ id?: string; function?: { name?: string; arguments?: string } }>;
+            // A planner that calls a tool it was not offered this turn is not obeyed (B2).
+            const rawCalls = (Array.isArray(plannedCalls) ? plannedCalls : []).filter((tc) => {
+              const n = String(tc.function?.name || '');
+              if (!notOfferedThisTurn.has(n)) return true;
+              turnTrace.notices.push(`unoffered_tool_call_dropped:${n}`);
+              return false;
+            });
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const u = (first.json as any)?.usage;
             toolProvider = first.provider; toolModel = first.model;
@@ -758,16 +792,32 @@ export async function POST(request: NextRequest) {
                 for (const n of notes?.unapplied ?? []) scopeUnapplied.add(n);
               }
               const results = await executor.executeRound(toolCalls.filter((tc) => keepIds.has(tc.id)), { provider: first.provider, model: first.model });
+              // B2: the model sees a BOUNDED copy of each result (structural shortening with a
+              // shown-of-total report); the renderers below still read the full r.content.
+              const perResultCap = perResultBudget(results.length);
               for (const tc of toolCalls) {
                 const r = results.find((x) => x.tool_call_id === tc.id);
                 const dup = dedupe.duplicates.find((d) => d.id === tc.id);
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                if (r) (messages as any[]).push({ role: 'tool', tool_call_id: r.tool_call_id, content: r.content });
+                if (r) {
+                  toolOriginals.set(r.tool_call_id, r.content);
+                  const bounded = boundToolResult(r.content, perResultCap);
+                  if (bounded.truncated) turnTrace.notices.push(`tool_result_bounded:${r.record.tool}:${bounded.originalChars}->${bounded.content.length}`);
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (messages as any[]).push({ role: 'tool', tool_call_id: r.tool_call_id, content: bounded.content });
+                }
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 else if (dup) (messages as any[]).push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify({ duplicate_of: dup.of, note: 'Same search as another call in this turn; its results are shown once.' }) });
               }
               pendingToolTurnIdx = null;
               turnTrace.tool_executions = results.map((r) => r.record);
+              // Ported release-hardening R6/R10: disclose codes Mindy chose, from what each strict-filter tool
+              // reports it APPLIED (src/lib/chat/code-disclosure.ts).
+              scopeInferred = inferredCodeDisclosure(
+                results.map((r) => ({ name: r.record.tool, status: r.record.status, content: r.content })),
+                interpretCapabilityNaics(intent.customerText).typedCodes,
+                (c) => getNaics(c)?.title ?? null,
+              );
+              if (scopeInferred) turnTrace.notices.push('inferred_codes_disclosed');
               // PR E: verified record lists are rendered from the tool data, not reproduced by the model.
               for (const r of results) {
                 const renderers: Record<string, (p: Record<string, unknown>) => RenderedRecords | null> = {
@@ -859,53 +909,91 @@ export async function POST(request: NextRequest) {
         // budget is downgraded from gpt-4o to gpt-4o-mini — never blocked, just a
         // cheaper model. Protects the $149 margin now that chat leads with gpt-4o.
         // (Resolved once above for the tool round; reuse to avoid a second budget read.)
-        const openaiKey = openaiKeyEarly;
         const chatModel = chatModelEarly;
-        const streamFrom = (url: string, key: string, model: string) => fetch(url, {
+        const streamFrom = (url: string, key: string, model: string, msgs: unknown[]) => fetch(url, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
           // stream_options.include_usage → OpenAI/Groq emit a final usage-only
           // chunk after the deltas. Without it, a streaming call returns NO usage
           // object, so cost attribution (esp. gpt-4o Chat) would log $0. The extra
           // frame is usage-only (empty choices) and the SSE parser already tolerates it.
-          body: JSON.stringify({ model, messages, temperature: TEMPERATURE, max_tokens: MAX_TOKENS, stream: true, stream_options: { include_usage: true } }),
+          body: JSON.stringify({ model, messages: msgs, ...openAiChatParams(model, { temperature: TEMPERATURE, maxTokens: MAX_TOKENS }), stream: true, stream_options: { include_usage: true } }),
         });
 
+        // B2: explicit answer chain (primary, then supported fallbacks), each provider checked
+        // against the private-data approved list. Provider error text goes to recordProviderEvent
+        // only; the customer sees a fixed message from customer-errors.ts.
+        const answerChain = resolveAnswerChain(modelEnv, { primaryModel: staging?.config.answerPrimary ?? chatModel })
+          .filter((t) => {
+            if (providerApprovedForPrivate(t.provider)) return true;
+            void recordProviderEvent({ kind: 'answer_failure', provider: t.provider, model: t.model, detail: 'answer model skipped: provider not on the approved list for private data', userEmail: auth.email! });
+            return false;
+          });
         let groqRes: Response | null = null;
         // Track which provider/model actually served the response for cost attribution.
-        let usedProvider = 'groq';
-        let usedModel = GROQ_MODEL;
+        let usedProvider = '';
+        let usedModel = '';
         let answerFallback = false;
-        if (openaiKey) {
-          const r = await streamFrom('https://api.openai.com/v1/chat/completions', openaiKey, chatModel);
-          if (r.ok && r.body) { groqRes = r; usedProvider = 'openai'; usedModel = chatModel; }
-          else {
-            // The answer step needs no tools, so the existing Groq fallback is kept, but it is
-            // no longer silent.
-            const detail = (await r.text().catch(() => '')).slice(0, 300);
-            void recordProviderEvent({ kind: 'answer_fallback', provider: 'openai', model: chatModel, status: r.status, detail, userEmail: auth.email!, next: `groq:${GROQ_MODEL}` });
+        // B2: whole-request token budget for the answer call (see token-budget.ts).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const answerKinds: MsgKind[] = (messages as any[]).map((m, i) => {
+          if (m.role === 'tool') return 'tool';
+          if (m.tool_calls) return 'tool_call';
+          if (m.role === 'system') return String(m.content || '').startsWith('VERIFIED RECORD LIST') ? 'records' : i < userTurnIdx ? 'system' : 'note';
+          return i < userTurnIdx ? 'history' : 'user';
+        });
+        let answerTooLarge = false;
+        for (let i = 0; i < answerChain.length && !groqRes; i++) {
+          const t = answerChain[i];
+          let r: Response | null = null;
+          let detail = '';
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const fit = fitMessages(messages as any[], answerKinds, { budget: inputBudget(t.model, MAX_TOKENS), toolOriginals });
+          if (fit.droppedHistory) turnTrace.notices.push(`answer_history_dropped:${fit.droppedHistory}`);
+          if (fit.toolCapChars) turnTrace.notices.push(`answer_tools_rebounded:${fit.toolCapChars}`);
+          if (fit.recordsShortened) turnTrace.notices.push('answer_records_copy_shortened');
+          if (!fit.fits) {
+            answerTooLarge = true;
+            turnTrace.answer_attempts.push({ provider: t.provider, model: t.model, status: null, code: 'request_too_large_not_sent' });
+            void recordProviderEvent({ kind: answerChain[i + 1] ? 'answer_fallback' : 'answer_failure', provider: t.provider, model: t.model, status: null, detail: `request_too_large: est ${fit.estimate} > budget ${fit.budget} tokens (not sent)`, userEmail: auth.email! });
+            continue;
           }
+          try {
+            r = await streamFrom(ANSWER_ENDPOINTS[t.provider], answerKey(modelEnv, t) || '', t.model, fit.messages);
+          } catch (e) {
+            detail = String((e as Error)?.message || e).slice(0, 300);
+          }
+          if (r && r.ok && r.body) {
+            groqRes = r; usedProvider = t.provider; usedModel = t.model; answerFallback = i > 0;
+            break;
+          }
+          if (r) detail = (await r.text().catch(() => '')).slice(0, 300);
+          turnTrace.answer_attempts.push({ provider: t.provider, model: t.model, status: r ? r.status : null, code: providerErrorCode(detail, r) });
+          const next = answerChain[i + 1];
+          void recordProviderEvent({
+            kind: next ? 'answer_fallback' : 'answer_failure',
+            provider: t.provider, model: t.model, status: r ? r.status : null, detail,
+            userEmail: auth.email!, next: next ? `${next.provider}:${next.model}` : undefined,
+          });
         }
-        if (!groqRes && !providerApprovedForPrivate('groq')) {
-          // The fallback provider is not approved for private data: fail visibly instead of
-          // sending this turn's context to it.
-          void recordProviderEvent({ kind: 'answer_failure', provider: 'openai', model: chatModel, detail: 'answer fallback blocked: groq is not on the approved list for private data', userEmail: auth.email! });
-          send({ type: 'error', message: 'Mindy could not answer right now. Please try again in a moment.' });
-          send({ type: 'done' });
-          closeStream();
-          return;
+        if (!answerChain.length) {
+          void recordProviderEvent({ kind: 'answer_failure', provider: 'none', model: 'none', detail: 'no answer model configured (missing provider key)', userEmail: auth.email! });
         }
-        if (!groqRes) {
-          answerFallback = true;
-          groqRes = await streamFrom('https://api.groq.com/openai/v1/chat/completions', groqKey || '', GROQ_MODEL);
-          usedProvider = 'groq';
-          usedModel = GROQ_MODEL;
-        }
-
-        if (!groqRes.ok || !groqRes.body) {
-          const errText = await groqRes.text().catch(() => '(no body)');
-          void recordProviderEvent({ kind: 'answer_failure', provider: usedProvider, model: usedModel, status: groqRes.status, detail: errText.slice(0, 300), userEmail: auth.email! });
-          send({ type: 'error', message: `AI ${groqRes.status}: ${errText.slice(0, 200)}` });
+        if (!groqRes || !groqRes.body) {
+          const kind = answerTooLarge ? 'request_too_large' : 'answer_unavailable';
+          turnTrace.notices.push(kind);
+          if (TRACE_EVENTS) {
+            // Preview-only: which answer models failed and how (status + provider error code), so a staging
+            // run can diagnose a failed turn. The customer-facing message below stays the fixed text.
+            send({
+              type: 'trace_usage',
+              planner: toolProvider ? { provider: toolProvider, model: toolModel, usage: toolUsageForCost } : null,
+              answer: null,
+              answer_attempts: turnTrace.answer_attempts,
+              notices: turnTrace.notices,
+            });
+          }
+          send({ type: 'error', code: kind, message: customerErrorMessage(kind) });
           send({ type: 'done' });
           closeStream();
           return;
@@ -915,6 +1003,7 @@ export async function POST(request: NextRequest) {
         if (renderedRecords.length) {
           const scopeLines = [
             scopeApplied.size ? `From your request: ${[...scopeApplied].join('; ')}.` : '',
+            scopeInferred ? `${scopeInferred}.` : '',
             scopeUnapplied.size ? `Could not apply: ${[...scopeUnapplied].join('; ')}. The results below do not reflect ${scopeUnapplied.size === 1 ? 'it' : 'them'}.` : '',
           ].filter(Boolean).join('\n');
           const recordBlock = `${scopeLines ? `${scopeLines}\n\n` : ''}${renderedRecords.map((r) => r.text).join('\n\n')}\n\n`;
@@ -1018,6 +1107,17 @@ export async function POST(request: NextRequest) {
           }
         }
         turnTrace.answer = { provider: usedProvider, model: usedModel, finish_reason: finishReason, fallback: answerFallback };
+        if (TRACE_EVENTS) {
+          // Verification aid (never on production, see TRACE_EVENTS): token usage per step so a staging run
+          // can report real cost, plus the notices that show bounding / budget / fallback decisions.
+          send({
+            type: 'trace_usage',
+            planner: toolProvider ? { provider: toolProvider, model: toolModel, usage: toolUsageForCost } : null,
+            answer: { provider: usedProvider, model: usedModel, usage: usageForCost, fallback: answerFallback, finish_reason: finishReason },
+            answer_attempts: turnTrace.answer_attempts,
+            notices: turnTrace.notices,
+          });
+        }
         if (finishReason === 'length') {
           turnTrace.notices.push('truncated');
           send({ type: 'truncated', message: 'This answer hit its length limit and was cut off. Ask Mindy to continue, or narrow the question.' });
@@ -1094,7 +1194,8 @@ export async function POST(request: NextRequest) {
         }).catch(err => console.error('[chat] persist failed:', err));
       } catch (err) {
         console.error('[chat] stream error:', err);
-        send({ type: 'error', message: String((err as Error)?.message || 'Stream failed') });
+        // B2: never forward the exception text (it can carry provider bodies) to the customer.
+        send({ type: 'error', code: 'stream_failed', message: customerErrorMessage('stream_failed') });
         send({ type: 'done' });
         closeStream();
       } finally {

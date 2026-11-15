@@ -39,6 +39,7 @@ import {
 import { runScopedAggregate, type ScopedAggregateDeps } from '@/lib/bigquery/scoped-aggregate';
 import { withCache } from '@/lib/mcp/external-cache';
 import type { IgnoredArg } from '@/lib/mcp/result-contract';
+import { isDodAgency, warehouseDefenseLag, type WarehouseDefenseLag } from '@/lib/usaspending/freshness';
 
 const AWARDS_TABLE = '`market-assasin.usaspending.awards`';
 const SEARCH_URL = 'https://api.usaspending.gov/api/v2/search/spending_by_award/';
@@ -161,6 +162,8 @@ export interface VehicleSpendMixResult {
     ignored_args: IgnoredArg[];
     as_of: string | null;
     lag_note: string;
+    /** Defense publication lag, only when the applied agency filter is Defense; null otherwise. */
+    defense_lag?: WarehouseDefenseLag | null;
     result_state?: 'unavailable' | 'not_reported';
     validation_error?: string;
     incomplete_reason?: string;
@@ -472,6 +475,13 @@ export async function getVehicleSpendMix(
       degraded: false,
       count: buckets.length,
       as_of: asOf,
+      // Evidence: this tool has no agency breakdown, so the caveat applies only when the applied agency
+      // filter is itself Defense. An unfiltered total is not shown to contain Defense dollars by this result.
+      defense_lag: warehouseDefenseLag({
+        fyFrom: fy.window.fy_from, fyTo: fy.window.fy_to, dateFrom: fy.window.date_from, dateTo: fy.window.date_to,
+        asOf: typeof asOf === 'string' ? asOf : null, now,
+        defenseEvidence: ag.name && isDodAgency(ag.name) ? `agency filter: ${ag.name}` : null,
+      }),
       ...(truncated
         ? { incomplete_reason: 'parent list truncated at 50,000; totals are a floor' }
         : verificationFailed
