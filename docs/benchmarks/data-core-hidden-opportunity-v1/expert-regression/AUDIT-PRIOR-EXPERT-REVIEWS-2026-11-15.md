@@ -75,3 +75,12 @@ Still open: the independent reviewer (name, pay ≈ $110–150), confirming the 
 - **The scorer uses it.** `v7/scripts/r16.labels()` applies Eric's labels last. `check_expert.py precedence` gives 47/47 from Eric, 0 violations. No previously reported RC number changes, because neither AI disagreement is in a top 20.
 - **No re-asking:** `expert.filter_new()` is required before any human review sheet. The guards spot-check and the 8 product calibration items have zero overlap.
 - **Regression check:** `check_expert.py candidate`. On RC3, none of Eric's Not-relevant notices reach the top 20, but 5 of his Direct notices (3 parts, 1 nursing, 1 HVAC) are never retrieved by any version. See `README.md`.
+
+## Eric's decisions, second set (2026-11-15)
+
+5. **Thin-market floor.** When fewer than 8 Direct solicitations exist for a business on the snapshot, the business passes the per-business floor if the top 20 contains **every** Direct solicitation that exists (floor = min(8, Direct available)).
+   Applied as written: the denominator stays the top 20, and no related work is padded in.
+   **Holdout consequence:** to use this rule, the number of Direct solicitations that exist on Dec 12 has to be established by humans, not assumed. For guards that means Eric judges every guard-coded notice plus the full-text guard-phrase candidates outside the codes.
+   On Nov 14 that was 13 coded notices (9 solicitations) and ~93 phrase hits, nearly all obvious non-matches. So expect ≈ 15–25 extra guard judgments in Stage 1. The same applies to steel if it falls under 8 available.
+6. **Steel ranking change approved for development:** within the top-20 sort, rank RELATED rows that carry real steel-building wording in the description above code-only and filler rows, without relabelling them Direct.
+   Agent 3 builds it on a dev branch. Agent 4 scores it independently. No tag or release.
