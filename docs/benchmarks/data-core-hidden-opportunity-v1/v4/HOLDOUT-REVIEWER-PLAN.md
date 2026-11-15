@@ -1,5 +1,7 @@
 # Human holdout: revised review plan (2026-11-14, for Eric's approval)
 
+**Revision 2 proposed (2026-11-15):** `HOLDOUT-PROTOCOL-ADAPTIVE.md` would replace §1–2 below with one AI-ordered sequential design (≈ 260 judgments for RC2). It is pending Eric's approval; until then this plan stands.
+
 **Supersedes the earlier option A/B plan.** Option B is cancelled, and the earlier internal reviewer assignment is withdrawn (Eric, 2026-11-14).
 **Eric is the subject-matter expert reviewer**, with a workload designed to be small. An independent qualified reviewer verifies a subset of his judgments.
 **AI labels are never counted** in any number below. They are not verification and never substitute for a human label.
