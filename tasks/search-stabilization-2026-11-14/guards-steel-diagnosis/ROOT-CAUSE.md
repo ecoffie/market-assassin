@@ -97,3 +97,20 @@ RUNNER_FULL=1 npx tsx tasks/search-stabilization-2026-11-14/guards-steel-diagnos
 `runner-full.mts` is holdout runner 1.1.0 plus two diagnosis-only additions: `RUNNER_FULL=1` writes the whole ranked
 window, and the F1 NAICS sub-window is emulated when the source exports `openCodeWindowNaics`. Running it at
 `5c5098165` reproduces RC3's published top 20 byte for byte.
+
+## Update (same day): F1 re-scored with Agent 4's round-17 labels and Eric's precedence
+
+Agent 4 labelled the 5 unlabelled notices (6 notice IDs; research 05918610c, AI round 17, dev fixture only):
+condensate pump PARTIAL/FIT, REPLACE CHILLER 1 B104 FIT/FIT, B28 AHU = Eric DIRECT (expert set), both Aviano custodial
+FIT/FIT, MSGR cleaning FIT/FIT. Eric's 47 judgments now override the AI labels where they overlap.
+
+| Phrasing | RC3 | F1+F3 |
+|---|---|---|
+| Steel long | 4–7 | **6–10** |
+| HVAC long | 9–11 | **9–15** |
+| Janitorial short | 14–14 | **19–19** |
+| Steel short (Eric's Outdoor Fitness = Direct) | 6–9 | 6–9 |
+| Every other phrasing (22) | — | identical |
+
+**No phrasing gets worse.** The HVAC long concern above is resolved. Guards stays 6–8 (supply). Steel short reaches 6 of
+the 7 both-AI-Direct solicitations that exist; steel long reaches 6. AI labels plus Eric's, in-sample, diagnostic only.
