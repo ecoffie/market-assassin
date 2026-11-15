@@ -1,7 +1,7 @@
 # Ask Mindy B2 — release candidate and go/no-go evidence (2026-11-14)
 
 PR #2053 · branch `fix/ask-mindy-b2` · based on main `7f3a14ac9` (includes #2049).
-**Status: NO-GO until the live staging run (§7) passes and Eric approves the model choices (§2).**
+**Status: staging acceptance run (§8) — terra/luna/gpt-4o/gpt-4o-mini PASS, Groq fallback FAIL (plan limit). Still NO-GO until Eric decides the models (§2, §8), approves the merge, and production is re-verified.**
 No production deploy, merge, model switch, migration or flag change has been made.
 
 ## 1. Production fallback model and its actual failure mode (verified, not assumed)
@@ -91,6 +91,45 @@ or report token cost.
 
 Prerequisites from Eric: an authorized synthetic Pro test account, and its sign-in done by a person on the preview.
 
+## 8. Live staging acceptance — RESULTS (2026-11-15, preview `b065f65f1` / `16bcc9ddf`)
+
+Run through the authenticated browser runner with a synthetic Pro test account: normal sign-in form, one attempt,
+no second factor requested. 8 questions per configuration. Answer models were selected per request by the preview-only
+config header. In the forced-failure configs the answer primary failed for real (`404 model_not_found`) and the real
+fallback chain answered.
+
+| Config | Planner → answer | Auto pass | Spend | Avg total | First token | Review |
+|---|---|---|---|---|---|---|
+| `current` | gpt-4o → gpt-4o | 8/8 | $0.566 | 5.2 s | 2.3–6.2 s | grounded; labels pre-sol/sources-sought as "opportunities"; outdated "DUNS" advice |
+| `terra` | terra → terra | 8/8 | $0.242 | 4.8 s | 2.6–6.1 s | best: separates bid-ready from earlier-stage notices; honest "no match" answers |
+| `fallback-luna` | terra → luna (fallback) | 8/8 | $0.162 | 4.3 s | 2.7–4.0 s | ≈ terra |
+| `fallback-mini` | gpt-4o → gpt-4o-mini (fallback) | 8/8 | $0.393 | 5.7 s | 2.2–3.6 s | **1 relevance fail on review**: presented unrelated Florida notices as security-guard work; weak on the nonsense query |
+| `fallback-groq` | terra → gpt-oss-120b (fallback) | **3/8** | $0.060 | 3.0 s | — | 5 data-heavy turns failed; Groq org limit (below) |
+
+Total spend ≈ **$1.42** of the $5 cap. Credit balance unchanged (100 → 100), with no `credits` events: Pro chat is not charged.
+
+**Groq root cause (exact provider error):** `413 rate_limit_exceeded` (type `tokens`): *Request too large for model
+openai/gpt-oss-120b … service tier on_demand on tokens per minute (TPM): Limit 8000.* Data-heavy answer requests are
+20–23K tokens, and back-to-back small turns exhaust the minute's budget too. This is a plan limit, not a budget bug.
+The per-target budget already uses the fallback model's context window, and no request budget can exceed a per-minute
+cap. Every failed turn showed the fixed customer message with no provider text.
+
+**Guards observed live:**
+- Tool guard: every open-opportunity question got `tool_not_offered:get_expiring_contracts`, and no open question showed an expiring list.
+- Bounding: tool results of 366K / 300K / 65K chars were bounded to 55K / 51K / 35K.
+- Budget: no `request_too_large`.
+- Code disclosure: shown only for inferred codes.
+- Invented filter: a planner-invented `state=VA` was removed (`unstated_filter_removed`).
+
+**Preview-only diagnostics added:** failed answer turns now emit `trace_usage.answer_attempts` (provider, model, status,
+machine error code; never provider text). Production emits nothing.
+
+**Recommendation (decisions are Eric's):**
+- Long-term: `CHAT_OPENAI_MODEL=gpt-6.1-terra` with `CHAT_ANSWER_FALLBACKS=openai:gpt-6-luna`. This is a configuration change only.
+- Interim: gpt-4o-mini works mechanically as the code-default fallback, but it is the weakest on relevance.
+- Cross-provider fallback: Groq is **not viable** on the on-demand tier. Either upgrade Groq to Dev tier and re-run
+  `fallback-groq` only, or accept that an account-wide OpenAI outage (Incident B) shows the fixed error message.
+
 ## Go / no-go
 
 | Gate | State |
@@ -98,8 +137,8 @@ Prerequisites from Eric: an authorized synthetic Pro test account, and its sign-
 | Unit suite (12,092 tests) · tsc · pre-push gate · GitHub `verify` · Vercel preview build | PASS (pre-push live steps skipped: no `.env.local`) |
 | Raw provider text never shown | PASS offline |
 | Oversized results bounded + whole-request budget | PASS offline |
-| Wrong-tool routing (security guard) | PASS offline · live pending |
+| Wrong-tool routing (security guard) | PASS offline + live (§8) |
 | #2049 billing / replay / error / disconnect | PASS offline |
-| Supported long-term models chosen + live-validated | **PENDING** (§2, §7) |
-| Live staging run: cost, quality, fallback behavior | **PENDING** (§7) |
+| Supported long-term models chosen + live-validated | terra + luna validated on staging (§8); **Eric's choice PENDING** |
+| Live staging run: cost, quality, fallback behavior | **DONE** (§8): 4 configs pass, Groq fallback fails (8K TPM plan limit) |
 | Production B2 | **not claimed** |
