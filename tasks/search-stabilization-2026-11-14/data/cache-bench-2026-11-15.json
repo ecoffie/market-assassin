@@ -1,0 +1,571 @@
+{
+ "snapshot": {
+  "rows": 9702,
+  "built_at": "2026-11-15T02:27:21.038Z",
+  "build_ms": 9924,
+  "json_bytes": 68045756,
+  "gzip_bytes": 20504877
+ },
+ "queries": {
+  "janitorial#0": {
+   "sql": {
+    "ms": 1795,
+    "count": 1219,
+    "error": null
+   },
+   "cache": {
+    "ms": 1356,
+    "count": 1219,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 12789,
+    "candidates": 1219,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": true,
+    "window": true,
+    "sql_window": 500
+   }
+  },
+  "janitorial#1": {
+   "sql": {
+    "ms": 8254,
+    "count": null,
+    "error": null
+   },
+   "cache": {
+    "ms": 1530,
+    "count": 568,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 22401,
+    "candidates": 568,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": false,
+    "window": true,
+    "sql_window": 500
+   }
+  },
+  "nursing#0": {
+   "sql": {
+    "ms": 1355,
+    "count": 46,
+    "error": null
+   },
+   "cache": {
+    "ms": 938,
+    "count": 46,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 25288,
+    "candidates": 46,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": true,
+    "window": true,
+    "sql_window": 46
+   }
+  },
+  "nursing#1": {
+   "sql": {
+    "ms": 8246,
+    "count": null,
+    "error": null
+   },
+   "cache": {
+    "ms": 1899,
+    "count": 344,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 34472,
+    "candidates": 344,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": false,
+    "window": true,
+    "sql_window": 344
+   }
+  },
+  "hvac#0": {
+   "sql": {
+    "ms": 5156,
+    "count": 279,
+    "error": null
+   },
+   "cache": {
+    "ms": 1324,
+    "count": 279,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 41528,
+    "candidates": 279,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": true,
+    "window": true,
+    "sql_window": 279
+   }
+  },
+  "hvac#1": {
+   "sql": {
+    "ms": 8335,
+    "count": null,
+    "error": null
+   },
+   "cache": {
+    "ms": 1926,
+    "count": 725,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 51188,
+    "candidates": 725,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": false,
+    "window": true,
+    "sql_window": 500
+   }
+  },
+  "guards#0": {
+   "sql": {
+    "ms": 4508,
+    "count": 487,
+    "error": null
+   },
+   "cache": {
+    "ms": 1238,
+    "count": 487,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 57623,
+    "candidates": 487,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": true,
+    "window": true,
+    "sql_window": 487
+   }
+  },
+  "guards#1": {
+   "sql": {
+    "ms": 8470,
+    "count": null,
+    "error": null
+   },
+   "cache": {
+    "ms": 1378,
+    "count": 112,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 67334,
+    "candidates": 112,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": false,
+    "window": true,
+    "sql_window": 112
+   }
+  },
+  "steelbldg#0": {
+   "sql": {
+    "ms": 3112,
+    "count": 573,
+    "error": null
+   },
+   "cache": {
+    "ms": 1475,
+    "count": 573,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 71824,
+    "candidates": 573,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": true,
+    "window": true,
+    "sql_window": 500
+   }
+  },
+  "steelbldg#1": {
+   "sql": {
+    "ms": 8301,
+    "count": null,
+    "error": null
+   },
+   "cache": {
+    "ms": 2240,
+    "count": 1564,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 81602,
+    "candidates": 1564,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": false,
+    "window": true,
+    "sql_window": 500
+   }
+  },
+  "grounds#0": {
+   "sql": {
+    "ms": 3927,
+    "count": 85,
+    "error": null
+   },
+   "cache": {
+    "ms": 1175,
+    "count": 85,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 87770,
+    "candidates": 85,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": true,
+    "window": true,
+    "sql_window": 85
+   }
+  },
+  "grounds#1": {
+   "sql": {
+    "ms": 8231,
+    "count": null,
+    "error": null
+   },
+   "cache": {
+    "ms": 1605,
+    "count": 170,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 97177,
+    "candidates": 170,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": false,
+    "window": true,
+    "sql_window": 170
+   }
+  },
+  "paving#0": {
+   "sql": {
+    "ms": 2468,
+    "count": 160,
+    "error": null
+   },
+   "cache": {
+    "ms": 1325,
+    "count": 160,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 101250,
+    "candidates": 160,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": true,
+    "window": true,
+    "sql_window": 160
+   }
+  },
+  "paving#1": {
+   "sql": {
+    "ms": 8389,
+    "count": null,
+    "error": null
+   },
+   "cache": {
+    "ms": 2195,
+    "count": 633,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 110965,
+    "candidates": 633,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": false,
+    "window": true,
+    "sql_window": 500
+   }
+  },
+  "parts#0": {
+   "sql": {
+    "ms": 1356,
+    "count": 1265,
+    "error": null
+   },
+   "cache": {
+    "ms": 1379,
+    "count": 1265,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 114518,
+    "candidates": 1265,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": true,
+    "window": true,
+    "sql_window": 500
+   }
+  },
+  "parts#1": {
+   "sql": {
+    "ms": 4270,
+    "count": 1761,
+    "error": null
+   },
+   "cache": {
+    "ms": 1483,
+    "count": 1761,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 120168,
+    "candidates": 1761,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": true,
+    "window": true,
+    "sql_window": 500
+   }
+  },
+  "fasteners#0": {
+   "sql": {
+    "ms": 4394,
+    "count": 400,
+    "error": null
+   },
+   "cache": {
+    "ms": 1451,
+    "count": 400,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 126046,
+    "candidates": 400,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": true,
+    "window": true,
+    "sql_window": 400
+   }
+  },
+  "fasteners#1": {
+   "sql": {
+    "ms": 8244,
+    "count": null,
+    "error": null
+   },
+   "cache": {
+    "ms": 1852,
+    "count": 906,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 135742,
+    "candidates": 906,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": false,
+    "window": true,
+    "sql_window": 500
+   }
+  },
+  "electrical#0": {
+   "sql": {
+    "ms": 1580,
+    "count": 1251,
+    "error": null
+   },
+   "cache": {
+    "ms": 1359,
+    "count": 1251,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 139174,
+    "candidates": 1251,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": true,
+    "window": true,
+    "sql_window": 500
+   }
+  },
+  "electrical#1": {
+   "sql": {
+    "ms": 8400,
+    "count": null,
+    "error": null
+   },
+   "cache": {
+    "ms": 2420,
+    "count": 1165,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 148934,
+    "candidates": 1165,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": false,
+    "window": true,
+    "sql_window": 500
+   }
+  },
+  "valves#0": {
+   "sql": {
+    "ms": 1331,
+    "count": 811,
+    "error": null
+   },
+   "cache": {
+    "ms": 1065,
+    "count": 811,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 152686,
+    "candidates": 811,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": true,
+    "window": true,
+    "sql_window": 500
+   }
+  },
+  "valves#1": {
+   "sql": {
+    "ms": 5974,
+    "count": 1545,
+    "error": null
+   },
+   "cache": {
+    "ms": 1575,
+    "count": 1545,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 159726,
+    "candidates": 1545,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": true,
+    "window": true,
+    "sql_window": 500
+   }
+  },
+  "aircraft#0": {
+   "sql": {
+    "ms": 1582,
+    "count": 880,
+    "error": null
+   },
+   "cache": {
+    "ms": 1319,
+    "count": 880,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 162884,
+    "candidates": 880,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": true,
+    "window": true,
+    "sql_window": 500
+   }
+  },
+  "aircraft#1": {
+   "sql": {
+    "ms": 8283,
+    "count": null,
+    "error": null
+   },
+   "cache": {
+    "ms": 2093,
+    "count": 1426,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 172487,
+    "candidates": 1426,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": false,
+    "window": true,
+    "sql_window": 500
+   }
+  },
+  "medical#0": {
+   "sql": {
+    "ms": 3912,
+    "count": 134,
+    "error": null
+   },
+   "cache": {
+    "ms": 1463,
+    "count": 134,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 178493,
+    "candidates": 134,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": true,
+    "window": true,
+    "sql_window": 134
+   }
+  },
+  "medical#1": {
+   "sql": {
+    "ms": 8286,
+    "count": null,
+    "error": null
+   },
+   "cache": {
+    "ms": 2486,
+    "count": 1292,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 188243,
+    "candidates": 1292,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": false,
+    "window": true,
+    "sql_window": 500
+   }
+  },
+  "ithardware#0": {
+   "sql": {
+    "ms": 2553,
+    "count": 425,
+    "error": null
+   },
+   "cache": {
+    "ms": 1295,
+    "count": 425,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 193282,
+    "candidates": 425,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": true,
+    "window": true,
+    "sql_window": 425
+   }
+  },
+  "ithardware#1": {
+   "sql": {
+    "ms": 8332,
+    "count": null,
+    "error": null
+   },
+   "cache": {
+    "ms": 2236,
+    "count": 1504,
+    "snapshot_built_at": "2026-11-15T02:27:21.038Z",
+    "snapshot_age_ms": 202909,
+    "candidates": 1504,
+    "delta_rows": 0
+   },
+   "parity": {
+    "count": false,
+    "window": true,
+    "sql_window": 500
+   }
+  }
+ }
+}
