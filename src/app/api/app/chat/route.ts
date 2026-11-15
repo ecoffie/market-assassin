@@ -1077,6 +1077,16 @@ export async function POST(request: NextRequest) {
           }
         }
         turnTrace.answer = { provider: usedProvider, model: usedModel, finish_reason: finishReason, fallback: answerFallback };
+        if (TRACE_EVENTS) {
+          // Verification aid (never on production, see TRACE_EVENTS): token usage per step so a staging run
+          // can report real cost, plus the notices that show bounding / budget / fallback decisions.
+          send({
+            type: 'trace_usage',
+            planner: toolProvider ? { provider: toolProvider, model: toolModel, usage: toolUsageForCost } : null,
+            answer: { provider: usedProvider, model: usedModel, usage: usageForCost, fallback: answerFallback, finish_reason: finishReason },
+            notices: turnTrace.notices,
+          });
+        }
         if (finishReason === 'length') {
           turnTrace.notices.push('truncated');
           send({ type: 'truncated', message: 'This answer hit its length limit and was cut off. Ask Mindy to continue, or narrow the question.' });

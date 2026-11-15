@@ -223,3 +223,13 @@ describe('B2: whole-request token budget', () => {
     expect(bodies.some((b) => b.model === 'gpt-6.1-terra')).toBe(true);
   });
 });
+
+describe('B2: staging usage trace', () => {
+  it('trace_usage is emitted on preview with the flag, and never on production even with the flag', async () => {
+    vi.stubEnv('ASK_MINDY_TRACE_EVENTS', 'true');
+    vi.stubEnv('VERCEL_ENV', 'preview');
+    expect((await ask('How do I write a capability statement?')).events.some((e) => e.type === 'trace_usage')).toBe(true);
+    vi.stubEnv('VERCEL_ENV', 'production');
+    expect((await ask('How do I write a capability statement?')).events.some((e) => e.type === 'trace_usage')).toBe(false);
+  });
+});
