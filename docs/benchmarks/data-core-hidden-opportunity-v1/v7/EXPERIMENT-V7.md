@@ -176,3 +176,42 @@ All of them are now labelled. The 382 new items were labelled by two blind revie
   - parts, short: 7–9
   - steel, long: 6–7
 - Diagnostic only: AI labels, in-sample, fixture snapshot.
+
+## Addendum 5: nurse-staffing related-PSC retrieval (n2-modifier-text @ `5d48336e1`)
+
+**Method.**
+- Run with runner 1.1.0. Route parity is 28/28.
+- Every nursing row in the new matched sets and top 20s was already two-reviewer labelled in round 12 (the full nursing pool), so no new labels were needed.
+- Only nursing changes. Script: `scripts/r14.py`. Results: `results/r14_eval.json`.
+
+| Nursing, relevant of the top 20 | `74b9dec43` | `5d48336e1` |
+|---|---|---|
+| Short | 8–9 | **11–15** |
+| Long | 9–10 | **10–13** |
+| Pooled short / long | 72–80% / 74–80% | 73–83% / 74–81% |
+
+- The businesses below 40% are unchanged: short has guards and parts, long has guards and steel.
+
+**The new rows (short: 45 added to the matched set):**
+
+| Category | Rows |
+|---|---|
+| FIT/FIT | 6 (13%) |
+| Relevant with a PARTIAL | 17 (38%) |
+| Reviewers split | 9 (20%) |
+| NO/NO | 13 (29%) |
+
+| Added rows by PSC | Breakdown |
+|---|---|
+| Q201 (24) | 9 NO/NO, 6 split, 9 relevant (mostly PARTIAL): Bureau of Prisons comprehensive medical, TRICARE, TSA occupational health, Job Corps medical |
+| Q518 (7) | 3 FIT/FIT, 4 relevant |
+| Q501 (1) | 1 FIT/FIT (locum anesthesia) |
+| Q701 (3) | 2 FIT/FIT, 1 NO |
+| Q403 (4) | 2 NO/NO, 1 split, 1 relevant |
+| Q511 (3) | 2 split, 1 relevant |
+| Q519 (3) | 2 relevant, 1 NO/NO |
+
+- **The top-20 swap (short):** 15 rows out and 15 in. The rows out were mostly NO/NO "nurse"-word noise (11 of 15). The rows in were 5 NO/NO, 4 split, 3 FIT/FIT and 3 relevant.
+- **View:** Q518, Q501 and Q701 are clean (6 FIT/FIT of 11, 1 NO). Q201 is the noise source: comprehensive-medical buys are provider or facility contracts, not staffing.
+  - Narrowing to Q501/Q518/Q701 (plus Q519) would keep most of the FIT gain.
+  - It would give up the Q201 PARTIALs, which count toward the bar only if Eric counts Related for this trade. Short would then likely sit near 8–11, not 11–15.
