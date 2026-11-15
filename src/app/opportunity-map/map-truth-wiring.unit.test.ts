@@ -16,16 +16,14 @@ const apiSrc = readFileSync(join(__dirname, '../api/app/opportunity-map/route.ts
 const clientSrc = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 
 describe('map-truth contract — API side', () => {
-  it('counts unmapped rows with the SAME filters, minus the map_lat predicate', () => {
-    expect(apiSrc).toContain('countUnmappedForFilters');
-    // Must reuse the shared filter builder, never re-express "what matches". Since Phase C that is
-    // the one canonical-plan adapter (applyFilters = applyMapsOpenFilters over the request's plan),
-    // shared with the headline count and the viewport pins — the discovery gate asserts all three.
-    const fn = apiSrc.slice(apiSrc.indexOf('async function countUnmappedForFilters'));
-    const body = fn.slice(0, fn.indexOf('\n    }'));
-    expect(body).toContain("applyFilters(q)");
+  it('counts unmapped LISTINGS with the SAME filters as the headline, in the same walk', () => {
+    // Since 2026-10-25 one walk of the complete filtered set yields mapped + unmapped listings
+    // (open-market-count.ts), through the one canonical-plan adapter shared with the viewport pins.
+    expect(apiSrc).toContain('const marketP = withCounts ? countOpenMarket(db, applyFilters) : Promise.resolve(null);');
     expect(apiSrc).toContain('const applyFilters = (q: any) => applyMapsOpenFilters(q, openReq);');
-    expect(body).toContain("is('map_lat', null)");
+    const lib = readFileSync(join(__dirname, '../../lib/opportunities/open-market-count.ts'), 'utf8');
+    expect(lib).toContain("select('solicitation_number, notice_id, map_lat'");
+    expect(lib).not.toMatch(/\.not\('map_lat'/);   // the walk must NOT drop locationless listings
   });
 
   it('returns the disclosure fields on the response', () => {
@@ -34,10 +32,10 @@ describe('map-truth contract — API side', () => {
   });
 
   it('treats an unestablished count as UNKNOWN, never 0 (Bug Prevention Rule #11)', () => {
-    const fn = apiSrc.slice(apiSrc.indexOf('async function countUnmappedForFilters'));
-    const body = fn.slice(0, fn.indexOf('\n    }'));
-    expect(body).toContain('return null');       // error path surfaces unknown
-    expect(body).not.toContain('count ?? 0');    // never fabricate a zero
+    const lib = readFileSync(join(__dirname, '../../lib/opportunities/open-market-count.ts'), 'utf8');
+    expect(lib).toContain('if (firstErr) throw firstErr;');
+    expect(lib).not.toContain('count ?? 0');
+    expect(apiSrc).toContain('unmappedForFilters == null');   // marketTotal stays null when unknown
   });
 });
 

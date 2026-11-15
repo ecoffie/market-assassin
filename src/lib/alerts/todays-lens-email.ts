@@ -13,6 +13,7 @@
  */
 
 import type { TodaysLens } from '@/lib/dashboard/todays-lens';
+import { todaysLensMapPath } from '@/lib/dashboard/todays-lens-link';
 
 // Mindy navy→purple button (matches the existing alert email CTA palette).
 const BUTTON_STYLE =
@@ -39,6 +40,7 @@ export function renderTodaysLensEmailBlock(
   lens: TodaysLens,
   baseUrl: string,
   trackedUrl?: (url: string, label: string, content?: string) => string,
+  opts?: { sentOn?: string },
 ): string {
   // Wrap through the click-tracker when provided; else the raw url (unit tests assert on the raw form).
   const wrap = (url: string, label: string) => (trackedUrl ? trackedUrl(url, label, label) : url);
@@ -79,7 +81,9 @@ export function renderTodaysLensEmailBlock(
         .join('<span style="color:#cbd5e1;"> &nbsp;·&nbsp; </span>')}</p>`
     : '';
 
-  const mapUrl = wrap(`${baseUrl}/opportunity-map?strategy=${encodeURIComponent(lens.lensStrategy)}&src=alert`, 'todays_lens_map');
+  // Carries the strands AND the exact NAICS the count used (todays-lens-link.ts) — a strategy-only link
+  // opened the same strands across EVERY NAICS: "Explore 13 recommended" landed on 95 / 137.
+  const mapUrl = wrap(`${baseUrl}${todaysLensMapPath(lens, { src: 'alert', sentOn: opts?.sentOn })}`, 'todays_lens_map');
 
   // Naming what is on the other side of the click converts better than a bare "Open Today's Map".
   // MUST be lens.totalOpen — the single real count from computeTodaysLens. Do NOT sum the strands:

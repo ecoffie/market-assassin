@@ -1889,7 +1889,9 @@ function mindyDayBannerHtml(): string {
     ? `<p style="color:#475569;font-size:14px;line-height:1.6;margin:9px 0 0 0;">${_leadBits.join(' &middot; ')}</p>`
     : '';
 
-  const todaysLensHtml = todaysLens ? renderTodaysLensEmailBlock(todaysLens, MINDY_SITE_URL, trackedUrl) : '';
+  const todaysLensHtml = todaysLens
+    ? renderTodaysLensEmailBlock(todaysLens, MINDY_SITE_URL, trackedUrl, { sentOn: new Date().toISOString().slice(0, 10) })
+    : '';
 
   const htmlContent = `
 <!DOCTYPE html>

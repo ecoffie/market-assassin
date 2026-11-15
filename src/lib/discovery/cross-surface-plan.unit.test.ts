@@ -177,7 +177,12 @@ describe('cross-surface query-plan gate', () => {
     expect(route).toContain("from '@/lib/opportunities/maps-open-discovery'");
     // All three Open paths (headline count · unmapped count · viewport pins) go through ONE plan.
     expect(route.match(/mapsOpenRequest\(/g)).toHaveLength(1);
-    expect(route.match(/applyFilters\((q|viewQ)\)/g)).toHaveLength(3);
+    // Since 2026-10-25 the headline + unmapped counts are ONE walk (open-market-count.ts) handed the
+    // same applyFilters, and that lib may not interpret the query either.
+    expect(route.match(/applyFilters\(viewQ\)/g)).toHaveLength(1);
+    expect(route.match(/countOpenMarket\(db, applyFilters\)/g)).toHaveLength(1);
+    const counter = strip(join(__dirname, '..', 'opportunities', 'open-market-count.ts'));
+    for (const legacy of ['applyMapFilters', 'parseMapFilters', 'buildSearchOr', 'resolveQueryIntent', 'agencyOrExpr']) expect(counter, `counter: ${legacy}`).not.toContain(legacy);
     // The adapter hands applyMapFilters SURFACE filters only: the plan-owned keys are blanked.
     for (const legacy of ['buildSearchOr', 'resolveQueryIntent', 'agencyOrExpr', 'agencyIlikeConds']) expect(adapter, `adapter: ${legacy}`).not.toContain(legacy);
     expect(adapter).toMatch(/search: '',/);
