@@ -156,3 +156,10 @@ describe('acc7 R4: buying-office calls that differ only by the default radius', 
     expect(r.keep.map((k) => k.id)).toEqual(['1', '2']);
   });
 });
+
+describe('map-view preamble states (2026-11-15)', () => {
+  it('every state in "the map area is in VA, MD, PA" is read as named, including ambiguous VA/PA', () => {
+    const t = '[Current map view — 853+ Open Now opps in view. Location: the map area is in VA, MD, PA (plotted pins in view, most first: VA 312, MD 140, PA 90). Answer for THIS view ...]\n\nWhich agencies buy the most in this view?';
+    expect([...compileIntent(t).explicitStates].sort()).toEqual(['MD', 'PA', 'VA']);
+  });
+});
