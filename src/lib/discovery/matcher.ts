@@ -205,7 +205,24 @@ export function normalizeQuery(raw: string): string {
 
 export function isCodeLike(raw: string): boolean {
   const t = String(raw || '').trim();
-  return /\d/.test(t) && !/\s/.test(t) && t.length <= 8;
+  return (/\d/.test(t) && !/\s/.test(t) && t.length <= 8) || productIdentifier(t) !== null;
+}
+
+/**
+ * PRODUCT IDENTIFIERS (Agent 3, 2026-11-14). An NSN or a manufacturer part number is one identifier, never words or
+ * codes. Measured defect: "4820-01-234-5678" became NAICS 4820 + NAICS 5678 + the words "01" · "234". Open notice titles
+ * write the same NSN as "4820-01-234-5678", "4820-012345678" and "4820012345678", so the identifier is matched with
+ * optional separators (codeRegex). An optional "NSN" / "P/N" / "part number" label is dropped. Part numbers longer than
+ * 8 characters need >= 3 digits and no spaces (<= 8 characters were already code-like and are unchanged).
+ */
+export function productIdentifier(raw: string): { kind: 'nsn' | 'part_number'; token: string } | null {
+  const t = String(raw || '').trim().replace(/^(?:nsn|p\/?n|part\s+(?:number|no\.?)|pn)\s*[:#]?\s*/i, '').trim();
+  const nsn = t.match(/^(\d{4})-?(\d{2})-?(\d{3})-?(\d{4})$/);
+  if (nsn) return { kind: 'nsn', token: `${nsn[1]}-${nsn[2]}-${nsn[3]}-${nsn[4]}` };
+  if (!/\s/.test(t) && t.length > 8 && t.length <= 24 && /^[a-z0-9][a-z0-9\-/.]*[a-z0-9]$/i.test(t) && (t.match(/\d/g) || []).length >= 3) {
+    return { kind: 'part_number', token: t };
+  }
+  return null;
 }
 
 /**
@@ -343,12 +360,16 @@ export function framedVerbs(text: string): Set<string> {
   return out;
 }
 
-function alternativeOf(text: string): Alternative | null {
+function alternativeOf(text: string, short = false): Alternative | null {
   const all = conceptsOf(text);
   if (!all.length) return null;
-  const framed = framedVerbs(text);
+  // Frame verbs and segment / role words are demoted ONLY in a short single sentence (isShortSentence). In a paragraph
+  // they pair with item words ("distributor" + "electrical") and demoting them made the partner admit alone: Agent 4's
+  // blind v5 scoring measured ≈70 relevant DLA item buys lost on the parts paragraph and 0/20 relevant among the rows
+  // the valves paragraph gained. Paragraphs keep today's behaviour until sentence handling exists.
+  const framed = short ? framedVerbs(text) : new Set<string>();
   const isPronoun = (c: Concept) => FUNCTION_WORDS.has(c.label) || framed.has(c.label)
-    || DISCOVERY_SEGMENT_WORDS.has(c.label) || DISCOVERY_ROLE_WORDS.has(c.label);
+    || (short && (DISCOVERY_SEGMENT_WORDS.has(c.label) || DISCOVERY_ROLE_WORDS.has(c.label)));
   const pronouns = all.filter(isPronoun);
   // Shape is decided on every concept (unchanged); pronouns and framed verbs are then removed from eligibility.
   const alt = alternativeOfConcepts(all);
@@ -402,13 +423,22 @@ function alternativeOfConcepts(concepts: Concept[]): Alternative | null {
  *      `for example` split the text, and the words themselves are dropped.
  *   2. The final "and" of a comma list separates its last two items: "bolts, screws and nuts" is three items, not
  *      bolts | ALL(screws · nuts).
- * Not done, measured: sharing the last item's head noun ("medical, dental and laboratory supplies" → medical
- * supplies | dental supplies | …) halved code-floor recall (41 → 21 of 88 PSC 65 notices) at the same labelled
- * precision, because product notices name the item ("6515--SYRINGE"), not the category word.
+ * The last item's head noun is shared when every earlier item is a single word (see listItems).
  */
 const LIST_MAX_WORDS = 15;
 const LIST_SEP_RE = /\s*[,;]\s*|\s+or\s+/i;
 const EXAMPLE_RE = /\s+(?:like|such\s+as|including|e\.?\s?g\.?|for\s+example)\s+/i;
+/** One sentence of at most LIST_MAX_WORDS words: the scope of list parsing and frame / segment / role demotion. */
+export function isShortSentence(text: string): boolean {
+  const sentences = String(text || '').split(/[.!?]+(?:\s+|$)/).filter((x) => x.trim()).length;
+  return sentences <= 1 && normalizeQuery(text).split(' ').filter(Boolean).length <= LIST_MAX_WORDS;
+}
+/** Words in a list item that can carry meaning (not function, frame, segment, role or supporting words). */
+function coreWordCount(part: string): number {
+  const framed = framedVerbs(part);
+  return conceptsOf(part).filter((c) => c.cls !== 'supporting' && !FUNCTION_WORDS.has(c.label) && !framed.has(c.label)
+    && !DISCOVERY_SEGMENT_WORDS.has(c.label) && !DISCOVERY_ROLE_WORDS.has(c.label)).length;
+}
 export function listItems(text: string): string[] {
   const clean = (xs: string[]) => xs.map((x) => x.trim()).filter(Boolean);
   const isList = LIST_SEP_RE.test(text) || EXAMPLE_RE.test(text);
@@ -416,8 +446,7 @@ export function listItems(text: string): string[] {
   // Multi-sentence paragraphs keep today's comma split: their trailing clauses ("identified by NSN and part number",
   // "for industrial, marine and military systems") became one-word items that admitted alone ("number", "systems"),
   // 4,000+ matches on four of the benchmark paragraphs (measured). Paragraphs belong to sentence handling.
-  const sentences = text.split(/[.!?]+(?:\s+|$)/).filter((x) => x.trim()).length;
-  if (sentences > 1 || normalizeQuery(text).split(' ').length > LIST_MAX_WORDS) return clean(text.split(LIST_SEP_RE));
+  if (!isShortSentence(text)) return clean(text.split(LIST_SEP_RE));
   const out: string[] = [];
   for (const chunk of clean(text.split(EXAMPLE_RE))) {
     const parts = clean(chunk.split(LIST_SEP_RE));
@@ -425,6 +454,15 @@ export function listItems(text: string): string[] {
       const last = parts.pop() as string;
       const items = clean(last.split(/\s+(?:and|&)\s+/i));
       parts.push(...items);
+      // Shared head noun: when every earlier item is ONE word and the last item is several, the last item's head noun
+      // belongs to each ("medical, dental and laboratory supplies" = medical supplies | dental supplies | laboratory
+      // supplies). A bare modifier must never become a concept: Agent 4's blind v5 sample found 0 of 30 relevant among
+      // the 528 rows bare "medical" added (medical services, VA construction, CDC guards).
+      const tail = parts[parts.length - 1];
+      const head = normalizeQuery(tail).split(' ').filter(Boolean).pop();
+      if (head && coreWordCount(tail) >= 2 && parts.slice(0, -1).every((x) => coreWordCount(x) === 1)) {
+        for (let i = 0; i < parts.length - 1; i++) if (!new RegExp(`\\b${head}\\b`, 'i').test(parts[i])) parts[i] = `${parts[i]} ${head}`;
+      }
     }
     out.push(...parts);
   }
@@ -441,6 +479,8 @@ export function buildTextMatcher(residual: string, exclusions: string[] = []): T
   const excluded = exclusions.flatMap((e) => conceptsOf(e)).map(({ cooccur: _drop, ...c }) => c);
   if (!trimmed) return { mode: 'none', normalized: '', phrase: null, alternatives: [], excluded };
 
+  const ident = productIdentifier(trimmed);
+  if (ident) return { mode: 'code', normalized: ident.token.toLowerCase(), phrase: ident.token, alternatives: [], excluded };
   if (isCodeLike(trimmed)) return { mode: 'code', normalized: trimmed.toLowerCase(), phrase: trimmed, alternatives: [], excluded };
 
   const quoted = trimmed.match(/^["“](.+)["”]$/);
@@ -451,7 +491,8 @@ export function buildTextMatcher(residual: string, exclusions: string[] = []): T
 
   const normalized = normalizeQuery(trimmed);
   const parts = listItems(trimmed);
-  const built = parts.map(alternativeOf).filter(Boolean) as Alternative[];
+  const short = isShortSentence(trimmed);
+  const built = parts.map((x) => alternativeOf(x, short)).filter(Boolean) as Alternative[];
   // A comma-separated part made ONLY of function words ("…, so that is what we do.") names no market: drop it when the
   // query has another part, so it can never admit on "so" / "that" / "we". A query with nothing else keeps its words.
   const marketParts = built.filter((a) => !a.eligible.every((c) => FUNCTION_WORDS.has(c.label)));

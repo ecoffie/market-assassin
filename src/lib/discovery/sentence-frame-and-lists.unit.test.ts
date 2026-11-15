@@ -33,6 +33,10 @@ describe('cause 1: a commerce verb in subject position is framing, not the produ
 });
 
 describe('cause 2: market-segment adjectives and the company role describe the seller, not the item', () => {
+  it('applies only to a short single sentence: in a paragraph they still pair (Agent 4 v5: ≈70 relevant lost otherwise)', () => {
+    const p = 'We are a distributor of electrical and electronic components. We sell connectors and relays by NSN.';
+    expect(m(p).alternatives.some((a) => a.eligible.some((c) => c.label === 'distributor'))).toBe(true);
+  });
   it('"industrial" / "defense" are not required; the product words still are', () => {
     expect(shape('We supply industrial and defense replacement parts.')).toBe('all(replacement·parts)');
     expect(shape('We are a valve supplier.')).toBe('all(valve)');
@@ -54,8 +58,10 @@ describe('cause 3: lists are items, and example words are not search words', () 
     expect(matchesText(q, ['53--SCREW,CAP,SOCKET HE'])).toBe(true);
     expect(matchesText(q, ['53--NUT,SELF-LOCKING,HEXAG'])).toBe(true);
   });
-  it('"medical, dental and laboratory supplies" is three items; the head noun is NOT shared (measured: halves recall)', () => {
-    expect(shape('We supply medical, dental and laboratory supplies.')).toBe('all(medical) | all(dental) | all(laboratory·supplies)');
+  it('a shared head noun is distributed; a bare modifier never becomes a concept', () => {
+    // Agent 4 v5 blind sample: bare "medical" added 528 rows, 0 of 30 relevant.
+    expect(shape('We supply medical, dental and laboratory supplies.')).toBe('all(medical·supplies) | all(dental·supplies) | all(laboratory·supplies)');
+    expect(matchesText(m('We supply medical, dental and laboratory supplies.'), ['Z1DZ--Replace Dental Vacuum Piping'])).toBe(false);
   });
   it('is untouched without a list: "repair and maintenance", "salt and pepper"', () => {
     expect(listItems('repair and maintenance')).toEqual(['repair and maintenance']);
