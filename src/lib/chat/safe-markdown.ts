@@ -9,7 +9,8 @@
  * rel="noopener noreferrer" and show their text (a bare URL shows its host, not the full URL).
  *
  * Supported: **bold**, __bold__, *italic*, _italic_, `code`, # … ###### headings, "- " / "* " / "• "
- * bullets, "1." / "1)" numbered lists, [text](http…) links, bare http(s) URLs, blank-line paragraphs.
+ * bullets, "1." / "1)" numbered lists, [text](http…) links, bare http(s) URLs, blank-line paragraphs, and
+ * GFM pipe tables (a header row, a |---| separator row, then body rows; cells get inline formatting).
  *
  * SELF-CONTAINED ON PURPOSE: no imports and no references outside the function body, because the map
  * page ships it to the browser via Function.prototype.toString (SAFE_MARKDOWN_SCRIPT below). Keep it
@@ -65,8 +66,36 @@ export function renderSafeMarkdown(input: string): string {
   var para: string[] = [];
   function flushPara() { if (para.length) { out.push('<p>' + para.join('<br>') + '</p>'); para = []; } }
   function closeList() { if (list) { out.push('</' + list + '>'); list = null; } }
+  // GFM pipe table helpers (operate on already-escaped lines; "|" is not touched by esc()).
+  function isTableRow(l: string): boolean { return /^\s*\|.*\|\s*$/.test(l) || (l.indexOf('|') > 0 && /\S\s*\|\s*\S/.test(l)); }
+  function isTableSep(l: string): boolean { return /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/.test(l) && l.indexOf('-') >= 0; }
+  function cells(l: string): string[] {
+    var t = l.trim();
+    if (t.charAt(0) === '|') t = t.slice(1);
+    if (t.charAt(t.length - 1) === '|') t = t.slice(0, -1);
+    return t.split('|').map(function (c: string) { return c.trim(); });
+  }
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i];
+    if (isTableRow(line) && i + 1 < lines.length && isTableSep(lines[i + 1])) {
+      flushPara(); closeList();
+      var head = cells(line);
+      var cols = Math.min(head.length, 20);
+      var rows: string[] = [];
+      var j = i + 2;
+      while (j < lines.length && lines[j].trim() && isTableRow(lines[j]) && rows.length < 500) {
+        var rc = cells(lines[j]);
+        var tds: string[] = [];
+        for (var c = 0; c < cols; c++) tds.push('<td>' + inline(rc[c] || '') + '</td>');
+        rows.push('<tr>' + tds.join('') + '</tr>');
+        j++;
+      }
+      var ths: string[] = [];
+      for (var k = 0; k < cols; k++) ths.push('<th>' + inline(head[k] || '') + '</th>');
+      out.push('<div class="md-table"><table><thead><tr>' + ths.join('') + '</tr></thead><tbody>' + rows.join('') + '</tbody></table></div>');
+      i = j - 1;
+      continue;
+    }
     var h = line.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/);
     var ul = line.match(/^\s*(?:[-*+]|&#8226;|•)\s+(.+)$/);
     var ol = line.match(/^\s*(\d{1,3})[.)]\s+(.+)$/);

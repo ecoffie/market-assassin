@@ -35,3 +35,11 @@ describe('MindyChatPanel renderMessageContent', () => {
     expect(html('Done [→ Pipeline] now', true)).toContain('<p>Done now</p>');
   });
 });
+
+describe('MindyChatPanel renders tables', () => {
+  it('a recompete table renders as a scrollable table', () => {
+    const out = html('| Holder | Value |\n|---|---|\n| **Acme** | $1.2M |', true);
+    expect(out).toContain('<div class="md-table"><table><thead><tr><th>Holder</th><th>Value</th></tr></thead><tbody><tr><td><strong>Acme</strong></td><td>$1.2M</td></tr></tbody></table></div>');
+    expect(out).toMatch(/\[&amp;_\.md-table\]:overflow-x-auto|\[&_\.md-table\]:overflow-x-auto/);
+  });
+});
