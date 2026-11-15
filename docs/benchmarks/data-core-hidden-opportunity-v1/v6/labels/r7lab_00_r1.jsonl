@@ -1,0 +1,35 @@
+{"id":"r7-0000","label":"NO","role":"NONE","restriction":"NONE","evidence":"pharmaceutical agents Uniform Formulary BPA, PSC 6505 drugs"}
+{"id":"r7-0001","label":"NO","role":"NONE","restriction":"NONE","evidence":"Wheelchair Van Repair Services, repair labour"}
+{"id":"r7-0002","label":"NO","role":"NONE","restriction":"NONE","evidence":"Industry Day construction Callao Naval Base Peru"}
+{"id":"r7-0003","label":"NO","role":"NONE","restriction":"NONE","evidence":"Veterans Affairs Pharmaceutical Industry Day, 6505 drugs"}
+{"id":"r7-0004","label":"NO","role":"NONE","restriction":"NONE","evidence":"RM16-1405 Building 592 renovations construction"}
+{"id":"r7-0005","label":"NO","role":"NONE","restriction":"NONE","evidence":"GOCO aircraft fuel services; lab supplies incidental"}
+{"id":"r7-0006","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"STOPPER,BOTTLE PSC 6640 laboratory item solicitation"}
+{"id":"r7-0007","label":"NO","role":"NONE","restriction":"NONE","evidence":"Health and Life Insurance Services Belize"}
+{"id":"r7-0008","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Induction heater with water chiller, PSC 6640 laboratory equipment"}
+{"id":"r7-0009","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"Atropine Auto-Injector 6505-31-017-0350 drug, Rafa NDA"}
+{"id":"r7-0010","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Graphite Furnace Atomic Absorption Spectrometer PSC 6640"}
+{"id":"r7-0011","label":"FIT","role":"SUB","restriction":"SOLE_SOURCE","evidence":"reagents and consumables Roche immunostainers, Roche only source"}
+{"id":"r7-0012","label":"NO","role":"NONE","restriction":"NONE","evidence":"StealthStation S8 preventative maintenance service contract"}
+{"id":"r7-0013","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"MEDICAL EQUIPMENT AND SUPPLIES PSC 6515"}
+{"id":"r7-0014","label":"NO","role":"NONE","restriction":"NONE","evidence":"Injectable Egg-Free Influenza Vaccine, 6505 pharmaceutical"}
+{"id":"r7-0015","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"ProteinSimple JESS automated protein analysis system 6640"}
+{"id":"r7-0016","label":"NO","role":"NONE","restriction":"NONE","evidence":"RM16-1405 Building 592 renovations construction"}
+{"id":"r7-0017","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Rugged Spectrometers PSC 6640 instrument"}
+{"id":"r7-0018","label":"NO","role":"NONE","restriction":"NONE","evidence":"USAFA Ambulance Services, service contract"}
+{"id":"r7-0019","label":"NO","role":"NONE","restriction":"NONE","evidence":"MEAL, RELIGIOUS, COLD WEATHER NSN 8970-01-737-3791 rations"}
+{"id":"r7-0020","label":"FIT","role":"SUB","restriction":"SOLE_SOURCE","evidence":"sole source Biomerieux VITEK MS Prime reagents and consumables ChromID agar"}
+{"id":"r7-0021","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"Pure Gas Dew Point Transmitters PUR-2W-M12-BR Michell"}
+{"id":"r7-0022","label":"NO","role":"NONE","restriction":"NONE","evidence":"Replace Dental Vacuum Piping construction"}
+{"id":"r7-0023","label":"NO","role":"NONE","restriction":"NONE","evidence":"Tinker AFB Multiple Award Construction Contract"}
+{"id":"r7-0024","label":"NO","role":"NONE","restriction":"NONE","evidence":"Reference and Esoteric Laboratory Testing services"}
+{"id":"r7-0025","label":"NO","role":"NONE","restriction":"BRAND_NAME","evidence":"Tektronix MSO44B 4 Series Mixed Signal Oscilloscope brand name"}
+{"id":"r7-0026","label":"NO","role":"NONE","restriction":"NONE","evidence":"Bullet Proof Pharmacy Window Boxes"}
+{"id":"r7-0027","label":"FIT","role":"SUB","restriction":"SOLE_SOURCE","evidence":"Fiber Optic Reflectance Spectrophotometer sole-source SciAps 6640"}
+{"id":"r7-0028","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Brand Name or Equal Teledyne Liquid Syringe Pump P/N 681240830"}
+{"id":"r7-0029","label":"NO","role":"NONE","restriction":"NONE","evidence":"Kingdom of Bahrain stevedoring port services"}
+{"id":"r7-0030","label":"NO","role":"NONE","restriction":"NONE","evidence":"Preventive Maintenance and Repair Services Kahuku Training Area"}
+{"id":"r7-0031","label":"NO","role":"NONE","restriction":"NONE","evidence":"Pantoprazole tablets NDC drug, 6505"}
+{"id":"r7-0032","label":"NO","role":"NONE","restriction":"NONE","evidence":"Biohazard and Infectious Waste disposal services"}
+{"id":"r7-0033","label":"NO","role":"NONE","restriction":"NONE","evidence":"MINICAMS PARTS brand name or equal, chemical monitor parts"}
+{"id":"r7-0034","label":"FIT","role":"PRIME","restriction":"NONE","evidence":"Thompson Surgical Reusable Retractor Sets Brand Name or Equal 6515"}

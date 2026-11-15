@@ -77,3 +77,24 @@ brand-name and sole-source. Show them on the card. Never filter on them.
 
 `r6_plan.json` · `labels/` (both reviewers plus `r6_meta.json`) · `results/r6_eval.json` · `scripts/r6.py plan|build|score` · `scripts/fetch_rows.mts`
 (read-only, credentials via `v4/scripts/bench-env.mts`). The notice text and sheets are reproducible and not committed.
+
+## Addendum: medical rc2 variants (`761b8d73b`), scored blind the same day
+
+The short medical phrasing now matches shared list items as adjacent phrases. The long phrasing is unchanged except for PSC 6505.
+45 new items (two reviewers; 38 of 45 agree on relevant-vs-not, so the ranges are wider). Script: `scripts/r7_medical.py`; results: `results/r7_medical_eval.json`.
+
+| Medical | Matched | Added vs production | Relevant in added sample | Est. relevant added | Removed vs production | Relevant in removed sample | Est. relevant lost |
+|---|---|---|---|---|---|---|---|
+| rc1, short (v6) | 459 | 353 | 3/30 | ≈ 35 | 50 | 1/25 | ≈ 2 |
+| **rc2_phrase**, short | 134 | 118 | 13–22 / 36 | ≈ 43–72 | 140 | 2/30 | **≈ 9** |
+| **rc2_phrase_6505**, short | 155 | 135 | 13–23 / 40 | ≈ 44–78 | 136 | 1/29 | **≈ 5** |
+| rc2_phrase, long | 1,290 | 62 | 11–18 / 19 | ≈ 36–59 | 0 | — | 0 |
+| rc2_phrase_6505, long | 1,308 | 80 | 12–19 / 25 | ≈ 38–61 | 0 | — | 0 |
+
+- **rc2 fixes the precision problem:** added rows go from about 10% relevant to about 35–60%. Production's own short-medical matches were mostly noise: rc2 drops 140
+  of production's 156, and only about 1 in 15 of the dropped rows is relevant.
+- **Cost:** about 9 relevant notices lost with `rc2_phrase` (sample: "Q301 Automated Blood Bank Solid Phase Analyzer", "Epinephrine Injector"), and about 5 with `_6505`.
+- **What PSC 6505 adds on its own:** 21 rows on short and 18 on long. About 1 of the 10 sampled is relevant. It wins back the epinephrine notice but mostly adds
+  drugs and biologicals that a medical-supplies business does not sell.
+- **Recommendation:** `rc2_phrase` as the default. Recover injector-type items through their item noun, not the whole FSC 6505. Whether "medical supplies" includes
+  pharmaceuticals is a scope ruling for Eric. If yes, `_6505` is slightly better on both added and lost. The difference between the two is within sampling error.
