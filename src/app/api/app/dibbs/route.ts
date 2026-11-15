@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { dibbsFreshness } from '@/lib/dibbs/freshness';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -73,8 +74,13 @@ export async function GET(request: NextRequest) {
 
   query = query.range(offset, offset + limit - 1);
 
-  const { data, error, count } = await query;
+  const [{ data, error, count }, latest] = await Promise.all([
+    query,
+    // Freshness is the data's own newest scrape time (freshness.ts). A failed read is null = unknown, never "fresh".
+    sb.from('dibbs_rfqs').select('scraped_at').not('scraped_at', 'is', null).order('scraped_at', { ascending: false }).limit(1),
+  ]);
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  const lastSyncedAt = !latest.error && latest.data?.[0]?.scraped_at ? String(latest.data[0].scraped_at) : null;
 
   const rows = (data || []).map((r: Record<string, unknown>) => ({
     solicitationNumber: r.solicitation_number,
@@ -97,6 +103,7 @@ export async function GET(request: NextRequest) {
     offset,
     limit,
     hasMore: (count ?? 0) > offset + rows.length,
+    freshness: dibbsFreshness(lastSyncedAt),
     rfqs: rows,
   });
 }

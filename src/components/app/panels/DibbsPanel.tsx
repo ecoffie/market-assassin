@@ -9,7 +9,8 @@
  * Authed /api/app route → MUST send getMIApiHeaders(email) or it 401s.
  */
 import { useState, useCallback, useEffect } from 'react';
-import { Package, Flame, Zap } from 'lucide-react';
+import { Package, Flame, Zap, PauseCircle } from 'lucide-react';
+import { dibbsFreshnessNotice, type DibbsFreshness } from '@/lib/dibbs/freshness';
 import { authedFetch } from '../authHeaders';
 import type { AppTier } from '../UnifiedSidebar';
 
@@ -57,6 +58,7 @@ export default function DibbsPanel({ email }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [freshness, setFreshness] = useState<DibbsFreshness | null>(null);
 
   const [q, setQ] = useState('');
   const [nsn, setNsn] = useState('');
@@ -88,6 +90,7 @@ export default function DibbsPanel({ email }: Props) {
         setRfqs(prev => (offset === 0 ? data.rfqs : [...prev, ...data.rfqs]));
         setTotal(data.total || 0);
         setHasMore(!!data.hasMore);
+        setFreshness(data.freshness ?? null);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Search failed');
       } finally {
@@ -121,6 +124,14 @@ export default function DibbsPanel({ email }: Props) {
           isn&apos;t on SAM.gov. Search by keyword, NSN, or FSC.
         </p>
       </div>
+
+      {/* Freshness: the DIBBS sync is parked; never present a frozen snapshot as a live market (freshness.ts). */}
+      {freshness && dibbsFreshnessNotice(freshness) && (
+        <div role="status" className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+          <PauseCircle className="h-4 w-4 mt-0.5 shrink-0" strokeWidth={2} />
+          <span>{dibbsFreshnessNotice(freshness)}</span>
+        </div>
+      )}
 
       {/* Search / filters */}
       <form onSubmit={onSubmit} className="bg-ground border border-surface rounded-xl p-4 space-y-3">
