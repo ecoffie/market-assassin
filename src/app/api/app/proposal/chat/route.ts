@@ -204,9 +204,12 @@ export async function POST(request: NextRequest) {
         // Proposal chat is the drafting assistant — it extracts exact clauses and
         // writes sections, so quality pays (Eric, Jul 2). Lead with full gpt-4o.
         // The per-user budget cap below already downgrades heavy users to Groq, so
-        // the margin is protected even at the higher model. CHAT_OPENAI_MODEL env
-        // can dial it back if needed.
-        const chatModel = process.env.CHAT_OPENAI_MODEL || 'gpt-4o';
+        // the margin is protected even at the higher model. PROPOSAL_CHAT_OPENAI_MODEL
+        // can dial it back if needed. Proposal chat deliberately does NOT read
+        // CHAT_OPENAI_MODEL: that variable is Ask Mindy's, and this route sends raw
+        // temperature/max_tokens and falls silently to Groq on any rejection, so an
+        // Ask Mindy model switch must never move it (2026-11-15, B2 step 2 hold).
+        const chatModel = process.env.PROPOSAL_CHAT_OPENAI_MODEL || 'gpt-4o';
         const streamFrom = (url: string, key: string, model: string) => fetch(url, {
           method: 'POST',
           headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },

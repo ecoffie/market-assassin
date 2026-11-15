@@ -226,6 +226,19 @@ describe('B2: whole-request token budget', () => {
     }
     expect(bodies.some((b) => b.model === 'gpt-6.1-terra')).toBe(true);
   });
+
+  it('Ask Mindy honours CHAT_OPENAI_MODEL (step-2 env): plans and answers on terra, luna answers on failure; PROPOSAL_CHAT_OPENAI_MODEL has no effect', async () => {
+    vi.stubEnv('CHAT_OPENAI_MODEL', 'gpt-6.1-terra'); vi.stubEnv('CHAT_ANSWER_FALLBACKS', 'openai:gpt-6-luna');
+    vi.stubEnv('PROPOSAL_CHAT_OPENAI_MODEL', 'gpt-4o-mini');
+    state.plannerCalls = [{ id: 'c1', function: { name: 'search_sam_opportunities', arguments: '{}' } }];
+    await ask('What janitorial opportunities are open in Florida right now?');
+    expect(state.plannerModels).toEqual(['gpt-6.1-terra']);
+    expect(state.answerModels).toEqual(['gpt-6.1-terra']);
+    state.answerModels = []; state.plannerModels = [];
+    state.failModels = new Set(['gpt-6.1-terra']);
+    await ask('What janitorial opportunities are open in Florida right now?');
+    expect(state.answerModels).toEqual(['gpt-6.1-terra', 'gpt-6-luna']);
+  });
 });
 
 describe('B2: over-budget users (LLM_OPENAI_MODEL || gpt-4o-mini, unchanged by this release)', () => {
