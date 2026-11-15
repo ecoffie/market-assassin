@@ -254,3 +254,51 @@ All of them are now labelled. The 382 new items were labelled by two blind revie
 | V-ranked | 11–13 | 12–14 |
 
   V-narrow matches or beats the full family on the lower bound and carries fewer split or NO rows. It is the recommended variant.
+
+## Addendum 7: RC3 candidate evaluation, `agent3/rc3-candidate` @ `23dcfae03` (untagged; all-in + S1 + P1/P2 + V-narrow)
+
+**One SHA, one set of numbers, for Eric's approval.** Diagnostic only: AI labels, in-sample, Nov 14 fixture. **Not the human holdout and not a certification.**
+
+**Independent checks, from Agent 4's own checkout under the shared lock:**
+
+| Check | Result |
+|---|---|
+| (a) Runner output | Byte-identical to Agent 3's `outputs/rc3-candidate-23dcfae03-nov14-fixture.json` (sha256 `75963f39e376d73b…`). Agent 4's rerun is also byte-identical. `src.commit` = `23dcfae03b80…`, not dirty |
+| (b) Composition | 28/28 phrasings have matched sets and top-20 identical to the evaluated part head: V-narrow `43a1c6ca7` for nursing, S1+P1/P2 `4a89f74f6` for parts and steel, all-in `e4cee694a` for everything else. No new labels were needed |
+| (c) Route parity | 28/28 |
+
+| Pooled, raw top-20 | RC1 | RC2 | RC3 preview | **RC3 candidate** |
+|---|---|---|---|---|
+| Short | 38–42% | 67–74% | 71–79% | **76–85%** |
+| Long | 41–45% | 62–66% | 61–66% | **78–84%** |
+| Short businesses below 40% | 10 | 4 | guards, parts | **guards** |
+| Long businesses below 40% | 8 | 4 | nursing, guards, steel, IT | **guards** |
+
+**Per business, relevant of the top 20 (lower–upper bound across the two reviewers), short / long:**
+
+| Business | Short | Long |
+|---|---|---|
+| Janitorial | 14–15 | 12–14 |
+| Nursing | 12–13 | 13–14 |
+| HVAC | 17–18 | 15–16 |
+| **Guards** | **6–8** | **7–9** |
+| Steel buildings | 12–15 | 11–12 |
+| Grounds | 16–17 | 15–18 |
+| Paving | 17–18 | 14–17 |
+| Replacement parts | 14–17 | 19 |
+| Fasteners | 20 | 20 |
+| Electrical | 19 | 20 |
+| Valves | 20 | 20 |
+| Aircraft | 16–18 | 18 |
+| Medical | 15–20 | 18–19 |
+| IT hardware | 15–19 | 16–19 |
+
+**Open items carried with this candidate:**
+1. Guards fails 40% on the lower bound, short and long. On the full labelled pool, only 6 Direct solicitations exist (12 counting Related). This is Eric's rule decision: how strict Related is and how the top 20 is counted, with the spot-check sheet as evidence. Ranking alone cannot fix it.
+2. Paving long (14–17) is below RC1's 18–19. It is above the bar and was noted in Addendum 1.
+3. Valves long: 15 of 20 are the same "PARTS KIT,BALL VALV" item under 20 solicitation numbers. This bears on the top-20 counting rule.
+4. Steel: the S1 drop sample was 0/30 relevant. Hangar and new-building notices that never state steel work could be called Related by a human.
+5. Nursing: the Related strictness also governs its clinical-service rows.
+6. These numbers are AI labels on the snapshot the fixes were designed against. The Dec 12 human holdout, the protocol in `v4/HOLDOUT-PROTOCOL-ADAPTIVE.md`, is what certifies. The candidate must be tagged by Dec 5 to be evaluated on it.
+
+Files: `runner_rc3_candidate.json`, `scripts/r16.py`, `results/r16_eval.json`.
