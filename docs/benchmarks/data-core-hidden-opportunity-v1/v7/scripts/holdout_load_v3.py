@@ -2,8 +2,9 @@
 # verified DIRECT matches only (Related reported separately); pooled 60% counts Direct+Related on distinct solicitations.
 # Simulated on the v7 AI-label preview, short phrasing (frozen protocol). Simulated human from two AI reviewers (FIT=Direct, PARTIAL=Related):
 # both FIT -> Direct 97%; split FIT -> Direct 50%/Related 25%; PARTIAL only -> Related 70%/Direct 10%; both NO -> NO 97%.
-# Run: python3 -I scripts/holdout_load_v3.py
+# Run: python3 -I scripts/holdout_load_v3.py [--pooled-direct]
 import json, os, sys, random, re, glob, math, collections
+POOL_DIRECT = '--pooled-direct' in sys.argv   # Eric 2026-11-15 (RC3 brief): overall 60% counts DIRECT only
 V7 = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 src = open(f'{V7}/scripts/r16.py').read().split("\ncmd = sys.argv[1]\n")[0]
 g = {'__file__': f'{V7}/scripts/r16.py', '__name__': 'r16'}; exec(compile(src, 'r16.py', 'exec'), g)
@@ -46,7 +47,7 @@ for rc in ('rc2', 'rc3'):
         fl = math.ceil(.4 * n); tot = [tot[0] + n, tot[1] + dl, tot[2] + dh, tot[3] + rl, tot[4] + rh]
         if dl < fl: below.append(f'{b} {dl}-{dh}/{n}')
         if rc == 'rc3': print(f'  rc3 {b:12s} n={n:2d} floor={fl} direct {dl}-{dh}  relevant {rl}-{rh}')
-    print(f' {rc}: pooled relevant {tot[3]/tot[0]:.0%}-{tot[4]/tot[0]:.0%} of {tot[0]}; Direct below floor (lo): {below}')
+    print(f' {rc}: pooled relevant {tot[3]/tot[0]:.0%}-{tot[4]/tot[0]:.0%}, pooled DIRECT {tot[1]/tot[0]:.0%}-{tot[2]/tot[0]:.0%} of {tot[0]}; Direct below floor (lo): {below}')
 def lower95(k, n, N):  # one-sided 95% normal bound with finite-population correction
     ph = k / n; return ph - 1.645 * math.sqrt(ph * (1 - ph) / n * (N - n) / (N - 1))
 def sim(rcs, recall_n, reps=300):
@@ -66,7 +67,7 @@ def sim(rcs, recall_n, reps=300):
                     if d >= fl or nd > n - fl: break
             pool = [(b, i) for b in BIZ for i in TOP[(b, rc)]]; N = len(pool); rng.shuffle(pool); k = m = 0
             for bi in pool:   # sequential pooled sample; stop when the bound clears 60% either way (checked every 20, min 40)
-                k += lab(*bi) != 'N'; m += 1
+                k += (lab(*bi) == 'D') if POOL_DIRECT else (lab(*bi) != 'N'); m += 1
                 if m >= 40 and m % 20 == 0:
                     lo = lower95(k, m, N); hi = 2 * k / m - lo
                     if lo >= .6 or hi < .6: break

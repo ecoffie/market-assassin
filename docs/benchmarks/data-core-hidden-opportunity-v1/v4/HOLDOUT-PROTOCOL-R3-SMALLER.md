@@ -1,5 +1,7 @@
 # Human holdout: smaller plan (revision 3, 2026-11-15, for Eric's approval)
 
+**Update, same day:** Eric's RC3 brief makes the overall 60% count **Direct only**, which moves the RC3-only estimate to ≈ 232 judgments. A fail-first Stage 1 (guards and steel, ≈ 32 judgments) comes first. Both are in `../expert-regression/AUDIT-PRIOR-EXPERT-REVIEWS-2026-11-15.md`, which supersedes the sizing below. Eric does not redo the 12 calibration items he already judged.
+
 **Replaces revision 2's sizing** (`HOLDOUT-PROTOCOL-ADAPTIVE.md` §1, §4). The sealing, leakage controls (§3) and verifier design (§2) of revision 2 are unchanged except where stated.
 Nothing starts until Eric approves. No staff member reviews anything. AI labels never count toward a gate.
 
