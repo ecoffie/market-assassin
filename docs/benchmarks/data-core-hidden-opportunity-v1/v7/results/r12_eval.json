@@ -1,0 +1,22 @@
+{
+ "nursing": {
+  "pool": 327,
+  "pool_labelled": 327,
+  "relevant_both": 35,
+  "relevant_both_solicitations": 23,
+  "relevant_either": 50,
+  "relevant_either_solicitations": 31,
+  "direct_both": 15,
+  "direct_both_solicitations": 14
+ },
+ "guards": {
+  "pool": 136,
+  "pool_labelled": 136,
+  "relevant_both": 16,
+  "relevant_both_solicitations": 12,
+  "relevant_either": 19,
+  "relevant_either_solicitations": 14,
+  "direct_both": 9,
+  "direct_both_solicitations": 6
+ }
+}

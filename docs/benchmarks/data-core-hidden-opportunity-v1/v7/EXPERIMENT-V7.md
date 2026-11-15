@@ -130,3 +130,22 @@ is Eric's decision and must happen before Dec 12.
   - The four long below-40% businesses remain. Nursing (5) and IT (7) are far off. Steel (6) is short of 8.
   - Guards (7) is the duplicate and too-few-families case raised in Addendum 1.
 - Diagnostic only: AI labels, in-sample on the fixture.
+
+## Addendum 3: are nursing and guards scarce markets? (r12, full pool labelled)
+
+**Pool.** Every fixture notice open at the snapshot whose code, NAICS or title keyword fits the trade (`scripts/r12.py`): nursing 327, guards 136.
+All of them are now labelled. The 382 new items were labelled by two blind reviewers, who agreed relevant-vs-not on 370 of 382. Results: `results/r12_eval.json`.
+
+| | Distinct relevant solicitations (both / either reviewer) | Direct only (both FIT) | Relevant solicitations in the guard-window branch's matched set (short / long) | Relevant in its top 20 (short / long) |
+|---|---|---|---|---|
+| Nursing | **23** / 31 | 14 | 10 / 15 | 8 / 5 |
+| Guards | **12** / 14 | **6** | 10 / 10 | 6 / 7 |
+
+- **Nursing is not scarce.**
+  - Short is now a retrieval gap as well as a ranking gap: its 47-notice matched set reaches only 10 of the 23 relevant solicitations.
+  - Many of the new relevant items are clinical-service buys (therapy, psychologist, Job Corps medical) that the reviewers called PARTIAL for a nurse-staffing firm. How strictly "Related" is applied matters here.
+- **Guards depends on the rule.**
+  - Counting Direct + Related, 12 relevant solicitations exist. That is enough for 8/20 in principle.
+  - Counting Direct only, 6 exist, so no ranking reaches 8/20.
+  - Six borderline Related solicitations go to Eric's 5-minute spot-check (`~/mindy-release-private/guards-related-spotcheck.md`, key sealed).
+- AI labels, diagnostic only. The pool is keyword- and code-bounded, so a relevant notice outside it would be missed. Counts are therefore near-census lower bounds.
