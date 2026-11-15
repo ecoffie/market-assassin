@@ -10,13 +10,15 @@ import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 import { getStaffRole } from '@/lib/api-auth';
 import type { AccountActivity } from './framework';
+import { activationPaidReasons } from '@/lib/entitlements/paid-reasons';
 
 const PAGE = 1000;
 const EMAIL_CHUNK = 150;
 
 /** listing/detail opens: the first-value proxy. */
 export const OPEN_OPPORTUNITY_TOOLS = new Set(['listing_open', 'open_details', 'pin_clicked', 'expand_opportunity', 'office_viewed']);
-export const PAID_REASONS = ['pro_monthly', 'app_tier_pro', 'mcp_sub_monthly', 'mcp_sub_annual', 'stripe_topup'];
+/** Shared paid-status reasons: the legacy list unless PAID_STATUS_RESOLVER=true (read at import). */
+export const PAID_REASONS = activationPaidReasons();
 
 /** Staff, comp, advocate, partner, demo and synthetic accounts are not customers. */
 export function isExcludedAccount(email: string): boolean {
