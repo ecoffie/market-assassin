@@ -745,11 +745,14 @@ export function labelOpenRow(
     cls = 'DIRECT_MATCH'; basis.push('buy_side_code');
   } else {
     const query = String(plan.intent?.residual || '');
-    const v = classifyOpenEvidence(row, plan, cap, query);
+    const v = classifyOpenEvidence(row, plan, classifierView(cap), query);
     cls = v.cls;
     const broadFamily = codeIn(cap.direct.naics.filter((c) => c.length < 6), row.naics_code)
       || codeIn(openDirectPsc(cap).filter((c) => c.length < 4), row.psc_code);
-    if (cls === 'WEAK_NON_MARKET' && broadFamily && v.basis !== 'repair_notice_for_parts') { cls = 'RELATED_MARKET_CANDIDATE'; basis.push('related_market_code'); }
+    if (cls !== 'DIRECT_MATCH' && nsnHardwareItem(row, cap) && v.basis !== 'repair_notice_for_parts' && v.basis !== 'service_notice_for_supplier') {
+      // DLA NSN parts (Eric 2026-11-15): for a replacement-parts supplier, a hardware stock-numbered item buy IS the sale.
+      cls = 'DIRECT_MATCH'; basis.push('buy_side_text');
+    } else if (cls === 'WEAK_NON_MARKET' && broadFamily && v.basis !== 'repair_notice_for_parts') { cls = 'RELATED_MARKET_CANDIDATE'; basis.push('related_market_code'); }
     else basis.push(EVIDENCE_TO_BASIS[v.basis]);
   }
   const company = companyRecallBasis(row, anchor);
@@ -759,6 +762,33 @@ export function labelOpenRow(
     ? (basis[0] === 'product_code' ? 0 : basis[0] === 'description_text' || basis[0] === 'single_list_word' ? 0.1 : 0.2) : 0;
   const tier = cls === 'WEAK_NON_MARKET' && company ? OPEN_TIER.COMPANY_CODE : OPEN_TIER[cls] + relatedOffset;
   return { cls, basis, tier };
+}
+
+/**
+ * DLA NSN PARTS (Eric, 2026-11-15; dev only). Only when the customer's phrase fires the replacement_parts preset: a notice
+ * filed under a HARDWARE FSC (groups 10-59: weapons through electrical/electronic components; 2- or 4-digit numeric PSC)
+ * that carries a National Stock Number in its title or description is a DIRECT item buy. Medical (65), food (89),
+ * fuel (91), IT (70/7x) and services never qualify; repair and service notices are excluded by the caller (Eric's S30
+ * ruling: repair is not supply). Title + description only, the columns FIND Open selects.
+ */
+/**
+ * The replacement_parts preset exists for RETRIEVAL (NSN vocabulary over title + description) and the NSN rule above. It
+ * must not change how every other parts row is classified: when it is the only preset, the evidence classifier sees the
+ * literal interpretation it saw before (no product codes, no vocabulary), so "Gearbox Assemblies for HC-130J" stays
+ * DIRECT and whole-vehicle buys stay RELATED (long-list guard tests).
+ */
+function classifierView(cap: MarketInterpretation['capability']): MarketInterpretation['capability'] {
+  const p = cap.codePresets;
+  if (!p || p.trades.length || p.products.length !== 1 || p.products[0] !== 'replacement_parts') return cap;
+  const { vocab: _v, vocabCols: _c, ...direct } = cap.direct; // eslint-disable-line @typescript-eslint/no-unused-vars
+  return { ...cap, kind: 'literal', codePresets: undefined, related_market: null,
+    direct: { ...direct, source: 'literal', naics: [], psc: [], terms: cap.requested ? [cap.requested] : [] } };
+}
+const NSN_RE = /\bNSN\b|\bnational\s+stock\s+number\b|\b\d{4}-\d{2}-\d{3}-\d{4}\b|\b\d{4}0\d{8}\b|\b\d{13}\b/i;
+function nsnHardwareItem(row: Record<string, unknown>, cap: MarketInterpretation['capability']): boolean {
+  if (!(cap.codePresets?.products || []).includes('replacement_parts')) return false;
+  if (!/^[1-5][0-9](?:[0-9A-Z]{2})?$/.test(String(row.psc_code || '').trim())) return false;
+  return NSN_RE.test(`${String(row.title || '')}\n${String(row.description || '')}`);
 }
 
 /**
