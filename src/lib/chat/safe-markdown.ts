@@ -1,0 +1,85 @@
+/**
+ * Safe markdown subset for Ask Mindy answers (2026-11-15: the map drawer showed **bold**, "- " bullets,
+ * ### headings and raw [text](https://…) links literally, and long URLs ran off the bubble).
+ *
+ * SECURITY CONTRACT: the model's text is HTML-ESCAPED FIRST, then a small markdown subset is turned into
+ * markup that this function writes itself. No model text ever reaches the output unescaped, so <script>,
+ * event-handler attributes and markup injection come out as text. Links are emitted only for http(s) URLs;
+ * any other scheme (javascript:, data:, vbscript:, …) renders as plain text. Links open in a new tab with
+ * rel="noopener noreferrer" and show their text (a bare URL shows its host, not the full URL).
+ *
+ * Supported: **bold**, __bold__, *italic*, _italic_, `code`, # … ###### headings, "- " / "* " / "• "
+ * bullets, "1." / "1)" numbered lists, [text](http…) links, bare http(s) URLs, blank-line paragraphs.
+ *
+ * SELF-CONTAINED ON PURPOSE: no imports and no references outside the function body, because the map
+ * page ships it to the browser via Function.prototype.toString (SAFE_MARKDOWN_SCRIPT below). Keep it
+ * plain ES5-style so the serialized source runs in every browser without build helpers.
+ */
+export function renderSafeMarkdown(input: string): string {
+  var MAX = 60000;
+  var src = String(input == null ? '' : input).slice(0, MAX).replace(/\u0000/g, '').replace(/\r\n?/g, '\n');
+
+  function esc(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function unesc(s: string): string {
+    return s.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  }
+  // An http(s) URL with no whitespace, quotes or angle brackets (checked on the UNESCAPED value).
+  function safeHref(raw: string): string | null {
+    var u = unesc(raw).trim();
+    if (!/^https?:\/\/[^\s"'<>`]+$/i.test(u)) return null;
+    return esc(u);
+  }
+  function hostOf(raw: string): string {
+    var m = unesc(raw).match(/^https?:\/\/([^/?#\s]+)/i);
+    return m ? esc(m[1].replace(/^www\./i, '')) : 'link';
+  }
+
+  // Inline formatting on ONE line of already-escaped text. Links are cut out into placeholders first so
+  // their URLs are never touched by the emphasis rules (underscores in URLs are common).
+  function inline(line: string): string {
+    var slots: string[] = [];
+    function keep(html: string): string { slots.push(html); return '\u0000' + (slots.length - 1) + '\u0000'; }
+    var s = line;
+    s = s.replace(/`([^`\n]{1,400})`/g, function (_m: string, code: string) { return keep('<code>' + code + '</code>'); });
+    s = s.replace(/\[([^\]\n]{1,300})\]\(([^)\s]{1,2000})\)/g, function (m: string, text: string, url: string) {
+      var href = safeHref(url);
+      return href ? keep('<a href="' + href + '" target="_blank" rel="noopener noreferrer">' + text + '</a>') : text;
+    });
+    s = s.replace(/https?:\/\/[^\s<>"'`)\]]+/gi, function (url: string) {
+      var trail = '';
+      var mm = url.match(/[.,;:!?]+$/);
+      if (mm) { trail = mm[0]; url = url.slice(0, -trail.length); }
+      var href = safeHref(url);
+      return href ? keep('<a href="' + href + '" target="_blank" rel="noopener noreferrer">' + hostOf(url) + '</a>') + trail : url + trail;
+    });
+    s = s.replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>').replace(/__([^_\n]+?)__/g, '<strong>$1</strong>');
+    s = s.replace(/(^|[^*\w])\*([^*\s][^*\n]*?)\*(?!\w)/g, '$1<em>$2</em>').replace(/(^|[^_\w])_([^_\s][^_\n]*?)_(?!\w)/g, '$1<em>$2</em>');
+    return s.replace(/\u0000(\d+)\u0000/g, function (_m: string, i: string) { return slots[Number(i)] || ''; });
+  }
+
+  var lines = esc(src).split('\n');
+  var out: string[] = [];
+  var list: 'ul' | 'ol' | null = null;
+  var para: string[] = [];
+  function flushPara() { if (para.length) { out.push('<p>' + para.join('<br>') + '</p>'); para = []; } }
+  function closeList() { if (list) { out.push('</' + list + '>'); list = null; } }
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+    var h = line.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/);
+    var ul = line.match(/^\s*(?:[-*+]|&#8226;|•)\s+(.+)$/);
+    var ol = line.match(/^\s*(\d{1,3})[.)]\s+(.+)$/);
+    if (!line.trim()) { flushPara(); closeList(); continue; }
+    if (h) { flushPara(); closeList(); out.push('<div class="md-h md-h' + Math.min(h[1].length, 3) + '">' + inline(h[2]) + '</div>'); continue; }
+    if (ul) { flushPara(); if (list !== 'ul') { closeList(); out.push('<ul>'); list = 'ul'; } out.push('<li>' + inline(ul[1]) + '</li>'); continue; }
+    if (ol) { flushPara(); if (list !== 'ol') { closeList(); out.push('<ol>'); list = 'ol'; } out.push('<li>' + inline(ol[2]) + '</li>'); continue; }
+    closeList();
+    para.push(inline(line));
+  }
+  flushPara(); closeList();
+  return out.join('');
+}
+
+/** Browser copy for pages that cannot import modules (the Opportunity Map route's inline scripts). */
+export const SAFE_MARKDOWN_SCRIPT = `<script>window.__mindyMd=${renderSafeMarkdown.toString()};</script>`;
