@@ -133,6 +133,16 @@ interface CitedSource {
   document_id: string | null;
 }
 
+/** A provider's machine error code (e.g. `rate_limit_exceeded`), never its free-text message. */
+export function providerErrorCode(body: string, res: Response | null): string | null {
+  if (!res) return 'network_error';
+  try {
+    const e = JSON.parse(body)?.error;
+    const c = String(e?.code ?? e?.type ?? '');
+    return /^[A-Za-z0-9_.-]{1,64}$/.test(c) ? c : null;
+  } catch { return null; }
+}
+
 function sseEvent(obj: unknown): string {
   return `data: ${JSON.stringify(obj)}\n\n`;
 }
@@ -599,9 +609,11 @@ export async function POST(request: NextRequest) {
           tools_offered: number;
           tool_executions: ChatExecutionRecord[];
           answer: { provider: string; model: string; finish_reason: string | null; fallback: boolean } | null;
+          /** Failed answer attempts: status + provider error code only (never the provider's message). */
+          answer_attempts: Array<{ provider: string; model: string; status: number | null; code: string | null }>;
           notices: string[];
           context?: { kind: 'opportunity'; notice_id: string };
-        } = { planner: null, planner_attempts: [], tools_offered: 0, tool_executions: [], answer: null, notices: [],
+        } = { planner: null, planner_attempts: [], tools_offered: 0, tool_executions: [], answer: null, answer_attempts: [], notices: [],
               ...(cardCtx ? { context: { kind: 'opportunity' as const, notice_id: cardCtx.noticeId } } : {}) };
         if (capabilityNote) turnTrace.notices.push('capability_interpreted');
         if (staging) turnTrace.notices.push(`staging_model_config:${staging.name}`);
@@ -942,6 +954,7 @@ export async function POST(request: NextRequest) {
           if (fit.recordsShortened) turnTrace.notices.push('answer_records_copy_shortened');
           if (!fit.fits) {
             answerTooLarge = true;
+            turnTrace.answer_attempts.push({ provider: t.provider, model: t.model, status: null, code: 'request_too_large_not_sent' });
             void recordProviderEvent({ kind: answerChain[i + 1] ? 'answer_fallback' : 'answer_failure', provider: t.provider, model: t.model, status: null, detail: `request_too_large: est ${fit.estimate} > budget ${fit.budget} tokens (not sent)`, userEmail: auth.email! });
             continue;
           }
@@ -955,6 +968,7 @@ export async function POST(request: NextRequest) {
             break;
           }
           if (r) detail = (await r.text().catch(() => '')).slice(0, 300);
+          turnTrace.answer_attempts.push({ provider: t.provider, model: t.model, status: r ? r.status : null, code: providerErrorCode(detail, r) });
           const next = answerChain[i + 1];
           void recordProviderEvent({
             kind: next ? 'answer_fallback' : 'answer_failure',
@@ -968,6 +982,17 @@ export async function POST(request: NextRequest) {
         if (!groqRes || !groqRes.body) {
           const kind = answerTooLarge ? 'request_too_large' : 'answer_unavailable';
           turnTrace.notices.push(kind);
+          if (TRACE_EVENTS) {
+            // Preview-only: which answer models failed and how (status + provider error code), so a staging
+            // run can diagnose a failed turn. The customer-facing message below stays the fixed text.
+            send({
+              type: 'trace_usage',
+              planner: toolProvider ? { provider: toolProvider, model: toolModel, usage: toolUsageForCost } : null,
+              answer: null,
+              answer_attempts: turnTrace.answer_attempts,
+              notices: turnTrace.notices,
+            });
+          }
           send({ type: 'error', code: kind, message: customerErrorMessage(kind) });
           send({ type: 'done' });
           closeStream();
@@ -1089,6 +1114,7 @@ export async function POST(request: NextRequest) {
             type: 'trace_usage',
             planner: toolProvider ? { provider: toolProvider, model: toolModel, usage: toolUsageForCost } : null,
             answer: { provider: usedProvider, model: usedModel, usage: usageForCost, fallback: answerFallback, finish_reason: finishReason },
+            answer_attempts: turnTrace.answer_attempts,
             notices: turnTrace.notices,
           });
         }

@@ -27,6 +27,9 @@ export const STAGING_MODEL_CONFIGS: Readonly<Record<string, StagingModelConfig>>
   terra: { env: { CHAT_OPENAI_MODEL: 'gpt-6.1-terra', CHAT_ANSWER_FALLBACKS: 'openai:gpt-6-luna,groq:openai/gpt-oss-120b' } },
   // Same-provider fallback: the answer primary fails for real, gpt-6-luna must answer.
   'fallback-luna': { env: { CHAT_OPENAI_MODEL: 'gpt-6.1-terra', CHAT_ANSWER_FALLBACKS: 'openai:gpt-6-luna' }, answerPrimary: FORCED_FAILURE_MODEL },
+  // Interim code-default fallback (what #2053 ships with no env change): current primary, the answer
+  // primary fails for real, gpt-4o-mini must answer.
+  'fallback-mini': { env: { CHAT_ANSWER_FALLBACKS: 'openai:gpt-4o-mini' }, answerPrimary: FORCED_FAILURE_MODEL },
   // Independent-provider fallback: the answer primary fails for real, Groq gpt-oss-120b must answer.
   'fallback-groq': { env: { CHAT_OPENAI_MODEL: 'gpt-6.1-terra', CHAT_ANSWER_FALLBACKS: 'groq:openai/gpt-oss-120b' }, answerPrimary: FORCED_FAILURE_MODEL },
 };

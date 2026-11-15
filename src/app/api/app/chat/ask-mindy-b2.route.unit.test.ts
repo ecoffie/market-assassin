@@ -260,6 +260,38 @@ describe('B2: preview-only staging model selector', () => {
     expect(raw).toMatch(/"fallback":true/);
   });
 
+  it('on a traced preview, fallback-mini forces a real primary failure and gpt-4o-mini answers (current planner)', async () => {
+    vi.stubEnv('ASK_MINDY_TRACE_EVENTS', 'true'); vi.stubEnv('VERCEL_ENV', 'preview');
+    state.failModels = new Set(['mindy-staging-forced-failure']);
+    vi.resetModules();
+    const { POST } = await import('./route');
+    const res = await POST(new Request('https://x/api/app/chat', { method: 'POST', headers: { 'x-ask-mindy-staging-config': 'fallback-mini' }, body: JSON.stringify({ email: ME, message: 'How do I write a capability statement?' }) }) as never);
+    const raw = await res.text();
+    expect(state.answerModels).toEqual(['mindy-staging-forced-failure', 'gpt-4o-mini']);
+    expect(state.answerUrls[1]).toMatch(/^https:\/\/api\.openai\.com\//);
+    expect(raw).toMatch(/"fallback":true/);
+    expect(raw).toMatch(/"answer_attempts":\[\{"provider":"openai","model":"mindy-staging-forced-failure"/);
+  });
+
+  it('when every answer model fails, a traced preview still emits trace_usage with each attempt (status + code, no provider text); production does not', async () => {
+    vi.stubEnv('ASK_MINDY_TRACE_EVENTS', 'true'); vi.stubEnv('VERCEL_ENV', 'preview');
+    state.failModels = new Set(['mindy-staging-forced-failure', 'gpt-4o-mini']);
+    vi.resetModules();
+    const mk = () => new Request('https://x/api/app/chat', { method: 'POST', headers: { 'x-ask-mindy-staging-config': 'fallback-mini' }, body: JSON.stringify({ email: ME, message: 'How do I write a capability statement?' }) });
+    const raw = await (await (await import('./route')).POST(mk() as never)).text();
+    const events = raw.split('\n').filter((l) => l.startsWith('data:')).map((l) => JSON.parse(l.slice(5)));
+    const tu = events.find((e) => e.type === 'trace_usage');
+    expect(tu?.answer).toBeNull();
+    expect(tu?.answer_attempts?.map((a: { model: string }) => a.model)).toEqual(['mindy-staging-forced-failure', 'gpt-4o-mini']);
+    expect(tu?.answer_attempts?.every((a: { status: number | null }) => typeof a.status === 'number')).toBe(true);
+    expect(raw).not.toContain(SECRET); // provider free text never reaches the stream, trace included
+    expect(events.find((e) => e.type === 'error')?.code).toBe('answer_unavailable');
+    vi.stubEnv('VERCEL_ENV', 'production');
+    vi.resetModules();
+    const prodRaw = await (await (await import('./route')).POST(mk() as never)).text();
+    expect(prodRaw).not.toMatch(/trace_usage|answer_attempts/);
+  });
+
   it('an unknown config name is ignored', async () => {
     vi.stubEnv('ASK_MINDY_TRACE_EVENTS', 'true'); vi.stubEnv('VERCEL_ENV', 'preview');
     vi.resetModules();

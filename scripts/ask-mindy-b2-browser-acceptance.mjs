@@ -117,7 +117,7 @@ async function pageAsk(item, configName, email) {
       if (e.type === 'error') outR.errors.push(`${e.code}: ${e.message}`);
       if (e.type === 'credits') outR.credits.push(e);
       if (e.type === 'trace') for (const t of e.tools || []) { outR.tools.push(`${t.tool}:${t.status}`); outR.resultChars.push(t.result_chars); }
-      if (e.type === 'trace_usage') { outR.usage = { planner: e.planner, answer: e.answer }; outR.notices.push(...(e.notices || [])); }
+      if (e.type === 'trace_usage') { outR.usage = { planner: e.planner, answer: e.answer }; outR.answerAttempts = e.answer_attempts || []; outR.notices.push(...(e.notices || [])); }
     }
   }
   outR.ms = Math.round(performance.now() - started);
@@ -169,7 +169,7 @@ async function main() {
         r.usd = cost(r.usage); spent += r.usd; r.fails = judge(r, item.expect);
         if (r.credits.length) r.fails.push('credits event on a Pro chat turn');
         results.push(r);
-        console.log(`${r.fails.length ? 'FAIL' : 'PASS'} [${cfg}] ${r.id} · ${r.ms}ms (first token ${r.firstTokenMs ?? '-'}ms) · $${r.usd.toFixed(4)} · tools=[${r.tools.join(', ')}] · answer=${r.usage?.answer?.model ?? '-'}${r.usage?.answer?.fallback ? ' (fallback)' : ''}${r.fails.length ? ` · ${r.fails.join('; ')}` : ''}`);
+        console.log(`${r.fails.length ? 'FAIL' : 'PASS'} [${cfg}] ${r.id} · ${r.ms}ms (first token ${r.firstTokenMs ?? '-'}ms) · $${r.usd.toFixed(4)} · tools=[${r.tools.join(', ')}] · answer=${r.usage?.answer?.model ?? '-'}${r.usage?.answer?.fallback ? ' (fallback)' : ''}${r.answerAttempts?.length ? ` · failed attempts=[${r.answerAttempts.map((a) => `${a.model}:${a.status ?? '-'}:${a.code ?? '-'}`).join(', ')}]` : ''}${r.fails.length ? ` · ${r.fails.join('; ')}` : ''}`);
       }
       if (stopped) { console.log(`Budget reserve reached at $${spent.toFixed(4)}; stopping.`); break; }
     }
