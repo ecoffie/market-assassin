@@ -17,9 +17,9 @@ describe('nurse staffing: adjacent clinical-service codes retrieve as RELATED, n
   it('the related family is retrieved; Q401 stays the only direct code', () => {
     const cap = interpretCapability(SHORT);
     expect(cap.direct.psc).toEqual(['Q401']);
-    expect(openRetrievalPsc(cap)).toEqual(expect.arrayContaining(['Q401', 'Q201', 'Q501', 'Q518', 'Q701']));
+    expect(openRetrievalPsc(cap)).toEqual(expect.arrayContaining(['Q401', 'Q501', 'Q518', 'Q701']));
+    expect(openRetrievalPsc(cap)).not.toContain('Q201');
     expect(label('Occupational Therapy Services', 'Q518').cls).toBe('RELATED_MARKET_CANDIDATE');
-    expect(label('Jacobs Creek JCC Medical Services', 'Q201').cls).toBe('RELATED_MARKET_CANDIDATE');
   });
   it('a locum staffing title is item evidence (DIRECT), like "medical staffing"', () => {
     expect(label('Q501--Locum - Anesthesiology Physician Services', 'Q501').cls).toBe('DIRECT_MATCH');
