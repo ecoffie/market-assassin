@@ -25,6 +25,10 @@ export const TOOL_COMPATIBLE_PLANNERS: ReadonlySet<string> = new Set([
   'openai:gpt-4o',
   'openai:gpt-4o-mini', // already the planner for users over their monthly LLM budget
   'anthropic:claude-sonnet-5', // served 230 production tool rounds through 2026-09-25
+  // gpt-6-luna (OpenAI's named replacement for gpt-4o/gpt-4o-mini, which shut down 2027-01-14):
+  // route test ask-mindy-b2 "luna planner" + live replay of the 8 acceptance planner requests
+  // (56 real tools, auto and required tool_choice, reasoning_effort none) 24/24 accepted, 2026-11-15.
+  'openai:gpt-6-luna',
 ]);
 
 export const plannerKey = (t: PlannerTarget) => `${t.provider}:${t.model}`;

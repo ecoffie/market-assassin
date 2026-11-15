@@ -30,6 +30,8 @@ const state: {
   answerThrows: boolean;
   answerMessages: Array<Array<{ role: string; content: string }>>;
   plannerModels: string[];
+  plannerBodies: Array<Record<string, unknown>>;
+  plannerFailModels: Set<string>;
 } = {} as never;
 const budget = { over: false };
 
@@ -82,7 +84,7 @@ function sse(text: string) {
 beforeEach(() => {
   Object.assign(state, {
     plannerCalls: [], offered: [], executed: [], executedArgs: [], toolContent: '{"ok":true,"results":[]}', toolStatus: 'success',
-    answerModels: [], answerUrls: [], failModels: new Set(), answerThrows: false, answerMessages: [], plannerModels: [],
+    answerModels: [], answerUrls: [], failModels: new Set(), answerThrows: false, answerMessages: [], plannerModels: [], plannerBodies: [], plannerFailModels: new Set(),
   });
   profile.block = '';
   budget.over = false;
@@ -93,6 +95,8 @@ beforeEach(() => {
     const b = JSON.parse(init.body);
     if (!b.stream) {
       state.plannerModels.push(b.model);
+      state.plannerBodies.push(b);
+      if (state.plannerFailModels.has(b.model)) return new Response(`{"error":{"message":"${SECRET}"}}`, { status: 503 });
       state.offered.push((b.tools ?? []).map((t: { function?: { name?: string } }) => String(t.function?.name)));
       return new Response(JSON.stringify({ choices: [{ message: { content: null, tool_calls: state.plannerCalls.length ? state.plannerCalls : undefined } }] }), { status: 200 });
     }
@@ -367,6 +371,53 @@ describe('B2: preview-only staging model selector', () => {
     const { POST } = await import('./route');
     await (await POST(new Request('https://x/api/app/chat', { method: 'POST', headers: { 'x-ask-mindy-staging-config': 'gpt-6-astra' }, body: JSON.stringify({ email: ME, message: 'How do I write a capability statement?' }) }) as never)).text();
     expect(state.answerModels).toEqual(['gpt-4o']);
+  });
+});
+
+describe('gpt-6-luna as the PLANNER (gpt-4o / gpt-4o-mini shut down 2027-01-14)', () => {
+  const Q = 'What janitorial opportunities are open in Florida right now?';
+  const call = { id: 'c1', function: { name: 'search_sam_opportunities', arguments: JSON.stringify({ keyword: 'janitorial', state: 'FL' }) } };
+
+  it('as the planner fallback: terra fails, luna plans with GPT-6 params and its tool call runs', async () => {
+    vi.stubEnv('CHAT_OPENAI_MODEL', 'gpt-6.1-terra');
+    vi.stubEnv('CHAT_PLANNER_FALLBACKS', 'openai:gpt-6-luna');
+    vi.stubEnv('CHAT_ANSWER_FALLBACKS', 'openai:gpt-6-luna');
+    state.plannerFailModels = new Set(['gpt-6.1-terra']);
+    state.plannerCalls = [call];
+    const { events } = await ask(Q);
+    expect(state.plannerModels).toEqual(['gpt-6.1-terra', 'gpt-6-luna']);
+    const luna = state.plannerBodies[1];
+    expect(luna).toMatchObject({ model: 'gpt-6-luna', reasoning_effort: 'none' });
+    expect(luna.max_completion_tokens).toBeGreaterThan(0);
+    expect(luna).not.toHaveProperty('temperature');
+    expect(luna).not.toHaveProperty('max_tokens');
+    expect(Array.isArray(luna.tools) && (luna.tools as unknown[]).length).toBeTruthy();
+    expect(luna.tool_choice).toBe('required'); // open-opportunity intent forces a tool, unchanged for luna
+    expect(state.executed).toEqual([['search_sam_opportunities']]);
+    expect(state.answerModels).toEqual(['gpt-6.1-terra']);
+    expect(JSON.stringify(events)).not.toMatch(/req_9f2|sk-live|context_length/);
+  });
+
+  it('as the over-budget planner + answer (LLM_OPENAI_MODEL=gpt-6-luna): luna plans with GPT-6 params', async () => {
+    budget.over = true;
+    vi.stubEnv('LLM_OPENAI_MODEL', 'gpt-6-luna');
+    state.plannerCalls = [call];
+    await ask(Q);
+    expect(state.plannerModels).toEqual(['gpt-6-luna']);
+    expect(state.plannerBodies[0]).toMatchObject({ model: 'gpt-6-luna', reasoning_effort: 'none' });
+    expect(state.plannerBodies[0]).not.toHaveProperty('temperature');
+    expect(state.executed).toEqual([['search_sam_opportunities']]);
+    expect(state.answerModels).toEqual(['gpt-6-luna']);
+  });
+
+  it('today\'s production env is unchanged: planner fallback stays gpt-4o', async () => {
+    vi.stubEnv('CHAT_OPENAI_MODEL', 'gpt-6.1-terra');
+    vi.stubEnv('CHAT_PLANNER_FALLBACKS', 'openai:gpt-4o');
+    state.plannerFailModels = new Set(['gpt-6.1-terra']);
+    state.plannerCalls = [call];
+    await ask(Q);
+    expect(state.plannerModels).toEqual(['gpt-6.1-terra', 'gpt-4o']);
+    expect(state.plannerBodies[1]).toMatchObject({ temperature: 0 });
   });
 });
 

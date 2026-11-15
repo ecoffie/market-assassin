@@ -30,6 +30,11 @@ describe('resolvePlannerChain', () => {
     expect(chain.map((t) => `${t.provider}:${t.model}`)).toEqual(['openai:gpt-4o', 'openai:gpt-4o-mini']);
   });
 
+  it('gpt-6-luna is a compatibility-tested planner fallback (gpt-4o retirement, 2027-01-14)', () => {
+    const chain = resolvePlannerChain({ ...KEYS, CHAT_OPENAI_MODEL: 'gpt-6.1-terra', CHAT_PLANNER_FALLBACKS: 'openai:gpt-6-luna' }, { overBudget: false });
+    expect(chain.map((t) => `${t.provider}:${t.model}`)).toEqual(['openai:gpt-6.1-terra', 'openai:gpt-6-luna']);
+  });
+
   it('drops a planner whose provider key is missing', () => {
     expect(resolvePlannerChain({ CHAT_CLAUDE_ENABLED: 'true', ANTHROPIC_API_KEY: 'a' }, { overBudget: false }))
       .toEqual([{ provider: 'anthropic', model: 'claude-sonnet-5' }]);
