@@ -67,7 +67,7 @@ const TRACE_EVENTS = process.env.ASK_MINDY_TRACE_EVENTS === 'true' && process.en
 const TRACE_RESULT_CHARS = Number(process.env.ASK_MINDY_TRACE_RESULT_CHARS) || 6000;
 import { shadowEntitlement } from '@/lib/entitlements/shadow';
 import {
-  isCardChatEnabled, cardChatTurnCredits, parseOpportunityContext, cardChatAccess, isBillableTurn,
+  cardChatGate, cardChatTurnCredits, parseOpportunityContext, cardChatAccess, isBillableTurn,
   CARD_CHAT_TOOLS, OPPORTUNITY_COLUMNS, buildOpportunityContextBlock, type OpportunityRecord,
 } from '@/lib/chat/card-chat';
 import { parseTurnId, claimCardTurn, completeCardTurn, failCardTurn, type ClaimResult } from '@/lib/chat/card-chat-turns';
@@ -384,8 +384,18 @@ export async function POST(request: NextRequest) {
   // ── Opportunity Map card chat (behind MAP_CARD_CHAT_ENABLED; see src/lib/chat/card-chat.ts) ──
   // With the flag off, `context` is ignored entirely and this route behaves exactly as before.
   // The client sends only the notice id; the record is loaded here, never taken from the client.
-  const cardFlag = isCardChatEnabled();
+  // Global flag, or (flag off) a session-verified synthetic account on MAP_CARD_CHAT_ALLOWLIST. Nothing the
+  // client sends can turn this on: the email and auth method come from verifyUserOwnsEmail above.
+  const cardGate = cardChatGate({ email: auth.email, authMethod: auth.method });
+  const cardFlag = cardGate.enabled;
   const cardCtx = cardFlag ? parseOpportunityContext((body as { context?: unknown }).context) : null;
+  if (cardGate.via === 'allowlist' && cardCtx) {
+    // Audit trail for every production-route acceptance turn (synthetic @example.com accounts only).
+    console.info('[card-chat:allowlist]', JSON.stringify({
+      email: auth.email, notice_id: cardCtx.noticeId, turn_id: typeof body.turn_id === 'string' ? body.turn_id : null,
+      replay_only: body.replay_only === true, at: new Date().toISOString(),
+    }));
+  }
   const turnCredits = cardChatTurnCredits();
   // Charge once per question: a question already answered is replayed from its saved copy BEFORE any balance
   // check (it was paid for once already), with no model call and no debit.

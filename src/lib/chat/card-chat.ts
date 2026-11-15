@@ -20,6 +20,50 @@ export function isCardChatEnabled(env: Record<string, string | undefined> = proc
 }
 
 /**
+ * Production-route acceptance allowlist (2026-11-15). Lets named SYNTHETIC test accounts use card chat on the
+ * real production route while MAP_CARD_CHAT_ENABLED stays off for everyone else.
+ *
+ * Every condition must hold, or the answer is "off" exactly as today:
+ *   - the global flag is OFF (when it is on, everyone already has it: via 'global');
+ *   - the caller's identity was verified by a SESSION (Supabase or MI session token). A signed email-link token
+ *     travels in the query string, so it never qualifies; nor does any header or body claim;
+ *   - the verified email is listed in MAP_CARD_CHAT_ALLOWLIST (comma-separated, case-insensitive);
+ *   - the listed entry is a synthetic address on CARD_CHAT_ALLOWLIST_DOMAIN (example.com, which is also
+ *     excluded from activation metrics by isExcludedAccount). A real customer address in the variable is
+ *     ignored, so a typo can never expose a customer;
+ *   - at most CARD_CHAT_ALLOWLIST_MAX entries are honoured (a long list is a misuse, not a test).
+ *
+ * The Map page's drawer flag (window.__CARD_CHAT_ENABLED) is NOT affected: no customer sees new UI. Acceptance
+ * is driven against /api/app/chat directly. Rollback: unset MAP_CARD_CHAT_ALLOWLIST and redeploy.
+ */
+export const CARD_CHAT_ALLOWLIST_DOMAIN = 'example.com';
+export const CARD_CHAT_ALLOWLIST_MAX = 10;
+
+export type CardChatGate = { enabled: boolean; via: 'global' | 'allowlist' | 'off' };
+
+export function parseCardChatAllowlist(raw: string | undefined): { emails: Set<string>; rejected: number } {
+  const entries = String(raw || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const emails = new Set<string>();
+  let rejected = 0;
+  for (const e of entries) {
+    const ok = /^[a-z0-9._+-]+@[a-z0-9.-]+$/.test(e) && e.endsWith(`@${CARD_CHAT_ALLOWLIST_DOMAIN}`);
+    if (ok && emails.size < CARD_CHAT_ALLOWLIST_MAX) emails.add(e);
+    else rejected++;
+  }
+  return { emails, rejected };
+}
+
+export function cardChatGate(
+  p: { email: string | null; authMethod: string | undefined },
+  env: Record<string, string | undefined> = process.env,
+): CardChatGate {
+  if (isCardChatEnabled(env)) return { enabled: true, via: 'global' };
+  if (!p.email || p.authMethod !== 'session') return { enabled: false, via: 'off' };
+  const { emails } = parseCardChatAllowlist(env.MAP_CARD_CHAT_ALLOWLIST);
+  return emails.has(p.email.trim().toLowerCase()) ? { enabled: true, via: 'allowlist' } : { enabled: false, via: 'off' };
+}
+
+/**
  * One flat, predictable charge per successful card answer. Proposed default 10 credits: the most common
  * per-tool price on the MCP catalog is 5 or 10 credits and a card answer typically runs one to three lookups,
  * so 10 is at or below what the same work costs through MCP, and the 100-credit introductory grant buys
