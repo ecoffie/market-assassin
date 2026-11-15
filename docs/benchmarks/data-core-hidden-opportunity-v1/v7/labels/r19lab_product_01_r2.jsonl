@@ -1,0 +1,13 @@
+{"id": "r19-0020", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 4710016767182 TUBING ASSEMBLY,NONMET qty 5; all responsible sources"}
+{"id": "r19-0021", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Sources sought NSN 1680-015322852 Wheel Assembly Main, new manufacture, 322 each"}
+{"id": "r19-0022", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 2540015795750 SEAT,VEHICULAR qty 27 to DLA Distribution"}
+{"id": "r19-0023", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 1730015724835 TIEDOWN,AIRCRAFT qty 936 to DLA Distribution San Diego"}
+{"id": "r19-0024", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 2010017194933 BEARING,STAVE SHAPED qty 54; mil specs available"}
+{"id": "r19-0025", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 4810016636640 PARTS KIT,BALL VALVE; approved source 47WD8 7250161-029"}
+{"id": "r19-0026", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5330016912466 PARTS KIT,SEAL REPL qty 1702; approved source 7X677"}
+{"id": "r19-0027", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 5990016796849 RESOLVER,ELECTRICAL qty 8 automated IDC spare part"}
+{"id": "r19-0028", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Sources sought NSN 1560-016784601 Deployment Support kit, new manufacture, FAT"}
+{"id": "r19-0029", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 5330014567520 GASKET qty 135 automated IDC; mil specs available"}
+{"id": "r19-0030", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 4720015623601 HOSE ASSEMBLY,NONMETAL; approved source 75Q65 3689304"}
+{"id": "r19-0031", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 4730016756085 FLANGE,PIPE qty 28 automated IDC spare part"}
+{"id": "r19-0032", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "NSN 2915-00-626-3123 VALVE,FUEL SYSTEM PN 6814762, AMC 2B solicitation"}

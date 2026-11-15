@@ -1,0 +1,20 @@
+{"id": "r19-0000", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 2910014474893 TANK,FUEL,ENGINE qty 14; approved source 60042 Z66108"}
+{"id": "r19-0001", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 2540014608048 COVER,SEAT,VEHICULAR qty 481; approved sources listed"}
+{"id": "r19-0002", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 2520013828728 PARTS KIT,CONSTANT VEL qty 595 to DLA Distribution"}
+{"id": "r19-0003", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 4310017244296 PARTS KIT,AIR FILTER; approved source 8C5P4"}
+{"id": "r19-0004", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 4820015139993 VALVE,FLOAT qty 12; all responsible sources may quote"}
+{"id": "r19-0005", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 1560-007802339 MANIFOLD,ENGINE AIR IQC, small business set aside, FAT"}
+{"id": "r19-0006", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 5330011760932 RETAINER,PACKING qty 579 automated IDC spare part"}
+{"id": "r19-0007", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5925014730631 CIRCUIT BREAKER; approved sources 01NN8 and 45152"}
+{"id": "r19-0008", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 4210015541177 PARTS KIT,FIRE EXTINGU; approved source 34623 6030920"}
+{"id": "r19-0009", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 4720015718965 HOSE ADAPTER KIT; approved sources 66935 part numbers"}
+{"id": "r19-0010", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 5305007175593 SCREW,MACHINE qty 228 HD; mil specs available"}
+{"id": "r19-0011", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 2540017213567 PARTS KIT,SEAT; approved source 59AT1 K000766"}
+{"id": "r19-0012", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 4820003694997 PARTS KIT,VALVE; approved source 86090 80857"}
+{"id": "r19-0013", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 4320009118338 PARTS KIT,HYDRAULIC MO; approved source 62983 914286"}
+{"id": "r19-0014", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 2530013776935 PARTS KIT,SEPARATOR qty 33 KT, drawings available"}
+{"id": "r19-0015", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "NSN 4710006047978 TUBE,METALLIC qty 991 FT automated IDC"}
+{"id": "r19-0016", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 2840016492397 CONE,INLET,AIRCRAFT GA; approved source 77445 51A681"}
+{"id": "r19-0017", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 5340014246652 STRAP,WEBBING; approved sources, use source control drawing"}
+{"id": "r19-0018", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "NSN 2995011142151 DETECTOR,METALLIC PART; approved sources 77272, 97484, A0126"}
+{"id": "r19-0019", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "NSN 1560-015165233 WINDSHIELD PANEL,AIRCRAFT qty 165; other than full and open"}

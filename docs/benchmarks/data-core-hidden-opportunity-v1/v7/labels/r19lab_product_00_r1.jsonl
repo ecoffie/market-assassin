@@ -1,0 +1,20 @@
+{"id": "r19-0000", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "TANK,FUEL,ENGINE NSN 2910014474893 replacement part"}
+{"id": "r19-0001", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "COVER,SEAT,VEHICULAR NSN 2540014608048 vehicle part"}
+{"id": "r19-0002", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PARTS KIT,CONSTANT VEL NSN 2520013828728 drivetrain parts"}
+{"id": "r19-0003", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "PARTS KIT,AIR FILTER NSN 4310017244296"}
+{"id": "r19-0004", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "VALVE,FLOAT NSN 4820015139993 industrial valve"}
+{"id": "r19-0005", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "MANIFOLD,ENGINE AIR NSN 1560-007802339 aircraft component"}
+{"id": "r19-0006", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "RETAINER,PACKING NSN 5330011760932 spare part"}
+{"id": "r19-0007", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "CIRCUIT BREAKER NSN 5925014730631 component"}
+{"id": "r19-0008", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "PARTS KIT,FIRE EXTINGU NSN 4210015541177"}
+{"id": "r19-0009", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "HOSE ADAPTER KIT NSN 4720015718965"}
+{"id": "r19-0010", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "SCREW,MACHINE NSN 5305007175593 hardware"}
+{"id": "r19-0011", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "PARTS KIT,SEAT NSN 2540017213567"}
+{"id": "r19-0012", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "PARTS KIT,VALVE NSN 4820003694997"}
+{"id": "r19-0013", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "PARTS KIT,HYDRAULIC MO NSN 4320009118338"}
+{"id": "r19-0014", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "PARTS KIT,SEPARATOR NSN 2530013776935"}
+{"id": "r19-0015", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "TUBE,METALLIC NSN 4710006047978"}
+{"id": "r19-0016", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "CONE,INLET,AIRCRAFT GA NSN 2840016492397"}
+{"id": "r19-0017", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "STRAP,WEBBING NSN 5340014246652 source control drawing"}
+{"id": "r19-0018", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "DETECTOR,METALLIC PART NSN 2995011142151"}
+{"id": "r19-0019", "label": "FIT", "role": "PRIME", "restriction": "UNCLEAR", "evidence": "WINDSHIELD PANEL,AIRCRAFT NSN 1560-015165233; other than full and open"}

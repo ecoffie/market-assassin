@@ -1,0 +1,13 @@
+{"id": "r19-0020", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "TUBING ASSEMBLY,NONMET NSN 4710016767182"}
+{"id": "r19-0021", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "Wheel Assembly Main C-130, NSN 1680-015322852, new manufacture sought"}
+{"id": "r19-0022", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "SEAT,VEHICULAR NSN 2540015795750"}
+{"id": "r19-0023", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "TIEDOWN,AIRCRAFT NSN 1730015724835"}
+{"id": "r19-0024", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "BEARING,STAVE SHAPED NSN 2010017194933"}
+{"id": "r19-0025", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "PARTS KIT,BALL VALVE NSN 4810016636640"}
+{"id": "r19-0026", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "PARTS KIT,SEAL REPL NSN 5330016912466"}
+{"id": "r19-0027", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "RESOLVER,ELECTRICAL NSN 5990016796849 component"}
+{"id": "r19-0028", "label": "PARTIAL", "role": "PRIME", "restriction": "NONE", "evidence": "Deployment Support NSN 1560-016784601 UH-60 sources sought, new manufacture"}
+{"id": "r19-0029", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "GASKET NSN 5330014567520 spare part"}
+{"id": "r19-0030", "label": "FIT", "role": "PRIME", "restriction": "APPROVED_SOURCE", "evidence": "HOSE ASSEMBLY,NONMETAL NSN 4720015623601"}
+{"id": "r19-0031", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "FLANGE,PIPE NSN 4730016756085"}
+{"id": "r19-0032", "label": "FIT", "role": "PRIME", "restriction": "NONE", "evidence": "VALVE,FUEL SYSTEM NSN 2915-00-626-3123 PN 6814762"}
