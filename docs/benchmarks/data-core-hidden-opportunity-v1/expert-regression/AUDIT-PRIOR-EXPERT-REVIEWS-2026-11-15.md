@@ -59,3 +59,12 @@ The overall 60% now counts **Direct only** (Eric's RC3 brief). On the AI preview
 3. Recall gate: does within-code recall count Direct only, or Direct + Related?
 4. Guards on the Dec 12 snapshot or Jan 9? December has few guard notices. The earlier plan deferred guards and nursing to Jan 9, but with guards now decisive, the date decides when RC3 can be called.
 5. The independent reviewer, and their pay.
+
+## Eric's decisions (2026-11-15, recorded by Agent 4)
+
+1. **Fail-first staging approved.** Judge guards and steel buildings first, and stop if either fails (once the independent reviewer confirms).
+2. **S30/C15: Not relevant.** Ruling 1 is upheld: a repair/modification notice is not relevant for a parts-only supplier. `expert_regression_v1.jsonl` now has **47 reusable** (18 Direct, 10 Related, 19 Not relevant). The sealed calibration key C15 is now NO, and its kind is corrected to product.
+3. **Recall gate counts Direct only.** All three gates are now Direct-only: overall ≥ 60%, per business ≥ 40%, within-code recall ≥ 50%. Related is reported separately.
+4. **Guards is judged on the Dec 12 snapshot.** RC3 can be decided in December. If Dec 12 holds fewer than 20 distinct guard solicitations in RC3's top 20, the floor is ceil(40% × distinct shown). The thin volume is reported with the result.
+
+Still open: the independent reviewer (name, pay ≈ $110–150), confirming the 8 product practice answers, and the optional guards spot-check.
