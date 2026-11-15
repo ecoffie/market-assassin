@@ -162,3 +162,49 @@ deliberately not changed in this phase. Agent 4's blind top-20 scoring of `rc_to
 | >= 50% within-code recall | Met in-sample for 9 of 13 measured businesses; electrical 55%, medical 63%; IT hardware 9% (floor is mostly software); nursing 50%, steel 53%, paving 71% unchanged. **In-sample only.** |
 | Human-reviewed fresh holdout | **Not run** (sealed; Dec 12 snapshot) |
 | A2 long queries | **Failing** (safe message only; see LONG-QUERY-DESIGN.md) |
+
+---
+
+# RC2 (Eric approved 2026-11-14): classification, rulings, cache, environment
+
+Branch `agent3/search-rc2` from tag `search-rc1-2026-11-14` (unchanged). Frozen as tag `search-rc2-2026-11-14`.
+
+## What RC2 changes (retrieval is identical to RC1 on all 28 phrasings)
+
+| Change | Commit |
+|---|---|
+| Pharmaceuticals / FSC 6505 only when the customer explicitly sells drugs, medications or pharmaceuticals | `cf084bb41` |
+| Evidence-based classification (`evidence-classifier.ts`): DIRECT = the work / item in the title head (agency and program names masked) or the trade's own specific code; product searches also need a product notice and the item code or DLA noun slot. RELATED = description-only, product code only, family code (in-code products first). NOT RELEVANT (kept, last, explained) = DLA boilerplate on product notices, agency / program name only, repair / return-to-RFI notices for a parts-only seller. Broad family codes alone are never DIRECT. | `0f94a4062` |
+| Cached open retrieval library (not wired) + description change marker | `cf8a04690` |
+
+## Evidence
+
+- **Retrieval:** matched sets identical to RC1 (asserted for all 28). Recall results of RC1 stand.
+- **Top-20 (indicative, labelled rows only, benchmark labels v4–v6 + Agent 4's 3 adjudications pending in my copy):**
+  RC1 181/423 relevant → RC2 206/267. Short phrasings: janitorial 0/0 → 10/10, guards 0/0 → 7/10,
+  grounds 12/20 → 17/20, fasteners 7/20 → 17/17, electrical 7/20 → 8/9, medical 5/15 → 10/15, valves 20/20 → 17/17,
+  aircraft 4/20 → 4/5, paving 15/20 → 15/20, parts 7/20 → 7/20, IT hardware 0/20 → 0/3. RC2's top 20 contain many
+  unlabelled rows, so this is NOT a gate measurement; Agent 4 scores both tags blind.
+- **Repair detector:** 57 of 746 benchmark rows both reviewers marked NO; 3 of 458 marked relevant, all three adjudicated
+  NO by Agent 4 under the repair rule (their own text states a repair requirement).
+- **Cache benchmark** (`harness/cache-bench.mts`, read-only): identical count and window on all 17 searches where SQL
+  completes; on the 11 long phrasings SQL's count timed out (null) while the cache returned complete results in 1.4–2.5 s.
+  Snapshot 9,702 rows, 9.9 s build, 68 MB JSON / 20.5 MB gzip.
+- **Tests:** classifier 10, cache 11, presets 12, sentence 11; opportunities/discovery/mcp/map/saved-searches 3,543 passed;
+  full unit suite on native arm64 Node 11,995 passed in 51 s; tsc clean.
+
+## Environment
+
+Native Node v24.13.0 arm64 (official tarball, SHA-256 verified) installed at `~/local/node-v24.13.0-darwin-arm64`; this
+worktree's dependencies reinstalled natively; the pre-push gate runs under it. The machine-wide default (`~/.zshrc` →
+`~/local/nodejs` = Intel v22.14, the wrong major for `engines: 24.x`) is NOT switched yet: every other worktree's
+`node_modules` holds Intel native binaries, and switching under them would break their sessions. Switching needs a
+coordinated `npm ci` per worktree.
+
+## Remaining failures / risks
+
+- Top-20 gate: not established until Agent 4's blind holdout scoring of both tags.
+- IT hardware: retrieval is weak (code floor is mostly software); unchanged.
+- The cache is not wired; A2 (long queries) still fails in production behaviour. Wiring needs Agent 5 + Eric.
+- Classification precision depends on title conventions (DLA "NOUN,MODIFIER"; "for / at" clauses). Unconventional
+  titles fall to RELATED, never removed.
