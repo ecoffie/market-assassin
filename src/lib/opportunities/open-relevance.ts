@@ -136,6 +136,17 @@ export function openCodeWindowPsc(cap: CapabilityInterpretation): string[] {
   return [...new Set(openProductPsc(cap).filter((c) => /^[0-9A-Z]{4}$/.test(c)))];
 }
 
+/**
+ * Index of the plan's positive-retrieval OR (text ∪ vocabulary ∪ codes) — the ONLY open op carrying the preset codes'
+ * psc conditions. null unless exactly one op qualifies, so a caller can fall back to the full plan.
+ */
+export function retrievalOpIndex(ops: ReadonlyArray<{ op: string; expr?: string }>, codes: string[]): number | null {
+  if (!codes.length) return null;
+  const conds = pscMatchConds(codes);
+  const hits = ops.map((o, k) => (o.op === 'or' && conds.every((c) => (o.expr || '').split(',').includes(c)) ? k : -1)).filter((k) => k >= 0);
+  return hits.length === 1 ? hits[0] : null;
+}
+
 export function pscMatchConds(codes: string[]): string[] {
   return codes
     .map((c) => String(c).trim())

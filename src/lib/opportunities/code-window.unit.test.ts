@@ -59,3 +59,18 @@ describe('NAVSUP repair buys are not a reseller\'s sale (Agent 4 v7, IT top 5)',
     expect(labelOpenRow({ title: 'KEYBOARD,DATA ENTRY', psc_code: '7E20', description: 'Delivery orders and modifications related to the instant procurement are issued by the Government.' }, plan, cap(IT_LONG), null).cls).toBe('DIRECT_MATCH');
   });
 });
+
+describe('cheap sub-window: the retrieval OR is located exactly, else the full plan is used', () => {
+  it('finds exactly one op for each product preset phrasing; none for a trade', async () => {
+    const { buildDiscoveryPlan } = await import('@/lib/discovery/plan');
+    const { MCP_POLICY } = await import('@/lib/discovery/policy');
+    const { retrievalOpIndex } = await import('./open-relevance');
+    for (const q of [IT_LONG, 'We supply industrial valves.', 'We supply medical, dental and laboratory supplies.']) {
+      const ops = buildDiscoveryPlan({ query: q }, MCP_POLICY, { today: '2026-11-15', fiscalYear: 2027 }).horizons.open.ops;
+      const k = retrievalOpIndex(ops as never, openCodeWindowPsc(cap(q)));
+      expect(k, q).not.toBeNull();
+      expect((ops[k!] as { expr: string }).expr).toMatch(/imatch|ilike/); // it is the text-bearing OR
+    }
+    expect(retrievalOpIndex([], [])).toBeNull();
+  });
+});
