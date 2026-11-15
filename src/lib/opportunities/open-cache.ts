@@ -43,6 +43,18 @@ export const CHANGE_COLS = ['synced_at', 'description_checked_at', 'sow_checked_
 export function changeCols(): readonly string[] {
   return process.env.OPEN_SNAPSHOT_CHANGE_MARKER === 'snapshot_changed_at' ? ['snapshot_changed_at'] : CHANGE_COLS;
 }
+/**
+ * CUT-OVER RULE (Agent 5, trigger review). Rows existing when the trigger is installed keep NULL (= unchanged), so a
+ * snapshot built BEFORE the install could miss every change made before it. With the DB marker selected, the operator
+ * records the install time in OPEN_SNAPSHOT_MARKER_SINCE (ISO); a snapshot built before it — or ANY snapshot while that
+ * variable is missing or invalid — is refused (the caller uses SQL, and the holder loads a fresh one).
+ */
+export function snapshotPredatesMarker(snapshot: OpenSnapshot): string | null {
+  if (process.env.OPEN_SNAPSHOT_CHANGE_MARKER !== 'snapshot_changed_at') return null;
+  const since = Date.parse(process.env.OPEN_SNAPSHOT_MARKER_SINCE || '');
+  if (isNaN(since)) return 'change marker selected but OPEN_SNAPSHOT_MARKER_SINCE (trigger install time) is not set';
+  return Date.parse(snapshot.builtAt) < since ? `snapshot built ${snapshot.builtAt} before the change trigger (${new Date(since).toISOString()})` : null;
+}
 export const SNAPSHOT_MAX_AGE_MS = 6 * 3600_000;
 export const DELTA_MAX = 1500;
 const ID_CHUNK = 150;
@@ -165,6 +177,8 @@ export async function cachedOpenRetrieval(args: {
   if (!snapshot) return { status: 'cache_unavailable', reason: 'no snapshot' };
   const age = now.getTime() - Date.parse(snapshot.builtAt);
   if (!(age >= 0) || age > SNAPSHOT_MAX_AGE_MS) return { status: 'cache_unavailable', reason: `snapshot age ${Math.round(age / 60000)} min` };
+  const predates = snapshotPredatesMarker(snapshot);
+  if (predates) return { status: 'cache_unavailable', reason: predates };
   let pass: (r: Record<string, unknown>) => boolean;
   try { pass = compileOps(plan.horizons.open.ops); } catch (e) { return { status: 'cache_unavailable', reason: (e as Error).message }; }
   const ids = snapshot.rows.filter(pass).map((r) => r.notice_id as string);
@@ -283,6 +297,8 @@ export async function openQueryFactory(client: any, plan: DiscoveryPlan, snapsho
   if (!snapshot) return sql('no snapshot');
   const age = now.getTime() - Date.parse(snapshot.builtAt);
   if (!(age >= 0) || age > SNAPSHOT_MAX_AGE_MS) return sql(`snapshot age ${Math.round(age / 60000)} min`);
+  const predates = snapshotPredatesMarker(snapshot);
+  if (predates) { requestOpenSnapshotRebuild(client, now); return sql(predates); }
   let pass: (r: Record<string, unknown>) => boolean;
   try { pass = compileOps(plan.horizons.open.ops); } catch (e) { return sql((e as Error).message); }
   const changed = await client.from('sam_opportunities').select('notice_id', { count: 'exact', head: true }).eq('active', true).or(changedSinceExpr(snapshot.builtAt));
@@ -309,7 +325,7 @@ function startLoad(client: any): void {
 }
 /** The current snapshot if fresh; otherwise starts ONE background load and returns null (callers use SQL meanwhile). */
 export function currentOpenSnapshot(client: any, now = new Date()): OpenSnapshot | null {
-  const fresh = current && now.getTime() - Date.parse(current.builtAt) <= SNAPSHOT_MAX_AGE_MS;
+  const fresh = current && now.getTime() - Date.parse(current.builtAt) <= SNAPSHOT_MAX_AGE_MS && !snapshotPredatesMarker(current);
   if (!fresh && !building) startLoad(client);
   return fresh ? current : null;
 }

@@ -10,6 +10,9 @@
 --
 -- Idempotent. No data rewrite: existing rows keep NULL (= unchanged); new rows and real changes get now().
 -- CONCURRENTLY for the index, so writes are not blocked (hence no-transaction).
+-- CUT-OVER: existing rows stay NULL, so any snapshot built before this runs must be discarded. After applying, set
+-- OPEN_SNAPSHOT_MARKER_SINCE=<install time, ISO> and only then OPEN_SNAPSHOT_CHANGE_MARKER=snapshot_changed_at; the code
+-- refuses older snapshots and loads a fresh one (open-cache.ts snapshotPredatesMarker).
 
 ALTER TABLE public.sam_opportunities ADD COLUMN IF NOT EXISTS snapshot_changed_at timestamptz;
 
@@ -37,6 +40,10 @@ BEGIN
   END IF;
   RETURN NEW;
 END $$;
+
+-- Hygiene (Agent 5): default privileges grant EXECUTE on new functions to anon/authenticated. A direct call errors
+-- anyway (trigger functions cannot be called directly), but keep the ACL clean.
+REVOKE ALL ON FUNCTION public.sam_opportunities_stamp_snapshot_change() FROM PUBLIC, anon, authenticated;
 
 DROP TRIGGER IF EXISTS sam_opportunities_snapshot_change ON public.sam_opportunities;
 CREATE TRIGGER sam_opportunities_snapshot_change

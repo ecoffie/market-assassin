@@ -23,6 +23,24 @@ Tests:
 - `open-snapshot-store.unit.test.ts`: round-trip, tamper and truncate refused, public or missing bucket refused, no `createBucket`.
 - `open-cache-integration.unit.test.ts`: default storage source makes one download and zero DB builds.
 
+## Trigger review notes (Agent 5, 2026-11-15), applied
+
+- **Cut-over:** rows that exist at install keep NULL, so any snapshot built before the install is refused.
+  - `OPEN_SNAPSHOT_MARKER_SINCE` = install time (ISO), set before `OPEN_SNAPSHOT_CHANGE_MARKER`.
+  - With the marker selected and no valid install time, every snapshot is refused.
+  - A refused snapshot triggers a fresh load.
+  - Covered by tests.
+- **ACL:** `REVOKE ALL ON FUNCTION … FROM PUBLIC, anon, authenticated` is in the draft.
+- **Cost, still to measure:** `IS DISTINCT FROM` on description and sow_text compares full text on every UPDATE that
+  rewrites them. Before approval, measure sync upsert latency before and after the trigger on a branch or preview
+  database:
+  - the same sync batch, with and without the trigger;
+  - p50 and p95 per batch;
+  - total sync duration;
+  - statement timeouts.
+  - Expectation: equal-length text compares are memcmp and the sync already writes these columns. The number must be
+    measured, not assumed.
+
 ## Approval path for Eric (unchanged from the review)
 
 1. A private `open-snapshots` bucket, service-role only.

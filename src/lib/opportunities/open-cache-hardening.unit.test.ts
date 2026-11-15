@@ -99,3 +99,25 @@ describe('#2 change marker: legacy writer stamps by default; the DB-stamped colu
     expect(fs.readdirSync(path.join(__dirname, '../../../supabase/migrations')).some((f) => f.includes('snapshot_changed_at'))).toBe(false); // never auto-applied
   });
 });
+
+describe('cut-over: with the DB change marker, a snapshot built before the trigger install is refused', () => {
+  it('refuses pre-install snapshots, and every snapshot while the install time is unset', async () => {
+    const { snapshotPredatesMarker } = await import('./open-cache');
+    const env = { m: process.env.OPEN_SNAPSHOT_CHANGE_MARKER, s: process.env.OPEN_SNAPSHOT_MARKER_SINCE };
+    const snap = (builtAt: string) => ({ builtAt, rows: [], count: 0 });
+    delete process.env.OPEN_SNAPSHOT_CHANGE_MARKER; delete process.env.OPEN_SNAPSHOT_MARKER_SINCE;
+    expect(snapshotPredatesMarker(snap('2026-11-15T08:00:00Z'))).toBeNull(); // legacy markers: no cut-over
+    process.env.OPEN_SNAPSHOT_CHANGE_MARKER = 'snapshot_changed_at';
+    expect(snapshotPredatesMarker(snap('2026-11-15T08:00:00Z'))).toMatch(/not set/);
+    process.env.OPEN_SNAPSHOT_MARKER_SINCE = '2026-11-15T10:00:00Z';
+    expect(snapshotPredatesMarker(snap('2026-11-15T09:59:00Z'))).toMatch(/before the change trigger/);
+    expect(snapshotPredatesMarker(snap('2026-11-15T10:01:00Z'))).toBeNull();
+    const r = await cachedOpenRetrieval({ client: trackingClient().client, plan: buildDiscoveryPlan({ query: 'janitorial services' }, MAPS_POLICY, CTX), snapshot: snap('2026-11-15T09:59:00Z') as never, select: '*', windowLimit: 500, now: new Date('2026-11-15T11:00:00Z') });
+    expect(r).toMatchObject({ status: 'cache_unavailable' });
+    for (const [k, v] of [['OPEN_SNAPSHOT_CHANGE_MARKER', env.m], ['OPEN_SNAPSHOT_MARKER_SINCE', env.s]] as const) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  });
+  it('the draft revokes EXECUTE on the trigger function from PUBLIC, anon and authenticated', () => {
+    const sql = fs.readFileSync(path.join(__dirname, '../../../tasks/search-stabilization-2026-11-14/migration-draft/snapshot_changed_at.up.sql'), 'utf8');
+    expect(sql).toMatch(/REVOKE ALL ON FUNCTION public\.sam_opportunities_stamp_snapshot_change\(\) FROM PUBLIC, anon, authenticated;/);
+  });
+});
