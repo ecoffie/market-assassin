@@ -76,3 +76,12 @@ describe('recurringMonthlyCreditStatus', () => {
     expect(currentAndPreviousMonth(new Date('2027-01-01T00:00:00Z'))).toEqual(['2027-01', '2026-12']);
   });
 });
+
+describe('shared live windows (no behaviour change)', () => {
+  it('uses the same 40 / 370 day windows it always had', async () => {
+    const shared = await import('@/lib/entitlements/paid-reasons');
+    expect(shared.MCP_SUB_MONTHLY_WINDOW_DAYS).toBe(40);
+    expect(shared.MCP_SUB_ANNUAL_WINDOW_DAYS).toBe(370);
+    expect(shared.DAY_MS).toBe(86_400_000);
+  });
+});
