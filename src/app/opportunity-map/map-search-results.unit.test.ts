@@ -83,6 +83,19 @@ describe('map_search emitter', () => {
     expect(win.__track.mock.calls[0][2]).toMatchObject({ query: 'Roofing', results: null });
   });
 
+  it('dedupe is per path: the same text as a keyword after an intent still captures (history + __lastQuery)', () => {
+    const { beginSearch } = load();
+    expect(beginSearch('roofing', 'intent')).toBe(true);
+    expect(beginSearch('roofing', 'intent')).toBe(false);
+    expect(beginSearch('Roofing', 'keyword')).toBe(true);
+    expect(beginSearch('roofing', 'keyword')).toBe(false);
+  });
+
+  it('captureSearch writes history only when beginSearch opened a keyword search', () => {
+    const body = MAP.slice(MAP.indexOf('function captureSearch(q){'), MAP.indexOf('function captureSearch(q){') + 200);
+    expect(body).toContain("if(!beginSearch(q,'keyword')) return;");
+  });
+
   it('the viewport script publishes round state at every round start and settle', () => {
     expect(MAP).toContain('window.__searchRoundState=_sr;');
     expect(MAP).toContain('round.srGen=_srStart();');

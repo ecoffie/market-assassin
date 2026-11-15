@@ -10505,6 +10505,10 @@ const SEARCH_PANEL_JS = `<script>(function(){
   //   results = the round's match total, or null when unknown (a failed horizon, or no settled round
   //   within 20 s). Never 0 for unknown. query (text) is still sent only for the keyword path, as before;
   //   the intent path sends query_len only. filters ride along via _track's _mapState (unchanged).
+  // Dedupe is PER PATH (keyword vs intent): typing the same text as a keyword after it ran as an intent
+  // must still record __lastQuery and the user_search_history row, exactly as before this change.
+  // If a submit causes no new round within 300 ms (the filters did not change), the count reported is
+  // the last settled round's, which is what the user is looking at.
   var _lastCap='', _pend=null, _pendT=0;
   function _srNow(){ try{ return performance.now(); }catch(e){ return Date.now(); } }
   function _emitSearch(n){ var p=_pend; if(!p) return; _pend=null; clearTimeout(_pendT);
@@ -10515,7 +10519,7 @@ const SEARCH_PANEL_JS = `<script>(function(){
     if(el>=20000){ _emitSearch(null); return; }
     if(el>=300 && s && s.gen>0 && !s.pendingDispatch && s.settledGen===s.gen){ _emitSearch(s.results); return; }
     _pendT=setTimeout(_waitResults,250); }
-  function beginSearch(q,via){ q=(q||'').trim(); if(!q||q.toLowerCase()===_lastCap) return false; _lastCap=q.toLowerCase();
+  function beginSearch(q,via){ q=(q||'').trim(); var k=via+'|'+q.toLowerCase(); if(!q||k===_lastCap) return false; _lastCap=k;
     if(_pend) _emitSearch(null);   // a newer submit supersedes: the older one's count is unknown, never dropped
     _pend={len:q.length, via:via, query:(via==='keyword')?q.slice(0,80):'', t0:_srNow()};
     _pendT=setTimeout(_waitResults,300);
