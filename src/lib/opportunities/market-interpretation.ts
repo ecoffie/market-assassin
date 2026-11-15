@@ -357,6 +357,16 @@ export const PRODUCT_PRESETS: CodePreset[] = [
     vocab: ['pharmaceutical', 'pharmaceuticals', 'injector', 'tablets', 'capsules'],
   },
   {
+    // P1 (2026-11-15, expert misses): Eric judged DLA NSN item buys Direct for a replacement-parts supplier
+    // ("48--VALVE,THROTTLE", "31--BEARING,BALL,ANNULA"), but those notices never say "replacement parts", so no version
+    // retrieved them. The hardware FSC groups 10–59 (weapons through electrical/electronic components) retrieve; as for
+    // every product preset, the code never makes a notice DIRECT on its own.
+    id: 'replacement_parts', label: 'Replacement and spare parts',
+    match: /\b(?:replacement|spare|repair)\s+parts\b/i,
+    naics: [], psc: ['1', '2', '3', '4', '5'],
+    vocab: [],
+  },
+  {
     id: 'medical_supplies', label: 'Medical, dental and laboratory supplies',
     match: /\b(?:medical|surgical|dental|laboratory|lab)\b[^.]{0,40}\b(?:supplies|consumables)\b/i,
     naics: [], psc: ['6510', '6515', '6520', '6532', '6540', '6545', '6550', '6640'],
