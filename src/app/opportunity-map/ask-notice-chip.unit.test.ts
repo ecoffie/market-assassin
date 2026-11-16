@@ -73,8 +73,8 @@ describe('selected notice attaches to the main chat', () => {
     expect(t.chat[0].context).toEqual({ kind: 'opportunity', notice_id: NID });
     expect(t.chat[0].turn_id).toBeUndefined();
     const m = String(t.chat[0].message);
-    expect(m).not.toContain('[Current map view');
-    expect(m).toContain('[Display: a narrow side panel');
+    expect(m).toContain('[Current map view'); // kept exactly as without a notice (server contract)
+    expect(m).toContain('Display: a narrow side panel');
     expect(m.endsWith('Who held this before?')).toBe(true);
     expect(JSON.stringify(t.chat[0])).not.toContain('Key West'); // the title is never sent; the server loads the record
   });
@@ -89,7 +89,7 @@ describe('selected notice attaches to the main chat', () => {
     expect((t.chat[1].history as unknown[]).length).toBe(2);
     expect(t.chat[1].context).toEqual({ kind: 'opportunity', notice_id: NID });
   });
-  it('the × removes it: the next question goes without context and with the map view again', async () => {
+  it('the × removes it: the next question goes without context', async () => {
     const t = boot();
     t.w.__selectedOpp = OPP;
     t.open();
