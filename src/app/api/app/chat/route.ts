@@ -37,7 +37,9 @@ import { hasProAccess } from '@/lib/access/resolve-access';
 // podcast retrieval (retrieveRagContext / retrievePodcastEpisodes) is gone entirely.
 import { loadBidderProfile, formatProfileForPrompt } from '@/lib/proposal/loaders';
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
-import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
+import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES, type PursuitDocsReader } from '@/lib/chat/tier0-tools';
+import { authorizePursuitRead } from '@/lib/proposal/pursuit-access';
+import type { PursuitDocText } from '@/lib/proposal/pursuit-doc-excerpts';
 // Tools run ONLY through the chat tool executor (policy check at offer AND execution,
 // preflight, per-tool error capture, execution log). Never import runMcpTool here.
 import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/chat-tool-executor';
@@ -207,7 +209,7 @@ GROUNDING:
 
 YOUR DATA TOOLS:
 You have a LARGE toolset over the federal Data Core — each tool's own description says exactly when to use it. USE them instead of giving generic advice: if a tool can answer a question with real data, call it. Never tell the user to "go check SAM.gov / the panel" for something a tool covers. What you can reach, by category:
-- THEIR OWN account (private): get_my_pipeline (their tracked pursuits/deadlines/stages) and search_my_vault (retrieves the records in their identity, past performance/CPARS, capabilities and team that match a query — always pass what they are asking about; it returns the relevant records, not the whole Vault). These return ONLY the workspace this user is working in — their own, or a client workspace they are authorized to coach (the result then carries workspace:"client"; say "this client's" rather than "your"). Never anyone else's.
+- THEIR OWN account (private): get_my_pipeline (their tracked pursuits/deadlines/stages) and search_my_vault (retrieves the records in their identity, past performance/CPARS, capabilities and team that match a query — always pass what they are asking about; it returns the relevant records, not the whole Vault) and search_my_pursuit_documents (passages from one tracked pursuit's stored RFP/SOW/Q&A/uploads that answer the question — name the pursuit by its title words or pursuit_id). These return ONLY the workspace this user is working in — their own, or a client workspace they are authorized to coach (the result then carries workspace:"client"; say "this client's" rather than "your"). Never anyone else's.
 - ADD / SAVE / TRACK requests: chat cannot write to their pipeline, saved list or alerts. When they ask to add, save or track an opportunity, do NOT stop at "I can't": point them to the step that does it — the "Start pursuit" button on the opportunity's map card (adds it to their pursuits), or "Generate proposal" on that card to start a proposal workspace for it. For an ongoing alert on a market, offer schedule_market_search.
 - OPPORTUNITIES: open SAM.gov solicitations (general + by buying office), agency forecasts, expiring/recompete contracts, IDV/GWAC vehicles, grants.
   ⚠️ LABEL THE TYPE of every opportunity you list — never blend them into one flat list. There are three distinct kinds, and mixing them misleads the user:
@@ -388,7 +390,9 @@ export async function POST(request: NextRequest) {
 
   // Auth without re-reading the body. Still validates Supabase session,
   // MI 2FA token, signed query token, and legacy cookie via the helper.
-  const auth = await verifyUserOwnsEmail(request, email);
+  // requireStrongAuth: the same verification the Vault routes use. Chat now reads private
+  // pursuit documents (search_my_pursuit_documents), so it states that requirement explicitly.
+  const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
   if (!auth.authenticated || !auth.email) {
     return new Response(JSON.stringify({ error: auth.error || 'Unauthorized' }), {
       status: 401,
@@ -673,7 +677,23 @@ export async function POST(request: NextRequest) {
         try {
           if (actingScope.kind === 'client') turnTrace.notices.push('acting_scope:client_workspace');
           if (actingScope.kind === 'unavailable') turnTrace.notices.push('acting_scope:unavailable');
-          const tier0Runtime = makeTier0Tools(getSupabase(), actingScope);
+          const pursuitDocs: PursuitDocsReader = {
+            // Owner, or a member / authorized coach of the pursuit's workspace (#2086). A missing
+            // pursuit and someone else's answer the same way.
+            authorize: (pipelineId) => authorizePursuitRead(getSupabase(), request, auth.email!, pipelineId),
+            load: async (pipelineId) => {
+              const { data, error } = await getSupabase()
+                .from('pursuit_documents')
+                // truncation-ok: ONE pipeline_id (max 39 docs measured 2026-08-23); excerpts are chosen downstream.
+                .select('filename, doc_kind, extracted_text')
+                .eq('pipeline_id', pipelineId)
+                .not('extracted_text', 'is', null)
+                .limit(60);
+              if (error) console.error('[chat] pursuit_documents query error:', error.message);
+              return { data: (data as PursuitDocText[] | null) ?? null, error };
+            },
+          };
+          const tier0Runtime = makeTier0Tools(getSupabase(), actingScope, undefined, { pursuitDocs, strongAuth: true });
           const executor = createChatToolExecutor({
             userEmail: auth.email!,
             ...(actingScope.kind === 'client' ? { vaultEmail: actingScope.vaultEmail } : {}),
