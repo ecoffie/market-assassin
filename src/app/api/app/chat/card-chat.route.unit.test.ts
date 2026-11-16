@@ -488,7 +488,7 @@ describe('main chat with a selected notice (Eric 2026-11-16: no card-chat flag)'
     for (const msgs of [state.plannerMessages[0], state.answerMessages[0]]) {
       const sys = msgs.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
       expect(sys).toContain('ADD / SAVE / TRACK requests');
-      expect(sys).toContain('the Save button on the opportunity\'s map card');
+      expect(sys).toContain('the "Start pursuit" button on the opportunity\'s map card');
       expect(sys).toContain('"Generate proposal"');
       expect(sys).toContain('do NOT stop at "I can\'t"');
     }
