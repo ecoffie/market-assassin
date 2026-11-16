@@ -10879,7 +10879,8 @@ const ASK_MINDY_CSS =
   + '.amk-att{display:flex;align-items:center;gap:6px;margin:0 0 8px;padding:6px 8px 6px 10px;background:#eef4ff;border:1px solid #d3e2fc;border-radius:9px;font:500 12px/1.35 Inter,system-ui,sans-serif;color:#1e3a8a}'
   + '.amk-att .lbl{color:#64748b;flex:none}.amk-att .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}'
   + '.amk-att .rm{flex:none;border:0;background:none;color:#64748b;cursor:pointer;font:600 15px/1 Inter;padding:0 2px}.amk-att .rm:hover{color:#1e3a8a}'
-  + '.amk-att .sp{flex:none;border:1px solid #bcd3fb;background:#fff;color:#1d4ed8;cursor:pointer;font:600 11.5px Inter,system-ui,sans-serif;border-radius:7px;padding:4px 8px}.amk-att .sp:hover{background:#e0ebff}.amk-att .sp:disabled{opacity:.6;cursor:default}'
+  + '.amk-att .sp small{display:block;font-weight:500;font-size:9.5px;color:#64748b;margin-top:1px}'
+  + '.amk-att .sp{flex:none;border:1px solid #bcd3fb;background:#fff;color:#1d4ed8;cursor:pointer;font:600 11.5px/1.2 Inter,system-ui,sans-serif;border-radius:7px;padding:4px 8px;text-align:center}.amk-att .sp:hover{background:#e0ebff}.amk-att .sp:disabled{opacity:.6;cursor:default}'
   + '.amk-ws{display:block;margin-top:8px;text-align:right;font:600 11.5px Inter,system-ui,sans-serif;color:#2563eb;text-decoration:none}.amk-ws:hover{text-decoration:underline}'
   + '.amk-in{display:flex;gap:8px;align-items:flex-end}'
   + '.amk-in textarea{flex:1;resize:none;border:1px solid #dde3ec;border-radius:12px;padding:10px 12px;font:400 13.5px Inter;color:#111c26;max-height:120px;outline:none}'
@@ -10952,7 +10953,7 @@ const ASK_MINDY_JS = `<script>(function(){
     if(attEl){
       if(attached&&!oppCtx){
         attEl.className='amk-att';
-        attEl.innerHTML='<span class="lbl">Asking about</span><span class="t" title="'+esc(attached.title)+'">'+esc(attached.title||'this opportunity')+'</span><button type="button" class="sp">Start a proposal</button><button type="button" class="rm" aria-label="Remove this opportunity from the question">\u00d7</button>';
+        attEl.innerHTML='<span class="lbl">Asking about</span><span class="t" title="'+esc(attached.title)+'">'+esc(attached.title||'this opportunity')+'</span><button type="button" class="sp" title="Saves this opportunity to My Pursuits, then opens Proposals">Start a proposal<small>Saves to My Pursuits</small></button><button type="button" class="rm" aria-label="Remove this opportunity from the question">\u00d7</button>';
         attEl.querySelector('.rm').onclick=function(){ if(attached) dismissedId=attached.id; attached=null; renderAttached(); };
         attEl.querySelector('.sp').onclick=function(){ startProposal(this); };
       } else { attEl.className=''; attEl.innerHTML=''; }
@@ -10971,9 +10972,14 @@ const ASK_MINDY_JS = `<script>(function(){
     if(!t||!em){ if(window.openSignInModal) window.openSignInModal('start a proposal',function(){ startProposal(btn); }); return; }
     btn.disabled=true; btn.textContent='Starting\u2026';
     var hd={'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em};
+    // Coach Mode, exactly as authedFetch (src/components/app/activeWorkspace.ts activeWorkspaceFor): a coach
+    // working in a client's workspace saves to THAT workspace. Withheld only when the stamp names another user;
+    // the server re-checks the coach's access either way.
+    try{ var ws=localStorage.getItem('mindy_active_workspace'), wso=localStorage.getItem('mindy_active_workspace_owner');
+      if(ws&&!(wso&&wso!==String(em).toLowerCase().trim())) hd['x-active-workspace']=ws; }catch(e){}
     var b={user_email:em,title:(n.title||'').trim()||'SAM.gov opportunity',notice_id:n.id,source:'ask_mindy'};
     if(n.deadline) b.response_deadline=n.deadline;
-    function fail(){ btn.disabled=false; btn.textContent='Try again'; }
+    function fail(){ btn.disabled=false; btn.innerHTML='Try again<small>Saves to My Pursuits</small>'; }
     fetch('/api/pipeline',{method:'POST',headers:hd,body:JSON.stringify(b)}).then(function(r){
       if(!r.ok&&r.status!==409){ fail(); return; }
       return r.json().catch(function(){ return null; }).then(function(d){

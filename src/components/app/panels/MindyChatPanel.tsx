@@ -726,9 +726,11 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                 type="button"
                 onClick={startProposal}
                 disabled={proposalState === 'working'}
+                title="Saves this opportunity to My Pursuits, then opens Proposals"
                 className="ml-auto shrink-0 rounded-md border border-purple-400/40 px-2 py-0.5 text-[11.5px] font-medium text-purple-100 hover:bg-purple-500/20 disabled:opacity-60"
               >
                 {proposalState === 'working' ? 'Starting…' : proposalState === 'failed' ? 'Try again' : 'Start a proposal'}
+                <span className="block text-[10px] font-normal text-faint">Saves to My Pursuits</span>
               </button>
               <button
                 type="button"

@@ -183,7 +183,7 @@ describe('Start a proposal (user click only)', () => {
     t.open();
     const calls = withPipeline(t, 200, { opportunity: { id: 'p-1' } });
     const btn = t.chip().querySelector('.sp') as HTMLButtonElement;
-    expect(btn.textContent).toBe('Start a proposal');
+    expect(btn.textContent).toBe('Start a proposalSaves to My Pursuits');
     btn.click();
     await flush();
     expect(calls).toHaveLength(1);
@@ -217,7 +217,39 @@ describe('Start a proposal (user click only)', () => {
     const btn = t.chip().querySelector('.sp') as HTMLButtonElement;
     btn.click();
     await flush();
-    expect(btn.textContent).toBe('Try again');
+    expect(btn.textContent).toBe('Try againSaves to My Pursuits');
     expect(btn.disabled).toBe(false);
+  });
+});
+
+describe('Start a proposal: Coach Mode workspace', () => {
+  async function run(store: Record<string, string>) {
+    const t = boot();
+    for (const [k, v] of Object.entries(store)) (t.w.localStorage as Storage).setItem(k, v);
+    t.w.__selectedOpp = OPP;
+    t.open();
+    const calls: Array<{ url: string; init: { headers?: Record<string, string> } }> = [];
+    t.w.fetch = vi.fn(async (url: string, init: { headers?: Record<string, string> }) => {
+      calls.push({ url, init });
+      if (url === '/api/pipeline') return { ok: false, status: 409, json: async () => ({ opportunity: { id: 'p-2', docs_status: 'failed' } }) };
+      return { ok: true, status: 200, json: async () => ({}) };
+    }) as never;
+    (t.chip().querySelector('.sp') as HTMLButtonElement).click();
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+    return calls;
+  }
+  it('a coach in a client workspace sends x-active-workspace on both requests', async () => {
+    const calls = await run({ mindy_active_workspace: 'ws-client', mindy_active_workspace_owner: 'pro@example.com' });
+    expect(calls).toHaveLength(2);
+    for (const c of calls) expect(c.init.headers!['x-active-workspace']).toBe('ws-client');
+  });
+  it('no active workspace, or one stamped by another user: no header', async () => {
+    for (const store of [{}, { mindy_active_workspace: 'ws-x', mindy_active_workspace_owner: 'someone@else.com' }]) {
+      const calls = await run(store);
+      for (const c of calls) expect(c.init.headers!['x-active-workspace']).toBeUndefined();
+    }
+  });
+  it('the label says it saves to My Pursuits', () => {
+    expect(MAP).toContain('Start a proposal<small>Saves to My Pursuits</small>');
   });
 });

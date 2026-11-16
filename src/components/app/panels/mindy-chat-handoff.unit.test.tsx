@@ -89,7 +89,7 @@ describe('MindyChatPanel Start a proposal', () => {
     await act(async () => { root.render(<MindyChatPanel email="pro@example.com" tier="pro" onPanelChange={onPanelChange} />); });
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     expect(calls.some((c) => c.url === '/api/pipeline')).toBe(false);
-    const btn = Array.from(el.querySelectorAll('button')).find((b) => b.textContent === 'Start a proposal')!;
+    const btn = Array.from(el.querySelectorAll('button')).find((b) => b.textContent === 'Start a proposalSaves to My Pursuits')!;
     await act(async () => { btn.click(); await new Promise((r) => setTimeout(r, 20)); });
     const post = calls.find((c) => c.url === '/api/pipeline')!;
     expect(post.body).toMatchObject({ user_email: 'pro@example.com', notice_id: NID, source: 'ask_mindy' });
