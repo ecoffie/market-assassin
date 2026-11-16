@@ -24,7 +24,7 @@ import { getWriteClient } from '@/lib/supabase/server-clients';
 import { MCP_CHANNEL_OR_FILTER } from './channel-filter';
 import { after } from 'next/server';
 import {
-  paidStatusResolverEnabled, paidStatusShadowEnabled, resolvePaidStatus, PAID_STATUS_POLICY,
+  paidStatusResolverEnabled, paidStatusShadowEnabled, resolvePaidStatus, hasLiveProGrant, PAID_STATUS_POLICY,
   type PaidStatus, type PaidStatusPolicy,
 } from '@/lib/entitlements/paid-status';
 import { subjectKey } from '@/lib/entitlements/shadow';
@@ -97,6 +97,10 @@ async function legacyHasPaidStanding(userEmail: string): Promise<boolean> {
   // their personal ledger holds no paid grant, but their calls bill a funded team pool.
   // (tasks/PRD-pooled-team-credits.md) Without this every team member reads as free-tier.
   const payer = await resolvePayer(userEmail);
+  // Owner rule 2026-11-16: never shorten anyone's access. A live Pro grant (e.g. a Pro Giant
+  // bundle whose grant runs past its first year) keeps proprietary standing. Read failure
+  // throws → the guard fails open, as it always has.
+  if (payer.kind !== 'pool' && await hasLiveProGrant(userEmail)) return true;
   return payer.kind === 'pool';
 }
 
@@ -107,9 +111,13 @@ async function legacyHasPaidStanding(userEmail: string): Promise<boolean> {
  *     scrapers. Complimentary is NOT paid; it is admitted here by an explicit rule, so a
  *     comp account can never be counted as revenue by anything reading paidFunding.
  *   - unknown (a read failed) → allowed: the guard fails open, as it always has.
+ *   - a live Pro grant → allowed, whatever the kind (access is never shortened).
  *   - trial / promotional_only / expired / none → requires paid credits.
  */
 export function proprietaryStandingFrom(status: PaidStatus, policy: PaidStatusPolicy = PAID_STATUS_POLICY): boolean {
+  // ACCESS decision: a live Pro grant always keeps standing (owner rule 2026-11-16: never
+  // shorten anyone's access). The Pro Giant 1-year term is a paid-status LABEL only.
+  if (status.liveProGrant === true) return true;
   if (status.kind === 'unknown') return policy.unknownAllows;
   if (status.paidFunding === true) return true;
   return policy.admitComplimentary && status.complimentaryAccess;

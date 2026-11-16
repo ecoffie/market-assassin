@@ -461,3 +461,21 @@ describe('Pro Giant bundle = one year of Pro, not lifetime (owner 2026-11-15)', 
     expect(s.kind).toBe('active_paid');
   });
 });
+
+describe('liveProGrant is an access fact only', () => {
+  it('never changes kind or paidFunding', async () => {
+    const { classifyPaidStatus } = await import('./paid-status');
+    const base = {
+      now: Date.parse('2026-11-16T00:00:00Z'), ledgerGrants: [], subscriptions: [], charges: [], prepaid: [],
+      trialEndsAt: null, poolFunded: false, isStaff: false, isAdvocate: false, isComp: false,
+      proGiant: { purchasedAt: '2025-06-01T00:00:00Z' },
+    };
+    const without = classifyPaidStatus(base);
+    const withGrant = classifyPaidStatus({ ...base, liveProGrant: true });
+    expect(withGrant.kind).toBe(without.kind);
+    expect(withGrant.paidFunding).toBe(false);
+    expect(withGrant.paidFunding).toBe(without.paidFunding);
+    expect(withGrant.liveProGrant).toBe(true);
+    expect(without.liveProGrant).toBe(false);
+  });
+});
