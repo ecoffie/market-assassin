@@ -8,9 +8,9 @@
 import fs from 'fs';
 const env = Object.fromEntries(fs.readFileSync('/Users/ericcoffie/Projects/market-assassin/.env.local', 'utf8').split('\n').filter((l) => /^[A-Z_]+=/.test(l)).map((l) => { const i = l.indexOf('='); return [l.slice(0, i), l.slice(i + 1).replace(/^"|"$/g, '').replace(/\\n$/, '')]; }));
 const { createClient } = await import('@supabase/supabase-js');
-const oc = await import('../../../src/lib/opportunities/open-cache.ts');
-const st = await import('../../../src/lib/opportunities/open-snapshot-store.ts');
-const { findOpportunities } = await import('../../../src/lib/opportunities/find-opportunities.ts');
+const oc = await import('@/lib/opportunities/open-cache');
+const st = await import('@/lib/opportunities/open-snapshot-store');
+const { findOpportunities } = await import('@/lib/opportunities/find-opportunities');
 
 const objects = new Map<string, Buffer>();
 const bucket = { exists: true, public: false };
