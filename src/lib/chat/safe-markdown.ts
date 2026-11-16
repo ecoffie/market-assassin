@@ -62,10 +62,31 @@ export function renderSafeMarkdown(input: string): string {
 
   var lines = esc(src).split('\n');
   var out: string[] = [];
+  // List state. Items are written open ("<li>…") and closed lazily, so an indented bullet can nest inside
+  // the open item and a blank line between items does not end the list. (2026-11-16: a numbered answer
+  // with "- " sub-bullets or blank lines between items rendered as "1., 1., 1." because each one closed
+  // the <ol> and opened a new one.)
   var list: 'ul' | 'ol' | null = null;
+  var liOpen = false;
+  var sub = false;
   var para: string[] = [];
   function flushPara() { if (para.length) { out.push('<p>' + para.join('<br>') + '</p>'); para = []; } }
-  function closeList() { if (list) { out.push('</' + list + '>'); list = null; } }
+  function closeSub() { if (sub) { out.push('</ul>'); sub = false; } }
+  function closeItem() { closeSub(); if (liOpen) { out.push('</li>'); liOpen = false; } }
+  function closeList() { closeItem(); if (list) { out.push('</' + list + '>'); list = null; } }
+  function indentOf(l: string): number { var m = l.match(/^[ \t]*/); return m ? m[0].replace(/\t/g, '    ').length : 0; }
+  var UL_RE = /^\s*(?:[-*+]|&#8226;|•)\s+(.+)$/;
+  var OL_RE = /^\s*(\d{1,3})[.)]\s+(.+)$/;
+  // After a blank line, does the next non-blank line carry on the current list?
+  function listContinues(from: number): boolean {
+    var n = from;
+    while (n < lines.length && !lines[n].trim()) n++;
+    if (n >= lines.length || !list) return false;
+    var nl = lines[n];
+    if (list === 'ol' && OL_RE.test(nl)) return true;
+    if (list === 'ul' && UL_RE.test(nl) && !OL_RE.test(nl)) return true;
+    return liOpen && indentOf(nl) >= 2 && UL_RE.test(nl);
+  }
   // GFM pipe table helpers (operate on already-escaped lines; "|" is not touched by esc()).
   function isTableRow(l: string): boolean { return /^\s*\|.*\|\s*$/.test(l) || (l.indexOf('|') > 0 && /\S\s*\|\s*\S/.test(l)); }
   function isTableSep(l: string): boolean { return /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/.test(l) && l.indexOf('-') >= 0; }
@@ -97,12 +118,32 @@ export function renderSafeMarkdown(input: string): string {
       continue;
     }
     var h = line.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/);
-    var ul = line.match(/^\s*(?:[-*+]|&#8226;|•)\s+(.+)$/);
-    var ol = line.match(/^\s*(\d{1,3})[.)]\s+(.+)$/);
-    if (!line.trim()) { flushPara(); closeList(); continue; }
+    var ul = line.match(UL_RE);
+    var ol = line.match(OL_RE);
+    var ind = indentOf(line);
+    if (!line.trim()) { flushPara(); if (!listContinues(i + 1)) closeList(); continue; }
     if (h) { flushPara(); closeList(); out.push('<div class="md-h md-h' + Math.min(h[1].length, 3) + '">' + inline(h[2]) + '</div>'); continue; }
-    if (ul) { flushPara(); if (list !== 'ul') { closeList(); out.push('<ul>'); list = 'ul'; } out.push('<li>' + inline(ul[1]) + '</li>'); continue; }
-    if (ol) { flushPara(); if (list !== 'ol') { closeList(); out.push('<ol>'); list = 'ol'; } out.push('<li>' + inline(ol[2]) + '</li>'); continue; }
+    // An indented bullet under an open item nests inside it (one level), whatever the outer list type.
+    if (ul && liOpen && ind >= 2) {
+      flushPara();
+      if (!sub) { out.push('<ul>'); sub = true; }
+      out.push('<li>' + inline(ul[1]) + '</li>');
+      continue;
+    }
+    if (ul) { flushPara(); if (list !== 'ul') { closeList(); out.push('<ul>'); list = 'ul'; } else closeItem(); out.push('<li>' + inline(ul[1])); liOpen = true; continue; }
+    if (ol) {
+      flushPara();
+      if (list !== 'ol') {
+        closeList();
+        var start = Number(ol[1]);
+        out.push(start > 1 ? '<ol start="' + start + '">' : '<ol>');
+        list = 'ol';
+      } else closeItem();
+      out.push('<li>' + inline(ol[2])); liOpen = true;
+      continue;
+    }
+    // An indented plain line right under an open item continues that item.
+    if (liOpen && ind >= 2) { closeSub(); out.push('<br>' + inline(line.trim())); continue; }
     closeList();
     para.push(inline(line));
   }

@@ -10850,7 +10850,7 @@ const ASK_MINDY_CSS =
   + '.amk-msg.a .bub{background:#f5f8fb;border:1px solid #e6ebf0;padding:12px 14px;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}'
   // Rendered answers (window.__mindyMd: escaped first, then a safe markdown subset). 2026-11-15.
   + '.amk-msg.a .bub.md{white-space:normal}.amk-msg.a .bub.md p{margin:0 0 8px}.amk-msg.a .bub.md p:last-child{margin-bottom:0}'
-  + '.amk-msg.a .bub.md ul,.amk-msg.a .bub.md ol{margin:4px 0 8px;padding-left:20px}.amk-msg.a .bub.md li{margin:2px 0}'
+  + '.amk-msg.a .bub.md ul,.amk-msg.a .bub.md ol{margin:4px 0 8px;padding-left:20px}.amk-msg.a .bub.md li{margin:2px 0}.amk-msg.a .bub.md li>ul{margin:2px 0 4px;padding-left:16px;list-style:disc}'
   + '.amk-msg.a .bub.md .md-h{font-weight:700;margin:10px 0 4px;color:#111c26}.amk-msg.a .bub.md .md-h1{font-size:15.5px}.amk-msg.a .bub.md .md-h2{font-size:14.5px}.amk-msg.a .bub.md .md-h3{font-size:13.5px}.amk-msg.a .bub.md .md-h:first-child{margin-top:0}'
   + '.amk-msg.a .bub.md code{font:12.5px ui-monospace,Menlo,monospace;background:#eef2f7;border-radius:4px;padding:1px 4px}'
   + '.amk-msg.a .bub a,.amk-src a{color:#2563eb;overflow-wrap:anywhere;word-break:break-word}'
