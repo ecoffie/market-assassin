@@ -18,7 +18,7 @@ const memStorage = {
   getBucket: async (name: string) => (name === st.OPEN_SNAPSHOT_BUCKET && bucket.exists ? { data: { name, public: bucket.public }, error: null } : { data: null, error: { message: 'not found' } }),
   from: (name: string) => ({
     upload: async (p: string, b: Buffer) => { if (!bucket.exists || name !== st.OPEN_SNAPSHOT_BUCKET) return { error: { message: 'no bucket' } }; objects.set(p, Buffer.from(b)); return { error: null }; },
-    download: async (p: string) => { const b = objects.get(p); return b ? { data: new Blob([b]), error: null } : { data: null, error: { message: 'not found' } }; },
+    download: async (p: string) => { const b = objects.get(p); return b ? { data: new Blob([new Uint8Array(b)]), error: null } : { data: null, error: { message: 'not found' } }; },
   }),
 };
 const real = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
