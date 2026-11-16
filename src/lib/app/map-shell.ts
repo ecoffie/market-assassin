@@ -27,6 +27,29 @@ export const MAP_SHELL_PATHS: Readonly<Record<MapShellPanel, string>> = {
   saved: '/opportunity-map/favorites',
 };
 
+/**
+ * The map's OTHER pages (Pursuits, Proposal workspace, Reports, Vault, Forecasts, Market). Inside the
+ * app they open IN the Map panel's frame (shell mode) instead of a new tab or a full-page jump, so a
+ * map action never leaves /app. The app URL carries which one as `mview`, so reload keeps it.
+ * `unplaced` is the retired alias of `forecasts` (its route 308s there).
+ */
+export const MAP_SUBPAGES = ['pursuits', 'proposal', 'reports', 'vault', 'forecasts', 'market'] as const;
+export type MapSubpage = (typeof MAP_SUBPAGES)[number];
+export const MAP_VIEW_PARAM = 'mview';
+const SUBPAGE_ALIASES: Readonly<Record<string, MapSubpage>> = { unplaced: 'forecasts' };
+
+export function isMapSubpage(v: unknown): v is MapSubpage {
+  return typeof v === 'string' && (MAP_SUBPAGES as readonly string[]).includes(v);
+}
+
+/** The map sub-page a path renders (`/opportunity-map/pursuits` → 'pursuits'), or null. */
+export function mapSubpageForPath(pathname: string): MapSubpage | null {
+  const m = /^\/opportunity-map\/([a-z]+)\/?$/.exec(pathname);
+  if (!m) return null;
+  const name = SUBPAGE_ALIASES[m[1]] ?? m[1];
+  return isMapSubpage(name) ? name : null;
+}
+
 /** The mode flag the map route reads. Never `embed` — that is the /today hero's static map. */
 export const SHELL_PARAM = 'shell';
 export const SHELL_VALUE = 'app';
@@ -34,9 +57,11 @@ export const SHELL_VALUE = 'app';
 /** postMessage types the framed map sends to /app. Same-origin only (checked on both ends). */
 export const MAP_SHELL_URL_MESSAGE = 'mindy:map-shell-url';
 export const MAP_SHELL_NAV_MESSAGE = 'mindy:map-shell-nav';
+/** Window event the app page fires when the active map panel's sidebar item is clicked again. */
+export const MAP_SHELL_HOME_EVENT = 'mindy:map-shell-home';
 
 /** Keys that belong to /app (or to the shell itself) and must never reach the map's URL. */
-const APP_ONLY_KEYS = new Set(['panel', SHELL_PARAM, 'embed', 'email', 'reset', 'setup', 'signup', 'next', 'notice', 'section', 'keyword']);
+const APP_ONLY_KEYS = new Set(['panel', MAP_VIEW_PARAM, SHELL_PARAM, 'embed', 'email', 'reset', 'setup', 'signup', 'next', 'notice', 'section', 'keyword']);
 
 export function isMapShellPanel(panel: unknown): panel is MapShellPanel {
   return panel === 'map' || panel === 'watchlist' || panel === 'saved';
@@ -75,38 +100,79 @@ function withoutKeys(search: string, drop: ReadonlySet<string>): string {
 export function mapShellSrc(panel: MapShellPanel, appSearch: string): string {
   const rest = withoutKeys(appSearch, APP_ONLY_KEYS);
   const sep = rest ? '&' : '?';
-  return `${MAP_SHELL_PATHS[panel]}${rest}${sep}${SHELL_PARAM}=${SHELL_VALUE}`;
+  const view = panel === 'map' ? mapViewOf(appSearch) : null;
+  const path = view ? `/opportunity-map/${view}` : MAP_SHELL_PATHS[panel];
+  return `${path}${rest}${sep}${SHELL_PARAM}=${SHELL_VALUE}`;
+}
+
+/** The valid `mview` in an app query string, or null (unknown values open the map itself). */
+export function mapViewOf(appSearch: string): MapSubpage | null {
+  const part = rawParts(appSearch).find((p) => keyOf(p) === MAP_VIEW_PARAM);
+  if (!part) return null;
+  const v = part.slice(part.indexOf('=') + 1);
+  return isMapSubpage(v) ? v : null;
 }
 
 /**
  * The /app URL that mirrors the map's own URL, so reload / share / copy keep the view.
  * `panel` leads; the map's params follow verbatim minus `shell`/`embed`.
  */
-export function appUrlForMapUrl(panel: MapShellPanel, mapSearch: string): string {
-  const rest = withoutKeys(mapSearch, new Set([SHELL_PARAM, 'embed', 'panel']));
-  return `/app?panel=${panel}${rest ? `&${rest.slice(1)}` : ''}`;
+export function appUrlForMapUrl(panel: MapShellPanel, mapSearch: string, view: MapSubpage | null = null): string {
+  const rest = withoutKeys(mapSearch, new Set([SHELL_PARAM, 'embed', 'panel', MAP_VIEW_PARAM]));
+  const v = panel === 'map' && view ? `&${MAP_VIEW_PARAM}=${view}` : '';
+  return `/app?panel=${panel}${v}${rest ? `&${rest.slice(1)}` : ''}`;
+}
+
+/** Which shell panel (+ map sub-page) renders a frame path, or null when no shell page does. */
+export function framePageForPath(pathname: string): { panel: MapShellPanel; view: MapSubpage | null } | null {
+  const panel = shellPanelForPath(pathname);
+  if (panel) return { panel, view: null };
+  const view = mapSubpageForPath(pathname);
+  return view ? { panel: 'map', view } : null;
 }
 
 /** True when a frame URL is already in shell mode (so it renders without its own chrome). */
 export function isShellFrameUrl(pathname: string, search: string): boolean {
-  return shellPanelForPath(pathname) !== null
+  return framePageForPath(pathname) !== null
     && rawParts(search).some((p) => keyOf(p) === SHELL_PARAM && p.slice(p.indexOf('=') + 1) === SHELL_VALUE);
 }
 
 export type FrameNavTarget =
-  | { kind: 'panel'; panel: MapShellPanel; search: string }
+  | { kind: 'panel'; panel: MapShellPanel; view: MapSubpage | null; search: string }
+  | { kind: 'app'; panel: string; search: string }
   | { kind: 'top'; href: string };
 
 /**
- * Where a navigation that STARTED inside the framed map should land, so the app never ends up
- * nested inside itself. A map page → the matching shell panel (in the frame); anything else on our
- * origin (/app, /pricing, /opportunity-map/pursuits …) → the whole window.
+ * Where a navigation that STARTED inside the framed map should land. Every map action stays inside
+ * /app (owner rule, 2026-11-16):
+ *  - a map page (the map, Watchlist, Saved, or a map sub-page such as Pursuits) → shown in the frame;
+ *  - `/app?panel=X…` → that app tab, switched in place (no reload, the app never nests in itself);
+ *  - `/pricing` → the Billing tab of Settings;
+ *  - anything else on our origin (a hosted report, /learn …) → the whole window (`top`). The frame's
+ *    click bridge opens those in a NEW tab before they ever get here, so this is only the fallback
+ *    for scripted navigations.
  */
 export function frameNavTarget(pathname: string, search: string, hash = ''): FrameNavTarget {
-  const panel = shellPanelForPath(pathname);
-  if (panel) return { kind: 'panel', panel, search: withoutKeys(search, new Set([SHELL_PARAM, 'embed'])) };
+  const page = framePageForPath(pathname);
+  if (page) {
+    return { kind: 'panel', panel: page.panel, view: page.view, search: withoutKeys(search, new Set([SHELL_PARAM, 'embed'])) };
+  }
+  const p = pathname.replace(/\/+$/, '') || '/';
+  if (p === '/app') {
+    const part = rawParts(search).find((x) => keyOf(x) === 'panel');
+    const panel = part ? part.slice(part.indexOf('=') + 1) : 'dashboard';
+    if (isMapShellPanel(panel)) {
+      const view = panel === 'map' ? mapViewOf(search) : null;
+      return { kind: 'panel', panel, view, search: withoutKeys(search, new Set(['panel', MAP_VIEW_PARAM, SHELL_PARAM, 'embed'])) };
+    }
+    if (/^[a-z][a-z-]{0,39}$/.test(panel)) return { kind: 'app', panel, search: search || '' };
+  }
+  if (p === '/pricing') return { kind: 'app', panel: 'settings', search: '?panel=settings&section=billing' };
   return { kind: 'top', href: `${pathname}${search}${hash}` };
 }
+
+/** Same-origin paths the frame hands to the app instead of opening a new tab (mirrored in APP_SHELL_JS). */
+export const IN_APP_PATH_RE = /^\/(app|pricing|opportunity-map)(\/|$)/;
 
 export interface MapShellMessage {
   type: typeof MAP_SHELL_URL_MESSAGE | typeof MAP_SHELL_NAV_MESSAGE;

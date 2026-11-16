@@ -16,7 +16,7 @@
  * The parent (/app) is the only reader of the messages below and checks origin + source.
  * Address translation lives in src/lib/app/map-shell.ts.
  */
-import { MAP_SHELL_NAV_MESSAGE, MAP_SHELL_URL_MESSAGE, SHELL_PARAM, SHELL_VALUE } from '@/lib/app/map-shell';
+import { IN_APP_PATH_RE, MAP_SHELL_NAV_MESSAGE, MAP_SHELL_URL_MESSAGE, SHELL_PARAM, SHELL_VALUE } from '@/lib/app/map-shell';
 
 export function isAppShellRequest(url: URL): boolean {
   return url.searchParams.get(SHELL_PARAM) === SHELL_VALUE;
@@ -77,14 +77,17 @@ export const SUBPAGE_APP_SHELL_CSS = '<style id="mp-app-shell">'
  *  1. Mirror the page's URL to the parent whenever the map rewrites it (it writes only via
  *     replaceState, from user actions), so /app's address carries the same view for reload/share.
  *  2. Hand same-origin link clicks to the parent instead of following them in the frame — the parent
- *     maps a map page to its shell panel and sends everything else (/app, /pricing, Pursuits …) to the
- *     whole window, so the app never ends up nested inside itself. External links, new-tab clicks,
- *     `#` anchors and links whose own handler already called preventDefault behave exactly as before.
+ *     shows a map page (incl. Pursuits, Proposal, Reports, Vault, Forecasts, Market) in the frame and
+ *     switches to the matching app tab for /app and /pricing, so a map action never leaves /app and the
+ *     app never ends up nested inside itself. Any other same-origin page opens in a new tab. External
+ *     links, new-tab clicks, `#` anchors and links whose own handler already called preventDefault
+ *     behave exactly as before.
+ *  3. window.open() of a map page or an app tab is routed the same way instead of opening a tab.
  * The parent also checks every frame load, which covers `location.href = …` navigations.
  */
 export const APP_SHELL_JS = '<script>(function(){'
   + 'if(window.parent===window)return;'
-  + 'var O=location.origin;'
+  + 'var O=location.origin,IN=' + IN_APP_PATH_RE.toString() + ';'
   + 'function post(m){try{window.parent.postMessage(m,O);}catch(e){}}'
   + 'function url(){post({type:"' + MAP_SHELL_URL_MESSAGE + '",path:location.pathname,search:location.search});}'
   + 'var H=window.history,rs=H.replaceState,ps=H.pushState;'
@@ -95,13 +98,25 @@ export const APP_SHELL_JS = '<script>(function(){'
   + 'document.addEventListener("click",function(e){'
   +   'if(e.defaultPrevented||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;'
   +   'var a=e.target&&e.target.closest?e.target.closest("a[href]"):null;if(!a)return;'
-  +   'if(a.target&&a.target!=="_self")return;if(a.hasAttribute("download"))return;'
+  +   'if(a.hasAttribute("download"))return;'
   +   'var raw=a.getAttribute("href")||"";if(!raw||raw.charAt(0)==="#"||/^(javascript|mailto|tel):/i.test(raw))return;'
   +   'var u;try{u=new URL(raw,location.href);}catch(x){return;}'
   +   'if(u.origin!==O)return;'
+  // A target="_blank" link to a map page or app tab ALSO stays in the app; any other new-tab link is untouched.
+  +   'if(a.target&&a.target!=="_self"&&!IN.test(u.pathname))return;'
   +   'e.preventDefault();'
+  +   'if(!IN.test(u.pathname)){try{window.open(u.href,"_blank","noopener");}catch(x){}return;}'
   +   'post({type:"' + MAP_SHELL_NAV_MESSAGE + '",path:u.pathname,search:u.search,hash:u.hash});'
   + '});'
+  // Scripted new tabs (Generate proposal, Draft capture strategy, Pursuits after a save) open their
+  // map page or app tab IN the app instead. Other URLs (a hosted report, SAM.gov) still open a tab.
+  + 'var wo=window.open;'
+  + 'window.open=function(href){'
+  +   'try{var u=new URL(String(href||""),location.href);'
+  +     'if(u.origin===O&&IN.test(u.pathname)){post({type:"' + MAP_SHELL_NAV_MESSAGE + '",path:u.pathname,search:u.search,hash:u.hash});return null;}'
+  +   '}catch(x){}'
+  +   'return wo.apply(window,arguments);'
+  + '};'
   + '})();</script>';
 
 /** Inject shell CSS (head) + JS (end of body) into a finished page. Function replacers: the strings carry `$`. */

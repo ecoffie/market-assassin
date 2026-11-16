@@ -27,7 +27,8 @@
  * NO EMOJI — every icon is an inline sized SVG (fill:none;stroke:currentColor). The
  * artifact's pen / target / trend / check / plus glyphs are all replaced with lucide-style SVGs.
  */
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
+import { SUBPAGE_APP_SHELL_CSS, applyAppShell, isAppShellRequest } from '../app-shell';
 import { LOGIN_MODAL_CSS, LOGIN_MODAL_HTML, LOGIN_MODAL_JS } from '../login-modal';
 import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../account-menu';
@@ -794,6 +795,8 @@ const PAGE = `<!DOCTYPE html><html lang="en" class="mindy-map"><head>
 ${ACCOUNT_MENU_JS}
 ${LOGIN_MODAL_HTML}${LOGIN_MODAL_JS}${'<script>'}window.__mapsSignIn=function(){var stale=false;try{stale=!!localStorage.getItem('mi_beta_email')&&!localStorage.getItem('mi_beta_auth_token');}catch(e){}var phrase=stale?'continue where you left off':'open your Company Vault';if(typeof window.openSignInModal==='function'){window.openSignInModal(phrase,function(){location.reload();});}else{location.href='/app?next='+encodeURIComponent('/opportunity-map/vault');}return false;};${'</script>'}</body></html>`;
 
-export async function GET() {
-  return new NextResponse(PAGE, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+export async function GET(request?: NextRequest) {
+  // ?shell=app — this page inside the signed-in app (Map panel frame): hide the site top bar + rail.
+  const html = request && isAppShellRequest(new URL(request.url)) ? applyAppShell(PAGE, SUBPAGE_APP_SHELL_CSS) : PAGE;
+  return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }

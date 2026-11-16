@@ -25,7 +25,8 @@ import { sendAppEngagement } from '@/components/app/track';
 import { getStoredPartnerRef } from '@/lib/mindy/partner-referral-client';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
 import { parseAppDeepLink } from '@/lib/app/deep-link-params';
-import { isMapShellPanel } from '@/lib/app/map-shell';
+import { MAP_SHELL_HOME_EVENT, isMapShellPanel } from '@/lib/app/map-shell';
+import { KNOWN_PANELS } from '@/lib/app/known-panels';
 
 /** The shared account-menu script (map + public pages) without its <script> wrapper. */
 const ACCOUNT_MENU_SCRIPT = ACCOUNT_MENU_JS.replace(/^<script>/, '').replace(/<\/script>[\s\S]*$/, '');
@@ -50,14 +51,7 @@ function DashboardLoading() {
   );
 }
 
-// Panels that may be deep-linked via ?panel=<id>. Keep in sync with AppPanel.
-const KNOWN_PANELS = new Set<AppPanel>([
-  'map', 'watchlist', 'saved',
-  'chat', 'dashboard', 'alerts', 'market-intel', 'research', 'forecasts',
-  'recompetes', 'contractors', 'decision-makers', 'pipeline', 'contacts',
-  'team', 'settings', 'vault', 'library', 'knowledge-base', 'coach',
-  'pricing', 'proposals', 'target-list', 'grants', 'dibbs', 'partner-finder',
-]);
+
 
 // Wrap in Suspense for useSearchParams
 export default function AppPage() {
@@ -647,7 +641,11 @@ function AppDashboard() {
   }, []);
 
   const handlePanelChange = useCallback((nextPanel: AppPanel, context?: Record<string, unknown>) => {
-    if (nextPanel === activePanelRef.current && !context) return;
+    if (nextPanel === activePanelRef.current && !context) {
+      // Map re-clicked while it shows one of its sub-pages (Pursuits, Proposal …) → back to the map.
+      if (nextPanel === 'map') window.dispatchEvent(new Event(MAP_SHELL_HOME_EVENT));
+      return;
+    }
     flushPanelTime(activePanelRef.current, 'panel_change');
     activePanelRef.current = nextPanel;
     panelStartedAtRef.current = Date.now();

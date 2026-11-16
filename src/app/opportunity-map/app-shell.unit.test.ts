@@ -88,3 +88,21 @@ describe('shell=app wiring', () => {
     }
   });
 });
+
+describe('map sub-pages open inside the app (shell=app)', () => {
+  const subs = ['pursuits', 'proposal', 'reports', 'vault', 'forecasts', 'market'] as const;
+  for (const sub of subs) {
+    it(`/opportunity-map/${sub} honours shell=app and is unchanged without it`, async () => {
+      const mod = await import(`./${sub}/route`);
+      const shell = await (await mod.GET(new Request(`https://x/opportunity-map/${sub}?shell=app`))).text();
+      expect(shell).toContain('id="mp-app-shell"');
+      expect(shell).toContain('mindy:map-shell-nav');
+      const plain = await (await mod.GET()).text();
+      expect(plain).not.toContain('mp-app-shell');
+    });
+  }
+  it('the frame routes window.open of a map page or app tab into the app', () => {
+    expect(APP_SHELL_JS).toContain('window.open=function(href)');
+    expect(APP_SHELL_JS).toContain('IN=/^\\/(app|pricing|opportunity-map)(\\/|$)/');
+  });
+});
