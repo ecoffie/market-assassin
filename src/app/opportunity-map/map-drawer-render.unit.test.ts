@@ -152,3 +152,29 @@ describe('follow-up chips: derived, and only under the latest answer', () => {
     expect(String(t.chat.at(-1)!.message)).toContain('Follow up please');
   });
 });
+
+describe('narrow-panel display rule (answer first)', () => {
+  it('every view-mode question carries the display rule after the view context, ahead of the question', async () => {
+    const t = boot({ tokens: [['a'], ['b']] });
+    await t.ask('What janitorial work is open here?');
+    await t.ask('And in Florida?');
+    for (const c of t.chat) {
+      const m = String(c.message);
+      expect(m).toContain('[Display: a narrow side panel. Start with the answer in 1–2 sentences');
+      expect(m).toContain('“Where I would start” recommendation goes first');
+      expect(m.indexOf('[Current map view')).toBeLessThan(m.indexOf('[Display:'));
+    }
+    expect(String(t.chat[1].message).endsWith('And in Florida?')).toBe(true);
+  });
+  it('the rule is never kept in history or shown to the user', async () => {
+    const t = boot({ tokens: [['a'], ['b']] });
+    await t.ask('q1');
+    await t.ask('q2');
+    const hist = t.chat[1].history as Array<{ role: string; content: string }>;
+    expect(hist[0]).toEqual({ role: 'user', content: 'q1' });
+    expect(t.w.document.querySelector('.amk-msg.u')!.textContent).toBe('q1');
+  });
+  it('the opening paragraph is styled as the answer', () => {
+    expect(MAP).toMatch(/\.amk-msg\.a \.bub\.md>p:first-child\{font-weight:500/);
+  });
+});
