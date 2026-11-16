@@ -21,6 +21,10 @@
  */
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
+/** The one sentence every private surface uses when the acting workspace can't be confirmed. */
+export const WORKSPACE_UNCONFIRMED_NOTE =
+  "The active workspace couldn't be confirmed, so no Vault, profile or pursuit data was loaded. Ask the user to retry.";
+
 type HeaderSource = { headers: { get(name: string): string | null } };
 
 export type ChatActingScope =

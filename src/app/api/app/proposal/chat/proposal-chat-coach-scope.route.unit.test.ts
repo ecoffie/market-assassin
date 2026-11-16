@@ -22,6 +22,9 @@ const state = vi.hoisted(() => ({
   budgetEmails: [] as string[],
   usageEmails: [] as string[],
   sources: [] as string[],
+  prompts: [] as string[],
+  pursuit: null as Record<string, unknown> | null,
+  tables: [] as string[],
 }));
 
 vi.mock('@/lib/two-factor-session', () => ({
@@ -47,26 +50,42 @@ vi.mock('@/lib/app/workspace', () => ({
   },
   clientNotificationEmail: (ws: string) => `${ws}@clients.getmindy.ai`,
 }));
-vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ from: () => ({}) }) }));
+vi.mock('@supabase/supabase-js', () => ({
+  createClient: () => ({
+    from(table: string) {
+      state.tables.push(table);
+      const q: Record<string, unknown> = {};
+      for (const m of ['select', 'eq', 'in', 'not', 'order', 'limit']) q[m] = () => q;
+      q.maybeSingle = async () => ({ data: table === 'user_pipeline' ? state.pursuit : null, error: null });
+      q.then = (resolve: (v: unknown) => void) =>
+        resolve({ data: table === 'pursuit_documents' ? [{ filename: 'rfp.pdf', doc_kind: 'solicitation', extracted_text: 'TEXT', notice_id: null }] : [], error: null });
+      return q;
+    },
+  }),
+}));
 
 beforeEach(() => {
   state.profileEmails = []; state.vaultEmails = []; state.budgetEmails = []; state.usageEmails = []; state.sources = [];
+  state.prompts = []; state.pursuit = null; state.tables = [];
   vi.stubEnv('OPENAI_API_KEY', 'ok');
   vi.stubEnv('GROQ_API_KEY', 'gk');
-  vi.stubGlobal('fetch', vi.fn(async () => new Response(
+  vi.stubGlobal('fetch', vi.fn(async (_u: unknown, init?: { body?: string }) => {
+    try { for (const m of JSON.parse(String(init?.body || '{}')).messages || []) state.prompts.push(String(m.content)); } catch { /* not JSON */ }
+    return new Response(
     new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"ok"}}]}\n\ndata: [DONE]\n\n')); c.close(); } }),
     { status: 200 },
-  )));
+  );
+  }));
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
-async function ask(activeWorkspace: string | null) {
+async function ask(activeWorkspace: string | null, pipelineId?: string) {
   vi.resetModules();
   const { POST } = await import('./route');
   const headers: Record<string, string> = {};
   if (activeWorkspace) headers['x-active-workspace'] = activeWorkspace;
   const res = await POST(new Request('https://getmindy.ai/api/app/proposal/chat', {
-    method: 'POST', headers, body: JSON.stringify({ email: COACH, message: 'Draft the technical approach.', rfpText: 'The contractor shall clean Building 12.' }),
+    method: 'POST', headers, body: JSON.stringify({ email: COACH, message: 'Draft the technical approach.', rfpText: 'The contractor shall clean Building 12.', ...(pipelineId ? { pipeline_id: pipelineId } : {}) }),
   }) as never);
   const text = await res.text();
   for (const line of text.split('\n')) {
@@ -113,5 +132,51 @@ describe('Manual Drive follows the acting scope', () => {
     await ask(WS);
     expect(state.vaultEmails).toEqual([COACH]);
     expect(state.profileEmails).toEqual([COACH]);
+  });
+});
+
+describe('unresolvable workspace says so (U1)', () => {
+  it("tells the model the workspace couldn't be confirmed — and never to fill in a Vault", async () => {
+    state.resolve = 'throw';
+    await ask(WS);
+    const prompt = state.prompts.join('\n');
+    expect(prompt).toContain("The active workspace couldn't be confirmed, so no Vault, profile or pursuit data was loaded. Ask the user to retry.");
+    expect(prompt).toMatch(/Do NOT tell the user to add Vault or profile data/);
+    expect(prompt).not.toMatch(/Vault is empty — tell the user what to add/);
+  });
+
+  it('own scope gets no workspace line', async () => {
+    state.resolve = 'own';
+    await ask(null);
+    expect(state.prompts.join('\n')).not.toMatch(/couldn't be confirmed/);
+  });
+});
+
+describe("client scope reads only the client's pursuits (N1-MD)", () => {
+  const PID = '11111111-2222-4333-8444-555555555555';
+  it("a coach's personal pursuit (authorizePursuitRead would allow it) → 404, no documents read", async () => {
+    state.resolve = 'client';
+    state.pursuit = { id: PID, user_email: COACH, workspace_id: 'coach-own-ws' };
+    const res = await ask(WS, PID);
+    expect(res.status).toBe(404);
+    expect(state.tables).not.toContain('pursuit_documents');
+    expect(state.vaultEmails).toEqual([]);
+  });
+
+  it("a pursuit in the client workspace → documents load and the client's Vault grounds the draft", async () => {
+    state.resolve = 'client';
+    state.pursuit = { id: PID, user_email: CLIENT_VAULT, workspace_id: WS };
+    const res = await ask(WS, PID);
+    expect(res.status).toBe(200);
+    expect(state.tables).toContain('pursuit_documents');
+    expect(state.vaultEmails).toEqual([CLIENT_VAULT]);
+  });
+
+  it('own scope: a personal pursuit still works (unchanged)', async () => {
+    state.resolve = 'own';
+    state.pursuit = { id: PID, user_email: COACH, workspace_id: null };
+    const res = await ask(null, PID);
+    expect(res.status).toBe(200);
+    expect(state.tables).toContain('pursuit_documents');
   });
 });

@@ -24,7 +24,7 @@ import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
 import { selectRelevantRfp } from '@/lib/proposal/select-relevant';
 import { authorizePursuitRead } from '@/lib/proposal/pursuit-access';
 import { loadSolicitationFactsBlock, type FactsDb } from '@/lib/chat/selected-notice';
-import { resolveChatActingScope, vaultEmailFor } from '@/lib/chat/chat-acting-scope';
+import { resolveChatActingScope, vaultEmailFor, WORKSPACE_UNCONFIRMED_NOTE } from '@/lib/chat/chat-acting-scope';
 import type { BidderProfile, VaultContext } from '@/lib/proposal/types';
 
 // RAG-as-standard: Manual Drive answers are informed by Mindy's real proposal
@@ -157,6 +157,23 @@ export async function POST(request: NextRequest) {
         ? NextResponse.json({ success: false, error: 'Could not load this pursuit. Try again.' }, { status: 503 })
         : NextResponse.json({ success: false, error: 'Pursuit not found' }, { status: 404 });
     }
+    // Same scope rule as Ask Mindy's pursuit documents: in a client workspace only THAT
+    // workspace's pursuits ground the draft — never a coach's personal pursuit next to the
+    // client's Vault (authorizePursuitRead alone would allow the coach's own row).
+    if (actingScope.kind === 'client') {
+      const { data: row, error: rowErr } = await createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+        .from('user_pipeline')
+        .select('id, workspace_id')
+        .eq('id', pipelineId)
+        .maybeSingle();
+      if (rowErr) {
+        console.error('[proposal/chat] pursuit scope query error:', rowErr.message);
+        return NextResponse.json({ success: false, error: 'Could not load this pursuit. Try again.' }, { status: 503 });
+      }
+      if (!row || row.workspace_id !== actingScope.workspaceId) {
+        return NextResponse.json({ success: false, error: 'Pursuit not found' }, { status: 404 });
+      }
+    }
     // Read only after access is granted above. A failed read just means no facts block.
     const { data: pursuitRow, error: pursuitErr } = await createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
       .from('user_pipeline').select('notice_id').eq('id', pipelineId).maybeSingle();
@@ -217,6 +234,11 @@ export async function POST(request: NextRequest) {
         // the fallback when the structured requirements don't cover the ask.
         const relevantRfp = rfpText ? selectRelevantRfp(rfpText, message, RFP_CONTEXT_BUDGET) : '';
         const contextParts = [
+          // Unresolvable workspace: say so (Ask Mindy's wording), so the model neither treats the
+          // missing Vault as "empty" nor tells a coach to fill one in.
+          actingScope.kind === 'unavailable'
+            ? `WORKSPACE: ${WORKSPACE_UNCONFIRMED_NOTE} Draft only from the RFP text, with [bracketed placeholders] for company facts. Do NOT tell the user to add Vault or profile data.`
+            : '',
           reqBlock ? `EXTRACTED REQUIREMENTS (the solicitation's obligations, already parsed — answer specific questions from THIS first):\n${reqBlock}` : '',
           solFacts ? solFacts.block : '',
           profileBlock ? `COMPANY PROFILE:\n${profileBlock}` : '',
