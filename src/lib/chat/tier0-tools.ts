@@ -54,7 +54,7 @@ export const TIER0_TOOL_DEFS = [
     function: {
       name: 'get_my_pipeline',
       description:
-        "Return the signed-in user's OWN tracked pursuits (their pipeline). Call this whenever they ask about their pipeline, their pursuits, their deadlines, what they're bidding/tracking, or 'which of mine is due first'. Returns their real rows only.",
+        "Return the signed-in user's OWN tracked pursuits (their pipeline). Call this whenever they ask about their pipeline, their pursuits, their deadlines, what they're bidding/tracking, or 'which of mine is due first'. Returns their real rows only. Each item carries pursuit_id and notice_id; pass notice_id to the solicitation tools (lookup_solicitation, get_solicitation_documents, get_solicitation_incumbent) when the user asks about one of their pursuits. notice_id is null when the pursuit has no SAM notice.",
       parameters: {
         type: 'object',
         properties: {
@@ -85,6 +85,8 @@ export const TIER0_TOOL_NAMES = new Set(TIER0_TOOL_DEFS.map((t) => t.function.na
 const PIPELINE_STAGES = new Set(['tracking', 'pursuing', 'bidding', 'submitted', 'won', 'lost']);
 
 interface PipelineRow {
+  id?: string;
+  notice_id?: string | null;
   title?: string;
   agency?: string;
   stage?: string;
@@ -111,7 +113,7 @@ export function makeTier0Tools(db: Tier0Db, email: string) {
       typeof args?.stage === 'string' && PIPELINE_STAGES.has(args.stage) ? args.stage : null;
 
     const cols =
-      'title, agency, stage, response_deadline, value_estimate, naics_code, set_aside, priority, next_action';
+      'id, notice_id, title, agency, stage, response_deadline, value_estimate, naics_code, set_aside, priority, next_action';
     let q = db.from('user_pipeline').select(cols).eq('user_email', boundEmail);
     // deadline-ascending so "due first" is row 0; nulls last.
     const base = q.order('response_deadline', { ascending: true, nullsFirst: false });
@@ -136,6 +138,14 @@ export function makeTier0Tools(db: Tier0Db, email: string) {
       ok: true,
       count: rows.length,
       items: rows.map((r) => ({
+        // pursuit_id (user_pipeline.id) is the handle Proposal AI opens a pursuit by;
+        // notice_id is the SAM id the solicitation tools take (lookup_solicitation,
+        // get_solicitation_documents, get_solicitation_incumbent). Both are already on
+        // the row; exposing them lets the model chain from "my pursuit" to its notice
+        // instead of asking the user to retype the number. notice_id is null for a
+        // pursuit saved without a SAM notice; never guess one.
+        pursuit_id: r.id ?? null,
+        notice_id: r.notice_id ?? null,
         title: r.title ?? null,
         agency: r.agency ?? null,
         stage: r.stage ?? null,

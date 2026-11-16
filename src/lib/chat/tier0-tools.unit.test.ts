@@ -28,7 +28,7 @@ vi.mock('@/lib/proposal/loaders', () => ({
  * A stub Supabase that RECORDS the filters applied, so a test can assert the
  * query was scoped to the bound email. Returns `rows` as the final result.
  */
-function stubDb(rows: unknown[], captured: { table?: string; filters: Array<[string, string]> }): Tier0Db {
+function stubDb(rows: unknown[], captured: { table?: string; cols?: string; filters: Array<[string, string]> }): Tier0Db {
   const makeChain = () => {
     const chain: Record<string, unknown> = {};
     chain.eq = (col: string, val: string) => {
@@ -42,7 +42,7 @@ function stubDb(rows: unknown[], captured: { table?: string; filters: Array<[str
   return {
     from(table: string) {
       captured.table = table;
-      return { select: () => makeChain() };
+      return { select: (cols: string) => { captured.cols = cols; return makeChain(); } };
     },
   } as unknown as Tier0Db;
 }
@@ -113,6 +113,22 @@ describe('get_my_pipeline — scoped to the bound email', () => {
     const res = await tools.execute('get_my_pipeline', {}) as { count: number; items: Array<Record<string, unknown>> };
     expect(res.count).toBe(1);
     expect(res.items[0]).toMatchObject({ title: 'DLA Tubing', agency: 'DLA', deadline: '2026-07-18', naics: '332996' });
+  });
+
+  it('selects and returns pursuit_id + notice_id so the model can chain to the solicitation tools', async () => {
+    const captured: { table?: string; cols?: string; filters: Array<[string, string]> } = { filters: [] };
+    const rows = [
+      { id: 'p-1', notice_id: '1a02451bf3e04edf93f56216c2113d73', title: 'Interface Unit', stage: 'tracking' },
+      { id: 'p-2', notice_id: null, title: 'Saved without a notice', stage: 'tracking' },
+    ];
+    const tools = makeTier0Tools(stubDb(rows, captured), 'o@x.com');
+    const res = await tools.execute('get_my_pipeline', {}) as { items: Array<Record<string, unknown>> };
+    expect(captured.cols?.split(',').map((c) => c.trim())).toEqual(expect.arrayContaining(['id', 'notice_id']));
+    expect(res.items[0]).toMatchObject({ pursuit_id: 'p-1', notice_id: '1a02451bf3e04edf93f56216c2113d73' });
+    // A pursuit without a notice stays null. Never a guessed id.
+    expect(res.items[1]).toMatchObject({ pursuit_id: 'p-2', notice_id: null });
+    // The bound-email filter still applies.
+    expect(captured.filters).toContainEqual(['user_email', 'o@x.com']);
   });
 });
 
