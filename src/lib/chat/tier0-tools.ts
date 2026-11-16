@@ -287,6 +287,19 @@ export function makeTier0Tools(
     };
   }
 
+  async function pursuitInClientWorkspace(pursuitId: string, workspaceId: string): Promise<boolean | 'error'> {
+    const { data, error } = await db
+      .from('user_pipeline')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .order('id', { ascending: true })
+      .eq('id', pursuitId)
+      .order('id', { ascending: true })
+      .limit(1);
+    if (error) return 'error';
+    return (data || []).length > 0;
+  }
+
   async function searchMyPursuitDocuments(args: { pursuit?: unknown; question?: unknown }): Promise<Record<string, unknown>> {
     const denied = (error: string, note: string) => ({ ok: false, error, count: 0, excerpts: [], note });
     // Private documents: the Vault routes' strong authentication, then an ownership check.
@@ -313,6 +326,13 @@ export function makeTier0Tools(
       pursuitId = pick.id;
     }
 
+    // Acting scope first, like the pipeline and Vault: in a client workspace only that
+    // workspace's pursuits are readable — not even a pursuit the coach owns personally.
+    if (scope.kind === 'client') {
+      const inScope = await pursuitInClientWorkspace(pursuitId, scope.workspaceId);
+      if (inScope === 'error') return denied('pursuit_unavailable', 'The pursuit could not be checked right now. Do not treat this as "no documents".');
+      if (!inScope) return denied('pursuit_not_found', 'No pursuit with that id in this workspace. Use a pursuit_id from get_my_pipeline.');
+    }
     const access = await options.pursuitDocs.authorize(pursuitId);
     if (!access.ok) {
       // Not found and not yours are deliberately the same answer (no id probing).

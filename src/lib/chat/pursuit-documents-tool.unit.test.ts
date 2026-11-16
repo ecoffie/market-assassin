@@ -136,3 +136,53 @@ describe('excerpts, not files', () => {
     expect(questionTerms('What does the RFP say about the page limit?')).toEqual(['page', 'limit']);
   });
 });
+
+describe('acting scope (N1): a client workspace reads only its own pursuits', () => {
+  const WS = '99999999-2222-3333-4444-555555555555';
+  const clientScope = { kind: 'client' as const, email: 'coach@firm.com', workspaceId: WS, vaultEmail: `${WS}@clients.getmindy.ai` };
+  // Stub: a pursuit row exists in the client workspace only when its id is in `inWs`.
+  function scopedDb(inWs: Set<string>, captured: Array<[string, string]> = []): Tier0Db {
+    const make = () => {
+      const f: Array<[string, string]> = [];
+      const chain: Record<string, unknown> = {};
+      chain.eq = (c: string, v: string) => { f.push([c, v]); captured.push([c, v]); return chain; };
+      chain.order = () => chain;
+      chain.limit = async () => {
+        const ws = f.find(([c]) => c === 'workspace_id')?.[1];
+        const id = f.find(([c]) => c === 'id')?.[1];
+        return { data: ws === WS && id && inWs.has(id) ? [{ id }] : [], error: null };
+      };
+      return chain;
+    };
+    return { from: () => ({ select: () => make() }) } as unknown as Tier0Db;
+  }
+
+  it("a pursuit the coach owns personally (authorize would allow it) is NOT readable from the client workspace", async () => {
+    const r = reader(new Set([OTHER])); // authorize allows the coach's own pursuit
+    const out = await makeTier0Tools(scopedDb(new Set([PID])), clientScope, vi.fn() as never, { pursuitDocs: r, strongAuth: true })
+      .execute('search_my_pursuit_documents', { pursuit: OTHER, question: 'page limit' });
+    expect(out).toMatchObject({ ok: false, error: 'pursuit_not_found' });
+    expect(r.authorize).not.toHaveBeenCalled();
+    expect(r.load).not.toHaveBeenCalled();
+  });
+
+  it("a pursuit in the client workspace passes the scope check, then still goes through authorize", async () => {
+    const r = reader(new Set([PID]));
+    const captured: Array<[string, string]> = [];
+    const out = await makeTier0Tools(scopedDb(new Set([PID]), captured), clientScope, vi.fn() as never, { pursuitDocs: r, strongAuth: true })
+      .execute('search_my_pursuit_documents', { pursuit: PID, question: 'page limit' });
+    expect(captured).toEqual(expect.arrayContaining([['workspace_id', WS], ['id', PID]]));
+    expect(r.authorize).toHaveBeenCalledWith(PID);
+    expect(out).toMatchObject({ ok: true, workspace: 'client' });
+  });
+});
+
+describe('whole-word matching (N2)', () => {
+  it('"fire" matches fire/fires, never firearm', () => {
+    const docs = [{ filename: 'a.pdf', extracted_text: 'Firearms qualification is required for all guards.' },
+      { filename: 'b.pdf', extracted_text: 'Fire alarm testing is required quarterly. Fires must be reported.' }];
+    const { excerpts } = selectPursuitDocExcerpts(docs, 'fire alarm');
+    expect(excerpts.map((e) => e.filename)).toEqual(['b.pdf']);
+    expect(selectPursuitDocExcerpts([docs[0]], 'fire').excerpts).toEqual([]);
+  });
+});

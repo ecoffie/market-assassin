@@ -10,7 +10,7 @@
  *
  * Selection is deterministic and explainable: split each document at paragraph
  * boundaries (chunkText, shared with the compliance matrix), score a passage by how
- * many DISTINCT question terms it contains (word-boundary match), keep the best few.
+ * many DISTINCT question terms it contains (whole-word match, plural allowed), keep the best few.
  * A passage with no question term is never returned — no filler.
  */
 import { chunkText } from '@/lib/proposal/compliance-matrix';
@@ -62,7 +62,8 @@ export function selectPursuitDocExcerpts(
 ): { excerpts: PursuitDocExcerpt[]; terms: string[]; truncated: boolean } {
   const terms = questionTerms(question);
   if (terms.length === 0) return { excerpts: [], terms, truncated: false };
-  const matchers = terms.map((t) => ({ t, re: new RegExp(`(^|[^a-z0-9])${escapeRe(t)}`, 'i') }));
+  // Whole word, plural allowed: "fire" matches "fire"/"fires", never "firearm".
+  const matchers = terms.map((t) => ({ t, re: new RegExp(`(^|[^a-z0-9])${escapeRe(t)}(s|es)?(?![a-z0-9])`, 'i') }));
 
   const scored: Array<PursuitDocExcerpt & { score: number; order: number }> = [];
   let order = 0;
