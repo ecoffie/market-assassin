@@ -37,6 +37,12 @@ export interface UnifiedPricingProps {
   forecastsLabel: string;
   /** FAQ entries rendered on the page (the /pricing JSON-LD mirrors these). */
   faqs: { q: string; a: string }[];
+  /**
+   * Credit plans only (getmindy.ai/mcp/pricing, Eric 2026-11-16: "only that pricing and not the
+   * app pricing"). Hides the app trial hero, the Mindy App tabs and the app cards/compare table.
+   * /pricing itself is SimplePricing now; the credit plans appear there as a dropdown.
+   */
+  mcpOnly?: boolean;
 }
 
 // ---- Links (unchanged from the previous pages) ----
@@ -192,9 +198,11 @@ function PlanCard({ p, compact }: { p: CardModel; compact?: boolean }) {
   );
 }
 
-export default function UnifiedPricing({ initialTab, proCredits, teamCredits, signupCredits, forecastsLabel, faqs }: UnifiedPricingProps) {
-  const [tab, setTab] = useState<PricingTab>(initialTab);
-  const [cmpTab, setCmpTab] = useState<PricingTab>(initialTab);
+export default function UnifiedPricing({ initialTab, proCredits, teamCredits, signupCredits, forecastsLabel, faqs, mcpOnly = false }: UnifiedPricingProps) {
+  const [tabState, setTab] = useState<PricingTab>(mcpOnly ? 'mcp' : initialTab);
+  const [cmpTabState, setCmpTab] = useState<PricingTab>(mcpOnly ? 'mcp' : initialTab);
+  const tab: PricingTab = mcpOnly ? 'mcp' : tabState;
+  const cmpTab: PricingTab = mcpOnly ? 'mcp' : cmpTabState;
   const [annual, setAnnual] = useState(true);
   const [picked, setPicked] = useState<Set<string>>(new Set(TASKS.filter((t) => t.on).map((t) => t.id)));
   const [opps, setOpps] = useState(20);
@@ -306,7 +314,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
       ],
     };
   };
-  const trialOffer = heroTrialOffer(me?.plan ?? null, annual);
+  const trialOffer = mcpOnly ? null : heroTrialOffer(me?.plan ?? null, annual);
   const CURRENT_CARD: Record<string, string> = { free: 'Free', pro: 'Pro', team: 'Teams' };
   if (me?.plan && CURRENT_CARD[me.plan]) {
     for (const c of appCards) if (c.name === CURRENT_CARD[me.plan]) c.current = true;
@@ -325,6 +333,17 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
   const perOpp = TASKS.filter((t) => picked.has(t.id)).reduce((s, t) => s + exampleCost(tools, t.tools), 0);
   const need = perOpp * opps;
   const rec = useMemo((): { card: CardModel | null; cap: number } => {
+    if (need <= trial && mcpOnly) {
+      // Credit-plans-only page: the small-use answer is the free signup credits, not the app trial.
+      return {
+        cap: trial,
+        card: {
+          name: 'Free credits', tag: `${fmt(trial)} credits when you first connect your AI.`, badge: '✦ Recommended', color: 'navy',
+          price: 0, per: 'to start', href: '/mcp', cta: 'Connect for free', note: 'No card needed. Upgrade to a credit plan when you need more.',
+          credits: [fmt(trial), 'credits', 'once'], tree: [['All', 'tools included'], ['Charged', 'on success only']], secs: [],
+        },
+      };
+    }
     if (need <= trial) {
       return {
         cap: trial,
@@ -339,7 +358,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
     if (!plan) return { cap: need, card: null };
     return { cap: plan.creditsPerMonth, card: { ...mcpCard(plan), badge: '✦ Recommended', color: 'navy' } };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [need, trial, plans, annual, tools]);
+  }, [need, trial, plans, annual, tools, mcpOnly]);
   const tickOn = Math.round(((opps - 5) / 145) * 29) + 1;
   const dotOn = Math.min(30, Math.round((need / Math.max(1, rec.cap)) * 30));
 
@@ -396,8 +415,17 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
       <div className="wrap">
         <section className="promo">
-          <h1>Federal market intelligence for you and <span className="l2">your AI&nbsp;agents.</span></h1>
-          <p>Find opportunities, research competitors, track recompetes, and put Mindy&apos;s intelligence to work inside Claude, Cursor, and your favorite AI tools.</p>
+          {mcpOnly ? (
+            <>
+              <h1>Mindy for <span className="l2">your AI&nbsp;agents.</span></h1>
+              <p>Credit plans for using Mindy inside Claude, ChatGPT, Cursor and any MCP agent. Pay only for successful calls. No app subscription needed.</p>
+            </>
+          ) : (
+            <>
+              <h1>Federal market intelligence for you and <span className="l2">your AI&nbsp;agents.</span></h1>
+              <p>Find opportunities, research competitors, track recompetes, and put Mindy&apos;s intelligence to work inside Claude, Cursor, and your favorite AI tools.</p>
+            </>
+          )}
           {trialOffer && (
             <>
               <div className="offer">
@@ -454,10 +482,10 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
             <p>{tab === 'app' ? 'For solo contractors & growing BD teams' : 'Metered credits for Claude, Cursor & any AI agent'}</p>
           </div>
           <div className="controls">
-            <div className="seg" role="tablist">
+            {!mcpOnly && <div className="seg" role="tablist">
               <button type="button" role="tab" aria-selected={tab === 'app'} className={tab === 'app' ? 'on' : ''} onClick={() => setTab('app')}>Mindy App</button>
               <button type="button" role="tab" aria-selected={tab === 'mcp'} className={tab === 'mcp' ? 'on' : ''} onClick={() => setTab('mcp')}>MCP Credits</button>
-            </div>
+            </div>}
             <BillingToggle saveLabel={`Save up to ${TEAM_ANNUAL_PCT}%`} />
           </div>
         </div>
@@ -497,8 +525,8 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
             </div>
             <p className="fine">
               Every tool is open on every plan — tiers differ only by monthly allowance. You&apos;re charged per successful call; refused requests and failures on our side are free.<br />
-              Already on the Mindy app? Pro and Teams include monthly MCP credits on the same account.{' '}
-              <a href="#plans" onClick={(e) => { e.preventDefault(); goTab('app'); }}>See app plans ↗</a>
+              Already on the Mindy app? Pro and Teams include monthly MCP credits on the same account.
+              {!mcpOnly && <>{' '}<a href="#plans" onClick={(e) => { e.preventDefault(); goTab('app'); }}>See app plans ↗</a></>}
             </p>
           </>
         )}
@@ -573,10 +601,10 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
         {/* COMPARE */}
         <h2 className="section-title">Compare every plan</h2>
         <p className="section-sub">No fine print, no &quot;contact us for pricing&quot; mystery boxes.</p>
-        <div className="seg cmp-seg" role="tablist">
+        {!mcpOnly && <div className="seg cmp-seg" role="tablist">
           <button type="button" role="tab" aria-selected={cmpTab === 'app'} className={cmpTab === 'app' ? 'on' : ''} onClick={() => setCmpTab('app')}>Mindy App</button>
           <button type="button" role="tab" aria-selected={cmpTab === 'mcp'} className={cmpTab === 'mcp' ? 'on' : ''} onClick={() => setCmpTab('mcp')}>MCP Credits</button>
-        </div>
+        </div>}
         <p className="tbl-hint">Swipe to compare every plan →</p>
         <div className="tbl-wrap" data-swipe="">
           <table>
@@ -604,12 +632,25 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
         </div>
 
         <section className="final">
-          <h2>Start your 14-day free trial.<br />See your first briefing tomorrow.</h2>
-          <p>Pick Pro or Team. Card required, no charge for 14 days. Cancel anytime.</p>
-          <div className="btns">
-            <a className="cta light" href="/pricing">Start for free</a>
-            <Link className="cta" href="/mcp">Connect Mindy to your AI →</Link>
-          </div>
+          {mcpOnly ? (
+            <>
+              <h2>Connect Mindy to your AI.<br />Start with {fmt(trial)} free credits.</h2>
+              <p>Sign in once from Claude, ChatGPT or Cursor. Pick a credit plan when you need more.</p>
+              <div className="btns">
+                <Link className="cta light" href="/mcp">Connect Mindy to your AI →</Link>
+                <a className="cta" href="#plans">See credit plans</a>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2>Start your 14-day free trial.<br />See your first briefing tomorrow.</h2>
+              <p>Pick Pro or Team. Card required, no charge for 14 days. Cancel anytime.</p>
+              <div className="btns">
+                <a className="cta light" href="/pricing">Start for free</a>
+                <Link className="cta" href="/mcp">Connect Mindy to your AI →</Link>
+              </div>
+            </>
+          )}
           <p className="quote">&ldquo;The big contractors have armies. You have Mindy.&rdquo;</p>
         </section>
       </div>
