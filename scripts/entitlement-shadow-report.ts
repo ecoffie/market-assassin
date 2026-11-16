@@ -31,6 +31,7 @@ import {
   canonicalDecision, entitlementStateFor, sourceCategory, type Capability, type EntitlementSource,
 } from '../src/lib/entitlements/policy';
 import { ADVOCATE_ACCOUNTS } from '../src/lib/mindy/advocate-accounts';
+import { shadowAccountIsPaying } from '../src/lib/entitlements/shadow-paying';
 import Stripe from 'stripe';
 import { readFileSync } from 'fs';
 import { classifyMembershipSubs, fetchMembershipSubs } from '../src/lib/entitlements/membership-reconciler';
@@ -233,7 +234,7 @@ async function main() {
       const n = used?.get(a.email) || 0;
       if (s.helper === 'none' && a.sources.length === 0 && n === 0) continue;
       const signature = [...new Set(a.sources.map(sourceCategory))].sort().join('+') || '(no source)';
-      const paying = a.sources.some((x) => !['mcp_credit_balance', 'staff', 'advocate', 'trial'].includes(x));
+      const paying = shadowAccountIsPaying(a.email, a.sources);
       const key = `${s.route}|${current}|${canon}|${signature}`;
       const row = agg.get(key) || { route: s.route, capability: s.capability, current: current ? 'ALLOW' : 'DENY', canonical: canon ? 'ALLOW' : 'DENY', signature, accounts: 0, usingIt: 0, paying: 0 };
       row.accounts++; if (n > 0) row.usingIt++; if (paying) row.paying++;

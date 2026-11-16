@@ -32,6 +32,32 @@ export const INTERNAL_CANARY_EMAILS = new Set([
 ]);
 
 /**
+ * Permanent INTERNAL TEST accounts: real logins the team uses to exercise production.
+ * They must never be counted as customers, sold to, or sent automated customer email
+ * (alerts, briefings, nudges, credit welcome). Deliberately an explicit list, not a
+ * staff-domain rule, so it does not depend on how staff identity is decided elsewhere.
+ *
+ * The list lives in the INTERNAL_TEST_EMAILS environment variable (comma-separated,
+ * server-side only), never in source: the repository is public. Unset = no test accounts.
+ * Read on every call so a test or a fresh deploy picks up the current value.
+ * Never add a card to these accounts: completing card setup enables auto-recharge.
+ */
+export function internalTestEmails(): Set<string> {
+  return new Set(
+    (process.env.INTERNAL_TEST_EMAILS || '')
+      .split(',')
+      .map((e) => e.toLowerCase().trim())
+      .filter(Boolean),
+  );
+}
+
+/** True for a permanent internal test account (see internalTestEmails). */
+export function isInternalTestAccount(email: string | null | undefined): boolean {
+  const normalized = (email || '').toLowerCase().trim();
+  return !!normalized && internalTestEmails().has(normalized);
+}
+
+/**
  * The full set of NON-CUSTOMER special accounts that must not be sold to OR
  * counted as customers: comp/testimonial demo accounts + advocates + partner
  * contacts + internal billing-canary accounts. Per Eric's model, advocates ARE partners and vice-versa, so the two
@@ -43,6 +69,7 @@ export function isSpecialAccount(email: string | null | undefined): boolean {
   return (
     COMP_TESTIMONIAL_EMAILS.has(normalized) ||
     INTERNAL_CANARY_EMAILS.has(normalized) ||
+    isInternalTestAccount(normalized) ||
     isAdvocateAccount(normalized) ||
     isPartnerContactEmail(normalized)
   );

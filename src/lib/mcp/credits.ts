@@ -10,6 +10,7 @@
 import type { OutcomeTelemetry } from '@/lib/mcp/call-outcome';
 import { getWriteClient } from '@/lib/supabase/server-clients';
 import { sendCreditWelcomeEmail } from './credit-emails';
+import { isInternalTestAccount } from '@/lib/mindy/campaign-exclusions';
 
 /**
  * Free credits granted ONE-TIME on a user's FIRST connection (first key or first
@@ -272,7 +273,8 @@ export async function grantSignupCreditsIfFirst(
   // re-send it every time the user reconnects. Never blocks the grant.
   // The registration path (registration-grant.ts) passes sendWelcome:false: the current welcome copy is
   // written for MCP ("free MCP credits") and a Maps/App registrant would get a misleading email.
-  if (granted > 0 && opts.sendWelcome !== false) {
+  // Internal test accounts get the credits but never the customer welcome email.
+  if (granted > 0 && opts.sendWelcome !== false && !isInternalTestAccount(email)) {
     await sendCreditWelcomeEmail({ email, credits: granted }).catch(() => {});
   }
   return granted;

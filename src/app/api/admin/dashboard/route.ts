@@ -1880,8 +1880,8 @@ async function getBetaHealth() {
 
     const activeSettings = settings.filter(user => user.is_active !== false && user.alerts_enabled !== false);
     const completedProfiles = activeSettings.filter(user => (user.naics_codes || []).length > 0);
-    const weeklyActiveEmails = new Set(engagement7d.map(row => row.user_email).filter(Boolean) as string[]);
-    const dailyActiveEmails = new Set(engagementToday.map(row => row.user_email).filter(Boolean) as string[]);
+    const weeklyActiveEmails = new Set(engagement7d.map(row => row.user_email).filter((e): e is string => Boolean(e) && !isExcludedFromMetrics(e)));
+    const dailyActiveEmails = new Set(engagementToday.map(row => row.user_email).filter((e): e is string => Boolean(e) && !isExcludedFromMetrics(e)));
     const firstClickEmails = new Set(
       engagement7d
         .filter(row => row.event_type === 'link_click')

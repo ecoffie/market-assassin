@@ -14,6 +14,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const SHOP_ADMIN_PASSWORD = 'admin123'; // shop uses different password
@@ -92,14 +93,14 @@ async function readAllRows<T>(
   const shopPurchasesPromise = fetchShopPurchases();
 
   // Get leads (free users)
-  const { data: leads, error: leadsError } = await readAllRows<Record<string, unknown>>((from, to) => getSupabase()
+  const { data: leadsRaw, error: leadsError } = await readAllRows<Record<string, unknown>>((from, to) => getSupabase()
     .from('leads')
     .select('email, name, company, source, resources_accessed, created_at')
     .order('created_at', { ascending: false })
     .range(from, to));
 
   // Get user_profiles (paying customers)
-  const { data: profiles, error: profilesError } = await readAllRows<Record<string, unknown>>((from, to) => getSupabase()
+  const { data: profilesRaw, error: profilesError } = await readAllRows<Record<string, unknown>>((from, to) => getSupabase()
     .from('user_profiles')
     .select('email, access_hunter_pro, access_assassin_standard, access_assassin_premium, access_recompete, access_contractor_db, access_content_standard, access_content_full_fix, access_briefings, created_at')
     .order('created_at', { ascending: false })
@@ -123,13 +124,13 @@ async function readAllRows<T>(
   // dropped) → these counts were always 0. Read the REAL table once and derive both.
   // tasks/smart-profile-dead-table-findings.md. (Read-only admin counts — NOT reviving
   // the retired alerts subsystem; those enroll/seed routes stay dead.)
-  const { data: briefingProfiles, error: bpError } = await readAllRows<Record<string, unknown>>((from, to) => getSupabase()
+  const { data: briefingProfilesRaw, error: bpError } = await readAllRows<Record<string, unknown>>((from, to) => getSupabase()
     .from('user_notification_settings')
     .select('user_email, naics_codes, agencies, created_at')
     .order('created_at', { ascending: false })
     .range(from, to));
 
-  const { data: alertSettings, error: asError } = await readAllRows<Record<string, unknown>>((from, to) => getSupabase()
+  const { data: alertSettingsRaw, error: asError } = await readAllRows<Record<string, unknown>>((from, to) => getSupabase()
     .from('user_notification_settings')
     .select('user_email, naics_codes, business_type, is_active, total_alerts_sent, created_at')
     .eq('alerts_enabled', true)
@@ -137,11 +138,21 @@ async function readAllRows<T>(
     .range(from, to));
 
   // Get unique users from search history (OH users who searched)
-  const { data: searchUsers, error: suError } = await readAllRows<{ user_email: string | null; tool: string; search_type: string }>((from, to) => getSupabase()
+  const { data: searchUsersRaw, error: suError } = await readAllRows<{ user_email: string | null; tool: string; search_type: string }>((from, to) => getSupabase()
     .from('user_search_history')
     .select('user_email, tool, search_type')
     .order('created_at', { ascending: false })
     .range(from, to));
+
+  // Comp, advocate, partner, canary and internal test accounts are not customers:
+  // drop them before anything below counts or lists users.
+  const isCustomerRow = (r: { email?: unknown; user_email?: unknown }) =>
+    !isExcludedFromMetrics(String(r.email ?? r.user_email ?? ''));
+  const leads = leadsRaw?.filter(isCustomerRow);
+  const profiles = profilesRaw?.filter(isCustomerRow);
+  const briefingProfiles = briefingProfilesRaw?.filter(isCustomerRow);
+  const alertSettings = alertSettingsRaw?.filter(isCustomerRow);
+  const searchUsers = searchUsersRaw?.filter(isCustomerRow);
 
   // Dedupe search users
   const uniqueSearchUsers = new Map<string, { tools: Set<string>, searches: number }>();
