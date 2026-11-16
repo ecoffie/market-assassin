@@ -24,7 +24,7 @@ import {
   type IncumbentFinding,
   type SolicitationIncumbentResult,
 } from '@/lib/usaspending/solicitation-incumbent';
-import { OPPORTUNITY_COLUMNS, type OpportunityRecord } from './card-chat';
+import { OPPORTUNITY_COLUMNS, describeDeadline, type OpportunityRecord } from './card-chat';
 
 /** The card columns plus what the buyer/contact facts read. */
 export const SELECTED_NOTICE_COLUMNS = `${OPPORTUNITY_COLUMNS},agency_hierarchy,office_address,points_of_contact`;
@@ -187,4 +187,63 @@ export function formatSelectedNoticeFacts(f: SelectedNoticeFacts): string[] {
     }
   }
   return lines;
+}
+
+// ── Manual Drive "solicitation facts" (Step 7) ─────────────────────────────────────────────────────────────
+// Proposal AI recomputes the facts Ask Mindy found from the pursuit's notice_id with the SAME functions:
+// nothing is copied or stored. No notice text or SOW here (Manual Drive already has the pursuit documents).
+
+/** The record fields the facts block reads (no description/SOW). */
+export const SOLICITATION_FACT_COLUMNS =
+  'notice_id,title,solicitation_number,department,sub_tier,office,notice_type,set_aside_description,naics_code,psc_code,posted_date,response_deadline,pop_city,pop_state,ui_link,active,agency_hierarchy,office_address,points_of_contact';
+
+/** The compact block Manual Drive puts beside the requirements. Absent fields are said to be absent. */
+export function formatSolicitationFactsBlock(rec: SelectedNoticeRecord, facts: SelectedNoticeFacts): string {
+  const v = (s: string | null | undefined) => (s && String(s).trim() ? String(s).trim() : 'not stated in the record');
+  const sol = rec.solicitation_number || rec.notice_id;
+  return [
+    `SOLICITATION FACTS (recomputed by Mindy from SAM.gov notice ${sol} and its incumbent lookup; cite as "SAM.gov notice ${sol}"):`,
+    `Title: ${v(rec.title)}`,
+    `Solicitation number: ${v(rec.solicitation_number)}`,
+    `Agency: ${v([rec.department, rec.sub_tier].filter(Boolean).join(' / '))}`,
+    `Notice type: ${v(rec.notice_type)}`,
+    `Set-aside: ${v(rec.set_aside_description)}`,
+    `NAICS: ${v(rec.naics_code)} · PSC: ${v(rec.psc_code)}`,
+    `Response deadline: ${v(describeDeadline(rec.response_deadline))}`,
+    `Place of performance: ${v([rec.pop_city, rec.pop_state].filter(Boolean).join(', '))}`,
+    ...formatSelectedNoticeFacts(facts),
+  ].join('\n');
+}
+
+export type FactsDb = {
+  from(table: string): {
+    select(cols: string): {
+      eq(col: string, val: string): { maybeSingle(): PromiseLike<{ data: unknown; error: { message?: string } | null }> };
+    };
+  };
+};
+
+/**
+ * Load the facts block for a notice id. null when the notice is not in Mindy's records or the read fails
+ * (the caller answers without the block; never a guessed record).
+ */
+export async function loadSolicitationFactsBlock(
+  db: FactsDb,
+  noticeId: string,
+  opts: Parameters<typeof loadSelectedNoticeFacts>[1] = {},
+): Promise<{ block: string; noticeId: string; label: string; finding: IncumbentFacts['finding'] } | null> {
+  const { data, error } = await db.from('sam_opportunities').select(SOLICITATION_FACT_COLUMNS).eq('notice_id', noticeId).maybeSingle();
+  if (error) {
+    console.error('[solicitation-facts] notice read failed:', error.message);
+    return null;
+  }
+  if (!data) return null;
+  const rec = data as SelectedNoticeRecord;
+  const facts = await loadSelectedNoticeFacts(rec, opts);
+  return {
+    block: formatSolicitationFactsBlock(rec, facts),
+    noticeId: rec.notice_id,
+    label: `SAM.gov notice ${rec.solicitation_number || rec.notice_id}`,
+    finding: facts.incumbent.finding,
+  };
 }
