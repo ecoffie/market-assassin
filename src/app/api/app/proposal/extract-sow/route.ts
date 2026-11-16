@@ -17,6 +17,7 @@ import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { isProEmail, proRequiredResponse } from '@/lib/access/require-pro';
 import { createClient } from '@supabase/supabase-js';
+import { authorizePursuitRead } from '@/lib/proposal/pursuit-access';
 import { extractSow, buildClinScope } from '@/lib/proposal/sow-extraction';
 
 export const runtime = 'nodejs';
@@ -63,6 +64,13 @@ export async function POST(request: NextRequest) {
   let clinScope: { title: string; body: string; name: string } | null = null;
   if (pipelineId) {
     const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    // Pursuit documents are read with the service-role key: check access first.
+    const access = await authorizePursuitRead(sb, request, auth.session.email ?? '', pipelineId);
+    if (!access.ok) {
+      return access.reason === 'error'
+        ? NextResponse.json({ success: false, error: 'Could not load this pursuit. Try again.' }, { status: 503 })
+        : NextResponse.json({ success: false, error: 'Pursuit not found' }, { status: 404 });
+    }
     const { data: docs, error: docsErr } = await sb.from('pursuit_documents')
       .select('filename, doc_kind, extracted_text, char_count')
       .eq('pipeline_id', pipelineId)
