@@ -24,6 +24,8 @@ import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
 import { selectRelevantRfp } from '@/lib/proposal/select-relevant';
 import { authorizePursuitRead } from '@/lib/proposal/pursuit-access';
 import { loadSolicitationFactsBlock, type FactsDb } from '@/lib/chat/selected-notice';
+import { resolveChatActingScope, vaultEmailFor } from '@/lib/chat/chat-acting-scope';
+import type { BidderProfile, VaultContext } from '@/lib/proposal/types';
 
 // RAG-as-standard: Manual Drive answers are informed by Mindy's real proposal
 // corpus (winning technical/pricing/past-perf volumes, templates, cap
@@ -119,6 +121,13 @@ export async function POST(request: NextRequest) {
   // The proposal workspace is a Pro feature (owner decision 2026-11-13).
   if (!(await isProEmail(auth.session.email))) return proRequiredResponse();
 
+  // Coach Mode: whose Vault and profile ground this draft — the same binding Ask Mindy uses
+  // (src/lib/chat/chat-acting-scope.ts). Client scope → the active client's; unresolvable →
+  // NONE (never the coach's own while they work for a client); no header → the caller's own.
+  // Data only: budget checks and cost attribution below stay on the caller (`email`).
+  const actingScope = await resolveChatActingScope(auth.session.email ?? email, request);
+  const vaultEmail = vaultEmailFor(actingScope);
+
   const groqKey = process.env.GROQ_API_KEY;
   if (!groqKey) {
     return NextResponse.json({ success: false, error: 'GROQ_API_KEY not configured' }, { status: 500 });
@@ -169,12 +178,15 @@ export async function POST(request: NextRequest) {
         // a slice of the RFP so retrieval is relevant to what they're writing.
         const ragQuery = `${message}\n${rfpText.slice(0, 1500)}`.trim();
         const [profile, vault, ragChunks, solFacts] = await Promise.all([
-          loadBidderProfile(email),
+          vaultEmail ? loadBidderProfile(vaultEmail) : Promise.resolve({} as BidderProfile),
           // A general Vault read: identity, past performance, capabilities AND team. 'exec_summary'
           // alone never loaded capabilities or team, although this comment used to claim it did
           // (parity audit 2026-11-16). Manual Drive is a writing workspace, so it preloads the set
           // (default row caps); Ask Mindy retrieves instead (src/lib/chat/vault-retrieval.ts).
-          loadVaultContext(email, 'exec_summary', { sections: ALL_VAULT_SECTIONS }),
+          // vaultEmail follows the acting scope (null = unresolved → empty, never the coach's own).
+          vaultEmail
+            ? loadVaultContext(vaultEmail, 'exec_summary', { sections: ALL_VAULT_SECTIONS })
+            : Promise.resolve({ has_any: false } as VaultContext),
           retrieveRagContext({ query: ragQuery, docTypes: PROPOSAL_DOC_TYPES, limit: 4, maxChars: 3000, maxPerDoc: 1 })
             .catch(() => []),
           // Solicitation facts from the pursuit's notice_id: buyer/DoDAAC/contact + the incumbent finding,
@@ -189,7 +201,7 @@ export async function POST(request: NextRequest) {
         const ragBlock = formatChunksForPrompt(ragChunks);
         const sources: string[] = [];
         if (rfpText) sources.push(rfpFileName || 'Uploaded RFP');
-        if (vault.has_any) sources.push('Your Vault (profile, past performance, capabilities, team)');
+        if (vault.has_any) sources.push(actingScope.kind === 'client' ? "This client's Vault (profile, past performance, capabilities, team)" : 'Your Vault (profile, past performance, capabilities, team)');
         if (cachedRequirements.length) sources.unshift(`${cachedRequirements.length} extracted requirements (cached matrix)`);
         if (solFacts) sources.push(`Solicitation facts (${solFacts.label}, buyer and incumbent lookup)`);
         if (ragChunks.length) sources.push(`Proposal corpus (${ragChunks.length} winning-volume references)`);
