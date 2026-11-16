@@ -24,6 +24,7 @@
 
 import { getVocabularyForCodes } from '@/lib/market/vocabulary';
 import { normalizeStateCode } from '@/lib/utils/us-states';
+import { placeOfPerformanceWinsExpr, performedOutsideRegion } from '@/lib/discovery/apply';
 
 // Structural subset of the Supabase query builder these tools use. Kept minimal
 // so tests can pass a stub without importing the real client.
@@ -71,7 +72,7 @@ export const TIER1_TOOL_DEFS = [
           },
           state: {
             type: 'string',
-            description: 'Optional state to filter by location — matches place of performance OR the buying office (SAM often omits place-of-performance, so office state is included for coverage). Accepts a 2-letter code ("FL"), a full name ("Florida") or a comma-separated list ("VA,MD,DC", OR). An unrecognized state returns an error instead of searching every state.',
+            description: 'Optional state to filter by location — uses the place of performance when the notice states one; only when it is missing does the buying office\'s state count (SAM omits place of performance on many notices). Work performed in another state is never returned. Accepts a 2-letter code ("FL"), a full name ("Florida") or a comma-separated list ("VA,MD,DC", OR). An unrecognized state returns an error instead of searching every state.',
           },
           limit: {
             type: 'number',
@@ -259,9 +260,8 @@ export function makeTier1Tools(db: Tier1Db) {
     const limit = resolveSamLimit(args?.limit);
     const offset = resolveSamOffset(args?.offset);
     const fetchN = offset + limit + 1;
-    // Location: match place-of-performance OR buying-office state. SAM omits
-    // pop_state on ~64% of rows, so office_address.state widens coverage. A
-    // state arg that doesn't resolve to a real code is ignored (still search).
+    // Location: place of performance when stated; the buying office's state only when it is not (SAM omits
+    // pop_state on ~64% of rows, so the office fallback keeps coverage without admitting out-of-state work).
     // One state or a list ("VA, MD and DC" / array). An unrecognized state is an error: dropping
     // it would silently search every state and present that as the asked-for location.
     const stateTokens = (Array.isArray(args?.state) ? args.state : typeof args?.state === 'string' ? [args.state] : [])
@@ -306,7 +306,13 @@ export function makeTier1Tools(db: Tier1Db) {
         x = x.or(naicsCodes.map((c) => (c.length < 6 ? `naics_code.like.${c}%` : `naics_code.eq.${c}`)).join(','));
       }
       if (setAsideCodes) x = x.in('set_aside_code', setAsideCodes);
-      if (stateCodes.length) x = x.or(stateCodes.flatMap((st) => [`pop_state.eq.${st}`, `office_address->>state.eq.${st}`]).join(','));
+      if (stateCodes.length) {
+        // Same rule as find_opportunities / Ask Mindy (#2076): place of performance wins; the buying office's
+        // state counts only when the notice has no place of performance. Two .or() groups AND together:
+        // (pop ∈ S OR office ∈ S) AND (pop IS NULL OR pop ∈ S)  ≡  pop ∈ S OR (pop IS NULL AND office ∈ S).
+        x = x.or(stateCodes.flatMap((st) => [`pop_state.eq.${st}`, `office_address->>state.eq.${st}`]).join(','));
+        x = x.or(placeOfPerformanceWinsExpr(stateCodes)!);
+      }
       return x;
     };
 
@@ -346,6 +352,8 @@ export function makeTier1Tools(db: Tier1Db) {
       for (const r of parts) {
         const k = rowKey(r);
         if (seen.has(k)) continue;
+        // Belt and braces for the database rule above: never return work performed outside the asked states.
+        if (performedOutsideRegion(r.pop_state, stateCodes)) continue;
         seen.add(k);
         out.push(r);
         if (out.length >= fetchN) break;
@@ -394,7 +402,7 @@ export function makeTier1Tools(db: Tier1Db) {
         limit,
         note: `No open SAM opportunities matched "${keyword}"${naicsCodes.length ? ` in NAICS ${naicsCodes.join(', ')}` : ''}${
           setAsideCodes ? ` with set-aside ${setAside} (${setAsideCodes.join('/')})` : ''
-        }${stateCodes.length ? ` in ${stateCodes.join(', ')} (place of performance or buying office)` : ''} right now.`,
+        }${stateCodes.length ? ` in ${stateCodes.join(', ')} (place of performance, or the buying office when none is stated)` : ''} right now.`,
       };
     }
     const page = rows.slice(offset, offset + limit);
