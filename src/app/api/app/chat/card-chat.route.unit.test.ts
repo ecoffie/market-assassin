@@ -483,6 +483,17 @@ describe('main chat with a selected notice (Eric 2026-11-16: no card-chat flag)'
     }
   });
 
+  it('D1: add/save/track requests are pointed at Save or "Generate proposal", never a bare "I can\'t"', async () => {
+    await post({ ...selected, message: 'Add this to my pipeline' });
+    for (const msgs of [state.plannerMessages[0], state.answerMessages[0]]) {
+      const sys = msgs.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
+      expect(sys).toContain('ADD / SAVE / TRACK requests');
+      expect(sys).toContain('the Save button on the opportunity\'s map card');
+      expect(sys).toContain('"Generate proposal"');
+      expect(sys).toContain('do NOT stop at "I can\'t"');
+    }
+  });
+
   it('flag off: the full tool set, no card turn claimed, nothing charged', async () => {
     await post(selected);
     expect(state.allowedToolNames).toBeNull();

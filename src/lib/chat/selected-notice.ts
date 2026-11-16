@@ -119,12 +119,43 @@ const NOT_CHECKED: IncumbentFacts = {
 
 export type IncumbentResolver = (noticeId: string) => Promise<SolicitationIncumbentResult>;
 
+// E1 (review 2026-11-16): the incumbent lookup (~2s on the live record) would rerun on every turn while a
+// notice stays selected. Cache the FINDING per conversation + notice, in memory (per server instance; a miss
+// just recomputes). No table. 'not_checked' (timeout/error) is never cached, so the next turn retries.
+const INCUMBENT_TTL_MS = 30 * 60 * 1000;
+const INCUMBENT_CACHE_MAX = 500;
+const incumbentCache = new Map<string, { at: number; facts: IncumbentFacts }>();
+
+/** Test hook. */
+export function clearIncumbentCache(): void { incumbentCache.clear(); }
+
+function cachedIncumbent(key: string, now: number): IncumbentFacts | null {
+  const hit = incumbentCache.get(key);
+  if (!hit) return null;
+  if (now - hit.at > INCUMBENT_TTL_MS) { incumbentCache.delete(key); return null; }
+  return hit.facts;
+}
+
+function rememberIncumbent(key: string, facts: IncumbentFacts, now: number): void {
+  if (facts.finding === 'not_checked') return;
+  if (incumbentCache.size >= INCUMBENT_CACHE_MAX) {
+    const oldest = incumbentCache.keys().next().value;
+    if (oldest !== undefined) incumbentCache.delete(oldest);
+  }
+  incumbentCache.set(key, { at: now, facts });
+}
+
 /** Buyer facts + the incumbent finding, the incumbent bounded by `timeoutMs` (unknown on timeout/error). */
 export async function loadSelectedNoticeFacts(
   rec: SelectedNoticeRecord,
-  opts: { timeoutMs?: number; resolveIncumbent?: IncumbentResolver } = {},
+  opts: { timeoutMs?: number; resolveIncumbent?: IncumbentResolver; cacheKey?: string; now?: () => number } = {},
 ): Promise<SelectedNoticeFacts> {
   const buyer = noticeBuyerFacts(rec);
+  const now = opts.now ?? Date.now;
+  // The key always includes the notice id, so a different notice in the same conversation never reuses it.
+  const key = opts.cacheKey ? `${opts.cacheKey}|${rec.notice_id}` : null;
+  const cached = key ? cachedIncumbent(key, now()) : null;
+  if (cached) return { ...buyer, incumbent: cached };
   const resolve = opts.resolveIncumbent ?? resolveSolicitationIncumbent;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const incumbent = await Promise.race([
@@ -132,6 +163,7 @@ export async function loadSelectedNoticeFacts(
     new Promise<IncumbentFacts>((r) => { timer = setTimeout(() => r(NOT_CHECKED), opts.timeoutMs ?? 4000); }),
   ]);
   clearTimeout(timer);
+  if (key) rememberIncumbent(key, incumbent, now());
   return { ...buyer, incumbent };
 }
 

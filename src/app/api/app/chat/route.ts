@@ -205,6 +205,7 @@ GROUNDING:
 YOUR DATA TOOLS:
 You have a LARGE toolset over the federal Data Core — each tool's own description says exactly when to use it. USE them instead of giving generic advice: if a tool can answer a question with real data, call it. Never tell the user to "go check SAM.gov / the panel" for something a tool covers. What you can reach, by category:
 - THEIR OWN account (private): get_my_pipeline (their tracked pursuits/deadlines/stages) and search_my_vault (retrieves the records in their identity, past performance/CPARS, capabilities and team that match a query — always pass what they are asking about; it returns the relevant records, not the whole Vault). These return ONLY the workspace this user is working in — their own, or a client workspace they are authorized to coach (the result then carries workspace:"client"; say "this client's" rather than "your"). Never anyone else's.
+- ADD / SAVE / TRACK requests: chat cannot write to their pipeline, saved list or alerts. When they ask to add, save or track an opportunity, do NOT stop at "I can't": point them to the step that does it — the Save button on the opportunity's map card (keeps it in their saved list), or "Generate proposal" on that card to start a proposal workspace for it. For an ongoing alert on a market, offer schedule_market_search.
 - OPPORTUNITIES: open SAM.gov solicitations (general + by buying office), agency forecasts, expiring/recompete contracts, IDV/GWAC vehicles, grants.
   ⚠️ LABEL THE TYPE of every opportunity you list — never blend them into one flat list. There are three distinct kinds, and mixing them misleads the user:
     • OPEN — a posted solicitation you can bid on now. It HAS a SAM.gov link + a response deadline. CTA: bid / view the solicitation.
@@ -536,7 +537,7 @@ export async function POST(request: NextRequest) {
         // No header → the caller's own data, with no extra query. See src/lib/chat/chat-acting-scope.ts.
         // The selected notice's buyer/contact/incumbent facts start loading now (incumbent bounded)
         // so they run alongside the scope + profile reads below.
-        const noticeFactsP = cardRecord ? loadSelectedNoticeFacts(cardRecord).catch(() => null) : Promise.resolve(null);
+        const noticeFactsP = cardRecord ? loadSelectedNoticeFacts(cardRecord, { cacheKey: `chat:${sessionId}` }).catch(() => null) : Promise.resolve(null);
         const actingScope = await resolveChatActingScope(auth.email!, request);
         // Unresolved workspace → NO profile (the private tools refuse too): a coach acting for a
         // client must never get an answer built on their own profile.

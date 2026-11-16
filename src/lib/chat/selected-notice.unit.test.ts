@@ -5,7 +5,7 @@ vi.mock('@/lib/usaspending/solicitation-incumbent', async (orig) => ({
   resolveSolicitationIncumbent: vi.fn(async () => { throw new Error('network is not used in unit tests'); }),
 }));
 
-import { noticeBuyerFacts, incumbentFactsFromResult, loadSelectedNoticeFacts, formatSelectedNoticeFacts, type SelectedNoticeRecord } from './selected-notice';
+import { noticeBuyerFacts, incumbentFactsFromResult, loadSelectedNoticeFacts, formatSelectedNoticeFacts, clearIncumbentCache, type SelectedNoticeRecord } from './selected-notice';
 import { INCUMBENT_ABSENCE_NOTES, type SolicitationIncumbentResult } from '@/lib/usaspending/solicitation-incumbent';
 
 // The SPRPA127RUA05 shape from the parity audit: `office` is null, the buyer lives in the hierarchy.
@@ -95,5 +95,43 @@ describe('formatSelectedNoticeFacts', () => {
     expect(lines).toContain('Office DoDAAC: SPRPA1');
     expect(lines).toContain('search_federal_contacts');
     expect(lines).toContain('Notice point of contact: Keli Barish, KELI.BARISH@DLA.MIL');
+  });
+});
+
+describe('incumbent cache (E1): per conversation + notice, in memory', () => {
+  it('a second turn in the same conversation reuses the finding (no second lookup)', async () => {
+    clearIncumbentCache();
+    const resolve = vi.fn(async () => result('candidate_not_confirmed', { prior_awards: [award as never] }));
+    await loadSelectedNoticeFacts(SPRPA, { resolveIncumbent: resolve, cacheKey: 'chat:s1' });
+    const again = await loadSelectedNoticeFacts(SPRPA, { resolveIncumbent: resolve, cacheKey: 'chat:s1' });
+    expect(resolve).toHaveBeenCalledTimes(1);
+    expect(again.incumbent.finding).toBe('candidate_not_confirmed');
+  });
+  it('another conversation, another notice, or no key → its own lookup', async () => {
+    clearIncumbentCache();
+    const resolve = vi.fn(async () => result('not_found'));
+    await loadSelectedNoticeFacts(SPRPA, { resolveIncumbent: resolve, cacheKey: 'chat:s1' });
+    await loadSelectedNoticeFacts(SPRPA, { resolveIncumbent: resolve, cacheKey: 'chat:s2' });
+    await loadSelectedNoticeFacts({ ...SPRPA, notice_id: 'b'.repeat(32) } as SelectedNoticeRecord, { resolveIncumbent: resolve, cacheKey: 'chat:s1' });
+    await loadSelectedNoticeFacts(SPRPA, { resolveIncumbent: resolve });
+    expect(resolve).toHaveBeenCalledTimes(4);
+  });
+  it('a timeout/error (not_checked) is not cached; the next turn retries', async () => {
+    clearIncumbentCache();
+    const failing = vi.fn(async () => { throw new Error('down'); });
+    await loadSelectedNoticeFacts(SPRPA, { resolveIncumbent: failing, cacheKey: 'chat:s1' });
+    const ok = vi.fn(async () => result('not_found'));
+    const f = await loadSelectedNoticeFacts(SPRPA, { resolveIncumbent: ok, cacheKey: 'chat:s1' });
+    expect(ok).toHaveBeenCalledTimes(1);
+    expect(f.incumbent.finding).toBe('not_found');
+  });
+  it('expires after 30 minutes', async () => {
+    clearIncumbentCache();
+    let t = 1_000_000;
+    const resolve = vi.fn(async () => result('not_found'));
+    await loadSelectedNoticeFacts(SPRPA, { resolveIncumbent: resolve, cacheKey: 'chat:s1', now: () => t });
+    t += 31 * 60 * 1000;
+    await loadSelectedNoticeFacts(SPRPA, { resolveIncumbent: resolve, cacheKey: 'chat:s1', now: () => t });
+    expect(resolve).toHaveBeenCalledTimes(2);
   });
 });
