@@ -55,6 +55,7 @@ import { inferredCodeDisclosure } from '@/lib/chat/code-disclosure';
 import { getNaics } from '@/lib/codes/lookup';
 import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
 import { guardUnstatedStates, guardUnstatedCities } from '@/lib/chat/stated-filters';
+import { parseDisplayHint, displayHintNote } from '@/lib/chat/display-hint';
 import { compileIntent, enforceIntent, dedupeToolCalls, isMapScopeNote, splitViewPreamble } from '@/lib/chat/intent-compiler';
 import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, renderSbloContact, lintAnalysis, deterministicNextSteps, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, SBLO_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
@@ -124,6 +125,8 @@ interface ChatRequest {
   turn_id?: string;
   /** Card chat: return the saved answer for turn_id if there is one; never run the model. */
   replay_only?: boolean;
+  /** How the surface shows the answer ('narrow_panel' = the Map drawer). A system note, never user text. */
+  display?: string;
 }
 
 // Retained only for the `chat_messages.cited_sources` column shape — Ask Mindy
@@ -551,8 +554,10 @@ export async function POST(request: NextRequest) {
         const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace('{today}', today).replace('{userProfile}', userProfileBlock)
           + (cardCtx ? '' : `\n\n${CURRENT_FIND_CHAT_CONTRACT}`);
 
+        // Presentation hint from the asking surface (src/lib/chat/display-hint.ts): answer prompt only.
+        const displayNote = displayHintNote(parseDisplayHint(body.display));
         const messages: Array<{ role: string; content: string }> = [
-          { role: 'system', content: systemPrompt },
+          { role: 'system', content: displayNote ? `${systemPrompt}\n\n${displayNote}` : systemPrompt },
         ];
         // Card chat: the selected opportunity, loaded from our record, as a labeled source block.
         const cardContext = cardRecord
