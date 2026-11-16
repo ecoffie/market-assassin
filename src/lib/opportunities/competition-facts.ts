@@ -181,3 +181,19 @@ export function competitionCounts(facts: Iterable<CompetitionFacts>): Record<Com
   for (const f of facts) c[f.class] += 1;
   return c;
 }
+
+/**
+ * Stable order for returned rows: within each evidence class (the order classes already arrive in is kept),
+ * competed and not-established rows first, then rows whose current award was not competed. Nothing is
+ * dropped and no other reordering happens.
+ */
+export function orderCompetedFirst<T extends { evidence_class?: string; competition?: { class?: string } | null }>(items: T[]): T[] {
+  const classRank = new Map<string, number>();
+  items.forEach((it) => { const k = it.evidence_class ?? ''; if (!classRank.has(k)) classRank.set(k, classRank.size); });
+  const restricted = (it: T) => (it.competition?.class === 'not_competed' ? 1 : 0);
+  return items
+    .map((it, i) => ({ it, i }))
+    .sort((a, b) => classRank.get(a.it.evidence_class ?? '')! - classRank.get(b.it.evidence_class ?? '')!
+      || restricted(a.it) - restricted(b.it) || a.i - b.i)
+    .map((x) => x.it);
+}

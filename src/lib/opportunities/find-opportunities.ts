@@ -69,7 +69,7 @@ import {
 } from '@/lib/opportunities/match-evidence';
 // IMI Workstream C (2026-09-22): region (multi-state) + acquisition-stage intent.
 import { normalizeStateCode } from '@/lib/utils/us-states';
-import { competitionFactsFor, competitionCounts, usaspendingCompetitionLookup, type CompetitionLookup, type CompetitionClass, type CompetitionFacts } from './competition-facts';
+import { competitionFactsFor, competitionCounts, orderCompetedFirst, usaspendingCompetitionLookup, type CompetitionLookup, type CompetitionClass, type CompetitionFacts } from './competition-facts';
 import {
   parseStageGroup,
   stageOrExpr,
@@ -318,7 +318,7 @@ export const HOST_RULES_FIND_FIRST_VALUE = [
   'INTERPRETATION: use presentation_note / market_interpretation.truth. A buyer alias (an acronym or short name resolved to the full agency name) is spelling, not a wider department. Never say you searched the whole parent department. Never claim a broader related market is the requested capability.',
   'COMING SOON UNAVAILABLE: if coming_soon status is unavailable because this buyer has no forecast publisher, that is coverage not established — not a measured zero. Do not invent forecast rows from parent-department feeds.',
   'COMING SOON PARTIAL: if coming_soon status is partial, its count covers only the buyers with a forecast publisher. Name the buyers listed in coverage.gaps as not measured — never say they have zero upcoming buys.',
-  'COMPETITION: a Coming back item may carry `competition`, read from that award\'s own USASpending record. Use competition.label for how the current award was made, in preference to set_aside_type. not_competed rows (for example "Not competed · AbilityOne" or "8(a) sole source") are not equally realistic targets: rank them after competed and not-established rows and say why in plain words (an AbilityOne award goes to a nonprofit that employs people with disabilities without competition; an 8(a) sole-source award goes to one 8(a) firm without competition). unknown means not established: say "not established", never "full and open". competition describes the CURRENT award only; never say the follow-on cannot be won.',
+  'COMPETITION: a Coming back item may carry `competition`, read from that award\'s own USASpending record. Use competition.label for how the current award was made, in preference to set_aside_type. not_competed rows (for example "Not competed · AbilityOne" or "8(a) sole source") are not equally realistic targets: rank them after competed and not-established rows in every list, short list or table (items already arrive in that order; never open a list with a not-competed row), and say why in plain words (an AbilityOne award goes to a nonprofit that employs people with disabilities without competition; an 8(a) sole-source award goes to one 8(a) firm without competition). unknown means not established: say "not established", never "full and open". competition describes the CURRENT award only; never say the follow-on cannot be won.',
   'HOLDER_SIGNAL: a Coming back row labelled HOLDER_SIGNAL matched only on the incumbent\'s NAME (the company name contains the search words). It is NOT a direct match and NOT demand for this work — never count it with DIRECT_MATCH. At most say the holder\'s name suggests related work worth checking; the contract itself (see naics_code / psc_code) may be something else entirely.',
 ] as const;
 
@@ -1154,6 +1154,10 @@ async function queryComingBack(
         if (f) { it.competition = { class: f.class, label: f.label }; all.push(f); }
       }
       competitionCountsOut = competitionCounts(all);
+      // Within each evidence class, rows whose current award was competed (or not established) come before
+      // rows whose current award was not competed. Stable, so soonest-end order is kept inside each group.
+      // Why: answers list rows in tool order; a not-competed row ending soonest led the FL janitorial short list.
+      items.splice(0, items.length, ...orderCompetedFirst(items));
     }
 
     const note = related
