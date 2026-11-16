@@ -25,6 +25,7 @@ import { sendAppEngagement } from '@/components/app/track';
 import { getStoredPartnerRef } from '@/lib/mindy/partner-referral-client';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
 import { parseAppDeepLink } from '@/lib/app/deep-link-params';
+import { isMapShellPanel } from '@/lib/app/map-shell';
 
 /** The shared account-menu script (map + public pages) without its <script> wrapper. */
 const ACCOUNT_MENU_SCRIPT = ACCOUNT_MENU_JS.replace(/^<script>/, '').replace(/<\/script>[\s\S]*$/, '');
@@ -51,6 +52,7 @@ function DashboardLoading() {
 
 // Panels that may be deep-linked via ?panel=<id>. Keep in sync with AppPanel.
 const KNOWN_PANELS = new Set<AppPanel>([
+  'map', 'watchlist', 'saved',
   'chat', 'dashboard', 'alerts', 'market-intel', 'research', 'forecasts',
   'recompetes', 'contractors', 'decision-makers', 'pipeline', 'contacts',
   'team', 'settings', 'vault', 'library', 'knowledge-base', 'coach',
@@ -919,7 +921,8 @@ function AppDashboard() {
     const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
     const isReload = nav?.type === 'reload';
 
-    if (isReload) {
+    // A reload of the in-app map keeps its view: the URL mirrors the map's own (src/lib/app/map-shell.ts).
+    if (isReload && !isMapShellPanel(searchParams.get('panel'))) {
       setActivePanel('dashboard');
       activePanelRef.current = 'dashboard';
       if (typeof window !== 'undefined') {
@@ -1484,6 +1487,7 @@ function AppDashboard() {
   }
 
   // Logged in - show dashboard
+  const isMapShell = isMapShellPanel(activePanel);
   return (
     <div className="min-h-screen bg-ground-deep flex">
       {/* Interactive product tour — drives the app for new users. */}
@@ -1507,7 +1511,11 @@ function AppDashboard() {
 
 
       {/* Main Content */}
-      <main className="flex-1 min-h-screen overflow-y-auto overflow-x-hidden pb-24 md:pb-0 w-full min-w-0">
+      {/* The in-app map fills the viewport under the top bar: a fixed-height column, no page scroll
+          (the map scrolls its own list), so there are never two scrollbars. */}
+      <main className={isMapShell
+        ? 'flex-1 h-screen h-dvh flex flex-col overflow-hidden w-full min-w-0'
+        : 'flex-1 min-h-screen overflow-y-auto overflow-x-hidden pb-24 md:pb-0 w-full min-w-0'}>
         {/* Top Bar */}
         <header className="sticky top-0 z-30 bg-ground-deep/90 backdrop-blur border-b border-surface px-4 md:px-6 py-3 md:py-4">
           <div className="flex items-center justify-between gap-3">
@@ -1547,7 +1555,7 @@ function AppDashboard() {
 
         {/* Thin-profile nudge: users on generic-only codes get a one-line describe
             prompt → real keywords + sharper matches (reuses onboarding's describe path). */}
-        <CapabilityNudge email={email} />
+        {!isMapShell && <CapabilityNudge email={email} />}
 
         {/* Tabs for the active sidebar group (nav-groups.ts) — only when it has 2+ pages.
             Tab clicks use the same handlePanelChange as the sidebar. */}
@@ -1576,14 +1584,15 @@ function AppDashboard() {
           captures shouldn't require panel-hunting. */}
       {email && (
         <>
-          <button
+          {/* Hidden over the in-app map: it would sit on the map's own bottom List/Map toggle. */}
+          {!isMapShell && <button
             onClick={() => setIsVoiceCaptureOpen(true)}
             className="md:hidden fixed bottom-5 right-5 z-40 w-14 h-14 rounded-full bg-purple-600 hover:bg-purple-500 text-white shadow-2xl shadow-black/60 ring-4 ring-slate-950/70 flex items-center justify-center transition-transform active:scale-95"
             aria-label="Voice capture"
             title="Voice capture"
           >
             <Mic className="w-6 h-6" strokeWidth={1.75} />
-          </button>
+          </button>}
           <VoiceCaptureModal
             email={email}
             isOpen={isVoiceCaptureOpen}
