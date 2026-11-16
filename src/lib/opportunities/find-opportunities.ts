@@ -31,6 +31,7 @@ import {
   applyOpenPlan,
   applyRecompetePlan,
   applyForecastPlan,
+  performedOutsideRegion,
   rankRecords,
   matchesText,
   MCP_POLICY,
@@ -549,6 +550,17 @@ export function resolveRegion(input: Pick<FindOpportunitiesInput, 'location' | '
  */
 export const UNRESOLVED_REGION_SENTINEL = 'ZZ';
 
+/** The asked states as real codes (sentinel removed). [] = no location asked. */
+function regionCodes(p: InterpretedQuery): string[] {
+  return p.plan.states.filter((s) => s !== UNRESOLVED_REGION_SENTINEL);
+}
+
+/** Drop rows performed in another state/territory (place of performance known and not asked). */
+function inRegion<T extends Record<string, unknown>>(rows: T[], col: string, p: InterpretedQuery): T[] {
+  const codes = regionCodes(p);
+  return codes.length ? rows.filter((r) => !performedOutsideRegion(r[col], codes)) : rows;
+}
+
 export function mcpDiscoveryInput(input: FindOpportunitiesInput, anchor?: CompanyAnchor | null): DiscoveryInput {
   const exact = String(input.advanced?.keyword_exact || '').replace(/"/g, ' ').trim();
   const company = companyCodeRecall(anchor);
@@ -588,7 +600,7 @@ export function eligibilityLabel(plan: DiscoveryPlan): string {
 function consumedFor(plan: DiscoveryPlan, horizon: HorizonKey, stage: AcquisitionStageGroup | 'invalid' | null = null): string[] {
   const out = [`canonical_discovery:v${plan.version}`, `eligibility:${eligibilityLabel(plan)}`];
   if (plan.buyers.length) out.push(`agency→identity_words(${plan.buyers.map((b) => b.requested).join('|')})`);
-  if (plan.states.length) out.push(`location→${horizon === 'open_now' ? 'pop_or_office' : horizon === 'coming_back' ? 'place_of_performance_state' : 'pop_state'}(${plan.states.join('|')})`);
+  if (plan.states.length) out.push(`location→${horizon === 'open_now' ? 'pop_else_office' : horizon === 'coming_back' ? 'place_of_performance_state' : 'pop_state'}(${plan.states.join('|')})`);
   if (stage && stage !== 'invalid' && horizon === 'open_now') out.push(`stage→${stage}(notice_type·title_secondary)`);
   if (plan.setAsides.length) out.push(`set_aside→${plan.setAsides.join('|')}`);
   if (plan.naics.length) out.push(`naics→${plan.naics.join('|')}`);
@@ -635,7 +647,7 @@ function interpretQuery(input: FindOpportunitiesInput, company: CompanyAnchorRes
     region: resolveRegion(input),
     stage: parseStageGroup(input.stage),
     interpreted: {
-      open_now: `Canonical discovery (${plan.horizons.open.via}): ${elig}; buyer = whole-word identity on department OR sub_tier; geo = place-of-performance OR buying-office state; rank = evidence tier → breadth → score → deadline`,
+      open_now: `Canonical discovery (${plan.horizons.open.via}): ${elig}; buyer = whole-word identity on department OR sub_tier; geo = place-of-performance state, else buying-office state when none is recorded; rank = evidence tier → breadth → score → deadline`,
       coming_back: `Canonical discovery (${plan.horizons.recompete.via}): ${elig}; buyer = awarding_agency OR awarding_sub_agency identity; geo = place_of_performance_state; window ≤${recompeteMonths}mo`,
       coming_soon: `Canonical discovery (${plan.horizons.forecast.via}): ${elig}; agency = forecast identity codes; geo = pop_state; ${policy.forecast.includePastFiscalYears ? 'past fiscal years INCLUDED (opt-in)' : 'current + future fiscal years'}; unresolved publisher → unavailable, not zero`,
     },
@@ -854,7 +866,7 @@ async function queryOpenNow(
         .limit(fetchCap);
       if (!base.error) baseRows = (base.data || []) as Array<Record<string, unknown>>;
     }
-    const rows = unionRows(baseRows, (data || []) as Array<Record<string, unknown>>, 'notice_id');
+    const rows = inRegion(unionRows(baseRows, (data || []) as Array<Record<string, unknown>>, 'notice_id'), 'pop_state', p);
     if (!rows.length) {
       const e = emptyHorizon(source, OPEN_HANDOFFS, consumed, unsupported, asOf, stage ? `No matching open ${STAGE_GROUP_LABEL[stage]} notices under these filters.` : 'No matching open solicitations under these filters.', unmapped);
       return stageInfo ? { ...e, stage: { ...stageInfo, returned_by_signal: { structured_notice_type: 0, title_keyword: 0 } } } : e;
@@ -922,7 +934,7 @@ async function queryOpenNow(
       error: null,
       allowed_handoffs: OPEN_HANDOFFS,
       semantics_note:
-        'Canonical discovery eligibility (word-bounded). Ranked DIRECT_MATCH → RELATED_MARKET_CANDIDATE → other, then by how many of the query’s concepts a notice carries, then deadline. Geography: place of performance OR buying-office state.'
+        'Canonical discovery eligibility (word-bounded). Ranked DIRECT_MATCH → RELATED_MARKET_CANDIDATE → other, then by how many of the query’s concepts a notice carries, then deadline. Geography: place-of-performance state when SAM records one; the buying-office state only when it does not (work performed in another state or territory is never shown).'
         + (p.company ? ' Company-anchored: rows recalled only by the company’s registered PSC/NAICS rank after related-market rows and are never DIRECT_MATCH. eligibility is a separate screen.' : ''),
       evidence_counts,
       ...(p.company ? { eligibility_counts: eligibilityCounts(items, p.company) } : {}),
@@ -1027,7 +1039,7 @@ async function queryComingBack(
     }
     // Belt and braces: the same rule in JS (parseAwardLineage), so a row the SQL predicate let
     // through can still never become an individual Coming Back item.
-    const unioned = unionRows(baseRows, (data || []) as Array<Record<string, unknown>>, 'contract_id');
+    const unioned = inRegion(unionRows(baseRows, (data || []) as Array<Record<string, unknown>>, 'contract_id'), 'place_of_performance_state', p);
     const lineageOk = unioned.filter((r) => parseAwardLineage(r as { contract_id?: string; contract_type?: string }).award_kind !== 'order_under_vehicle');
     // The same award can sit under a legacy April id AND its CONT_AWD_ id (dedupe-orders.ts) —
     // e.g. definitive contract 36C10X23C0057. One award, one Coming Back item.
@@ -1204,7 +1216,7 @@ async function queryComingSoon(
       const base = await applyForecastPlan(client.from(source).select(COLS), p.basePlan).limit(Math.max(limit, 200));
       if (!base.error) baseRows = (base.data || []) as Row[];
     }
-    const all = unionRows(baseRows, (data || []) as Row[], 'id') as Row[];
+    const all = inRegion(unionRows(baseRows, (data || []) as Row[], 'id') as Row[], 'pop_state', p);
     const scores = new Map(rankRecords(p.plan, all, ['title', 'description', 'naics_description', 'department']).map((s) => [s.row, s]));
     const rows = [...all].sort((a, b) => {
       const bd = (scores.get(b)?.breadth ?? 0) - (scores.get(a)?.breadth ?? 0);
