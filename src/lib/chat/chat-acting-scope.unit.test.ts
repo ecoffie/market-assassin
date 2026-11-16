@@ -56,46 +56,69 @@ function stubDb(captured: { filters: Array<[string, string]> }, rows: unknown[] 
   return { from: () => ({ select: () => chain }) } as unknown as Tier0Db;
 }
 
+const noVault = () => ({ loadVault: vi.fn(), matchEvidence: vi.fn() }) as never;
 const clientScope: ChatActingScope = { kind: 'client', email: 'coach@firm.com', workspaceId: CLIENT_WS, vaultEmail: `${CLIENT_WS}@clients.getmindy.ai` };
 
 describe('Tier-0 tools in a client workspace', () => {
   it("get_my_pipeline reads the CLIENT workspace's rows only — never the coach's email", async () => {
     const captured = { filters: [] as Array<[string, string]> };
-    const tools = makeTier0Tools(stubDb(captured), clientScope, vi.fn());
+    const tools = makeTier0Tools(stubDb(captured), clientScope, noVault());
     const out = await tools.execute('get_my_pipeline', { email: 'victim@y.com' } as Record<string, unknown>);
     expect(captured.filters).toContainEqual(['workspace_id', CLIENT_WS]);
     expect(captured.filters.some(([c]) => c === 'user_email')).toBe(false);
     expect(out).toMatchObject({ ok: true, workspace: 'client', count: 1 });
   });
 
-  it("search_my_vault loads the CLIENT's Vault (its synthetic owner email), not the coach's", async () => {
-    const loadVault = vi.fn(async () => ({ has_any: true, identity: { company_name: 'Client Co' } }));
-    const tools = makeTier0Tools(stubDb({ filters: [] }), clientScope, loadVault as never);
-    const out = await tools.execute('search_my_vault', {});
-    expect(loadVault).toHaveBeenCalledWith(`${CLIENT_WS}@clients.getmindy.ai`, 'exec_summary');
-    expect(loadVault).not.toHaveBeenCalledWith('coach@firm.com', expect.anything());
-    expect(out).toMatchObject({ ok: true, workspace: 'client', has_any: true });
+  it("search_my_vault retrieves from the CLIENT's Vault (its synthetic owner email) — loader AND matcher — never the coach's", async () => {
+    const clientEmail = `${CLIENT_WS}@clients.getmindy.ai`;
+    const loadVault = vi.fn(async () => ({
+      has_any: true, identity: { company_name: 'Client Co' },
+      past_performance: [{ id: 'pp1', contract_title: 'Client Treasury IT', agency: 'Treasury' }],
+    }));
+    const matchEvidence = vi.fn(async () => [{ kind: 'past_performance' as const, id: 'pp1', score: 0.9 }]);
+    const tools = makeTier0Tools(stubDb({ filters: [] }), clientScope, { loadVault, matchEvidence } as never);
+    const out = await tools.execute('search_my_vault', { query: 'treasury', email: 'coach@firm.com' } as Record<string, unknown>);
+    expect(loadVault).toHaveBeenCalledWith(clientEmail);
+    expect(matchEvidence).toHaveBeenCalledWith(clientEmail, 'treasury');
+    expect(loadVault).not.toHaveBeenCalledWith('coach@firm.com');
+    expect(matchEvidence).not.toHaveBeenCalledWith('coach@firm.com', expect.anything());
+    expect(out).toMatchObject({ ok: true, workspace: 'client', has_any: true, mode: 'retrieved', matched: 1 });
+    expect((out.past_performance as Array<Record<string, unknown>>)[0]).toMatchObject({ contract_title: 'Client Treasury IT' });
+  });
+
+  it("an empty / non-matching client Vault is worded as this client's, not the coach's", async () => {
+    const empty = makeTier0Tools(stubDb({ filters: [] }), clientScope, { loadVault: vi.fn(async () => ({ has_any: false })), matchEvidence: vi.fn(async () => []) } as never);
+    expect(String((await empty.execute('search_my_vault', { query: 'x' })).note)).toMatch(/^This client's Vault is empty/);
+    const miss = makeTier0Tools(stubDb({ filters: [] }), clientScope, {
+      loadVault: vi.fn(async () => ({ has_any: true, past_performance: [{ id: 'pp1', contract_title: 'A' }] })),
+      matchEvidence: vi.fn(async () => []),
+    } as never);
+    const out = await miss.execute('search_my_vault', { query: 'cyber' });
+    expect(String(out.note)).toMatch(/Nothing in this client's Vault matches "cyber"/);
+    expect(out).toMatchObject({ workspace: 'client' });
   });
 
   it('own scope (plain email) is unchanged: user_email filter, own Vault, no workspace tag', async () => {
     const captured = { filters: [] as Array<[string, string]> };
     const loadVault = vi.fn(async () => ({ has_any: false }));
-    const tools = makeTier0Tools(stubDb(captured), 'owner@x.com', loadVault as never);
+    const tools = makeTier0Tools(stubDb(captured), 'owner@x.com', { loadVault, matchEvidence: vi.fn(async () => []) } as never);
     const p = await tools.execute('get_my_pipeline', {});
     await tools.execute('search_my_vault', {});
     expect(captured.filters).toEqual([['user_email', 'owner@x.com']]);
-    expect(loadVault).toHaveBeenCalledWith('owner@x.com', 'exec_summary');
+    expect(loadVault).toHaveBeenCalledWith('owner@x.com');
     expect(p).not.toHaveProperty('workspace');
   });
 
   it('unavailable scope reads NOTHING and says so', async () => {
     const captured = { filters: [] as Array<[string, string]> };
     const loadVault = vi.fn();
-    const tools = makeTier0Tools(stubDb(captured), { kind: 'unavailable', email: 'coach@firm.com' }, loadVault as never);
+    const matchEvidence = vi.fn();
+    const tools = makeTier0Tools(stubDb(captured), { kind: 'unavailable', email: 'coach@firm.com' }, { loadVault, matchEvidence } as never);
     expect(await tools.execute('get_my_pipeline', {})).toMatchObject({ ok: false, error: 'workspace_unavailable' });
     expect(await tools.execute('search_my_vault', {})).toMatchObject({ ok: false, error: 'workspace_unavailable' });
     expect(captured.filters).toEqual([]);
     expect(loadVault).not.toHaveBeenCalled();
+    expect(matchEvidence).not.toHaveBeenCalled();
   });
 });
 
@@ -144,7 +167,7 @@ describe('chat route: the system-prompt profile follows the acting scope (F1)', 
 
 describe('own-scope empty pipeline note (L1)', () => {
   it('does not claim the user has no pursuits; says team-workspace rows are not searched', async () => {
-    const tools = makeTier0Tools(stubDb({ filters: [] }, []), 'owner@x.com', vi.fn() as never);
+    const tools = makeTier0Tools(stubDb({ filters: [] }, []), 'owner@x.com', noVault());
     for (const args of [{}, { stage: 'bidding' }]) {
       const out = await tools.execute('get_my_pipeline', args);
       expect(out).toMatchObject({ ok: true, count: 0 });

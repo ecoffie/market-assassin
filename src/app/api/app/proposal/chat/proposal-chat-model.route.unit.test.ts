@@ -23,6 +23,7 @@ vi.mock('@/lib/proposal/loaders', () => ({
   loadBidderProfile: async () => null,
   formatProfileForPrompt: () => '',
   loadVaultContext: async () => ({ has_any: false }),
+  ALL_VAULT_SECTIONS: ['identity', 'past_performance', 'capabilities', 'team'],
 }));
 vi.mock('@/lib/rag/retrieve', () => ({ retrieveRagContext: async () => [], formatChunksForPrompt: () => '' }));
 vi.mock('@/lib/proposal/select-relevant', () => ({ selectRelevantRfp: () => '' }));

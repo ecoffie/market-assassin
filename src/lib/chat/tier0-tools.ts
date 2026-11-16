@@ -21,8 +21,20 @@
  * isolation guarantee is auditable in one place.
  */
 
-import { loadVaultContext } from '@/lib/proposal/loaders';
-import type { ChatActingScope } from '@/lib/chat/chat-acting-scope';
+import { loadVaultContext, ALL_VAULT_SECTIONS } from '@/lib/proposal/loaders';
+import { vaultEmailFor, type ChatActingScope } from '@/lib/chat/chat-acting-scope';
+import { matchRequirementsToEvidence } from '@/lib/proposal/evidence-match';
+import { parseRetrieveArgs, retrieveVault, RETRIEVAL_POOL_LIMITS, type VaultRetrievalDeps } from './vault-retrieval';
+
+/** Production retrieval deps: the shared loader (all sections) + the shared hybrid matcher. */
+const defaultVaultDeps: VaultRetrievalDeps = {
+  loadVault: (email) => loadVaultContext(email, 'exec_summary', { sections: ALL_VAULT_SECTIONS, limits: RETRIEVAL_POOL_LIMITS }),
+  matchEvidence: async (email, query) => {
+    // useRerank:false keeps this a retrieval step (no LLM call). One "requirement" = the question.
+    const [res] = await matchRequirementsToEvidence(email, [{ id: 'q', requirement: query }], { useRerank: false, topN: 12 });
+    return res?.evidence ?? [];
+  },
+};
 
 // The subset of the Supabase client surface these tools use. Kept structural so
 // tests can pass a stub without importing the real client.
@@ -75,8 +87,23 @@ export const TIER0_TOOL_DEFS = [
     function: {
       name: 'search_my_vault',
       description:
-        "Return the signed-in user's OWN Vault: their company identity, past performance (contracts/CPARS), and capability library. Call this when they ask about their own experience, past performance, capabilities, or want you to reference their real record when drafting.",
-      parameters: { type: 'object', properties: {}, required: [], additionalProperties: false },
+        "Retrieve records from the signed-in user's OWN Vault (company identity, past performance/CPARS, capability library, team and key personnel) that are relevant to the question. Pass `query` with what the user is asking about in their words (e.g. 'DLA spare parts', 'cybersecurity past performance', 'who is cleared'); only the matching records come back. Without `query` you get an overview (identity summary, counts and titles), not full records. If nothing matches, say so; never substitute unrelated records.",
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: "What the user is asking about, in their words. Used to pick the relevant Vault records.",
+          },
+          sections: {
+            type: 'array',
+            items: { type: 'string', enum: ['past_performance', 'capabilities', 'team'] },
+            description: 'Optional: only these record sections.',
+          },
+        },
+        required: [],
+        additionalProperties: false,
+      },
     },
   },
 ];
@@ -106,7 +133,7 @@ interface PipelineRow {
 export function makeTier0Tools(
   db: Tier0Db,
   emailOrScope: string | ChatActingScope,
-  loadVault: typeof loadVaultContext = loadVaultContext,
+  vaultDeps: VaultRetrievalDeps = defaultVaultDeps,
 ) {
   // Closure — the model cannot reach or override any of this. A plain email is the
   // caller's own scope (unchanged behaviour). A coach acting in an authorized client
@@ -172,32 +199,18 @@ export function makeTier0Tools(
     };
   }
 
-  async function searchMyVault(): Promise<Record<string, unknown>> {
-    // Reuse the proposal loader — already email-scoped, already the safe pattern.
-    // 'exec_summary' pulls identity + past performance + capabilities (the broad set).
-    if (scope.kind === 'unavailable') return unavailable;
-    // Client workspace: the client's Vault (stored under its synthetic owner email,
-    // exactly as the Vault screen reads it), never the coach's own.
-    const vaultEmail = scope.kind === 'client' ? scope.vaultEmail : boundEmail;
-    const vault = await loadVault(vaultEmail, 'exec_summary');
-    if (!vault.has_any) {
-      return {
-        ok: true,
-        has_any: false,
-        note: scope.kind === 'client'
-          ? "This client's Vault is empty — no identity, past performance, or capabilities saved yet."
-          : 'Your Vault is empty — no identity, past performance, or capabilities saved yet.',
-        ...workspaceNote,
-      };
-    }
-    return {
-      ok: true,
-      ...workspaceNote,
-      has_any: true,
-      identity: vault.identity ?? null,
-      past_performance: vault.past_performance ?? [],
-      capabilities: vault.capabilities ?? [],
-    };
+  async function searchMyVault(args: Record<string, unknown>): Promise<Record<string, unknown>> {
+    // Retrieval, not a dump: the whole Vault is loaded server-side as the pool, and
+    // only the records relevant to `query` go back to the model (vault-retrieval.ts).
+    // The Vault is the acting scope's: a coach in an authorized client workspace reads
+    // the client's Vault (its synthetic owner email), never their own. Loader AND
+    // matcher get the same email. Unresolved scope → read nothing.
+    const vaultEmail = vaultEmailFor(scope);
+    if (!vaultEmail) return unavailable;
+    const out = await retrieveVault(vaultEmail, parseRetrieveArgs(args), vaultDeps, {
+      owner: scope.kind === 'client' ? 'client' : 'own',
+    });
+    return { ...out, ...workspaceNote };
   }
 
   return {
@@ -206,7 +219,7 @@ export function makeTier0Tools(
         case 'get_my_pipeline':
           return getMyPipeline(args || {});
         case 'search_my_vault':
-          return searchMyVault();
+          return searchMyVault(args || {});
         default:
           // A name outside the Tier-0 set must never silently succeed.
           return { ok: false, error: `unknown_tool:${name}` };

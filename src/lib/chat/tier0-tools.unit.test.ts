@@ -11,15 +11,25 @@ import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES, type Tier0Db } from 
 // Mock the Vault loader so searchMyVault tests don't hit the real DB. We capture
 // the email it was called with to prove the bound email flows through.
 const vaultCalls: string[] = [];
-vi.mock('@/lib/proposal/loaders', () => ({
-  loadVaultContext: vi.fn(async (email: string) => {
+const vaultOpts: unknown[] = [];
+const matchCalls: Array<{ email: string; requirement: string }> = [];
+vi.mock('@/lib/proposal/evidence-match', () => ({
+  matchRequirementsToEvidence: vi.fn(async (email: string, reqs: Array<{ requirement: string }>) => {
+    matchCalls.push({ email, requirement: reqs[0]?.requirement });
+    return [{ requirementId: 'q', requirement: reqs[0]?.requirement, evidence: [{ kind: 'past_performance', id: 'pp-1', label: 'DLA Tubing', detail: '', score: 1 }], gap: false }];
+  }),
+}));
+vi.mock('@/lib/proposal/loaders', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/proposal/loaders')>()),
+  loadVaultContext: vi.fn(async (email: string, _section: string, opts?: unknown) => {
+    vaultOpts.push(opts);
     vaultCalls.push(email);
     if (email === 'empty@x.com') return { has_any: false };
     return {
       has_any: true,
       identity: { company_name: 'Acme Fed' },
-      past_performance: [{ contract_title: 'DLA Tubing', agency: 'DLA' }],
-      capabilities: [{ capability_name: 'Machining' }],
+      past_performance: [{ id: 'pp-1', contract_title: 'DLA Tubing', agency: 'DLA' }],
+      capabilities: [{ id: 'c-1', capability_name: 'Machining', description: 'CNC machining' }],
     };
   }),
 }));
@@ -131,11 +141,30 @@ describe('search_my_vault — scoped to the bound email', () => {
     expect(String(res.note)).toMatch(/empty/i);
   });
 
-  it('populated Vault returns identity + past performance + capabilities', async () => {
+  it('loads every Vault section (capabilities and team included), not the exec_summary narrowing', async () => {
+    vaultOpts.length = 0;
     const tools = makeTier0Tools(stubDb([], { filters: [] }), 'owner@x.com');
-    const res = await tools.execute('search_my_vault', {}) as { has_any: boolean; past_performance: unknown[] };
-    expect(res.has_any).toBe(true);
-    expect(res.past_performance).toHaveLength(1);
+    await tools.execute('search_my_vault', {});
+    expect(vaultOpts[0]).toMatchObject({ sections: ['identity', 'past_performance', 'capabilities', 'team'] });
+  });
+
+  it('without a query returns an overview (titles + counts), not full records', async () => {
+    const tools = makeTier0Tools(stubDb([], { filters: [] }), 'owner@x.com');
+    const res = await tools.execute('search_my_vault', {}) as Record<string, unknown>;
+    expect(res.mode).toBe('overview');
+    expect(res.counts).toMatchObject({ past_performance: 1, capabilities: 1 });
+    expect(res.titles).toMatchObject({ past_performance: ['DLA Tubing — DLA'], capabilities: ['Machining'] });
+    expect(res.past_performance).toBeUndefined();
+  });
+
+  it('with a query retrieves through the matcher with the BOUND email and returns only the hits', async () => {
+    matchCalls.length = 0;
+    const tools = makeTier0Tools(stubDb([], { filters: [] }), 'owner@x.com');
+    const res = await tools.execute('search_my_vault', { query: 'DLA tubing', email: 'victim@y.com' } as Record<string, unknown>) as Record<string, unknown>;
+    expect(matchCalls).toEqual([{ email: 'owner@x.com', requirement: 'DLA tubing' }]);
+    expect(res.mode).toBe('retrieved');
+    expect(res.past_performance).toEqual([{ contract_title: 'DLA Tubing', agency: 'DLA' }]);
+    expect(res.capabilities).toEqual([]); // Machining was not a hit, so it is not sent
   });
 });
 
