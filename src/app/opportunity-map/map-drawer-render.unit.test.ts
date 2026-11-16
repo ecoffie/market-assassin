@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { TextDecoder as NodeTextDecoder, TextEncoder as NodeTextEncoder } from 'node:util';
 import { JSDOM } from 'jsdom';
 import { SAFE_MARKDOWN_SCRIPT } from '@/lib/chat/safe-markdown';
+import { splitViewPreamble } from '@/lib/chat/intent-compiler';
 
 const MAP = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 function drawerScript(): string {
@@ -160,9 +161,12 @@ describe('narrow-panel display rule (answer first)', () => {
     await t.ask('And in Florida?');
     for (const c of t.chat) {
       const m = String(c.message);
-      expect(m).toContain('[Display: a narrow side panel. Start with the answer in 1–2 sentences');
+      expect(m).toContain('Display: a narrow side panel. Start with the answer in 1–2 sentences');
       expect(m).toContain('“Where I would start” recommendation goes first');
-      expect(m.indexOf('[Current map view')).toBeLessThan(m.indexOf('[Display:'));
+      // Inside the view bracket: the server's own splitter strips both, leaving only the customer's words.
+      const sp = splitViewPreamble(m);
+      expect(sp.view).toContain('Display: a narrow side panel');
+      expect(sp.rest.trim()).toBe(String(c === t.chat[0] ? 'What janitorial work is open here?' : 'And in Florida?'));
     }
     expect(String(t.chat[1].message).endsWith('And in Florida?')).toBe(true);
   });

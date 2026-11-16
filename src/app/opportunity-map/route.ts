@@ -10966,14 +10966,16 @@ const ASK_MINDY_JS = `<script>(function(){
     var c=viewCtx(); var parts=ctxParts(c);
     ctxEl.innerHTML='<span class="dim">Context:</span> '+parts.map(esc).join(' \\u00b7 '); }
   // Threaded to the chat so answers are about THIS view — a compact, factual preface (no invented numbers).
-  function ctxPreamble(){ var c=viewCtx(); var parts=ctxParts(c); if(!parts.length)return '';
-    return '[Current map view \\u2014 '+parts.join('; ')+'. '+ctxLocation(c)+' Answer for THIS view when the question is about "these"/"this"/"here": use this location, not the user\\'s saved profile locations, and do not choose a city the user did not name.]\\n\\n'; }
+  function ctxPreamble(extra){ var c=viewCtx(); var parts=ctxParts(c); if(!parts.length)return '';
+    return '[Current map view \\u2014 '+parts.join('; ')+'. '+ctxLocation(c)+' Answer for THIS view when the question is about "these"/"this"/"here": use this location, not the user\\'s saved profile locations, and do not choose a city the user did not name.'+(extra?' '+extra:'')+']\\n\\n'; }
   // NARROW-PANEL DISPLAY RULE (2026-11-16 parity audit): the drawer is ~420px wide, so a full wide-host
   // layout (every horizon, 4-5 bullet lines per item, the recommendation last) scrolls the answer out of
   // sight. This asks for the SAME facts in an order and length that fit: the answer first, short sections,
   // one line per item. It changes presentation only. find-completeness still adds any horizon the model
   // leaves out, so a shorter answer cannot drop one. Not shown to the user; not kept in history.
-  var PANEL_RULE='[Display: a narrow side panel. Start with the answer in 1\\u20132 sentences (for an opportunity search, your \\u201cWhere I would start\\u201d recommendation goes first). Then the details: at most 5 items per section, one line per item (or a short table with at most 3 columns); a section with nothing in it is one line. Keep paragraphs to 2 sentences. Link text is the solicitation title or number, never \\u201chere\\u201d. Offer the rest on request.]\\n\\n';
+  // It rides INSIDE the [Current map view …] bracket, so the server's splitViewPreamble strips it with the
+  // view and it never reaches the intent compiler or the SOW-excerpt choice as if the customer typed it.
+  var PANEL_RULE='Display: a narrow side panel. Start with the answer in 1\\u20132 sentences (for an opportunity search, your \\u201cWhere I would start\\u201d recommendation goes first). Then the details: at most 5 items per section, one line per item (or a short table with at most 3 columns); a section with nothing in it is one line. Keep paragraphs to 2 sentences. Link text is the solicitation title or number, never \\u201chere\\u201d. Offer the rest on request.';
   function setOpen(o){ ov.classList.toggle('show',o); drawer.classList.toggle('show',o); drawer.setAttribute('aria-hidden',o?'false':'true'); if(o){ renderCtx(); if(!body.children.length){ if(oppCtx)greetCard(); else greet(); } setTimeout(function(){ input&&input.focus(); },220); } }
   function greetCard(){
     var chips=[['What does it require?','Summarize what this solicitation requires: scope, deliverables, and key dates.'],
@@ -11055,7 +11057,7 @@ const ASK_MINDY_JS = `<script>(function(){
     // Prepend the grounded view context to the MESSAGE (not shown to the user) so the answer
     // is about "these"/"here" — the map\\u2019s real filters + count, never fabricated.
     // Card chat sends NO view preamble: the server supplies the opportunity from its own record.
-    var sendMsg=oppCtx?q:(ctxPreamble()+PANEL_RULE+q);
+    var sendMsg=oppCtx?q:(ctxPreamble(PANEL_RULE)+q);
     var payload={email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8)};
     if(oppCtx){ payload.context={kind:'opportunity',notice_id:oppCtx.id}; payload.turn_id=turnId; if(opts.replay)payload.replay_only=true;
       if(!opts.turnId){ try{ if(window.__track) window.__track('tool_use','card_chat_ask',{turn:Math.floor(history.length/2)+1}); }catch(e){} } }
