@@ -49,6 +49,45 @@ export function pricingFaqs(c: { signupCredits: number; proCredits: number; team
   ];
 }
 
+/** The /mcp/pricing FAQ — credit plans only (no app trial or app prices). */
+export function mcpPricingFaqs(c: { signupCredits: number; proCredits: number; teamCredits: number }): { q: string; a: string }[] {
+  const n = (x: number) => x.toLocaleString('en-US');
+  return [
+    {
+      q: 'Can I try it before I pay?',
+      a: `Yes. You get ${n(c.signupCredits)} free credits the first time you connect Mindy to your AI. No card needed.`,
+    },
+    {
+      q: 'Which AI tools does it work with?',
+      a: "Claude, ChatGPT, Cursor and any agent that supports MCP. You connect by signing in through your browser — no API key to copy.",
+    },
+    {
+      q: 'How do credits work?',
+      a: "Each tool call costs a set number of credits. You're charged when Mindy does the research — even a search that honestly finds nothing. You're not charged for refused requests, failures on our side, or calls stopped before they run.",
+    },
+    {
+      q: 'Entry, Mid or Growth — which do I need?',
+      a: 'Every plan has the same tools; they differ only in monthly credits. Entry suits occasional use, Mid is the daily driver, Growth covers several markets at once. Need more than that? Email us for an Enterprise pool. Use the plan finder above to size it.',
+    },
+    {
+      q: 'What happens when I run out of credits?',
+      a: 'The next call is declined with a top-up message before it runs — you never go negative. Add a $119 top-up (1,000 credits, never expires), upgrade, or wait for renewal.',
+    },
+    {
+      q: 'Do you offer an annual discount?',
+      a: 'Yes — two months free on every credit plan, and the year of credits is added upfront.',
+    },
+    {
+      q: 'I already pay for Mindy Pro or Team. Do I need this?',
+      a: `Probably not. Pro includes ${n(c.proCredits)} credits a month and Team includes ${n(c.teamCredits)}. A credit plan only makes sense if you use more than that, or don't want the app.`,
+    },
+    {
+      q: 'What is your refund policy?',
+      a: "Payments are final and we don't refund partial months. You can cancel anytime and keep your plan until the end of the period you paid for. If a technical problem stops you from using what you bought, email admin@getmindy.ai within 7 days of purchase.",
+    },
+  ];
+}
+
 /** The /pricing FAQ (Pro / Team / Enterprise, 14-day trial). /pricing mirrors it into FAQPage JSON-LD. */
 export function appPricingFaqs(c: { proCredits: number; teamCredits: number }): { q: string; a: string }[] {
   const n = (x: number) => x.toLocaleString('en-US');

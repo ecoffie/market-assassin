@@ -118,11 +118,47 @@ function TrialUpgradeBox({ offer, email, token, onDone }: {
 
 const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
+/** A credit-only (MCP) plan for the dropdown under the cards. */
+export type CreditPlan = {
+  id: string; label: string; credits: number;
+  monthlyUsd: number; monthlyHref: string;
+  annualPerMonthUsd: number | null; annualHref: string | null;
+};
+
+/**
+ * "Only need Mindy in your AI?" — the credit-only plans as a dropdown on /pricing instead of a
+ * link to a separate page (Eric 2026-11-16). Follows the page's Monthly/Annual toggle.
+ */
+function CreditPlansDropdown({ plans, annual }: { plans: CreditPlan[]; annual: boolean }) {
+  if (!plans.length) return null;
+  return (
+    <details className="credits-dd" data-testid="credit-plans-dropdown">
+      <summary>Only need Mindy inside Claude, ChatGPT or Cursor? <span>See credit-only plans</span></summary>
+      <div className="cdd-grid">
+        {plans.map((p) => {
+          const useAnnual = annual && p.annualPerMonthUsd != null && !!p.annualHref;
+          return (
+            <div className="cdd-card" key={p.id}>
+              <h3>{p.label}</h3>
+              <div className="cdd-price"><b>${fmt(useAnnual ? p.annualPerMonthUsd! : p.monthlyUsd)}</b><span>/ mo{useAnnual ? ', billed annually' : ''}</span></div>
+              <p className="cdd-cr">{fmt(p.credits)} credits / month</p>
+              <a className="cta outline" href={useAnnual ? p.annualHref! : p.monthlyHref}>Get {p.label}</a>
+              <NoRefundNote />
+            </div>
+          );
+        })}
+      </div>
+      <p className="cdd-fine">Same tools on every plan; you&apos;re charged only for successful calls. No app included. <Link href="/mcp/pricing">Compare credit plans in detail</Link>.</p>
+    </details>
+  );
+}
+
 type Cell = boolean | string;
 type CompareGroup = [group: string, rows: Array<[label: string, pro: Cell, team: Cell, ent: Cell]>];
 
-export default function SimplePricing({ proCredits, teamCredits, forecastsLabel, faqs }: {
+export default function SimplePricing({ proCredits, teamCredits, forecastsLabel, faqs, creditPlans = [] }: {
   proCredits: number; teamCredits: number; forecastsLabel: string; faqs: { q: string; a: string }[];
+  creditPlans?: CreditPlan[];
 }) {
   const [annual, setAnnual] = useState(false);
   // Same token every Mindy page sends; /api/app/me verifies it server-side. Any failure leaves the
@@ -304,8 +340,10 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
 
       <p className="fine">
         Card required for the trial. No charge for 14 days, and you can cancel anytime before it ends.
-        After that, all sales final. Running AI agents only? <Link href="/mcp/pricing">See credit-only plans</Link>.
+        After that, all sales final.
       </p>
+
+      <CreditPlansDropdown plans={creditPlans} annual={annual} />
 
       <LogoMarquee />
 
@@ -407,6 +445,23 @@ const CSS = `
 .sp .foot{text-align:center;font-size:14px;color:var(--mp-muted);margin:16px 0 0}
 .sp .foot a,.sp .fine a{color:var(--mp-navy)}
 .sp .fine{text-align:center;color:var(--mp-muted);font-size:13px;line-height:1.6;max-width:640px;margin:28px auto 0}
+.sp .credits-dd{max-width:900px;margin:24px auto 0;border:1px solid var(--mp-line);border-radius:14px;background:var(--mp-surface)}
+.sp .credits-dd summary{cursor:pointer;padding:16px 20px;font-size:15px;color:var(--mp-body);text-align:center;list-style:none}
+.sp .credits-dd summary::-webkit-details-marker{display:none}
+.sp .credits-dd summary span{color:var(--mp-navy);font-weight:600;margin-left:6px}
+.sp .credits-dd summary span::after{content:' ▾'}
+.sp .credits-dd[open] summary span::after{content:' ▴'}
+.sp .cdd-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:4px 20px 8px}
+@media (max-width:700px){.sp .cdd-grid{grid-template-columns:1fr}}
+.sp .cdd-card{border:1px solid var(--mp-line);border-radius:12px;padding:18px;background:var(--mp-wash)}
+.sp .cdd-card h3{margin:0;font-family:var(--mp-font-serif);font-size:20px}
+.sp .cdd-price{display:flex;align-items:baseline;gap:6px;margin:8px 0 0}
+.sp .cdd-price b{font-size:28px}
+.sp .cdd-price span{color:var(--mp-muted);font-size:13px}
+.sp .cdd-cr{margin:4px 0 0;font-size:14px;font-weight:600}
+.sp .cdd-card .cta{margin:14px 0 4px}
+.sp .cdd-fine{margin:0;padding:8px 20px 18px;text-align:center;font-size:13px;color:var(--mp-muted)}
+.sp .cdd-fine a{color:var(--mp-navy)}
 .sp .cmp{margin:80px 0 0}
 .sp .cmp h2{font-family:var(--mp-font-serif);font-size:clamp(28px,3.4vw,40px);font-weight:700;text-align:center;margin:0 0 28px}
 .sp .cmp-scroll{overflow-x:auto;border:1px solid var(--mp-line);border-radius:18px;background:var(--mp-surface)}
