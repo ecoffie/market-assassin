@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { assertEmittedRegex, compileOps, requestOpenSnapshotRebuild, __setOpenSnapshotForTests, REBUILD_MIN_INTERVAL_MS, VERIFY_CONCURRENCY, cachedOpenRetrieval, type OpenSnapshot } from './open-cache';
@@ -119,5 +119,23 @@ describe('cut-over: with the DB change marker, a snapshot built before the trigg
   it('the draft revokes EXECUTE on the trigger function from PUBLIC, anon and authenticated', () => {
     const sql = fs.readFileSync(path.join(__dirname, '../../../tasks/search-stabilization-2026-11-14/migration-draft/snapshot_changed_at.up.sql'), 'utf8');
     expect(sql).toMatch(/REVOKE ALL ON FUNCTION public\.sam_opportunities_stamp_snapshot_change\(\) FROM PUBLIC, anon, authenticated;/);
+  });
+});
+
+describe('preview-only seam release (2026-11-16)', () => {
+  const keep = { ...process.env };
+  afterEach(() => { process.env = { ...keep }; });
+  it('never releases on production, even with every flag set', async () => {
+    const m = await import('./open-cache');
+    process.env.VERCEL_ENV = 'production'; process.env.OPEN_SNAPSHOT_PREVIEW = 'true'; process.env.OPEN_SNAPSHOT_RETRIEVAL = 'true';
+    expect(m.previewSeamRelease()).toBe(false);
+    expect(m.openSnapshotEnabled()).toBe(false);
+  });
+  it('releases on a preview only with both flags', async () => {
+    const m = await import('./open-cache');
+    process.env.VERCEL_ENV = 'preview'; process.env.OPEN_SNAPSHOT_PREVIEW = 'true'; process.env.OPEN_SNAPSHOT_RETRIEVAL = 'true';
+    expect(m.openSnapshotEnabled()).toBe(true);
+    delete process.env.OPEN_SNAPSHOT_PREVIEW;
+    expect(m.openSnapshotEnabled()).toBe(false);
   });
 });

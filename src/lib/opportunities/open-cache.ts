@@ -226,8 +226,16 @@ const SNAPSHOT_SEAM_RELEASED = false;
 let seamAllowedForTests = false;
 /** Test seam: lets the seam's own unit tests exercise it. Never call from application code. */
 export function __allowUnhardenedSeamForTests(on: boolean) { seamAllowedForTests = on; }
+/**
+ * PREVIEW-ONLY release (Eric via Agent 5, 2026-11-16: infrastructure approved for preparation and preview testing only;
+ * production activation on hold). True only on a Vercel PREVIEW deployment with OPEN_SNAPSHOT_PREVIEW=true. On production
+ * VERCEL_ENV is 'production', so this can never release the seam there, whatever flags are set.
+ */
+export function previewSeamRelease(): boolean {
+  return process.env.VERCEL_ENV === 'preview' && process.env.OPEN_SNAPSHOT_PREVIEW === 'true';
+}
 export function openSnapshotEnabled(): boolean {
-  return (SNAPSHOT_SEAM_RELEASED || seamAllowedForTests) && process.env.OPEN_SNAPSHOT_RETRIEVAL === 'true';
+  return (SNAPSHOT_SEAM_RELEASED || seamAllowedForTests || previewSeamRelease()) && process.env.OPEN_SNAPSHOT_RETRIEVAL === 'true';
 }
 
 type Call = { m: string; a: unknown[] };
@@ -356,5 +364,7 @@ export function requestOpenSnapshotRebuild(client: any, now = new Date()): boole
   startLoad(client);
   return true;
 }
+/** The in-flight snapshot load, if any (preview diagnostics await it; callers never block on it). */
+export function pendingOpenSnapshotLoad(): Promise<OpenSnapshot | null> | null { return building; }
 /** Test seam. */
 export function __setOpenSnapshotForTests(s: OpenSnapshot | null) { current = s; building = null; lastOverflowRebuild = 0; }
