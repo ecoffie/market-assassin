@@ -154,23 +154,22 @@ describe('follow-up chips: derived, and only under the latest answer', () => {
   });
 });
 
-describe('narrow-panel display rule (answer first)', () => {
-  it('every view-mode question carries the display rule after the view context, ahead of the question', async () => {
+describe('narrow-panel display (answer first)', () => {
+  it('every question says display:narrow_panel; the message stays the view preface + the question only', async () => {
     const t = boot({ tokens: [['a'], ['b']] });
     await t.ask('What janitorial work is open here?');
     await t.ask('And in Florida?');
+    expect(t.chat.map((c) => c.display)).toEqual(['narrow_panel', 'narrow_panel']);
     for (const c of t.chat) {
       const m = String(c.message);
-      expect(m).toContain('Display: a narrow side panel. Start with the answer in 1–2 sentences');
-      expect(m).toContain('“Where I would start” recommendation goes first');
-      // Inside the view bracket: the server's own splitter strips both, leaving only the customer's words.
+      expect(m).not.toMatch(/Display:|narrow side panel/i);
       const sp = splitViewPreamble(m);
-      expect(sp.view).toContain('Display: a narrow side panel');
-      expect(sp.rest.trim()).toBe(String(c === t.chat[0] ? 'What janitorial work is open here?' : 'And in Florida?'));
+      expect(sp.view).toContain('[Current map view');
     }
-    expect(String(t.chat[1].message).endsWith('And in Florida?')).toBe(true);
+    expect(splitViewPreamble(String(t.chat[0].message)).rest).toBe('What janitorial work is open here?');
+    expect(splitViewPreamble(String(t.chat[1].message)).rest).toBe('And in Florida?');
   });
-  it('the rule is never kept in history or shown to the user', async () => {
+  it('history and the user bubble hold only what the user typed', async () => {
     const t = boot({ tokens: [['a'], ['b']] });
     await t.ask('q1');
     await t.ask('q2');
