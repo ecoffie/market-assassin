@@ -22,6 +22,7 @@
  */
 
 import { loadVaultContext } from '@/lib/proposal/loaders';
+import type { ChatActingScope } from '@/lib/chat/chat-acting-scope';
 
 // The subset of the Supabase client surface these tools use. Kept structural so
 // tests can pass a stub without importing the real client.
@@ -102,8 +103,20 @@ interface PipelineRow {
  * supplied and is treated as UNTRUSTED — only whitelisted, validated fields are
  * ever used, and NEVER an identity field.
  */
-export function makeTier0Tools(db: Tier0Db, email: string) {
-  const boundEmail = email; // closure — the model cannot reach or override this
+export function makeTier0Tools(
+  db: Tier0Db,
+  emailOrScope: string | ChatActingScope,
+  loadVault: typeof loadVaultContext = loadVaultContext,
+) {
+  // Closure — the model cannot reach or override any of this. A plain email is the
+  // caller's own scope (unchanged behaviour). A coach acting in an authorized client
+  // workspace gets that client's rows ONLY (see chat-acting-scope.ts).
+  const scope: ChatActingScope =
+    typeof emailOrScope === 'string' ? { kind: 'own', email: emailOrScope } : emailOrScope;
+  const boundEmail = scope.email;
+  const workspaceNote = scope.kind === 'client' ? { workspace: 'client' as const } : {};
+  const unavailable = { ok: false, error: 'workspace_unavailable', count: 0, items: [],
+    note: "Couldn't confirm which workspace you're working in, so no private data was read. Try again." };
 
   async function getMyPipeline(args: { stage?: unknown }): Promise<Record<string, unknown>> {
     // Validate the ONLY model-supplied field. Anything unexpected is ignored.
@@ -112,14 +125,18 @@ export function makeTier0Tools(db: Tier0Db, email: string) {
 
     const cols =
       'title, agency, stage, response_deadline, value_estimate, naics_code, set_aside, priority, next_action';
-    let q = db.from('user_pipeline').select(cols).eq('user_email', boundEmail);
+    if (scope.kind === 'unavailable') return unavailable;
+    // Client workspace: that workspace's pursuits only (pipeline GET's asClient branch).
+    let q = scope.kind === 'client'
+      ? db.from('user_pipeline').select(cols).eq('workspace_id', scope.workspaceId)
+      : db.from('user_pipeline').select(cols).eq('user_email', boundEmail);
     // deadline-ascending so "due first" is row 0; nulls last.
     const base = q.order('response_deadline', { ascending: true, nullsFirst: false });
     const runnable = stage ? base.eq('stage', stage).order('response_deadline', { ascending: true, nullsFirst: false }) : base;
     const { data, error } = await runnable.limit(25);
 
     if (error) {
-      return { ok: false, error: 'pipeline_unavailable', count: 0, items: [] };
+      return { ok: false, error: 'pipeline_unavailable', count: 0, items: [], ...workspaceNote };
     }
     const rows = (data || []) as PipelineRow[];
     if (rows.length === 0) {
@@ -127,13 +144,19 @@ export function makeTier0Tools(db: Tier0Db, email: string) {
         ok: true,
         count: 0,
         items: [],
-        note: stage
-          ? `You have no pursuits in the "${stage}" stage.`
-          : 'You have no pursuits in your pipeline yet.',
+        note: scope.kind === 'client'
+          ? (stage ? `This client workspace has no pursuits in the "${stage}" stage.` : 'This client workspace has no pursuits yet.')
+          : stage
+            // Own scope reads only rows saved under the user's own email (team-workspace rows
+            // are not searched here), so the note must not claim the user has nothing.
+            ? `No pursuits in the "${stage}" stage are saved under your own account. Team-workspace pursuits aren't searched here.`
+            : "No pursuits are saved under your own account. Team-workspace pursuits aren't searched here.",
+        ...workspaceNote,
       };
     }
     return {
       ok: true,
+      ...workspaceNote,
       count: rows.length,
       items: rows.map((r) => ({
         title: r.title ?? null,
@@ -152,12 +175,24 @@ export function makeTier0Tools(db: Tier0Db, email: string) {
   async function searchMyVault(): Promise<Record<string, unknown>> {
     // Reuse the proposal loader — already email-scoped, already the safe pattern.
     // 'exec_summary' pulls identity + past performance + capabilities (the broad set).
-    const vault = await loadVaultContext(boundEmail, 'exec_summary');
+    if (scope.kind === 'unavailable') return unavailable;
+    // Client workspace: the client's Vault (stored under its synthetic owner email,
+    // exactly as the Vault screen reads it), never the coach's own.
+    const vaultEmail = scope.kind === 'client' ? scope.vaultEmail : boundEmail;
+    const vault = await loadVault(vaultEmail, 'exec_summary');
     if (!vault.has_any) {
-      return { ok: true, has_any: false, note: 'Your Vault is empty — no identity, past performance, or capabilities saved yet.' };
+      return {
+        ok: true,
+        has_any: false,
+        note: scope.kind === 'client'
+          ? "This client's Vault is empty — no identity, past performance, or capabilities saved yet."
+          : 'Your Vault is empty — no identity, past performance, or capabilities saved yet.',
+        ...workspaceNote,
+      };
     }
     return {
       ok: true,
+      ...workspaceNote,
       has_any: true,
       identity: vault.identity ?? null,
       past_performance: vault.past_performance ?? [],

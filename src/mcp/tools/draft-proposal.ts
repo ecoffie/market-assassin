@@ -107,6 +107,11 @@ export interface DraftProposalInput {
   agency?: string;
   /** The MCP caller's verified email — loads their Vault + attributes LLM cost. */
   userEmail?: string | null;
+  /**
+   * A Vault that is not the caller's (Ask Mindy, coach in an authorized client workspace).
+   * Used ONLY to read data; LLM cost and budget stay on userEmail.
+   */
+  vaultEmail?: string | null;
 }
 
 /** A section trimmed of the heavy internal meta (RAG chunk bodies, source lists,
@@ -179,7 +184,8 @@ export async function draftProposal(input: DraftProposalInput): Promise<DraftPro
   let engineDegraded = false;
   try {
     const res = await generateAllSections({
-      email: input.userEmail || '',
+      email: input.vaultEmail || input.userEmail || '',
+      ...(input.vaultEmail && input.userEmail ? { billingEmail: input.userEmail } : {}),
       sourceText,
       rfpAgency: input.agency,
       ...(sectionTypes ? { sectionTypes } : {}),
@@ -247,6 +253,8 @@ export interface DraftProposalSectionInput {
   agency?: string;
   requirements?: Array<{ requirement: string; category?: string; section?: string; id?: string }>;
   userEmail?: string | null;
+  /** See DraftProposalInput.vaultEmail — data only; cost stays on userEmail. */
+  vaultEmail?: string | null;
 }
 
 export interface DraftProposalSectionResult {
@@ -287,7 +295,8 @@ export async function draftProposalSection(input: DraftProposalSectionInput): Pr
   let degraded = false;
   try {
     draft = await generateV2Draft({
-      email: input.userEmail || '',
+      email: input.vaultEmail || input.userEmail || '',
+      ...(input.vaultEmail && input.userEmail ? { billingEmail: input.userEmail } : {}),
       sectionType: sectionType as SectionType,
       sourceText,
       rfpAgency: input.agency,

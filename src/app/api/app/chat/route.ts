@@ -41,6 +41,8 @@ import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/ti
 // Tools run ONLY through the chat tool executor (policy check at offer AND execution,
 // preflight, per-tool error capture, execution log). Never import runMcpTool here.
 import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/chat-tool-executor';
+import { resolveChatActingScope, vaultEmailFor } from '@/lib/chat/chat-acting-scope';
+import type { BidderProfile } from '@/lib/proposal/types';
 import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, resolveAnswerChain, answerKey, ANSWER_ENDPOINTS, openAiChatParams, type PlannerTarget } from '@/lib/chat/planner-config';
 import { fitMessages, inputBudget, type MsgKind } from '@/lib/chat/token-budget';
 import { stagingModelConfig, STAGING_CONFIG_HEADER } from '@/lib/chat/staging-model-config';
@@ -201,7 +203,7 @@ GROUNDING:
 
 YOUR DATA TOOLS:
 You have a LARGE toolset over the federal Data Core — each tool's own description says exactly when to use it. USE them instead of giving generic advice: if a tool can answer a question with real data, call it. Never tell the user to "go check SAM.gov / the panel" for something a tool covers. What you can reach, by category:
-- THEIR OWN account (private): get_my_pipeline (their tracked pursuits/deadlines/stages) and search_my_vault (their identity, past performance/CPARS, capabilities). These return ONLY this signed-in user's data — never anyone else's.
+- THEIR OWN account (private): get_my_pipeline (their tracked pursuits/deadlines/stages) and search_my_vault (their identity, past performance/CPARS, capabilities). These return ONLY the workspace this user is working in — their own, or a client workspace they are authorized to coach (the result then carries workspace:"client"; say "this client's" rather than "your"). Never anyone else's.
 - OPPORTUNITIES: open SAM.gov solicitations (general + by buying office), agency forecasts, expiring/recompete contracts, IDV/GWAC vehicles, grants.
   ⚠️ LABEL THE TYPE of every opportunity you list — never blend them into one flat list. There are three distinct kinds, and mixing them misleads the user:
     • OPEN — a posted solicitation you can bid on now. It HAS a SAM.gov link + a response deadline. CTA: bid / view the solicitation.
@@ -518,7 +520,14 @@ export async function POST(request: NextRequest) {
         // we should remove. No one wants to learn here"). Ask Mindy on the map answers from the
         // DATA CORE (live SAM/awards/agencies/firms/forecasts/recompete tools), not from a
         // teaching knowledge base. No RAG retrieval, no teaching context, no citation chips.
-        const profile = await loadBidderProfile(auth.email!);
+        // Coach Mode: the profile, Vault, pipeline and Vault-grounded drafts act on the same
+        // workspace the screens resolve (x-active-workspace, authorized via org_clients/org_members).
+        // No header → the caller's own data, with no extra query. See src/lib/chat/chat-acting-scope.ts.
+        const actingScope = await resolveChatActingScope(auth.email!, request);
+        // Unresolved workspace → NO profile (the private tools refuse too): a coach acting for a
+        // client must never get an answer built on their own profile.
+        const profileEmail = vaultEmailFor(actingScope);
+        const profile: BidderProfile = profileEmail ? await loadBidderProfile(profileEmail) : {};
         const userProfileBlock = formatProfileForPrompt(profile);
         const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
         // F1: the CURRENT_FIND contract (shared with the MCP host's P2 rule). Not for card chat, which answers
@@ -637,9 +646,13 @@ export async function POST(request: NextRequest) {
         // Option B: true while every tool result this turn was shown as a verified list.
         let allResultsRendered = true;
         try {
-          const tier0Runtime = makeTier0Tools(getSupabase(), auth.email!);
+          if (actingScope.kind === 'client') turnTrace.notices.push('acting_scope:client_workspace');
+          if (actingScope.kind === 'unavailable') turnTrace.notices.push('acting_scope:unavailable');
+          const tier0Runtime = makeTier0Tools(getSupabase(), actingScope);
           const executor = createChatToolExecutor({
             userEmail: auth.email!,
+            ...(actingScope.kind === 'client' ? { vaultEmail: actingScope.vaultEmail } : {}),
+            ...(actingScope.kind === 'unavailable' ? { privateScopeUnavailable: true } : {}),
             chatSessionId: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId) ? sessionId : null,
             tier0: { defs: TIER0_TOOL_DEFS, names: TIER0_TOOL_NAMES, execute: (n, a) => tier0Runtime.execute(n, a) },
             // Card chat offers only its opportunity tools (narrowing; the policy still applies).
