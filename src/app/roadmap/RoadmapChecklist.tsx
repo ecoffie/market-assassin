@@ -27,7 +27,6 @@ const CSS = `
 .rd-in{max-width:900px;margin:0 auto}
 .rd-hero .rd-in{padding:28px 0 36px;display:grid;gap:14px}
 .rd-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-.rd-brand{display:inline-flex;align-items:center;gap:8px;font:700 16px var(--mp-font-sans);color:var(--mp-ink)}
 .rd-ed{font:600 12px var(--mp-font-sans);color:var(--mp-navy);border:1px solid var(--mp-line);background:var(--mp-surface);padding:5px 12px;border-radius:999px}
 .rd-kicker{font:700 11px var(--mp-font-sans);letter-spacing:.1em;text-transform:uppercase;color:var(--mp-navy);margin:6px 0 0}
 .rd-h1{font:700 clamp(2.2rem,6vw,3.8rem)/1.03 var(--mp-font-sans);letter-spacing:-.03em;color:var(--mp-ink);margin:0;max-width:15ch;text-wrap:balance}
@@ -112,10 +111,9 @@ export default function RoadmapChecklist() {
         <div className="mp-container">
           <div className="rd-in">
             <div className="rd-top">
-              <span className="rd-brand"><MindyLogo size={26} />Mindy</span>
+              <p className="rd-kicker" style={{ margin: 0 }}>Free · no sign-up needed</p>
               <span className="rd-ed">2027 Edition</span>
             </div>
-            <p className="rd-kicker">Free · no sign-up needed</p>
             <h1 className="rd-h1">2027 Federal Contracting Roadmap</h1>
             <p className="rd-by">Presented by <MindyLogo size={20} /><b>Mindy</b></p>
             <p className="rd-lede">

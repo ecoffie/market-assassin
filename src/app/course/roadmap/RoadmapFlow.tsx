@@ -35,7 +35,6 @@ const CSS = `
 .rm-hero{background:var(--mp-navy-wash);border-bottom:1px solid var(--mp-line)}
 .rm-hero-in{max-width:760px;margin:0 auto;padding:28px 0 34px;display:grid;gap:14px}
 .rm-hero-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-.rm-brand{display:inline-flex;align-items:center;gap:8px;font:700 16px var(--mp-font-sans);color:var(--mp-ink)}
 .rm-ed{font:600 12px var(--mp-font-sans);color:var(--mp-navy);border:1px solid var(--mp-line);background:var(--mp-surface);padding:5px 12px;border-radius:999px}
 .rm-kicker{font:700 11px var(--mp-font-sans);letter-spacing:.1em;text-transform:uppercase;color:var(--mp-navy);margin:6px 0 0}
 .rm-h1{font:700 clamp(2.1rem,5.5vw,3.4rem)/1.04 var(--mp-font-sans);letter-spacing:-.03em;color:var(--mp-ink);margin:0;max-width:16ch;text-wrap:balance}
@@ -256,10 +255,9 @@ function RoadmapHero({ compact, kicker, lede }: { compact: boolean; kicker: stri
       <div className="mp-container">
         <div className="rm-hero-in">
           <div className="rm-hero-top">
-            <span className="rm-brand"><MindyLogo size={26} />Mindy</span>
+            <p className="rm-kicker" style={{ margin: 0 }}>{kicker}</p>
             <span className="rm-ed">2027 Edition</span>
           </div>
-          <p className="rm-kicker">{kicker}</p>
           <h1 className="rm-h1">2027 Federal Contracting Roadmap</h1>
           <p className="rm-by">Presented by <MindyLogo size={20} /><b>Mindy</b></p>
           {lede && <p className="rm-lede">{lede}</p>}
