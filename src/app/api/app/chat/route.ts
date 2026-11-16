@@ -48,7 +48,7 @@ import { customerErrorMessage } from '@/lib/chat/customer-errors';
 import { boundToolResult, perResultBudget } from '@/lib/chat/bound-tool-result';
 import { filterToolsForTurn, enforceFindArgs, SAM_ONLY_TOOL } from '@/lib/chat/tool-selection';
 import { CURRENT_FIND_CHAT_CONTRACT } from '@/lib/mcp/potato-journey';
-import { missingHorizonFooter, type FindResultLite } from '@/lib/chat/find-completeness';
+import { findCompletionFooter, type FindResultWithItems } from '@/lib/chat/find-completeness';
 import { inferredCodeDisclosure } from '@/lib/chat/code-disclosure';
 import { getNaics } from '@/lib/codes/lookup';
 import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
@@ -551,7 +551,7 @@ export async function POST(request: NextRequest) {
         // B2: full tool results by tool_call_id, so the token-budget step re-bounds from the originals.
         const toolOriginals = new Map<string, string>();
         // F1: the find_opportunities summary, so a CURRENT_FIND answer always covers all three horizons.
-        let findResult: FindResultLite | null = null;
+        let findResult: FindResultWithItems | null = null;
 
         // ── TOOL-ROUND message list — the CLEAN question, NO RAG context ──
         // (Andre @ CypherIntel 2026-07-30) The RAG teaching corpus was stapled onto
@@ -821,7 +821,7 @@ export async function POST(request: NextRequest) {
                 if (r) {
                   toolOriginals.set(r.tool_call_id, r.content);
                   if (r.record.tool === 'find_opportunities' && r.record.status === 'success') {
-                    try { const p = JSON.parse(r.content) as FindResultLite; if (p && typeof p === 'object') findResult = p; } catch { /* unparseable: no footer */ }
+                    try { const p = JSON.parse(r.content) as FindResultWithItems; if (p && typeof p === 'object') findResult = p; } catch { /* unparseable: no footer */ }
                   }
                   const bounded = boundToolResult(r.content, perResultCap);
                   if (bounded.truncated) turnTrace.notices.push(`tool_result_bounded:${r.record.tool}:${bounded.originalChars}->${bounded.content.length}`);
@@ -1137,13 +1137,14 @@ export async function POST(request: NextRequest) {
         }
         // F1: any horizon the answer left out is appended from the tool's own summary (status + counts only).
         if (findResult && assistantContent.trim()) {
-          // Any horizon the answer did not cover (counts only; rows are never added back deterministically:
-          // the tool's text match lets noise through, e.g. "Marine Security Guard Residence" cooking services).
-          const footer = missingHorizonFooter(assistantContent, findResult.summary);
+          // Any horizon the answer did not cover (counts only). Open now rows are never added back (the tool's
+          // text match lets noise through, e.g. "Marine Security Guard Residence" cooking services). Coming back
+          // DIRECT_MATCH rows (buy-side evidence) ARE added as a table when the answer did not name them.
+          const { text: footer, addedTable } = findCompletionFooter(assistantContent, findResult);
           if (footer) {
             assistantContent += footer;
             send({ type: 'token', content: footer });
-            turnTrace.notices.push('find_horizons_completed_from_summary');
+            turnTrace.notices.push(addedTable ? 'find_coming_back_table_from_tool' : 'find_horizons_completed_from_summary');
           }
         }
         turnTrace.answer = { provider: usedProvider, model: usedModel, finish_reason: finishReason, fallback: answerFallback };
