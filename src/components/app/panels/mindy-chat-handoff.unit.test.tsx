@@ -15,6 +15,7 @@ vi.mock('../authHeaders', () => ({
     if (url.startsWith('/api/app/chat-sessions') && url.includes('sessionId=')) {
       return { ok: true, status: 200, json: async () => ({ success: true, messages: [{ id: 'm1', role: 'user', content: 'earlier question' }, { id: 'm2', role: 'assistant', content: 'earlier answer' }] }) };
     }
+    if (url === '/api/pipeline') return { ok: true, status: 200, json: async () => ({ success: true, opportunity: { id: 'p-9' } }) };
     if (url === '/api/app/chat') {
       const enc = new TextEncoder();
       return { ok: true, status: 200, body: new ReadableStream({ start(c) { c.enqueue(enc.encode('data: {"type":"done"}\n\n')); c.close(); } }), json: async () => ({}) };
@@ -75,5 +76,23 @@ describe('MindyChatPanel map handoff', () => {
   it('no handoff → no chip', async () => {
     const el = await mount();
     expect(el.querySelector('[data-testid="attached-opp"]')).toBeNull();
+  });
+});
+
+describe('MindyChatPanel Start a proposal', () => {
+  it('only on click: tracks the notice and opens Proposals on that pursuit in-app', async () => {
+    sessionStorage.setItem('mindy_chat_handoff', JSON.stringify({ v: 1, sessionId: null, context: { kind: 'opportunity', notice_id: NID, title: 'T', deadline: '' } }));
+    const onPanelChange = vi.fn();
+    const el = document.createElement('div');
+    document.body.appendChild(el);
+    const root = createRoot(el);
+    await act(async () => { root.render(<MindyChatPanel email="pro@example.com" tier="pro" onPanelChange={onPanelChange} />); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    expect(calls.some((c) => c.url === '/api/pipeline')).toBe(false);
+    const btn = Array.from(el.querySelectorAll('button')).find((b) => b.textContent === 'Start a proposal')!;
+    await act(async () => { btn.click(); await new Promise((r) => setTimeout(r, 20)); });
+    const post = calls.find((c) => c.url === '/api/pipeline')!;
+    expect(post.body).toMatchObject({ user_email: 'pro@example.com', notice_id: NID, source: 'ask_mindy' });
+    expect(onPanelChange).toHaveBeenCalledWith('proposals', { pursuit_id: 'p-9' });
   });
 });
