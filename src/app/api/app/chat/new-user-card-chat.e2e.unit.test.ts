@@ -84,6 +84,12 @@ function fakeClient() {
   };
 }
 
+// The selected-notice incumbent lookup must not reach the network (or the model-call fetch counter).
+vi.mock('@/lib/usaspending/solicitation-incumbent', async (orig) => ({
+  ...(await orig<object>()),
+  resolveSolicitationIncumbent: async () => ({ queried: '', notice: null, incumbent: null, prior_awards: [], summary: null,
+    _meta: { grounded_notice: true, grounded_incumbent: false, degraded: false, notice_source: null, incumbent_finding: 'not_found' } }),
+}));
 vi.mock('@/lib/supabase/server-clients', () => ({ getWriteClient: () => fakeClient() }));
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => fakeClient() }));
 vi.mock('next/server', async (orig) => ({ ...(await orig<object>()), after: (fn: () => unknown) => { void fn(); } }));

@@ -79,8 +79,9 @@ const TRACE_RESULT_CHARS = Number(process.env.ASK_MINDY_TRACE_RESULT_CHARS) || 6
 import { shadowEntitlement } from '@/lib/entitlements/shadow';
 import {
   isCardChatEnabled, cardChatTurnCredits, parseOpportunityContext, cardChatAccess, isBillableTurn,
-  CARD_CHAT_TOOLS, OPPORTUNITY_COLUMNS, buildOpportunityContextBlock, type OpportunityRecord,
+  CARD_CHAT_TOOLS, buildOpportunityContextBlock,
 } from '@/lib/chat/card-chat';
+import { SELECTED_NOTICE_COLUMNS, loadSelectedNoticeFacts, formatSelectedNoticeFacts, type SelectedNoticeRecord } from '@/lib/chat/selected-notice';
 import { parseTurnId, claimCardTurn, completeCardTurn, failCardTurn, type ClaimResult } from '@/lib/chat/card-chat-turns';
 
 export const dynamic = 'force-dynamic';
@@ -397,11 +398,15 @@ export async function POST(request: NextRequest) {
   const chatPro = await hasProAccess(auth.email);
   shadowEntitlement({ route: 'app/chat POST', capability: 'chat.ask', email: auth.email, identityVerified: true, currentAllow: chatPro });
 
-  // ── Opportunity Map card chat (behind MAP_CARD_CHAT_ENABLED; see src/lib/chat/card-chat.ts) ──
-  // With the flag off, `context` is ignored entirely and this route behaves exactly as before.
-  // The client sends only the notice id; the record is loaded here, never taken from the client.
+  // ── Selected listing (Eric 2026-11-16: it attaches to THIS main chat; see src/lib/chat/selected-notice.ts) ──
+  // `context: { kind: 'opportunity', notice_id }` is parsed on every turn, flag or not. The client sends only
+  // the notice id; the record and its buyer/contact/incumbent facts are loaded here, never taken from the client.
+  // The legacy card-chat path (per-turn credits for non-Pro + its narrowed tool list) still exists only behind
+  // MAP_CARD_CHAT_ENABLED, which is off in production; with it off, a selected notice changes the context only:
+  // the Pro gate, the full tool set and the CURRENT_FIND contract are unchanged.
   const cardFlag = isCardChatEnabled();
-  const cardCtx = cardFlag ? parseOpportunityContext((body as { context?: unknown }).context) : null;
+  const selectedCtx = parseOpportunityContext((body as { context?: unknown }).context);
+  const cardCtx = cardFlag ? selectedCtx : null;
   const turnCredits = cardChatTurnCredits();
   // Charge once per question: a question already answered is replayed from its saved copy BEFORE any balance
   // check (it was paid for once already), with no model call and no debit.
@@ -437,17 +442,23 @@ export async function POST(request: NextRequest) {
   // A billable card question must carry its turn id: without one a retry could not be recognized, and the
   // route would have no saved copy to replay.
   if (cardBillable && !turnId) return jsonResponse({ error: 'turn_id_required' }, 400);
-  let cardRecord: OpportunityRecord | null = null;
-  if (cardCtx) {
+  let cardRecord: SelectedNoticeRecord | null = null;
+  // Why the selected notice could not be attached (main chat only; the card path refuses instead).
+  let selectedNoticeMiss: 'unavailable' | 'not_found' | null = null;
+  if (selectedCtx) {
     const { data: rec, error: recErr } = await getSupabase()
-      .from('sam_opportunities').select(OPPORTUNITY_COLUMNS).eq('notice_id', cardCtx.noticeId).maybeSingle();
-    if (recErr) {
-      return new Response(JSON.stringify({ error: 'opportunity_unavailable' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+      .from('sam_opportunities').select(SELECTED_NOTICE_COLUMNS).eq('notice_id', selectedCtx.noticeId).maybeSingle();
+    if (recErr || !rec) {
+      if (cardCtx) {
+        return recErr
+          ? new Response(JSON.stringify({ error: 'opportunity_unavailable' }), { status: 503, headers: { 'Content-Type': 'application/json' } })
+          : new Response(JSON.stringify({ error: 'opportunity_not_found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+      }
+      // Main chat: answer the question anyway, without a selected-notice block (never a guessed record).
+      selectedNoticeMiss = recErr ? 'unavailable' : 'not_found';
+    } else {
+      cardRecord = rec as unknown as SelectedNoticeRecord;
     }
-    if (!rec) {
-      return new Response(JSON.stringify({ error: 'opportunity_not_found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
-    cardRecord = rec as unknown as OpportunityRecord;
   }
 
   // B2: no Groq key is required any more (Groq is no longer the default fallback). Missing
@@ -523,11 +534,15 @@ export async function POST(request: NextRequest) {
         // Coach Mode: the profile, Vault, pipeline and Vault-grounded drafts act on the same
         // workspace the screens resolve (x-active-workspace, authorized via org_clients/org_members).
         // No header → the caller's own data, with no extra query. See src/lib/chat/chat-acting-scope.ts.
+        // The selected notice's buyer/contact/incumbent facts start loading now (incumbent bounded)
+        // so they run alongside the scope + profile reads below.
+        const noticeFactsP = cardRecord ? loadSelectedNoticeFacts(cardRecord).catch(() => null) : Promise.resolve(null);
         const actingScope = await resolveChatActingScope(auth.email!, request);
         // Unresolved workspace → NO profile (the private tools refuse too): a coach acting for a
         // client must never get an answer built on their own profile.
         const profileEmail = vaultEmailFor(actingScope);
         const profile: BidderProfile = profileEmail ? await loadBidderProfile(profileEmail) : {};
+        const noticeFacts = await noticeFactsP;
         const userProfileBlock = formatProfileForPrompt(profile);
         const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
         // F1: the CURRENT_FIND contract (shared with the MCP host's P2 rule). Not for card chat, which answers
@@ -539,7 +554,9 @@ export async function POST(request: NextRequest) {
           { role: 'system', content: systemPrompt },
         ];
         // Card chat: the selected opportunity, loaded from our record, as a labeled source block.
-        const cardContext = cardRecord ? buildOpportunityContextBlock(cardRecord, message) : null;
+        const cardContext = cardRecord
+          ? buildOpportunityContextBlock(cardRecord, splitViewPreamble(message).rest || message, noticeFacts ? formatSelectedNoticeFacts(noticeFacts) : [])
+          : null;
         if (cardContext) messages.push({ role: 'system', content: cardContext.block });
 
         // Trim history to last HISTORY_LIMIT messages for prompt-size budget.
@@ -632,7 +649,9 @@ export async function POST(request: NextRequest) {
           notices: string[];
           context?: { kind: 'opportunity'; notice_id: string };
         } = { planner: null, planner_attempts: [], tools_offered: 0, tool_executions: [], answer: null, answer_attempts: [], notices: [],
-              ...(cardCtx ? { context: { kind: 'opportunity' as const, notice_id: cardCtx.noticeId } } : {}) };
+              ...(selectedCtx ? { context: { kind: 'opportunity' as const, notice_id: selectedCtx.noticeId } } : {}) };
+        if (selectedNoticeMiss) turnTrace.notices.push(`selected_notice:${selectedNoticeMiss}`);
+        if (noticeFacts) turnTrace.notices.push(`selected_notice_incumbent:${noticeFacts.incumbent.finding}`);
         if (capabilityNote) turnTrace.notices.push('capability_interpreted');
         if (staging) turnTrace.notices.push(`staging_model_config:${staging.name}`);
         const notify = (code: string, text: string) => {
@@ -1181,7 +1200,7 @@ export async function POST(request: NextRequest) {
           send({ type: 'truncated', message: 'This answer hit its length limit and was cut off. Ask Mindy to continue, or narrow the question.' });
         }
         const citedSources: CitedSource[] = cardContext
-          ? [{ title: cardContext.source.label, url: cardContext.source.url, doc_type: 'sam_notice', source_path: null, document_id: cardCtx?.noticeId ?? null }]
+          ? [{ title: cardContext.source.label, url: cardContext.source.url, doc_type: 'sam_notice', source_path: null, document_id: selectedCtx?.noticeId ?? null }]
           : [];
         send({ type: 'citations', sources: citedSources });
 

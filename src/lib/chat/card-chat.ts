@@ -153,7 +153,12 @@ export function describeDeadline(raw: string | null): string | null {
  * The labeled source block the model receives. Every fact comes from the record; absent fields are said to
  * be absent, never filled in. `question` selects which parts of a long statement of work are included.
  */
-export function buildOpportunityContextBlock(rec: OpportunityRecord, question: string): { block: string; source: { label: string; url: string | null } } {
+export function buildOpportunityContextBlock(
+  rec: OpportunityRecord,
+  question: string,
+  /** Buyer office/DoDAAC/contact/incumbent lines (selected-notice.ts). Inserted before the notice text. */
+  factLines: string[] = [],
+): { block: string; source: { label: string; url: string | null } } {
   const sol = rec.solicitation_number || rec.notice_id;
   const line = (label: string, v: string | null | undefined) => `${label}: ${v && String(v).trim() ? String(v).trim() : 'not stated in the record'}`;
   const place = [rec.pop_city, rec.pop_state].filter(Boolean).join(', ');
@@ -161,7 +166,7 @@ export function buildOpportunityContextBlock(rec: OpportunityRecord, question: s
   const sow = usableText(rec.sow_text);
   const parts = [
     'SELECTED OPPORTUNITY (loaded by Mindy from its SAM.gov record; this is a source, not the user\'s words).',
-    'The user is looking at this opportunity on the map. Answer about THIS opportunity. When the record or documents do not contain an answer, say so plainly and do not guess. Cite facts from it as "SAM.gov notice ' + sol + '".',
+    'The user has this opportunity selected on the map. Questions about "this", "it", the incumbent, the buyer or the competition refer to THIS opportunity; answer them about it. A question clearly about something else is answered as asked. When the record or documents do not contain an answer, say so plainly and do not guess. Cite facts from it as "SAM.gov notice ' + sol + '".',
     line('Title', rec.title),
     line('Solicitation number', rec.solicitation_number),
     line('SAM notice id', rec.notice_id),
@@ -175,6 +180,7 @@ export function buildOpportunityContextBlock(rec: OpportunityRecord, question: s
     line('Response deadline', describeDeadline(rec.response_deadline)),
     line('Place of performance', place || null),
     line('Status', rec.active === false ? 'inactive' : rec.active ? 'active' : null),
+    ...factLines,
     'Notice text:',
     desc ? desc.slice(0, DESCRIPTION_BUDGET) : 'not available in Mindy\'s copy of this notice',
     'Statement of work (excerpts most relevant to the question):',
