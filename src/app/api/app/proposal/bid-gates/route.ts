@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { createClient } from '@supabase/supabase-js';
+import { authorizePursuitRead } from '@/lib/proposal/pursuit-access';
 import { callLLM } from '@/lib/llm/call-llm';
 
 export const runtime = 'nodejs';
@@ -60,6 +61,13 @@ export async function GET(request: NextRequest) {
   if (!pipelineId) return NextResponse.json({ success: false, error: 'pipeline_id required' }, { status: 400 });
 
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  // The pursuit and its solicitation are read with the service-role key: check access first.
+  const access = await authorizePursuitRead(sb, request, auth.session.email ?? '', pipelineId);
+  if (!access.ok) {
+    return access.reason === 'error'
+      ? NextResponse.json({ success: false, error: 'Could not load this pursuit. Try again.' }, { status: 503 })
+      : NextResponse.json({ success: false, error: 'Pursuit not found' }, { status: 404 });
+  }
   const { data: pursuit, error: pursuitErr } = await sb.from('user_pipeline')
     .select('title, set_aside, naics_code, response_deadline, notice_id')
     .eq('id', pipelineId).maybeSingle();
