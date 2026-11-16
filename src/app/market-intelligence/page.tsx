@@ -6,16 +6,17 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { persistAccessEmail } from '@/lib/access-cookie';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
+import { PRO_TRIAL_ANNUAL, PRO_TRIAL_MONTHLY, TEAM_TRIAL_ANNUAL, TEAM_TRIAL_MONTHLY } from '@/components/public-site/pricing/app-plan-links';
 
 // Public pricing — anchor prices for the upgrade page.
 //
 // Pro tier ($149/mo or $1,490/yr) is the default selection because
 // most upgrades are single-seat. Team tier ($499/mo or $4,990/yr,
 // 5 seats included) ships as a toggle option for small BD teams.
-const CHECKOUT_MONTHLY      = 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C'; // Pro $149/mo
-const CHECKOUT_ANNUAL       = 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D'; // Pro $1,490/yr
-const CHECKOUT_TEAM_MONTHLY = 'https://buy.stripe.com/9B63cw0ke8388pfclafnO0E'; // Team $499/mo
-const CHECKOUT_TEAM_ANNUAL  = 'https://buy.stripe.com/4gM14oc2W97c20R3OEfnO0F'; // Team $4,990/yr
+const CHECKOUT_MONTHLY      = PRO_TRIAL_MONTHLY;  // 14-day trial, then Pro $149/mo
+const CHECKOUT_ANNUAL       = PRO_TRIAL_ANNUAL;   // 14-day trial, then Pro $1,490/yr
+const CHECKOUT_TEAM_MONTHLY = TEAM_TRIAL_MONTHLY; // 14-day trial, then Team $499/mo
+const CHECKOUT_TEAM_ANNUAL  = TEAM_TRIAL_ANNUAL;  // 14-day trial, then Team annual
 
 // Private loyalty pricing (for email campaigns to past customers only - NOT shown on public page)
 // const CHECKOUT_LOYALTY_MONTHLY = 'https://buy.stripe.com/00wfZigjc97ceND3OEfnO0z'; // $49/mo
@@ -407,8 +408,8 @@ function MarketIntelligenceContent() {
             } text-(--mp-surface) font-bold text-base rounded-lg text-center transition-colors`}
           >
             {tier === 'pro'
-              ? (billingPeriod === 'monthly' ? 'Upgrade to Pro — Monthly →' : 'Upgrade to Pro — Annual →')
-              : (billingPeriod === 'monthly' ? 'Start Team — Monthly →' : 'Start Team — Annual →')}
+              ? (billingPeriod === 'monthly' ? 'Start 14-day free trial — Monthly →' : 'Start 14-day free trial — Annual →')
+              : (billingPeriod === 'monthly' ? 'Start 14-day Team trial — Monthly →' : 'Start 14-day Team trial — Annual →')}
           </a>
           <p className="text-center text-xs text-(--mp-muted) mt-2">
             Secure checkout via Stripe · Cancel anytime · All sales final · No refunds
@@ -545,7 +546,7 @@ function MarketIntelligenceContent() {
                     href={CHECKOUT_MONTHLY}
                     className="inline-block px-4 py-2 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-semibold transition-colors text-xs"
                   >
-                    Get Pro →
+                    Try Pro free →
                   </a>
                   <NoRefundNote />
                 </td>

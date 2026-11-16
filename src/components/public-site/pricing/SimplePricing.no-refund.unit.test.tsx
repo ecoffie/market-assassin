@@ -16,8 +16,8 @@ const trialHrefs = new Set([PRO_TRIAL_ANNUAL, PRO_TRIAL_MONTHLY, TEAM_TRIAL_ANNU
 describe('/pricing: no-refund line under each trial button', () => {
   const trialButtons = [...doc.querySelectorAll('a.cta')].filter((a) => trialHrefs.has(a.getAttribute('href') ?? ''));
 
-  it('finds the four trial buttons (two plan cards, two in the comparison table)', () => {
-    expect(trialButtons).toHaveLength(4);
+  it('finds the five trial buttons (hero, two plan cards, two in the comparison table)', () => {
+    expect(trialButtons).toHaveLength(5);
   });
 
   it('puts the note directly under every trial button', () => {
