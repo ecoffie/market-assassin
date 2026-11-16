@@ -22,6 +22,7 @@ import { createClient } from '@supabase/supabase-js';
 import { loadBidderProfile, formatProfileForPrompt, loadVaultContext } from '@/lib/proposal/loaders';
 import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
 import { selectRelevantRfp } from '@/lib/proposal/select-relevant';
+import { authorizePursuitRead } from '@/lib/proposal/pursuit-access';
 
 // RAG-as-standard: Manual Drive answers are informed by Mindy's real proposal
 // corpus (winning technical/pricing/past-perf volumes, templates, cap
@@ -130,6 +131,19 @@ export async function POST(request: NextRequest) {
   let rfpFileName = String(body.rfpFileName || '');
   let cachedRequirements: Array<{ requirement: string; category?: string; section?: string }> = [];
   if (pipelineId) {
+    // The documents are read with the service-role key, so ownership is checked
+    // here: the caller must own the pursuit or share its workspace.
+    const access = await authorizePursuitRead(
+      createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!),
+      request,
+      auth.session.email ?? '',
+      pipelineId,
+    );
+    if (!access.ok) {
+      return access.reason === 'error'
+        ? NextResponse.json({ success: false, error: 'Could not load this pursuit. Try again.' }, { status: 503 })
+        : NextResponse.json({ success: false, error: 'Pursuit not found' }, { status: 404 });
+    }
     const loaded = await loadPursuitContext(pipelineId);
     if (loaded.rfpText) { rfpText = loaded.rfpText; rfpFileName = loaded.rfpFileName || rfpFileName; }
     cachedRequirements = loaded.requirements;
