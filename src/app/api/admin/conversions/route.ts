@@ -148,7 +148,7 @@ export async function GET(req: NextRequest) {
       'Lead-magnet registrations = GHL contacts with that tag whose contact was created in the window (someone already on your list who registers counts on the day they first joined the list).',
       'New accounts = alert-settings rows created in the window (every new account gets one).',
       'Trials started = completed Stripe checkouts on the four 14-day trial links.',
-      'Clicked a trial button = people on /pricing who clicked "Start 14-day trial" (Google Analytics; our trial_click event plus GA4 outbound clicks to Stripe checkout). Checkout completion = trials started ÷ people who clicked.',
+      'Clicked a trial button = people on /pricing who clicked a "Start free trial" button (Google Analytics; our trial_click event plus GA4 outbound clicks to Stripe checkout). Checkout completion = trials started ÷ people who clicked.',
       'Avg time on pricing = Google Analytics engaged time on /pricing per visitor (time the tab was in front of them).',
       'Paid sign-ups = new Stripe subscriptions to Mindy (App = Pro/Team, Credits = MCP credit plans), by Eastern date; a free trial counts on the day it is first charged, abandoned checkouts and trials that cancel are excluded, one-time purchases not counted.',
     ],

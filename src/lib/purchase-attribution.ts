@@ -27,16 +27,19 @@ export type CheckoutProduct = {
   type: 'stripe_payment_link' | 'external';
 };
 
-// Mindy Pro + Team checkout targets. Pro monthly/annual are live Stripe payment
-// links; the IDs match the govcon-funnels map so cross-site product rollups
-// aggregate cleanly.
+// Mindy Pro + Team checkout targets. The IDs match the govcon-funnels map so
+// cross-site product rollups aggregate cleanly. Pro monthly/annual point at the
+// 14-day FREE-TRIAL links (2026-11-16) — the same links as /pricing
+// (components/public-site/pricing/app-plan-links.ts). They used to point at the
+// pay-today links, so the in-app upgrade button and the free-user upgrade emails
+// never offered the trial. amountCents stays the post-trial price.
 export const CHECKOUT_PRODUCTS: Record<string, CheckoutProduct> = {
   'mindy-pro-monthly': {
     id: 'mindy-pro-monthly',
     name: 'Mindy Pro Monthly',
     priceLabel: '$149/mo',
     amountCents: 14900,
-    checkoutUrl: 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C',
+    checkoutUrl: 'https://buy.stripe.com/7sYcN64Au4QWcFv70QfnO18', // 14-day trial, then $149/mo
     type: 'stripe_payment_link',
   },
   'mindy-pro-annual': {
@@ -44,7 +47,7 @@ export const CHECKOUT_PRODUCTS: Record<string, CheckoutProduct> = {
     name: 'Mindy Pro Annual',
     priceLabel: '$1,490/yr',
     amountCents: 149000,
-    checkoutUrl: 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D',
+    checkoutUrl: 'https://buy.stripe.com/fZudRaff82IO48Z5WMfnO19', // 14-day trial, then $1,490/yr
     type: 'stripe_payment_link',
   },
   // Founders Lifetime $4,997 — capped founding cohort (100 seats). Same product

@@ -4,6 +4,11 @@
  * /pricing — three plans, little text (modeled on Fyxer's pricing page, Nov 2026).
  * Pro and Team start a 14-day free trial (card required); Enterprise goes to sales.
  * No Free plan on this page. Credit allowances come from the server constants as props.
+ *
+ * Trial-click pass (2026-11-16): only ~4% of pricing visitors clicked a trial button, and all
+ * three trials so far were Pro monthly. So the hero now leads with the free trial and its own
+ * button, Pro is the highlighted plan, monthly billing is the default, and every trial button
+ * says "$0 today" (the charge only comes after 14 days).
  * The credit-only MCP plans keep their own page at /mcp/pricing.
  */
 import { useEffect, useState } from 'react';
@@ -119,7 +124,7 @@ type CompareGroup = [group: string, rows: Array<[label: string, pro: Cell, team:
 export default function SimplePricing({ proCredits, teamCredits, forecastsLabel, faqs }: {
   proCredits: number; teamCredits: number; forecastsLabel: string; faqs: { q: string; a: string }[];
 }) {
-  const [annual, setAnnual] = useState(true);
+  const [annual, setAnnual] = useState(false);
   // Same token every Mindy page sends; /api/app/me verifies it server-side. Any failure leaves the
   // public page as is (never guesses a plan).
   const [me, setMe] = useState<MePlan | null>(null);
@@ -154,11 +159,11 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
 
   const basePlans: Plan[] = [
     {
-      name: 'Pro', tag: 'For solo contractors and small firms going after federal work.',
+      name: 'Pro', tag: 'For solo contractors and small firms going after federal work.', featured: true,
       price: annual ? `$${fmt(Math.round(PRO_ANNUAL_USD / 12))}` : `$${PRO_MONTHLY_USD}`,
       was: annual ? `$${PRO_MONTHLY_USD}` : undefined,
       per: annual ? '/ mo, billed annually' : '/ mo, billed monthly', trial: true,
-      cta: 'Start 14-day trial', href: annual ? PRO_TRIAL_ANNUAL : PRO_TRIAL_MONTHLY,
+      cta: 'Start free trial', href: annual ? PRO_TRIAL_ANNUAL : PRO_TRIAL_MONTHLY,
       lead: 'Find and win your own contracts.', base: 'Everything you need to start',
       features: [
         ['Opportunities matched to you', 'Daily alerts and briefings for your NAICS, keywords and agencies.'],
@@ -169,11 +174,11 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
       usage: ['Monthly usage included', `${fmt(proCredits)} credits / month`],
     },
     {
-      name: 'Team', tag: 'Built for BD teams working several markets at once.', featured: true,
+      name: 'Team', tag: 'Built for BD teams working several markets at once.',
       price: annual ? `$${fmt(TEAM_ANNUAL_PER_MONTH)}` : `$${TEAM_MONTHLY_USD}`,
       was: annual ? `$${TEAM_MONTHLY_USD}` : undefined,
       per: annual ? '/ mo, billed annually' : '/ mo, billed monthly', trial: true,
-      cta: 'Start 14-day trial', href: annual ? TEAM_TRIAL_ANNUAL : TEAM_TRIAL_MONTHLY,
+      cta: 'Start free trial', href: annual ? TEAM_TRIAL_ANNUAL : TEAM_TRIAL_MONTHLY,
       lead: 'Win more as a team.', base: 'All Pro features, plus',
       features: [
         ['Up to 5 users', 'One plan for your whole BD team.'],
@@ -243,7 +248,15 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
     <main className="sp">
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
       <section className="hero">
-        <h1>Plans that grow with you</h1>
+        <h1>Try Mindy Pro free for 14 days</h1>
+        {(!me || me === 'free') && (
+          <>
+            <p className="sub">$0 today. Cancel anytime before day 14 and you won&apos;t be charged.</p>
+            <a className="cta hero-cta" href={annual ? PRO_TRIAL_ANNUAL : PRO_TRIAL_MONTHLY}
+              onClick={() => trackTrialClick('pro', annual ? 'annual' : 'monthly', 'hero')}>Start my free trial</a>
+            <NoRefundNote style={{ margin: '8px 0 0' }} />
+          </>
+        )}
         {me ? (
           <p className="you">You&apos;re on the <b>{PLAN_NAME[me]}</b> plan.{me !== 'free' && <> <a href={BILLING_URL}>Manage billing</a></>}</p>
         ) : <MemberProof />}
@@ -257,7 +270,7 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
       <section className="cards" id="plans">
         {plans.map((p) => (
           <article key={p.name} className={`card ${p.featured ? 'featured' : ''} ${p.current ? 'current' : ''}`}>
-            <h2>{p.name}{p.current && <span className="mine">Your plan</span>}</h2>
+            <h2>{p.name}{p.current ? <span className="mine">Your plan</span> : p.featured && <span className="pop">Most popular</span>}</h2>
             <p className="tag">{p.tag}</p>
             {p.price ? (
               <div className="price"><span className="now">{p.price}</span>{p.was && <span className="was">{p.was}</span>}</div>
@@ -265,7 +278,7 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
               <div className="price"><span className="now sales">Speak to sales</span></div>
             )}
             <p className="per">{p.per}</p>
-            {p.trial && <p className="trial">14 day free trial</p>}
+            {p.trial && <p className="trial"><b>$0 today</b> · 14 days free</p>}
             {p.current
               ? <span className="cta is-current" aria-current="true">Current plan</span>
               : <a className={`cta ${p.outline ? 'outline' : ''}`} href={p.href} onClick={p.trial ? () => trackTrialClick(p.name === 'Team' ? 'team' : 'pro', annual ? 'annual' : 'monthly', 'card') : undefined}>{p.cta}</a>}
@@ -376,6 +389,10 @@ const CSS = `
 .sp .tu-err{margin:8px 0 0;font-size:13px;color:var(--mp-warn)}
 .sp .tu-ok{margin:-8px 0 22px;font-size:14px;color:var(--mp-ok);font-weight:600}
 .sp .you{margin:14px 0 0;font-size:16px;color:var(--mp-body)}
+.sp .hero .sub{margin:14px auto 0;font-size:18px;line-height:1.5;color:var(--mp-body);max-width:560px}
+.sp .hero .hero-cta{display:inline-block;margin:20px 0 0;padding:14px 32px;font-size:17px}
+.sp .hero .hero-cta + p{max-width:420px;margin-left:auto !important;margin-right:auto !important}
+.sp .card h2 .pop{margin-left:10px;vertical-align:middle;font:600 12px var(--mp-font-sans);color:var(--mp-navy);border:1px solid var(--mp-navy);border-radius:999px;padding:3px 10px}
 .sp .you a{color:var(--mp-navy);margin-left:6px}
 .sp .lead{font-weight:600;margin:0}
 .sp .base{color:var(--mp-muted);font-size:13px;margin:2px 0 12px}

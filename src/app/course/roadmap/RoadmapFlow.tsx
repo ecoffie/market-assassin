@@ -281,9 +281,9 @@ function ProOffer({ proCredits, firstName, onSkip }: { proCredits: number; first
           </li>
         </ul>
         <a className="rm-link rm-link--primary" href={PRO_CHECKOUT} style={{ marginTop: 24, width: '100%', justifyContent: 'center', fontSize: 16 }}>
-          Yes, get Mindy Pro for $149/mo
+          Yes, try Mindy Pro free for 14 days
         </a>
-        <p className="mp-meta" style={{ marginTop: 8, textAlign: 'center' }}>Cancel anytime.</p>
+        <p className="mp-meta" style={{ marginTop: 8, textAlign: 'center' }}>$0 today, then $149/mo. Cancel anytime before day 14.</p>
         <NoRefundNote />
       </div>
 

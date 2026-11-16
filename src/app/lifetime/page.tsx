@@ -8,6 +8,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import FoundersSeats from '@/components/lifetime/FoundersSeats';
+import { PRO_TRIAL_ANNUAL, PRO_TRIAL_MONTHLY } from '@/components/public-site/pricing/app-plan-links';
 import {
   FOUNDERS_LIFETIME_CAP,
   FOUNDERS_LIFETIME_PRICE,
@@ -21,8 +22,8 @@ export const dynamic = 'force-dynamic';
 
 const FOUNDERS_CHECKOUT = '/checkout/founders-lifetime';
 const BOOTCAMP_CHECKOUT = '/checkout/bootcamp-lifetime';
-const MONTHLY_CHECKOUT = 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C';
-const ANNUAL_CHECKOUT = 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D';
+const MONTHLY_CHECKOUT = PRO_TRIAL_MONTHLY; // 14-day trial, then $149/mo
+const ANNUAL_CHECKOUT = PRO_TRIAL_ANNUAL;   // 14-day trial, then $1,490/yr
 
 const breakEvenMonths = foundersBreakEvenMonths();
 
@@ -304,7 +305,7 @@ export default function LifetimePage() {
             {special ? `Claim your lifetime seat — $${fmt(livePrice)} →` : 'Claim Founders Lifetime →'}
           </Link>
           <p className="mt-6 text-sm text-(--mp-muted)">
-            Not ready?{' '}
+            Not ready? Try Pro free for 14 days, then{' '}
             <Link href={MONTHLY_CHECKOUT} className="text-(--mp-navy) hover:underline">
               Pro at ${PRO_MONTHLY}/mo
             </Link>{' '}
