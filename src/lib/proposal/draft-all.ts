@@ -35,6 +35,12 @@ const PARALLEL_BATCH_SIZE = 3;
 
 export interface DraftAllOpts {
   email: string;
+  /**
+   * Who pays for the LLM calls (cost log + per-user budget). Defaults to `email`. Set when
+   * `email` names a Vault that is not the caller's: a coach drafting for a client
+   * workspace reads the client's Vault but the cost stays on the coach.
+   */
+  billingEmail?: string;
   sourceText: string;
   fileName?: string;
   rfpAgency?: string | null;
@@ -176,6 +182,7 @@ async function renderSectionsInBatches(
         }
         const sectionArgs = {
           email: opts.email,
+          ...(opts.billingEmail ? { billingEmail: opts.billingEmail } : {}),
           sectionType: outline.sectionType,
           sourceText: augmentedSource,
           fileName: opts.fileName,

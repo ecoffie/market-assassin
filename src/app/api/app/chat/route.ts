@@ -41,7 +41,8 @@ import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/ti
 // Tools run ONLY through the chat tool executor (policy check at offer AND execution,
 // preflight, per-tool error capture, execution log). Never import runMcpTool here.
 import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/chat-tool-executor';
-import { resolveChatActingScope } from '@/lib/chat/chat-acting-scope';
+import { resolveChatActingScope, vaultEmailFor } from '@/lib/chat/chat-acting-scope';
+import type { BidderProfile } from '@/lib/proposal/types';
 import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, resolveAnswerChain, answerKey, ANSWER_ENDPOINTS, openAiChatParams, type PlannerTarget } from '@/lib/chat/planner-config';
 import { fitMessages, inputBudget, type MsgKind } from '@/lib/chat/token-budget';
 import { stagingModelConfig, STAGING_CONFIG_HEADER } from '@/lib/chat/staging-model-config';
@@ -523,7 +524,10 @@ export async function POST(request: NextRequest) {
         // workspace the screens resolve (x-active-workspace, authorized via org_clients/org_members).
         // No header → the caller's own data, with no extra query. See src/lib/chat/chat-acting-scope.ts.
         const actingScope = await resolveChatActingScope(auth.email!, request);
-        const profile = await loadBidderProfile(actingScope.kind === 'client' ? actingScope.vaultEmail : auth.email!);
+        // Unresolved workspace → NO profile (the private tools refuse too): a coach acting for a
+        // client must never get an answer built on their own profile.
+        const profileEmail = vaultEmailFor(actingScope);
+        const profile: BidderProfile = profileEmail ? await loadBidderProfile(profileEmail) : {};
         const userProfileBlock = formatProfileForPrompt(profile);
         const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
         // F1: the CURRENT_FIND contract (shared with the MCP host's P2 rule). Not for card chat, which answers

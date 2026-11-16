@@ -131,3 +131,13 @@ describe('Vault-grounded registry tools in chat', () => {
     expect(r.content).toContain('workspace_unavailable');
   });
 });
+
+describe('chat route: the system-prompt profile follows the acting scope (F1)', () => {
+  it('loads the profile via vaultEmailFor and uses an empty profile when the scope is unavailable', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(`${process.cwd()}/src/app/api/app/chat/route.ts`, 'utf8');
+    expect(src).toMatch(/const profileEmail = vaultEmailFor\(actingScope\);/);
+    expect(src).toMatch(/profileEmail \? await loadBidderProfile\(profileEmail\) : \{\}/);
+    expect(src).not.toMatch(/loadBidderProfile\(auth\.email/);
+  });
+});

@@ -45,6 +45,12 @@ async function mapPool<T, R>(items: T[], concurrency: number, fn: (item: T, i: n
 
 export interface MultiPassOpts {
   email: string;
+  /**
+   * Who pays for the LLM calls (cost log + per-user budget). Defaults to `email`. Set when
+   * `email` names a Vault that is not the caller's: a coach drafting for a client
+   * workspace reads the client's Vault but the cost stays on the coach.
+   */
+  billingEmail?: string;
   sectionType: SectionType;
   sourceText: string;
   fileName?: string;

@@ -2959,7 +2959,8 @@ async function dispatchMcpTool(
       notice_id: typeof args.notice_id === 'string' ? args.notice_id : undefined,
       sections: Array.isArray(args.sections) ? (args.sections as string[]) : undefined,
       agency: typeof args.agency === 'string' ? args.agency : undefined,
-      userEmail: ctx.vaultEmail ?? ctx.userEmail,
+      userEmail: ctx.userEmail,
+      vaultEmail: ctx.vaultEmail,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
@@ -2973,7 +2974,8 @@ async function dispatchMcpTool(
       requirements: Array.isArray(args.requirements)
         ? (args.requirements as Array<{ requirement: string; category?: string; section?: string; id?: string }>)
         : undefined,
-      userEmail: ctx.vaultEmail ?? ctx.userEmail,
+      userEmail: ctx.userEmail,
+      vaultEmail: ctx.vaultEmail,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
