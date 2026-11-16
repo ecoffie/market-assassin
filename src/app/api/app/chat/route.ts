@@ -48,7 +48,7 @@ import { customerErrorMessage } from '@/lib/chat/customer-errors';
 import { boundToolResult, perResultBudget } from '@/lib/chat/bound-tool-result';
 import { filterToolsForTurn, enforceFindArgs, SAM_ONLY_TOOL } from '@/lib/chat/tool-selection';
 import { CURRENT_FIND_CHAT_CONTRACT } from '@/lib/mcp/potato-journey';
-import { findCompletionFooter, type FindResultWithItems } from '@/lib/chat/find-completeness';
+import { findCompletionFooter, comingBackListLeadsWithNotCompeted, type FindResultWithItems } from '@/lib/chat/find-completeness';
 import { inferredCodeDisclosure } from '@/lib/chat/code-disclosure';
 import { getNaics } from '@/lib/codes/lookup';
 import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
@@ -1140,6 +1140,10 @@ export async function POST(request: NextRequest) {
           // Any horizon the answer did not cover (counts only). Open now rows are never added back (the tool's
           // text match lets noise through, e.g. "Marine Security Guard Residence" cooking services). Coming back
           // DIRECT_MATCH rows (buy-side evidence) ARE added as a table when the answer did not name them.
+          // Monitoring only (no rewrite): the answer's own list opened with a not-competed Coming back row.
+          if (comingBackListLeadsWithNotCompeted(assistantContent, findResult?.horizons?.coming_back?.items || [])) {
+            turnTrace.notices.push('find_coming_back_order_not_competed_first');
+          }
           const { text: footer, addedTable } = findCompletionFooter(assistantContent, findResult);
           if (footer) {
             assistantContent += footer;

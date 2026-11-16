@@ -125,6 +125,27 @@ export function answerNamesTopComingBack(answer: string, items: ComingBackItemLi
   return top.filter((k) => a.includes(k)).length >= Math.min(3, top.length);
 }
 
+/**
+ * True when the answer's own prose (tables excluded) names a not-competed Coming back holder before any
+ * competed / not-established one, while such a row exists. The ordering rule says competed rows come first;
+ * this is the check behind it (FL janitorial 2026-11-16: the short list opened with a not-competed row).
+ */
+export function comingBackListLeadsWithNotCompeted(answer: string, items: ComingBackItemLite[]): boolean {
+  const direct = items.filter((i) => i.evidence_class === 'DIRECT_MATCH' && i.incumbent_name);
+  if (!direct.some((i) => i.competition?.class !== 'not_competed')) return false; // nothing competed to put first
+  const prose = String(answer || '').split('\n').filter((l) => !/^\s*\|/.test(l)).join('\n')
+    .toLowerCase().replace(/[^a-z0-9 \n]+/g, ' ').replace(/[ ]+/g, ' ');
+  let first: ComingBackItemLite | null = null;
+  let firstAt = Infinity;
+  for (const i of direct) {
+    const k = nameKey(String(i.incumbent_name));
+    if (!k) continue;
+    const at = prose.indexOf(k);
+    if (at >= 0 && at < firstAt) { firstAt = at; first = i; }
+  }
+  return !!first && first.competition?.class === 'not_competed';
+}
+
 /** Narrow-panel table (4 columns) of the top direct Coming back rows. '' when there are none. */
 export function comingBackTable(items: ComingBackItemLite[], max = COMING_BACK_TABLE_ROWS): string {
   const rows = prioritizedComingBack(items).slice(0, max);

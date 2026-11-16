@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { missingHorizonFooter, findCompletionFooter, comingBackTable, prioritizedComingBack, answerNamesTopComingBack } from './find-completeness';
+import { missingHorizonFooter, findCompletionFooter, comingBackTable, prioritizedComingBack, answerNamesTopComingBack, comingBackListLeadsWithNotCompeted } from './find-completeness';
+import { orderCompetedFirst } from '../opportunities/competition-facts';
 import flFx from './__fixtures__/fl-janitorial-coming-back.json';
 
 const FL = {
@@ -80,5 +81,42 @@ describe('Florida janitorial: Coming back rows are shown deterministically, qual
     expect(findCompletionFooter('## Open now … ## Coming back one line ## Coming soon …', { summary: flFx.summary, horizons: { coming_back: { status: 'grounded', items: two } } }).addedTable).toBe(false);
     const related = flFx.items.map((i) => ({ ...i, evidence_class: 'RELATED_MARKET_CANDIDATE' }));
     expect(comingBackTable(related)).toBe('');
+  });
+});
+
+describe('Coming back order: competed first in every list (FL janitorial, 2026-11-16)', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const items = (flFx as any).items as Parameters<typeof orderCompetedFirst>[0];
+  it('the tool order puts every competed / not-established row before any not-competed one, keeping end-date order inside each group', () => {
+    expect(items[0].competition?.class).toBe('not_competed'); // fixture = the pre-fix order (Ally Facility first)
+    const out = orderCompetedFirst(items);
+    expect(out).toHaveLength(items.length);
+    const firstRestricted = out.findIndex((i) => i.competition?.class === 'not_competed');
+    expect(out.slice(firstRestricted).every((i) => i.competition?.class === 'not_competed')).toBe(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const names = out.slice(0, firstRestricted).map((i: any) => i.incumbent_name);
+    expect(names).toEqual(['DAMMEL CLEANING ENTERPRISE INC', 'CARC-ADVOCATES FOR CITIZENS WITH DISABILITIES, INC.', 'FORTAZO CORP.', 'NASCENCE GROUP LLC', 'VIP SPECIAL SERVICES LLC', 'CITADEL FEDERAL SOLUTIONS LLC']);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((out[firstRestricted] as any).incumbent_name).toBe('ALLY FACILITY SOLUTIONS, INC.');
+  });
+  it('evidence classes keep their order; a class is never mixed into another', () => {
+    const rows = [
+      { evidence_class: 'DIRECT_MATCH', competition: { class: 'not_competed' }, id: 1 },
+      { evidence_class: 'DIRECT_MATCH', competition: { class: 'competed' }, id: 2 },
+      { evidence_class: 'RELATED_MARKET_CANDIDATE', competition: { class: 'competed' }, id: 3 },
+      { evidence_class: 'RELATED_MARKET_CANDIDATE', competition: null, id: 4 },
+    ];
+    expect(orderCompetedFirst(rows).map((r) => r.id)).toEqual([2, 1, 3, 4]);
+  });
+  it('flags a short list that opens with the not-competed Ally Facility row; passes once competed rows lead', () => {
+    const bad = 'Coming back in Florida:\n- **Ally Facility Solutions** — ends Nov. 18, 2026 (Not competed)\n- **Dammel Cleaning Enterprise** — ends Nov. 30, 2026 (Competed · SB set-aside)';
+    const good = 'Coming back in Florida:\n- **Dammel Cleaning Enterprise** — ends Nov. 30, 2026 (Competed · SB set-aside)\n- **Ally Facility Solutions** — ends Nov. 18, 2026 (Not competed)';
+    expect(comingBackListLeadsWithNotCompeted(bad, items)).toBe(true);
+    expect(comingBackListLeadsWithNotCompeted(good, items)).toBe(false);
+  });
+  it('the table alone never triggers it, and an all-not-competed result has nothing to put first', () => {
+    expect(comingBackListLeadsWithNotCompeted(comingBackTable(items), items)).toBe(false);
+    const restrictedOnly = items.filter((i) => i.competition?.class === 'not_competed');
+    expect(comingBackListLeadsWithNotCompeted('Ally Facility Solutions ends soon.', restrictedOnly)).toBe(false);
   });
 });
