@@ -18,7 +18,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
-import { resolveActiveWorkspace } from '@/lib/app/workspace';
+// Owner, or a member / authorized coach of the pursuit's workspace — the shared rule (#2086).
+import { canAccessPursuit } from '@/lib/proposal/pursuit-access';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,21 +35,6 @@ function getSupabase(): SupabaseClient {
 type Status = 'open' | 'in_progress' | 'done' | 'n_a';
 const STATUSES: Status[] = ['open', 'in_progress', 'done', 'n_a'];
 
-async function ownsPursuit(
-  row: { user_email?: string | null; workspace_id?: string | null },
-  email: string,
-  request: NextRequest,
-): Promise<boolean> {
-  if (row.user_email?.toLowerCase() === email.toLowerCase()) return true;
-  if (row.workspace_id) {
-    try {
-      const { workspaceId } = await resolveActiveWorkspace(email.toLowerCase(), request);
-      if (workspaceId && row.workspace_id === workspaceId) return true;
-    } catch { /* deny */ }
-  }
-  return false;
-}
-
 /** Load the pursuit row and verify the caller may access it. */
 async function authorizePursuit(request: NextRequest, email: string, pipelineId: string) {
   const sb = getSupabase();
@@ -59,7 +45,7 @@ async function authorizePursuit(request: NextRequest, email: string, pipelineId:
     .maybeSingle();
   if (pursuitErr) console.error('[compliance-state] pursuit query error:', pursuitErr.message);
   if (!pursuit) return { ok: false as const, status: 404, error: 'Pursuit not found' };
-  if (!(await ownsPursuit(pursuit, email, request))) return { ok: false as const, status: 403, error: 'Not your pursuit' };
+  if (!(await canAccessPursuit(pursuit, email, request))) return { ok: false as const, status: 403, error: 'Not your pursuit' };
   return { ok: true as const, sb };
 }
 

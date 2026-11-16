@@ -18,7 +18,8 @@ import { logEngagement, EventTypes } from '@/lib/engagement';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { fetchPursuitDocsAuto } from '@/lib/grants/fetch-grant-docs';
-import { resolveActiveWorkspace } from '@/lib/app/workspace';
+// Owner, or a member / authorized coach of the pursuit's workspace — the shared rule (#2086).
+import { canAccessPursuit } from '@/lib/proposal/pursuit-access';
 import { isValidSamNoticeId } from '@/lib/sam/utils';
 import { fetchNoticeDescription, isDescriptionLink } from '@/lib/sam/notice-description';
 
@@ -36,27 +37,6 @@ function getSupabase() {
     );
   }
   return _supabase;
-}
-
-// A pursuit belongs to the caller if their email matches OR it lives in their
-// workspace. The pipeline LIST endpoint scopes the same way, so a workspace
-// pursuit shows up in the picker — matching only on user_email here 403'd those
-// rows ("not your pursuit") even though the user could see them.
-async function ownsPursuit(
-  row: { user_email?: string | null; workspace_id?: string | null },
-  email: string,
-  request: NextRequest,
-): Promise<boolean> {
-  if (row.user_email?.toLowerCase() === email.toLowerCase()) return true;
-  if (row.workspace_id) {
-    try {
-      const { workspaceId } = await resolveActiveWorkspace(email.toLowerCase(), request);
-      if (workspaceId && row.workspace_id === workspaceId) return true;
-    } catch {
-      // Workspace lookup unavailable — deny.
-    }
-  }
-  return false;
 }
 
 /**
@@ -133,7 +113,7 @@ export async function GET(request: NextRequest) {
       { status: 404 }
     );
   }
-  if (!(await ownsPursuit(pipelineRow, email, request))) {
+  if (!(await canAccessPursuit(pipelineRow, email, request))) {
     return NextResponse.json(
       { success: false, error: 'not your pursuit' },
       { status: 403 }
@@ -375,7 +355,7 @@ export async function POST(request: NextRequest) {
   if (pipelineErr || !pipelineRow) {
     return NextResponse.json({ success: false, error: 'pursuit not found' }, { status: 404 });
   }
-  if (!(await ownsPursuit(pipelineRow, email, request))) {
+  if (!(await canAccessPursuit(pipelineRow, email, request))) {
     return NextResponse.json({ success: false, error: 'not your pursuit' }, { status: 403 });
   }
   if (!pipelineRow.notice_id) {
