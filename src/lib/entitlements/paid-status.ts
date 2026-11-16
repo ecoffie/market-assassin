@@ -28,6 +28,7 @@
  * Gated: consumers switch to this only when PAID_STATUS_RESOLVER=true (literal 'true',
  * like every repo flag). Default OFF = every consumer keeps its old definition.
  */
+import { kv } from '@vercel/kv';
 import { getWriteClient } from '@/lib/supabase/server-clients';
 import { getStaffRole } from '@/lib/api-auth';
 import { isAdvocateAccount } from '@/lib/mindy/advocate-accounts';
@@ -50,7 +51,7 @@ export * from './paid-reasons';
 
 export type PaidStatusKind =
   | 'active_paid'      // live paid subscription, live MCP plan, or a funded team pool
-  | 'prepaid'          // live off-Stripe prepaid term (invoice / wire / bundle)
+  | 'prepaid'          // live off-Stripe prepaid term (invoice / wire / bundle), or a lifetime / bundle purchase
   | 'paid_credits'     // bought credits (top-up / auto-recharge), no live subscription
   | 'complimentary'    // staff / advocate / comp — access yes, paid no
   | 'trial'            // trialing; a $0 trial invoice is still a trial
@@ -66,6 +67,8 @@ export type PaidSource =
   | 'unverified_app_tier'
   | 'credit_purchase'
   | 'prepaid'
+  | 'lifetime_purchase'
+  | 'pro_giant_term'
   | 'pool'
   | 'trial'
   | 'staff'
@@ -109,6 +112,10 @@ export interface ChargeFact {
   created_at?: string | null;
 }
 export interface PrepaidFact { access_starts_on: string; access_ends_on: string }
+export interface ProGiantFact { purchasedAt: string | null }
+
+/** The Pro Giant bundle bought one year of Pro. */
+export const PRO_GIANT_TERM_DAYS = 365;
 
 /** All inputs; `null` for a store means the read FAILED (not "empty"). */
 export interface PaidStatusFacts {
@@ -124,6 +131,17 @@ export interface PaidStatusFacts {
   /** undefined when the trial read failed. */
   trialReadOk?: boolean;
   poolFunded: boolean | null;
+  /**
+   * A lifetime / bundle purchase that is live right now (owner 2026-11-15: lifetime bundle
+   * members are paid). undefined = not read (treated as no); null = the read FAILED.
+   */
+  lifetimeMember?: boolean | null;
+  /**
+   * Pro Giant bundle (owner 2026-11-15: one year of Pro, not lifetime). Present only for a
+   * Pro Giant buyer whose Pro grant is live; purchasedAt null = the purchase date could not
+   * be found. undefined = not a Pro Giant member (or not read); null = the read FAILED.
+   */
+  proGiant?: ProGiantFact | null;
   isStaff: boolean;
   isAdvocate: boolean;
   isComp: boolean;
@@ -168,6 +186,8 @@ export function classifyPaidStatus(f: PaidStatusFacts, policy: PaidStatusPolicy 
   if (f.prepaid === null) failures.push('mcp_prepaid_entitlements');
   if (f.trialReadOk === false) failures.push('trial_ends_at');
   if (f.poolFunded === null) failures.push('payer');
+  if (f.lifetimeMember === null) failures.push('lifetime_purchase');
+  if (f.proGiant === null) failures.push('pro_giant');
 
   const sources = new Set<PaidSource>();
   if (f.isStaff) sources.add('staff');
@@ -225,6 +245,18 @@ export function classifyPaidStatus(f: PaidStatusFacts, policy: PaidStatusPolicy 
   const prepaidLive = f.prepaid!.some((p) => p.access_starts_on <= today && today <= p.access_ends_on);
   if (prepaidLive) sources.add('prepaid');
 
+  // Lifetime / bundle buyers paid once for permanent access: paid, like a prepaid term.
+  const lifetime = f.lifetimeMember === true;
+  if (lifetime) sources.add('lifetime_purchase');
+
+  // Pro Giant bought ONE year of Pro: paid only inside purchase + 365 days. After that it is
+  // not paid (it never falls into the lifetime rule), and a missing date is unknown below.
+  const proGiantAt = ts(f.proGiant?.purchasedAt ?? null);
+  const proGiantDateMissing = !!f.proGiant && !Number.isFinite(proGiantAt);
+  const proGiantLive = !!f.proGiant && Number.isFinite(proGiantAt)
+    && proGiantAt <= now && now < proGiantAt + PRO_GIANT_TERM_DAYS * DAY_MS;
+  if (proGiantLive) sources.add('pro_giant_term');
+
   if (f.poolFunded) sources.add('pool');
 
   const profileTrial = Number.isFinite(ts(f.trialEndsAt ?? null)) && ts(f.trialEndsAt ?? null) >= now;
@@ -250,7 +282,7 @@ export function classifyPaidStatus(f: PaidStatusFacts, policy: PaidStatusPolicy 
   // --- Headline kind (precedence)
   let kind: PaidStatusKind;
   if (activePaidSub || mcpSubLive || f.poolFunded) kind = 'active_paid';
-  else if (prepaidLive) kind = 'prepaid';
+  else if (prepaidLive || lifetime || proGiantLive) kind = 'prepaid';
   else if (creditPurchase) kind = 'paid_credits';
   else if (complimentaryRegistry || complimentaryLedger) kind = 'complimentary';
   else if (trialing) kind = 'trial';
@@ -280,7 +312,8 @@ export function classifyPaidStatus(f: PaidStatusFacts, policy: PaidStatusPolicy 
         : liveNonTrial && !paidCharge && !hadMcpSub ? 'paid_invoice_not_mirrored'
           : appTierUnexplained ? (mirrorHasSubs ? 'app_tier_mirror_stale' : 'app_tier_no_mirrored_subscription')
             : ambiguousOnly && !trialing ? 'ambiguous_pro_monthly'
-              : null);
+              : proGiantDateMissing ? 'pro_giant_purchase_date_missing'
+                : null);
   if (unestablished) {
     return {
       kind: 'unknown', sources: [...sources], paidFunding: null,
@@ -316,6 +349,10 @@ export interface PaidStatusReader {
   prepaid(email: string): Promise<Read<PrepaidFact[]>>;
   trialEndsAt(email: string): Promise<Read<string | null>>;
   poolFunded(email: string): Promise<Read<boolean>>;
+  /** Optional so older readers keep working: absent = not read (counted as no). */
+  lifetimeMember?(email: string): Promise<Read<boolean>>;
+  /** Optional. ok+null = not a Pro Giant member with a live grant. */
+  proGiant?(email: string): Promise<Read<ProGiantFact | null>>;
 }
 
 export const LEDGER_CAP = 1000;
@@ -385,7 +422,77 @@ export const supabasePaidStatusReader: PaidStatusReader = {
     if (payer.kind === 'unavailable') return { ok: false };
     return { ok: true, value: payer.kind === 'pool' };
   },
+  /**
+   * Same attribution rule as R2 (entitlements/sources.ts): customer_classifications is a
+   * point-in-time Stripe snapshot, so a 'lifetime' row counts only while a Pro grant is
+   * live right now (KV briefings:{email} or an unexpired user_profiles.access_briefings).
+   * A cancelled or churned row therefore never makes an account paid. A Pro Giant row is
+   * never lifetime, whatever its briefings_access says.
+   */
+  async lifetimeMember(email) {
+    const cls = await readClassification(email);
+    if (!cls.ok) return { ok: false };
+    const c = cls.value;
+    if (!c || c.classification === 'pro_giant' || c.briefings_access !== 'lifetime' || !notExpiredIso(c.briefings_expiry)) {
+      return { ok: true, value: false };
+    }
+    const grant = await liveProGrant(email);
+    return grant.ok ? { ok: true, value: grant.value } : { ok: false };
+  },
+  /**
+   * A Pro Giant buyer with a live Pro grant, and the date of the Pro Giant purchase from the
+   * Stripe mirror: the earliest succeeded, unrefunded charge whose description names Pro
+   * Giant. No such charge = purchasedAt null (unknown), never a guessed date.
+   */
+  async proGiant(email) {
+    const cls = await readClassification(email);
+    if (!cls.ok) return { ok: false };
+    const c = cls.value;
+    if (!c || (c.classification !== 'pro_giant' && c.bundle_tier !== 'Pro Giant Bundle')) return { ok: true, value: null };
+    const grant = await liveProGrant(email);
+    if (!grant.ok) return { ok: false };
+    if (!grant.value) return { ok: true, value: null };
+    const db = getWriteClient();
+    const { data: customers, error: cErr } = await db
+      .from('stripe_customers').select('id').ilike('email', ilikeLiteral(email)).limit(50);
+    if (cErr) return { ok: false };
+    const ids = (customers ?? []).map((x) => (x as { id: string }).id);
+    if (!ids.length) return { ok: true, value: { purchasedAt: null } };
+    const { data, error } = await db.from('stripe_charges')
+      .select('created_at, refunded')
+      .in('customer_id', ids).eq('status', 'succeeded').ilike('description', '%pro giant%')
+      .order('created_at', { ascending: true }).limit(20);
+    if (error) return { ok: false };
+    const first = (data ?? []).find((r) => !(r as { refunded?: boolean | null }).refunded) as { created_at?: string } | undefined;
+    return { ok: true, value: { purchasedAt: first?.created_at ?? null } };
+  },
 };
+
+type ClassificationRow = {
+  classification?: string | null; briefings_access?: string | null;
+  briefings_expiry?: string | null; bundle_tier?: string | null;
+};
+
+function notExpiredIso(iso: string | null | undefined): boolean {
+  return !iso || Date.parse(iso) >= Date.now();
+}
+
+async function readClassification(email: string): Promise<Read<ClassificationRow | null>> {
+  const { data, error } = await getWriteClient().from('customer_classifications')
+    .select('classification, briefings_access, briefings_expiry, bundle_tier').eq('email', email).maybeSingle();
+  if (error) return { ok: false };
+  return { ok: true, value: (data as ClassificationRow | null) ?? null };
+}
+
+/** A Pro grant live right now: unexpired user_profiles.access_briefings, else KV briefings:{email}. */
+async function liveProGrant(email: string): Promise<Read<boolean>> {
+  const { data, error } = await getWriteClient().from('user_profiles')
+    .select('access_briefings, briefings_expires_at').eq('email', email).maybeSingle();
+  if (error) return { ok: false };
+  const p = data as { access_briefings?: boolean | null; briefings_expires_at?: string | null } | null;
+  if (p?.access_briefings && notExpiredIso(p.briefings_expires_at)) return { ok: true, value: true };
+  try { return { ok: true, value: !!(await kv.get(`briefings:${email}`)) }; } catch { return { ok: false }; }
+}
 
 async function safe<T>(p: () => Promise<Read<T>>): Promise<Read<T>> {
   try { return await p(); } catch { return { ok: false }; }
@@ -411,12 +518,14 @@ export async function resolvePaidStatus(
       poolFunded: false, isStaff: false, isAdvocate: false, isComp: false,
     });
   }
-  const [ledger, stripe, prepaid, trial, pool] = await Promise.all([
+  const [ledger, stripe, prepaid, trial, pool, lifetime, proGiant] = await Promise.all([
     safe(() => reader.ledgerGrants(email, LEDGER_CAP)),
     safe(() => reader.subscriptionsAndCharges(email)),
     safe(() => reader.prepaid(email)),
     safe(() => reader.trialEndsAt(email)),
     safe(() => reader.poolFunded(email)),
+    reader.lifetimeMember ? safe(() => reader.lifetimeMember!(email)) : Promise.resolve(undefined),
+    reader.proGiant ? safe(() => reader.proGiant!(email)) : Promise.resolve(undefined),
   ]);
   return classifyPaidStatus({
     now,
@@ -429,6 +538,8 @@ export async function resolvePaidStatus(
     trialEndsAt: trial.ok ? trial.value : null,
     trialReadOk: trial.ok,
     poolFunded: pool.ok ? pool.value : null,
+    lifetimeMember: lifetime === undefined ? undefined : lifetime.ok ? lifetime.value : null,
+    proGiant: proGiant === undefined ? undefined : !proGiant.ok ? null : proGiant.value ?? undefined,
     isStaff, isAdvocate, isComp,
   });
 }

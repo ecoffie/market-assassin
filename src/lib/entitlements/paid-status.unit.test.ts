@@ -366,3 +366,98 @@ describe('review fixes: owner policy is explicit and one line each', () => {
     expect(proprietaryStandingFrom(comp, { ...PAID_STATUS_POLICY, admitComplimentary: false })).toBe(false);
   });
 });
+
+describe('lifetime / bundle members are paid (owner 2026-11-15)', () => {
+  it('a live lifetime purchase is paid, as prepaid', () => {
+    const s = classifyPaidStatus(facts({ lifetimeMember: true }));
+    expect(s.kind).toBe('prepaid');
+    expect(s.paidFunding).toBe(true);
+    expect(s.sources).toContain('lifetime_purchase');
+  });
+
+  it('settles the ambiguous pro_monthly row a lifetime buyer carries', () => {
+    const s = classifyPaidStatus(facts({ lifetimeMember: true, ledgerGrants: [g('pro_monthly')] }));
+    expect(s.kind).toBe('prepaid');
+    expect(s.paidFunding).toBe(true);
+    // Without the lifetime fact the same ledger stays unknown, as before.
+    expect(classifyPaidStatus(facts({ ledgerGrants: [g('pro_monthly')] })).kind).toBe('unknown');
+  });
+
+  it('a live subscription still reads active_paid first', () => {
+    const s = classifyPaidStatus(facts({ lifetimeMember: true, subscriptions: [sub({})], charges: [paidCharge] }));
+    expect(s.kind).toBe('active_paid');
+    expect(s.sources).toEqual(expect.arrayContaining(['stripe_subscription_paid', 'lifetime_purchase']));
+  });
+
+  it('not read (undefined) changes nothing; false is no; a failed read is unknown', () => {
+    expect(classifyPaidStatus(facts({})).kind).toBe('none');
+    expect(classifyPaidStatus(facts({ lifetimeMember: false })).kind).toBe('none');
+    const failed = classifyPaidStatus(facts({ lifetimeMember: null }));
+    expect(failed.kind).toBe('unknown');
+    expect(failed.failures).toContain('lifetime_purchase');
+  });
+
+  it('the extraction guard admits a lifetime member when the resolver is on', () => {
+    expect(proprietaryStandingFrom(classifyPaidStatus(facts({ lifetimeMember: true })), PAID_STATUS_POLICY)).toBe(true);
+  });
+
+  it('the loader passes the reader result through, and a reader without it is unchanged', async () => {
+    const ok = <T>(value: T) => Promise.resolve({ ok: true as const, value });
+    const base: PaidStatusReader = {
+      ledgerGrants: () => ok([]),
+      subscriptionsAndCharges: () => ok({ subscriptions: [], charges: [] }),
+      prepaid: () => ok([]),
+      trialEndsAt: () => ok(null),
+      poolFunded: () => ok(false),
+    };
+    expect((await resolvePaidStatus('buyer@example.test', { now: NOW, reader: base })).kind).toBe('none');
+    expect((await resolvePaidStatus('buyer@example.test', {
+      now: NOW, reader: { ...base, lifetimeMember: () => ok(true) },
+    })).kind).toBe('prepaid');
+    const failed = await resolvePaidStatus('buyer@example.test', {
+      now: NOW, reader: { ...base, lifetimeMember: () => Promise.reject(new Error('kv down')) },
+    });
+    expect(failed.kind).toBe('unknown');
+  });
+});
+
+describe('Pro Giant bundle = one year of Pro, not lifetime (owner 2026-11-15)', () => {
+  const daysAgo = (d: number) => new Date(NOW - d * 86_400_000).toISOString();
+
+  it('inside the 1-year term → prepaid (paid)', () => {
+    const s = classifyPaidStatus(facts({ proGiant: { purchasedAt: daysAgo(200) } }));
+    expect(s.kind).toBe('prepaid');
+    expect(s.paidFunding).toBe(true);
+    expect(s.sources).toContain('pro_giant_term');
+  });
+
+  it('after the term → not paid', () => {
+    const s = classifyPaidStatus(facts({ proGiant: { purchasedAt: daysAgo(366) } }));
+    expect(s.paidFunding).toBe(false);
+    expect(s.kind).toBe('none');
+    expect(s.sources).not.toContain('pro_giant_term');
+  });
+
+  it('after the term with the legacy pro_monthly row → unknown, never paid', () => {
+    const s = classifyPaidStatus(facts({ proGiant: { purchasedAt: daysAgo(400) }, ledgerGrants: [g('pro_monthly')] }));
+    expect(s.paidFunding).not.toBe(true);
+  });
+
+  it('no purchase date → unknown, not paid', () => {
+    const s = classifyPaidStatus(facts({ proGiant: { purchasedAt: null } }));
+    expect(s.kind).toBe('unknown');
+    expect(s.paidFunding).toBeNull();
+    expect(s.failures).toEqual(['pro_giant_purchase_date_missing']);
+  });
+
+  it('a failed read → unknown', () => {
+    const s = classifyPaidStatus(facts({ proGiant: null }));
+    expect(s.kind).toBe('unknown');
+    expect(s.failures).toContain('pro_giant');
+  });
+
+  it('other paid evidence still wins over a missing date', () => {
+    const s = classifyPaidStatus(facts({ proGiant: { purchasedAt: null }, subscriptions: [sub({})], charges: [paidCharge] }));
+    expect(s.kind).toBe('active_paid');
+  });
+});

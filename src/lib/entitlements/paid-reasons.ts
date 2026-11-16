@@ -127,3 +127,19 @@ export const LEGACY_ACTIVATION_PAID_REASONS: readonly string[] = [
 export function activationPaidReasons(): string[] {
   return paidStatusResolverEnabled() ? [...PAID_FUNDING_REASONS] : [...LEGACY_ACTIVATION_PAID_REASONS];
 }
+
+/** credit-health's own legacy "has paid us" list, frozen so flag-OFF is provably unchanged. */
+export const LEGACY_CREDIT_HEALTH_PAID_REASONS: readonly string[] = [
+  'stripe_topup', 'auto_recharge', 'subscription', 'mcp_sub_monthly', 'mcp_sub_annual',
+];
+
+/**
+ * The ledger reasons credit-health treats as "this account has paid us". Like the
+ * activation dashboard it reads ledger rows in bulk and cannot corroborate app_tier_*
+ * against an invoice, so with PAID_STATUS_RESOLVER=true it uses PAID_FUNDING_REASONS
+ * (adds app_tier_pro / app_tier_team; drops 'subscription', which no current grant path
+ * writes and the resolver treats as promotional). Read per call, not at import.
+ */
+export function creditHealthPaidReasons(): ReadonlySet<string> {
+  return new Set(paidStatusResolverEnabled() ? PAID_FUNDING_REASONS : LEGACY_CREDIT_HEALTH_PAID_REASONS);
+}
