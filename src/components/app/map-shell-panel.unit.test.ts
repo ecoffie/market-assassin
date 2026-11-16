@@ -9,10 +9,11 @@ const sidebar = read('UnifiedSidebar.tsx');
 const panels = read('panels', 'index.tsx');
 const shellPanel = read('panels', 'MapShellPanel.tsx');
 const appPage = read('..', '..', 'app', 'app', 'page.tsx');
+const knownPanels = read('..', '..', 'lib', 'app', 'known-panels.ts');
 
 describe('map shell panels', () => {
   it('map / watchlist / saved are deep-linkable panels rendered by MapShellPanel', () => {
-    const known = appPage.slice(appPage.indexOf('const KNOWN_PANELS'), appPage.indexOf(']);', appPage.indexOf('const KNOWN_PANELS')));
+    const known = knownPanels.slice(knownPanels.indexOf('const KNOWN_PANELS'), knownPanels.indexOf(']);', knownPanels.indexOf('const KNOWN_PANELS')));
     for (const p of ['map', 'watchlist', 'saved']) {
       expect(known).toContain(`'${p}'`);
       expect(sidebar).toContain(`| '${p}'`);

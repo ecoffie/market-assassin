@@ -3,6 +3,8 @@ import {
   MAP_SHELL_NAV_MESSAGE,
   MAP_SHELL_URL_MESSAGE,
   appUrlForMapUrl,
+  IN_APP_PATH_RE,
+  framePageForPath,
   frameNavTarget,
   isMapShellPanel,
   isShellFrameUrl,
@@ -58,13 +60,34 @@ describe('map shell — frame URL → app URL (mirroring)', () => {
 });
 
 describe('map shell — navigations that start in the frame', () => {
-  it('map pages become shell panels; everything else goes to the whole window', () => {
-    expect(frameNavTarget('/opportunity-map', '?ss=1')).toEqual({ kind: 'panel', panel: 'map', search: '?ss=1' });
-    expect(frameNavTarget('/opportunity-map/saved', '')).toEqual({ kind: 'panel', panel: 'watchlist', search: '' });
-    expect(frameNavTarget('/opportunity-map/favorites/', '?shell=app')).toEqual({ kind: 'panel', panel: 'saved', search: '' });
-    expect(frameNavTarget('/app', '?panel=dashboard')).toEqual({ kind: 'top', href: '/app?panel=dashboard' });
-    expect(frameNavTarget('/opportunity-map/pursuits', '?x=1', '#a')).toEqual({ kind: 'top', href: '/opportunity-map/pursuits?x=1#a' });
-    expect(frameNavTarget('/pricing', '')).toEqual({ kind: 'top', href: '/pricing' });
+  it('every map action stays in the app: map pages in the frame, app links and pricing as tabs', () => {
+    expect(frameNavTarget('/opportunity-map', '?ss=1')).toEqual({ kind: 'panel', panel: 'map', view: null, search: '?ss=1' });
+    expect(frameNavTarget('/opportunity-map/saved', '')).toEqual({ kind: 'panel', panel: 'watchlist', view: null, search: '' });
+    expect(frameNavTarget('/opportunity-map/favorites/', '?shell=app')).toEqual({ kind: 'panel', panel: 'saved', view: null, search: '' });
+    // map sub-pages open inside the Map panel's frame
+    expect(frameNavTarget('/opportunity-map/pursuits', '?x=1', '#a')).toEqual({ kind: 'panel', panel: 'map', view: 'pursuits', search: '?x=1' });
+    expect(frameNavTarget('/opportunity-map/proposal', '?pursuit=7')).toEqual({ kind: 'panel', panel: 'map', view: 'proposal', search: '?pursuit=7' });
+    expect(frameNavTarget('/opportunity-map/unplaced', '')).toEqual({ kind: 'panel', panel: 'map', view: 'forecasts', search: '' });
+    // app links switch tabs in place
+    expect(frameNavTarget('/app', '?panel=dashboard')).toEqual({ kind: 'app', panel: 'dashboard', search: '?panel=dashboard' });
+    expect(frameNavTarget('/app', '?panel=settings&section=billing')).toEqual({ kind: 'app', panel: 'settings', search: '?panel=settings&section=billing' });
+    expect(frameNavTarget('/app', '?panel=watchlist')).toEqual({ kind: 'panel', panel: 'watchlist', view: null, search: '' });
+    expect(frameNavTarget('/app', '?panel=map&mview=vault&opp=1')).toEqual({ kind: 'panel', panel: 'map', view: 'vault', search: '?opp=1' });
+    expect(frameNavTarget('/pricing', '')).toEqual({ kind: 'app', panel: 'settings', search: '?panel=settings&section=billing' });
+    // unknown pages are never framed (no reload loop)
+    expect(frameNavTarget('/opportunity-map/og', '')).toEqual({ kind: 'top', href: '/opportunity-map/og' });
+    expect(frameNavTarget('/learn', '')).toEqual({ kind: 'top', href: '/learn' });
+  });
+
+  it('a map sub-page round-trips through the app URL (reload keeps it)', () => {
+    const app = appUrlForMapUrl('map', '?pursuit=7', 'proposal');
+    expect(app).toBe('/app?panel=map&mview=proposal&pursuit=7');
+    expect(mapShellSrc('map', app.slice(app.indexOf('?')))).toBe('/opportunity-map/proposal?pursuit=7&shell=app');
+    expect(mapShellSrc('map', '?panel=map&mview=bogus')).toBe('/opportunity-map?shell=app');
+    expect(isShellFrameUrl('/opportunity-map/pursuits', '?shell=app')).toBe(true);
+    expect(framePageForPath('/opportunity-map/market')).toEqual({ panel: 'map', view: 'market' });
+    expect(IN_APP_PATH_RE.test('/opportunity-map/pursuits')).toBe(true);
+    expect(IN_APP_PATH_RE.test('/reports/abc')).toBe(false);
   });
 
   it('recognises a frame that is already in shell mode', () => {
