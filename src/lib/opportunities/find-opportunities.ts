@@ -6,6 +6,7 @@
  * Does NOT change map viewport APIs. Cross-class dedupe is intentionally absent.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { classifySearchFailure } from './search-failure';
 import { recompeteRowAnnotations } from '@/lib/recompete/annotate';
 import { parseAwardLineage, NOT_ORDER_UNDER_VEHICLE_OR } from '@/lib/recompete/award-lineage';
 import { dedupeRecompeteRows, type DedupeableRecompeteRow } from '@/lib/recompete/dedupe-orders';
@@ -840,7 +841,12 @@ async function queryOpenNow(
     const { data, count, error } = await inStage(applyOpenPlan(client.from(source).select(COLS, { count: 'exact' }), p.plan))
       .order('response_deadline', { ascending: true, nullsFirst: false })
       .limit(fetchCap);
-    if (error) return unavailable(source, OPEN_HANDOFFS, error.message, unsupported);
+    if (error) {
+      // A timed-out search is "too long", with an actionable message; still unavailable, never zero (search-failure.ts).
+      const f = classifySearchFailure(error);
+      const u = unavailable(source, OPEN_HANDOFFS, f.message, unsupported);
+      return f.code === 'search_too_long' ? { ...u, error: { class: 'search_too_long', message: f.message } } : u;
+    }
 
     let unmapped: number | null = null;
     {
