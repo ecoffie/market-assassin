@@ -1,0 +1,87 @@
+/**
+ * `?shell=app` — the map rendered INSIDE the signed-in app (/app?panel=map, Option A, 2026-11-16).
+ *
+ * The app keeps its own top bar + sidebar and shows this page in a same-origin iframe. In this mode
+ * the map hides ONLY its site top bar (.zhead) and its icon rail (.zrail). Everything else — filter
+ * bar, list, drawers, saved-search, sign-in state, boot/fetch behaviour — is the standalone map,
+ * unchanged. The standalone `/opportunity-map` (signed-out visitors, SEO, every existing link) never
+ * sees any of this: it is injected only when the request carries `shell=app`.
+ *
+ * ⚠️ This is NOT `?embed=` (the /today hero's static, filter-less map with its own boot rules).
+ * `shell` never touches OPPS, BOOT_VIEW_JS, VIEWPORT_JS or the fetch rounds, so the Maps P0/P1 rule
+ * "one boot round, no duplicate fetch" holds by construction. Return continuity is unaffected too:
+ * `shell` is not in the stand-down list, so a bare shell map restores the remembered market exactly
+ * like a bare standalone map.
+ *
+ * The parent (/app) is the only reader of the messages below and checks origin + source.
+ * Address translation lives in src/lib/app/map-shell.ts.
+ */
+import { MAP_SHELL_NAV_MESSAGE, MAP_SHELL_URL_MESSAGE, SHELL_PARAM, SHELL_VALUE } from '@/lib/app/map-shell';
+
+export function isAppShellRequest(url: URL): boolean {
+  return url.searchParams.get(SHELL_PARAM) === SHELL_VALUE;
+}
+
+/**
+ * The main map. Hides .zhead/.zrail and re-grids .app without their row/column, so there is no blank
+ * gap where they were. --zh-h is pinned to 0 (ZHEAD_HEIGHT_JS would measure 0 anyway once .zhead is
+ * display:none, but the drawer's fallback is 52px until that script runs). Drawers lose the 64px
+ * rail offset. Phone layout mirrors the map's own ≤640px single-column grid minus the header row.
+ */
+export const MAP_APP_SHELL_CSS = '<style id="mp-app-shell">'
+  + ':root{--zh-h:0px!important}'
+  + '.zhead,.zrail{display:none!important}'
+  + '.app{grid-template-columns:minmax(0,1fr) 400px!important;grid-template-rows:auto auto minmax(0,1fr)!important;'
+  + 'grid-template-areas:"ztop ztop" "znote znote" "zmap zcards"!important}'
+  + '.app.collapsed{grid-template-columns:minmax(0,1fr) 0px!important}'
+  + '.oppbd,.oppdrawer{left:0!important}'
+  + '@media(max-width:640px){'
+  +   '.app,.app.collapsed{grid-template-columns:1fr!important;grid-template-rows:auto auto minmax(0,1fr)!important;'
+  +     'grid-template-areas:"ztop" "znote" "zcards"!important}'
+  + '}'
+  + '</style>';
+
+/** Watchlist / Saved sub-pages: same two elements hidden; their content column loses the rail margin. */
+export const SUBPAGE_APP_SHELL_CSS = '<style id="mp-app-shell">'
+  + '.zhead,.zrail{display:none!important}'
+  + '.main{margin-left:0!important}'
+  + '</style>';
+
+/**
+ * In the frame:
+ *  1. Mirror the page's URL to the parent whenever the map rewrites it (it writes only via
+ *     replaceState, from user actions), so /app's address carries the same view for reload/share.
+ *  2. Hand same-origin link clicks to the parent instead of following them in the frame — the parent
+ *     maps a map page to its shell panel and sends everything else (/app, /pricing, Pursuits …) to the
+ *     whole window, so the app never ends up nested inside itself. External links, new-tab clicks,
+ *     `#` anchors and links whose own handler already called preventDefault behave exactly as before.
+ * The parent also checks every frame load, which covers `location.href = …` navigations.
+ */
+export const APP_SHELL_JS = '<script>(function(){'
+  + 'if(window.parent===window)return;'
+  + 'var O=location.origin;'
+  + 'function post(m){try{window.parent.postMessage(m,O);}catch(e){}}'
+  + 'function url(){post({type:"' + MAP_SHELL_URL_MESSAGE + '",path:location.pathname,search:location.search});}'
+  + 'var H=window.history,rs=H.replaceState,ps=H.pushState;'
+  + 'H.replaceState=function(){var r=rs.apply(H,arguments);url();return r;};'
+  + 'H.pushState=function(){var r=ps.apply(H,arguments);url();return r;};'
+  + 'window.addEventListener("popstate",url);'
+  + 'url();'
+  + 'document.addEventListener("click",function(e){'
+  +   'if(e.defaultPrevented||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;'
+  +   'var a=e.target&&e.target.closest?e.target.closest("a[href]"):null;if(!a)return;'
+  +   'if(a.target&&a.target!=="_self")return;if(a.hasAttribute("download"))return;'
+  +   'var raw=a.getAttribute("href")||"";if(!raw||raw.charAt(0)==="#"||/^(javascript|mailto|tel):/i.test(raw))return;'
+  +   'var u;try{u=new URL(raw,location.href);}catch(x){return;}'
+  +   'if(u.origin!==O)return;'
+  +   'e.preventDefault();'
+  +   'post({type:"' + MAP_SHELL_NAV_MESSAGE + '",path:u.pathname,search:u.search,hash:u.hash});'
+  + '});'
+  + '})();</script>';
+
+/** Inject shell CSS (head) + JS (end of body) into a finished page. Function replacers: the strings carry `$`. */
+export function applyAppShell(html: string, css: string): string {
+  return html
+    .replace('</head>', () => css + '</head>')
+    .replace(/<\/body>(?![\s\S]*<\/body>)/, () => APP_SHELL_JS + '</body>');
+}

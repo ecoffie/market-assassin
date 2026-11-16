@@ -1,19 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Lock,
   PanelLeftClose,
   PanelLeftOpen,
-  Map as MapIcon,
+  MapPin,
+  Bell,
+  Heart,
 } from 'lucide-react';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
 import { UpgradeModal } from './UpgradeModal';
 import { useAppTracker } from './track';
-import { mapHomeLink } from '@/lib/maps/map-links';
+import { authedFetch } from './authHeaders';
 import {
   NAV_GROUPS,
   type NavGroup,
@@ -30,6 +32,9 @@ import {
 
 // Panel types for the unified MI platform
 export type AppPanel =
+  | 'map'            // Opportunity Map inside the app shell (iframe, ?shell=app) — first sidebar item
+  | 'watchlist'      // Map Watchlist (saved searches + new matches) inside the app shell
+  | 'saved'          // Map Saved (hearted opportunities) inside the app shell
   | 'chat'           // Mindy Chat - RAG-backed Q&A (v1, #117)
   | 'dashboard'      // AI Briefings - Daily/Weekly/Pursuit
   | 'my-market'      // Market Dossier — the one-shot assembled market
@@ -62,14 +67,16 @@ export type AppPanel =
 // Tier definitions
 export type AppTier = 'free' | 'pro' | 'team' | 'enterprise';
 
-// The Opportunity Map — free for everyone, a real document navigation to the map route
-// (served by a route handler, not a Next page, so never a client-side <Link> transition).
-const OPPORTUNITY_MAP_LINK = {
-  id: 'opportunity-map' as const,
-  label: 'Opportunity Map',
-  icon: MapIcon,
-  description: 'Open, recompete and forecast on one map',
-};
+// The Opportunity Map lives INSIDE the app (Option A, 2026-11-16): "Map" is the first sidebar item and
+// switches to the `map` panel, which shows the map route in the app shell (MapShellPanel, ?shell=app).
+// Free for everyone. Watchlist and Saved — the map's own rail items — sit under a "Saved" heading.
+// The standalone /opportunity-map is unchanged for signed-out visitors, SEO and existing links.
+type ShellItem = { id: 'map' | 'watchlist' | 'saved'; label: string; icon: typeof MapPin; description: string };
+const MAP_ITEM: ShellItem = { id: 'map', label: 'Map', icon: MapPin, description: 'Open, recompete and forecast on one map' };
+const SAVED_ITEMS: ShellItem[] = [
+  { id: 'watchlist', label: 'Watchlist', icon: Bell, description: 'Saved searches and new matches' },
+  { id: 'saved', label: 'Saved opportunities', icon: Heart, description: 'Opportunities you hearted' },
+];
 
 // Sidebar = one row per NAV GROUP (src/components/app/nav-groups.ts). Each group's old pages
 // render as tabs across the top of the main area (AppNavTabs). History of the per-panel order
@@ -121,6 +128,22 @@ export default function UnifiedSidebar({
   const [upgradeFeature, setUpgradeFeature] = useState<string | null>(null);
   const track = useAppTracker(userEmail);
   const router = useRouter();
+  // Watchlist badge — unseen new matches across saved searches (the same call the map rail makes).
+  // No number on any failure: an unknown count is never shown as a count.
+  const [watchBadge, setWatchBadge] = useState<number | null>(null);
+  useEffect(() => {
+    if (!userEmail) return;
+    let cancelled = false;
+    authedFetch(`/api/app/saved-searches?badge=1&email=${encodeURIComponent(userEmail)}`, userEmail)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled) return;
+        const n = d && d.success && typeof d.count === 'number' ? d.count : null;
+        setWatchBadge(n && n > 0 ? n : null);
+      })
+      .catch(() => { /* no badge */ });
+    return () => { cancelled = true; };
+  }, [userEmail]);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   // Collapsed-state tooltip rendered with position:fixed so the nav's
   // overflow-y-auto scroll clip can't eat it. Captured from the hovered
@@ -161,6 +184,51 @@ export default function UnifiedSidebar({
       setUpgradeFeature(member.panel);
       track('link_click', 'sidebar', { action: 'upgrade_modal_shown', feature: member.panel, tier: userTier });
     }
+  };
+
+  const renderShellItem = (item: ShellItem, count: number | null = null) => {
+    const Icon = item.icon;
+    const isActive = activePanel === item.id;
+    const isHovered = hoveredItem === item.id;
+    const countLabel = count ? (count > 99 ? '99+' : String(count)) : null;
+    return (
+      <button
+        key={item.id}
+        type="button"
+        data-tour={`nav-${item.id}`}
+        aria-current={isActive ? 'page' : undefined}
+        onClick={() => {
+          track('link_click', 'sidebar', { action: item.id === 'map' ? 'open_map' : 'open_panel', feature: item.id, tier: userTier });
+          onPanelChange(item.id);
+          onMobileClose?.();
+        }}
+        onMouseEnter={(e) => { setHoveredItem(item.id); showTooltip(e, item.label, countLabel ?? undefined, false); }}
+        onMouseLeave={() => { setHoveredItem(null); setTooltip(null); }}
+        className={`group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 ${
+          isActive
+            ? 'bg-purple-500/15 text-purple-300 border border-purple-500/30'
+            : 'text-ink-soft hover:bg-surface hover:text-white'
+        } ${isCollapsed ? 'justify-center' : ''}`}
+      >
+        <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
+        {isCollapsed && countLabel && (
+          <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold leading-4 text-center">{countLabel}</span>
+        )}
+        {!isCollapsed && (
+          <>
+            <div className="flex-1 min-w-0 text-left">
+              <span className="text-sm font-medium">{item.label}</span>
+              {(isHovered || isActive) && (
+                <div className="text-xs text-faint mt-0.5 truncate">{item.description}</div>
+              )}
+            </div>
+            {countLabel && (
+              <span className="shrink-0 min-w-[20px] px-1.5 py-0.5 rounded-full bg-red-600 text-white text-[11px] font-bold text-center" aria-label={`${countLabel} new matches`}>{countLabel}</span>
+            )}
+          </>
+        )}
+      </button>
+    );
   };
 
   const tierColors: Record<AppTier, string> = {
@@ -264,34 +332,8 @@ export default function UnifiedSidebar({
           the footer AND the tooltips, instead of trading one for the other. */}
       <nav className="flex-1 py-4 overflow-y-auto">
         <div className="space-y-1 px-2">
-          {/* Opportunity Map — a real document navigation to the map route. */}
-          {(() => {
-            const MapItemIcon = OPPORTUNITY_MAP_LINK.icon;
-            const isHovered = hoveredItem === OPPORTUNITY_MAP_LINK.id;
-            return (
-              <a
-                data-tour={`nav-${OPPORTUNITY_MAP_LINK.id}`}
-                href={mapHomeLink()}
-                onClick={() => {
-                  track('link_click', 'sidebar', { action: 'open_map', feature: OPPORTUNITY_MAP_LINK.id, tier: userTier });
-                  onMobileClose?.();
-                }}
-                onMouseEnter={(e) => { setHoveredItem(OPPORTUNITY_MAP_LINK.id); showTooltip(e, OPPORTUNITY_MAP_LINK.label, undefined, false); }}
-                onMouseLeave={() => { setHoveredItem(null); setTooltip(null); }}
-                className={`group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 text-ink-soft hover:bg-surface hover:text-white ${isCollapsed ? 'justify-center' : ''}`}
-              >
-                <MapItemIcon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
-                {!isCollapsed && (
-                  <div className="flex-1 min-w-0 text-left">
-                    <span className="text-sm font-medium">{OPPORTUNITY_MAP_LINK.label}</span>
-                    {isHovered && (
-                      <div className="text-xs text-faint mt-0.5 truncate">{OPPORTUNITY_MAP_LINK.description}</div>
-                    )}
-                  </div>
-                )}
-              </a>
-            );
-          })()}
+          {/* Map — the first item. A panel switch (onClick), not an href: the map renders inside the app shell. */}
+          {renderShellItem(MAP_ITEM)}
 
           {NAV_GROUPS.filter((g) => isGroupInSidebar(g, navCtx)).map((group) => {
             const isActive = activeGroup?.id === group.id;
@@ -351,6 +393,14 @@ export default function UnifiedSidebar({
               </button>
             );
           })}
+
+          {/* Saved — the map's Watchlist and Saved pages, in the app shell. */}
+          <div className="pt-3 mt-2 border-t border-surface">
+            {!isCollapsed && (
+              <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-faint">Saved</div>
+            )}
+            {SAVED_ITEMS.map((item) => renderShellItem(item, item.id === 'watchlist' ? watchBadge : null))}
+          </div>
         </div>
       </nav>
 
