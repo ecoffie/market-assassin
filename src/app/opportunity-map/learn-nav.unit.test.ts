@@ -26,7 +26,7 @@ describe('desktop: Learn in the right cluster, second', () => {
     expect(read(p)).toContain('<a href="/bid">Bid with confidence</a>\n    <a href="/learn">Learn</a>\n    <a href="/pricing">Pricing</a>');
   });
   it('the shared public top bar has no Learn tab: How it works replaced it (2026-11-12)', () => {
-    expect(MP_HEADER_PRODUCT_LINKS.map((l) => l.href)).toEqual(['/mcp/gallery', '/jobs']);
+    expect(MP_HEADER_PRODUCT_LINKS.map((l) => l.href)).toEqual(['/mcp/gallery', '/roadmap']);
     expect(MP_HOW_IT_WORKS.length).toBeGreaterThan(0);
     expect(MP_HOW_IT_WORKS.some((i) => i.href === '/learn')).toBe(false);
   });
