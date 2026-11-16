@@ -92,6 +92,12 @@ import { tierFor } from '@/lib/mcp/entitlements';
 export interface McpToolContext {
   /** The verified key owner — used for user-bound tools + (Slice 3) the debit. */
   userEmail: string;
+  /**
+   * Whose Vault grounds a draft, when that is not the caller's own. Set only by Ask Mindy
+   * for a coach acting in an authorized client workspace (src/lib/chat/chat-acting-scope.ts).
+   * MCP transports never set it, so hosted MCP behaviour is unchanged.
+   */
+  vaultEmail?: string;
 }
 
 /**
@@ -2953,7 +2959,7 @@ async function dispatchMcpTool(
       notice_id: typeof args.notice_id === 'string' ? args.notice_id : undefined,
       sections: Array.isArray(args.sections) ? (args.sections as string[]) : undefined,
       agency: typeof args.agency === 'string' ? args.agency : undefined,
-      userEmail: ctx.userEmail,
+      userEmail: ctx.vaultEmail ?? ctx.userEmail,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
@@ -2967,7 +2973,7 @@ async function dispatchMcpTool(
       requirements: Array.isArray(args.requirements)
         ? (args.requirements as Array<{ requirement: string; category?: string; section?: string; id?: string }>)
         : undefined,
-      userEmail: ctx.userEmail,
+      userEmail: ctx.vaultEmail ?? ctx.userEmail,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
