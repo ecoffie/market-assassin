@@ -142,8 +142,13 @@ export async function POST(request: NextRequest) {
   let rfpFileName = String(body.rfpFileName || '');
   let cachedRequirements: Array<{ requirement: string; category?: string; section?: string }> = [];
   // The pursuit's SAM notice id (Step 7): Proposal AI recomputes the solicitation facts from it.
+  // Set only inside the gate below, so the solicitation-facts preload is gated with it.
   let pursuitNoticeId: string | null = null;
-  if (pipelineId) {
+  // Unresolved workspace (U1-b): load NO pursuit data at all — no access check, no
+  // user_pipeline read (notice_id or scope), no documents, no solicitation facts — consistent
+  // with the WORKSPACE_UNCONFIRMED_NOTE the model is given below. Requests without a pipeline_id
+  // are unchanged. Any later pursuit-keyed preload must sit inside this gate.
+  if (pipelineId && actingScope.kind !== 'unavailable') {
     // The documents are read with the service-role key, so ownership is checked
     // here: the caller must own the pursuit or share its workspace.
     const access = await authorizePursuitRead(

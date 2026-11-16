@@ -180,3 +180,16 @@ describe("client scope reads only the client's pursuits (N1-MD)", () => {
     expect(state.tables).toContain('pursuit_documents');
   });
 });
+
+describe('unresolved workspace loads no pursuit data (U1-b)', () => {
+  const PID = '11111111-2222-4333-8444-555555555555';
+  it("a pursuit the coach owns: no user_pipeline / pursuit_documents read, and the note is present", async () => {
+    state.resolve = 'throw';
+    state.pursuit = { id: PID, user_email: COACH, workspace_id: null };
+    const res = await ask(WS, PID);
+    expect(res.status).toBe(200);
+    expect(state.tables).not.toContain('pursuit_documents');
+    expect(state.tables).not.toContain('user_pipeline');
+    expect(state.prompts.join('\n')).toContain("The active workspace couldn't be confirmed, so no Vault, profile or pursuit data was loaded. Ask the user to retry.");
+  });
+});
