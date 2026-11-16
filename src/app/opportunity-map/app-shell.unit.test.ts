@@ -30,6 +30,13 @@ describe('shell=app hides only the site top bar and the icon rail', () => {
   it('sub-page CSS', () => {
     expect(hiddenSelectors(SUBPAGE_APP_SHELL_CSS).sort()).toEqual(['.zhead', '.zrail']);
   });
+  it('the filter bar WRAPS in shell mode (never scrolls — overflow clips its dropdowns), desktop only', () => {
+    const desk = MAP_APP_SHELL_CSS.slice(MAP_APP_SHELL_CSS.indexOf('@media(min-width:641px)'));
+    expect(desk).toContain('.ztop{flex-wrap:wrap!important');
+    expect(desk).toContain('.ztop .fbar .fscroll{flex-wrap:wrap!important');
+    expect(MAP_APP_SHELL_CSS).not.toMatch(/overflow(-x)?\s*:\s*(auto|scroll|hidden)/);
+  });
+
   it('re-grids .app without the header row or rail column — no blank gap', () => {
     expect(MAP_APP_SHELL_CSS).toContain('grid-template-areas:"ztop ztop" "znote znote" "zmap zcards"');
     expect(MAP_APP_SHELL_CSS).not.toMatch(/grid-template-areas:[^;]*zhead/);
@@ -50,7 +57,7 @@ describe('shell=app wiring', () => {
   });
 
   it('the map route applies it only off the embed branch, after the page is built', () => {
-    expect(route).toContain('if (!embed && isAppShellRequest(reqUrl)) html = applyAppShell(html, MAP_APP_SHELL_CSS);');
+    expect(route).toContain('if (!embed && isAppShellRequest(reqUrl)) html = applyAppShell(html, MAP_APP_SHELL_CSS + MAP_APP_SHELL_RESIZE_JS);');
     // it is not ?embed= — the embed boot branch is untouched
     expect(route).not.toMatch(/if \(embed\)[^\n]*shell/);
   });

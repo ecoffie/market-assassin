@@ -23,7 +23,7 @@ import { MARKET_FEEDBACK_CSS, MARKET_BOOT_HTML, MARKET_BOOT_APP_OPEN, MARKET_FEE
 import { LAYOUT_MOVE_JS } from './layout-move';
 import { HIERARCHY_HORIZON_LIMIT_JS } from '@/lib/opportunities/hierarchy-sub-agency';
 import { WATCH_SCOPE_JS } from '@/lib/saved-searches/watch-scope-client';
-import { MAP_APP_SHELL_CSS, applyAppShell, isAppShellRequest } from './app-shell';
+import { MAP_APP_SHELL_CSS, MAP_APP_SHELL_RESIZE_JS, applyAppShell, isAppShellRequest } from './app-shell';
 
 export const dynamic = 'force-dynamic';
 
@@ -11535,6 +11535,6 @@ export async function GET(request: NextRequest) {
   // ?shell=app — this map inside the signed-in app's shell (/app?panel=map). Hides ONLY .zhead/.zrail
   // and adds the parent bridge; data, boot and fetch behaviour are untouched (see app-shell.ts).
   // Never for ?embed= (a different, static mode with its own boot rules).
-  if (!embed && isAppShellRequest(reqUrl)) html = applyAppShell(html, MAP_APP_SHELL_CSS);
+  if (!embed && isAppShellRequest(reqUrl)) html = applyAppShell(html, MAP_APP_SHELL_CSS + MAP_APP_SHELL_RESIZE_JS);
   return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }

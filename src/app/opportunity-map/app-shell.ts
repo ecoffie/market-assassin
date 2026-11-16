@@ -35,11 +35,36 @@ export const MAP_APP_SHELL_CSS = '<style id="mp-app-shell">'
   + 'grid-template-areas:"ztop ztop" "znote znote" "zmap zcards"!important}'
   + '.app.collapsed{grid-template-columns:minmax(0,1fr) 0px!important}'
   + '.oppbd,.oppdrawer{left:0!important}'
+  // The filter bar. Inside the app the map is ~250px narrower (the app sidebar), and the
+  // standalone bar is one nowrap row of flex:none pills, so its tail ("Save search", "Clear all")
+  // ran off the right edge. Here it WRAPS instead — never a scroller: overflow on .ztop/.fbar/
+  // .fscroll clips every dropdown (route.ts PERMANENT RULE). The search keeps the left of row 1;
+  // the pills take the rest and flow onto a second row only when they must. Desktop only — the
+  // phone layout (≤640px) already wraps with its own rules, untouched here.
+  + '@media(min-width:641px){'
+  +   '.ztop{flex-wrap:wrap!important;row-gap:8px!important;padding:10px 14px!important}'
+  +   '.zsearch{flex:1 1 200px!important;max-width:320px!important}'
+  +   '.ztop .fbar{flex:1 1 560px!important;min-width:0!important}'
+  +   '.ztop .fbar .fscroll{flex-wrap:wrap!important;row-gap:8px!important;column-gap:6px!important;overflow:visible!important}'
+  + '}'
   + '@media(max-width:640px){'
   +   '.app,.app.collapsed{grid-template-columns:1fr!important;grid-template-rows:auto auto minmax(0,1fr)!important;'
   +     'grid-template-areas:"ztop" "znote" "zcards"!important}'
   + '}'
   + '</style>';
+
+/**
+ * The filter bar's height now depends on width (it may wrap), and Leaflet only re-measures on a
+ * WINDOW resize. When the bar's height changes, the map pane changes height without a window
+ * resize, so tell Leaflet. Presentation only: invalidateSize() never fetches, and a same-centre,
+ * same-zoom moveend is a layout move (layout-move.ts) that fetches only newly exposed area.
+ */
+export const MAP_APP_SHELL_RESIZE_JS = '<script>(function(){'
+  + 'function go(){var t=document.querySelector(".ztop");if(!t||!window.ResizeObserver)return;var last=-1;'
+  + 'new ResizeObserver(function(){var h=t.offsetHeight;if(h===last)return;var first=last<0;last=h;if(first)return;'
+  + 'try{if(window.map)setTimeout(function(){try{map.invalidateSize();}catch(e){}},60);}catch(e){}}).observe(t);}'
+  + 'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",go);else go();'
+  + '})();</script>';
 
 /** Watchlist / Saved sub-pages: same two elements hidden; their content column loses the rail margin. */
 export const SUBPAGE_APP_SHELL_CSS = '<style id="mp-app-shell">'
