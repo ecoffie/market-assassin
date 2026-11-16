@@ -141,3 +141,17 @@ describe('chat route: the system-prompt profile follows the acting scope (F1)', 
     expect(src).not.toMatch(/loadBidderProfile\(auth\.email/);
   });
 });
+
+describe('own-scope empty pipeline note (L1)', () => {
+  it('does not claim the user has no pursuits; says team-workspace rows are not searched', async () => {
+    const tools = makeTier0Tools(stubDb({ filters: [] }, []), 'owner@x.com', vi.fn() as never);
+    for (const args of [{}, { stage: 'bidding' }]) {
+      const out = await tools.execute('get_my_pipeline', args);
+      expect(out).toMatchObject({ ok: true, count: 0 });
+      const note = String(out.note);
+      expect(note).toMatch(/your own account/);
+      expect(note).toMatch(/Team-workspace pursuits aren't searched here/);
+      expect(note).not.toMatch(/^You have no pursuits/);
+    }
+  });
+});

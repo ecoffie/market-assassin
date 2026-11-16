@@ -147,8 +147,10 @@ export function makeTier0Tools(
         note: scope.kind === 'client'
           ? (stage ? `This client workspace has no pursuits in the "${stage}" stage.` : 'This client workspace has no pursuits yet.')
           : stage
-            ? `You have no pursuits in the "${stage}" stage.`
-            : 'You have no pursuits in your pipeline yet.',
+            // Own scope reads only rows saved under the user's own email (team-workspace rows
+            // are not searched here), so the note must not claim the user has nothing.
+            ? `No pursuits in the "${stage}" stage are saved under your own account. Team-workspace pursuits aren't searched here.`
+            : "No pursuits are saved under your own account. Team-workspace pursuits aren't searched here.",
         ...workspaceNote,
       };
     }
