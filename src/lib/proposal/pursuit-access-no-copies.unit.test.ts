@@ -9,6 +9,11 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+// Deliberately NOT listed: proposal/upload. It attaches a file to a pursuit only when the
+// pipeline row's user_email equals the scoped owner (the caller, or in Coach Mode the active
+// client's owner email) — an owner-only check with no workspace-member path, i.e. STRICTER
+// than this rule. Moving it onto the shared helper would WIDEN who can write documents into
+// a pursuit, so it keeps its own check (and resolves the workspace itself for that reason).
 const ROUTES = ['pursuit-docs', 'compliance-state', 'chat', 'compliance', 'extract-sow', 'bid-gates'];
 
 describe('pursuit routes use the shared access rule, never a copy', () => {
