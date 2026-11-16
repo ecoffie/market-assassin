@@ -86,6 +86,10 @@ const MD_CLASSES = [
   '[&_.md-table]:my-3 [&_.md-table]:overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_table]:text-[13px]',
   '[&_th]:text-left [&_th]:font-semibold [&_th]:text-slate-100 [&_th]:border-b [&_th]:border-white/15 [&_th]:px-2 [&_th]:py-1.5 [&_th]:whitespace-nowrap',
   '[&_td]:border-b [&_td]:border-white/5 [&_td]:px-2 [&_td]:py-1.5 [&_td]:align-top',
+  // Narrow panel: cells and the links in them wrap at word boundaries only (the container's
+  // overflow-wrap:anywhere broke holder names mid-word); the value column stays on one line; every
+  // column stays visible at panel width. 2026-11-16.
+  '[&_td]:[overflow-wrap:normal] [&_td]:[word-break:normal] [&_td_a]:![overflow-wrap:normal] [&_td_a]:![word-break:normal] [&_td:first-child]:min-w-[8rem] [&_td:nth-child(2)]:whitespace-nowrap',
 ].join(' ');
 
 export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChatPanelProps) {

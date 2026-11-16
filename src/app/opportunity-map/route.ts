@@ -10855,6 +10855,8 @@ const ASK_MINDY_CSS =
   + '.amk-msg.a .bub a,.amk-src a{color:#2563eb;overflow-wrap:anywhere;word-break:break-word}'
   + '.amk-msg.a .bub.md .md-table{margin:6px 0 10px;overflow-x:auto}.amk-msg.a .bub.md table{border-collapse:collapse;width:100%;font-size:12.5px}'
   + '.amk-msg.a .bub.md th{text-align:left;font-weight:700;border-bottom:1px solid #d7dee8;padding:5px 6px;white-space:nowrap}.amk-msg.a .bub.md td{border-bottom:1px solid #edf1f5;padding:5px 6px;vertical-align:top;overflow-wrap:normal;word-break:normal}'
+  // Narrow drawer: holder links must not break mid-word; the value stays on one line; every column stays visible at drawer width. 2026-11-16.
+  + '.amk-msg.a .bub.md td a{overflow-wrap:normal;word-break:normal}.amk-msg.a .bub.md td:first-child{min-width:130px}.amk-msg.a .bub.md td:nth-child(2){white-space:nowrap}'
   // Follow-up ACTION chips under an answer (the vision\'s "What agencies use Azure? / Add to pipeline").
   + '.amk-act{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}'
   + '.amk-act button{font:600 11.5px Inter;color:#2563eb;background:#eaf1fe;border:1px solid #d3e2fc;border-radius:8px;padding:6px 11px;cursor:pointer;text-align:left}'
