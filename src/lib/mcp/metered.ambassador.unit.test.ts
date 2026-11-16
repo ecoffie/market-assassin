@@ -1,11 +1,12 @@
 /**
- * Approved Mindy Ambassadors use Mindy without paying credits (owner decision 2026-11-12:
- * "Free Pro, truly unlimited"). runMeteredTool prices their calls at 0 before anything runs:
- * no balance check, no debit, the call still runs and is logged. Everyone else bills as before.
+ * Approved Mindy Ambassadors use Mindy without paying credits up to a monthly cap (owner decisions
+ * 2026-11-12 "free Pro" and 2026-11-16 "max at 5,000"). runMeteredTool prices a covered call at 0
+ * before anything runs: no balance check, no debit, the call still runs, is logged, and its list
+ * price is added to the month's usage. Past the cap, and for everyone else, calls bill as before.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/lib/ambassadors/store', () => ({ isApprovedAmbassador: vi.fn(async () => false) }));
+vi.mock('@/lib/ambassadors/store', () => ({ ambassadorCoversCall: vi.fn(async () => false), recordAmbassadorUsage: vi.fn(async () => undefined) }));
 vi.mock('./tool-registry', () => ({
   isMcpTool: vi.fn(() => true),
   creditsFor: vi.fn(() => 50),
@@ -35,14 +36,25 @@ const m = (fn: unknown) => fn as any;
 beforeEach(() => vi.clearAllMocks());
 
 describe('runMeteredTool — Mindy Ambassadors are never charged', () => {
-  it('an approved ambassador with a ZERO balance runs a 50-credit tool for free', async () => {
-    m(store.isApprovedAmbassador).mockResolvedValueOnce(true);
+  it('an approved ambassador under the cap, with a ZERO balance, runs a 50-credit tool for free', async () => {
+    m(store.ambassadorCoversCall).mockResolvedValueOnce(true);
     const out = await runMeteredTool('draft_proposal', { notice_id: 'n' }, { userEmail: 'amb@example.com' });
     expect(out.ok).toBe(true);
     expect(out.creditsCharged).toBe(0);
     expect(m(credits.getBalance)).not.toHaveBeenCalled();
     expect(m(payer.debitResolvedPayer)).not.toHaveBeenCalled();
     expect(m(credits.logCall).mock.calls.at(-1)[0]).toMatchObject({ userEmail: 'amb@example.com', status: 'success', creditsCharged: 0 });
+    expect(m(store.ambassadorCoversCall)).toHaveBeenCalledWith('amb@example.com', 50);
+    expect(m(store.recordAmbassadorUsage)).toHaveBeenCalledWith('amb@example.com', 50);
+  });
+
+  it('an ambassador past the cap is billed like anyone (debited from their balance)', async () => {
+    // ambassadorCoversCall answers false once the month's usage would pass 5,000.
+    m(credits.getBalance).mockResolvedValueOnce(500);
+    const out = await runMeteredTool('draft_proposal', { notice_id: 'n' }, { userEmail: 'amb@example.com' });
+    expect(out.ok).toBe(true);
+    expect(m(payer.debitResolvedPayer).mock.calls[0][1]).toBe(50);
+    expect(m(store.recordAmbassadorUsage)).not.toHaveBeenCalled();
   });
 
   it('anyone else with a zero balance is refused, exactly as before', async () => {

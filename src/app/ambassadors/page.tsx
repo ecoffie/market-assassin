@@ -50,7 +50,7 @@ const DOES_NOT_COUNT: string[] = [
 ];
 
 const YOU_GET: Row[] = [
-  ['Twelve months of Mindy', 'Full access with a generous monthly credit allowance and complete training on the platform. One seat. Access runs through MCP, so credits rather than logins are the unit, and one connection serves your whole team.'],
+  ['Twelve months of Mindy', 'Full access with a generous monthly credit allowance (up to 5,000 credits a month) and complete training on the platform. One seat. Access runs through MCP, so credits rather than logins are the unit, and one connection serves your whole team.'],
   ['A podcast appearance', 'Part of the package, not something you earn. We place it in the second or third quarter of your term, once you have a real pursuit to talk about rather than just a login. The episode is about your business, not about the software.'],
   ['Our audience', '57,000 YouTube subscribers, a daily podcast past 895 episodes, and 26,000 on LinkedIn. We feature ambassadors across all of it and reshare your best work.'],
   ['The cohort', "A private group of contractors across different codes, certifications and regions, with introductions made deliberately. Several of you will end up on each other's bids, and that is the point."],
@@ -74,7 +74,7 @@ const CLAIM_LIMITS: Row[] = [
 
 const TERMS: Row[] = [
   ['Length', 'Twelve months from the day your access turns on.'],
-  ['Seats', 'One. Access is through MCP, so your whole team works off one connection and the ceiling is on usage rather than headcount. There is a stated fair-use limit that no normal user reaches.'],
+  ['Seats', 'One. Access is through MCP, so your whole team works off one connection and the ceiling is on usage rather than headcount. The fair-use limit is 5,000 credits a month, which no normal user reaches.'],
   ['There is no fee', 'In either direction. We are not paying you and you are not paying us. The licence is the equipment, not the payment.'],
   ['Month thirteen', 'You move to a paying licence at a locked ambassador discount. We tell you that rate when you sign, so there is no surprise in month twelve.'],
   ['Competitors', 'We are not asking for exclusivity. We do ask that you are not in an equivalent program with a direct competitor at the same time, and that you make no comparative claims in either direction.'],
