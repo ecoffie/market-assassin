@@ -6458,8 +6458,20 @@ const DRAWER_JS = `<script>
   }
   // Resolves {state:'saved'|'dup'|'fail', d:<parsed body or {}>, pipeline:boolean}. Never rejects.
   function postSave(a){ return postReq(a,saveReq(a)); }
+  // Coach Mode (Eric's coach decision, 2026-11-16): a coach working in a client's workspace saves to THAT
+  // workspace, exactly as /app's authedFetch does (src/components/app/activeWorkspace.ts activeWorkspaceFor):
+  // the stored active workspace is sent unless its owner stamp names a different user; the server re-checks
+  // the coach's access. No active workspace (every non-coach) = no header = the request is unchanged.
+  function activeWorkspaceHeader(em){
+    try{ var ws=localStorage.getItem('mindy_active_workspace'); if(!ws) return null;
+      var owner=localStorage.getItem('mindy_active_workspace_owner');
+      if(owner&&em&&owner!==String(em).toLowerCase().trim()) return null;
+      return ws; }catch(e){ return null; }
+  }
   function postReq(a,q){
-    return fetch(q.url,{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},body:JSON.stringify(q.body)})
+    var hd={'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em};
+    var ws=activeWorkspaceHeader(a.em); if(ws) hd['x-active-workspace']=ws;
+    return fetch(q.url,{method:'POST',headers:hd,body:JSON.stringify(q.body)})
       .then(function(r){ return r.json().catch(function(){return {};}).then(function(d){ return {state:saveOutcome(r),d:d||{},pipeline:q.url==='/api/pipeline',pro:r.status===402}; }); },
             function(){ return {state:'fail',d:{},pipeline:q.url==='/api/pipeline'}; });
   }
