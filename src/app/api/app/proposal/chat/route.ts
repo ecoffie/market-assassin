@@ -19,7 +19,7 @@ import { isProEmail, proRequiredResponse } from '@/lib/access/require-pro';
 import { callLLM } from '@/lib/llm/call-llm';
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { createClient } from '@supabase/supabase-js';
-import { loadBidderProfile, formatProfileForPrompt, loadVaultContext } from '@/lib/proposal/loaders';
+import { loadBidderProfile, formatProfileForPrompt, loadVaultContext, ALL_VAULT_SECTIONS } from '@/lib/proposal/loaders';
 import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
 import { selectRelevantRfp } from '@/lib/proposal/select-relevant';
 import { authorizePursuitRead } from '@/lib/proposal/pursuit-access';
@@ -160,8 +160,11 @@ export async function POST(request: NextRequest) {
         const ragQuery = `${message}\n${rfpText.slice(0, 1500)}`.trim();
         const [profile, vault, ragChunks] = await Promise.all([
           loadBidderProfile(email),
-          // 'exec_summary' pulls identity + past performance + capabilities.
-          loadVaultContext(email, 'exec_summary'),
+          // A general Vault read: identity, past performance, capabilities AND team. 'exec_summary'
+          // alone never loaded capabilities or team, although this comment used to claim it did
+          // (parity audit 2026-11-16). Manual Drive is a writing workspace, so it preloads the set
+          // (default row caps); Ask Mindy retrieves instead (src/lib/chat/vault-retrieval.ts).
+          loadVaultContext(email, 'exec_summary', { sections: ALL_VAULT_SECTIONS }),
           retrieveRagContext({ query: ragQuery, docTypes: PROPOSAL_DOC_TYPES, limit: 4, maxChars: 3000, maxPerDoc: 1 })
             .catch(() => []),
         ]);
@@ -171,7 +174,7 @@ export async function POST(request: NextRequest) {
         const ragBlock = formatChunksForPrompt(ragChunks);
         const sources: string[] = [];
         if (rfpText) sources.push(rfpFileName || 'Uploaded RFP');
-        if (vault.has_any) sources.push('Your Vault (profile, past performance, capabilities)');
+        if (vault.has_any) sources.push('Your Vault (profile, past performance, capabilities, team)');
         if (cachedRequirements.length) sources.unshift(`${cachedRequirements.length} extracted requirements (cached matrix)`);
         if (ragChunks.length) sources.push(`Proposal corpus (${ragChunks.length} winning-volume references)`);
         send({ type: 'sources', sources });
@@ -338,6 +341,13 @@ function formatVaultForPrompt(vault: any): string {
     out.push('Capabilities:');
     for (const c of vault.capabilities.slice(0, 8)) {
       out.push(`- ${c.capability_name}: ${String(c.description || '').slice(0, 160)}`);
+    }
+  }
+  if (vault?.team?.length) {
+    out.push('Team:');
+    for (const m of vault.team.slice(0, 8)) {
+      const tags = [m.is_key_personnel && 'key personnel', m.security_clearance && `${m.security_clearance} clearance`, m.years_experience && `${m.years_experience} yrs`].filter(Boolean).join(', ');
+      out.push(`- ${m.full_name || 'Team member'}${m.title ? `, ${m.title}` : ''}${tags ? ` (${tags})` : ''}${m.bio_short ? `: ${String(m.bio_short).slice(0, 160)}` : ''}`);
     }
   }
   return out.join('\n');
