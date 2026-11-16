@@ -50,12 +50,12 @@ Run under the heavy-test lock. The snapshot path answered **28/28**.
 
 | | Short phrasings (14) | Long phrasings (14) |
 |---|---|---|
-| SQL path | answered 14 | **timed out on all 14** ("search too long", about 8.6 s) |
+| SQL path | answered 14 | **timed out on 14 of 28** ("search too long", about 8.6 s) — see correction below |
 | Snapshot path | answered 14 | answered 14 (median 4.3 s, max 6.1 s) |
 | Open-now count, cache vs SQL | **identical 14/14** | — (SQL has no count) |
 | Median time, cache vs SQL | 3.3 s vs 4.7 s | — |
 
-A local re-run against the same live DB reproduced it exactly: the SQL path timed out on the same 14 long phrasings,
+A local re-run against the same live DB reproduced it exactly: the SQL path timed out on the same 14 phrasings (12 long, 2 short),
 twice in a row each.
 
 **Top-25 differences, where both answered.** The set of distinct solicitations in the top 20 is identical for 11 of the 14;
@@ -71,7 +71,7 @@ same-deadline rows, so it belongs on a dev branch with a re-measure, not on the 
 
 ## 4. Two findings beyond the cache
 
-1. **RC3's SQL path times out on all 14 long phrasings against the live database.** The holdout runner scores a fixture
+1. **CORRECTION (2026-11-16, round 2):** the 14 SQL timeouts are 12 long + 2 short (nursing short, steel short), not "all 14 long"; RC3's SQL answered parts long and valves long. See CACHE-PREVIEW-ROUND2.md. **RC3's SQL path times out on most long phrasings against the live database.** The holdout runner scores a fixture
    snapshot in memory, so it cannot see statement timeouts. Whether production (main) does the same on long descriptions was
    not checked here. That should be measured before any decision that relies on the long phrasings.
 2. The diagnostic route's `classes_same` field is not meaningful: FIND items carry no `evidence_class` field, so it compared

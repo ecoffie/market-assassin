@@ -921,6 +921,7 @@ async function queryOpenNow(
     const fetchCap = Math.max(limit, OPEN_FETCH_CAP);
     const { data, count, error } = await inStage(openQ(COLS, { count: 'exact' }))
       .order('response_deadline', { ascending: true, nullsFirst: false })
+        .order('notice_id', { ascending: true }) // deterministic tie-break: same-deadline rows (cache parity, 2026-11-16)
       .limit(fetchCap);
     if (error) {
       // A timed-out search is "too long", with an actionable message; still unavailable, never zero (search-failure.ts).
@@ -956,6 +957,7 @@ async function queryOpenNow(
     if (p.basePlan) {
       const base = await inStage(applyOpenPlan(client.from(source).select(COLS), p.basePlan))
         .order('response_deadline', { ascending: true, nullsFirst: false })
+        .order('notice_id', { ascending: true }) // deterministic tie-break: same-deadline rows (cache parity, 2026-11-16)
         .limit(fetchCap);
       if (!base.error) baseRows = (base.data || []) as Array<Record<string, unknown>>;
     }
@@ -975,6 +977,7 @@ async function queryOpenNow(
         : openQ(COLS);
       const cw = await inStage(subQ).in('psc_code', codeWin)
         .order('response_deadline', { ascending: true, nullsFirst: false })
+        .order('notice_id', { ascending: true }) // deterministic tie-break: same-deadline rows (cache parity, 2026-11-16)
         .limit(OPEN_CODE_WINDOW_CAP);
       if (!cw.error) rows = unionRows(rows, (cw.data || []) as Array<Record<string, unknown>>, 'notice_id');
     }

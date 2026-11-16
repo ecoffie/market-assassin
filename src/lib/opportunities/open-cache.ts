@@ -191,7 +191,7 @@ export async function cachedOpenRetrieval(args: {
   if (changedHead.count > DELTA_MAX) { requestOpenSnapshotRebuild(client, now); return { status: 'cache_unavailable', reason: `${changedHead.count} rows changed since the snapshot (> ${DELTA_MAX}; rebuild requested)` }; }
   if (dHead.error || dHead.count == null) return { status: 'cache_unavailable', reason: `delta count unavailable (${dHead.error?.message ?? 'null'})` };
   const delta = await applyOpenPlan(client.from('sam_opportunities').select(select), plan).or(changedSinceExpr(at))
-    .order('response_deadline', { ascending: true, nullsFirst: false }).limit(windowLimit);
+    .order('response_deadline', { ascending: true, nullsFirst: false }).order('notice_id', { ascending: true }).limit(windowLimit);
   if (delta.error) return { status: 'cache_unavailable', reason: `delta read failed (${delta.error.message})` };
 
   // Live verification of snapshot candidates (unchanged rows only), chunked by id.
@@ -201,13 +201,13 @@ export async function cachedOpenRetrieval(args: {
   for (let i = 0; i < ids.length; i += ID_CHUNK) chunks.push(ids.slice(i, i + ID_CHUNK));
   const results = await mapLimited<string[], any>(chunks, VERIFY_CONCURRENCY, (c) => {
     const q = unchangedSince(structured(client.from('sam_opportunities').select(select, { count: 'exact' }), plan).in('notice_id', c), at);
-    return q.order('response_deadline', { ascending: true, nullsFirst: false }).limit(windowLimit);
+    return q.order('response_deadline', { ascending: true, nullsFirst: false }).order('notice_id', { ascending: true }).limit(windowLimit);
   });
   for (const r of results) {
     if (r.error || r.count == null) return { status: 'cache_unavailable', reason: `verify failed (${r.error?.message ?? 'count null'})` };
     count += r.count; rows.push(...(r.data || []));
   }
-  rows.sort((a, b) => String(a.response_deadline ?? '9999').localeCompare(String(b.response_deadline ?? '9999')));
+  rows.sort((a, b) => String(a.response_deadline ?? '9999').localeCompare(String(b.response_deadline ?? '9999')) || String(a.notice_id).localeCompare(String(b.notice_id)));
   return { status: 'ok', count, rows: rows.slice(0, windowLimit), coverage: { snapshot_built_at: at, snapshot_age_ms: age, candidates: ids.length, delta_rows: dHead.count as number } };
 }
 
