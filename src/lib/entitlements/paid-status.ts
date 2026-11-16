@@ -85,6 +85,14 @@ export interface PaidStatus {
   /** Money received for what the account holds now. null = unknown. */
   paidFunding: boolean | null;
   complimentaryAccess: boolean;
+  /**
+   * ACCESS fact, never a payment fact: a Pro grant is live right now (unexpired
+   * user_profiles.access_briefings or KV briefings:{email}). Owner rule 2026-11-16: never
+   * shorten anyone's access, so access gates admit a live grant whatever paidFunding says
+   * (e.g. a Pro Giant buyer past day 365 whose grant runs longer). Never feeds paidFunding,
+   * metrics or credit-health. Absent/false = no live grant or not read.
+   */
+  liveProGrant?: boolean;
   evidence: {
     liveSubscriptionStatus: string | null;
     /** Promotional / unrecognised ledger reasons seen (names only, never amounts). */
@@ -142,6 +150,8 @@ export interface PaidStatusFacts {
    * be found. undefined = not a Pro Giant member (or not read); null = the read FAILED.
    */
   proGiant?: ProGiantFact | null;
+  /** Access-only fact (see PaidStatus.liveProGrant). A failed read is false, never a failure. */
+  liveProGrant?: boolean | null;
   isStaff: boolean;
   isAdvocate: boolean;
   isComp: boolean;
@@ -199,6 +209,7 @@ export function classifyPaidStatus(f: PaidStatusFacts, policy: PaidStatusPolicy 
     return {
       kind: 'unknown', sources: [...sources], paidFunding: null,
       complimentaryAccess: complimentaryRegistry,
+      liveProGrant: f.liveProGrant === true,
       evidence: { liveSubscriptionStatus: null, promotionalReasons: [], ledgerTruncated: !!f.ledgerTruncated },
       failures,
     };
@@ -318,6 +329,7 @@ export function classifyPaidStatus(f: PaidStatusFacts, policy: PaidStatusPolicy 
     return {
       kind: 'unknown', sources: [...sources], paidFunding: null,
       complimentaryAccess: complimentaryRegistry || complimentaryLedger,
+      liveProGrant: f.liveProGrant === true,
       evidence: { liveSubscriptionStatus: liveNonTrial?.status ?? null, promotionalReasons, ledgerTruncated: !!f.ledgerTruncated },
       failures: [unestablished],
     };
@@ -328,6 +340,7 @@ export function classifyPaidStatus(f: PaidStatusFacts, policy: PaidStatusPolicy 
     sources: [...sources],
     paidFunding,
     complimentaryAccess: complimentaryRegistry || complimentaryLedger,
+    liveProGrant: f.liveProGrant === true,
     evidence: {
       liveSubscriptionStatus: liveNonTrial?.status ?? trialingSub?.status ?? null,
       promotionalReasons,
@@ -353,6 +366,8 @@ export interface PaidStatusReader {
   lifetimeMember?(email: string): Promise<Read<boolean>>;
   /** Optional. ok+null = not a Pro Giant member with a live grant. */
   proGiant?(email: string): Promise<Read<ProGiantFact | null>>;
+  /** Optional. A Pro grant live right now (access fact only). */
+  liveProGrant?(email: string): Promise<Read<boolean>>;
 }
 
 export const LEDGER_CAP = 1000;
@@ -466,6 +481,7 @@ export const supabasePaidStatusReader: PaidStatusReader = {
     const first = (data ?? []).find((r) => !(r as { refunded?: boolean | null }).refunded) as { created_at?: string } | undefined;
     return { ok: true, value: { purchasedAt: first?.created_at ?? null } };
   },
+  liveProGrant: (email) => liveProGrant(email),
 };
 
 type ClassificationRow = {
@@ -494,6 +510,18 @@ async function liveProGrant(email: string): Promise<Read<boolean>> {
   try { return { ok: true, value: !!(await kv.get(`briefings:${email}`)) }; } catch { return { ok: false }; }
 }
 
+/**
+ * Access gates only: is a Pro grant live for this email right now? Throws when the grant
+ * stores cannot be read, so a caller that fails open (the extraction guard) keeps doing so.
+ */
+export async function hasLiveProGrant(rawEmail: string): Promise<boolean> {
+  const email = (rawEmail || '').toLowerCase().trim();
+  if (!email) return false;
+  const r = await liveProGrant(email);
+  if (!r.ok) throw new Error('live Pro grant read failed');
+  return r.value;
+}
+
 async function safe<T>(p: () => Promise<Read<T>>): Promise<Read<T>> {
   try { return await p(); } catch { return { ok: false }; }
 }
@@ -518,7 +546,7 @@ export async function resolvePaidStatus(
       poolFunded: false, isStaff: false, isAdvocate: false, isComp: false,
     });
   }
-  const [ledger, stripe, prepaid, trial, pool, lifetime, proGiant] = await Promise.all([
+  const [ledger, stripe, prepaid, trial, pool, lifetime, proGiant, grant] = await Promise.all([
     safe(() => reader.ledgerGrants(email, LEDGER_CAP)),
     safe(() => reader.subscriptionsAndCharges(email)),
     safe(() => reader.prepaid(email)),
@@ -526,6 +554,7 @@ export async function resolvePaidStatus(
     safe(() => reader.poolFunded(email)),
     reader.lifetimeMember ? safe(() => reader.lifetimeMember!(email)) : Promise.resolve(undefined),
     reader.proGiant ? safe(() => reader.proGiant!(email)) : Promise.resolve(undefined),
+    reader.liveProGrant ? safe(() => reader.liveProGrant!(email)) : Promise.resolve(undefined),
   ]);
   return classifyPaidStatus({
     now,
@@ -540,6 +569,7 @@ export async function resolvePaidStatus(
     poolFunded: pool.ok ? pool.value : null,
     lifetimeMember: lifetime === undefined ? undefined : lifetime.ok ? lifetime.value : null,
     proGiant: proGiant === undefined ? undefined : !proGiant.ok ? null : proGiant.value ?? undefined,
+    liveProGrant: grant !== undefined && grant.ok && grant.value,
     isStaff, isAdvocate, isComp,
   });
 }
