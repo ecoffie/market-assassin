@@ -83,6 +83,8 @@ import {
   CARD_CHAT_TOOLS, buildOpportunityContextBlock,
 } from '@/lib/chat/card-chat';
 import { SELECTED_NOTICE_COLUMNS, loadSelectedNoticeFacts, formatSelectedNoticeFacts, type SelectedNoticeRecord } from '@/lib/chat/selected-notice';
+import { resolveMentionedNotice, type MentionedNoticeResult } from '@/lib/chat/mentioned-notice';
+import { abilityOneCaveat } from '@/lib/chat/category-caveats';
 import { parseTurnId, claimCardTurn, completeCardTurn, failCardTurn, type ClaimResult } from '@/lib/chat/card-chat-turns';
 
 export const dynamic = 'force-dynamic';
@@ -197,6 +199,7 @@ VOICE:
 - Direct, plain language. Federal acronyms are fine (NAICS, OSBP, FAR, IDIQ, 8(a), HUBZone, WOSB, SDVOSB, SAM, GSA). Tech/sales jargon (TAL, ICP, ABM, GTM) is not.
 - NEVER say "I'm an AI" or "as a language model". You're Mindy.
 - Keep responses tight. Most answers are 3-6 sentences or a short numbered list. No essays.
+- ANSWER FIRST. The first sentence answers the question that was asked: for "which agencies should I target first" it names the first target and why; for "who should I contact" it names the contact. How you ranked, which data you used, its time window and freshness come AFTER the answer in at most two short sentences. Never open with methodology, data caveats or a list of steps you took.
 
 TODAY: {today} (US Eastern). Use this date for every time calculation. When the user asks about a window such as "the next 18 months", compute its end date from today and compare every date you report against it. Never call a date inside the window "outside" it, or the reverse.
 
@@ -208,7 +211,7 @@ GROUNDING:
 YOUR DATA TOOLS:
 You have a LARGE toolset over the federal Data Core — each tool's own description says exactly when to use it. USE them instead of giving generic advice: if a tool can answer a question with real data, call it. Never tell the user to "go check SAM.gov / the panel" for something a tool covers. What you can reach, by category:
 - THEIR OWN account (private): get_my_pipeline (their tracked pursuits/deadlines/stages) and search_my_vault (retrieves the records in their identity, past performance/CPARS, capabilities and team that match a query — always pass what they are asking about; it returns the relevant records, not the whole Vault). These return ONLY the workspace this user is working in — their own, or a client workspace they are authorized to coach (the result then carries workspace:"client"; say "this client's" rather than "your"). Never anyone else's.
-- ADD / SAVE / TRACK requests: chat cannot write to their pipeline, saved list or alerts. When they ask to add, save or track an opportunity, do NOT stop at "I can't": point them to the step that does it — the "Start pursuit" button on the opportunity's map card (adds it to their pursuits), or "Generate proposal" on that card to start a proposal workspace for it. For an ongoing alert on a market, offer schedule_market_search.
+- ADD / SAVE / TRACK requests: chat cannot write to their pipeline, saved list or alerts. When they ask to add, save or track an opportunity, do NOT stop at "I can't": point them to the step that does it — the "Start pursuit" button on the opportunity's map card (adds it to their pursuits), or "Generate proposal" on that card to start a proposal workspace for it. When the opportunity is attached to this chat (its notice chip shows above the message box), the chip's "Start a proposal" button does both: it saves it to My Pursuits and opens a proposal workspace. For an ongoing alert on a market, offer schedule_market_search.
 - OPPORTUNITIES: open SAM.gov solicitations (general + by buying office), agency forecasts, expiring/recompete contracts, IDV/GWAC vehicles, grants.
   ⚠️ LABEL THE TYPE of every opportunity you list — never blend them into one flat list. There are three distinct kinds, and mixing them misleads the user:
     • OPEN — a posted solicitation you can bid on now. It HAS a SAM.gov link + a response deadline. CTA: bid / view the solicitation.
@@ -233,6 +236,7 @@ Tool-use rules:
 - Is a contract still active / who replaced it: call search_past_contracts ONCE with include_status=true plus a keyword from the description in formal wording ("identification card", not "ID card"), the agency and the state implied by the place (or piid_prefix / the number the user gave). Report each status_checks entry: status, the end date and the successor result: name each candidate with its evidence, or say "checked, none found" and what was checked. Do not ask the user for a contract number first.
 - If a result has _meta.lag_note, say the data is current through that date and recent awards may not be published yet. Never say no award was made.
 - Incumbents: name one only when _meta.incumbent_finding is "identified". Otherwise follow _meta.absence_note: say you could not identify (or confirm) an incumbent and what was searched. Never say "there is no incumbent", "no one holds it", "it appears there is no incumbent" or "this is a new requirement" unless a record says so; not finding a prior award is not proof that none exists.
+- Small-business contact at a buying office or agency (small business specialist, SBLO, OSDBU/OSBP): call search_federal_contacts for the office AND lookup_federal_osbp for its department in the same step. If the office search names no small-business specialist, give the department's small business office from lookup_federal_osbp (office, director, email and phone exactly as returned, with its verified date), and say it is the agency-level small business office, not that buying office's own specialist. Do not stop at "I couldn't confirm a contact" when that lookup returned an office.
 - Contacts at a company: call get_sblo_contact. If it has no named liaison but returns registered_points_of_contact, name those people with their titles, say they are the firm's registered SAM points of contact (not a designated small business liaison) as of the as_of date, and never state an email or phone the tool did not return.
 - Who buys a kind of work in a city or metro: call get_buying_offices with the state, the core city in city (it expands to the metro automatically), and the NAICS. Name each contracting office with its code, the customer agencies in top_funding_offices, the obligated dollars, and where the work is performed; never say the office is located in the city.
 - How much spending runs through schedules, BPAs or IDIQs: call get_vehicle_spend_mix and give dollars and percent for each bucket, plus the verified, heuristic and unresolved shares. unavailable or scope_too_broad is not a zero: say so and narrow the window.
@@ -540,13 +544,29 @@ export async function POST(request: NextRequest) {
         // No header → the caller's own data, with no extra query. See src/lib/chat/chat-acting-scope.ts.
         // The selected notice's buyer/contact/incumbent facts start loading now (incumbent bounded)
         // so they run alongside the scope + profile reads below.
-        const noticeFactsP = cardRecord ? loadSelectedNoticeFacts(cardRecord, { cacheKey: `chat:${sessionId}` }).catch(() => null) : Promise.resolve(null);
+        // Plain chat (nothing attached): the notice the user NAMED in their own words this conversation is
+        // resolved from our record and grounds the answer the same way (src/lib/chat/mentioned-notice.ts).
+        // Context only: card billing (cardCtx) is untouched, and nothing is stored.
+        const noticeP = (async () => {
+          let rec = cardRecord;
+          let origin: 'selected' | 'mentioned' = 'selected';
+          let mention: MentionedNoticeResult | null = null;
+          if (!rec && !selectedCtx) {
+            const priorTurns = Array.isArray(body.history) ? body.history.slice(-HISTORY_LIMIT) : [];
+            mention = await resolveMentionedNotice(getSupabase(), splitViewPreamble(message).rest || message, priorTurns)
+              .catch(() => ({ status: 'none' }) as MentionedNoticeResult);
+            if (mention.status === 'resolved') { rec = mention.notice.record; origin = 'mentioned'; }
+          }
+          const facts = rec ? await loadSelectedNoticeFacts(rec, { cacheKey: `chat:${sessionId}` }).catch(() => null) : null;
+          return { rec, origin, mention, facts };
+        })();
         const actingScope = await resolveChatActingScope(auth.email!, request);
         // Unresolved workspace → NO profile (the private tools refuse too): a coach acting for a
         // client must never get an answer built on their own profile.
         const profileEmail = vaultEmailFor(actingScope);
         const profile: BidderProfile = profileEmail ? await loadBidderProfile(profileEmail) : {};
-        const noticeFacts = await noticeFactsP;
+        const { rec: noticeRecord, origin: noticeOrigin, mention: mentionedNotice, facts: noticeFacts } = await noticeP;
+        cardRecord = noticeRecord;
         const userProfileBlock = formatProfileForPrompt(profile);
         const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
         // F1: the CURRENT_FIND contract (shared with the MCP host's P2 rule). Not for card chat, which answers
@@ -561,9 +581,13 @@ export async function POST(request: NextRequest) {
         ];
         // Card chat: the selected opportunity, loaded from our record, as a labeled source block.
         const cardContext = cardRecord
-          ? buildOpportunityContextBlock(cardRecord, splitViewPreamble(message).rest || message, noticeFacts ? formatSelectedNoticeFacts(noticeFacts) : [])
+          ? buildOpportunityContextBlock(cardRecord, splitViewPreamble(message).rest || message, noticeFacts ? formatSelectedNoticeFacts(noticeFacts) : [], noticeOrigin)
           : null;
         if (cardContext) messages.push({ role: 'system', content: cardContext.block });
+        // Category caveat grounded by the work the customer named in THIS message (janitorial → AbilityOne).
+        const customerWords = splitViewPreamble(message).rest || message;
+        const categoryNote = abilityOneCaveat(customerWords, interpretCapabilityNaics(customerWords).codes);
+        if (categoryNote) messages.push({ role: 'system', content: categoryNote });
 
         // Trim history to last HISTORY_LIMIT messages for prompt-size budget.
         const history = Array.isArray(body.history) ? body.history.slice(-HISTORY_LIMIT) : [];
@@ -657,6 +681,7 @@ export async function POST(request: NextRequest) {
         } = { planner: null, planner_attempts: [], tools_offered: 0, tool_executions: [], answer: null, answer_attempts: [], notices: [],
               ...(selectedCtx ? { context: { kind: 'opportunity' as const, notice_id: selectedCtx.noticeId } } : {}) };
         if (selectedNoticeMiss) turnTrace.notices.push(`selected_notice:${selectedNoticeMiss}`);
+        if (mentionedNotice && mentionedNotice.status !== 'none') turnTrace.notices.push(`mentioned_notice:${mentionedNotice.status}`);
         if (noticeFacts) turnTrace.notices.push(`selected_notice_incumbent:${noticeFacts.incumbent.finding}`);
         if (capabilityNote) turnTrace.notices.push('capability_interpreted');
         if (staging) turnTrace.notices.push(`staging_model_config:${staging.name}`);
@@ -1206,7 +1231,7 @@ export async function POST(request: NextRequest) {
           send({ type: 'truncated', message: 'This answer hit its length limit and was cut off. Ask Mindy to continue, or narrow the question.' });
         }
         const citedSources: CitedSource[] = cardContext
-          ? [{ title: cardContext.source.label, url: cardContext.source.url, doc_type: 'sam_notice', source_path: null, document_id: selectedCtx?.noticeId ?? null }]
+          ? [{ title: cardContext.source.label, url: cardContext.source.url, doc_type: 'sam_notice', source_path: cardRecord ? `sam_notice:${cardRecord.notice_id}` : null, document_id: null }]
           : [];
         send({ type: 'citations', sources: citedSources });
 

@@ -149,3 +149,24 @@ describe('CARD_CHAT_TOOLS — a narrowing list of real, chat-allowed tools', () 
     }
   });
 });
+
+describe('buildOpportunityContextBlock origin (plain chat, mentioned-notice.ts)', () => {
+  const rec = {
+    notice_id: 'a'.repeat(32), title: 'T', solicitation_number: 'SPRPA127RUA05', department: null, sub_tier: null, office: null,
+    notice_type: null, set_aside_description: null, naics_code: null, psc_code: null, posted_date: null, response_deadline: null,
+    pop_city: null, pop_state: null, description: 'Approved sources only.', sow_text: null, ui_link: null, active: true,
+  };
+  it('default stays the selected-on-the-map wording', () => {
+    const { block } = buildOpportunityContextBlock(rec, 'q');
+    expect(block).toMatch(/^SELECTED OPPORTUNITY/);
+    expect(block).toContain('selected on the map');
+  });
+  it("'mentioned' says the user named it, never that it is selected on the map, and points drafts at the contact", () => {
+    const { block } = buildOpportunityContextBlock(rec, 'q', ['Notice point of contact: KELI.BARISH@DLA.MIL'], 'mentioned');
+    expect(block).toMatch(/^MENTIONED OPPORTUNITY .*the user named SPRPA127RUA05/);
+    expect(block).not.toContain('selected on the map');
+    expect(block).toMatch(/address a draft to that contact and cite the solicitation number/);
+    expect(block).toContain('Approved sources only.');
+    expect(block).toContain('KELI.BARISH@DLA.MIL');
+  });
+});

@@ -23,6 +23,8 @@ const state: {
   inserts: Array<{ table: string; row: Record<string, unknown> }>;
   allowedToolNames: unknown;
   incumbent: unknown;
+  /** sam_opportunities lookups by solicitation number / notice id (mentioned-notice.ts). */
+  mentionLookups: unknown[];
 } = {} as never;
 
 // In-memory turn store with the SQL functions' semantics (claim / complete = save + debit once / fail).
@@ -89,8 +91,23 @@ vi.mock('@/lib/chat/tier0-tools', () => ({ makeTier0Tools: () => ({ execute: asy
 function builder(table: string) {
   const q: Record<string, unknown> = {};
   let eqVal: unknown = null;
+  let ilikeVal: unknown = null;
+  let eqCol = '';
   q.select = () => q;
-  q.eq = (_k: string, v: unknown) => { eqVal = v; return q; };
+  q.eq = (k: string, v: unknown) => { eqVal = v; eqCol = k; return q; };
+  q.ilike = (_k: string, v: unknown) => { ilikeVal = v; return q; };
+  q.order = () => q;
+  // The plain-chat mentioned-notice lookup (an exact solicitation number or notice id → rows).
+  q.limit = async () => {
+    if (table !== 'sam_opportunities') return { data: [], error: null };
+    state.mentionLookups.push(ilikeVal != null ? `ilike:${ilikeVal}` : `${eqCol}:${eqVal}`);
+    if (state.recordError) return { data: null, error: { message: 'down' } };
+    const r = state.record;
+    const hit = !!r && (ilikeVal != null
+      ? String(r.solicitation_number).toUpperCase() === String(ilikeVal).toUpperCase()
+      : eqCol === 'solicitation_number' ? r.solicitation_number === eqVal : r.notice_id === eqVal);
+    return { data: hit ? [r] : [], error: null };
+  };
   q.update = () => ({ eq: async () => ({ error: null }) });
   q.insert = async (row: Record<string, unknown>) => { state.inserts.push({ table, row }); return { error: null }; };
   q.maybeSingle = async () => {
@@ -130,7 +147,7 @@ beforeEach(() => {
       _meta: { grounded_notice: true, grounded_incumbent: false, degraded: false, notice_source: 'cache', incumbent_finding: 'candidate_not_confirmed' },
     },
     recordError: false, sessions: {}, answer: 'The response deadline is 2026-12-04 (SAM.gov notice W912PL26Q0042).', answerFails: false, finishReason: 'stop',
-    plannerMessages: [], answerMessages: [], inserts: [], allowedToolNames: null,
+    plannerMessages: [], answerMessages: [], inserts: [], allowedToolNames: null, mentionLookups: [],
   });
   turns.clear(); tokenSeq = 0;
   claimCardTurn.mockClear(); completeCardTurn.mockClear(); failCardTurn.mockClear();
@@ -532,5 +549,121 @@ describe('main chat with a selected notice (Eric 2026-11-16: no card-chat flag)'
     await post({ context: { kind: 'opportunity', notice_id: 'not-a-notice' } });
     const sys = state.answerMessages[0].filter((m) => m.role === 'system').map((m) => m.content).join('\n');
     expect(sys).not.toContain('SELECTED OPPORTUNITY');
+  });
+});
+
+describe('plain /app chat: the notice the user named (scorecard 2026-11-16, C1/C1b/C3)', () => {
+  beforeEach(() => { state.pro = true; vi.stubEnv('MAP_CARD_CHAT_ENABLED', ''); });
+  const system = (msgs: Array<{ role: string; content: string }>) => msgs.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
+
+  it('a solicitation number in the message grounds the answer in that notice: body, set-aside and contact', async () => {
+    const { res } = await post({ message: 'Tell me about solicitation W912PL26Q0042.' });
+    expect(res.status).toBe(200);
+    for (const msgs of [state.plannerMessages[0], state.answerMessages[0]]) {
+      const sys = system(msgs);
+      expect(sys).toContain('MENTIONED OPPORTUNITY');
+      expect(sys).not.toContain('SELECTED OPPORTUNITY');
+      expect(sys).toContain('Provide janitorial services.');
+      expect(sys).toContain('Set-aside: Total Small Business');
+      expect(sys).toContain('Notice point of contact: Jane Buyer, jane.buyer@usace.army.mil');
+    }
+    // One indexed equality on the stored uppercase form; the ILIKE never runs on a hit.
+    expect(state.mentionLookups).toEqual(['solicitation_number:W912PL26Q0042']);
+  });
+
+  it('a lowercase number misses the exact match once, then the case-insensitive lookup finds it', async () => {
+    state.record = { ...state.record!, solicitation_number: 'w912pl26q0042' };
+    await post({ message: 'Tell me about solicitation w912pl26q0042' });
+    expect(state.mentionLookups).toEqual(['solicitation_number:W912PL26Q0042', 'ilike:w912pl26q0042']);
+    expect(system(state.answerMessages[0])).toContain('MENTIONED OPPORTUNITY');
+  });
+
+  it('C1b T6: "email the contracting officer" two turns later keeps the contact from the earlier turn', async () => {
+    await post({
+      message: 'Email the contracting officer for me and ask for the drawings and the delivery schedule',
+      history: [
+        { role: 'user', content: 'Tell me about solicitation W912PL26Q0042' },
+        { role: 'assistant', content: 'W912PL26Q0042 is open.' },
+        { role: 'user', content: 'Add it to my pipeline' },
+        { role: 'assistant', content: 'Select Start pursuit on its map card.' },
+      ],
+    });
+    const sys = system(state.answerMessages[0]);
+    expect(sys).toContain('MENTIONED OPPORTUNITY');
+    expect(sys).toContain('jane.buyer@usace.army.mil');
+    expect(sys).toMatch(/address a draft to that contact and cite the solicitation number/);
+  });
+
+  it('context only: no card turn, no charge, the full tool set; the source is the SAM.gov notice, not a KB doc', async () => {
+    const { events } = await post({ message: 'What does W912PL26Q0042 require?' });
+    expect(claimCardTurn).not.toHaveBeenCalled();
+    expect(charges()).toBe(0);
+    expect(state.allowedToolNames).toBeNull();
+    const cites = events.find((e) => e.type === 'citations') as { sources?: Array<Record<string, unknown>> } | undefined;
+    expect(cites?.sources?.[0]).toMatchObject({ doc_type: 'sam_notice', url: 'https://sam.gov/opp/x/view', document_id: null, source_path: `sam_notice:${NID}` });
+  });
+
+  it('an id that appears only in an assistant answer never attaches a notice', async () => {
+    await post({ message: 'Which one should I start with?', history: [{ role: 'user', content: 'Find janitorial work' }, { role: 'assistant', content: 'Open now: W912PL26Q0042 …' }] });
+    expect(system(state.answerMessages[0])).not.toContain('MENTIONED OPPORTUNITY');
+    expect(state.mentionLookups).toEqual([]);
+  });
+
+  it('a number Mindy does not have: answered without a guessed record', async () => {
+    const { res } = await post({ message: 'Tell me about solicitation N0017426R9999' });
+    expect(res.status).toBe(200);
+    expect(system(state.answerMessages[0])).not.toContain('MENTIONED OPPORTUNITY');
+  });
+
+  it('a record read failure: answered without a block', async () => {
+    state.recordError = true;
+    await post({ message: 'Tell me about solicitation W912PL26Q0042' });
+    expect(system(state.answerMessages[0])).not.toContain('MENTIONED OPPORTUNITY');
+  });
+
+  it('an attached notice wins: the named-notice lookup does not run', async () => {
+    await post({ message: 'Compare it with W912PL26Q0042', context: { kind: 'opportunity', notice_id: NID } });
+    expect(system(state.answerMessages[0])).toContain('SELECTED OPPORTUNITY');
+    expect(state.mentionLookups).toEqual([]);
+  });
+
+  it('a free account naming a notice in plain chat is still refused (main chat stays Pro)', async () => {
+    state.pro = false;
+    const { res } = await post({ message: 'Tell me about solicitation W912PL26Q0042' });
+    expect(res.status).toBe(403);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('C2: answer first, AbilityOne by category, OSBP/OSDBU fallback', () => {
+  beforeEach(() => { state.pro = true; vi.stubEnv('MAP_CARD_CHAT_ENABLED', ''); });
+  const system = (msgs: Array<{ role: string; content: string }>) => msgs.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
+
+  it('the system prompt tells the model to answer first and to fall back to the agency small business office', async () => {
+    await post({ message: 'Who is the small business contact at the top one?' });
+    const sys = system(state.answerMessages[0]);
+    expect(sys).toContain('ANSWER FIRST.');
+    expect(sys).toMatch(/Never open with methodology/);
+    expect(sys).toMatch(/call search_federal_contacts for the office AND lookup_federal_osbp for its department in the same step/);
+    // Planner gets the same rule (it decides which tools run).
+    expect(system(state.plannerMessages[0])).toMatch(/lookup_federal_osbp for its department/);
+  });
+
+  it('a janitorial question carries the AbilityOne caveat to the answer model', async () => {
+    await post({ message: 'I run a small janitorial company in Florida. Which federal agencies should I target first, and why?' });
+    expect(system(state.answerMessages[0])).toContain('core AbilityOne Program category');
+  });
+
+  it('the follow-up that does not name the work does not repeat it', async () => {
+    await post({
+      message: 'Who is the small business contact at the top one?',
+      history: [{ role: 'user', content: 'I run a small janitorial company in Florida. Which agencies should I target?' }, { role: 'assistant', content: 'Start with VA NCO 8.' }],
+    });
+    expect(system(state.answerMessages[0])).not.toContain('AbilityOne Program category');
+  });
+
+  it('other work gets no AbilityOne caveat', async () => {
+    await post({ message: 'Which agencies buy HVAC services in Texas?' });
+    expect(system(state.answerMessages[0])).not.toContain('AbilityOne Program category');
   });
 });

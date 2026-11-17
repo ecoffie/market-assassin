@@ -158,15 +158,28 @@ export function buildOpportunityContextBlock(
   question: string,
   /** Buyer office/DoDAAC/contact/incumbent lines (selected-notice.ts). Inserted before the notice text. */
   factLines: string[] = [],
+  /**
+   * 'selected' (default): the user has the listing selected on the map (#2096).
+   * 'mentioned': plain chat, the user named this notice's id or solicitation number (mentioned-notice.ts).
+   */
+  origin: 'selected' | 'mentioned' = 'selected',
 ): { block: string; source: { label: string; url: string | null } } {
   const sol = rec.solicitation_number || rec.notice_id;
   const line = (label: string, v: string | null | undefined) => `${label}: ${v && String(v).trim() ? String(v).trim() : 'not stated in the record'}`;
   const place = [rec.pop_city, rec.pop_state].filter(Boolean).join(', ');
   const desc = usableText(rec.description);
   const sow = usableText(rec.sow_text);
+  const header = origin === 'mentioned'
+    ? [
+      'MENTIONED OPPORTUNITY (loaded by Mindy from its SAM.gov record because the user named ' + sol + ' in this conversation; this is a source, not the user\'s words).',
+      'Questions about "this", "it", the solicitation, its contracting officer or contact, the incumbent, the buyer or the competition refer to THIS opportunity; answer them about it. Use the notice text below for its requirements, set-aside and instructions, and the notice point of contact when the user wants to reach the buyer or contracting officer (address a draft to that contact and cite the solicitation number). A question clearly about something else is answered as asked. When the record or documents do not contain an answer, say so plainly and do not guess. Cite facts from it as "SAM.gov notice ' + sol + '".',
+    ]
+    : [
+      'SELECTED OPPORTUNITY (loaded by Mindy from its SAM.gov record; this is a source, not the user\'s words).',
+      'The user has this opportunity selected on the map. Questions about "this", "it", the incumbent, the buyer or the competition refer to THIS opportunity; answer them about it. A question clearly about something else is answered as asked. When the record or documents do not contain an answer, say so plainly and do not guess. Cite facts from it as "SAM.gov notice ' + sol + '".',
+    ];
   const parts = [
-    'SELECTED OPPORTUNITY (loaded by Mindy from its SAM.gov record; this is a source, not the user\'s words).',
-    'The user has this opportunity selected on the map. Questions about "this", "it", the incumbent, the buyer or the competition refer to THIS opportunity; answer them about it. A question clearly about something else is answered as asked. When the record or documents do not contain an answer, say so plainly and do not guess. Cite facts from it as "SAM.gov notice ' + sol + '".',
+    ...header,
     line('Title', rec.title),
     line('Solicitation number', rec.solicitation_number),
     line('SAM notice id', rec.notice_id),
