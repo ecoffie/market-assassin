@@ -41,7 +41,7 @@ vi.mock('@/lib/chat/chat-acting-scope', async (orig) => ({
     state.scope === 'client' ? { kind: 'client', email, workspaceId: 'ws-1', vaultEmail: CLIENT_EMAIL }
       : state.scope === 'unavailable' ? { kind: 'unavailable', email } : { kind: 'own', email },
 }));
-vi.mock('@/lib/documents/chat-store', async (orig) => ({
+vi.mock('@/lib/vault/chat-store', async (orig) => ({
   ...(await orig<object>()),
   countSessionDocuments: async () => (state.count === 'unavailable' ? { ok: false, reason: 'unavailable', message: 'x' } : { ok: true, value: state.count }),
   listChatDocuments: async (_db: unknown, scope: { sessionId: string; ownerEmail: string }) => { state.listed.push(scope); return { ok: true, value: [] }; },

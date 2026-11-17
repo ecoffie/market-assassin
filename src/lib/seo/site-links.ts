@@ -95,6 +95,7 @@ export const SITE_LINK_GROUPS: SiteLinkGroup[] = [
       { href: '/about', label: 'About' },
       { href: '/customers', label: 'Customer results' },
       { href: '/ambassadors', label: 'Ambassadors' },
+      { href: '/jobs', label: 'Jobs' },
       { href: '/privacy', label: 'Privacy' },
       { href: '/terms', label: 'Terms' },
     ],

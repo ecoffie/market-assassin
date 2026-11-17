@@ -12,7 +12,7 @@
  */
 import { selectRelevantRfp } from '@/lib/text/select-relevant';
 import { UNTRUSTED_TEXT_RULE, fenceUntrusted, safeName } from './untrusted-text';
-import type { ChatDocumentText } from '@/lib/documents/chat-store';
+import type { ChatDocumentText } from '@/lib/vault/chat-store';
 
 /** Total characters of document text in one answer call (~13K tokens at 3 chars/token). */
 export const DOCUMENT_BLOCK_BUDGET = 40_000;

@@ -26,8 +26,38 @@ export interface LaunchedBrowser {
     goto(url: string, opts?: Record<string, unknown>): Promise<unknown>;
     screenshot(opts?: Record<string, unknown>): Promise<Uint8Array | Buffer>;
     content(): Promise<string>;
+    // Used only by htmlToPdf's `lockdown` mode (both puppeteer and puppeteer-core provide them).
+    setJavaScriptEnabled?(enabled: boolean): Promise<void>;
+    setRequestInterception?(enabled: boolean): Promise<void>;
+    on?(event: 'request', handler: (req: InterceptedRequest) => void): unknown;
   }>;
   close(): Promise<void>;
+}
+
+export interface InterceptedRequest {
+  url(): string;
+  continue(): Promise<void> | void;
+  abort(errorCode?: string): Promise<void> | void;
+}
+
+/**
+ * A locked-down page may load only the document itself: `about:blank` (where setContent writes) and
+ * inline `data:` URIs (embedded images/fonts). Everything else — http(s), file:, blob:, ws: — is
+ * aborted, so attacker-influenced HTML cannot fetch, beacon or read local files from the renderer.
+ */
+export function isLockdownAllowedUrl(url: string): boolean {
+  return url === 'about:blank' || url.startsWith('data:');
+}
+
+export interface HtmlToPdfOptions {
+  /**
+   * Render untrusted, self-contained HTML: JavaScript OFF and every network request aborted except
+   * about:blank / data:. Opt-in so existing callers (e.g. the market-research export) keep their
+   * behavior. The page must fail closed: if the browser cannot apply the lockdown, no PDF is made.
+   */
+  lockdown?: boolean;
+  /** Test seam. */
+  launch?: () => Promise<LaunchedBrowser>;
 }
 
 /** True when running in a serverless environment with no bundled browser. */
@@ -76,11 +106,23 @@ export interface PdfResult {
 export async function htmlToPdf(
   html: string,
   pdfOptions: Record<string, unknown> = { format: 'Letter', printBackground: true },
+  options: HtmlToPdfOptions = {},
 ): Promise<PdfResult> {
   let browser: LaunchedBrowser | null = null;
   try {
-    browser = await launchBrowser();
+    browser = await (options.launch ?? launchBrowser)();
     const page = await browser.newPage();
+    if (options.lockdown) {
+      if (!page.setJavaScriptEnabled || !page.setRequestInterception || !page.on) {
+        throw new Error('lockdown_unsupported: browser page cannot disable JavaScript or intercept requests');
+      }
+      await page.setJavaScriptEnabled(false);
+      await page.setRequestInterception(true);
+      page.on('request', (req) => {
+        if (isLockdownAllowedUrl(req.url())) void req.continue();
+        else void req.abort('blockedbyclient');
+      });
+    }
     await page.setContent(html, { waitUntil: 'networkidle0' });
     const pdf = await page.pdf(pdfOptions);
     return { pdf: Buffer.from(pdf), error: null };

@@ -37,6 +37,7 @@ interface ArchivedDraftRow {
   created_at: string | null;
   content: {
     draft?: string;
+    html?: string;
     wordCount?: number;
     label?: string;
     sectionType?: string;
@@ -147,6 +148,7 @@ export async function GET(request: NextRequest) {
       wordCount: number;
       targetWords: number;
       profileGrounded?: boolean;
+      html?: string;
     }> = [];
 
     for (const row of rows) {
@@ -165,6 +167,8 @@ export async function GET(request: NextRequest) {
         // proxy (only affects the cosmetic length hint, never the export).
         targetWords: wordCount,
         profileGrounded: c?.meta?.profileGrounded,
+        // Formatting + images saved by the Word-style editor (absent on an unedited draft).
+        html: typeof c?.html === 'string' ? c.html : undefined,
       });
     }
 
@@ -179,4 +183,92 @@ export async function GET(request: NextRequest) {
     // Never break the panel — an empty reload just leaves the user to redraft.
     return NextResponse.json({ success: true, sections: [], fileName: null, generatedAt: null });
   }
+}
+
+const MAX_HTML_BYTES = 4 * 1024 * 1024;
+const SECTION_KEY = /^[a-z_]{2,40}$/;
+
+/**
+ * POST /api/app/proposal/drafts?email=… — save one section edited in the Word-style editor.
+ * Body: { section, label, fileName, html, text }.
+ *
+ * Updates the newest archived row for that section of that proposal (same subtype + same file name)
+ * so the GET above returns the edit on the next load; when there is no row yet (a section typed from
+ * scratch) it inserts one tagged like a draft-all row. The plain `text` is what the scan, the package
+ * export and the library read; `html` keeps the formatting and images.
+ */
+export async function POST(request: NextRequest) {
+  const email = request.nextUrl.searchParams.get('email');
+  if (!email) return NextResponse.json({ success: false, error: 'email query param is required' }, { status: 400 });
+  const authSession = requireMIAuthSession(request, email);
+  if (!authSession.ok) return authSession.response;
+
+  let body: { section?: string; label?: string; fileName?: string; html?: string; text?: string };
+  try { body = await request.json(); } catch { return NextResponse.json({ success: false, error: 'Invalid JSON' }, { status: 400 }); }
+  const section = String(body.section || '');
+  const html = typeof body.html === 'string' ? body.html : '';
+  const text = typeof body.text === 'string' ? body.text : '';
+  if (!SECTION_KEY.test(section)) return NextResponse.json({ success: false, error: 'Unknown section' }, { status: 400 });
+  if (Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES) {
+    return NextResponse.json({ success: false, error: 'This section is too large to save. Use smaller images.' }, { status: 413 });
+  }
+  const fileName = String(body.fileName || 'untitled RFP').slice(0, 300);
+  const label = String(body.label || section).slice(0, 120);
+
+  const { workspaceId, asClient } = await resolveActiveWorkspace(email, request);
+  const scopedEmail = (asClient ? clientNotificationEmail(workspaceId) : email).toLowerCase();
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return NextResponse.json({ success: false, error: 'Storage unavailable' }, { status: 500 });
+  const supabase = createClient(url, key, { auth: { persistSession: false } });
+
+  const wordCount = (text.match(/[A-Za-z0-9][\w'’-]*/g) || []).length;
+  const isCapStmt = ['company_overview', 'cap_past_performance', 'capabilities', 'differentiators', 'poc'].includes(section);
+
+  const { data: rows, error: findError } = await supabase
+    .from('user_generated_archive')
+    .select('id, title, content')
+    .eq('user_email', scopedEmail)
+    .eq('content_subtype', section)
+    .in('content_type', ['proposal_section', 'cap_statement'])
+    .contains('tags', ['draft-all'])
+    .order('created_at', { ascending: false })
+    .limit(20);
+  if (findError) {
+    console.warn('[proposal/drafts] save lookup failed:', findError.message);
+    return NextResponse.json({ success: false, error: 'Could not save. Try again.' }, { status: 500 });
+  }
+  const existing = (rows || []).find((r: { title: string | null }) => fileNameFromTitle(r.title) === fileName) as
+    | { id: string; content: Record<string, unknown> | null } | undefined;
+
+  const content = { ...(existing?.content || {}), draft: text, html, wordCount, sectionType: section, label, edited: true, editedAt: new Date().toISOString() };
+  if (existing) {
+    const { error } = await supabase
+      .from('user_generated_archive')
+      .update({ content, content_text: text.slice(0, 50_000) })
+      .eq('id', existing.id);
+    if (error) {
+      console.warn('[proposal/drafts] save update failed:', error.message);
+      return NextResponse.json({ success: false, error: 'Could not save. Try again.' }, { status: 500 });
+    }
+    return NextResponse.json({ success: true, id: existing.id });
+  }
+  const { data: inserted, error } = await supabase
+    .from('user_generated_archive')
+    .insert({
+      user_email: scopedEmail,
+      content_type: isCapStmt ? 'cap_statement' : 'proposal_section',
+      content_subtype: section,
+      title: `${label} — ${fileName}`,
+      content,
+      content_text: text.slice(0, 50_000),
+      tags: ['draft-all', 'edited'],
+    })
+    .select('id')
+    .single();
+  if (error) {
+    console.warn('[proposal/drafts] save insert failed:', error.message);
+    return NextResponse.json({ success: false, error: 'Could not save. Try again.' }, { status: 500 });
+  }
+  return NextResponse.json({ success: true, id: inserted?.id });
 }

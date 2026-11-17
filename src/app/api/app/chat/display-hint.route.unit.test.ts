@@ -180,6 +180,16 @@ describe('display hint', () => {
     const msgRows = state.inserts.filter((i) => i.table === 'mindy_chat_messages').flatMap((i) => (Array.isArray(i.row) ? i.row : [i.row])) as Array<{ role: string; content: string }>;
     expect(msgRows.find((r) => r.role === 'user')!.content).toBe(MSG);
   });
+  it('a new conversation is titled from the typed question, never the Map view preamble', async () => {
+    await post({ message: MSG, display: 'narrow_panel' });
+    const sess = state.inserts.find((i) => i.table === 'mindy_chat_sessions')!;
+    expect(sess.row.title).toBe('Who buys janitorial work here?');
+  });
+  it('a preamble with no typed question leaves the title empty (shown as Untitled)', async () => {
+    await post({ message: VIEW + ' ', display: 'narrow_panel' });
+    const sess = state.inserts.find((i) => i.table === 'mindy_chat_sessions');
+    if (sess) expect(String(sess.row.title ?? '')).not.toContain('Current map view');
+  });
   it('absent or unknown values change nothing', async () => {
     for (const display of [undefined, 'wide', 'NARROW_PANEL', 1, { x: 1 }]) {
       state.answerMessages = [];

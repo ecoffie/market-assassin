@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { isSourceStale } from '@/lib/data-sources/freshness';
+import { isTableMeasured } from '@/lib/data-sources/table-measured';
 import { measureDatasetPopulation } from '@/lib/data-sources/measured-population';
 
 export const runtime = 'nodejs';
@@ -37,6 +38,8 @@ export async function GET(request: NextRequest) {
 
   const stale = sources.filter(s => {
     if (s.category === 'live_api' || !s.last_built) return false;
+    // Measured from the table's own rows by check-data-freshness; the stamp is not its clock.
+    if (isTableMeasured(s.key)) return false;
     return isSourceStale({
       lastBuilt: s.last_built,
       cadence: s.refresh_cadence,
