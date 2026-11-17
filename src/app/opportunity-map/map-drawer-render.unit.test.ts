@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { TextDecoder as NodeTextDecoder, TextEncoder as NodeTextEncoder } from 'node:util';
 import { JSDOM } from 'jsdom';
 import { SAFE_MARKDOWN_SCRIPT } from '@/lib/chat/safe-markdown';
+import { splitViewPreamble } from '@/lib/chat/intent-compiler';
 
 const MAP = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 function drawerScript(): string {
@@ -150,5 +151,33 @@ describe('follow-up chips: derived, and only under the latest answer', () => {
     (t.chipRows()[0].querySelector('button') as HTMLButtonElement).click();
     await new Promise((r) => setTimeout(r, 0));
     expect(String(t.chat.at(-1)!.message)).toContain('Follow up please');
+  });
+});
+
+describe('narrow-panel display (answer first)', () => {
+  it('every question says display:narrow_panel; the message stays the view preface + the question only', async () => {
+    const t = boot({ tokens: [['a'], ['b']] });
+    await t.ask('What janitorial work is open here?');
+    await t.ask('And in Florida?');
+    expect(t.chat.map((c) => c.display)).toEqual(['narrow_panel', 'narrow_panel']);
+    for (const c of t.chat) {
+      const m = String(c.message);
+      expect(m).not.toMatch(/Display:|narrow side panel/i);
+      const sp = splitViewPreamble(m);
+      expect(sp.view).toContain('[Current map view');
+    }
+    expect(splitViewPreamble(String(t.chat[0].message)).rest).toBe('What janitorial work is open here?');
+    expect(splitViewPreamble(String(t.chat[1].message)).rest).toBe('And in Florida?');
+  });
+  it('history and the user bubble hold only what the user typed', async () => {
+    const t = boot({ tokens: [['a'], ['b']] });
+    await t.ask('q1');
+    await t.ask('q2');
+    const hist = t.chat[1].history as Array<{ role: string; content: string }>;
+    expect(hist[0]).toEqual({ role: 'user', content: 'q1' });
+    expect(t.w.document.querySelector('.amk-msg.u')!.textContent).toBe('q1');
+  });
+  it('the opening paragraph is styled as the answer', () => {
+    expect(MAP).toMatch(/\.amk-msg\.a \.bub\.md>p:first-child\{font-weight:500/);
   });
 });

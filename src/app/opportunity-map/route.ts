@@ -10844,12 +10844,14 @@ const ASK_MINDY_CSS =
   + '.amk-x{border:0;background:none;color:#8595a6;cursor:pointer;line-height:1;padding:0;align-self:flex-start;display:flex;align-items:center}'
   + '.amk-x svg{stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}'
   + '.amk-body{flex:1;overflow-y:auto;padding:16px 17px;display:flex;flex-direction:column;gap:14px}'
-  + '.amk-msg{max-width:90%;font:400 13.5px/1.55 Inter,system-ui,sans-serif}'
+  + '.amk-msg{max-width:90%;font:400 14px/1.6 Inter,system-ui,sans-serif}'
   + '.amk-msg.u{align-self:flex-end;background:#2563eb;color:#fff;padding:9px 13px;border-radius:14px 14px 3px 14px}'
   + '.amk-msg.a{align-self:flex-start;color:#1e2230;width:100%}'
   + '.amk-msg.a .bub{background:#f5f8fb;border:1px solid #e6ebf0;padding:12px 14px;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}'
   // Rendered answers (window.__mindyMd: escaped first, then a safe markdown subset). 2026-11-15.
-  + '.amk-msg.a .bub.md{white-space:normal}.amk-msg.a .bub.md p{margin:0 0 8px}.amk-msg.a .bub.md p:last-child{margin-bottom:0}'
+  + '.amk-msg.a .bub.md{white-space:normal}.amk-msg.a .bub.md p{margin:0 0 10px}.amk-msg.a .bub.md p:last-child{margin-bottom:0}'
+  // Answer-first: the opening paragraph is the answer, so it reads a step heavier than the details below it.
+  + '.amk-msg.a .bub.md>p:first-child{font-weight:500;color:#111c26}.amk-msg.a .bub.md li+li{margin-top:5px}.amk-msg.a .bub.md .md-h{margin-top:14px}'
   + '.amk-msg.a .bub.md ul,.amk-msg.a .bub.md ol{margin:4px 0 8px;padding-left:20px}.amk-msg.a .bub.md li{margin:2px 0}.amk-msg.a .bub.md li>ul{margin:2px 0 4px;padding-left:16px;list-style:disc}'
   + '.amk-msg.a .bub.md .md-h{font-weight:700;margin:10px 0 4px;color:#111c26}.amk-msg.a .bub.md .md-h1{font-size:15.5px}.amk-msg.a .bub.md .md-h2{font-size:14.5px}.amk-msg.a .bub.md .md-h3{font-size:13.5px}.amk-msg.a .bub.md .md-h:first-child{margin-top:0}'
   + '.amk-msg.a .bub.md code{font:12.5px ui-monospace,Menlo,monospace;background:#eef2f7;border-radius:4px;padding:1px 4px}'
@@ -10876,7 +10878,7 @@ const ASK_MINDY_CSS =
   + '.amk-send:disabled{opacity:.45;cursor:default}.amk-send svg{width:18px;height:18px}'
   + '.amk-up{text-align:center;padding:30px 20px}.amk-up h4{font:800 16px Inter;margin:0 0 6px;color:#111c26}.amk-up p{font:500 13px Inter;color:#6b7787;margin:0 0 14px}'
   + '.amk-up a{display:inline-block;background:#0a8f57;color:#fff;text-decoration:none;border-radius:10px;padding:10px 20px;font:700 13px Inter}'
-  + '@media(prefers-color-scheme:dark){.amk{background:#111823}.amk-hd{border-color:#202b39}.amk-hd h3{color:#eaf1f8}.amk-msg.a{color:#eaf1f8}.amk-msg.a .bub{background:#0d141d;border-color:#202b39}.amk-msg.a .bub.md .md-h{color:#eaf1f8}.amk-msg.a .bub.md code{background:#18222f}.amk-msg.a .bub a{color:#7fb0ff}.amk-chips button{background:#0d141d;border-color:#202b39;color:#cdd8e4}.amk-foot{border-color:#202b39}.amk-in textarea{background:#0d141d;border-color:#202b39;color:#eaf1f8}.amk-empty b,.amk-up h4{color:#eaf1f8}.amk-act button{background:#122033;border-color:#1f3a5c}}';
+  + '@media(prefers-color-scheme:dark){.amk{background:#111823}.amk-hd{border-color:#202b39}.amk-hd h3{color:#eaf1f8}.amk-msg.a{color:#eaf1f8}.amk-msg.a .bub{background:#0d141d;border-color:#202b39}.amk-msg.a .bub.md .md-h,.amk-msg.a .bub.md>p:first-child{color:#eaf1f8}.amk-msg.a .bub.md code{background:#18222f}.amk-msg.a .bub a{color:#7fb0ff}.amk-chips button{background:#0d141d;border-color:#202b39;color:#cdd8e4}.amk-foot{border-color:#202b39}.amk-in textarea{background:#0d141d;border-color:#202b39;color:#eaf1f8}.amk-empty b,.amk-up h4{color:#eaf1f8}.amk-act button{background:#122033;border-color:#1f3a5c}}';
 
 const ASK_MINDY_HTML =
   '<div class="amk-ov" id="amkOv"></div>'
@@ -10966,6 +10968,10 @@ const ASK_MINDY_JS = `<script>(function(){
   // Threaded to the chat so answers are about THIS view — a compact, factual preface (no invented numbers).
   function ctxPreamble(){ var c=viewCtx(); var parts=ctxParts(c); if(!parts.length)return '';
     return '[Current map view \\u2014 '+parts.join('; ')+'. '+ctxLocation(c)+' Answer for THIS view when the question is about "these"/"this"/"here": use this location, not the user\\'s saved profile locations, and do not choose a city the user did not name.]\\n\\n'; }
+  // NARROW-PANEL DISPLAY (2026-11-16 parity audit): the drawer is ~420px wide, so every request says so with
+  // display:'narrow_panel'. The server adds the presentation rule (answer first, short sections) to the answer
+  // prompt as a SYSTEM note (src/lib/chat/display-hint.ts). It is never part of the message, so it is never
+  // stored as the customer's words or read as their intent (review F3).
   function setOpen(o){ ov.classList.toggle('show',o); drawer.classList.toggle('show',o); drawer.setAttribute('aria-hidden',o?'false':'true'); if(o){ renderCtx(); if(!body.children.length){ if(oppCtx)greetCard(); else greet(); } setTimeout(function(){ input&&input.focus(); },220); } }
   function greetCard(){
     var chips=[['What does it require?','Summarize what this solicitation requires: scope, deliverables, and key dates.'],
@@ -11048,7 +11054,7 @@ const ASK_MINDY_JS = `<script>(function(){
     // is about "these"/"here" — the map\\u2019s real filters + count, never fabricated.
     // Card chat sends NO view preamble: the server supplies the opportunity from its own record.
     var sendMsg=oppCtx?q:(ctxPreamble()+q);
-    var payload={email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8)};
+    var payload={email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8),display:'narrow_panel'};
     if(oppCtx){ payload.context={kind:'opportunity',notice_id:oppCtx.id}; payload.turn_id=turnId; if(opts.replay)payload.replay_only=true;
       if(!opts.turnId){ try{ if(window.__track) window.__track('tool_use','card_chat_ask',{turn:Math.floor(history.length/2)+1}); }catch(e){} } }
     var cardAtSend=oppCtx;
