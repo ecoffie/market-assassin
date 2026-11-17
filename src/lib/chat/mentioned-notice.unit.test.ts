@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractNoticeRefs, userTextsNewestFirst, resolveMentionedNotice, lookupNoticeRef } from './mentioned-notice';
+import { extractNoticeRefs, userTextsNewestFirst, resolveMentionedNotice, lookupNoticeRef, answerUsesNotice } from './mentioned-notice';
 
 const NID = '1a02451bf3e04edf93f56216c2113d73';
 type Row = { notice_id: string; solicitation_number: string | null; posted_date: string | null };
@@ -138,5 +138,20 @@ describe('resolveMentionedNotice', () => {
     const miss = fakeDb([lower]);
     expect(await lookupNoticeRef(miss.db, { kind: 'solicitation_number', value: 'sprpa127rua05' })).toMatchObject({ notice_id: NID });
     expect(miss.calls.map((c) => [c.op, c.ordered])).toEqual([['eq', true], ['ilike', true]]);
+  });
+});
+
+describe('answerUsesNotice (sticky-chip follow-up)', () => {
+  const rec = { notice_id: 'a'.repeat(32), solicitation_number: 'SPRPA127RUA05', title: 'Janitorial Services, Building 12',
+    points_of_contact: [{ email: 'jane.buyer@usace.army.mil' }] };
+  it('an answer that quotes the number, title or a contact email used the notice', () => {
+    expect(answerUsesNotice('SPRPA127RUA05 closes Dec 4.', rec)).toBe(true);
+    expect(answerUsesNotice('Email Jane at jane.buyer@usace.army.mil.', rec)).toBe(true);
+    expect(answerUsesNotice('For janitorial services, building 12 is the site.', rec)).toBe(true);
+  });
+  it('an unrelated answer did not', () => {
+    expect(answerUsesNotice('The top janitorial buyers in Florida are the VA and the Coast Guard.', rec)).toBe(false);
+    expect(answerUsesNotice('', rec)).toBe(false);
+    expect(answerUsesNotice('SPRPA127RUA05', null)).toBe(false);
   });
 });
