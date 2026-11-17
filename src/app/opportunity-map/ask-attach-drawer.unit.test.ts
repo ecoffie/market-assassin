@@ -22,14 +22,14 @@ function token(email: string): string {
 }
 
 type Call = { url: string; method: string; file?: string; body?: Record<string, unknown> };
-function boot(opts: { flag: boolean; uploadReply?: { status: number; json: Record<string, unknown> } }) {
+function boot(opts: { flag: boolean; uploadReply?: { status: number; json: Record<string, unknown> }; store?: Record<string, string> }) {
   const dom = new JSDOM(
     '<!doctype html><html><body><div id="amkOv"></div><aside id="amk" aria-hidden="true"><div id="amkCtx"></div><button id="amkX"></button>'
     + '<div id="amkBody"></div><div class="amk-foot"><div class="amk-in"><textarea id="amkIn"></textarea><button id="amkSend"></button></div></div></aside></body></html>',
     { url: 'https://getmindy.ai/opportunity-map', runScripts: 'outside-only' },
   );
   const w = dom.window as unknown as Record<string, unknown> & Window & { eval: (s: string) => unknown };
-  const store: Record<string, string> = { mi_beta_auth_token: token('pro@example.com') };
+  const store: Record<string, string> = { mi_beta_auth_token: token('pro@example.com'), ...(opts.store ?? {}) };
   Object.defineProperty(w, 'localStorage', { value: { getItem: (k: string) => store[k] ?? null, setItem: (k: string, v: string) => { store[k] = v; }, removeItem: (k: string) => { delete store[k]; } } });
   w.TextDecoder = NodeTextDecoder as never;
   w.__VAULT_ATTACH = opts.flag;
@@ -120,5 +120,29 @@ describe('Map drawer attach', () => {
     const del = calls.find((c) => c.method === 'DELETE')!;
     expect(del.url).toContain('id=d1');
     expect(doc.querySelectorAll('[data-testid="amk-doc"]')).toHaveLength(0);
+  });
+
+  it('coach working AS A CLIENT: attach is disabled with a pointer to the main panel; nothing is uploaded (never the coach\'s own Vault)', async () => {
+    const { doc, calls, attach } = boot({ flag: true, store: { mindy_active_workspace: 'ws-client-1', mindy_active_workspace_owner: 'pro@example.com' } });
+    const row = doc.querySelector('[data-testid="amk-attach"]') as HTMLElement;
+    const clip = row.querySelector('.amk-clip') as HTMLButtonElement;
+    expect(row.getAttribute('data-client-mode')).toBe('1');
+    expect(clip.disabled).toBe(true);
+    expect(row.textContent).toContain('Switch to the main Ask Mindy panel to attach files for this client.');
+    await attach('client-sow.pdf'); // even a forced change event uploads nothing
+    expect(calls.some((c) => c.url.startsWith('/api/app/chat/documents') && c.method === 'POST')).toBe(false);
+  });
+
+  it('a workspace stamp left by ANOTHER user does not block the owner (same rule as #2101)', () => {
+    const { doc } = boot({ flag: true, store: { mindy_active_workspace: 'ws-x', mindy_active_workspace_owner: 'someone@else.com' } });
+    expect((doc.querySelector('.amk-clip') as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('own workspace: the upload carries no x-active-workspace (matches the drawer chat scope)', async () => {
+    const { calls, attach, w } = boot({ flag: true });
+    await attach('sow.pdf');
+    const f = (w.fetch as unknown as { mock: { calls: Array<[string, { headers?: Record<string, string> }]> } }).mock.calls.find(([u, i]) => u.startsWith('/api/app/chat/documents') && (i as { method?: string }).method === 'POST')!;
+    expect(f[1].headers?.['x-active-workspace']).toBeUndefined();
+    expect(calls.length).toBeGreaterThan(0);
   });
 });
