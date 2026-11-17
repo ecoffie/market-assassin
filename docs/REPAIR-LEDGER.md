@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-17 — Ask Mindy reliability (Agent 2, audit A6/A7)
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-17 | Ask Mindy timeouts + visible failures (P1a) | **The chat route had no timeout anywhere** (no per-tool, planner, answer or overall deadline, no maxDuration): a hung tool or provider ended the stream with no `error`/`done` — a silent blank answer — and a card turn stayed locked for its lease. Now: per-tool timeout (45 s; drafting tools longer) + a round budget (later calls refused, never started), planner attempts 30 s, answer connect 30 s (then the next model), answer stream idle 45 s (cut + "incomplete" notice), and a turn watchdog at 285 s (< maxDuration 300) that always sends `error` + `done` and releases the card turn. A timed-out write is reported as UNKNOWN. **A6:** every non-success tool status now shows the incomplete notice (`lookup_incomplete` for refusals; `lookup_failed` unchanged for failures/timeouts). Successful turns unchanged. | `export function incompleteToolNotice(` → `src/lib/chat/turn-deadlines.ts` · `export const maxDuration = 300;` → `src/app/api/app/chat/route.ts` · `round_deadline_exceeded` → `src/lib/chat/chat-tool-executor.ts` | `ask-mindy-reliability.route.unit.test.ts` (11, real route + real executor; 9 red on main) + `turn-deadlines.unit.test.ts` + executor timeout tests; chat/MCP suites 1,432 pass; tsc clean | DRAFT PR |
+
 ## 2026-11-14 — Introductory credits at registration (one per account)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
