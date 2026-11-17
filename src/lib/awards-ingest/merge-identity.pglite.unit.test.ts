@@ -19,7 +19,7 @@
  * clause, UPDATE/INSERT lists, the locate aggregates and the ASSERT predicate — is executed as
  * generated, never re-typed here. Never touches a real database.
  */
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
@@ -32,6 +32,11 @@ import {
   type MergeIdentityPlan,
   type MergeLocateRow,
 } from './merge-sql';
+
+import { PGLITE_HOOK_TIMEOUT_MS } from '@/test/pglite-timeouts';
+
+// PGlite boot + migrations can exceed the 10s default hook limit under full-suite load (see the constant).
+vi.setConfig({ hookTimeout: PGLITE_HOOK_TIMEOUT_MS });
 
 const AWARDS = '`market-assasin.usaspending.awards`';
 const STAGING = 'market-assasin.usaspending.awards_ingest_staging';

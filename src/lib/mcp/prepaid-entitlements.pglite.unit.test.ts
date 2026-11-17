@@ -7,11 +7,16 @@
  * second grant for an already-claimed month (October), grants the next one once; and the
  * claim lookup pattern matches exactly that account's month.
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
 import { claimLikePattern, monthlyGrantKey } from './prepaid-entitlements';
+
+import { PGLITE_HOOK_TIMEOUT_MS } from '@/test/pglite-timeouts';
+
+// PGlite boot + migrations can exceed the 10s default hook limit under full-suite load (see the constant).
+vi.setConfig({ hookTimeout: PGLITE_HOOK_TIMEOUT_MS });
 
 const mig = (f: string) => readFileSync(join(process.cwd(), 'supabase/migrations', f), 'utf8');
 const MIGRATION = mig('20261005_mcp_prepaid_entitlements.sql');

@@ -6,9 +6,14 @@
  * (both pinned by dhs-identity.unit.test.ts). So after the migration, a republished '*F…' record must UPDATE the
  * existing canonical row: same uuid, same created_at, new content, no new row.
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { PGlite } from '@electric-sql/pglite';
 import { canonicalDhsExternalId } from './dhs-identity';
+
+import { PGLITE_HOOK_TIMEOUT_MS } from '@/test/pglite-timeouts';
+
+// PGlite boot + migrations can exceed the 10s default hook limit under full-suite load (see the constant).
+vi.setConfig({ hookTimeout: PGLITE_HOOK_TIMEOUT_MS });
 
 const db = new PGlite();
 type R = { id: string; created_at: Date; title: string };
