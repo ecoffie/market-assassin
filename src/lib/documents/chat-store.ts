@@ -116,8 +116,9 @@ export async function loadChatDocumentTexts(db: ChatDocsDb, scope: { sessionId: 
  * Eric's retention ruling. Archiving nothing (wrong id/session/owner) is `false`.
  */
 export async function archiveChatDocument(db: ChatDocsDb, scope: { id: string; sessionId: string; ownerEmail: string }): Promise<StoreResult<boolean>> {
-  const { data, error } = await scoped(db.from(VAULT_DOCS_TABLE).update({ archived_at: new Date().toISOString() }).eq('id', scope.id), scope)
-    .select('id');
+  const { count, error } = await scoped(db.from(VAULT_DOCS_TABLE).update({ archived_at: new Date().toISOString() }, { count: 'exact' }).eq('id', scope.id), scope);
   if (error) return classify(error);
-  return { ok: true, value: Array.isArray(data) && data.length > 0 };
+  // INT-005: read the exact affected count, never a RETURNING payload. A null count is unknown.
+  if (typeof count !== 'number') return { ok: false, reason: 'error', message: 'archive count unavailable' };
+  return { ok: true, value: count > 0 };
 }

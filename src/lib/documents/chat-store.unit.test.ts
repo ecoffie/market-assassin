@@ -85,11 +85,14 @@ describe('Vault-backed conversation documents', () => {
   });
 
   it('archive is a soft delete (archived_at), and archiving nothing is false, not success', async () => {
-    const hit = fakeDb({ data: [{ id: 'd1' }], error: null });
+    const hit = fakeDb({ count: 1, error: null });
     expect(await archiveChatDocument(hit.db as never, { ...scope, id: 'd1' })).toEqual({ ok: true, value: true });
-    const upd = hit.calls[0].ops.find(([m]) => m === 'update')?.[1][0] as Record<string, unknown>;
-    expect(Object.keys(upd)).toEqual(['archived_at']);
-    const miss = fakeDb({ data: [], error: null });
+    const upd = hit.calls[0].ops.find(([m]) => m === 'update')?.[1] as unknown[];
+    expect(Object.keys(upd[0] as object)).toEqual(['archived_at']);
+    expect(upd[1]).toEqual({ count: 'exact' });
+    const miss = fakeDb({ count: 0, error: null });
     expect(await archiveChatDocument(miss.db as never, { ...scope, id: 'd2' })).toEqual({ ok: true, value: false });
+    const unknown = fakeDb({ count: null, error: null });
+    expect(await archiveChatDocument(unknown.db as never, { ...scope, id: 'd3' })).toMatchObject({ ok: false, reason: 'error' });
   });
 });
