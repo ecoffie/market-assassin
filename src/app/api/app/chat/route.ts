@@ -1231,7 +1231,7 @@ export async function POST(request: NextRequest) {
           send({ type: 'truncated', message: 'This answer hit its length limit and was cut off. Ask Mindy to continue, or narrow the question.' });
         }
         const citedSources: CitedSource[] = cardContext
-          ? [{ title: cardContext.source.label, url: cardContext.source.url, doc_type: 'sam_notice', source_path: null, document_id: selectedCtx?.noticeId ?? cardRecord?.notice_id ?? null }]
+          ? [{ title: cardContext.source.label, url: cardContext.source.url, doc_type: 'sam_notice', source_path: cardRecord ? `sam_notice:${cardRecord.notice_id}` : null, document_id: null }]
           : [];
         send({ type: 'citations', sources: citedSources });
 

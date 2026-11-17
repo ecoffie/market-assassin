@@ -71,11 +71,23 @@ function escapeIlike(token: string): string {
 /** One ref → its record (the newest posted version for a solicitation number), or null on a miss/error. */
 export async function lookupNoticeRef(db: Db, ref: NoticeRef): Promise<SelectedNoticeRecord | null> {
   try {
-    const q = db.from('sam_opportunities').select(SELECTED_NOTICE_COLUMNS);
-    const { data, error } = ref.kind === 'notice_id'
-      ? await q.eq('notice_id', ref.value).limit(1)
-      : await q.ilike('solicitation_number', escapeIlike(ref.value)).limit(25);
-    if (error || !Array.isArray(data) || !data.length) return null;
+    const rows = (q: any) => q.order('posted_date', { ascending: false }).limit(25); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const sel = () => db.from('sam_opportunities').select(SELECTED_NOTICE_COLUMNS);
+    if (ref.kind === 'notice_id') {
+      const { data, error } = await sel().eq('notice_id', ref.value).limit(1);
+      return !error && Array.isArray(data) && data.length ? (data[0] as SelectedNoticeRecord) : null;
+    }
+    // Exact match on the stored (uppercase) form first: an indexed equality. Only a miss pays for the
+    // case-insensitive ILIKE. Newest version first so it reaches selectCanonicalVersion within the limit.
+    const exact = await rows(sel().eq('solicitation_number', ref.value.toUpperCase()));
+    if (exact.error) return null;
+    let data = exact.data;
+    if (!Array.isArray(data) || !data.length) {
+      const loose = await rows(sel().ilike('solicitation_number', escapeIlike(ref.value)));
+      if (loose.error) return null;
+      data = loose.data;
+    }
+    if (!Array.isArray(data) || !data.length) return null;
     return selectCanonicalVersion(data as SelectedNoticeRecord[]);
   } catch {
     return null;

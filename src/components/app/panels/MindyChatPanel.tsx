@@ -42,6 +42,17 @@ interface CitedSource {
   document_id: string | null;
 }
 
+/**
+ * Where a citation chip goes. A Knowledge Base doc opens the KB; a SAM.gov notice (doc_type 'sam_notice') is
+ * NEVER a KB doc, even when an older saved answer carries its notice id in document_id: it opens its SAM.gov
+ * link (review on #2106: the chip opened the Knowledge Base on a non-KB id).
+ */
+export function citationTarget(c: Pick<CitedSource, 'doc_type' | 'url' | 'document_id'>): 'kb' | 'url' | 'none' {
+  if (c.document_id && c.doc_type !== 'sam_notice') return 'kb';
+  if (c.url) return 'url';
+  return 'none';
+}
+
 interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -638,7 +649,8 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                           // lands on the real, searchable doc — not a dead end.
                           // Falls back to the inline drawer if navigation isn't
                           // wired.
-                          if (c.document_id) {
+                          const target = citationTarget(c);
+                          if (target === 'kb' && c.document_id) {
                             return (
                               <button
                                 key={i}
@@ -653,7 +665,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                             );
                           }
                           // External URL (podcast libsyn) — open in new tab
-                          if (c.url) {
+                          if (target === 'url' && c.url) {
                             return (
                               <a
                                 key={i}

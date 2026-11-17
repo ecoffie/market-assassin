@@ -6,19 +6,22 @@ type Row = { notice_id: string; solicitation_number: string | null; posted_date:
 
 /** A fake sam_opportunities: notice_id eq / solicitation_number ilike (exact, case-insensitive). */
 function fakeDb(rows: Row[], opts: { error?: boolean } = {}) {
-  const calls: Array<{ col: string; val: string }> = [];
+  const calls: Array<{ col: string; val: string; op: string; ordered: boolean }> = [];
   const db = {
     from: () => {
-      let col = ''; let val = '';
+      let col = ''; let val = ''; let op = ''; let ordered = false;
       const q = {
         select: () => q,
-        eq: (c: string, v: string) => { col = c; val = v; return q; },
-        ilike: (c: string, v: string) => { col = c; val = v; return q; },
+        eq: (c: string, v: string) => { col = c; val = v; op = 'eq'; return q; },
+        ilike: (c: string, v: string) => { col = c; val = v; op = 'ilike'; return q; },
+        order: (c: string, o: { ascending: boolean }) => { ordered = c === 'posted_date' && o.ascending === false; return q; },
         limit: async () => {
-          calls.push({ col, val });
+          calls.push({ col, val, op, ordered });
           if (opts.error) return { data: null, error: { message: 'down' } };
           const unesc = val.replace(/\\(.)/g, '$1');
-          const data = rows.filter((r) => col === 'notice_id' ? r.notice_id === val : String(r.solicitation_number).toUpperCase() === unesc.toUpperCase());
+          const data = rows.filter((r) => col === 'notice_id' ? r.notice_id === val
+            : op === 'eq' ? r.solicitation_number === val
+            : String(r.solicitation_number).toUpperCase() === unesc.toUpperCase());
           return { data, error: null };
         },
       };
@@ -106,12 +109,24 @@ describe('resolveMentionedNotice', () => {
   it('bounded: at most 4 lookups per request', async () => {
     const { db, calls } = fakeDb([]);
     await resolveMentionedNotice(db, 'AB12CD34 EF56GH78 IJ90KL12 MN34OP56 QR78ST90 UV12WX34', [{ role: 'user', content: 'YZ56AB78' }]);
-    expect(calls).toHaveLength(4);
+    // 4 tokens, each an exact miss + its ILIKE fallback.
+    expect(new Set(calls.map((c) => c.val.toUpperCase())).size).toBe(4);
   });
 
   it('LIKE wildcards in the token are escaped (an exact match only)', async () => {
     const { db, calls } = fakeDb([]);
     await lookupNoticeRef(db, { kind: 'solicitation_number', value: 'W912_PL26%Q42' });
-    expect(calls[0]).toEqual({ col: 'solicitation_number', val: 'W912\\_PL26\\%Q42' });
+    expect(calls[1]).toMatchObject({ col: 'solicitation_number', op: 'ilike', val: 'W912\\_PL26\\%Q42' });
+  });
+
+  it('exact uppercase equality first; the ILIKE runs only on a miss; both newest posted first', async () => {
+    const sprpa: Row = { notice_id: NID, solicitation_number: 'SPRPA127RUA05', posted_date: '2026-11-01' };
+    const hit = fakeDb([sprpa]);
+    expect(await lookupNoticeRef(hit.db, { kind: 'solicitation_number', value: 'sprpa127rua05' })).toMatchObject({ notice_id: NID });
+    expect(hit.calls).toEqual([{ col: 'solicitation_number', val: 'SPRPA127RUA05', op: 'eq', ordered: true }]);
+    const lower: Row = { ...sprpa, solicitation_number: 'sprpa127rua05' };
+    const miss = fakeDb([lower]);
+    expect(await lookupNoticeRef(miss.db, { kind: 'solicitation_number', value: 'sprpa127rua05' })).toMatchObject({ notice_id: NID });
+    expect(miss.calls.map((c) => [c.op, c.ordered])).toEqual([['eq', true], ['ilike', true]]);
   });
 });

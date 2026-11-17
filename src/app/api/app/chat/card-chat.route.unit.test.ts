@@ -92,18 +92,20 @@ function builder(table: string) {
   const q: Record<string, unknown> = {};
   let eqVal: unknown = null;
   let ilikeVal: unknown = null;
+  let eqCol = '';
   q.select = () => q;
-  q.eq = (_k: string, v: unknown) => { eqVal = v; return q; };
+  q.eq = (k: string, v: unknown) => { eqVal = v; eqCol = k; return q; };
   q.ilike = (_k: string, v: unknown) => { ilikeVal = v; return q; };
+  q.order = () => q;
   // The plain-chat mentioned-notice lookup (an exact solicitation number or notice id → rows).
   q.limit = async () => {
     if (table !== 'sam_opportunities') return { data: [], error: null };
-    state.mentionLookups.push(ilikeVal ?? eqVal);
+    state.mentionLookups.push(ilikeVal != null ? `ilike:${ilikeVal}` : `${eqCol}:${eqVal}`);
     if (state.recordError) return { data: null, error: { message: 'down' } };
     const r = state.record;
     const hit = !!r && (ilikeVal != null
       ? String(r.solicitation_number).toUpperCase() === String(ilikeVal).toUpperCase()
-      : r.notice_id === eqVal);
+      : eqCol === 'solicitation_number' ? r.solicitation_number === eqVal : r.notice_id === eqVal);
     return { data: hit ? [r] : [], error: null };
   };
   q.update = () => ({ eq: async () => ({ error: null }) });
@@ -565,7 +567,15 @@ describe('plain /app chat: the notice the user named (scorecard 2026-11-16, C1/C
       expect(sys).toContain('Set-aside: Total Small Business');
       expect(sys).toContain('Notice point of contact: Jane Buyer, jane.buyer@usace.army.mil');
     }
-    expect(state.mentionLookups).toEqual(['W912PL26Q0042']);
+    // One indexed equality on the stored uppercase form; the ILIKE never runs on a hit.
+    expect(state.mentionLookups).toEqual(['solicitation_number:W912PL26Q0042']);
+  });
+
+  it('a lowercase number misses the exact match once, then the case-insensitive lookup finds it', async () => {
+    state.record = { ...state.record!, solicitation_number: 'w912pl26q0042' };
+    await post({ message: 'Tell me about solicitation w912pl26q0042' });
+    expect(state.mentionLookups).toEqual(['solicitation_number:W912PL26Q0042', 'ilike:w912pl26q0042']);
+    expect(system(state.answerMessages[0])).toContain('MENTIONED OPPORTUNITY');
   });
 
   it('C1b T6: "email the contracting officer" two turns later keeps the contact from the earlier turn', async () => {
@@ -584,13 +594,13 @@ describe('plain /app chat: the notice the user named (scorecard 2026-11-16, C1/C
     expect(sys).toMatch(/address a draft to that contact and cite the solicitation number/);
   });
 
-  it('context only: no card turn, no charge, the full tool set; the persisted source is the notice', async () => {
+  it('context only: no card turn, no charge, the full tool set; the source is the SAM.gov notice, not a KB doc', async () => {
     const { events } = await post({ message: 'What does W912PL26Q0042 require?' });
     expect(claimCardTurn).not.toHaveBeenCalled();
     expect(charges()).toBe(0);
     expect(state.allowedToolNames).toBeNull();
-    const cites = events.find((e) => e.type === 'citations') as { sources?: Array<{ document_id: string | null }> } | undefined;
-    expect(cites?.sources?.[0]?.document_id).toBe(NID);
+    const cites = events.find((e) => e.type === 'citations') as { sources?: Array<Record<string, unknown>> } | undefined;
+    expect(cites?.sources?.[0]).toMatchObject({ doc_type: 'sam_notice', url: 'https://sam.gov/opp/x/view', document_id: null, source_path: `sam_notice:${NID}` });
   });
 
   it('an id that appears only in an assistant answer never attaches a notice', async () => {
