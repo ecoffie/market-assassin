@@ -28,9 +28,13 @@ import agencyAliases from '@/data/agency-aliases.json';
 export type ValidationIssue = { path: string; message: string };
 export type ValidationResult = { ok: true; model: DocModel } | { ok: false; issues: ValidationIssue[] };
 
-const BLOCK_TYPES = new Set(['paragraph', 'bullets', 'table', 'chart', 'callout', 'pagebreak']);
-const CLAIMS = new Set(['fact', 'assumption', 'recommendation', 'unverified', 'context']);
-const SOURCE_KINDS = new Set(['sam_notice', 'usaspending', 'upload', 'vault', 'tool', 'web', 'other']);
+/** The allowed values, exported so a producer's schema (create_document) states them exactly. */
+export const BLOCK_TYPE_VALUES = ['paragraph', 'bullets', 'table', 'chart', 'callout', 'pagebreak'] as const;
+export const CLAIM_VALUES = ['fact', 'assumption', 'recommendation', 'unverified', 'context'] as const;
+export const SOURCE_KIND_VALUES = ['sam_notice', 'usaspending', 'upload', 'vault', 'tool', 'web', 'other'] as const;
+const BLOCK_TYPES = new Set<string>(BLOCK_TYPE_VALUES);
+const CLAIMS = new Set<string>(CLAIM_VALUES);
+const SOURCE_KINDS = new Set<string>(SOURCE_KIND_VALUES);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ATTENTION_MAX_CHARS = 120;
 
@@ -296,7 +300,7 @@ export function validateDocModel(input: unknown): ValidationResult {
       else if (sourceIds.has(s.id)) add(`${p}.id`, `duplicate source id "${s.id}"`);
       else sourceIds.add(s.id);
       if (!str(s.label)) add(`${p}.label`, 'required');
-      if (!SOURCE_KINDS.has(String(s.kind))) add(`${p}.kind`, 'unknown source kind');
+      if (!SOURCE_KINDS.has(String(s.kind))) add(`${p}.kind`, `unknown source kind "${String(s.kind)}"; allowed values: ${SOURCE_KIND_VALUES.join(', ')}`);
       if (s.url !== undefined && (typeof s.url !== 'string' || !/^https?:\/\//i.test(s.url))) add(`${p}.url`, 'must be an http(s) URL');
     });
   }
