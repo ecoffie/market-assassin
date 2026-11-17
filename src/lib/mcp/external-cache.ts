@@ -160,3 +160,69 @@ export async function withCache<T>(
   }
   return { value: fresh, fromCache: false };
 }
+// ── LAST-GOOD FALLBACK (Data Core 2026-11-17) ─────────────────────────────────────────────
+// Eric: "if BQ is down we should have cache on these things that have errors (not everything),
+// at least on the forecasts." Unlike withCache (serve-from-cache-first, TTL), this is LIVE-FIRST:
+// the source answers whenever it can. A successful, non-empty answer is snapshotted; when the
+// source ERRORS, the most recent snapshot is served instead — labelled with when it was taken,
+// never presented as live. An error with no snapshot stays an error (unknown, never zero).
+
+/** How long a snapshot stays usable as a fallback. Older than this → treat as no snapshot. */
+export const LAST_GOOD_MAX_AGE_SECONDS = 30 * 24 * 3600;
+
+export interface LastGood<T> {
+  value: T;
+  /** ISO time the snapshot was taken (when the source last answered successfully). */
+  fetchedAt: string;
+}
+
+/** The most recent snapshot regardless of TTL, bounded by LAST_GOOD_MAX_AGE_SECONDS. Never throws. */
+export async function getLastGood<T>(apiType: string, params: Record<string, unknown>): Promise<LastGood<T> | null> {
+  const sb = getClient();
+  if (!sb) return null;
+  try {
+    const { data, error } = await sb
+      .from('mcp_external_cache')
+      .select('response_data, fetched_at')
+      .eq('cache_key', generateCacheKey(apiType, params))
+      .maybeSingle();
+    if (error || !data || !data.fetched_at) return null;
+    if (Date.now() - new Date(data.fetched_at).getTime() > LAST_GOOD_MAX_AGE_SECONDS * 1000) return null;
+    return { value: data.response_data as T, fetchedAt: data.fetched_at };
+  } catch (err) {
+    console.error('[mcp/cache] getLastGood failed (no fallback):', err);
+    return null;
+  }
+}
+
+export type LiveOrLastGood<T> =
+  | { value: T; source: 'live' }
+  | { value: T; source: 'last_good'; fetchedAt: string }
+  | { value: T; source: 'error' };
+
+/**
+ * Live-first with a labelled last-good fallback.
+ * @param fetcher returns `{ value, failed }` — `failed` means the SOURCE errored (not "no rows").
+ * A live non-empty success is snapshotted (TTL = LAST_GOOD_MAX_AGE_SECONDS); a live EMPTY success is
+ * returned as-is and never snapshotted (an empty answer is not evidence worth preserving).
+ */
+export async function liveWithLastGood<T>(
+  apiType: string,
+  params: Record<string, unknown>,
+  fetcher: () => Promise<{ value: T; failed: boolean }>,
+): Promise<LiveOrLastGood<T>> {
+  let res: { value: T; failed: boolean };
+  try {
+    res = await fetcher();
+  } catch (err) {
+    console.error(`[mcp/cache] ${apiType} live fetch threw:`, err);
+    res = { value: undefined as unknown as T, failed: true };
+  }
+  if (!res.failed) {
+    if (!isEmptyResult(res.value)) await setCached(apiType, params, res.value, LAST_GOOD_MAX_AGE_SECONDS);
+    return { value: res.value, source: 'live' };
+  }
+  const snap = await getLastGood<T>(apiType, params);
+  if (snap) return { value: snap.value, source: 'last_good', fetchedAt: snap.fetchedAt };
+  return { value: res.value, source: 'error' };
+}
