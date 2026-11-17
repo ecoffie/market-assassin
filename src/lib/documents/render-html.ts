@@ -6,9 +6,9 @@
  * data, never markup. No external fonts, scripts or images are referenced, so rendering makes no
  * network requests.
  */
-import type { Block, DocModel, TableBlock } from './model';
+import type { Block, Claim, DocModel, TableBlock } from './model';
 import { chartToSvg } from './charts';
-import { citationIndex, citeMarker, claimLabel, formatCell, formatDocDate, parseInline } from './format';
+import { citationIndex, citeMarker, claimClass, claimLabel, claimsPresent, formatCell, formatDocDate, parseInline, unverifiedStatements } from './format';
 
 export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -50,7 +50,8 @@ p { margin: 0 0 9px; orphans: 3; widows: 3; }
 ul, ol { margin: 0 0 10px; padding-left: 20px; } li { margin: 0 0 4px; }
 sup.cite { font-size: 7.5pt; color: #1e3a8a; margin-left: 2px; }
 .label { display: inline-block; font-size: 7.5pt; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; border-radius: 3px; margin-right: 6px; vertical-align: 1px; }
-.label.estimate { background: #fef3c7; color: #92400e; }
+.label.assumption { background: #fef3c7; color: #92400e; }
+.label.unverified { background: #fee2e2; color: #991b1b; }
 .label.recommendation { background: #dcfce7; color: #166534; }
 table { width: 100%; border-collapse: collapse; margin: 6px 0 4px; font-size: 9pt; break-inside: auto; }
 thead { display: table-header-group; }
@@ -69,9 +70,16 @@ figure { margin: 10px 0 14px; break-inside: avoid; }
 .pagebreak { break-after: page; }
 .sources ol { padding-left: 22px; font-size: 9pt; } .sources li { margin-bottom: 5px; word-break: break-word; }
 .sources .meta { color: #6b7280; }
+.unverified ol { padding-left: 22px; font-size: 9.5pt; } .unverified li { margin-bottom: 5px; } .unverified .meta { color: #6b7280; }
 `;
 
-function tableHtml(b: TableBlock, marker: string, label: string | null): string {
+/** The visible label chip for a claim ('' when the claim carries none). */
+function labelChip(claim: Claim | undefined): string {
+  const l = claimLabel(claim);
+  return l ? `<span class="label ${claimClass(claim)}">${escapeHtml(l)}</span>` : '';
+}
+
+function tableHtml(b: TableBlock, marker: string): string {
   const head = b.columns.map((c) => `<th class="${c.align === 'right' || ['usd', 'int', 'pct'].includes(c.format ?? '') ? 'num' : ''}">${escapeHtml(c.label)}</th>`).join('');
   const body = b.rows
     .map((r) => `<tr>${b.columns
@@ -83,15 +91,12 @@ function tableHtml(b: TableBlock, marker: string, label: string | null): string 
       })
       .join('')}</tr>`)
     .join('');
-  const cap = [label ? `<span class="label ${label.toLowerCase()}">${label}</span>` : '', b.caption ? inline(b.caption) : '', marker ? `<sup class="cite">${marker}</sup>` : ''].filter(Boolean).join(' ');
+  const cap = [labelChip(b.claim), b.caption ? inline(b.caption) : '', marker ? `<sup class="cite">${marker}</sup>` : ''].filter(Boolean).join(' ');
   return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>${cap ? `<div class="caption">${cap}</div>` : ''}`;
 }
 
 function blockHtml(b: Block, numberOf: (id: string) => number | null): string {
-  const lab = (c?: string) => {
-    const l = claimLabel(c as never);
-    return l ? `<span class="label ${l.toLowerCase()}">${l}</span>` : '';
-  };
+  const lab = (c?: Claim) => labelChip(c);
   const sup = (cites?: string[]) => {
     const m = citeMarker(cites, numberOf);
     return m ? `<sup class="cite">${m}</sup>` : '';
@@ -104,10 +109,9 @@ function blockHtml(b: Block, numberOf: (id: string) => number | null): string {
       return `<${tag}>${b.items.map((it) => `<li>${lab(it.claim)}${inline(it.text)}${sup(it.cites)}</li>`).join('')}</${tag}>`;
     }
     case 'table':
-      return tableHtml(b, citeMarker(b.cites, numberOf), claimLabel(b.claim));
+      return tableHtml(b, citeMarker(b.cites, numberOf));
     case 'chart': {
-      const l = claimLabel(b.claim);
-      const cap = [l ? `<span class="label ${l.toLowerCase()}">${l}</span>` : '', b.caption ? inline(b.caption) : '', sup(b.cites)].filter(Boolean).join(' ');
+      const cap = [labelChip(b.claim), b.caption ? inline(b.caption) : '', sup(b.cites)].filter(Boolean).join(' ');
       return `<figure>${chartToSvg(b)}${cap ? `<figcaption class="caption">${cap}</figcaption>` : ''}</figure>`;
     }
     case 'callout': {
@@ -127,8 +131,8 @@ export interface RenderHtmlOptions {
 export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): string {
   const { ordered, numberOf } = citationIndex(model);
   const showToc = opts.toc ?? model.sections.length >= 4;
-  const hasEstimates = JSON.stringify(model.sections).includes('"claim":"estimate"');
-  const hasRecs = JSON.stringify(model.sections).includes('"claim":"recommendation"');
+  const present = claimsPresent(model);
+  const unverified = unverifiedStatements(model);
 
   const meta: string[] = [];
   if (model.preparedFor) meta.push(`<dt>Prepared for</dt><dd>${escapeHtml(model.preparedFor)}</dd>`);
@@ -138,14 +142,15 @@ export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): strin
 
   const reading = [
     '<b>How to read this document.</b> Facts carry a numbered citation like <sup class="cite">[1]</sup> that points to the Sources section.',
-    hasEstimates ? 'Statements marked <span class="label estimate">Estimate</span> are projections or inferences, not recorded facts.' : '',
-    hasRecs ? 'Statements marked <span class="label recommendation">Recommendation</span> are suggested actions.' : '',
+    present.has('assumption') ? 'Statements marked <span class="label assumption">ASSUMPTION</span> are premises stated by the author, not recorded facts; check them before relying on them.' : '',
+    present.has('recommendation') ? 'Statements marked <span class="label recommendation">Recommendation</span> are suggested actions.' : '',
+    unverified.length ? `Statements marked <span class="label unverified">Unverified — no source</span> could not be traced to a source and are listed in the Unverified statements section.` : '',
   ].filter(Boolean).join(' ');
 
   const cover = `<section class="cover"><div class="kicker">Report</div><h1>${escapeHtml(model.title)}</h1>${model.subtitle ? `<p class="subtitle">${escapeHtml(model.subtitle)}</p>` : ''}<dl>${meta.join('')}</dl><div class="reading">${reading}</div></section>`;
 
   const toc = showToc
-    ? `<section class="toc"><h2>Contents</h2><ol>${model.sections.filter((s) => (s.level ?? 1) === 1).map((s) => `<li>${escapeHtml(s.heading)}</li>`).join('')}${ordered.length ? '<li>Sources</li>' : ''}</ol></section>`
+    ? `<section class="toc"><h2>Contents</h2><ol>${model.sections.filter((s) => (s.level ?? 1) === 1).map((s) => `<li>${escapeHtml(s.heading)}</li>`).join('')}${unverified.length ? '<li>Unverified statements</li>' : ''}${ordered.length ? '<li>Sources</li>' : ''}</ol></section>`
     : '';
 
   const body = model.sections
@@ -154,6 +159,12 @@ export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): strin
       return `<section id="${escapeHtml(s.id)}"><${tag}>${escapeHtml(s.heading)}</${tag}>${s.blocks.map((b) => blockHtml(b, numberOf)).join('')}</section>`;
     })
     .join('');
+
+  const unverifiedSection = unverified.length
+    ? `<section class="unverified"><h2>Unverified statements</h2><p>These statements appear in the document without a source. Verify each one before relying on it.</p><ol>${unverified
+      .map((u) => `<li><span class="meta">${escapeHtml(u.section)}:</span> ${inline(u.text)}</li>`)
+      .join('')}</ol></section>`
+    : '';
 
   const sources = ordered.length
     ? `<section class="sources"><h2>Sources</h2><ol>${ordered
@@ -167,5 +178,5 @@ export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): strin
       .join('')}</ol></section>`
     : '';
 
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(model.title)}</title><style>${CSS}</style></head><body><main class="doc">${cover}${toc}${body}${sources}</main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(model.title)}</title><style>${CSS}</style></head><body><main class="doc">${cover}${toc}${body}${unverifiedSection}${sources}</main></body></html>`;
 }

@@ -13,6 +13,8 @@ const state = vi.hoisted(() => ({
   pro: true,
   pdf: { pdf: Buffer.from('%PDF-1.7 rendered') as Buffer | null, error: null as string | null },
   proChecked: [] as string[],
+  rl: { allowed: true, resetAt: 0 },
+  rlKeys: [] as Array<{ key: string; limit: number; window: number }>,
 }));
 
 vi.mock('@/lib/two-factor-session', () => ({
@@ -22,6 +24,12 @@ vi.mock('@/lib/two-factor-session', () => ({
 }));
 vi.mock('@/lib/access/resolve-access', () => ({ hasProAccess: async (e: string) => { state.proChecked.push(e); return state.pro; } }));
 vi.mock('@/lib/pdf/launch-browser', () => ({ htmlToPdf: async () => state.pdf }));
+vi.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: async (key: string, limit: number, window: number) => {
+    state.rlKeys.push({ key, limit, window });
+    return { allowed: state.rl.allowed, remaining: 0, limit, resetAt: state.rl.resetAt };
+  },
+}));
 
 import { POST } from './route';
 
@@ -34,6 +42,7 @@ const ok = (format: string, model: unknown = SAMPLE_REPORT) => req({ email: 'Use
 
 beforeEach(() => {
   state.authOk = true; state.pro = true; state.proChecked = [];
+  state.rl = { allowed: true, resetAt: Math.floor(Date.now() / 1000) + 300 }; state.rlKeys = [];
   state.pdf = { pdf: Buffer.from('%PDF-1.7 rendered'), error: null };
 });
 
@@ -97,6 +106,32 @@ describe('POST /api/app/documents/render', () => {
   it('refuses oversized bodies', async () => {
     expect((await POST(req({ email: 'a@b.c', format: 'pdf', model: { pad: 'x'.repeat(1_600_000) } }))).status).toBe(413);
     expect((await POST(req({ email: 'a@b.c', format: 'pdf', model: SAMPLE_REPORT }, { 'content-length': '9999999' }))).status).toBe(413);
+  });
+
+  it('rate-limits per verified account and format: PDF 10 / DOCX 30 per 10 minutes', async () => {
+    await POST(ok('pdf'));
+    await POST(ok('docx'));
+    expect(state.rlKeys).toEqual([
+      { key: 'docrender:pdf:user@example.com', limit: 10, window: 600 },
+      { key: 'docrender:docx:user@example.com', limit: 30, window: 600 },
+    ]);
+  });
+
+  it('over the limit: 429 with Retry-After, and Chromium is never started', async () => {
+    state.rl = { allowed: false, resetAt: Math.floor(Date.now() / 1000) + 120 };
+    let rendered = false;
+    state.pdf = { get pdf() { rendered = true; return Buffer.from('%PDF'); }, error: null } as never;
+    const res = await POST(ok('pdf'));
+    expect(res.status).toBe(429);
+    expect(Number(res.headers.get('retry-after'))).toBeGreaterThan(0);
+    expect((await res.json()).error).toBe('rate_limited');
+    expect(rendered).toBe(false);
+  });
+
+  it('auth and Pro are checked BEFORE the limiter (an anonymous caller cannot burn a user\'s quota)', async () => {
+    state.authOk = false;
+    await POST(ok('pdf'));
+    expect(state.rlKeys).toEqual([]);
   });
 
   it('is write-free: the route imports no database, storage or logging client', () => {

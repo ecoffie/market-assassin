@@ -6,17 +6,25 @@
  * later XLSX/PPTX) turn the same model into a file. Revisions edit the stored model, never re-prompt
  * from scratch.
  *
- * Every content block may carry a claim label:
- *   fact           — must cite at least one source (validate.ts enforces it)
- *   estimate       — rendered with a visible "Estimate" label
- *   recommendation — rendered with a visible "Recommendation" label
+ * Every content block MUST carry a claim label (validate.ts refuses an unlabeled block — an
+ * unlabeled block used to skip the citation rule entirely):
+ *   fact           — a verified statement; must cite at least one source
+ *   assumption     — rendered with a visible "ASSUMPTION" label (a premise the reader must check)
+ *   recommendation — rendered with a visible "Recommendation" label (a suggested action)
+ *   unverified     — rendered "Unverified — no source" and listed in an "Unverified statements"
+ *                    section. Set by demoteUncitedFacts, never a way to dress up a guess.
+ *   context        — describes the DOCUMENT itself (scope, method, how to read it). It may not
+ *                    contain a number: a figure is always a claim about the world.
+ *
+ * There is no "estimate" label (Eric, 2026-11-17): a statement is verified, an ASSUMPTION, or
+ * omitted. A decision-critical statement with no source (`critical: true`) is omitted, not labeled.
  *
  * Neutral module: nothing here may import Proposal AI (src/lib/proposal/*), gov-buyer or MRR logic.
  */
 
 export const DOC_SCHEMA = 'mindy.doc/1' as const;
 
-export type Claim = 'fact' | 'estimate' | 'recommendation';
+export type Claim = 'fact' | 'assumption' | 'recommendation' | 'unverified' | 'context';
 
 export type SourceKind = 'sam_notice' | 'usaspending' | 'upload' | 'vault' | 'tool' | 'web' | 'other';
 
@@ -34,6 +42,11 @@ export interface DocSource {
 
 interface Labeled {
   claim?: Claim;
+  /**
+   * The statement drives a decision (a dollar figure, a deadline, an eligibility rule). If it has no
+   * resolvable source it is OMITTED by demoteUncitedFacts, never shown as unverified.
+   */
+  critical?: boolean;
   /** Source ids from DocModel.sources. */
   cites?: string[];
 }
@@ -87,6 +100,8 @@ export interface ChartBlock extends Labeled {
   kind: 'bar' | 'line' | 'pie';
   /** Label for the value axis, e.g. "Obligations ($M)". */
   yLabel?: string;
+  /** Label for the category axis, e.g. "Fiscal quarter" or "Department". */
+  xLabel?: string;
   series: { name: string; points: ChartPoint[] }[];
 }
 
@@ -142,13 +157,18 @@ export const DOC_LIMITS = {
 } as const;
 
 /** The labeled items inside a block (a bullets block labels each item; others label themselves). */
-export function labeledUnits(block: Block): Array<{ claim?: Claim; cites?: string[]; where: string }> {
+export function labeledUnits(block: Block): Array<{ claim?: Claim; cites?: string[]; critical?: boolean; where: string; text: string }> {
   switch (block.type) {
     case 'bullets':
-      return block.items.map((it, i) => ({ claim: it.claim, cites: it.cites, where: `${block.id}[${i}]` }));
+      return block.items.map((it, i) => ({ claim: it.claim, cites: it.cites, critical: it.critical, where: `${block.id}[${i}]`, text: it.text }));
     case 'pagebreak':
       return [];
-    default:
-      return [{ claim: block.claim, cites: block.cites, where: block.id }];
+    case 'paragraph':
+    case 'callout':
+      return [{ claim: block.claim, cites: block.cites, critical: block.critical, where: block.id, text: block.text }];
+    case 'table':
+      return [{ claim: block.claim, cites: block.cites, critical: block.critical, where: block.id, text: block.caption || 'Table' }];
+    case 'chart':
+      return [{ claim: block.claim, cites: block.cites, critical: block.critical, where: block.id, text: block.caption || 'Chart' }];
   }
 }

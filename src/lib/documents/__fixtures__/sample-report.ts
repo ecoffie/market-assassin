@@ -44,7 +44,7 @@ const expiring: TableBlock['rows'] = Array.from({ length: 16 }, (_, i) => ({
 const longText = (topic: string) =>
   `This section summarizes ${topic} from the research gathered in the conversation. ` +
   'The figures are drawn from the cited records and are reported as recorded; where a value was not available in the source it is shown as "Not available" rather than as zero. ' +
-  'Readers should treat the numbered citations as the authority for every stated fact, and should read statements labeled as estimates or recommendations as Mindy\'s analysis, not as recorded data.';
+  'Readers should treat the numbered citations as the authority for every stated fact, and should read statements labeled as assumptions or recommendations as Mindy\'s analysis, not as recorded data.';
 
 export const SAMPLE_REPORT: DocModel = {
   schema: DOC_SCHEMA,
@@ -67,7 +67,7 @@ export const SAMPLE_REPORT: DocModel = {
       blocks: [
         { type: 'paragraph', id: 'exec-p1', claim: 'fact', cites: ['s1'], text: 'Federal agencies obligated an illustrative **$1.93B** for janitorial services across the three fiscal years in scope, spread over 15 departments and 330 buying offices.' },
         { type: 'paragraph', id: 'exec-p2', claim: 'fact', cites: ['s1', 's2'], text: 'Spending is concentrated: the top three departments account for about half of all obligations, and 46 solicitations are open now.' },
-        { type: 'callout', id: 'exec-c1', tone: 'key_finding', claim: 'estimate', text: 'At the current pace, roughly **$640M** a year is likely to be competed again within 24 months as existing contracts expire.' },
+        { type: 'callout', id: 'exec-c1', tone: 'key_finding', claim: 'assumption', text: 'At the current pace, roughly **$640M** a year is likely to be competed again within 24 months as existing contracts expire.' },
         {
           type: 'bullets', id: 'exec-b1', items: [
             { text: 'Veterans Affairs is the largest buyer and runs the most small-business set-asides.', claim: 'fact', cites: ['s1'] },
@@ -81,12 +81,12 @@ export const SAMPLE_REPORT: DocModel = {
       id: 'market',
       heading: 'Market size and trend',
       blocks: [
-        { type: 'paragraph', id: 'market-p1', text: longText('the size and direction of the market') },
+        { type: 'paragraph', id: 'market-p1', claim: 'context', text: longText('the size and direction of the market') },
         {
           type: 'chart', id: 'market-c1', kind: 'line', caption: 'Quarterly obligations, illustrative ($)', claim: 'fact', cites: ['s1'], yLabel: 'Obligations',
           series: [{ name: 'Obligations', points: ['FY24 Q1', 'FY24 Q2', 'FY24 Q3', 'FY24 Q4', 'FY25 Q1', 'FY25 Q2', 'FY25 Q3', 'FY25 Q4', 'FY26 Q1', 'FY26 Q2', 'FY26 Q3', 'FY26 Q4'].map((x, i) => ({ x, y: Math.round((140 + i * 6 + (i % 4 === 3 ? 40 : 0)) * 1_000_000) })) }],
         },
-        { type: 'paragraph', id: 'market-p2', claim: 'estimate', text: 'Fourth-quarter spikes suggest year-end buying; expect the largest award volume in July through September.' },
+        { type: 'paragraph', id: 'market-p2', claim: 'assumption', text: 'Fourth-quarter spikes suggest year-end buying; expect the largest award volume in July through September.' },
         {
           type: 'chart', id: 'market-c2', kind: 'pie', caption: 'Obligations by set-aside type, illustrative', claim: 'fact', cites: ['s1'],
           series: [{ name: 'Share', points: [{ x: 'Small business', y: 41 }, { x: 'Full and open', y: 27 }, { x: '8(a)', y: 13 }, { x: 'SDVOSB', y: 10 }, { x: 'HUBZone', y: 6 }, { x: 'WOSB', y: 3 }] }],
@@ -97,7 +97,7 @@ export const SAMPLE_REPORT: DocModel = {
       id: 'buyers',
       heading: 'Who buys',
       blocks: [
-        { type: 'paragraph', id: 'buyers-p1', text: longText('the departments that buy these services') },
+        { type: 'paragraph', id: 'buyers-p1', claim: 'context', text: longText('the departments that buy these services') },
         {
           type: 'table', id: 'buyers-t1', caption: 'Obligations by department, FY2024–FY2026 (illustrative)', claim: 'fact', cites: ['s1'],
           columns: [
@@ -118,7 +118,7 @@ export const SAMPLE_REPORT: DocModel = {
       id: 'competition',
       heading: 'Competition',
       blocks: [
-        { type: 'paragraph', id: 'comp-p1', text: longText('the firms that win this work') },
+        { type: 'paragraph', id: 'comp-p1', claim: 'context', text: longText('the firms that win this work') },
         {
           type: 'table', id: 'comp-t1', caption: 'Leading vendors by obligations (illustrative)', claim: 'fact', cites: ['s1'],
           columns: [
@@ -130,8 +130,8 @@ export const SAMPLE_REPORT: DocModel = {
           ],
           rows: vendors,
         },
-        { type: 'callout', id: 'comp-c1', tone: 'warning', text: 'Vendor rankings reflect obligations, not win rates. A firm with fewer, larger awards can rank above a firm that wins more often.' },
-        { type: 'paragraph', id: 'comp-p2', claim: 'estimate', text: 'The market is moderately fragmented: no vendor holds more than an estimated 5% of obligations.' },
+        { type: 'callout', id: 'comp-c1', tone: 'warning', claim: 'context', text: 'Vendor rankings reflect obligations, not win rates. A firm with fewer, larger awards can rank above a firm that wins more often.' },
+        { type: 'paragraph', id: 'comp-p2', claim: 'assumption', text: 'The market is moderately fragmented: no vendor appears to hold more than about 5% of obligations.' },
       ],
     },
     {
@@ -165,7 +165,7 @@ export const SAMPLE_REPORT: DocModel = {
       blocks: [
         { type: 'paragraph', id: 'price-p1', claim: 'fact', cites: ['s4'], text: 'Your uploaded pricing notes list a loaded labor rate of $31.40 per hour for custodial staff and $38.75 for supervisors.' },
         { type: 'paragraph', id: 'price-p2', claim: 'fact', cites: ['s5'], text: 'The reference range for comparable federal custodial labor is $27–$36 per hour, before wage-determination adjustments.' },
-        { type: 'paragraph', id: 'price-p3', claim: 'estimate', text: 'Your custodial rate sits in the upper third of the reference range, which is competitive for best-value awards but may lose lowest-price, technically acceptable competitions.' },
+        { type: 'paragraph', id: 'price-p3', claim: 'assumption', text: 'Your custodial rate sits in the upper third of the reference range, which is competitive for best-value awards but may lose lowest-price, technically acceptable competitions.' },
         {
           type: 'table', id: 'price-t1', caption: 'Rate comparison (illustrative)', claim: 'fact', cites: ['s4', 's5'],
           columns: [{ key: 'role', label: 'Labor category' }, { key: 'yours', label: 'Your rate', align: 'right' }, { key: 'low', label: 'Reference low', align: 'right' }, { key: 'high', label: 'Reference high', align: 'right' }],
@@ -190,15 +190,15 @@ export const SAMPLE_REPORT: DocModel = {
             { claim: 'recommendation', text: 'Pursue teaming with an 8(a) or SDVOSB firm for set-asides you cannot bid directly.' },
           ],
         },
-        { type: 'paragraph', id: 'rec-p1', text: longText('the recommended next steps and their rationale') },
+        { type: 'paragraph', id: 'rec-p1', claim: 'context', text: longText('the recommended next steps and their rationale') },
       ],
     },
     {
       id: 'method',
       heading: 'Method and limitations',
       blocks: [
-        { type: 'paragraph', id: 'method-p1', text: 'This report was assembled by Mindy from the research in one conversation. Facts are taken from the cited sources as recorded. Estimates are Mindy\'s projections from those facts and are labeled. Recommendations are suggested actions and are labeled.' },
-        { type: 'paragraph', id: 'method-p2', text: 'Coverage is limited to the sources listed. A department or vendor absent from a table may still buy or sell these services under a different classification.' },
+        { type: 'paragraph', id: 'method-p1', claim: 'context', text: 'This report was assembled by Mindy from the research in one conversation. Facts are taken from the cited sources as recorded. Assumptions are premises stated by the author and are labeled. Recommendations are suggested actions and are labeled.' },
+        { type: 'paragraph', id: 'method-p2', claim: 'context', text: 'Coverage is limited to the sources listed. A department or vendor absent from a table may still buy or sell these services under a different classification.' },
       ],
     },
   ],

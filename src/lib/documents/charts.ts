@@ -43,8 +43,11 @@ function barSvg(chart: ChartBlock, width: number): string {
   const groupH = barH * chart.series.length + groupGap;
   const labelW = 190;
   const valueW = 64;
-  const top = multi ? 28 : 8;
-  const height = top + cats.length * groupH + 8;
+  // Axis titles: the category axis title sits above the labels, the value axis title under the bars.
+  const catTitleH = chart.xLabel ? 16 : 0;
+  const valueTitleH = chart.yLabel ? 18 : 0;
+  const top = (multi ? 28 : 8) + catTitleH;
+  const height = top + cats.length * groupH + 8 + valueTitleH;
   const plotW = width - labelW - valueW;
   const max = Math.max(0, ...chart.series.flatMap((s) => s.points.map((p) => p.y)));
   const scale = max > 0 ? plotW / max : 0;
@@ -68,7 +71,9 @@ function barSvg(chart: ChartBlock, width: number): string {
       parts.push(`<text x="${labelW + w + 5}" y="${y + barH - 6}" font-size="10.5" fill="${MUTED}">${compact(v)}</text>`);
     });
   });
-  parts.push(`<line x1="${labelW}" y1="${top - 4}" x2="${labelW}" y2="${height - 6}" stroke="${AXIS}"/>`);
+  parts.push(`<line x1="${labelW}" y1="${top - 4}" x2="${labelW}" y2="${height - 6 - valueTitleH}" stroke="${AXIS}"/>`);
+  if (chart.xLabel) parts.push(`<text x="${labelW - 8}" y="${top - 8}" font-size="10" font-weight="600" text-anchor="end" fill="${MUTED}">${esc(truncate(chart.xLabel, 30))}</text>`);
+  if (chart.yLabel) parts.push(`<text x="${labelW + plotW / 2}" y="${height - 4}" font-size="10" text-anchor="middle" fill="${MUTED}">${esc(chart.yLabel)}</text>`);
   return svgWrap(width, height, chart, parts);
 }
 
@@ -116,6 +121,7 @@ function lineSvg(chart: ChartBlock, width: number): string {
     }
   });
   if (chart.yLabel) parts.push(`<text x="12" y="${top + ph / 2}" font-size="10" fill="${MUTED}" transform="rotate(-90 12 ${top + ph / 2})" text-anchor="middle">${esc(chart.yLabel)}</text>`);
+  if (chart.xLabel) parts.push(`<text x="${left + (width - left - right) / 2}" y="${height - 2}" font-size="10" text-anchor="middle" fill="${MUTED}">${esc(chart.xLabel)}</text>`);
   return svgWrap(width, height, chart, parts);
 }
 

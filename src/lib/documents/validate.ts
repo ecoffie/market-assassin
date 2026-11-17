@@ -4,13 +4,18 @@
  * The rules a renderer relies on are enforced HERE, never trusted to whatever produced the model
  * (an LLM, a feature adapter, a client):
  *   - structure: known block types, unique ids, required fields, size limits;
+ *   - EVERY BLOCK IS LABELED: a block (or bullet item) with no claim is an error. An unlabeled block
+ *     used to skip the citation rule entirely (review M1, 2026-11-17);
  *   - FACTS MUST CITE: a block labeled `fact` needs at least one cite, and every cite must resolve to
  *     a source in `sources`. A fact with no resolvable cite is an error, not a warning — an uncited
  *     "fact" in a client-facing PDF is exactly the claim Mindy cannot defend;
+ *   - CONTEXT HAS NO NUMBERS: `context` describes the document; a digit means it is a claim;
  *   - numbers: table/chart values must be finite; a missing value is null ("Not available"), never 0.
  *
- * `demoteUncitedFacts` is the one sanctioned repair: it relabels an uncited fact as an estimate (which
- * renders with a visible "Estimate" label) instead of dropping content.
+ * `demoteUncitedFacts` is the one sanctioned repair (Eric's rule: verified, ASSUMPTION, or omitted —
+ * never "estimate"): an uncited decision-critical statement is OMITTED; any other uncited statement
+ * is relabeled `unverified`, which renders "Unverified — no source" and is listed in its own section.
+ * Ask Mindy retries sourcing first and only then calls this.
  */
 import { DOC_LIMITS, DOC_SCHEMA, labeledUnits, type Block, type DocModel } from './model';
 
@@ -18,7 +23,7 @@ export type ValidationIssue = { path: string; message: string };
 export type ValidationResult = { ok: true; model: DocModel } | { ok: false; issues: ValidationIssue[] };
 
 const BLOCK_TYPES = new Set(['paragraph', 'bullets', 'table', 'chart', 'callout', 'pagebreak']);
-const CLAIMS = new Set(['fact', 'estimate', 'recommendation']);
+const CLAIMS = new Set(['fact', 'assumption', 'recommendation', 'unverified', 'context']);
 const SOURCE_KINDS = new Set(['sam_notice', 'usaspending', 'upload', 'vault', 'tool', 'web', 'other']);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -133,6 +138,10 @@ export function validateDocModel(input: unknown): ValidationResult {
           }
           case 'chart':
             if (!['bar', 'line', 'pie'].includes(blk.kind)) add(`${bp}.kind`, 'unknown chart kind');
+            for (const k of ['xLabel', 'yLabel'] as const) {
+              const v = (blk as unknown as Record<string, unknown>)[k];
+              if (v !== undefined && (typeof v !== 'string' || v.length > 80)) add(`${bp}.${k}`, 'must be a string of at most 80 chars');
+            }
             if (!Array.isArray(blk.series) || blk.series.length === 0) { add(`${bp}.series`, 'at least one series'); break; }
             if (blk.series.length > DOC_LIMITS.maxChartSeries) add(`${bp}.series`, `more than ${DOC_LIMITS.maxChartSeries}`);
             if (blk.kind === 'pie' && blk.series.length !== 1) add(`${bp}.series`, 'a pie chart has exactly one series');
@@ -151,7 +160,10 @@ export function validateDocModel(input: unknown): ValidationResult {
 
         // Claim labels and the facts-must-cite rule.
         for (const u of labeledUnits(blk)) {
-          if (u.claim !== undefined && !CLAIMS.has(u.claim)) add(`${bp}`, `unknown claim "${String(u.claim)}" at ${u.where}`);
+          if (u.claim === undefined) add(`${bp}`, `a claim label is required (fact, assumption, recommendation, unverified or context) at ${u.where}`);
+          else if (!CLAIMS.has(u.claim)) add(`${bp}`, `unknown claim "${String(u.claim)}" at ${u.where}${String(u.claim) === 'estimate' ? ' — there is no estimate label; use assumption, or cite a source' : ''}`);
+          if (u.critical !== undefined && typeof u.critical !== 'boolean') add(`${bp}`, `critical must be a boolean at ${u.where}`);
+          if (u.claim === 'context' && (/\d/.test(u.text) || blk.type === 'table' || blk.type === 'chart')) add(`${bp}`, `context may not contain numbers, tables or charts (${u.where}); label it fact and cite a source`);
           if (u.cites !== undefined && !Array.isArray(u.cites)) { add(`${bp}`, `cites must be an array at ${u.where}`); continue; }
           const cites = u.cites ?? [];
           const unresolved = cites.filter((c) => !sourceIds.has(c));
@@ -168,26 +180,45 @@ export function validateDocModel(input: unknown): ValidationResult {
   return issues.length ? { ok: false, issues } : { ok: true, model: input as unknown as DocModel };
 }
 
+export interface DemotionResult {
+  model: DocModel;
+  /** Relabeled `unverified` (still in the document, listed in "Unverified statements"). */
+  unverified: string[];
+  /** Removed: decision-critical statements with no resolvable source. */
+  omitted: string[];
+}
+
 /**
- * Relabel every `fact` that has no resolvable cite as an `estimate`. Returns a new model and the
- * locations changed. Content is never dropped; it just stops claiming to be a sourced fact.
+ * Repair uncited facts (and unlabeled units, which are treated as facts): decision-critical ones are
+ * OMITTED, the rest are relabeled `unverified`. Never relabels anything as an estimate or assumption —
+ * an assumption is a premise the author states on purpose, not a demoted fact. A bullets block whose
+ * items are all omitted is removed; a section can end up empty and keeps its heading.
  */
-export function demoteUncitedFacts(model: DocModel): { model: DocModel; demoted: string[] } {
+export function demoteUncitedFacts(model: DocModel): DemotionResult {
   const ids = new Set(model.sources.map((s) => s.id));
-  const demoted: string[] = [];
-  const fix = <T extends { claim?: string; cites?: string[] }>(u: T, where: string): T => {
-    if (u.claim !== 'fact') return u;
-    if ((u.cites ?? []).some((c) => ids.has(c))) return u;
-    demoted.push(where);
-    return { ...u, claim: 'estimate' };
+  const unverified: string[] = [];
+  const omitted: string[] = [];
+  type Unit = { claim?: string; cites?: string[]; critical?: boolean };
+  // Returns the repaired unit, or null when it must be omitted.
+  const fix = <T extends Unit>(u: T, where: string): T | null => {
+    const isFact = u.claim === 'fact' || u.claim === undefined;
+    if (!isFact) return u;
+    if ((u.cites ?? []).some((c) => ids.has(c))) return u.claim === undefined ? { ...u, claim: 'fact' } : u;
+    if (u.critical === true) { omitted.push(where); return null; }
+    unverified.push(where);
+    return { ...u, claim: 'unverified' };
   };
   const sections = model.sections.map((sec) => ({
     ...sec,
-    blocks: sec.blocks.map((b): Block => {
-      if (b.type === 'bullets') return { ...b, items: b.items.map((it, i) => fix(it, `${b.id}[${i}]`)) };
-      if (b.type === 'pagebreak') return b;
-      return fix(b, b.id);
+    blocks: sec.blocks.flatMap((b): Block[] => {
+      if (b.type === 'pagebreak') return [b];
+      if (b.type === 'bullets') {
+        const items = b.items.map((it, i) => fix(it, `${b.id}[${i}]`)).filter((it): it is NonNullable<typeof it> => it !== null);
+        return items.length ? [{ ...b, items }] : [];
+      }
+      const fixed = fix(b, b.id);
+      return fixed ? [fixed] : [];
     }),
   }));
-  return { model: { ...model, sections }, demoted };
+  return { model: { ...model, sections }, unverified, omitted };
 }

@@ -78,11 +78,38 @@ export function citeMarker(cites: string[] | undefined, numberOf: (id: string) =
   return nums.length ? `[${nums.join(', ')}]` : '';
 }
 
-/** The visible label a claim carries. Facts carry their citation instead of a word label. */
+/**
+ * The visible label a claim carries. Facts carry their citation instead of a word label; context
+ * (text about the document itself) carries none. There is no "Estimate" label.
+ */
 export function claimLabel(claim: Claim | undefined): string | null {
-  if (claim === 'estimate') return 'Estimate';
+  if (claim === 'assumption') return 'ASSUMPTION';
   if (claim === 'recommendation') return 'Recommendation';
+  if (claim === 'unverified') return 'Unverified — no source';
   return null;
+}
+
+/** A CSS-safe class for the label (the unverified label contains spaces and a dash). */
+export function claimClass(claim: Claim | undefined): string {
+  return claim === 'assumption' || claim === 'recommendation' || claim === 'unverified' ? claim : '';
+}
+
+/** Every statement labeled unverified, in document order, for the "Unverified statements" list. */
+export function unverifiedStatements(model: DocModel): Array<{ section: string; text: string }> {
+  const out: Array<{ section: string; text: string }> = [];
+  for (const sec of model.sections) {
+    for (const b of sec.blocks) {
+      for (const u of labeledUnits(b)) if (u.claim === 'unverified') out.push({ section: sec.heading, text: u.text });
+    }
+  }
+  return out;
+}
+
+/** Which claim labels appear anywhere in the model (drives the "How to read" note). */
+export function claimsPresent(model: DocModel): Set<Claim> {
+  const set = new Set<Claim>();
+  for (const sec of model.sections) for (const b of sec.blocks) for (const u of labeledUnits(b)) if (u.claim) set.add(u.claim);
+  return set;
 }
 
 /** "17 November 2026" from YYYY-MM-DD, rendered in UTC so the date never shifts by time zone. */

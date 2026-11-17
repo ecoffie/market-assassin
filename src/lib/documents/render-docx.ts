@@ -5,7 +5,7 @@
  * Professional defaults: named heading styles (navigable in Word's outline), a cover block, a
  * contents list, header with the title, footer with "Page X of Y", bordered tables whose header row
  * repeats across pages, number columns right-aligned, "Not available" for missing values, visible
- * Estimate/Recommendation labels, [n] citations resolving to a numbered Sources section.
+ * ASSUMPTION / Recommendation / "Unverified — no source" labels, [n] citations resolving to a numbered Sources section.
  *
  * Charts: v1 renders a chart as its data table under the caption ("Chart data"). A vector chart in
  * Word needs an SVG plus a PNG fallback, which needs a rasterizer; that is a follow-up. The PDF
@@ -32,7 +32,7 @@ import {
   WidthType,
 } from 'docx';
 import type { Block, ChartBlock, DocModel, TableBlock, TableColumn } from './model';
-import { citationIndex, citeMarker, claimLabel, formatCell, formatDocDate, parseInline } from './format';
+import { citationIndex, citeMarker, claimLabel, claimsPresent, formatCell, formatDocDate, parseInline, unverifiedStatements } from './format';
 
 const NAVY = '1E3A8A';
 const INK = '1F2937';
@@ -50,8 +50,8 @@ function runs(text: string, base: { size?: number; color?: string } = {}): TextR
 function labelRun(claim: string | undefined): TextRun[] {
   const l = claimLabel(claim as never);
   if (!l) return [];
-  const color = l === 'Estimate' ? '92400E' : '166534';
-  const fill = l === 'Estimate' ? 'FEF3C7' : 'DCFCE7';
+  const color = claim === 'assumption' ? '92400E' : claim === 'unverified' ? '991B1B' : '166534';
+  const fill = claim === 'assumption' ? 'FEF3C7' : claim === 'unverified' ? 'FEE2E2' : 'DCFCE7';
   return [
     new TextRun({ font: FONT, text: ` ${l.toUpperCase()} `, bold: true, size: 15, color, shading: { type: ShadingType.CLEAR, color: 'auto', fill } }),
     new TextRun({ font: FONT, size: 21, text: ' ' }),
@@ -131,7 +131,9 @@ function caption(text: string | undefined, claim: string | undefined, cites: str
 }
 
 function chartAsTable(b: ChartBlock): Table {
-  const columns: TableColumn[] = [{ key: 'x', label: 'Category' }, ...b.series.map((s, i) => ({ key: `s${i}`, label: s.name, align: 'right' as const }))];
+  // Axis titles become the column headers, so the data table says what each column measures.
+  const valueHeader = (name: string) => (b.yLabel && b.series.length === 1 ? `${name} (${b.yLabel})` : name);
+  const columns: TableColumn[] = [{ key: 'x', label: b.xLabel || 'Category' }, ...b.series.map((s, i) => ({ key: `s${i}`, label: valueHeader(s.name), align: 'right' as const }))];
   const rows = b.series[0].points.map((p, pi) => {
     const row: Record<string, string | number | null> = { x: p.x };
     b.series.forEach((s, si) => { row[`s${si}`] = s.points[pi]?.y ?? null; });
@@ -201,11 +203,13 @@ export function buildDocx(model: DocModel): Document {
       ],
     })),
   }));
-  const json = JSON.stringify(model.sections);
+  const present = claimsPresent(model);
+  const unverified = unverifiedStatements(model);
   const reading = [
     'How to read this document. Facts carry a numbered citation like [1] that points to the Sources section.',
-    json.includes('"claim":"estimate"') ? 'Statements marked ESTIMATE are projections or inferences, not recorded facts.' : '',
-    json.includes('"claim":"recommendation"') ? 'Statements marked RECOMMENDATION are suggested actions.' : '',
+    present.has('assumption') ? 'Statements marked ASSUMPTION are premises stated by the author, not recorded facts; check them before relying on them.' : '',
+    present.has('recommendation') ? 'Statements marked RECOMMENDATION are suggested actions.' : '',
+    unverified.length ? 'Statements marked UNVERIFIED — NO SOURCE could not be traced to a source and are listed in the Unverified statements section.' : '',
   ].filter(Boolean).join(' ');
   children.push(new Paragraph({ spacing: { before: 600 }, shading: { type: ShadingType.CLEAR, color: 'auto', fill: 'F9FAFB' }, children: [new TextRun({ font: FONT, text: reading, size: 17, color: '374151' })] }));
   children.push(new Paragraph({ children: [new PageBreak()] }));
@@ -214,6 +218,7 @@ export function buildDocx(model: DocModel): Document {
   if (showToc) {
     children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ font: FONT, text: 'Contents' })] }));
     const tops = model.sections.filter((s) => (s.level ?? 1) === 1).map((s) => s.heading);
+    if (unverified.length) tops.push('Unverified statements');
     if (ordered.length) tops.push('Sources');
     tops.forEach((h) => children.push(new Paragraph({ style: 'Body', numbering: { reference: 'mindy-numbers-toc', level: 0 }, children: [new TextRun({ font: FONT, size: 21, text: h })] })));
     children.push(new Paragraph({ children: [new PageBreak()] }));
@@ -224,6 +229,17 @@ export function buildDocx(model: DocModel): Document {
     const heading = s.level === 3 ? HeadingLevel.HEADING_3 : s.level === 2 ? HeadingLevel.HEADING_2 : HeadingLevel.HEADING_1;
     children.push(new Paragraph({ heading, children: [new TextRun({ font: FONT, text: s.heading })] }));
     for (const b of s.blocks) children.push(...blockToDocx(b, numberOf));
+  }
+
+  // Unverified statements
+  if (unverified.length) {
+    children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ font: FONT, text: 'Unverified statements' })] }));
+    children.push(new Paragraph({ style: 'Body', children: [new TextRun({ font: FONT, size: 21, text: 'These statements appear in the document without a source. Verify each one before relying on it.' })] }));
+    unverified.forEach((u) => children.push(new Paragraph({
+      style: 'Body',
+      numbering: { reference: 'mindy-numbers-unverified', level: 0 },
+      children: [new TextRun({ font: FONT, size: 21, text: `${u.section}: `, color: MUTED }), ...runs(u.text)],
+    })));
   }
 
   // Sources
@@ -244,12 +260,17 @@ export function buildDocx(model: DocModel): Document {
     title: model.title,
     description: model.subtitle,
     styles: {
-      default: { document: { run: { font: FONT, size: 21, color: INK } } },
+      // Title and Heading1–3 are BUILT-IN docx styles. Customize them through `default`, never by
+      // re-declaring their ids in paragraphStyles — that emits duplicate w:styleId entries, which
+      // MS Word may repair or reject (review, 2026-11-17).
+      default: {
+        document: { run: { font: FONT, size: 21, color: INK } },
+        title: { run: { font: FONT, size: 56, bold: true, color: '111827' }, paragraph: { spacing: { after: 160 } } },
+        heading1: { run: { font: FONT, size: 32, bold: true, color: NAVY }, paragraph: { spacing: { before: 360, after: 140 }, keepNext: true, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'C7D2FE', space: 4 } } } },
+        heading2: { run: { font: FONT, size: 25, bold: true, color: '111827' }, paragraph: { spacing: { before: 280, after: 100 }, keepNext: true } },
+        heading3: { run: { font: FONT, size: 22, bold: true, color: '111827' }, paragraph: { spacing: { before: 220, after: 80 }, keepNext: true } },
+      },
       paragraphStyles: [
-        { id: 'Title', name: 'Title', basedOn: 'Normal', next: 'Normal', run: { font: FONT, size: 56, bold: true, color: '111827' }, paragraph: { spacing: { after: 160 } } },
-        { id: 'Heading1', name: 'Heading 1', basedOn: 'Normal', next: 'Body', quickFormat: true, run: { font: FONT, size: 32, bold: true, color: NAVY }, paragraph: { spacing: { before: 360, after: 140 }, keepNext: true, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'C7D2FE', space: 4 } } } },
-        { id: 'Heading2', name: 'Heading 2', basedOn: 'Normal', next: 'Body', quickFormat: true, run: { font: FONT, size: 25, bold: true, color: '111827' }, paragraph: { spacing: { before: 280, after: 100 }, keepNext: true } },
-        { id: 'Heading3', name: 'Heading 3', basedOn: 'Normal', next: 'Body', quickFormat: true, run: { font: FONT, size: 22, bold: true, color: '111827' }, paragraph: { spacing: { before: 220, after: 80 }, keepNext: true } },
         { id: 'Body', name: 'Body', basedOn: 'Normal', run: { font: FONT, size: 21 }, paragraph: { spacing: { after: 140, line: 288 } } },
         { id: 'Caption', name: 'Caption', basedOn: 'Normal', run: { font: FONT, size: 17, color: MUTED }, paragraph: { spacing: { before: 60, after: 220 } } },
       ],
@@ -258,6 +279,7 @@ export function buildDocx(model: DocModel): Document {
       config: [
         { reference: 'mindy-bullets', levels: [{ level: 0, format: LevelFormat.BULLET, text: '•', alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 360, hanging: 260 } } } }] },
         { reference: 'mindy-numbers', levels: [{ level: 0, format: LevelFormat.DECIMAL, text: '%1.', alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 360, hanging: 300 } } } }] },
+        { reference: 'mindy-numbers-unverified', levels: [{ level: 0, format: LevelFormat.DECIMAL, text: '%1.', alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 360, hanging: 300 } } } }] },
         { reference: 'mindy-numbers-toc', levels: [{ level: 0, format: LevelFormat.DECIMAL, text: '%1.', alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 360, hanging: 300 } } } }] },
       ],
     },
