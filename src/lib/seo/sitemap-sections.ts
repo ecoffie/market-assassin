@@ -38,6 +38,7 @@ import { LISTICLES } from '@/data/top-listicles';
 import { publishedPublications } from '@/lib/analytics/research-publications';
 import { getOpportunitySitemapEntries, getClosedOpportunitySitemapEntries } from '@/lib/seo/opportunities';
 import { getOfficeSitemapEntries } from '@/lib/seo/offices';
+import { getRecompeteSitemapChunk } from '@/lib/seo/recompetes';
 import { toLastmod, renderSitemapIndex, SITEMAP_URL_LIMIT, type SitemapEntry } from '@/lib/seo/sitemap-xml';
 
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai';
@@ -53,6 +54,9 @@ export const SITEMAP_CHILDREN = [
   'sitemap-opportunities-closed.xml',
   'sitemap-forecasts.xml',
   'sitemap-offices.xml',
+  'sitemap-recompetes-1.xml',
+  'sitemap-recompetes-2.xml',
+  'sitemap-recompetes-3.xml',
 ] as const;
 
 /** The index document, served at /sitemap.xml and /sitemap-index.xml. */
@@ -351,5 +355,23 @@ export async function officeEntries(): Promise<SitemapEntry[]> {
     lastModified: r.lastModified,
     changeFrequency: 'daily' as const,
     priority: 0.6,
+  }));
+}
+
+/**
+ * Expiring contracts (/recompetes/<slug>), one numbered child per RECOMPETE_SITEMAP_CHUNK rows of
+ * the gated set (real rows, named incumbent + agency, a stated value, ending between 90 days ago
+ * and 24 months out). Numbered rather than one file because the gated set can exceed 50,000.
+ * No lastmod — see getRecompeteSitemapChunk. `chunk` is 0-based.
+ */
+export async function recompeteEntries(chunk: number): Promise<SitemapEntry[]> {
+  const rows = await getRecompeteSitemapChunk(chunk);
+  if (rows.length > SITEMAP_URL_LIMIT) {
+    throw new Error(`recompete sitemap child ${chunk + 1} has ${rows.length} URLs, over the ${SITEMAP_URL_LIMIT} limit`);
+  }
+  return rows.map((r) => ({
+    url: `${SITE_URL}/recompetes/${r.slug}`,
+    changeFrequency: 'weekly' as const,
+    priority: 0.5,
   }));
 }

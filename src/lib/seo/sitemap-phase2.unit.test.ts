@@ -100,13 +100,18 @@ describe('lastmod is a data date or nothing', () => {
 
 describe('the sitemap is split by page family', () => {
   it('the index lists one child per family and no build-time lastmod', () => {
-    expect(SITEMAP_CHILDREN).toEqual([
+    // The original six stay first and in order; later families are appended after them.
+    expect(SITEMAP_CHILDREN.slice(0, 6)).toEqual([
       'sitemap-static.xml', 'sitemap-contractors.xml', 'sitemap-contracts.xml',
       'sitemap-contractor-tabs.xml', 'sitemap-opportunities.xml', 'sitemap-facets.xml',
-      'sitemap-opportunities-closed.xml',
-      'sitemap-forecasts.xml',
-      'sitemap-offices.xml',
     ]);
+    // Families added 2026-11-17 (closed opps, forecasts, offices, expiring contracts).
+    expect(SITEMAP_CHILDREN).toEqual(expect.arrayContaining([
+      'sitemap-opportunities-closed.xml', 'sitemap-forecasts.xml', 'sitemap-offices.xml',
+      'sitemap-recompetes-1.xml', 'sitemap-recompetes-2.xml', 'sitemap-recompetes-3.xml',
+    ]));
+    expect(new Set(SITEMAP_CHILDREN).size).toBe(SITEMAP_CHILDREN.length);
+    for (const c of SITEMAP_CHILDREN) expect(() => read(`src/app/${c}/route.ts`)).not.toThrow();
     const xml = renderSitemapIndex(SITEMAP_CHILDREN.map((c) => ({ loc: `https://getmindy.ai/${c}` })));
     expect(xml.match(/<sitemap>/g)).toHaveLength(SITEMAP_CHILDREN.length);
     expect(xml).not.toContain('<lastmod>');
