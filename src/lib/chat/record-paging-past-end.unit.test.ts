@@ -104,3 +104,23 @@ describe('the source ledger for a page past the end', () => {
     expect(s.items?.[0]).toMatchObject({ n: 11, key: 'C0011' });
   });
 });
+
+describe('percent columns: one precision per column', () => {
+  it('buying offices Share: 7.00% beside 6.36%, never 7% beside 6.36%', () => {
+    const offs = [{ office_name: 'A', office_code: 'A1', obligated: 7_000_000, share_pct: 7, award_count: 3 }, { office_name: 'B', office_code: 'B1', obligated: 6_360_000, share_pct: 6.36, award_count: 2 }, { office_name: 'C', office_code: 'C1', obligated: 1_000_000, share_pct: 0.5, award_count: 1 }];
+    const r = renderBuyingOffices({ scope: { naics: ['561720'] }, offices: offs, totals: { obligated: 100_000_000, award_count: 6, office_count: 3 }, notes: [], _meta: {} })!;
+    const col = r.text.split('\n').filter((l) => /^\| \d+\. /.test(l)).map((l) => l.split(' | ')[2]);
+    expect(col).toEqual(['7.00%', '6.36%', '0.50%']);
+  });
+  it('a whole-number column stays whole; a missing share is a dash, never 0%', () => {
+    const offs = [{ office_name: 'A', office_code: 'A1', obligated: 5, share_pct: 60, award_count: 1 }, { office_name: 'B', office_code: 'B1', obligated: 4, share_pct: null, award_count: 1 }];
+    const r = renderBuyingOffices({ scope: {}, offices: offs, totals: { obligated: 9, award_count: 2, office_count: 2 }, notes: [], _meta: {} })!;
+    const col = r.text.split('\n').filter((l) => /^\| \d+\. /.test(l)).map((l) => l.split(' | ')[2]);
+    expect(col).toEqual(['60%', '—']);
+  });
+  it('vehicle mix Share uses one precision', () => {
+    const r = renderVehicleMix({ scope: { naics: ['561720'], window: 'FY2025' }, total_obligated: 100, total_award_count: 3, buckets: [{ label: 'GSA Schedule', obligated: 40, share_pct: 40, award_count: 1 }, { label: 'BPA', obligated: 60, share_pct: 59.75, award_count: 2 }], rollups: {}, classification: {}, _meta: {} })!;
+    expect(r.text).toMatch(/^\| GSA Schedule \| \$40 \| 40\.00% \| 1 \|$/m);
+    expect(r.text).toMatch(/^\| BPA \| \$60 \| 59\.75% \| 2 \|$/m);
+  });
+});

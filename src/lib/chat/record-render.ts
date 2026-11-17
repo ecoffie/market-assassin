@@ -158,6 +158,17 @@ function moneyColumn(values: unknown[]): string[] {
   return out.map((x, i) => (nums[i] == null ? '' : x));
 }
 
+/**
+ * Percentages for one column, already in percent units (6.36 = 6.36%): one precision for the whole
+ * column, the most any value needs, at most 2 (the same rule as moneyColumn), so 7.00% sits beside 6.36%.
+ * Missing → '—'.
+ */
+function pctColumn(values: unknown[]): string[] {
+  const nums = values.map((v) => { const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN; return Number.isFinite(n) ? n : null; });
+  const d = Math.min(2, Math.max(0, ...nums.map((n) => (n == null ? 0 : (String(Number(n.toFixed(2))).split('.')[1] ?? '').length))));
+  return nums.map((n) => (n == null ? '—' : `${n.toFixed(d)}%`));
+}
+
 /** A markdown table cell: no pipes or line breaks inside a cell. */
 function cell(s: string): string {
   return String(s ?? '').replace(/\|/g, '/').replace(/\s+/g, ' ').trim() || '—';
@@ -651,6 +662,7 @@ export function renderBuyingOffices(result: Rec, opts: { offset?: number } = {})
       // Column order follows the chat panel's table styling: the name first (kept readable), the value
       // second (never wrapped); the number travels in the name cell so the detail lines can refer to it.
       const obCol = moneyColumn(page.map((o) => o.obligated));
+      const shareCol = pctColumn(page.map((o) => o.share_pct));
       // One precision for every amount in each detail list on this page (customers, contracting offices, examples).
       const customersOf = (o: Rec) => (Array.isArray(o.top_funding_offices) ? (o.top_funding_offices as Rec[]) : [])
         .filter((f) => str(f.name) && !sameName(str(f.name), str(o.office_name))).slice(0, 2);
@@ -661,7 +673,7 @@ export function renderBuyingOffices(result: Rec, opts: { offset?: number } = {})
       lines.push(...mdTable(['Office', 'Net obligations', 'Share', 'Awards', 'Agency'], page.map((o, i) => [
         `${offset + i + 1}. ${withCode(str(o.office_name), str(o.office_code))}`,
         obCol[i],
-        o.share_pct == null || str(o.share_pct) === '' ? '—' : `${str(o.share_pct)}%`,
+        shareCol[i],
         String(num(o.award_count) ?? 0),
         title(str(o.sub_agency)) || title(str(o.agency)) || 'not reported',
       ])));
@@ -898,7 +910,8 @@ export function renderVehicleMix(result: Rec): RenderedRecords | null {
   lines.push('');
   const shownBuckets = buckets.filter((b) => (num(b.obligated) ?? 0) !== 0 || (num(b.award_count) ?? 0) > 0);
   const bCol = moneyColumn(shownBuckets.map((b) => b.obligated));
-  lines.push(...mdTable(['Vehicle', 'Obligations', 'Share', 'Awards'], shownBuckets.map((b, i) => [str(b.label), bCol[i], `${str(b.share_pct)}%`, String(num(b.award_count) ?? 0)])));
+  const bPct = pctColumn(shownBuckets.map((b) => b.share_pct));
+  lines.push(...mdTable(['Vehicle', 'Obligations', 'Share', 'Awards'], shownBuckets.map((b, i) => [str(b.label), bCol[i], bPct[i], String(num(b.award_count) ?? 0)])));
   const r = (k: string) => (roll[k] && typeof roll[k] === 'object' ? roll[k] as Rec : null);
   const rl = [['all schedules', r('all_schedules')], ['all BPAs', r('all_bpas')], ['all IDIQs and GWACs', r('all_idiqs_and_gwacs')]].filter(([, v]) => v).map(([k, v]) => `${k} ${money((v as Rec).obligated)} (${str((v as Rec).share_pct)}%)`);
   if (rl.length) { lines.push(''); lines.push(`Rollups: ${rl.join('; ')}.`); }
