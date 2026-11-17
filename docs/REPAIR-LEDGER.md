@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-17 — Ask Mindy: revise a saved document across turns (Agent 2)
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-17 | Ask Mindy document revision | **"Revise that capability statement (make a new version, keep the original)" never reached create_document** (Agent 4 prod test, eric@, allowlist): with ONE tool round and no document id carried between turns, the planner spent every turn on find_my_documents and Mindy said it could not save. Now the signed source ledger carries Vault document ids (find_my_documents / create_document: id, kind, version; owner-scoped; a generated Word + PDF pair is one document). With #2138 merged, the revise turn follows the document-text rule (create_document is the only write tool) and does not repeat a document already in the upload planner block. A revise request with exactly one resolvable document loads that document for the planner (owner-checked against the acting scope, fenced as untrusted, 12K chars), forces create_document, and sets revises_document_id deterministically (the generated document's id; none for the user's own file, which stays unchanged). No resolvable document (none, several, or not this owner's) forces nothing and find_my_documents stays the right call. The planner's output cap is 4,096 tokens when create_document is offered (1,024 cut a doc_model mid-JSON). create_document and find_my_documents are logged billing_outcome nonbillable_free_tool. | `export function resolveRevisionTarget(` → `src/lib/chat/context-sources.ts` · `export const CHAT_FREE_TOOLS` → `src/lib/chat/chat-tool-executor.ts` | `ask-mindy-doc-revise.route.unit.test.ts` (7, real route + executor; 3 red on main) + context-sources (+5) + executor (+3, 2 red); chat + MCP + map + components 3,234 pass; tsc clean | DRAFT PR |
+
 ## 2026-11-17 — Ask Mindy context contract v1 (Agent 2, audit A2/A5/A8)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

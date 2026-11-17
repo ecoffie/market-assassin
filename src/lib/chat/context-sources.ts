@@ -22,8 +22,12 @@ export type SourceKind = 'federal_record' | 'account_record' | 'user_document' |
 export type SourceTrust = 'verified_record' | 'user_supplied' | 'third_party_claim' | 'internal';
 export type SourceStatus = 'ok' | 'empty' | 'degraded' | 'failed' | 'refused' | 'truncated';
 
+/** A Vault document carried by the ledger: what kind it is, and (for a generated one) its version. */
+export type VaultDocKind = 'company' | 'reference' | 'generated';
+export interface LedgerDoc { kind: VaultDocKind; version?: number }
+
 /** One numbered (or keyed) record inside a source. `n` is set only when the user SAW that number. */
-export interface LedgerItem { n?: number; key: string; label: string }
+export interface LedgerItem { n?: number; key: string; label: string; doc?: LedgerDoc }
 
 export interface ContextSource {
   /** Stable for the conversation: "src:<tool>:<call>" for a tool result. */
@@ -102,7 +106,7 @@ export const LEDGER_MAX_ITEMS = 50;
 const KEY_RE = /^[A-Za-z0-9][A-Za-z0-9._:\-/]{2,63}$/;
 
 /** Tools whose results are the caller's own (or an authorized client's) account data. */
-export const PRIVATE_SOURCE_TOOLS: ReadonlySet<string> = new Set(['get_my_pipeline', 'search_my_vault', 'draft_proposal', 'draft_proposal_section']);
+export const PRIVATE_SOURCE_TOOLS: ReadonlySet<string> = new Set(['get_my_pipeline', 'search_my_vault', 'draft_proposal', 'draft_proposal_section', 'find_my_documents', 'create_document']);
 
 const TOOL_LABELS: Record<string, string> = {
   get_expiring_contracts: 'Expiring contracts (USASpending via Mindy recompete data)',
@@ -125,6 +129,8 @@ const TOOL_LABELS: Record<string, string> = {
   get_contractor_award_history: 'Contractor award history (USASpending)',
   get_my_pipeline: 'Your pursuits',
   search_my_vault: 'Your Vault records',
+  find_my_documents: 'Your saved documents (Vault)',
+  create_document: 'Document Mindy saved to your Vault',
 };
 
 function toolLabel(tool: string): string {
@@ -190,6 +196,65 @@ function keyedItems(parsed: unknown, limit = LEDGER_MAX_ITEMS): LedgerItem[] {
   return out;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const docKind = (k: unknown): VaultDocKind => (k === 'generated' ? 'generated' : k === 'reference' ? 'reference' : 'company');
+
+/**
+ * Vault documents named by find_my_documents (one document read, or several listed) or saved by
+ * create_document (one item for the saved pair: the Word file's id, which create_document resolves to the
+ * PDF too). Ids are carried so a later "revise that" has the real document, never an invented one.
+ */
+function vaultDocItems(tool: string, parsed: Record<string, unknown> | null): LedgerItem[] | null {
+  if (!parsed) return null;
+  if (tool === 'find_my_documents') {
+    const one = parsed.document as Record<string, unknown> | undefined;
+    const list = one ? [one] : Array.isArray(parsed.items) ? (parsed.items as Array<Record<string, unknown>>) : [];
+    const valid = list.filter((d) => d && typeof d.document_id === 'string' && UUID_RE.test(d.document_id));
+    return collapseGeneratedPairs(valid)
+      .slice(0, LEDGER_MAX_ITEMS)
+      .map((d) => ({ key: String(d.document_id), label: safeLabel(d.file_name), doc: { kind: docKind(d.kind) } }));
+  }
+  if (tool === 'create_document') {
+    if (parsed.ok !== true || !Array.isArray(parsed.files)) return [];
+    const files = (parsed.files as Array<Record<string, unknown>>).filter((f) => f && typeof f.document_id === 'string' && UUID_RE.test(f.document_id));
+    const main = files.find((f) => f.format === 'docx') ?? files[0];
+    if (!main) return [];
+    const v = Number(parsed.version ?? main.version);
+    return [{ key: String(main.document_id), label: safeLabel(main.file_name ?? parsed.title), doc: { kind: 'generated', ...(Number.isInteger(v) && v > 0 ? { version: v } : {}) } }];
+  }
+  return null;
+}
+
+/** Two files saved this close together with the same name are one generated document's Word + PDF pair. */
+const PAIR_WINDOW_MS = 5 * 60_000;
+const baseFileName = (f: unknown) => String(f ?? '').replace(/\.(pdf|docx)$/i, '').trim().toLowerCase();
+
+/**
+ * create_document saves every generated document as a Word + PDF pair (same name, same version, saved together).
+ * find_my_documents lists both files, so "revise that" saw two documents and asked "which one?" (Agent 4 live
+ * test, 2026-11-17). A generated pair is ONE document: keep the Word file's id (create_document resolves the PDF
+ * from it). Only generated files with the same base name saved within PAIR_WINDOW_MS collapse; different titles,
+ * versions saved at different times, and an upload next to a generated file stay separate (ambiguous).
+ */
+function collapseGeneratedPairs(docs: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+  const out: Array<Record<string, unknown>> = [];
+  const used = new Set<number>();
+  docs.forEach((d, i) => {
+    if (used.has(i)) return;
+    if (d.kind !== 'generated') { out.push(d); return; }
+    const t = Date.parse(String(d.saved ?? ''));
+    const j = docs.findIndex((e, k) => k !== i && !used.has(k) && e.kind === 'generated'
+      && baseFileName(e.file_name) === baseFileName(d.file_name)
+      && /\.pdf$/i.test(String(e.file_name)) !== /\.pdf$/i.test(String(d.file_name))
+      && Number.isFinite(t) && Number.isFinite(Date.parse(String(e.saved ?? '')))
+      && Math.abs(Date.parse(String(e.saved)) - t) <= PAIR_WINDOW_MS);
+    if (j < 0) { out.push(d); return; }
+    used.add(i); used.add(j);
+    out.push(/\.docx$/i.test(String(d.file_name)) ? d : docs[j]);
+  });
+  return out;
+}
+
 /** Records the user saw in a rendered list, numbered exactly as displayed. */
 function renderedItems(tool: string, parsed: Record<string, unknown> | null, r: RenderedRecords): LedgerItem[] {
   const labels = new Map<string, string>();
@@ -223,7 +288,7 @@ export function sourceFromToolResult(p: {
   const status = statusFor(p.status, parsed, p.rendered);
   const items = status === 'failed' || status === 'refused' || status === 'degraded'
     ? []
-    : p.rendered ? renderedItems(p.tool, parsed, p.rendered) : keyedItems(parsed);
+    : p.rendered ? renderedItems(p.tool, parsed, p.rendered) : (vaultDocItems(p.tool, parsed) ?? keyedItems(parsed));
   const codeQuery = !isPrivate && p.argsRedacted ? sanitizeQuery(p.argsRedacted) : {};
   const query = Object.keys(codeQuery).length ? codeQuery : null;
   return {
@@ -325,7 +390,11 @@ export function parseLedger(raw: unknown, currentScope: string): SourceLedger | 
         const n = typeof i.n === 'number' && Number.isInteger(i.n) && i.n > 0 && i.n < 10_000 ? i.n : undefined;
         // The label is prose the server cannot verify, so it is not carried back into a prompt: the key is
         // the reference, and the model looks the record up before saying anything about it.
-        return [{ ...(n ? { n } : {}), key: i.key, label: '' }];
+        const d = i.doc && typeof i.doc === 'object' ? i.doc as Record<string, unknown> : null;
+        const doc = d && ['company', 'reference', 'generated'].includes(String(d.kind))
+          ? { kind: d.kind as VaultDocKind, ...(typeof d.version === 'number' && Number.isInteger(d.version) && d.version > 0 && d.version < 10_000 ? { version: d.version } : {}) }
+          : undefined;
+        return [{ ...(n ? { n } : {}), key: i.key, label: '', ...(doc ? { doc } : {}) }];
       })
       : [];
     const status = ['ok', 'empty', 'degraded', 'failed', 'refused', 'truncated'].includes(String(x.status)) ? String(x.status) as SourceStatus : 'ok';
@@ -439,4 +508,35 @@ export function ledgerNotes(message: string, ledgersNewestFirst: SourceLedger[])
     notes.push('EARLIER SOURCES in this conversation (identifiers only, not facts; to continue a list, repeat its search with the next display offset):\n' + lines.slice(0, 24).join('\n'));
   }
   return notes;
+}
+
+/**
+ * A request to revise / update / make a new version of a document ("revise that capability statement, keep
+ * the original"). Deliberately narrow: an editing verb AND a document reference.
+ */
+export function isReviseIntent(message: string): boolean {
+  const m = String(message || '').toLowerCase();
+  const verb = /\b(revise|revision|rework|rewrite|redo|update|edit|tighten|improve|polish|refresh|new version|another version|next version)\b/.test(m);
+  const doc = /\b(it|that|this|the (?:doc|document|file|statement|report|brief|deliverable|pdf|word file|version)|capability statement|document|doc)\b/.test(m);
+  return verb && doc;
+}
+
+export interface RevisionTarget { id: string; kind: VaultDocKind; version?: number }
+
+/**
+ * The single Vault document a revise request refers to: the documents in the NEWEST ledger that carries any.
+ * Exactly one → that document. None, or several (the user must say which) → null, and find_my_documents
+ * stays the right call. Never guessed.
+ */
+export function resolveRevisionTarget(message: string, ledgersNewestFirst: SourceLedger[]): RevisionTarget | null {
+  if (!isReviseIntent(message)) return null;
+  for (const l of ledgersNewestFirst) {
+    const docs = l.entries.flatMap((e) => (e.items ?? []).filter((i) => i.doc && UUID_RE.test(i.key)));
+    if (!docs.length) continue;
+    const unique = [...new Map(docs.map((d) => [d.key, d])).values()];
+    if (unique.length !== 1) return null;
+    const d = unique[0];
+    return { id: d.key, kind: d.doc!.kind, ...(d.doc!.version ? { version: d.doc!.version } : {}) };
+  }
+  return null;
 }
