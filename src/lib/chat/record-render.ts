@@ -16,13 +16,14 @@
  */
 
 export const EXPIRING_TOOL = 'get_expiring_contracts';
-export const DISPLAY_PAGE = 20;
+export const DISPLAY_PAGE = 10;
 /** Chat always fetches the whole matched set (local table, up to the tool max) so pages are exact. */
 export const CHAT_FETCH_LIMIT = 200;
 
 type Rec = Record<string, unknown>;
 
 import { US_STATE_NAMES } from '@/lib/utils/us-states';
+import { formatUsd, formatColumn } from '@/lib/documents/format';
 import { interpretCapabilityNaics } from '@/lib/market/capability-naics';
 /** A state named in a record's own description that differs from its reported place of performance. */
 export function describedStateConflict(description: string, popState: string): string | null {
@@ -140,12 +141,54 @@ export interface RenderedRecords {
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : v == null ? '' : String(v).trim());
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
+/** Compact dollars, the same formatter the document engine uses ($298.1M, $1.2K, -$6.4K). Never a raw 298054424. */
 function money(v: unknown): string {
   const n = num(v);
   if (n == null) return '';
-  const r = Math.round(n);
-  return r < 0 ? `-$${Math.abs(r).toLocaleString('en-US')}` : `$${r.toLocaleString('en-US')}`;
+  return formatUsd(Math.round(n));
 }
+
+/**
+ * Dollars for one column or one list: the document engine's column rule (one precision for every
+ * figure, the most any of them needs, at most 2), so $41.87M never sits next to $16M. Missing → ''.
+ */
+function moneyColumn(values: unknown[]): string[] {
+  const nums = values.map((v) => { const n = num(v); return n == null ? null : Math.round(n); });
+  const out = formatColumn(nums.map((n) => n ?? ''), 'usd');
+  return out.map((x, i) => (nums[i] == null ? '' : x));
+}
+
+/** A markdown table cell: no pipes or line breaks inside a cell. */
+function cell(s: string): string {
+  return String(s ?? '').replace(/\|/g, '/').replace(/\s+/g, ' ').trim() || '—';
+}
+function mdTable(header: string[], rows: string[][]): string[] {
+  return [`| ${header.join(' | ')} |`, `|${header.map(() => '---').join('|')}|`, ...rows.map((r) => `| ${r.map(cell).join(' | ')} |`)];
+}
+
+/** Federal office names arrive in capitals. Title-case words for reading; keep codes and acronyms as written. */
+const OFFICE_ACRONYMS = new Set(['FLETC', 'NAVSUP', 'NAVFAC', 'NAVSEA', 'NAVAIR', 'USACE', 'AFSC', 'AFLCMC', 'AFICA', 'AFCEC', 'MICC', 'DLA', 'GSA', 'PBS', 'FAS', 'NASA', 'FEMA', 'USDA', 'FAA', 'DHS', 'ICE', 'CBP', 'TSA', 'NIH', 'CDC', 'IRS', 'USCG', 'USAF', 'USMC', 'DOL', 'DOE', 'DOJ', 'DOI', 'DOT', 'HHS', 'HUD', 'EPA', 'SSA', 'NOAA', 'NIST', 'NPS', 'BLM', 'BOP', 'FBI', 'DEA', 'ATF', 'USPS', 'VA', 'VHA', 'VISN', 'NAWC', 'SPAWAR', 'NAVWAR', 'NSWC', 'NUWC', 'SOCOM', 'USSOCOM', 'DISA', 'DTRA', 'DCMA', 'JCAS', 'AEC', 'CSA', 'FS', 'ACC', 'AFB', 'CONS', 'CONF', 'LGC', 'MXG', 'ABW', 'CCG', 'ACQ']);
+const SMALL_WORDS = new Set(['OF', 'AND', 'THE', 'FOR', 'IN', 'AT', 'ON', 'TO', 'BY']);
+export function officeDisplayName(name: string): string {
+  const s = str(name);
+  if (!s || s !== s.toUpperCase()) return s;
+  return s.split(/(\s+)/).map((tok, i) => {
+    if (/^\s+$/.test(tok)) return tok;
+    // Hyphenated tokens (ACC-RI, USDA-FS) are judged part by part.
+    return tok.split('-').map((part) => {
+      const core = part.replace(/[^A-Z0-9]/g, '');
+      if (!core || /\d/.test(core) || OFFICE_ACRONYMS.has(core) || core.length <= 3 && !SMALL_WORDS.has(core)) return part;
+      if (SMALL_WORDS.has(core) && i > 0) return part.toLowerCase();
+      return part.toLowerCase().replace(/(^|[(/])([a-z])/g, (_m, a, b) => a + b.toUpperCase());
+    }).join('-');
+  }).join('');
+}
+/** "Name (CODE)" without doubling a code the name already carries. */
+function withCode(name: string, code: string): string {
+  const n = officeDisplayName(name) || 'office name not reported';
+  return code && !n.includes(`(${code})`) ? `${n} (${code})` : n;
+}
+const sameName = (a: string, b: string) => str(a).toUpperCase().replace(/[^A-Z0-9]/g, '') === str(b).toUpperCase().replace(/[^A-Z0-9]/g, '');
 
 function clip(s: string, n: number): string {
   const t = s.replace(/\s+/g, ' ').trim();
@@ -155,7 +198,7 @@ function clip(s: string, n: number): string {
 function title(s: string): string {
   // USASpending names arrive upper-case; keep acronyms (LLC, INC) readable without guessing.
   if (!s || s !== s.toUpperCase()) return s;
-  return s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase()).replace(/\b(Llc|Inc|Lp|Llp|Pllc|Usa|Us)\b/g, (m) => m.toUpperCase());
+  return s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase()).replace(/\b(Llc|Inc|Lp|Llp|Pllc|Usa|Us|Afb)\b/g, (m) => m.toUpperCase());
 }
 
 /** All records in one list: standalone contracts, in-window orders, and orders with no recorded parent. */
@@ -258,6 +301,34 @@ function recordLine(n: number, r: Rec & { _kind: string }): string {
   return `${n}. ${id} · ${who} · ${agency} · ${place} · ends ${end} · ${kind}${value ? ` · obligated ${value}` : ''}${desc ? ` · ${desc}` : ''}${conflict ? ` · CHECK: the description names ${conflict}, which is not in the reported place-of-performance state ${st}; this record may not belong to the requested place` : ''}${region ? ` · note: ${region}` : ''}${basis}${otherWork ? ` · CHECK: the description describes ${otherWork} work, not the work requested` : ''}`;
 }
 
+/** Table row for one expiring record (the facts); its CHECK lines and notes go under the table. */
+function recordRow(n: number, r: Rec & { _kind: string }): string[] {
+  const id = str(r.piid) || str(r.contract_id) || 'number not recorded';
+  const kind = r._kind === 'contract' ? '' : r._kind === 'order' ? ` (order under ${str(r.parent_vehicle_piid) || 'its parent vehicle'})` : ' (order, parent vehicle not recorded)';
+  const city = title(str(r.place_of_performance_city));
+  const st = str(r.place_of_performance_state);
+  return [
+    `${n}. ${id}${kind}`, money(r.total_obligation) || '—', str(r.period_of_performance_current_end) || 'not recorded',
+    title(str(r.incumbent_name)) || 'not recorded',
+    title(str(r.awarding_sub_agency)) || title(str(r.awarding_agency)) || 'not recorded',
+    st ? (city ? `${city}, ${st}` : st) : 'not reported', clip(str(r.description), 70) || '—',
+  ];
+}
+/** The notes recordLine attaches to a record, without the facts already in its table row. */
+function recordNotes(r: Rec): string {
+  const st = str(r.place_of_performance_state);
+  const conflict = describedPlaceConflict(str(r.description), st);
+  const otherWork = describedOtherWork(str(r.description), REQUESTED_LABELS);
+  const confirms = describedRequestedWork(str(r.description), REQUESTED_LABELS);
+  const region = conflict ? null : describedRegionNote(str(r.description), st);
+  return [
+    conflict ? `CHECK: the description names ${conflict}, which is not in the reported place-of-performance state ${st}; this record may not belong to the requested place` : '',
+    region ? `note: ${region}` : '',
+    confirms ? `description confirms: ${confirms}` : '',
+    otherWork ? `CHECK: the description describes ${otherWork} work, not the work requested` : '',
+  ].filter(Boolean).join(' · ');
+}
+
 /**
  * Render a get_expiring_contracts result. `offset` is the 0-based index of the first record to
  * display (continuations). Returns null when the result is not renderable (no _meta).
@@ -293,19 +364,11 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
     lines.push(`No expiring contracts or task orders match (${filters}). Source: Mindy recompete data (USASpending).`);
   } else {
     lines.push(`${total} expiring record${total === 1 ? '' : 's'} match (${filters}). Source: Mindy recompete data (USASpending)${meta.window && (meta.window as Rec).as_of ? `, as of ${str((meta.window as Rec).as_of)}` : ''}.`);
-    lines.push(`${standalone} standalone contract${standalone === 1 ? '' : 's'} and ${orders} order${orders === 1 ? '' : 's'} under a vehicle (task orders, delivery orders or BPA calls) were retrieved.`);
-    const af0 = (meta.applied_filters && typeof meta.applied_filters === 'object' ? meta.applied_filters : {}) as Rec;
-    if (af0.naics) lines.push('Matched by industry (NAICS) code: the code is how the agency classified each contract and can include other work than the words you used, so check each description. Place of performance is as USASpending reports it.');
     const byAgency = new Map<string, number>();
     for (const r of records) { const a = title(str(r.awarding_agency)) || 'agency not recorded'; byAgency.set(a, (byAgency.get(a) ?? 0) + 1); }
     lines.push(`By awarding agency: ${[...byAgency.entries()].sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1)).map(([a, n]) => `${a} ${n}`).join('; ')}.`);
-    if (REQUESTED_LABELS.length) {
-      lines.push('Records tagged "description confirms" name the requested work in their own description (Mindy\'s term match). Untagged records match by industry code; the term match did not confirm their work, which does not mean the work differs.');
-    }
     const flaggedRecs = records.filter((r) => describedPlaceConflict(str(r.description), str(r.place_of_performance_state)) || describedOtherWork(str(r.description), REQUESTED_LABELS));
-    const flagged = flaggedRecs.length;
     flaggedIdsOut = flaggedRecs.map((r) => str(r.piid) || str(r.contract_id));
-    if (flagged) lines.push(`Mindy marked ${flagged} record${flagged === 1 ? '' : 's'} CHECK because the description names a place outside the reported state or describes different work. This check only catches wording it recognizes, so an unmarked record can still describe other work; the count above includes every record as reported by USASpending.`);
     const exhaustiveNow = from === 1 && to === total && retrieved === total;
     lines.push(exhaustiveNow
       ? `Showing all ${total}, soonest end date first.`
@@ -314,7 +377,13 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
   if (ignored) lines.push(ignored);
   if (page.length) {
     lines.push('');
-    page.forEach((r, i) => lines.push(recordLine(offset + i + 1, r)));
+    const obCol = moneyColumn(page.map((r) => r.total_obligation));
+    lines.push(...mdTable(['Contract', 'Obligated', 'Ends', 'Incumbent', 'Agency', 'Place', 'Work'], page.map((r, i) => { const row = recordRow(offset + i + 1, r); row[1] = obCol[i] || '—'; return row; })));
+    const notes = page.map((r, i) => ({ n: offset + i + 1, t: recordNotes(r) })).filter((x) => x.t);
+    if (notes.length) {
+      lines.push('');
+      notes.forEach(({ n, t }) => lines.push(`- **${n}.** ${t}`));
+    }
   }
   const pageIds = new Set(page.map((r) => str(r.contract_id) || str(r.piid)));
   const offPage = records
@@ -325,6 +394,14 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
     lines.push('');
     lines.push(`Also marked CHECK (outside the rows shown above):`);
     offPage.forEach(({ r, i }) => lines.push(recordLine(i + 1, r)));
+  }
+  if (retrieved > 0 && state !== 'unavailable' && meta.degraded !== true) {
+    const af0 = (meta.applied_filters && typeof meta.applied_filters === 'object' ? meta.applied_filters : {}) as Rec;
+    const flagged = flaggedIdsOut.length;
+    lines.push('');
+    lines.push(`**About this data:** ${standalone} standalone contract${standalone === 1 ? '' : 's'} and ${orders} order${orders === 1 ? '' : 's'} under a vehicle (task orders, delivery orders or BPA calls); place of performance is as USASpending reports it.${af0.naics ? ' Matched by industry (NAICS) code, which can include other work than the words you used, so check each description.' : ''}`
+      + `${REQUESTED_LABELS.length ? ' "Description confirms" means the record names the requested work in its own description (Mindy\'s term match); untagged records match by industry code, which does not mean the work differs.' : ''}`
+      + `${flagged ? ` Mindy marked ${flagged} record${flagged === 1 ? '' : 's'} CHECK because the description names a place outside the reported state or describes different work; this check only catches wording it recognizes, and the count includes every record as reported by USASpending.` : ''}`);
   }
   const exhaustive = retrieved > 0 && from === 1 && to === total && retrieved === total;
   if (retrieved > 0 && !exhaustive) {
@@ -354,13 +431,14 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
  * customer continues a long list), which the MCP tool itself does not take.
  */
 export function prepareChatToolArgs(name: string, rawArgs: string): { args: string; displayOffset: number } {
-  if (name !== EXPIRING_TOOL) return { args: rawArgs, displayOffset: 0 };
+  if (name !== EXPIRING_TOOL && name !== BUYING_OFFICES_TOOL) return { args: rawArgs, displayOffset: 0 };
   try {
     const a = JSON.parse(rawArgs || '{}');
     if (a && typeof a === 'object' && !Array.isArray(a)) {
       const off = Number(a.display_offset);
       delete a.display_offset;
-      a.limit = CHAT_FETCH_LIMIT;
+      // Expiring lists fetch the whole matched set so every page is exact; buying offices already return their ranked set.
+      if (name === EXPIRING_TOOL) a.limit = CHAT_FETCH_LIMIT;
       return { args: JSON.stringify(a), displayOffset: Number.isFinite(off) && off > 0 ? Math.floor(off) : 0 };
     }
   } catch { /* leave unparseable args for the executor to refuse */ }
@@ -498,7 +576,25 @@ export const BUYING_OFFICES_TOOL = 'get_buying_offices';
  * the customers (funding offices) behind it, and where the work was performed. Amounts are shown
  * exactly as returned (no rounding by a model). Returns null when there are no offices to show.
  */
-export function renderBuyingOffices(result: Rec): RenderedRecords | null {
+/** Rows per page for ranked lists in chat (Eric 2026-11-17: top 10, then "ask for the next 10"). */
+export const OFFICE_PAGE = 10;
+
+/**
+ * The tool's freshness note without its internal wording. A sentence naming a field ("as_of") or the
+ * warehouse is about how Mindy stores the data, not about what the customer can rely on.
+ */
+function customerFreshness(meta: Rec): string {
+  const loaded = str(meta.as_of) ? `latest action loaded ${str(meta.as_of)}` : '';
+  const note = str(meta.lag_note).split(/(?<=\.)\s+/).filter((x) => x && !/\b\w+_\w+\b|BigQuery|warehouse|ingested/i.test(x)).join(' ');
+  return [loaded, note].filter(Boolean).join('; ');
+}
+
+/** An office's example awards as displayed: positive in-window obligations only (a deobligation is not an example of buying), at most two. */
+function shownExamples(o: Rec): Rec[] {
+  return (Array.isArray(o.example_awards) ? (o.example_awards as Rec[]) : []).filter((e) => (num(e.obligated) ?? 0) > 0 && (str(e.piid) || str(e.award_id))).slice(0, 2);
+}
+
+export function renderBuyingOffices(result: Rec, opts: { offset?: number } = {}): RenderedRecords | null {
   const offices = Array.isArray(result?.offices) ? (result.offices as Rec[]) : null;
   const meta = (result?._meta && typeof result._meta === 'object' ? result._meta : {}) as Rec;
   if (!offices) return null;
@@ -511,51 +607,100 @@ export function renderBuyingOffices(result: Rec): RenderedRecords | null {
   if (scope.state) parts.push(`work performed in ${str(scope.state)}`);
   if (metro) parts.push(`${title(str(metro.core_city))} metro (cities within ${str(metro.radius_miles)} miles${scope.state ? `, in ${str(scope.state)} only` : ''})`);
   else if (Array.isArray(scope.cities) && scope.cities.length) parts.push(`cities ${(scope.cities as unknown[]).map((c) => title(str(c))).join(', ')}`);
+  // A window Mindy chose is disclosed, in plain words (accepted rule; Agent 5 2026-11-17: only the jargon was wrong).
   const toolNotes = Array.isArray(result.notes) ? (result.notes as unknown[]).map(str) : [];
   const defaultedWindow = toolNotes.some((n) => /no window given|defaulted/i.test(n));
-  if (scope.window) parts.push(`${str(scope.window)}${defaultedWindow ? ' (default window; none was given)' : ''}`);
+  if (scope.window) parts.push(`${str(scope.window)}${defaultedWindow ? '; you didn\'t name a period, so Mindy used this one' : ''}`);
+  const searched = parts.join(' · ');
+  // The ranking role is the tool's applied_filters.rank_by. A funding ranking lists the customer offices
+  // whose money is on the awards, not contracting offices (release check R4). "Award actions recorded"
+  // stays true for a net-negative office.
+  const funding = str(af.rank_by) === 'funding';
   const lines: string[] = [];
+  const buyers = offices.filter((o) => (num(o.obligated) ?? 0) > 0);
+  const nonBuyers = offices.filter((o) => (num(o.obligated) ?? 0) <= 0);
+  const officeCount = num(totals?.office_count) ?? offices.length;
+  const offset = Math.max(0, Math.min(Math.floor(opts.offset ?? 0), Math.max(buyers.length - 1, 0)));
+  const page = buyers.slice(offset, offset + OFFICE_PAGE);
+  const from = page.length ? offset + 1 : 0;
+  const to = page.length ? offset + page.length : 0;
+  const notRetrieved = Math.max(0, officeCount - offices.length);
+  const exhaustive = offices.length > 0 && from <= 1 && to === buyers.length && notRetrieved === 0;
+
   if (!offices.length) {
-    lines.push(`No buying offices found (${parts.join(' · ') || 'no filters'}). Source: USASpending prime awards.`);
+    lines.push(`No buying offices found (${searched || 'no filters'}). Source: USASpending prime awards.`);
   } else {
-    const officeCount = num(totals?.office_count) ?? offices.length;
-    // The ranking role is the tool's applied_filters.rank_by. A funding ranking lists the customer offices
-    // whose money is on the awards, not contracting offices (release check: R4 ranked by funding was
-    // labeled "contracting offices"). "Award actions recorded" stays true for a net-negative office.
-    const rankAf = (meta.applied_filters && typeof meta.applied_filters === 'object' ? meta.applied_filters : {}) as Rec;
-    const funding = str(rankAf.rank_by) === 'funding';
-    lines.push(`${officeCount} ${funding ? `customer (funding) office${officeCount === 1 ? ' has' : 's have'} award actions recorded for` : `contracting office${officeCount === 1 ? '' : 's'} recorded award actions for`} this work (${parts.join(' · ')}), ${money(totals?.obligated)} net obligated (after deobligations) across ${num(totals?.award_count) ?? '?'} awards. Source: USASpending prime awards; location is where the work was performed, not where the office sits.`);
-    lines.push(funding
-      ? 'Ranked by customer (funding) office: these are the federal offices whose money is on the awards, and each line names the contracting office that made them. They are government offices, not companies. Office totals are net of deobligations.'
-      : 'These are federal government contracting offices (buyers), not companies. Office totals are net of deobligations.');
-    const positive = offices.filter((o) => (num(o.obligated) ?? 0) > 0).length;
-    lines.push(`${offices.length < officeCount ? `Showing the top ${offices.length} of ${officeCount}` : `Showing all ${officeCount}`} by net obligations: ${positive} with positive net obligations are listed below${offices.length - positive ? `, and ${offices.length - positive} with zero or negative net obligations are listed separately` : ''}.`);
-    lines.push('Ranked by obligations under the industry (NAICS) codes shown; a code can include other work than the words you used, so check the example awards listed for each office.');
-    if (meta.as_of || meta.lag_note) lines.push(`Data freshness: ${meta.as_of ? `latest action loaded ${str(meta.as_of)}` : ''}${meta.as_of && meta.lag_note ? '; ' : ''}${meta.lag_note ? str(meta.lag_note) : ''}.`.replace(/\.\.$/, '.'));
-    const dodLag = defenseLagSentence(meta);
-    if (dodLag) lines.push(dodLag);
+    // 1. The headline.
+    lines.push(`**${officeCount} ${funding ? `customer (funding) office${officeCount === 1 ? '** has' : 's** have'} award actions recorded for` : `contracting office${officeCount === 1 ? '' : 's'}** recorded award actions for`} this work: **${money(totals?.obligated)}** net obligated across ${num(totals?.award_count) ?? '?'} awards.`);
+    // 2. What was searched and what these rows are.
+    lines.push(`${searched ? `Search: ${searched}. ` : ''}${funding
+      ? 'These are the federal offices whose money is on the awards (customers), not companies; each one\'s contracting offices are listed under the table.'
+      : 'These are federal government contracting offices (buyers), not companies.'}`);
     lines.push('');
-    const buyers = offices.filter((o) => (num(o.obligated) ?? 0) > 0);
-    const nonBuyers = offices.filter((o) => (num(o.obligated) ?? 0) <= 0);
-    buyers.forEach((o, i) => {
-      const customers = (Array.isArray(o.top_funding_offices) ? (o.top_funding_offices as Rec[]) : []).slice(0, 3).map((f) => `${title(str(f.name))} ${money(f.obligated)}`).filter((x) => x.trim());
-      const contracting = (Array.isArray(o.top_awarding_offices) ? (o.top_awarding_offices as Rec[]) : []).slice(0, 3).map((f) => `${str(f.name)}${str(f.code) && !str(f.name).includes(`(${str(f.code)})`) ? ` (${str(f.code)})` : ''} ${money(f.obligated)}`).filter((x) => x.trim());
-      const places = (Array.isArray(o.top_places) ? (o.top_places as Rec[]) : []).slice(0, 3).map((p) => [title(str(p.city)), str(p.state)].filter(Boolean).join(', ')).filter(Boolean);
-      const examples = (Array.isArray(o.example_awards) ? (o.example_awards as Rec[]) : []).slice(0, 2).map((e) => `${str(e.piid) || str(e.award_id)} ${money(e.obligated)}`).filter((x) => x.trim());
-      lines.push(`${i + 1}. ${str(o.office_name) || 'office name not reported'}${o.office_code ? ` (${str(o.office_code)})` : ''} · ${[title(str(o.agency)), title(str(o.sub_agency))].filter(Boolean).join(' / ')} · ${money(o.obligated)} (${str(o.share_pct)}%) · ${num(o.award_count) ?? 0} awards${funding ? (contracting.length ? ` · contracting offices: ${contracting.join('; ')}` : '') : (customers.length ? ` · customers: ${customers.join('; ')}` : '')}${places.length ? ` · work performed in ${places.join('; ')}` : ''}${examples.length ? ` · example awards (obligations in this window): ${examples.join('; ')}` : ''}`);
-    });
-    if (nonBuyers.length) {
-      lines.push('');
-      lines.push(`Also returned, with zero or negative net obligations in this window (deobligations, so not evidence of buying): ${nonBuyers.map((o) => `${str(o.office_name)}${o.office_code ? ` (${str(o.office_code)})` : ''} ${money(o.obligated)}`).join('; ')}.`);
+    // 3. The results.
+    if (page.length) {
+      // Column order follows the chat panel's table styling: the name first (kept readable), the value
+      // second (never wrapped); the number travels in the name cell so the detail lines can refer to it.
+      const obCol = moneyColumn(page.map((o) => o.obligated));
+      // One precision for every amount in each detail list on this page (customers, contracting offices, examples).
+      const customersOf = (o: Rec) => (Array.isArray(o.top_funding_offices) ? (o.top_funding_offices as Rec[]) : [])
+        .filter((f) => str(f.name) && !sameName(str(f.name), str(o.office_name))).slice(0, 2);
+      const contractingOf = (o: Rec) => (Array.isArray(o.top_awarding_offices) ? (o.top_awarding_offices as Rec[]) : []).slice(0, 2);
+      const custMoney = moneyColumn(page.flatMap((o) => (funding ? contractingOf(o) : customersOf(o)).map((f) => f.obligated)));
+      const exMoney = moneyColumn(page.flatMap((o) => shownExamples(o).map((e) => e.obligated)));
+      let ci = 0; let ei = 0;
+      lines.push(...mdTable(['Office', 'Net obligations', 'Share', 'Awards', 'Agency'], page.map((o, i) => [
+        `${offset + i + 1}. ${withCode(str(o.office_name), str(o.office_code))}`,
+        obCol[i],
+        o.share_pct == null || str(o.share_pct) === '' ? '—' : `${str(o.share_pct)}%`,
+        String(num(o.award_count) ?? 0),
+        title(str(o.sub_agency)) || title(str(o.agency)) || 'not reported',
+      ])));
+      // A detail line only where it adds something the table does not say.
+      const details: string[] = [];
+      page.forEach((o, i) => {
+        const bits: string[] = [];
+        if (funding) {
+          const contracting = contractingOf(o).map((f) => `${withCode(str(f.name), str(f.code))} ${custMoney[ci++]}`.trim());
+          if (contracting.length) bits.push(`contracting offices: ${contracting.join('; ')}`);
+        } else {
+          const customers = customersOf(o).map((f) => `${officeDisplayName(str(f.name))} ${custMoney[ci++]}`.trim());
+          if (customers.length) bits.push(`customers: ${customers.join('; ')}`);
+        }
+        const places = (Array.isArray(o.top_places) ? (o.top_places as Rec[]) : []).slice(0, 2).map((p) => [title(str(p.city)), str(p.state)].filter(Boolean).join(', ')).filter(Boolean);
+        if (places.length) bits.push(`work in ${places.join('; ')}`);
+        // Example awards show what the office bought; a deobligation is not an example of buying.
+        const examples = shownExamples(o).map((e) => `${str(e.piid) || str(e.award_id)} (${exMoney[ei++]})`);
+        if (examples.length) bits.push(`example awards: ${examples.join(', ')}`);
+        if (bits.length) details.push(`- **${offset + i + 1}.** ${bits.join(' · ')}`);
+      });
+      if (details.length) { lines.push(''); lines.push(...details); }
     }
+    lines.push('');
+    // 4. The honest count and how to continue.
+    const countBits: string[] = [];
+    countBits.push(exhaustive ? `Showing all ${buyers.length} offices.` : `Showing ${from}–${to} of the ${buyers.length} offices with positive net obligations.`);
+    if (to < buyers.length) countBits.push(`Ask "show offices ${to + 1} to ${Math.min(to + OFFICE_PAGE, buyers.length)}" for the next ${Math.min(OFFICE_PAGE, buyers.length - to)}.`);
+    if (notRetrieved) countBits.push(`${notRetrieved} more office${notRetrieved === 1 ? ' ranks' : 's rank'} below the top ${offices.length} retrieved; narrow the search to see ${notRetrieved === 1 ? 'it' : 'them'}.`);
+    lines.push(countBits.join(' '));
+    if (nonBuyers.length) {
+      const nbMoney = moneyColumn(nonBuyers.map((o) => o.obligated));
+      lines.push(`Also returned, with zero or negative net obligations in this window (deobligations, so not evidence of buying): ${nonBuyers.map((o, i) => `${withCode(str(o.office_name), str(o.office_code))} ${nbMoney[i]}`).join('; ')}.`);
+    }
+    // 5. One note on what the numbers mean (every caveat that changes interpretation, once).
+    lines.push('');
+    lines.push('**About this data:** USASpending prime awards, net of deobligations; place is where the work was performed, not where the office sits. Ranked under the industry (NAICS) code, which can include other work than the words you used, so check the example awards.');
+    const fresh = customerFreshness(meta);
+    const dodLag = defenseLagSentence(meta);
+    if (fresh || dodLag) lines.push(`${fresh ? `Data: ${fresh}.` : ''}${fresh && dodLag ? ' ' : ''}${dodLag ?? ''}`.replace(/\.\.$/, '.'));
   }
 
-  const total = num(totals?.office_count) ?? offices.length;
   return {
-    tool: BUYING_OFFICES_TOOL, text: lines.join('\n'), total, retrieved: offices.length, from: offices.length ? 1 : 0, to: offices.length,
-    shown: offices.length, exhaustive: offices.length === total, ids: offices.map((o) => str(o.office_code) || str(o.office_name)),
-    officeExamples: offices.map((o) => ({ office: `${str(o.office_name)}${o.office_code ? ` (${str(o.office_code)})` : ''}`, ids: (Array.isArray(o.example_awards) ? (o.example_awards as Rec[]) : []).map((e) => str(e.piid) || str(e.award_id)).filter(Boolean) })),
-    allowedCounts: Array.from(new Set([total, offices.length, num(totals?.award_count) ?? -1].filter((n) => n >= 0))), standalone: offices.length, orders: 0,
+    tool: BUYING_OFFICES_TOOL, text: lines.join('\n'), total: officeCount, retrieved: offices.length, from, to,
+    shown: page.length, exhaustive, ids: page.map((o) => str(o.office_code) || str(o.office_name)),
+    // Only the example awards actually displayed: the cross-check note says the award is "listed above for this office".
+    officeExamples: page.map((o) => ({ office: withCode(str(o.office_name), str(o.office_code)), ids: shownExamples(o).map((e) => str(e.piid) || str(e.award_id)).filter(Boolean) })),
+    allowedCounts: Array.from(new Set([officeCount, offices.length, buyers.length, nonBuyers.length, page.length, from, to, notRetrieved, num(totals?.award_count) ?? -1].filter((n) => n >= 0))), standalone: offices.length, orders: 0,
   };
 }
 
@@ -720,9 +865,11 @@ export function renderAwardList(result: Rec): RenderedRecords | null {
   const others = cands.filter((c) => !c.startsWith(`${str(office?.code)} `));
   if (others.length) lines.push(`Other office codes matching "${str(office?.requested)}" were found but not searched: ${others.join('; ')}.`);
   lines.push('');
-  awards.forEach((a, i) => {
-    lines.push(`${i + 1}. ${str(a.awardId)} · ${title(str(a.recipientName)) || 'recipient not reported'}${a.description ? ` · ${clip(str(a.description), 180)}` : ''} · ${str(a.startDate) || '?'} to ${str(a.endDate) || '?'} · ${money(a.awardAmount)} lifetime${a.popState ? ` · performed in ${str(a.popState)}` : ''}`);
-  });
+  const valCol = moneyColumn(awards.map((a) => a.awardAmount));
+  lines.push(...mdTable(['Award', 'Lifetime value', 'Recipient', 'Period', 'Place', 'Work'], awards.map((a, i) => [
+    `${i + 1}. ${str(a.awardId)}`, valCol[i] || '—', title(str(a.recipientName)) || 'recipient not reported',
+    `${str(a.startDate) || '?'} to ${str(a.endDate) || '?'}`, str(a.popState) || '—', clip(str(a.description), 80) || '—',
+  ])));
   const ig = ignoredLine(meta);
   if (ig) { lines.push(''); lines.push(ig); }
   if (meta.lag_note || str(meta.result_state) === 'partial') { lines.push(''); lines.push(`Data status: ${str(meta.result_state) === 'partial' ? 'may be incomplete' : str(meta.result_state) || 'may be incomplete'}.${meta.lag_note ? ` ${freshnessSentence(meta)}` : ''}`); }
@@ -739,14 +886,15 @@ export function renderVehicleMix(result: Rec): RenderedRecords | null {
   const lines: string[] = [];
   lines.push(`Spending by contract vehicle (NAICS ${(Array.isArray(scope.naics) ? scope.naics as unknown[] : []).map(str).join(', ')}${scope.agency ? ` · ${str(scope.agency)}` : ''}${scope.state ? ` · ${str(scope.state)}` : ''} · ${str(scope.window)}): ${money(result.total_obligated)} obligated across ${num(result.total_award_count) ?? '?'} awards. Every bucket is listed; shares are of that total.`);
   lines.push('');
-  buckets.filter((b) => (num(b.obligated) ?? 0) !== 0 || (num(b.award_count) ?? 0) > 0).forEach((b, i) => {
-    lines.push(`${i + 1}. ${str(b.label)}: ${money(b.obligated)} (${str(b.share_pct)}%) · ${num(b.award_count) ?? 0} awards`);
-  });
+  const shownBuckets = buckets.filter((b) => (num(b.obligated) ?? 0) !== 0 || (num(b.award_count) ?? 0) > 0);
+  const bCol = moneyColumn(shownBuckets.map((b) => b.obligated));
+  lines.push(...mdTable(['Vehicle', 'Obligations', 'Share', 'Awards'], shownBuckets.map((b, i) => [str(b.label), bCol[i], `${str(b.share_pct)}%`, String(num(b.award_count) ?? 0)])));
   const r = (k: string) => (roll[k] && typeof roll[k] === 'object' ? roll[k] as Rec : null);
   const rl = [['all schedules', r('all_schedules')], ['all BPAs', r('all_bpas')], ['all IDIQs and GWACs', r('all_idiqs_and_gwacs')]].filter(([, v]) => v).map(([k, v]) => `${k} ${money((v as Rec).obligated)} (${str((v as Rec).share_pct)}%)`);
   if (rl.length) { lines.push(''); lines.push(`Rollups: ${rl.join('; ')}.`); }
   const vmeta = (result._meta && typeof result._meta === 'object' ? result._meta : {}) as Rec;
-  if (vmeta.as_of || vmeta.lag_note) lines.push(`Data freshness: ${vmeta.as_of ? `latest action loaded ${str(vmeta.as_of)}` : ''}${vmeta.as_of && vmeta.lag_note ? '; ' : ''}${vmeta.lag_note ? str(vmeta.lag_note) : ''}.`.replace(/\.\.$/, '.'));
+  const vFresh = customerFreshness(vmeta);
+  if (vFresh) lines.push(`Data: ${vFresh}.`.replace(/\.\.$/, '.'));
   const vDod = defenseLagSentence(vmeta);
   if (vDod) lines.push(vDod);
   lines.push(`Classification: of the dollars linked to a vehicle, ${str(cls.verified_share_of_parented_pct)}% were verified from USASpending vehicle records. Of all dollars, ${str(cls.heuristic_share_of_total_pct)}% were typed from contract-number patterns and ${str(cls.unresolved_share_of_total_pct)}% could not be classified.`);
