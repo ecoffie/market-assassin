@@ -607,8 +607,10 @@ export function renderBuyingOffices(result: Rec, opts: { offset?: number } = {})
   if (scope.state) parts.push(`work performed in ${str(scope.state)}`);
   if (metro) parts.push(`${title(str(metro.core_city))} metro (cities within ${str(metro.radius_miles)} miles${scope.state ? `, in ${str(scope.state)} only` : ''})`);
   else if (Array.isArray(scope.cities) && scope.cities.length) parts.push(`cities ${(scope.cities as unknown[]).map((c) => title(str(c))).join(', ')}`);
-  // The window is stated plainly; whether the customer named it is not their concern (Agent 5, 2026-11-17).
-  if (scope.window) parts.push(str(scope.window));
+  // A window Mindy chose is disclosed, in plain words (accepted rule; Agent 5 2026-11-17: only the jargon was wrong).
+  const toolNotes = Array.isArray(result.notes) ? (result.notes as unknown[]).map(str) : [];
+  const defaultedWindow = toolNotes.some((n) => /no window given|defaulted/i.test(n));
+  if (scope.window) parts.push(`${str(scope.window)}${defaultedWindow ? '; you didn\'t name a period, so Mindy used this one' : ''}`);
   const searched = parts.join(' · ');
   // The ranking role is the tool's applied_filters.rank_by. A funding ranking lists the customer offices
   // whose money is on the awards, not contracting offices (release check R4). "Award actions recorded"

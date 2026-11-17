@@ -408,10 +408,15 @@ describe('attempt-2 fixes', () => {
     expect(r.text).toMatch(/Also marked CHECK \(outside the rows shown above\):\n22\. PA1 · /);
     expect(r.ids).toContain('PA1');
   });
+  it('a window the customer named carries no "Mindy used this one" note', () => {
+    const r = renderBuyingOffices({ scope: { naics: ['5613'], window: 'FY2025' }, offices: [{ office_name: 'A', obligated: 5, share_pct: 100, award_count: 1 }], totals: { obligated: 5, award_count: 1, office_count: 1 }, notes: [], _meta: {} })!;
+    expect(r.text).toMatch(/Search: NAICS 5613 · FY2025\. /);
+    expect(r.text).not.toMatch(/Mindy used this one/);
+  });
   it('tool-internal notes are not shown; a defaulted window is stated in plain words', () => {
     const r = renderBuyingOffices({ scope: { naics: ['5613'], window: 'FY2024-FY2026' }, offices: [{ office_name: 'A', obligated: 5, share_pct: 100, award_count: 1 }], totals: { obligated: 5, award_count: 1, office_count: 1 }, notes: ['No window given: defaulted to FY2024-FY2026.', 'see top_places'], _meta: {} })!;
-    expect(r.text).toMatch(/FY2024-FY2026\./);
-    expect(r.text).not.toMatch(/default window|none was given/); // stated plainly (Agent 5, 2026-11-17)
+    expect(r.text).toMatch(/FY2024-FY2026; you didn't name a period, so Mindy used this one\./);
+    expect(r.text).not.toMatch(/default window|none was given/);
     expect(r.text).not.toMatch(/top_places|No window given/);
   });
 });

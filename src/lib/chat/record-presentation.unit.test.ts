@@ -87,9 +87,9 @@ describe('buying offices: presentation', () => {
     expect(r.text).not.toMatch(/\((\w+)\) \(\1\)/);
     for (const l of r.text.split('\n').filter((x) => x.includes('example awards'))) expect(l).not.toMatch(/-\$|C900/);
     expect(r.text).not.toMatch(/customers?: FLETC Glynco Procurement Office/i);
-    // The window is stated plainly; nothing about a default (Agent 5, 2026-11-17).
-    expect(r.text).toMatch(/Search: NAICS 561720 · work performed in GA · FY2024-FY2026 \(federal fiscal years, Oct 1 - Sep 30\)\. /);
-    expect(r.text).not.toMatch(/default|none was given/i);
+    // A window Mindy chose is disclosed in plain words, without jargon.
+    expect(r.text).toMatch(/Search: NAICS 561720 · work performed in GA · FY2024-FY2026 \(federal fiscal years, Oct 1 - Sep 30\); you didn't name a period, so Mindy used this one\. /);
+    expect(r.text).not.toMatch(/default window|none was given/i);
   });
   it('one precision per money column and per money list (the document engine rule)', () => {
     const decimalsOf = (xs: string[]) => new Set(xs.map((x) => (x.match(/\.(\d+)[KMB]$/)?.[1] ?? '').length));
