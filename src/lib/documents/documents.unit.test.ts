@@ -386,6 +386,23 @@ describe('chart axis titles', () => {
   });
 });
 
+describe('HTML Content-Security-Policy', () => {
+  it('the CSP meta is the FIRST element of <head> (it must govern prefetch/preconnect links too)', () => {
+    const html = renderHtml(SAMPLE_REPORT);
+    const head = html.slice(html.indexOf('<head>') + '<head>'.length);
+    expect(head.startsWith(`<meta http-equiv="Content-Security-Policy" content="${"default-src 'none'; style-src 'unsafe-inline'; img-src data:"}">`)).toBe(true);
+    expect(html.match(/http-equiv="Content-Security-Policy"/g)).toHaveLength(1);
+  });
+
+  it('model text cannot inject a second policy or a prefetch link', () => {
+    const m = clone();
+    m.title = '<meta http-equiv="Content-Security-Policy" content="default-src *"><link rel="prefetch" href="https://evil.example/">';
+    const html = renderHtml(m);
+    expect(html.match(/<meta http-equiv/g)).toHaveLength(1);
+    expect(html).not.toMatch(/<link rel="prefetch"/);
+  });
+});
+
 describe('unverified statements', () => {
   const m = () => tiny({ sections: [{ id: 'a', heading: 'Buyers', blocks: [
     { type: 'paragraph', id: 'p1', text: 'VA buys the most.', claim: 'unverified' },

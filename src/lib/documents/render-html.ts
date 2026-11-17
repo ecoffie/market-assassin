@@ -10,6 +10,15 @@ import type { Block, Claim, DocModel, TableBlock } from './model';
 import { chartToSvg } from './charts';
 import { citationIndex, citeMarker, claimClass, claimLabel, claimsPresent, formatCell, formatDocDate, parseInline, unverifiedStatements } from './format';
 
+/**
+ * The document page may load nothing but itself: no scripts, no network, no frames; only its own
+ * inline styles and data: images. Emitted as the FIRST element of <head> so it governs everything
+ * after it — including <link rel="prefetch">, which Chromium issues outside request interception
+ * (A4, real-browser probe on #2107), so the PDF lockdown alone does not stop it. The render route
+ * sends the same value as an HTTP header on the degraded HTML.
+ */
+export const DOC_HTML_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:";
+
 export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
@@ -178,5 +187,5 @@ export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): strin
       .join('')}</ol></section>`
     : '';
 
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(model.title)}</title><style>${CSS}</style></head><body><main class="doc">${cover}${toc}${body}${unverifiedSection}${sources}</main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="${DOC_HTML_CSP}"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(model.title)}</title><style>${CSS}</style></head><body><main class="doc">${cover}${toc}${body}${unverifiedSection}${sources}</main></body></html>`;
 }

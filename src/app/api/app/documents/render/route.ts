@@ -22,7 +22,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { hasProAccess } from '@/lib/access/resolve-access';
-import { renderDocument, type DocFormat } from '@/lib/documents';
+import { renderDocument, DOC_HTML_CSP, type DocFormat } from '@/lib/documents';
 import { checkRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
@@ -36,7 +36,7 @@ const FORMATS: ReadonlySet<string> = new Set(['pdf', 'docx']);
 
 const NO_STORE = { 'Cache-Control': 'private, no-store' };
 /** For the inline degraded-HTML fallback (the PDF renderer's page, served from our origin). */
-export const DEGRADED_HTML_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:";
+export const DEGRADED_HTML_CSP = DOC_HTML_CSP; // one value: the page's own <meta> CSP
 
 /**
  * Per-account render limits over a rolling 10 minutes. A PDF runs headless Chromium for up to 60 s,
