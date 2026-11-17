@@ -209,7 +209,8 @@ function vaultDocItems(tool: string, parsed: Record<string, unknown> | null): Le
   if (tool === 'find_my_documents') {
     const one = parsed.document as Record<string, unknown> | undefined;
     const list = one ? [one] : Array.isArray(parsed.items) ? (parsed.items as Array<Record<string, unknown>>) : [];
-    return list.filter((d) => d && typeof d.document_id === 'string' && UUID_RE.test(d.document_id))
+    const valid = list.filter((d) => d && typeof d.document_id === 'string' && UUID_RE.test(d.document_id));
+    return collapseGeneratedPairs(valid)
       .slice(0, LEDGER_MAX_ITEMS)
       .map((d) => ({ key: String(d.document_id), label: safeLabel(d.file_name), doc: { kind: docKind(d.kind) } }));
   }
@@ -222,6 +223,36 @@ function vaultDocItems(tool: string, parsed: Record<string, unknown> | null): Le
     return [{ key: String(main.document_id), label: safeLabel(main.file_name ?? parsed.title), doc: { kind: 'generated', ...(Number.isInteger(v) && v > 0 ? { version: v } : {}) } }];
   }
   return null;
+}
+
+/** Two files saved this close together with the same name are one generated document's Word + PDF pair. */
+const PAIR_WINDOW_MS = 5 * 60_000;
+const baseFileName = (f: unknown) => String(f ?? '').replace(/\.(pdf|docx)$/i, '').trim().toLowerCase();
+
+/**
+ * create_document saves every generated document as a Word + PDF pair (same name, same version, saved together).
+ * find_my_documents lists both files, so "revise that" saw two documents and asked "which one?" (Agent 4 live
+ * test, 2026-11-17). A generated pair is ONE document: keep the Word file's id (create_document resolves the PDF
+ * from it). Only generated files with the same base name saved within PAIR_WINDOW_MS collapse; different titles,
+ * versions saved at different times, and an upload next to a generated file stay separate (ambiguous).
+ */
+function collapseGeneratedPairs(docs: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+  const out: Array<Record<string, unknown>> = [];
+  const used = new Set<number>();
+  docs.forEach((d, i) => {
+    if (used.has(i)) return;
+    if (d.kind !== 'generated') { out.push(d); return; }
+    const t = Date.parse(String(d.saved ?? ''));
+    const j = docs.findIndex((e, k) => k !== i && !used.has(k) && e.kind === 'generated'
+      && baseFileName(e.file_name) === baseFileName(d.file_name)
+      && /\.pdf$/i.test(String(e.file_name)) !== /\.pdf$/i.test(String(d.file_name))
+      && Number.isFinite(t) && Number.isFinite(Date.parse(String(e.saved ?? '')))
+      && Math.abs(Date.parse(String(e.saved)) - t) <= PAIR_WINDOW_MS);
+    if (j < 0) { out.push(d); return; }
+    used.add(i); used.add(j);
+    out.push(/\.docx$/i.test(String(d.file_name)) ? d : docs[j]);
+  });
+  return out;
 }
 
 /** Records the user saw in a rendered list, numbered exactly as displayed. */

@@ -175,6 +175,40 @@ describe('revise a document across two turns: the ledger carries the real doc id
   });
 });
 
+describe('a generated document found as its PDF + Word pair is ONE document (Agent 4, live item 5)', () => {
+  it('find_my_documents lists a generated v1 PDF + DOCX pair → "revise that" resolves to the DOCX id, forces create_document with revises_document_id', async () => {
+    const first = await findTurn({ ok: true, count: 2, items: [
+      { document_id: '55555555-5555-4555-8555-555555555555', file_name: 'Harborline Capability Statement.pdf', kind: 'generated', saved: '2026-11-17T18:00:03.000Z' },
+      { document_id: GEN_V1_DOCX, file_name: 'Harborline Capability Statement.docx', kind: 'generated', saved: '2026-11-17T18:00:01.000Z' },
+    ] });
+    const e = ledgerOf(first)!.entries.find((x) => x.tool === 'find_my_documents')!;
+    expect(e.items).toEqual([expect.objectContaining({ key: GEN_V1_DOCX, doc: { kind: 'generated' } })]);
+    fetchCalls.length = 0; h.createArgs.length = 0;
+    h.docRow = { id: GEN_V1_DOCX, original_filename: 'Harborline Capability Statement.docx', doc_class: 'generated', version: 1, doc_model: DOC_MODEL, extracted_text: null };
+    plan.planner = async () => plannerResponse([{ name: 'create_document', args: { doc_model: DOC_MODEL } }]);
+    await ask(REVISE, { history: [{ role: 'assistant', content: 'Found 2 files.', sources: ledgerOf(first) }] });
+    expect(forcedCreate(lastPlanner())).toBe(true);
+    expect(h.createArgs[0].revises_document_id).toBe(GEN_V1_DOCX);
+  });
+
+  it('two different generated documents, or a pair saved far apart (two versions), stay ambiguous', async () => {
+    for (const items of [
+      [{ document_id: GEN_V1_DOCX, file_name: 'Harborline Capability Statement.docx', kind: 'generated', saved: '2026-11-17T18:00:00.000Z' },
+       { document_id: UPLOAD_ID, file_name: 'Harborline Past Performance.docx', kind: 'generated', saved: '2026-11-17T18:00:00.000Z' }],
+      [{ document_id: GEN_V1_DOCX, file_name: 'Harborline Capability Statement.docx', kind: 'generated', saved: '2026-11-10T09:00:00.000Z' },
+       { document_id: '55555555-5555-4555-8555-555555555555', file_name: 'Harborline Capability Statement.pdf', kind: 'generated', saved: '2026-11-17T18:00:00.000Z' }],
+      [{ document_id: UPLOAD_ID, file_name: 'Harborline Capability Statement.docx', kind: 'company', saved: '2026-11-17T18:00:00.000Z' },
+       { document_id: GEN_V1_DOCX, file_name: 'Harborline Capability Statement.pdf', kind: 'generated', saved: '2026-11-17T18:00:00.000Z' }],
+    ]) {
+      const first = await findTurn({ ok: true, count: 2, items });
+      expect(ledgerOf(first)!.entries.find((x) => x.tool === 'find_my_documents')!.items).toHaveLength(2);
+      fetchCalls.length = 0;
+      await ask(REVISE, { history: [{ role: 'assistant', content: 'Which one?', sources: ledgerOf(first) }] });
+      expect(forcedCreate(lastPlanner())).toBe(false);
+    }
+  });
+});
+
 describe('no resolvable document → find_my_documents stays the right call', () => {
   it('a new conversation (no ledger): not forced, no document loaded, find_my_documents runs', async () => {
     plan.planner = async () => plannerResponse([{ name: 'find_my_documents', args: { name_words: 'capability statement' } }]);
