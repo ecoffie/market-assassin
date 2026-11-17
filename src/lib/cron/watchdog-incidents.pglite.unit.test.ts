@@ -7,16 +7,11 @@
  *   UPDATE ... WHERE incident_key = $1 AND version = $2
  * Two overlapping watchdog passes must produce exactly ONE Slack message.
  */
-import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runWatchdogIncidents, type IncidentRow, type IncidentStore, type WatchdogObservation } from './watchdog-incidents';
-
-import { PGLITE_HOOK_TIMEOUT_MS } from '@/test/pglite-timeouts';
-
-// PGlite boot + migrations can exceed the 10s default hook limit under full-suite load (see the constant).
-vi.setConfig({ hookTimeout: PGLITE_HOOK_TIMEOUT_MS });
 
 const MIGRATION = readFileSync(join(process.cwd(), 'supabase/migrations/20261005_ops_incidents.sql'), 'utf8');
 const db = new PGlite();

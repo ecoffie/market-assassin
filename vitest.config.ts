@@ -25,6 +25,9 @@ export default defineConfig({
       './src/test/no-live-bigquery.setup.ts',
       // Any non-loopback network connection in a unit test fails immediately.
       './tests/setup/no-network.ts',
+      // *.pglite.* suites boot an in-process Postgres + migrations in beforeAll: a 60s SETUP budget, scoped by
+      // file name so every current and future PGlite file is covered (src/test/pglite-timeouts.ts).
+      './src/test/pglite-timeouts.setup.ts',
     ],
     // Only pick up *.unit.test.ts(x). This deliberately avoids the existing
     // tests/*.test.ts protocol files (keyword-geo-filter.test.ts, office-name-
