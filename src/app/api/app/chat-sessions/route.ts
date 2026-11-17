@@ -16,6 +16,7 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { hasProAccess } from '@/lib/access/resolve-access';
 import { shadowEntitlement } from '@/lib/entitlements/shadow';
+import { isViewPreambleTitle, sessionTitleFrom } from '@/lib/chat/view-preamble';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -75,9 +76,12 @@ export async function GET(request: NextRequest) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+    // Older Map conversations were titled from the Map view preamble; show the customer's first question.
+    const firstUser = (messages || []).find((m: { role: string }) => m.role === 'user') as { content?: string } | undefined;
+    const title = isViewPreambleTitle(session.title) ? (sessionTitleFrom(firstUser?.content || '') || null) : session.title;
     return NextResponse.json({
       success: true,
-      session: { id: session.id, title: session.title },
+      session: { id: session.id, title },
       messages: messages || [],
     });
   }
@@ -92,7 +96,7 @@ export async function GET(request: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ success: true, sessions: sessions || [] });
+  return NextResponse.json({ success: true, sessions: await repairPreambleTitles(supabase, sessions || []) });
 }
 
 export async function DELETE(request: NextRequest) {
@@ -120,4 +124,47 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   return NextResponse.json({ success: true });
+}
+
+const TITLE_REPAIR_PAGE = 1000;
+const TITLE_REPAIR_MAX_PAGES = 5;
+
+type SessionRow = { id: string; title: string | null; message_count: number; updated_at: string };
+
+/**
+ * Conversations started from the Map before 2026-11-17 were titled with the first 60 characters of the
+ * stored message, which is the Map view preamble, not the customer's question. Re-title those at read time
+ * from the conversation's first user message (stored rows are not rewritten). A failed lookup leaves the
+ * title empty ("Untitled") rather than showing the preamble.
+ */
+async function repairPreambleTitles(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  sessions: SessionRow[],
+): Promise<SessionRow[]> {
+  const bad = sessions.filter((s) => isViewPreambleTitle(s.title)).map((s) => s.id);
+  if (!bad.length) return sessions;
+  const firstQuestion = new Map<string, string>();
+  // Paged (PostgREST caps a response at 1,000 rows and long conversations have many user turns); stops as
+  // soon as every affected conversation has its first question. Ordered by created_at, id so pages are stable.
+  for (let page = 0; page < TITLE_REPAIR_MAX_PAGES && firstQuestion.size < bad.length; page++) {
+    const from = page * TITLE_REPAIR_PAGE;
+    const { data, error } = await supabase
+      .from('mindy_chat_messages')
+      .select('session_id, content, created_at')
+      .in('session_id', bad) // a fixed set, so offsets stay valid across pages
+      .eq('role', 'user')
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, from + TITLE_REPAIR_PAGE - 1);
+    if (error) { console.error('[chat-sessions] title repair query error:', error.message); break; }
+    const rows = (data || []) as Array<{ session_id: string; content: string }>;
+    for (const row of rows) {
+      if (firstQuestion.has(row.session_id)) continue;
+      const t = sessionTitleFrom(row.content || '');
+      if (t) firstQuestion.set(row.session_id, t);
+    }
+    if (rows.length < TITLE_REPAIR_PAGE) break;
+  }
+  return sessions.map((s) => (isViewPreambleTitle(s.title) ? { ...s, title: firstQuestion.get(s.id) ?? null } : s));
 }

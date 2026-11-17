@@ -66,3 +66,19 @@ describe('catalogLinkFindings (weekly, never blocks CI)', () => {
     expect(r.findings).toEqual([]);
   });
 });
+
+describe('real catalog, 2026-11-17: INL and NCMA Warfighter editions have passed', () => {
+  it('neither shows a passed date, and both say no_next_announced with official evidence', async () => {
+    const real = (await import('@/data/federal-events-sources.json')).default as unknown as EventCatalog & {
+      majorAnnualConferences: Array<{ name: string; next_occurrence?: unknown; verification?: { status?: string; checked_at?: string; source_url?: string } }>;
+    };
+    const passed = catalogDateFindings(real, '2026-11-17').filter((f) => f.kind === 'occurrence_passed').map((f) => f.entry);
+    for (const name of ['Idaho National Laboratory (INL) Industry Days', 'NCMA Warfighter Acquisition Forum']) {
+      expect(passed, name).not.toContain(name);
+      const e = real.majorAnnualConferences.find((c) => c.name === name)!;
+      expect(e.next_occurrence, name).toBeUndefined();
+      expect(e.verification, name).toMatchObject({ status: 'no_next_announced', checked_at: '2026-11-17' });
+      expect(e.verification?.source_url, name).toMatch(/^https:\/\/www\.(energy\.gov|ncmahq\.org)\//);
+    }
+  });
+});

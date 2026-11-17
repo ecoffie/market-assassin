@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildDocumentContext, buildManifest, DOCUMENT_BLOCK_BUDGET } from './document-context';
 import { fenceUntrusted, neutralizeFences, safeName, UNTRUSTED_TEXT_RULE } from './untrusted-text';
-import type { ChatDocumentText } from '@/lib/documents/chat-store';
+import type { ChatDocumentText } from '@/lib/vault/chat-store';
 
 const d = (filename: string, text: string, over: Partial<ChatDocumentText> = {}): ChatDocumentText => ({
   id: filename, filename, mime_type: 'text/plain', size_bytes: text.length, page_count: null, char_count: text.length,

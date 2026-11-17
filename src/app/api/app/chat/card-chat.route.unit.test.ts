@@ -23,6 +23,10 @@ const state: {
   inserts: Array<{ table: string; row: Record<string, unknown> }>;
   allowedToolNames: unknown;
   incumbent: unknown;
+  /** sam_opportunities lookups by solicitation number / notice id (mentioned-notice.ts). */
+  mentionLookups: unknown[];
+  /** P2: when set, the planner calls one tool and the executor returns this record + content. */
+  toolRound: { status: string; content: unknown; error_category?: string } | null;
 } = {} as never;
 
 // In-memory turn store with the SQL functions' semantics (claim / complete = save + debit once / fail).
@@ -76,7 +80,16 @@ vi.mock('@/lib/chat/card-chat-turns', async (orig) => ({
 vi.mock('@/lib/chat/chat-tool-executor', () => ({
   createChatToolExecutor: (opts: { allowedToolNames?: unknown }) => {
     state.allowedToolNames = opts.allowedToolNames ?? null;
-    return { offeredToolDefs: () => [], executeRound: async () => [], policyFor: () => ({ decision: 'allowed_read' }) };
+    return {
+      offeredToolDefs: () => (state.toolRound ? [{ type: 'function', function: { name: 'lookup_solicitation', description: 'x', parameters: { type: 'object', properties: {} } } }] : []),
+      executeRound: async (calls: Array<{ id: string; function: { name: string } }>) => calls.map((c) => ({
+        tool_call_id: c.id,
+        content: JSON.stringify(state.toolRound!.content),
+        argsRedacted: {},
+        record: { execution_id: 'x', tool: c.function.name, decision: 'allowed_read', status: state.toolRound!.status, error_category: state.toolRound!.error_category ?? null, latency_ms: 1 },
+      })),
+      policyFor: () => ({ decision: 'allowed_read' }),
+    };
   },
 }));
 // The selected-notice incumbent lookup (src/lib/chat/selected-notice.ts) — never the network in tests.
@@ -89,8 +102,23 @@ vi.mock('@/lib/chat/tier0-tools', () => ({ makeTier0Tools: () => ({ execute: asy
 function builder(table: string) {
   const q: Record<string, unknown> = {};
   let eqVal: unknown = null;
+  let ilikeVal: unknown = null;
+  let eqCol = '';
   q.select = () => q;
-  q.eq = (_k: string, v: unknown) => { eqVal = v; return q; };
+  q.eq = (k: string, v: unknown) => { eqVal = v; eqCol = k; return q; };
+  q.ilike = (_k: string, v: unknown) => { ilikeVal = v; return q; };
+  q.order = () => q;
+  // The plain-chat mentioned-notice lookup (an exact solicitation number or notice id → rows).
+  q.limit = async () => {
+    if (table !== 'sam_opportunities') return { data: [], error: null };
+    state.mentionLookups.push(ilikeVal != null ? `ilike:${ilikeVal}` : `${eqCol}:${eqVal}`);
+    if (state.recordError) return { data: null, error: { message: 'down' } };
+    const r = state.record;
+    const hit = !!r && (ilikeVal != null
+      ? String(r.solicitation_number).toUpperCase() === String(ilikeVal).toUpperCase()
+      : eqCol === 'solicitation_number' ? r.solicitation_number === eqVal : r.notice_id === eqVal);
+    return { data: hit ? [r] : [], error: null };
+  };
   q.update = () => ({ eq: async () => ({ error: null }) });
   q.insert = async (row: Record<string, unknown>) => { state.inserts.push({ table, row }); return { error: null }; };
   q.maybeSingle = async () => {
@@ -130,7 +158,7 @@ beforeEach(() => {
       _meta: { grounded_notice: true, grounded_incumbent: false, degraded: false, notice_source: 'cache', incumbent_finding: 'candidate_not_confirmed' },
     },
     recordError: false, sessions: {}, answer: 'The response deadline is 2026-12-04 (SAM.gov notice W912PL26Q0042).', answerFails: false, finishReason: 'stop',
-    plannerMessages: [], answerMessages: [], inserts: [], allowedToolNames: null,
+    plannerMessages: [], answerMessages: [], inserts: [], allowedToolNames: null, mentionLookups: [], toolRound: null,
   });
   turns.clear(); tokenSeq = 0;
   claimCardTurn.mockClear(); completeCardTurn.mockClear(); failCardTurn.mockClear();
@@ -145,6 +173,9 @@ beforeEach(() => {
       return new Response(sseBody(state.answer), { status: 200 });
     }
     state.plannerMessages.push(b.messages);
+    if (state.toolRound) {
+      return new Response(JSON.stringify({ choices: [{ message: { content: null, tool_calls: [{ id: 'c1', type: 'function', function: { name: 'lookup_solicitation', arguments: JSON.stringify({ query: 'W912PL26Q0042' }) } }] } }], usage: { prompt_tokens: 5, completion_tokens: 1 } }), { status: 200 });
+    }
     return new Response(JSON.stringify({ choices: [{ message: { content: 'no tools needed' } }], usage: { prompt_tokens: 5, completion_tokens: 1 } }), { status: 200 });
   }));
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -277,6 +308,38 @@ describe('credits: exactly once for a successful free card turn, never for failu
     const { res } = await post(card);
     expect(res.status).toBe(503);
     expect(fetch).not.toHaveBeenCalled();
+  });
+  // P2 / audit B1: a turn whose data was not fully retrieved is free, like any other degraded answer.
+  it('a successful tool round is still charged exactly once (unchanged)', async () => {
+    state.toolRound = { status: 'success', content: { ok: true, notice: { notice_id: NID }, _meta: { grounded: true, degraded: false } } };
+    await post(card);
+    expect(charges()).toBe(1);
+    expect(completeCardTurn.mock.calls[0][0]).toMatchObject({ credits: 10 });
+  });
+  it.each([
+    ['a thrown tool (failed)', { status: 'failed', error_category: 'tool_error', content: { ok: false, state: 'unavailable', error_category: 'tool_error' } }, 'tool_failed'],
+    ['a tool returning ok:false', { status: 'success', content: { ok: false, error_category: 'sam_unavailable', message: 'SAM is down' } }, 'tool_degraded'],
+    ['a degraded tool result', { status: 'success', content: { ok: true, notice: null, _meta: { grounded: false, degraded: true } } }, 'tool_degraded'],
+    ['an unavailable result state', { status: 'success', content: { ok: true, _meta: { result_state: 'unavailable' } } }, 'tool_degraded'],
+    ['a partial result (part of the request not checked)', { status: 'success', content: { ok: true, notice: { notice_id: NID }, _meta: { result_state: 'partial', ignored_args: ['city'] } } }, 'tool_degraded'],
+    ['a policy refusal', { status: 'blocked_policy', error_category: 'not_offered_here', content: { ok: false, state: 'unavailable', error_category: 'not_offered_here' } }, 'tool_refused'],
+    ['an invalid-input rejection', { status: 'rejected_invalid_input', error_category: 'invalid_input', content: { ok: false, state: 'unavailable', error_category: 'invalid_input' } }, 'tool_refused'],
+  ])('%s → no charge; the turn is free and re-askable', async (_n, round, reason) => {
+    state.toolRound = round;
+    const { events } = await post(card);
+    expect(events.some((e) => e.type === 'token')).toBe(true); // the answer is still shown
+    expect(charges()).toBe(0);
+    expect(completeCardTurn).not.toHaveBeenCalled();
+    expect(failCardTurn.mock.calls[0][0]).toMatchObject({ reason });
+    expect(turns.get(TURN)?.status).toBe('failed');
+    expect(events.some((e) => e.type === 'credits')).toBe(false);
+  });
+  it('reason precedence: a tool reason is reported before a length-cut answer (tool_* before incomplete)', async () => {
+    state.toolRound = { status: 'success', content: { ok: false, error_category: 'sam_unavailable' } };
+    state.finishReason = 'length';
+    await post(card);
+    expect(charges()).toBe(0);
+    expect(failCardTurn.mock.calls[0][0]).toMatchObject({ reason: 'tool_degraded' });
   });
   it('completion fails (unknown outcome) → reported as nothing charged; the turn is released', async () => {
     completeCardTurn.mockImplementationOnce(async () => { throw new Error('timeout'); });
@@ -532,5 +595,159 @@ describe('main chat with a selected notice (Eric 2026-11-16: no card-chat flag)'
     await post({ context: { kind: 'opportunity', notice_id: 'not-a-notice' } });
     const sys = state.answerMessages[0].filter((m) => m.role === 'system').map((m) => m.content).join('\n');
     expect(sys).not.toContain('SELECTED OPPORTUNITY');
+  });
+});
+
+describe('plain /app chat: the notice the user named (scorecard 2026-11-16, C1/C1b/C3)', () => {
+  beforeEach(() => { state.pro = true; vi.stubEnv('MAP_CARD_CHAT_ENABLED', ''); });
+  const system = (msgs: Array<{ role: string; content: string }>) => msgs.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
+
+  it('a solicitation number in the message grounds the answer in that notice: body, set-aside and contact', async () => {
+    const { res } = await post({ message: 'Tell me about solicitation W912PL26Q0042.' });
+    expect(res.status).toBe(200);
+    for (const msgs of [state.plannerMessages[0], state.answerMessages[0]]) {
+      const sys = system(msgs);
+      expect(sys).toContain('MENTIONED OPPORTUNITY');
+      expect(sys).not.toContain('SELECTED OPPORTUNITY');
+      expect(sys).toContain('Provide janitorial services.');
+      expect(sys).toContain('Set-aside: Total Small Business');
+      expect(sys).toContain('Notice point of contact: Jane Buyer, jane.buyer@usace.army.mil');
+    }
+    // One indexed equality on the stored uppercase form; the ILIKE never runs on a hit.
+    expect(state.mentionLookups).toEqual(['solicitation_number:W912PL26Q0042']);
+  });
+
+  it('a lowercase number misses the exact match once, then the case-insensitive lookup finds it', async () => {
+    state.record = { ...state.record!, solicitation_number: 'w912pl26q0042' };
+    await post({ message: 'Tell me about solicitation w912pl26q0042' });
+    expect(state.mentionLookups).toEqual(['solicitation_number:W912PL26Q0042', 'ilike:w912pl26q0042']);
+    expect(system(state.answerMessages[0])).toContain('MENTIONED OPPORTUNITY');
+  });
+
+  it('C1b T6: "email the contracting officer" two turns later keeps the contact from the earlier turn', async () => {
+    await post({
+      message: 'Email the contracting officer for me and ask for the drawings and the delivery schedule',
+      history: [
+        { role: 'user', content: 'Tell me about solicitation W912PL26Q0042' },
+        { role: 'assistant', content: 'W912PL26Q0042 is open.' },
+        { role: 'user', content: 'Add it to my pipeline' },
+        { role: 'assistant', content: 'Select Start pursuit on its map card.' },
+      ],
+    });
+    const sys = system(state.answerMessages[0]);
+    expect(sys).toContain('MENTIONED OPPORTUNITY');
+    expect(sys).toContain('jane.buyer@usace.army.mil');
+    expect(sys).toMatch(/address a draft to that contact and cite the solicitation number/);
+  });
+
+  it('context only: no card turn, no charge, the full tool set; the source is the SAM.gov notice, not a KB doc', async () => {
+    const { events } = await post({ message: 'What does W912PL26Q0042 require?' });
+    expect(claimCardTurn).not.toHaveBeenCalled();
+    expect(charges()).toBe(0);
+    expect(state.allowedToolNames).toBeNull();
+    const cites = events.find((e) => e.type === 'citations') as { sources?: Array<Record<string, unknown>> } | undefined;
+    expect(cites?.sources?.[0]).toMatchObject({ doc_type: 'sam_notice', url: 'https://sam.gov/opp/x/view', document_id: null, source_path: `sam_notice:${NID}` });
+  });
+
+  it('sticky chip: a notice from an EARLIER turn stays as context but is not cited when the answer did not use it', async () => {
+    state.answer = 'The top janitorial buyers in Florida are the VA and the Coast Guard.';
+    const { events } = await post({ message: 'Who are the top janitorial buyers in Florida?', history: [
+      { role: 'user', content: 'Tell me about solicitation W912PL26Q0042' }, { role: 'assistant', content: 'It is open.' },
+    ] });
+    expect(system(state.answerMessages[0])).toContain('MENTIONED OPPORTUNITY');
+    const cites = events.find((e) => e.type === 'citations') as { sources?: unknown[] } | undefined;
+    expect(cites?.sources).toEqual([]);
+    // The saved copy (what a reload shows) carries no chip either.
+    const rows = state.inserts.filter((i) => i.table === 'mindy_chat_messages').flatMap((i) => (Array.isArray(i.row) ? i.row : [i.row])) as Array<Record<string, unknown>>;
+    const assistant = rows.filter((r) => r.role === 'assistant');
+    expect(assistant.length).toBeGreaterThan(0);
+    expect(assistant.at(-1)!.cited_sources).toEqual([]);
+  });
+
+  it('sticky chip: an earlier-turn notice the answer DID use ("email the CO") keeps its SAM.gov chip', async () => {
+    state.answer = 'Here is a draft to jane.buyer@usace.army.mil about W912PL26Q0042.';
+    const { events } = await post({ message: 'Email the contracting officer for me', history: [
+      { role: 'user', content: 'Tell me about solicitation W912PL26Q0042' }, { role: 'assistant', content: 'It is open.' },
+    ] });
+    const cites = events.find((e) => e.type === 'citations') as { sources?: Array<Record<string, unknown>> } | undefined;
+    expect(cites?.sources?.[0]).toMatchObject({ doc_type: 'sam_notice' });
+  });
+
+  it('sticky chip pin: an ATTACHED notice keeps its chip even when the answer does not quote it', async () => {
+    state.answer = 'Plenty of small businesses bid on work like this.';
+    const { events } = await post({ message: 'Is this a good fit for a small business?', context: { kind: 'opportunity', notice_id: NID } });
+    const cites = events.find((e) => e.type === 'citations') as { sources?: Array<Record<string, unknown>> } | undefined;
+    expect(cites?.sources?.[0]).toMatchObject({ doc_type: 'sam_notice', source_path: `sam_notice:${NID}` });
+  });
+
+  it('sticky chip pin: a notice named in THIS message keeps its chip even when the answer does not quote it', async () => {
+    state.answer = 'Plenty of small businesses bid on work like this.';
+    const { events } = await post({ message: 'Is W912PL26Q0042 a good fit for a small business?' });
+    const cites = events.find((e) => e.type === 'citations') as { sources?: Array<Record<string, unknown>> } | undefined;
+    expect(cites?.sources?.[0]).toMatchObject({ doc_type: 'sam_notice' });
+  });
+
+  it('an id that appears only in an assistant answer never attaches a notice', async () => {
+    await post({ message: 'Which one should I start with?', history: [{ role: 'user', content: 'Find janitorial work' }, { role: 'assistant', content: 'Open now: W912PL26Q0042 …' }] });
+    expect(system(state.answerMessages[0])).not.toContain('MENTIONED OPPORTUNITY');
+    expect(state.mentionLookups).toEqual([]);
+  });
+
+  it('a number Mindy does not have: answered without a guessed record', async () => {
+    const { res } = await post({ message: 'Tell me about solicitation N0017426R9999' });
+    expect(res.status).toBe(200);
+    expect(system(state.answerMessages[0])).not.toContain('MENTIONED OPPORTUNITY');
+  });
+
+  it('a record read failure: answered without a block', async () => {
+    state.recordError = true;
+    await post({ message: 'Tell me about solicitation W912PL26Q0042' });
+    expect(system(state.answerMessages[0])).not.toContain('MENTIONED OPPORTUNITY');
+  });
+
+  it('an attached notice wins: the named-notice lookup does not run', async () => {
+    await post({ message: 'Compare it with W912PL26Q0042', context: { kind: 'opportunity', notice_id: NID } });
+    expect(system(state.answerMessages[0])).toContain('SELECTED OPPORTUNITY');
+    expect(state.mentionLookups).toEqual([]);
+  });
+
+  it('a free account naming a notice in plain chat is still refused (main chat stays Pro)', async () => {
+    state.pro = false;
+    const { res } = await post({ message: 'Tell me about solicitation W912PL26Q0042' });
+    expect(res.status).toBe(403);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('C2: answer first, AbilityOne by category, OSBP/OSDBU fallback', () => {
+  beforeEach(() => { state.pro = true; vi.stubEnv('MAP_CARD_CHAT_ENABLED', ''); });
+  const system = (msgs: Array<{ role: string; content: string }>) => msgs.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
+
+  it('the system prompt tells the model to answer first and to fall back to the agency small business office', async () => {
+    await post({ message: 'Who is the small business contact at the top one?' });
+    const sys = system(state.answerMessages[0]);
+    expect(sys).toContain('ANSWER FIRST.');
+    expect(sys).toMatch(/Never open with methodology/);
+    expect(sys).toMatch(/call search_federal_contacts for the office AND lookup_federal_osbp for its department in the same step/);
+    // Planner gets the same rule (it decides which tools run).
+    expect(system(state.plannerMessages[0])).toMatch(/lookup_federal_osbp for its department/);
+  });
+
+  it('a janitorial question carries the AbilityOne caveat to the answer model', async () => {
+    await post({ message: 'I run a small janitorial company in Florida. Which federal agencies should I target first, and why?' });
+    expect(system(state.answerMessages[0])).toContain('core AbilityOne Program category');
+  });
+
+  it('the follow-up that does not name the work does not repeat it', async () => {
+    await post({
+      message: 'Who is the small business contact at the top one?',
+      history: [{ role: 'user', content: 'I run a small janitorial company in Florida. Which agencies should I target?' }, { role: 'assistant', content: 'Start with VA NCO 8.' }],
+    });
+    expect(system(state.answerMessages[0])).not.toContain('AbilityOne Program category');
+  });
+
+  it('other work gets no AbilityOne caveat', async () => {
+    await post({ message: 'Which agencies buy HVAC services in Texas?' });
+    expect(system(state.answerMessages[0])).not.toContain('AbilityOne Program category');
   });
 });
