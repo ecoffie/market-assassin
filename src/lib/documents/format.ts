@@ -3,7 +3,7 @@
  * citation numbering and claim labels. Every renderer uses these so a DOCX and a PDF of the same
  * model say exactly the same thing.
  */
-import type { CellValue, Claim, ColumnFormat, DocModel, DocSource } from './model';
+import type { Block, CellValue, ChartBlock, Claim, ColumnFormat, DocModel, DocSource, TableBlock } from './model';
 import { labeledUnits } from './model';
 
 /** A missing value is "Not available", never 0 (CLAUDE.md: unknown ≠ zero). */
@@ -13,14 +13,8 @@ export function formatCell(v: CellValue, format: ColumnFormat = 'text'): string 
   if (v === null || v === undefined || (typeof v === 'string' && v.trim() === '')) return NOT_AVAILABLE;
   if (typeof v === 'string') return v;
   switch (format) {
-    case 'usd': {
-      const abs = Math.abs(v);
-      const sign = v < 0 ? '-' : '';
-      if (abs >= 1e9) return `${sign}$${(abs / 1e9).toFixed(abs >= 1e10 ? 1 : 2)}B`;
-      if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(abs >= 1e7 ? 1 : 2)}M`;
-      if (abs >= 1e3) return `${sign}$${Math.round(abs).toLocaleString('en-US')}`;
-      return `${sign}$${abs.toFixed(abs % 1 === 0 ? 0 : 2)}`;
-    }
+    case 'usd':
+      return formatUsd(v);
     case 'int':
       return Math.round(v).toLocaleString('en-US');
     case 'pct':
@@ -31,10 +25,43 @@ export function formatCell(v: CellValue, format: ColumnFormat = 'text'): string 
   }
 }
 
+/** Drop a trailing ".0" / ".00" so $30.0M reads $30M and $1.50B reads $1.5B. */
+const trimZeros = (x: string) => x.replace(/\.0+$/, '').replace(/(\.\d*[1-9])0+$/, '$1');
+
+/** Client-ready dollars: $1.93B · $412.5M · $5.25M · $850K · $12.5K · $31.40. Never a raw 412500000. */
+export function formatUsd(v: number): string {
+  const abs = Math.abs(v);
+  const sign = v < 0 ? '-' : '';
+  if (abs >= 1e9) return `${sign}$${trimZeros((abs / 1e9).toFixed(abs >= 1e10 ? 1 : 2))}B`;
+  if (abs >= 1e6) return `${sign}$${trimZeros((abs / 1e6).toFixed(abs >= 1e7 ? 1 : 2))}M`;
+  if (abs >= 1e3) return `${sign}$${trimZeros((abs / 1e3).toFixed(abs >= 1e5 ? 0 : 1))}K`;
+  return `${sign}$${abs.toFixed(abs % 1 === 0 ? 0 : 2)}`;
+}
+
+/** A chart value in the chart's declared format; with none, large numbers still get separators. */
+export function formatChartValue(v: number, format?: 'usd' | 'int' | 'pct'): string {
+  if (format === 'usd') return formatUsd(v);
+  if (format === 'pct') return `${trimZeros((v * 100).toFixed(1))}%`;
+  if (format === 'int' || Math.abs(v) >= 1e4) return Math.round(v).toLocaleString('en-US');
+  return Number.isInteger(v) ? String(v) : v.toFixed(1);
+}
+
+/**
+ * Prose safety net: a raw "$412500000" becomes "$412.5M" and a bare run of 7+ digits gets
+ * separators (30000000 → 30,000,000). Leaves years, NAICS codes (6 digits), already-separated
+ * numbers, decimals and anything glued to letters or hyphens (PIIDs, UEIs, IDs) alone.
+ */
+export function formatProseNumbers(text: string): string {
+  return text
+    .replace(/\$(\d{4,})(?![\d,.]*\d)/g, (_m, d: string) => formatUsd(Number(d)))
+    .replace(/(?<![\w$.,-])(\d{7,})(?![\w.,-]*\d|[A-Za-z-])/g, (_m, d: string) => Number(d).toLocaleString('en-US'));
+}
+
 export type InlineRun = { text: string; bold?: boolean; italic?: boolean };
 
 /** Parse the only inline emphasis the model allows: **bold** and _italic_. Everything else is literal. */
-export function parseInline(text: string): InlineRun[] {
+export function parseInline(raw: string): InlineRun[] {
+  const text = formatProseNumbers(raw);
   const runs: InlineRun[] = [];
   const re = /(\*\*([^*]+)\*\*|(?<![\w])_([^_]+)_(?![\w]))/g;
   let last = 0;
@@ -128,4 +155,23 @@ export function formatDocDate(iso: string): string {
 export function fileBaseName(title: string): string {
   const base = title.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
   return base || 'Mindy-document';
+}
+
+/**
+ * Does an adjacent table already show every value this chart plots? True when, for every series
+ * point, some row has the point's category in a text cell and its value in a number cell. Used by
+ * the DOCX renderer (which draws a chart as a data table) to avoid printing the same numbers twice.
+ */
+export function chartDuplicatesTable(chart: ChartBlock, table: TableBlock): boolean {
+  return chart.series.every((s) => s.points.every((p) => table.rows.some((r) => {
+    const vals = Object.values(r);
+    return vals.some((v) => typeof v === 'string' && v.trim() === p.x.trim()) && vals.some((v) => typeof v === 'number' && v === p.y);
+  })));
+}
+
+/** The chart at `i` duplicates the table directly before or after it in the same section. */
+export function chartShownByAdjacentTable(blocks: Block[], i: number): boolean {
+  const b = blocks[i];
+  if (!b || b.type !== 'chart') return false;
+  return [blocks[i - 1], blocks[i + 1]].some((n) => n?.type === 'table' && chartDuplicatesTable(b, n));
 }

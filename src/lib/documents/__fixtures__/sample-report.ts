@@ -41,11 +41,6 @@ const expiring: TableBlock['rows'] = Array.from({ length: 16 }, (_, i) => ({
   ends: `2027-${String((i % 12) + 1).padStart(2, '0')}-28`,
 }));
 
-const longText = (topic: string) =>
-  `This section summarizes ${topic} from the research gathered in the conversation. ` +
-  'The figures are drawn from the cited records and are reported as recorded; where a value was not available in the source it is shown as "Not available" rather than as zero. ' +
-  'Readers should treat the numbered citations as the authority for every stated fact, and should read statements labeled as assumptions or recommendations as Mindy\'s analysis, not as recorded data.';
-
 export const SAMPLE_REPORT: DocModel = {
   schema: DOC_SCHEMA,
   title: 'Federal Janitorial Services Market — Research Report (Fixture)',
@@ -81,14 +76,14 @@ export const SAMPLE_REPORT: DocModel = {
       id: 'market',
       heading: 'Market size and trend',
       blocks: [
-        { type: 'paragraph', id: 'market-p1', claim: 'fact', cites: ['s1'], text: longText('the size and direction of the market') },
+        { type: 'paragraph', id: 'market-p1', claim: 'fact', cites: ['s1'], text: 'Quarterly obligations rose across the period, with a spike in the fourth quarter of each fiscal year.' },
         {
-          type: 'chart', id: 'market-c1', kind: 'line', caption: 'Quarterly obligations, illustrative ($)', claim: 'fact', cites: ['s1'], yLabel: 'Obligations',
+          type: 'chart', id: 'market-c1', kind: 'line', caption: 'Quarterly obligations, illustrative', claim: 'fact', cites: ['s1'], xLabel: 'Fiscal quarter', yLabel: 'Obligations', valueFormat: 'usd',
           series: [{ name: 'Obligations', points: ['FY24 Q1', 'FY24 Q2', 'FY24 Q3', 'FY24 Q4', 'FY25 Q1', 'FY25 Q2', 'FY25 Q3', 'FY25 Q4', 'FY26 Q1', 'FY26 Q2', 'FY26 Q3', 'FY26 Q4'].map((x, i) => ({ x, y: Math.round((140 + i * 6 + (i % 4 === 3 ? 40 : 0)) * 1_000_000) })) }],
         },
         { type: 'paragraph', id: 'market-p2', claim: 'assumption', origin: 'This is Mindy\'s reading of the monthly pattern above, not a forecast from the agencies.', text: 'Fourth-quarter spikes suggest year-end buying; expect the largest award volume in July through September.' },
         {
-          type: 'chart', id: 'market-c2', kind: 'pie', caption: 'Obligations by set-aside type, illustrative', claim: 'fact', cites: ['s1'],
+          type: 'chart', id: 'market-c2', kind: 'pie', caption: 'Obligations by set-aside type, illustrative (% of obligations)', claim: 'fact', cites: ['s1'], xLabel: 'Set-aside type',
           series: [{ name: 'Share', points: [{ x: 'Small business', y: 41 }, { x: 'Full and open', y: 27 }, { x: '8(a)', y: 13 }, { x: 'SDVOSB', y: 10 }, { x: 'HUBZone', y: 6 }, { x: 'WOSB', y: 3 }] }],
         },
       ],
@@ -97,7 +92,7 @@ export const SAMPLE_REPORT: DocModel = {
       id: 'buyers',
       heading: 'Who buys',
       blocks: [
-        { type: 'paragraph', id: 'buyers-p1', claim: 'fact', cites: ['s1'], text: longText('the departments that buy these services') },
+        { type: 'paragraph', id: 'buyers-p1', claim: 'fact', cites: ['s1'], text: 'Fifteen departments bought these services. Veterans Affairs, the Army and the Navy account for about half of all obligations.' },
         {
           type: 'table', id: 'buyers-t1', caption: 'Obligations by department, FY2024–FY2026 (illustrative)', claim: 'fact', cites: ['s1'],
           columns: [
@@ -109,7 +104,7 @@ export const SAMPLE_REPORT: DocModel = {
           rows: agencies,
         },
         {
-          type: 'chart', id: 'buyers-c1', kind: 'bar', caption: 'Top departments by obligations, illustrative', claim: 'fact', cites: ['s1'],
+          type: 'chart', id: 'buyers-c1', kind: 'bar', caption: 'Top departments by obligations, illustrative', claim: 'fact', cites: ['s1'], xLabel: 'Department', valueFormat: 'usd',
           series: [{ name: 'Obligations', points: agencies.slice(0, 8).map((r) => ({ x: String(r.agency), y: Number(r.obligations) })) }],
         },
       ],
@@ -118,7 +113,7 @@ export const SAMPLE_REPORT: DocModel = {
       id: 'competition',
       heading: 'Competition',
       blocks: [
-        { type: 'paragraph', id: 'comp-p1', claim: 'fact', cites: ['s1'], text: longText('the firms that win this work') },
+        { type: 'paragraph', id: 'comp-p1', claim: 'fact', cites: ['s1'], text: 'Eighteen firms account for the largest share of obligations; most hold a small-business or socioeconomic designation.' },
         {
           type: 'table', id: 'comp-t1', caption: 'Leading vendors by obligations (illustrative)', claim: 'fact', cites: ['s1'],
           columns: [
@@ -151,7 +146,7 @@ export const SAMPLE_REPORT: DocModel = {
           rows: expiring,
         },
         {
-          type: 'chart', id: 'pipe-c1', kind: 'bar', caption: 'Expiring value by agency, illustrative', claim: 'fact', cites: ['s3'],
+          type: 'chart', id: 'pipe-c1', kind: 'bar', caption: 'Expiring value by agency, illustrative', claim: 'fact', cites: ['s3'], xLabel: 'Agency', valueFormat: 'usd',
           series: [
             { name: 'Next 6 months', points: ['VA', 'Army', 'Navy', 'GSA', 'Air Force'].map((x, i) => ({ x, y: (30 - i * 4) * 1_000_000 })) },
             { name: '6–12 months', points: ['VA', 'Army', 'Navy', 'GSA', 'Air Force'].map((x, i) => ({ x, y: (22 - i * 3) * 1_000_000 })) },
@@ -190,7 +185,7 @@ export const SAMPLE_REPORT: DocModel = {
             { claim: 'recommendation', text: 'Pursue teaming with an 8(a) or SDVOSB firm for set-asides you cannot bid directly.' },
           ],
         },
-        { type: 'paragraph', id: 'rec-p1', claim: 'fact', cites: ['s1'], text: longText('the recommended next steps and their rationale') },
+        { type: 'paragraph', id: 'rec-p1', claim: 'fact', cites: ['s1'], text: 'The recommended offices are the three largest buyers by obligations in the period covered.' },
       ],
     },
     {
@@ -198,7 +193,7 @@ export const SAMPLE_REPORT: DocModel = {
       heading: 'Method and limitations',
       role: 'about',
       blocks: [
-        { type: 'paragraph', id: 'method-p1', claim: 'context', text: 'This report was assembled by Mindy from the research in one conversation. Facts are taken from the cited sources as recorded. Assumptions are premises stated by the author and are labeled. Recommendations are suggested actions and are labeled.' },
+        { type: 'paragraph', id: 'method-p1', claim: 'context', text: 'This report was assembled by Mindy from the research in one conversation. Facts are taken from the cited sources as recorded, and a value missing from a source is shown as Not available rather than as zero. Assumptions are premises stated for this analysis and are labeled. Recommendations are suggested actions and are labeled.' },
         { type: 'paragraph', id: 'method-p2', claim: 'context', text: 'Coverage is limited to the sources listed. A department or vendor absent from a table may still buy or sell these services under a different classification.' },
       ],
     },

@@ -43,5 +43,5 @@ export async function renderDocument(input: unknown, format: DocFormat): Promise
 }
 
 export type { DocModel } from './model';
-export { validateDocModel, demoteUncitedFacts } from './validate';
+export { validateDocModel, demoteUncitedFacts, fixtureMarkers } from './validate';
 export { DOC_HTML_CSP } from './render-html';

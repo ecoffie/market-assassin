@@ -71,7 +71,10 @@ td { padding: 5px 8px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
 tbody tr:nth-child(even) td { background: #f8fafc; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 td.na { color: #9ca3af; font-style: italic; }
-.caption { font-size: 8.5pt; color: #6b7280; margin: 2px 0 14px; }
+.caption { font-size: 8.5pt; color: #6b7280; margin: 12px 0 4px; break-after: avoid; }
+.tablewrap { margin: 0 0 14px; }
+th.num, td.num { white-space: nowrap; }
+th { white-space: nowrap; }
 figure { margin: 10px 0 14px; break-inside: avoid; }
 .callout { border-left: 4px solid #1e3a8a; background: #eef2ff; padding: 10px 14px; margin: 10px 0 14px; border-radius: 0 6px 6px 0; break-inside: avoid; }
 .callout.warning { border-color: #b45309; background: #fffbeb; }
@@ -107,7 +110,7 @@ function tableHtml(b: TableBlock, marker: string): string {
       .join('')}</tr>`)
     .join('');
   const cap = [labelChip(b.claim), b.caption ? inline(b.caption) : '', marker ? `<sup class="cite">${marker}</sup>` : ''].filter(Boolean).join(' ') + originHtml(b);
-  return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>${cap ? `<div class="caption">${cap}</div>` : ''}`;
+  return `<div class="tablewrap">${cap ? `<div class="caption">${cap}</div>` : ''}<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
 }
 
 function blockHtml(b: Block, numberOf: (id: string) => number | null): string {
@@ -127,7 +130,7 @@ function blockHtml(b: Block, numberOf: (id: string) => number | null): string {
       return tableHtml(b, citeMarker(b.cites, numberOf));
     case 'chart': {
       const cap = [labelChip(b.claim), b.caption ? inline(b.caption) : '', sup(b.cites)].filter(Boolean).join(' ') + originHtml(b);
-      return `<figure>${chartToSvg(b)}${cap ? `<figcaption class="caption">${cap}</figcaption>` : ''}</figure>`;
+      return `<figure>${cap ? `<figcaption class="caption">${cap}</figcaption>` : ''}${chartToSvg(b)}</figure>`;
     }
     case 'callout': {
       const title = b.tone === 'key_finding' ? 'Key finding' : b.tone === 'warning' ? 'Caution' : 'Note';

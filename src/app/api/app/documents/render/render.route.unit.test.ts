@@ -38,7 +38,15 @@ function req(body: unknown, headers: Record<string, string> = {}) {
     method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: typeof body === 'string' ? body : JSON.stringify(body),
   }) as never;
 }
-const ok = (format: string, model: unknown = SAMPLE_REPORT) => req({ email: 'User@Example.com', format, model });
+/** The fixture with its test markers removed — what a real, non-fixture document looks like to the route. */
+const REAL = (() => {
+  const m = JSON.parse(JSON.stringify(SAMPLE_REPORT));
+  m.title = 'Federal Janitorial Services Market — Research Report';
+  m.meta = { generatedBy: 'ask_mindy', version: 1 };
+  m.sources = m.sources.map((s: { url?: string; label: string }, i: number) => ({ ...s, label: s.label.replace(/\s*\(fixture\)/i, ''), ...(s.url ? { url: `https://www.usaspending.gov/search/${i}` } : {}) }));
+  return m;
+})();
+const ok = (format: string, model: unknown = REAL) => req({ email: 'User@Example.com', format, model });
 
 beforeEach(() => {
   state.authOk = true; state.pro = true; state.proChecked = [];
@@ -67,7 +75,7 @@ describe('POST /api/app/documents/render', () => {
   });
 
   it('validates the model server-side (facts must cite) → 422 with issues', async () => {
-    const bad = JSON.parse(JSON.stringify(SAMPLE_REPORT));
+    const bad = JSON.parse(JSON.stringify(REAL));
     bad.sections[0].blocks[0].cites = [];
     const res = await POST(ok('pdf', bad));
     expect(res.status).toBe(422);
@@ -76,11 +84,22 @@ describe('POST /api/app/documents/render', () => {
     expect(JSON.stringify(j.issues)).toMatch(/a fact must cite/);
   });
 
+  it('fixture content never becomes a customer document: the test fixture and example.com sources are refused', async () => {
+    const res = await POST(ok('docx', SAMPLE_REPORT));
+    expect(res.status).toBe(422);
+    const j = await res.json();
+    expect(j.error).toBe('fixture_content');
+    expect(JSON.stringify(j.issues)).toMatch(/fixture/);
+    const sneaky = JSON.parse(JSON.stringify(REAL));
+    sneaky.sources[0].url = 'https://sub.example.org/data';
+    expect((await POST(ok('pdf', sneaky))).status).toBe(422);
+  });
+
   it('returns a real DOCX attachment', async () => {
     const res = await POST(ok('docx'));
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    expect(res.headers.get('content-disposition')).toBe('attachment; filename="Federal-Janitorial-Services-Market-Research-Report-Fixture.docx"');
+    expect(res.headers.get('content-disposition')).toBe('attachment; filename="Federal-Janitorial-Services-Market-Research-Report.docx"');
     expect(res.headers.get('cache-control')).toBe('private, no-store');
     const bytes = Buffer.from(await res.arrayBuffer());
     expect(bytes.subarray(0, 2).toString()).toBe('PK');

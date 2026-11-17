@@ -180,6 +180,30 @@ export function hardenedAssumptions(prev: DocModel, next: DocModel): string[] {
   return out;
 }
 
+// ── No per-section boilerplate (Eric, 2026-11-17) ────────────────────────────────────────────────
+// Method text belongs ONCE, in the 'about' section ("Method and limitations"); claim-specific
+// qualifications stay next to their claims. A long sentence repeated in two or more blocks is
+// boilerplate: the validator refuses it and demotion keeps only the first occurrence.
+const BOILERPLATE_MIN_CHARS = 60;
+const sentencesOf = (t: string) => t.replace(/\*\*|_/g, '').split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter(Boolean);
+const sentenceKey = (x: string) => x.replace(/\s+/g, ' ').toLowerCase();
+
+/** Long sentences that appear in more than one block (block ids in reading order). */
+export function repeatedSentences(model: DocModel): Array<{ sentence: string; where: string[] }> {
+  const seen = new Map<string, { sentence: string; where: string[] }>();
+  for (const sec of model.sections) for (const b of sec.blocks) for (const u of labeledUnits(b)) {
+    if (b.type === 'table' || b.type === 'chart') continue;
+    for (const x of new Set(sentencesOf(u.text))) {
+      if (x.length < BOILERPLATE_MIN_CHARS) continue;
+      const k = sentenceKey(x);
+      const e = seen.get(k) ?? { sentence: x, where: [] };
+      e.where.push(u.where);
+      seen.set(k, e);
+    }
+  }
+  return [...seen.values()].filter((e) => e.where.length > 1);
+}
+
 /** Must this unit cite a source, given its label? (recommendation: any figure; assumption: a factual claim) */
 function labelNeedsSource(claim: string | undefined, text: string): boolean {
   if (claim === 'recommendation') return statesFigure(text);
@@ -364,6 +388,11 @@ export function validateDocModel(input: unknown): ValidationResult {
     });
   }
   if (blockCount > DOC_LIMITS.maxBlocks) add('sections', `more than ${DOC_LIMITS.maxBlocks} blocks`);
+  if (Array.isArray((input as { sections?: unknown }).sections) && issues.length === 0) {
+    for (const r of repeatedSentences(input as unknown as DocModel)) {
+      add('sections', `repeated boilerplate in ${r.where.join(', ')}: "${r.sentence.slice(0, 80)}${r.sentence.length > 80 ? '…' : ''}" — state method text once in the 'about' section and keep qualifications next to their claims`);
+    }
+  }
   if (chars > DOC_LIMITS.maxTotalChars) add('sections', `more than ${DOC_LIMITS.maxTotalChars} characters of content`);
 
   return issues.length ? { ok: false, issues } : { ok: true, model: input as unknown as DocModel };
@@ -430,7 +459,32 @@ export function demoteUncitedFacts(model: DocModel): DemotionResult {
     const { origin: _origin, ...rest } = withoutCites(u);
     return { ...rest, claim: 'unverified' } as T;
   };
-  const sections = model.sections.map((sec) => ({
+  // Per-section boilerplate: keep the first occurrence of a repeated long sentence, drop the rest.
+  const firstSeen = new Set<string>();
+  const dedupe = <T extends { text?: string }>(u: T): T | null => {
+    if (typeof u.text !== 'string') return u;
+    const kept = sentencesOf(u.text).filter((x) => {
+      if (x.length < BOILERPLATE_MIN_CHARS) return true;
+      const k = sentenceKey(x);
+      if (firstSeen.has(k)) return false;
+      firstSeen.add(k);
+      return true;
+    });
+    if (!kept.length) return null;
+    return kept.join(' ') === sentencesOf(u.text).join(' ') ? u : { ...u, text: kept.join(' ') };
+  };
+  const deduped = model.sections.map((sec) => ({
+    ...sec,
+    blocks: sec.blocks.flatMap((b): Block[] => {
+      if (b.type === 'bullets') {
+        const items = b.items.map((it) => dedupe(it)).filter((it): it is NonNullable<typeof it> => it !== null);
+        return items.length ? [{ ...b, items }] : [];
+      }
+      if (b.type === 'paragraph' || b.type === 'callout') { const d = dedupe(b); return d ? [d as Block] : []; }
+      return [b];
+    }),
+  }));
+  const sections = deduped.map((sec) => ({
     ...sec,
     blocks: sec.blocks.flatMap((b): Block[] => {
       const about = sec.role === 'about';
@@ -444,4 +498,22 @@ export function demoteUncitedFacts(model: DocModel): DemotionResult {
     }),
   }));
   return { model: { ...model, sections }, unverified, omitted, droppedCites };
+}
+
+/**
+ * Test-fixture content must never reach a customer document. The fixture marks itself
+ * (meta.generatedBy 'fixture', "(fixture)" labels) and every reserved example domain (RFC 2606:
+ * example.com/.net/.org) is a test-only address. Production entry points refuse a model carrying
+ * any of these (the render route; the generate tool will call the same predicate).
+ */
+export function fixtureMarkers(model: unknown): string[] {
+  const found: string[] = [];
+  const m = model as { meta?: { generatedBy?: unknown }; title?: unknown; sources?: Array<{ url?: unknown; label?: unknown }> };
+  if (m?.meta?.generatedBy === 'fixture') found.push('meta.generatedBy is "fixture"');
+  if (typeof m?.title === 'string' && /\(fixture\)/i.test(m.title)) found.push('title is marked (fixture)');
+  for (const src of Array.isArray(m?.sources) ? m.sources : []) {
+    if (typeof src?.url === 'string' && /^https?:\/\/(?:[\w-]+\.)*example\.(?:com|net|org)(?:[/:?#]|$)/i.test(src.url)) found.push(`source url ${src.url}`);
+    if (typeof src?.label === 'string' && /\(fixture\)/i.test(src.label)) found.push(`source "${src.label}"`);
+  }
+  return found;
 }

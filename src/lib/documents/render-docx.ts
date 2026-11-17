@@ -32,7 +32,7 @@ import {
   WidthType,
 } from 'docx';
 import type { Block, ChartBlock, DocModel, TableBlock, TableColumn } from './model';
-import { assumptionOrigin, citationIndex, citeMarker, claimLabel, claimsPresent, formatCell, formatDocDate, parseInline, unverifiedStatements } from './format';
+import { assumptionOrigin, chartShownByAdjacentTable, citationIndex, citeMarker, claimLabel, claimsPresent, formatCell, formatChartValue, formatDocDate, parseInline, unverifiedStatements } from './format';
 
 const NAVY = '1E3A8A';
 const INK = '1F2937';
@@ -95,17 +95,24 @@ function bodyCell(text: string, opts: { right: boolean; na: boolean; zebra: bool
   });
 }
 
-/** Fixed column widths: text columns get twice the share of number columns. */
-function columnWidths(columns: TableColumn[]): number[] {
-  const weights = columns.map((c) => (isNumCol(c) ? 1 : 2));
-  const total = weights.reduce((a, b) => a + b, 0);
-  const widths = weights.map((w) => Math.floor((CONTENT_DXA * w) / total));
+/**
+ * Content-aware column widths: each column gets room for its longest cell (header included, capped so
+ * one long value cannot starve the rest), so a vendor name does not wrap while a 7-character dollar
+ * figure does not hog a third of the page. Number columns keep a floor so they never wrap.
+ */
+function columnWidths(columns: TableColumn[], rows: TableBlock['rows']): number[] {
+  const want = columns.map((c) => {
+    const longest = Math.max(c.label.length, ...rows.map((r) => formatCell(r[c.key] ?? null, c.format).length));
+    return isNumCol(c) ? Math.min(Math.max(longest, 8), 16) : Math.min(Math.max(longest, 6), 42);
+  });
+  const total = want.reduce((a, b) => a + b, 0);
+  const widths = want.map((w) => Math.floor((CONTENT_DXA * w) / total));
   widths[widths.length - 1] += CONTENT_DXA - widths.reduce((a, b) => a + b, 0);
   return widths;
 }
 
 function table(columns: TableColumn[], rows: TableBlock['rows']): Table {
-  const widths = columnWidths(columns);
+  const widths = columnWidths(columns, rows);
   return new Table({
     width: { size: CONTENT_DXA, type: WidthType.DXA },
     columnWidths: widths,
@@ -126,6 +133,7 @@ function caption(text: string | undefined, claim: string | undefined, cites: str
   if (!text && !claimLabel(claim as never) && !citeMarker(cites, numberOf) && !prefix) return null;
   return new Paragraph({
     style: 'Caption',
+    keepNext: true,
     children: [
       ...labelRun(claim),
       ...(prefix ? [new TextRun({ font: FONT, text: prefix, italics: true, size: 17, color: MUTED })] : []),
@@ -136,19 +144,25 @@ function caption(text: string | undefined, claim: string | undefined, cites: str
   });
 }
 
+/** Space after a table (the caption now sits above it). */
+function spacer(): Paragraph {
+  return new Paragraph({ spacing: { before: 0, after: 160 }, children: [] });
+}
+
 function chartAsTable(b: ChartBlock): Table {
-  // Axis titles become the column headers, so the data table says what each column measures.
+  // One compact, formatted table: axis titles become headers, values read like the rest of the
+  // document ($30M, 1,234), never raw (30000000).
   const valueHeader = (name: string) => (b.yLabel && b.series.length === 1 ? `${name} (${b.yLabel})` : name);
   const columns: TableColumn[] = [{ key: 'x', label: b.xLabel || 'Category' }, ...b.series.map((s, i) => ({ key: `s${i}`, label: valueHeader(s.name), align: 'right' as const }))];
   const rows = b.series[0].points.map((p, pi) => {
     const row: Record<string, string | number | null> = { x: p.x };
-    b.series.forEach((s, si) => { row[`s${si}`] = s.points[pi]?.y ?? null; });
+    b.series.forEach((s, si) => { const y = s.points[pi]?.y; row[`s${si}`] = y === undefined || y === null ? null : formatChartValue(y, b.valueFormat); });
     return row;
   });
   return table(columns, rows);
 }
 
-function blockToDocx(b: Block, numberOf: Numberer): (Paragraph | Table)[] {
+function blockToDocx(b: Block, numberOf: Numberer, shownByAdjacentTable = false): (Paragraph | Table)[] {
   switch (b.type) {
     case 'paragraph':
       return [new Paragraph({ style: 'Body', children: [...labelRun(b.claim), ...runs(b.text), ...citeRun(b.cites, numberOf), ...originRun(b)] })];
@@ -160,11 +174,14 @@ function blockToDocx(b: Block, numberOf: Numberer): (Paragraph | Table)[] {
       }));
     case 'table': {
       const cap = caption(b.caption, b.claim, b.cites, numberOf, undefined, b.origin);
-      return [table(b.columns, b.rows), ...(cap ? [cap] : [])];
+      return [...(cap ? [cap] : []), table(b.columns, b.rows), spacer()];
     }
     case 'chart': {
-      const cap = caption(b.caption, b.claim, b.cites, numberOf, 'Chart data. ', b.origin);
-      return [chartAsTable(b), ...(cap ? [cap] : [])];
+      // Word has no native chart here, so a chart is its data. When the adjacent table already shows
+      // every value, printing it again is duplication: omit it (the table carries the information).
+      if (shownByAdjacentTable) return [];
+      const cap = caption(b.caption, b.claim, b.cites, numberOf, undefined, b.origin);
+      return [...(cap ? [cap] : []), chartAsTable(b), spacer()];
     }
     case 'callout': {
       const title = b.tone === 'key_finding' ? 'KEY FINDING' : b.tone === 'warning' ? 'CAUTION' : 'NOTE';
@@ -234,7 +251,7 @@ export function buildDocx(model: DocModel): Document {
   for (const s of model.sections) {
     const heading = s.level === 3 ? HeadingLevel.HEADING_3 : s.level === 2 ? HeadingLevel.HEADING_2 : HeadingLevel.HEADING_1;
     children.push(new Paragraph({ heading, children: [new TextRun({ font: FONT, text: s.heading })] }));
-    for (const b of s.blocks) children.push(...blockToDocx(b, numberOf));
+    s.blocks.forEach((b, i) => children.push(...blockToDocx(b, numberOf, chartShownByAdjacentTable(s.blocks, i))));
   }
 
   // Unverified statements
@@ -278,7 +295,7 @@ export function buildDocx(model: DocModel): Document {
       },
       paragraphStyles: [
         { id: 'Body', name: 'Body', basedOn: 'Normal', run: { font: FONT, size: 21 }, paragraph: { spacing: { after: 140, line: 288 } } },
-        { id: 'Caption', name: 'Caption', basedOn: 'Normal', run: { font: FONT, size: 17, color: MUTED }, paragraph: { spacing: { before: 60, after: 220 } } },
+        { id: 'Caption', name: 'Caption', basedOn: 'Normal', run: { font: FONT, size: 17, color: MUTED }, paragraph: { spacing: { before: 160, after: 80 }, keepNext: true } },
       ],
     },
     numbering: {

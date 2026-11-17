@@ -17,8 +17,8 @@ vi.mock('@/lib/pdf/launch-browser', () => ({
 
 import { SAMPLE_REPORT } from './__fixtures__/sample-report';
 import { DOC_SCHEMA, type DocModel } from './model';
-import { validateDocModel, demoteUncitedFacts, hardenedAssumptions, DEFAULT_ASSUMPTION_ORIGIN } from './validate';
-import { citationIndex, citeMarker, formatCell, parseInline, NOT_AVAILABLE, fileBaseName } from './format';
+import { validateDocModel, demoteUncitedFacts, hardenedAssumptions, DEFAULT_ASSUMPTION_ORIGIN, repeatedSentences, fixtureMarkers } from './validate';
+import { citationIndex, citeMarker, formatCell, formatChartValue, chartDuplicatesTable, parseInline, NOT_AVAILABLE, fileBaseName } from './format';
 import { renderHtml } from './render-html';
 import { renderDocx } from './render-docx';
 import { renderPdf, pdfOptions } from './render-pdf';
@@ -458,6 +458,74 @@ describe('validateDocModel', () => {
   });
 });
 
+describe('client-ready numbers (Eric, 2026-11-17)', () => {
+  it('dollars read $1.93B · $412.5M · $30M · $850K; never raw', () => {
+    expect([1_930_000_000, 1_200_000_000, 412_500_000, 30_000_000, 5_250_000, 850_000, 12_500, 31.4].map((v) => formatCell(v, 'usd')))
+      .toEqual(['$1.93B', '$1.2B', '$412.5M', '$30M', '$5.25M', '$850K', '$12.5K', '$31.40']);
+    expect(formatCell(0.214, 'pct')).toBe('21.4%');
+    expect(formatCell(1234567, 'int')).toBe('1,234,567');
+  });
+
+  it('prose: a raw $412500000 or 30000000 is normalized; codes, years and IDs are left alone', () => {
+    expect(parseInline('Obligations were $412500000 and 30000000 units.').map((r) => r.text).join('')).toBe('Obligations were $412.5M and 30,000,000 units.');
+    for (const keep of ['NAICS 561720 in FY2026 and 2027.', 'W912PL21C0001 and EX-FIXTURE-1001', 'UEI ABC1234567890', '$1,930,000,000', '$27–$36 per hour']) {
+      expect(parseInline(keep).map((r) => r.text).join('')).toBe(keep);
+    }
+  });
+
+  it('chart values in a data table use the chart format; without one, large numbers still get separators', () => {
+    expect(formatChartValue(30_000_000, 'usd')).toBe('$30M');
+    expect(formatChartValue(30_000_000)).toBe('30,000,000');
+    expect(formatChartValue(41)).toBe('41');
+  });
+});
+
+describe('no per-section boilerplate (Eric, 2026-11-17)', () => {
+  const boiler = 'The figures are drawn from the cited records and are reported as recorded without adjustment.';
+  const m = () => tiny({ sections: [
+    { id: 'a', heading: 'A', blocks: [{ type: 'paragraph', id: 'p1', text: `First point. ${boiler}`, claim: 'fact', cites: ['s1'] }] },
+    { id: 'b', heading: 'B', blocks: [{ type: 'paragraph', id: 'p2', text: `Second point. ${boiler}`, claim: 'fact', cites: ['s1'] }, { type: 'paragraph', id: 'p3', text: boiler, claim: 'fact', cites: ['s1'] }] },
+  ] });
+
+  it('a long sentence repeated across blocks is refused', () => {
+    expect(issuesOf(m()).join(' ')).toMatch(/repeated boilerplate in p1, p2, p3/);
+  });
+
+  it('demotion keeps the first occurrence only (a block left empty is dropped)', () => {
+    const d = demoteUncitedFacts(m());
+    const texts = d.model.sections.flatMap((s) => s.blocks.map((b) => (b as { text: string }).text));
+    expect(texts).toEqual([`First point. ${boiler}`, 'Second point.']);
+    expect(issuesOf(d.model)).toEqual([]);
+  });
+
+  it('the fixture report no longer repeats its method paragraph', () => {
+    expect(repeatedSentences(SAMPLE_REPORT)).toEqual([]);
+  });
+});
+
+describe('fixture safeguard', () => {
+  it('the fixture identifies itself, and only tests and the local render script import it', () => {
+    expect(fixtureMarkers(SAMPLE_REPORT).length).toBeGreaterThan(0);
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const p = join(dir, name);
+        if (statSync(p).isDirectory()) { if (name !== 'node_modules') walk(p); continue; }
+        if (!/\.(ts|tsx|js|mjs)$/.test(name) || /\.test\.|__fixtures__/.test(p)) continue;
+        if (/__fixtures__\/sample-report|sample-report['"]/.test(readFileSync(p, 'utf8'))) offenders.push(p);
+      }
+    };
+    walk(join(process.cwd(), 'src'));
+    expect(offenders).toEqual([]);
+  });
+
+  it('example.com sources and "(fixture)" labels are fixture markers; a real source is not', () => {
+    expect(fixtureMarkers({ sources: [{ url: 'https://www.example.com/x', label: 'x' }] })).toHaveLength(1);
+    expect(fixtureMarkers({ sources: [{ url: 'https://www.usaspending.gov/x', label: 'USAspending award data' }] })).toEqual([]);
+    expect(fixtureMarkers({ sources: [{ url: 'https://notexample.com/x', label: 'x' }] })).toEqual([]);
+  });
+});
+
 describe('format helpers', () => {
   it('a missing value is "Not available", never 0', () => {
     expect(formatCell(null, 'usd')).toBe(NOT_AVAILABLE);
@@ -623,8 +691,52 @@ describe('render-docx', () => {
     expect(doc).not.toContain('ESTIMATE');
     expect(doc).toContain('RECOMMENDATION');
     expect(doc).toContain(NOT_AVAILABLE);
-    expect(doc).toContain('Chart data.');
+    // Eric's review (2026-11-17): no duplicate chart-data table, nothing raw, captions above tables.
+    expect(doc).not.toContain('Chart data.');
+    expect(doc).not.toMatch(/>(?:412500000|30000000|301200000|22000000)</);
+    expect(doc).toContain('>$412.5M<');
+    expect(doc).toContain('>$30M<');
   });
+
+  it('DOCX: a chart whose values an adjacent table already shows is omitted; any other chart is ONE formatted table', async () => {
+    const doc = strFromU8(unzipSync(new Uint8Array(await renderDocx(SAMPLE_REPORT)))['word/document.xml']);
+    // "Who buys": the department table shows every plotted value → the bar chart adds nothing in Word.
+    expect(doc).not.toContain('Top departments by obligations, illustrative');
+    expect(doc.match(/Obligations by department, FY2024–FY2026/g)).toHaveLength(1);
+    // "Upcoming recompetes": the per-agency chart is NOT in the contract table → kept, formatted.
+    expect(doc).toContain('Expiring value by agency, illustrative');
+    expect(doc.indexOf('Expiring value by agency')).toBeLessThan(doc.indexOf('>Next 6 months<')); // caption ABOVE its table
+    expect(doc).toContain('>Agency<');
+    expect(doc).toContain('>$22M<');
+  });
+
+  it('chartDuplicatesTable: only when EVERY plotted value is in the table', () => {
+    const t = { type: 'table', id: 't', columns: [{ key: 'a', label: 'A' }, { key: 'v', label: 'V', format: 'usd' }], rows: [{ a: 'X', v: 5 }, { a: 'Y', v: 7 }] } as never;
+    const chart = (pts: Array<[string, number]>) => ({ type: 'chart', id: 'c', kind: 'bar', series: [{ name: 's', points: pts.map(([x, y]) => ({ x, y })) }] }) as never;
+    expect(chartDuplicatesTable(chart([['X', 5], ['Y', 7]]), t)).toBe(true);
+    expect(chartDuplicatesTable(chart([['X', 5], ['Y', 8]]), t)).toBe(false);
+    expect(chartDuplicatesTable(chart([['X', 5], ['Z', 7]]), t)).toBe(false);
+  });
+
+  it('DOCX columns get room for their content: a long vendor name is wider than a dollar column', async () => {
+    const doc = strFromU8(unzipSync(new Uint8Array(await renderDocx(SAMPLE_REPORT)))['word/document.xml']);
+    const i = doc.indexOf('>Vendor<');
+    const grid = doc.slice(doc.lastIndexOf('<w:tblGrid>', i), doc.indexOf('</w:tblGrid>', doc.lastIndexOf('<w:tblGrid>', i)));
+    const widths = [...grid.matchAll(/w:w="(\d+)"/g)].map((m) => Number(m[1]));
+    expect(widths).toHaveLength(5); // Vendor, Awards, Obligations, Typical set-aside, HQ state
+    expect(widths[0]).toBeGreaterThan(widths[2] * 2.5);
+    // ~31 characters at 9pt fits on one line (~0.065in/char → ~2.9in ≈ 4200 dxa).
+    expect(widths[0]).toBeGreaterThanOrEqual(4000);
+  });
+
+  it('PDF/HTML: chart values are formatted ($), captions sit above tables and charts', () => {
+    const html = renderHtml(SAMPLE_REPORT);
+    expect(html).toMatch(/>\$412\.5M</);
+    expect(html).not.toMatch(/>(?:412500000|30000000|30\.0M)</);
+    expect(html).toMatch(/<div class="tablewrap"><div class="caption">.*Obligations by department/);
+    expect(html).toMatch(/<figure><figcaption class="caption">/);
+  });
+
 
   it('round-trips through the shared extractor (same pipeline as uploads)', async () => {
     const buf = await renderDocx(SAMPLE_REPORT);

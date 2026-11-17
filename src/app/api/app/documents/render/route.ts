@@ -22,7 +22,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { hasProAccess } from '@/lib/access/resolve-access';
-import { renderDocument, DOC_HTML_CSP, type DocFormat } from '@/lib/documents';
+import { renderDocument, DOC_HTML_CSP, fixtureMarkers, type DocFormat } from '@/lib/documents';
 import { checkRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
@@ -101,6 +101,10 @@ export async function POST(request: NextRequest) {
       { status: 429, headers: { ...NO_STORE, 'Retry-After': String(retryAfter) } },
     );
   }
+
+  // Test fixtures and reserved example domains never become a customer document.
+  const markers = fixtureMarkers(body.model);
+  if (markers.length) return json({ success: false, error: 'fixture_content', issues: markers.slice(0, 10) }, 422);
 
   const out = await renderDocument(body.model, format as DocFormat);
   if (!out.ok) {

@@ -119,6 +119,8 @@ export interface ChartBlock extends Labeled {
   yLabel?: string;
   /** Label for the category axis, e.g. "Fiscal quarter" or "Department". */
   xLabel?: string;
+  /** How values read: 'usd' ($412.5M), 'int' (1,234), 'pct' (fractions → 28.4%). Omitted: plain numbers with separators. */
+  valueFormat?: 'usd' | 'int' | 'pct';
   series: { name: string; points: ChartPoint[] }[];
 }
 
