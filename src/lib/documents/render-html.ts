@@ -8,6 +8,7 @@
  */
 import type { Block, Claim, DocModel, TableBlock } from './model';
 import { chartToSvg } from './charts';
+import { hex, resolveTheme, type Theme } from './theme';
 import { assumptionOrigin, citationIndex, citeMarker, claimClass, claimLabel, claimsPresent, formatColumn, formatDocDate, parseInline, unverifiedStatements } from './format';
 
 /**
@@ -35,56 +36,79 @@ function inline(text: string): string {
     .join('');
 }
 
-const CSS = `
+/**
+ * The page stylesheet, built ONLY from theme tokens (theme.ts) — no color is hard-coded here, so a
+ * preset restyles the whole PDF. Structure and class names are the same for every theme.
+ */
+function themeCss(t: Theme): string {
+  const c = (k: Exclude<keyof Theme['colors'], 'caution' | 'keyMessage' | 'note' | 'recommendation' | 'assumption' | 'unverified' | 'chart'>) => hex(t.colors[k]);
+  const k = t.colors;
+  const band = t.headingStyle === 'band';
+  const r = t.table.headerRadiusPx;
+  return `
 @page { size: Letter; margin: 0.9in 0.85in 0.95in 0.85in; }
 * { box-sizing: border-box; }
-html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-body { margin: 0; color: #1f2937; background: #fff; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10.5pt; line-height: 1.5; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: ${c('pageBg')}; }
+body { margin: 0; color: ${c('ink')}; background: ${c('pageBg')}; font-family: ${t.fonts.pdf}; font-size: 10.5pt; line-height: 1.5; }
 .doc { max-width: 7.2in; margin: 0 auto; }
-.cover { padding: 1.4in 0 0.6in; border-bottom: 3px solid #1e3a8a; margin-bottom: 0.35in; break-after: page; }
-.cover .kicker { font-size: 9pt; letter-spacing: .12em; text-transform: uppercase; color: #1e3a8a; font-weight: 700; }
-.cover h1 { font-size: 28pt; line-height: 1.15; margin: 10px 0 8px; color: #111827; }
-.cover .subtitle { font-size: 13pt; color: #4b5563; margin: 0 0 28px; }
+.cover { padding: ${t.cover === 'brand-band' ? '0.2in' : '1.4in'} 0 0.5in; margin-bottom: 0.35in; break-after: page; }
+.cover.rule .titleblock { border-bottom: 2px solid ${c('accent2')}; padding-bottom: 18px; }
+.brandband { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-radius: 12px; padding: 16px 20px; margin-bottom: 0.45in; color: ${c('white')}; background: linear-gradient(90deg, ${hex((t.gradient ?? [k.accent, k.accent])[0])}, ${hex((t.gradient ?? [k.accent, k.accent])[1])}); }
+.brandband .mark { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; background: ${c('white')}; color: ${c('accent')}; font-weight: 800; font-size: 18pt; margin-right: 12px; }
+.brandband .who { display: flex; align-items: center; }
+.brandband .name { font-weight: 700; font-size: 13pt; line-height: 1.1; }
+.brandband .tag { font-size: 7.5pt; letter-spacing: .14em; font-weight: 600; opacity: .9; }
+.brandband .contact { text-align: right; font-size: 8.5pt; line-height: 1.4; opacity: .95; }
+.cover .kicker { font-size: 9pt; letter-spacing: .12em; text-transform: uppercase; color: ${c('accent2')}; font-weight: 700; }
+.cover h1 { font-size: 28pt; line-height: 1.15; margin: 10px 0 8px; color: ${c('title')}; }
+.cover .subtitle { font-size: 13pt; color: ${c('meta')}; margin: 0 0 28px; }
 .cover dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; font-size: 10pt; margin: 0; }
-.cover dt { color: #6b7280; } .cover dd { margin: 0; }
-.reading { margin-top: 0.5in; padding: 12px 14px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 9pt; color: #374151; background: #f9fafb; }
-.reading b { color: #111827; }
+.cover dt { color: ${c('meta')}; } .cover dd { margin: 0; color: ${c('meta')}; }
+.cover .card { background: ${c('panelBg')}; border: 1px solid ${c('rule')}; border-radius: 10px; padding: 14px 18px; }
+.cover .card dt { color: ${c('accent')}; font-weight: 700; } .cover .card dd { color: ${c('ink')}; }
+.reading { margin-top: 0.5in; padding: 12px 14px; border: 1px solid ${c('rule')}; border-radius: 6px; font-size: 9pt; color: ${c('meta')}; background: ${c('panelBg')}; }
+.reading b { color: ${c('ink')}; }
 .toc { break-after: page; }
-.toc h2 { border: 0; }
 .toc ol { padding-left: 18px; } .toc li { margin: 4px 0; }
-h2 { font-size: 16pt; color: #1e3a8a; margin: 26px 0 10px; padding-bottom: 4px; border-bottom: 1px solid #c7d2fe; break-after: avoid; }
-h3 { font-size: 12.5pt; color: #111827; margin: 20px 0 8px; break-after: avoid; }
-h4 { font-size: 11pt; color: #111827; margin: 16px 0 6px; break-after: avoid; }
+${band
+    ? `h2 { background: ${c('accent')}; color: ${c('white')}; text-transform: uppercase; letter-spacing: .06em; font-size: 12pt; padding: 7px 12px; margin: 26px 0 12px; break-after: avoid; }`
+    : `h2 { font-size: 15pt; color: ${c('accent')}; margin: 26px 0 10px; padding-bottom: 5px; border-bottom: 1px solid ${c('rule')}; break-after: avoid; }
+h2 .num { margin-right: 8px; }`}
+h3 { font-size: 12.5pt; color: ${c('accent')}; margin: 20px 0 8px; break-after: avoid; }
+h4 { font-size: 11pt; color: ${c('accent')}; margin: 16px 0 6px; break-after: avoid; }
 p { margin: 0 0 9px; orphans: 3; widows: 3; }
 ul, ol { margin: 0 0 10px; padding-left: 20px; } li { margin: 0 0 4px; }
-sup.cite { font-size: 7.5pt; color: #1e3a8a; margin-left: 2px; }
+em { color: ${c('accent')}; }
+sup.cite { font-size: 7.5pt; color: ${c('accent')}; margin-left: 2px; }
 .label { display: inline-block; font-size: 7.5pt; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; border-radius: 3px; margin-right: 6px; vertical-align: 1px; }
-.label.assumption { background: #fef3c7; color: #92400e; }
-.origin { color: #6b7280; font-style: italic; }
-.label.unverified { background: #fee2e2; color: #991b1b; }
-.label.recommendation { background: #dcfce7; color: #166534; }
-table { width: 100%; border-collapse: collapse; margin: 6px 0 4px; font-size: 9pt; break-inside: auto; }
+.label.assumption { background: ${hex(k.assumption.fill)}; color: ${hex(k.assumption.text)}; }
+.origin { color: ${c('muted')}; font-style: italic; }
+.label.unverified { background: ${hex(k.unverified.fill)}; color: ${hex(k.unverified.text)}; }
+.label.recommendation { background: ${hex(k.recommendation.fill)}; color: ${hex(k.recommendation.text)}; box-shadow: inset 0 0 0 1px ${hex(k.recommendation.border)}; }
+table { width: 100%; border-collapse: separate; border-spacing: 0; margin: 6px 0 4px; font-size: 9pt; break-inside: auto; }
 thead { display: table-header-group; }
 tr { break-inside: avoid; }
-th { text-align: left; background: #1e3a8a; color: #fff; font-weight: 600; padding: 6px 8px; }
-td { padding: 5px 8px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
-tbody tr:nth-child(even) td { background: #f8fafc; }
-td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-td.na { color: #9ca3af; font-style: italic; }
-.caption { font-size: 8.5pt; color: #6b7280; margin: 12px 0 4px; break-after: avoid; }
+th { text-align: left; background: ${c('tableHeaderBg')}; color: ${c('tableHeaderFg')}; font-weight: 700; padding: 6px 8px; white-space: nowrap;${t.table.uppercaseHeader ? ' text-transform: uppercase; letter-spacing: .04em; font-size: 7.8pt;' : ''} }
+${r ? `th:first-child { border-top-left-radius: ${r}px; } th:last-child { border-top-right-radius: ${r}px; }` : ''}
+td { padding: 5px 8px; border-bottom: 1px solid ${c('rule')}; vertical-align: top; background: ${c('panelBg')}; }
+tbody tr:nth-child(even) td { background: ${c('rowFill')}; }
+${t.table.boldFirstColumn ? `td:first-child { font-weight: 600; color: ${c('accent')}; }` : ''}
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.na { color: ${c('na')}; font-style: italic; }
+.caption { font-size: 8.5pt; color: ${c('muted')}; margin: 12px 0 4px; break-after: avoid; }
 .tablewrap { margin: 0 0 14px; }
-th.num, td.num { white-space: nowrap; }
-th { white-space: nowrap; }
 figure { margin: 10px 0 14px; break-inside: avoid; }
-.callout { border-left: 4px solid #1e3a8a; background: #eef2ff; padding: 10px 14px; margin: 10px 0 14px; border-radius: 0 6px 6px 0; break-inside: avoid; }
-.callout.warning { border-color: #b45309; background: #fffbeb; }
-.callout.key_finding { border-color: #0f766e; background: #f0fdfa; }
-.callout .ct { font-size: 8pt; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #374151; margin-bottom: 3px; }
+.callout { border-left: 4px solid ${hex(k.note.border)}; background: ${hex(k.note.fill)}; color: ${hex(k.note.text)}; padding: 10px 14px; margin: 10px 0 14px; border-radius: 0 6px 6px 0; break-inside: avoid; }
+.callout.warning { border-color: ${hex(k.caution.border)}; background: ${hex(k.caution.fill)}; color: ${hex(k.caution.text)}; font-weight: 700; }
+.callout.key_finding { border-color: ${hex(k.keyMessage.border)}; background: ${hex(k.keyMessage.fill)}; color: ${hex(k.keyMessage.text)}; font-size: 11.5pt; }
+.callout .ct { font-size: 8pt; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: ${c('accent')}; margin-bottom: 3px; }
+.callout.warning .ct { color: ${hex(k.caution.text)}; }
 .pagebreak { break-after: page; }
 .sources ol { padding-left: 22px; font-size: 9pt; } .sources li { margin-bottom: 5px; word-break: break-word; }
-.sources .meta { color: #6b7280; }
-.unverified ol { padding-left: 22px; font-size: 9.5pt; } .unverified li { margin-bottom: 5px; } .unverified .meta { color: #6b7280; }
+.sources .meta { color: ${c('muted')}; }
+.unverified ol { padding-left: 22px; font-size: 9.5pt; } .unverified li { margin-bottom: 5px; } .unverified .meta { color: ${c('muted')}; }
 `;
+}
 
 /** The visible label chip for a claim ('' when the claim carries none). */
 function originHtml(u: { claim?: Claim; origin?: string }): string {
@@ -114,7 +138,7 @@ function tableHtml(b: TableBlock, marker: string): string {
   return `<div class="tablewrap">${cap ? `<div class="caption">${cap}</div>` : ''}<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
 }
 
-function blockHtml(b: Block, numberOf: (id: string) => number | null): string {
+function blockHtml(b: Block, numberOf: (id: string) => number | null, theme: Theme): string {
   const lab = (c?: Claim) => labelChip(c);
   const sup = (cites?: string[]) => {
     const m = citeMarker(cites, numberOf);
@@ -131,7 +155,7 @@ function blockHtml(b: Block, numberOf: (id: string) => number | null): string {
       return tableHtml(b, citeMarker(b.cites, numberOf));
     case 'chart': {
       const cap = [labelChip(b.claim), b.caption ? inline(b.caption) : '', sup(b.cites)].filter(Boolean).join(' ') + originHtml(b);
-      return `<figure>${cap ? `<figcaption class="caption">${cap}</figcaption>` : ''}${chartToSvg(b)}</figure>`;
+      return `<figure>${cap ? `<figcaption class="caption">${cap}</figcaption>` : ''}${chartToSvg(b, 640, theme)}</figure>`;
     }
     case 'callout': {
       const title = b.tone === 'key_finding' ? 'Key finding' : b.tone === 'warning' ? 'Caution' : 'Note';
@@ -148,6 +172,7 @@ export interface RenderHtmlOptions {
 }
 
 export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): string {
+  const theme = resolveTheme(model.theme);
   const { ordered, numberOf } = citationIndex(model);
   const showToc = opts.toc ?? model.sections.length >= 4;
   const present = claimsPresent(model);
@@ -166,16 +191,30 @@ export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): strin
     unverified.length ? `Statements marked <span class="label unverified">Unverified — no source</span> could not be traced to a source and are listed in the Unverified statements section.` : '',
   ].filter(Boolean).join(' ');
 
-  const cover = `<section class="cover"><div class="kicker">Report</div><h1>${escapeHtml(model.title)}</h1>${model.subtitle ? `<p class="subtitle">${escapeHtml(model.subtitle)}</p>` : ''}<dl>${meta.join('')}</dl><div class="reading">${reading}</div></section>`;
+  // Cover. Both styles use ONLY the model's own metadata — nothing is generated for the cover.
+  const brand = theme.brand;
+  const card: string[] = [];
+  if (model.preparedFor) card.push(`<dt>Prepared for</dt><dd>${escapeHtml(model.preparedFor)}</dd>`);
+  if (typeof model.meta?.attention === 'string' && model.meta.attention.trim()) card.push(`<dt>Attention</dt><dd>${escapeHtml(model.meta.attention)}</dd>`);
+  card.push(`<dt>Prepared by</dt><dd>${escapeHtml(brand.name)}</dd>`);
+  if (model.subtitle) card.push(`<dt>What this is</dt><dd>${escapeHtml(model.subtitle)}</dd>`);
+  card.push(`<dt>Date</dt><dd>${escapeHtml(formatDocDate(model.date))}</dd>`);
+  if (ordered.length) card.push(`<dt>Sources</dt><dd>${ordered.length} cited source${ordered.length === 1 ? '' : 's'}</dd>`);
+  const cover = theme.cover === 'brand-band'
+    ? `<section class="cover brand"><div class="brandband"><div class="who"><span class="mark">${escapeHtml(brand.mark)}</span><div><div class="name">${escapeHtml(brand.name)}</div><div class="tag">${escapeHtml(brand.tagline)}</div></div></div><div class="contact">${brand.contactLines.map(escapeHtml).join('<br>')}</div></div><h1>${escapeHtml(model.title)}</h1>${model.subtitle ? `<p class="subtitle">${escapeHtml(model.subtitle)}</p>` : ''}<dl class="card">${card.join('')}</dl><div class="reading">${reading}</div></section>`
+    : `<section class="cover rule"><div class="titleblock"><div class="kicker">Report</div><h1>${escapeHtml(model.title)}</h1>${model.subtitle ? `<p class="subtitle">${escapeHtml(model.subtitle)}</p>` : ''}<dl>${meta.join('')}</dl></div><div class="reading">${reading}</div></section>`;
 
   const toc = showToc
     ? `<section class="toc"><h2>Contents</h2><ol>${model.sections.filter((s) => (s.level ?? 1) === 1).map((s) => `<li>${escapeHtml(s.heading)}</li>`).join('')}${unverified.length ? '<li>Unverified statements</li>' : ''}${ordered.length ? '<li>Sources</li>' : ''}</ol></section>`
     : '';
 
+  let topNo = 0;
   const body = model.sections
     .map((s) => {
       const tag = s.level === 3 ? 'h4' : s.level === 2 ? 'h3' : 'h2';
-      return `<section id="${escapeHtml(s.id)}"><${tag}>${escapeHtml(s.heading)}</${tag}>${s.blocks.map((b) => blockHtml(b, numberOf)).join('')}</section>`;
+      // 'numbered-rule' numbers the top-level body sections ("1. Executive summary").
+      const num = tag === 'h2' && theme.headingStyle === 'numbered-rule' ? `<span class="num">${++topNo}.</span>` : '';
+      return `<section id="${escapeHtml(s.id)}"><${tag}>${num}${escapeHtml(s.heading)}</${tag}>${s.blocks.map((b) => blockHtml(b, numberOf, theme)).join('')}</section>`;
     })
     .join('');
 
@@ -197,5 +236,5 @@ export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): strin
       .join('')}</ol></section>`
     : '';
 
-  return `<!doctype html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="${DOC_HTML_CSP}"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(model.title)}</title><style>${CSS}</style></head><body><main class="doc">${cover}${toc}${body}${unverifiedSection}${sources}</main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="${DOC_HTML_CSP}"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(model.title)}</title><style>${themeCss(theme)}</style></head><body><main class="doc">${cover}${toc}${body}${unverifiedSection}${sources}</main></body></html>`;
 }

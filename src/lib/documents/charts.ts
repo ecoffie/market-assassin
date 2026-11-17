@@ -6,13 +6,22 @@
  * when there is more than one series, direct value labels, no gridline clutter.
  */
 import type { ChartBlock } from './model';
+import { hex, resolveTheme, type Theme } from './theme';
 import { formatChartValue, usdColumnDecimals } from './format';
 
-const INK = '#1f2937';
-const MUTED = '#6b7280';
-const AXIS = '#d1d5db';
-const PRIMARY = '#1e3a8a';
-const SERIES = ['#1e3a8a', '#0f766e', '#b45309', '#7c3aed', '#be123c', '#4b5563'];
+// Palette for the chart being drawn, from the document's theme (set by chartToSvg; rendering is sync).
+let INK = '';
+let MUTED = '';
+let AXIS = '';
+let GRID = '';
+let WHITE = '';
+let PRIMARY = '';
+let SERIES: string[] = [];
+function usePalette(t: Theme) {
+  INK = hex(t.colors.ink); MUTED = hex(t.colors.muted); WHITE = hex(t.colors.white);
+  AXIS = hex(t.colors.chart.axis); GRID = hex(t.colors.chart.grid);
+  PRIMARY = hex(t.colors.chart.primary); SERIES = t.colors.chart.series.map(hex);
+}
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -57,7 +66,8 @@ function multiText(x: number | string, y: number, lines: string[], attrs: string
   return `<text x="${x}" y="${y.toFixed(1)}" ${attrs}>${lines.map((l, i) => `<tspan x="${x}" dy="${i === 0 ? 0 : lineH}">${esc(l)}</tspan>`).join('')}</text>`;
 }
 
-export function chartToSvg(chart: ChartBlock, width = 640): string {
+export function chartToSvg(chart: ChartBlock, width = 640, theme: Theme = resolveTheme(undefined)): string {
+  usePalette(theme);
   if (chart.kind === 'pie') return pieSvg(chart, width);
   return chart.kind === 'line' ? lineSvg(chart, width) : barSvg(chart, width);
 }
@@ -136,7 +146,7 @@ function lineSvg(chart: ChartBlock, width: number): string {
   for (let t = 0; t <= 4; t++) {
     const v = min + (span * t) / 4;
     const y = yAt(v);
-    parts.push(`<line x1="${left}" y1="${y.toFixed(1)}" x2="${width - right}" y2="${y.toFixed(1)}" stroke="${t === 0 ? AXIS : '#f1f5f9'}"/>`);
+    parts.push(`<line x1="${left}" y1="${y.toFixed(1)}" x2="${width - right}" y2="${y.toFixed(1)}" stroke="${t === 0 ? AXIS : GRID}"/>`);
     parts.push(`<text x="${left - 6}" y="${(y + 4).toFixed(1)}" font-size="10" text-anchor="end" fill="${MUTED}">${label(v, chart.valueFormat, chartUsdDecimals(chart))}</text>`);
   }
   // Label spacing from the labels' real width, so adjacent labels ("FY26 Q3" / "FY26 Q4") never
@@ -195,7 +205,7 @@ function pieSvg(chart: ChartBlock, width: number): string {
       const large = frac > 0.5 ? 1 : 0;
       const x0 = cx + r * Math.cos(a0), y0 = cy + r * Math.sin(a0);
       const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
-      parts.push(`<path d="M${cx},${cy} L${x0.toFixed(2)},${y0.toFixed(2)} A${r},${r} 0 ${large} 1 ${x1.toFixed(2)},${y1.toFixed(2)} Z" fill="${color}" stroke="#fff" stroke-width="1.5"/>`);
+      parts.push(`<path d="M${cx},${cy} L${x0.toFixed(2)},${y0.toFixed(2)} A${r},${r} 0 ${large} 1 ${x1.toFixed(2)},${y1.toFixed(2)} Z" fill="${color}" stroke="${WHITE}" stroke-width="1.5"/>`);
       a0 = a1;
     }
     const ly = legendTop[i] + 10;

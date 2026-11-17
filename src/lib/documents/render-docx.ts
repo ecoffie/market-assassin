@@ -32,19 +32,26 @@ import {
   WidthType,
 } from 'docx';
 import type { Block, ChartBlock, DocModel, TableBlock, TableColumn } from './model';
+import { resolveTheme, type Theme } from './theme';
 import { assumptionOrigin, chartShownByAdjacentTable, citationIndex, citeMarker, claimLabel, claimsPresent, formatColumn, formatChartValue, formatDocDate, usdColumnDecimals, parseInline, unverifiedStatements } from './format';
 
-const NAVY = '1E3A8A';
-const INK = '1F2937';
-const MUTED = '6B7280';
-const FONT = 'Calibri';
+// The document's theme (theme.ts), resolved once per buildDocx call (which is synchronous). Every
+// color and the font below come from it — nothing is hard-coded in this renderer.
+let T: Theme = resolveTheme(undefined);
+let NAVY = T.colors.accent;
+let INK = T.colors.ink;
+let MUTED = T.colors.muted;
+let FONT = T.fonts.docx;
+function useTheme(t: Theme) {
+  T = t; NAVY = t.colors.accent; INK = t.colors.ink; MUTED = t.colors.muted; FONT = t.fonts.docx;
+}
 /** Letter 8.5in minus 0.85in margins each side, in twentieths of a point (DXA). */
 const CONTENT_DXA = 9792;
 
 type Numberer = (id: string) => number | null;
 
 function runs(text: string, base: { size?: number; color?: string } = {}): TextRun[] {
-  return parseInline(text).map((r) => new TextRun({ font: FONT, size: 21, text: r.text, bold: r.bold, italics: r.italic, ...base }));
+  return parseInline(text).map((r) => new TextRun({ font: FONT, size: 21, text: r.text, bold: r.bold, italics: r.italic, ...(r.italic && !base.color ? { color: NAVY } : {}), ...base }));
 }
 
 function originRun(u: { claim?: string; origin?: string }, size = 21): TextRun[] {
@@ -55,8 +62,9 @@ function originRun(u: { claim?: string; origin?: string }, size = 21): TextRun[]
 function labelRun(claim: string | undefined): TextRun[] {
   const l = claimLabel(claim as never);
   if (!l) return [];
-  const color = claim === 'assumption' ? '92400E' : claim === 'unverified' ? '991B1B' : '166534';
-  const fill = claim === 'assumption' ? 'FEF3C7' : claim === 'unverified' ? 'FEE2E2' : 'DCFCE7';
+  const k = T.colors;
+  const color = claim === 'assumption' ? k.assumption.text : claim === 'unverified' ? k.unverified.text : k.recommendation.text;
+  const fill = claim === 'assumption' ? k.assumption.fill : claim === 'unverified' ? k.unverified.fill : k.recommendation.fill;
   return [
     new TextRun({ font: FONT, text: ` ${l.toUpperCase()} `, bold: true, size: 15, color, shading: { type: ShadingType.CLEAR, color: 'auto', fill } }),
     new TextRun({ font: FONT, size: 21, text: ' ' }),
@@ -70,27 +78,29 @@ function citeRun(cites: string[] | undefined, numberOf: Numberer): TextRun[] {
 
 const isNumCol = (c: TableColumn) => c.align === 'right' || ['usd', 'int', 'pct'].includes(c.format ?? '');
 
-const CELL_BORDER = { style: BorderStyle.SINGLE, size: 4, color: 'E5E7EB' };
+const cellRule = () => ({ style: BorderStyle.SINGLE, size: 4, color: T.colors.rule });
+const noRule = () => ({ style: BorderStyle.NONE, size: 0, color: T.colors.white });
 
 function headerCell(text: string, right: boolean, width: number): TableCell {
   return new TableCell({
     width: { size: width, type: WidthType.DXA },
-    shading: { type: ShadingType.CLEAR, color: 'auto', fill: NAVY },
+    shading: { type: ShadingType.CLEAR, color: 'auto', fill: T.colors.tableHeaderBg },
     margins: { top: 60, bottom: 60, left: 100, right: 100 },
-    borders: { top: CELL_BORDER, bottom: CELL_BORDER, left: CELL_BORDER, right: CELL_BORDER },
-    children: [new Paragraph({ alignment: right ? AlignmentType.RIGHT : AlignmentType.LEFT, children: [new TextRun({ font: FONT, text, bold: true, color: 'FFFFFF', size: 18 })] })],
+    borders: { top: noRule(), bottom: noRule(), left: noRule(), right: noRule() },
+    children: [new Paragraph({ alignment: right ? AlignmentType.RIGHT : AlignmentType.LEFT, children: [new TextRun({ font: FONT, text, bold: true, allCaps: T.table.uppercaseHeader, color: T.colors.tableHeaderFg, size: T.table.uppercaseHeader ? 16 : 18 })] })],
   });
 }
 
-function bodyCell(text: string, opts: { right: boolean; na: boolean; zebra: boolean; width: number }): TableCell {
+function bodyCell(text: string, opts: { right: boolean; na: boolean; zebra: boolean; width: number; first?: boolean }): TableCell {
+  const lead = !!opts.first && T.table.boldFirstColumn && !opts.na;
   return new TableCell({
     width: { size: opts.width, type: WidthType.DXA },
-    shading: opts.zebra ? { type: ShadingType.CLEAR, color: 'auto', fill: 'F8FAFC' } : undefined,
+    shading: opts.zebra ? { type: ShadingType.CLEAR, color: 'auto', fill: T.colors.rowFill } : undefined,
     margins: { top: 50, bottom: 50, left: 100, right: 100 },
-    borders: { top: CELL_BORDER, bottom: CELL_BORDER, left: CELL_BORDER, right: CELL_BORDER },
+    borders: { top: noRule(), bottom: cellRule(), left: noRule(), right: noRule() },
     children: [new Paragraph({
       alignment: opts.right ? AlignmentType.RIGHT : AlignmentType.LEFT,
-      children: [new TextRun({ font: FONT, text, size: 18, italics: opts.na, color: opts.na ? '9CA3AF' : INK })],
+      children: [new TextRun({ font: FONT, text, size: 18, bold: lead, italics: opts.na, color: opts.na ? T.colors.na : lead ? NAVY : INK })],
     })],
   });
 }
@@ -123,7 +133,7 @@ function table(columns: TableColumn[], rows: TableBlock['rows']): Table {
         cantSplit: true,
         children: columns.map((c, ci) => {
           const v = r[c.key] ?? null;
-          return bodyCell(cells[ci][i], { right: isNumCol(c), na: v === null, zebra: i % 2 === 1, width: widths[ci] });
+          return bodyCell(cells[ci][i], { right: isNumCol(c), na: v === null, zebra: i % 2 === 1, width: widths[ci], first: ci === 0 });
         }),
       })),
     ],
@@ -187,12 +197,17 @@ function blockToDocx(b: Block, numberOf: Numberer, shownByAdjacentTable = false)
     }
     case 'callout': {
       const title = b.tone === 'key_finding' ? 'KEY FINDING' : b.tone === 'warning' ? 'CAUTION' : 'NOTE';
-      const fill = b.tone === 'warning' ? 'FFFBEB' : b.tone === 'key_finding' ? 'F0FDFA' : 'EEF2FF';
-      const bar = b.tone === 'warning' ? 'B45309' : b.tone === 'key_finding' ? '0F766E' : NAVY;
-      const border = { left: { style: BorderStyle.SINGLE, size: 24, color: bar, space: 8 } };
+      const warn = b.tone === 'warning';
+      const key = b.tone === 'key_finding';
+      const pal = warn ? T.colors.caution : key ? T.colors.keyMessage : T.colors.note;
+      const fill = pal.fill;
+      const border = { left: { style: BorderStyle.SINGLE, size: 24, color: pal.border, space: 8 } };
+      const bodyRuns = warn
+        ? parseInline(b.text).map((r) => new TextRun({ font: FONT, size: 21, text: r.text, bold: true, italics: r.italic, color: pal.text }))
+        : runs(b.text, key ? { size: 23, color: pal.text } : { color: pal.text });
       return [
-        new Paragraph({ border, shading: { type: ShadingType.CLEAR, color: 'auto', fill }, spacing: { before: 120, after: 0 }, children: [new TextRun({ font: FONT, text: title, bold: true, size: 15, color: '374151' })] }),
-        new Paragraph({ border, shading: { type: ShadingType.CLEAR, color: 'auto', fill }, spacing: { after: 160 }, children: [...labelRun(b.claim), ...runs(b.text), ...citeRun(b.cites, numberOf), ...originRun(b)] }),
+        new Paragraph({ border, shading: { type: ShadingType.CLEAR, color: 'auto', fill }, spacing: { before: 120, after: 0 }, children: [new TextRun({ font: FONT, text: title, bold: true, size: 15, color: warn ? pal.text : NAVY })] }),
+        new Paragraph({ border, shading: { type: ShadingType.CLEAR, color: 'auto', fill }, spacing: { after: 160 }, children: [...labelRun(b.claim), ...bodyRuns, ...citeRun(b.cites, numberOf), ...originRun(b)] }),
       ];
     }
     case 'pagebreak':
@@ -201,33 +216,69 @@ function blockToDocx(b: Block, numberOf: Numberer, shownByAdjacentTable = false)
 }
 
 export function buildDocx(model: DocModel): Document {
+  useTheme(resolveTheme(model.theme));
   const { ordered, numberOf } = citationIndex(model);
   const showToc = model.sections.length >= 4;
   const children: (Paragraph | Table)[] = [];
 
-  // Cover
-  children.push(new Paragraph({ spacing: { before: 2400, after: 120 }, children: [new TextRun({ font: FONT, text: 'REPORT', bold: true, size: 18, color: NAVY, characterSpacing: 40 })] }));
-  children.push(new Paragraph({ style: 'Title', children: [new TextRun({ font: FONT, size: 56, bold: true, color: '111827', text: model.title })] }));
-  if (model.subtitle) children.push(new Paragraph({ spacing: { after: 360 }, children: [new TextRun({ font: FONT, text: model.subtitle, size: 26, color: '4B5563' })] }));
-  // Cover metadata as a borderless two-column table (tab stops render inconsistently across viewers).
-  const meta: Array<[string, string]> = [];
-  if (model.preparedFor) meta.push(['Prepared for', model.preparedFor]);
-  meta.push(['Date', formatDocDate(model.date)]);
-  meta.push(['Prepared with', 'Mindy']);
-  if (ordered.length) meta.push(['Sources', `${ordered.length} cited source${ordered.length === 1 ? '' : 's'}`]);
-  const none = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+  // Cover. Built ONLY from the model's own metadata — nothing is generated for the cover.
+  const none = { style: BorderStyle.NONE, size: 0, color: T.colors.white };
   const noBorders = { top: none, bottom: none, left: none, right: none };
-  children.push(new Table({
-    width: { size: 6800, type: WidthType.DXA },
-    columnWidths: [2000, 4800],
-    borders: { ...noBorders, insideHorizontal: none, insideVertical: none },
-    rows: meta.map(([k, v]) => new TableRow({
-      children: [
-        new TableCell({ borders: noBorders, width: { size: 2000, type: WidthType.DXA }, children: [new Paragraph({ spacing: { after: 40 }, children: [new TextRun({ font: FONT, text: k, color: MUTED, size: 20 })] })] }),
-        new TableCell({ borders: noBorders, width: { size: 4800, type: WidthType.DXA }, children: [new Paragraph({ spacing: { after: 40 }, children: [new TextRun({ font: FONT, text: v, size: 20 })] })] }),
-      ],
-    })),
-  }));
+  const kvTable = (rows: Array<[string, string]>, keyColor: string, valueColor: string, boxed: boolean) => {
+    const edge = boxed ? { style: BorderStyle.SINGLE, size: 6, color: T.colors.rule } : none;
+    const box = { top: edge, bottom: edge, left: edge, right: edge };
+    return new Table({
+      width: { size: boxed ? CONTENT_DXA : 6800, type: WidthType.DXA },
+      columnWidths: boxed ? [2400, CONTENT_DXA - 2400] : [2000, 4800],
+      borders: { ...box, insideHorizontal: none, insideVertical: none },
+      rows: rows.map(([k, v]) => new TableRow({
+        children: [
+          new TableCell({ borders: noBorders, margins: boxed ? { left: 160, top: 40, bottom: 40 } : undefined, width: { size: boxed ? 2400 : 2000, type: WidthType.DXA }, children: [new Paragraph({ spacing: { after: 40 }, children: [new TextRun({ font: FONT, text: k, bold: boxed, color: keyColor, size: 20 })] })] }),
+          new TableCell({ borders: noBorders, margins: boxed ? { right: 160, top: 40, bottom: 40 } : undefined, width: { size: boxed ? CONTENT_DXA - 2400 : 4800, type: WidthType.DXA }, children: [new Paragraph({ spacing: { after: 40 }, children: [new TextRun({ font: FONT, text: v, size: 20, color: valueColor })] })] }),
+        ],
+      })),
+    });
+  };
+  if (T.cover === 'brand-band') {
+    // Brand header band: solid accent fill in Word (no gradients there), mark + tagline + contact lines.
+    const brand = T.brand;
+    const fill = { type: ShadingType.CLEAR, color: 'auto', fill: NAVY };
+    children.push(new Table({
+      width: { size: CONTENT_DXA, type: WidthType.DXA },
+      columnWidths: [6000, CONTENT_DXA - 6000],
+      borders: { ...noBorders, insideHorizontal: none, insideVertical: none },
+      rows: [new TableRow({ children: [
+        new TableCell({ borders: noBorders, shading: fill, margins: { top: 180, bottom: 180, left: 240 }, width: { size: 6000, type: WidthType.DXA }, children: [
+          new Paragraph({ children: [new TextRun({ font: FONT, text: ` ${brand.mark} `, bold: true, size: 30, color: NAVY, shading: { type: ShadingType.CLEAR, color: 'auto', fill: T.colors.white } }), new TextRun({ font: FONT, text: `  ${brand.name}`, bold: true, size: 26, color: T.colors.white })] }),
+          new Paragraph({ children: [new TextRun({ font: FONT, text: brand.tagline, bold: true, size: 15, color: T.colors.white, characterSpacing: 30 })] }),
+        ] }),
+        new TableCell({ borders: noBorders, shading: fill, margins: { top: 180, bottom: 180, right: 240 }, width: { size: CONTENT_DXA - 6000, type: WidthType.DXA }, children: brand.contactLines.map((l) => new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ font: FONT, text: l, size: 17, color: T.colors.white })] })) }),
+      ] })],
+    }));
+    children.push(new Paragraph({ spacing: { before: 600, after: 0 }, children: [] }));
+    children.push(new Paragraph({ style: 'Title', children: [new TextRun({ font: FONT, size: 56, bold: true, color: T.colors.title, text: model.title })] }));
+    if (model.subtitle) children.push(new Paragraph({ spacing: { after: 300 }, children: [new TextRun({ font: FONT, text: model.subtitle, size: 26, color: T.colors.meta })] }));
+    const card: Array<[string, string]> = [];
+    if (model.preparedFor) card.push(['Prepared for', model.preparedFor]);
+    if (typeof model.meta?.attention === 'string' && model.meta.attention.trim()) card.push(['Attention', model.meta.attention]);
+    card.push(['Prepared by', brand.name]);
+    if (model.subtitle) card.push(['What this is', model.subtitle]);
+    card.push(['Date', formatDocDate(model.date)]);
+    if (ordered.length) card.push(['Sources', `${ordered.length} cited source${ordered.length === 1 ? '' : 's'}`]);
+    children.push(kvTable(card, NAVY, INK, true));
+  } else {
+    children.push(new Paragraph({ spacing: { before: 2400, after: 120 }, children: [new TextRun({ font: FONT, text: 'REPORT', bold: true, size: 18, color: T.colors.accent2, characterSpacing: 40 })] }));
+    children.push(new Paragraph({ style: 'Title', children: [new TextRun({ font: FONT, size: 56, bold: true, color: T.colors.title, text: model.title })] }));
+    if (model.subtitle) children.push(new Paragraph({ spacing: { after: 360 }, children: [new TextRun({ font: FONT, text: model.subtitle, size: 26, color: T.colors.meta })] }));
+    const meta: Array<[string, string]> = [];
+    if (model.preparedFor) meta.push(['Prepared for', model.preparedFor]);
+    meta.push(['Date', formatDocDate(model.date)]);
+    meta.push(['Prepared with', T.brand.name]);
+    if (ordered.length) meta.push(['Sources', `${ordered.length} cited source${ordered.length === 1 ? '' : 's'}`]);
+    children.push(kvTable(meta, T.colors.meta, T.colors.meta, false));
+    // Thin accent rule closing the title block.
+    children.push(new Paragraph({ spacing: { before: 240, after: 0 }, border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: T.colors.accent2, space: 1 } }, children: [] }));
+  }
   const present = claimsPresent(model);
   const unverified = unverifiedStatements(model);
   const reading = [
@@ -236,7 +287,7 @@ export function buildDocx(model: DocModel): Document {
     present.has('recommendation') ? 'Statements marked RECOMMENDATION are suggested actions.' : '',
     unverified.length ? 'Statements marked UNVERIFIED — NO SOURCE could not be traced to a source and are listed in the Unverified statements section.' : '',
   ].filter(Boolean).join(' ');
-  children.push(new Paragraph({ spacing: { before: 600 }, shading: { type: ShadingType.CLEAR, color: 'auto', fill: 'F9FAFB' }, children: [new TextRun({ font: FONT, text: reading, size: 17, color: '374151' })] }));
+  children.push(new Paragraph({ spacing: { before: 600 }, shading: { type: ShadingType.CLEAR, color: 'auto', fill: T.colors.panelBg }, children: [new TextRun({ font: FONT, text: reading, size: 17, color: T.colors.meta })] }));
   children.push(new Paragraph({ children: [new PageBreak()] }));
 
   // Contents
@@ -250,9 +301,12 @@ export function buildDocx(model: DocModel): Document {
   }
 
   // Body
+  let topNo = 0;
   for (const s of model.sections) {
     const heading = s.level === 3 ? HeadingLevel.HEADING_3 : s.level === 2 ? HeadingLevel.HEADING_2 : HeadingLevel.HEADING_1;
-    children.push(new Paragraph({ heading, children: [new TextRun({ font: FONT, text: s.heading })] }));
+    // 'numbered-rule' numbers the top-level body sections ("1. Executive summary").
+    const label = heading === HeadingLevel.HEADING_1 && T.headingStyle === 'numbered-rule' ? `${++topNo}. ${s.heading}` : s.heading;
+    children.push(new Paragraph({ heading, children: [new TextRun({ font: FONT, text: label })] }));
     s.blocks.forEach((b, i) => children.push(...blockToDocx(b, numberOf, chartShownByAdjacentTable(s.blocks, i))));
   }
 
@@ -290,10 +344,14 @@ export function buildDocx(model: DocModel): Document {
       // MS Word may repair or reject (review, 2026-11-17).
       default: {
         document: { run: { font: FONT, size: 21, color: INK } },
-        title: { run: { font: FONT, size: 56, bold: true, color: '111827' }, paragraph: { spacing: { after: 160 } } },
-        heading1: { run: { font: FONT, size: 32, bold: true, color: NAVY }, paragraph: { spacing: { before: 360, after: 140 }, keepNext: true, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'C7D2FE', space: 4 } } } },
-        heading2: { run: { font: FONT, size: 25, bold: true, color: '111827' }, paragraph: { spacing: { before: 280, after: 100 }, keepNext: true } },
-        heading3: { run: { font: FONT, size: 22, bold: true, color: '111827' }, paragraph: { spacing: { before: 220, after: 80 }, keepNext: true } },
+        title: { run: { font: FONT, size: 56, bold: true, color: T.colors.title }, paragraph: { spacing: { after: 160 } } },
+        heading1: T.headingStyle === 'band'
+          // Full-width band: accent fill, white uppercase text.
+          ? { run: { font: FONT, size: 24, bold: true, color: T.colors.white, allCaps: true, characterSpacing: 20 }, paragraph: { spacing: { before: 360, after: 160 }, keepNext: true, shading: { type: ShadingType.CLEAR, color: 'auto', fill: NAVY } } }
+          // Numbered accent heading with a thin rule.
+          : { run: { font: FONT, size: 30, bold: true, color: NAVY }, paragraph: { spacing: { before: 360, after: 140 }, keepNext: true, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: T.colors.rule, space: 4 } } } },
+        heading2: { run: { font: FONT, size: 25, bold: true, color: NAVY }, paragraph: { spacing: { before: 280, after: 100 }, keepNext: true } },
+        heading3: { run: { font: FONT, size: 22, bold: true, color: NAVY }, paragraph: { spacing: { before: 220, after: 80 }, keepNext: true } },
       },
       paragraphStyles: [
         { id: 'Body', name: 'Body', basedOn: 'Normal', run: { font: FONT, size: 21 }, paragraph: { spacing: { after: 140, line: 288 } } },

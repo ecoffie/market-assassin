@@ -24,6 +24,7 @@ import { renderDocx } from './render-docx';
 import { renderPdf, pdfOptions } from './render-pdf';
 import { renderDocument } from './index';
 import { chartToSvg, wrapWords } from './charts';
+import { THEMES, THEME_NAMES, DEFAULT_THEME, resolveTheme } from './theme';
 import { inferKind, extractByKind, extractDocx } from './extract';
 
 const clone = (): DocModel => JSON.parse(JSON.stringify(SAMPLE_REPORT));
@@ -613,6 +614,123 @@ describe('fixture safeguard', () => {
   });
 });
 
+describe('theme layer (Eric, 2026-11-17: styling must be flexible)', () => {
+  const briefing = (): DocModel => ({ ...clone(), theme: 'briefing' });
+
+  it('presets: mindy (default) and briefing; unknown or missing falls back to mindy and never blocks a render', async () => {
+    expect(THEME_NAMES).toEqual(['mindy', 'briefing']);
+    expect(DEFAULT_THEME).toBe('mindy');
+    expect(resolveTheme(undefined).name).toBe('mindy');
+    expect(resolveTheme('briefing').name).toBe('briefing');
+    expect(resolveTheme('neon').name).toBe('mindy');
+    expect(resolveTheme(42).name).toBe('mindy');
+    expect(resolveTheme('__proto__').name).toBe('mindy');
+    const odd = { ...clone(), theme: 'neon' };
+    expect(issuesOf(odd)).toEqual([]);
+    expect((await renderDocument(odd, 'docx')).ok).toBe(true);
+    expect(renderHtml(odd)).toBe(renderHtml(clone()));
+  });
+
+  it('no hard-coded colors in the render paths: every color comes from theme.ts', () => {
+    for (const f of ['render-html.ts', 'render-docx.ts', 'charts.ts']) {
+      const src = readFileSync(join(process.cwd(), 'src/lib/documents', f), 'utf8');
+      expect(src.match(/#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|'[0-9A-Fa-f]{6}'/g) ?? [], f).toEqual([]);
+    }
+  });
+
+  it('both renderers read the tokens: changing a preset restyles HTML, SVG and DOCX', async () => {
+    const m = clone();
+    const html = renderHtml(m);
+    expect(html).toContain('#1e3a8a');
+    const docxBefore = strFromU8(unzipSync(new Uint8Array(await renderDocx(m)))['word/document.xml']);
+    const saved = THEMES.mindy.colors.tableHeaderBg;
+    try {
+      (THEMES.mindy.colors as { tableHeaderBg: string }).tableHeaderBg = 'ABCDEF';
+      expect(renderHtml(m)).toContain('th { text-align: left; background: #abcdef;');
+      const docx = strFromU8(unzipSync(new Uint8Array(await renderDocx(m)))['word/document.xml']);
+      expect(docx).toContain('w:fill="ABCDEF"');
+      expect(docxBefore).not.toContain('w:fill="ABCDEF"');
+    } finally {
+      (THEMES.mindy.colors as { tableHeaderBg: string }).tableHeaderBg = saved;
+    }
+  });
+
+  it('labels keep their exact wording and the assumption chip stays amber in EVERY theme', async () => {
+    for (const m of [clone(), briefing()]) {
+      const html = renderHtml(m);
+      expect(html).toContain('class="label assumption">Planning assumption</span>');
+      expect(html).toContain('class="label recommendation">Recommendation</span>');
+      expect(html).toMatch(/\.label\.assumption \{ background: #fef3c7; color: #92400e; \}/);
+      const doc = strFromU8(unzipSync(new Uint8Array(await renderDocx(m)))['word/document.xml']);
+      expect(doc).toContain('PLANNING ASSUMPTION');
+      expect(doc).toContain('RECOMMENDATION');
+      expect(doc).toMatch(/w:fill="FEF3C7"/);
+    }
+  });
+
+  it("mindy (PDF): brand band (gradient, M mark, tagline, brand contact lines), metadata card, numbered headings, rounded headers, soft page", () => {
+    const html = renderHtml(clone());
+    expect(html).toMatch(/\.brandband \{[^}]*background: linear-gradient\(90deg, #1e3a8a, #7c3aed\);/);
+    expect(html).toContain('<span class="mark">M</span>');
+    expect(html).toContain('FEDERAL MARKET INTELLIGENCE');
+    expect(html).toContain('support@getmindy.ai');
+    expect(html).toMatch(/<dl class="card"><dt>Prepared for<\/dt><dd>Example Company \(fixture\)<\/dd><dt>Prepared by<\/dt><dd>Mindy<\/dd><dt>What this is<\/dt>/);
+    expect(html).not.toContain('<dt>Attention</dt>'); // only from the model's own metadata
+    expect(renderHtml({ ...clone(), meta: { attention: 'Contracting officer' } })).toContain('<dt>Attention</dt><dd>Contracting officer</dd>');
+    expect(html).toContain('<h2><span class="num">2.</span>Market size and trend</h2>');
+    expect(html).toMatch(/th:first-child \{ border-top-left-radius: 6px; \}/);
+    expect(html).toMatch(/td:first-child \{ font-weight: 600; color: #1e3a8a; \}/);
+    expect(html).toMatch(/body \{[^}]*background: #f7f7fb;/);
+  });
+
+  it('briefing (PDF): navy title + gold rule, full-width navy bands in white uppercase, uppercase headers, blue-gray rows, no numbering', () => {
+    const html = renderHtml(briefing());
+    expect(html).toMatch(/\.cover\.rule \.titleblock \{ border-bottom: 2px solid #b8892a;/);
+    expect(html).toMatch(/\.cover h1 \{[^}]*color: #0b2545; \}/);
+    expect(html).toMatch(/h2 \{ background: #0b2545; color: #ffffff; text-transform: uppercase;/);
+    expect(html).toContain('<h2>Market size and trend</h2>');
+    expect(html).toMatch(/th \{[^}]*text-transform: uppercase;/);
+    expect(html).toMatch(/tbody tr:nth-child\(even\) td \{ background: #eef2f7; \}/);
+    expect(html).toMatch(/\.callout\.warning \{ border-color: #b91c1c; background: #fbe9e9; color: #7f1d1d; font-weight: 700; \}/);
+    expect(html).toMatch(/\.label\.recommendation \{ background: #fbf3e0; color: #8c6418;/);
+    expect(html).not.toContain('class="brandband"');
+  });
+
+  it('DOCX per preset: mindy = brand band + numbered rule headings + bold first column; briefing = navy band headings in caps + gold rule + caps headers', async () => {
+    const parts = async (m: DocModel) => { const f = unzipSync(new Uint8Array(await renderDocx(m))); return { doc: strFromU8(f['word/document.xml']), styles: strFromU8(f['word/styles.xml']) }; };
+    const h1 = (styles: string) => styles.slice(styles.indexOf('w:styleId="Heading1"'), styles.indexOf('</w:style>', styles.indexOf('w:styleId="Heading1"')));
+    const mi = await parts(clone());
+    expect(mi.doc).toContain('FEDERAL MARKET INTELLIGENCE');
+    expect(mi.doc).toContain('>1. Executive summary<');
+    expect(h1(mi.styles)).not.toMatch(/w:fill=/);
+    expect(h1(mi.styles)).toMatch(/w:bottom/);
+    const vendorCell = mi.doc.slice(mi.doc.lastIndexOf('<w:r>', mi.doc.indexOf('>Example Facility Services A LLC<')), mi.doc.indexOf('>Example Facility Services A LLC<'));
+    expect(vendorCell).toMatch(/<w:b\/>/);
+    const br = await parts(briefing());
+    expect(br.doc).not.toContain('FEDERAL MARKET INTELLIGENCE');
+    expect(br.doc).toContain('>Executive summary<');
+    expect(h1(br.styles)).toMatch(/w:fill="0B2545"/);
+    expect(h1(br.styles)).toMatch(/<w:caps\/>|<w:caps w:val="true"\/>/);
+    expect(br.doc).toMatch(/w:color="B8892A"/);
+    expect(br.doc).toMatch(/w:fill="EEF2F7"/);
+    expect(br.doc).toContain('w:rFonts w:ascii="Arial"');
+  });
+
+  it('DOCX callouts (briefing): caution = red fill + bold dark-red text; key message = blue-gray, larger', async () => {
+    const m = tiny({ theme: 'briefing', sections: [{ id: 'a', heading: 'A', blocks: [
+      { type: 'callout', id: 'w', tone: 'warning', text: 'Proposals are due Friday.', claim: 'fact', cites: ['s1'] },
+      { type: 'callout', id: 'k', tone: 'key_finding', text: 'The market is concentrated.', claim: 'fact', cites: ['s1'] },
+    ] }] });
+    const doc = strFromU8(unzipSync(new Uint8Array(await renderDocx(m)))['word/document.xml']);
+    expect(doc).toMatch(/w:fill="FBE9E9"/);
+    const warnRun = doc.slice(doc.lastIndexOf('<w:r>', doc.indexOf('Proposals are due Friday.')), doc.indexOf('Proposals are due Friday.'));
+    expect(warnRun).toMatch(/<w:b\/>/);
+    expect(warnRun).toMatch(/w:val="7F1D1D"/);
+    const keyRun = doc.slice(doc.lastIndexOf('<w:r>', doc.indexOf('The market is concentrated.')), doc.indexOf('The market is concentrated.'));
+    expect(keyRun).toMatch(/w:sz w:val="23"/);
+  });
+});
+
 describe('format helpers', () => {
   it('a missing value is "Not available", never 0', () => {
     expect(formatCell(null, 'usd')).toBe(NOT_AVAILABLE);
@@ -873,7 +991,7 @@ describe('render-pdf', () => {
     const r = await renderPdf(SAMPLE_REPORT);
     expect(r.pdf?.subarray(0, 5).toString()).toBe('%PDF-');
     expect(r.error).toBeNull();
-    expect(pdfState.calls[0].html).toContain('<h2>Executive summary</h2>');
+    expect(pdfState.calls[0].html).toContain('<h2><span class="num">1.</span>Executive summary</h2>'); // default theme numbers sections
   });
 
   it('renders the PDF locked down (JavaScript off, network blocked) — the HTML carries LLM/upload text', async () => {

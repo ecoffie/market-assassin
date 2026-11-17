@@ -160,7 +160,14 @@ export interface DocModel {
   date: string;
   sources: DocSource[];
   sections: DocSection[];
+  /**
+   * Visual preset ('mindy' default, 'briefing'). Styling only — see theme.ts. An unknown name falls
+   * back to the default; it never blocks a render.
+   */
+  theme?: string;
   meta?: {
+    /** Who the document is addressed to on the cover card ("Attention"), when the producer has it. */
+    attention?: string;
     generatedBy?: string;
     version?: number;
     parentVersion?: number;
