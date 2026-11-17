@@ -32,9 +32,11 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 // a program name like 8(a). "one" is excluded: "one of the offices" is not a figure.
 const NUMERIC_TOKEN = /(?<![A-Za-z0-9])\$?\d[\d,]*(?:\.\d+)?(?![A-Za-z0-9(])|(?<![A-Za-z0-9])\$?\d[\d,]*(?:\.\d+)?(?:[KkMmBb]|%)(?![A-Za-z0-9])/;
 const NUMBER_WORD = /\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|trillion|dozen|percent)\b/i;
-// Proportions are figures too ("half of all obligations", "a third", "most buyers"). "quarter" is
-// deliberately absent: "fourth-quarter buying" is a time, not an amount.
-const FRACTION_WORD = /\b(?:half|halves|third|thirds|fifth|fifths|majority|minority|most|twice|double|triple|doubled|tripled)\b/i;
+// Proportions are figures too ("half of all obligations", "a third", "most buyers"). "quarter" counts only
+// in its proportion form ("a quarter of", "three quarters of"); "fourth-quarter buying" is a time.
+// "third"/"fifth" likewise only as proportions ("a third", "two thirds", "the upper third of"), never the
+// ordinal ("the third quarter").
+const FRACTION_WORD = /\b(?:half|halves|majority|minority|most|twice|double|triple|doubled|tripled)\b|\b(?:a|one|three)\s+quarters?\s+of\b|\b(?:a|one|two|three|four)\s+(?:third|fifth)s?\b|\b(?:third|fifth)s?\s+of\b/i;
 
 // `context` describes the DOCUMENT. It may never carry a decision-relevant claim, whatever section the
 // model put it in (the model chooses the section role, so the role alone proves nothing):

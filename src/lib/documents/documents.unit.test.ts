@@ -150,10 +150,13 @@ describe('validateDocModel', () => {
       { type: 'paragraph', id: 'f1', text: 'Target the offices that place half of all obligations.', claim: 'recommendation' },
       { type: 'paragraph', id: 'f2', text: 'A third of buyers will recompete early.', claim: 'assumption' },
       { type: 'paragraph', id: 'f3', text: 'Focus where most buyers use set-asides.', claim: 'recommendation' },
+      { type: 'paragraph', id: 'f4', text: 'A quarter of spending goes to two vendors.', claim: 'assumption' },
+      { type: 'paragraph', id: 'f5', text: 'Three quarters of awards are set aside.', claim: 'recommendation' },
       { type: 'paragraph', id: 'ok', text: 'Expect fourth-quarter buying to peak.', claim: 'assumption' },
+      { type: 'paragraph', id: 'ok2', text: 'Plan outreach before the third quarter ends.', claim: 'recommendation' },
     ] }] });
     const msgs = issuesOf(m).filter((x) => /must cite its source/.test(x));
-    expect(msgs.map((x) => x.match(/\((\w+)\)$/)?.[1])).toEqual(['f1', 'f2', 'f3']);
+    expect(msgs.map((x) => x.match(/\((\w+)\)$/)?.[1])).toEqual(['f1', 'f2', 'f3', 'f4', 'f5']);
   });
 
   it('demoteUncitedFacts output always validates (misplaced context, uncited figures, critical+unverified)', () => {
