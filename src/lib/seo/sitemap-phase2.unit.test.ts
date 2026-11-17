@@ -105,6 +105,7 @@ describe('the sitemap is split by page family', () => {
       'sitemap-contractor-tabs.xml', 'sitemap-opportunities.xml', 'sitemap-facets.xml',
       'sitemap-opportunities-closed.xml',
       'sitemap-forecasts.xml',
+      'sitemap-offices.xml',
     ]);
     const xml = renderSitemapIndex(SITEMAP_CHILDREN.map((c) => ({ loc: `https://getmindy.ai/${c}` })));
     expect(xml.match(/<sitemap>/g)).toHaveLength(SITEMAP_CHILDREN.length);

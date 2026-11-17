@@ -37,6 +37,7 @@ import { COMPETITORS } from '@/data/competitors';
 import { LISTICLES } from '@/data/top-listicles';
 import { publishedPublications } from '@/lib/analytics/research-publications';
 import { getOpportunitySitemapEntries, getClosedOpportunitySitemapEntries } from '@/lib/seo/opportunities';
+import { getOfficeSitemapEntries } from '@/lib/seo/offices';
 import { toLastmod, renderSitemapIndex, SITEMAP_URL_LIMIT, type SitemapEntry } from '@/lib/seo/sitemap-xml';
 
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai';
@@ -51,6 +52,7 @@ export const SITEMAP_CHILDREN = [
   'sitemap-facets.xml',
   'sitemap-opportunities-closed.xml',
   'sitemap-forecasts.xml',
+  'sitemap-offices.xml',
 ] as const;
 
 /** The index document, served at /sitemap.xml and /sitemap-index.xml. */
@@ -332,4 +334,22 @@ export async function facetEntries(): Promise<SitemapEntry[]> {
       url: `${SITE_URL}/set-aside/${x.setAside}/${x.naics}`, changeFrequency: 'daily' as const, priority: 0.7,
     })),
   ];
+}
+
+/**
+ * DoD buying offices (/offices/<DODAAC>): a DoD directory row + enough active notices to clear the
+ * thin gate (officeSitemapEligible, a subset of the page's own index gate). lastmod = the latest
+ * posted_date among the office's active notices.
+ */
+export async function officeEntries(): Promise<SitemapEntry[]> {
+  const rows = await getOfficeSitemapEntries();
+  if (rows.length > SITEMAP_URL_LIMIT) {
+    throw new Error(`office sitemap has ${rows.length} URLs, over the ${SITEMAP_URL_LIMIT} per-file limit`);
+  }
+  return rows.map((r) => ({
+    url: `${SITE_URL}/offices/${r.dodaac}`,
+    lastModified: r.lastModified,
+    changeFrequency: 'daily' as const,
+    priority: 0.6,
+  }));
 }
