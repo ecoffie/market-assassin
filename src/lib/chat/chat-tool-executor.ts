@@ -113,7 +113,7 @@ export interface RoundOptions {
 }
 
 /** Registry tools that read the acting user's Vault (bound to the acting scope in chat). */
-export const VAULT_GROUNDED_TOOLS: ReadonlySet<string> = new Set(['draft_proposal', 'draft_proposal_section']);
+export const VAULT_GROUNDED_TOOLS: ReadonlySet<string> = new Set(['draft_proposal', 'draft_proposal_section', 'create_document']);
 
 function refusal(category: string, message: string): Record<string, unknown> {
   return { ok: false, state: 'unavailable', error_category: category, message };
