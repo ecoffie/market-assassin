@@ -36,7 +36,6 @@ import {
   Search,
   Sparkles,
   CalendarClock,
-  Trophy,
   CircleUser,
   Shield,
 } from 'lucide-react';
@@ -285,14 +284,19 @@ export const NAV_GROUPS: NavGroup[] = [
       { panel: 'target-list', tab: 'Offices' },
     ],
   },
+  // Proposals and Pricing were one "Win the bid" group with two tabs; split into their own
+  // sidebar rows (Eric, 2026-11-17).
   {
-    id: 'win',
-    label: 'Win the bid',
-    icon: Trophy,
-    members: [
-      { panel: 'pricing', tab: 'Pricing' },
-      { panel: 'proposals', tab: 'Proposals' },
-    ],
+    id: 'proposals',
+    label: 'Proposals',
+    icon: FileText,
+    members: [{ panel: 'proposals', tab: 'Proposals' }],
+  },
+  {
+    id: 'pricing',
+    label: 'Pricing',
+    icon: DollarSign,
+    members: [{ panel: 'pricing', tab: 'Pricing' }],
   },
   {
     id: 'research',
