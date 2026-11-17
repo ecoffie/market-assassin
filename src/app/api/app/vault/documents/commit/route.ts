@@ -34,6 +34,7 @@ import {
 } from '@/lib/vault/normalize';
 import { embedVaultRow } from '@/lib/vault/embed-evidence';
 import { isKnownNaicsCode } from '@/lib/codes/validate-market-codes';
+import { mayCommitToFacts } from '@/lib/vault/doc-class';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -104,12 +105,27 @@ export async function POST(request: NextRequest) {
   // Optional: commit still works if no document_id is given.
   let sourceText = '';
   if (documentId) {
-    const { data: doc } = await sb
+    // select('*'), not a column list: doc_class only exists once migration
+    // 20261117_vault_doc_class.sql is applied, and naming it before then would 400
+    // the read and silently skip the gate below.
+    const { data: doc, error: docErr } = await sb
       .from('user_boilerplate_docs')
-      .select('extracted_text')
+      .select('*')
       .eq('id', documentId)
       .eq('user_email', userEmail)
       .maybeSingle();
+    if (docErr) {
+      return NextResponse.json({ success: false, error: 'Could not load the document.' }, { status: 500 });
+    }
+    // Reference (Ask Mindy) and generated documents are not the user's company
+    // material: their contents become Vault facts only with an explicit confirmation.
+    const gate = mayCommitToFacts(doc, body.confirm_non_company === true);
+    if (!gate.ok) {
+      return NextResponse.json(
+        { success: false, error: gate.message, code: 'confirmation_required', doc_class: gate.docClass },
+        { status: 409 },
+      );
+    }
     sourceText = String(doc?.extracted_text || '');
   }
 
