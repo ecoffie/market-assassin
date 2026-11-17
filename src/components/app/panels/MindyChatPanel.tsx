@@ -23,6 +23,7 @@ import { authedFetch } from '../authHeaders';
 import { UpgradeModal } from '../UpgradeModal';
 import { DEFAULT_STARTER_PROMPTS } from '@/lib/chat/starter-prompts';
 import { renderSafeMarkdown } from '@/lib/chat/safe-markdown';
+import { startProposalFromNotice } from '@/lib/chat/start-proposal';
 import { CHAT_HANDOFF_KEY, parseChatHandoff, opportunityContextField, type AttachedOpportunity } from '@/lib/chat/chat-handoff';
 
 interface MindyChatPanelProps {
@@ -108,6 +109,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
   // The opportunity this conversation is about (from the Map drawer's "Open in full workspace"). Shown as a
   // removable chip; only its id is sent.
   const [attachedOpp, setAttachedOpp] = useState<AttachedOpportunity | null>(null);
+  const [proposalState, setProposalState] = useState<'idle' | 'working' | 'failed'>('idle');
   // Conversation history sidebar.
   const [sessions, setSessions] = useState<Array<{ id: string; title: string | null; message_count: number; updated_at: string }>>([]);
   const [loadingSession, setLoadingSession] = useState(false);
@@ -413,6 +415,22 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
     inputRef.current?.focus();
   }, [email, openSession]);
 
+  // "Start a proposal" (user click only): track the attached notice, make sure its documents are fetched,
+  // and open Proposals on that pursuit. See src/lib/chat/start-proposal.ts.
+  const startProposal = useCallback(async () => {
+    if (!email || !attachedOpp || proposalState === 'working') return;
+    setProposalState('working');
+    const r = await startProposalFromNotice(
+      (url, init) => authedFetch(url, email, init),
+      email,
+      { notice_id: attachedOpp.notice_id, title: attachedOpp.title, deadline: attachedOpp.deadline },
+    );
+    if (!r.ok) { setProposalState('failed'); return; }
+    setProposalState('idle');
+    if (onPanelChange) onPanelChange('proposals', { pursuit_id: r.pursuitId });
+    else window.location.href = r.href;
+  }, [email, attachedOpp, proposalState, onPanelChange]);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Enter sends; Shift+Enter inserts a newline (Claude-style). Cmd/Ctrl+Enter still sends.
     // Ignore Enter while an IME composition is in progress (e.g. Japanese/Chinese input).
@@ -706,9 +724,19 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
               {attachedOpp.deadline && <span className="text-faint shrink-0">· due {attachedOpp.deadline.slice(0, 10)}</span>}
               <button
                 type="button"
-                onClick={() => setAttachedOpp(null)}
+                onClick={startProposal}
+                disabled={proposalState === 'working'}
+                title="Saves this opportunity to My Pursuits, then opens Proposals"
+                className="ml-auto shrink-0 rounded-md border border-purple-400/40 px-2 py-0.5 text-[11.5px] font-medium text-purple-100 hover:bg-purple-500/20 disabled:opacity-60"
+              >
+                {proposalState === 'working' ? 'Starting…' : proposalState === 'failed' ? 'Try again' : 'Start a proposal'}
+                <span className="block text-[10px] font-normal text-faint">Saves to My Pursuits</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAttachedOpp(null); setProposalState('idle'); }}
                 aria-label="Remove this opportunity from the question"
-                className="ml-auto shrink-0 rounded p-0.5 text-faint hover:text-white"
+                className="shrink-0 rounded p-0.5 text-faint hover:text-white"
               >
                 <X className="w-3.5 h-3.5" />
               </button>

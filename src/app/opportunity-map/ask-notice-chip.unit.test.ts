@@ -94,7 +94,7 @@ describe('selected notice attaches to the main chat', () => {
     const t = boot();
     t.w.__selectedOpp = OPP;
     t.open();
-    (t.chip().querySelector('button') as HTMLButtonElement).click();
+    (t.chip().querySelector('.rm') as HTMLButtonElement).click();
     expect(t.chip().textContent).toBe('');
     expect(t.w.document.getElementById('amkCtx')!.textContent).toContain('in view');
     await t.ask('q');
@@ -155,5 +155,101 @@ describe('the listing drawer publishes the selection', () => {
   it('sets window.__selectedOpp for SAM notices (no flag) and clears it on close', () => {
     expect(MAP).toMatch(/window\.__selectedOpp=\/\^\[0-9a-f\]\{32\}\$\/\.test/);
     expect(MAP).toMatch(/function close\(\)\{[^}]*window\.__selectedOpp=null;/);
+  });
+});
+
+describe('Start a proposal (user click only)', () => {
+  function withPipeline(t: ReturnType<typeof boot>, status: number, body: unknown) {
+    const calls: Array<{ url: string; init: { method?: string; body?: string } }> = [];
+    t.w.fetch = vi.fn(async (url: string, init: { method?: string; body?: string }) => {
+      calls.push({ url, init });
+      if (url === '/api/pipeline') return { ok: status < 300, status, json: async () => body };
+      return { ok: true, status: 200, json: async () => ({ success: true }) };
+    }) as never;
+    return calls;
+  }
+  const flush = async () => { for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0)); };
+  it('nothing is written until the button is clicked', async () => {
+    const t = boot();
+    t.w.__selectedOpp = OPP;
+    const calls = withPipeline(t, 200, { opportunity: { id: 'p-1' } });
+    t.open();
+    await flush();
+    expect(calls).toHaveLength(0);
+  });
+  it('new pursuit: one pipeline POST with only the notice facts, then opens Proposals', async () => {
+    const t = boot();
+    t.w.__selectedOpp = OPP;
+    t.open();
+    const calls = withPipeline(t, 200, { opportunity: { id: 'p-1' } });
+    const btn = t.chip().querySelector('.sp') as HTMLButtonElement;
+    expect(btn.textContent).toBe('Start a proposalSaves to My Pursuits');
+    btn.click();
+    await flush();
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe('/api/pipeline');
+    expect(JSON.parse(calls[0].init.body!)).toEqual({ user_email: 'pro@example.com', title: OPP.title, notice_id: NID, source: 'ask_mindy', response_deadline: OPP.deadline });
+    expect(btn.textContent).toBe('Opening…');
+  });
+  it('already tracked without documents: asks for its documents once', async () => {
+    const t = boot();
+    t.w.__selectedOpp = OPP;
+    t.open();
+    const calls = withPipeline(t, 409, { opportunity: { id: 'p-2', docs_status: 'failed' } });
+    (t.chip().querySelector('.sp') as HTMLButtonElement).click();
+    await flush();
+    expect(calls.map((c) => c.url)).toEqual(['/api/pipeline', '/api/app/proposal/pursuit-docs?email=pro%40example.com&pipeline_id=p-2']);
+  });
+  it('already tracked with documents: no second fetch', async () => {
+    const t = boot();
+    t.w.__selectedOpp = OPP;
+    t.open();
+    const calls = withPipeline(t, 409, { opportunity: { id: 'p-3', docs_status: 'ready' } });
+    (t.chip().querySelector('.sp') as HTMLButtonElement).click();
+    await flush();
+    expect(calls).toHaveLength(1);
+  });
+  it('a failed save says Try again and does not navigate', async () => {
+    const t = boot();
+    t.w.__selectedOpp = OPP;
+    t.open();
+    withPipeline(t, 500, {});
+    const btn = t.chip().querySelector('.sp') as HTMLButtonElement;
+    btn.click();
+    await flush();
+    expect(btn.textContent).toBe('Try againSaves to My Pursuits');
+    expect(btn.disabled).toBe(false);
+  });
+});
+
+describe('Start a proposal: Coach Mode workspace', () => {
+  async function run(store: Record<string, string>) {
+    const t = boot();
+    for (const [k, v] of Object.entries(store)) (t.w.localStorage as Storage).setItem(k, v);
+    t.w.__selectedOpp = OPP;
+    t.open();
+    const calls: Array<{ url: string; init: { headers?: Record<string, string> } }> = [];
+    t.w.fetch = vi.fn(async (url: string, init: { headers?: Record<string, string> }) => {
+      calls.push({ url, init });
+      if (url === '/api/pipeline') return { ok: false, status: 409, json: async () => ({ opportunity: { id: 'p-2', docs_status: 'failed' } }) };
+      return { ok: true, status: 200, json: async () => ({}) };
+    }) as never;
+    (t.chip().querySelector('.sp') as HTMLButtonElement).click();
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+    return calls;
+  }
+  it('a coach in a client workspace sends x-active-workspace on both requests', async () => {
+    const calls = await run({ mindy_active_workspace: 'ws-client', mindy_active_workspace_owner: 'pro@example.com' });
+    expect(calls).toHaveLength(2);
+    for (const c of calls) expect(c.init.headers!['x-active-workspace']).toBe('ws-client');
+  });
+  it('no active workspace, or one stamped by another user: no header', async () => {
+    for (const store of [{}, { mindy_active_workspace: 'ws-x', mindy_active_workspace_owner: 'someone@else.com' }]) {
+      const calls = await run(store);
+      for (const c of calls) expect(c.init.headers!['x-active-workspace']).toBeUndefined();
+    }
+  });
+  it('the label says it saves to My Pursuits', () => {
+    expect(MAP).toContain('Start a proposal<small>Saves to My Pursuits</small>');
   });
 });

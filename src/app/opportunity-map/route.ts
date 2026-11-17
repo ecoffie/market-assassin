@@ -10878,7 +10878,9 @@ const ASK_MINDY_CSS =
   // Attached notice chip (the selected opportunity rides along with the main chat) + the full-workspace link.
   + '.amk-att{display:flex;align-items:center;gap:6px;margin:0 0 8px;padding:6px 8px 6px 10px;background:#eef4ff;border:1px solid #d3e2fc;border-radius:9px;font:500 12px/1.35 Inter,system-ui,sans-serif;color:#1e3a8a}'
   + '.amk-att .lbl{color:#64748b;flex:none}.amk-att .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}'
-  + '.amk-att button{flex:none;border:0;background:none;color:#64748b;cursor:pointer;font:600 15px/1 Inter;padding:0 2px}.amk-att button:hover{color:#1e3a8a}'
+  + '.amk-att .rm{flex:none;border:0;background:none;color:#64748b;cursor:pointer;font:600 15px/1 Inter;padding:0 2px}.amk-att .rm:hover{color:#1e3a8a}'
+  + '.amk-att .sp small{display:block;font-weight:500;font-size:9.5px;color:#64748b;margin-top:1px}'
+  + '.amk-att .sp{flex:none;border:1px solid #bcd3fb;background:#fff;color:#1d4ed8;cursor:pointer;font:600 11.5px/1.2 Inter,system-ui,sans-serif;border-radius:7px;padding:4px 8px;text-align:center}.amk-att .sp:hover{background:#e0ebff}.amk-att .sp:disabled{opacity:.6;cursor:default}'
   + '.amk-ws{display:block;margin-top:8px;text-align:right;font:600 11.5px Inter,system-ui,sans-serif;color:#2563eb;text-decoration:none}.amk-ws:hover{text-decoration:underline}'
   + '.amk-in{display:flex;gap:8px;align-items:flex-end}'
   + '.amk-in textarea{flex:1;resize:none;border:1px solid #dde3ec;border-radius:12px;padding:10px 12px;font:400 13.5px Inter;color:#111c26;max-height:120px;outline:none}'
@@ -10887,7 +10889,7 @@ const ASK_MINDY_CSS =
   + '.amk-send:disabled{opacity:.45;cursor:default}.amk-send svg{width:18px;height:18px}'
   + '.amk-up{text-align:center;padding:30px 20px}.amk-up h4{font:800 16px Inter;margin:0 0 6px;color:#111c26}.amk-up p{font:500 13px Inter;color:#6b7787;margin:0 0 14px}'
   + '.amk-up a{display:inline-block;background:#0a8f57;color:#fff;text-decoration:none;border-radius:10px;padding:10px 20px;font:700 13px Inter}'
-  + '@media(prefers-color-scheme:dark){.amk{background:#111823}.amk-hd{border-color:#202b39}.amk-hd h3{color:#eaf1f8}.amk-msg.a{color:#eaf1f8}.amk-msg.a .bub{background:#0d141d;border-color:#202b39}.amk-msg.a .bub.md .md-h,.amk-msg.a .bub.md>p:first-child{color:#eaf1f8}.amk-msg.a .bub.md code{background:#18222f}.amk-msg.a .bub a{color:#7fb0ff}.amk-chips button{background:#0d141d;border-color:#202b39;color:#cdd8e4}.amk-foot{border-color:#202b39}.amk-in textarea{background:#0d141d;border-color:#202b39;color:#eaf1f8}.amk-empty b,.amk-up h4{color:#eaf1f8}.amk-act button{background:#122033;border-color:#1f3a5c}.amk-att{background:#122033;border-color:#1f3a5c;color:#cfe0ff}.amk-ws{color:#7fb0ff}}';
+  + '@media(prefers-color-scheme:dark){.amk{background:#111823}.amk-hd{border-color:#202b39}.amk-hd h3{color:#eaf1f8}.amk-msg.a{color:#eaf1f8}.amk-msg.a .bub{background:#0d141d;border-color:#202b39}.amk-msg.a .bub.md .md-h,.amk-msg.a .bub.md>p:first-child{color:#eaf1f8}.amk-msg.a .bub.md code{background:#18222f}.amk-msg.a .bub a{color:#7fb0ff}.amk-chips button{background:#0d141d;border-color:#202b39;color:#cdd8e4}.amk-foot{border-color:#202b39}.amk-in textarea{background:#0d141d;border-color:#202b39;color:#eaf1f8}.amk-empty b,.amk-up h4{color:#eaf1f8}.amk-act button{background:#122033;border-color:#1f3a5c}.amk-att{background:#122033;border-color:#1f3a5c;color:#cfe0ff}.amk-att .sp{background:#0d141d;border-color:#1f3a5c;color:#9ec2ff}.amk-ws{color:#7fb0ff}}';
 
 const ASK_MINDY_HTML =
   '<div class="amk-ov" id="amkOv"></div>'
@@ -10951,11 +10953,49 @@ const ASK_MINDY_JS = `<script>(function(){
     if(attEl){
       if(attached&&!oppCtx){
         attEl.className='amk-att';
-        attEl.innerHTML='<span class="lbl">Asking about</span><span class="t" title="'+esc(attached.title)+'">'+esc(attached.title||'this opportunity')+'</span><button type="button" aria-label="Remove this opportunity from the question">\u00d7</button>';
-        attEl.querySelector('button').onclick=function(){ if(attached) dismissedId=attached.id; attached=null; renderAttached(); };
+        attEl.innerHTML='<span class="lbl">Asking about</span><span class="t" title="'+esc(attached.title)+'">'+esc(attached.title||'this opportunity')+'</span><button type="button" class="sp" title="Saves this opportunity to My Pursuits, then opens Proposals">Start a proposal<small>Saves to My Pursuits</small></button><button type="button" class="rm" aria-label="Remove this opportunity from the question">\u00d7</button>';
+        attEl.querySelector('.rm').onclick=function(){ if(attached) dismissedId=attached.id; attached=null; renderAttached(); };
+        attEl.querySelector('.sp').onclick=function(){ startProposal(this); };
       } else { attEl.className=''; attEl.innerHTML=''; }
     }
     renderCtx();
+  }
+  // "Start a proposal" — the user's click only; Mindy never writes on its own. ES5 copy of
+  // src/lib/chat/start-proposal.ts (kept in step by start-proposal-parity.unit.test.ts): POST /api/pipeline
+  // (a 409 = already tracked, and carries that row); a NEW pursuit already fetches its documents
+  // (fetchPursuitDocsAuto, scheduled by the pipeline route); an existing one whose documents never arrived
+  // gets POST /api/app/proposal/pursuit-docs. Then /app?panel=proposals&pursuit_id=<row id>.
+  var DOCS_SETTLED={ready:1,loaded:1,fetching:1};
+  function startProposal(btn){
+    var n=attached; if(!n||btn.disabled)return;
+    var t=tok(), em=email();
+    if(!t||!em){ if(window.openSignInModal) window.openSignInModal('start a proposal',function(){ startProposal(btn); }); return; }
+    btn.disabled=true; btn.textContent='Starting\u2026';
+    var hd={'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em};
+    // Coach Mode, exactly as authedFetch (src/components/app/activeWorkspace.ts activeWorkspaceFor): a coach
+    // working in a client's workspace saves to THAT workspace. Withheld only when the stamp names another user;
+    // the server re-checks the coach's access either way.
+    try{ var ws=localStorage.getItem('mindy_active_workspace'), wso=localStorage.getItem('mindy_active_workspace_owner');
+      if(ws&&!(wso&&wso!==String(em).toLowerCase().trim())) hd['x-active-workspace']=ws; }catch(e){}
+    var b={user_email:em,title:(n.title||'').trim()||'SAM.gov opportunity',notice_id:n.id,source:'ask_mindy'};
+    if(n.deadline) b.response_deadline=n.deadline;
+    function fail(){ btn.disabled=false; btn.innerHTML='Try again<small>Saves to My Pursuits</small>'; }
+    fetch('/api/pipeline',{method:'POST',headers:hd,body:JSON.stringify(b)}).then(function(r){
+      if(!r.ok&&r.status!==409){ fail(); return; }
+      return r.json().catch(function(){ return null; }).then(function(d){
+        var op=d&&d.opportunity, pid=op&&op.id?String(op.id):'';
+        if(!pid){ fail(); return; }
+        var p=Promise.resolve();
+        if(r.status===409&&!DOCS_SETTLED[String(op.docs_status||'')]){
+          p=fetch('/api/app/proposal/pursuit-docs?email='+encodeURIComponent(em)+'&pipeline_id='+encodeURIComponent(pid),{method:'POST',headers:hd,keepalive:true}).catch(function(){});
+        }
+        try{ if(window.__track) window.__track('tool_use','ask_mindy_start_proposal',{existing:r.status===409}); }catch(e){}
+        btn.textContent='Opening\u2026';
+        // The docs request is started before leaving (keepalive) and never waited on: Proposals shows its state.
+        location.href='/app?panel=proposals&pursuit_id='+encodeURIComponent(pid);
+        return p;
+      });
+    }).catch(fail);
   }
   window.__onSelectedOpp=function(){ if(drawer.classList.contains('show')) syncAttached(); };
   // Continue this conversation (and the attached notice) in the full Ask Mindy workspace. The panel reads
