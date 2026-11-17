@@ -101,8 +101,9 @@ describe('find_my_documents', () => {
   it('this_conversation_only without a conversation → empty, no query', async () => {
     const { db, queries } = fakeDb([row({})]);
     const r = await makeMyDocumentsTool(db, own, { chatSessionId: null }).execute({ this_conversation_only: true });
-    expect(r.count).toBe(0);
-    expect(queries).toHaveLength(0);
+    expect(r).toMatchObject({ ok: true, count: 0, no_current_conversation: true });
+    expect(String(r.note)).toMatch(/no current conversation/);
+    expect(queries).toHaveLength(0); // never .eq('chat_session_id', null)
   });
 
   it('archived documents are excluded in every query', async () => {

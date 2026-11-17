@@ -102,7 +102,9 @@ export function makeMyDocumentsTool(db: MyDocsDb, scope: ChatActingScope, opts: 
 
     // Step 1: metadata only.
     if (args?.this_conversation_only === true && !opts.chatSessionId) {
-      return { ok: true, ...workspaceNote, count: 0, items: [], note: 'This conversation has no saved documents yet.' };
+      // No valid current conversation (new chat, or an id not accepted as the caller's): say so
+      // explicitly. The query below is never built, so chat_session_id is never matched against null.
+      return { ok: true, ...workspaceNote, count: 0, items: [], no_current_conversation: true, note: 'There is no current conversation to search, so no conversation documents were looked up. Offer to search all saved documents by name instead.' };
     }
     let q = db.from('user_boilerplate_docs').select(META).eq('user_email', owner).is('archived_at', null);
     const cls = args?.doc_class;
