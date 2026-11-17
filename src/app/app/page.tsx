@@ -27,6 +27,7 @@ import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
 import { parseAppDeepLink } from '@/lib/app/deep-link-params';
 import { MAP_SHELL_HOME_EVENT, isMapShellPanel } from '@/lib/app/map-shell';
 import { KNOWN_PANELS } from '@/lib/app/known-panels';
+import TrialOfferBanner from '@/components/app/TrialOfferBanner';
 
 /** The shared account-menu script (map + public pages) without its <script> wrapper. */
 const ACCOUNT_MENU_SCRIPT = ACCOUNT_MENU_JS.replace(/^<script>/, '').replace(/<\/script>[\s\S]*$/, '');
@@ -71,6 +72,8 @@ export default function AppPage() {
 function AppDashboard() {
   const [email, setEmail] = useState<string | null>(null);
   const [tier, setTier] = useState<AppTier>('free');
+  // True once /api/access/check has answered, so the free-only trial banner never flashes for Pro.
+  const [tierResolved, setTierResolved] = useState(false);
   const [coachModeAllowed, setCoachModeAllowed] = useState(false);
   // Internal staff (govcongiants / getmindy team). Kept for staff-only treatment;
   // no longer gates the prototype demo tabs.
@@ -310,6 +313,7 @@ function AppDashboard() {
 
       setEmail(userEmail);
       setTier(userTier);
+      setTierResolved(true);
       setCoachModeAllowed(!!accessData?.coachMode?.allowed);
       setIsStaff(!!accessData?.isStaff);
       setCanSeePrototypes(!!accessData?.canSeePrototypes);
@@ -1514,6 +1518,10 @@ function AppDashboard() {
       <main className={isMapShell
         ? 'flex-1 h-screen h-dvh flex flex-col overflow-hidden w-full min-w-0'
         : 'flex-1 min-h-screen overflow-y-auto overflow-x-hidden pb-24 md:pb-0 w-full min-w-0'}>
+        {/* Free members only: start the 14-day Pro trial — the first thing on the page, above the
+            top bar (owner, 2026-11-17). Also on the map, where it sits above the map frame. */}
+        {tierResolved && tier === 'free' && !isStaff && <TrialOfferBanner email={email} />}
+
         {/* Top Bar */}
         <header className="sticky top-0 z-30 bg-ground-deep/90 backdrop-blur border-b border-surface px-4 md:px-6 py-3 md:py-4">
           <div className="flex items-center justify-between gap-3">
