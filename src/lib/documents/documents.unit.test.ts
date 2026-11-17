@@ -187,9 +187,11 @@ describe('validateDocModel', () => {
       { type: 'paragraph', id: 'uv', text: 'Producer doubts it.', claim: 'unverified', cites: ['s1'] },
     ] }] });
     expect(issuesOf(m)).not.toEqual([]);
-    const { model, unverified, omitted } = demoteUncitedFacts(m);
+    const { model, unverified, omitted, droppedCites } = demoteUncitedFacts(m);
     expect(unverified).toEqual(['only']);
     expect(omitted).toEqual([]);
+    // Reported, not silent — including 'mixed', which stays a fact on its real source.
+    expect(droppedCites).toEqual([{ where: 'only', ids: ['s9'] }, { where: 'mixed', ids: ['s9'] }]);
     const [only, mixed, uv] = model.sections[0].blocks as Array<{ claim?: string; cites?: string[] }>;
     expect(only).toMatchObject({ claim: 'unverified' });
     expect(only.cites).toBeUndefined();
@@ -262,6 +264,7 @@ describe('validateDocModel', () => {
     expect(unverified).toEqual(['p1', 'b[1]']);
     expect(omitted).toEqual([]);
     expect(issuesOf(model)).toEqual([]); // the dangling "zzz" is dropped, so the repaired model validates
+    expect(demoteUncitedFacts(m).droppedCites).toEqual([{ where: 'b[1]', ids: ['zzz'] }]);
     const p1 = model.sections[0].blocks[0];
     expect(p1.type === 'paragraph' && p1.claim).toBe('unverified');
     expect(p1.type === 'paragraph' && p1.text).toBe('Uncited');

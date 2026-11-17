@@ -238,6 +238,12 @@ export interface DemotionResult {
   unverified: string[];
   /** Removed: decision-critical statements with no resolvable source. */
   omitted: string[];
+  /**
+   * Cite ids with no source behind them, removed from the unit at `where` (whatever else happened to
+   * it). A non-empty list means the producer referenced sources it never supplied: surface it, don't
+   * treat the repaired document as a clean one.
+   */
+  droppedCites: Array<{ where: string; ids: string[] }>;
 }
 
 /**
@@ -251,6 +257,7 @@ export function demoteUncitedFacts(model: DocModel): DemotionResult {
   const ids = new Set(model.sources.map((s) => s.id));
   const unverified: string[] = [];
   const omitted: string[] = [];
+  const droppedCites: Array<{ where: string; ids: string[] }> = [];
   type Unit = { claim?: string; cites?: string[]; critical?: boolean; text?: string; caption?: string };
   // Returns the repaired unit, or null when it must be omitted. A unit is held to the
   // facts-must-cite rule when it is a fact, unlabeled, a recommendation/assumption stating a
@@ -261,6 +268,7 @@ export function demoteUncitedFacts(model: DocModel): DemotionResult {
     // (a hallucinated "s9" used to survive demotion and make the result fail validation).
     const all = Array.isArray(input.cites) ? input.cites : [];
     const resolved = all.filter((c) => ids.has(c));
+    if (resolved.length !== all.length) droppedCites.push({ where, ids: all.filter((c) => !ids.has(c)) });
     const u: T = resolved.length === all.length ? input : resolved.length ? { ...input, cites: resolved } : withoutCites(input);
     const text = u.text ?? u.caption ?? '';
     const cited = resolved.length > 0;
@@ -289,5 +297,5 @@ export function demoteUncitedFacts(model: DocModel): DemotionResult {
       return fixed ? [fixed as Block] : [];
     }),
   }));
-  return { model: { ...model, sections }, unverified, omitted };
+  return { model: { ...model, sections }, unverified, omitted, droppedCites };
 }
