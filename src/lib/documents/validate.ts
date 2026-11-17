@@ -124,9 +124,29 @@ export function assumptionAssertsFact(text: string): boolean {
 // company's standing. They can NEVER ride on an ASSUMPTION block: they cite (as a fact) or are omitted —
 // never shown as "unverified", never left as a premise. "Award volume" (a seasonal pattern) is not an award.
 const NEVER_ASSUMPTION_PARTS: RegExp[] = [
-  /\b(?:certif\w*|8\s*\(\s*a\s*\)|HUBZone|SDVOSB|VOSB|EDWOSB|WOSB|VetCert|DBE)\b/i,
-  /\b(?:set[- ]asides?|sole[- ]source\w*|eligib\w*|ineligib\w*|size standard|qualif(?:y|ies|ied) (?:as|for)|(?:is|are|as) (?:a )?small business|small[- ]business (?:status|concern|size))\b/i,
-  /\b(?:past performance|CPARS|PPIRS|prior (?:contracts?|work|awards?) (?:with|for))\b/i,
+  // Socioeconomic status / certification — acronyms and spelled out. Only the COMPANY's standing:
+  // "certified payroll" and a person's certification ("staff will complete Security+ certification")
+  // are planning, not status (A4 round 2).
+  /\b(?:8\s*\(\s*a\s*\)|HUBZone)|\b(?:SDVOSB|VOSB|EDWOSB|WOSB|VetCert|DBE|SDB)\b/,
+  /\b(?:(?:service[- ]disabled )?veteran[- ]owned|wom[ae]n[- ]owned|minority[- ]owned|(?:socially and )?economically disadvantaged|small disadvantaged business)\b/i,
+  /\b(?:certified|certification) (?:as|under)\b|\bSBA[- ]certified\b/i,
+  /\b(?:we are|we're|we remain|our (?:firm|company|business) is|the (?:firm|company|business) is)\s+(?:an?\s+)?(?:[\w-]+\s+){0,2}certified\b/i,
+  /\b(?:we|firm|company|business) (?:holds?|has|have|maintains?) (?:an? |the |its |our )?(?:active |current |valid )?(?:[\w()-]+ ){0,2}certification\b/i,
+  // Size / small-business status.
+  /\b(?:is|are|as|we're) (?:a |an )?(?:[\w-]+ ){0,3}small[- ]business(?:es)?\b|\bsmall[- ]business (?:status|concern|size)\b|\bsize standard\b|\bother than small\b/i,
+  // Set-aside / sole-source status.
+  /\b(?:set[- ]asides?|sole[- ]source\w*)\b/i,
+  // Eligibility / qualification — only when tied to an award, contract, set-aside, program or size
+  // ("only eligible travel costs", "qualifies for overtime pay" are planning).
+  /\b(?:eligib\w*|ineligib\w*|qualif(?:y|ies|ied))\b[^.]{0,40}\b(?:awards?|contracts?|set[- ]asides?|programs?|size|preference|8\s*\(\s*a\s*\)|HUBZone|SDVOSB|WOSB|small[- ]business|price evaluation)\b/i,
+  /\b(?:award|contract|set[- ]aside|program) eligibility\b/i,
+  // Past performance — named, or a first-person record of prior work.
+  /\b(?:past performance|CPARS|PPIRS)\b|\b(?:prior|previous) (?:contracts?|work|awards?) (?:with|for)\b/i,
+  /\b(?:[Ww]e|[Oo]ur (?:firm|company|team))\b[^.]{0,40}?\b(?:previously |have |has )?(?:supported|performed|delivered|served|held|completed|managed)\b[^.]{0,60}?(?:\b(?:contracts?|task orders?|requirements?|programs?|agenc(?:y|ies))\b|\bfor (?:the )?[A-Z])/,
+  /\b(?:were|was|as) the (?:prime|incumbent|subcontractor|sub) on\b/i,
+  // Contract-vehicle holding is eligibility.
+  /\bGSA (?:MAS|[Ss]chedule)\b|\b(?:GWAC|IDIQ|BPA|MAC) (?:holder|award)\b|\bhold (?:a|an|the|our) [\w -]{0,20}(?:schedule|vehicle|GWAC|IDIQ|BPA)\b/i,
+  // Contract awards and who won.
   /\b(?:awarded|contract awards?|award (?:of|to)|won (?:the|a|an|this|that|it|its)|winner of|(?:was|were|been) awarded)\b/i,
 ];
 export function neverAnAssumption(text: string): boolean {

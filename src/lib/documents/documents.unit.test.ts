@@ -222,7 +222,31 @@ describe('validateDocModel', () => {
       ['set-aside status', 'Assume the follow-on will be a small-business set-aside.'],
       ['eligibility', 'For planning, assume we are eligible for the HUBZone price preference.'],
       ['size status', 'Assume we qualify as a small business under 541512.'],
+      // A4 round 2 misses — spelled-out statuses, natural past-performance phrasing, vehicle holding:
+      ['SDVOSB spelled out', 'Assume we are a service-disabled veteran-owned small business.'],
+      ['WOSB spelled out', 'We assume we are a woman-owned small business.'],
+      ['past performance: previously supported', 'We assume we previously supported the Navy on this requirement.'],
+      ['past performance: have performed', 'Assume we have performed three similar contracts for VA.'],
+      ['past performance: were the prime', 'Assume we were the prime on the last task order.'],
+      ['vehicle holding', 'Assume we hold a GSA MAS contract.'],
+      ['SBA-certified company', 'We assume our company is SBA-certified.'],
+      ['economically disadvantaged', 'Assume our firm is an economically disadvantaged small business.'],
     ];
+
+    // Over-omission would silently DELETE planning content (demotion omits these), so the false
+    // positives are pinned as hard as the misses (A4 round 2).
+    const notNever = [
+      'We assume certified payroll reporting adds 2 hours a week.',
+      'For planning, assume only eligible travel costs are reimbursed.',
+      'We assume staff will complete Security+ certification by Q2.',
+      'We assume the proposal team qualifies for overtime pay.',
+      'We assume we will deliver the draft for review in two weeks.',
+      'We assume the agency will use an IDIQ vehicle.',
+    ];
+    it.each(notNever)('planning that only sounds like a never-topic is kept: %s', (text) => {
+      expect(issuesOf(one(text)).join(' ')).not.toMatch(/can never be an assumption/);
+      expect(demoteUncitedFacts(one(text)).omitted).toEqual([]);
+    });
     it.each(never)('never an assumption (%s): rejected even when cited; demotion OMITS it', (_why, text) => {
       expect(issuesOf(one(text)).join(' ')).toMatch(/can never be an assumption \(p\); label it fact and cite a source, or omit it/);
       expect(issuesOf(one(text, { cites: ['s1'] })).join(' ')).toMatch(/can never be an assumption/);
