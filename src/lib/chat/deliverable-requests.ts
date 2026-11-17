@@ -27,7 +27,7 @@ const WEAK_NOUN = /\b(summary|schedule|strategy|brief|timeline)\b/i;
 const FORMAT_WORD = '(pdf|docx?|word(?:\\s+doc(?:ument)?)?|excel|xlsx|spreadsheet|powerpoint|pptx|slide\\s*deck)';
 const FORMAT = new RegExp(`\\b(?:as|in|to|into)\\s+(?:an?\\s+)?${FORMAT_WORD}\\b|\\b(?:a|an)\\s+${FORMAT_WORD}(?:\\s+(?:file|version|copy))?\\b`, 'i');
 const CONCEPT_QUESTION = /^\s*(?:what|why|how)\s+(?:is|are|does|do|should)\s+(?:a|an|the)?\s*(?:\d{2,3}[\s-]?day\s+)?(?:plan|roadmap|report|checklist|capability\s+statement|strategy)\b/i;
-const DAY_PLAN = /\b(\d{2,3})[\s-]?day\s+(?:action\s+)?plan\b/i;
+const DAY_PLAN = /\b(\d{2,3})[\s-]?day\s+(?:action\s+)?(?:plan|road\s*map|timeline)\b/i;
 
 export type DeliverableRequest = { wantsFile: boolean; format: string | null; dayPlan: number | null };
 
@@ -36,9 +36,11 @@ export function detectDeliverableRequest(text: string): DeliverableRequest | nul
   const t = String(text || '');
   // A question ABOUT a deliverable ("What is a 90-day plan?") is answered, not produced.
   if (CONCEPT_QUESTION.test(t)) return null;
-  if (!PRODUCE.test(t)) return null;
   const dayPlanMatch = t.match(DAY_PLAN);
   const fm = t.match(FORMAT);
+  // "export" is a production verb ONLY with an explicit format ("Export this plan to Word"); bare "export"
+  // ("export control", "export-controlled items") never is.
+  if (!PRODUCE.test(t) && !(/\bexport\b/i.test(t) && fm)) return null;
   const strong = STRONG_NOUN.test(t) || !!dayPlanMatch;
   const weak = WEAK_NOUN.test(t) && (!!fm || !!dayPlanMatch);
   if (!strong && !weak) return null;

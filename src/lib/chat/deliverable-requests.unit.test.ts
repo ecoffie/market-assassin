@@ -10,6 +10,11 @@ describe('deliverable requests (Agent 4 S3: "offer, then nothing")', () => {
     expect(detectDeliverableRequest('Make a summary of these as a PDF')).toMatchObject({ wantsFile: true, format: 'PDF' });
     expect(detectDeliverableRequest('Write me a 60-day plan')).toEqual({ wantsFile: false, format: null, dayPlan: 60 });
   });
+  it('"export … to <format>" with a deliverable is a file request; an N-day roadmap/timeline carries its day count', () => {
+    expect(detectDeliverableRequest('Export this plan to Word')).toMatchObject({ wantsFile: true, format: 'WORD' });
+    expect(detectDeliverableRequest('Make me a 60-day roadmap')).toMatchObject({ dayPlan: 60 });
+    expect(detectDeliverableRequest('Give me a 30-day timeline as a PDF')).toMatchObject({ dayPlan: 30, wantsFile: true });
+  });
   it('Agent 4 false triggers are NEVER deliverable requests (uploads, export control, SAM downloads, weak nouns)', () => {
     for (const t of [
       'Can you summarize the attachment I uploaded?',
