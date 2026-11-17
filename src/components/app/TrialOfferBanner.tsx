@@ -31,14 +31,14 @@ export default function TrialOfferBanner({ email }: { email: string | null }) {
     setShow(false);
   };
   return (
-    <div data-testid="trial-offer-banner" className="mx-4 md:mx-6 mt-4 rounded-xl border border-[#cfe1ff] bg-[#eff5ff] px-4 py-3 flex flex-wrap items-center gap-3">
-      <span className="h-9 w-9 shrink-0 rounded-lg bg-[#006aff] text-white inline-flex items-center justify-center" aria-hidden><Sparkles className="h-5 w-5" /></span>
+    <div data-testid="trial-offer-banner" className="shrink-0 border-b border-[#cfe1ff] bg-[#eff5ff] px-4 md:px-6 py-2.5 flex flex-wrap items-center gap-3">
+      <span className="h-8 w-8 shrink-0 rounded-lg bg-[#006aff] text-white inline-flex items-center justify-center" aria-hidden><Sparkles className="h-5 w-5" /></span>
       <div className="min-w-[220px] flex-1">
         <p className="text-[15px] font-semibold text-[#111c26]">Try Mindy Pro free for 14 days</p>
         <p className="text-sm text-[#3a4654]">AI briefings, recompetes 12 months out, full market research and the proposal editor. $0 today, cancel anytime.</p>
       </div>
-      <a href={trialBannerHref(email)} className="h-10 px-4 rounded-lg bg-[#006aff] hover:bg-[#0057d1] text-white text-sm font-semibold inline-flex items-center">Start free trial</a>
-      <button type="button" onClick={dismiss} aria-label="Hide this for now" className="h-10 w-10 rounded-lg inline-flex items-center justify-center text-[#5a6675] hover:bg-white">
+      <a href={trialBannerHref(email)} className="h-9 px-4 rounded-lg bg-[#006aff] hover:bg-[#0057d1] text-white text-sm font-semibold inline-flex items-center">Start free trial</a>
+      <button type="button" onClick={dismiss} aria-label="Hide this for now" className="h-9 w-9 rounded-lg inline-flex items-center justify-center text-[#5a6675] hover:bg-white">
         <X className="h-4 w-4" />
       </button>
     </div>

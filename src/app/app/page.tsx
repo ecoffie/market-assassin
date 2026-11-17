@@ -1518,6 +1518,10 @@ function AppDashboard() {
       <main className={isMapShell
         ? 'flex-1 h-screen h-dvh flex flex-col overflow-hidden w-full min-w-0'
         : 'flex-1 min-h-screen overflow-y-auto overflow-x-hidden pb-24 md:pb-0 w-full min-w-0'}>
+        {/* Free members only: start the 14-day Pro trial — the first thing on the page, above the
+            top bar (owner, 2026-11-17). Also on the map, where it sits above the map frame. */}
+        {tierResolved && tier === 'free' && !isStaff && <TrialOfferBanner email={email} />}
+
         {/* Top Bar */}
         <header className="sticky top-0 z-30 bg-ground-deep/90 backdrop-blur border-b border-surface px-4 md:px-6 py-3 md:py-4">
           <div className="flex items-center justify-between gap-3">
@@ -1558,9 +1562,6 @@ function AppDashboard() {
         {/* Thin-profile nudge: users on generic-only codes get a one-line describe
             prompt → real keywords + sharper matches (reuses onboarding's describe path). */}
         {!isMapShell && <CapabilityNudge email={email} />}
-
-        {/* Free members only: start the 14-day Pro trial (owner, 2026-11-17). */}
-        {!isMapShell && tierResolved && tier === 'free' && !isStaff && <TrialOfferBanner email={email} />}
 
         {/* Tabs for the active sidebar group (nav-groups.ts) — only when it has 2+ pages.
             Tab clicks use the same handlePanelChange as the sidebar. */}
