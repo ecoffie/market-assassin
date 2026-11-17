@@ -22,6 +22,7 @@ const state: {
   answerMessages: Array<Array<{ role: string; content: string }>>;
   inserts: Array<{ table: string; row: Record<string, unknown> }>;
   allowedToolNames: unknown;
+  incumbent: unknown;
 } = {} as never;
 
 // In-memory turn store with the SQL functions' semantics (claim / complete = save + debit once / fail).
@@ -78,6 +79,11 @@ vi.mock('@/lib/chat/chat-tool-executor', () => ({
     return { offeredToolDefs: () => [], executeRound: async () => [], policyFor: () => ({ decision: 'allowed_read' }) };
   },
 }));
+// The selected-notice incumbent lookup (src/lib/chat/selected-notice.ts) — never the network in tests.
+vi.mock('@/lib/usaspending/solicitation-incumbent', async (orig) => ({
+  ...(await orig<object>()),
+  resolveSolicitationIncumbent: async () => state.incumbent,
+}));
 vi.mock('@/lib/chat/tier0-tools', () => ({ makeTier0Tools: () => ({ execute: async () => ({}) }), TIER0_TOOL_DEFS: [], TIER0_TOOL_NAMES: new Set() }));
 
 function builder(table: string) {
@@ -115,6 +121,13 @@ beforeEach(() => {
       sub_tier: 'DEPT OF THE ARMY', office: 'LA District', notice_type: 'Solicitation', set_aside_description: 'Total Small Business',
       naics_code: '561720', psc_code: 'S201', posted_date: '2026-11-01', response_deadline: '2026-12-04', pop_city: null, pop_state: 'CA',
       description: 'Provide janitorial services.', sow_text: null, ui_link: 'https://sam.gov/opp/x/view', active: true,
+      agency_hierarchy: 'DEPT OF DEFENSE.DEPT OF THE ARMY.W071 ENDIST LOS ANGELES', office_address: { city: 'LOS ANGELES', state: 'CA' },
+      points_of_contact: [{ type: 'primary', fullName: 'Jane Buyer', email: 'jane.buyer@usace.army.mil', phone: '213-555-0100' }],
+    },
+    incumbent: {
+      queried: NID, notice: null, incumbent: null, summary: null,
+      prior_awards: [{ recipientName: 'ACME CLEANING LLC', awardId: 'W912PL21C0001', naicsCode: '561720', pscCode: 'S201', popPotentialEnd: '2026-12-31' }],
+      _meta: { grounded_notice: true, grounded_incumbent: false, degraded: false, notice_source: 'cache', incumbent_finding: 'candidate_not_confirmed' },
     },
     recordError: false, sessions: {}, answer: 'The response deadline is 2026-12-04 (SAM.gov notice W912PL26Q0042).', answerFails: false, finishReason: 'stop',
     plannerMessages: [], answerMessages: [], inserts: [], allowedToolNames: null,
@@ -447,5 +460,77 @@ describe('B2 × charge-once (integration with #2049)', () => {
     const replay = await post(card);
     expect(replay.events.some((e) => e.type === 'replayed')).toBe(true);
     expect(charges()).toBe(1);
+  });
+});
+
+describe('main chat with a selected notice (Eric 2026-11-16: no card-chat flag)', () => {
+  const selected = { context: { kind: 'opportunity', notice_id: NID } };
+  beforeEach(() => { vi.stubEnv('MAP_CARD_CHAT_ENABLED', ''); state.pro = true; });
+
+  it('Pro, flag off: planner and answer get the record block with buyer, DoDAAC, contact and the incumbent as stated', async () => {
+    const { res } = await post({ ...selected, message: '[Current map view: VA, MD, DC]\n\nWho is the buyer?' });
+    expect(res.status).toBe(200);
+    const answerSys = state.answerMessages[0].filter((m) => m.role === 'system').map((m) => m.content).join('\n');
+    const plannerSys = state.plannerMessages[0].filter((m) => m.role === 'system').map((m) => m.content).join('\n');
+    for (const s of [answerSys, plannerSys]) {
+      expect(s).toContain('SELECTED OPPORTUNITY');
+      expect(s).toContain('W912PL26Q0042');
+      expect(s).toContain('Buying office: LA District (LOS ANGELES, CA)');
+      expect(s).toContain('Office DoDAAC: W912PL');
+      expect(s).toContain('jane.buyer@usace.army.mil');
+      expect(s).toContain('Finding: candidate_not_confirmed');
+      expect(s).toContain('NOT identified as the incumbent');
+    }
+  });
+
+  it('D1: add/save/track requests are pointed at Save or "Generate proposal", never a bare "I can\'t"', async () => {
+    await post({ ...selected, message: 'Add this to my pipeline' });
+    for (const msgs of [state.plannerMessages[0], state.answerMessages[0]]) {
+      const sys = msgs.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
+      expect(sys).toContain('ADD / SAVE / TRACK requests');
+      expect(sys).toContain('the "Start pursuit" button on the opportunity\'s map card');
+      expect(sys).toContain('"Generate proposal"');
+      expect(sys).toContain('do NOT stop at "I can\'t"');
+    }
+  });
+
+  it('flag off: the full tool set, no card turn claimed, nothing charged', async () => {
+    await post(selected);
+    expect(state.allowedToolNames).toBeNull();
+    expect(claimCardTurn).not.toHaveBeenCalled();
+    expect(completeCardTurn).not.toHaveBeenCalled();
+  });
+
+  it('flag off: a free account with a selected notice is still refused (main chat stays Pro)', async () => {
+    state.pro = false;
+    const { res } = await post(selected);
+    expect(res.status).toBe(403);
+  });
+
+  it('an identified incumbent is named; the office falls back to the hierarchy leaf when SAM left office empty', async () => {
+    state.record = { ...state.record!, office: null };
+    state.incumbent = {
+      queried: NID, notice: null, summary: null, prior_awards: [],
+      incumbent: { recipientName: 'ACME CLEANING LLC', awardId: 'W912PL21C0001', naicsCode: '561720', pscCode: 'S201', popPotentialEnd: '2026-12-31' },
+      _meta: { grounded_notice: true, grounded_incumbent: true, degraded: false, notice_source: 'cache', incumbent_finding: 'identified' },
+    };
+    await post(selected);
+    const sys = state.answerMessages[0].filter((m) => m.role === 'system').map((m) => m.content).join('\n');
+    expect(sys).toContain('Buying office: W071 ENDIST LOS ANGELES');
+    expect(sys).toContain('Incumbent award: ACME CLEANING LLC, award W912PL21C0001');
+  });
+
+  it('a selected notice Mindy does not have: the question is still answered, without a guessed record', async () => {
+    state.record = null;
+    const { res } = await post(selected);
+    expect(res.status).toBe(200);
+    const sys = state.answerMessages[0].filter((m) => m.role === 'system').map((m) => m.content).join('\n');
+    expect(sys).not.toContain('SELECTED OPPORTUNITY');
+  });
+
+  it('a malformed notice id is ignored (no record read, ordinary chat)', async () => {
+    await post({ context: { kind: 'opportunity', notice_id: 'not-a-notice' } });
+    const sys = state.answerMessages[0].filter((m) => m.role === 'system').map((m) => m.content).join('\n');
+    expect(sys).not.toContain('SELECTED OPPORTUNITY');
   });
 });
