@@ -9,7 +9,7 @@
 import type { Block, Claim, DocModel, TableBlock } from './model';
 import { chartToSvg } from './charts';
 import { hex, resolveTheme, type Theme } from './theme';
-import { assumptionOrigin, citationIndex, citeMarker, claimClass, claimLabel, claimsPresent, formatColumn, formatDocDate, parseInline, unverifiedStatements } from './format';
+import { assumptionOrigin, keepDash, citationIndex, citeMarker, claimClass, claimLabel, claimsPresent, formatColumn, formatDocDate, parseInline, unverifiedStatements } from './format';
 
 /**
  * The document page may load nothing but itself: no scripts, no network, no frames; only its own
@@ -201,11 +201,11 @@ export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): strin
   card.push(`<dt>Date</dt><dd>${escapeHtml(formatDocDate(model.date))}</dd>`);
   if (ordered.length) card.push(`<dt>Sources</dt><dd>${ordered.length} cited source${ordered.length === 1 ? '' : 's'}</dd>`);
   const cover = theme.cover === 'brand-band'
-    ? `<section class="cover brand"><div class="brandband"><div class="who"><span class="mark">${escapeHtml(brand.mark)}</span><div><div class="name">${escapeHtml(brand.name)}</div><div class="tag">${escapeHtml(brand.tagline)}</div></div></div><div class="contact">${brand.contactLines.map(escapeHtml).join('<br>')}</div></div><h1>${escapeHtml(model.title)}</h1>${model.subtitle ? `<p class="subtitle">${escapeHtml(model.subtitle)}</p>` : ''}<dl class="card">${card.join('')}</dl><div class="reading">${reading}</div></section>`
-    : `<section class="cover rule"><div class="titleblock"><div class="kicker">Report</div><h1>${escapeHtml(model.title)}</h1>${model.subtitle ? `<p class="subtitle">${escapeHtml(model.subtitle)}</p>` : ''}<dl>${meta.join('')}</dl></div><div class="reading">${reading}</div></section>`;
+    ? `<section class="cover brand"><div class="brandband"><div class="who"><span class="mark">${escapeHtml(brand.mark)}</span><div><div class="name">${escapeHtml(brand.name)}</div><div class="tag">${escapeHtml(brand.tagline)}</div></div></div><div class="contact">${brand.contactLines.map(escapeHtml).join('<br>')}</div></div><h1>${escapeHtml(keepDash(model.title))}</h1>${model.subtitle ? `<p class="subtitle">${escapeHtml(model.subtitle)}</p>` : ''}<dl class="card">${card.join('')}</dl><div class="reading">${reading}</div></section>`
+    : `<section class="cover rule"><div class="titleblock"><div class="kicker">Report</div><h1>${escapeHtml(keepDash(model.title))}</h1>${model.subtitle ? `<p class="subtitle">${escapeHtml(model.subtitle)}</p>` : ''}<dl>${meta.join('')}</dl></div><div class="reading">${reading}</div></section>`;
 
   const toc = showToc
-    ? `<section class="toc"><h2>Contents</h2><ol>${model.sections.filter((s) => (s.level ?? 1) === 1).map((s) => `<li>${escapeHtml(s.heading)}</li>`).join('')}${unverified.length ? '<li>Unverified statements</li>' : ''}${ordered.length ? '<li>Sources</li>' : ''}</ol></section>`
+    ? `<section class="toc"><h2>Contents</h2><ol>${model.sections.filter((s) => (s.level ?? 1) === 1).map((s) => `<li>${escapeHtml(keepDash(s.heading))}</li>`).join('')}${unverified.length ? '<li>Unverified statements</li>' : ''}${ordered.length ? '<li>Sources</li>' : ''}</ol></section>`
     : '';
 
   let topNo = 0;
@@ -214,7 +214,7 @@ export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): strin
       const tag = s.level === 3 ? 'h4' : s.level === 2 ? 'h3' : 'h2';
       // 'numbered-rule' numbers the top-level body sections ("1. Executive summary").
       const num = tag === 'h2' && theme.headingStyle === 'numbered-rule' ? `<span class="num">${++topNo}.</span>` : '';
-      return `<section id="${escapeHtml(s.id)}"><${tag}>${num}${escapeHtml(s.heading)}</${tag}>${s.blocks.map((b) => blockHtml(b, numberOf, theme)).join('')}</section>`;
+      return `<section id="${escapeHtml(s.id)}"><${tag}>${num}${escapeHtml(keepDash(s.heading))}</${tag}>${s.blocks.map((b) => blockHtml(b, numberOf, theme)).join('')}</section>`;
     })
     .join('');
 
@@ -236,5 +236,5 @@ export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): strin
       .join('')}</ol></section>`
     : '';
 
-  return `<!doctype html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="${DOC_HTML_CSP}"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(model.title)}</title><style>${themeCss(theme)}</style></head><body><main class="doc">${cover}${toc}${body}${unverifiedSection}${sources}</main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="${DOC_HTML_CSP}"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(keepDash(model.title))}</title><style>${themeCss(theme)}</style></head><body><main class="doc">${cover}${toc}${body}${unverifiedSection}${sources}</main></body></html>`;
 }

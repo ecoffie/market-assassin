@@ -32,6 +32,7 @@ const BLOCK_TYPES = new Set(['paragraph', 'bullets', 'table', 'chart', 'callout'
 const CLAIMS = new Set(['fact', 'assumption', 'recommendation', 'unverified', 'context']);
 const SOURCE_KINDS = new Set(['sam_notice', 'usaspending', 'upload', 'vault', 'tool', 'web', 'other']);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const ATTENTION_MAX_CHARS = 120;
 
 // A count or an amount: a free-standing number ("$640M", "16", "24 months", "5%") or a number
 // word ("eight", "forty-two", "million"). Not a digit glued to letters (FY26, Q3, W912PL) and not
@@ -270,6 +271,13 @@ export function validateDocModel(input: unknown): ValidationResult {
   const m = input as Partial<DocModel> & Record<string, unknown>;
 
   if (m.schema !== DOC_SCHEMA) add('schema', `must be "${DOC_SCHEMA}"`);
+  // Cover "Attention" line (A4 LOW): plain text, one line, at most ATTENTION_MAX_CHARS after trimming.
+  const attention = (m.meta as { attention?: unknown } | undefined)?.attention;
+  if (attention !== undefined) {
+    if (typeof attention !== 'string') add('meta.attention', 'must be a string');
+    else if (/[\u0000-\u001f\u007f]/.test(attention)) add('meta.attention', 'must be a single line of plain text');
+    else if (attention.trim().length > ATTENTION_MAX_CHARS) add('meta.attention', `longer than ${ATTENTION_MAX_CHARS} chars`);
+  }
   if (!str(m.title)) add('title', 'required');
   else if (m.title.length > DOC_LIMITS.maxTitleChars) add('title', `longer than ${DOC_LIMITS.maxTitleChars} chars`);
   if (m.subtitle !== undefined && typeof m.subtitle !== 'string') add('subtitle', 'must be a string');

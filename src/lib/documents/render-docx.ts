@@ -33,7 +33,7 @@ import {
 } from 'docx';
 import type { Block, ChartBlock, DocModel, TableBlock, TableColumn } from './model';
 import { resolveTheme, type Theme } from './theme';
-import { assumptionOrigin, chartShownByAdjacentTable, citationIndex, citeMarker, claimLabel, claimsPresent, formatColumn, formatChartValue, formatDocDate, usdColumnDecimals, parseInline, unverifiedStatements } from './format';
+import { assumptionOrigin, keepDash, chartShownByAdjacentTable, citationIndex, citeMarker, claimLabel, claimsPresent, formatColumn, formatChartValue, formatDocDate, usdColumnDecimals, parseInline, unverifiedStatements } from './format';
 
 // The document's theme (theme.ts), resolved once per buildDocx call (which is synchronous). Every
 // color and the font below come from it — nothing is hard-coded in this renderer.
@@ -256,7 +256,7 @@ export function buildDocx(model: DocModel): Document {
       ] })],
     }));
     children.push(new Paragraph({ spacing: { before: 600, after: 0 }, children: [] }));
-    children.push(new Paragraph({ style: 'Title', children: [new TextRun({ font: FONT, size: 56, bold: true, color: T.colors.title, text: model.title })] }));
+    children.push(new Paragraph({ style: 'Title', children: [new TextRun({ font: FONT, size: 56, bold: true, color: T.colors.title, text: keepDash(model.title) })] }));
     if (model.subtitle) children.push(new Paragraph({ spacing: { after: 300 }, children: [new TextRun({ font: FONT, text: model.subtitle, size: 26, color: T.colors.meta })] }));
     const card: Array<[string, string]> = [];
     if (model.preparedFor) card.push(['Prepared for', model.preparedFor]);
@@ -268,7 +268,7 @@ export function buildDocx(model: DocModel): Document {
     children.push(kvTable(card, NAVY, INK, true));
   } else {
     children.push(new Paragraph({ spacing: { before: 2400, after: 120 }, children: [new TextRun({ font: FONT, text: 'REPORT', bold: true, size: 18, color: T.colors.accent2, characterSpacing: 40 })] }));
-    children.push(new Paragraph({ style: 'Title', children: [new TextRun({ font: FONT, size: 56, bold: true, color: T.colors.title, text: model.title })] }));
+    children.push(new Paragraph({ style: 'Title', children: [new TextRun({ font: FONT, size: 56, bold: true, color: T.colors.title, text: keepDash(model.title) })] }));
     if (model.subtitle) children.push(new Paragraph({ spacing: { after: 360 }, children: [new TextRun({ font: FONT, text: model.subtitle, size: 26, color: T.colors.meta })] }));
     const meta: Array<[string, string]> = [];
     if (model.preparedFor) meta.push(['Prepared for', model.preparedFor]);
@@ -293,7 +293,7 @@ export function buildDocx(model: DocModel): Document {
   // Contents
   if (showToc) {
     children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ font: FONT, text: 'Contents' })] }));
-    const tops = model.sections.filter((s) => (s.level ?? 1) === 1).map((s) => s.heading);
+    const tops = model.sections.filter((s) => (s.level ?? 1) === 1).map((s) => keepDash(s.heading));
     if (unverified.length) tops.push('Unverified statements');
     if (ordered.length) tops.push('Sources');
     tops.forEach((h) => children.push(new Paragraph({ style: 'Body', numbering: { reference: 'mindy-numbers-toc', level: 0 }, children: [new TextRun({ font: FONT, size: 21, text: h })] })));
@@ -306,7 +306,7 @@ export function buildDocx(model: DocModel): Document {
     const heading = s.level === 3 ? HeadingLevel.HEADING_3 : s.level === 2 ? HeadingLevel.HEADING_2 : HeadingLevel.HEADING_1;
     // 'numbered-rule' numbers the top-level body sections ("1. Executive summary").
     const label = heading === HeadingLevel.HEADING_1 && T.headingStyle === 'numbered-rule' ? `${++topNo}. ${s.heading}` : s.heading;
-    children.push(new Paragraph({ heading, children: [new TextRun({ font: FONT, text: label })] }));
+    children.push(new Paragraph({ heading, children: [new TextRun({ font: FONT, text: keepDash(label) })] }));
     s.blocks.forEach((b, i) => children.push(...blockToDocx(b, numberOf, chartShownByAdjacentTable(s.blocks, i))));
   }
 
@@ -368,7 +368,7 @@ export function buildDocx(model: DocModel): Document {
     },
     sections: [{
       properties: { page: { margin: { top: 1300, right: 1224, bottom: 1300, left: 1224 } } },
-      headers: { default: new Header({ children: [new Paragraph({ tabStops: [{ type: TabStopType.RIGHT, position: CONTENT_DXA }], children: [new TextRun({ font: FONT, text: model.title.length > 90 ? `${model.title.slice(0, 89)}…` : model.title, ...headerFooterRun }), new TextRun({ font: FONT, text: '\tPrepared with Mindy', ...headerFooterRun })] })] }) },
+      headers: { default: new Header({ children: [new Paragraph({ tabStops: [{ type: TabStopType.RIGHT, position: CONTENT_DXA }], children: [new TextRun({ font: FONT, text: keepDash(model.title.length > 90 ? `${model.title.slice(0, 89)}…` : model.title), ...headerFooterRun }), new TextRun({ font: FONT, text: '\tPrepared with Mindy', ...headerFooterRun })] })] }) },
       footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ font: FONT, children: ['Page ', PageNumber.CURRENT, ' of ', PageNumber.TOTAL_PAGES], ...headerFooterRun })] })] }) },
       children,
     }],

@@ -13,6 +13,7 @@
  */
 import type { DocModel } from './model';
 import { renderHtml, escapeHtml } from './render-html';
+import { keepDash } from './format';
 import { htmlToPdf } from '@/lib/pdf/launch-browser';
 
 export interface PdfRender {
@@ -24,7 +25,7 @@ export interface PdfRender {
 
 /** Page header + "Page X of Y" footer. Chromium substitutes the classed spans. */
 export function pdfOptions(model: DocModel): Record<string, unknown> {
-  const title = escapeHtml(model.title.length > 90 ? `${model.title.slice(0, 89)}…` : model.title);
+  const title = escapeHtml(keepDash(model.title.length > 90 ? `${model.title.slice(0, 89)}…` : model.title));
   const style = 'font-family: Helvetica, Arial, sans-serif; font-size: 7.5pt; color: #6b7280; width: 100%; padding: 0 0.85in;';
   return {
     format: 'Letter',

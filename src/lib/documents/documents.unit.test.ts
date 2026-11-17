@@ -18,7 +18,7 @@ vi.mock('@/lib/pdf/launch-browser', () => ({
 import { SAMPLE_REPORT } from './__fixtures__/sample-report';
 import { DOC_SCHEMA, type DocModel } from './model';
 import { validateDocModel, demoteUncitedFacts, hardenedAssumptions, DEFAULT_ASSUMPTION_ORIGIN, repeatedSentences, fixtureMarkers } from './validate';
-import { citationIndex, citeMarker, formatCell, formatColumn, formatChartValue, chartDuplicatesTable, parseInline, NOT_AVAILABLE, fileBaseName } from './format';
+import { keepDash, citationIndex, citeMarker, formatCell, formatColumn, formatChartValue, chartDuplicatesTable, parseInline, NOT_AVAILABLE, fileBaseName } from './format';
 import { renderHtml } from './render-html';
 import { renderDocx } from './render-docx';
 import { renderPdf, pdfOptions } from './render-pdf';
@@ -730,6 +730,43 @@ describe('theme layer (Eric, 2026-11-17: styling must be flexible)', () => {
     expect(warnRun).toMatch(/w:val="7F1D1D"/);
     const keyRun = doc.slice(doc.lastIndexOf('<w:r>', doc.indexOf('The market is concentrated.')), doc.indexOf('The market is concentrated.'));
     expect(keyRun).toMatch(/w:sz w:val="23"/);
+  });
+});
+
+describe('titles keep a dash with the word before it (A5, v5)', () => {
+  it('keepDash turns the space before an em/en dash into a non-breaking space, nothing else', () => {
+    expect(keepDash('Federal Janitorial Services Market — Research Report')).toBe('Federal Janitorial Services Market — Research Report');
+    expect(keepDash('FY2024 – FY2026 trend')).toBe('FY2024 – FY2026 trend');
+    expect(keepDash('Pre-award work-up')).toBe('Pre-award work-up');
+  });
+
+  it('PDF/HTML and DOCX titles and headings carry the non-breaking space', async () => {
+    const m = { ...clone(), sections: [...clone().sections, { id: 'extra', heading: 'Next steps — 90 days', blocks: [{ type: 'paragraph' as const, id: 'x1', text: 'Act.', claim: 'recommendation' as const }] }] };
+    const html = renderHtml(m);
+    expect(html).toContain('<h1>Federal Janitorial Services Market — Research Report (Fixture)</h1>');
+    expect(html).toContain('Next steps — 90 days</h2>');
+    expect(html).not.toMatch(/Market — Research/);
+    expect(String(pdfOptions(m).headerTemplate)).toContain('Market — Research');
+    const files = unzipSync(new Uint8Array(await renderDocx(m)));
+    const doc = strFromU8(files['word/document.xml']);
+    const header = Object.keys(files).filter((k) => /^word\/header\d*\.xml$/.test(k)).map((k) => strFromU8(files[k])).join('');
+    expect(doc).toContain('Market — Research Report (Fixture)');
+    expect(doc).toContain('Next steps — 90 days');
+    expect(doc).not.toContain('Market — Research');
+    expect(header).toContain('Market — Research');
+  });
+});
+
+describe('cover "Attention" line is bounded (A4 LOW)', () => {
+  const withAttention = (attention: unknown) => ({ ...tiny(), meta: { attention } as never });
+  it('accepts a short single line (trimmed length up to 120)', () => {
+    expect(issuesOf(withAttention('Contracting officer, Region 4'))).toEqual([]);
+    expect(issuesOf(withAttention(`  ${'a'.repeat(120)}  `))).toEqual([]);
+  });
+  it('rejects longer than 120 characters, multi-line or control characters, and non-strings', () => {
+    expect(issuesOf(withAttention('a'.repeat(121))).join(' ')).toMatch(/meta\.attention|longer than 120 chars/);
+    expect(issuesOf(withAttention('Line one\nLine two')).join(' ')).toMatch(/single line of plain text/);
+    expect(issuesOf(withAttention(42)).join(' ')).toMatch(/must be a string/);
   });
 });
 

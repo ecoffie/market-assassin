@@ -225,3 +225,12 @@ export function chartShownByAdjacentTable(blocks: Block[], i: number): boolean {
   if (!b || b.type !== 'chart') return false;
   return [blocks[i - 1], blocks[i + 1]].some((n) => n?.type === 'table' && chartDuplicatesTable(b, n));
 }
+
+/**
+ * Titles and headings: a spaced em/en dash stays attached to the word before it, so a wrapped title
+ * never starts a line with "— Research Report" (A5, v5). The space before the dash becomes a
+ * non-breaking space (U+00A0); text is otherwise unchanged.
+ */
+export function keepDash(text: string): string {
+  return text.replace(/[ \t]+([—–])/g, ' $1');
+}
