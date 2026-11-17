@@ -61,6 +61,8 @@ import { sessionTitleFrom } from '@/lib/chat/view-preamble';
 import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, renderSbloContact, lintAnalysis, deterministicNextSteps, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, SBLO_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
 import { mixedTurnNote, composeMixedAnswer, type UnrenderedResult } from '@/lib/chat/mixed-turn';
+import { sourceFromToolResult, renderedStub, citationsFromSources, ledgerFromSources, parseLedger, ledgerNotes, type ContextSource, type SourceLedger } from '@/lib/chat/context-sources';
+import { guardFacts } from '@/lib/proposal/fact-guard';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
 import { chatDeadlines, toolTimeoutMs, readWithIdleTimeout, incompleteToolNotice, withTimeout, ChatTimeoutError } from '@/lib/chat/turn-deadlines';
 
@@ -122,6 +124,8 @@ function getSupabase() {
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  /** P3: the compact source ledger returned with that answer, re-sent by the client (untrusted). */
+  sources?: unknown;
 }
 
 interface ChatRequest {
@@ -629,6 +633,16 @@ export async function POST(request: NextRequest) {
 
         // Trim history to last HISTORY_LIMIT messages for prompt-size budget.
         const history = Array.isArray(body.history) ? body.history.slice(-HISTORY_LIMIT) : [];
+        // P3 (A2): the source ledgers the client re-sent with earlier answers, newest first. Untrusted: parsed
+        // and sanitized; private entries from another acting scope are dropped. They give "#12" a real id.
+        const actingScopeKey = actingScope.kind === 'client' ? `client:${actingScope.workspaceId}` : actingScope.kind;
+        const priorLedgers: SourceLedger[] = [...history].reverse()
+          .filter((h) => h.role === 'assistant')
+          .map((h) => parseLedger(h.sources, actingScopeKey))
+          .filter((l): l is SourceLedger => !!l)
+          .slice(0, 3);
+        const ledgerSystemNotes = ledgerNotes(splitViewPreamble(message).rest || message, priorLedgers);
+        for (const n of ledgerSystemNotes) messages.push({ role: 'system', content: n });
         for (const h of history) {
           if (h.role === 'user' || h.role === 'assistant') {
             messages.push({ role: h.role, content: String(h.content || '').slice(0, 2000) });
@@ -675,6 +689,7 @@ export async function POST(request: NextRequest) {
           { role: 'system', content: capabilityNote ? `${systemPrompt}\n\n${capabilityNote}` : systemPrompt },
         ];
         if (cardContext) toolRoundMessages.push({ role: 'system', content: cardContext.block });
+        for (const n of ledgerSystemNotes) toolRoundMessages.push({ role: 'system', content: n });
         for (const h of history) {
           if (h.role === 'user' || h.role === 'assistant') {
             toolRoundMessages.push({ role: h.role, content: String(h.content || '').slice(0, 2000) });
@@ -746,6 +761,10 @@ export async function POST(request: NextRequest) {
         // P2 / audit B1: one billing outcome per executed tool call. Any failed, refused or degraded call
         // makes a card turn free (isBillableTurn), like any other incomplete answer.
         const toolBillingOutcomes: ToolBillingOutcome[] = [];
+        // P3: this turn's tool results as ContextSources (ledger, citations, A8 stubs), and their full contents
+        // for the log-only grounding check.
+        const turnSources: ContextSource[] = [];
+        const groundingTexts: string[] = [];
         try {
           if (actingScope.kind === 'client') turnTrace.notices.push('acting_scope:client_workspace');
           if (actingScope.kind === 'unavailable') turnTrace.notices.push('acting_scope:unavailable');
@@ -933,6 +952,8 @@ export async function POST(request: NextRequest) {
               // B2: the model sees a BOUNDED copy of each result (structural shortening with a
               // shown-of-total report); the renderers below still read the full r.content.
               const perResultCap = perResultBudget(results.length);
+              const toolMessageIdx = new Map<string, number>();
+              const renderedByCall = new Map<string, RenderedRecords>();
               for (const tc of toolCalls) {
                 const r = results.find((x) => x.tool_call_id === tc.id);
                 const dup = dedupe.duplicates.find((d) => d.id === tc.id);
@@ -944,7 +965,8 @@ export async function POST(request: NextRequest) {
                   const bounded = boundToolResult(r.content, perResultCap);
                   if (bounded.truncated) turnTrace.notices.push(`tool_result_bounded:${r.record.tool}:${bounded.originalChars}->${bounded.content.length}`);
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  (messages as any[]).push({ role: 'tool', tool_call_id: r.tool_call_id, content: bounded.content });
+                  const idx = (messages as any[]).push({ role: 'tool', tool_call_id: r.tool_call_id, content: bounded.content }) - 1;
+                  toolMessageIdx.set(r.tool_call_id, idx);
                 }
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 else if (dup) (messages as any[]).push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify({ duplicate_of: dup.of, note: 'Same search as another call in this turn; its results are shown once.' }) });
@@ -979,7 +1001,7 @@ export async function POST(request: NextRequest) {
                 try {
                   const parsed = JSON.parse(r.content);
                   const rendered = renderer(parsed);
-                  if (rendered) renderedRecords.push(rendered);
+                  if (rendered) { renderedRecords.push(rendered); renderedByCall.set(r.tool_call_id, rendered); }
                   else unrendered();
                 } catch (renderErr) {
                   unrendered();
@@ -987,6 +1009,26 @@ export async function POST(request: NextRequest) {
                 }
               }
               crossCheckOffices(renderedRecords);
+              // P3: every result becomes a ContextSource. A8: a rendered tool's JSON is not sent to the answer
+              // model a second time (the VERIFIED RECORD LIST carries it); a short stub keeps the call/result pair.
+              const retrievedAt = new Date().toISOString();
+              for (const r of results) {
+                groundingTexts.push(r.content);
+                const src = sourceFromToolResult({
+                  tool: r.record.tool, toolCallId: r.tool_call_id, status: r.record.status, content: r.content,
+                  rendered: renderedByCall.get(r.tool_call_id) ?? null, argsRedacted: r.argsRedacted,
+                  owner: { email: (actingScope.kind === 'client' ? actingScope.vaultEmail : auth.email!) || auth.email!, scope: actingScopeKey },
+                  retrievedAt,
+                });
+                turnSources.push(src);
+                const idx = toolMessageIdx.get(r.tool_call_id);
+                if (src.rendered && idx != null) {
+                  const stub = renderedStub(src);
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (messages as any[])[idx].content = stub;
+                  toolOriginals.set(r.tool_call_id, stub);
+                }
+              }
               if (TRACE_EVENTS) {
                 send({
                   type: 'trace',
@@ -1348,9 +1390,33 @@ export async function POST(request: NextRequest) {
         const staleMention = noticeOrigin === 'mentioned' && mentionedNotice?.status === 'resolved'
           && mentionedNotice.notice.fromEarlierTurn && !answerUsesNotice(assistantContent, cardRecord);
         if (staleMention) turnTrace.notices.push('mentioned_notice:chip_dropped_unused');
-        const citedSources: CitedSource[] = cardContext && !staleMention
-          ? [{ title: cardContext.source.label, url: cardContext.source.url, doc_type: 'sam_notice', source_path: cardRecord ? `sam_notice:${cardRecord.notice_id}` : null, document_id: null }]
-          : [];
+        // P3 (A5): citations come from this turn's sources that returned data (no longer always []); the
+        // selected/mentioned SAM.gov notice stays first when it applies.
+        const citedSources: CitedSource[] = [
+          ...(cardContext && !staleMention
+            ? [{ title: cardContext.source.label, url: cardContext.source.url, doc_type: 'sam_notice', source_path: cardRecord ? `sam_notice:${cardRecord.notice_id}` : null, document_id: null }]
+            : []),
+          ...citationsFromSources(turnSources),
+        ];
+        // P3: log-only grounding check (never changes or blocks the answer). Specifics in the model's own text
+        // that trace to no tool result, rendered list, selected notice, profile or the user's words are counted.
+        try {
+          const modelText = assistantContent.slice(modelTextStart);
+          if (modelText.trim()) {
+            const grounding = [message, ...history.map((h) => String(h.content || '')), userProfileBlock, cardContext?.block ?? '',
+              ...renderedRecords.map((r) => r.text), ...groundingTexts].join('\n');
+            const g = guardFacts(modelText, grounding);
+            if (g.unverified.length) {
+              turnTrace.notices.push(`grounding_unverified:${g.unverified.length}`);
+              turnTrace.notices.push(`grounding_kinds:${[...new Set(g.unverified.map((f) => f.kind))].join(',')}`);
+              console.warn('[chat] grounding check (log-only):', g.unverified.length, 'unverified specific(s)');
+            }
+          }
+        } catch (gErr) {
+          console.error('[chat] grounding check failed (non-fatal):', (gErr as Error)?.message);
+        }
+        // P3 (A2): the compact source ledger, kept by the client and re-sent with history.
+        send({ type: 'sources', ledger: ledgerFromSources(turnSources) });
         send({ type: 'citations', sources: citedSources });
 
         // Card chat charge: ONCE PER QUESTION. A complete answer is saved with its sources and debited in ONE
