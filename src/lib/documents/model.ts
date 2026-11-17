@@ -9,7 +9,10 @@
  * Every content block MUST carry a claim label (validate.ts refuses an unlabeled block — an
  * unlabeled block used to skip the citation rule entirely):
  *   fact           — a verified statement; must cite at least one source
- *   assumption     — rendered with a visible "ASSUMPTION" label (a premise the reader must check)
+ *   assumption     — rendered "Planning assumption" with its stated origin (a premise the reader must
+ *                    check). Never carries certifications, contract awards, past performance or
+ *                    eligibility/set-aside status — those cite or are omitted — and never hardens
+ *                    into a fact across revisions (hardenedAssumptions in validate.ts)
  *   recommendation — rendered with a visible "Recommendation" label (a suggested action)
  *   unverified     — rendered "Unverified — no source" and listed in an "Unverified statements"
  *                    section. Set by demoteUncitedFacts, never a way to dress up a guess.
@@ -57,6 +60,12 @@ interface Labeled {
   critical?: boolean;
   /** Source ids from DocModel.sources. */
   cites?: string[];
+  /**
+   * Assumptions only: where the premise comes from, stated for the reader, e.g. "This analysis models
+   * these figures; they were not verified against the customer's records." Rendered after the text.
+   * Required on an uncited assumption (Eric, 2026-11-17: origin must be explicit).
+   */
+  origin?: string;
 }
 
 export interface ParagraphBlock extends Labeled {
@@ -170,18 +179,18 @@ export const DOC_LIMITS = {
 } as const;
 
 /** The labeled items inside a block (a bullets block labels each item; others label themselves). */
-export function labeledUnits(block: Block): Array<{ claim?: Claim; cites?: string[]; critical?: boolean; where: string; text: string }> {
+export function labeledUnits(block: Block): Array<{ claim?: Claim; cites?: string[]; critical?: boolean; origin?: string; where: string; text: string }> {
   switch (block.type) {
     case 'bullets':
-      return block.items.map((it, i) => ({ claim: it.claim, cites: it.cites, critical: it.critical, where: `${block.id}[${i}]`, text: it.text }));
+      return block.items.map((it, i) => ({ claim: it.claim, cites: it.cites, critical: it.critical, origin: it.origin, where: `${block.id}[${i}]`, text: it.text }));
     case 'pagebreak':
       return [];
     case 'paragraph':
     case 'callout':
-      return [{ claim: block.claim, cites: block.cites, critical: block.critical, where: block.id, text: block.text }];
+      return [{ claim: block.claim, cites: block.cites, critical: block.critical, origin: block.origin, where: block.id, text: block.text }];
     case 'table':
-      return [{ claim: block.claim, cites: block.cites, critical: block.critical, where: block.id, text: block.caption || 'Table' }];
+      return [{ claim: block.claim, cites: block.cites, critical: block.critical, origin: block.origin, where: block.id, text: block.caption || 'Table' }];
     case 'chart':
-      return [{ claim: block.claim, cites: block.cites, critical: block.critical, where: block.id, text: block.caption || 'Chart' }];
+      return [{ claim: block.claim, cites: block.cites, critical: block.critical, origin: block.origin, where: block.id, text: block.caption || 'Chart' }];
   }
 }

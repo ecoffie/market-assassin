@@ -11,7 +11,10 @@
  *     "fact" in a client-facing PDF is exactly the claim Mindy cannot defend;
  *   - CONTEXT HAS NO NUMBERS: `context` describes the document; a digit means it is a claim;
  *   - ASSUMPTIONS MAY PLAN, NOT ASSERT (Eric, 2026-11-17): an assumption may state a planning figure,
- *     but one asserting a factual claim about the world must cite (assumptionAssertsFact);
+ *     but one asserting a factual claim about the world must cite (assumptionAssertsFact); an uncited
+ *     assumption states its origin; certifications, contract awards, past performance and
+ *     eligibility/set-aside status are never an assumption (neverAnAssumption: cite as fact or omit);
+ *     a revision never turns an assumption into a fact (hardenedAssumptions);
  *   - numbers: table/chart values must be finite; a missing value is null ("Not available"), never 0.
  *
  * `demoteUncitedFacts` is the one sanctioned repair (Eric's rule: verified, ASSUMPTION, or omitted —
@@ -114,6 +117,47 @@ export function assumptionAssertsFact(text: string): boolean {
   if (figure && (WORLD_TERM.test(plain) || namesAgency(plain) || NAMED_COMPANY.test(plain) || CONTRACT_NUMBER.test(plain))) return true;
   if (figure && !PLANNING_FRAME.test(plain)) return true;
   return INCUMBENT_CLAIM.test(plain) || AWARD_CLAIM.test(plain) || WENT_TO_COMPANY.test(plain) || SPECIFIC_DATE.test(plain) || DEADLINE.test(plain);
+}
+
+// ── Never an assumption (Eric, 2026-11-17) ───────────────────────────────────────────────────────
+// Certifications, contract awards, past performance and eligibility/set-aside status are facts about a
+// company's standing. They can NEVER ride on an ASSUMPTION block: they cite (as a fact) or are omitted —
+// never shown as "unverified", never left as a premise. "Award volume" (a seasonal pattern) is not an award.
+const NEVER_ASSUMPTION_PARTS: RegExp[] = [
+  /\b(?:certif\w*|8\s*\(\s*a\s*\)|HUBZone|SDVOSB|VOSB|EDWOSB|WOSB|VetCert|DBE)\b/i,
+  /\b(?:set[- ]asides?|sole[- ]source\w*|eligib\w*|ineligib\w*|size standard|qualif(?:y|ies|ied) (?:as|for)|(?:is|are|as) (?:a )?small business|small[- ]business (?:status|concern|size))\b/i,
+  /\b(?:past performance|CPARS|PPIRS|prior (?:contracts?|work|awards?) (?:with|for))\b/i,
+  /\b(?:awarded|contract awards?|award (?:of|to)|won (?:the|a|an|this|that|it|its)|winner of|(?:was|were|been) awarded)\b/i,
+];
+export function neverAnAssumption(text: string): boolean {
+  const plain = text.replace(/\*\*|_/g, '');
+  return NEVER_ASSUMPTION_PARTS.some((re) => re.test(plain));
+}
+
+/** What an uncited assumption says about its origin when the producer gave none (set only by demotion). */
+export const DEFAULT_ASSUMPTION_ORIGIN = 'This is a planning assumption made for this analysis. It was not verified against the customer\'s records.';
+const ORIGIN_MAX_CHARS = 300;
+
+/**
+ * Revisions never harden an assumption into a fact (Eric, 2026-11-17). Compares a revised model with
+ * the one it revises and returns every unit that was an ASSUMPTION before and now claims to be a FACT
+ * (or carries no label / context): matched by unit location (block id, bullet index) or by identical
+ * text. Dropping an assumption or demoting it to unverified is fine; re-emitting it as a fact is not.
+ * The revision save path (saveGeneratedDocument, #2116) must refuse a non-empty result.
+ */
+export function hardenedAssumptions(prev: DocModel, next: DocModel): string[] {
+  const norm = (t: string) => t.replace(/\*\*|_/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const prevWhere = new Set<string>();
+  const prevText = new Set<string>();
+  for (const sec of prev.sections) for (const b of sec.blocks) for (const u of labeledUnits(b)) {
+    if (u.claim === 'assumption') { prevWhere.add(u.where); prevText.add(norm(u.text)); }
+  }
+  const out: string[] = [];
+  for (const sec of next.sections) for (const b of sec.blocks) for (const u of labeledUnits(b)) {
+    const hardened = u.claim === 'fact' || u.claim === undefined || u.claim === 'context';
+    if (hardened && (prevWhere.has(u.where) || prevText.has(norm(u.text)))) out.push(u.where);
+  }
+  return out;
 }
 
 /** Must this unit cite a source, given its label? (recommendation: any figure; assumption: a factual claim) */
@@ -278,6 +322,17 @@ export function validateDocModel(input: unknown): ValidationResult {
               ? `an assumption may state a planning figure, but a factual claim (an award, obligation, ceiling, incumbent, date, or a count of buyers, vendors or contracts) must cite its source (${u.where})`
               : `a recommendation that states a count or amount must cite its source (${u.where})`);
           }
+          if (u.claim === 'assumption' && neverAnAssumption(u.text)) {
+            add(`${bp}`, `certifications, contract awards, past performance and eligibility/set-aside status can never be an assumption (${u.where}); label it fact and cite a source, or omit it`);
+          }
+          if (u.origin !== undefined) {
+            if (u.claim !== 'assumption') add(`${bp}`, `origin applies only to an assumption (${u.where})`);
+            else if (typeof u.origin !== 'string' || !u.origin.trim()) add(`${bp}`, `origin must be a non-empty string (${u.where})`);
+            else if (u.origin.length > ORIGIN_MAX_CHARS) add(`${bp}`, `origin is limited to ${ORIGIN_MAX_CHARS} characters (${u.where})`);
+          }
+          if (u.claim === 'assumption' && (u.cites ?? []).filter((c) => sourceIds.has(c)).length === 0 && !(typeof u.origin === 'string' && u.origin.trim())) {
+            add(`${bp}`, `an uncited assumption must state its origin (${u.where}), e.g. "This analysis models these figures; they were not verified against the customer's records."`);
+          }
           if (u.cites !== undefined && !Array.isArray(u.cites)) { add(`${bp}`, `cites must be an array at ${u.where}`); continue; }
           const cites = u.cites ?? [];
           const unresolved = cites.filter((c) => !sourceIds.has(c));
@@ -320,7 +375,7 @@ export function demoteUncitedFacts(model: DocModel): DemotionResult {
   const unverified: string[] = [];
   const omitted: string[] = [];
   const droppedCites: Array<{ where: string; ids: string[] }> = [];
-  type Unit = { claim?: string; cites?: string[]; critical?: boolean; text?: string; caption?: string };
+  type Unit = { claim?: string; cites?: string[]; critical?: boolean; text?: string; caption?: string; origin?: string };
   // Returns the repaired unit, or null when it must be omitted. A unit is held to the
   // facts-must-cite rule when it is a fact, unlabeled, a recommendation stating a figure, an
   // assumption asserting a factual claim (assumptionAssertsFact), or `context` the validator would refuse (outside an 'about' section, or with a number).
@@ -334,17 +389,26 @@ export function demoteUncitedFacts(model: DocModel): DemotionResult {
     const u: T = resolved.length === all.length ? input : resolved.length ? { ...input, cites: resolved } : withoutCites(input);
     const text = u.text ?? u.caption ?? '';
     const cited = resolved.length > 0;
+    // Never an assumption: cited or not, it is omitted — never relabeled a fact (assumptions do not
+    // harden) and never shown as unverified (these topics cite or are left out).
+    if (u.claim === 'assumption' && neverAnAssumption(text)) { omitted.push(where); return null; }
     const mustCite =
       u.claim === 'fact' || u.claim === undefined ||
       labelNeedsSource(u.claim, text) ||
       (u.claim === 'context' && (!about || isTableOrChart || /\d/.test(text) || NUMBER_WORD.test(text) || CONTEXT_FORBIDDEN.test(text) || text.length > CONTEXT_MAX_CHARS)) ||
       (u.claim === 'unverified' && u.critical === true);
     // An explicitly unverified (non-critical) statement keeps the producer's own doubt; only its cites go.
-    if (!mustCite) return u.claim === 'unverified' ? withoutCites(u) : u;
+    if (!mustCite) {
+      if (u.claim === 'unverified') return withoutCites(u);
+      // An uncited planning assumption must say where it comes from; supply the honest default.
+      if (u.claim === 'assumption' && !cited && !(typeof u.origin === 'string' && u.origin.trim())) return { ...u, origin: DEFAULT_ASSUMPTION_ORIGIN };
+      return u;
+    }
     if (cited) return u.claim === undefined || u.claim === 'context' || u.claim === 'unverified' ? { ...u, claim: 'fact' } : u;
     if (u.critical === true) { omitted.push(where); return null; }
     unverified.push(where);
-    return { ...withoutCites(u), claim: 'unverified' };
+    const { origin: _origin, ...rest } = withoutCites(u);
+    return { ...rest, claim: 'unverified' } as T;
   };
   const sections = model.sections.map((sec) => ({
     ...sec,

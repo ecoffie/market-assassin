@@ -17,7 +17,7 @@ vi.mock('@/lib/pdf/launch-browser', () => ({
 
 import { SAMPLE_REPORT } from './__fixtures__/sample-report';
 import { DOC_SCHEMA, type DocModel } from './model';
-import { validateDocModel, demoteUncitedFacts } from './validate';
+import { validateDocModel, demoteUncitedFacts, hardenedAssumptions, DEFAULT_ASSUMPTION_ORIGIN } from './validate';
 import { citationIndex, citeMarker, formatCell, parseInline, NOT_AVAILABLE, fileBaseName } from './format';
 import { renderHtml } from './render-html';
 import { renderDocx } from './render-docx';
@@ -74,7 +74,7 @@ describe('validateDocModel', () => {
 
   it('assumptions, recommendations, unverified and context need no citation', () => {
     const m = tiny({ sections: [{ id: 'a', heading: 'A', blocks: [
-      { type: 'paragraph', id: 'p1', text: 'Likely', claim: 'assumption' },
+      { type: 'paragraph', id: 'p1', text: 'Likely', claim: 'assumption', origin: 'Stated for planning; not verified.' },
       { type: 'paragraph', id: 'p2', text: 'Do this', claim: 'recommendation' },
       { type: 'paragraph', id: 'p3', text: 'Untraced', claim: 'unverified' },
     ] }, { id: 'm', heading: 'Method', role: 'about', blocks: [
@@ -146,16 +146,15 @@ describe('validateDocModel', () => {
       ['deadline', 'Assume proposals are due by the end of the quarter.'],
       ['unframed figure', 'Expect $640M a year to recompete.'],
       // A4 round 2 probes — verb forms, agency names, a winner with no figure:
-      ['agency + "awarded" (verb)', 'We assume DHS awarded $3M for this work last year.'],
       ['agency + "spends" (verb)', 'We assume the VA spends $5M a year on janitorial services.'],
       ['agency + "buys" + share', 'Assume GSA buys 40% of this work.'],
-      ['who won, no figure', 'Assume the Army awarded it to Acme last year.'],
       ['obligated (verb), named service', 'We assume the Navy obligated $12M.'],
       ['agency acronym + count of orders', 'We assume NASA will issue two task orders.'],
       ['"went to" a company, no figure', 'Assume the contract went to Acme.'],
     ];
+    const ORIGIN = "This analysis models these figures; they were not verified against the customer's records.";
     const one = (text: string, extra: Record<string, unknown> = {}) =>
-      tiny({ sections: [{ id: 'a', heading: 'A', blocks: [{ type: 'paragraph', id: 'p', text, claim: 'assumption', ...extra }] }] });
+      tiny({ sections: [{ id: 'a', heading: 'A', blocks: [{ type: 'paragraph', id: 'p', text, claim: 'assumption', origin: ORIGIN, ...extra }] }] });
 
     it.each(planning)('a planning assumption passes uncited: %s', (text) => {
       expect(issuesOf(one(text))).toEqual([]);
@@ -177,6 +176,91 @@ describe('validateDocModel', () => {
       expect(c.model.sections[0].blocks).toEqual([]);
       const keep = demoteUncitedFacts(one('We assume a ~$2M annual budget for planning.'));
       expect(keep.model.sections[0].blocks[0]).toMatchObject({ claim: 'assumption' });
+    });
+
+    // Eric's qualification (2026-11-17), rule 1: origin must be explicit.
+    it('an uncited assumption must state its origin; demotion supplies the honest default', () => {
+      const bare = one('Assume the program has 250 users across 12 sites.', { origin: undefined });
+      expect(issuesOf(bare).join(' ')).toMatch(/an uncited assumption must state its origin \(p\)/);
+      const d = demoteUncitedFacts(bare);
+      expect(d.model.sections[0].blocks[0]).toMatchObject({ claim: 'assumption', origin: DEFAULT_ASSUMPTION_ORIGIN });
+      expect(issuesOf(d.model)).toEqual([]);
+      expect(issuesOf(one('Assume the program has 250 users across 12 sites.', { origin: undefined, cites: ['s1'] }))).toEqual([]); // cited: the source is the origin
+    });
+
+    it('renders as "Planning assumption" with its origin stated (HTML and DOCX)', async () => {
+      const m = one('Assume the program has 250 users across 12 sites.');
+      const html = renderHtml(m);
+      expect(html).toContain('class="label assumption">Planning assumption</span>Assume the program has 250 users across 12 sites.');
+      expect(html).toContain(`<span class="origin">${ORIGIN.replace("'", '&#39;')}</span>`);
+      const files = unzipSync(new Uint8Array(await renderDocx(m)));
+      const doc = strFromU8(files['word/document.xml']);
+      expect(doc).toContain('PLANNING ASSUMPTION');
+      expect(doc).toContain('were not verified against the customer');
+    });
+
+    it('the unlabeled factual form of a customer figure must cite (fact), or is shown Unverified', () => {
+      const m = tiny({ sections: [{ id: 'a', heading: 'A', blocks: [{ type: 'paragraph', id: 'p', text: 'The customer operates 12 sites serving 250 users.', claim: 'fact' }] }] });
+      expect(issuesOf(m).join(' ')).toMatch(/a fact must cite/);
+      expect(demoteUncitedFacts(m).model.sections[0].blocks[0]).toMatchObject({ claim: 'unverified' });
+    });
+
+    it('origin belongs to assumptions only, and is bounded', () => {
+      const f = tiny({ sections: [{ id: 'a', heading: 'A', blocks: [{ type: 'paragraph', id: 'p', text: 'x', claim: 'fact', cites: ['s1'], origin: 'y' } as never] }] });
+      expect(issuesOf(f).join(' ')).toMatch(/origin applies only to an assumption/);
+      expect(issuesOf(one('Assume a modest budget.', { origin: 'z'.repeat(301) })).join(' ')).toMatch(/origin is limited to 300 characters/);
+    });
+
+    // Rule 2: never an assumption — cite as a fact, or omit. Never "unverified", never kept as a premise.
+    const never: Array<[string, string]> = [
+      ['certification', 'We assume the firm holds an active 8(a) certification.'],
+      ['certification (SDVOSB)', 'Assume we are SDVOSB-certified for this pursuit.'],
+      ['contract award', 'We assume DHS awarded $3M for this work last year.'],
+      ['contract award, no figure', 'Assume the Army awarded it to Acme last year.'],
+      ['won', 'Assume Acme won the last recompete.'],
+      ['past performance', 'We assume strong past performance with the VA.'],
+      ['set-aside status', 'Assume the follow-on will be a small-business set-aside.'],
+      ['eligibility', 'For planning, assume we are eligible for the HUBZone price preference.'],
+      ['size status', 'Assume we qualify as a small business under 541512.'],
+    ];
+    it.each(never)('never an assumption (%s): rejected even when cited; demotion OMITS it', (_why, text) => {
+      expect(issuesOf(one(text)).join(' ')).toMatch(/can never be an assumption \(p\); label it fact and cite a source, or omit it/);
+      expect(issuesOf(one(text, { cites: ['s1'] })).join(' ')).toMatch(/can never be an assumption/);
+      for (const m of [one(text), one(text, { cites: ['s1'] })]) {
+        const d = demoteUncitedFacts(m);
+        expect(d.omitted).toEqual(['p']);
+        expect(d.unverified).toEqual([]);
+        expect(d.model.sections[0].blocks).toEqual([]);
+        expect(issuesOf(d.model)).toEqual([]);
+      }
+    });
+
+    it('the same topic as a cited FACT is fine (that is the sanctioned form)', () => {
+      const m = tiny({ sections: [{ id: 'a', heading: 'A', blocks: [{ type: 'paragraph', id: 'p', text: 'DHS awarded $3M for this work in FY2025.', claim: 'fact', cites: ['s1'] }] }] });
+      expect(issuesOf(m)).toEqual([]);
+    });
+
+    // Rule 3: assumptions never harden into facts across revisions.
+    it('demotion never turns an assumption into a fact', () => {
+      const m = tiny({ sections: [{ id: 'a', heading: 'A', blocks: [
+        { type: 'paragraph', id: 'c', text: 'We assume a ~$2M annual budget for planning.', claim: 'assumption', cites: ['s1'] },
+        { type: 'paragraph', id: 'u', text: 'We assume a ~$2M annual budget for planning.', claim: 'assumption' },
+        { type: 'paragraph', id: 'f', text: 'We assume the agency obligated $12M.', claim: 'assumption' },
+      ] }] });
+      const claims = demoteUncitedFacts(m).model.sections[0].blocks.map((b) => (b as { claim?: string }).claim);
+      expect(claims).toEqual(['assumption', 'assumption', 'unverified']);
+    });
+
+    it('hardenedAssumptions flags a revision that re-emits an assumption as a fact (by id or by text)', () => {
+      const prev = one('Assume the program has 250 users across 12 sites.');
+      const sameId = tiny({ sections: [{ id: 'a', heading: 'A', blocks: [{ type: 'paragraph', id: 'p', text: 'The program has 250 users across 12 sites.', claim: 'fact', cites: ['s1'] }] }] });
+      const sameText = tiny({ sections: [{ id: 'b', heading: 'B', blocks: [{ type: 'bullets', id: 'x', items: [{ text: 'Assume the program has 250 users across 12 sites.', claim: 'fact', cites: ['s1'] }] }] }] });
+      expect(hardenedAssumptions(prev, sameId)).toEqual(['p']);
+      expect(hardenedAssumptions(prev, sameText)).toEqual(['x[0]']);
+      expect(hardenedAssumptions(prev, prev)).toEqual([]); // kept as an assumption
+      expect(hardenedAssumptions(prev, demoteUncitedFacts(one('Assume the agency obligated $12M.')).model)).toEqual([]); // unverified is not hardening
+      const dropped = tiny({ sections: [{ id: 'a', heading: 'A', blocks: [{ type: 'paragraph', id: 'other', text: 'Something else entirely.', claim: 'fact', cites: ['s1'] }] }] });
+      expect(hardenedAssumptions(prev, dropped)).toEqual([]); // dropped is not hardening
     });
   });
 
@@ -397,7 +481,8 @@ describe('render-html', () => {
 
   it('shows labels, citations, Not available and a numbered Sources section', () => {
     const html = renderHtml(SAMPLE_REPORT);
-    expect(html).toContain('class="label assumption">ASSUMPTION</span>');
+    expect(html).toContain('class="label assumption">Planning assumption</span>');
+    expect(html).toContain('<span class="origin">This is how to read the ranking, not a measured win rate.</span>');
     expect(html).not.toMatch(/Estimate/);
     expect(html).toContain('class="label recommendation">Recommendation</span>');
     expect(html).toContain('<sup class="cite">[1]</sup>');
@@ -509,7 +594,8 @@ describe('render-docx', () => {
     expect(header).toContain('Prepared with Mindy');
     expect(doc).toContain('w:tblHeader');
     expect(doc).toContain('w:val="Heading1"');
-    expect(doc).toContain('ASSUMPTION');
+    expect(doc).toContain('PLANNING ASSUMPTION');
+    expect(doc).toContain('This is how to read the ranking, not a measured win rate.');
     expect(doc).not.toContain('ESTIMATE');
     expect(doc).toContain('RECOMMENDATION');
     expect(doc).toContain(NOT_AVAILABLE);

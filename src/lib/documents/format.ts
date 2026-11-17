@@ -83,10 +83,15 @@ export function citeMarker(cites: string[] | undefined, numberOf: (id: string) =
  * (text about the document itself) carries none. There is no "Estimate" label.
  */
 export function claimLabel(claim: Claim | undefined): string | null {
-  if (claim === 'assumption') return 'ASSUMPTION';
+  if (claim === 'assumption') return 'Planning assumption';
   if (claim === 'recommendation') return 'Recommendation';
   if (claim === 'unverified') return 'Unverified — no source';
   return null;
+}
+
+/** The origin sentence an assumption renders after its text (null for every other claim). */
+export function assumptionOrigin(u: { claim?: Claim; origin?: string }): string | null {
+  return u.claim === 'assumption' && typeof u.origin === 'string' && u.origin.trim() ? u.origin.trim() : null;
 }
 
 /** A CSS-safe class for the label (the unverified label contains spaces and a dash). */

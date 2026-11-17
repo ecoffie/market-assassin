@@ -5,7 +5,7 @@
  * Professional defaults: named heading styles (navigable in Word's outline), a cover block, a
  * contents list, header with the title, footer with "Page X of Y", bordered tables whose header row
  * repeats across pages, number columns right-aligned, "Not available" for missing values, visible
- * ASSUMPTION / Recommendation / "Unverified — no source" labels, [n] citations resolving to a numbered Sources section.
+ * Planning assumption (with its origin) / Recommendation / "Unverified — no source" labels, [n] citations resolving to a numbered Sources section.
  *
  * Charts: v1 renders a chart as its data table under the caption ("Chart data"). A vector chart in
  * Word needs an SVG plus a PNG fallback, which needs a rasterizer; that is a follow-up. The PDF
@@ -32,7 +32,7 @@ import {
   WidthType,
 } from 'docx';
 import type { Block, ChartBlock, DocModel, TableBlock, TableColumn } from './model';
-import { citationIndex, citeMarker, claimLabel, claimsPresent, formatCell, formatDocDate, parseInline, unverifiedStatements } from './format';
+import { assumptionOrigin, citationIndex, citeMarker, claimLabel, claimsPresent, formatCell, formatDocDate, parseInline, unverifiedStatements } from './format';
 
 const NAVY = '1E3A8A';
 const INK = '1F2937';
@@ -45,6 +45,11 @@ type Numberer = (id: string) => number | null;
 
 function runs(text: string, base: { size?: number; color?: string } = {}): TextRun[] {
   return parseInline(text).map((r) => new TextRun({ font: FONT, size: 21, text: r.text, bold: r.bold, italics: r.italic, ...base }));
+}
+
+function originRun(u: { claim?: string; origin?: string }, size = 21): TextRun[] {
+  const o = assumptionOrigin(u as never);
+  return o ? [new TextRun({ font: FONT, size, text: ` ${o}`, italics: true, color: MUTED })] : [];
 }
 
 function labelRun(claim: string | undefined): TextRun[] {
@@ -117,7 +122,7 @@ function table(columns: TableColumn[], rows: TableBlock['rows']): Table {
   });
 }
 
-function caption(text: string | undefined, claim: string | undefined, cites: string[] | undefined, numberOf: Numberer, prefix?: string): Paragraph | null {
+function caption(text: string | undefined, claim: string | undefined, cites: string[] | undefined, numberOf: Numberer, prefix?: string, origin?: string): Paragraph | null {
   if (!text && !claimLabel(claim as never) && !citeMarker(cites, numberOf) && !prefix) return null;
   return new Paragraph({
     style: 'Caption',
@@ -126,6 +131,7 @@ function caption(text: string | undefined, claim: string | undefined, cites: str
       ...(prefix ? [new TextRun({ font: FONT, text: prefix, italics: true, size: 17, color: MUTED })] : []),
       ...(text ? runs(text, { size: 17, color: MUTED }) : []),
       ...citeRun(cites, numberOf),
+      ...originRun({ claim, origin }, 17),
     ],
   });
 }
@@ -145,19 +151,19 @@ function chartAsTable(b: ChartBlock): Table {
 function blockToDocx(b: Block, numberOf: Numberer): (Paragraph | Table)[] {
   switch (b.type) {
     case 'paragraph':
-      return [new Paragraph({ style: 'Body', children: [...labelRun(b.claim), ...runs(b.text), ...citeRun(b.cites, numberOf)] })];
+      return [new Paragraph({ style: 'Body', children: [...labelRun(b.claim), ...runs(b.text), ...citeRun(b.cites, numberOf), ...originRun(b)] })];
     case 'bullets':
       return b.items.map((it) => new Paragraph({
         style: 'Body',
         numbering: { reference: b.ordered ? 'mindy-numbers' : 'mindy-bullets', level: 0 },
-        children: [...labelRun(it.claim), ...runs(it.text), ...citeRun(it.cites, numberOf)],
+        children: [...labelRun(it.claim), ...runs(it.text), ...citeRun(it.cites, numberOf), ...originRun(it)],
       }));
     case 'table': {
-      const cap = caption(b.caption, b.claim, b.cites, numberOf);
+      const cap = caption(b.caption, b.claim, b.cites, numberOf, undefined, b.origin);
       return [table(b.columns, b.rows), ...(cap ? [cap] : [])];
     }
     case 'chart': {
-      const cap = caption(b.caption, b.claim, b.cites, numberOf, 'Chart data. ');
+      const cap = caption(b.caption, b.claim, b.cites, numberOf, 'Chart data. ', b.origin);
       return [chartAsTable(b), ...(cap ? [cap] : [])];
     }
     case 'callout': {
@@ -167,7 +173,7 @@ function blockToDocx(b: Block, numberOf: Numberer): (Paragraph | Table)[] {
       const border = { left: { style: BorderStyle.SINGLE, size: 24, color: bar, space: 8 } };
       return [
         new Paragraph({ border, shading: { type: ShadingType.CLEAR, color: 'auto', fill }, spacing: { before: 120, after: 0 }, children: [new TextRun({ font: FONT, text: title, bold: true, size: 15, color: '374151' })] }),
-        new Paragraph({ border, shading: { type: ShadingType.CLEAR, color: 'auto', fill }, spacing: { after: 160 }, children: [...labelRun(b.claim), ...runs(b.text), ...citeRun(b.cites, numberOf)] }),
+        new Paragraph({ border, shading: { type: ShadingType.CLEAR, color: 'auto', fill }, spacing: { after: 160 }, children: [...labelRun(b.claim), ...runs(b.text), ...citeRun(b.cites, numberOf), ...originRun(b)] }),
       ];
     }
     case 'pagebreak':
@@ -207,7 +213,7 @@ export function buildDocx(model: DocModel): Document {
   const unverified = unverifiedStatements(model);
   const reading = [
     'How to read this document. Facts carry a numbered citation like [1] that points to the Sources section.',
-    present.has('assumption') ? 'Statements marked ASSUMPTION are premises stated by the author, not recorded facts; check them before relying on them.' : '',
+    present.has('assumption') ? 'Statements marked PLANNING ASSUMPTION are premises stated for this analysis, not recorded facts; each says where it comes from. Check them before relying on them.' : '',
     present.has('recommendation') ? 'Statements marked RECOMMENDATION are suggested actions.' : '',
     unverified.length ? 'Statements marked UNVERIFIED — NO SOURCE could not be traced to a source and are listed in the Unverified statements section.' : '',
   ].filter(Boolean).join(' ');

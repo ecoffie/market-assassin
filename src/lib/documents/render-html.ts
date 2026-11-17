@@ -8,7 +8,7 @@
  */
 import type { Block, Claim, DocModel, TableBlock } from './model';
 import { chartToSvg } from './charts';
-import { citationIndex, citeMarker, claimClass, claimLabel, claimsPresent, formatCell, formatDocDate, parseInline, unverifiedStatements } from './format';
+import { assumptionOrigin, citationIndex, citeMarker, claimClass, claimLabel, claimsPresent, formatCell, formatDocDate, parseInline, unverifiedStatements } from './format';
 
 /**
  * The document page may load nothing but itself: no scripts, no network, no frames; only its own
@@ -60,6 +60,7 @@ ul, ol { margin: 0 0 10px; padding-left: 20px; } li { margin: 0 0 4px; }
 sup.cite { font-size: 7.5pt; color: #1e3a8a; margin-left: 2px; }
 .label { display: inline-block; font-size: 7.5pt; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; border-radius: 3px; margin-right: 6px; vertical-align: 1px; }
 .label.assumption { background: #fef3c7; color: #92400e; }
+.origin { color: #6b7280; font-style: italic; }
 .label.unverified { background: #fee2e2; color: #991b1b; }
 .label.recommendation { background: #dcfce7; color: #166534; }
 table { width: 100%; border-collapse: collapse; margin: 6px 0 4px; font-size: 9pt; break-inside: auto; }
@@ -83,6 +84,11 @@ figure { margin: 10px 0 14px; break-inside: avoid; }
 `;
 
 /** The visible label chip for a claim ('' when the claim carries none). */
+function originHtml(u: { claim?: Claim; origin?: string }): string {
+  const o = assumptionOrigin(u);
+  return o ? ` <span class="origin">${escapeHtml(o)}</span>` : '';
+}
+
 function labelChip(claim: Claim | undefined): string {
   const l = claimLabel(claim);
   return l ? `<span class="label ${claimClass(claim)}">${escapeHtml(l)}</span>` : '';
@@ -100,7 +106,7 @@ function tableHtml(b: TableBlock, marker: string): string {
       })
       .join('')}</tr>`)
     .join('');
-  const cap = [labelChip(b.claim), b.caption ? inline(b.caption) : '', marker ? `<sup class="cite">${marker}</sup>` : ''].filter(Boolean).join(' ');
+  const cap = [labelChip(b.claim), b.caption ? inline(b.caption) : '', marker ? `<sup class="cite">${marker}</sup>` : ''].filter(Boolean).join(' ') + originHtml(b);
   return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>${cap ? `<div class="caption">${cap}</div>` : ''}`;
 }
 
@@ -112,20 +118,20 @@ function blockHtml(b: Block, numberOf: (id: string) => number | null): string {
   };
   switch (b.type) {
     case 'paragraph':
-      return `<p>${lab(b.claim)}${inline(b.text)}${sup(b.cites)}</p>`;
+      return `<p>${lab(b.claim)}${inline(b.text)}${sup(b.cites)}${originHtml(b)}</p>`;
     case 'bullets': {
       const tag = b.ordered ? 'ol' : 'ul';
-      return `<${tag}>${b.items.map((it) => `<li>${lab(it.claim)}${inline(it.text)}${sup(it.cites)}</li>`).join('')}</${tag}>`;
+      return `<${tag}>${b.items.map((it) => `<li>${lab(it.claim)}${inline(it.text)}${sup(it.cites)}${originHtml(it)}</li>`).join('')}</${tag}>`;
     }
     case 'table':
       return tableHtml(b, citeMarker(b.cites, numberOf));
     case 'chart': {
-      const cap = [labelChip(b.claim), b.caption ? inline(b.caption) : '', sup(b.cites)].filter(Boolean).join(' ');
+      const cap = [labelChip(b.claim), b.caption ? inline(b.caption) : '', sup(b.cites)].filter(Boolean).join(' ') + originHtml(b);
       return `<figure>${chartToSvg(b)}${cap ? `<figcaption class="caption">${cap}</figcaption>` : ''}</figure>`;
     }
     case 'callout': {
       const title = b.tone === 'key_finding' ? 'Key finding' : b.tone === 'warning' ? 'Caution' : 'Note';
-      return `<div class="callout ${b.tone}"><div class="ct">${title}</div>${lab(b.claim)}${inline(b.text)}${sup(b.cites)}</div>`;
+      return `<div class="callout ${b.tone}"><div class="ct">${title}</div>${lab(b.claim)}${inline(b.text)}${sup(b.cites)}${originHtml(b)}</div>`;
     }
     case 'pagebreak':
       return '<div class="pagebreak"></div>';
@@ -151,7 +157,7 @@ export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): strin
 
   const reading = [
     '<b>How to read this document.</b> Facts carry a numbered citation like <sup class="cite">[1]</sup> that points to the Sources section.',
-    present.has('assumption') ? 'Statements marked <span class="label assumption">ASSUMPTION</span> are premises stated by the author, not recorded facts; check them before relying on them.' : '',
+    present.has('assumption') ? 'Statements marked <span class="label assumption">Planning assumption</span> are premises stated for this analysis, not recorded facts; each says where it comes from. Check them before relying on them.' : '',
     present.has('recommendation') ? 'Statements marked <span class="label recommendation">Recommendation</span> are suggested actions.' : '',
     unverified.length ? `Statements marked <span class="label unverified">Unverified — no source</span> could not be traced to a source and are listed in the Unverified statements section.` : '',
   ].filter(Boolean).join(' ');

@@ -86,7 +86,7 @@ export const SAMPLE_REPORT: DocModel = {
           type: 'chart', id: 'market-c1', kind: 'line', caption: 'Quarterly obligations, illustrative ($)', claim: 'fact', cites: ['s1'], yLabel: 'Obligations',
           series: [{ name: 'Obligations', points: ['FY24 Q1', 'FY24 Q2', 'FY24 Q3', 'FY24 Q4', 'FY25 Q1', 'FY25 Q2', 'FY25 Q3', 'FY25 Q4', 'FY26 Q1', 'FY26 Q2', 'FY26 Q3', 'FY26 Q4'].map((x, i) => ({ x, y: Math.round((140 + i * 6 + (i % 4 === 3 ? 40 : 0)) * 1_000_000) })) }],
         },
-        { type: 'paragraph', id: 'market-p2', claim: 'assumption', text: 'Fourth-quarter spikes suggest year-end buying; expect the largest award volume in July through September.' },
+        { type: 'paragraph', id: 'market-p2', claim: 'assumption', origin: 'This is Mindy\'s reading of the monthly pattern above, not a forecast from the agencies.', text: 'Fourth-quarter spikes suggest year-end buying; expect the largest award volume in July through September.' },
         {
           type: 'chart', id: 'market-c2', kind: 'pie', caption: 'Obligations by set-aside type, illustrative', claim: 'fact', cites: ['s1'],
           series: [{ name: 'Share', points: [{ x: 'Small business', y: 41 }, { x: 'Full and open', y: 27 }, { x: '8(a)', y: 13 }, { x: 'SDVOSB', y: 10 }, { x: 'HUBZone', y: 6 }, { x: 'WOSB', y: 3 }] }],
@@ -130,7 +130,7 @@ export const SAMPLE_REPORT: DocModel = {
           ],
           rows: vendors,
         },
-        { type: 'callout', id: 'comp-c1', tone: 'warning', claim: 'assumption', text: 'Vendor rankings reflect obligations, not win rates. A firm with fewer, larger awards can rank above a firm that wins more often.' },
+        { type: 'callout', id: 'comp-c1', tone: 'warning', claim: 'assumption', origin: 'This is how to read the ranking, not a measured win rate.', text: 'Vendor rankings reflect obligations, not win rates. A firm with fewer, larger awards can rank above a firm that wins more often.' },
         { type: 'paragraph', id: 'comp-p2', claim: 'assumption', cites: ['s1'], text: 'The market is moderately fragmented: no vendor appears to hold more than about 5% of obligations.' },
       ],
     },
