@@ -25,6 +25,7 @@ import { DEFAULT_STARTER_PROMPTS } from '@/lib/chat/starter-prompts';
 import { renderSafeMarkdown } from '@/lib/chat/safe-markdown';
 import { startProposalFromNotice } from '@/lib/chat/start-proposal';
 import { CHAT_HANDOFF_KEY, parseChatHandoff, opportunityContextField, type AttachedOpportunity } from '@/lib/chat/chat-handoff';
+import { customerText } from '@/lib/chat/view-preamble';
 
 interface MindyChatPanelProps {
   email: string | null;
@@ -633,7 +634,9 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                   )}
                   <div className={`text-[14.5px] leading-relaxed ${msg.errored ? 'text-red-300' : msg.role === 'user' ? 'text-slate-100' : 'text-slate-200'}`}>
                     {msg.content
-                      ? renderMessageContent(msg.content, msg.role === 'assistant' && !msg.errored)
+                      // A Map conversation's user turn carries the Map view preamble for the model; the
+                      // bubble shows only what the customer typed (history still sends msg.content as stored).
+                      ? renderMessageContent(msg.role === 'user' ? customerText(msg.content) : msg.content, msg.role === 'assistant' && !msg.errored)
                       : msg.isStreaming
                         ? <span className="text-faint italic">Thinking…</span>
                         : null}
