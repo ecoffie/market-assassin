@@ -23,7 +23,7 @@ export const CHAT_FETCH_LIMIT = 200;
 type Rec = Record<string, unknown>;
 
 import { US_STATE_NAMES } from '@/lib/utils/us-states';
-import { formatUsd } from '@/lib/documents/format';
+import { formatUsd, formatColumn } from '@/lib/documents/format';
 import { interpretCapabilityNaics } from '@/lib/market/capability-naics';
 /** A state named in a record's own description that differs from its reported place of performance. */
 export function describedStateConflict(description: string, popState: string): string | null {
@@ -146,6 +146,16 @@ function money(v: unknown): string {
   const n = num(v);
   if (n == null) return '';
   return formatUsd(Math.round(n));
+}
+
+/**
+ * Dollars for one column or one list: the document engine's column rule (one precision for every
+ * figure, the most any of them needs, at most 2), so $41.87M never sits next to $16M. Missing → ''.
+ */
+function moneyColumn(values: unknown[]): string[] {
+  const nums = values.map((v) => { const n = num(v); return n == null ? null : Math.round(n); });
+  const out = formatColumn(nums.map((n) => n ?? ''), 'usd');
+  return out.map((x, i) => (nums[i] == null ? '' : x));
 }
 
 /** A markdown table cell: no pipes or line breaks inside a cell. */
@@ -367,7 +377,8 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
   if (ignored) lines.push(ignored);
   if (page.length) {
     lines.push('');
-    lines.push(...mdTable(['Contract', 'Obligated', 'Ends', 'Incumbent', 'Agency', 'Place', 'Work'], page.map((r, i) => recordRow(offset + i + 1, r))));
+    const obCol = moneyColumn(page.map((r) => r.total_obligation));
+    lines.push(...mdTable(['Contract', 'Obligated', 'Ends', 'Incumbent', 'Agency', 'Place', 'Work'], page.map((r, i) => { const row = recordRow(offset + i + 1, r); row[1] = obCol[i] || '—'; return row; })));
     const notes = page.map((r, i) => ({ n: offset + i + 1, t: recordNotes(r) })).filter((x) => x.t);
     if (notes.length) {
       lines.push('');
@@ -596,9 +607,8 @@ export function renderBuyingOffices(result: Rec, opts: { offset?: number } = {})
   if (scope.state) parts.push(`work performed in ${str(scope.state)}`);
   if (metro) parts.push(`${title(str(metro.core_city))} metro (cities within ${str(metro.radius_miles)} miles${scope.state ? `, in ${str(scope.state)} only` : ''})`);
   else if (Array.isArray(scope.cities) && scope.cities.length) parts.push(`cities ${(scope.cities as unknown[]).map((c) => title(str(c))).join(', ')}`);
-  const toolNotes = Array.isArray(result.notes) ? (result.notes as unknown[]).map(str) : [];
-  const defaultedWindow = toolNotes.some((n) => /no window given|defaulted/i.test(n));
-  if (scope.window) parts.push(`${str(scope.window)}${defaultedWindow ? ', default window, none was given' : ''}`);
+  // The window is stated plainly; whether the customer named it is not their concern (Agent 5, 2026-11-17).
+  if (scope.window) parts.push(str(scope.window));
   const searched = parts.join(' · ');
   // The ranking role is the tool's applied_filters.rank_by. A funding ranking lists the customer offices
   // whose money is on the awards, not contracting offices (release check R4). "Award actions recorded"
@@ -629,9 +639,17 @@ export function renderBuyingOffices(result: Rec, opts: { offset?: number } = {})
     if (page.length) {
       // Column order follows the chat panel's table styling: the name first (kept readable), the value
       // second (never wrapped); the number travels in the name cell so the detail lines can refer to it.
+      const obCol = moneyColumn(page.map((o) => o.obligated));
+      // One precision for every amount in each detail list on this page (customers, contracting offices, examples).
+      const customersOf = (o: Rec) => (Array.isArray(o.top_funding_offices) ? (o.top_funding_offices as Rec[]) : [])
+        .filter((f) => str(f.name) && !sameName(str(f.name), str(o.office_name))).slice(0, 2);
+      const contractingOf = (o: Rec) => (Array.isArray(o.top_awarding_offices) ? (o.top_awarding_offices as Rec[]) : []).slice(0, 2);
+      const custMoney = moneyColumn(page.flatMap((o) => (funding ? contractingOf(o) : customersOf(o)).map((f) => f.obligated)));
+      const exMoney = moneyColumn(page.flatMap((o) => shownExamples(o).map((e) => e.obligated)));
+      let ci = 0; let ei = 0;
       lines.push(...mdTable(['Office', 'Net obligations', 'Share', 'Awards', 'Agency'], page.map((o, i) => [
         `${offset + i + 1}. ${withCode(str(o.office_name), str(o.office_code))}`,
-        money(o.obligated),
+        obCol[i],
         o.share_pct == null || str(o.share_pct) === '' ? '—' : `${str(o.share_pct)}%`,
         String(num(o.award_count) ?? 0),
         title(str(o.sub_agency)) || title(str(o.agency)) || 'not reported',
@@ -641,18 +659,16 @@ export function renderBuyingOffices(result: Rec, opts: { offset?: number } = {})
       page.forEach((o, i) => {
         const bits: string[] = [];
         if (funding) {
-          const contracting = (Array.isArray(o.top_awarding_offices) ? (o.top_awarding_offices as Rec[]) : []).slice(0, 2).map((f) => `${withCode(str(f.name), str(f.code))} ${money(f.obligated)}`);
+          const contracting = contractingOf(o).map((f) => `${withCode(str(f.name), str(f.code))} ${custMoney[ci++]}`.trim());
           if (contracting.length) bits.push(`contracting offices: ${contracting.join('; ')}`);
         } else {
-          const customers = (Array.isArray(o.top_funding_offices) ? (o.top_funding_offices as Rec[]) : [])
-            .filter((f) => str(f.name) && !sameName(str(f.name), str(o.office_name))).slice(0, 2)
-            .map((f) => `${officeDisplayName(str(f.name))} ${money(f.obligated)}`);
+          const customers = customersOf(o).map((f) => `${officeDisplayName(str(f.name))} ${custMoney[ci++]}`.trim());
           if (customers.length) bits.push(`customers: ${customers.join('; ')}`);
         }
         const places = (Array.isArray(o.top_places) ? (o.top_places as Rec[]) : []).slice(0, 2).map((p) => [title(str(p.city)), str(p.state)].filter(Boolean).join(', ')).filter(Boolean);
         if (places.length) bits.push(`work in ${places.join('; ')}`);
         // Example awards show what the office bought; a deobligation is not an example of buying.
-        const examples = shownExamples(o).map((e) => `${str(e.piid) || str(e.award_id)} (${money(e.obligated)})`);
+        const examples = shownExamples(o).map((e) => `${str(e.piid) || str(e.award_id)} (${exMoney[ei++]})`);
         if (examples.length) bits.push(`example awards: ${examples.join(', ')}`);
         if (bits.length) details.push(`- **${offset + i + 1}.** ${bits.join(' · ')}`);
       });
@@ -666,7 +682,8 @@ export function renderBuyingOffices(result: Rec, opts: { offset?: number } = {})
     if (notRetrieved) countBits.push(`${notRetrieved} more office${notRetrieved === 1 ? ' ranks' : 's rank'} below the top ${offices.length} retrieved; narrow the search to see ${notRetrieved === 1 ? 'it' : 'them'}.`);
     lines.push(countBits.join(' '));
     if (nonBuyers.length) {
-      lines.push(`Also returned, with zero or negative net obligations in this window (deobligations, so not evidence of buying): ${nonBuyers.map((o) => `${withCode(str(o.office_name), str(o.office_code))} ${money(o.obligated)}`).join('; ')}.`);
+      const nbMoney = moneyColumn(nonBuyers.map((o) => o.obligated));
+      lines.push(`Also returned, with zero or negative net obligations in this window (deobligations, so not evidence of buying): ${nonBuyers.map((o, i) => `${withCode(str(o.office_name), str(o.office_code))} ${nbMoney[i]}`).join('; ')}.`);
     }
     // 5. One note on what the numbers mean (every caveat that changes interpretation, once).
     lines.push('');
@@ -846,8 +863,9 @@ export function renderAwardList(result: Rec): RenderedRecords | null {
   const others = cands.filter((c) => !c.startsWith(`${str(office?.code)} `));
   if (others.length) lines.push(`Other office codes matching "${str(office?.requested)}" were found but not searched: ${others.join('; ')}.`);
   lines.push('');
+  const valCol = moneyColumn(awards.map((a) => a.awardAmount));
   lines.push(...mdTable(['Award', 'Lifetime value', 'Recipient', 'Period', 'Place', 'Work'], awards.map((a, i) => [
-    `${i + 1}. ${str(a.awardId)}`, money(a.awardAmount) || '—', title(str(a.recipientName)) || 'recipient not reported',
+    `${i + 1}. ${str(a.awardId)}`, valCol[i] || '—', title(str(a.recipientName)) || 'recipient not reported',
     `${str(a.startDate) || '?'} to ${str(a.endDate) || '?'}`, str(a.popState) || '—', clip(str(a.description), 80) || '—',
   ])));
   const ig = ignoredLine(meta);
@@ -866,8 +884,9 @@ export function renderVehicleMix(result: Rec): RenderedRecords | null {
   const lines: string[] = [];
   lines.push(`Spending by contract vehicle (NAICS ${(Array.isArray(scope.naics) ? scope.naics as unknown[] : []).map(str).join(', ')}${scope.agency ? ` · ${str(scope.agency)}` : ''}${scope.state ? ` · ${str(scope.state)}` : ''} · ${str(scope.window)}): ${money(result.total_obligated)} obligated across ${num(result.total_award_count) ?? '?'} awards. Every bucket is listed; shares are of that total.`);
   lines.push('');
-  lines.push(...mdTable(['Vehicle', 'Obligations', 'Share', 'Awards'], buckets.filter((b) => (num(b.obligated) ?? 0) !== 0 || (num(b.award_count) ?? 0) > 0)
-    .map((b) => [str(b.label), money(b.obligated), `${str(b.share_pct)}%`, String(num(b.award_count) ?? 0)])));
+  const shownBuckets = buckets.filter((b) => (num(b.obligated) ?? 0) !== 0 || (num(b.award_count) ?? 0) > 0);
+  const bCol = moneyColumn(shownBuckets.map((b) => b.obligated));
+  lines.push(...mdTable(['Vehicle', 'Obligations', 'Share', 'Awards'], shownBuckets.map((b, i) => [str(b.label), bCol[i], `${str(b.share_pct)}%`, String(num(b.award_count) ?? 0)])));
   const r = (k: string) => (roll[k] && typeof roll[k] === 'object' ? roll[k] as Rec : null);
   const rl = [['all schedules', r('all_schedules')], ['all BPAs', r('all_bpas')], ['all IDIQs and GWACs', r('all_idiqs_and_gwacs')]].filter(([, v]) => v).map(([k, v]) => `${k} ${money((v as Rec).obligated)} (${str((v as Rec).share_pct)}%)`);
   if (rl.length) { lines.push(''); lines.push(`Rollups: ${rl.join('; ')}.`); }

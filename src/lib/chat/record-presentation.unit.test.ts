@@ -56,7 +56,7 @@ describe('buying offices: presentation', () => {
     expect(lines[header + 1]).toMatch(/^\|---/);
     const rows = lines.slice(header + 2).filter((l) => /^\| \d+\. /.test(l));
     expect(rows.length).toBe(10);
-    expect(rows[0]).toBe('| 1. FLETC Glynco Procurement Office (70LGLY) | $30M | 10% | 20 | Federal Law Enforcement Training Center |');
+    expect(rows[0]).toBe('| 1. FLETC Glynco Procurement Office (70LGLY) | $30.0M | 10% | 20 | Federal Law Enforcement Training Center |');
     expect(r.text).toMatch(/Showing 1–10 of the 47 offices with positive net obligations\./);
     expect(r.text).toMatch(/Ask "show offices 11 to 20" for the next 10\./);
     expect(r.text).toMatch(/2 more offices rank below the top 50 retrieved/);
@@ -87,7 +87,19 @@ describe('buying offices: presentation', () => {
     expect(r.text).not.toMatch(/\((\w+)\) \(\1\)/);
     for (const l of r.text.split('\n').filter((x) => x.includes('example awards'))) expect(l).not.toMatch(/-\$|C900/);
     expect(r.text).not.toMatch(/customers?: FLETC Glynco Procurement Office/i);
-    expect(r.text).toMatch(/default window, none was given/);
+    // The window is stated plainly; nothing about a default (Agent 5, 2026-11-17).
+    expect(r.text).toMatch(/Search: NAICS 561720 · work performed in GA · FY2024-FY2026 \(federal fiscal years, Oct 1 - Sep 30\)\. /);
+    expect(r.text).not.toMatch(/default|none was given/i);
+  });
+  it('one precision per money column and per money list (the document engine rule)', () => {
+    const decimalsOf = (xs: string[]) => new Set(xs.map((x) => (x.match(/\.(\d+)[KMB]$/)?.[1] ?? '').length));
+    const rows = lines.filter((l) => /^\| \d+\. /.test(l));
+    const col = rows.map((l) => l.split(' | ')[1]);
+    expect(col.every((x) => /^\$\d+(\.\d+)?[KMB]$/.test(x))).toBe(true);
+    expect(decimalsOf(col).size).toBe(1);
+    const ex = [...r.text.matchAll(/example awards: ([^\n]+)/g)].flatMap((m) => [...m[1].matchAll(/\((\$[^)]+)\)/g)].map((x) => x[1]));
+    expect(ex.length).toBeGreaterThan(1);
+    expect(decimalsOf(ex).size).toBe(1);
   });
   it('offices with zero or negative net are still listed separately, never as buyers', () => {
     expect(r.text).toMatch(/Also returned, with zero or negative net obligations in this window \(deobligations, so not evidence of buying\): DOL - JCAS - AEC \(1605AE\) \$0; W072 Endist Louisville \(W912QR\) -\$6\.4K; USDA-FS, CSA East 11 \(124451\) -\$10\./);
@@ -156,6 +168,6 @@ describe('award list and vehicle mix: presentation', () => {
     const r = renderVehicleMix({ scope: { naics: ['561720'], window: 'FY2024-FY2026' }, total_obligated: 298_054_424, total_award_count: 198, buckets: [{ label: 'GSA Schedule', obligated: 120_000_000, share_pct: 40.3, award_count: 50 }, { label: 'Standalone contract', obligated: 178_054_424, share_pct: 59.7, award_count: 148 }], rollups: {}, classification: {}, _meta: {} })!;
     expect(r.text).not.toMatch(RAW_MONEY);
     expect(r.text).toMatch(/^\| Vehicle \| Obligations \| Share \| Awards \|$/m);
-    expect(r.text).toMatch(/\| GSA Schedule \| \$120M \| 40\.3% \| 50 \|/);
+    expect(r.text).toMatch(/^\| GSA Schedule \| \$120\.0M \| 40\.3% \| 50 \|$/m);
   });
 });

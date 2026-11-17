@@ -177,7 +177,7 @@ describe('buying offices', () => {
     expect(r.text).toMatch(/Search: NAICS 5613, 5611 · work performed in TN · Memphis metro \(cities within 30 miles, in TN only\) · FY2024-FY2026\./);
     expect(r.text).toMatch(/Showing all 2 offices\.|Showing 1–2 of the 2 offices with positive net obligations\./);
     expect(r.text).toMatch(/8 more offices rank below the top 2 retrieved/);
-    expect(r.text).toMatch(/^\| 1\. NAVSUP FLT LOG CTR Norfolk \(N00189\) \| \$58\.9M \| 89\.6% \| 12 \| Department of the Navy \|$/m);
+    expect(r.text).toMatch(/^\| 1\. NAVSUP FLT LOG CTR Norfolk \(N00189\) \| \$58\.88M \| 89\.6% \| 12 \| Department of the Navy \|$/m);
     expect(r.text).toMatch(/^- \*\*1\.\*\* customers: Navy Personnel Command \$50M · work in Millington, TN$/m);
     expect(r.text).toMatch(/These are federal government contracting offices \(buyers\), not companies\./);
   });
@@ -410,7 +410,8 @@ describe('attempt-2 fixes', () => {
   });
   it('tool-internal notes are not shown; a defaulted window is stated in plain words', () => {
     const r = renderBuyingOffices({ scope: { naics: ['5613'], window: 'FY2024-FY2026' }, offices: [{ office_name: 'A', obligated: 5, share_pct: 100, award_count: 1 }], totals: { obligated: 5, award_count: 1, office_count: 1 }, notes: ['No window given: defaulted to FY2024-FY2026.', 'see top_places'], _meta: {} })!;
-    expect(r.text).toMatch(/FY2024-FY2026, default window, none was given/);
+    expect(r.text).toMatch(/FY2024-FY2026\./);
+    expect(r.text).not.toMatch(/default window|none was given/); // stated plainly (Agent 5, 2026-11-17)
     expect(r.text).not.toMatch(/top_places|No window given/);
   });
 });
