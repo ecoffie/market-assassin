@@ -25,6 +25,8 @@ import {
   type AwardsFreshness,
 } from '@/lib/awards-ingest';
 import { staleDaysForCadence } from '@/lib/data-sources/freshness';
+import { TABLE_MEASURED_SOURCES, classifyTableFreshness, isTableMeasured } from '@/lib/data-sources/table-measured';
+import { decideStamp } from '@/lib/data-sources/stamp-guard';
 import eventsCatalog from '@/data/federal-events-sources.json';
 import { CATALOG_KEY, catalogDateFindings, catalogLinkFindings, type EventCatalog } from '@/lib/events/catalog-freshness';
 
@@ -41,15 +43,31 @@ export async function GET(request: NextRequest) {
 
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
-  // STAMP action: ?stamp=<source key> marks a source refreshed AFTER you actually
-  // ran its rebuild script. We never auto-stamp (that would fake freshness — the
-  // refreshes are human-run scrapers). This is the honest "I did the refresh" call.
+  // STAMP action: ?stamp=<key>&records=<n>&evidence=<what was refreshed, where to check it>
+  // marks a curated source refreshed AFTER you actually ran its refresh. We never
+  // auto-stamp, and a stamp is never a way to clear an alert: decideStamp refuses keys
+  // whose freshness is measured elsewhere (table-measured, the events catalog,
+  // producer-stamped, live APIs) and refuses any stamp without a record count and
+  // cited evidence. The evidence is appended to the row's notes for audit.
   const stampKey = request.nextUrl.searchParams.get('stamp');
   if (stampKey) {
     const today = new Date().toISOString().slice(0, 10);
-    const { error: upErr } = await sb.from('data_sources').update({ last_built: today }).eq('key', stampKey);
+    const { data: row, error: rowErr } = await sb
+      .from('data_sources').select('key,is_active,category,notes').eq('key', stampKey).maybeSingle();
+    if (rowErr) return NextResponse.json({ success: false, error: rowErr.message }, { status: 500 });
+    const decision = decideStamp({
+      key: stampKey,
+      row,
+      evidence: request.nextUrl.searchParams.get('evidence'),
+      records: request.nextUrl.searchParams.get('records'),
+      today,
+    });
+    if (!decision.ok) {
+      return NextResponse.json({ success: false, stamped: null, refused: stampKey, error: decision.reason }, { status: decision.status });
+    }
+    const { error: upErr } = await sb.from('data_sources').update(decision.update).eq('key', stampKey);
     if (upErr) return NextResponse.json({ success: false, error: upErr.message }, { status: 500 });
-    return NextResponse.json({ success: true, stamped: stampKey, last_built: today });
+    return NextResponse.json({ success: true, stamped: stampKey, last_built: decision.update.last_built, record_count: decision.update.record_count });
   }
 
   const { data, error } = await sb.from('data_sources').select('*').eq('is_active', true);
@@ -69,6 +87,8 @@ export async function GET(request: NextRequest) {
   for (const s of data || []) {
     // Checked below from the catalog file itself, never from a stamped last_built.
     if (s.key === CATALOG_KEY) continue;
+    // Measured from the table's own rows below — a stamp never decides these.
+    if (isTableMeasured(s.key)) continue;
     if (s.key === 'bq_awards') {
       const freshness = classifyFreshness({
         clocks: resolveAwardsIngestClocks({ notes: s.notes, lastBuilt: s.last_built }),
@@ -162,6 +182,31 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Table-measured sources: freshness = what the scheduled producer actually wrote
+  // (age of the newest row AND the share of rows refreshed in its window). Replaces the
+  // stamp for sources whose producer never writes last_built (dodaac_directory: a false
+  // 169-day alert while the job refreshed 4,901/4,902 rows on 2026-11-06).
+  const tableMeasured: Record<string, ReturnType<typeof classifyTableFreshness>> = {};
+  for (const spec of Object.values(TABLE_MEASURED_SOURCES)) {
+    const windowStart = new Date(now - spec.windowDays * 86400_000).toISOString();
+    const [newestRes, totalRes, windowRes] = await Promise.all([
+      sb.from(spec.table).select(spec.column).order(spec.column, { ascending: false }).limit(1).maybeSingle(),
+      sb.from(spec.table).select('*', { count: 'exact', head: true }),
+      sb.from(spec.table).select('*', { count: 'exact', head: true }).gte(spec.column, windowStart),
+    ]);
+    // An errored read is unknown, never a count of zero.
+    const f = classifyTableFreshness({
+      spec,
+      newest: newestRes.error ? null : (newestRes.data as Record<string, string> | null)?.[spec.column],
+      total: totalRes.error ? null : totalRes.count,
+      refreshedInWindow: windowRes.error ? null : windowRes.count,
+    });
+    tableMeasured[spec.key] = f;
+    if (f.status !== 'healthy') {
+      stale.push({ key: spec.key, name: spec.name, cadence: `table-measured (${spec.windowDays}d)`, ageDays: f.ageDays ?? -1, refreshWith: `${f.status}: ${f.detail}` });
+    }
+  }
+
   // When sources are overdue, post the refresh checklist to OPS (Slack). The cron runs
   // unattended, so JSON alone is invisible. The refreshes are human-run scrapers; the alert
   // tells Eric exactly which script to run, then ?stamp=<key> marks it done.
@@ -185,7 +230,7 @@ export async function GET(request: NextRequest) {
         subject: `${stale.length} Mindy data source(s) need attention`,
         html: `<p>${stale.length} source(s) need attention — curated sources past their refresh cadence, and/or a live sync that has gone quiet.</p>`
           + `<ul>${rows}</ul>`
-          + `<p>After running a script, mark it done: <code>curl "https://getmindy.ai/api/cron/check-data-freshness?password=...&amp;stamp=&lt;key&gt;"</code><br>`
+          + `<p>After running a refresh, mark it done WITH evidence: <code>curl "https://getmindy.ai/api/cron/check-data-freshness?password=...&amp;stamp=&lt;key&gt;&amp;records=&lt;n&gt;&amp;evidence=&lt;what+changed+and+where+to+check&gt;"</code> (refused without evidence; table-measured sources cannot be stamped).<br>`
           + `Keys: ${stale.map(s => s.key).join(', ')}</p>`,
         emailType: 'admin_alert',
       });
@@ -203,6 +248,7 @@ export async function GET(request: NextRequest) {
     totalSources: (data || []).length,
     staleCount: stale.length,
     stale,
+    tableMeasured,
     eventsCatalog: { lastFullReview: (eventsCatalog as EventCatalog).lastFullReview ?? null, findings: catalogFindings, links: catalogLinks },
     notified,
     message: notifyFailed
