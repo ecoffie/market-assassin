@@ -70,3 +70,27 @@ export function buildManifest(docs: Pick<ChatDocumentText, 'filename' | 'char_co
     ...lines,
   ].join('\n');
 }
+
+/** How much uploaded text the PLANNER sees when it may build a document (much less than the answer step). */
+export const PLANNER_DOCUMENT_BUDGET = 12_000;
+
+/**
+ * For create_document ONLY (callers allowlisted for generate). The planner builds the document's blocks,
+ * so it must see the user's uploaded material — otherwise a "make my capability statement a document"
+ * request produces a document without the company's own content (production, 2026-11-17). Fenced as
+ * untrusted data like the answer block, smaller, and labeled with each document's id so company content
+ * is cited to the upload (sources[].kind "upload", recordId = the id).
+ */
+export function buildPlannerDocumentContext(docs: ChatDocumentText[], question: string, budget = PLANNER_DOCUMENT_BUDGET): string | null {
+  const usable = docs.filter((d) => (d.extracted_text || '').trim().length > 0);
+  if (!usable.length) return null;
+  const ctx = buildDocumentContext(usable, question, budget);
+  if (!ctx) return null;
+  const block = ctx.block;
+  const ids = usable.map((d) => `- ${safeName(d.filename)} — document_id: ${d.id}`).join('\n');
+  return [
+    'FOR create_document: the user uploaded these documents. When building a document, include their relevant company content (capabilities, approach, company facts) as blocks labeled "fact" that cite a source { kind: "upload", recordId: <document_id>, label: <file name> }. Use only what the text states; never invent certifications, awards, past performance or eligibility.',
+    ids,
+    block,
+  ].join('\n');
+}

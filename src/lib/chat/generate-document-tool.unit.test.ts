@@ -164,6 +164,27 @@ describe('create_document', () => {
     });
   });
 
+  it('diagnostics: units before/after the repair and omissions BY REASON (no content)', async () => {
+    const s = setup();
+    const m = model({ sections: [{ id: 'a', heading: 'Summary', blocks: [
+      { type: 'paragraph', id: 'p1', text: 'VA obligated $412.5M for janitorial services.', claim: 'fact', cites: ['s1'] },
+      { type: 'paragraph', id: 'p2', text: 'We assume strong past performance with the VA.', claim: 'assumption', origin: 'x' },
+      { type: 'paragraph', id: 'p3', text: 'Proposals are due December 4.', claim: 'fact', critical: true },
+      { type: 'paragraph', id: 'p4', text: 'Most buyers prefer local firms.', claim: 'fact' },
+    ] }] });
+    const r = await s.tool.execute({ doc_model: m });
+    expect(r).toMatchObject({ ok: true, diagnostics: { units_in: 4, units_out: 2, unverified: 1, omitted_by_reason: { never_an_assumption: 1, critical_without_source: 1 }, uncited_sources: [] } });
+    expect(JSON.stringify(r.diagnostics)).not.toMatch(/past performance|December|local firms/);
+  });
+
+  it('the description tells the model to include the uploaded company material, cited to the upload, never as assumptions', () => {
+    const d = CREATE_DOCUMENT_TOOL_DEF.function.description;
+    expect(d).toMatch(/INCLUDING the user's uploaded company material/);
+    expect(d).toMatch(/kind: 'upload', recordId: <the upload's document_id>/);
+    expect(d).toMatch(/never label it an assumption and never leave it out/);
+    expect(d).toMatch(/ONLY when the uploaded text states them, as facts citing the upload/);
+  });
+
   it('the tool schema states every allowed value, exactly as the validator accepts them', () => {
     const dm = (CREATE_DOCUMENT_TOOL_DEF.function.parameters.properties.doc_model) as R;
     expect(dm.properties.sources.items.properties.kind.enum).toEqual([...SOURCE_KIND_VALUES]);
