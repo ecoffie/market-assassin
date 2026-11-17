@@ -172,6 +172,34 @@ describe('validateDocModel', () => {
     expect(issuesOf(model)).toEqual([]);
   });
 
+  it('an unverified statement carries no cites ("no source" beside [n] contradicts itself)', () => {
+    const m = tiny({ sections: [{ id: 'a', heading: 'A', blocks: [
+      { type: 'paragraph', id: 'p1', text: 'The office buys cleaning.', claim: 'unverified', cites: ['s1'] },
+      { type: 'bullets', id: 'b', items: [{ text: 'x', claim: 'unverified', cites: ['s1'] }] },
+    ] }] });
+    expect(issuesOf(m).filter((x) => /unverified statement carries no cites/.test(x))).toHaveLength(2);
+  });
+
+  it('demoteUncitedFacts drops dangling cite ids so its output validates', () => {
+    const m = tiny({ sections: [{ id: 'a', heading: 'A', blocks: [
+      { type: 'paragraph', id: 'only', text: 'Only a hallucinated source.', claim: 'fact', cites: ['s9'] },
+      { type: 'paragraph', id: 'mixed', text: 'One real, one not.', claim: 'fact', cites: ['s1', 's9'] },
+      { type: 'paragraph', id: 'uv', text: 'Producer doubts it.', claim: 'unverified', cites: ['s1'] },
+    ] }] });
+    expect(issuesOf(m)).not.toEqual([]);
+    const { model, unverified, omitted } = demoteUncitedFacts(m);
+    expect(unverified).toEqual(['only']);
+    expect(omitted).toEqual([]);
+    const [only, mixed, uv] = model.sections[0].blocks as Array<{ claim?: string; cites?: string[] }>;
+    expect(only).toMatchObject({ claim: 'unverified' });
+    expect(only.cites).toBeUndefined();
+    expect(mixed).toMatchObject({ claim: 'fact', cites: ['s1'] });
+    expect(uv).toMatchObject({ claim: 'unverified' });
+    expect(uv.cites).toBeUndefined();
+    expect(issuesOf(model)).toEqual([]);
+    expect(renderHtml(model)).not.toMatch(/Producer doubts it\.<sup/);
+  });
+
   it('M1: an UNLABELED block or bullet item is rejected (it used to skip facts-must-cite)', () => {
     const m = tiny({ sections: [{ id: 'a', heading: 'A', blocks: [
       { type: 'paragraph', id: 'p1', text: 'Spend was $5M.' },
@@ -233,7 +261,7 @@ describe('validateDocModel', () => {
     const { model, unverified, omitted } = demoteUncitedFacts(m);
     expect(unverified).toEqual(['p1', 'b[1]']);
     expect(omitted).toEqual([]);
-    expect(issuesOf(model)).toEqual(['cites unknown source(s) zzz at b[1]']);
+    expect(issuesOf(model)).toEqual([]); // the dangling "zzz" is dropped, so the repaired model validates
     const p1 = model.sections[0].blocks[0];
     expect(p1.type === 'paragraph' && p1.claim).toBe('unverified');
     expect(p1.type === 'paragraph' && p1.text).toBe('Uncited');

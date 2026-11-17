@@ -210,6 +210,9 @@ export function validateDocModel(input: unknown): ValidationResult {
             if (u.text.length > CONTEXT_MAX_CHARS) add(`${bp}`, `context is limited to ${CONTEXT_MAX_CHARS} characters (${u.where})`);
           }
           if (u.claim === 'unverified' && u.critical === true) add(`${bp}`, `a decision-critical statement cannot be unverified (${u.where}); cite a source or omit it`);
+          // "Unverified — no source" next to a [n] citation contradicts itself, and the cited source would
+          // still be listed under Sources as if it supported the statement.
+          if (u.claim === 'unverified' && Array.isArray(u.cites) && u.cites.length) add(`${bp}`, `an unverified statement carries no cites (${u.where}); if the source supports it, label it fact`);
           if ((u.claim === 'recommendation' || u.claim === 'assumption') && statesFigure(u.text) && (u.cites ?? []).filter((c) => sourceIds.has(c)).length === 0) {
             add(`${bp}`, `${u.claim === 'assumption' ? 'an assumption' : 'a recommendation'} that states a count or amount must cite its source (${u.where})`);
           }
@@ -252,19 +255,26 @@ export function demoteUncitedFacts(model: DocModel): DemotionResult {
   // Returns the repaired unit, or null when it must be omitted. A unit is held to the
   // facts-must-cite rule when it is a fact, unlabeled, a recommendation/assumption stating a
   // figure, or `context` the validator would refuse (outside an 'about' section, or with a number).
-  const fix = <T extends Unit>(u: T, where: string, about: boolean, isTableOrChart: boolean): T | null => {
+  const withoutCites = <T extends Unit>(x: T): T => { const { cites: _dropped, ...rest } = x; return rest as T; };
+  const fix = <T extends Unit>(input: T, where: string, about: boolean, isTableOrChart: boolean): T | null => {
+    // A cite id with no source behind it is not evidence. Drop it so the repaired model validates
+    // (a hallucinated "s9" used to survive demotion and make the result fail validation).
+    const all = Array.isArray(input.cites) ? input.cites : [];
+    const resolved = all.filter((c) => ids.has(c));
+    const u: T = resolved.length === all.length ? input : resolved.length ? { ...input, cites: resolved } : withoutCites(input);
     const text = u.text ?? u.caption ?? '';
-    const cited = (u.cites ?? []).some((c) => ids.has(c));
+    const cited = resolved.length > 0;
     const mustCite =
       u.claim === 'fact' || u.claim === undefined ||
       ((u.claim === 'recommendation' || u.claim === 'assumption') && statesFigure(text)) ||
       (u.claim === 'context' && (!about || isTableOrChart || /\d/.test(text) || NUMBER_WORD.test(text) || CONTEXT_FORBIDDEN.test(text) || text.length > CONTEXT_MAX_CHARS)) ||
       (u.claim === 'unverified' && u.critical === true);
-    if (!mustCite) return u;
+    // An explicitly unverified (non-critical) statement keeps the producer's own doubt; only its cites go.
+    if (!mustCite) return u.claim === 'unverified' ? withoutCites(u) : u;
     if (cited) return u.claim === undefined || u.claim === 'context' || u.claim === 'unverified' ? { ...u, claim: 'fact' } : u;
     if (u.critical === true) { omitted.push(where); return null; }
     unverified.push(where);
-    return { ...u, claim: 'unverified' };
+    return { ...withoutCites(u), claim: 'unverified' };
   };
   const sections = model.sections.map((sec) => ({
     ...sec,
