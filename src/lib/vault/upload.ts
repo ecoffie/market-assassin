@@ -87,6 +87,13 @@ export interface VaultUploadDeps {
   db: VaultDb;
   storage: VaultStorage;
   resolveScope?: (email: string, request: VaultUploadInput['request']) => Promise<ChatActingScope>;
+  /**
+   * Runs after every check has passed and immediately before the first write (the blob). Lets a
+   * caller create what the row depends on (e.g. the conversation row for chat_session_id) only
+   * when the file is actually going to be stored. Returning false aborts with storage_failed and
+   * stores nothing.
+   */
+  beforeWrite?: (owner: { ownerEmail: string; workspace: 'own' | 'client' }) => Promise<boolean>;
   /** Per-account upload limit (default: the shared KV limiter + per-instance backstop). */
   limit?: typeof checkVaultLimit;
   now?: () => number;
@@ -191,6 +198,10 @@ export async function saveVaultUpload(input: VaultUploadInput, deps: VaultUpload
       ok: false, status: 422, code: 'unreadable',
       message: "Mindy couldn't read any text in this file (it may be a scanned image), so it couldn't be checked and wasn't saved. Upload a text-based PDF, Word or text file.",
     };
+  }
+
+  if (deps.beforeWrite && !(await deps.beforeWrite(owner))) {
+    return { ok: false, status: 500, code: 'storage_failed', message: 'The file could not be saved. Nothing was stored. Try again.' };
   }
 
   // 5) Private bucket only.

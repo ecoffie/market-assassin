@@ -66,6 +66,7 @@ const nextConfig: NextConfig = {
         '/api/pipeline/**/*',
         '/api/app/vault/documents/**/*',
         '/api/app/proposal/upload/**/*',
+        '/api/app/chat/documents/**/*',
         '/api/app/proposal/pursuit-docs/**/*',
         '/api/actions/add-to-pipeline/**/*',
         '/api/admin/heal-pursuit-attachments/**/*',
