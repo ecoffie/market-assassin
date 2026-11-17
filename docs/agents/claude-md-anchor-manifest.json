@@ -1,0 +1,854 @@
+{
+ "source": "CLAUDE.md @ origin/main 9ef8383b1 (230,328 chars)",
+ "created": "2026-11-17",
+ "anchors": [
+  {
+   "kind": "heading",
+   "text": "## Critical Rules",
+   "location": "docs/agents/project-rules.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## ⚠️ Sharing `.env.local` into a worktree — use the helper, never raw `ln -sfn`",
+   "location": "docs/agents/release-and-worktrees.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## ⛔ Never pop an unidentified shared stash",
+   "location": "docs/agents/release-and-worktrees.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## ⚠️ `vercel --prod` from a worktree — link `.vercel` in THAT worktree first",
+   "location": "docs/agents/release-and-worktrees.md",
+   "status": "reworded",
+   "now": "## ⚠️ `vercel --prod` from a worktree — link `.vercel` in THAT worktree first"
+  },
+  {
+   "kind": "heading",
+   "text": "## 🎯 Current priority order — READ BEFORE PICKING UP WORK",
+   "location": "docs/agents/current-state.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## 🧭 Incumbent identity: location is corroboration, never identity (FROZEN 2026-09-22)",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## 🔗 Record links vs market links — READ before emitting any per-record URL",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## 🔁 Return continuity — the Map remembers the MARKET, not just the viewport (2026-09-21)",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## 👥 Proven Players — FILTER, then RANK (2026-10-04)",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## 🔤 A MATCH IS A CLAIM — READ before touching /try, the match engine, or SEO page generation",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## 📐 A number is a product feature — READ before building anything that DISPLAYS a number",
+   "location": "docs/agents/data-integrity.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## 🧭 The GovCon Operating System — READ THIS FIRST for any new build",
+   "location": "docs/agents/platform.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## In-flight work — READ THIS FIRST before re-deriving anything",
+   "location": "docs/agents/current-state.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Unified MI Platform Architecture (May 2026)",
+   "location": "docs/agents/platform.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Pre-Deploy QA",
+   "location": "docs/agents/release-and-worktrees.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## SAM.gov API Integration",
+   "location": "docs/agents/data-sources.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Award Intelligence + Office Rosters (June 8, 2026)",
+   "location": "docs/agents/data-sources.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Keyword-first market research (June 8, 2026)",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Agency Hierarchy API v2 (Moat 7)",
+   "location": "docs/agents/data-sources.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Project Overview",
+   "location": "docs/agents/platform.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Related Projects",
+   "location": "docs/agents/platform.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Tools Built",
+   "location": "docs/agents/product-and-tools.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Products & Pricing",
+   "location": "docs/agents/product-and-tools.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Rate Limiting & Abuse Detection",
+   "location": "docs/agents/platform.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Access Control System",
+   "location": "docs/agents/platform.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Data Systems",
+   "location": "docs/agents/product-and-tools.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Key Files",
+   "location": "docs/agents/current-state.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Admin Endpoint Standard",
+   "location": "docs/agents/platform.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## MI Launch Command Center (May 2026)",
+   "location": "docs/agents/product-and-tools.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## AI Tool Health Dashboard (April 19, 2026)",
+   "location": "docs/agents/product-and-tools.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Bug Prevention Rules",
+   "location": "docs/agents/data-integrity.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## One fix = every surface — now a GATE (`scripts/audit-tool-catalog-drift.mjs`, Jul 17 2026)",
+   "location": "docs/agents/mcp.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## ⚠️ The gate validates the CHECKOUT BEING PUSHED — not the hook's location",
+   "location": "docs/agents/release-and-worktrees.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## The silent-failure gate (`scripts/audit-supabase-errors.mjs`, Jul 16-17 2026)",
+   "location": "docs/agents/data-integrity.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## The rank-then-filter gate (`scripts/audit-rank-then-filter.mjs`, Jul 2026)",
+   "location": "docs/agents/data-integrity.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Vercel KV Resilience (May 2026)",
+   "location": "docs/agents/platform.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Email Template Standard",
+   "location": "docs/agents/platform.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Environment Variables",
+   "location": "docs/agents/platform.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## 🔔 Pending Tasks",
+   "location": "docs/agents/current-state.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## JTED 2026 Presentation & Guide",
+   "location": "docs/agents/current-state.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Sales Attribution (June 2, 2026 — PR #5)",
+   "location": "docs/agents/product-and-tools.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Full-text search + global lookup (June 11, 2026)",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Launch ops + onboarding (June 10-11, 2026)",
+   "location": "docs/agents/product-and-tools.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## SEO crawl health + dependency security (June 24, 2026)",
+   "location": "docs/agents/product-and-tools.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Mindy MCP Server — Phase 1 platform: billing / auth / transport (SHIPPED 2026-07-12)",
+   "location": "docs/agents/mcp.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Mindy MCP Server — Data Core tools (2026-07-12)",
+   "location": "docs/agents/mcp.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Mindy MCP Server — Keyless OAuth 2.1 (2026-07-13)",
+   "location": "docs/agents/mcp.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Mindy MCP Server — `/chatgpt/mcp` profile (ChatGPT plugin Path A, 2026-10-02)",
+   "location": "docs/agents/mcp.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Mindy MCP Server — usage visibility + tool grouping (2026-07-15, PR #247)",
+   "location": "docs/agents/mcp.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Mindy MCP Server — account area + usage charts (2026-07-16, PRs #251–253)",
+   "location": "docs/agents/mcp.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## MCP credit emails — receipts + welcome (2026-07-16)",
+   "location": "docs/agents/mcp.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Location search for opportunities (2026-07-16)",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Past-contracts (AWARDS) search by location — MCP + BigQuery + USASpending (2026-07-16)",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Mindy MCP Server — proposal WRITING tools (2026-07-16)",
+   "location": "docs/agents/mcp.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Market spend: ONE shared query + the lead-vs-biggest split (2026-07-16, PRs #290/#293)",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## One-Shot Composite Tools — ALL 3 SHIPPED (2026-07-16)",
+   "location": "docs/agents/mcp.md",
+   "status": "moved"
+  },
+  {
+   "kind": "heading",
+   "text": "## Verification Recipes — how to PROVE each surface works (rule #2)",
+   "location": "docs/agents/verification.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "1. **No Framer.** Do not use any Framer MCP tools. This is a pure Next.js/React codebase.",
+   "location": "docs/agents/project-rules.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "2. **This is the DEVELOPMENT project.** Deploys to `getmindy.ai`. For live `shop.govcongiants.org` changes, use `/Users/ericcoffie/govcon-shop`.",
+   "location": "docs/agents/project-rules.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "3. **Content Reaper `API_BASE` must be `''`** (empty string) in all `public/content-generator/*.html` files. Never set to an external URL.",
+   "location": "docs/agents/project-rules.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "4. **Different Supabase databases.** market-assassin and govcon-shop have SEPARATE Supabase instances. They do NOT share tables.",
+   "location": "docs/agents/project-rules.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "5. **KV store connected to BOTH projects** via Vercel Storage integration. KV backfills can run from either project.",
+   "location": "docs/agents/project-rules.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "6. **SAM.gov API does NOT support comma-separated NAICS codes.** Must make parallel requests for each NAICS code and merge results. See `src/lib/briefings/pipelines/sam-gov.ts`.",
+   "location": "docs/agents/project-rules.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "7. **FPDS.gov retired Feb 24, 2026.** All federal contract data now flows through SAM.gov APIs. See `docs/sam-apis.md` for full reference.",
+   "location": "docs/agents/project-rules.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "8. **Always run QA tests before deploying.** Use `npm run deploy` (runs tests first) or `npm run test:pre-deploy`.",
+   "location": "docs/agents/project-rules.md",
+   "status": "reworded",
+   "now": "8. **Always run QA tests before a change is released.** Use `npm run test:pre-deploy`. **[Release control 2026-11-17]** `npm run deploy` runs `vercel --prod`, a direct production upload of the local tree that bypasses GitHub review. It is a covered action under root CLAUDE.md rule 15: builders never run it."
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "9. **Unified notification table:** All alert/briefing code uses `user_notification_settings` (not the old `user_alert_settings` or `user_briefing_profile` tables which were dropped). The `smart-profile` service (`src/lib/smart-profile/`) is **dead code** - its `user_briefing_profile` table was never deployed.",
+   "location": "docs/agents/project-rules.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "10. **Daily briefings MUST use fast GREEN builder.** `send-briefings-fast` must use `buildSamGreenBriefing()` (instant, no AI), NOT `generateDailyBriefFromSam()` which calls Claude API (~4s/user, causes timeouts). Run `tests/test-briefing-architecture.sh` to verify.",
+   "location": "docs/agents/project-rules.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "11. **Briefing log MUST include briefing_type in all queries.** The `briefing_log` table has a unique constraint on `(user_email, briefing_date, briefing_type)`. All INSERT/UPDATE/SELECT must filter by `briefing_type` ('daily', 'weekly', 'pursuit') to avoid collisions between briefing types.",
+   "location": "docs/agents/project-rules.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "12. **Weekly-alerts drains the whole cycle.** Each cron run evaluates pending users until done or a 220s time budget (`WEEKLY_ALERT_RUN_BUDGET_MS`) is spent — never a fixed per-run user count. The old `BATCH_SIZE=75` × 10 windows silently capped every cycle at 750 of ~1,790 eligible, so everyone after roughly \"j\" never got a weekly alert (fixed 2026-10-06, `src/lib/alerts/weekly-drain.ts`). The cursor is this cycle's `alert_log` rows (unique on `user_email`+`alert_date`+`alert_type='weekly'`), read PAGED; every evaluated user writes `sent`/`skipped`/`failed`. Runs self-report pending users via `reportCronOutcome`. Uses the local `sam_opportunities` cache in the hot path.",
+   "location": "docs/agents/project-rules.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "13. **All Mindy email sends use shared `sendEmail()` — Resend ONLY, from `mail.getmindy.ai`, NO fallback** (sender isolation, 2026-10-27). A Resend failure throws (`ResendSendError` / `EmailOutcomeUnknownError`); `sendEmail` refuses any From outside `mail.getmindy.ai` (`UnapprovedSenderError`). Never add a nodemailer/Office365 transport or a `@govcongiants.com` From in `src/` or `scripts/` — `scripts/audit-email-sender.mjs` blocks the push.",
+   "location": "docs/agents/project-rules.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "14. **Unified MI Platform Architecture.** All tools live inside `/briefings` as panels switched by sidebar, NOT separate routes. This follows the Atlassian navigation pattern. See \"Unified MI Platform Architecture\" section below.",
+   "location": "docs/agents/project-rules.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "15. **Release control (Eric, updated 2026-11-17).** A session MAY merge a PR to `main` when Eric explicitly says so in that session for that specific PR (e.g. \"merge #2131\") and its CI `verify` check is green. Independent review (Agent 4) and coordinator sequencing (Agent 5) are STILL required — no exceptions, even if Eric asks in chat — for changes to payments/Stripe, auth or access control, production env vars or feature flags, and database migrations (`npm run migrate -- --go`). A session must NEVER run `vercel --prod`, `vercel promote`, `vercel rollback` or `vercel redeploy` against production without Eric's explicit OK. **Why:** on 2026-11-17 an unattributed production Redeploy rolled back 19 merges, including two access-control fixes.",
+   "location": "CLAUDE.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "⚠️ **Navy and NAPEX are FINISHED.** They no longer govern the roadmap; what remains from them",
+   "location": "docs/agents/current-state.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "⚠️ **The lexicon must never contain a word that can NAME THE WORK.** Federal agencies buy",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "⚠️ **`mi_map_last_search` must never carry a bbox.** The viewport already has an owner that is",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "⚠️ **Never remember a filter `__applySavedSearch` cannot give back.** `window.__mapStateMeaningful`",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "⚠️ **An empty default map is not a session.** The meaningfulness check runs on BOTH the write and",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "⚠️ **The memory never fights the URL.** Any record link (`?opp= ?company= ?buyer= ?recompete=",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⛔ **`top_contractors_by_dimension` is a top-50 LISTICLE, not a population.** It powers `/top/*`",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⚠️ **HELD:** `PLAYERS_SOURCE=canonical` is OFF and the production table is NOT built. Required",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⚠️ **/try resolves NO NAICS.** It passes `skipUsaSpendingCoverage`, so `naicsCodes` is",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⚠️ **Absent ≠ unrestricted.** `classifySetAside(null)` is `not_stated`, not `open`.",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⚠️ **An RFI is not a bid.** Every card carries a `stage` (`open_bid` /",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⚠️ **PLURAL IS NOT DERIVATION, and the SQL keyword must be SINGULAR.** \"we build fences\"",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⚠️ **AN EXACT-TOKEN MISS IS NOT MARKET ABSENCE.** `/try` matches the words in a",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⛔ **There is NO body-text rescue, and the one that was built is RETRACTED.** A",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "⚠️ **HARD CONSTRAINT, enforced by CI:** every contract must trace to an `INT-###` class from the",
+   "location": "docs/agents/data-integrity.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⛔ Migration `20260929_pooled_team_credits.sql` is NOT applied and the one Team subscriber is NOT migrated; each needs Eric's approval (runbook §11). Apply with `--only`, never bare `--go`.",
+   "location": "docs/agents/current-state.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⛔ No public pricing/copy change and no `POOLED_PLAN_DEFAULTS` change until Eric approves the seat-and-credit proposal (private repo `ecoffie/govcon-proposals`, `mindy-pricing/`).",
+   "location": "docs/agents/current-state.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⚠️ A client abort does NOT cancel the PostgREST/Postgres statement (`authenticator` statement_timeout=8s), so every duplicate round is real DB load. Remove duplicates at the source; never rely on the abort.",
+   "location": "docs/agents/current-state.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⚠️ Building your market is CSS-revealed from the SERVER HTML (`.app mfb-booting`, 300 ms opacity animation) — never",
+   "location": "docs/agents/current-state.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⚠️ Measure Maps timing with NATIVE arm64 Chrome (`arch -arm64 … --remote-debugging-port`). Node here is x64, so",
+   "location": "docs/agents/current-state.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⚠️ A USER ACTION supersedes in-flight work AT ONCE (`_actionNow()` bumps `_fetchGen`) — the dispatch now yields a",
+   "location": "docs/agents/current-state.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⚠️ Mark stale with INLINE writes + composited VEILS (z 450, over the map pane, under every control). Measured:",
+   "location": "docs/agents/current-state.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⚠️ `npm run migrate -- --go` applies EVERY pending file. `20260924_saved_search_forecast_watermark.sql` (#1683) is",
+   "location": "docs/agents/current-state.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⛔ Do not fix Maps/saved-search search locally — migrate the consumer. The **cross-surface gate**",
+   "location": "docs/agents/current-state.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⚠️ **DIRECT_MATCH needs BUY-SIDE evidence** (`match-evidence.ts`). A holder-name-only hit is `HOLDER_SIGNAL`;",
+   "location": "docs/agents/current-state.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⚠️ **The cursor is `sam_opportunities.created_at`, never `posted_date`.** 34,906 notices",
+   "location": "docs/agents/current-state.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⚠️ **Registered + enabled + firing on time ≠ working.** The first scheduled fire **401'd**:",
+   "location": "docs/agents/current-state.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⚠️ **`source` / `source_table` on `federal_contacts` are column DEFAULTS**, not provenance. The",
+   "location": "docs/agents/current-state.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⛔ While parked: do NOT wire SBIR.gov, expand SBIR coverage, investigate DARPA, repair NSF, add DIBBS monitoring, change grant retention, dedupe grant populations, change sync schedules, or add specialty feeds.",
+   "location": "docs/agents/current-state.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "1. **`sam_api_cache`** — the SAM response cache. Entity lookups are `api_type='entity'`; the raw",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "2. **Our own DB / BigQuery** — `sam_opportunities` (88K cached opps), `recipients`/awards in",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "3. **`fetchSamOpportunitiesFromCache()`** for briefings/alerts — never the live opps API in a loop.",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "0. **CACHE-FIRST (see the ⛔ block above)** — read `sam_api_cache` / our DB / BigQuery BEFORE any",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "1. **No comma-separated NAICS** — make parallel requests",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "2. **Always cache responses** — 24h TTL minimum (write-side; #0 is the read-side companion)",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "3. **USASpending is primary for Contract Awards** — has bid count data",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "4. **Use MCP tools when available** — `mcp__samgov__*` for opportunities",
+   "location": "docs/agents/search-and-matching.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "**⚠️ `pagination.total` is a FLOOR, not a global count.** Once the filtered set crosses",
+   "location": "docs/agents/product-and-tools.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "**⚠️ Daily tier gate (READ BEFORE TOUCHING `daily-alerts/route.ts`):**",
+   "location": "docs/agents/product-and-tools.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "⚠️ **Register the account the advocate WORKS FROM, not their app signup.** Tabitha connects as",
+   "location": "docs/agents/product-and-tools.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "1. **Never `continue` after Supabase failure** — always run KV operations unconditionally.",
+   "location": "docs/agents/data-integrity.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "2. **Never match comma-joined strings directly** — split on delimiters first.",
+   "location": "docs/agents/data-integrity.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "3. **Formatting must be consistent server + client** — markdown must render correctly.",
+   "location": "docs/agents/data-integrity.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "4. **Always persist state after generation** — upsert to database immediately.",
+   "location": "docs/agents/data-integrity.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "5. **Arrays must be `.join(' ')` not interpolated** — avoid `${array}` producing comma-joined.",
+   "location": "docs/agents/data-integrity.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "6. **Never `.slice()` user data silently** — make caps explicit or configurable.",
+   "location": "docs/agents/data-integrity.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "7. **Use unified `user_notification_settings` table** — Old tables (`user_alert_settings`, `user_briefing_profile`) were dropped. All code uses unified table now.",
+   "location": "docs/agents/data-integrity.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "8. **Always add fallback NAICS** — If user has no NAICS, use defaults: `541512, 541611, 541330, 541990, 561210`.",
+   "location": "docs/agents/data-integrity.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "9. **Supabase LIKE uses `%` not `*`** — For pattern matching, use `naics_code.like.236%` not `naics_code.like.236*`. The `*` wildcard returns 0 results.",
+   "location": "docs/agents/data-integrity.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "10. **All KV operations must have try-catch fallback** — KV quota can be exceeded (500K requests/month on free tier). Functions must gracefully degrade: rate limits allow requests, abuse checks return false, access checks return null. See `src/lib/abuse-detection.ts` and `src/lib/access-codes.ts` for patterns.",
+   "location": "docs/agents/data-integrity.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "11. **`count ?? 0` is DATA FABRICATION — a null count means UNKNOWN, never zero.** Measured:",
+   "location": "docs/agents/data-integrity.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "⚠️ **A mutating tool must be visible as one.** `add_contacts_to_crm` writes to the user's",
+   "location": "docs/agents/mcp.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "⚠️ **Resolving the cwd is only half the fix.** Under an absolute primary hooksPath a",
+   "location": "docs/agents/release-and-worktrees.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "⚠️ **Historical gate claims are corrected accordingly.** PR #1610's pre-push results are",
+   "location": "docs/agents/release-and-worktrees.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "⚠️ **Canonicalize the hook SOURCE before its ownership means anything.** Two laundering",
+   "location": "docs/agents/release-and-worktrees.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "1. **Scrub the git environment BEFORE the first git command** — `GIT_DIR`,",
+   "location": "docs/agents/release-and-worktrees.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "2. **Operate exclusively inside a validated temporary directory.** Assert every path is",
+   "location": "docs/agents/release-and-worktrees.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "⚠️ **VALIDATE THE ANCHOR ITSELF, or every other guard is a tautology.** Found in review",
+   "location": "docs/agents/release-and-worktrees.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "3. **Every `cd` gets `|| die`.** A test without `set -e` treats a failed `cd` as \"carry on",
+   "location": "docs/agents/release-and-worktrees.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "**⚠️ It was blind on FOUR independent axes, each individually reasonable.** Fixing one proved",
+   "location": "docs/agents/data-integrity.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "**⚠️ THE BILLING SEAM (do not break):** the hosted HTTP edge MUST dispatch tool calls",
+   "location": "docs/agents/mcp.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "**⚠️ ChatGPT-attributed auto-recharge (PR #1778 LIVE, merged `9c24b306`; migration",
+   "location": "docs/agents/mcp.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "**⚠️ The billing seam still holds.** The transport verifier",
+   "location": "docs/agents/mcp.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "**⚠️ Two client-auth gotchas on the `/mcp` APIs** (both bit this work — memory",
+   "location": "docs/agents/mcp.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "- ⚠️ Pro/Team are **app** tiers — their MCP allowance is `PRO_MONTHLY_CREDITS` /",
+   "location": "docs/agents/mcp.md",
+   "status": "moved"
+  },
+  {
+   "kind": "warning",
+   "text": "**⚠️ This number has now gone stale TWICE in this doc** — it said 6,000/mo (corrected",
+   "location": "docs/agents/mcp.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "1. **Wrong DATA?** Query the source table/API, compare to screen. A \"No X found\" when data exists, or a stale figure = a **query/wiring bug** → fix the backend, don't mask it in the UI. (Most \"still shows X\" loops are this.)",
+   "location": "docs/agents/verification.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "2. **Stale CACHE?** DB is right but screen is old → fix the cache layer (KV / last-good / SWR), not the component.",
+   "location": "docs/agents/verification.md",
+   "status": "moved"
+  },
+  {
+   "kind": "numbered-rule",
+   "text": "3. **UI RENDER?** Data is right, presentation wrong → the component. Apply standing UI standards (counts at top · names not codes · chips clickable · spinner on load · legible contrast · vertical bars · no dead empty-state · jargon defined).",
+   "location": "docs/agents/verification.md",
+   "status": "moved"
+  }
+ ]
+}

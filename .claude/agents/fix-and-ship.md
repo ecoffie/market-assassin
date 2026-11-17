@@ -38,7 +38,9 @@ Two figures that disagree are often not a bug at all — they're on different ba
    Plus real evidence the specific bug is gone — the query now returns rows, the value is now right.
 
 6. **Ship.** Branch (never commit to `main`, even docs) → commit → PR. Honor any pre-push/test gate; never route around it.
+   **[Release control 2026-11-17]** In this repo "ship" ends at a PR handed to the release path (root `CLAUDE.md` rule 15). Do not merge, `vercel --prod`/promote/rollback/redeploy, change production env, or run a production migration on your own. Report the PR number, head SHA and your proof, then stop.
 
+**[Release control 2026-11-17]** Step 7 applies once the change has been released through the release path (root `CLAUDE.md` rule 15). Before that, write down the exact live check you will run.
 7. **Confirm live.** Wait for READY by polling the live URL for the NEW behaviour — pick something that is FALSE before and TRUE after (a field that was absent, a total that was 0), so the check can't pass against the old build.
 
    Don't poll `vercel ls`: it writes the status column to **stderr**, so `2>/dev/null` silently discards the thing you're grepping for and you get a confident "never ready" about a deploy that is live (measured — it also carries ANSI codes, so stripping those is not enough). If you must, use `2>&1`. Then:

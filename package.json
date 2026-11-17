@@ -67,6 +67,7 @@
     "db:check": "node scripts/db.mjs --check",
     "report:intel": "node scripts/report-intel.mjs",
     "demo:reset": "npx tsx scripts/demo-reset.ts",
+    "audit:claude-md": "node scripts/audit-claude-md.mjs",
     "migrate": "npx tsx scripts/migrate.ts",
     "migrate:status": "npx tsx scripts/migrate.ts status",
     "migrate:baseline": "npx tsx scripts/migrate.ts baseline",
