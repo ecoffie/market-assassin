@@ -14,6 +14,7 @@
  * for that. The ledger never carries untrusted prose to the model: keys are charset-limited and labels are
  * reduced to a short, plain identifier-like string before they enter a prompt.
  */
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { RenderedRecords } from './record-render';
 import { collectExpiringRecords, EXPIRING_TOOL } from './record-render';
 
@@ -67,7 +68,34 @@ export interface LedgerEntry {
   items?: LedgerItem[];
 }
 
-export interface SourceLedger { v: 1; entries: LedgerEntry[] }
+/**
+ * `sig` is an HMAC the server adds when it emits the ledger. A returned ledger is used only if the signature
+ * verifies, so nothing the client wrote or edited can come back into a prompt (review MED, Agent 4).
+ */
+export interface SourceLedger { v: 1; entries: LedgerEntry[]; sig?: string }
+
+/**
+ * The ledger signing key: CHAT_LEDGER_SECRET if set, otherwise derived (HMAC with a fixed label) from the
+ * service-role key every deployment already has. No key → ledgers are not signed and returned ledgers are
+ * ignored (fail closed: follow-ups behave as before P3).
+ */
+function ledgerKey(): Buffer | null {
+  const base = process.env.CHAT_LEDGER_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!base) return null;
+  return createHmac('sha256', base).update('ask-mindy-source-ledger:v1').digest();
+}
+
+function ledgerSig(entries: LedgerEntry[], key: Buffer): string {
+  return createHmac('sha256', key).update(JSON.stringify({ v: 1, entries })).digest('base64url');
+}
+
+function verifyLedgerSig(entries: unknown, sig: unknown): boolean {
+  const key = ledgerKey();
+  if (!key || typeof sig !== 'string' || !Array.isArray(entries)) return false;
+  const expected = Buffer.from(ledgerSig(entries as LedgerEntry[], key));
+  const got = Buffer.from(sig);
+  return got.length === expected.length && timingSafeEqual(got, expected);
+}
 
 export const LEDGER_MAX_ENTRIES = 12;
 export const LEDGER_MAX_ITEMS = 50;
@@ -196,7 +224,8 @@ export function sourceFromToolResult(p: {
   const items = status === 'failed' || status === 'refused' || status === 'degraded'
     ? []
     : p.rendered ? renderedItems(p.tool, parsed, p.rendered) : keyedItems(parsed);
-  const query = !isPrivate && p.argsRedacted && Object.keys(p.argsRedacted).length && JSON.stringify(p.argsRedacted).length <= 400 ? p.argsRedacted : null;
+  const codeQuery = !isPrivate && p.argsRedacted ? sanitizeQuery(p.argsRedacted) : {};
+  const query = Object.keys(codeQuery).length ? codeQuery : null;
   return {
     id: `src:${p.tool}:${p.toolCallId}`.slice(0, 96),
     kind: isPrivate ? 'account_record' : 'federal_record',
@@ -251,17 +280,21 @@ export function citationsFromSources(sources: ContextSource[]): Array<{ title: s
 }
 
 export function ledgerFromSources(sources: ContextSource[]): SourceLedger {
-  return {
-    v: 1,
-    entries: sources.slice(0, LEDGER_MAX_ENTRIES).map((s) => ({
+  const entries: LedgerEntry[] = sources.slice(0, LEDGER_MAX_ENTRIES).map((s) => ({
       id: s.id, kind: s.kind, ...(s.tool ? { tool: s.tool } : {}), label: s.label, status: s.status,
       asOf: s.asOf ?? null, retrievedAt: s.retrievedAt,
       ...(s.shown != null ? { shown: s.shown, total: s.total } : {}),
       ...(s.owner ? { private: true as const, scope: s.owner.scope } : {}),
       ...(s.query ? { query: s.query } : {}),
       ...(s.items?.length ? { items: s.items.slice(0, LEDGER_MAX_ITEMS) } : {}),
-    })),
-  };
+  }));
+  return signLedger(entries);
+}
+
+/** Wrap entries as a ledger, signed when a key is available. */
+export function signLedger(entries: LedgerEntry[]): SourceLedger {
+  const key = ledgerKey();
+  return key ? { v: 1, entries, sig: ledgerSig(entries, key) } : { v: 1, entries };
 }
 
 /**
@@ -272,8 +305,10 @@ export function ledgerFromSources(sources: ContextSource[]): SourceLedger {
  */
 export function parseLedger(raw: unknown, currentScope: string): SourceLedger | null {
   if (!raw || typeof raw !== 'object') return null;
-  const r = raw as { v?: unknown; entries?: unknown };
+  const r = raw as { v?: unknown; entries?: unknown; sig?: unknown };
   if (r.v !== 1 || !Array.isArray(r.entries)) return null;
+  // Only a ledger this server emitted, unchanged, is used. A forged or edited one is ignored entirely.
+  if (!verifyLedgerSig(r.entries, r.sig)) return null;
   const entries: LedgerEntry[] = [];
   for (const e of r.entries.slice(0, LEDGER_MAX_ENTRIES)) {
     if (!e || typeof e !== 'object') continue;
@@ -310,13 +345,32 @@ export function parseLedger(raw: unknown, currentScope: string): SourceLedger | 
   return entries.length ? { v: 1, entries } : null;
 }
 
+/**
+ * Search arguments kept for "the next 20": code-like values only (NAICS/PSC codes, state codes, dates, ids,
+ * numbers). Free text (a keyword, an agency name typed by the user) is dropped: the ledger feeds a system
+ * note, and user words must never gain system authority there (review MED).
+ */
+const CODE_VALUE_RE = /^[A-Za-z0-9.:\/-]{1,24}$/;
+function codeValue(v: unknown): string | number | boolean | null {
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'string') {
+    const parts = v.split(',').map((x) => x.trim()).filter(Boolean);
+    return parts.length && parts.length <= 10 && parts.every((x) => CODE_VALUE_RE.test(x) && /\d/.test(x) || /^[A-Z]{2}$/.test(x)) ? parts.join(',') : null;
+  }
+  return null;
+}
 function sanitizeQuery(q: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(q).slice(0, 12)) {
     if (!/^[a-z0-9_]{1,40}$/.test(k)) continue;
-    if (typeof v === 'number' || typeof v === 'boolean') out[k] = v;
-    else if (typeof v === 'string') out[k] = safeLabel(v, 60);
-    else if (Array.isArray(v)) out[k] = v.filter((x) => typeof x === 'string' || typeof x === 'number').slice(0, 10).map((x) => (typeof x === 'string' ? safeLabel(x, 40) : x));
+    if (Array.isArray(v)) {
+      const vals = v.slice(0, 10).map(codeValue);
+      if (vals.length && vals.every((x) => x !== null)) out[k] = vals;
+    } else {
+      const c = codeValue(v);
+      if (c !== null) out[k] = c;
+    }
   }
   return out;
 }
