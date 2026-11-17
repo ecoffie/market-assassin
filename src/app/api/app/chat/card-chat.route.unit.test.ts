@@ -705,3 +705,20 @@ describe('C2: answer first, AbilityOne by category, OSBP/OSDBU fallback', () => 
     expect(system(state.answerMessages[0])).not.toContain('AbilityOne Program category');
   });
 });
+
+describe('deliverables are delivered, never only offered (Agent 4 S3)', () => {
+  beforeEach(() => { state.pro = true; vi.stubEnv('MAP_CARD_CHAT_ENABLED', ''); });
+  const sys = (msgs: Array<{ role: string; content: string }>) => msgs.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
+  it('"Give me a 90-day plan as a PDF" → planner and answer get the deliver-now note with dated phases', async () => {
+    await post({ message: 'Give me a 90-day plan as a PDF', history: [{ role: 'user', content: 'Structured cabling in New England' }, { role: 'assistant', content: 'Open now: W912PL26Q0042 …' }] });
+    const answer = sys(state.answerMessages[0]);
+    expect(answer).toContain('DELIVERABLE REQUESTED');
+    expect(answer).toMatch(/\(days 1–30\)/);
+    expect(answer).toContain('NEVER offer a deliverable without delivering it');
+    expect(sys(state.plannerMessages[0])).toContain('DELIVERABLE REQUESTED');
+  });
+  it('an ordinary question gets no deliverable note', async () => {
+    await post({ message: 'Which agencies buy HVAC in Texas?' });
+    expect(sys(state.answerMessages[0])).not.toContain('DELIVERABLE REQUESTED');
+  });
+});

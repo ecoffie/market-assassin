@@ -85,6 +85,7 @@ import {
 import { SELECTED_NOTICE_COLUMNS, loadSelectedNoticeFacts, formatSelectedNoticeFacts, type SelectedNoticeRecord } from '@/lib/chat/selected-notice';
 import { resolveMentionedNotice, answerUsesNotice, type MentionedNoticeResult } from '@/lib/chat/mentioned-notice';
 import { abilityOneCaveat } from '@/lib/chat/category-caveats';
+import { deliverableNote } from '@/lib/chat/deliverable-requests';
 import { parseTurnId, claimCardTurn, completeCardTurn, failCardTurn, type ClaimResult } from '@/lib/chat/card-chat-turns';
 
 export const dynamic = 'force-dynamic';
@@ -254,6 +255,7 @@ SCOPE:
 WRITING STYLE:
 - NEVER use bracketed placeholders like "[Company Name]" or "[Your Business]" in responses. If you don't have the user's company name, write generic advice using "your company" or "your business" instead.
 - Default to second person ("you / your") — you're talking TO the user, not ABOUT a hypothetical bidder.
+- NEVER offer a deliverable without delivering it. If the user asks for a plan, report, checklist or document, write it in the same answer. If they ask for a file format you cannot produce here (PDF, Word, a download), say so in one line and then write the full content in the chat.
 - NEVER mention tool names, internal mechanics, or "the [X] tool" to the user. Just answer with what you found, or — if you need one more detail to search (e.g. which agency) — ask for it naturally ("Which agency did you have in mind?"). The user never sees the plumbing.
 
 USER PROFILE (use to personalize answers when relevant; if blank, write generically using "your company"):
@@ -588,6 +590,10 @@ export async function POST(request: NextRequest) {
         const customerWords = splitViewPreamble(message).rest || message;
         const categoryNote = abilityOneCaveat(customerWords, interpretCapabilityNaics(customerWords).codes);
         if (categoryNote) messages.push({ role: 'system', content: categoryNote });
+        // A plan / report / file request is DELIVERED in this answer; a format chat cannot produce gets one line
+        // (src/lib/chat/deliverable-requests.ts — Agent 4 S3 "offer, then nothing").
+        const deliverable = deliverableNote(customerWords, today);
+        if (deliverable) messages.push({ role: 'system', content: deliverable });
 
         // Trim history to last HISTORY_LIMIT messages for prompt-size budget.
         const history = Array.isArray(body.history) ? body.history.slice(-HISTORY_LIMIT) : [];
@@ -637,6 +643,8 @@ export async function POST(request: NextRequest) {
           { role: 'system', content: capabilityNote ? `${systemPrompt}\n\n${capabilityNote}` : systemPrompt },
         ];
         if (cardContext) toolRoundMessages.push({ role: 'system', content: cardContext.block });
+        // The planner sees the deliverable request too, so it searches first when nothing has been found yet.
+        if (deliverable) toolRoundMessages.push({ role: 'system', content: deliverable });
         for (const h of history) {
           if (h.role === 'user' || h.role === 'assistant') {
             toolRoundMessages.push({ role: h.role, content: String(h.content || '').slice(0, 2000) });
