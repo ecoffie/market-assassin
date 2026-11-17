@@ -19,9 +19,13 @@ import { isProEmail, proRequiredResponse } from '@/lib/access/require-pro';
 import { callLLM } from '@/lib/llm/call-llm';
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { createClient } from '@supabase/supabase-js';
-import { loadBidderProfile, formatProfileForPrompt, loadVaultContext } from '@/lib/proposal/loaders';
+import { loadBidderProfile, formatProfileForPrompt, loadVaultContext, ALL_VAULT_SECTIONS } from '@/lib/proposal/loaders';
 import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
 import { selectRelevantRfp } from '@/lib/proposal/select-relevant';
+import { authorizePursuitRead } from '@/lib/proposal/pursuit-access';
+import { loadSolicitationFactsBlock, type FactsDb } from '@/lib/chat/selected-notice';
+import { resolveChatActingScope, vaultEmailFor, WORKSPACE_UNCONFIRMED_NOTE } from '@/lib/chat/chat-acting-scope';
+import type { BidderProfile, VaultContext } from '@/lib/proposal/types';
 
 // RAG-as-standard: Manual Drive answers are informed by Mindy's real proposal
 // corpus (winning technical/pricing/past-perf volumes, templates, cap
@@ -58,6 +62,7 @@ Rules:
 - Write in the user's voice: concrete, specific, no marketing fluff, no "we are pleased to".
 - When asked to draft a section, return clean prose ready to paste into the proposal. When asked a question about the RFP, answer directly and cite the relevant requirement.
 - If the RFP text or Vault is missing what's needed, say so plainly and tell the user what to upload or add.
+- SOLICITATION FACTS (when present) are Mindy's record of this pursuit's notice: buyer office, contact, deadline and the incumbent finding. State the incumbent ONLY as the finding says: name one only when the finding is "identified"; otherwise say it could not be confirmed, and never say there is no incumbent.
 - Never say "as an AI" — you're Mindy.`;
 
 function sseEvent(obj: unknown): string {
@@ -116,6 +121,13 @@ export async function POST(request: NextRequest) {
   // The proposal workspace is a Pro feature (owner decision 2026-11-13).
   if (!(await isProEmail(auth.session.email))) return proRequiredResponse();
 
+  // Coach Mode: whose Vault and profile ground this draft — the same binding Ask Mindy uses
+  // (src/lib/chat/chat-acting-scope.ts). Client scope → the active client's; unresolvable →
+  // NONE (never the coach's own while they work for a client); no header → the caller's own.
+  // Data only: budget checks and cost attribution below stay on the caller (`email`).
+  const actingScope = await resolveChatActingScope(auth.session.email ?? email, request);
+  const vaultEmail = vaultEmailFor(actingScope);
+
   const groqKey = process.env.GROQ_API_KEY;
   if (!groqKey) {
     return NextResponse.json({ success: false, error: 'GROQ_API_KEY not configured' }, { status: 500 });
@@ -129,7 +141,50 @@ export async function POST(request: NextRequest) {
   let rfpText = String(body.rfpText || '').slice(0, RFP_MAX_CHARS);
   let rfpFileName = String(body.rfpFileName || '');
   let cachedRequirements: Array<{ requirement: string; category?: string; section?: string }> = [];
-  if (pipelineId) {
+  // The pursuit's SAM notice id (Step 7): Proposal AI recomputes the solicitation facts from it.
+  // Set only inside the gate below, so the solicitation-facts preload is gated with it.
+  let pursuitNoticeId: string | null = null;
+  // Unresolved workspace (U1-b): load NO pursuit data at all — no access check, no
+  // user_pipeline read (notice_id or scope), no documents, no solicitation facts — consistent
+  // with the WORKSPACE_UNCONFIRMED_NOTE the model is given below. Requests without a pipeline_id
+  // are unchanged. Any later pursuit-keyed preload must sit inside this gate.
+  if (pipelineId && actingScope.kind !== 'unavailable') {
+    // The documents are read with the service-role key, so ownership is checked
+    // here: the caller must own the pursuit or share its workspace.
+    const access = await authorizePursuitRead(
+      createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!),
+      request,
+      auth.session.email ?? '',
+      pipelineId,
+    );
+    if (!access.ok) {
+      return access.reason === 'error'
+        ? NextResponse.json({ success: false, error: 'Could not load this pursuit. Try again.' }, { status: 503 })
+        : NextResponse.json({ success: false, error: 'Pursuit not found' }, { status: 404 });
+    }
+    // Same scope rule as Ask Mindy's pursuit documents: in a client workspace only THAT
+    // workspace's pursuits ground the draft — never a coach's personal pursuit next to the
+    // client's Vault (authorizePursuitRead alone would allow the coach's own row).
+    if (actingScope.kind === 'client') {
+      const { data: row, error: rowErr } = await createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+        .from('user_pipeline')
+        .select('id, workspace_id')
+        .eq('id', pipelineId)
+        .maybeSingle();
+      if (rowErr) {
+        console.error('[proposal/chat] pursuit scope query error:', rowErr.message);
+        return NextResponse.json({ success: false, error: 'Could not load this pursuit. Try again.' }, { status: 503 });
+      }
+      if (!row || row.workspace_id !== actingScope.workspaceId) {
+        return NextResponse.json({ success: false, error: 'Pursuit not found' }, { status: 404 });
+      }
+    }
+    // Read only after access is granted above. A failed read just means no facts block.
+    const { data: pursuitRow, error: pursuitErr } = await createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+      .from('user_pipeline').select('notice_id').eq('id', pipelineId).maybeSingle();
+    if (pursuitErr) console.error('[proposal/chat] pursuit notice read failed:', pursuitErr.message);
+    const nid = String((pursuitRow as { notice_id?: string | null } | null)?.notice_id || '').trim().toLowerCase();
+    pursuitNoticeId = /^[0-9a-f]{32}$/.test(nid) ? nid : null;
     const loaded = await loadPursuitContext(pipelineId);
     if (loaded.rfpText) { rfpText = loaded.rfpText; rfpFileName = loaded.rfpFileName || rfpFileName; }
     cachedRequirements = loaded.requirements;
@@ -144,12 +199,23 @@ export async function POST(request: NextRequest) {
         // proposal RAG as the build standard. RAG query = the user's message +
         // a slice of the RFP so retrieval is relevant to what they're writing.
         const ragQuery = `${message}\n${rfpText.slice(0, 1500)}`.trim();
-        const [profile, vault, ragChunks] = await Promise.all([
-          loadBidderProfile(email),
-          // 'exec_summary' pulls identity + past performance + capabilities.
-          loadVaultContext(email, 'exec_summary'),
+        const [profile, vault, ragChunks, solFacts] = await Promise.all([
+          vaultEmail ? loadBidderProfile(vaultEmail) : Promise.resolve({} as BidderProfile),
+          // A general Vault read: identity, past performance, capabilities AND team. 'exec_summary'
+          // alone never loaded capabilities or team, although this comment used to claim it did
+          // (parity audit 2026-11-16). Manual Drive is a writing workspace, so it preloads the set
+          // (default row caps); Ask Mindy retrieves instead (src/lib/chat/vault-retrieval.ts).
+          // vaultEmail follows the acting scope (null = unresolved → empty, never the coach's own).
+          vaultEmail
+            ? loadVaultContext(vaultEmail, 'exec_summary', { sections: ALL_VAULT_SECTIONS })
+            : Promise.resolve({ has_any: false } as VaultContext),
           retrieveRagContext({ query: ragQuery, docTypes: PROPOSAL_DOC_TYPES, limit: 4, maxChars: 3000, maxPerDoc: 1 })
             .catch(() => []),
+          // Solicitation facts from the pursuit's notice_id: buyer/DoDAAC/contact + the incumbent finding,
+          // computed by the same functions Ask Mindy's tools use (incumbent bounded at 4s). Never stored.
+          pursuitNoticeId
+            ? loadSolicitationFactsBlock(createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!) as unknown as FactsDb, pursuitNoticeId, { cacheKey: `pursuit:${pipelineId}` }).catch(() => null)
+            : Promise.resolve(null),
         ]);
 
         const profileBlock = formatProfileForPrompt(profile);
@@ -157,8 +223,9 @@ export async function POST(request: NextRequest) {
         const ragBlock = formatChunksForPrompt(ragChunks);
         const sources: string[] = [];
         if (rfpText) sources.push(rfpFileName || 'Uploaded RFP');
-        if (vault.has_any) sources.push('Your Vault (profile, past performance, capabilities)');
+        if (vault.has_any) sources.push(actingScope.kind === 'client' ? "This client's Vault (profile, past performance, capabilities, team)" : 'Your Vault (profile, past performance, capabilities, team)');
         if (cachedRequirements.length) sources.unshift(`${cachedRequirements.length} extracted requirements (cached matrix)`);
+        if (solFacts) sources.push(`Solicitation facts (${solFacts.label}, buyer and incumbent lookup)`);
         if (ragChunks.length) sources.push(`Proposal corpus (${ragChunks.length} winning-volume references)`);
         send({ type: 'sources', sources });
 
@@ -172,7 +239,13 @@ export async function POST(request: NextRequest) {
         // the fallback when the structured requirements don't cover the ask.
         const relevantRfp = rfpText ? selectRelevantRfp(rfpText, message, RFP_CONTEXT_BUDGET) : '';
         const contextParts = [
+          // Unresolvable workspace: say so (Ask Mindy's wording), so the model neither treats the
+          // missing Vault as "empty" nor tells a coach to fill one in.
+          actingScope.kind === 'unavailable'
+            ? `WORKSPACE: ${WORKSPACE_UNCONFIRMED_NOTE} Draft only from the RFP text, with [bracketed placeholders] for company facts. Do NOT tell the user to add Vault or profile data.`
+            : '',
           reqBlock ? `EXTRACTED REQUIREMENTS (the solicitation's obligations, already parsed — answer specific questions from THIS first):\n${reqBlock}` : '',
+          solFacts ? solFacts.block : '',
           profileBlock ? `COMPANY PROFILE:\n${profileBlock}` : '',
           vaultBlock ? `VAULT:\n${vaultBlock}` : '',
           relevantRfp ? `RFP / SOLICITATION TEXT${rfpFileName ? ` (${rfpFileName})` : ''} — relevant excerpts:\n${relevantRfp}` : '',
@@ -204,9 +277,12 @@ export async function POST(request: NextRequest) {
         // Proposal chat is the drafting assistant — it extracts exact clauses and
         // writes sections, so quality pays (Eric, Jul 2). Lead with full gpt-4o.
         // The per-user budget cap below already downgrades heavy users to Groq, so
-        // the margin is protected even at the higher model. CHAT_OPENAI_MODEL env
-        // can dial it back if needed.
-        const chatModel = process.env.CHAT_OPENAI_MODEL || 'gpt-4o';
+        // the margin is protected even at the higher model. PROPOSAL_CHAT_OPENAI_MODEL
+        // can dial it back if needed. Proposal chat deliberately does NOT read
+        // CHAT_OPENAI_MODEL: that variable is Ask Mindy's, and this route sends raw
+        // temperature/max_tokens and falls silently to Groq on any rejection, so an
+        // Ask Mindy model switch must never move it (2026-11-15, B2 step 2 hold).
+        const chatModel = process.env.PROPOSAL_CHAT_OPENAI_MODEL || 'gpt-4o';
         const streamFrom = (url: string, key: string, model: string) => fetch(url, {
           method: 'POST',
           headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
@@ -321,6 +397,13 @@ function formatVaultForPrompt(vault: any): string {
     out.push('Capabilities:');
     for (const c of vault.capabilities.slice(0, 8)) {
       out.push(`- ${c.capability_name}: ${String(c.description || '').slice(0, 160)}`);
+    }
+  }
+  if (vault?.team?.length) {
+    out.push('Team:');
+    for (const m of vault.team.slice(0, 8)) {
+      const tags = [m.is_key_personnel && 'key personnel', m.security_clearance && `${m.security_clearance} clearance`, m.years_experience && `${m.years_experience} yrs`].filter(Boolean).join(', ');
+      out.push(`- ${m.full_name || 'Team member'}${m.title ? `, ${m.title}` : ''}${tags ? ` (${tags})` : ''}${m.bio_short ? `: ${String(m.bio_short).slice(0, 160)}` : ''}`);
     }
   }
   return out.join('\n');

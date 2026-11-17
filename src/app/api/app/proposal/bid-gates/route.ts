@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { createClient } from '@supabase/supabase-js';
+import { authorizePursuitRead, canAccessPursuit } from '@/lib/proposal/pursuit-access';
 import { callLLM } from '@/lib/llm/call-llm';
 
 export const runtime = 'nodejs';
@@ -60,6 +61,13 @@ export async function GET(request: NextRequest) {
   if (!pipelineId) return NextResponse.json({ success: false, error: 'pipeline_id required' }, { status: 400 });
 
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  // The pursuit and its solicitation are read with the service-role key: check access first.
+  const access = await authorizePursuitRead(sb, request, auth.session.email ?? '', pipelineId);
+  if (!access.ok) {
+    return access.reason === 'error'
+      ? NextResponse.json({ success: false, error: 'Could not load this pursuit. Try again.' }, { status: 503 })
+      : NextResponse.json({ success: false, error: 'Pursuit not found' }, { status: 404 });
+  }
   const { data: pursuit, error: pursuitErr } = await sb.from('user_pipeline')
     .select('title, set_aside, naics_code, response_deadline, notice_id')
     .eq('id', pipelineId).maybeSingle();
@@ -198,16 +206,9 @@ export async function POST(request: NextRequest) {
   const { data: pursuit, error: pursuitAuthErr } = await sb.from('user_pipeline').select('id, user_email, workspace_id').eq('id', pipelineId).maybeSingle();
   if (pursuitAuthErr) console.error('[bid-gates] pursuit auth query error:', pursuitAuthErr.message);
   if (!pursuit) return NextResponse.json({ success: false, error: 'Pursuit not found' }, { status: 404 });
-  const owns = pursuit.user_email?.toLowerCase() === email!.toLowerCase();
-  if (!owns) {
-    // workspace fallback
-    try {
-      const { resolveActiveWorkspace } = await import('@/lib/app/workspace');
-      const { workspaceId } = await resolveActiveWorkspace(email!.toLowerCase(), request);
-      if (!workspaceId || pursuit.workspace_id !== workspaceId) return NextResponse.json({ success: false, error: 'Not your pursuit' }, { status: 403 });
-    } catch {
-      return NextResponse.json({ success: false, error: 'Not your pursuit' }, { status: 403 });
-    }
+  // Owner, or a member / authorized coach of the pursuit's workspace — the shared rule (#2086).
+  if (!(await canAccessPursuit(pursuit, email!, request))) {
+    return NextResponse.json({ success: false, error: 'Not your pursuit' }, { status: 403 });
   }
 
   const update: Record<string, unknown> = {

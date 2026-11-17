@@ -16,6 +16,7 @@
  * off by default — "notifications off" must never silently become "detection off".
  */
 import { getWriteClient } from '@/lib/supabase/server-clients';
+import { creditHealthPaidReasons } from '@/lib/entitlements/paid-reasons';
 
 /** Warn once an account carrying a recurring allowance drops below this. */
 export const LOW_BALANCE_THRESHOLD = 1600;
@@ -55,8 +56,8 @@ export interface CreditHealth {
   errors: string[];
 }
 
-/** Grant reasons that evidence the account has PAID us (directly or via subscription). */
-const PAID_REASONS = new Set(['stripe_topup', 'auto_recharge', 'subscription', 'mcp_sub_monthly', 'mcp_sub_annual']);
+// Grant reasons that evidence the account has PAID us come from the shared paid-status
+// module (creditHealthPaidReasons): the legacy list unless PAID_STATUS_RESOLVER=true.
 /** Reasons the system issues on its own to any signup. */
 const FREE_REASONS = new Set(['signup_grant']);
 
@@ -120,6 +121,7 @@ export async function collectCreditHealth(lookbackHours = 24): Promise<CreditHea
 
   // Funding history → account kind.
   const kindBy = new Map<string, AccountKind>();
+  const PAID_REASONS = creditHealthPaidReasons();
   for (let i = 0; i < emails.length; i += 100) {
     const { data, error } = await db.from('mcp_credit_ledger')
       .select('user_email, reason').gt('delta', 0).in('user_email', emails.slice(i, i + 100));

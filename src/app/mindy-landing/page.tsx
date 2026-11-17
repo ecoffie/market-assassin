@@ -548,7 +548,7 @@ export default function MindyLandingPage() {
                 href={CHECKOUT_MONTHLY}
                 className="block w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-center transition-colors shadow-lg shadow-purple-500/25"
               >
-                Get Mindy Pro
+                Start 14-day free trial
               </Link>
               <NoRefundNote className="text-muted" />
             </div>
@@ -602,7 +602,7 @@ export default function MindyLandingPage() {
               href={CHECKOUT_ANNUAL}
               className="inline-block px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition-colors"
             >
-              Get Annual Plan
+              Start free trial (annual)
             </Link>
             <NoRefundNote className="text-muted" />
           </div>

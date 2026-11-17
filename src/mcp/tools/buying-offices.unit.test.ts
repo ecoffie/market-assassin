@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('@/lib/supabase/server-clients', () => ({ getWriteClient: () => ({}), getReadClient: () => ({}) }));
 import { buildBuyingOfficesQuery, getBuyingOffices, piidFromAwardId } from './buying-offices';
 import type { ScopedAggregateDeps } from '@/lib/bigquery/scoped-aggregate';
+import { expandMetroCities, metroCoreStates } from '@/lib/bigquery/award-scope';
 import { annotateResultContract } from '@/lib/mcp/result-contract';
 import { listMcpTools, toolParameters } from '@/lib/mcp/tool-registry';
 import { isPublicMcpTool, listPublicMcpTools } from '@/lib/mcp/public-catalog';
@@ -70,6 +71,8 @@ describe('get_buying_offices', () => {
     expect(r.offices[0].share_pct).toBeCloseTo(89.58, 1);
     expect(r.totals).toMatchObject({ obligated: 65_723_500.81, award_count: 74, office_count: 17 });
     expect(r._meta.as_of).toBe('2026-09-30');
+    // Ported Defense lag: emitted from the tool's own rows (a Navy office is listed), with the evidence named.
+    expect(r._meta.defense_lag).toMatchObject({ applies: true, lag_days: 90, window_end: '2026-09-30', evidence: expect.stringContaining('NAVSUP') });
     expect(r.scope.location_basis).toBe('place_of_performance');
     // Cities are reported both ways: matched, and requested-but-empty.
     expect(r.cities_matched?.map((c) => c.city)).toEqual(['MEMPHIS', 'MILLINGTON']);
@@ -184,6 +187,65 @@ describe('deterministic metro expansion (no dependence on which suburbs a model 
     const { d, calls } = deps();
     await getBuyingOffices({ state: 'TN', city: 'Atlantis', naics: '5613' }, d, NOW);
     expect(calls.find((c) => 'cities' in c.params)!.params.cities).toEqual(['ATLANTIS']);
+  });
+});
+
+describe('a metro is always pinned to one state (2026-11-15 Birmingham incident)', () => {
+  // Production answer: "Birmingham metro (cities within 30 miles)" with no state ranked offices whose
+  // work was in Leeds MA, Fairfield PA, New Castle DE, Cordova AK and Pelham TN, because the expansion
+  // returned Birmingham AL's suburb NAMES and the query matched those names in every state.
+  const OTHER_STATE_NAMES = ['LEEDS', 'FAIRFIELD', 'PELHAM', 'CORDOVA'];
+
+  it('no state + an ambiguous core city (Birmingham: AL, IA, MI, NJ, OH) does not expand suburbs by bare name', async () => {
+    const { d, calls } = deps();
+    const r = await getBuyingOffices({ city: 'Birmingham', naics: '2362' }, d, NOW);
+    const sent = calls.find((c) => 'cities' in c.params)!.params as Record<string, unknown>;
+    expect(sent.cities).toEqual(['BIRMINGHAM']);
+    for (const n of OTHER_STATE_NAMES) expect(sent.cities).not.toContain(n);
+    expect(r._meta.applied_filters.metro).toBeUndefined();
+    expect(r.notes.join(' ')).toMatch(/BIRMINGHAM is a city name in AL, IA, MI, NJ, OH/);
+    expect(r.notes.join(' ')).toMatch(/City matched in every state/);
+  });
+
+  it('no state + an ambiguous core city with an explicit radius reports the radius as not applied, naming the states', async () => {
+    const { d } = deps();
+    const r = await getBuyingOffices({ city: 'Birmingham', naics: '2362', metro_radius_miles: 30 }, d, NOW);
+    expect(r._meta.applied_filters.metro_radius_miles).toBeUndefined();
+    expect(JSON.stringify(r._meta.ignored_args)).toMatch(/several states \(AL, IA, MI, NJ, OH\)/);
+  });
+
+  it('state AL + Birmingham expands the metro AND filters on AL, so suburb names cannot match other states', async () => {
+    const { d, calls } = deps();
+    const r = await getBuyingOffices({ state: 'AL', city: 'Birmingham', naics: '2362' }, d, NOW);
+    const call = calls.find((c) => 'cities' in c.params)!;
+    expect(call.params.cities).toEqual(expect.arrayContaining(['BIRMINGHAM', 'LEEDS', 'FAIRFIELD', 'PELHAM']));
+    expect(call.params.state).toBe('AL');
+    expect(call.query).toContain('pop_state = @state');
+    expect(r.scope.state).toBe('AL');
+    expect(r._meta.applied_filters.metro).toMatchObject({ core_city: 'BIRMINGHAM', state: 'AL', state_source: 'given' });
+  });
+
+  it('no state + a core city that exists in ONE state pins the metro to that state and says so', async () => {
+    const { d, calls } = deps();
+    const r = await getBuyingOffices({ city: 'Tuscaloosa', naics: '2362' }, d, NOW);
+    const call = calls.find((c) => 'cities' in c.params)!;
+    expect(call.params.state).toBe('AL');
+    expect(call.query).toContain('pop_state = @state');
+    expect(r.scope.state).toBe('AL');
+    expect(r._meta.applied_filters.state).toBe('AL');
+    expect(r._meta.applied_filters.metro).toMatchObject({ core_city: 'TUSCALOOSA', state: 'AL', state_source: 'core_city' });
+    expect(r.notes.join(' ')).toMatch(/No state was given; TUSCALOOSA is only in AL/);
+    expect(r.notes.join(' ')).not.toMatch(/City matched in every state/);
+    expect(call.cacheKey).toContain(':AL:');
+  });
+
+  it('expandMetroCities never returns an unpinned expansion', () => {
+    expect(expandMetroCities('Birmingham', [])).toBeNull();
+    expect(metroCoreStates('Birmingham')).toEqual(['AL', 'IA', 'MI', 'NJ', 'OH']);
+    const al = expandMetroCities('Birmingham', ['AL'])!;
+    expect(al.state).toBe('AL');
+    expect(al.cities).toEqual(expect.arrayContaining(['LEEDS', 'FAIRFIELD', 'PELHAM']));
+    expect(expandMetroCities('Tuscaloosa', [])!.state).toBe('AL');
   });
 });
 

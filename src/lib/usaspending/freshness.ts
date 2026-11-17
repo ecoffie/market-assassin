@@ -100,3 +100,42 @@ export function assessPublicationLag(opts: {
     'Check SAM.gov award notices or the agency announcement for recent awards.';
   return { ...base, applies: true, note };
 }
+
+export interface WarehouseDefenseLag {
+  applies: true;
+  lag_days: number;
+  dod_complete_through: string;
+  window_end: string;
+  /** What in the tool's own result shows Defense dollars are in scope. */
+  evidence: string;
+  note: string;
+}
+
+/**
+ * Defense publication lag for a fiscal-year window over the BigQuery award warehouse (buying offices,
+ * vehicle mix). Same cutoff as assessPublicationLag, so every tool states one rule.
+ *
+ * Evidence rule (ported from fix/ask-mindy-release-hardening, tightened 2026-11-14): the caveat is
+ * emitted only when the CALLER passes evidence from its own result that Defense dollars are in the
+ * totals (a Defense office in the returned rows, or an explicit Defense agency filter). "Defense could
+ * be in scope" is not evidence. Returns null when there is no evidence or the window ends before the cutoff.
+ */
+export function warehouseDefenseLag(opts: {
+  fyFrom?: number | null; fyTo?: number | null; dateFrom?: string | null; dateTo?: string | null;
+  asOf?: string | null; defenseEvidence: string | null; now?: Date;
+}): WarehouseDefenseLag | null {
+  if (!opts.defenseEvidence) return null;
+  const windowEnd = (opts.dateTo || (opts.fyTo ? `${opts.fyTo}-09-30` : '')).slice(0, 10);
+  if (!windowEnd) return null;
+  const windowStart = (opts.dateFrom || (opts.fyFrom ? `${opts.fyFrom - 1}-10-01` : '')).slice(0, 10) || undefined;
+  const a = assessPublicationLag({ dateFrom: windowStart, dateTo: windowEnd, asOf: opts.asOf, now: opts.now });
+  if (!a.applies) return null;
+  return {
+    applies: true,
+    lag_days: a.lag_days,
+    dod_complete_through: a.dod_complete_through,
+    window_end: windowEnd,
+    evidence: opts.defenseEvidence,
+    note: `Defense (DoD, including Navy, Army and Air Force) contract actions are published with a ~${a.lag_days}-day delay, so Defense dollars after about ${a.dod_complete_through} may not be in these totals yet; the window runs through ${windowEnd}.`,
+  };
+}

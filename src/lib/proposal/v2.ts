@@ -331,6 +331,12 @@ ${honestRule}
 
 export async function generateV2Draft(opts: {
   email: string;
+  /**
+   * Who pays for the LLM calls (cost log + per-user budget). Defaults to `email`. Set when
+   * `email` names a Vault that is not the caller's: a coach drafting for a client
+   * workspace reads the client's Vault but the cost stays on the coach.
+   */
+  billingEmail?: string;
   sectionType: SectionType;
   sourceText: string;
   fileName?: string;
@@ -363,7 +369,7 @@ export async function generateV2Draft(opts: {
     // keeps PII off grok, which the drafting chain would otherwise fall back to.
     dataClass: 'sensitive',
     tool: 'proposal_v2',
-    userEmail: opts.email,
+    userEmail: opts.billingEmail || opts.email,
   });
   const rawDraft = (rawDraftRaw || '').trim();
   if (!rawDraft) throw new Error('AI returned empty draft (all providers)');

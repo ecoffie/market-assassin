@@ -87,7 +87,8 @@
     "src/app/course",
     "src/app/features",
     "src/app/ambassadors",
-    "src/app/customers"
+    "src/app/customers",
+    "src/app/roadmap"
   ],
   "runtimeRoutes": [
     "/today",
@@ -182,7 +183,8 @@
     "/features/market-research",
     "/features/bid-with-confidence",
     "/ambassadors",
-    "/customers"
+    "/customers",
+    "/roadmap"
   ],
   "parityRoutes": [
     "/today",

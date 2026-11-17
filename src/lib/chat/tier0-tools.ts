@@ -21,7 +21,20 @@
  * isolation guarantee is auditable in one place.
  */
 
-import { loadVaultContext } from '@/lib/proposal/loaders';
+import { loadVaultContext, ALL_VAULT_SECTIONS } from '@/lib/proposal/loaders';
+import { vaultEmailFor, WORKSPACE_UNCONFIRMED_NOTE, type ChatActingScope } from '@/lib/chat/chat-acting-scope';
+import { matchRequirementsToEvidence } from '@/lib/proposal/evidence-match';
+import { parseRetrieveArgs, retrieveVault, RETRIEVAL_POOL_LIMITS, type VaultRetrievalDeps } from './vault-retrieval';
+
+/** Production retrieval deps: the shared loader (all sections) + the shared hybrid matcher. */
+const defaultVaultDeps: VaultRetrievalDeps = {
+  loadVault: (email) => loadVaultContext(email, 'exec_summary', { sections: ALL_VAULT_SECTIONS, limits: RETRIEVAL_POOL_LIMITS }),
+  matchEvidence: async (email, query) => {
+    // useRerank:false keeps this a retrieval step (no LLM call). One "requirement" = the question.
+    const [res] = await matchRequirementsToEvidence(email, [{ id: 'q', requirement: query }], { useRerank: false, topN: 12 });
+    return res?.evidence ?? [];
+  },
+};
 
 // The subset of the Supabase client surface these tools use. Kept structural so
 // tests can pass a stub without importing the real client.
@@ -74,8 +87,23 @@ export const TIER0_TOOL_DEFS = [
     function: {
       name: 'search_my_vault',
       description:
-        "Return the signed-in user's OWN Vault: their company identity, past performance (contracts/CPARS), and capability library. Call this when they ask about their own experience, past performance, capabilities, or want you to reference their real record when drafting.",
-      parameters: { type: 'object', properties: {}, required: [], additionalProperties: false },
+        "Retrieve records from the signed-in user's OWN Vault (company identity, past performance/CPARS, capability library, team and key personnel) that are relevant to the question. Pass `query` with what the user is asking about in their words (e.g. 'DLA spare parts', 'cybersecurity past performance', 'who is cleared'); only the matching records come back. Without `query` you get an overview (identity summary, counts and titles), not full records. If nothing matches, say so; never substitute unrelated records.",
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: "What the user is asking about, in their words. Used to pick the relevant Vault records.",
+          },
+          sections: {
+            type: 'array',
+            items: { type: 'string', enum: ['past_performance', 'capabilities', 'team'] },
+            description: 'Optional: only these record sections.',
+          },
+        },
+        required: [],
+        additionalProperties: false,
+      },
     },
   },
 ];
@@ -102,8 +130,20 @@ interface PipelineRow {
  * supplied and is treated as UNTRUSTED — only whitelisted, validated fields are
  * ever used, and NEVER an identity field.
  */
-export function makeTier0Tools(db: Tier0Db, email: string) {
-  const boundEmail = email; // closure — the model cannot reach or override this
+export function makeTier0Tools(
+  db: Tier0Db,
+  emailOrScope: string | ChatActingScope,
+  vaultDeps: VaultRetrievalDeps = defaultVaultDeps,
+) {
+  // Closure — the model cannot reach or override any of this. A plain email is the
+  // caller's own scope (unchanged behaviour). A coach acting in an authorized client
+  // workspace gets that client's rows ONLY (see chat-acting-scope.ts).
+  const scope: ChatActingScope =
+    typeof emailOrScope === 'string' ? { kind: 'own', email: emailOrScope } : emailOrScope;
+  const boundEmail = scope.email;
+  const workspaceNote = scope.kind === 'client' ? { workspace: 'client' as const } : {};
+  const unavailable = { ok: false, error: 'workspace_unavailable', count: 0, items: [],
+    note: WORKSPACE_UNCONFIRMED_NOTE };
 
   async function getMyPipeline(args: { stage?: unknown }): Promise<Record<string, unknown>> {
     // Validate the ONLY model-supplied field. Anything unexpected is ignored.
@@ -112,14 +152,18 @@ export function makeTier0Tools(db: Tier0Db, email: string) {
 
     const cols =
       'title, agency, stage, response_deadline, value_estimate, naics_code, set_aside, priority, next_action';
-    let q = db.from('user_pipeline').select(cols).eq('user_email', boundEmail);
+    if (scope.kind === 'unavailable') return unavailable;
+    // Client workspace: that workspace's pursuits only (pipeline GET's asClient branch).
+    let q = scope.kind === 'client'
+      ? db.from('user_pipeline').select(cols).eq('workspace_id', scope.workspaceId)
+      : db.from('user_pipeline').select(cols).eq('user_email', boundEmail);
     // deadline-ascending so "due first" is row 0; nulls last.
     const base = q.order('response_deadline', { ascending: true, nullsFirst: false });
     const runnable = stage ? base.eq('stage', stage).order('response_deadline', { ascending: true, nullsFirst: false }) : base;
     const { data, error } = await runnable.limit(25);
 
     if (error) {
-      return { ok: false, error: 'pipeline_unavailable', count: 0, items: [] };
+      return { ok: false, error: 'pipeline_unavailable', count: 0, items: [], ...workspaceNote };
     }
     const rows = (data || []) as PipelineRow[];
     if (rows.length === 0) {
@@ -127,13 +171,19 @@ export function makeTier0Tools(db: Tier0Db, email: string) {
         ok: true,
         count: 0,
         items: [],
-        note: stage
-          ? `You have no pursuits in the "${stage}" stage.`
-          : 'You have no pursuits in your pipeline yet.',
+        note: scope.kind === 'client'
+          ? (stage ? `This client workspace has no pursuits in the "${stage}" stage.` : 'This client workspace has no pursuits yet.')
+          : stage
+            // Own scope reads only rows saved under the user's own email (team-workspace rows
+            // are not searched here), so the note must not claim the user has nothing.
+            ? `No pursuits in the "${stage}" stage are saved under your own account. Team-workspace pursuits aren't searched here.`
+            : "No pursuits are saved under your own account. Team-workspace pursuits aren't searched here.",
+        ...workspaceNote,
       };
     }
     return {
       ok: true,
+      ...workspaceNote,
       count: rows.length,
       items: rows.map((r) => ({
         title: r.title ?? null,
@@ -149,20 +199,18 @@ export function makeTier0Tools(db: Tier0Db, email: string) {
     };
   }
 
-  async function searchMyVault(): Promise<Record<string, unknown>> {
-    // Reuse the proposal loader — already email-scoped, already the safe pattern.
-    // 'exec_summary' pulls identity + past performance + capabilities (the broad set).
-    const vault = await loadVaultContext(boundEmail, 'exec_summary');
-    if (!vault.has_any) {
-      return { ok: true, has_any: false, note: 'Your Vault is empty — no identity, past performance, or capabilities saved yet.' };
-    }
-    return {
-      ok: true,
-      has_any: true,
-      identity: vault.identity ?? null,
-      past_performance: vault.past_performance ?? [],
-      capabilities: vault.capabilities ?? [],
-    };
+  async function searchMyVault(args: Record<string, unknown>): Promise<Record<string, unknown>> {
+    // Retrieval, not a dump: the whole Vault is loaded server-side as the pool, and
+    // only the records relevant to `query` go back to the model (vault-retrieval.ts).
+    // The Vault is the acting scope's: a coach in an authorized client workspace reads
+    // the client's Vault (its synthetic owner email), never their own. Loader AND
+    // matcher get the same email. Unresolved scope → read nothing.
+    const vaultEmail = vaultEmailFor(scope);
+    if (!vaultEmail) return unavailable;
+    const out = await retrieveVault(vaultEmail, parseRetrieveArgs(args), vaultDeps, {
+      owner: scope.kind === 'client' ? 'client' : 'own',
+    });
+    return { ...out, ...workspaceNote };
   }
 
   return {
@@ -171,7 +219,7 @@ export function makeTier0Tools(db: Tier0Db, email: string) {
         case 'get_my_pipeline':
           return getMyPipeline(args || {});
         case 'search_my_vault':
-          return searchMyVault();
+          return searchMyVault(args || {});
         default:
           // A name outside the Tier-0 set must never silently succeed.
           return { ok: false, error: `unknown_tool:${name}` };

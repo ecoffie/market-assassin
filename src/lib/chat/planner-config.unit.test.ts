@@ -30,6 +30,11 @@ describe('resolvePlannerChain', () => {
     expect(chain.map((t) => `${t.provider}:${t.model}`)).toEqual(['openai:gpt-4o', 'openai:gpt-4o-mini']);
   });
 
+  it('gpt-6-luna is a compatibility-tested planner fallback (gpt-4o retirement, 2027-01-14)', () => {
+    const chain = resolvePlannerChain({ ...KEYS, CHAT_OPENAI_MODEL: 'gpt-6.1-terra', CHAT_PLANNER_FALLBACKS: 'openai:gpt-6-luna' }, { overBudget: false });
+    expect(chain.map((t) => `${t.provider}:${t.model}`)).toEqual(['openai:gpt-6.1-terra', 'openai:gpt-6-luna']);
+  });
+
   it('drops a planner whose provider key is missing', () => {
     expect(resolvePlannerChain({ CHAT_CLAUDE_ENABLED: 'true', ANTHROPIC_API_KEY: 'a' }, { overBudget: false }))
       .toEqual([{ provider: 'anthropic', model: 'claude-sonnet-5' }]);
@@ -56,7 +61,10 @@ describe('chat route wiring (source assertions)', () => {
   });
 
   it('selects the planner through resolvePlannerChain and records provider events', () => {
-    expect(code).toMatch(/resolvePlannerChain\(process\.env/);
+    expect(code).toMatch(/resolvePlannerChain\(modelEnv/);
+    // modelEnv is process.env unless the preview-only staging selector applies (never on production).
+    expect(code).toMatch(/const modelEnv: Record<string, string \| undefined> = staging \? \{ \.\.\.process\.env, \.\.\.staging\.config\.env \} : process\.env;/);
+    expect(code).toMatch(/stagingModelConfig\(request\.headers\.get\(STAGING_CONFIG_HEADER\), TRACE_EVENTS\)/);
     expect(code).toMatch(/recordProviderEvent\(/);
     expect(code).not.toMatch(/CHAT_CLAUDE_MODEL \|\| 'claude-sonnet-5'/);
   });
@@ -73,7 +81,8 @@ describe('chat route wiring (source assertions)', () => {
 
   it('applies the private-data provider allow-list to the planner and the answer fallback', () => {
     expect(code).toMatch(/resolved\.filter\(\(t\) => providerApprovedForPrivate\(t\.provider\)\)/);
-    expect(code).toMatch(/!groqRes && !providerApprovedForPrivate\('groq'\)/);
+    // B2: every answer model (primary and fallbacks) passes the same allow-list.
+    expect(code).toMatch(/resolveAnswerChain\(modelEnv, \{ primaryModel: staging\?\.config\.answerPrimary \?\? chatModel \}\)\s*\.filter\(\(t\) => \{\s*if \(providerApprovedForPrivate\(t\.provider\)\) return true;/);
   });
 
   it('streams verification traces only behind ASK_MINDY_TRACE_EVENTS', () => {
@@ -99,7 +108,7 @@ describe('chat route wiring (source assertions)', () => {
   it('stream close never throws or recurses, and a disconnect stops the provider stream', () => {
     expect(route).toMatch(/const closeStream = \(\) => \{\n\s+try \{ controller\.close\(\); \} catch \{ clientGone = true; \}/);
     expect(code.match(/controller\.close\(\)/g)).toHaveLength(1); // only inside closeStream
-    expect(code).toMatch(/if \(clientGone\) \{ await reader\.cancel\(\)/);
+    expect(code).toMatch(/if \(clientGone\) \{ streamCut = true; await reader\.cancel\(\)/);
   });
 });
 

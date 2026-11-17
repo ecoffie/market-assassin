@@ -5,6 +5,7 @@
  * is rebuilt.
  */
 import { isCardChatEnabled } from '@/lib/chat/card-chat';
+import { SAFE_MARKDOWN_SCRIPT } from '@/lib/chat/safe-markdown';
 import { NextRequest, NextResponse } from 'next/server';
 import { PLAYERS_HEADER_TEXT_JS, PROVEN_PLAYERS_LABEL, PROVEN_PLAYERS_DESCRIPTION } from '@/lib/players/copy';
 import { getMapOpportunities, SET_GROUPS } from '@/lib/opportunities/map-data';
@@ -22,6 +23,7 @@ import { MARKET_FEEDBACK_CSS, MARKET_BOOT_HTML, MARKET_BOOT_APP_OPEN, MARKET_FEE
 import { LAYOUT_MOVE_JS } from './layout-move';
 import { HIERARCHY_HORIZON_LIMIT_JS } from '@/lib/opportunities/hierarchy-sub-agency';
 import { WATCH_SCOPE_JS } from '@/lib/saved-searches/watch-scope-client';
+import { MAP_APP_SHELL_CSS, MAP_APP_SHELL_RESIZE_JS, applyAppShell, isAppShellRequest } from './app-shell';
 
 export const dynamic = 'force-dynamic';
 
@@ -1736,9 +1738,35 @@ const VIEWPORT_JS = `<script>
   // the current viewport, and every active filter. Every field is a REAL number/value
   // off the map's own state — the drawer never fabricates the context line, and it
   // threads the same filters into the chat so answers are about THIS view.
+  // viewStates: WHERE the view is. Without it the preamble carried only a count, and Ask Mindy filled
+  // the location from the user's saved profile (2026-11-15: a Mid-Atlantic view answered about the
+  // "Birmingham metro"). Counted from the plotted pins inside the current map bounds: each pin's own
+  // 2-letter state (pin.state, else the trailing ", ST" of pin.loc). Top 6 by pin count; [] when
+  // nothing is plotted or the map is not ready (the preamble then says no location is known).
+  function pinState(p){
+    var s=String((p&&p.state)||'').trim().toUpperCase();
+    if(s.length!==2&&p&&p.loc){ var parts=String(p.loc).split(','); s=parts.length>1?String(parts[parts.length-1]||'').trim().toUpperCase():''; }
+    return (s.length===2&&s.charCodeAt(0)>=65&&s.charCodeAt(0)<=90&&s.charCodeAt(1)>=65&&s.charCodeAt(1)<=90)?s:'';
+  }
+  window.__mindyViewStates = function(pins, bounds){
+    var m={}, out=[];
+    if(!bounds||typeof bounds.contains!=='function'||!pins||!pins.length) return out;
+    for(var i=0;i<pins.length;i++){
+      var p=pins[i]; if(!p||typeof p.lat!=='number'||typeof p.lng!=='number') continue;
+      if(!bounds.contains([p.lat,p.lng])) continue;
+      var s=pinState(p); if(!s) continue;
+      m[s]=(m[s]||0)+1;
+    }
+    for(var k in m) if(Object.prototype.hasOwnProperty.call(m,k)) out.push({state:k,pins:m[k]});
+    out.sort(function(a,b){ return b.pins-a.pins || (a.state<b.state?-1:1); });
+    return out.slice(0,6);
+  };
   window.__mindyViewCtx = function(){
     function pick(){ for(var i=0;i<arguments.length;i++){ var v=arguments[i]; if(v!=null&&v!=='') return v; } return ''; }
+    var viewStates=[];
+    try{ if(typeof map!=='undefined'&&map&&map.getBounds) viewStates=window.__mindyViewStates(typeof OPPS!=='undefined'?OPPS:[], map.getBounds()); }catch(e){ viewStates=[]; }
     return {
+      viewStates: viewStates,
       count: (typeof INVIEW==='number'&&INVIEW>0)?INVIEW:(typeof TOTAL==='number'?TOTAL:0),
       capped: !!CAPPED,
       q: (Q||'').trim(),
@@ -6370,7 +6398,7 @@ const DRAWER_JS = `<script>
   // 'open' | 'dla' | 'recompete' | 'forecast' | 'company' | 'buyer', or null when closed.
   // Read-only for other modules; set by each drawer opener below.
   window.__drawerKind=null;
-  function close(){ dr.classList.remove('show'); bd.classList.remove('show'); clearTaskOrderPins(); window.__drawerKind=null; }
+  function close(){ dr.classList.remove('show'); bd.classList.remove('show'); clearTaskOrderPins(); window.__drawerKind=null; window.__selectedOpp=null; }
   // listing_open for drawers that can be reached WITHOUT openOppDrawer (typed ?recompete= /
   // ?forecast= deep links, similar-listing cards). openOppDrawer already emits it before routing
   // to these drawers and leaves a one-shot marker, so the same open is never counted twice.
@@ -6430,8 +6458,20 @@ const DRAWER_JS = `<script>
   }
   // Resolves {state:'saved'|'dup'|'fail', d:<parsed body or {}>, pipeline:boolean}. Never rejects.
   function postSave(a){ return postReq(a,saveReq(a)); }
+  // Coach Mode (Eric's coach decision, 2026-11-16): a coach working in a client's workspace saves to THAT
+  // workspace, exactly as /app's authedFetch does (src/components/app/activeWorkspace.ts activeWorkspaceFor):
+  // the stored active workspace is sent unless its owner stamp names a different user; the server re-checks
+  // the coach's access. No active workspace (every non-coach) = no header = the request is unchanged.
+  function activeWorkspaceHeader(em){
+    try{ var ws=localStorage.getItem('mindy_active_workspace'); if(!ws) return null;
+      var owner=localStorage.getItem('mindy_active_workspace_owner');
+      if(owner&&em&&owner!==String(em).toLowerCase().trim()) return null;
+      return ws; }catch(e){ return null; }
+  }
   function postReq(a,q){
-    return fetch(q.url,{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},body:JSON.stringify(q.body)})
+    var hd={'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em};
+    var ws=activeWorkspaceHeader(a.em); if(ws) hd['x-active-workspace']=ws;
+    return fetch(q.url,{method:'POST',headers:hd,body:JSON.stringify(q.body)})
       .then(function(r){ return r.json().catch(function(){return {};}).then(function(d){ return {state:saveOutcome(r),d:d||{},pipeline:q.url==='/api/pipeline',pro:r.status===402}; }); },
             function(){ return {state:'fail',d:{},pipeline:q.url==='/api/pipeline'}; });
   }
@@ -6990,6 +7030,10 @@ const DRAWER_JS = `<script>
     // SAM notice id (32 hex) gets it — the server refuses anything else anyway.
     var _cc=!!window.__CARD_CHAT_ENABLED && /^[0-9a-f]{32}$/.test(String(o.id||'').toLowerCase());
     if(_cc) window.__cardChatOpp={id:String(o.id).toLowerCase(),title:o.title||'',deadline:o.deadline||''};
+    // The SELECTED NOTICE for the main Ask Mindy chat (no flag): the chat shows it as a removable chip and
+    // sends only its id; the server loads the record. Cleared when this drawer closes.
+    window.__selectedOpp=/^[0-9a-f]{32}$/.test(String(o.id||'').toLowerCase())?{id:String(o.id).toLowerCase(),title:o.title||'',deadline:o.deadline||''}:null;
+    try{ if(window.__onSelectedOpp) window.__onSelectedOpp(); }catch(e){}
     return '<div class="oact" id="osec-actions">'
       + (_cc?'<button class="b ask" onclick="window.__askAboutOpp&&window.__askAboutOpp(window.__cardChatOpp)">Ask Mindy about this opportunity</button>':'')
       + '<button class="b pri" onclick="saveCurrentOpp(this)">Start pursuit</button>'
@@ -10816,10 +10860,22 @@ const ASK_MINDY_CSS =
   + '.amk-x{border:0;background:none;color:#8595a6;cursor:pointer;line-height:1;padding:0;align-self:flex-start;display:flex;align-items:center}'
   + '.amk-x svg{stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}'
   + '.amk-body{flex:1;overflow-y:auto;padding:16px 17px;display:flex;flex-direction:column;gap:14px}'
-  + '.amk-msg{max-width:90%;font:400 13.5px/1.55 Inter,system-ui,sans-serif}'
+  + '.amk-msg{max-width:90%;font:400 14px/1.6 Inter,system-ui,sans-serif}'
   + '.amk-msg.u{align-self:flex-end;background:#2563eb;color:#fff;padding:9px 13px;border-radius:14px 14px 3px 14px}'
   + '.amk-msg.a{align-self:flex-start;color:#1e2230;width:100%}'
-  + '.amk-msg.a .bub{background:#f5f8fb;border:1px solid #e6ebf0;padding:12px 14px;border-radius:12px;white-space:pre-wrap}'
+  + '.amk-msg.a .bub{background:#f5f8fb;border:1px solid #e6ebf0;padding:12px 14px;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}'
+  // Rendered answers (window.__mindyMd: escaped first, then a safe markdown subset). 2026-11-15.
+  + '.amk-msg.a .bub.md{white-space:normal}.amk-msg.a .bub.md p{margin:0 0 10px}.amk-msg.a .bub.md p:last-child{margin-bottom:0}'
+  // Answer-first: the opening paragraph is the answer, so it reads a step heavier than the details below it.
+  + '.amk-msg.a .bub.md>p:first-child{font-weight:500;color:#111c26}.amk-msg.a .bub.md li+li{margin-top:5px}.amk-msg.a .bub.md .md-h{margin-top:14px}'
+  + '.amk-msg.a .bub.md ul,.amk-msg.a .bub.md ol{margin:4px 0 8px;padding-left:20px}.amk-msg.a .bub.md li{margin:2px 0}.amk-msg.a .bub.md li>ul{margin:2px 0 4px;padding-left:16px;list-style:disc}'
+  + '.amk-msg.a .bub.md .md-h{font-weight:700;margin:10px 0 4px;color:#111c26}.amk-msg.a .bub.md .md-h1{font-size:15.5px}.amk-msg.a .bub.md .md-h2{font-size:14.5px}.amk-msg.a .bub.md .md-h3{font-size:13.5px}.amk-msg.a .bub.md .md-h:first-child{margin-top:0}'
+  + '.amk-msg.a .bub.md code{font:12.5px ui-monospace,Menlo,monospace;background:#eef2f7;border-radius:4px;padding:1px 4px}'
+  + '.amk-msg.a .bub a,.amk-src a{color:#2563eb;overflow-wrap:anywhere;word-break:break-word}'
+  + '.amk-msg.a .bub.md .md-table{margin:6px 0 10px;overflow-x:auto}.amk-msg.a .bub.md table{border-collapse:collapse;width:100%;font-size:12.5px}'
+  + '.amk-msg.a .bub.md th{text-align:left;font-weight:700;border-bottom:1px solid #d7dee8;padding:5px 6px;white-space:nowrap}.amk-msg.a .bub.md td{border-bottom:1px solid #edf1f5;padding:5px 6px;vertical-align:top;overflow-wrap:normal;word-break:normal}'
+  // Narrow drawer: holder links must not break mid-word; the value stays on one line; every column stays visible at drawer width. 2026-11-16.
+  + '.amk-msg.a .bub.md td a{overflow-wrap:normal;word-break:normal}.amk-msg.a .bub.md td:first-child{min-width:130px}.amk-msg.a .bub.md td:nth-child(2){white-space:nowrap}'
   // Follow-up ACTION chips under an answer (the vision\'s "What agencies use Azure? / Add to pipeline").
   + '.amk-act{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}'
   + '.amk-act button{font:600 11.5px Inter;color:#2563eb;background:#eaf1fe;border:1px solid #d3e2fc;border-radius:8px;padding:6px 11px;cursor:pointer;text-align:left}'
@@ -10831,6 +10887,13 @@ const ASK_MINDY_CSS =
   + '.amk-chips button{font:600 12.5px Inter;color:#243a52;background:#f0f5fb;border:1px solid #e0e8f2;border-radius:10px;padding:9px 12px;cursor:pointer;text-align:left;line-height:1.3}'
   + '.amk-chips button:hover{background:#e6eef8;border-color:#c9d8ea}'
   + '.amk-foot{border-top:1px solid #eef1f5;padding:12px 14px}'
+  // Attached notice chip (the selected opportunity rides along with the main chat) + the full-workspace link.
+  + '.amk-att{display:flex;align-items:center;gap:6px;margin:0 0 8px;padding:6px 8px 6px 10px;background:#eef4ff;border:1px solid #d3e2fc;border-radius:9px;font:500 12px/1.35 Inter,system-ui,sans-serif;color:#1e3a8a}'
+  + '.amk-att .lbl{color:#64748b;flex:none}.amk-att .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}'
+  + '.amk-att .rm{flex:none;border:0;background:none;color:#64748b;cursor:pointer;font:600 15px/1 Inter;padding:0 2px}.amk-att .rm:hover{color:#1e3a8a}'
+  + '.amk-att .sp small{display:block;font-weight:500;font-size:9.5px;color:#64748b;margin-top:1px}'
+  + '.amk-att .sp{flex:none;border:1px solid #bcd3fb;background:#fff;color:#1d4ed8;cursor:pointer;font:600 11.5px/1.2 Inter,system-ui,sans-serif;border-radius:7px;padding:4px 8px;text-align:center}.amk-att .sp:hover{background:#e0ebff}.amk-att .sp:disabled{opacity:.6;cursor:default}'
+  + '.amk-ws{display:block;margin-top:8px;text-align:right;font:600 11.5px Inter,system-ui,sans-serif;color:#2563eb;text-decoration:none}.amk-ws:hover{text-decoration:underline}'
   + '.amk-in{display:flex;gap:8px;align-items:flex-end}'
   + '.amk-in textarea{flex:1;resize:none;border:1px solid #dde3ec;border-radius:12px;padding:10px 12px;font:400 13.5px Inter;color:#111c26;max-height:120px;outline:none}'
   + '.amk-in textarea:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}'
@@ -10838,7 +10901,7 @@ const ASK_MINDY_CSS =
   + '.amk-send:disabled{opacity:.45;cursor:default}.amk-send svg{width:18px;height:18px}'
   + '.amk-up{text-align:center;padding:30px 20px}.amk-up h4{font:800 16px Inter;margin:0 0 6px;color:#111c26}.amk-up p{font:500 13px Inter;color:#6b7787;margin:0 0 14px}'
   + '.amk-up a{display:inline-block;background:#0a8f57;color:#fff;text-decoration:none;border-radius:10px;padding:10px 20px;font:700 13px Inter}'
-  + '@media(prefers-color-scheme:dark){.amk{background:#111823}.amk-hd{border-color:#202b39}.amk-hd h3{color:#eaf1f8}.amk-msg.a{color:#eaf1f8}.amk-msg.a .bub{background:#0d141d;border-color:#202b39}.amk-chips button{background:#0d141d;border-color:#202b39;color:#cdd8e4}.amk-foot{border-color:#202b39}.amk-in textarea{background:#0d141d;border-color:#202b39;color:#eaf1f8}.amk-empty b,.amk-up h4{color:#eaf1f8}.amk-act button{background:#122033;border-color:#1f3a5c}}';
+  + '@media(prefers-color-scheme:dark){.amk{background:#111823}.amk-hd{border-color:#202b39}.amk-hd h3{color:#eaf1f8}.amk-msg.a{color:#eaf1f8}.amk-msg.a .bub{background:#0d141d;border-color:#202b39}.amk-msg.a .bub.md .md-h,.amk-msg.a .bub.md>p:first-child{color:#eaf1f8}.amk-msg.a .bub.md code{background:#18222f}.amk-msg.a .bub a{color:#7fb0ff}.amk-chips button{background:#0d141d;border-color:#202b39;color:#cdd8e4}.amk-foot{border-color:#202b39}.amk-in textarea{background:#0d141d;border-color:#202b39;color:#eaf1f8}.amk-empty b,.amk-up h4{color:#eaf1f8}.amk-act button{background:#122033;border-color:#1f3a5c}.amk-att{background:#122033;border-color:#1f3a5c;color:#cfe0ff}.amk-att .sp{background:#0d141d;border-color:#1f3a5c;color:#9ec2ff}.amk-ws{color:#7fb0ff}}';
 
 const ASK_MINDY_HTML =
   '<div class="amk-ov" id="amkOv"></div>'
@@ -10864,6 +10927,13 @@ const ASK_MINDY_JS = `<script>(function(){
   var ov=document.getElementById('amkOv'), drawer=document.getElementById('amk'), body=document.getElementById('amkBody'), input=document.getElementById('amkIn'), send=document.getElementById('amkSend'), ctxEl=document.getElementById('amkCtx');
   if(!ov||!drawer||!body) return;
   function esc(x){ return (x==null?'':String(x)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  // Answer text \\u2192 the bubble. window.__mindyMd (src/lib/chat/safe-markdown.ts) ESCAPES the model text first
+  // and only then writes its own markup for a small markdown subset, so innerHTML never receives raw model
+  // text. Without it (script missing) the text is shown as plain text, never as HTML.
+  function paint(bub,text){
+    if(typeof window.__mindyMd==='function'){ try{ bub.innerHTML=window.__mindyMd(text); bub.classList.add('md'); return; }catch(e){} }
+    bub.classList.remove('md'); bub.textContent=text;
+  }
   function tok(){ try{return localStorage.getItem('mi_beta_auth_token');}catch(e){return null;} }
   function email(){ try{ var t=tok()||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){ return ''; } }
   var sessionId='', history=[], busy=false;
@@ -10873,10 +10943,94 @@ const ASK_MINDY_JS = `<script>(function(){
   // The class is amk-card, NOT card: the map already styles .card (listing cards, incl. a :hover transform)
   // and a shared name let that hover rule pin the closed drawer on screen on touch devices.
   var oppCtx=null, viewState={sessionId:'',history:[]}, viewPlaceholder=(input&&input.placeholder)||'';
+  // ── ATTACHED NOTICE (main chat, no flag): the opportunity open in the listing drawer rides along with the
+  // SAME conversation as a removable chip. Only its id is sent (context:{kind:'opportunity',notice_id}); the
+  // server loads the record. There is no separate thread. Removing the chip keeps it off until another
+  // notice is selected.
+  var attached=null, dismissedId='';
+  var foot=input&&input.parentNode&&input.parentNode.parentNode;
+  var attEl=document.getElementById('amkAtt');
+  if(!attEl&&foot&&input.parentNode){ attEl=document.createElement('div'); attEl.id='amkAtt'; foot.insertBefore(attEl,input.parentNode); }
+  var wsEl=document.getElementById('amkWs');
+  if(!wsEl&&foot){ wsEl=document.createElement('a'); wsEl.id='amkWs'; wsEl.className='amk-ws'; wsEl.href='/app?panel=chat'; wsEl.textContent='Open in full workspace \u2197'; foot.appendChild(wsEl); }
+  function syncAttached(){
+    if(oppCtx) return;
+    var s=window.__selectedOpp;
+    var id=s&&/^[0-9a-f]{32}$/.test(String(s.id||''))?String(s.id):'';
+    // Mirrors the listing drawer: the notice open there now, or nothing (a closed listing never lingers).
+    attached=(id&&id!==dismissedId)?{id:id,title:String(s.title||''),deadline:String(s.deadline||'')}:null;
+    renderAttached();
+  }
+  function renderAttached(){
+    if(attEl){
+      if(attached&&!oppCtx){
+        attEl.className='amk-att';
+        attEl.innerHTML='<span class="lbl">Asking about</span><span class="t" title="'+esc(attached.title)+'">'+esc(attached.title||'this opportunity')+'</span><button type="button" class="sp" title="Saves this opportunity to My Pursuits, then opens Proposals">Start a proposal<small>Saves to My Pursuits</small></button><button type="button" class="rm" aria-label="Remove this opportunity from the question">\u00d7</button>';
+        attEl.querySelector('.rm').onclick=function(){ if(attached) dismissedId=attached.id; attached=null; renderAttached(); };
+        attEl.querySelector('.sp').onclick=function(){ startProposal(this); };
+      } else { attEl.className=''; attEl.innerHTML=''; }
+    }
+    renderCtx();
+  }
+  // "Start a proposal" — the user's click only; Mindy never writes on its own. ES5 copy of
+  // src/lib/chat/start-proposal.ts (kept in step by start-proposal-parity.unit.test.ts): POST /api/pipeline
+  // (a 409 = already tracked, and carries that row); a NEW pursuit already fetches its documents
+  // (fetchPursuitDocsAuto, scheduled by the pipeline route); an existing one whose documents never arrived
+  // gets POST /api/app/proposal/pursuit-docs. Then /app?panel=proposals&pursuit_id=<row id>.
+  var DOCS_SETTLED={ready:1,loaded:1,fetching:1};
+  function startProposal(btn){
+    var n=attached; if(!n||btn.disabled)return;
+    var t=tok(), em=email();
+    if(!t||!em){ if(window.openSignInModal) window.openSignInModal('start a proposal',function(){ startProposal(btn); }); return; }
+    btn.disabled=true; btn.textContent='Starting\u2026';
+    var hd={'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em};
+    // Coach Mode, exactly as authedFetch (src/components/app/activeWorkspace.ts activeWorkspaceFor): a coach
+    // working in a client's workspace saves to THAT workspace. Withheld only when the stamp names another user;
+    // the server re-checks the coach's access either way.
+    try{ var ws=localStorage.getItem('mindy_active_workspace'), wso=localStorage.getItem('mindy_active_workspace_owner');
+      if(ws&&!(wso&&wso!==String(em).toLowerCase().trim())) hd['x-active-workspace']=ws; }catch(e){}
+    var b={user_email:em,title:(n.title||'').trim()||'SAM.gov opportunity',notice_id:n.id,source:'ask_mindy'};
+    if(n.deadline) b.response_deadline=n.deadline;
+    function fail(){ btn.disabled=false; btn.innerHTML='Try again<small>Saves to My Pursuits</small>'; }
+    fetch('/api/pipeline',{method:'POST',headers:hd,body:JSON.stringify(b)}).then(function(r){
+      if(!r.ok&&r.status!==409){ fail(); return; }
+      return r.json().catch(function(){ return null; }).then(function(d){
+        var op=d&&d.opportunity, pid=op&&op.id?String(op.id):'';
+        if(!pid){ fail(); return; }
+        var p=Promise.resolve();
+        if(r.status===409&&!DOCS_SETTLED[String(op.docs_status||'')]){
+          p=fetch('/api/app/proposal/pursuit-docs?email='+encodeURIComponent(em)+'&pipeline_id='+encodeURIComponent(pid),{method:'POST',headers:hd,keepalive:true}).catch(function(){});
+        }
+        try{ if(window.__track) window.__track('tool_use','ask_mindy_start_proposal',{existing:r.status===409}); }catch(e){}
+        btn.textContent='Opening\u2026';
+        // The docs request is started before leaving (keepalive) and never waited on: Proposals shows its state.
+        location.href='/app?panel=proposals&pursuit_id='+encodeURIComponent(pid);
+        return p;
+      });
+    }).catch(fail);
+  }
+  window.__onSelectedOpp=function(){ if(drawer.classList.contains('show')) syncAttached(); };
+  // Continue this conversation (and the attached notice) in the full Ask Mindy workspace. The panel reads
+  // mindy_chat_handoff once and does not auto-send. Inside the /app shell the frame hands this link to the
+  // parent window; standalone it navigates normally. Same-origin frames share sessionStorage.
+  if(wsEl) wsEl.addEventListener('click',function(){
+    try{ sessionStorage.setItem('mindy_chat_handoff',JSON.stringify({v:1,sessionId:oppCtx?'':(sessionId||''),
+      context:(attached&&!oppCtx)?{kind:'opportunity',notice_id:attached.id,title:attached.title,deadline:attached.deadline}:(oppCtx?{kind:'opportunity',notice_id:oppCtx.id,title:oppCtx.title,deadline:oppCtx.deadline}:null)})); }catch(e){}
+    try{ if(window.__track) window.__track('tool_use','ask_mindy_open_workspace',{attached:!!(attached||oppCtx)}); }catch(e){}
+  });
+  // CHARGE ONCE PER QUESTION: every card question gets a stable turn id. It is saved here as "pending" BEFORE
+  // the request and cleared only when the answer has fully arrived, so a dropped connection, a refresh or a
+  // reopen asks the server for THAT question again (same id): the server returns the saved answer for free
+  // instead of answering and charging twice. A new question always gets a new id.
+  var pendingTurn=null;
+  function newTurnId(){ try{ if(window.crypto&&crypto.randomUUID) return crypto.randomUUID(); }catch(e){}
+    var b=new Uint8Array(16); try{ crypto.getRandomValues(b); }catch(e){ for(var i=0;i<16;i++)b[i]=Math.floor(Math.random()*256); }
+    b[6]=(b[6]&15)|64; b[8]=(b[8]&63)|128; var h=Array.prototype.map.call(b,function(x){return (x+256).toString(16).slice(1);}).join('');
+    return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20); }
   function cardKey(id){ return 'mindy_card_chat:'+id; }
-  function loadCard(id){ try{ var j=JSON.parse(localStorage.getItem(cardKey(id))||'null'); if(j&&typeof j==='object')return {sessionId:String(j.sessionId||''),history:Array.isArray(j.history)?j.history.slice(-8):[]}; }catch(e){} return {sessionId:'',history:[]}; }
-  function saveCard(){ if(!oppCtx)return; try{ localStorage.setItem(cardKey(oppCtx.id),JSON.stringify({sessionId:sessionId,history:history.slice(-8)})); }catch(e){} }
-  function leaveCard(){ if(!oppCtx)return; saveCard(); oppCtx=null; sessionId=viewState.sessionId; history=viewState.history; drawer.classList.remove('amk-card'); if(input)input.placeholder=viewPlaceholder; body.innerHTML=''; }
+  function loadCard(id){ try{ var j=JSON.parse(localStorage.getItem(cardKey(id))||'null'); if(j&&typeof j==='object'){ var pd=(j.pending&&typeof j.pending.turnId==='string'&&typeof j.pending.q==='string')?{turnId:j.pending.turnId,q:j.pending.q}:null; return {sessionId:String(j.sessionId||''),history:Array.isArray(j.history)?j.history.slice(-8):[],pending:pd}; } }catch(e){} return {sessionId:'',history:[],pending:null}; }
+  function saveCard(){ if(!oppCtx)return; try{ localStorage.setItem(cardKey(oppCtx.id),JSON.stringify({sessionId:sessionId,history:history.slice(-8),pending:pendingTurn})); }catch(e){} }
+  function leaveCard(){ if(!oppCtx)return; saveCard(); oppCtx=null; pendingTurn=null; sessionId=viewState.sessionId; history=viewState.history; drawer.classList.remove('amk-card'); if(input)input.placeholder=viewPlaceholder; body.innerHTML=''; }
   // ── The GROUNDED view context (approved vision: "Context: N open opps in view \\u00b7 FL \\u00b7 NAICS 236220").
   // Read fresh from the map's bridge every time the drawer opens — never a stale snapshot, never fabricated.
   function viewCtx(){ try{ if(typeof window.__mindyViewCtx==='function') return window.__mindyViewCtx()||{}; }catch(e){} return {}; }
@@ -10891,16 +11045,33 @@ const ASK_MINDY_JS = `<script>(function(){
     if(c.psc) p.push('PSC '+c.psc);
     if(c.setAside) p.push(String(c.setAside).split(',')[0]);
     if(c.agency) p.push(c.agency);
+    if(!c.state && c.viewStates && c.viewStates.length) p.push('in '+c.viewStates.slice(0,4).map(function(v){ return v.state; }).join(', '));
     return p;
   }
+  // WHERE the view is, for the model. A state filter wins; else the states of the plotted pins in view;
+  // else say the location is unknown. Never leave it blank: a blank location let the planner substitute
+  // the user's saved profile states and invent a city (2026-11-15 Birmingham-for-Mid-Atlantic defect).
+  function ctxLocation(c){
+    if(c.state) return 'Location: the map is filtered to '+c.state+'.';
+    // "in VA, MD, PA": the server's intent compiler reads a 2-letter code after "in"/"," as a named state
+    // (an ambiguous code such as VA, PA or DE counts only in that form), so every state in view is read
+    // the same way and scopes the view's searches. Pin counts follow, for the model's context only.
+    if(c.viewStates && c.viewStates.length) return 'Location: the map area is in '+c.viewStates.map(function(v){ return v.state; }).join(', ')+' (plotted pins in view, most first: '+c.viewStates.map(function(v){ return v.state+' '+v.pins; }).join(', ')+').';
+    return 'Location: unknown for this view. If the question needs a place, ask which state or city before searching.';
+  }
   function renderCtx(){ if(!ctxEl)return;
-    if(oppCtx){ ctxEl.innerHTML='<span class="dim">About:</span> '+esc(oppCtx.title||'this opportunity')+(oppCtx.deadline?' <span class="dim">\\u00b7 due '+esc(String(oppCtx.deadline).slice(0,10))+'</span>':''); return; }
+    var about=oppCtx||attached;
+    if(about){ ctxEl.innerHTML='<span class="dim">About:</span> '+esc(about.title||'this opportunity')+(about.deadline?' <span class="dim">\\u00b7 due '+esc(String(about.deadline).slice(0,10))+'</span>':''); return; }
     var c=viewCtx(); var parts=ctxParts(c);
     ctxEl.innerHTML='<span class="dim">Context:</span> '+parts.map(esc).join(' \\u00b7 '); }
   // Threaded to the chat so answers are about THIS view — a compact, factual preface (no invented numbers).
   function ctxPreamble(){ var c=viewCtx(); var parts=ctxParts(c); if(!parts.length)return '';
-    return '[Current map view \\u2014 '+parts.join('; ')+'. Answer for THIS view when the question is about "these"/"this"/"here".]\\n\\n'; }
-  function setOpen(o){ ov.classList.toggle('show',o); drawer.classList.toggle('show',o); drawer.setAttribute('aria-hidden',o?'false':'true'); if(o){ renderCtx(); if(!body.children.length){ if(oppCtx)greetCard(); else greet(); } setTimeout(function(){ input&&input.focus(); },220); } }
+    return '[Current map view \\u2014 '+parts.join('; ')+'. '+ctxLocation(c)+' Answer for THIS view when the question is about "these"/"this"/"here": use this location, not the user\\'s saved profile locations, and do not choose a city the user did not name.]\\n\\n'; }
+  // NARROW-PANEL DISPLAY (2026-11-16 parity audit): the drawer is ~420px wide, so every request says so with
+  // display:'narrow_panel'. The server adds the presentation rule (answer first, short sections) to the answer
+  // prompt as a SYSTEM note (src/lib/chat/display-hint.ts). It is never part of the message, so it is never
+  // stored as the customer's words or read as their intent (review F3).
+  function setOpen(o){ ov.classList.toggle('show',o); drawer.classList.toggle('show',o); drawer.setAttribute('aria-hidden',o?'false':'true'); if(o){ syncAttached(); if(!body.children.length){ if(oppCtx)greetCard(); else greet(); } setTimeout(function(){ input&&input.focus(); },220); } }
   function greetCard(){
     var chips=[['What does it require?','Summarize what this solicitation requires: scope, deliverables, and key dates.'],
       ['Who held this before?','Who held this work before, and what did the prior contract cost?'],
@@ -10917,11 +11088,14 @@ const ASK_MINDY_JS = `<script>(function(){
     if(!/^[0-9a-f]{32}$/.test(id)||busy) return;
     if(!oppCtx) viewState={sessionId:sessionId,history:history.slice()}; else saveCard();
     oppCtx={id:id,title:String(op.title||''),deadline:String(op.deadline||'')};
-    var st=loadCard(id); sessionId=st.sessionId; history=st.history;
-    drawer.classList.add('amk-card'); if(input)input.placeholder='Ask about this opportunity\\u2026'; body.innerHTML='';
+    var st=loadCard(id); sessionId=st.sessionId; history=st.history; pendingTurn=st.pending;
+    drawer.classList.add('amk-card'); if(input)input.placeholder='Ask about this opportunity\\u2026'; body.innerHTML=''; renderAttached();
     if(history.length){ history.forEach(function(m){ addMsg(m.role==='user'?'user':'assistant', m.content); }); }
-    try{ if(window.__track) window.__track('tool_use','card_chat_open',{has_history:history.length>0}); }catch(e){}
+    try{ if(window.__track) window.__track('tool_use','card_chat_open',{has_history:history.length>0,pending:!!pendingTurn}); }catch(e){}
     setOpen(true);
+    // A question that was asked but whose answer never fully arrived (connection dropped, page refreshed):
+    // fetch the saved answer. replay never runs the model and never charges.
+    if(pendingTurn){ var pd=pendingTurn; ask(pd.q,{turnId:pd.turnId,replay:true}); }
   };
   function greet(){
     var c=viewCtx();
@@ -10932,19 +11106,30 @@ const ASK_MINDY_JS = `<script>(function(){
     else { chips.push(['Who buys 541512 work?','Which agencies buy the most NAICS 541512 (custom computer programming) work?']);
       chips.push(['Find the incumbent','How do I find who currently holds a contract before it recompetes?']); }
     chips.push(['Write a capability statement','What should my capability statement include for the agencies in this view?']);
-    chips.push(['Add a target to my pipeline','How do I track one of these opportunities in my pipeline?']);
     var h='<div class="amk-empty"><b>Ask about what you\\u2019re looking at</b><div class="lead">Agencies, incumbents, set-asides, teaming \\u2014 answered from live federal data for this view.</div><div class="amk-chips">';
     chips.forEach(function(ch){ h+='<button data-q="'+esc(ch[1])+'">'+esc(ch[0])+'</button>'; });
     h+='</div></div>';
     body.innerHTML=h;
     Array.prototype.forEach.call(body.querySelectorAll('.amk-chips button'),function(b){ b.onclick=function(){ ask(b.getAttribute('data-q')); }; });
   }
-  // Public opener — context-aware: seed the input with the current search term (does NOT auto-send).
+  // Public opener (does NOT auto-send). An explicit question (typed in the search bar, then "Ask") goes into the
+  // box as the customer's own words. The map's search term only becomes the HINT: it already reaches the answer
+  // through the view preamble, and putting it in the box made "click in and type" send the two glued together
+  // ("hvac servicesFind HVAC\\u2026", D7, Agent 4 live scorecard 2026-11-16). What is sent = what is in the box.
+  // A later open without a seed clears the box only if it still holds the text the opener itself put there
+  // (openerSeed); a draft the customer typed is kept.
+  var openerSeed='';
   window.openAskMindy=function(seed){
     leaveCard();
     var q=(seed!=null?String(seed):'').trim();
-    if(!q){ var c=viewCtx(); if(c&&c.q)q=String(c.q).trim(); }
-    if(q&&input)input.value=q;
+    if(input){
+      if(q){ input.value=q; openerSeed=q; input.placeholder=viewPlaceholder; }
+      else {
+        if(openerSeed&&input.value===openerSeed) input.value='';
+        openerSeed='';
+        var c=viewCtx(), vq=(c&&c.q)?String(c.q).trim():''; input.placeholder=vq?('Ask about \\u201c'+vq+'\\u201d\\u2026'):viewPlaceholder;
+      }
+    }
     setOpen(true);
   };
   var x=document.getElementById('amkX'); if(x)x.onclick=function(){ setOpen(false); };
@@ -10954,9 +11139,11 @@ const ASK_MINDY_JS = `<script>(function(){
   if(input){ input.addEventListener('input',function(){ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,120)+'px'; });
     input.addEventListener('keydown',function(e){ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); ask(input.value); } }); }
   if(send)send.onclick=function(){ ask(input?input.value:''); };
-  function addMsg(role, text){ var d=document.createElement('div'); d.className='amk-msg '+(role==='user'?'u':'a'); d.innerHTML=(role==='user')?esc(text):('<div class="bub"></div>'); if(role!=='user')d.querySelector('.bub').textContent=text||''; body.appendChild(d); body.scrollTop=body.scrollHeight; return d; }
+  function addMsg(role, text){ var d=document.createElement('div'); d.className='amk-msg '+(role==='user'?'u':'a'); d.innerHTML=(role==='user')?esc(text):('<div class="bub"></div>'); if(role!=='user'){ var bb=d.querySelector('.bub'); if(text) paint(bb,text); else bb.textContent=''; } body.appendChild(d); body.scrollTop=body.scrollHeight; return d; }
   function upsell(){ body.innerHTML='<div class="amk-up"><h4>\\ud83d\\udd12 Ask Mindy is a Pro feature</h4><p>Get grounded, real-data answers on set-asides, agencies, opportunities, teaming and proposals \\u2014 with sources.</p><a href="/market-intelligence">Upgrade to Pro</a></div>'; }
-  function ask(q){
+  // opts (card chat only): turnId = reuse this question's id (retry/reopen); replay = only fetch the saved answer.
+  function ask(q,opts){
+    opts=opts||{};
     q=(q||'').trim(); if(!q||busy)return;
     var t=tok(), em=email();
     // Card chat resumes the same question after sign-in (the card and its thread stay open); view mode keeps
@@ -10964,25 +11151,52 @@ const ASK_MINDY_JS = `<script>(function(){
     if(!t||!em){ var _cq=q, _card=!!oppCtx; if(window.openSignInModal){window.openSignInModal(_card?'ask Mindy about this opportunity':'ask Mindy',function(){ if(_card&&oppCtx){ ask(_cq); } else location.reload(); });}else{location.href='/app?next='+encodeURIComponent(location.pathname);} return; }
     // clear the greeting on first ask
     if(body.querySelector('.amk-empty'))body.innerHTML='';
-    if(input){ input.value=''; input.style.height='auto'; }
+    if(input&&!opts.turnId){ input.value=''; input.style.height='auto'; }
+    // A card question is recorded as pending (with its turn id) before it is sent.
+    var turnId=null, polls=opts.polls||0;
+    if(oppCtx){ turnId=opts.turnId||newTurnId(); pendingTurn={turnId:turnId,q:q}; saveCard(); }
     addMsg('user', q);
     var aEl=addMsg('assistant',''); var bub=aEl.querySelector('.bub');
     bub.innerHTML='<span class="amk-typing"><i></i><i></i><i></i></span>';
-    busy=true; if(send)send.disabled=true;
-    var acc='', started=false;
+    busy=true; if(send)send.disabled=true; clearFollowups();
+    var acc='', started=false, gotDone=false, gotError=false;
     // Prepend the grounded view context to the MESSAGE (not shown to the user) so the answer
     // is about "these"/"here" — the map\\u2019s real filters + count, never fabricated.
     // Card chat sends NO view preamble: the server supplies the opportunity from its own record.
+    // An attached notice travels as context (below); the map-view preface stays in the message exactly as
+    // without one (server contract, Agent 1, 2026-11-16: the server reconciles the two).
+    var attAtSend=oppCtx?null:attached;
     var sendMsg=oppCtx?q:(ctxPreamble()+q);
-    var payload={email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8)};
-    if(oppCtx){ payload.context={kind:'opportunity',notice_id:oppCtx.id}; try{ if(window.__track) window.__track('tool_use','card_chat_ask',{turn:Math.floor(history.length/2)+1}); }catch(e){} }
+    var payload={email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8),display:'narrow_panel'};
+    if(attAtSend){ payload.context={kind:'opportunity',notice_id:attAtSend.id}; try{ if(window.__track) window.__track('tool_use','ask_mindy_with_notice',{}); }catch(e){} }
+    if(oppCtx){ payload.context={kind:'opportunity',notice_id:oppCtx.id}; payload.turn_id=turnId; if(opts.replay)payload.replay_only=true;
+      if(!opts.turnId){ try{ if(window.__track) window.__track('tool_use','card_chat_ask',{turn:Math.floor(history.length/2)+1}); }catch(e){} } }
+    var cardAtSend=oppCtx;
+    function release(){ busy=false; if(send)send.disabled=false; }
+    // Drop the question's two bubbles (it is about to be re-asked with the same turn id).
+    function dropBubbles(){ var u=aEl.previousSibling; if(aEl.parentNode)aEl.parentNode.removeChild(aEl); if(u&&u.classList&&u.classList.contains('u')&&u.parentNode)u.parentNode.removeChild(u); }
+    // The answer did not arrive: offer to get it. Same turn id, so an answer the server already finished
+    // comes back free, and one it did not finish is answered (and charged) once.
+    function offerRetry(msg){ bub.textContent=msg; var w=document.createElement('div'); w.className='amk-act'; var b=document.createElement('button'); b.textContent='Get the answer';
+      b.onclick=function(){ if(busy||oppCtx!==cardAtSend)return; dropBubbles(); ask(q,{turnId:turnId}); }; w.appendChild(b); aEl.appendChild(w); }
     fetch('/api/app/chat',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},body:JSON.stringify(payload)})
       .then(function(r){
-        if(r.status===403){ upsell(); busy=false; if(send)send.disabled=false; return null; }
-        if(r.status===402){ r.json().then(function(d){ creditsWall(bub,d||{}); },function(){ creditsWall(bub,{}); }); busy=false; if(send)send.disabled=false; return null; }
-        if(r.status===404&&oppCtx){ bub.textContent='Mindy could not load this opportunity right now. Try reopening it.'; busy=false; if(send)send.disabled=false; return null; }
+        if(r.status===403){ if(turnId){ pendingTurn=null; saveCard(); } upsell(); busy=false; if(send)send.disabled=false; return null; }
+        if(r.status===402){ if(turnId){ pendingTurn=null; saveCard(); } r.json().then(function(d){ creditsWall(bub,d||{}); },function(){ creditsWall(bub,{}); }); busy=false; if(send)send.disabled=false; return null; }
+        // Charge once per question: the same question is still being answered by another request (a second
+        // tab, a double click, a retry during a slow answer). Wait, then fetch the saved answer (free).
+        if(r.status===409&&turnId){ return r.json().catch(function(){ return {}; }).then(function(d){
+          if(d&&d.error==='turn_in_progress'&&polls<20){ bub.innerHTML='<span class="amk-typing"><i></i><i></i><i></i></span>';
+            // Stay busy while waiting so a new question cannot replace this pending one.
+            setTimeout(function(){ release(); if(oppCtx!==cardAtSend)return; dropBubbles(); ask(q,{turnId:turnId,replay:true,polls:polls+1}); },(Math.min(10,Math.max(1,+(d.retry_after)||3)))*1000); return null; }
+          pendingTurn=null; saveCard();
+          bub.textContent=(d&&d.error==='turn_in_progress')?'Mindy is still working on this answer. Reopen this opportunity in a minute to see it.':'Something went wrong. Ask again.'; release(); return null; }); }
+        if(r.status===404&&turnId&&opts.replay){ return r.json().catch(function(){ return {}; }).then(function(d){
+          if(d&&d.error==='turn_not_completed'){ offerRetry('This answer did not finish, so it was not charged.'); release(); return null; }
+          bub.textContent='Mindy could not load this opportunity right now. Try reopening it.'; release(); return null; }); }
+        if(r.status===404&&oppCtx){ if(turnId){ pendingTurn=null; saveCard(); } bub.textContent='Mindy could not load this opportunity right now. Try reopening it.'; busy=false; if(send)send.disabled=false; return null; }
         if(r.status===401){ bub.textContent='Please sign in again to ask Mindy.'; busy=false; if(send)send.disabled=false; return null; }
-        if(!r.ok||!r.body){ bub.textContent='Something went wrong. Try again.'; busy=false; if(send)send.disabled=false; return null; }
+        if(!r.ok||!r.body){ if(turnId){ offerRetry('Something went wrong before the answer arrived.'); release(); return null; } bub.textContent='Something went wrong. Try again.'; busy=false; if(send)send.disabled=false; return null; }
         var reader=r.body.getReader(), dec=new TextDecoder(), buf='';
         function pump(){ return reader.read().then(function(res){
           if(res.done){ finish(); return; }
@@ -10991,18 +11205,28 @@ const ASK_MINDY_JS = `<script>(function(){
           parts.forEach(function(p){ var line=p.split('\\n').filter(function(l){return l.indexOf('data:')===0;}).map(function(l){return l.slice(5).trim();}).join(''); if(!line)return;
             var ev; try{ ev=JSON.parse(line); }catch(e){ return; }
             if(ev.type==='session'){ sessionId=ev.sessionId||sessionId; }
-            else if(ev.type==='token'){ if(!started){ bub.textContent=''; started=true; } acc+=(ev.content||''); bub.textContent=acc; body.scrollTop=body.scrollHeight; }
+            else if(ev.type==='token'){ if(!started){ bub.textContent=''; started=true; } acc+=(ev.content||''); paint(bub,acc); body.scrollTop=body.scrollHeight; }
             // citations event is now always empty (RAG corpus removed 2026-08-02) \\u2014 ignored.
-            else if(ev.type==='error'){ if(!started)bub.textContent=(ev.message||'Something went wrong.'); }
+            else if(ev.type==='error'){ gotError=true; if(!started)bub.textContent=(ev.message||'Something went wrong.'); }
+            else if(ev.type==='done'){ gotDone=true; }
+            else if(ev.type==='replayed'){ var rd=document.createElement('div'); rd.className='amk-credits'; rd.textContent='Saved answer \\u00b7 no extra credits'; aEl.appendChild(rd); }
             else if(ev.type==='citations'&&oppCtx&&Array.isArray(ev.sources)&&ev.sources.length){ var sd=document.createElement('div'); sd.className='amk-src'; var s0=ev.sources[0]; sd.innerHTML='Source: '+(s0.url?'<a href="'+esc(s0.url)+'" target="_blank" rel="noopener">'+esc(s0.title||'SAM.gov notice')+'</a>':esc(s0.title||'SAM.gov notice')); aEl.appendChild(sd); }
             else if(ev.type==='credits'&&typeof ev.balance==='number'){ var cd=document.createElement('div'); cd.className='amk-credits'; cd.textContent=(ev.charged?ev.charged+' credits used \\u00b7 ':'')+ev.balance+' credits left'; aEl.appendChild(cd); }
           });
           return pump();
         }); }
-        function finish(){ if(!started&&!acc)bub.textContent='Mindy had no answer for that \\u2014 try rephrasing.'; history.push({role:'user',content:q}); history.push({role:'assistant',content:acc}); saveCard(); if(acc&&!oppCtx)followups(aEl); busy=false; if(send)send.disabled=false; body.scrollTop=body.scrollHeight; }
-        return pump();
+        function finish(){
+          // Card chat: only a FULLY received answer clears the pending question. A stream that ended without
+          // its done event lost the connection: keep the turn id so "Get the answer" (or reopening the card)
+          // fetches it without a second charge.
+          if(turnId&&!gotDone){ if(oppCtx===cardAtSend){ offerRetry(acc?'The connection dropped before the answer finished.':'The connection dropped before the answer arrived.'); } release(); body.scrollTop=body.scrollHeight; return; }
+          if(turnId&&oppCtx===cardAtSend){ pendingTurn=null; }
+          if(!started&&!acc&&!gotError)bub.textContent='Mindy had no answer for that \\u2014 try rephrasing.';
+          if(!(turnId&&gotError&&!acc)){ history.push({role:'user',content:q}); history.push({role:'assistant',content:acc}); }
+          saveCard(); if(acc)paint(bub,acc); if(acc&&!oppCtx)followups(aEl,q,acc); busy=false; if(send)send.disabled=false; body.scrollTop=body.scrollHeight; }
+        return pump().catch(function(){ if(turnId){ if(oppCtx===cardAtSend)offerRetry('The connection dropped before the answer finished.'); release(); return; } bub.textContent='Connection failed. Check your network and try again.'; release(); });
       })
-      .catch(function(){ bub.textContent='Connection failed. Check your network and try again.'; busy=false; if(send)send.disabled=false; });
+      .catch(function(){ if(turnId){ offerRetry('Connection failed before the answer arrived.'); release(); return; } bub.textContent='Connection failed. Check your network and try again.'; busy=false; if(send)send.disabled=false; });
   }
   // Card chat out of credits: say what an answer costs and what they hold; Pro is the next step. No new grant.
   function creditsWall(bub,d){
@@ -11011,17 +11235,25 @@ const ASK_MINDY_JS = `<script>(function(){
       +'Mindy Pro includes Ask Mindy without per-answer credits, plus deeper research. <a href="/market-intelligence">See Pro</a>';
     try{ if(window.__track) window.__track('tool_use','card_chat_credits_wall',{balance:bal}); }catch(e){}
   }
-  // Follow-up ACTION chips under an answer (the vision\\u2019s bottom row). Data-core next steps only.
-  function followups(aEl){
-    var c=viewCtx();
-    var acts=[];
-    if(c.count>0){ acts.push(['Who are the contacts?','Who are the buying-office contacts for opportunities in this view? Give names and emails.']);
-      acts.push(['Set-aside breakdown','What is the set-aside breakdown for this view?']); }
-    acts.push(['Write a capability statement','Draft a short capability statement tailored to the agencies in this view.']);
-    acts.push(['Add to my pipeline','How do I add one of these to my pipeline to track it?']);
-    var wrap=document.createElement('div'); wrap.className='amk-act';
-    acts.slice(0,4).forEach(function(a){ var b=document.createElement('button'); b.textContent=a[0]; b.onclick=function(){ ask(a[1]); }; wrap.appendChild(b); });
-    aEl.appendChild(wrap); body.scrollTop=body.scrollHeight;
+  // Follow-up chips: ONLY under the latest answer, and DERIVED from that question + answer by the same
+  // endpoint the /app panel uses (POST /api/app/chat/suggestions). The old version appended the same four
+  // fixed chips under every answer (2026-11-15). No chips when the endpoint returns none or fails.
+  function clearFollowups(){ var old=body.querySelectorAll('.amk-act.amk-fu'); for(var i=0;i<old.length;i++){ if(old[i].parentNode)old[i].parentNode.removeChild(old[i]); } }
+  function followups(aEl,q,answer){
+    clearFollowups();
+    var t=tok(), em=email(); if(!t||!em)return;
+    var mine=aEl;
+    fetch('/api/app/chat/suggestions',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},body:JSON.stringify({email:em,message:q,answer:String(answer||'').slice(0,6000)})})
+      .then(function(r){ return r.ok?r.json():null; })
+      .then(function(d){
+        var list=(d&&Array.isArray(d.suggestions))?d.suggestions.filter(function(x){ return typeof x==='string'&&x.trim(); }).slice(0,3):[];
+        if(!list.length||!mine.parentNode||mine!==body.lastElementChild||busy)return; // a newer question is already showing
+        clearFollowups();
+        var wrap=document.createElement('div'); wrap.className='amk-act amk-fu';
+        list.forEach(function(s){ var b=document.createElement('button'); b.textContent=s; b.onclick=function(){ clearFollowups(); ask(s); }; wrap.appendChild(b); });
+        mine.appendChild(wrap); body.scrollTop=body.scrollHeight;
+      })
+      .catch(function(){});
   }
 })();
 </script>`;
@@ -11389,7 +11621,7 @@ export async function GET(request: NextRequest) {
     // <div>, so anything after it gets parsed INTO that hidden .lgm-ov (display:none) and the
     // fixed FAB/drawer compute to 0×0. Leading the body keeps the mobile chrome a direct <body> child.
     // MARKET_FEEDBACK_JS precedes VIEWPORT_JS so window.__mf exists before the first fetch round reports to it.
-    const bodyInject = MOBILE_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + DIBBS_FLAG_JS + WATCH_SCOPE_SCRIPT + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + CARD_CHAT_FLAG_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + ACCOUNT_MENU_JS + ZHEAD_HEIGHT_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
+    const bodyInject = MOBILE_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + DIBBS_FLAG_JS + WATCH_SCOPE_SCRIPT + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + CARD_CHAT_FLAG_JS + SAFE_MARKDOWN_SCRIPT + ASK_MINDY_JS + LOGIN_MODAL_JS + ACCOUNT_MENU_JS + ZHEAD_HEIGHT_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Code→name for the State picker (50 states + DC). Already a shared constant — the Filters
@@ -11420,5 +11652,9 @@ export async function GET(request: NextRequest) {
   // exactly as before (generic title); the authenticated Maps experience is untouched either way.
   const shareHead = await shareHeadP;
   if (shareHead) html = repl(html, '<title>Mindy Map</title>', shareHead);
+  // ?shell=app — this map inside the signed-in app's shell (/app?panel=map). Hides ONLY .zhead/.zrail
+  // and adds the parent bridge; data, boot and fetch behaviour are untouched (see app-shell.ts).
+  // Never for ?embed= (a different, static mode with its own boot rules).
+  if (!embed && isAppShellRequest(reqUrl)) html = applyAppShell(html, MAP_APP_SHELL_CSS + MAP_APP_SHELL_RESIZE_JS);
   return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }

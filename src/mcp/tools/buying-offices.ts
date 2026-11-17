@@ -25,6 +25,7 @@ import {
   bqDateString,
   normalizeCities,
   expandMetroCities,
+  metroCoreStates,
   DEFAULT_METRO_RADIUS_MILES,
   normalizeNaicsPrefixes,
   normalizePscPrefixes,
@@ -38,6 +39,7 @@ import {
 } from '@/lib/bigquery/award-scope';
 import { runScopedAggregate, type ScopedAggregateDeps } from '@/lib/bigquery/scoped-aggregate';
 import type { IgnoredArg } from '@/lib/mcp/result-contract';
+import { isDodAgency, warehouseDefenseLag, type WarehouseDefenseLag } from '@/lib/usaspending/freshness';
 
 const AWARDS_TABLE = '`market-assasin.usaspending.awards`';
 const NOT_REPORTED = '(not reported)';
@@ -109,6 +111,8 @@ export interface BuyingOfficesResult {
     ignored_args: IgnoredArg[];
     as_of: string | null;
     lag_note: string;
+    /** Defense publication lag, only when a Defense office is in the returned rows; null otherwise. */
+    defense_lag?: WarehouseDefenseLag | null;
     result_state?: 'unavailable' | 'not_reported';
     validation_error?: string;
     incomplete_reason?: string;
@@ -329,6 +333,13 @@ export async function getBuyingOffices(
   const metroCore = coreCities.length === 1 ? coreCities[0]
     : !coreCities.length && explicitCities.length === 1 && input.metro_radius_miles != null ? explicitCities[0] : null;
   const metro = metroCore && radius > 0 ? expandMetroCities(metroCore, st.state ? [st.state] : [], radius) : null;
+  // A metro is always pinned to one state: the expansion returns bare city NAMES, so without a state
+  // filter they matched same-name cities nationwide (2026-11-15: a "Birmingham metro" total included
+  // Leeds MA, Fairfield PA and Cordova AK). With no state given, the core city's only state is used;
+  // an ambiguous core name (Birmingham: AL, IA, MI, NJ, OH) is not expanded at all.
+  const state: string | null = st.state ?? metro?.state ?? null;
+  const metroStatePinned = !st.state && !!metro;
+  const metroAmbiguousStates = metroCore && radius > 0 && !st.state && !metro ? metroCoreStates(metroCore) : [];
   const requestedCities = Array.from(new Set([...coreCities, ...explicitCities]));
   const cities = metro ? Array.from(new Set([...metro.cities, ...requestedCities])) : requestedCities;
   const naics = normalizeNaicsPrefixes(input.naics);
@@ -355,22 +366,24 @@ export async function getBuyingOffices(
   };
   if (fy.window.date_from) applied.date_from = fy.window.date_from;
   if (fy.window.date_to) applied.date_to = fy.window.date_to;
-  if (st.state) applied.state = st.state;
+  if (state) applied.state = state;
   if (cities.length) {
     if (input.city != null) applied.city = coreCities;
     if (input.cities != null) applied.cities = explicitCities;
-    if (metro) applied.metro = { core_city: metroCore, center: metro.center, radius_miles: radius, cities_included: metro.cities.length };
+    if (metro) applied.metro = { core_city: metroCore, center: metro.center, state: metro.state, state_source: metroStatePinned ? 'core_city' : 'given', radius_miles: radius, cities_included: metro.cities.length };
   }
   if (input.metro_radius_miles != null) {
     if (metro || radius === 0) applied.metro_radius_miles = radius;
-    else ignored.push({ arg: 'metro_radius_miles', value: String(input.metro_radius_miles), reason: 'unsupported_value', detail: 'a metro radius applies to one core city; the cities were matched exactly' });
+    else ignored.push({ arg: 'metro_radius_miles', value: String(input.metro_radius_miles), reason: 'unsupported_value', detail: metroAmbiguousStates.length > 1
+      ? `the city name exists in several states (${metroAmbiguousStates.join(', ')}); pass state to expand one metro. The city was matched exactly`
+      : 'a metro radius applies to one core city; the cities were matched exactly' });
   }
   if (naics.codes.length) applied.naics = naics.codes;
   if (psc.codes.length) applied.psc = psc.codes;
 
   const scope: BuyingOfficesResult['scope'] = {
     location_basis: 'place_of_performance',
-    state: st.state,
+    state,
     cities,
     naics: naics.codes,
     psc: psc.codes,
@@ -384,7 +397,9 @@ export async function getBuyingOffices(
       : 'Ranked by FUNDING office (the customer). top_awarding_offices names the contracting offices that bought for it. Funding offices carry no office code in the source.',
     'Dollars are net obligations inside the window (de-obligations subtract), not lifetime award values.',
   ];
-  if (cities.length && !st.state) notes.push('City matched in every state because no state was given; pass state to disambiguate.');
+  if (metroStatePinned && metro) notes.push(`No state was given; ${metroCore} is only in ${metro.state} in Mindy's city list, so the metro is ${metro.state} only.`);
+  if (metroAmbiguousStates.length > 1) notes.push(`${metroCore} is a city name in ${metroAmbiguousStates.join(', ')}. No metro was expanded because no state was given; pass state for one metro.`);
+  if (cities.length && !state) notes.push('City matched in every state because no state was given; pass state to disambiguate.');
   if (fy.window.defaulted) notes.push(`No window given: defaulted to the latest three complete fiscal years (${windowLabel(fy.window)}).`);
 
   const baseMeta = {
@@ -394,7 +409,7 @@ export async function getBuyingOffices(
     lag_note: LAG_NOTE,
   };
 
-  if (!st.state && !naics.codes.length && !psc.codes.length) {
+  if (!state && !naics.codes.length && !psc.codes.length) {
     return {
       scope,
       offices: [],
@@ -408,19 +423,19 @@ export async function getBuyingOffices(
 
   const query = buildBuyingOfficesQuery({
     role,
-    hasState: !!st.state,
+    hasState: !!state,
     hasCities: cities.length > 0,
     hasNaics: naics.codes.length > 0,
     hasPsc: psc.codes.length > 0,
     windowSql: windowPredicate(fy.window),
   });
   const params: Record<string, unknown> = { ...windowParams(fy.window), limit };
-  if (st.state) params.state = st.state;
+  if (state) params.state = state;
   if (cities.length) params.cities = cities;
   if (naics.codes.length) params.naics = naics.codes;
   if (psc.codes.length) params.psc = psc.codes;
 
-  const cacheKey = `ask:buying-offices:v1:${role}:${st.state ?? '-'}:${cities.join('|') || '-'}:${naics.codes.join('|') || '-'}:${psc.codes.join('|') || '-'}:${fy.window.fy_from}-${fy.window.fy_to}:${fy.window.date_from ?? ''}:${fy.window.date_to ?? ''}:${limit}`;
+  const cacheKey = `ask:buying-offices:v2:${role}:${state ?? '-'}:${cities.join('|') || '-'}:${naics.codes.join('|') || '-'}:${psc.codes.join('|') || '-'}:${fy.window.fy_from}-${fy.window.fy_to}:${fy.window.date_from ?? ''}:${fy.window.date_to ?? ''}:${limit}`;
   const outcome = await runScopedAggregate<Row>({ cacheKey, query, params, tool: 'get_buying_offices', family: `buying_offices_${role}` }, deps);
 
   if (outcome.status === 'too_broad') {
@@ -505,6 +520,16 @@ export async function getBuyingOffices(
       degraded: false,
       count: offices.length,
       as_of: first ? bqDateString(first.as_of) : null,
+      // Evidence: a Defense office (or a Defense awarding office) in the rows this tool returned.
+      defense_lag: (() => {
+        const dod = offices.find((o) => isDodAgency(o.agency) || isDodAgency(o.sub_agency)
+          || (o.top_awarding_offices ?? []).some((t) => isDodAgency(t.agency)));
+        return warehouseDefenseLag({
+          fyFrom: fy.window.fy_from, fyTo: fy.window.fy_to, dateFrom: fy.window.date_from, dateTo: fy.window.date_to,
+          asOf: first ? bqDateString(first.as_of) : null, now,
+          defenseEvidence: dod ? `Defense office in results: ${dod.office_name || dod.agency || 'unnamed'}` : null,
+        });
+      })(),
     },
   };
   if (cities.length) {

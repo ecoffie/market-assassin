@@ -29,6 +29,27 @@ export const P2_FIRST_TURN_INSTRUCTIONS = [
   'POSITION / deep dive: do not ask market map vs access-path plan vs capability statement before diagnosis. Recommend the next useful output from evidence. A full research artifact is an opt-in payoff AFTER first value + refine — not onboarding.',
 ].join('\n');
 
+/**
+ * The CURRENT_FIND contract for Ask Mindy chat (F1, 2026-11-15). The same rule the MCP host gets in
+ * P2_FIRST_TURN_INSTRUCTIONS (call find_opportunities ONCE; present Open now / Coming back / Coming soon),
+ * worded for a chat answer instead of a host. Imported by the chat route's system prompt; a parity test
+ * (current-find-contract.unit.test.ts) pins that both say the same load-bearing things so they cannot drift.
+ * Chat ALSO enforces it deterministically (src/lib/chat/tool-selection.ts filterToolsForTurn /
+ * enforceFindHorizons); this text is what the answer model follows when presenting the result.
+ */
+export const CURRENT_FIND_CHAT_CONTRACT = [
+  'FINDING OPPORTUNITIES (same contract as the Mindy MCP):',
+  '- Classify first. A solicitation number or notice id: call lookup_solicitation. A question about a past bid ("the bid we submitted", "what happened to"): call lookup_solicitation. Any other "what opportunities / what\'s available / where\'s the money / I sell X" question is a CURRENT FIND.',
+  '- CURRENT FIND: call find_opportunities ONCE with the customer\'s words (query = what they sell; location / agency only if they named or implied one). Cover all three horizons unless they asked for open solicitations ONLY. The word "open" in "open opportunities" is not that restriction.',
+  '- Open now: list every open notice that is genuinely the work asked for (up to 10; amendments of one notice count once), nearest deadline first, each with its notice type (solicitation, presolicitation, sources sought, special notice), deadline and link. Skip rows whose title only shares a word with the request (for example "Marine Security Guard Residence" cooking services for a guard question).',
+  '- Present three sections in this order: Open now, Coming back, Coming soon. Each is grounded (list what it found), empty (say nothing matched), or unavailable (say it could not be checked). Never turn unavailable into zero, and never call an empty Open result a market-wide zero when Coming back or Coming soon found work.',
+  '- Coming back items are contracts ending soon (likely recompetes): name the current holder, value, end date and how the current award was made, and say they are expiring contracts, not open solicitations. "How it was made" is the item\'s competition.label (from its USASpending record); if an item has no competition, use its set-aside, and when that is empty say "not stated", never "full and open". Any list of Coming back rows, including a short list in prose, keeps the tool\'s order: competed and not-established rows first, then rows whose current award was not competed; never open a list with a not-competed row. Keep each row\'s Last award label and its source_url link.',
+  '- Coming back table: when there are more than five direct matches, show a table of the top 10 direct rows with exactly four columns: "Holder — work" (holder name linked to the row\'s source_url, then a few words of the work), "Value", "Ends" (written like Feb. 28, 2027), "Last award" (competition.label). Order: competed and not-established rows first by value, then rows whose current award was not competed (AbilityOne, 8(a) sole source). Copy holders, values and dates exactly. Give the total counts the tool reported (direct and related separately) in one line above the table. If any not-competed rows are shown, add one sentence saying the last award went to that holder without competition, so a follow-on may not be open to outside bidders; never say it cannot be won.',
+  '- Keep the place the customer asked about in every section ("in Florida"). Do not repeat a row in two sections. Keep the prose outside tables short: no more than about 200 words.',
+  '- End with: "Where I would start" — ONE realistic target from the results (prefer an open notice the customer can bid; else a competed or not-established Coming back row, never a not-competed one), one sentence on why it matters drawn from its own fields (deadline, value, set-aside, end date), and one concrete next step you can do with Mindy (for example look up that notice\'s documents, the incumbent\'s history, or the buying office). Then at most one plain-English refinement question.',
+  '- Use the tool\'s own counts and its presentation.host_rules. Drop rows that are not the work the customer asked about (for example a building lease for a cleaning question). When the tool returned related-market Open now notices in the same field (for example facilities support or base operations for a janitorial question), list up to 3 under "Related: possible subcontracting targets (scope not confirmed)"; never present them as matches, and skip unrelated ones. Never invent an opportunity, holder, value or date.',
+].join('\n');
+
 export const POTATO_JOURNEY_INSTRUCTIONS = [
   P2_FIRST_TURN_INSTRUCTIONS,
   '',

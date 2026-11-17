@@ -5,6 +5,7 @@ import { isProEmail, proRequiredResponse } from '@/lib/access/require-pro';
 import { logToolError, ToolNames, AIProviders, classifyError } from '@/lib/tool-errors';
 import { normalizeCategory } from '@/lib/proposal/section-alignment';
 import { createClient } from '@supabase/supabase-js';
+import { authorizePursuitRead } from '@/lib/proposal/pursuit-access';
 import crypto from 'node:crypto';
 import {
   type ComplianceRequirement,
@@ -242,6 +243,18 @@ export async function POST(request: NextRequest) {
   const sourceText = (body.text || '').trim();
   let multiDocResult: MultiDocResult | null = null;
   if (body.pipeline_id) {
+    // Pursuit documents are read with the service-role key: check access first.
+    const access = await authorizePursuitRead(
+      createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!),
+      request,
+      authSession.session.email ?? '',
+      String(body.pipeline_id),
+    );
+    if (!access.ok) {
+      return access.reason === 'error'
+        ? NextResponse.json({ success: false, error: 'Could not load this pursuit. Try again.' }, { status: 503 })
+        : NextResponse.json({ success: false, error: 'Pursuit not found' }, { status: 404 });
+    }
     multiDocResult = await extractMultiDoc(body.pipeline_id);
   }
   if (!multiDocResult && !sourceText) {

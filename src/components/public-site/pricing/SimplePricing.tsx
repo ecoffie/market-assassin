@@ -4,6 +4,11 @@
  * /pricing — three plans, little text (modeled on Fyxer's pricing page, Nov 2026).
  * Pro and Team start a 14-day free trial (card required); Enterprise goes to sales.
  * No Free plan on this page. Credit allowances come from the server constants as props.
+ *
+ * Trial-click pass (2026-11-16): only ~4% of pricing visitors clicked a trial button, and all
+ * three trials so far were Pro monthly. So the hero now leads with the free trial and its own
+ * button, Pro is the highlighted plan, monthly billing is the default, and every trial button
+ * says "$0 today" (the charge only comes after 14 days).
  * The credit-only MCP plans keep their own page at /mcp/pricing.
  */
 import { useEffect, useState } from 'react';
@@ -113,13 +118,49 @@ function TrialUpgradeBox({ offer, email, token, onDone }: {
 
 const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
+/** A credit-only (MCP) plan for the dropdown under the cards. */
+export type CreditPlan = {
+  id: string; label: string; credits: number;
+  monthlyUsd: number; monthlyHref: string;
+  annualPerMonthUsd: number | null; annualHref: string | null;
+};
+
+/**
+ * "Only need Mindy in your AI?" — the credit-only plans as a dropdown on /pricing instead of a
+ * link to a separate page (Eric 2026-11-16). Follows the page's Monthly/Annual toggle.
+ */
+function CreditPlansDropdown({ plans, annual }: { plans: CreditPlan[]; annual: boolean }) {
+  if (!plans.length) return null;
+  return (
+    <details className="credits-dd" data-testid="credit-plans-dropdown">
+      <summary>Only need Mindy inside Claude, ChatGPT or Cursor? <span>See credit-only plans</span></summary>
+      <div className="cdd-grid">
+        {plans.map((p) => {
+          const useAnnual = annual && p.annualPerMonthUsd != null && !!p.annualHref;
+          return (
+            <div className="cdd-card" key={p.id}>
+              <h3>{p.label}</h3>
+              <div className="cdd-price"><b>${fmt(useAnnual ? p.annualPerMonthUsd! : p.monthlyUsd)}</b><span>/ mo{useAnnual ? ', billed annually' : ''}</span></div>
+              <p className="cdd-cr">{fmt(p.credits)} credits / month</p>
+              <a className="cta outline" href={useAnnual ? p.annualHref! : p.monthlyHref}>Get {p.label}</a>
+              <NoRefundNote />
+            </div>
+          );
+        })}
+      </div>
+      <p className="cdd-fine">Same tools on every plan; you&apos;re charged only for successful calls. No app included. <Link href="/mcp/pricing">Compare credit plans in detail</Link>.</p>
+    </details>
+  );
+}
+
 type Cell = boolean | string;
 type CompareGroup = [group: string, rows: Array<[label: string, pro: Cell, team: Cell, ent: Cell]>];
 
-export default function SimplePricing({ proCredits, teamCredits, forecastsLabel, faqs }: {
+export default function SimplePricing({ proCredits, teamCredits, forecastsLabel, faqs, creditPlans = [] }: {
   proCredits: number; teamCredits: number; forecastsLabel: string; faqs: { q: string; a: string }[];
+  creditPlans?: CreditPlan[];
 }) {
-  const [annual, setAnnual] = useState(true);
+  const [annual, setAnnual] = useState(false);
   // Same token every Mindy page sends; /api/app/me verifies it server-side. Any failure leaves the
   // public page as is (never guesses a plan).
   const [me, setMe] = useState<MePlan | null>(null);
@@ -154,11 +195,11 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
 
   const basePlans: Plan[] = [
     {
-      name: 'Pro', tag: 'For solo contractors and small firms going after federal work.',
+      name: 'Pro', tag: 'For solo contractors and small firms going after federal work.', featured: true,
       price: annual ? `$${fmt(Math.round(PRO_ANNUAL_USD / 12))}` : `$${PRO_MONTHLY_USD}`,
       was: annual ? `$${PRO_MONTHLY_USD}` : undefined,
       per: annual ? '/ mo, billed annually' : '/ mo, billed monthly', trial: true,
-      cta: 'Start 14-day trial', href: annual ? PRO_TRIAL_ANNUAL : PRO_TRIAL_MONTHLY,
+      cta: 'Start free trial', href: annual ? PRO_TRIAL_ANNUAL : PRO_TRIAL_MONTHLY,
       lead: 'Find and win your own contracts.', base: 'Everything you need to start',
       features: [
         ['Opportunities matched to you', 'Daily alerts and briefings for your NAICS, keywords and agencies.'],
@@ -169,11 +210,11 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
       usage: ['Monthly usage included', `${fmt(proCredits)} credits / month`],
     },
     {
-      name: 'Team', tag: 'Built for BD teams working several markets at once.', featured: true,
+      name: 'Team', tag: 'Built for BD teams working several markets at once.',
       price: annual ? `$${fmt(TEAM_ANNUAL_PER_MONTH)}` : `$${TEAM_MONTHLY_USD}`,
       was: annual ? `$${TEAM_MONTHLY_USD}` : undefined,
       per: annual ? '/ mo, billed annually' : '/ mo, billed monthly', trial: true,
-      cta: 'Start 14-day trial', href: annual ? TEAM_TRIAL_ANNUAL : TEAM_TRIAL_MONTHLY,
+      cta: 'Start free trial', href: annual ? TEAM_TRIAL_ANNUAL : TEAM_TRIAL_MONTHLY,
       lead: 'Win more as a team.', base: 'All Pro features, plus',
       features: [
         ['Up to 5 users', 'One plan for your whole BD team.'],
@@ -243,7 +284,15 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
     <main className="sp">
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
       <section className="hero">
-        <h1>Plans that grow with you</h1>
+        <h1>Try Mindy Pro free for 14 days</h1>
+        {(!me || me === 'free') && (
+          <>
+            <p className="sub">$0 today. Cancel anytime before day 14 and you won&apos;t be charged.</p>
+            <a className="cta hero-cta" href={annual ? PRO_TRIAL_ANNUAL : PRO_TRIAL_MONTHLY}
+              onClick={() => trackTrialClick('pro', annual ? 'annual' : 'monthly', 'hero')}>Start my free trial</a>
+            <NoRefundNote style={{ margin: '8px 0 0' }} />
+          </>
+        )}
         {me ? (
           <p className="you">You&apos;re on the <b>{PLAN_NAME[me]}</b> plan.{me !== 'free' && <> <a href={BILLING_URL}>Manage billing</a></>}</p>
         ) : <MemberProof />}
@@ -257,7 +306,7 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
       <section className="cards" id="plans">
         {plans.map((p) => (
           <article key={p.name} className={`card ${p.featured ? 'featured' : ''} ${p.current ? 'current' : ''}`}>
-            <h2>{p.name}{p.current && <span className="mine">Your plan</span>}</h2>
+            <h2>{p.name}{p.current ? <span className="mine">Your plan</span> : p.featured && <span className="pop">Most popular</span>}</h2>
             <p className="tag">{p.tag}</p>
             {p.price ? (
               <div className="price"><span className="now">{p.price}</span>{p.was && <span className="was">{p.was}</span>}</div>
@@ -265,7 +314,7 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
               <div className="price"><span className="now sales">Speak to sales</span></div>
             )}
             <p className="per">{p.per}</p>
-            {p.trial && <p className="trial">14 day free trial</p>}
+            {p.trial && <p className="trial"><b>$0 today</b> · 14 days free</p>}
             {p.current
               ? <span className="cta is-current" aria-current="true">Current plan</span>
               : <a className={`cta ${p.outline ? 'outline' : ''}`} href={p.href} onClick={p.trial ? () => trackTrialClick(p.name === 'Team' ? 'team' : 'pro', annual ? 'annual' : 'monthly', 'card') : undefined}>{p.cta}</a>}
@@ -291,8 +340,10 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
 
       <p className="fine">
         Card required for the trial. No charge for 14 days, and you can cancel anytime before it ends.
-        After that, all sales final. Running AI agents only? <Link href="/mcp/pricing">See credit-only plans</Link>.
+        After that, all sales final.
       </p>
+
+      <CreditPlansDropdown plans={creditPlans} annual={annual} />
 
       <LogoMarquee />
 
@@ -376,6 +427,10 @@ const CSS = `
 .sp .tu-err{margin:8px 0 0;font-size:13px;color:var(--mp-warn)}
 .sp .tu-ok{margin:-8px 0 22px;font-size:14px;color:var(--mp-ok);font-weight:600}
 .sp .you{margin:14px 0 0;font-size:16px;color:var(--mp-body)}
+.sp .hero .sub{margin:14px auto 0;font-size:18px;line-height:1.5;color:var(--mp-body);max-width:560px}
+.sp .hero .hero-cta{display:inline-block;margin:20px 0 0;padding:14px 32px;font-size:17px}
+.sp .hero .hero-cta + p{max-width:420px;margin-left:auto !important;margin-right:auto !important}
+.sp .card h2 .pop{margin-left:10px;vertical-align:middle;font:600 12px var(--mp-font-sans);color:var(--mp-navy);border:1px solid var(--mp-navy);border-radius:999px;padding:3px 10px}
 .sp .you a{color:var(--mp-navy);margin-left:6px}
 .sp .lead{font-weight:600;margin:0}
 .sp .base{color:var(--mp-muted);font-size:13px;margin:2px 0 12px}
@@ -390,6 +445,23 @@ const CSS = `
 .sp .foot{text-align:center;font-size:14px;color:var(--mp-muted);margin:16px 0 0}
 .sp .foot a,.sp .fine a{color:var(--mp-navy)}
 .sp .fine{text-align:center;color:var(--mp-muted);font-size:13px;line-height:1.6;max-width:640px;margin:28px auto 0}
+.sp .credits-dd{max-width:900px;margin:24px auto 0;border:1px solid var(--mp-line);border-radius:14px;background:var(--mp-surface)}
+.sp .credits-dd summary{cursor:pointer;padding:16px 20px;font-size:15px;color:var(--mp-body);text-align:center;list-style:none}
+.sp .credits-dd summary::-webkit-details-marker{display:none}
+.sp .credits-dd summary span{color:var(--mp-navy);font-weight:600;margin-left:6px}
+.sp .credits-dd summary span::after{content:' ▾'}
+.sp .credits-dd[open] summary span::after{content:' ▴'}
+.sp .cdd-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:4px 20px 8px}
+@media (max-width:700px){.sp .cdd-grid{grid-template-columns:1fr}}
+.sp .cdd-card{border:1px solid var(--mp-line);border-radius:12px;padding:18px;background:var(--mp-wash)}
+.sp .cdd-card h3{margin:0;font-family:var(--mp-font-serif);font-size:20px}
+.sp .cdd-price{display:flex;align-items:baseline;gap:6px;margin:8px 0 0}
+.sp .cdd-price b{font-size:28px}
+.sp .cdd-price span{color:var(--mp-muted);font-size:13px}
+.sp .cdd-cr{margin:4px 0 0;font-size:14px;font-weight:600}
+.sp .cdd-card .cta{margin:14px 0 4px}
+.sp .cdd-fine{margin:0;padding:8px 20px 18px;text-align:center;font-size:13px;color:var(--mp-muted)}
+.sp .cdd-fine a{color:var(--mp-navy)}
 .sp .cmp{margin:80px 0 0}
 .sp .cmp h2{font-family:var(--mp-font-serif);font-size:clamp(28px,3.4vw,40px);font-weight:700;text-align:center;margin:0 0 28px}
 .sp .cmp-scroll{overflow-x:auto;border:1px solid var(--mp-line);border-radius:18px;background:var(--mp-surface)}

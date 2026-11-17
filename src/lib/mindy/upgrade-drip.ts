@@ -49,7 +49,7 @@ export const UPGRADE_DRIP: DripEmail[] = [
 <p><b>Your homework:</b> think about the ONE NAICS code you search most. Now ask — what else gets bought under different codes that you'd actually qualify for? That list is usually 3–5x bigger than people think.</p>
 <p>Talk soon,</p>
 <p>${SIGN}</p>
-<p style="color:#6b7280;font-size:14px;margin-top:24px;">P.S. Doing this coverage math by hand across 42 codes takes hours. Inside Mindy Pro you type "drones" and it maps the whole market for you in seconds. ${softCta(cta, 'See how Mindy maps your market →')} Tomorrow: the $430 billion most people never look at.</p>
+<p style="color:#6b7280;font-size:14px;margin-top:24px;">P.S. Doing this coverage math by hand across 42 codes takes hours. Inside Mindy Pro you type "drones" and it maps the whole market for you in seconds. ${softCta(cta, 'Try Mindy Pro free for 14 days →')} Tomorrow: the $430 billion most people never look at.</p>
 `),
   },
   {
@@ -64,7 +64,7 @@ export const UPGRADE_DRIP: DripEmail[] = [
 <p><b>Your homework:</b> pick one agency you'd love to work with. Find a contract in your space that's expiring in the next 12 months. That's your target — start building the relationship now, not when the solicitation drops.</p>
 <p>Talk soon,</p>
 <p>${SIGN}</p>
-<p style="color:#6b7280;font-size:14px;margin-top:24px;">P.S. Finding expiring contracts by hand means digging through USASpending one award at a time. Mindy Pro surfaces the recompetes in your space automatically and alerts you when one moves. ${softCta(cta, 'See your expiring-contract targets →')} Next: why the title of an opportunity lies to you.</p>
+<p style="color:#6b7280;font-size:14px;margin-top:24px;">P.S. Finding expiring contracts by hand means digging through USASpending one award at a time. Mindy Pro surfaces the recompetes in your space automatically and alerts you when one moves. ${softCta(cta, 'Try Mindy Pro free for 14 days →')} Next: why the title of an opportunity lies to you.</p>
 `),
   },
   {
@@ -79,7 +79,7 @@ export const UPGRADE_DRIP: DripEmail[] = [
 <p><b>Your homework:</b> next time you find an opportunity that fits, open the actual SOW/PWS attachment before you judge it. You'll be surprised how often the title undersold it — and how often a boring title hides perfect work.</p>
 <p>Talk soon,</p>
 <p>${SIGN}</p>
-<p style="color:#6b7280;font-size:14px;margin-top:24px;">P.S. Reading every attachment by hand isn't realistic at scale. Mindy Pro searches the full body + the SOW/PWS text of 88,000+ opportunities, so the right ones surface even when the title hides them. ${softCta(cta, 'Search the full text in Mindy →')} Last one: how the winners decide what NOT to bid.</p>
+<p style="color:#6b7280;font-size:14px;margin-top:24px;">P.S. Reading every attachment by hand isn't realistic at scale. Mindy Pro searches the full body + the SOW/PWS text of 88,000+ opportunities, so the right ones surface even when the title hides them. ${softCta(cta, 'Try Mindy Pro free for 14 days →')} Last one: how the winners decide what NOT to bid.</p>
 `),
   },
   {
@@ -95,7 +95,7 @@ export const UPGRADE_DRIP: DripEmail[] = [
 <p><b>Your homework:</b> look at the last 5 opportunities you considered. Honestly, how many did you have a real edge on? If it's all 5, you're not being selective enough. If it's 1, that's the one — go deep.</p>
 <p>You've got this.</p>
 <p>${SIGN}</p>
-<p style="color:#6b7280;font-size:14px;margin-top:24px;">P.S. Mindy Pro does the bid/no-bid grounding for you — incumbent, competition, fit, and why — so you spend your hours on the 2–3 that count, not all 20. That's the whole point. ${softCta(cta, 'Let Mindy help you focus →')} Thanks for reading these — reply anytime, I read them.</p>
+<p style="color:#6b7280;font-size:14px;margin-top:24px;">P.S. Mindy Pro does the bid/no-bid grounding for you — incumbent, competition, fit, and why — so you spend your hours on the 2–3 that count, not all 20. That's the whole point. ${softCta(cta, 'Try Mindy Pro free for 14 days →')} Thanks for reading these — reply anytime, I read them.</p>
 `),
   },
 ];

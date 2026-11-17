@@ -38,6 +38,8 @@ const CoachPanel = lazy(() => import('./CoachPanel'));
 const DisaVehicleWatchPanel = lazy(() => import('./DisaVehicleWatchPanel'));
 const OsbpSmbResearchPanel = lazy(() => import('./OsbpSmbResearchPanel'));
 const MiccMrrPanel = lazy(() => import('./MiccMrrPanel'));
+// The Opportunity Map (and its Watchlist / Saved pages) in the app shell — a same-origin iframe.
+const MapShellPanel = lazy(() => import('./MapShellPanel'));
 
 interface PanelContainerProps {
   activePanel: AppPanel;
@@ -65,6 +67,11 @@ function PanelLoading() {
 export default function PanelContainer({ activePanel, email, tier, onPanelChange, panelContext }: PanelContainerProps) {
   const renderPanel = () => {
     switch (activePanel) {
+      case 'map':
+      case 'watchlist':
+      case 'saved':
+        // key: each panel is its own frame (src is computed once per mount from the app URL).
+        return <MapShellPanel key={activePanel} panel={activePanel} onPanelChange={onPanelChange} />;
       case 'chat':
         return <MindyChatPanel email={email} tier={tier} onPanelChange={onPanelChange} />;
       case 'dashboard':

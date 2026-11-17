@@ -114,21 +114,44 @@ export function formatProfileForPrompt(profile: BidderProfile): string {
 
 // ---- Vault context (identity + past perf + capabilities + team) ----
 
-export async function loadVaultContext(email: string, sectionType: SectionType): Promise<VaultContext> {
+/** The four Vault sections the loader can read. */
+export type VaultSection = 'identity' | 'past_performance' | 'capabilities' | 'team';
+
+/** Every Vault section. Pass as `sections` for a general (non-section-specific) Vault read. */
+export const ALL_VAULT_SECTIONS: readonly VaultSection[] = ['identity', 'past_performance', 'capabilities', 'team'];
+
+/** Default row caps per section (unchanged from the section-narrowed behaviour). */
+const DEFAULT_VAULT_LIMITS = { past_performance: 10, capabilities: 15, team: 8 } as const;
+
+export interface VaultLoadOptions {
+  /**
+   * Load exactly these sections, overriding the per-section-type narrowing.
+   * Ask Mindy and Manual Drive are general Vault reads: neither is drafting one
+   * section, so the old `'exec_summary'` narrowing silently dropped capabilities
+   * and team for both. Omit to keep the section-type behaviour the drafters use.
+   */
+  sections?: readonly VaultSection[];
+  /** Override the per-section row caps. */
+  limits?: Partial<Record<Exclude<VaultSection, 'identity'>, number>>;
+}
+
+export async function loadVaultContext(email: string, sectionType: SectionType, opts: VaultLoadOptions = {}): Promise<VaultContext> {
   const supabase = getSupabase();
   const ctx: VaultContext = { has_any: false };
 
   // Same per-section narrowing as v1 — only load what THIS section uses.
-  const needsIdentity = true;
   // Why Us (differentiators) and LOI Opening (company_overview) are EVIDENCE
   // sections — they argue "why this firm fits" and must cite real contracts,
   // not just capabilities. They previously loaded only capabilities, so a vault
   // WITH past performance still got vague "proven track record" prose because
   // the contracts were never put in front of the model. (Eval: Why Us 68, LOI
   // Opening 67 — the two lowest.)
-  const needsPastPerf = sectionType === 'past_performance' || sectionType === 'cap_past_performance' || sectionType === 'exec_summary' || sectionType === 'differentiators' || sectionType === 'company_overview';
-  const needsCapabilities = sectionType === 'capabilities' || sectionType === 'technical' || sectionType === 'differentiators' || sectionType === 'company_overview';
-  const needsTeam = sectionType === 'management' || sectionType === 'poc';
+  const want = opts.sections ? new Set(opts.sections) : null;
+  const needsIdentity = want ? want.has('identity') : true;
+  const needsPastPerf = want ? want.has('past_performance') : (sectionType === 'past_performance' || sectionType === 'cap_past_performance' || sectionType === 'exec_summary' || sectionType === 'differentiators' || sectionType === 'company_overview');
+  const needsCapabilities = want ? want.has('capabilities') : (sectionType === 'capabilities' || sectionType === 'technical' || sectionType === 'differentiators' || sectionType === 'company_overview');
+  const needsTeam = want ? want.has('team') : (sectionType === 'management' || sectionType === 'poc');
+  const limits = { ...DEFAULT_VAULT_LIMITS, ...(opts.limits || {}) };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const queries: any[] = [];
@@ -137,18 +160,18 @@ export async function loadVaultContext(email: string, sectionType: SectionType):
   }
   if (needsPastPerf) {
     queries.push(supabase.from('user_past_performance')
-      .select('contract_title, agency, sub_agency, office, contract_number, period_start, period_end, contract_value, role, scope_description, outcomes, cpars_rating, reference_name, reference_phone, relevance_keywords, naics_codes')
-      .eq('user_email', email).is('archived_at', null).limit(10));
+      .select('id, contract_title, agency, sub_agency, office, contract_number, period_start, period_end, contract_value, role, scope_description, outcomes, cpars_rating, reference_name, reference_phone, relevance_keywords, naics_codes')
+      .eq('user_email', email).is('archived_at', null).limit(limits.past_performance));
   }
   if (needsCapabilities) {
     queries.push(supabase.from('user_capabilities_library')
-      .select('capability_name, description, related_naics, evidence, tools_methods')
-      .eq('user_email', email).is('archived_at', null).limit(15));
+      .select('id, capability_name, description, related_naics, evidence, tools_methods')
+      .eq('user_email', email).is('archived_at', null).limit(limits.capabilities));
   }
   if (needsTeam) {
     queries.push(supabase.from('user_team_members')
-      .select('full_name, title, security_clearance, certifications, years_experience, bio_short, role_type, is_key_personnel')
-      .eq('user_email', email).is('archived_at', null).order('is_key_personnel', { ascending: false }).limit(8));
+      .select('id, full_name, title, security_clearance, certifications, years_experience, bio_short, role_type, is_key_personnel')
+      .eq('user_email', email).is('archived_at', null).order('is_key_personnel', { ascending: false }).limit(limits.team));
   }
 
   const results = await Promise.all(queries);

@@ -18,6 +18,7 @@
  * chat-private tools through the tier-0 executor.
  */
 import { randomUUID } from 'node:crypto';
+import { WORKSPACE_UNCONFIRMED_NOTE } from '@/lib/chat/chat-acting-scope';
 import { listMcpTools, isMcpTool, runMcpTool, creditsFor } from '@/lib/mcp/tool-registry';
 import { logCall, type CallStatus } from '@/lib/mcp/credits';
 import { preflightPaidInput } from '@/lib/mcp/credit-integrity';
@@ -85,7 +86,17 @@ export interface ChatToolExecutorOptions {
    * executed; it can never add a tool the policy blocks. Unset = the full policy-filtered set, unchanged.
    */
   allowedToolNames?: ReadonlySet<string>;
+  /**
+   * Whose Vault grounds Vault-reading registry tools (drafting) when a coach is acting in an
+   * authorized client workspace. Unset = the caller's own (unchanged). See chat-acting-scope.ts.
+   */
+  vaultEmail?: string;
+  /** True when the acting workspace could not be resolved: Vault-reading tools refuse. */
+  privateScopeUnavailable?: boolean;
 }
+
+/** Registry tools that read the acting user's Vault (bound to the acting scope in chat). */
+export const VAULT_GROUNDED_TOOLS: ReadonlySet<string> = new Set(['draft_proposal', 'draft_proposal_section']);
 
 function refusal(category: string, message: string): Record<string, unknown> {
   return { ok: false, state: 'unavailable', error_category: category, message };
@@ -286,13 +297,24 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
       }
     }
 
+    // 5b) A Vault-grounded draft must not fall back to the coach's own Vault when the acting
+    // workspace could not be resolved.
+    if (opts.privateScopeUnavailable && VAULT_GROUNDED_TOOLS.has(name)) {
+      await log(planner, name, 'blocked_policy', executionId, { args, errorCategory: 'workspace_unavailable' });
+      return done('blocked_policy', policy.decision, 'workspace_unavailable',
+        refusal('workspace_unavailable', WORKSPACE_UNCONFIRMED_NOTE));
+    }
+
     // 6) Execute with per-tool error capture. ONLY the tool call itself is inside this try:
     // once the tool has returned (possibly after a write), nothing below may report it as failed.
     let result: Record<string, unknown> | undefined;
     try {
       result = tier0.names.has(name)
         ? await tier0.execute(name, args)
-        : (await deps.runMcpTool(name, args, { userEmail: opts.userEmail })).result;
+        : (await deps.runMcpTool(name, args, {
+            userEmail: opts.userEmail,
+            ...(opts.vaultEmail && VAULT_GROUNDED_TOOLS.has(name) ? { vaultEmail: opts.vaultEmail } : {}),
+          })).result;
     } catch (err) {
       const latencyMs = Date.now() - started;
       console.error(`[chat] tool ${name} failed:`, err);

@@ -15,12 +15,16 @@
  * render as a small footer under that bubble.
  */
 
+import { customerErrorMessage, CUSTOMER_ERROR_MESSAGES } from '@/lib/chat/customer-errors';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Menu, MessageCircle, BookOpen, Lock, FileText } from 'lucide-react';
+import { Menu, MessageCircle, BookOpen, Lock, FileText, X } from 'lucide-react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 import { UpgradeModal } from '../UpgradeModal';
 import { DEFAULT_STARTER_PROMPTS } from '@/lib/chat/starter-prompts';
+import { renderSafeMarkdown } from '@/lib/chat/safe-markdown';
+import { startProposalFromNotice } from '@/lib/chat/start-proposal';
+import { CHAT_HANDOFF_KEY, parseChatHandoff, opportunityContextField, type AttachedOpportunity } from '@/lib/chat/chat-handoff';
 
 interface MindyChatPanelProps {
   email: string | null;
@@ -36,6 +40,17 @@ interface CitedSource {
   // Set for internal docs (course_material etc) — opens the doc in
   // the inline drawer instead of navigating to an external URL.
   document_id: string | null;
+}
+
+/**
+ * Where a citation chip goes. A Knowledge Base doc opens the KB; a SAM.gov notice (doc_type 'sam_notice') is
+ * NEVER a KB doc, even when an older saved answer carries its notice id in document_id: it opens its SAM.gov
+ * link (review on #2106: the chip opened the Knowledge Base on a non-KB id).
+ */
+export function citationTarget(c: Pick<CitedSource, 'doc_type' | 'url' | 'document_id'>): 'kb' | 'url' | 'none' {
+  if (c.document_id && c.doc_type !== 'sam_notice') return 'kb';
+  if (c.url) return 'url';
+  return 'none';
 }
 
 interface ChatMessage {
@@ -55,13 +70,40 @@ interface ChatMessage {
 // mindy_chat_messages still have them. Cleaning at render keeps the
 // chat history readable without a backfill migration. Also collapses
 // any trailing space or double-space the strip leaves behind.
-function renderMessageContent(content: string) {
+export function renderMessageContent(content: string, asMarkdown = false) {
   const cleaned = content
     .replace(/\s*\[→\s*[^\]]+\]\s*/g, ' ')
     .replace(/ {2,}/g, ' ')
     .replace(/ ([.,;:!?])/g, '$1');
-  return <span className="whitespace-pre-wrap">{cleaned}</span>;
+  if (!asMarkdown) return <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">{cleaned}</span>;
+  // Assistant answers: the shared SAFE renderer (src/lib/chat/safe-markdown.ts) HTML-escapes the model text
+  // first and only then writes its own markup for a small markdown subset (http(s) links only), so this
+  // innerHTML never contains unescaped model text. Before 2026-11-15 the raw **, ###, - and [text](url)
+  // showed literally.
+  return (
+    <div
+      className={MD_CLASSES}
+      dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(cleaned) }}
+    />
+  );
 }
+
+const MD_CLASSES = [
+  'mindy-md [overflow-wrap:anywhere] break-words',
+  '[&_p]:my-0 [&_p+p]:mt-2.5 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_li>ul]:my-1',
+  '[&_strong]:font-semibold [&_strong]:text-slate-50 [&_em]:italic',
+  '[&_.md-h]:font-semibold [&_.md-h]:text-slate-50 [&_.md-h]:mt-3 [&_.md-h]:mb-1 [&_.md-h:first-child]:mt-0 [&_.md-h1]:text-[16px] [&_.md-h2]:text-[15px] [&_.md-h3]:text-[14.5px]',
+  '[&_a]:text-purple-300 [&_a]:underline [&_a]:underline-offset-2 hover:[&_a]:text-purple-200 [&_a]:break-words',
+  '[&_code]:font-mono [&_code]:text-[13px] [&_code]:bg-white/5 [&_code]:rounded [&_code]:px-1',
+  // GFM tables (e.g. Coming back recompetes): scroll sideways on narrow screens instead of overflowing.
+  '[&_.md-table]:my-3 [&_.md-table]:overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_table]:text-[13px]',
+  '[&_th]:text-left [&_th]:font-semibold [&_th]:text-slate-100 [&_th]:border-b [&_th]:border-white/15 [&_th]:px-2 [&_th]:py-1.5 [&_th]:whitespace-nowrap',
+  '[&_td]:border-b [&_td]:border-white/5 [&_td]:px-2 [&_td]:py-1.5 [&_td]:align-top',
+  // Narrow panel: cells and the links in them wrap at word boundaries only (the container's
+  // overflow-wrap:anywhere broke holder names mid-word); the value column stays on one line; every
+  // column stays visible at panel width. 2026-11-16.
+  '[&_td]:[overflow-wrap:normal] [&_td]:[word-break:normal] [&_td_a]:![overflow-wrap:normal] [&_td_a]:![word-break:normal] [&_td:first-child]:min-w-[8rem] [&_td:nth-child(2)]:whitespace-nowrap',
+].join(' ');
 
 export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -75,6 +117,10 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
   const [showUpgrade, setShowUpgrade] = useState(false);
   const isFree = tier === 'free';
   const [sessionId, setSessionId] = useState<string | null>(null);
+  // The opportunity this conversation is about (from the Map drawer's "Open in full workspace"). Shown as a
+  // removable chip; only its id is sent.
+  const [attachedOpp, setAttachedOpp] = useState<AttachedOpportunity | null>(null);
+  const [proposalState, setProposalState] = useState<'idle' | 'working' | 'failed'>('idle');
   // Conversation history sidebar.
   const [sessions, setSessions] = useState<Array<{ id: string; title: string | null; message_count: number; updated_at: string }>>([]);
   const [loadingSession, setLoadingSession] = useState(false);
@@ -171,6 +217,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
           message: text,
           sessionId: sessionId || undefined,
           history: historyForServer,
+          ...opportunityContextField(attachedOpp),
         }),
         signal: controller.signal,
       });
@@ -184,8 +231,14 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
         return;
       }
       if (!res.ok || !res.body) {
-        const errBody = await res.text().catch(() => '');
-        throw new Error(`Chat ${res.status}: ${errBody.slice(0, 200) || 'no response body'}`);
+        // B2: the response body is never shown (it can carry server or provider detail).
+        console.error('[MindyChat] chat request failed', res.status);
+        setMessages(prev => prev.map(m =>
+          m.id === assistantMsg.id
+            ? { ...m, content: customerErrorMessage('service_unavailable'), errored: true, isStreaming: false }
+            : m
+        ));
+        return;
       }
 
       const reader = res.body.getReader();
@@ -224,7 +277,8 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
             } else if (evt.type === 'error') {
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id
-                  ? { ...m, content: m.content || `Sorry — ${evt.message || 'something broke'}.`, errored: true, isStreaming: false }
+                  // B2: only messages from the fixed customer-safe table are displayed verbatim.
+                  ? { ...m, content: m.content || (CUSTOMER_ERROR_MESSAGES.includes(evt.message) ? evt.message : customerErrorMessage('answer_unavailable')), errored: true, isStreaming: false }
                   : m
               ));
             } else if (evt.type === 'done') {
@@ -255,10 +309,10 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
           .catch(() => { /* no chips on failure */ });
       }
     } catch (err) {
-      const errMsg = (err as Error)?.message || 'Stream failed';
+      console.error('[MindyChat] stream failed', err);
       setMessages(prev => prev.map(m =>
         m.id === assistantMsg.id
-          ? { ...m, content: m.content || `Couldn't reach Mindy: ${errMsg}`, errored: true, isStreaming: false }
+          ? { ...m, content: m.content || customerErrorMessage('connection_failed'), errored: true, isStreaming: false }
           : m
       ));
     } finally {
@@ -266,7 +320,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
       abortRef.current = null;
       inputRef.current?.focus();
     }
-  }, [email, isStreaming, messages, sessionId, isFree]);
+  }, [email, isStreaming, messages, sessionId, isFree, attachedOpp]);
 
   // --- Conversation history ----------------------------------------
   const loadSessions = useCallback(async () => {
@@ -312,6 +366,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
   const startNewChat = useCallback(() => {
     setMessages([]);
     setSessionId(null);
+    setAttachedOpp(null);
     inputRef.current?.focus();
   }, []);
 
@@ -352,6 +407,40 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
       setTimeout(() => sendMessage(seed!.trim()), 50);
     }
   }, [email, sendMessage]);
+
+  // Map drawer handoff ("Open in full workspace"): continue that conversation and keep its attached notice.
+  // Read once, never auto-sends. The session is loaded through the owner-checked chat-sessions API.
+  const handoffHandledRef = useRef(false);
+  useEffect(() => {
+    if (handoffHandledRef.current || !email) return;
+    handoffHandledRef.current = true;
+    let raw: string | null = null;
+    try {
+      raw = sessionStorage.getItem(CHAT_HANDOFF_KEY);
+      if (raw) sessionStorage.removeItem(CHAT_HANDOFF_KEY);
+    } catch { /* sessionStorage unavailable */ }
+    const h = parseChatHandoff(raw);
+    if (!h) return;
+    if (h.opportunity) setAttachedOpp(h.opportunity);
+    if (h.sessionId) openSession(h.sessionId);
+    inputRef.current?.focus();
+  }, [email, openSession]);
+
+  // "Start a proposal" (user click only): track the attached notice, make sure its documents are fetched,
+  // and open Proposals on that pursuit. See src/lib/chat/start-proposal.ts.
+  const startProposal = useCallback(async () => {
+    if (!email || !attachedOpp || proposalState === 'working') return;
+    setProposalState('working');
+    const r = await startProposalFromNotice(
+      (url, init) => authedFetch(url, email, init),
+      email,
+      { notice_id: attachedOpp.notice_id, title: attachedOpp.title, deadline: attachedOpp.deadline },
+    );
+    if (!r.ok) { setProposalState('failed'); return; }
+    setProposalState('idle');
+    if (onPanelChange) onPanelChange('proposals', { pursuit_id: r.pursuitId });
+    else window.location.href = r.href;
+  }, [email, attachedOpp, proposalState, onPanelChange]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Enter sends; Shift+Enter inserts a newline (Claude-style). Cmd/Ctrl+Enter still sends.
@@ -544,7 +633,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                   )}
                   <div className={`text-[14.5px] leading-relaxed ${msg.errored ? 'text-red-300' : msg.role === 'user' ? 'text-slate-100' : 'text-slate-200'}`}>
                     {msg.content
-                      ? renderMessageContent(msg.content)
+                      ? renderMessageContent(msg.content, msg.role === 'assistant' && !msg.errored)
                       : msg.isStreaming
                         ? <span className="text-faint italic">Thinking…</span>
                         : null}
@@ -560,7 +649,8 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                           // lands on the real, searchable doc — not a dead end.
                           // Falls back to the inline drawer if navigation isn't
                           // wired.
-                          if (c.document_id) {
+                          const target = citationTarget(c);
+                          if (target === 'kb' && c.document_id) {
                             return (
                               <button
                                 key={i}
@@ -575,7 +665,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                             );
                           }
                           // External URL (podcast libsyn) — open in new tab
-                          if (c.url) {
+                          if (target === 'url' && c.url) {
                             return (
                               <a
                                 key={i}
@@ -639,6 +729,31 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
       {/* Input */}
       <div className="px-6 py-4 border-t border-surface bg-ground-deep shrink-0">
         <div className="max-w-3xl mx-auto">
+          {attachedOpp && (
+            <div data-testid="attached-opp" className="mb-2 flex items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-1.5 text-[12.5px] text-purple-100">
+              <span className="text-faint shrink-0">Asking about</span>
+              <span className="font-medium truncate" title={attachedOpp.title}>{attachedOpp.title || 'this opportunity'}</span>
+              {attachedOpp.deadline && <span className="text-faint shrink-0">· due {attachedOpp.deadline.slice(0, 10)}</span>}
+              <button
+                type="button"
+                onClick={startProposal}
+                disabled={proposalState === 'working'}
+                title="Saves this opportunity to My Pursuits, then opens Proposals"
+                className="ml-auto shrink-0 rounded-md border border-purple-400/40 px-2 py-0.5 text-[11.5px] font-medium text-purple-100 hover:bg-purple-500/20 disabled:opacity-60"
+              >
+                {proposalState === 'working' ? 'Starting…' : proposalState === 'failed' ? 'Try again' : 'Start a proposal'}
+                <span className="block text-[10px] font-normal text-faint">Saves to My Pursuits</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAttachedOpp(null); setProposalState('idle'); }}
+                aria-label="Remove this opportunity from the question"
+                className="shrink-0 rounded p-0.5 text-faint hover:text-white"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
           <div className="relative">
             <textarea
               ref={inputRef}

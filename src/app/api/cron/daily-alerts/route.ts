@@ -58,6 +58,7 @@ import { loadVaultEligibility, type VaultEligibilityMap } from '@/lib/market/vau
 import { MINDY_APP_URL, MINDY_SITE_URL, mindyDashboardUrlFor } from '@/lib/mindy/email-branding';
 import { computeTodaysLens, type TodaysLens } from '@/lib/dashboard/todays-lens';
 import { renderTodaysLensEmailBlock } from '@/lib/alerts/todays-lens-email';
+import { isInternalTestAccount } from '@/lib/mindy/campaign-exclusions';
 
 export const maxDuration = 300;
 
@@ -433,6 +434,9 @@ async function runDailyAlertJob(options?: {
       console.error('[Daily Alerts] Error fetching users:', usersError);
       return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
     }
+    // Internal test accounts never receive the scheduled customer alert. An explicit
+    // ?testEmail= run still reaches them, so the team can QA the email on purpose.
+    if (!options?.testEmail) users = users.filter((u) => !isInternalTestAccount(u.user_email));
 
     if (!users || users.length === 0) {
       console.log('[Daily Alerts] No daily alert users found');

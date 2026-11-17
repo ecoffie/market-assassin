@@ -1,0 +1,399 @@
+{
+ "_source": "find_opportunities {query:\"janitorial services\",location:\"Florida\"} coming_back, 2026-11-16; competition from each award USASpending record (public data)",
+ "summary": {
+  "open_now": {
+   "status": "grounded",
+   "matched_count": 8
+  },
+  "coming_back": {
+   "status": "grounded",
+   "matched_count": 80,
+   "direct_match": 44,
+   "related_market_candidate": 36,
+   "holder_signal": 0
+  },
+  "coming_soon": {
+   "status": "empty",
+   "matched_count": 0
+  },
+  "headline": "8 open now (1 direct · 7 related-market) · 80 coming back (44 direct · 36 related-market) · 0 coming soon",
+  "claim_hygiene": "Related-market rows are labeled RELATED_MARKET_CANDIDATE and are not confirmed capability demand. Counts are per-horizon matches under this query — not unique procurements across horizons. Do not call combined raw rows unique opportunities. Do not count RELATED_MARKET_CANDIDATE as confirmed “janitorial services” demand."
+ },
+ "items": [
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "ALLY FACILITY SOLUTIONS, INC.",
+   "description": "KITCHEN DEEP CLEANING SERVICES",
+   "value_label": "$148K",
+   "potential_total_value": 148045.26,
+   "current_end": "2026-11-18",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_36C24825P1801_3600_-NONE-_-NONE-",
+   "set_aside_type": "Full & Open",
+   "competition": {
+    "class": "not_competed",
+    "label": "Not competed"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "DAMMEL CLEANING ENTERPRISE INC",
+   "description": "JANITORIAL AND GROUNDSKEEPING SERVICES FOR THE WEST PALM BEACH SSC, AIR TRAFFIC CONTROL TOWER.",
+   "value_label": "$763K",
+   "potential_total_value": 763312.84,
+   "current_end": "2026-11-30",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_697DCK22C00334_6920_-NONE-_-NONE-",
+   "set_aside_type": "SB-Total",
+   "competition": {
+    "class": "competed",
+    "label": "Competed · SB set-aside"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "CARC-ADVOCATES FOR CITIZENS WITH DISABILITIES, INC.",
+   "description": "THIS IS A JANITORIAL SERVICES CONTRACT FOR USDA APHIS VS, GAINESVILLE FL OFFICE PERFORMANCE IS REQUIRED AS PER THE SOW. BASE    - 12/01/2021 - 11/30/2022 OP YR 1 - 12/01/2022 - 11/30/2023 OP YR 2 - 12/01/2023 - 11/30/2024 OP YR 3 - 12/01/2024 -",
+   "value_label": "$217K",
+   "potential_total_value": 217316.58,
+   "current_end": "2026-11-30",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_12639522C0010_12K3_-NONE-_-NONE-",
+   "set_aside_type": "Full & Open",
+   "competition": {
+    "class": "competed",
+    "label": "Competed"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "GLOBAL CONNECTIONS TO EMPLOYMENT, INC.",
+   "description": "CUSTODIAL SERVICES AT THE ARMED FORCES RETIREMENT HOME LOCATED IN GULFPORT, MS",
+   "value_label": "$9.6M",
+   "potential_total_value": 9579353.19,
+   "current_end": "2026-11-30",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_140D0426C9408_1406_-NONE-_-NONE-",
+   "set_aside_type": null,
+   "competition": {
+    "class": "not_competed",
+    "label": "Not competed · AbilityOne"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "FORTAZO CORP.",
+   "description": "MRG SFD JANITORIAL",
+   "value_label": "$139K",
+   "potential_total_value": 138572.76,
+   "current_end": "2026-12-10",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_140R4024P0007_1425_-NONE-_-NONE-",
+   "set_aside_type": "SB-Total",
+   "competition": {
+    "class": "competed",
+    "label": "Competed · SB set-aside"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "GLOBAL CONNECTIONS TO EMPLOYMENT, INC.",
+   "description": "CUSTODIAL SERVICES FOR THE WASHINGTON DC CAMPUS",
+   "value_label": "$7.6M",
+   "potential_total_value": 7576925.15,
+   "current_end": "2026-12-31",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_140D0426C9407_1406_-NONE-_-NONE-",
+   "set_aside_type": null,
+   "competition": {
+    "class": "not_competed",
+    "label": "Not competed · AbilityOne"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "GULFSTREAM GOODWILL INDUSTRIES, INC.",
+   "description": "MOWING, JANITORIAL AND RECYCLING",
+   "value_label": "$15.4M",
+   "potential_total_value": 15371862.58,
+   "current_end": "2026-12-31",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_W912EP22C0005_9700_-NONE-_-NONE-",
+   "set_aside_type": "Full & Open",
+   "competition": {
+    "class": "not_competed",
+    "label": "Not competed · AbilityOne"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "GLOBAL CONNECTIONS TO EMPLOYMENT, INC.",
+   "description": "AWARD FOR JANITORIAL AND MESS SERVICES AT AIR STATION CLEARWATER.",
+   "value_label": "$4.2M",
+   "potential_total_value": 4165683.56,
+   "current_end": "2026-12-31",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_70Z08423CDL930010_7008_-NONE-_-NONE-",
+   "set_aside_type": "Full & Open",
+   "competition": {
+    "class": "not_competed",
+    "label": "Not competed · AbilityOne"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "NASCENCE GROUP LLC",
+   "description": "PROVIDE ALL PERSONNEL, TOOLS, MATERIALS, AND SUPERVISION FOR FACILITIES JANITORIAL SERVICES FOR MULTIPLE FEDERAL AVIATION ADMINISTRATION (FAA) FACILITIES IN THE FLORIDA AREA OF THE JACKSONVILLE DISTRICT",
+   "value_label": "$924K",
+   "potential_total_value": 924468,
+   "current_end": "2027-02-28",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_697DCK25C00052_6920_-NONE-_-NONE-",
+   "set_aside_type": "SB-Total",
+   "competition": {
+    "class": "competed",
+    "label": "Competed · SB set-aside"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "GLOBAL CONNECTIONS TO EMPLOYMENT, INC.",
+   "description": "JANITORIAL/CUSTODIAL SERVICES - NEW PORT RICHEY (NPR) CBOC",
+   "value_label": "$3.3M",
+   "potential_total_value": 3310930.72,
+   "current_end": "2027-03-14",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_36C24824C0036_3600_-NONE-_-NONE-",
+   "set_aside_type": "Full & Open",
+   "competition": {
+    "class": "not_competed",
+    "label": "Not competed · AbilityOne"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "GENCO GENERAL CONTRACTORS OF PUERTO RICO CORP.",
+   "description": "JANITORIAL SERVICES NATIONAL MARINE CENTER",
+   "value_label": "$1.0M",
+   "potential_total_value": 1026001.73,
+   "current_end": "2027-03-31",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_70B02C23P00000103_7014_-NONE-_-NONE-",
+   "set_aside_type": "8(a)",
+   "competition": {
+    "class": "not_competed",
+    "label": "8(a) sole source"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "THE RIGHT 2 WORK CORPORATION",
+   "description": "JANITORIAL SERVICES AT MAIN FACILITY BUILDING, ALL OUTLYING BUILDINGS AND TRAILERS AT THE JACKSONVILLE AIR TRAFFIC CONTROL CENTER IN HILLIARD, FLORIDA.",
+   "value_label": "$3.9M",
+   "potential_total_value": 3919725.71,
+   "current_end": "2027-03-31",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_697DCK21C00331_6920_-NONE-_-NONE-",
+   "set_aside_type": "Full & Open",
+   "competition": {
+    "class": "not_competed",
+    "label": "Not competed · AbilityOne"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "VIP SPECIAL SERVICES LLC",
+   "description": "WINDOW WASHING BAY PINES VAMC AND LEE COUNTY HCC",
+   "value_label": "$784K",
+   "potential_total_value": 784100,
+   "current_end": "2027-03-31",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_36C24822P0878_3600_-NONE-_-NONE-",
+   "set_aside_type": "SDVOSB",
+   "competition": {
+    "class": "competed",
+    "label": "Competed · SDVOSB"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "GOODWILL INDUSTRIES OF SOUTH FLORIDA INC",
+   "description": "JANITORIAL AND MESS ATTENDANT SERVICES AIRSTATION MIAMI, OPA LOCKA FL",
+   "value_label": "$3.6M",
+   "potential_total_value": 3626319.53,
+   "current_end": "2027-03-31",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_70Z08423CDL930011_7008_-NONE-_-NONE-",
+   "set_aside_type": "Full & Open",
+   "competition": {
+    "class": "not_competed",
+    "label": "Not competed · AbilityOne"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "GOODWILL INDUSTRIES OF SOUTH FLORIDA INC",
+   "description": "JANITORIAL CONTRACT FOR CLEANING THE MIAMI PORT OFFICE",
+   "value_label": "$200K",
+   "potential_total_value": 199559.05,
+   "current_end": "2027-03-31",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_12639522C0035_12K3_-NONE-_-NONE-",
+   "set_aside_type": "Full & Open",
+   "competition": {
+    "class": "not_competed",
+    "label": "Not competed · AbilityOne"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "TRAINING, REHABILITATION, & DEVELOPMENT INSTITUTE, INC.",
+   "description": "CUSTODIAL SERVICES",
+   "value_label": "$5.0M",
+   "potential_total_value": 4964392.69,
+   "current_end": "2027-04-30",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_FA441725C0004_9700_-NONE-_-NONE-",
+   "set_aside_type": "Full & Open",
+   "competition": {
+    "class": "not_competed",
+    "label": "Not competed · AbilityOne"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "BYRD ENTERPRISES UNLIMITED INC",
+   "description": "SED-828 - JANITORIAL SERVICES AT BARRANCAS NATIONAL CEMETERY",
+   "value_label": "$130K",
+   "potential_total_value": 130289.21,
+   "current_end": "2027-05-14",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_36C78625C50275_3600_-NONE-_-NONE-",
+   "set_aside_type": "SDVOSB",
+   "competition": {
+    "class": "not_competed",
+    "label": "Not competed"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "MCKENZIE'S CLEANING INC",
+   "description": "JANITORIAL CLEANING SERVICES",
+   "value_label": "$1.2M",
+   "potential_total_value": 1231737.75,
+   "current_end": "2027-05-31",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_W912EP24C0013_9700_-NONE-_-NONE-",
+   "set_aside_type": null,
+   "competition": {
+    "class": "not_competed",
+    "label": "8(a) sole source"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "GOODWILL INDUSTRIES OF SOUTH FLORIDA INC",
+   "description": "THE SERVICE REQUIREMENT INCLUDES PROVIDING NON-PERSONAL SERVICES, TO INCLUDE ALL MANAGEMENT, TOOLS, EQUIPMENT, SUPPLIES AND LABOR NECESSARY TO ENSURE THAT CUSTODIAL SERVICES ARE PERFORMED AT HOMESTEAD AIR RESERVE BASE IN A MANNER THAT WILL MAINTAIN.",
+   "value_label": "$882K",
+   "potential_total_value": 881962.08,
+   "current_end": "2027-05-31",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_FA664826C0003_9700_-NONE-_-NONE-",
+   "set_aside_type": null,
+   "competition": {
+    "class": "not_competed",
+    "label": "Not competed · AbilityOne"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "KRA-CRJ JV INC",
+   "description": "JANITORIAL/CUSTODIAL SERVICES FOR GULF ECOSYSTEM MODELING AND MEASUREMENT DIVISION (GEMMD) CENTER FOR ENVIRONMENTAL MEASUREMENT AND MONITORING (CEMM) FACILITY.",
+   "value_label": "$877K",
+   "potential_total_value": 876965.06,
+   "current_end": "2027-05-31",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_68HERC23C0047_6800_-NONE-_-NONE-",
+   "set_aside_type": "8(a)",
+   "competition": {
+    "class": "not_competed",
+    "label": "8(a) sole source"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "HEAVENLY HEARTS CLEANING SERVICES, INC",
+   "description": "JANITORIAL SERVICES",
+   "value_label": "$712K",
+   "potential_total_value": 711824.5,
+   "current_end": "2027-05-31",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_W912EP24C0012_9700_-NONE-_-NONE-",
+   "set_aside_type": null,
+   "competition": {
+    "class": "not_competed",
+    "label": "8(a) sole source"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "HEAVENLY HEARTS CLEANING SERVICES, INC",
+   "description": "81ST RD FLORIDA MUNICIPAL SERVICES,  JANITORIAL SERVICES AND GROUNDS MAINTENANCE",
+   "value_label": "$1.7M",
+   "potential_total_value": 1682413.5,
+   "current_end": "2027-06-13",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_W912HP25CA001_9700_-NONE-_-NONE-",
+   "set_aside_type": null,
+   "competition": {
+    "class": "not_competed",
+    "label": "8(a) sole source"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "YELLOWSTONE ENTERPRISES LLC",
+   "description": "JANITORIAL SERVICES",
+   "value_label": "$228K",
+   "potential_total_value": 227900,
+   "current_end": "2027-06-30",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_36C78624C50357_3600_-NONE-_-NONE-",
+   "set_aside_type": "Full & Open",
+   "competition": {
+    "class": "not_competed",
+    "label": "Not competed"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "SMA HEALTHCARE, INC",
+   "description": "CUSTODIAL SERVICES",
+   "value_label": "$5.0M",
+   "potential_total_value": 5033763.92,
+   "current_end": "2027-06-30",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_36C24824P1096_3600_-NONE-_-NONE-",
+   "set_aside_type": "Full & Open",
+   "competition": {
+    "class": "not_competed",
+    "label": "Not competed · AbilityOne"
+   }
+  },
+  {
+   "evidence_class": "DIRECT_MATCH",
+   "incumbent_name": "CITADEL FEDERAL SOLUTIONS LLC",
+   "description": "JANITORIAL SERVICES FOR BAY PINES NATIONAL CEMETERY.",
+   "value_label": "$216K",
+   "potential_total_value": 216000,
+   "current_end": "2027-06-30",
+   "location_label": "FL",
+   "contract_id": "CONT_AWD_36C78624C50317_3600_-NONE-_-NONE-",
+   "set_aside_type": "SDVOSB",
+   "competition": {
+    "class": "competed",
+    "label": "Competed · SDVOSB"
+   }
+  }
+ ]
+}

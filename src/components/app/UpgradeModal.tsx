@@ -13,7 +13,8 @@ import { X, Check, Sparkles } from 'lucide-react';
  * of a silent disabled button, we show what that feature does + the Pro value + a
  * direct checkout CTA. Feature-aware: the headline names what they just clicked.
  *
- * Routes through /checkout/mindy-pro-monthly so purchase attribution is captured.
+ * Routes through /checkout/mindy-pro-monthly (the 14-day free-trial link since 2026-11-16) so
+ * purchase attribution is captured.
  */
 
 // What each locked panel unlocks — the one-line pitch shown when a free user
@@ -108,8 +109,8 @@ export function UpgradeModal({
           </ul>
 
           <div className="mt-6 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-white">{isTeamUpsell ? '$499' : '$149'}</span>
-            <span className="text-sm text-muted">/mo — cancel anytime</span>
+            <span className="text-3xl font-black text-white">$0 today</span>
+            <span className="text-sm text-muted">then {isTeamUpsell ? '$499' : '$149'}/mo after 14 days — cancel anytime</span>
           </div>
 
           {isTeamUpsell ? (
@@ -118,7 +119,7 @@ export function UpgradeModal({
               onClick={() => onCtaClick?.('team')}
               className="mt-4 block w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3 text-center font-semibold text-white shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] hover:from-blue-500 hover:to-indigo-500"
             >
-              Upgrade to Teams — manage clients →
+              Try Teams free for 14 days →
             </Link>
           ) : (
             <Link
@@ -126,7 +127,7 @@ export function UpgradeModal({
               onClick={() => onCtaClick?.('monthly')}
               className="mt-4 block w-full rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 py-3 text-center font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:scale-[1.02] hover:from-purple-500 hover:to-blue-500"
             >
-              Go Pro — unlock everything →
+              Start 14-day free trial →
             </Link>
           )}
           <NoRefundNote className="text-muted" />

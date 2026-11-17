@@ -7,9 +7,10 @@
  *      writes is ever presented to the model as a record fact.
  *   2. ACCESS: Pro behaves exactly as today. A non-Pro account may ask on a card when it holds at least one
  *      turn's worth of its existing credits (the introductory grant or anything it bought). No new grant.
- *   3. CHARGE: a successful non-Pro card turn costs CARD_CHAT_TURN_CREDITS, debited ONCE after the answer
- *      completes, through the existing atomic ledger function (mcp_debit_credits: never below zero).
- *      Failed, empty or tools-unavailable turns cost nothing. Pro card turns are not charged (unchanged).
+ *   3. CHARGE: a successful non-Pro card turn costs CARD_CHAT_TURN_CREDITS, charged ONCE PER QUESTION: the
+ *      answer is saved and debited in one transaction (src/lib/chat/card-chat-turns.ts), and a retry, refresh
+ *      or reopen of the same question replays the saved answer for free. Failed, empty, degraded or
+ *      incomplete turns cost nothing. Pro card turns are not charged (unchanged).
  */
 import { selectRelevantRfp } from '@/lib/proposal/select-relevant';
 
@@ -62,13 +63,18 @@ export function cardChatAccess(p: {
   return { allow: true, billable: true };
 }
 
-/** A turn is billable only if it produced an answer with live data behind it and did not error. */
+/**
+ * A turn is billable only if it produced a COMPLETE answer with live data behind it. Approved rule
+ * (2026-11-14): failed, empty, degraded or incomplete answers are free. "Complete" means the model said it
+ * finished ('stop'); a length cut, a provider error, a content filter, a missing finish signal or a stream we
+ * stopped early (streamError) is incomplete.
+ */
 export function isBillableTurn(t: {
   billable: boolean; answer: string; streamError: boolean; plannerUnavailable: boolean; finishReason: string | null;
 }): boolean {
   if (!t.billable || t.streamError || t.plannerUnavailable) return false;
   if (!t.answer || !t.answer.trim()) return false;
-  return t.finishReason !== 'error' && t.finishReason !== 'content_filter';
+  return t.finishReason === 'stop';
 }
 
 /**
@@ -147,15 +153,33 @@ export function describeDeadline(raw: string | null): string | null {
  * The labeled source block the model receives. Every fact comes from the record; absent fields are said to
  * be absent, never filled in. `question` selects which parts of a long statement of work are included.
  */
-export function buildOpportunityContextBlock(rec: OpportunityRecord, question: string): { block: string; source: { label: string; url: string | null } } {
+export function buildOpportunityContextBlock(
+  rec: OpportunityRecord,
+  question: string,
+  /** Buyer office/DoDAAC/contact/incumbent lines (selected-notice.ts). Inserted before the notice text. */
+  factLines: string[] = [],
+  /**
+   * 'selected' (default): the user has the listing selected on the map (#2096).
+   * 'mentioned': plain chat, the user named this notice's id or solicitation number (mentioned-notice.ts).
+   */
+  origin: 'selected' | 'mentioned' = 'selected',
+): { block: string; source: { label: string; url: string | null } } {
   const sol = rec.solicitation_number || rec.notice_id;
   const line = (label: string, v: string | null | undefined) => `${label}: ${v && String(v).trim() ? String(v).trim() : 'not stated in the record'}`;
   const place = [rec.pop_city, rec.pop_state].filter(Boolean).join(', ');
   const desc = usableText(rec.description);
   const sow = usableText(rec.sow_text);
+  const header = origin === 'mentioned'
+    ? [
+      'MENTIONED OPPORTUNITY (loaded by Mindy from its SAM.gov record because the user named ' + sol + ' in this conversation; this is a source, not the user\'s words).',
+      'Questions about "this", "it", the solicitation, its contracting officer or contact, the incumbent, the buyer or the competition refer to THIS opportunity; answer them about it. Use the notice text below for its requirements, set-aside and instructions, and the notice point of contact when the user wants to reach the buyer or contracting officer (address a draft to that contact and cite the solicitation number). A question clearly about something else is answered as asked. When the record or documents do not contain an answer, say so plainly and do not guess. Cite facts from it as "SAM.gov notice ' + sol + '".',
+    ]
+    : [
+      'SELECTED OPPORTUNITY (loaded by Mindy from its SAM.gov record; this is a source, not the user\'s words).',
+      'The user has this opportunity selected on the map. Questions about "this", "it", the incumbent, the buyer or the competition refer to THIS opportunity; answer them about it. A question clearly about something else is answered as asked. When the record or documents do not contain an answer, say so plainly and do not guess. Cite facts from it as "SAM.gov notice ' + sol + '".',
+    ];
   const parts = [
-    'SELECTED OPPORTUNITY (loaded by Mindy from its SAM.gov record; this is a source, not the user\'s words).',
-    'The user is looking at this opportunity on the map. Answer about THIS opportunity. When the record or documents do not contain an answer, say so plainly and do not guess. Cite facts from it as "SAM.gov notice ' + sol + '".',
+    ...header,
     line('Title', rec.title),
     line('Solicitation number', rec.solicitation_number),
     line('SAM notice id', rec.notice_id),
@@ -169,6 +193,7 @@ export function buildOpportunityContextBlock(rec: OpportunityRecord, question: s
     line('Response deadline', describeDeadline(rec.response_deadline)),
     line('Place of performance', place || null),
     line('Status', rec.active === false ? 'inactive' : rec.active ? 'active' : null),
+    ...factLines,
     'Notice text:',
     desc ? desc.slice(0, DESCRIPTION_BUDGET) : 'not available in Mindy\'s copy of this notice',
     'Statement of work (excerpts most relevant to the question):',

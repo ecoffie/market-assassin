@@ -3,7 +3,7 @@
  * tool arguments. One test per demonstrated failure (independent reviews 2026-11-14).
  */
 import { describe, it, expect } from 'vitest';
-import { compileIntent, enforceIntent } from './intent-compiler';
+import { compileIntent, enforceIntent, isMapScopeNote, splitViewPreamble } from './intent-compiler';
 
 const NOW = new Date('2026-11-14T03:30:00Z'); // 10:30 PM Eastern on 2026-11-13
 const enforce = (tool: string, args: Record<string, unknown>, text: string) => {
@@ -154,5 +154,70 @@ describe('acc7 R4: buying-office calls that differ only by the default radius', 
       { id: '2', name: 'get_buying_offices', args: JSON.stringify({ state: 'TN', city: 'Memphis', naics: '561320', metro_radius_miles: 0 }) },
     ]);
     expect(r.keep.map((k) => k.id)).toEqual(['1', '2']);
+  });
+});
+
+describe('map-view preamble states (2026-11-15)', () => {
+  const VIEW = '[Current map view \u2014 853+ Open Now opps in view. Location: the map area is in VA, MD, PA (plotted pins in view, most first: VA 312, MD 140, PA 90). Answer for THIS view ...]\n\n';
+
+  it('states from the view preamble are the MAP\'s, not the customer\'s words', () => {
+    const c = compileIntent(`${VIEW}Which agencies buy the most in this view?`);
+    expect(c.explicitStates).toEqual([]);
+    expect([...c.viewStates].sort()).toEqual(['MD', 'PA', 'VA']);
+    expect(c.viewStateSource).toBe('map_area');
+  });
+  it('a map state filter is reported as the filter', () => {
+    const c = compileIntent('[Current map view \u2014 40 Open Now opps in view; CA. Location: the map is filtered to CA. Answer ...]\n\nWho buys here?');
+    expect(c).toMatchObject({ explicitStates: [], viewStates: ['CA'], viewStateSource: 'map_filter' });
+  });
+  it('a state the customer typed wins over the map', () => {
+    const c = compileIntent(`${VIEW}Show me janitorial work in Texas instead`);
+    expect(c).toMatchObject({ explicitStates: ['TX'], viewStates: [], viewStateSource: null });
+  });
+  it('enforced notes say where the scope came from', () => {
+    const map = enforceIntent('search_sam_opportunities', '{"keyword":"janitorial"}', compileIntent(`${VIEW}Janitorial work here?`));
+    expect(JSON.parse(map.args).state.split(',').sort()).toEqual(['MD', 'PA', 'VA']);
+    expect(map.applied).toEqual(['scoped to the states on your map: VA, MD, PA']);
+    expect(map.applied.join(' ')).not.toMatch(/from your request/);
+    expect(isMapScopeNote(map.applied[0])).toBe(true);
+    const filt = enforceIntent('search_sam_opportunities', '{"keyword":"janitorial"}', compileIntent('[Current map view \u2014 40 opps in view; CA. Location: the map is filtered to CA. Answer ...]\n\nJanitorial work here?'));
+    expect(filt.applied).toEqual(["scoped to your map's state filter: CA"]);
+    const typed = enforceIntent('search_sam_opportunities', '{"keyword":"janitorial"}', compileIntent('Janitorial work in TN, MS or AR'));
+    expect(typed.applied).toEqual(['states AR, MS, TN from your request']);
+    expect(isMapScopeNote(typed.applied[0])).toBe(false);
+  });
+  it('a message without the preamble is unaffected', () => {
+    expect(splitViewPreamble('Which agencies buy the most?')).toEqual({ view: null, rest: 'Which agencies buy the most?' });
+  });
+});
+
+describe('map industry filter in the view preamble (2026-11-15 follow-up)', () => {
+  const VIEW_NAICS = '[Current map view — 40 Open Now opps in view; NAICS 236220. Location: the map is filtered to CA. Answer ...]\n\n';
+
+  it('NAICS from the map filter is the MAP\'s, not the customer\'s', () => {
+    const c = compileIntent(`${VIEW_NAICS}Which contracts expire in the next 12 months here?`);
+    expect(c).toMatchObject({ capabilityCodes: ['236220'], capabilitySource: 'map_filter' });
+  });
+  it('a comma list in the filter is kept whole', () => {
+    const c = compileIntent('[Current map view — 9 opps in view; NAICS 236220,238210. Location: unknown ...]\n\nWhat expires soon here?');
+    expect(c.capabilityCodes).toEqual(['236220', '238210']);
+  });
+  it('enforced note says "from your map\'s industry filter", never "for the work you named"', () => {
+    const e = enforceIntent('get_expiring_contracts', '{"months_window":12}', compileIntent(`${VIEW_NAICS}Which contracts expire in the next 12 months here?`));
+    expect(JSON.parse(e.args).naics).toBe('236220');
+    expect(e.applied).toContain("industry codes 236220 from your map's industry filter");
+    expect(e.applied.join(' ')).not.toMatch(/for the work you named/);
+    expect(isMapScopeNote("industry codes 236220 from your map's industry filter")).toBe(true);
+  });
+  it('codes the customer typed keep "for the work you named" and win over the map', () => {
+    const c = compileIntent(`${VIEW_NAICS}Which NAICS 561720 contracts expire in the next 12 months?`);
+    expect(c).toMatchObject({ capabilityCodes: ['561720'], capabilitySource: 'request' });
+    const e = enforceIntent('get_expiring_contracts', '{"months_window":12}', c);
+    expect(e.applied.join(' ')).toMatch(/industry codes 561720 for the work you named/);
+    expect(isMapScopeNote(e.applied.find((n) => n.startsWith('industry codes'))!)).toBe(false);
+  });
+  it('without a preamble nothing changes', () => {
+    expect(compileIntent('Which NAICS 561720 contracts expire soon?')).toMatchObject({ capabilityCodes: ['561720'], capabilitySource: 'request' });
+    expect(compileIntent('How do I write a capability statement?')).toMatchObject({ capabilityCodes: [], capabilitySource: null });
   });
 });

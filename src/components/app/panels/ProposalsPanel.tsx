@@ -2336,6 +2336,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         <ProposalChat
           email={email}
           pipelineId={activePursuitId}
+          opportunity={activePursuit ? { title: activePursuit.title, agency: activePursuit.agency, deadline: activePursuit.response_deadline, noticeId: activePursuit.notice_id } : null}
           rfpText={uploadedRfp?.text || ''}
           rfpFileName={uploadedRfp?.fileName || ''}
           hasVault={!!vaultSummary?.hasIdentity || (vaultSummary?.past_performance ?? 0) > 0 || (vaultSummary?.capabilities ?? 0) > 0}

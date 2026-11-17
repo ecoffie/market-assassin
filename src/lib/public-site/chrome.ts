@@ -56,7 +56,7 @@ export const MP_AI_MENU: readonly MpAiMenuItem[] = [
 /** Left of the top bar, after the "How it works" menu. Hidden at <=980px. */
 export const MP_HEADER_PRODUCT_LINKS: readonly MpChromeLink[] = [
   { href: '/mcp/gallery', label: 'Mindy in your AI', sub: MP_AI_MENU },
-  { href: '/jobs', label: 'Jobs' },
+  { href: '/roadmap', label: '2027 Roadmap' },
 ];
 
 export interface MpHowItWorksItem extends MpChromeLink {

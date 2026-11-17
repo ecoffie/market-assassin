@@ -22,9 +22,18 @@
 import { resolvePayer } from './payer';
 import { getWriteClient } from '@/lib/supabase/server-clients';
 import { MCP_CHANNEL_OR_FILTER } from './channel-filter';
+import { after } from 'next/server';
+import {
+  paidStatusResolverEnabled, paidStatusShadowEnabled, resolvePaidStatus, hasLiveProGrant, PAID_STATUS_POLICY,
+  type PaidStatus, type PaidStatusPolicy,
+} from '@/lib/entitlements/paid-status';
+import { subjectKey } from '@/lib/entitlements/shadow';
 
 /**
- * Ledger reasons that mark an account as having PAID standing (Layer A gate).
+ * LEGACY ledger reasons for Layer A paid standing — used only while PAID_STATUS_RESOLVER
+ * is off. Known defects (fixed by the shared resolver, src/lib/entitlements/paid-status.ts):
+ * admin_grant and comp_monthly are not payment, and mcp_sub_monthly / mcp_sub_annual /
+ * auto_recharge are missing, so paying MCP-plan subscribers read as free-only.
  *
  * `app_tier_pro` / `app_tier_team` are what Path A checkout writes via
  * handleAppTierSubscriptionInvoice — NOT `pro_monthly` (that's the MCP
@@ -70,8 +79,11 @@ export interface GuardVerdict {
   message: string;
 }
 
-/** True if the account has ever received PAID credits (top-up / Pro / admin). */
-async function hasPaidStanding(userEmail: string): Promise<boolean> {
+/**
+ * LEGACY Layer A (flag OFF): true if the account has ever received a grant in
+ * PAID_LEDGER_REASONS, or is a member of a funded team pool.
+ */
+async function legacyHasPaidStanding(userEmail: string): Promise<boolean> {
   const { data, error } = await getWriteClient()
     .from('mcp_credit_ledger')
     .select('id')
@@ -85,7 +97,56 @@ async function hasPaidStanding(userEmail: string): Promise<boolean> {
   // their personal ledger holds no paid grant, but their calls bill a funded team pool.
   // (tasks/PRD-pooled-team-credits.md) Without this every team member reads as free-tier.
   const payer = await resolvePayer(userEmail);
+  // Owner rule 2026-11-16: never shorten anyone's access. A live Pro grant (e.g. a Pro Giant
+  // bundle whose grant runs past its first year) keeps proprietary standing. Read failure
+  // throws → the guard fails open, as it always has.
+  if (payer.kind !== 'pool' && await hasLiveProGrant(userEmail)) return true;
   return payer.kind === 'pool';
+}
+
+/**
+ * Layer A standing from the SHARED paid-status resolver (flag ON).
+ *   - paid funding (live subscription / MCP plan / pool / prepaid / bought credits) → allowed
+ *   - complimentary (staff / advocate / comp) → allowed: known people, not drive-by
+ *     scrapers. Complimentary is NOT paid; it is admitted here by an explicit rule, so a
+ *     comp account can never be counted as revenue by anything reading paidFunding.
+ *   - unknown (a read failed) → allowed: the guard fails open, as it always has.
+ *   - a live Pro grant → allowed, whatever the kind (access is never shortened).
+ *   - trial / promotional_only / expired / none → requires paid credits.
+ */
+export function proprietaryStandingFrom(status: PaidStatus, policy: PaidStatusPolicy = PAID_STATUS_POLICY): boolean {
+  // ACCESS decision: a live Pro grant always keeps standing (owner rule 2026-11-16: never
+  // shorten anyone's access). The Pro Giant 1-year term is a paid-status LABEL only.
+  if (status.liveProGrant === true) return true;
+  if (status.kind === 'unknown') return policy.unknownAllows;
+  if (status.paidFunding === true) return true;
+  return policy.admitComplimentary && status.complimentaryAccess;
+}
+
+/** Shadow compare: logs a disagreement only, with a keyed hash — never the email. */
+function shadowCompare(userEmail: string, legacy: boolean): void {
+  if (!paidStatusShadowEnabled()) return;
+  // Shadow-only reads (about 6 per proprietary call) happen after the response, and only
+  // while PAID_STATUS_SHADOW is on. after() keeps the serverless function alive for them.
+  const task = () => resolvePaidStatus(userEmail).then((status) => {
+    const next = proprietaryStandingFrom(status);
+    if (next !== legacy) {
+      console.info('[mcp:extraction-guard] paid-status shadow disagreement', JSON.stringify({
+        subject: subjectKey(userEmail), legacy, next, kind: status.kind, sources: status.sources,
+      }));
+    }
+  }).catch(() => { /* shadow never affects the call */ });
+  try { after(task); } catch { void task(); /* outside a request scope (scripts/tests) */ }
+}
+
+/** Layer A: does this account have the standing to call proprietary tools? */
+async function hasPaidStanding(userEmail: string): Promise<boolean> {
+  if (paidStatusResolverEnabled()) {
+    return proprietaryStandingFrom(await resolvePaidStatus(userEmail));
+  }
+  const legacy = await legacyHasPaidStanding(userEmail);
+  shadowCompare(userEmail, legacy);
+  return legacy;
 }
 
 /** Count DELIVERED proprietary results for this account since `sinceMs` ago. */

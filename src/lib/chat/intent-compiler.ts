@@ -19,8 +19,12 @@ import { federalToday } from '@/lib/dates/federal-day';
 export interface CompiledIntent {
   requestTime: string;
   federalDate: string;
-  /** States the customer named (name or capitalized code). */
+  /** States the customer named (name or capitalized code) in their own words. */
   explicitStates: string[];
+  /** States the map view supplied (the Opportunity Map "ask about this view" preamble), not the customer's words. */
+  viewStates: string[];
+  /** Where viewStates came from: the map's state filter, or the states of the pins in view. */
+  viewStateSource: 'map_filter' | 'map_area' | null;
   /** States implied only by a city or metro the customer named. */
   impliedStates: string[];
   /** Named buying offices, e.g. "USACE Memphis District". */
@@ -30,6 +34,8 @@ export interface CompiledIntent {
   /** "next 18 months" -> 18; "next year" -> 12. */
   windowMonths: number | null;
   capabilityCodes: string[];
+  /** Where capabilityCodes came from: the customer's words, or the map's industry (NAICS) filter. */
+  capabilitySource: 'request' | 'map_filter' | null;
   capabilityLabels: string[];
   /** The customer asked for all / every / a complete list. */
   completeness: boolean;
@@ -67,9 +73,39 @@ function explicitStatesIn(text: string): string[] {
   return out;
 }
 
+/**
+ * The map's "ask about this view" preamble ("[Current map view — …]\n\n" at the start of the message) is
+ * machine text, not the customer's words. States it supplies are reported as the map's, never as "from
+ * your request" (2026-11-15 review: a note must not say the customer asked for something they did not).
+ */
+const VIEW_PREAMBLE_RE = /^\s*\[Current map view [\s\S]*?\]\s*(?:\n|$)/;
+export function splitViewPreamble(text: string): { view: string | null; rest: string } {
+  const m = String(text || '').match(VIEW_PREAMBLE_RE);
+  return m ? { view: m[0], rest: String(text).slice(m[0].length) } : { view: null, rest: String(text || '') };
+}
+/** NAICS codes the map's industry filter put in the preamble ("…; NAICS 236220; …" or "NAICS 236220,238210"). */
+function viewNaicsIn(view: string | null): string[] {
+  if (!view) return [];
+  const m = view.match(/\bNAICS ((?:\d{2,6})(?:\s*,\s*\d{2,6})*)/);
+  return m ? Array.from(new Set(m[1].split(/\s*,\s*/))) : [];
+}
+function viewStatesIn(view: string | null): { states: string[]; source: 'map_filter' | 'map_area' | null } {
+  if (!view) return { states: [], source: null };
+  const filter = view.match(/Location: the map is filtered to ([A-Z]{2})\./);
+  if (filter && normalizeStateCode(filter[1])) return { states: [filter[1]], source: 'map_filter' };
+  const area = view.match(/Location: the map area is in ([A-Z]{2}(?:, [A-Z]{2})*) \(/);
+  if (area) {
+    const states = area[1].split(', ').filter((c) => !!normalizeStateCode(c));
+    if (states.length) return { states, source: 'map_area' };
+  }
+  return { states: [], source: null };
+}
+
 export function compileIntent(text: string, now: Date = new Date(), customerText: string = text): CompiledIntent {
   const src = String(text || '');
-  const explicit = explicitStatesIn(src);
+  const { view, rest } = splitViewPreamble(src);
+  const explicit = explicitStatesIn(rest);
+  const fromView = viewStatesIn(view);
   const implied = [...impliedStates(src)].filter((s) => !explicit.includes(s));
   const offices = Array.from(new Set([...src.matchAll(OFFICE_RE)].map((m) => m[1].replace(/\s+/g, ' ').trim())));
   let sinceDate: string | null = null;
@@ -82,16 +118,22 @@ export function compileIntent(text: string, now: Date = new Date(), customerText
   if (nm) windowMonths = Number(nm[1]);
   else if (/\b(?:next|coming)\s+(?:year|12\s+months)\b/i.test(src)) windowMonths = 12;
   else if (/\b(?:next|coming)\s+two\s+years\b/i.test(src)) windowMonths = 24;
-  const cap = interpretCapabilityNaics(src);
+  // Industry codes: the customer's words first; the map's industry filter only when they gave none.
+  const cap = interpretCapabilityNaics(rest);
+  const customerCodes = cap.typedCodes.length ? cap.typedCodes : cap.codes;
+  const viewNaics = customerCodes.length ? [] : viewNaicsIn(view);
   return {
     requestTime: now.toISOString(),
     federalDate: federalToday(now),
     explicitStates: explicit,
+    viewStates: explicit.length ? [] : fromView.states,
+    viewStateSource: explicit.length ? null : fromView.source,
     impliedStates: implied,
     officePhrases: offices,
     sinceDate,
     windowMonths,
-    capabilityCodes: cap.typedCodes.length ? cap.typedCodes : cap.codes,
+    capabilityCodes: customerCodes.length ? customerCodes : viewNaics,
+    capabilitySource: customerCodes.length ? 'request' : viewNaics.length ? 'map_filter' : null,
     capabilityLabels: cap.items.map((i) => i.label),
     completeness: /\b(all|every|complete\s+list|full\s+list)\b/i.test(src),
     agencyPhrases: offices.length ? [] : Array.from(new Set([...src.matchAll(AGENCY_RE)].map((m) => m[1]))),
@@ -103,6 +145,31 @@ export function compileIntent(text: string, now: Date = new Date(), customerText
 const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
 export interface Enforcement { args: string; applied: string[]; unapplied: string[] }
+
+/**
+ * Add the states that scope this request to a state-filtered search, and say where they came from:
+ * the customer's own words ("from your request") or the map view ("scoped to the states on your map").
+ * The customer's words win: a state they typed replaces the map's (viewStates is empty then).
+ */
+/** True for an applied note whose scope came from the map view, not the customer's words. */
+export function isMapScopeNote(note: string): boolean {
+  return /^scoped to (the states on your map|your map's state filter):/.test(note) || / from your map's industry filter$/.test(note);
+}
+
+function applyStates(a: Record<string, unknown>, intent: CompiledIntent, applied: string[]): void {
+  const fromRequest = intent.explicitStates.length > 0;
+  const states = fromRequest ? intent.explicitStates : intent.viewStates;
+  if (!states.length) return;
+  const have = listOf(a.state).map((s) => normalizeStateCode(s)).filter((x): x is string => !!x);
+  const missing = states.filter((s) => !have.includes(s));
+  if (!missing.length) return;
+  a.state = Array.from(new Set([...have, ...states])).join(',');
+  applied.push(fromRequest
+    ? `states ${states.join(', ')} from your request`
+    : intent.viewStateSource === 'map_filter'
+      ? `scoped to your map's state filter: ${states.join(', ')}`
+      : `scoped to the states on your map: ${states.join(', ')}`);
+}
 
 const listOf = (v: unknown): string[] =>
   (Array.isArray(v) ? v : v == null ? [] : [v]).flatMap((x) => String(x ?? '').split(/\s*[,;/&]\s*|\s+(?:or|and)\s+/i)).map((t) => t.trim()).filter(Boolean);
@@ -145,16 +212,17 @@ export function enforceIntent(toolName: string, rawArgs: string, intent: Compile
       if (intent.windowMonths <= 60) { a.months_window = intent.windowMonths; applied.push(`${intent.windowMonths}-month window from your request`); }
       else unapplied.push(`a ${intent.windowMonths}-month window (the tool's maximum is 60)`);
     }
-    if (intent.explicitStates.length) {
-      const have = listOf(a.state).map((s) => normalizeStateCode(s)).filter((x): x is string => !!x);
-      const missing = intent.explicitStates.filter((s) => !have.includes(s));
-      if (missing.length) { a.state = Array.from(new Set([...have, ...intent.explicitStates])).join(','); applied.push(`states ${intent.explicitStates.join(', ')} from your request`); }
-    }
+    applyStates(a, intent, applied);
     if (intent.capabilityCodes.length) {
       const have = listOf(a.naics);
       const covered = (c: string) => have.some((h) => /^\d+$/.test(h) && (c.startsWith(h) || h.startsWith(c)));
       const missing = intent.capabilityCodes.filter((c) => !covered(c));
-      if (missing.length) { a.naics = [...have, ...missing].join(','); applied.push(`industry codes ${[...have, ...missing].join(', ')} for the work you named (${missing.join(', ')} added by Mindy)`); }
+      if (missing.length) {
+        a.naics = [...have, ...missing].join(',');
+        applied.push(intent.capabilitySource === 'map_filter'
+          ? `industry codes ${[...have, ...missing].join(', ')} from your map's industry filter`
+          : `industry codes ${[...have, ...missing].join(', ')} for the work you named (${missing.join(', ')} added by Mindy)`);
+      }
     }
   }
 
@@ -173,11 +241,7 @@ export function enforceIntent(toolName: string, rawArgs: string, intent: Compile
     }
   }
 
-  if (toolName === 'search_sam_opportunities' && intent.explicitStates.length) {
-    const have = listOf(a.state).map((s) => normalizeStateCode(s)).filter((x): x is string => !!x);
-    const missing = intent.explicitStates.filter((s) => !have.includes(s));
-    if (missing.length) { a.state = Array.from(new Set([...have, ...intent.explicitStates])).join(','); applied.push(`states ${intent.explicitStates.join(', ')} from your request`); }
-  }
+  if (toolName === 'search_sam_opportunities') applyStates(a, intent, applied);
 
   // A city or metro the customer named, searched through its state on a tool with no city filter:
   // say the search covers the whole state (acc4 R5: "Millington" shown only as "place of performance TN").

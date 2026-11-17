@@ -41,11 +41,11 @@ export async function generateFollowups(
       system:
         'You suggest the NEXT action a federal-contracting user would take after Mindy\'s answer. ' +
         'Mindy can: look up named buying-office contacts, open live SAM solicitations, contractor/incumbent intel, ' +
-        'agency spending, GSA CALC pricing, draft outreach emails, add items to a pipeline/target list, and run bid/no-bid analysis. ' +
+        'agency spending, GSA CALC pricing, draft outreach emails, and run bid/no-bid analysis. Mindy cannot save, track or add anything to a pipeline or target list from chat — never suggest that. ' +
         'Return STRICT JSON: {"suggestions":["...","...","..."]}. ' +
         'Exactly 3. Each is a short imperative or question the user could click to send back to Mindy (max ~8 words), ' +
         'action-oriented and SPECIFIC to this answer — use the real names, agencies, or opportunities it mentions. ' +
-        'Favor next steps (draft an email to X, find open opportunities at Y, who is the incumbent, what is the set-aside, add to my pipeline) ' +
+        'Favor next steps (draft an email to X, find open opportunities at Y, who is the incumbent, what is the set-aside) ' +
         'over generic trivia. No numbering.',
       user:
         `User asked: "${userMessage.slice(0, 500)}"\n\n` +

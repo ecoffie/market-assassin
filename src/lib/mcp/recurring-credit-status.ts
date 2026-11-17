@@ -16,13 +16,12 @@
  */
 import { getWriteClient } from '@/lib/supabase/server-clients';
 import { isMonthClaimed } from '@/lib/mcp/prepaid-entitlements';
+import { DAY_MS, MCP_SUB_ANNUAL_WINDOW_DAYS, MCP_SUB_MONTHLY_WINDOW_DAYS } from '@/lib/entitlements/paid-reasons';
 
 export type RecurringCreditStatus = 'included' | 'not_included' | 'unknown';
 
-const DAY_MS = 86_400_000;
-/** A monthly MCP plan invoice renews every ~30 days; an annual one every ~365. */
-const MCP_SUB_MONTHLY_WINDOW_DAYS = 40;
-const MCP_SUB_ANNUAL_WINDOW_DAYS = 370;
+// A monthly MCP plan invoice renews every ~30 days, an annual one every ~365: the live
+// windows are the shared paid-status constants, so this display and the resolver agree.
 
 export function currentAndPreviousMonth(now: Date): [string, string] {
   const cur = now.toISOString().slice(0, 7);

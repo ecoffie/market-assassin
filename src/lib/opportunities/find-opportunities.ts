@@ -6,6 +6,7 @@
  * Does NOT change map viewport APIs. Cross-class dedupe is intentionally absent.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { classifySearchFailure } from './search-failure';
 import { recompeteRowAnnotations } from '@/lib/recompete/annotate';
 import { parseAwardLineage, NOT_ORDER_UNDER_VEHICLE_OR } from '@/lib/recompete/award-lineage';
 import { dedupeRecompeteRows, type DedupeableRecompeteRow } from '@/lib/recompete/dedupe-orders';
@@ -31,6 +32,7 @@ import {
   applyOpenPlan,
   applyRecompetePlan,
   applyForecastPlan,
+  performedOutsideRegion,
   rankRecords,
   matchesText,
   MCP_POLICY,
@@ -67,6 +69,7 @@ import {
 } from '@/lib/opportunities/match-evidence';
 // IMI Workstream C (2026-09-22): region (multi-state) + acquisition-stage intent.
 import { normalizeStateCode } from '@/lib/utils/us-states';
+import { competitionFactsFor, competitionCounts, orderCompetedFirst, usaspendingCompetitionLookup, type CompetitionLookup, type CompetitionClass, type CompetitionFacts } from './competition-facts';
 import {
   parseStageGroup,
   stageOrExpr,
@@ -141,6 +144,8 @@ export interface FindOpportunitiesInput {
 export interface FindOpportunitiesDeps {
   client?: SupabaseClient;
   entityLookup?: EntityLookup;
+  /** How each returned Coming back award was competed (USASpending). null = skip (tests). */
+  competitionLookup?: CompetitionLookup | null;
 }
 
 export interface FindNextAction {
@@ -190,6 +195,8 @@ export interface HorizonResult {
   coverage?: { state: 'partial' | 'unestablished'; gaps: ForecastCoverageGap[] };
   /** Coming Back only: task/delivery orders the plan matched and excluded (null = count unavailable). Internal. */
   orders_excluded?: number | null;
+  /** Coming back only: how the returned awards were competed (USASpending award record). */
+  competition_counts?: Record<CompetitionClass, number> | null;
   /** Company-anchored FIND only: verdict counts over the RETURNED items (not the matched population). */
   eligibility_counts?: Record<EligibilityStatus, number> | null;
   /** Stage-filtered FIND only (input.stage). Open now carries the counts; other horizons say "not applied". */
@@ -311,6 +318,7 @@ export const HOST_RULES_FIND_FIRST_VALUE = [
   'INTERPRETATION: use presentation_note / market_interpretation.truth. A buyer alias (an acronym or short name resolved to the full agency name) is spelling, not a wider department. Never say you searched the whole parent department. Never claim a broader related market is the requested capability.',
   'COMING SOON UNAVAILABLE: if coming_soon status is unavailable because this buyer has no forecast publisher, that is coverage not established — not a measured zero. Do not invent forecast rows from parent-department feeds.',
   'COMING SOON PARTIAL: if coming_soon status is partial, its count covers only the buyers with a forecast publisher. Name the buyers listed in coverage.gaps as not measured — never say they have zero upcoming buys.',
+  'COMPETITION: a Coming back item may carry `competition`, read from that award\'s own USASpending record. Use competition.label for how the current award was made, in preference to set_aside_type. not_competed rows (for example "Not competed · AbilityOne" or "8(a) sole source") are not equally realistic targets: rank them after competed and not-established rows in every list, short list or table (items already arrive in that order; never open a list with a not-competed row), and say why in plain words (an AbilityOne award goes to a nonprofit that employs people with disabilities without competition; an 8(a) sole-source award goes to one 8(a) firm without competition). unknown means not established: say "not established", never "full and open". competition describes the CURRENT award only; never say the follow-on cannot be won.',
   'HOLDER_SIGNAL: a Coming back row labelled HOLDER_SIGNAL matched only on the incumbent\'s NAME (the company name contains the search words). It is NOT a direct match and NOT demand for this work — never count it with DIRECT_MATCH. At most say the holder\'s name suggests related work worth checking; the contract itself (see naics_code / psc_code) may be something else entirely.',
 ] as const;
 
@@ -549,6 +557,17 @@ export function resolveRegion(input: Pick<FindOpportunitiesInput, 'location' | '
  */
 export const UNRESOLVED_REGION_SENTINEL = 'ZZ';
 
+/** The asked states as real codes (sentinel removed). [] = no location asked. */
+function regionCodes(p: InterpretedQuery): string[] {
+  return p.plan.states.filter((s) => s !== UNRESOLVED_REGION_SENTINEL);
+}
+
+/** Drop rows performed in another state/territory (place of performance known and not asked). */
+function inRegion<T extends Record<string, unknown>>(rows: T[], col: string, p: InterpretedQuery): T[] {
+  const codes = regionCodes(p);
+  return codes.length ? rows.filter((r) => !performedOutsideRegion(r[col], codes)) : rows;
+}
+
 export function mcpDiscoveryInput(input: FindOpportunitiesInput, anchor?: CompanyAnchor | null): DiscoveryInput {
   const exact = String(input.advanced?.keyword_exact || '').replace(/"/g, ' ').trim();
   const company = companyCodeRecall(anchor);
@@ -588,7 +607,7 @@ export function eligibilityLabel(plan: DiscoveryPlan): string {
 function consumedFor(plan: DiscoveryPlan, horizon: HorizonKey, stage: AcquisitionStageGroup | 'invalid' | null = null): string[] {
   const out = [`canonical_discovery:v${plan.version}`, `eligibility:${eligibilityLabel(plan)}`];
   if (plan.buyers.length) out.push(`agency→identity_words(${plan.buyers.map((b) => b.requested).join('|')})`);
-  if (plan.states.length) out.push(`location→${horizon === 'open_now' ? 'pop_or_office' : horizon === 'coming_back' ? 'place_of_performance_state' : 'pop_state'}(${plan.states.join('|')})`);
+  if (plan.states.length) out.push(`location→${horizon === 'open_now' ? 'pop_else_office' : horizon === 'coming_back' ? 'place_of_performance_state' : 'pop_state'}(${plan.states.join('|')})`);
   if (stage && stage !== 'invalid' && horizon === 'open_now') out.push(`stage→${stage}(notice_type·title_secondary)`);
   if (plan.setAsides.length) out.push(`set_aside→${plan.setAsides.join('|')}`);
   if (plan.naics.length) out.push(`naics→${plan.naics.join('|')}`);
@@ -635,7 +654,7 @@ function interpretQuery(input: FindOpportunitiesInput, company: CompanyAnchorRes
     region: resolveRegion(input),
     stage: parseStageGroup(input.stage),
     interpreted: {
-      open_now: `Canonical discovery (${plan.horizons.open.via}): ${elig}; buyer = whole-word identity on department OR sub_tier; geo = place-of-performance OR buying-office state; rank = evidence tier → breadth → score → deadline`,
+      open_now: `Canonical discovery (${plan.horizons.open.via}): ${elig}; buyer = whole-word identity on department OR sub_tier; geo = place-of-performance state, else buying-office state when none is recorded; rank = evidence tier → breadth → score → deadline`,
       coming_back: `Canonical discovery (${plan.horizons.recompete.via}): ${elig}; buyer = awarding_agency OR awarding_sub_agency identity; geo = place_of_performance_state; window ≤${recompeteMonths}mo`,
       coming_soon: `Canonical discovery (${plan.horizons.forecast.via}): ${elig}; agency = forecast identity codes; geo = pop_state; ${policy.forecast.includePastFiscalYears ? 'past fiscal years INCLUDED (opt-in)' : 'current + future fiscal years'}; unresolved publisher → unavailable, not zero`,
     },
@@ -822,7 +841,12 @@ async function queryOpenNow(
     const { data, count, error } = await inStage(applyOpenPlan(client.from(source).select(COLS, { count: 'exact' }), p.plan))
       .order('response_deadline', { ascending: true, nullsFirst: false })
       .limit(fetchCap);
-    if (error) return unavailable(source, OPEN_HANDOFFS, error.message, unsupported);
+    if (error) {
+      // A timed-out search is "too long", with an actionable message; still unavailable, never zero (search-failure.ts).
+      const f = classifySearchFailure(error);
+      const u = unavailable(source, OPEN_HANDOFFS, f.message, unsupported);
+      return f.code === 'search_too_long' ? { ...u, error: { class: 'search_too_long', message: f.message } } : u;
+    }
 
     let unmapped: number | null = null;
     {
@@ -854,7 +878,7 @@ async function queryOpenNow(
         .limit(fetchCap);
       if (!base.error) baseRows = (base.data || []) as Array<Record<string, unknown>>;
     }
-    const rows = unionRows(baseRows, (data || []) as Array<Record<string, unknown>>, 'notice_id');
+    const rows = inRegion(unionRows(baseRows, (data || []) as Array<Record<string, unknown>>, 'notice_id'), 'pop_state', p);
     if (!rows.length) {
       const e = emptyHorizon(source, OPEN_HANDOFFS, consumed, unsupported, asOf, stage ? `No matching open ${STAGE_GROUP_LABEL[stage]} notices under these filters.` : 'No matching open solicitations under these filters.', unmapped);
       return stageInfo ? { ...e, stage: { ...stageInfo, returned_by_signal: { structured_notice_type: 0, title_keyword: 0 } } } : e;
@@ -922,7 +946,7 @@ async function queryOpenNow(
       error: null,
       allowed_handoffs: OPEN_HANDOFFS,
       semantics_note:
-        'Canonical discovery eligibility (word-bounded). Ranked DIRECT_MATCH → RELATED_MARKET_CANDIDATE → other, then by how many of the query’s concepts a notice carries, then deadline. Geography: place of performance OR buying-office state.'
+        'Canonical discovery eligibility (word-bounded). Ranked DIRECT_MATCH → RELATED_MARKET_CANDIDATE → other, then by how many of the query’s concepts a notice carries, then deadline. Geography: place-of-performance state when SAM records one; the buying-office state only when it does not (work performed in another state or territory is never shown).'
         + (p.company ? ' Company-anchored: rows recalled only by the company’s registered PSC/NAICS rank after related-market rows and are never DIRECT_MATCH. eligibility is a separate screen.' : ''),
       evidence_counts,
       ...(p.company ? { eligibility_counts: eligibilityCounts(items, p.company) } : {}),
@@ -973,6 +997,7 @@ async function queryComingBack(
   client: SupabaseClient,
   p: InterpretedQuery,
   limit: number,
+  competitionLookup: CompetitionLookup | null = null,
 ): Promise<HorizonResult> {
   const source = 'recompete_opportunities';
   if (p.plan.status !== 'ok') return blockedHorizon(source, BACK_HANDOFFS, p.plan);
@@ -1027,7 +1052,7 @@ async function queryComingBack(
     }
     // Belt and braces: the same rule in JS (parseAwardLineage), so a row the SQL predicate let
     // through can still never become an individual Coming Back item.
-    const unioned = unionRows(baseRows, (data || []) as Array<Record<string, unknown>>, 'contract_id');
+    const unioned = inRegion(unionRows(baseRows, (data || []) as Array<Record<string, unknown>>, 'contract_id'), 'place_of_performance_state', p);
     const lineageOk = unioned.filter((r) => parseAwardLineage(r as { contract_id?: string; contract_type?: string }).award_kind !== 'order_under_vehicle');
     // The same award can sit under a legacy April id AND its CONT_AWD_ id (dedupe-orders.ts) —
     // e.g. definitive contract 36C10X23C0057. One award, one Coming Back item.
@@ -1110,8 +1135,30 @@ async function queryComingBack(
       psc_code: (r.psc_code as string) || null,
       description: (r.description as string) || null,
       awarding_sub_agency: (r.awarding_sub_agency as string) || null,
+      // The award's public record (the citation for holder, value, dates and competition).
+      ...(r.contract_id ? { source_url: `https://www.usaspending.gov/award/${encodeURIComponent(String(r.contract_id))}` } : {}),
       };
     });
+
+    // How each returned award was competed — from its own USASpending record, never inferred.
+    // A not-competed award (AbilityOne mandatory source, 8(a) sole source…) is not an equally
+    // actionable recompete. Failure or budget → 'unknown', never "competed".
+    let competitionCountsOut: Record<CompetitionClass, number> | null = null;
+    if (competitionLookup && items.length) {
+      const facts = await competitionFactsFor(items.map((i) => String(i.contract_id || '')), competitionLookup);
+      // Compact on the item ({class, label}): the full facts would push a 25-row result past the chat's
+      // 60K evidence budget (measured: FL janitorial 51K → 63K, Coming back cut from 25 rows to 12).
+      const all: CompetitionFacts[] = [];
+      for (const it of items) {
+        const f = facts.get(String(it.contract_id || ''));
+        if (f) { it.competition = { class: f.class, label: f.label }; all.push(f); }
+      }
+      competitionCountsOut = competitionCounts(all);
+      // Within each evidence class, rows whose current award was competed (or not established) come before
+      // rows whose current award was not competed. Stable, so soonest-end order is kept inside each group.
+      // Why: answers list rows in tool order; a not-competed row ending soonest led the FL janitorial short list.
+      items.splice(0, items.length, ...orderCompetedFirst(items));
+    }
 
     const note = related
       ? `DIRECT_MATCH is confirmed capability relevance. RELATED_MARKET_CANDIDATE is a broader related market (industry family or this buyer’s wider market) — not confirmed ${cap.requested ? `“${cap.requested}”` : 'capability'} demand. Geography: place of performance only. Not a live solicitation. Watch/email for this horizon is not available yet.`
@@ -1131,9 +1178,11 @@ async function queryComingBack(
       unmapped_count: unmapped,
       error: null,
       allowed_handoffs: BACK_HANDOFFS,
-      semantics_note: note + ' DIRECT_MATCH requires buy-side evidence (description / PSC / NAICS). HOLDER_SIGNAL rows matched only on the holder\'s name.' + orderNote,
+      semantics_note: note + ' DIRECT_MATCH requires buy-side evidence (description / PSC / NAICS). HOLDER_SIGNAL rows matched only on the holder\'s name.' + orderNote
+        + (competitionCountsOut ? ' competition {class,label} = how the CURRENT award was made, from its USASpending record (source_url): not_competed covers AbilityOne mandatory-source and 8(a) sole-source awards; unknown = not established, never assume competed. It does not decide how the follow-on will be bought.' : ''),
       evidence_counts,
       orders_excluded: ordersExcluded === null ? null : ordersExcluded + ordersDroppedInJs,
+      ...(competitionCountsOut ? { competition_counts: competitionCountsOut } : {}),
       ...(p.company ? { eligibility_counts: eligibilityCounts(items, p.company) } : {}),
     };
   } catch (e) {
@@ -1204,7 +1253,7 @@ async function queryComingSoon(
       const base = await applyForecastPlan(client.from(source).select(COLS), p.basePlan).limit(Math.max(limit, 200));
       if (!base.error) baseRows = (base.data || []) as Row[];
     }
-    const all = unionRows(baseRows, (data || []) as Row[], 'id') as Row[];
+    const all = inRegion(unionRows(baseRows, (data || []) as Row[], 'id') as Row[], 'pop_state', p);
     const scores = new Map(rankRecords(p.plan, all, ['title', 'description', 'naics_description', 'department']).map((s) => [s.row, s]));
     const rows = [...all].sort((a, b) => {
       const bd = (scores.get(b)?.breadth ?? 0) - (scores.get(a)?.breadth ?? 0);
@@ -1554,7 +1603,7 @@ export async function findOpportunities(
     const h = key === 'open_now'
       ? await queryOpenNow(client, interpreted, limit)
       : key === 'coming_back'
-        ? await queryComingBack(client, interpreted, limit)
+        ? await queryComingBack(client, interpreted, limit, deps.competitionLookup === undefined ? usaspendingCompetitionLookup : deps.competitionLookup)
         : await queryComingSoon(client, interpreted, limit);
     return annotateHorizon(key, h, interpreted);
   };
