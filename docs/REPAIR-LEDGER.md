@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-17 — Ask Mindy mixed turns (Agent 2, audit A1)
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-17 | Ask Mindy mixed turns (P1b) | **When one tool's records were rendered as a verified list and another tool's result was not, the other tool's findings never reached the user**: a global "state no number, date, name…" note was added and `lintAnalysis` dropped every non-imperative or digit-bearing sentence, including "the lookup failed". Repro: expiring contracts + find_opportunities showed only the expiring list. Now a mixed turn scopes the rule to the rendered lists, names the unshown lookups (with failure status), keeps part 1 as a normal grounded answer minus sentences restating a rendered record id, lints only the part after `NEXT STEPS:`, and runs the count check on that part only. All-rendered and no-render turns unchanged. | `export function composeMixedAnswer(` → `src/lib/chat/mixed-turn.ts` · `const mixedTurn = renderedRecords.length > 0 && unrenderedResults.length > 0;` → `src/app/api/app/chat/route.ts` | `ask-mindy-mixed-turns.route.unit.test.ts` (7, real route + executor; 4 red on main) + `mixed-turn.unit.test.ts` (9); chat suites 712 pass; tsc clean | DRAFT PR |
+
 ## 2026-11-17 — Ask Mindy reliability (Agent 2, audit A6/A7)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

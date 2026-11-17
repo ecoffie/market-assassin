@@ -60,6 +60,7 @@ import { compileIntent, enforceIntent, dedupeToolCalls, isMapScopeNote, splitVie
 import { sessionTitleFrom } from '@/lib/chat/view-preamble';
 import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, renderSbloContact, lintAnalysis, deterministicNextSteps, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, SBLO_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
+import { mixedTurnNote, composeMixedAnswer, type UnrenderedResult } from '@/lib/chat/mixed-turn';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
 import { chatDeadlines, toolTimeoutMs, readWithIdleTimeout, incompleteToolNotice, withTimeout, ChatTimeoutError } from '@/lib/chat/turn-deadlines';
 
@@ -739,6 +740,9 @@ export async function POST(request: NextRequest) {
         const renderedRecords: RenderedRecords[] = [];
         // Option B: true while every tool result this turn was shown as a verified list.
         let allResultsRendered = true;
+        // A1: the results that were NOT rendered (other tools, or a rendered tool that failed). In a mixed
+        // turn the no-facts rule applies to the rendered lists only; these must still reach the user.
+        const unrenderedResults: UnrenderedResult[] = [];
         try {
           if (actingScope.kind === 'client') turnTrace.notices.push('acting_scope:client_workspace');
           if (actingScope.kind === 'unavailable') turnTrace.notices.push('acting_scope:unavailable');
@@ -966,14 +970,15 @@ export async function POST(request: NextRequest) {
                   [SBLO_TOOL]: renderSbloContact,
                 };
                 const renderer = renderers[r.record.tool];
-                if (r.record.status !== 'success' || !renderer) { allResultsRendered = false; continue; }
+                const unrendered = () => { allResultsRendered = false; unrenderedResults.push({ tool: r.record.tool, status: r.record.status }); };
+                if (r.record.status !== 'success' || !renderer) { unrendered(); continue; }
                 try {
                   const parsed = JSON.parse(r.content);
                   const rendered = renderer(parsed);
                   if (rendered) renderedRecords.push(rendered);
-                  else allResultsRendered = false;
+                  else unrendered();
                 } catch (renderErr) {
-                  allResultsRendered = false;
+                  unrendered();
                   console.error('[chat] record render failed:', renderErr);
                 }
               }
@@ -1020,7 +1025,13 @@ export async function POST(request: NextRequest) {
         // A7 (review LOW-1): no answer request after the watchdog ended the turn.
         if (turnTimedOut) return;
         // ── end Tier-0 tool round ──
-        if (renderedRecords.length) {
+        // A1: a mixed turn (some results rendered, some not) scopes the no-facts rule to the rendered lists.
+        const mixedTurn = renderedRecords.length > 0 && unrenderedResults.length > 0;
+        if (mixedTurn) {
+          turnTrace.notices.push(`mixed_turn:${unrenderedResults.map((u) => u.tool).join(',')}`);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (messages as any[]).push({ role: 'system', content: mixedTurnNote(renderedRecords, unrenderedResults) });
+        } else if (renderedRecords.length) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (messages as any[]).push({
             role: 'system',
@@ -1265,21 +1276,26 @@ export async function POST(request: NextRequest) {
           // Option B (rel2 R9): when every result is a verified list, the closing is built from those lists
           // only; the model's closing is not shown (it could refer to things the answer does not show).
           const deterministic = allResultsRendered ? deterministicNextSteps(renderedRecords) : '';
-          const linted = deterministic ? { text: deterministic, dropped: [] as string[] } : lintAnalysis(
-            assistantContent.slice(modelTextStart),
-            anyCheck
-              ? 'Review the records marked CHECK above before pursuing them.'
-              : anyShown
-                ? 'The figures above come directly from the source data for this question.'
-                : 'Nothing verified was found for this search; check SAM.gov award notices or the agency\'s announcements for newer information.',
-          );
+          const lintFallback = anyCheck
+            ? 'Review the records marked CHECK above before pursuing them.'
+            : anyShown
+              ? 'The figures above come directly from the source data for this question.'
+              : 'Nothing verified was found for this search; check SAM.gov award notices or the agency\'s announcements for newer information.';
+          // A1: in a mixed turn, part 1 (the other lookups) is kept as a normal answer minus restatements of the
+          // rendered records; only part 2 (after NEXT STEPS:) gets the next-step lint.
+          const mixed = !deterministic && mixedTurn ? composeMixedAnswer(assistantContent.slice(modelTextStart), renderedRecords, lintFallback) : null;
+          if (mixed && !mixed.markerFound) turnTrace.notices.push('mixed_turn:marker_missing');
+          const linted = deterministic ? { text: deterministic, dropped: [] as string[] }
+            : mixed ? { text: mixed.text, dropped: mixed.dropped }
+              : lintAnalysis(assistantContent.slice(modelTextStart), lintFallback);
           if (linted.dropped.length) {
             turnTrace.notices.push(`analysis_sentences_dropped:${linted.dropped.length}`);
             console.warn('[chat] analysis sentences dropped:', linted.dropped);
           }
           assistantContent = assistantContent.slice(0, modelTextStart) + linted.text;
           send({ type: 'token', content: linted.text });
-          const problems = checkSummaryAgainstRecords(assistantContent.slice(modelTextStart), renderedRecords);
+          // A1: in a mixed turn, part 1 counts belong to the OTHER lookups; only part 2 speaks about the records.
+          const problems = checkSummaryAgainstRecords(mixed ? mixed.nextStepsText : assistantContent.slice(modelTextStart), renderedRecords);
           if (problems.length) {
             const totals = renderedRecords.map((r) => r.total).join(' and ');
             const correction = `\n\nCount check: the verified record count for this search is ${totals}; the list above is authoritative.`;
