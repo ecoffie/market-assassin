@@ -1,0 +1,171 @@
+/**
+ * DocModel → a self-contained, print-ready HTML document.
+ *
+ * The PDF renderer feeds this to Chromium (render-pdf.ts); the same HTML is the printable fallback
+ * when Chromium is unavailable and, later, the in-app preview. All model text is escaped: a model is
+ * data, never markup. No external fonts, scripts or images are referenced, so rendering makes no
+ * network requests.
+ */
+import type { Block, DocModel, TableBlock } from './model';
+import { chartToSvg } from './charts';
+import { citationIndex, citeMarker, claimLabel, formatCell, formatDocDate, parseInline } from './format';
+
+export function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function inline(text: string): string {
+  return parseInline(text)
+    .map((r) => {
+      const t = escapeHtml(r.text);
+      if (r.bold && r.italic) return `<strong><em>${t}</em></strong>`;
+      if (r.bold) return `<strong>${t}</strong>`;
+      if (r.italic) return `<em>${t}</em>`;
+      return t;
+    })
+    .join('');
+}
+
+const CSS = `
+@page { size: Letter; margin: 0.9in 0.85in 0.95in 0.85in; }
+* { box-sizing: border-box; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { margin: 0; color: #1f2937; background: #fff; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10.5pt; line-height: 1.5; }
+.doc { max-width: 7.2in; margin: 0 auto; }
+.cover { padding: 1.4in 0 0.6in; border-bottom: 3px solid #1e3a8a; margin-bottom: 0.35in; break-after: page; }
+.cover .kicker { font-size: 9pt; letter-spacing: .12em; text-transform: uppercase; color: #1e3a8a; font-weight: 700; }
+.cover h1 { font-size: 28pt; line-height: 1.15; margin: 10px 0 8px; color: #111827; }
+.cover .subtitle { font-size: 13pt; color: #4b5563; margin: 0 0 28px; }
+.cover dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; font-size: 10pt; margin: 0; }
+.cover dt { color: #6b7280; } .cover dd { margin: 0; }
+.reading { margin-top: 0.5in; padding: 12px 14px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 9pt; color: #374151; background: #f9fafb; }
+.reading b { color: #111827; }
+.toc { break-after: page; }
+.toc h2 { border: 0; }
+.toc ol { padding-left: 18px; } .toc li { margin: 4px 0; }
+h2 { font-size: 16pt; color: #1e3a8a; margin: 26px 0 10px; padding-bottom: 4px; border-bottom: 1px solid #c7d2fe; break-after: avoid; }
+h3 { font-size: 12.5pt; color: #111827; margin: 20px 0 8px; break-after: avoid; }
+h4 { font-size: 11pt; color: #111827; margin: 16px 0 6px; break-after: avoid; }
+p { margin: 0 0 9px; orphans: 3; widows: 3; }
+ul, ol { margin: 0 0 10px; padding-left: 20px; } li { margin: 0 0 4px; }
+sup.cite { font-size: 7.5pt; color: #1e3a8a; margin-left: 2px; }
+.label { display: inline-block; font-size: 7.5pt; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; border-radius: 3px; margin-right: 6px; vertical-align: 1px; }
+.label.estimate { background: #fef3c7; color: #92400e; }
+.label.recommendation { background: #dcfce7; color: #166534; }
+table { width: 100%; border-collapse: collapse; margin: 6px 0 4px; font-size: 9pt; break-inside: auto; }
+thead { display: table-header-group; }
+tr { break-inside: avoid; }
+th { text-align: left; background: #1e3a8a; color: #fff; font-weight: 600; padding: 6px 8px; }
+td { padding: 5px 8px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+tbody tr:nth-child(even) td { background: #f8fafc; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.na { color: #9ca3af; font-style: italic; }
+.caption { font-size: 8.5pt; color: #6b7280; margin: 2px 0 14px; }
+figure { margin: 10px 0 14px; break-inside: avoid; }
+.callout { border-left: 4px solid #1e3a8a; background: #eef2ff; padding: 10px 14px; margin: 10px 0 14px; border-radius: 0 6px 6px 0; break-inside: avoid; }
+.callout.warning { border-color: #b45309; background: #fffbeb; }
+.callout.key_finding { border-color: #0f766e; background: #f0fdfa; }
+.callout .ct { font-size: 8pt; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #374151; margin-bottom: 3px; }
+.pagebreak { break-after: page; }
+.sources ol { padding-left: 22px; font-size: 9pt; } .sources li { margin-bottom: 5px; word-break: break-word; }
+.sources .meta { color: #6b7280; }
+`;
+
+function tableHtml(b: TableBlock, marker: string, label: string | null): string {
+  const head = b.columns.map((c) => `<th class="${c.align === 'right' || ['usd', 'int', 'pct'].includes(c.format ?? '') ? 'num' : ''}">${escapeHtml(c.label)}</th>`).join('');
+  const body = b.rows
+    .map((r) => `<tr>${b.columns
+      .map((c) => {
+        const v = r[c.key] ?? null;
+        const txt = formatCell(v, c.format);
+        const num = c.align === 'right' || ['usd', 'int', 'pct'].includes(c.format ?? '');
+        return `<td class="${[num ? 'num' : '', v === null ? 'na' : ''].filter(Boolean).join(' ')}">${escapeHtml(txt)}</td>`;
+      })
+      .join('')}</tr>`)
+    .join('');
+  const cap = [label ? `<span class="label ${label.toLowerCase()}">${label}</span>` : '', b.caption ? inline(b.caption) : '', marker ? `<sup class="cite">${marker}</sup>` : ''].filter(Boolean).join(' ');
+  return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>${cap ? `<div class="caption">${cap}</div>` : ''}`;
+}
+
+function blockHtml(b: Block, numberOf: (id: string) => number | null): string {
+  const lab = (c?: string) => {
+    const l = claimLabel(c as never);
+    return l ? `<span class="label ${l.toLowerCase()}">${l}</span>` : '';
+  };
+  const sup = (cites?: string[]) => {
+    const m = citeMarker(cites, numberOf);
+    return m ? `<sup class="cite">${m}</sup>` : '';
+  };
+  switch (b.type) {
+    case 'paragraph':
+      return `<p>${lab(b.claim)}${inline(b.text)}${sup(b.cites)}</p>`;
+    case 'bullets': {
+      const tag = b.ordered ? 'ol' : 'ul';
+      return `<${tag}>${b.items.map((it) => `<li>${lab(it.claim)}${inline(it.text)}${sup(it.cites)}</li>`).join('')}</${tag}>`;
+    }
+    case 'table':
+      return tableHtml(b, citeMarker(b.cites, numberOf), claimLabel(b.claim));
+    case 'chart': {
+      const l = claimLabel(b.claim);
+      const cap = [l ? `<span class="label ${l.toLowerCase()}">${l}</span>` : '', b.caption ? inline(b.caption) : '', sup(b.cites)].filter(Boolean).join(' ');
+      return `<figure>${chartToSvg(b)}${cap ? `<figcaption class="caption">${cap}</figcaption>` : ''}</figure>`;
+    }
+    case 'callout': {
+      const title = b.tone === 'key_finding' ? 'Key finding' : b.tone === 'warning' ? 'Caution' : 'Note';
+      return `<div class="callout ${b.tone}"><div class="ct">${title}</div>${lab(b.claim)}${inline(b.text)}${sup(b.cites)}</div>`;
+    }
+    case 'pagebreak':
+      return '<div class="pagebreak"></div>';
+  }
+}
+
+export interface RenderHtmlOptions {
+  /** Include a contents page (default true when there are 4+ sections). */
+  toc?: boolean;
+}
+
+export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): string {
+  const { ordered, numberOf } = citationIndex(model);
+  const showToc = opts.toc ?? model.sections.length >= 4;
+  const hasEstimates = JSON.stringify(model.sections).includes('"claim":"estimate"');
+  const hasRecs = JSON.stringify(model.sections).includes('"claim":"recommendation"');
+
+  const meta: string[] = [];
+  if (model.preparedFor) meta.push(`<dt>Prepared for</dt><dd>${escapeHtml(model.preparedFor)}</dd>`);
+  meta.push(`<dt>Date</dt><dd>${escapeHtml(formatDocDate(model.date))}</dd>`);
+  meta.push(`<dt>Prepared with</dt><dd>Mindy</dd>`);
+  if (ordered.length) meta.push(`<dt>Sources</dt><dd>${ordered.length} cited source${ordered.length === 1 ? '' : 's'}</dd>`);
+
+  const reading = [
+    '<b>How to read this document.</b> Facts carry a numbered citation like <sup class="cite">[1]</sup> that points to the Sources section.',
+    hasEstimates ? 'Statements marked <span class="label estimate">Estimate</span> are projections or inferences, not recorded facts.' : '',
+    hasRecs ? 'Statements marked <span class="label recommendation">Recommendation</span> are suggested actions.' : '',
+  ].filter(Boolean).join(' ');
+
+  const cover = `<section class="cover"><div class="kicker">Report</div><h1>${escapeHtml(model.title)}</h1>${model.subtitle ? `<p class="subtitle">${escapeHtml(model.subtitle)}</p>` : ''}<dl>${meta.join('')}</dl><div class="reading">${reading}</div></section>`;
+
+  const toc = showToc
+    ? `<section class="toc"><h2>Contents</h2><ol>${model.sections.filter((s) => (s.level ?? 1) === 1).map((s) => `<li>${escapeHtml(s.heading)}</li>`).join('')}${ordered.length ? '<li>Sources</li>' : ''}</ol></section>`
+    : '';
+
+  const body = model.sections
+    .map((s) => {
+      const tag = s.level === 3 ? 'h4' : s.level === 2 ? 'h3' : 'h2';
+      return `<section id="${escapeHtml(s.id)}"><${tag}>${escapeHtml(s.heading)}</${tag}>${s.blocks.map((b) => blockHtml(b, numberOf)).join('')}</section>`;
+    })
+    .join('');
+
+  const sources = ordered.length
+    ? `<section class="sources"><h2>Sources</h2><ol>${ordered
+      .map((s) => {
+        const bits = [escapeHtml(s.label)];
+        if (s.recordId) bits.push(`<span class="meta">(${escapeHtml(s.recordId)})</span>`);
+        if (s.retrievedAt) bits.push(`<span class="meta">Retrieved ${escapeHtml(s.retrievedAt)}.</span>`);
+        if (s.url) bits.push(`<span class="meta">${escapeHtml(s.url)}</span>`);
+        return `<li>${bits.join(' ')}</li>`;
+      })
+      .join('')}</ol></section>`
+    : '';
+
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(model.title)}</title><style>${CSS}</style></head><body><main class="doc">${cover}${toc}${body}${sources}</main></body></html>`;
+}

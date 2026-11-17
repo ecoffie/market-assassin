@@ -1,0 +1,44 @@
+/**
+ * DocModel → PDF: render-html.ts, then headless Chromium via the shared launcher
+ * (src/lib/pdf/launch-browser.ts: @sparticuz/chromium + puppeteer-core on Vercel, full puppeteer
+ * locally). Chromium output is real, selectable text with vector charts.
+ *
+ * Never silent: when no browser can start, the result carries `pdf: null`, the reason, and the same
+ * HTML so the caller can return a printable page WITH a degrade header. A route that launches
+ * Chromium must be listed in next.config.ts `outputFileTracingIncludes`, or the binary never reaches
+ * the function.
+ */
+import type { DocModel } from './model';
+import { renderHtml, escapeHtml } from './render-html';
+import { htmlToPdf } from '@/lib/pdf/launch-browser';
+
+export interface PdfRender {
+  pdf: Buffer | null;
+  html: string;
+  /** Why the PDF could not be produced (null on success). */
+  error: string | null;
+}
+
+/** Page header + "Page X of Y" footer. Chromium substitutes the classed spans. */
+export function pdfOptions(model: DocModel): Record<string, unknown> {
+  const title = escapeHtml(model.title.length > 90 ? `${model.title.slice(0, 89)}…` : model.title);
+  const style = 'font-family: Helvetica, Arial, sans-serif; font-size: 7.5pt; color: #6b7280; width: 100%; padding: 0 0.85in;';
+  return {
+    format: 'Letter',
+    printBackground: true,
+    displayHeaderFooter: true,
+    headerTemplate: `<div style="${style} display:flex; justify-content:space-between;"><span>${title}</span><span>Prepared with Mindy</span></div>`,
+    footerTemplate: `<div style="${style} text-align:center;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>`,
+    margin: { top: '0.9in', right: '0.85in', bottom: '0.95in', left: '0.85in' },
+  };
+}
+
+export async function renderPdf(
+  model: DocModel,
+  deps: { htmlToPdf: typeof htmlToPdf } = { htmlToPdf },
+): Promise<PdfRender> {
+  const html = renderHtml(model);
+  const { pdf, error } = await deps.htmlToPdf(html, pdfOptions(model));
+  if (!pdf) return { pdf: null, html, error: error || 'pdf_unavailable' };
+  return { pdf, html, error: null };
+}
