@@ -71,10 +71,55 @@ export function cardChatAccess(p: {
  */
 export function isBillableTurn(t: {
   billable: boolean; answer: string; streamError: boolean; plannerUnavailable: boolean; finishReason: string | null;
+  /** P2 / audit B1: one entry per executed tool call (toolBillingOutcome). Any non-'ok' → free. */
+  toolOutcomes?: ReadonlyArray<ToolBillingOutcome>;
 }): boolean {
   if (!t.billable || t.streamError || t.plannerUnavailable) return false;
+  if (t.toolOutcomes?.some((o) => o !== 'ok')) return false;
   if (!t.answer || !t.answer.trim()) return false;
   return t.finishReason === 'stop';
+}
+
+/**
+ * P2 / audit B1: how one tool call affects billing. Before, isBillableTurn ignored tool outcomes, so a thrown
+ * tool, a tool returning ok:false (pipeline_unavailable, sam_unavailable) or a policy refusal still charged
+ * the full turn while the customer was told the answer "may be incomplete". The module's own rule is that a
+ * degraded answer is free.
+ *   failed   — the call ran and threw or timed out
+ *   refused  — the call was refused before it ran (policy, budget, invalid input)
+ *   degraded — the call returned, but its data was not fully retrieved (ok:false, state 'unavailable',
+ *              _meta.degraded, or result_state 'unavailable' / 'partial' / 'filter_not_applied')
+ *   ok       — anything else, including an honest empty result (grounded:false, none_found). An empty
+ *              result is a real, complete answer and stays billable.
+ */
+export type ToolBillingOutcome = 'ok' | 'failed' | 'refused' | 'degraded';
+
+/**
+ * Result states that mean the data was not fully retrieved. 'partial' and 'filter_not_applied' mean part of
+ * the request was NOT checked (the customer is told which part): incomplete, so free under Eric's rule
+ * "failed or incomplete = free" (confirmed 2026-11-17).
+ */
+const INCOMPLETE_RESULT_STATES: ReadonlySet<string> = new Set(['unavailable', 'partial', 'filter_not_applied']);
+
+export function toolBillingOutcome(status: string, content: string): ToolBillingOutcome {
+  if (status === 'failed') return 'failed';
+  if (status !== 'success') return 'refused';
+  let parsed: unknown;
+  try { parsed = JSON.parse(content); } catch { return 'ok'; }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return 'ok';
+  const r = parsed as { ok?: unknown; state?: unknown; _meta?: { degraded?: unknown; result_state?: unknown } | null };
+  if (r.ok === false || r.state === 'unavailable') return 'degraded';
+  const meta = r._meta && typeof r._meta === 'object' ? r._meta : null;
+  if (meta && (meta.degraded === true || INCOMPLETE_RESULT_STATES.has(String(meta.result_state)))) return 'degraded';
+  return 'ok';
+}
+
+/** The failCardTurn reason for a turn made free by its tools, or null if every tool was ok. */
+export function unbillableToolReason(outcomes: ReadonlyArray<ToolBillingOutcome>): 'tool_failed' | 'tool_refused' | 'tool_degraded' | null {
+  if (outcomes.includes('failed')) return 'tool_failed';
+  if (outcomes.includes('refused')) return 'tool_refused';
+  if (outcomes.includes('degraded')) return 'tool_degraded';
+  return null;
 }
 
 /**
@@ -158,15 +203,28 @@ export function buildOpportunityContextBlock(
   question: string,
   /** Buyer office/DoDAAC/contact/incumbent lines (selected-notice.ts). Inserted before the notice text. */
   factLines: string[] = [],
+  /**
+   * 'selected' (default): the user has the listing selected on the map (#2096).
+   * 'mentioned': plain chat, the user named this notice's id or solicitation number (mentioned-notice.ts).
+   */
+  origin: 'selected' | 'mentioned' = 'selected',
 ): { block: string; source: { label: string; url: string | null } } {
   const sol = rec.solicitation_number || rec.notice_id;
   const line = (label: string, v: string | null | undefined) => `${label}: ${v && String(v).trim() ? String(v).trim() : 'not stated in the record'}`;
   const place = [rec.pop_city, rec.pop_state].filter(Boolean).join(', ');
   const desc = usableText(rec.description);
   const sow = usableText(rec.sow_text);
+  const header = origin === 'mentioned'
+    ? [
+      'MENTIONED OPPORTUNITY (loaded by Mindy from its SAM.gov record because the user named ' + sol + ' in this conversation; this is a source, not the user\'s words).',
+      'Questions about "this", "it", the solicitation, its contracting officer or contact, the incumbent, the buyer or the competition refer to THIS opportunity; answer them about it. Use the notice text below for its requirements, set-aside and instructions, and the notice point of contact when the user wants to reach the buyer or contracting officer (address a draft to that contact and cite the solicitation number). A question clearly about something else is answered as asked. When the record or documents do not contain an answer, say so plainly and do not guess. Cite facts from it as "SAM.gov notice ' + sol + '".',
+    ]
+    : [
+      'SELECTED OPPORTUNITY (loaded by Mindy from its SAM.gov record; this is a source, not the user\'s words).',
+      'The user has this opportunity selected on the map. Questions about "this", "it", the incumbent, the buyer or the competition refer to THIS opportunity; answer them about it. A question clearly about something else is answered as asked. When the record or documents do not contain an answer, say so plainly and do not guess. Cite facts from it as "SAM.gov notice ' + sol + '".',
+    ];
   const parts = [
-    'SELECTED OPPORTUNITY (loaded by Mindy from its SAM.gov record; this is a source, not the user\'s words).',
-    'The user has this opportunity selected on the map. Questions about "this", "it", the incumbent, the buyer or the competition refer to THIS opportunity; answer them about it. A question clearly about something else is answered as asked. When the record or documents do not contain an answer, say so plainly and do not guess. Cite facts from it as "SAM.gov notice ' + sol + '".',
+    ...header,
     line('Title', rec.title),
     line('Solicitation number', rec.solicitation_number),
     line('SAM notice id', rec.notice_id),

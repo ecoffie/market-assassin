@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   isCardChatEnabled, cardChatTurnCredits, parseOpportunityContext, cardChatAccess, isBillableTurn,
+  toolBillingOutcome, unbillableToolReason,
   buildOpportunityContextBlock, describeDeadline, CARD_CHAT_TOOLS, type OpportunityRecord,
 } from './card-chat';
 import { listMcpTools } from '@/lib/mcp/tool-registry';
@@ -75,6 +76,40 @@ describe('isBillableTurn — only successful answers with live data cost credits
   it.each([['length'], [null]])('an incomplete answer (finish %s) is free (approved rule 2026-11-14)', (fr) => {
     expect(isBillableTurn({ ...ok, finishReason: fr })).toBe(false);
   });
+  // P2 / audit B1: tool outcomes count. Failed, degraded or refused data → free.
+  it('all tools ok (or no tools) → still billable', () => {
+    expect(isBillableTurn({ ...ok, toolOutcomes: [] })).toBe(true);
+    expect(isBillableTurn({ ...ok, toolOutcomes: ['ok', 'ok'] })).toBe(true);
+  });
+  it.each([['failed'], ['degraded'], ['refused']] as const)('any %s tool → free', (o) => {
+    expect(isBillableTurn({ ...ok, toolOutcomes: ['ok', o] })).toBe(false);
+  });
+});
+
+describe('toolBillingOutcome', () => {
+  it.each([
+    ['failed', '{"ok":false}', 'failed'],
+    ['blocked_policy', '{"ok":false}', 'refused'],
+    ['rejected_invalid_input', '{}', 'refused'],
+    ['success', '{"ok":false,"error_category":"pipeline_unavailable"}', 'degraded'],
+    ['success', '{"state":"unavailable"}', 'degraded'],
+    ['success', '{"_meta":{"degraded":true}}', 'degraded'],
+    ['success', '{"_meta":{"result_state":"unavailable"}}', 'degraded'],
+    ['success', '{"ok":true,"_meta":{"grounded":false,"degraded":false,"result_state":"none_found"}}', 'ok'],
+    // Eric's rule: failed or incomplete = free. A partial result (part of the request not checked) is incomplete.
+    ['success', '{"ok":true,"_meta":{"result_state":"partial"}}', 'degraded'],
+    ['success', '{"ok":true,"_meta":{"result_state":"filter_not_applied"}}', 'degraded'],
+    ['success', '{"ok":true,"_meta":{"result_state":"results","ignored_args":[]}}', 'ok'],
+    ['success', 'not json', 'ok'],
+  ])('%s + %s → %s', (status, content, expected) => {
+    expect(toolBillingOutcome(status, content)).toBe(expected);
+  });
+  it('the reason prefers failed, then refused, then degraded', () => {
+    expect(unbillableToolReason(['ok'])).toBeNull();
+    expect(unbillableToolReason(['degraded', 'refused'])).toBe('tool_refused');
+    expect(unbillableToolReason(['degraded', 'failed', 'refused'])).toBe('tool_failed');
+    expect(unbillableToolReason(['degraded'])).toBe('tool_degraded');
+  });
 });
 
 describe('buildOpportunityContextBlock — facts only from the record', () => {
@@ -147,5 +182,26 @@ describe('CARD_CHAT_TOOLS — a narrowing list of real, chat-allowed tools', () 
     for (const n of ['schedule_market_search', 'delete_market_schedule', 'generate_market_report', 'draft_proposal', 'add_contacts_to_crm']) {
       expect(CARD_CHAT_TOOLS.has(n)).toBe(false);
     }
+  });
+});
+
+describe('buildOpportunityContextBlock origin (plain chat, mentioned-notice.ts)', () => {
+  const rec = {
+    notice_id: 'a'.repeat(32), title: 'T', solicitation_number: 'SPRPA127RUA05', department: null, sub_tier: null, office: null,
+    notice_type: null, set_aside_description: null, naics_code: null, psc_code: null, posted_date: null, response_deadline: null,
+    pop_city: null, pop_state: null, description: 'Approved sources only.', sow_text: null, ui_link: null, active: true,
+  };
+  it('default stays the selected-on-the-map wording', () => {
+    const { block } = buildOpportunityContextBlock(rec, 'q');
+    expect(block).toMatch(/^SELECTED OPPORTUNITY/);
+    expect(block).toContain('selected on the map');
+  });
+  it("'mentioned' says the user named it, never that it is selected on the map, and points drafts at the contact", () => {
+    const { block } = buildOpportunityContextBlock(rec, 'q', ['Notice point of contact: KELI.BARISH@DLA.MIL'], 'mentioned');
+    expect(block).toMatch(/^MENTIONED OPPORTUNITY .*the user named SPRPA127RUA05/);
+    expect(block).not.toContain('selected on the map');
+    expect(block).toMatch(/address a draft to that contact and cite the solicitation number/);
+    expect(block).toContain('Approved sources only.');
+    expect(block).toContain('KELI.BARISH@DLA.MIL');
   });
 });

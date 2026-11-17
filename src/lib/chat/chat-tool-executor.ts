@@ -25,6 +25,7 @@ import { preflightPaidInput } from '@/lib/mcp/credit-integrity';
 import { classifyCallOutcome } from '@/lib/mcp/call-outcome';
 import { chatToolPolicy, isChatOfferable, type ChatToolPolicy } from './chat-tool-policy';
 import { redactToolArgs } from './redact-args';
+import { withTimeout, ChatTimeoutError } from './turn-deadlines';
 
 export const MAX_CALLS_PER_ROUND = 8;
 export const MAX_WRITES_PER_ROUND = 1;
@@ -93,6 +94,22 @@ export interface ChatToolExecutorOptions {
   vaultEmail?: string;
   /** True when the acting workspace could not be resolved: Vault-reading tools refuse. */
   privateScopeUnavailable?: boolean;
+  /**
+   * A7: how long one call to a tool may run (ms). Unset = no limit (the previous behavior, kept for
+   * callers that bound the whole operation themselves). The Ask Mindy route always sets it.
+   */
+  toolTimeoutMs?: (name: string) => number;
+}
+
+/** A logging call may never hold up a turn: telemetry waits at most this long. */
+export const LOG_TIMEOUT_MS = 5_000;
+
+/** Per-round limits passed by the caller. */
+export interface RoundOptions {
+  /** Epoch ms after which no further call in this round starts, and running calls are cut off. */
+  deadlineAt?: number;
+  /** True once the turn has ended for the customer (watchdog): no further call starts, writes included. */
+  isCancelled?: () => boolean;
 }
 
 /** Registry tools that read the acting user's Vault (bound to the acting scope in chat). */
@@ -189,7 +206,7 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
     },
   ) {
     const isRegistry = deps.isMcpTool(name);
-    await deps.logCall({
+    const write = deps.logCall({
       userEmail: opts.userEmail,
       toolName: name || '(empty)',
       status,
@@ -208,12 +225,19 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
         errorCategory: fields.errorCategory ?? null,
       },
     });
+    try {
+      await withTimeout(Promise.resolve(write), LOG_TIMEOUT_MS, 'execution_log');
+    } catch (err) {
+      if (!(err instanceof ChatTimeoutError)) throw err;
+      console.error('[chat] execution log timed out (non-fatal):', name);
+    }
   }
 
   async function executeOne(
     call: ChatToolCall,
     budget: { calls: number; writes: number },
     planner: PlannerIdentity,
+    round: RoundOptions = {},
   ): Promise<ChatToolResult> {
     const executionId = randomUUID();
     const toolCallId = call.id || `call_${executionId.slice(0, 8)}`;
@@ -238,6 +262,21 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
       await log(planner, name, 'blocked_policy', executionId, { errorCategory: 'round_budget_exceeded' });
       return done('blocked_policy', 'not_evaluated', 'round_budget_exceeded',
         refusal('round_budget_exceeded', `Only ${MAX_CALLS_PER_ROUND} lookups run per step; this one was skipped. Do not treat it as an empty result.`));
+    }
+
+    // 1a) Turn cancelled (A7 watchdog): the customer has already been told the turn timed out, so nothing
+    // further may run on their behalf — above all no write.
+    if (round.isCancelled?.()) {
+      await log(planner, name, 'blocked_policy', executionId, { errorCategory: 'turn_cancelled' });
+      return done('blocked_policy', 'not_evaluated', 'turn_cancelled',
+        refusal('turn_cancelled', 'The turn ended before this lookup could run, so it did not run.'));
+    }
+
+    // 1b) Round deadline (A7): once the round's time is spent, later calls are refused, never started.
+    if (round.deadlineAt != null && Date.now() >= round.deadlineAt) {
+      await log(planner, name, 'blocked_policy', executionId, { errorCategory: 'round_deadline_exceeded' });
+      return done('blocked_policy', 'not_evaluated', 'round_deadline_exceeded',
+        refusal('round_deadline_exceeded', 'The lookups for this step ran out of time, so this one did not run. Do not treat it as an empty result.'));
     }
 
     // 2) Arguments. Refuse unparseable input instead of running it as {}.
@@ -307,15 +346,33 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
 
     // 6) Execute with per-tool error capture. ONLY the tool call itself is inside this try:
     // once the tool has returned (possibly after a write), nothing below may report it as failed.
+    // A7: the call is bounded by its own timeout and by the round deadline, whichever is sooner. A
+    // timed-out call keeps running in the background (tools take no abort signal); its late result is
+    // discarded, and a write's outcome is reported as UNKNOWN, never as done or not done.
     let result: Record<string, unknown> | undefined;
+    const limits = [
+      opts.toolTimeoutMs ? opts.toolTimeoutMs(name) : null,
+      round.deadlineAt != null ? round.deadlineAt - Date.now() : null,
+    ].filter((n): n is number => n != null);
+    const limitMs = limits.length ? Math.max(0, Math.min(...limits)) : null;
     try {
-      result = tier0.names.has(name)
+      const run = (async () => tier0.names.has(name)
         ? await tier0.execute(name, args)
         : (await deps.runMcpTool(name, args, {
             userEmail: opts.userEmail,
             ...(opts.vaultEmail && VAULT_GROUNDED_TOOLS.has(name) ? { vaultEmail: opts.vaultEmail } : {}),
-          })).result;
+          })).result)();
+      result = limitMs == null ? await run : await withTimeout(run, limitMs, `tool:${name}`);
     } catch (err) {
+      if (err instanceof ChatTimeoutError) {
+        const latencyMs = Date.now() - started;
+        console.error(`[chat] tool ${name} timed out after ${err.ms} ms`);
+        await safeLog(planner, name, 'failed', executionId, { args, latencyMs, errorCategory: 'tool_timeout' });
+        return done('failed', policy.decision, 'tool_timeout', refusal('tool_timeout',
+          policy.decision === 'allowed_write'
+            ? 'This change did not confirm in time. It may still complete: tell the user to check before trying again, and do not say it was or was not made.'
+            : 'This lookup timed out, so its data is unavailable. Do not treat it as an empty result.'));
+      }
       const latencyMs = Date.now() - started;
       console.error(`[chat] tool ${name} failed:`, err);
       await safeLog(planner, name, 'failed', executionId, { args, latencyMs, errorCategory: 'tool_error' });
@@ -336,7 +393,7 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
   }
 
   /** Run one model round of tool calls. Always returns one result per call, in order. */
-  async function executeRound(calls: ChatToolCall[], planner: PlannerIdentity): Promise<ChatToolResult[]> {
+  async function executeRound(calls: ChatToolCall[], planner: PlannerIdentity, round: RoundOptions = {}): Promise<ChatToolResult[]> {
     const budget = { calls: 0, writes: 0 };
     const out: ChatToolResult[] = [];
     // Sequential, as before (parallel execution of independent calls is Phase 2). Each call is
@@ -345,7 +402,7 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
     for (let i = 0; i < calls.length; i++) {
       const call = calls[i];
       try {
-        out.push(await executeOne(call, budget, planner));
+        out.push(await executeOne(call, budget, planner, round));
       } catch (err) {
         console.error('[chat] unexpected executor error (isolated to one call):', err);
         out.push({

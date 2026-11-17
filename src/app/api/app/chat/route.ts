@@ -57,9 +57,14 @@ import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/ca
 import { guardUnstatedStates, guardUnstatedCities } from '@/lib/chat/stated-filters';
 import { parseDisplayHint, displayHintNote } from '@/lib/chat/display-hint';
 import { compileIntent, enforceIntent, dedupeToolCalls, isMapScopeNote, splitViewPreamble } from '@/lib/chat/intent-compiler';
+import { sessionTitleFrom } from '@/lib/chat/view-preamble';
 import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, renderSbloContact, lintAnalysis, deterministicNextSteps, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, SBLO_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
+import { mixedTurnNote, composeMixedAnswer, type UnrenderedResult } from '@/lib/chat/mixed-turn';
+import { sourceFromToolResult, renderedStub, citationsFromSources, ledgerFromSources, parseLedger, ledgerNotes, type ContextSource, type SourceLedger } from '@/lib/chat/context-sources';
+import { guardFacts } from '@/lib/proposal/fact-guard';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
+import { chatDeadlines, toolTimeoutMs, readWithIdleTimeout, incompleteToolNotice, withTimeout, ChatTimeoutError } from '@/lib/chat/turn-deadlines';
 
 // Every Ask Mindy turn carries customer-private context (the user's profile; often Vault or
 // pipeline results). So every provider the chat route calls directly must be on the SAME
@@ -80,13 +85,18 @@ const TRACE_RESULT_CHARS = Number(process.env.ASK_MINDY_TRACE_RESULT_CHARS) || 6
 import { shadowEntitlement } from '@/lib/entitlements/shadow';
 import {
   isCardChatEnabled, cardChatTurnCredits, parseOpportunityContext, cardChatAccess, isBillableTurn,
-  CARD_CHAT_TOOLS, buildOpportunityContextBlock,
+  CARD_CHAT_TOOLS, buildOpportunityContextBlock, toolBillingOutcome, unbillableToolReason, type ToolBillingOutcome,
 } from '@/lib/chat/card-chat';
 import { SELECTED_NOTICE_COLUMNS, loadSelectedNoticeFacts, formatSelectedNoticeFacts, type SelectedNoticeRecord } from '@/lib/chat/selected-notice';
+import { resolveMentionedNotice, answerUsesNotice, type MentionedNoticeResult } from '@/lib/chat/mentioned-notice';
+import { abilityOneCaveat } from '@/lib/chat/category-caveats';
 import { parseTurnId, claimCardTurn, completeCardTurn, failCardTurn, type ClaimResult } from '@/lib/chat/card-chat-turns';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+// A7: an explicit platform limit. Must equal CHAT_ROUTE_MAX_DURATION_S (turn-deadlines.ts): the turn
+// watchdog fires before it, so a turn always ends with `error` + `done`, never a silent cut.
+export const maxDuration = 300;
 
 // B2: the answer-step model chain lives in resolveAnswerChain (planner-config.ts). The old
 // Groq llama-3.1-8b-instant backup is retired; Groq runs only if CHAT_ANSWER_FALLBACKS lists it.
@@ -114,6 +124,8 @@ function getSupabase() {
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  /** P3: the compact source ledger returned with that answer, re-sent by the client (untrusted). */
+  sources?: unknown;
 }
 
 interface ChatRequest {
@@ -197,6 +209,7 @@ VOICE:
 - Direct, plain language. Federal acronyms are fine (NAICS, OSBP, FAR, IDIQ, 8(a), HUBZone, WOSB, SDVOSB, SAM, GSA). Tech/sales jargon (TAL, ICP, ABM, GTM) is not.
 - NEVER say "I'm an AI" or "as a language model". You're Mindy.
 - Keep responses tight. Most answers are 3-6 sentences or a short numbered list. No essays.
+- ANSWER FIRST. The first sentence answers the question that was asked: for "which agencies should I target first" it names the first target and why; for "who should I contact" it names the contact. How you ranked, which data you used, its time window and freshness come AFTER the answer in at most two short sentences. Never open with methodology, data caveats or a list of steps you took.
 
 TODAY: {today} (US Eastern). Use this date for every time calculation. When the user asks about a window such as "the next 18 months", compute its end date from today and compare every date you report against it. Never call a date inside the window "outside" it, or the reverse.
 
@@ -208,7 +221,7 @@ GROUNDING:
 YOUR DATA TOOLS:
 You have a LARGE toolset over the federal Data Core — each tool's own description says exactly when to use it. USE them instead of giving generic advice: if a tool can answer a question with real data, call it. Never tell the user to "go check SAM.gov / the panel" for something a tool covers. What you can reach, by category:
 - THEIR OWN account (private): get_my_pipeline (their tracked pursuits/deadlines/stages) and search_my_vault (retrieves the records in their identity, past performance/CPARS, capabilities and team that match a query — always pass what they are asking about; it returns the relevant records, not the whole Vault). These return ONLY the workspace this user is working in — their own, or a client workspace they are authorized to coach (the result then carries workspace:"client"; say "this client's" rather than "your"). Never anyone else's.
-- ADD / SAVE / TRACK requests: chat cannot write to their pipeline, saved list or alerts. When they ask to add, save or track an opportunity, do NOT stop at "I can't": point them to the step that does it — the "Start pursuit" button on the opportunity's map card (adds it to their pursuits), or "Generate proposal" on that card to start a proposal workspace for it. For an ongoing alert on a market, offer schedule_market_search.
+- ADD / SAVE / TRACK requests: chat cannot write to their pipeline, saved list or alerts. When they ask to add, save or track an opportunity, do NOT stop at "I can't": point them to the step that does it — the "Start pursuit" button on the opportunity's map card (adds it to their pursuits), or "Generate proposal" on that card to start a proposal workspace for it. When the opportunity is attached to this chat (its notice chip shows above the message box), the chip's "Start a proposal" button does both: it saves it to My Pursuits and opens a proposal workspace. For an ongoing alert on a market, offer schedule_market_search.
 - OPPORTUNITIES: open SAM.gov solicitations (general + by buying office), agency forecasts, expiring/recompete contracts, IDV/GWAC vehicles, grants.
   ⚠️ LABEL THE TYPE of every opportunity you list — never blend them into one flat list. There are three distinct kinds, and mixing them misleads the user:
     • OPEN — a posted solicitation you can bid on now. It HAS a SAM.gov link + a response deadline. CTA: bid / view the solicitation.
@@ -233,6 +246,7 @@ Tool-use rules:
 - Is a contract still active / who replaced it: call search_past_contracts ONCE with include_status=true plus a keyword from the description in formal wording ("identification card", not "ID card"), the agency and the state implied by the place (or piid_prefix / the number the user gave). Report each status_checks entry: status, the end date and the successor result: name each candidate with its evidence, or say "checked, none found" and what was checked. Do not ask the user for a contract number first.
 - If a result has _meta.lag_note, say the data is current through that date and recent awards may not be published yet. Never say no award was made.
 - Incumbents: name one only when _meta.incumbent_finding is "identified". Otherwise follow _meta.absence_note: say you could not identify (or confirm) an incumbent and what was searched. Never say "there is no incumbent", "no one holds it", "it appears there is no incumbent" or "this is a new requirement" unless a record says so; not finding a prior award is not proof that none exists.
+- Small-business contact at a buying office or agency (small business specialist, SBLO, OSDBU/OSBP): call search_federal_contacts for the office AND lookup_federal_osbp for its department in the same step. If the office search names no small-business specialist, give the department's small business office from lookup_federal_osbp (office, director, email and phone exactly as returned, with its verified date), and say it is the agency-level small business office, not that buying office's own specialist. Do not stop at "I couldn't confirm a contact" when that lookup returned an office.
 - Contacts at a company: call get_sblo_contact. If it has no named liaison but returns registered_points_of_contact, name those people with their titles, say they are the firm's registered SAM points of contact (not a designated small business liaison) as of the as_of date, and never state an email or phone the tool did not return.
 - Who buys a kind of work in a city or metro: call get_buying_offices with the state, the core city in city (it expands to the metro automatically), and the NAICS. Name each contracting office with its code, the customer agencies in top_funding_offices, the obligated dollars, and where the work is performed; never say the office is located in the city.
 - How much spending runs through schedules, BPAs or IDIQs: call get_vehicle_spend_mix and give dollars and percent for each bucket, plus the verified, heuristic and unresolved shares. unavailable or scope_too_broad is not a zero: say so and narrow the window.
@@ -280,7 +294,8 @@ async function persistExchange(params: {
     .maybeSingle();
   if (existingErr) console.error('[chat] session query error:', existingErr.message);
 
-  const sessionTitle = params.userMessage.slice(0, 60).replace(/\s+/g, ' ').trim();
+  // Titled from the customer's typed words, never the Map view preamble stored with the message.
+  const sessionTitle = sessionTitleFrom(params.userMessage) || null;
   const nowIso = new Date().toISOString();
 
   if (existing) {
@@ -494,6 +509,8 @@ export async function POST(request: NextRequest) {
     if (claim.sessionId) sessionId = claim.sessionId;
   }
   const startedAt = Date.now();
+  // A7: every wait in this turn is bounded (src/lib/chat/turn-deadlines.ts).
+  const deadlines = chatDeadlines(process.env);
 
   // SSE response — manually constructed ReadableStream since the
   // Vercel Edge / Node runtime doesn't expose an out-of-the-box helper.
@@ -514,16 +531,45 @@ export async function POST(request: NextRequest) {
       let turnSettled = false;
       // True only when WE stopped reading the model because the browser left: the answer is incomplete.
       let streamCut = false;
+      // A7: the stream has been closed (done sent). After this, send() is a no-op.
+      let ended = false;
+      // A7: the answer provider stopped sending bytes mid-answer; the answer is cut and flagged.
+      let answerStalled = false;
+      // A7: the turn watchdog fired: error + done were sent and the card turn released.
+      let turnTimedOut = false;
+      let answerAbort: AbortController | null = null;
+      // The answer stream's reader, so the watchdog can end a pending read even if the abort is not honored.
+      let answerReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
       // A client that disconnected makes enqueue/close throw. That must never be mistaken for a
       // tool failure (it would inject a "tools unavailable" note after a completed write), and it
       // must never skip cost recording or persistence: both are wrapped and never throw.
       const send = (obj: unknown) => {
-        if (clientGone) return;
+        if (clientGone || ended) return;
         try { controller.enqueue(encoder.encode(sseEvent(obj))); } catch { clientGone = true; }
       };
       const closeStream = () => {
+        if (ended) return;
+        ended = true;
         try { controller.close(); } catch { clientGone = true; }
       };
+      // A7 turn watchdog: whatever is still waiting (a provider, a tool, a database read), the customer gets
+      // an error and the stream ends before the platform limit. A card turn is released (free, re-askable)
+      // instead of staying locked in progress for its lease.
+      const watchdog = setTimeout(() => {
+        if (ended) return;
+        turnTimedOut = true;
+        console.error('[chat] turn deadline reached after', deadlines.turnMs, 'ms');
+        try { answerAbort?.abort(new ChatTimeoutError('turn', deadlines.turnMs)); } catch { /* already done */ }
+        void answerReader?.cancel().catch(() => {});
+        send({ type: 'error', code: 'turn_timeout', message: customerErrorMessage('turn_timeout') });
+        send({ type: 'done' });
+        closeStream();
+        if (claimToken && turnId && !turnSettled) {
+          turnSettled = true;
+          void failCardTurn({ turnId, claimToken, reason: 'turn_timeout' })
+            .catch((e) => console.error('[chat] card turn fail-mark failed:', (e as Error)?.message));
+        }
+      }, deadlines.turnMs);
 
       try {
         // Tell client which session this exchange belongs to right away
@@ -540,13 +586,29 @@ export async function POST(request: NextRequest) {
         // No header → the caller's own data, with no extra query. See src/lib/chat/chat-acting-scope.ts.
         // The selected notice's buyer/contact/incumbent facts start loading now (incumbent bounded)
         // so they run alongside the scope + profile reads below.
-        const noticeFactsP = cardRecord ? loadSelectedNoticeFacts(cardRecord, { cacheKey: `chat:${sessionId}` }).catch(() => null) : Promise.resolve(null);
+        // Plain chat (nothing attached): the notice the user NAMED in their own words this conversation is
+        // resolved from our record and grounds the answer the same way (src/lib/chat/mentioned-notice.ts).
+        // Context only: card billing (cardCtx) is untouched, and nothing is stored.
+        const noticeP = (async () => {
+          let rec = cardRecord;
+          let origin: 'selected' | 'mentioned' = 'selected';
+          let mention: MentionedNoticeResult | null = null;
+          if (!rec && !selectedCtx) {
+            const priorTurns = Array.isArray(body.history) ? body.history.slice(-HISTORY_LIMIT) : [];
+            mention = await resolveMentionedNotice(getSupabase(), splitViewPreamble(message).rest || message, priorTurns)
+              .catch(() => ({ status: 'none' }) as MentionedNoticeResult);
+            if (mention.status === 'resolved') { rec = mention.notice.record; origin = 'mentioned'; }
+          }
+          const facts = rec ? await loadSelectedNoticeFacts(rec, { cacheKey: `chat:${sessionId}` }).catch(() => null) : null;
+          return { rec, origin, mention, facts };
+        })();
         const actingScope = await resolveChatActingScope(auth.email!, request);
         // Unresolved workspace → NO profile (the private tools refuse too): a coach acting for a
         // client must never get an answer built on their own profile.
         const profileEmail = vaultEmailFor(actingScope);
         const profile: BidderProfile = profileEmail ? await loadBidderProfile(profileEmail) : {};
-        const noticeFacts = await noticeFactsP;
+        const { rec: noticeRecord, origin: noticeOrigin, mention: mentionedNotice, facts: noticeFacts } = await noticeP;
+        cardRecord = noticeRecord;
         const userProfileBlock = formatProfileForPrompt(profile);
         const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
         // F1: the CURRENT_FIND contract (shared with the MCP host's P2 rule). Not for card chat, which answers
@@ -561,12 +623,26 @@ export async function POST(request: NextRequest) {
         ];
         // Card chat: the selected opportunity, loaded from our record, as a labeled source block.
         const cardContext = cardRecord
-          ? buildOpportunityContextBlock(cardRecord, splitViewPreamble(message).rest || message, noticeFacts ? formatSelectedNoticeFacts(noticeFacts) : [])
+          ? buildOpportunityContextBlock(cardRecord, splitViewPreamble(message).rest || message, noticeFacts ? formatSelectedNoticeFacts(noticeFacts) : [], noticeOrigin)
           : null;
         if (cardContext) messages.push({ role: 'system', content: cardContext.block });
+        // Category caveat grounded by the work the customer named in THIS message (janitorial → AbilityOne).
+        const customerWords = splitViewPreamble(message).rest || message;
+        const categoryNote = abilityOneCaveat(customerWords, interpretCapabilityNaics(customerWords).codes);
+        if (categoryNote) messages.push({ role: 'system', content: categoryNote });
 
         // Trim history to last HISTORY_LIMIT messages for prompt-size budget.
         const history = Array.isArray(body.history) ? body.history.slice(-HISTORY_LIMIT) : [];
+        // P3 (A2): the source ledgers the client re-sent with earlier answers, newest first. Untrusted: parsed
+        // and sanitized; private entries from another acting scope are dropped. They give "#12" a real id.
+        const actingScopeKey = actingScope.kind === 'client' ? `client:${actingScope.workspaceId}` : actingScope.kind;
+        const priorLedgers: SourceLedger[] = [...history].reverse()
+          .filter((h) => h.role === 'assistant')
+          .map((h) => parseLedger(h.sources, actingScopeKey))
+          .filter((l): l is SourceLedger => !!l)
+          .slice(0, 3);
+        const ledgerSystemNotes = ledgerNotes(splitViewPreamble(message).rest || message, priorLedgers);
+        for (const n of ledgerSystemNotes) messages.push({ role: 'system', content: n });
         for (const h of history) {
           if (h.role === 'user' || h.role === 'assistant') {
             messages.push({ role: h.role, content: String(h.content || '').slice(0, 2000) });
@@ -613,6 +689,7 @@ export async function POST(request: NextRequest) {
           { role: 'system', content: capabilityNote ? `${systemPrompt}\n\n${capabilityNote}` : systemPrompt },
         ];
         if (cardContext) toolRoundMessages.push({ role: 'system', content: cardContext.block });
+        for (const n of ledgerSystemNotes) toolRoundMessages.push({ role: 'system', content: n });
         for (const h of history) {
           if (h.role === 'user' || h.role === 'assistant') {
             toolRoundMessages.push({ role: h.role, content: String(h.content || '').slice(0, 2000) });
@@ -657,6 +734,7 @@ export async function POST(request: NextRequest) {
         } = { planner: null, planner_attempts: [], tools_offered: 0, tool_executions: [], answer: null, answer_attempts: [], notices: [],
               ...(selectedCtx ? { context: { kind: 'opportunity' as const, notice_id: selectedCtx.noticeId } } : {}) };
         if (selectedNoticeMiss) turnTrace.notices.push(`selected_notice:${selectedNoticeMiss}`);
+        if (mentionedNotice && mentionedNotice.status !== 'none') turnTrace.notices.push(`mentioned_notice:${mentionedNotice.status}`);
         if (noticeFacts) turnTrace.notices.push(`selected_notice_incumbent:${noticeFacts.incumbent.finding}`);
         if (capabilityNote) turnTrace.notices.push('capability_interpreted');
         if (staging) turnTrace.notices.push(`staging_model_config:${staging.name}`);
@@ -664,12 +742,29 @@ export async function POST(request: NextRequest) {
           turnTrace.notices.push(code);
           send({ type: 'notice', code, message: text });
         };
+        // Usage is recorded once per step, including on paths the watchdog cut short (review LOW-2).
+        let plannerUsageRecorded = false;
+        const recordPlannerUsage = () => {
+          if (plannerUsageRecorded || !toolProvider) return;
+          plannerUsageRecorded = true;
+          void recordLlmUsage({ userEmail: auth.email, tool: 'chat_tool_round', provider: toolProvider, model: toolModel, usage: toolUsageForCost || undefined });
+        };
         let plannerUnavailable = false;
         // Index of an assistant tool_calls turn whose results have not all been appended yet.
         let pendingToolTurnIdx: number | null = null;
         const renderedRecords: RenderedRecords[] = [];
         // Option B: true while every tool result this turn was shown as a verified list.
         let allResultsRendered = true;
+        // A1: the results that were NOT rendered (other tools, or a rendered tool that failed). In a mixed
+        // turn the no-facts rule applies to the rendered lists only; these must still reach the user.
+        const unrenderedResults: UnrenderedResult[] = [];
+        // P2 / audit B1: one billing outcome per executed tool call. Any failed, refused or degraded call
+        // makes a card turn free (isBillableTurn), like any other incomplete answer.
+        const toolBillingOutcomes: ToolBillingOutcome[] = [];
+        // P3: this turn's tool results as ContextSources (ledger, citations, A8 stubs), and their full contents
+        // for the log-only grounding check.
+        const turnSources: ContextSource[] = [];
+        const groundingTexts: string[] = [];
         try {
           if (actingScope.kind === 'client') turnTrace.notices.push('acting_scope:client_workspace');
           if (actingScope.kind === 'unavailable') turnTrace.notices.push('acting_scope:unavailable');
@@ -682,6 +777,7 @@ export async function POST(request: NextRequest) {
             tier0: { defs: TIER0_TOOL_DEFS, names: TIER0_TOOL_NAMES, execute: (n, a) => tier0Runtime.execute(n, a) },
             // Card chat offers only its opportunity tools (narrowing; the policy still applies).
             ...(cardCtx ? { allowedToolNames: CARD_CHAT_TOOLS } : {}),
+            toolTimeoutMs: (n) => toolTimeoutMs(n, deadlines),
           });
           // Offered tools are filtered by the chat tool policy (blocked tools are never shown).
           // B2: an open-opportunity question is not offered the expiring-contracts tool (it returns
@@ -744,7 +840,7 @@ export async function POST(request: NextRequest) {
                 };
                 if (/haiku-4-5|sonnet-4-|opus-4-[0-5]|claude-3/i.test(t.model)) cbody.temperature = 0;
                 const cr = await fetch('https://api.anthropic.com/v1/messages', {
-                  method: 'POST',
+                  method: 'POST', signal: AbortSignal.timeout(deadlines.plannerMs),
                   headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
                   body: JSON.stringify(cbody),
                 });
@@ -752,7 +848,7 @@ export async function POST(request: NextRequest) {
                 return { ok: false, status: cr.status, detail: (await cr.text().catch(() => '')).slice(0, 300) };
               }
               const r = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST', headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+                method: 'POST', signal: AbortSignal.timeout(deadlines.plannerMs), headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   model: t.model, messages: plannerMessages, ...openAiChatParams(t.model, { temperature: 0, maxTokens: TOOL_ROUND_MAX_TOKENS }),
                   // OPP_INTENT (Andre fix) → 'required' so an opportunity search can't decline the tool.
@@ -849,10 +945,15 @@ export async function POST(request: NextRequest) {
                 for (const n of notes?.applied ?? []) scopeApplied.add(n);
                 for (const n of notes?.unapplied ?? []) scopeUnapplied.add(n);
               }
-              const results = await executor.executeRound(toolCalls.filter((tc) => keepIds.has(tc.id)), { provider: first.provider, model: first.model });
+              // A7 (review LOW-1): a planner that answered after the watchdog fired runs nothing — the customer
+              // has already seen "took too long". Each call re-checks too (isCancelled), so a write never starts late.
+              if (turnTimedOut) { recordPlannerUsage(); return; }
+              const results = await executor.executeRound(toolCalls.filter((tc) => keepIds.has(tc.id)), { provider: first.provider, model: first.model }, { deadlineAt: Date.now() + deadlines.toolRoundBudgetMs, isCancelled: () => turnTimedOut });
               // B2: the model sees a BOUNDED copy of each result (structural shortening with a
               // shown-of-total report); the renderers below still read the full r.content.
               const perResultCap = perResultBudget(results.length);
+              const toolMessageIdx = new Map<string, number>();
+              const renderedByCall = new Map<string, RenderedRecords>();
               for (const tc of toolCalls) {
                 const r = results.find((x) => x.tool_call_id === tc.id);
                 const dup = dedupe.duplicates.find((d) => d.id === tc.id);
@@ -864,13 +965,15 @@ export async function POST(request: NextRequest) {
                   const bounded = boundToolResult(r.content, perResultCap);
                   if (bounded.truncated) turnTrace.notices.push(`tool_result_bounded:${r.record.tool}:${bounded.originalChars}->${bounded.content.length}`);
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  (messages as any[]).push({ role: 'tool', tool_call_id: r.tool_call_id, content: bounded.content });
+                  const idx = (messages as any[]).push({ role: 'tool', tool_call_id: r.tool_call_id, content: bounded.content }) - 1;
+                  toolMessageIdx.set(r.tool_call_id, idx);
                 }
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 else if (dup) (messages as any[]).push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify({ duplicate_of: dup.of, note: 'Same search as another call in this turn; its results are shown once.' }) });
               }
               pendingToolTurnIdx = null;
               turnTrace.tool_executions = results.map((r) => r.record);
+              for (const r of results) toolBillingOutcomes.push(toolBillingOutcome(r.record.status, r.content));
               // Ported release-hardening R6/R10: disclose codes Mindy chose, from what each strict-filter tool
               // reports it APPLIED (src/lib/chat/code-disclosure.ts).
               scopeInferred = inferredCodeDisclosure(
@@ -893,18 +996,39 @@ export async function POST(request: NextRequest) {
                   [SBLO_TOOL]: renderSbloContact,
                 };
                 const renderer = renderers[r.record.tool];
-                if (r.record.status !== 'success' || !renderer) { allResultsRendered = false; continue; }
+                const unrendered = () => { allResultsRendered = false; unrenderedResults.push({ tool: r.record.tool, status: r.record.status }); };
+                if (r.record.status !== 'success' || !renderer) { unrendered(); continue; }
                 try {
                   const parsed = JSON.parse(r.content);
                   const rendered = renderer(parsed);
-                  if (rendered) renderedRecords.push(rendered);
-                  else allResultsRendered = false;
+                  if (rendered) { renderedRecords.push(rendered); renderedByCall.set(r.tool_call_id, rendered); }
+                  else unrendered();
                 } catch (renderErr) {
-                  allResultsRendered = false;
+                  unrendered();
                   console.error('[chat] record render failed:', renderErr);
                 }
               }
               crossCheckOffices(renderedRecords);
+              // P3: every result becomes a ContextSource. A8: a rendered tool's JSON is not sent to the answer
+              // model a second time (the VERIFIED RECORD LIST carries it); a short stub keeps the call/result pair.
+              const retrievedAt = new Date().toISOString();
+              for (const r of results) {
+                groundingTexts.push(r.content);
+                const src = sourceFromToolResult({
+                  tool: r.record.tool, toolCallId: r.tool_call_id, status: r.record.status, content: r.content,
+                  rendered: renderedByCall.get(r.tool_call_id) ?? null, argsRedacted: r.argsRedacted,
+                  owner: { email: (actingScope.kind === 'client' ? actingScope.vaultEmail : auth.email!) || auth.email!, scope: actingScopeKey },
+                  retrievedAt,
+                });
+                turnSources.push(src);
+                const idx = toolMessageIdx.get(r.tool_call_id);
+                if (src.rendered && idx != null) {
+                  const stub = renderedStub(src);
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (messages as any[])[idx].content = stub;
+                  toolOriginals.set(r.tool_call_id, stub);
+                }
+              }
               if (TRACE_EVENTS) {
                 send({
                   type: 'trace',
@@ -917,9 +1041,9 @@ export async function POST(request: NextRequest) {
                   })),
                 });
               }
-              if (results.some((r) => r.record.status === 'failed')) {
-                notify('lookup_failed', 'One of the data lookups failed, so this answer may be incomplete.');
-              }
+              // A6: every non-success status is announced, not only `failed` (refusals, round budget, timeouts).
+              const incomplete = incompleteToolNotice(results.map((r) => r.record));
+              if (incomplete) notify(incomplete.code, incomplete.message);
             }
           }
         } catch (toolErr) {
@@ -943,11 +1067,17 @@ export async function POST(request: NextRequest) {
           });
         }
         // Log the tool-round LLM spend separately (fire-and-forget).
-        if (toolProvider) {
-          void recordLlmUsage({ userEmail: auth.email, tool: 'chat_tool_round', provider: toolProvider, model: toolModel, usage: toolUsageForCost || undefined });
-        }
+        recordPlannerUsage();
+        // A7 (review LOW-1): no answer request after the watchdog ended the turn.
+        if (turnTimedOut) return;
         // ── end Tier-0 tool round ──
-        if (renderedRecords.length) {
+        // A1: a mixed turn (some results rendered, some not) scopes the no-facts rule to the rendered lists.
+        const mixedTurn = renderedRecords.length > 0 && unrenderedResults.length > 0;
+        if (mixedTurn) {
+          turnTrace.notices.push(`mixed_turn:${unrenderedResults.map((u) => u.tool).join(',')}`);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (messages as any[]).push({ role: 'system', content: mixedTurnNote(renderedRecords, unrenderedResults) });
+        } else if (renderedRecords.length) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (messages as any[]).push({
             role: 'system',
@@ -973,8 +1103,8 @@ export async function POST(request: NextRequest) {
         // cheaper model. Protects the $149 margin now that chat leads with gpt-4o.
         // (Resolved once above for the tool round; reuse to avoid a second budget read.)
         const chatModel = chatModelEarly;
-        const streamFrom = (url: string, key: string, model: string, msgs: unknown[]) => fetch(url, {
-          method: 'POST',
+        const streamFrom = (url: string, key: string, model: string, msgs: unknown[], signal: AbortSignal) => fetch(url, {
+          method: 'POST', signal,
           headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
           // stream_options.include_usage → OpenAI/Groq emit a final usage-only
           // chunk after the deltas. Without it, a streaming call returns NO usage
@@ -1021,16 +1151,24 @@ export async function POST(request: NextRequest) {
             void recordProviderEvent({ kind: answerChain[i + 1] ? 'answer_fallback' : 'answer_failure', provider: t.provider, model: t.model, status: null, detail: `request_too_large: est ${fit.estimate} > budget ${fit.budget} tokens (not sent)`, userEmail: auth.email! });
             continue;
           }
+          // A7: the connect wait is bounded (then the next model is tried); the same controller lets the
+          // watchdog stop a stream that is already flowing.
+          const ctrl = new AbortController();
+          answerAbort = ctrl;
+          const connectTimer = setTimeout(() => ctrl.abort(new ChatTimeoutError('answer_connect', deadlines.answerConnectMs)), deadlines.answerConnectMs);
           try {
-            r = await streamFrom(ANSWER_ENDPOINTS[t.provider], answerKey(modelEnv, t) || '', t.model, fit.messages);
+            r = await streamFrom(ANSWER_ENDPOINTS[t.provider], answerKey(modelEnv, t) || '', t.model, fit.messages, ctrl.signal);
           } catch (e) {
             detail = String((e as Error)?.message || e).slice(0, 300);
+          } finally {
+            clearTimeout(connectTimer);
           }
+          if (turnTimedOut) break;
           if (r && r.ok && r.body) {
             groqRes = r; usedProvider = t.provider; usedModel = t.model; answerFallback = i > 0;
             break;
           }
-          if (r) detail = (await r.text().catch(() => '')).slice(0, 300);
+          if (r) detail = (await withTimeout(r.text(), 5_000, 'answer_error_body').catch(() => '')).slice(0, 300);
           turnTrace.answer_attempts.push({ provider: t.provider, model: t.model, status: r ? r.status : null, code: providerErrorCode(detail, r) });
           const next = answerChain[i + 1];
           void recordProviderEvent({
@@ -1082,7 +1220,14 @@ export async function POST(request: NextRequest) {
         let tokensUsed: number | null = null;
         // Full usage object (prompt/completion split) for cost attribution.
         let usageForCost: { prompt_tokens?: number; completion_tokens?: number } | null = null;
+        let answerUsageRecorded = false;
+        const recordAnswerUsage = () => {
+          if (answerUsageRecorded) return;
+          answerUsageRecorded = true;
+          void recordLlmUsage({ userEmail: auth.email, tool: 'chat', provider: usedProvider, model: usedModel, usage: usageForCost || undefined });
+        };
         const reader = groqRes.body.getReader();
+        answerReader = reader;
         const decoder = new TextDecoder();
         let leftover = '';
         let finishReason: string | null = null;
@@ -1090,7 +1235,22 @@ export async function POST(request: NextRequest) {
         while (true) {
           // Nobody is reading: stop the provider stream instead of generating unread tokens.
           if (clientGone) { streamCut = true; await reader.cancel().catch(() => {}); break; }
-          const { done, value } = await reader.read();
+          if (turnTimedOut) { await reader.cancel().catch(() => {}); break; }
+          // A7: a provider that stops sending mid-answer is cut after answerIdleMs, never awaited forever.
+          let read: ReadableStreamReadResult<Uint8Array> | 'timeout';
+          try {
+            read = await readWithIdleTimeout(reader, deadlines.answerIdleMs);
+          } catch (readErr) {
+            if (turnTimedOut) break; // the watchdog aborted the stream; it already ended the turn
+            throw readErr;
+          }
+          if (read === 'timeout') {
+            answerStalled = true;
+            void reader.cancel().catch(() => {});
+            try { answerAbort?.abort(new ChatTimeoutError('answer_idle', deadlines.answerIdleMs)); } catch { /* done */ }
+            break;
+          }
+          const { done, value } = read;
           if (done) break;
           const chunkStr = leftover + decoder.decode(value, { stream: true });
           const lines = chunkStr.split('\n');
@@ -1126,6 +1286,20 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        if (answerStalled) {
+          turnTrace.notices.push('answer_stalled');
+          if (!assistantContent.trim()) {
+            // Nothing was shown: an error, not a blank bubble. The prompt was still sent, so its usage counts.
+            send({ type: 'error', code: 'answer_unavailable', message: customerErrorMessage('answer_unavailable') });
+            send({ type: 'done' });
+            closeStream();
+            recordAnswerUsage();
+            return;
+          }
+          notify('answer_incomplete', 'Mindy stopped responding partway through this answer, so it is incomplete. Please try again.');
+        }
+        if (turnTimedOut) { recordAnswerUsage(); return; }
+
         // Emit citations after the response completes. v2 (May 31): no
         // longer parse inline [→ X] markers from the response — those
         // confused users when the underlying doc had no public URL.
@@ -1149,21 +1323,26 @@ export async function POST(request: NextRequest) {
           // Option B (rel2 R9): when every result is a verified list, the closing is built from those lists
           // only; the model's closing is not shown (it could refer to things the answer does not show).
           const deterministic = allResultsRendered ? deterministicNextSteps(renderedRecords) : '';
-          const linted = deterministic ? { text: deterministic, dropped: [] as string[] } : lintAnalysis(
-            assistantContent.slice(modelTextStart),
-            anyCheck
-              ? 'Review the records marked CHECK above before pursuing them.'
-              : anyShown
-                ? 'The figures above come directly from the source data for this question.'
-                : 'Nothing verified was found for this search; check SAM.gov award notices or the agency\'s announcements for newer information.',
-          );
+          const lintFallback = anyCheck
+            ? 'Review the records marked CHECK above before pursuing them.'
+            : anyShown
+              ? 'The figures above come directly from the source data for this question.'
+              : 'Nothing verified was found for this search; check SAM.gov award notices or the agency\'s announcements for newer information.';
+          // A1: in a mixed turn, part 1 (the other lookups) is kept as a normal answer minus restatements of the
+          // rendered records; only part 2 (after NEXT STEPS:) gets the next-step lint.
+          const mixed = !deterministic && mixedTurn ? composeMixedAnswer(assistantContent.slice(modelTextStart), renderedRecords, lintFallback) : null;
+          if (mixed && !mixed.markerFound) turnTrace.notices.push('mixed_turn:marker_missing');
+          const linted = deterministic ? { text: deterministic, dropped: [] as string[] }
+            : mixed ? { text: mixed.text, dropped: mixed.dropped }
+              : lintAnalysis(assistantContent.slice(modelTextStart), lintFallback);
           if (linted.dropped.length) {
             turnTrace.notices.push(`analysis_sentences_dropped:${linted.dropped.length}`);
             console.warn('[chat] analysis sentences dropped:', linted.dropped);
           }
           assistantContent = assistantContent.slice(0, modelTextStart) + linted.text;
           send({ type: 'token', content: linted.text });
-          const problems = checkSummaryAgainstRecords(assistantContent.slice(modelTextStart), renderedRecords);
+          // A1: in a mixed turn, part 1 counts belong to the OTHER lookups; only part 2 speaks about the records.
+          const problems = checkSummaryAgainstRecords(mixed ? mixed.nextStepsText : assistantContent.slice(modelTextStart), renderedRecords);
           if (problems.length) {
             const totals = renderedRecords.map((r) => r.total).join(' and ');
             const correction = `\n\nCount check: the verified record count for this search is ${totals}; the list above is authoritative.`;
@@ -1205,9 +1384,39 @@ export async function POST(request: NextRequest) {
           turnTrace.notices.push('truncated');
           send({ type: 'truncated', message: 'This answer hit its length limit and was cut off. Ask Mindy to continue, or narrow the question.' });
         }
-        const citedSources: CitedSource[] = cardContext
-          ? [{ title: cardContext.source.label, url: cardContext.source.url, doc_type: 'sam_notice', source_path: null, document_id: selectedCtx?.noticeId ?? null }]
-          : [];
+        // A notice carried over from an EARLIER turn stays as context (so "Email the contracting officer" still
+        // works), but the SAM.gov chip is shown only if this answer actually used it. Otherwise every later,
+        // unrelated answer was cited to that notice, and the saved copy kept the wrong chip on reload.
+        const staleMention = noticeOrigin === 'mentioned' && mentionedNotice?.status === 'resolved'
+          && mentionedNotice.notice.fromEarlierTurn && !answerUsesNotice(assistantContent, cardRecord);
+        if (staleMention) turnTrace.notices.push('mentioned_notice:chip_dropped_unused');
+        // P3 (A5): citations come from this turn's sources that returned data (no longer always []); the
+        // selected/mentioned SAM.gov notice stays first when it applies.
+        const citedSources: CitedSource[] = [
+          ...(cardContext && !staleMention
+            ? [{ title: cardContext.source.label, url: cardContext.source.url, doc_type: 'sam_notice', source_path: cardRecord ? `sam_notice:${cardRecord.notice_id}` : null, document_id: null }]
+            : []),
+          ...citationsFromSources(turnSources),
+        ];
+        // P3: log-only grounding check (never changes or blocks the answer). Specifics in the model's own text
+        // that trace to no tool result, rendered list, selected notice, profile or the user's words are counted.
+        try {
+          const modelText = assistantContent.slice(modelTextStart);
+          if (modelText.trim()) {
+            const grounding = [message, ...history.map((h) => String(h.content || '')), userProfileBlock, cardContext?.block ?? '',
+              ...renderedRecords.map((r) => r.text), ...groundingTexts].join('\n');
+            const g = guardFacts(modelText, grounding);
+            if (g.unverified.length) {
+              turnTrace.notices.push(`grounding_unverified:${g.unverified.length}`);
+              turnTrace.notices.push(`grounding_kinds:${[...new Set(g.unverified.map((f) => f.kind))].join(',')}`);
+              console.warn('[chat] grounding check (log-only):', g.unverified.length, 'unverified specific(s)');
+            }
+          }
+        } catch (gErr) {
+          console.error('[chat] grounding check failed (non-fatal):', (gErr as Error)?.message);
+        }
+        // P3 (A2): the compact source ledger, kept by the client and re-sent with history.
+        send({ type: 'sources', ledger: ledgerFromSources(turnSources) });
         send({ type: 'citations', sources: citedSources });
 
         // Card chat charge: ONCE PER QUESTION. A complete answer is saved with its sources and debited in ONE
@@ -1216,8 +1425,8 @@ export async function POST(request: NextRequest) {
         // empty, degraded or incomplete answer (including one we stopped because the browser left) is marked
         // failed: free, and the same question may be asked again. Pro answers are saved with 0 credits.
         let creditsCharged = 0;
-        if (claimToken && turnId) {
-          const complete = isBillableTurn({ billable: true, answer: assistantContent, streamError: streamCut, plannerUnavailable, finishReason });
+        if (claimToken && turnId && !turnTimedOut) {
+          const complete = isBillableTurn({ billable: true, answer: assistantContent, streamError: streamCut || answerStalled, plannerUnavailable, finishReason, toolOutcomes: toolBillingOutcomes });
           if (complete) {
             try {
               const c = await completeCardTurn({
@@ -1236,10 +1445,14 @@ export async function POST(request: NextRequest) {
               turnTrace.notices.push('card_turn:complete_error');
             }
           } else {
+            const toolReason = unbillableToolReason(toolBillingOutcomes);
+            // Precedence (Agent 4): client_disconnected → answer_stalled → tools_unavailable → tool_* → empty → incomplete.
             const reason = streamCut ? 'client_disconnected'
-              : plannerUnavailable ? 'tools_unavailable'
-                : !assistantContent.trim() ? 'empty_answer'
-                  : `incomplete:${finishReason ?? 'no_finish'}`;
+              : answerStalled ? 'answer_stalled'
+                : plannerUnavailable ? 'tools_unavailable'
+                  : toolReason ? toolReason
+                    : !assistantContent.trim() ? 'empty_answer'
+                      : `incomplete:${finishReason ?? 'no_finish'}`;
             try {
               await failCardTurn({ turnId, claimToken, reason });
               turnSettled = true;
@@ -1255,13 +1468,7 @@ export async function POST(request: NextRequest) {
 
         // Cost attribution — this route calls the LLM provider directly (bypasses
         // callLLM), so log usage explicitly. Fire-and-forget; never throws.
-        void recordLlmUsage({
-          userEmail: auth.email,
-          tool: 'chat',
-          provider: usedProvider,
-          model: usedModel,
-          usage: usageForCost || undefined,
-        });
+        recordAnswerUsage();
 
         // Fire-and-forget persistence (no await — don't block response close)
         const latencyMs = Date.now() - startedAt;
@@ -1282,6 +1489,7 @@ export async function POST(request: NextRequest) {
         send({ type: 'done' });
         closeStream();
       } finally {
+        clearTimeout(watchdog);
         // Any path that did not settle the turn (provider failure, early return, thrown error) leaves it
         // free and re-askable. The update matches only this claim, so it can never undo a completed turn.
         if (claimToken && turnId && !turnSettled) {

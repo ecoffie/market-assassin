@@ -8,6 +8,7 @@ import type { LoiFields } from '@/lib/proposal/loi-fields';
 import { loiFieldsHaveContent } from '@/lib/proposal/loi-fields';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import ProposalChat from './ProposalChat';
+import ProposalEditor from '../proposal/ProposalEditor';
 import DocManifest from './DocManifest';
 import BidDecisionGate from './BidDecisionGate';
 import { mapLinkForOpportunity } from '@/lib/maps/map-links';
@@ -138,6 +139,8 @@ const LOI_RESPONSE_SECTION_TABS: Array<{ id: SectionType; label: string; targetW
 
 interface SectionDraft {
   draft: string;
+  /** Formatting + images from the Word-style editor (absent until the section is edited there). */
+  html?: string;
   wordCount: number;
   targetWords: number;
   generatedAt: number;
@@ -917,7 +920,6 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   // a live drafting run is never clobbered.
   useEffect(() => {
     if (!email || restoredOnceRef.current) return;
-    restoredOnceRef.current = true;
     let cancelled = false;
     (async () => {
       try {
@@ -925,9 +927,13 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         if (!res.ok) return;
         const data = await res.json();
         const sections = (data?.sections || []) as Array<{
-          section: SectionType; draft: string; wordCount: number; targetWords: number; profileGrounded?: boolean;
+          section: SectionType; draft: string; wordCount: number; targetWords: number; profileGrounded?: boolean; html?: string;
         }>;
-        if (cancelled || sections.length === 0) return;
+        // Mark restored only once a run actually completes: a run cancelled by an effect re-run
+        // (React dev double-invoke, an email change) must not block the next one.
+        if (cancelled) return;
+        restoredOnceRef.current = true;
+        if (sections.length === 0) return;
         setDrafts(prev => {
           // Never overwrite drafts the user generated this session.
           const hasLive = Object.values(prev).some(d => !!d?.draft);
@@ -937,6 +943,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             if (!s.section || !s.draft) continue;
             next[s.section] = {
               draft: s.draft,
+              html: s.html,
               wordCount: s.wordCount,
               targetWords: s.targetWords,
               profileGrounded: s.profileGrounded,
@@ -986,12 +993,6 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     return () => clearInterval(interval);
   }, [draftAllLoading]);
 
-  const scrollToReview = useCallback(() => {
-    setShowAdvancedOutputs(true);
-    requestAnimationFrame(() => {
-      reviewSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  }, []);
 
   const generateDraft = useCallback(async (sectionType: SectionType) => {
     if (!email || !uploadedRfp) return;
@@ -1098,9 +1099,8 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         setActiveSection(data.sections[0].section);
       }
       setShowAdvancedOutputs(true);
-      requestAnimationFrame(() => {
-        reviewSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
+      // Land the user in the Word-style editor with every drafted section on the page.
+      if ((data.sections || []).length > 0) setEditorOpen(true);
     } catch (err) {
       // A user-initiated Stop shows a neutral notice, not a scary error.
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -1134,6 +1134,21 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           wordCount: text.split(/\s+/).filter(Boolean).length,
         },
       };
+    });
+  }, []);
+
+  // Word-style editor (2026-11-17). Edits arrive as text + html; generatedAt is kept so the editor
+  // does not rebuild a section from text under the user's caret. A section typed from scratch is
+  // created with generatedAt 0 (the editor's own marker for "already in sync").
+  const [editorOpen, setEditorOpen] = useState(false);
+  const onEditorSectionChange = useCallback((id: string, text: string, html: string) => {
+    const sectionType = id as SectionType;
+    setDrafts(prev => {
+      const existing = prev[sectionType];
+      const wordCount = text.split(/\s+/).filter(Boolean).length;
+      if (existing) return { ...prev, [sectionType]: { ...existing, draft: text, html, wordCount } };
+      const target = [...RFP_SECTION_TABS, ...LOI_RESPONSE_SECTION_TABS].find(t => t.id === sectionType)?.targetWords || 300;
+      return { ...prev, [sectionType]: { draft: text, html, wordCount, targetWords: target, generatedAt: 0 } };
     });
   }, []);
 
@@ -1686,6 +1701,35 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
 
   const pack = selectedOpportunity ? buildPrepPack(selectedOpportunity) : null;
 
+  if (editorOpen && email) {
+    const due = activePursuit?.response_deadline ? formatDate(activePursuit.response_deadline) : '';
+    return (
+      <ProposalEditor
+        email={email}
+        title={activePursuit?.title || exportContextName.replace(/\.(pdf|docx|txt)$/i, '') || proposalFlowName}
+        subtitle={[activePursuit?.agency, due ? `Due ${due}` : ''].filter(Boolean).join(' · ') || undefined}
+        pipelineId={activePursuitId}
+        rfpText={uploadedRfp?.text || ''}
+        rfpFileName={uploadedRfp?.fileName || ''}
+        saveFileName={uploadedRfp?.fileName || restoredDraftFile || 'untitled RFP'}
+        sections={currentSectionTabs}
+        drafts={drafts}
+        onSectionChange={onEditorSectionChange}
+        onDraftSection={(id) => generateDraft(id as SectionType)}
+        draftingSection={draftLoading}
+        canDraft={!!uploadedRfp?.text?.trim()}
+        draftError={draftError}
+        requirements={compliance.map(c => ({ id: c.id, text: c.requirement, section: c.section, status: c.status }))}
+        onRequirementStatus={(id, status) => updateRequirement(id, { status })}
+        onFindRequirements={uploadedRfp?.text?.trim() ? () => { void generateCompliance(); } : undefined}
+        findingRequirements={complianceLoading}
+        onExportPackage={() => exportProposalPackage()}
+        exportingPackage={exporting}
+        onClose={() => setEditorOpen(false)}
+      />
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1706,6 +1750,17 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {(hasAnyDraft || responseOutputsReady) && (
+            <button
+              type="button"
+              onClick={() => setEditorOpen(true)}
+              data-testid="open-proposal-editor"
+              className="px-4 py-2 bg-[#006aff] hover:bg-[#0057d1] text-white text-sm font-semibold rounded-lg transition-colors inline-flex items-center gap-2"
+            >
+              <PenLine className="h-4 w-4" strokeWidth={2} />
+              {hasAnyDraft ? 'Open in editor' : 'Write in the editor'}
+            </button>
+          )}
           {(activePursuitId || uploadedRfp) && (
             <button
               type="button"
@@ -2504,7 +2559,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               <div className="flex flex-wrap gap-3">
                 <button
                   type="button"
-                  onClick={scrollToReview}
+                  onClick={() => setEditorOpen(true)}
                   className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-purple-600 hover:bg-purple-500 text-white transition-colors"
                 >
                   Review my draft

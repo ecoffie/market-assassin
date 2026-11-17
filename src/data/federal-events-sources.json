@@ -166,9 +166,9 @@
       "value": "high",
       "verification": {
         "status": "verified_upcoming",
-        "checked_at": "2026-11-09",
+        "checked_at": "2026-11-17",
         "source_url": "https://www.ncmahq.org/events",
-        "note": "Lists Nov 12, 2026; Feb 21-23, 2027; Jul 25-28, 2027."
+        "note": "Checked 2026-11-17: Warfighter Acquisition Forum Nov 12, 2026 (past); upcoming: Nexus Feb 21-23, 2027; World Congress Jul 25-28, 2027."
       }
     },
     "act_iac": {
@@ -402,9 +402,9 @@
       "value": "high",
       "verification": {
         "status": "verified_upcoming",
-        "checked_at": "2026-11-09",
+        "checked_at": "2026-11-17",
         "source_url": "https://www.energy.gov/osbp/events",
-        "note": "Lists INL Industry Days Nov 11-12, 2026."
+        "note": "Checked 2026-11-17: INL Industry Days Nov 11-12, 2026 (past); next listed: 2027 DOE Small Business Forum and Expo, Jun 1-3, 2027, Aurora CO."
       }
     },
     "immixgroup": {
@@ -937,18 +937,11 @@
       "value": "Listed by DOE Office of Small Business Programs.",
       "url": "https://www.energy.gov/osbp/events",
       "agencies": ["DOE", "Department of Energy"],
-      "next_occurrence": {
-        "start": "2026-11-11",
-        "end": "2026-11-12",
-        "location": "Idaho Falls, ID",
-        "registration_url": null,
-        "verified_at": "2026-11-09",
-        "source_url": "https://www.energy.gov/osbp/events"
-      },
       "verification": {
-        "status": "verified_upcoming",
-        "checked_at": "2026-11-09",
-        "source_url": "https://www.energy.gov/osbp/events"
+        "status": "no_next_announced",
+        "checked_at": "2026-11-17",
+        "source_url": "https://www.energy.gov/osbp/events",
+        "note": "Nov 11-12, 2026 edition held. As of 2026-11-17 the DOE OSBP events page lists no later INL Industry Days. INL's own page (inl.gov) refused automated access (403), so it was not checked."
       }
     },
     {
@@ -959,18 +952,11 @@
       "registration_cost": "See organizer",
       "value": "NCMA forum on defense acquisition.",
       "url": "https://www.ncmahq.org/events",
-      "next_occurrence": {
-        "start": "2026-11-12",
-        "end": "2026-11-12",
-        "location": "Ronald Reagan Building, 1300 Pennsylvania Ave NW, Washington, DC",
-        "registration_url": null,
-        "verified_at": "2026-11-09",
-        "source_url": "https://www.ncmahq.org/events"
-      },
       "verification": {
-        "status": "verified_upcoming",
-        "checked_at": "2026-11-09",
-        "source_url": "https://www.ncmahq.org/events"
+        "status": "no_next_announced",
+        "checked_at": "2026-11-17",
+        "source_url": "https://www.ncmahq.org/events",
+        "note": "Nov 12, 2026 edition held. As of 2026-11-17 NCMA's events page lists no 2027 Warfighter Acquisition Forum (its 2027 dates are Nexus Feb 21-23 and World Congress Jul 25-28)."
       }
     },
     {

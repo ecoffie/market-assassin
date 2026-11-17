@@ -673,7 +673,7 @@ export async function GET(request: NextRequest) {
       derivedFrom: ['bq_awards'],
       stored: c.dodaac, unit: 'offices',
       headlineContribution: 0,
-      freshness: { state: 'UNKNOWN', asOf: e.dodaac, basis: 'MAX(dodaac_directory.updated_at) — no registered producer cadence' },
+      freshness: { state: 'UNKNOWN', asOf: e.dodaac, basis: 'MAX(dodaac_directory.updated_at) — monthly producer refresh-dodaac-directory (0 9 6 * *); age + row coverage judged by check-data-freshness (table-measured), never by last_built' },
       surface: { state: 'internal_only', tools: [], note: 'anchors office rosters, events and opportunity office names' },
       upstreams: ['usaspending'], provenance: 'Contracting offices decoded from award DoDAACs (USASpending/FPDS in BigQuery).',
     },
