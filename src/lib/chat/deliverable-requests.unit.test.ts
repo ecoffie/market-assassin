@@ -5,8 +5,22 @@ describe('deliverable requests (Agent 4 S3: "offer, then nothing")', () => {
   it('a plan asked for as a PDF is a file request with a day count', () => {
     expect(detectDeliverableRequest('Give me a 90-day plan as a PDF')).toEqual({ wantsFile: true, format: 'PDF', dayPlan: 90 });
     expect(detectDeliverableRequest('Can you put together a capability statement in Word?')).toMatchObject({ wantsFile: true, format: 'WORD' });
-    expect(detectDeliverableRequest('export this to excel')).toMatchObject({ wantsFile: true, format: 'EXCEL' });
+    expect(detectDeliverableRequest('Turn this into an Excel spreadsheet report')).toMatchObject({ wantsFile: true, format: 'EXCEL' });
+    expect(detectDeliverableRequest('Create a checklist for SAM registration')).toEqual({ wantsFile: false, format: null, dayPlan: null });
+    expect(detectDeliverableRequest('Make a summary of these as a PDF')).toMatchObject({ wantsFile: true, format: 'PDF' });
     expect(detectDeliverableRequest('Write me a 60-day plan')).toEqual({ wantsFile: false, format: null, dayPlan: 60 });
+  });
+  it('Agent 4 false triggers are NEVER deliverable requests (uploads, export control, SAM downloads, weak nouns)', () => {
+    for (const t of [
+      'Can you summarize the attachment I uploaded?',
+      'Are there export control compliance contracts?',
+      'Find export-controlled items opportunities',
+      'Can you download the solicitation documents for W912PL?',
+      'check the schedule for the industry day',
+      'give me a summary of the Navy market',
+      'help with my strategy for DLA',
+      'export this to excel',
+    ]) expect(detectDeliverableRequest(t), t).toBeNull();
   });
   it('questions ABOUT a deliverable and ordinary questions are not requests', () => {
     expect(detectDeliverableRequest('What is a 90-day plan?')).toBeNull();

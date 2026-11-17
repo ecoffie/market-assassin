@@ -10,26 +10,40 @@
  * uses real calendar dates rather than ones the model guesses.
  */
 
-const FILE_FORMAT = /\b(pdf|docx?|word\s+doc(?:ument)?|word\s+file|in\s+word|excel|xlsx|spreadsheet|powerpoint|pptx|slide\s*deck|download(?:able)?|attach(?:ment)?|export)\b/i;
-const DELIVERABLE = /\b(plan|roadmap|road\s*map|report|checklist|one[\s-]?pager|summary|brief|memo|capability\s+statement|strategy|playbook|timeline|schedule)\b/i;
-const ASK = /\b(give|make|create|build|write|draft|put\s+together|prepare|generate|send|produce|export|save|turn\s+(?:this|that|it)\s+into|can\s+you|could\s+you|i\s+(?:need|want|'d\s+like)|as\s+an?)\b/i;
+/**
+ * Detection is deliberately STRICT (Agent 4 review, 2026-11-17). False triggers it must never fire on:
+ * "summarize the attachment I uploaded" (uploads, #2112), "export control compliance", "export-controlled items",
+ * "download the solicitation documents" (Mindy returns SAM links), "check the schedule for…",
+ * "give me a summary of…", "help with my strategy for DLA".
+ *
+ *   deliverable = a PRODUCTION verb AND a deliverable noun, where a WEAK noun (summary, schedule, strategy,
+ *                 brief, timeline) also needs a file format or an N-day plan;
+ *   file        = deliverable AND an explicit format ("as/in/to/into a PDF|Word|DOCX|Excel|…", or "a PDF").
+ * "attach(ment)", bare "export" and bare "download" are never triggers.
+ */
+const PRODUCE = /\b(give\s+me|make|create|build|write|draft|put\s+together|prepare|generate|produce|send\s+me|turn\s+(?:this|that|it)\s+into|i\s+(?:need|want|'d\s+like))\b/i;
+const STRONG_NOUN = /\b(plan|roadmap|road\s*map|report|checklist|one[\s-]?pager|memo|capability\s+statement|playbook)\b/i;
+const WEAK_NOUN = /\b(summary|schedule|strategy|brief|timeline)\b/i;
+const FORMAT_WORD = '(pdf|docx?|word(?:\\s+doc(?:ument)?)?|excel|xlsx|spreadsheet|powerpoint|pptx|slide\\s*deck)';
+const FORMAT = new RegExp(`\\b(?:as|in|to|into)\\s+(?:an?\\s+)?${FORMAT_WORD}\\b|\\b(?:a|an)\\s+${FORMAT_WORD}(?:\\s+(?:file|version|copy))?\\b`, 'i');
 const CONCEPT_QUESTION = /^\s*(?:what|why|how)\s+(?:is|are|does|do|should)\s+(?:a|an|the)?\s*(?:\d{2,3}[\s-]?day\s+)?(?:plan|roadmap|report|checklist|capability\s+statement|strategy)\b/i;
 const DAY_PLAN = /\b(\d{2,3})[\s-]?day\s+(?:action\s+)?plan\b/i;
 
 export type DeliverableRequest = { wantsFile: boolean; format: string | null; dayPlan: number | null };
 
-/** null when the message does not ask for a deliverable. */
+/** null when the message does not ask Mindy to PRODUCE a deliverable. */
 export function detectDeliverableRequest(text: string): DeliverableRequest | null {
   const t = String(text || '');
-  const dayPlanMatch = t.match(DAY_PLAN);
-  const fm = t.match(FILE_FORMAT);
   // A question ABOUT a deliverable ("What is a 90-day plan?") is answered, not produced.
   if (CONCEPT_QUESTION.test(t)) return null;
-  const deliverable = DELIVERABLE.test(t) || !!dayPlanMatch || !!fm;
-  if (!deliverable || !ASK.test(t)) return null;
-  // Name the real format when one is given ("export this to excel" → EXCEL); a bare "download"/"export" → file.
-  const named = t.match(/\b(pdf|docx?|word|excel|xlsx|spreadsheet|powerpoint|pptx|slide\s*deck)\b/i);
-  const format = fm ? (named ? named[1].toUpperCase().replace(/\s+/g, ' ') : 'FILE') : null;
+  if (!PRODUCE.test(t)) return null;
+  const dayPlanMatch = t.match(DAY_PLAN);
+  const fm = t.match(FORMAT);
+  const strong = STRONG_NOUN.test(t) || !!dayPlanMatch;
+  const weak = WEAK_NOUN.test(t) && (!!fm || !!dayPlanMatch);
+  if (!strong && !weak) return null;
+  const word = fm ? (fm[1] ?? fm[2] ?? '') : '';
+  const format = fm ? (/^word/i.test(word) ? 'WORD' : word.toUpperCase().replace(/\s+/g, ' ')) : null;
   return { wantsFile: !!fm, format, dayPlan: dayPlanMatch ? Number(dayPlanMatch[1]) : null };
 }
 
@@ -45,7 +59,7 @@ export function deliverableNote(text: string, todayIso: string): string | null {
   if (!req) return null;
   const lines: string[] = ['DELIVERABLE REQUESTED — deliver it in THIS answer. Never offer without delivering.'];
   if (req.wantsFile) {
-    lines.push(`- The customer asked for a ${req.format === 'FILE' ? 'file' : req.format}. This chat cannot create or attach files yet. Say that in ONE short line at the top (e.g. "I can't attach a ${req.format === 'FILE' ? 'file' : req.format} here yet, so here is the plan in full — you can copy it."), then write the complete deliverable below it. Do NOT stop after saying you can't, and do NOT ask whether they want it drafted.`);
+    lines.push(`- The customer asked for a ${req.format ?? 'file'}. This chat cannot create or attach files yet. Say that in ONE short line at the top (e.g. "I can't attach a ${req.format ?? 'file'} here yet, so here is the plan in full — you can copy it."), then write the complete deliverable below it. Do NOT stop after saying you can't, and do NOT ask whether they want it drafted.`);
   } else {
     lines.push('- Write the complete deliverable now. Do NOT describe what you could write or ask whether they want it.');
   }
