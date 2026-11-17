@@ -38,6 +38,10 @@ import {
   getTopNaicsForRecipient,
   getRecentAwardsForRecipient,
   getExecutivesForRecipient,
+  getAllNaicsForRecipient,
+  getAllAgenciesForRecipient,
+  allNaicsCacheKey,
+  allAgenciesCacheKey,
   recipientSlug,
 } from '@/lib/bigquery/recipients';
 import { WARM_QUEUE_KEY } from '@/lib/seo/served-slugs';
@@ -66,6 +70,32 @@ const CURSOR_KEY = 'cron:warm-contractor-pages:cursor';
 // crawler walking junk slugs cannot turn the queue into a BigQuery bill: a junk slug costs
 // only the identity lookup (~115 MB) and then resolves to a cached "not found".
 const QUEUE_DRAIN_PER_RUN = 25;
+
+// /contractors/<slug>/naics and /agencies tabs (2026-11-17). Their full-breakdown caches had NO
+// warmer, and the pages read them cache-only — so every tab rendered empty and
+// sitemap-contractor-tabs.xml advertised 0 URLs (it lists a tab only when that cache clears
+// SUBPAGE_MIN_ROWS). Warmed on a SEPARATE cursor at a small rate: the agencies breakdown is the
+// heaviest query on the site (up to ~3 GiB on a mega-prime). The slug list is spend-ordered, so
+// the most-searched contractors get their tabs first.
+const TAB_WARM_PER_RUN = 10;
+const TAB_CURSOR_KEY = 'cron:warm-contractor-pages:tabs-cursor';
+
+async function warmTabs(slug: string): Promise<WarmResult> {
+  const rollup = await getRollupOrSingleBySlug(slug, true);
+  if (!rollup) return 'skipped';
+  const { child_ueis: ueis, rollup_uei: rollupUei } = rollup;
+  await Promise.all([
+    getAllNaicsForRecipient(ueis, rollupUei, true),
+    getAllAgenciesForRecipient(ueis, rollupUei, true),
+  ]);
+  if (
+    bqResultState(allNaicsCacheKey(rollupUei), 0) === 'failed' ||
+    bqResultState(allAgenciesCacheKey(rollupUei), 0) === 'failed'
+  ) return 'failed';
+  revalidatePath(`/contractors/${slug}/naics`);
+  revalidatePath(`/contractors/${slug}/agencies`);
+  return 'warmed';
+}
 
 function authorized(request: NextRequest): boolean {
   // No `x-vercel-cron` header check: any client can send it. Vercel cron sends
@@ -237,6 +267,34 @@ async function handle(request: NextRequest) {
     console.warn('[warm-contractor-pages] cursor write failed:', err);
   }
 
+  // 3. NAICS / agency tab caches, on their own cursor (see TAB_WARM_PER_RUN).
+  const tabs = { cursor: 0, nextCursor: 0, warmed: 0, skipped: 0, stoppedBy: null as string | null };
+  try {
+    tabs.cursor = Number((await kv.get<number>(TAB_CURSOR_KEY)) ?? 0) || 0;
+  } catch (err) {
+    console.warn('[warm-contractor-pages] tab cursor read failed, starting at 0:', err);
+  }
+  if (tabs.cursor >= slugs.length) tabs.cursor = 0;
+  let tabPos = tabs.cursor;
+  for (const slug of slugs.slice(tabs.cursor, tabs.cursor + TAB_WARM_PER_RUN)) {
+    let r: WarmResult;
+    try { r = await warmTabs(slug); } catch { r = 'failed'; }
+    if (r === 'failed') {
+      // Do not advance past it: the next run retries this slug.
+      tabs.stoppedBy = `BigQuery failure at ${slug}`;
+      failures.push({ slug, error: 'tab warm failed (BigQuery)' });
+      break;
+    }
+    if (r === 'warmed') tabs.warmed++; else tabs.skipped++;
+    tabPos++;
+  }
+  tabs.nextCursor = tabPos >= slugs.length ? 0 : tabPos;
+  try {
+    await kv.set(TAB_CURSOR_KEY, tabs.nextCursor);
+  } catch (err) {
+    console.warn('[warm-contractor-pages] tab cursor write failed:', err);
+  }
+
   return NextResponse.json({
     success: failures.length === 0,
     totalSlugs: slugs.length,
@@ -249,6 +307,7 @@ async function handle(request: NextRequest) {
     failures: failures.slice(0, 20),
     priority,
     queue: { drained: queued.length, warmed: queueWarmed, depthAfter: queueDepthAfter },
+    tabs,
   });
 }
 
