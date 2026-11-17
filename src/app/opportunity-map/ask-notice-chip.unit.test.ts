@@ -71,7 +71,8 @@ describe('selected notice attaches to the main chat', () => {
     expect(t.w.document.getElementById('amkCtx')!.textContent).toBe('About: Janitorial Services, USCG Sector Key West · due 2026-12-04');
     await t.ask('Who held this before?');
     expect(t.chat[0].context).toEqual({ kind: 'opportunity', notice_id: NID });
-    expect(t.chat[0].turn_id).toBeUndefined();
+    // Answer billing: every view-mode question carries its own turn id (the server ignores it when billing is off).
+    expect(String(t.chat[0].turn_id)).toMatch(/^[0-9a-f-]{36}$/);
     const m = String(t.chat[0].message);
     expect(m).toContain('[Current map view'); // kept exactly as without a notice (server contract)
     expect(m).not.toContain('Display:');

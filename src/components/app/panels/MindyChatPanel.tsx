@@ -205,6 +205,9 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
 
     const controller = new AbortController();
     abortRef.current = controller;
+    // One id per question: the server charges an answer at most once per turn id and replays a finished one
+    // free (answer billing, Eric decision 3). Ignored by the server when billing is off.
+    const turnId = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : undefined;
 
     try {
       const res = await authedFetch('/api/app/chat', email, {
@@ -217,6 +220,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
           message: text,
           sessionId: sessionId || undefined,
           history: historyForServer,
+          ...(turnId ? { turn_id: turnId } : {}),
           ...opportunityContextField(attachedOpp),
         }),
         signal: controller.signal,
@@ -228,6 +232,18 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
         // of a cryptic error.
         setMessages(prev => prev.filter(m => m.id !== userMsg.id && m.id !== assistantMsg.id));
         setShowUpgrade(true);
+        return;
+      }
+      if (res.status === 402 || res.status === 409) {
+        // 402: not enough credits for one answer. 409: this question is already being answered elsewhere.
+        // DRAFT COPY — pending Eric's sign-off.
+        const d = await res.json().catch(() => ({} as Record<string, unknown>));
+        const per = typeof d.credits_per_answer === 'number' ? d.credits_per_answer : null;
+        const bal = typeof d.balance === 'number' ? d.balance : null;
+        const content = res.status === 402
+          ? `You're out of Ask Mindy credits for now.${per ? ` Each answer that pulls Mindy's data uses ${per} credits${bal != null ? ` and you have ${bal}` : ''}.` : ''} Top up on the Credits page, or wait for your monthly refill.`
+          : 'Mindy is still working on this answer. Give it a moment, then ask again.';
+        setMessages(prev => prev.map(m => m.id === assistantMsg.id ? { ...m, content, errored: true, isStreaming: false } : m));
         return;
       }
       if (!res.ok || !res.body) {
@@ -274,6 +290,11 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id ? { ...m, notices: [...(m.notices || []), evt.message] } : m
               ));
+            } else if (evt.type === 'credits' && typeof evt.balance === 'number' && evt.charged > 0) {
+              const note = `${evt.charged} credits used · ${evt.balance} left`;
+              setMessages(prev => prev.map(m => m.id === assistantMsg.id ? { ...m, notices: [...(m.notices || []), note] } : m));
+            } else if (evt.type === 'replayed') {
+              setMessages(prev => prev.map(m => m.id === assistantMsg.id ? { ...m, notices: [...(m.notices || []), 'Saved answer · no extra credits'] } : m));
             } else if (evt.type === 'error') {
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id

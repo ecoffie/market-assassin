@@ -44,6 +44,25 @@ export function parseOpportunityContext(raw: unknown): OpportunityContext | null
   return NOTICE_ID.test(id) ? { kind: 'opportunity', noticeId: id } : null;
 }
 
+/**
+ * Ask Mindy answer billing (Eric decision 3, 2026-11-17): every SUCCESSFUL intelligence answer on main Ask
+ * Mindy and the map costs CARD_CHAT_TURN_CREDITS (default 10), Pro included (Pro's monthly allowance pays for
+ * it). Off unless ASK_MINDY_ANSWER_BILLING is exactly "true", so merging this changes nothing until it is
+ * turned on. Same once-per-question path as card chat (card_chat_turns): retries and reopens replay free.
+ */
+export function isAnswerBillingEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  return String(env.ASK_MINDY_ANSWER_BILLING || '').trim().toLowerCase() === 'true';
+}
+
+/**
+ * Credits for one COMPLETE turn (isBillableTurn already true). Only an INTELLIGENCE answer is charged: one that
+ * read Mindy's data this turn (a data tool succeeded) or was grounded in a notice record. A clarifying
+ * question, a greeting, a refusal or a "which agency?" reply is saved (so it replays) but costs nothing.
+ */
+export function answerCredits(p: { billable: boolean; usedData: boolean; turnCredits: number }): number {
+  return p.billable && p.usedData ? p.turnCredits : 0;
+}
+
 export type CardChatAccess =
   | { allow: true; billable: boolean }
   | { allow: false; status: 403 | 402; error: 'pro_required' | 'credits_required'; balance?: number };
@@ -54,7 +73,15 @@ export type CardChatAccess =
  */
 export function cardChatAccess(p: {
   isPro: boolean; flagOn: boolean; context: OpportunityContext | null; balance: number | null; turnCredits: number;
+  /** ASK_MINDY_ANSWER_BILLING: Pro answers are charged too, so Pro needs one answer's worth of credits. */
+  answerBilling?: boolean;
 }): CardChatAccess {
+  if (p.isPro && p.answerBilling) {
+    if (p.balance == null || p.balance < p.turnCredits) {
+      return { allow: false, status: 402, error: 'credits_required', ...(p.balance != null ? { balance: p.balance } : {}) };
+    }
+    return { allow: true, billable: true };
+  }
   if (p.isPro) return { allow: true, billable: false };
   if (!p.flagOn || !p.context) return { allow: false, status: 403, error: 'pro_required' };
   if (p.balance == null || p.balance < p.turnCredits) {

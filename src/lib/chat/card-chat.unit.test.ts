@@ -170,3 +170,26 @@ describe('buildOpportunityContextBlock origin (plain chat, mentioned-notice.ts)'
     expect(block).toContain('KELI.BARISH@DLA.MIL');
   });
 });
+
+describe('answer billing helpers (ASK_MINDY_ANSWER_BILLING)', () => {
+  it('flag is off unless exactly "true"', async () => {
+    const { isAnswerBillingEnabled } = await import('./card-chat');
+    expect(isAnswerBillingEnabled({})).toBe(false);
+    expect(isAnswerBillingEnabled({ ASK_MINDY_ANSWER_BILLING: '1' })).toBe(false);
+    expect(isAnswerBillingEnabled({ ASK_MINDY_ANSWER_BILLING: ' TRUE ' })).toBe(true);
+  });
+  it('Pro under answer billing needs one answer of credits; unknown balance refuses', async () => {
+    const { cardChatAccess } = await import('./card-chat');
+    const base = { isPro: true, flagOn: false, context: null, turnCredits: 10, answerBilling: true };
+    expect(cardChatAccess({ ...base, balance: 10 })).toEqual({ allow: true, billable: true });
+    expect(cardChatAccess({ ...base, balance: 9 })).toMatchObject({ allow: false, status: 402, error: 'credits_required', balance: 9 });
+    expect(cardChatAccess({ ...base, balance: null })).toMatchObject({ allow: false, status: 402 });
+    expect(cardChatAccess({ ...base, answerBilling: false, balance: 0 })).toEqual({ allow: true, billable: false });
+  });
+  it('only an answer that read data is charged', async () => {
+    const { answerCredits } = await import('./card-chat');
+    expect(answerCredits({ billable: true, usedData: true, turnCredits: 10 })).toBe(10);
+    expect(answerCredits({ billable: true, usedData: false, turnCredits: 10 })).toBe(0);
+    expect(answerCredits({ billable: false, usedData: true, turnCredits: 10 })).toBe(0);
+  });
+});
