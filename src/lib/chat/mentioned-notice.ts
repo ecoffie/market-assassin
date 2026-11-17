@@ -11,7 +11,8 @@
  *   - Only the USER's words are read (the current message, then earlier user turns, newest first). An id that
  *     appears only in an assistant answer (a FIND list, say) never attaches a notice.
  *   - The newest user message that names a notice decides. If it names two or more different notices, none is
- *     attached (a comparison is answered with tools, not one notice's block).
+ *     attached (a comparison is answered with tools, not one notice's block). If none of the notices it names
+ *     is in our data, none is attached either — an older turn's notice is never substituted for it.
  *   - A token is looked up only if it has the shape of a notice id or a solicitation number, and only an exact
  *     match on our own record counts. A miss attaches nothing; nothing is guessed.
  */
@@ -71,7 +72,7 @@ function escapeIlike(token: string): string {
 /** One ref → its record (the newest posted version for a solicitation number), or null on a miss/error. */
 export async function lookupNoticeRef(db: Db, ref: NoticeRef): Promise<SelectedNoticeRecord | null> {
   try {
-    const rows = (q: any) => q.order('posted_date', { ascending: false }).limit(25); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const rows = (q: any) => q.order('posted_date', { ascending: false, nullsFirst: false }).limit(25); // eslint-disable-line @typescript-eslint/no-explicit-any
     const sel = () => db.from('sam_opportunities').select(SELECTED_NOTICE_COLUMNS);
     if (ref.kind === 'notice_id') {
       const { data, error } = await sel().eq('notice_id', ref.value).limit(1);
@@ -129,7 +130,9 @@ export async function resolveMentionedNotice(db: Db, message: string, history: M
     }
     if (found.size === 1) return { status: 'resolved', notice: [...found.values()][0] };
     if (found.size > 1) return { status: 'ambiguous', count: found.size };
-    if (lookups >= MAX_LOOKUPS) break;
+    // The newest message that names a notice decides EVEN WHEN NOTHING MATCHED. Falling through to an older
+    // turn would answer "What about W912PL26R0099?" (not in our data) with SPRPA127RUA05's body and contact.
+    break;
   }
   return { status: 'none' };
 }

@@ -14,7 +14,7 @@ function fakeDb(rows: Row[], opts: { error?: boolean } = {}) {
         select: () => q,
         eq: (c: string, v: string) => { col = c; val = v; op = 'eq'; return q; },
         ilike: (c: string, v: string) => { col = c; val = v; op = 'ilike'; return q; },
-        order: (c: string, o: { ascending: boolean }) => { ordered = c === 'posted_date' && o.ascending === false; return q; },
+        order: (c: string, o: { ascending: boolean; nullsFirst?: boolean }) => { ordered = c === 'posted_date' && o.ascending === false && o.nullsFirst === false; return q; },
         limit: async () => {
           calls.push({ col, val, op, ordered });
           if (opts.error) return { data: null, error: { message: 'down' } };
@@ -80,6 +80,16 @@ describe('resolveMentionedNotice', () => {
       { role: 'user', content: 'SPRPA127RUA05' }, { role: 'user', content: 'what about W912PL26Q0042' },
     ]);
     expect(r).toMatchObject({ status: 'resolved', notice: { record: { notice_id: 'b'.repeat(32) } } });
+  });
+
+  it('a newer message naming a notice we do not hold attaches NOTHING — never an older turn\'s notice', async () => {
+    const { db, calls } = fakeDb([sprpa]);
+    const r = await resolveMentionedNotice(db, 'What about W912PL26R0099?', [
+      { role: 'user', content: 'Tell me about SPRPA127RUA05' }, { role: 'assistant', content: '…' },
+    ]);
+    expect(r).toEqual({ status: 'none' });
+    // Only the newest message's token was looked up; the older turn was never read.
+    expect(new Set(calls.map((c) => c.val.toUpperCase()))).toEqual(new Set(['W912PL26R0099']));
   });
 
   it('two different notices in one message → ambiguous, nothing attached', async () => {
