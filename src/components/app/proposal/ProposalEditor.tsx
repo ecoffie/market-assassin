@@ -437,7 +437,7 @@ export default function ProposalEditor(props: Props) {
       const host = Object.entries(editorRefs.current).find(([, el]) => el && el.contains(replaceRangeRef.current!.commonAncestorContainer));
       if (host && restoreRange()) {
         // One paragraph replaces the selection inline; several become blocks of their own.
-        const single = /^<p>((?:(?!<\/?p>).)*)<\/p>$/s.exec(frag);
+        const single = /^<p>((?:(?!<\/?p>)[\s\S])*)<\/p>$/.exec(frag);
         document.execCommand('insertHTML', false, single ? single[1] : frag);
         changeSection(host[0], sanitizeEditorHtml(host[1]!.innerHTML));
         replaceRangeRef.current = null;
