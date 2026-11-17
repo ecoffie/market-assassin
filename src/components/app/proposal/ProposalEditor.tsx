@@ -19,7 +19,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Bold, ChevronLeft, Copy, Download, Image as ImageIcon, Italic, List, ListOrdered, Loader2, Redo2,
+  Bold, Check, ChevronLeft, Copy, Download, Image as ImageIcon, Italic, List, ListOrdered, Loader2, Redo2,
   Search, Send, Sparkles, Underline, Undo2, Upload, X,
 } from 'lucide-react';
 import { authedFetch } from '../authHeaders';
@@ -31,6 +31,7 @@ import { isProxyableImageUrl, type ImageResult } from '@/lib/proposal/image-sear
 import { streamProposalChat, type ProposalChatTurn } from '@/lib/proposal/chat-stream';
 
 export interface EditorSectionDef { id: string; label: string; targetWords: number }
+export interface EditorRequirement { id: string; text: string; section?: string; status: 'open' | 'in_progress' | 'done' | 'n_a' }
 export interface EditorDraft { draft: string; html?: string; wordCount?: number; generatedAt: number }
 
 interface Props {
@@ -49,7 +50,12 @@ interface Props {
   draftingSection?: string | null;
   canDraft: boolean;
   draftError?: string | null;
-  complianceSummary?: { done: number; total: number } | null;
+  /** The RFP's requirements (compliance matrix). Status `done` = covered; `n_a` is left out of the count. */
+  requirements?: EditorRequirement[];
+  onRequirementStatus?: (id: string, status: EditorRequirement['status']) => void;
+  /** Builds the requirements list from the loaded solicitation (the compliance matrix). */
+  onFindRequirements?: () => void;
+  findingRequirements?: boolean;
   onExportPackage?: () => void;
   exportingPackage?: boolean;
   onClose: () => void;
@@ -183,7 +189,8 @@ function SectionEditable({
 export default function ProposalEditor(props: Props) {
   const {
     email, title, subtitle, pipelineId, rfpText, rfpFileName, saveFileName, sections, drafts,
-    onSectionChange, onDraftSection, draftingSection, canDraft, draftError, complianceSummary,
+    onSectionChange, onDraftSection, draftingSection, canDraft, draftError,
+    requirements = [], onRequirementStatus, onFindRequirements, findingRequirements,
     onExportPackage, exportingPackage, onClose,
   } = props;
 
@@ -506,6 +513,12 @@ export default function ProposalEditor(props: Props) {
     insertIntoSection(active, figureHtml(src, file.name.replace(/\.[^.]+$/, ''), ''));
   };
 
+  /* ── requirements covered ── */
+  const [reqOpen, setReqOpen] = useState(false);
+  const counted = requirements.filter((r) => r.status !== 'n_a');
+  const coveredCount = counted.filter((r) => r.status === 'done').length;
+  const allCovered = counted.length > 0 && coveredCount === counted.length;
+
   /* ── export ── */
   const [exportOpen, setExportOpen] = useState(false);
   const [exporting, setExporting] = useState<null | 'pdf' | 'docx'>(null);
@@ -566,11 +579,45 @@ export default function ProposalEditor(props: Props) {
           <p className="text-xs text-[#5a6675] truncate">{subtitle ? `${subtitle} · ` : ''}{saveLabel}</p>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          {complianceSummary && complianceSummary.total > 0 && (
-            <span className="hidden md:inline text-[13px] font-semibold text-[#137a4e] bg-[#e8f6ef] rounded-full px-3 py-1.5">
-              {complianceSummary.done} of {complianceSummary.total} requirements marked done
-            </span>
-          )}
+          {counted.length > 0 ? (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setReqOpen((o) => !o)}
+                aria-expanded={reqOpen}
+                data-testid="requirements-covered"
+                className={`h-9 px-3.5 rounded-full text-[13px] font-semibold inline-flex items-center gap-1.5 ${allCovered ? 'text-[#137a4e] bg-[#e8f6ef] hover:bg-[#d6f0e3]' : 'text-[#92400e] bg-[#fff4e0] hover:bg-[#ffebc7]'}`}
+              >
+                {allCovered && <Check className="h-4 w-4" aria-hidden />}
+                {coveredCount} of {counted.length} requirements covered
+              </button>
+              {reqOpen && (
+                <div className="absolute right-0 top-11 z-30 w-[380px] max-h-[60vh] overflow-y-auto bg-white border border-[#e6eaef] rounded-xl shadow-xl p-3">
+                  <p className="px-1 pb-2 text-xs text-[#5a6675]">Tick a requirement once your proposal covers it. Ask Mindy &ldquo;Check against the RFP&rdquo; to see what a section is missing.</p>
+                  <ul className="flex flex-col gap-1">
+                    {counted.map((r) => (
+                      <li key={r.id}>
+                        <label className="flex gap-2.5 rounded-lg px-2 py-2 hover:bg-[#f7f9fb] cursor-pointer">
+                          <input type="checkbox" checked={r.status === 'done'} disabled={!onRequirementStatus}
+                            onChange={(e) => onRequirementStatus?.(r.id, e.target.checked ? 'done' : 'open')}
+                            className="mt-0.5 h-4 w-4 accent-[#006aff]" />
+                          <span className="text-sm leading-snug">
+                            {r.section && <span className="font-semibold text-[#5a6675]">{r.section} · </span>}
+                            {r.text}
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : onFindRequirements ? (
+            <button type="button" onClick={onFindRequirements} disabled={findingRequirements} data-testid="requirements-covered"
+              className="h-9 px-3.5 rounded-full text-[13px] font-semibold inline-flex items-center gap-1.5 text-[#005ee0] bg-[#eff5ff] hover:bg-[#e0ecff] disabled:opacity-70">
+              {findingRequirements ? <><Loader2 className="h-4 w-4 animate-spin" aria-hidden />Finding RFP requirements…</> : 'Find RFP requirements'}
+            </button>
+          ) : null}
           <div className="relative">
             <button
               type="button"
