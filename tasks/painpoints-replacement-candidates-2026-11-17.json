@@ -1,0 +1,2551 @@
+{
+ "_about": {
+  "what": "PROPOSED replacement pain points — NOT SERVED, NOT ADOPTED. Adoption into src/data/agency-pain-points.json requires Eric's separate approval.",
+  "generated_by": "npx tsx scripts/painpoints/build-replacement-candidates.ts --write",
+  "generated_at": "2026-11-17",
+  "guards": "no pre-2001 source · https URL required · GAO document number required · agency must resolve exactly to a canonical toptier name; substring-derived agencies refused"
+ },
+ "summary": {
+  "mode": "write-proposal",
+  "high_risk": {
+   "document_number": "GAO-25-107743",
+   "areas": 38,
+   "mapped_candidates": 23,
+   "unmapped_areas": 15,
+   "unmapped_by_basis": {
+    "multi_agency": 7,
+    "government_wide": 8
+   }
+  },
+  "institute": {
+   "gao_rows_read": 161,
+   "by_resolution_method": {
+    "unresolved": 71,
+    "exact_name": 90
+   },
+   "earliest": "2026-07-22",
+   "latest": "2026-11-16"
+  },
+  "accepted": 111,
+  "accepted_by_origin": {
+   "gao_high_risk_2025": 22,
+   "institute_gao_report": 89
+  },
+  "accepted_requires_review": 10,
+  "accepted_already_served_living": 60,
+  "accepted_agencies": 26,
+  "rejected": 73,
+  "rejected_by_reason": {
+   "unresolved_agency": 68,
+   "missing_document_number": 5
+  }
+ },
+ "unmapped_high_risk_areas": [
+  {
+   "n": 1,
+   "area": "Improving the Delivery of Federal Disaster Assistance",
+   "mapping_basis": "multi_agency"
+  },
+  {
+   "n": 10,
+   "area": "Ensuring the Cybersecurity of the Nation",
+   "mapping_basis": "government_wide"
+  },
+  {
+   "n": 12,
+   "area": "Government-wide Personnel Security Clearance Process",
+   "mapping_basis": "government_wide"
+  },
+  {
+   "n": 14,
+   "area": "Improving and Modernizing Federal Disability Programs",
+   "mapping_basis": "multi_agency"
+  },
+  {
+   "n": 15,
+   "area": "Improving Federal Management of Programs that Serve Tribes and Their Members",
+   "mapping_basis": "multi_agency"
+  },
+  {
+   "n": 16,
+   "area": "Improving Federal Oversight of Food Safety",
+   "mapping_basis": "multi_agency"
+  },
+  {
+   "n": 17,
+   "area": "Improving IT Acquisitions and Management",
+   "mapping_basis": "government_wide"
+  },
+  {
+   "n": 18,
+   "area": "Limiting the Federal Government's Fiscal Exposure by Better Managing Climate Change Risks",
+   "mapping_basis": "government_wide"
+  },
+  {
+   "n": 20,
+   "area": "Managing Federal Real Property",
+   "mapping_basis": "government_wide"
+  },
+  {
+   "n": 23,
+   "area": "Modernizing the U.S. Financial Regulatory System",
+   "mapping_basis": "government_wide"
+  },
+  {
+   "n": 25,
+   "area": "National Efforts to Prevent, Respond to, and Recover from Drug Misuse",
+   "mapping_basis": "multi_agency"
+  },
+  {
+   "n": 28,
+   "area": "Protecting Technologies Critical to U.S. National Security Interests",
+   "mapping_basis": "government_wide"
+  },
+  {
+   "n": 29,
+   "area": "Resolving the Federal Role in Housing Finance",
+   "mapping_basis": "multi_agency"
+  },
+  {
+   "n": 30,
+   "area": "Strategic Human Capital Management",
+   "mapping_basis": "government_wide"
+  },
+  {
+   "n": 36,
+   "area": "U.S. Government's Environmental Liability",
+   "mapping_basis": "multi_agency"
+  }
+ ],
+ "candidates": [
+  {
+   "agency": "Department of Energy",
+   "pain_point": "Acquisition and Program Management for DOE's National Nuclear Security Administration and Office of Environmental Management (GAO High-Risk List, GAO-25-107743, February 2025)",
+   "origin": "gao_high_risk_2025",
+   "document_number": "GAO-25-107743",
+   "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970316",
+   "publication_date": "2025-02-25",
+   "agency_resolution_method": "curated_area_table:title_named",
+   "requires_review": false,
+   "high_risk_area": 2,
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Defense",
+   "pain_point": "DOD Approach to Business Transformation (GAO High-Risk List, GAO-25-107743, February 2025)",
+   "origin": "gao_high_risk_2025",
+   "document_number": "GAO-25-107743",
+   "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970303",
+   "publication_date": "2025-02-25",
+   "agency_resolution_method": "curated_area_table:title_named",
+   "requires_review": false,
+   "high_risk_area": 3,
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Defense",
+   "pain_point": "DOD Business Systems Modernization (GAO High-Risk List, GAO-25-107743, February 2025)",
+   "origin": "gao_high_risk_2025",
+   "document_number": "GAO-25-107743",
+   "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970304",
+   "publication_date": "2025-02-25",
+   "agency_resolution_method": "curated_area_table:title_named",
+   "requires_review": false,
+   "high_risk_area": 4,
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Defense",
+   "pain_point": "DOD Contract Management (GAO High-Risk List, GAO-25-107743, February 2025)",
+   "origin": "gao_high_risk_2025",
+   "document_number": "GAO-25-107743",
+   "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970305",
+   "publication_date": "2025-02-25",
+   "agency_resolution_method": "curated_area_table:title_named",
+   "requires_review": false,
+   "high_risk_area": 5,
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Defense",
+   "pain_point": "DOD Financial Management (GAO High-Risk List, GAO-25-107743, February 2025)",
+   "origin": "gao_high_risk_2025",
+   "document_number": "GAO-25-107743",
+   "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970317",
+   "publication_date": "2025-02-25",
+   "agency_resolution_method": "curated_area_table:title_named",
+   "requires_review": false,
+   "high_risk_area": 6,
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Defense",
+   "pain_point": "DOD Weapon Systems Acquisition (GAO High-Risk List, GAO-25-107743, February 2025)",
+   "origin": "gao_high_risk_2025",
+   "document_number": "GAO-25-107743",
+   "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970313",
+   "publication_date": "2025-02-25",
+   "agency_resolution_method": "curated_area_table:title_named",
+   "requires_review": false,
+   "high_risk_area": 7,
+   "already_served_living": false
+  },
+  {
+   "agency": "Small Business Administration",
+   "pain_point": "Emergency Loans for Small Businesses (GAO High-Risk List, GAO-25-107743, February 2025)",
+   "origin": "gao_high_risk_2025",
+   "document_number": "GAO-25-107743",
+   "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970306",
+   "publication_date": "2025-02-25",
+   "agency_resolution_method": "curated_area_table:program_owner",
+   "requires_review": true,
+   "high_risk_area": 8,
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of the Treasury",
+   "pain_point": "Enforcement of Tax Laws (GAO High-Risk List, GAO-25-107743, February 2025)",
+   "origin": "gao_high_risk_2025",
+   "document_number": "GAO-25-107743",
+   "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970318",
+   "publication_date": "2025-02-25",
+   "agency_resolution_method": "curated_area_table:program_owner",
+   "requires_review": true,
+   "high_risk_area": 9,
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Transportation",
+   "pain_point": "Funding the Nation's Surface Transportation System (GAO High-Risk List, GAO-25-107743, February 2025)",
+   "origin": "gao_high_risk_2025",
+   "document_number": "GAO-25-107743",
+   "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970299",
+   "publication_date": "2025-02-25",
+   "agency_resolution_method": "curated_area_table:program_owner",
+   "requires_review": true,
+   "high_risk_area": 11,
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Health and Human Services",
+   "pain_point": "HHS Leadership and Coordination of Public Health Emergencies (GAO High-Risk List, GAO-25-107743, February 2025)",
+   "origin": "gao_high_risk_2025",
+   "document_number": "GAO-25-107743",
+   "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970300",
+   "publication_date": "2025-02-25",
+   "agency_resolution_method": "curated_area_table:title_named",
+   "requires_review": false,
+   "high_risk_area": 13,
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of the Interior",
+   "pain_point": "Management of Federal Oil and Gas Resources (GAO High-Risk List, GAO-25-107743, February 2025)",
+   "origin": "gao_high_risk_2025",
+   "document_number": "GAO-25-107743",
+   "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970324",
+   "publication_date": "2025-02-25",
+   "agency_resolution_method": "curated_area_table:program_owner",
+   "requires_review": true,
+   "high_risk_area": 19,
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Veterans Affairs",
+   "pain_point": "Managing Risks and Improving VA Health Care (GAO High-Risk List, GAO-25-107743, February 2025)",
+   "origin": "gao_high_risk_2025",
+   "document_number": "GAO-25-107743",
+   "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970325",
+   "publication_date": "2025-02-25",
+   "agency_resolution_method": "curated_area_table:title_named",
+   "requires_review": false,
+   "high_risk_area": 21,
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Health and Human Services",
+   "pain_point": "Medicare Program & Improper Payments (GAO High-Risk List, GAO-25-107743, February 2025)",
+   "origin": "gao_high_risk_2025",
+   "document_number": "GAO-25-107743",
+   "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970326",
+   "publication_date": "2025-02-25",
+   "agency_resolution_method": "curated_area_table:program_owner",
+   "requires_review": true,
+   "high_risk_area": 22,
+   "already_served_living": false
+  },
+  {
+   "agency": "National Aeronautics and Space Administration",
+   "pain_point": "NASA Acquisition Management (GAO High-Risk List, GAO-25-107743, February 2025)",
+   "origin": "gao_high_risk_2025",
+   "document_number": "GAO-25-107743",
+   "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970328",
+   "publication_date": "2025-02-25",
+   "agency_resolution_method": "curated_area_table:title_named",
+   "requires_review": false,
+   "high_risk_area": 24,
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Homeland Security",
+   "pain_point": "National Flood Insurance Program (GAO High-Risk List, GAO-25-107743, February 2025)",
+   "origin": "gao_high_risk_2025",
+   "document_number": "GAO-25-107743",
+   "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970309",
+   "publication_date": "2025-02-25",
+   "agency_resolution_method": "curated_area_table:program_owner",
+   "requires_review": true,
+   "high_risk_area": 26,
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Health and Human Services",
+   "pain_point": "Protecting Public Health through Enhanced Oversight of Medical Products (GAO High-Risk List, GAO-25-107743, February 2025)",
+   "origin": "gao_high_risk_2025",
+   "document_number": "GAO-25-107743",
+   "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970329",
+   "publication_date": "2025-02-25",
+   "agency_resolution_method": "curated_area_table:program_owner",
+   "requires_review": true,
+   "high_risk_area": 27,
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Homeland Security",
+   "pain_point": "Strengthening Department of Homeland Security IT and Financial Management Functions (GAO High-Risk List, GAO-25-107743, February 2025)",
+   "origin": "gao_high_risk_2025",
+   "document_number": "GAO-25-107743",
+   "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970332",
+   "publication_date": "2025-02-25",
+   "agency_resolution_method": "curated_area_table:title_named",
+   "requires_review": false,
+   "high_risk_area": 31,
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Justice",
+   "pain_point": "Strengthening Management of the Federal Prison System (GAO High-Risk List, GAO-25-107743, February 2025)",
+   "origin": "gao_high_risk_2025",
+   "document_number": "GAO-25-107743",
+   "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970301",
+   "publication_date": "2025-02-25",
+   "agency_resolution_method": "curated_area_table:program_owner",
+   "requires_review": true,
+   "high_risk_area": 32,
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Health and Human Services",
+   "pain_point": "Strengthening Medicaid Program Integrity (GAO High-Risk List, GAO-25-107743, February 2025)",
+   "origin": "gao_high_risk_2025",
+   "document_number": "GAO-25-107743",
+   "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970333",
+   "publication_date": "2025-02-25",
+   "agency_resolution_method": "curated_area_table:program_owner",
+   "requires_review": true,
+   "high_risk_area": 33,
+   "already_served_living": false
+  },
+  {
+   "agency": "Environmental Protection Agency",
+   "pain_point": "Transforming EPA's Process for Assessing and Managing Chemical Risks (GAO High-Risk List, GAO-25-107743, February 2025)",
+   "origin": "gao_high_risk_2025",
+   "document_number": "GAO-25-107743",
+   "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970334",
+   "publication_date": "2025-02-25",
+   "agency_resolution_method": "curated_area_table:title_named",
+   "requires_review": false,
+   "high_risk_area": 34,
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Labor",
+   "pain_point": "Unemployment Insurance System (GAO High-Risk List, GAO-25-107743, February 2025)",
+   "origin": "gao_high_risk_2025",
+   "document_number": "GAO-25-107743",
+   "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970302",
+   "publication_date": "2025-02-25",
+   "agency_resolution_method": "curated_area_table:program_owner",
+   "requires_review": true,
+   "high_risk_area": 35,
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Veterans Affairs",
+   "pain_point": "VA Acquisition Management (GAO High-Risk List, GAO-25-107743, February 2025)",
+   "origin": "gao_high_risk_2025",
+   "document_number": "GAO-25-107743",
+   "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970335",
+   "publication_date": "2025-02-25",
+   "agency_resolution_method": "curated_area_table:title_named",
+   "requires_review": false,
+   "high_risk_area": 38,
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Health and Human Services",
+   "pain_point": "Child Care Pandemic Funds: HHS Can Help States Better Prepare for Future Emergencies and Ongoing Challenges (Source: GAO-27-108090)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-108090",
+   "source_url": "https://www.gao.gov/products/gao-27-108090",
+   "publication_date": "2026-11-16",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "f38f5fce-1497-413f-8d1a-03f10ac72e73",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of the Interior",
+   "pain_point": "Indian Affairs: Legal Framework for Probate and Other Factors Limit Interior’s Options to Improve Its Process (Source: GAO-27-108031)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-108031",
+   "source_url": "https://www.gao.gov/products/gao-27-108031",
+   "publication_date": "2026-11-16",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "c2481c20-3579-4840-900b-7c54bb05e136",
+   "already_served_living": true
+  },
+  {
+   "agency": "Securities and Exchange Commission",
+   "pain_point": "Financial Audit: Securities and Exchange Commission’s FY 2026 and FY 2025 Financial Statements (Source: GAO-27-108840)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-108840",
+   "source_url": "https://www.gao.gov/products/gao-27-108840",
+   "publication_date": "2026-11-16",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "a141d032-7339-4a79-97d6-64fb97d73fd5",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Defense",
+   "pain_point": "Military Personnel: More Complete Data Needed on Humanitarian Reassignments and Safety Transfers (Source: GAO-27-108819)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-108819",
+   "source_url": "https://www.gao.gov/products/gao-27-108819",
+   "publication_date": "2026-11-13",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "5aacca5c-20fa-4f5f-874c-644662ba1f67",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of the Interior",
+   "pain_point": "Coal Mine Reclamation: Additional Actions Needed to Return Mined Lands to Beneficial Uses (Source: GAO-27-107499)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-107499",
+   "source_url": "https://www.gao.gov/products/gao-27-107499",
+   "publication_date": "2026-11-12",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "20bbecd7-0aee-4fa0-865b-9554cefe45e9",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Homeland Security",
+   "pain_point": "Preparedness Grants: Improved Transparency and Communication Needed (Source: GAO-27-109434)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-109434",
+   "source_url": "https://www.gao.gov/products/gao-27-109434",
+   "publication_date": "2026-11-12",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "d38cf96c-2615-4b40-aa68-863161cb516a",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Education",
+   "pain_point": "K-12 Education: Data Show That Less than Half of Students Were Ready for Kindergarten in Selected States (Source: GAO-27-108796)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-108796",
+   "source_url": "https://www.gao.gov/products/gao-27-108796",
+   "publication_date": "2026-11-12",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "ff25f6ea-9351-4cfa-9cec-c747c87a68a1",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Labor",
+   "pain_point": "401(k) Plan Investments: DOL Can Take Steps to Prepare for Expected Private Equity Growth (Source: GAO-27-106779)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-106779",
+   "source_url": "https://www.gao.gov/products/gao-27-106779",
+   "publication_date": "2026-11-10",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "b358e345-5aed-4482-a84c-f2617dab4330",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Veterans Affairs",
+   "pain_point": "Veteran Lending: Early Planning Is Critical to Assessing VA’s New Foreclosure Avoidance Program (Source: GAO-27-108908)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-108908",
+   "source_url": "https://www.gao.gov/products/gao-27-108908",
+   "publication_date": "2026-11-10",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "cd1ffe54-bb17-46a9-87d4-796e49cdb7d6",
+   "already_served_living": false
+  },
+  {
+   "agency": "Social Security Administration",
+   "pain_point": "Social Security Administration: Actions Needed to Improve Data Exchanges for Beneficiaries in Foster Care (Source: GAO-27-108035)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-108035",
+   "source_url": "https://www.gao.gov/products/gao-27-108035",
+   "publication_date": "2026-11-09",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "11b1e02f-8a89-48ea-84d8-c7249dc6c2c9",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Defense",
+   "pain_point": "F-35 Program: DOD Needs to Strengthen Oversight of Tens of Billions of Dollars in Parts (Source: GAO-27-108713)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-108713",
+   "source_url": "https://www.gao.gov/products/gao-27-108713",
+   "publication_date": "2026-11-09",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "23ed3015-62ee-4898-b211-a8cf401f2b36",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of the Treasury",
+   "pain_point": "Financial Audit: Bureau of the Fiscal Service’s FY 2026 and FY 2025 Schedules of Federal Debt (Source: GAO-27-108795)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-108795",
+   "source_url": "https://www.gao.gov/products/gao-27-108795",
+   "publication_date": "2026-11-09",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "621e8a01-5794-489e-ad7a-6254d3144cc3",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Health and Human Services",
+   "pain_point": "Opioid Overdose Reversal Medications: Medicare and Medicaid Enrollees Generally Had Coverage in Selected Recent Years (Source: GAO-27-108163)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-108163",
+   "source_url": "https://www.gao.gov/products/gao-27-108163",
+   "publication_date": "2026-11-09",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "4fdfdc88-6a6f-4e76-984b-64f94e5919dc",
+   "already_served_living": false
+  },
+  {
+   "agency": "Small Business Administration",
+   "pain_point": "Small Business Administration: Opportunities Exist to Improve Improper Payment Estimation and Recovery Processes (Source: GAO-27-107701)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-107701",
+   "source_url": "https://www.gao.gov/products/gao-27-107701",
+   "publication_date": "2026-11-09",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "657c6686-3b21-4bde-a0c5-8509847fe417",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Homeland Security",
+   "pain_point": "Immigration Detention: Changes In Inspections of ICE Facilities Raise Questions About Oversight (Source: GAO-27-109299)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-109299",
+   "source_url": "https://www.gao.gov/products/gao-27-109299",
+   "publication_date": "2026-11-05",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "a037470f-e930-401c-a3c7-e6d51e082b8c",
+   "already_served_living": true
+  },
+  {
+   "agency": "Environmental Protection Agency",
+   "pain_point": "Superfund: EPA Should Collect and Use Information on the Effectiveness of Its Recovery of Cleanup Costs (Source: GAO-27-107925)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-107925",
+   "source_url": "https://www.gao.gov/products/gao-27-107925",
+   "publication_date": "2026-11-05",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "e4e78983-ce46-43c5-9d36-02e93ee6fd82",
+   "already_served_living": true
+  },
+  {
+   "agency": "Federal Deposit Insurance Corporation",
+   "pain_point": "International Collaboration: Federal Banking Agencies Actively Participated in Standard-Setting Bodies (Source: GAO-27-108190)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-108190",
+   "source_url": "https://www.gao.gov/products/gao-27-108190",
+   "publication_date": "2026-11-05",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "153d542a-43df-48c7-b23b-7e35fded52a7",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Health and Human Services",
+   "pain_point": "Private Health Insurance: Market Concentration in 2024 Was Generally Higher Than in 2011 (Source: GAO-27-108927)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-108927",
+   "source_url": "https://www.gao.gov/products/gao-27-108927",
+   "publication_date": "2026-10-16",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "faf4751c-2047-4972-b1a0-926060780c67",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Energy",
+   "pain_point": "National Nuclear Security Administration: Reductions to Federal Workforce (Source: GAO-27-109127)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-109127",
+   "source_url": "https://www.gao.gov/products/gao-27-109127",
+   "publication_date": "2026-10-16",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "2eb00b85-c875-44b4-868d-a75477aa56ee",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of the Treasury",
+   "pain_point": "Critical Minerals: Limited Available Information on the Full Extent of Foreign Investment in Mining on Federal Lands (Source: GAO-27-108094)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-108094",
+   "source_url": "https://www.gao.gov/products/gao-27-108094",
+   "publication_date": "2026-10-16",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "894d16fc-c47b-4dd4-ac2f-61ae5f60a1f2",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Energy",
+   "pain_point": "Nuclear Waste: Future Land Use Planning at Selected DOE Cleanup Sites (Source: GAO-27-108063)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-108063",
+   "source_url": "https://www.gao.gov/products/gao-27-108063",
+   "publication_date": "2026-10-16",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "ce26ed1b-ffe0-4705-ab21-a642065ae6e7",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Justice",
+   "pain_point": "Tax Filing: IRS Should Enhance Ghost Preparer Identification and Compliance Efforts in a Comprehensive Preparer Strategy (Source: GAO-27-108176)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-108176",
+   "source_url": "https://www.gao.gov/products/gao-27-108176",
+   "publication_date": "2026-10-16",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "1b6d8140-55de-422b-a9e9-b359a2f14f9f",
+   "already_served_living": true
+  },
+  {
+   "agency": "General Services Administration",
+   "pain_point": "Federal Real Property: New Occupancy Data Help Agencies Shed Unneeded Office Space But Gaps Limit the Full Picture (Source: GAO-27-108503)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-108503",
+   "source_url": "https://www.gao.gov/products/gao-27-108503",
+   "publication_date": "2026-10-16",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "0b58b953-3be2-4607-b2e3-8e89f84b8546",
+   "already_served_living": true
+  },
+  {
+   "agency": "National Aeronautics and Space Administration",
+   "pain_point": "Geostationary Weather Satellites: Next Generation Program Challenges Put Vital Observations at Risk (Source: GAO-26-107739)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-107739",
+   "source_url": "https://www.gao.gov/products/gao-26-107739",
+   "publication_date": "2026-10-16",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "64ebb784-f771-48de-84a2-4bf6505b1942",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of the Interior",
+   "pain_point": "Critical Minerals: BLM Should Ensure Individuals and Businesses Meet Citizenship Requirements for Hardrock Mining Claims (Source: GAO-27-108196)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-108196",
+   "source_url": "https://www.gao.gov/products/gao-27-108196",
+   "publication_date": "2026-10-16",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "d0d2cffa-3f02-416e-b1a1-73f75cb0a657",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Defense",
+   "pain_point": "Artificial Intelligence: Actions and Opportunities to Implement Responsible Use in DOD (Source: GAO-27-107837)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-107837",
+   "source_url": "https://www.gao.gov/products/gao-27-107837",
+   "publication_date": "2026-10-14",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "b9aa2644-0b94-4aad-8ebd-067c19eae279",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Housing and Urban Development",
+   "pain_point": "Department of Housing and Urban Development: 2025 Workforce and Spending Changes (Source: GAO-26-108442)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108442",
+   "source_url": "https://www.gao.gov/products/gao-26-108442",
+   "publication_date": "2026-10-14",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "04abd796-482e-4a12-93b9-b71689237b97",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Homeland Security",
+   "pain_point": "Federal Law Enforcement: CBP and ICE Should Improve Body-Worn Camera Program Management (Source: GAO-26-108157)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108157",
+   "source_url": "https://www.gao.gov/products/gao-26-108157",
+   "publication_date": "2026-10-14",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "04f1c440-e7ba-48d4-b691-cd92895372b5",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of the Interior",
+   "pain_point": "Geothermal Energy: Bureau of Land Management Should Improve Permitting Process as Development Demand Grows on Federal Lands (Source: GAO-26-108040)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108040",
+   "source_url": "https://www.gao.gov/products/gao-26-108040",
+   "publication_date": "2026-10-08",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "da71064e-79ea-416f-bf8c-918587c024c4",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Defense",
+   "pain_point": "Army Corps of Engineers: Determinations That Projects Do Not Need Environmental Mitigation Should Be Clarified (Source: GAO-27-108551)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-108551",
+   "source_url": "https://www.gao.gov/products/gao-27-108551",
+   "publication_date": "2026-10-08",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "5d03f413-05e2-4a8a-ae86-f9efab9bfa3f",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Defense",
+   "pain_point": "Precision Navigation Systems: Challenges Remain with Fielding New Capabilities (Source: GAO-27-107676)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-107676",
+   "source_url": "https://www.gao.gov/products/gao-27-107676",
+   "publication_date": "2026-10-07",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "8d94670e-f689-4b8d-b588-96ade99137d7",
+   "already_served_living": true
+  },
+  {
+   "agency": "General Services Administration",
+   "pain_point": "IT Dashboard: Selected Agencies’ Investment Ratings Fail to Fully Consider Risks (Source: GAO-27-108416)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-108416",
+   "source_url": "https://www.gao.gov/products/gao-27-108416",
+   "publication_date": "2026-10-07",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "5a61bf5b-3410-4768-a2fe-3da11be24b7a",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Commerce",
+   "pain_point": "Economic Development Administration: Better Coordination with Regional Commissions and Performance Management Needed (Source: GAO-27-108496)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-108496",
+   "source_url": "https://www.gao.gov/products/gao-27-108496",
+   "publication_date": "2026-10-07",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "7c813d20-a260-4ac9-8453-04b1a51d2f10",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Labor",
+   "pain_point": "Disability Employment: DOL Should Enhance Monitoring and Guidance for Federal Contractors (Source: GAO-26-107937)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-107937",
+   "source_url": "https://www.gao.gov/products/gao-26-107937",
+   "publication_date": "2026-10-06",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "311fe5f9-e808-4749-a66f-fc530e90378a",
+   "already_served_living": true
+  },
+  {
+   "agency": "General Services Administration",
+   "pain_point": "U.S. Interagency Council on Homelessness: Staff Placed on Administrative Leave Have Returned and Await Direction (Source: GAO-27-108779)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-108779",
+   "source_url": "https://www.gao.gov/products/gao-27-108779",
+   "publication_date": "2026-10-02",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "748e4f60-b67e-4b76-b741-f65e74b682dd",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Homeland Security",
+   "pain_point": "Flood Insurance: Congressional Action Could Help Increase Coverage for At-Risk Properties (Source: GAO-27-108012)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-27-108012",
+   "source_url": "https://www.gao.gov/products/gao-27-108012",
+   "publication_date": "2026-10-01",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "02c54684-c3d1-4ad4-a27c-0361d3ab2027",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Homeland Security",
+   "pain_point": "Disaster Assistance: FEMA Actions Needed to Better Support People with Disabilities in Disasters (Source: GAO-26-108057)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108057",
+   "source_url": "https://www.gao.gov/products/gao-26-108057",
+   "publication_date": "2026-09-30",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "d1945c71-4180-4c99-8e0b-c7c8bb8cea2b",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Veterans Affairs",
+   "pain_point": "VA Health Care: Prevalence Information Needed to Better Understand and Address Harassment Involving Veterans (Source: GAO-26-109183)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-109183",
+   "source_url": "https://www.gao.gov/products/gao-26-109183",
+   "publication_date": "2026-09-30",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "c122d9de-7a6d-4511-8e0c-7898637e22fd",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Veterans Affairs",
+   "pain_point": "VA Health Care: Action Needed to Improve Fertility Care Communications and Eligibility Determination Process (Source: GAO-26-108492)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108492",
+   "source_url": "https://www.gao.gov/products/gao-26-108492",
+   "publication_date": "2026-09-29",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "493acf88-b9d1-484a-a714-dcaded6f5fa9",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Labor",
+   "pain_point": "Child Labor: DOL Action Needed to Better Protect Working Children (Source: GAO-26-107722)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-107722",
+   "source_url": "https://www.gao.gov/products/gao-26-107722",
+   "publication_date": "2026-09-29",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "14165b4d-8ad6-4a55-88a9-4c557a7b199e",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Justice",
+   "pain_point": "Criminal Justice: Data on Noncitizen Incarcerations, Convictions, Removals, and Costs (Source: GAO-26-107448)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-107448",
+   "source_url": "https://www.gao.gov/products/gao-26-107448",
+   "publication_date": "2026-09-28",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "58bfa233-f36d-4ece-9786-4bd6f28e53e7",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of State",
+   "pain_point": "Nonimmigrant Visas: State Should Consistently Conduct Global Staffing Needs Assessments to Help Balance Workloads and Address Long Wait Times (Source: GAO-26-107902)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-107902",
+   "source_url": "https://www.gao.gov/products/gao-26-107902",
+   "publication_date": "2026-09-28",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "ea9ed10c-5420-4977-ac30-bf1f9d6bb4cc",
+   "already_served_living": true
+  },
+  {
+   "agency": "Nuclear Regulatory Commission",
+   "pain_point": "Nuclear Power: Actions Needed to Improve NRC’s Assessment of Its Workforce Needs (Source: GAO-26-108737)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108737",
+   "source_url": "https://www.gao.gov/products/gao-26-108737",
+   "publication_date": "2026-09-28",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "7023620f-f928-4ba8-b636-0fc101752c9c",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Homeland Security",
+   "pain_point": "FEMA: Billions in Building Resilient Infrastructure and Communities Subgrants Remain Unawarded (Source: GAO-26-107774)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-107774",
+   "source_url": "https://www.gao.gov/products/gao-26-107774",
+   "publication_date": "2026-09-24",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "2bc73889-63b5-4a77-8a99-8a167ce7b55d",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Defense",
+   "pain_point": "Military Installations: Remote and Isolated Locations Face Challenges Delivering Critical Support Services (Source: GAO-26-108231)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108231",
+   "source_url": "https://www.gao.gov/products/gao-26-108231",
+   "publication_date": "2026-09-24",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "4224981b-40c5-4890-9759-39bfb48f7864",
+   "already_served_living": true
+  },
+  {
+   "agency": "General Services Administration",
+   "pain_point": "Federal Real Property: The Judiciary Should Measure the Utilization of Its Administrative Space (Source: GAO-26-108603)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108603",
+   "source_url": "https://www.gao.gov/products/gao-26-108603",
+   "publication_date": "2026-09-24",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "e337c64a-eb05-4e39-9122-db61c1262ada",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Homeland Security",
+   "pain_point": "Immigration Detention: Urgent Planning Needed to Avoid Further Waste of Taxpayer Dollars (Source: GAO-26-108663)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108663",
+   "source_url": "https://www.gao.gov/products/gao-26-108663",
+   "publication_date": "2026-09-24",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "8fa621d4-9411-4063-b96e-eb1ece0caeed",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Education",
+   "pain_point": "K-12 Education: Actions to Improve Oversight of Key Federal Programs and Address High Chronic Absenteeism (Source: GAO-26-107920)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-107920",
+   "source_url": "https://www.gao.gov/products/gao-26-107920",
+   "publication_date": "2026-09-23",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "5ebad8df-83e1-49dd-a2d1-612a91d82d59",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Veterans Affairs",
+   "pain_point": "Veterans Health Care: Information on Eligibility for and Use of Dental Benefits (Source: GAO-26-108467)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108467",
+   "source_url": "https://www.gao.gov/products/gao-26-108467",
+   "publication_date": "2026-09-23",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "5a749a60-b14c-4e6e-bf41-fae5fad29e80",
+   "already_served_living": false
+  },
+  {
+   "agency": "Agency for International Development",
+   "pain_point": "West Bank and Gaza: State Should Incorporate Leading Practices and Lessons Learned into Anti-Terrorism Oversight (Source: GAO-26-107939)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-107939",
+   "source_url": "https://www.gao.gov/products/gao-26-107939",
+   "publication_date": "2026-09-23",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "d5f08a43-b566-480f-8065-df4d7105b9d9",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Energy",
+   "pain_point": "National Nuclear Security Administration: Use of Line Items in Management and Operating Contracts Could Be Improved (Source: GAO-26-108409)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108409",
+   "source_url": "https://www.gao.gov/products/gao-26-108409",
+   "publication_date": "2026-09-23",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "9370c814-df74-4d56-91a4-549ebfdc49f6",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Health and Human Services",
+   "pain_point": "Drug Scheduling: While DEA Decisions Have Aligned with Recent HHS Recommendations, Both Need Comprehensive Policies (Source: GAO-26-108623)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108623",
+   "source_url": "https://www.gao.gov/products/gao-26-108623",
+   "publication_date": "2026-09-23",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "86d5e43e-de62-465e-a9e4-5250837af757",
+   "already_served_living": false
+  },
+  {
+   "agency": "General Services Administration",
+   "pain_point": "Federal Real Property: GSA Should Publicize Accessibility Complaint Process for Its Office Buildings (Source: GAO-26-108575)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108575",
+   "source_url": "https://www.gao.gov/products/gao-26-108575",
+   "publication_date": "2026-09-22",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "e6b3fadf-ce66-43ae-a5e3-d6e6fe47f9de",
+   "already_served_living": true
+  },
+  {
+   "agency": "General Services Administration",
+   "pain_point": "Federal Real Property: Funding and Other Challenges Have Hindered Progress Under a Temporary Disposal Process (Source: GAO-26-108451)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108451",
+   "source_url": "https://www.gao.gov/products/gao-26-108451",
+   "publication_date": "2026-09-21",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "29885c49-88ab-4cd2-ab46-7687c0ba1cee",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Transportation",
+   "pain_point": "Aviation Cybersecurity: Enhanced Air Safety Requires FAA to Better Mitigate Threats to Aircraft Communications (Source: GAO-26-108439)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108439",
+   "source_url": "https://www.gao.gov/products/gao-26-108439",
+   "publication_date": "2026-09-21",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "75c49b08-8b5b-474d-948a-3279bbc1a623",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Defense",
+   "pain_point": "Global Aging: Key Implications for U.S. Foreign Policy and Federal Agencies (Source: GAO-26-108732)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108732",
+   "source_url": "https://www.gao.gov/products/gao-26-108732",
+   "publication_date": "2026-09-21",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "d987da8d-0d18-4d61-bc08-c84206d9fcff",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Health and Human Services",
+   "pain_point": "Medical Devices: FDA Should Strengthen Policies Guiding Audits of Third Party Review Organizations (Source: GAO-26-108499)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108499",
+   "source_url": "https://www.gao.gov/products/gao-26-108499",
+   "publication_date": "2026-09-21",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "2ec2ceb1-5b7f-4061-a454-250a79b9ecd1",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Health and Human Services",
+   "pain_point": "Cybersecurity: HHS Should Strengthen Oversight and Enhance Security Controls for the 988 Suicide and Crisis Lifeline (Source: GAO-26-108836)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108836",
+   "source_url": "https://www.gao.gov/products/gao-26-108836",
+   "publication_date": "2026-09-17",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "bdde9525-5cdd-461e-bf81-15fa19c2d994",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Homeland Security",
+   "pain_point": "Whistleblower Protection: DHS Should Ensure Timely Resolution of Retaliation Complaints (Source: GAO-26-108106)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108106",
+   "source_url": "https://www.gao.gov/products/gao-26-108106",
+   "publication_date": "2026-09-17",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "42f80766-c3dc-4529-b348-bf09ccf4ac1b",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Homeland Security",
+   "pain_point": "DHS Grants: Approach to Terminations and Pauses Disrupted Some Program Activities (Source: GAO-26-109097)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-109097",
+   "source_url": "https://www.gao.gov/products/gao-26-109097",
+   "publication_date": "2026-09-17",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "e63070e2-0d40-4f30-840a-1c79d478118d",
+   "already_served_living": false
+  },
+  {
+   "agency": "Export-Import Bank of the United States",
+   "pain_point": "Export-Import Bank: Expanded Use of Delinquent Federal Debt Data Could Better Mitigate Credit Risk (Source: GAO-26-108530)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108530",
+   "source_url": "https://www.gao.gov/products/gao-26-108530",
+   "publication_date": "2026-09-16",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "74568df2-4959-4eea-9884-27f60cf67f55",
+   "already_served_living": true
+  },
+  {
+   "agency": "General Services Administration",
+   "pain_point": "Federal Personal Property: GSA Can Better Assess the Effectiveness of Its Disposal Efforts (Source: GAO-26-108521)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108521",
+   "source_url": "https://www.gao.gov/products/gao-26-108521",
+   "publication_date": "2026-09-16",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "06011244-fd39-448d-bcc0-bdc49d5a4017",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Housing and Urban Development",
+   "pain_point": "Native American Issues: Preliminary Observations on Housing and Homelessness (Source: GAO-26-109173)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-109173",
+   "source_url": "https://www.gao.gov/products/gao-26-109173",
+   "publication_date": "2026-09-16",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "5b8782ee-fba6-4e15-872b-c55a890a7874",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of the Treasury",
+   "pain_point": "U.S. Consolidated Financial Statements: Improvements Needed in Controls over Treasury Preparation Processes (Source: GAO-26-109081)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-109081",
+   "source_url": "https://www.gao.gov/products/gao-26-109081",
+   "publication_date": "2026-09-15",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "5c2b1bd5-5387-4e51-80b6-5ebb4aaf541d",
+   "already_served_living": true
+  },
+  {
+   "agency": "Office of Personnel Management",
+   "pain_point": "Federal Workforce: Deferred Resignation Program Largely Responsible for Sixfold Increase in Paid Administrative Leave Salary Costs (Source: GAO-26-108477)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108477",
+   "source_url": "https://www.gao.gov/products/gao-26-108477",
+   "publication_date": "2026-09-15",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "14b0303a-3caa-42d7-81e7-7862bcf55b18",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Housing and Urban Development",
+   "pain_point": "Mortgage Insurance: HUD’s Risk-Sharing Program and Its Role in Financing Affordable Rental Housing (Source: GAO-26-109028)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-109028",
+   "source_url": "https://www.gao.gov/products/gao-26-109028",
+   "publication_date": "2026-09-15",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "df4664b3-e226-4e66-9faa-f9ce595df137",
+   "already_served_living": true
+  },
+  {
+   "agency": "General Services Administration",
+   "pain_point": "Federal Real Property: GSA Should Take Additional Steps to Improve Agencies’ Awareness of Meeting Spaces List (Source: GAO-26-108669)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108669",
+   "source_url": "https://www.gao.gov/products/gao-26-108669",
+   "publication_date": "2026-09-14",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "e669b564-6bbd-4be4-b2dc-60360a365010",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Education",
+   "pain_point": "K-12 Education: Facility Issues Led About One in Five Districts to Cancel School in 2024-25, Affecting 2 Million Students (Source: GAO-26-107970)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-107970",
+   "source_url": "https://www.gao.gov/products/gao-26-107970",
+   "publication_date": "2026-09-14",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "ea15f526-951c-4345-9902-0a0ebb8b2d23",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of the Interior",
+   "pain_point": "National Register of Historic Places: Selected States and Tribes Identified Challenges to Participation (Source: GAO-26-107879)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-107879",
+   "source_url": "https://www.gao.gov/products/gao-26-107879",
+   "publication_date": "2026-09-14",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "45784bfe-4fa0-4e95-b6cc-b19a30d3e381",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Transportation",
+   "pain_point": "Air Traffic Control Systems: Ambitious New Modernization Effort Needs to Improve Cost and Schedule Planning (Source: GAO-26-107992)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-107992",
+   "source_url": "https://www.gao.gov/products/gao-26-107992",
+   "publication_date": "2026-09-14",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "7b686407-977e-463f-886c-ba4abc0a5529",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Agriculture",
+   "pain_point": "Agricultural Diseases And Pests: Nationwide Assessment and Strategy Needed to Enhance the Climate Resilience of Farms and Forests (Source: GAO-26-106756)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-106756",
+   "source_url": "https://www.gao.gov/products/gao-26-106756",
+   "publication_date": "2026-09-10",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "36a4d380-8b36-47bd-94a9-cc65794f6bf1",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Homeland Security",
+   "pain_point": "Disaster Risk: Improvements Needed to Enhance FEMA’s National Risk Index (Source: GAO-26-107894)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-107894",
+   "source_url": "https://www.gao.gov/products/gao-26-107894",
+   "publication_date": "2026-09-10",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "4055c785-ae46-43db-bcb6-d09b68c896d3",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Defense",
+   "pain_point": "DOD Installation Services: Action Needed to Improve Oversight of Intergovernmental Support Agreements (Source: GAO-26-108092)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108092",
+   "source_url": "https://www.gao.gov/products/gao-26-108092",
+   "publication_date": "2026-09-09",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "60ba8213-b406-4db0-aa98-88d3f6bb1772",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of State",
+   "pain_point": "Priority Open Recommendations: Department of State (Source: GAO-26-109086)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-109086",
+   "source_url": "https://www.gao.gov/products/gao-26-109086",
+   "publication_date": "2026-09-08",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "8e3bb4cc-a37c-4ef6-8d17-a628dcd6fd5c",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of Homeland Security",
+   "pain_point": "Chemical Security: DHS Should Provide Options for Voluntary Vetting of Facility Personnel for Terrorist Ties (Source: GAO-26-108127)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108127",
+   "source_url": "https://www.gao.gov/products/gao-26-108127",
+   "publication_date": "2026-09-08",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "02d9db31-3ee0-4281-9947-90d1c805d127",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of the Treasury",
+   "pain_point": "Banking Services: Cannabis Businesses Face Access Challenges (Source: GAO-26-107498)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-107498",
+   "source_url": "https://www.gao.gov/products/gao-26-107498",
+   "publication_date": "2026-09-08",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "1be02bd2-3708-4770-8feb-258a946f0a52",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Homeland Security",
+   "pain_point": "DHS Contracts: Reported Potential Cost Avoidance from Terminations Will Not Fully Materialize (Source: GAO-26-109096)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-109096",
+   "source_url": "https://www.gao.gov/products/gao-26-109096",
+   "publication_date": "2026-09-03",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "e84f54dc-876e-43a9-90b5-e9f8125d5356",
+   "already_served_living": false
+  },
+  {
+   "agency": "Department of State",
+   "pain_point": "Secret Service: Protection Policies Should be Consistently Updated to Better Ensure Protectee Safety (Source: GAO-26-108455)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108455",
+   "source_url": "https://www.gao.gov/products/gao-26-108455",
+   "publication_date": "2026-09-03",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "efac06e2-7a40-4dd1-bb10-4489744b0416",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Transportation",
+   "pain_point": "Flight Simulators: FAA Should Take Steps to Ensure Oversight Efforts Address Increased Workload (Source: GAO-26-107726)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-107726",
+   "source_url": "https://www.gao.gov/products/gao-26-107726",
+   "publication_date": "2026-09-03",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "5aa2ac86-a94b-42ed-ac1a-26f9398dec19",
+   "already_served_living": true
+  },
+  {
+   "agency": "Securities and Exchange Commission",
+   "pain_point": "Bank Financial Disclosures: Actions Needed to Improve Oversight of Information Provided to Investors (Source: GAO-26-107719)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-107719",
+   "source_url": "https://www.gao.gov/products/gao-26-107719",
+   "publication_date": "2026-09-03",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "a7ee336e-5788-4f1c-8167-372cd06b4327",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Defense",
+   "pain_point": "Defense Management: DOD Needs to Review Its Defense Agencies and Field Activities for Efficiency and Effectiveness (Source: GAO-26-107781)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-107781",
+   "source_url": "https://www.gao.gov/products/gao-26-107781",
+   "publication_date": "2026-09-03",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "98595030-70f0-431e-80a1-3b54668f2ea7",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Veterans Affairs",
+   "pain_point": "VA Electronic Health Record Modernization: Actions Needed to Sustain Accelerated System Deployments (Source: GAO-26-109393)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-109393",
+   "source_url": "https://www.gao.gov/products/gao-26-109393",
+   "publication_date": "2026-09-01",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "80a44c41-9748-4fb4-9f56-ac620a69692f",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Transportation",
+   "pain_point": "High School Aviation Maintenance Programs: FAA Should Assess Expanding Access to the Mechanic Knowledge Test (Source: GAO-26-108303)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108303",
+   "source_url": "https://www.gao.gov/products/gao-26-108303",
+   "publication_date": "2026-09-01",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "45a4c82f-f243-4635-97b8-3e64d5248e03",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Defense",
+   "pain_point": "National Security Space: DOD Has Opportunities to Improve Its Use of Commercial Data and Related Services (Source: GAO-26-107959)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-107959",
+   "source_url": "https://www.gao.gov/products/gao-26-107959",
+   "publication_date": "2026-08-27",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "ca192710-72df-4216-a3ec-b29579a18eaf",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Defense",
+   "pain_point": "Navy Readiness: Actions Needed to Address Costly Attack Submarine Maintenance Challenges (Source: GAO-26-109256)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-109256",
+   "source_url": "https://www.gao.gov/products/gao-26-109256",
+   "publication_date": "2026-08-27",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "eab38e42-8ece-4bf3-959b-26a7a5e1e624",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Defense",
+   "pain_point": "K-12 Education: Improved Oversight Could Help DOD Schools Better Support Students with Literacy and Math Skill Deficits (Source: GAO-26-108038)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108038",
+   "source_url": "https://www.gao.gov/products/gao-26-108038",
+   "publication_date": "2026-08-26",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "25ef5fc2-5d65-469d-b7e9-761f0856b25b",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of Energy",
+   "pain_point": "DOE Contracting: Risk-Informed Oversight and Clearer Expectations for Assurance Systems Would Improve Accountability (Source: GAO-26-107850)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-107850",
+   "source_url": "https://www.gao.gov/products/gao-26-107850",
+   "publication_date": "2026-08-26",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "4230b180-6a90-47a9-a21e-93b808c3e0b3",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of the Treasury",
+   "pain_point": "Opportunity Zones: Effects of Original Tax Incentive Mostly Unknown and Revised Incentive May Offer Improvements (Source: GAO-26-108132)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-108132",
+   "source_url": "https://www.gao.gov/products/gao-26-108132",
+   "publication_date": "2026-08-24",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "eb9da863-f0e2-464e-b626-0ad357f3808d",
+   "already_served_living": true
+  },
+  {
+   "agency": "Department of State",
+   "pain_point": "State Department: Standards for Overseas Housing Need Review [Reissued with revisions on Oct. 21, 2026] (Source: GAO-26-107965)",
+   "origin": "institute_gao_report",
+   "document_number": "GAO-26-107965",
+   "source_url": "https://www.gao.gov/products/gao-26-107965",
+   "publication_date": "2026-08-10",
+   "agency_resolution_method": "institute_resolver:exact_name",
+   "requires_review": false,
+   "institute_source_id": "68c64b8a-fd94-46f1-87f0-977a0d1fe96c",
+   "already_served_living": false
+  }
+ ],
+ "rejected": [
+  {
+   "reason": "unresolved_agency",
+   "detail": "\"United States Postal Service\" is not an exact canonical agency (unresolved)",
+   "candidate": {
+    "agency": "United States Postal Service",
+    "pain_point": "USPS Financial Viability (GAO High-Risk List, GAO-25-107743, February 2025)",
+    "origin": "gao_high_risk_2025",
+    "document_number": "GAO-25-107743",
+    "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970312",
+    "publication_date": "2025-02-25",
+    "agency_resolution_method": "curated_area_table:title_named",
+    "requires_review": false,
+    "high_risk_area": 37
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Traffic Control Devices Manual: Selected Practitioners Reported Never or Rarely Deviating from DOT Standards (Source: GAO-27-108431)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-108431",
+    "source_url": "https://www.gao.gov/products/gao-27-108431",
+    "publication_date": "2026-11-16",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "78cf022e-8017-4222-8a4c-81f5ae98532a"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Tribal Justice: Congressional Action Needed to Support Tribal Sovereignty (Source: GAO-27-108087)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-108087",
+    "source_url": "https://www.gao.gov/products/gao-27-108087",
+    "publication_date": "2026-11-16",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "74c8d845-b3b4-4a63-b026-1b59b011a967"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Performance and Accountability Report: Fiscal Year 2026 (Source: GAO-27-900726)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-900726",
+    "source_url": "https://www.gao.gov/products/gao-27-900726",
+    "publication_date": "2026-11-16",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "7537bc84-a13d-4397-85a0-5ae8d8c939ce"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Federal Prisons: Improved Reviews of Natural Deaths and Communications with Families Needed (Source: GAO-27-108744)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-108744",
+    "source_url": "https://www.gao.gov/products/gao-27-108744",
+    "publication_date": "2026-11-16",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "0fc24ae4-11e3-4754-a699-d4e747ecd8d9"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Financial Audit: IRS’s FY 2026 and FY 2025 Financial Statements (Source: GAO-27-108909)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-108909",
+    "source_url": "https://www.gao.gov/products/gao-27-108909",
+    "publication_date": "2026-11-12",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "c1baee53-2cd4-4fea-b316-fdad2847181a"
+   }
+  },
+  {
+   "reason": "missing_document_number",
+   "detail": "document_number=OIG-27-1SP",
+   "candidate": {
+    "agency": "Government Accountability Office",
+    "pain_point": "Fall 2026 Semiannual Report to Congress (Source: OIG-27-1SP)",
+    "origin": "institute_gao_report",
+    "document_number": "OIG-27-1SP",
+    "source_url": "https://www.gao.gov/products/oig-27-1sp",
+    "publication_date": "2026-11-12",
+    "agency_resolution_method": "institute_resolver:exact_name",
+    "requires_review": false,
+    "institute_source_id": "ebb3f957-f940-43cf-b1d8-e31ddb583524"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Grants Management: GAO's Fraud Risk Framework Could Provide Roadmap for Enhancing States' Subrecipient Oversight (Source: GAO-27-108450)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-108450",
+    "source_url": "https://www.gao.gov/products/gao-27-108450",
+    "publication_date": "2026-11-10",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "85ed4ee9-6f78-4f20-8523-d7897b9e0629"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Multilateral Banks: Treasury Should Improve Consistency and Transparency of Decisions on Projects Affecting U.S. Producers (Source: GAO-27-108667)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-108667",
+    "source_url": "https://www.gao.gov/products/gao-27-108667",
+    "publication_date": "2026-11-10",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "7cad2e66-6959-46c5-96e7-0f6060368986"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "IRS Taxpayer Services: Challenges in Measuring the Benefits of Customer Service Investments (Source: GAO-27-108701)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-108701",
+    "source_url": "https://www.gao.gov/products/gao-27-108701",
+    "publication_date": "2026-11-10",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "b8aa9c6c-2ebc-4cee-9785-ef3757e13adb"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Housing Construction Innovations: Technologies and Policy Options to Help Increase Supply and Affordability (Source: GAO-27-108037)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-108037",
+    "source_url": "https://www.gao.gov/products/gao-27-108037",
+    "publication_date": "2026-11-10",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "4c4bfd64-ef34-4287-a608-469bd1362d72"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Department of Agriculture: Little Transparency on Whether Key Issues Were Analyzed Before Reorganization Decision (Source: GAO-27-108734)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-108734",
+    "source_url": "https://www.gao.gov/products/gao-27-108734",
+    "publication_date": "2026-11-09",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "b05a5678-e450-43e7-b954-e0182cd72d59"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Democracy Assistance: State Department Should Improve Congressional Notification of Its Use of Certain Legal Authorities (Source: GAO-27-107900)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-107900",
+    "source_url": "https://www.gao.gov/products/gao-27-107900",
+    "publication_date": "2026-11-06",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "b8162d6d-9717-43c3-a02d-43d6ec978d65"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "District of Columbia Charter Schools: Key Changes Made to Academic Accountability System (Source: GAO-27-109048)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-109048",
+    "source_url": "https://www.gao.gov/products/gao-27-109048",
+    "publication_date": "2026-11-05",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "fde9fdc2-a477-4745-a9d0-eb2d7cd4258e"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "U.S. Patent and Trademark Office: Patent Backlog Reduction Efforts Pose Risks to Examiner Retention and Examination Quality (Source: GAO-27-108491)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-108491",
+    "source_url": "https://www.gao.gov/products/gao-27-108491",
+    "publication_date": "2026-11-05",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "743f10c3-09e2-4100-9162-c4098fc3881a"
+   }
+  },
+  {
+   "reason": "missing_document_number",
+   "detail": "document_number=E16078",
+   "candidate": {
+    "agency": "",
+    "pain_point": "October 28, 2026 letter commenting on the International Auditing and Assurance Standards Board's July 2026 Exposure Draft: \"Proposed International Standard on Auditing for Audits of Financial Statements of Less Complex Entities (Revised)\" (Source: E16078)",
+    "origin": "institute_gao_report",
+    "document_number": "E16078",
+    "source_url": "https://www.gao.gov/products/e16078",
+    "publication_date": "2026-10-29",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "a3e3a005-a548-482e-a6ec-144d37ba2ecc"
+   }
+  },
+  {
+   "reason": "missing_document_number",
+   "detail": "document_number=E16067",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Professional Standards Update No. 102 (Source: E16067)",
+    "origin": "institute_gao_report",
+    "document_number": "E16067",
+    "source_url": "https://www.gao.gov/products/e16067",
+    "publication_date": "2026-10-26",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "b89bd620-972f-4986-9180-6c2c2898d13d"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Research Security: NIH Action Needed to Strengthen Foreign Interference Risk Management (Source: GAO-27-107848)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-107848",
+    "source_url": "https://www.gao.gov/products/gao-27-107848",
+    "publication_date": "2026-10-16",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "a4652d19-f6a3-4673-ac07-9773f587917b"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Textile Circular Economy: Policy Options for the U.S. (Source: GAO-27-108142)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-108142",
+    "source_url": "https://www.gao.gov/products/gao-27-108142",
+    "publication_date": "2026-10-16",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "d89e3d6f-8578-44cd-8db0-e15dd3456b28"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "National Security: FBI Should Strengthen Partnerships to Combat Non-Traditional Intelligence Collectors (Source: GAO-27-109057)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-109057",
+    "source_url": "https://www.gao.gov/products/gao-27-109057",
+    "publication_date": "2026-10-16",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "5a3a1ecb-2b27-44ec-bfa9-3beb7c79f49c"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Nuclear Waste: Addressing Legal and Regulatory Barriers Could Accelerate Cleanup and Reduce Costs (Source: GAO-27-107791)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-107791",
+    "source_url": "https://www.gao.gov/products/gao-27-107791",
+    "publication_date": "2026-10-16",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "e8f77c65-0421-4c54-996b-7cf73312dffc"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "2027-2032 Strategic Plan: Serving Congress and the Nation (Source: GAO-27-900655)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-900655",
+    "source_url": "https://www.gao.gov/products/gao-27-900655",
+    "publication_date": "2026-10-16",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "05e8f8f1-0846-48d1-9940-380fd79c470d"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Service Member Records: DOD Needs to Address Improper and Delayed Releasing of Personnel and Health Information (Source: GAO-27-107784)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-107784",
+    "source_url": "https://www.gao.gov/products/gao-27-107784",
+    "publication_date": "2026-10-16",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "3141eefa-7944-4224-83ba-76915851c315"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Mortgage Lending: Newly Enacted Restrictions May Help Curb Unwanted Solicitations While Preserving Comparison Shopping (Source: GAO-27-108874)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-108874",
+    "source_url": "https://www.gao.gov/products/gao-27-108874",
+    "publication_date": "2026-10-06",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "397ae2e3-0b45-4114-99c7-e8bea0800141"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Quantum Computing: Federal Actions Needed to Prepare for Emerging Cyber Threat (Source: GAO-27-108740)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-108740",
+    "source_url": "https://www.gao.gov/products/gao-27-108740",
+    "publication_date": "2026-10-06",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "69d0cf4a-38a8-414d-8ee9-2eca1256f99b"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Rural Health Transformation Program: Early Implementation Actions and Monitoring Plans (Source: GAO-27-108853)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-108853",
+    "source_url": "https://www.gao.gov/products/gao-27-108853",
+    "publication_date": "2026-10-06",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "83e1a690-509b-434e-91df-c572c0e0ff15"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Concrete Masonry Promotion Program: Commerce Could Enhance Its Oversight Controls (Source: GAO-27-108692)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-108692",
+    "source_url": "https://www.gao.gov/products/gao-27-108692",
+    "publication_date": "2026-10-05",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "4cdbac3e-b49b-4454-9ec8-e73868b4a8b1"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Medicare Part D: Payments and Contracts Between Pharmacies and Plan Sponsors That Are Vertically Integrated (Source: GAO-26-107393)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-107393",
+    "source_url": "https://www.gao.gov/products/gao-26-107393",
+    "publication_date": "2026-10-05",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "3ff9394f-276b-4750-9adf-5e837977a8b2"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Innovation in Action: Getting You Up to Speed on Manufacturing (Source: GAO-27-109056)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-109056",
+    "source_url": "https://www.gao.gov/products/gao-27-109056",
+    "publication_date": "2026-10-02",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "a5f56fcb-cc4a-4c54-9672-675bc7b326f8"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "State Department: Fly America Act’s Effects on Travel Costs and Personnel Experience (Source: GAO-27-108631)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-108631",
+    "source_url": "https://www.gao.gov/products/gao-27-108631",
+    "publication_date": "2026-10-01",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "8eff1ab1-75ee-4bde-a7a1-958e3f7dcfb2"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Supplemental Nutrition Assistance Program: Federal Actions Needed to Help Veterans Access Benefits (Source: GAO-27-108111)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-27-108111",
+    "source_url": "https://www.gao.gov/products/gao-27-108111",
+    "publication_date": "2026-10-01",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "fff80d37-0ca1-4733-8da1-8335d185a004"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Tobacco Products: FDA Should Monitor Timeliness of Application Reviews (Source: GAO-26-108195)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-108195",
+    "source_url": "https://www.gao.gov/products/gao-26-108195",
+    "publication_date": "2026-10-01",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "c7e8b694-c5bd-4aad-95e4-8df9477ec0a7"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Public Health Preparedness: Action Needed to Address National and Biosecurity Risks Associated with Disposal of Federal Laboratory Equipment (Source: GAO-26-107729)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-107729",
+    "source_url": "https://www.gao.gov/products/gao-26-107729",
+    "publication_date": "2026-10-01",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "777a4c4b-21ac-46ee-a367-2539e08434d5"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Fraud in Federal Programs: Limited Beneficial Ownership Information Available on Awardees (Source: GAO-26-108174)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-108174",
+    "source_url": "https://www.gao.gov/products/gao-26-108174",
+    "publication_date": "2026-09-30",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "b1aa68e0-e7ac-4c54-9ef3-cecc7a5bd81a"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Foreign Assistance: Agencies Made Broad Changes, but State Lacked Guidance for Decisions (Source: GAO-26-108607)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-108607",
+    "source_url": "https://www.gao.gov/products/gao-26-108607",
+    "publication_date": "2026-09-30",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "5e8c0f04-0c2f-40c4-a2af-4f4abdf17838"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Internet of Things: OMB Action Needed to Ensure Agencies Secure Their Networked Devices (Source: GAO-26-108937)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-108937",
+    "source_url": "https://www.gao.gov/products/gao-26-108937",
+    "publication_date": "2026-09-30",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "f6dfbf48-8390-4676-b058-f5a8275cbc96"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Combatting Illicit Drugs: DOJ and DHS Must Resolve Uncertainties Around Collaboration to Ensure Effective Counternarcotics Investigations (Source: GAO-26-107414)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-107414",
+    "source_url": "https://www.gao.gov/products/gao-26-107414",
+    "publication_date": "2026-09-30",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "ee5e857a-6aba-4340-8200-d2e48d2135b8"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Supplemental Material for GAO-25-107721:  Summary of Key Changes in the 2025 Green Book Revision (Source: GAO-26-109325)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-109325",
+    "source_url": "https://www.gao.gov/products/gao-26-109325",
+    "publication_date": "2026-09-30",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "ab36a70a-6b8a-4abb-93cc-5acf7295dbc7"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Director of National Intelligence: Status of Open GAO Recommendations (Source: GAO-26-109273)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-109273",
+    "source_url": "https://www.gao.gov/products/gao-26-109273",
+    "publication_date": "2026-09-30",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "85aba29b-7992-43f2-85f4-838feabaf13a"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Coast Guard: Additional Action Needed to Address Marine Firefighting Challenges (Source: GAO-26-108533)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-108533",
+    "source_url": "https://www.gao.gov/products/gao-26-108533",
+    "publication_date": "2026-09-29",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "89e0f40b-a88c-4944-8abb-257f8a2a600f"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "DOGE: Congress and the Public Lack Assurance That Systems and Data Were Protected at Multiple Agencies (Source: GAO-26-108192)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-108192",
+    "source_url": "https://www.gao.gov/products/gao-26-108192",
+    "publication_date": "2026-09-29",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "122edd86-1a98-4346-864c-1289ac935056"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Small Business Research Programs: Better Data Could Improve Insight into Companies’ Success (Source: GAO-26-108750)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-108750",
+    "source_url": "https://www.gao.gov/products/gao-26-108750",
+    "publication_date": "2026-09-29",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "e3788522-67bf-44c7-8559-9123d691e5ff"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Firearms Trafficking to Mexico: Better Data and Performance Monitoring Would Help Agencies Direct Resources to Counter Cartels (Source: GAO-26-108061)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-108061",
+    "source_url": "https://www.gao.gov/products/gao-26-108061",
+    "publication_date": "2026-09-28",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "e1a0ff45-cf5d-4510-8031-3ea381234260"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Cybersecurity Regulations: Industry Panelists Identify Duplication and Conflicts and Ways to Address Them (Source: GAO-26-109197)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-109197",
+    "source_url": "https://www.gao.gov/products/gao-26-109197",
+    "publication_date": "2026-09-28",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "612b0b63-5c73-40e7-8904-2e459d77f888"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "IT Systems Annual Assessment: DOD Should Improve IT Fraud Risk Management Practices (Source: GAO-26-108596)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-108596",
+    "source_url": "https://www.gao.gov/products/gao-26-108596",
+    "publication_date": "2026-09-28",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "7ada6d27-49fa-474f-b0e8-c409c53fa303"
+   }
+  },
+  {
+   "reason": "missing_document_number",
+   "detail": "document_number=OIG-26-3",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Acquisition Management: Opportunities Exist for GAO to Strengthen Its Policies and Procedures (Source: OIG-26-3)",
+    "origin": "institute_gao_report",
+    "document_number": "OIG-26-3",
+    "source_url": "https://www.gao.gov/products/oig-26-3",
+    "publication_date": "2026-09-25",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "8fca9253-5914-4299-8511-71205f656582"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Compacts of Free Association: VA Is Pursuing Partial Implementation of Health Care Authorities in the Freely Associated States (Source: GAO-26-109152)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-109152",
+    "source_url": "https://www.gao.gov/products/gao-26-109152",
+    "publication_date": "2026-09-25",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "05e9fc4a-e9a5-4caa-917c-332cf254d838"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Tax Fraud: The Federal Government Loses an Estimated $116 Billion to $304 Billion Annually (Source: GAO-26-107810)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-107810",
+    "source_url": "https://www.gao.gov/products/gao-26-107810",
+    "publication_date": "2026-09-25",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "e00c656c-187b-4c20-9033-2689309835a9"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Naval Shipyards: Complete Information Needed for Decision-Making on Multibillion-Dollar, 50-Year Infrastructure Program (Source: GAO-26-107830)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-107830",
+    "source_url": "https://www.gao.gov/products/gao-26-107830",
+    "publication_date": "2026-09-25",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "5fd2e2bf-12e1-4e5c-969c-7992ddebe41b"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Private Health Insurance: Federal and State Oversight of Contraceptive Coverage Requirements (Source: GAO-26-108446)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-108446",
+    "source_url": "https://www.gao.gov/products/gao-26-108446",
+    "publication_date": "2026-09-24",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "cb2f7080-e528-49b4-9a23-20bb4c512d1c"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Funding Status: Infrastructure Investment and Jobs and Inflation Reduction Acts at the Departments of Agriculture and Energy (Source: GAO-26-109087)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-109087",
+    "source_url": "https://www.gao.gov/products/gao-26-109087",
+    "publication_date": "2026-09-24",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "b87ef3ca-ede3-4d0f-96d8-2fdd1a226fe4"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Maternal Health: Information on and Federal Oversight of Mortality Review Committees (Source: GAO-26-108690)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-108690",
+    "source_url": "https://www.gao.gov/products/gao-26-108690",
+    "publication_date": "2026-09-24",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "84775cb8-0f23-4ff3-9dd2-e254c65bd6a0"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Disability Employment: Providers Cited Challenges with State Coordination of Federal Funds (Source: GAO-26-107741)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-107741",
+    "source_url": "https://www.gao.gov/products/gao-26-107741",
+    "publication_date": "2026-09-23",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "70fddf9f-2dc9-4da1-b8dc-6db50c2b806d"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Telecommunications: Better Information Sharing Needed to Ensure Compliance with Foreign-Sourced Equipment Prohibitions (Source: GAO-26-108630)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-108630",
+    "source_url": "https://www.gao.gov/products/gao-26-108630",
+    "publication_date": "2026-09-22",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "fe585d8b-3038-4808-86c1-5728c27da1d4"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Tribal Water Infrastructure: Opportunities Exist to Improve Federal Assistance (Source: GAO-26-107178)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-107178",
+    "source_url": "https://www.gao.gov/products/gao-26-107178",
+    "publication_date": "2026-09-22",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "630dc6be-d6fc-4aff-99ab-36edf4260d1a"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Coast Guard: Actions to Address Sexual Misconduct Underway but Incomplete (Source: GAO-26-109302)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-109302",
+    "source_url": "https://www.gao.gov/products/gao-26-109302",
+    "publication_date": "2026-09-18",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "16e78f91-e6b0-4e6e-b94c-6d36c9019110"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Coast Guard: Opportunities Remain to Improve Access to Housing (Source: GAO-26-109300)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-109300",
+    "source_url": "https://www.gao.gov/products/gao-26-109300",
+    "publication_date": "2026-09-18",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "4f499a0e-49b5-490c-a15e-23d91c2cb178"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Unpaid Household Work: Estimated Value and Time Spent on Domestic Tasks and Caregiving (Source: GAO-26-107871)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-107871",
+    "source_url": "https://www.gao.gov/products/gao-26-107871",
+    "publication_date": "2026-09-17",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "d7d0f6d9-f02c-4713-b120-a8f3a404d070"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Medicaid: Improved Oversight Needed of State Eligibility Error Corrective Action Plans (Source: GAO-26-108017)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-108017",
+    "source_url": "https://www.gao.gov/products/gao-26-108017",
+    "publication_date": "2026-09-17",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "9f3c5c6f-5885-46aa-92a0-6fd744463d8d"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "U.S. Postal Service: Cost-Cutting Initiatives and Other Factors Have Contributed to Declining Service Performance (Source: GAO-26-108527)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-108527",
+    "source_url": "https://www.gao.gov/products/gao-26-108527",
+    "publication_date": "2026-09-17",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "0a9d0902-90d1-4730-b700-98ac5bfdcc2c"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Economic Development Administration: Additional Collaboration with Other Agencies Could Reduce Risks Associated with Overlap (Source: GAO-26-107826)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-107826",
+    "source_url": "https://www.gao.gov/products/gao-26-107826",
+    "publication_date": "2026-09-17",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "86d8820f-2d46-461a-a4bc-475f02759874"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Congressional Award Foundation: Review of the FY 2025 Financial Statement Audit (Source: GAO-26-109196)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-109196",
+    "source_url": "https://www.gao.gov/products/gao-26-109196",
+    "publication_date": "2026-09-16",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "0f23656f-96ed-4127-8cca-ac615fdbf6b2"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Health Insurance Exchanges: Coverage of Non-Excepted Abortion Services by Qualified Health Plans in 2026 (Source: GAO-26-108995)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-108995",
+    "source_url": "https://www.gao.gov/products/gao-26-108995",
+    "publication_date": "2026-09-15",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "1c907fd2-ca9d-4193-b537-615e277b7461"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Economy Act: An Overview (Source: GAO-26-900743)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-900743",
+    "source_url": "https://www.gao.gov/products/gao-26-900743",
+    "publication_date": "2026-09-15",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "b631076c-391f-4224-b01b-beb791c2eb30"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "COVID-19: Federal Efforts and Stakeholder Views on Expediting the Transportation of Personal Protective Equipment (Source: GAO-26-108488)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-108488",
+    "source_url": "https://www.gao.gov/products/gao-26-108488",
+    "publication_date": "2026-09-14",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "138e3223-fce8-42e5-b9c1-6baed14b1a57"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Testing and Evaluation Guide: Best Practices for Commercial Off-the-Shelf Systems (Exposure Draft) (Source: GAO-26-108068)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-108068",
+    "source_url": "https://www.gao.gov/products/gao-26-108068",
+    "publication_date": "2026-09-14",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "b8a6419e-c09a-4665-a2ff-aaa5ccd75761"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Nuclear Security Enterprise: Strategic Partnership Projects Can Support Mission, Operations, and Research (Source: GAO-26-108229)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-108229",
+    "source_url": "https://www.gao.gov/products/gao-26-108229",
+    "publication_date": "2026-09-10",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "fa444e31-8e1c-4f9d-b3ab-d885dab3a40d"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Federal Rulemaking: Agencies Continue to Use Good Cause and Other Mechanisms to Forgo Public Comments (Source: GAO-26-108208)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-108208",
+    "source_url": "https://www.gao.gov/products/gao-26-108208",
+    "publication_date": "2026-09-04",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "06c79e1a-36cb-4a6a-9c6a-b0e4f4037e34"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Disaster Contracting: FEMA and the Corps of Engineers Have Opportunities to Improve Local Vendor Use (Source: GAO-26-108426)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-108426",
+    "source_url": "https://www.gao.gov/products/gao-26-108426",
+    "publication_date": "2026-09-03",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "40ea49db-31d1-465f-bbba-0cfa0bb088b5"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Telecommunications: GSA Should Assess Agencies’ Effectiveness at Preventing Service Disruptions (Source: GAO-26-107919)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-107919",
+    "source_url": "https://www.gao.gov/products/gao-26-107919",
+    "publication_date": "2026-08-31",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "c52133a7-7af2-47ee-9c34-c003e010a709"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Broadband Deployment: Agencies Should Take Steps to Better Target Underserved Areas and Consider Sustainability (Source: GAO-26-107725)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-107725",
+    "source_url": "https://www.gao.gov/products/gao-26-107725",
+    "publication_date": "2026-08-31",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "34c245c7-202f-4d64-8611-d679202744b1"
+   }
+  },
+  {
+   "reason": "missing_document_number",
+   "detail": "document_number=OIG-26-2",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Information Technology Modernization: Enhanced Controls Could Help GAO Ensure Decisions Are Documented and Stakeholders Are Fully Informed (Source: OIG-26-2)",
+    "origin": "institute_gao_report",
+    "document_number": "OIG-26-2",
+    "source_url": "https://www.gao.gov/products/oig-26-2",
+    "publication_date": "2026-08-28",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "631903eb-a3ba-4626-8381-7470735eda55"
+   }
+  },
+  {
+   "reason": "unresolved_agency",
+   "detail": "method=unresolved",
+   "candidate": {
+    "agency": "",
+    "pain_point": "Federal Social Safety Net Programs: Millions of Workers, Including Many Employed by Large Employers, Continue to Rely on Medicaid and SNAP [Reissued with revisions on Aug. 24, 2026] (Source: GAO-26-108703)",
+    "origin": "institute_gao_report",
+    "document_number": "GAO-26-108703",
+    "source_url": "https://www.gao.gov/products/gao-26-108703",
+    "publication_date": "2026-07-22",
+    "agency_resolution_method": "unresolved",
+    "requires_review": false,
+    "institute_source_id": "fd0e5ccb-27fb-44bc-bd12-ac3a5fc33624"
+   }
+  }
+ ]
+}
