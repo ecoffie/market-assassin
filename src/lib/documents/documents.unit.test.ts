@@ -133,6 +133,11 @@ describe('validateDocModel', () => {
       'We assume 400 employees for planning.',
       'For planning, assume a 10% win rate.',
       'We assume the RFP drops in Q2 FY2027 for planning.',
+      // The author's OWN planned spending (first-person subject) is planning, not a market claim (A4 round 3).
+      'We assume we will spend $50K on travel for planning.',
+      'Our budget assumes we buy two laptops at about 1,500 dollars each.',
+      'We plan to procure software licenses within a $20K budget.',
+      'For planning, assume a 15% share of our revenue goes to overhead.',
     ];
     const factual: Array<[string, string]> = [
       ['award value about a named company', 'We assume Acme Federal holds a $40M ceiling.'],
@@ -153,6 +158,11 @@ describe('validateDocModel', () => {
       ['obligated (verb), named service', 'We assume the Navy obligated $12M.'],
       ['agency acronym + count of orders', 'We assume NASA will issue two task orders.'],
       ['"went to" a company, no figure', 'Assume the contract went to Acme.'],
+      // Someone ELSE spending/buying stays a claim, even with a first-person frame around it:
+      ['agency spent (words)', 'We assume CMS spent roughly two million dollars.'],
+      ['agency bought (count)', 'Assume the Coast Guard bought 40 boats.'],
+      ['the customer spends, no agency named', 'Assume the customer spends $5M a year here.'],
+      ['first person, but a market share', 'We assume a 15% share of the market.'],
     ];
     const one = (text: string, extra: Record<string, unknown> = {}) =>
       tiny({ sections: [{ id: 'a', heading: 'A', blocks: [{ type: 'paragraph', id: 'p', text, claim: 'assumption', ...extra }] }] });

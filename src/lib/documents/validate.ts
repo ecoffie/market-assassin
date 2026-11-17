@@ -75,7 +75,13 @@ export function statesFigure(text: string): boolean {
 // Nouns that make a figure a claim about the federal market rather than the author's plan.
 // Nouns AND verb forms that make a figure a claim about the federal market rather than the author's
 // plan (A4 round 2: "awarded", "spends", "buys", "% of" used to slip past a noun-only list).
-const WORLD_TERM = /\b(?:agenc(?:y|ies)|departments?|offices?|buyers?|vendors?|bidders?|offerors?|competitors?|incumbents?|contractors?|firms?|compan(?:y|ies)|recompet\w*|contracts?|awar\w*|obligat\w*|spen(?:d|ds|ding|t)|ceilings?|solicitations?|opportunit(?:y|ies)|(?:task|delivery) orders?|market|buy|buys|bought|buying|purchas\w*|procur\w*|share)\b|\bpercent of\b|%\s+of\b/i;
+const WORLD_TERM = /\b(?:agenc(?:y|ies)|departments?|offices?|buyers?|vendors?|bidders?|offerors?|competitors?|incumbents?|contractors?|firms?|compan(?:y|ies)|recompet\w*|contracts?|awar\w*|obligat\w*|ceilings?|solicitations?|opportunit(?:y|ies)|(?:task|delivery) orders?|market)\b/i;
+// Spending / buying / share words describe the market only when someone ELSE is doing it. With a
+// first-person subject ("we will spend $50K on travel", "our budget assumes we buy two laptops") they
+// are the author's own plan — Eric's rule allows that (A4 round 3). A world term or a named agency in
+// the same sentence still makes it a claim ("we assume the VA spends $5M").
+const MARKET_VERB = /\b(?:spen(?:d|ds|ding|t)|buy|buys|bought|buying|purchas\w*|procur\w*|share)\b|\bpercent of\b|%\s+of\b/i;
+const FIRST_PERSON = /\b(?:we|our|us|ours)\b|\bI\b/i;
 // A federal buyer named in the text. Acronyms come from the repo's agency alias list, matched
 // case-sensitively as whole words; acronyms that collide with ordinary usage are left out
 // (BPA = blanket purchase agreement, USA = the country, and two-letter codes like AG/ED/AF).
@@ -112,6 +118,7 @@ export function assumptionAssertsFact(text: string): boolean {
   const plain = text.replace(/\*\*|_/g, '');
   const figure = statesFigure(plain);
   if (figure && (WORLD_TERM.test(plain) || namesAgency(plain) || NAMED_COMPANY.test(plain) || CONTRACT_NUMBER.test(plain))) return true;
+  if (figure && MARKET_VERB.test(plain) && !FIRST_PERSON.test(plain)) return true;
   if (figure && !PLANNING_FRAME.test(plain)) return true;
   return INCUMBENT_CLAIM.test(plain) || AWARD_CLAIM.test(plain) || WENT_TO_COMPANY.test(plain) || SPECIFIC_DATE.test(plain) || DEADLINE.test(plain);
 }
