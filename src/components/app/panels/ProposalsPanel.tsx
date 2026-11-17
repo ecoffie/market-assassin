@@ -1719,7 +1719,10 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         draftingSection={draftLoading}
         canDraft={!!uploadedRfp?.text?.trim()}
         draftError={draftError}
-        complianceSummary={compliance.length ? { done: compliance.filter(c => c.status === 'done').length, total: compliance.length } : null}
+        requirements={compliance.map(c => ({ id: c.id, text: c.requirement, section: c.section, status: c.status }))}
+        onRequirementStatus={(id, status) => updateRequirement(id, { status })}
+        onFindRequirements={uploadedRfp?.text?.trim() ? () => { void generateCompliance(); } : undefined}
+        findingRequirements={complianceLoading}
         onExportPackage={() => exportProposalPackage()}
         exportingPackage={exporting}
         onClose={() => setEditorOpen(false)}
