@@ -118,6 +118,44 @@ describe('validateDocModel', () => {
     expect(msgs.map((x) => x.match(/\((\w+)\)$/)?.[1])).toEqual(['r1', 'r2', 'r3']);
   });
 
+  it('context in an ABOUT section cannot carry a decision-critical claim (Agent 4 probes, round 4)', () => {
+    const probe = (text: string) => issuesOf(tiny({ sections: [{ id: 'm', heading: 'Method', role: 'about', blocks: [{ type: 'paragraph', id: 'p', text, claim: 'context' }] }] }));
+    for (const text of [
+      'The incumbent is Acme Federal, and the agency intends a sole-source award.',
+      'This work is set aside for SDVOSB firms only.',
+      'Only 8(a) firms are eligible.',
+      'Proposals are due by the end of March.',
+      'Delta Corp holds the current contract.',
+      'The deadline cannot move.',
+    ]) expect(probe(text).join(' '), text).toMatch(/context may not name a company, an incumbent or award, eligibility or set-aside terms, or a date/);
+  });
+
+  it('ordinary method/how-to-read prose still passes as context', () => {
+    const ok = tiny({ sections: [{ id: 'm', heading: 'How to read', role: 'about', blocks: [
+      { type: 'paragraph', id: 'p1', text: 'Readers may treat cited statements as recorded data and should check assumptions before relying on them.', claim: 'context' },
+      { type: 'paragraph', id: 'p2', text: 'Coverage is limited to the listed sources; a buyer absent from a table may still buy under another classification.', claim: 'context' },
+    ] }] });
+    expect(issuesOf(ok)).toEqual([]);
+  });
+
+  it('an about section holds at most 4 context blocks of at most 600 chars', () => {
+    const blocks = Array.from({ length: 5 }, (_, i) => ({ type: 'paragraph' as const, id: `p${i}`, text: 'How to read this report.', claim: 'context' as const }));
+    expect(issuesOf(tiny({ sections: [{ id: 'm', heading: 'M', role: 'about', blocks }] })).join(' ')).toMatch(/at most 4 context blocks/);
+    const long = tiny({ sections: [{ id: 'm', heading: 'M', role: 'about', blocks: [{ type: 'paragraph', id: 'p', text: 'word '.repeat(130), claim: 'context' }] }] });
+    expect(issuesOf(long).join(' ')).toMatch(/limited to 600 characters/);
+  });
+
+  it('fraction words are figures: a recommendation/assumption stating a proportion must cite', () => {
+    const m = tiny({ sections: [{ id: 'a', heading: 'A', blocks: [
+      { type: 'paragraph', id: 'f1', text: 'Target the offices that place half of all obligations.', claim: 'recommendation' },
+      { type: 'paragraph', id: 'f2', text: 'A third of buyers will recompete early.', claim: 'assumption' },
+      { type: 'paragraph', id: 'f3', text: 'Focus where most buyers use set-asides.', claim: 'recommendation' },
+      { type: 'paragraph', id: 'ok', text: 'Expect fourth-quarter buying to peak.', claim: 'assumption' },
+    ] }] });
+    const msgs = issuesOf(m).filter((x) => /must cite its source/.test(x));
+    expect(msgs.map((x) => x.match(/\((\w+)\)$/)?.[1])).toEqual(['f1', 'f2', 'f3']);
+  });
+
   it('demoteUncitedFacts output always validates (misplaced context, uncited figures, critical+unverified)', () => {
     const m = tiny({ sections: [{ id: 'a', heading: 'A', blocks: [
       { type: 'paragraph', id: 'c1', text: 'Incumbent is Acme.', claim: 'context' },

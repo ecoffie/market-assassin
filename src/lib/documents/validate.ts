@@ -32,10 +32,33 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 // a program name like 8(a). "one" is excluded: "one of the offices" is not a figure.
 const NUMERIC_TOKEN = /(?<![A-Za-z0-9])\$?\d[\d,]*(?:\.\d+)?(?![A-Za-z0-9(])|(?<![A-Za-z0-9])\$?\d[\d,]*(?:\.\d+)?(?:[KkMmBb]|%)(?![A-Za-z0-9])/;
 const NUMBER_WORD = /\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|trillion|dozen|percent)\b/i;
+// Proportions are figures too ("half of all obligations", "a third", "most buyers"). "quarter" is
+// deliberately absent: "fourth-quarter buying" is a time, not an amount.
+const FRACTION_WORD = /\b(?:half|halves|third|thirds|fifth|fifths|majority|minority|most|twice|double|triple|doubled|tripled)\b/i;
+
+// `context` describes the DOCUMENT. It may never carry a decision-relevant claim, whatever section the
+// model put it in (the model chooses the section role, so the role alone proves nothing):
+//   - eligibility / set-aside / competition vocabulary,
+//   - an incumbent, an award, or a named company (by legal suffix),
+//   - a date, deadline or due day.
+const CONTEXT_FORBIDDEN_PARTS: RegExp[] = [
+  // Eligibility, set-aside and competition vocabulary (any case).
+  /\b(?:SDVOSB|VOSB|WOSB|EDWOSB|HUBZone|set[- ]asides?|sole[- ]source|small[- ]business|eligib\w*|certif\w*|incumbent\w*|award\w*|recompete\w*|competed|competition|bidders?|offerors?)\b/i,
+  /\b8\s*\(\s*a\s*\)/i,
+  // A named company: a capitalized legal or trade suffix ("Acme Federal", "Delta Corp.", "Apex LLC").
+  /\b[A-Z][\w&'-]*\s+(?:Inc|LLC|L\.L\.C|Corp|Corporation|Company|Co|Ltd|LLP|PLLC|Holdings|Federal|Technologies|Solutions|Group|Systems|Services)\b/,
+  // A date or deadline. Month names are matched capitalized so the verb "may" never trips it.
+  /\b(?:January|February|March|April|May|June|July|August|September|October|November|December|Sept?|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Oct|Nov|Dec|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/,
+  /\b(?:deadline|due date|due by|due on|is due|are due|tomorrow|yesterday)\b/i,
+];
+const CONTEXT_FORBIDDEN = { test: (t: string) => CONTEXT_FORBIDDEN_PARTS.some((re) => re.test(t)) };
+/** An 'about' section is a short note on the document, never a place to put content. */
+const ABOUT_MAX_CONTEXT_BLOCKS = 4;
+const CONTEXT_MAX_CHARS = 600;
 /** Does this text state a count or an amount? */
 export function statesFigure(text: string): boolean {
   const plain = text.replace(/\*\*|_/g, '');
-  return NUMERIC_TOKEN.test(plain) || NUMBER_WORD.test(plain);
+  return NUMERIC_TOKEN.test(plain) || NUMBER_WORD.test(plain) || FRACTION_WORD.test(plain);
 }
 
 function isObj(v: unknown): v is Record<string, unknown> {
@@ -109,6 +132,8 @@ export function validateDocModel(input: unknown): ValidationResult {
       if (sec.level !== undefined && ![1, 2, 3].includes(sec.level as number)) add(`${sp}.level`, 'must be 1, 2 or 3');
       if (sec.role !== undefined && sec.role !== 'body' && sec.role !== 'about') add(`${sp}.role`, "must be 'body' or 'about'");
       const isAbout = sec.role === 'about';
+      const contextBlocks = Array.isArray(sec.blocks) ? sec.blocks.filter((b) => isObj(b) && (b as { claim?: unknown }).claim === 'context').length : 0;
+      if (contextBlocks > ABOUT_MAX_CONTEXT_BLOCKS) add(`${sp}.blocks`, `at most ${ABOUT_MAX_CONTEXT_BLOCKS} context blocks per section; move content into a cited section`);
       if (!Array.isArray(sec.blocks)) return add(`${sp}.blocks`, 'must be an array');
       sec.blocks.forEach((b, bi) => {
         const bp = `${sp}.blocks[${bi}]`;
@@ -179,10 +204,12 @@ export function validateDocModel(input: unknown): ValidationResult {
           if (u.claim === 'context') {
             if (!isAbout) add(`${bp}`, `context is allowed only in a section with role 'about' (how to read, method, limitations) (${u.where}); in this section label it fact and cite a source`);
             if (/\d/.test(u.text) || NUMBER_WORD.test(u.text) || blk.type === 'table' || blk.type === 'chart') add(`${bp}`, `context may not contain numbers (in digits or words), tables or charts (${u.where}); label it fact and cite a source`);
+            if (CONTEXT_FORBIDDEN.test(u.text)) add(`${bp}`, `context may not name a company, an incumbent or award, eligibility or set-aside terms, or a date (${u.where}); that is a claim: label it fact and cite a source`);
+            if (u.text.length > CONTEXT_MAX_CHARS) add(`${bp}`, `context is limited to ${CONTEXT_MAX_CHARS} characters (${u.where})`);
           }
           if (u.claim === 'unverified' && u.critical === true) add(`${bp}`, `a decision-critical statement cannot be unverified (${u.where}); cite a source or omit it`);
           if ((u.claim === 'recommendation' || u.claim === 'assumption') && statesFigure(u.text) && (u.cites ?? []).filter((c) => sourceIds.has(c)).length === 0) {
-            add(`${bp}`, `a ${u.claim} that states a count or amount must cite its source (${u.where})`);
+            add(`${bp}`, `${u.claim === 'assumption' ? 'an assumption' : 'a recommendation'} that states a count or amount must cite its source (${u.where})`);
           }
           if (u.cites !== undefined && !Array.isArray(u.cites)) { add(`${bp}`, `cites must be an array at ${u.where}`); continue; }
           const cites = u.cites ?? [];
@@ -229,7 +256,7 @@ export function demoteUncitedFacts(model: DocModel): DemotionResult {
     const mustCite =
       u.claim === 'fact' || u.claim === undefined ||
       ((u.claim === 'recommendation' || u.claim === 'assumption') && statesFigure(text)) ||
-      (u.claim === 'context' && (!about || isTableOrChart || /\d/.test(text) || NUMBER_WORD.test(text))) ||
+      (u.claim === 'context' && (!about || isTableOrChart || /\d/.test(text) || NUMBER_WORD.test(text) || CONTEXT_FORBIDDEN.test(text) || text.length > CONTEXT_MAX_CHARS)) ||
       (u.claim === 'unverified' && u.critical === true);
     if (!mustCite) return u;
     if (cited) return u.claim === undefined || u.claim === 'context' || u.claim === 'unverified' ? { ...u, claim: 'fact' } : u;
