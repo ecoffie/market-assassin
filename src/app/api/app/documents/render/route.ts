@@ -4,8 +4,11 @@
  * Body: { email, format: 'pdf' | 'docx', model: DocModel }
  *
  * The document engine's first entry point (src/lib/documents). It is WRITE-FREE: nothing is stored,
- * logged to a table or cached; the caller's model goes in, a file comes out. Storing models (and
- * rendering by id) arrives with the chat_documents table, which needs separate approval.
+ * logged to a table or cached; the caller's model goes in, a file comes out. The renderer stays
+ * pure: saving a rendered file is the APP layer's job, as a doc_class='generated' row in the Vault
+ * (user_boilerplate_docs + private bucket vault-assets — see #2109 and the generated-files PR).
+ * There is no chat_documents table; that draft was retired (Eric, 2026-11-17: the Vault is the
+ * only document store).
  *
  * Auth: the signed Mindy session for `email`, and Pro (hasProAccess, the same gate as Ask Mindy).
  * The model is validated server-side (structure, limits, facts-must-cite) before anything renders.
