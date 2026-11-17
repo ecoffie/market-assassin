@@ -24,6 +24,7 @@ import {
   type HighRiskList,
   type InstituteGaoRow,
 } from '../../src/lib/strategic-intel/painpoint-replacement';
+import { readAllPages } from '../../src/lib/paged-read';
 
 const ROOT = resolve(__dirname, '../..');
 config({ path: resolve(ROOT, '.env.local'), quiet: true });
@@ -42,22 +43,22 @@ async function main() {
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     auth: { persistSession: false },
   });
-  const { data: inst, error: instErr } = await sb
+  // Paged with proof of exhaustion: PostgREST caps any response at 1,000 rows.
+  const inst = await readAllPages<InstituteGaoRow>(() => sb
     .from('institute_sources')
     .select('id,source_org,source_type,document_number,title,source_url,publication_date,canonical_agency,resolution_method')
     .eq('source_org', 'GAO')
-    .order('publication_date', { ascending: false })
-    .limit(5000);
-  if (instErr) throw new Error(`institute_sources read failed: ${instErr.message}`);
-  const instRows = (inst ?? []) as InstituteGaoRow[];
+    .order('id'));
+  if (inst.error || !inst.exhausted) throw new Error(`institute_sources read incomplete: ${inst.error ?? 'not exhausted'}`);
+  const instRows = inst.rows;
 
-  const { data: living, error: livErr } = await sb
+  const living = await readAllPages<{ institute_source_ids: string[] | null }>(() => sb
     .from('agency_pain_points_db')
-    .select('agency,source,source_url,institute_source_ids')
+    .select('id,institute_source_ids')
     .eq('source', 'gao')
-    .limit(5000);
-  if (livErr) throw new Error(`agency_pain_points_db read failed: ${livErr.message}`);
-  const livingIds = new Set((living ?? []).flatMap((r: { institute_source_ids: string[] | null }) => r.institute_source_ids ?? []));
+    .order('id'));
+  if (living.error || !living.exhausted) throw new Error(`agency_pain_points_db read incomplete: ${living.error ?? 'not exhausted'}`);
+  const livingIds = new Set(living.rows.flatMap((r) => r.institute_source_ids ?? []));
 
   const all = [...hr.candidates, ...instituteCandidates(instRows)];
   const { accepted, rejected } = partitionCandidates(all);
