@@ -1526,8 +1526,9 @@ const FEDERAL_OSBP_TOOL_DEF = {
     description:
       'The Office of Small Business Programs (OSBP/OSDBU) — the small-business front door — for a federal ' +
       'command or agency. Pass a command/agency name or abbreviation (e.g. "NAVFAC", "USACE", "Department of ' +
-      'the Navy"). Returns the OSBP office, director (with a director_verified YYYY-MM stamp — names rotate, ' +
-      'mailboxes are stable), email/phone/address, acquisition office, forecast URL, and key capabilities. ' +
+      'the Navy"). Returns the OSBP office, director (with a director_verified YYYY-MM stamp — names rotate), ' +
+      'email with email_status verified|unverified|none (email_verified YYYY-MM = seen on an official page; never ' +
+      'present an unverified address as confirmed), phone/address, acquisition office, forecast URL, and key capabilities. ' +
       'A parent-agency input returns all its commands\' offices. grounded=false = not in the curated directory ' +
       '(DoD/DLA/Navy/Army-weighted) — do NOT invent a contact.',
     parameters: {

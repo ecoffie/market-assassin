@@ -1,8 +1,9 @@
 {
   "metadata": {
     "description": "Federal Agency Information Database - Forecasts, Websites, and Office of Small Business Programs (OSBP) Contacts for DoD and Civilian Agencies",
-    "lastUpdated": "2026-06-25",
-    "version": "2.0"
+    "lastUpdated": "2026-11-17",
+    "version": "2.0",
+    "contactAudit": "2026-11-17: every unverified (placeholder or never-verified) small-business office was checked against official agency pages. emailVerified = the exact mailbox was seen on an official page. emailAudit records the result; withheldEmail = not found on a fully read official small-business page (retained, never served)."
   },
   "commands": {
     "NAVFAC": {
@@ -122,7 +123,13 @@
         "director": "NAVSUP OSBP Director",
         "phone": "(717) 605-3430",
         "email": "navsup_small_business@navy.mil",
-        "address": "5450 Carlisle Pike, Mechanicsburg, PA 17055"
+        "address": "5450 Carlisle Pike, Mechanicsburg, PA 17055",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.navsup.navy.mil/",
+          "note": "inconclusive: stored small-business page is a 404; only the homepage was read; homepage lists no small-business mailbox; stored forecastUrl is a 404"
+        }
       },
       "acquisitionOffice": {
         "name": "NAVSUP Contracting",
@@ -141,8 +148,17 @@
         "name": "SSP Office of Small Business Programs",
         "director": "SSP OSBP Director",
         "phone": "(202) 764-1600",
-        "email": "ssp_osbp@navy.mil",
-        "address": "1250 10th Street SE, Washington Navy Yard, DC 20374"
+        "email": "sspsmallbusiness@ssp.navy.mil",
+        "address": "1250 10th Street SE, Washington Navy Yard, DC 20374",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.ssp.navy.mil/Doing-Business/Small-Business-Office/",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.ssp.navy.mil/Doing-Business/Small-Business-Office/",
+          "previousEmail": "ssp_osbp@navy.mil",
+          "note": "stored ssp_osbp@navy.mil not on page; phone not on page"
+        }
       },
       "acquisitionOffice": {
         "name": "SSP Contracting",
@@ -162,7 +178,12 @@
         "director": "NECC OSBP Director",
         "phone": "(757) 462-7400",
         "email": "necc_osbp@navy.mil",
-        "address": "2000 Navy Pentagon, Washington, DC 20350"
+        "address": "2000 Navy Pentagon, Washington, DC 20350",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.necc.navy.mil/"
+        }
       },
       "acquisitionOffice": {
         "name": "NECC Contracting",
@@ -181,8 +202,17 @@
         "name": "MSC Office of Small Business Programs",
         "director": "MSC OSBP Director",
         "phone": "(757) 443-5822",
-        "email": "msc_osbp@navy.mil",
-        "address": "914 Charles Morris Court SE, Washington Navy Yard, DC 20398"
+        "email": "msc_smallbiz@us.navy.mil",
+        "address": "914 Charles Morris Court SE, Washington Navy Yard, DC 20398",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.msc.usff.navy.mil/Doing-Business-with-MSC/Small-Business-Opportunities/",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.msc.usff.navy.mil/Doing-Business-with-MSC/Small-Business-Opportunities/",
+          "previousEmail": "msc_osbp@navy.mil",
+          "note": "stored msc_osbp@navy.mil not on page"
+        }
       },
       "acquisitionOffice": {
         "name": "MSC Contracting",
@@ -202,7 +232,13 @@
         "director": "NSWC OSBP Director",
         "phone": "(619) 537-1000",
         "email": "nswc_osbp@navy.mil",
-        "address": "2000 Trident Way, San Diego, CA 92155"
+        "address": "2000 Trident Way, San Diego, CA 92155",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.nsw.navy.mil/",
+          "note": "'Access Denied' in an ordinary browser session; not bypassed"
+        }
       },
       "acquisitionOffice": {
         "name": "NSWC Contracting",
@@ -221,8 +257,15 @@
         "name": "CNIC Office of Small Business Programs",
         "director": "CNIC OSBP Director",
         "phone": "(202) 433-4000",
-        "email": "cnic_osbp@navy.mil",
-        "address": "716 Sicard Street SE, Washington Navy Yard, DC 20374"
+        "email": "",
+        "address": "716 Sicard Street SE, Washington Navy Yard, DC 20374",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "not_published",
+          "sourceUrl": "https://www.cnic.navy.mil/Business-Opportunities/",
+          "withheldEmail": "cnic_osbp@navy.mil",
+          "note": "page reached; no small-business mailbox listed"
+        }
       },
       "acquisitionOffice": {
         "name": "CNIC Contracting",
@@ -242,7 +285,13 @@
         "director": "NETC OSBP Director",
         "phone": "(850) 452-4141",
         "email": "netc_osbp@navy.mil",
-        "address": "250 Dallas Street, Pensacola, FL 32508"
+        "address": "250 Dallas Street, Pensacola, FL 32508",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "no_official_sb_page",
+          "sourceUrl": "https://www.netc.navy.mil/",
+          "note": "homepage reached; no small-business link or mailbox"
+        }
       },
       "acquisitionOffice": {
         "name": "NETC Contracting",
@@ -262,7 +311,13 @@
         "director": "ONI OSBP Director",
         "phone": "(301) 669-3001",
         "email": "oni_osbp@navy.mil",
-        "address": "4251 Suitland Road, Washington, DC 20395"
+        "address": "4251 Suitland Road, Washington, DC 20395",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "no_official_sb_page",
+          "sourceUrl": "https://www.oni.navy.mil/",
+          "note": "homepage reached; no small-business link or mailbox found; stored mailbox appears nowhere"
+        }
       },
       "acquisitionOffice": {
         "name": "ONI Contracting",
@@ -282,7 +337,13 @@
         "director": "USINDOPACOM OSBP Director",
         "phone": "(808) 477-1341",
         "email": "usindopacom_osbp@pacom.mil",
-        "address": "Camp H.M. Smith, HI 96861"
+        "address": "Camp H.M. Smith, HI 96861",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "no_official_sb_page",
+          "sourceUrl": "https://www.pacom.mil/",
+          "note": "homepage reached; no small-business link or mailbox found; stored mailbox appears nowhere"
+        }
       },
       "acquisitionOffice": {
         "name": "USINDOPACOM Contracting",
@@ -302,7 +363,13 @@
         "director": "USFF OSBP Director",
         "phone": "(757) 836-6100",
         "email": "usff_osbp@navy.mil",
-        "address": "1562 Mitscher Avenue, Norfolk, VA 23551"
+        "address": "1562 Mitscher Avenue, Norfolk, VA 23551",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "no_official_sb_page",
+          "sourceUrl": "https://www.usff.navy.mil/",
+          "note": "homepage reached; no small-business link or mailbox found; stored mailbox appears nowhere"
+        }
       },
       "acquisitionOffice": {
         "name": "USFF Contracting",
@@ -322,7 +389,12 @@
         "director": "USNAVSO OSBP Director",
         "phone": "(904) 270-5101",
         "email": "usnavso_osbp@navy.mil",
-        "address": "Naval Station Mayport, FL 32228"
+        "address": "Naval Station Mayport, FL 32228",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.usnavso.navy.mil/"
+        }
       },
       "acquisitionOffice": {
         "name": "USNAVSO Contracting",
@@ -342,7 +414,13 @@
         "director": "FLTCYBER OSBP Director",
         "phone": "(443) 634-4600",
         "email": "fltcyber_osbp@navy.mil",
-        "address": "9800 Savage Road, Fort Meade, MD 20755"
+        "address": "9800 Savage Road, Fort Meade, MD 20755",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "no_official_sb_page",
+          "sourceUrl": "https://www.fcc.navy.mil/",
+          "note": "homepage reached; no small-business link or mailbox found; stored mailbox appears nowhere"
+        }
       },
       "acquisitionOffice": {
         "name": "FLTCYBER Contracting",
@@ -362,7 +440,13 @@
         "director": "NPC OSBP Director",
         "phone": "(901) 874-3000",
         "email": "npc_osbp@navy.mil",
-        "address": "5720 Integrity Drive, Millington, TN 38055"
+        "address": "5720 Integrity Drive, Millington, TN 38055",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "no_official_sb_page",
+          "sourceUrl": "https://www.mynavyhr.navy.mil/",
+          "note": "homepage reached; no small-business link or mailbox found; stored mailbox appears nowhere"
+        }
       },
       "acquisitionOffice": {
         "name": "NPC Contracting",
@@ -403,7 +487,13 @@
         "director": "Karen C. Davis",
         "phone": "(256) 955-9108",
         "email": "usarmy.redstone.acc.list.acc-small-business@army.mil",
-        "address": "4505 Martin Road, Redstone Arsenal, AL 35898"
+        "address": "4505 Martin Road, Redstone Arsenal, AL 35898",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://acc.army.mil/smallbusiness/",
+          "note": "named director Karen C. Davis remains UNVERIFIED"
+        }
       },
       "acquisitionOffice": {
         "name": "ACC Headquarters",
@@ -444,7 +534,12 @@
         "director": "TRADOC OSBP Director",
         "phone": "(757) 501-5775",
         "email": "usarmy.jble.tradoc.mbx.g8-osbp@army.mil",
-        "address": "950 Jefferson Ave, Fort Eustis, VA 23604"
+        "address": "950 Jefferson Ave, Fort Eustis, VA 23604",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.tradoc.army.mil/Resources/Contracting/"
+        }
       },
       "acquisitionOffice": {
         "name": "TRADOC Contracting",
@@ -464,7 +559,13 @@
         "director": "WHC OSBP Director",
         "phone": "(703) 545-6700",
         "email": "usarmy.pentagon.hqda-whc.list.contracting@army.mil",
-        "address": "103 Third Ave, Fort McNair, Washington, DC 20319"
+        "address": "103 Third Ave, Fort McNair, Washington, DC 20319",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.whc.army.mil/contracting/",
+          "note": "page did not load (chrome-error)"
+        }
       },
       "acquisitionOffice": {
         "name": "WHC Contracting",
@@ -484,7 +585,13 @@
         "director": "ARCYBER OSBP Director",
         "phone": "(443) 861-2000",
         "email": "usarmy.meade.arcyber.mbx.osbp@army.mil",
-        "address": "9800 Savage Road, Fort Meade, MD 20755"
+        "address": "9800 Savage Road, Fort Meade, MD 20755",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "no_official_sb_page",
+          "sourceUrl": "https://www.arcyber.army.mil/Resources/",
+          "note": "Resources page reached; no small-business link or mailbox"
+        }
       },
       "acquisitionOffice": {
         "name": "ARCYBER Acquisition",
@@ -504,7 +611,12 @@
         "director": "SDDC OSBP Director",
         "phone": "(618) 220-6285",
         "email": "usarmy.scott.sddc.mbx.osbp@army.mil",
-        "address": "1 Soldier Way, Scott AFB, IL 62225"
+        "address": "1 Soldier Way, Scott AFB, IL 62225",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.sddc.army.mil/Pages/Business-Opportunities.aspx"
+        }
       },
       "acquisitionOffice": {
         "name": "SDDC Contracting",
@@ -524,7 +636,13 @@
         "director": "USARCENT OSBP Director",
         "phone": "(803) 885-8000",
         "email": "usarmy.shaw.usarcent.mbx.osbp@army.mil",
-        "address": "1 Freedom Drive, Shaw AFB, SC 29152"
+        "address": "1 Freedom Drive, Shaw AFB, SC 29152",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "no_official_sb_page",
+          "sourceUrl": "https://www.usarcent.army.mil/",
+          "note": "homepage reached; no small-business link or mailbox"
+        }
       },
       "acquisitionOffice": {
         "name": "USARCENT Contracting",
@@ -544,7 +662,13 @@
         "director": "USAREUR-AF OSBP Director",
         "phone": "+49 611-143-537-0",
         "email": "usarmy.wiesbaden.usareur.mbx.osbp@army.mil",
-        "address": "Unit 29351, APO AE 09014"
+        "address": "Unit 29351, APO AE 09014",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.europeafrica.army.mil/Contracting/",
+          "note": "stored contracting page is a 404; no SB page found"
+        }
       },
       "acquisitionOffice": {
         "name": "USAREUR-AF Contracting",
@@ -564,7 +688,13 @@
         "director": "USARPAC OSBP Director",
         "phone": "(808) 438-2703",
         "email": "usarmy.shafter.usarpac.mbx.osbp@army.mil",
-        "address": "Building T-117, Fort Shafter, HI 96858"
+        "address": "Building T-117, Fort Shafter, HI 96858",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "no_official_sb_page",
+          "sourceUrl": "https://www.usarpac.army.mil/",
+          "note": "homepage reached; no small-business link or mailbox"
+        }
       },
       "acquisitionOffice": {
         "name": "USARPAC Contracting",
@@ -583,8 +713,17 @@
         "name": "USASMDC Office of Small Business Programs",
         "director": "USASMDC OSBP Director",
         "phone": "(256) 955-3852",
-        "email": "usarmy.redstone.smdc.mbx.osbp@army.mil",
-        "address": "P.O. Box 1500, Huntsville, AL 35807"
+        "email": "usarmy.redstone.smdc.mbx.small-business-office@army.mil",
+        "address": "P.O. Box 1500, Huntsville, AL 35807",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.smdc.army.mil/RESOURCES/SBO/",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.smdc.army.mil/RESOURCES/SBO/",
+          "previousEmail": "usarmy.redstone.smdc.mbx.osbp@army.mil",
+          "note": "stored ...mbx.osbp@army.mil not published; phone not on page"
+        }
       },
       "acquisitionOffice": {
         "name": "USASMDC Contracting",
@@ -604,7 +743,13 @@
         "director": "USASOC OSBP Director",
         "phone": "(910) 432-6005",
         "email": "usarmy.bragg.usasoc.mbx.osbp@army.mil",
-        "address": "2929 Desert Storm Drive, Fort Liberty, NC 28310"
+        "address": "2929 Desert Storm Drive, Fort Liberty, NC 28310",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.soc.mil/USASOC%20Contracting/USASOC%20Contracting.html",
+          "note": "redirects off-domain; not read"
+        }
       },
       "acquisitionOffice": {
         "name": "USASOC Contracting",
@@ -624,7 +769,13 @@
         "director": "FORSCOM OSBP Director",
         "phone": "(910) 570-8000",
         "email": "usarmy.bragg.forscom.mbx.osbp@army.mil",
-        "address": "1777 Hardee Avenue SW, Fort Liberty, NC 28310"
+        "address": "1777 Hardee Avenue SW, Fort Liberty, NC 28310",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.forscom.army.mil/",
+          "note": "page could not be read in browser (cannot attach)"
+        }
       },
       "acquisitionOffice": {
         "name": "FORSCOM Contracting",
@@ -662,10 +813,19 @@
       "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Air%20Force%20Sustainment",
       "smallBusinessOffice": {
         "name": "AFSC Office of Small Business Programs",
-        "director": "Michael Boyd",
+        "director": "AFSC Small Business Director",
         "phone": "(405) 734-2581",
-        "email": "afsc.sb@us.af.mil",
-        "address": "3001 Staff Drive, Tinker AFB, OK 73145"
+        "email": "afsc.sb.workflow@us.af.mil",
+        "address": "3001 Staff Drive, Tinker AFB, OK 73145",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.afsc.af.mil/Units/SBO/",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.afsc.af.mil/Units/SBO/",
+          "previousEmail": "afsc.sb@us.af.mil",
+          "note": "official SBO page lists no named director; stored named director 'Michael Boyd' does not appear → remove the name, use the role title. Page also lists afsc.ol.sb@us.af.mil and individual specialists."
+        }
       },
       "acquisitionOffice": {
         "name": "AFSC Contracting",
@@ -706,7 +866,13 @@
         "director": "ACC OSBP Director",
         "phone": "(757) 764-5569",
         "email": "acc.sb@us.af.mil",
-        "address": "205 Dodd Blvd, Joint Base Langley-Eustis, VA 23665"
+        "address": "205 Dodd Blvd, Joint Base Langley-Eustis, VA 23665",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.acc.af.mil/Units/ACC-AMIC-Small-Business/",
+          "note": "ACC AMIC Small Business page returned 'Access Denied' in an ordinary browser session; not bypassed"
+        }
       },
       "acquisitionOffice": {
         "name": "ACC Contracting",
@@ -726,7 +892,13 @@
         "director": "AETC OSBP Director",
         "phone": "(210) 652-4365",
         "email": "aetc.sb@us.af.mil",
-        "address": "1 F Street, Joint Base San Antonio-Randolph, TX 78150"
+        "address": "1 F Street, Joint Base San Antonio-Randolph, TX 78150",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "no_official_sb_page",
+          "sourceUrl": "https://www.aetc.af.mil/About-Us/",
+          "note": "stored URL is an About-Us page; no small-business link or mailbox"
+        }
       },
       "acquisitionOffice": {
         "name": "AETC Contracting",
@@ -746,7 +918,13 @@
         "director": "AFGSC OSBP Director",
         "phone": "(318) 456-2014",
         "email": "afgsc.sb@us.af.mil",
-        "address": "245 Davis Ave E, Barksdale AFB, LA 71110"
+        "address": "245 Davis Ave E, Barksdale AFB, LA 71110",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.afgsc.af.mil/About-Us/",
+          "note": "stored URL is a 404"
+        }
       },
       "acquisitionOffice": {
         "name": "AFGSC Contracting",
@@ -766,7 +944,13 @@
         "director": "AFRC OSBP Director",
         "phone": "(478) 327-1748",
         "email": "afrc.sb@us.af.mil",
-        "address": "155 Richard Ray Blvd, Robins AFB, GA 31098"
+        "address": "155 Richard Ray Blvd, Robins AFB, GA 31098",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "no_official_sb_page",
+          "sourceUrl": "https://www.afrc.af.mil/About-Us/",
+          "note": "stored URL is an About-Us page; no small-business link or mailbox"
+        }
       },
       "acquisitionOffice": {
         "name": "AFRC Contracting",
@@ -786,7 +970,13 @@
         "director": "AFSOC OSBP Director",
         "phone": "(850) 884-5813",
         "email": "afsoc.sb@us.af.mil",
-        "address": "100 Bartley Street, Hurlburt Field, FL 32544"
+        "address": "100 Bartley Street, Hurlburt Field, FL 32544",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.afsoc.af.mil/About-Us/",
+          "note": "'Access Denied' in an ordinary browser session; not bypassed"
+        }
       },
       "acquisitionOffice": {
         "name": "AFSOC Contracting",
@@ -806,7 +996,13 @@
         "director": "AMC OSBP Director",
         "phone": "(618) 229-4825",
         "email": "amc.sb@us.af.mil",
-        "address": "402 Scott Drive, Scott AFB, IL 62225"
+        "address": "402 Scott Drive, Scott AFB, IL 62225",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.amc.af.mil/About-Us/",
+          "note": "'Access Denied' in an ordinary browser session; not bypassed"
+        }
       },
       "acquisitionOffice": {
         "name": "AMC Contracting",
@@ -826,7 +1022,13 @@
         "director": "PACAF OSBP Director",
         "phone": "(808) 449-5392",
         "email": "pacaf.sb@us.af.mil",
-        "address": "25 E Street, Joint Base Pearl Harbor-Hickam, HI 96853"
+        "address": "25 E Street, Joint Base Pearl Harbor-Hickam, HI 96853",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.pacaf.af.mil/About-Us/",
+          "note": "'Access Denied' in an ordinary browser session; not bypassed"
+        }
       },
       "acquisitionOffice": {
         "name": "PACAF Contracting",
@@ -846,7 +1048,13 @@
         "director": "USAFE-AFAFRICA OSBP Director",
         "phone": "+49 6371-47-6926",
         "email": "usafe.sb@us.af.mil",
-        "address": "Unit 3050, APO AE 09094, Ramstein AB, Germany"
+        "address": "Unit 3050, APO AE 09094, Ramstein AB, Germany",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "no_official_sb_page",
+          "sourceUrl": "https://www.usafe.af.mil/About-Us/",
+          "note": "stored URL is an About-Us page; no small-business link or mailbox"
+        }
       },
       "acquisitionOffice": {
         "name": "USAFE-AFAFRICA Contracting",
@@ -1012,8 +1220,17 @@
         "name": "CBP Small Business Office",
         "director": "CBP OSDBU Director",
         "phone": "(202) 344-1550",
-        "email": "cbp-smallbusiness@cbp.dhs.gov",
-        "address": "1300 Pennsylvania Avenue NW, Washington, DC 20229"
+        "email": "CBP-IPOP@cbp.dhs.gov",
+        "address": "1300 Pennsylvania Avenue NW, Washington, DC 20229",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.dhs.gov/osdbu/small-business-specialists",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.dhs.gov/osdbu/small-business-specialists",
+          "previousEmail": "cbp-smallbusiness@cbp.dhs.gov",
+          "note": "DHS small-business specialists page is marked archived (\"may be outdated\"); DHS SB Specialists page is in DHS content archive (labelled possibly outdated) but shows Last Updated 10/01/2026. DHS OSDBU Executive Director per https://www.dhs.gov/osdbu: Dina Thompson. SB Specialists: David Harrod (202) 553-6456 and Ivette Jorge (202) 556-6545, both CBP-IPOP@cbp.dhs.gov."
+        }
       },
       "acquisitionOffice": {
         "name": "CBP Procurement Directorate",
@@ -1032,8 +1249,17 @@
         "name": "ICE Small Business Office",
         "director": "ICE OSDBU Director",
         "phone": "(202) 732-2600",
-        "email": "ice-smallbusiness@ice.dhs.gov",
-        "address": "500 12th Street SW, Washington, DC 20536"
+        "email": "Samuel.L.Thompson@ice.dhs.gov",
+        "address": "500 12th Street SW, Washington, DC 20536",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.dhs.gov/osdbu/small-business-specialists",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.dhs.gov/osdbu/small-business-specialists",
+          "previousEmail": "ice-smallbusiness@ice.dhs.gov",
+          "note": "DHS small-business specialists page is marked archived (\"may be outdated\"); DHS SB Specialists page is in DHS content archive (labelled possibly outdated) but shows Last Updated 10/01/2026. DHS OSDBU Executive Director per https://www.dhs.gov/osdbu: Dina Thompson. Only a personal address is published: Samuel Thompson, Acting Small Business Specialist. No ICE shared SB mailbox shown."
+        }
       },
       "acquisitionOffice": {
         "name": "ICE Office of Acquisition Management",
@@ -1052,8 +1278,17 @@
         "name": "TSA Small Business Office",
         "director": "TSA OSDBU Director",
         "phone": "(571) 227-2090",
-        "email": "tsa-smallbusiness@tsa.dhs.gov",
-        "address": "601 S. 12th Street, Arlington, VA 20598"
+        "email": "TSASmallBiz@tsa.dhs.gov",
+        "address": "601 S. 12th Street, Arlington, VA 20598",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.dhs.gov/osdbu/small-business-specialists",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.dhs.gov/osdbu/small-business-specialists",
+          "previousEmail": "tsa-smallbusiness@tsa.dhs.gov",
+          "note": "DHS small-business specialists page is marked archived (\"may be outdated\"); DHS SB Specialists page is in DHS content archive (labelled possibly outdated) but shows Last Updated 10/01/2026. DHS OSDBU Executive Director per https://www.dhs.gov/osdbu: Dina Thompson. Elizabeth Harrington, Small Business Specialist."
+        }
       },
       "acquisitionOffice": {
         "name": "TSA Office of Contracting and Procurement",
@@ -1093,8 +1328,17 @@
         "name": "FEMA Office of Small and Disadvantaged Business Utilization",
         "director": "FEMA OSDBU Director",
         "phone": "(202) 212-4220",
-        "email": "fema-osdbu@fema.dhs.gov",
-        "address": "500 C Street SW, Washington, DC 20472"
+        "email": "FEMA-SB@fema.dhs.gov",
+        "address": "500 C Street SW, Washington, DC 20472",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.dhs.gov/osdbu/small-business-specialists",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.dhs.gov/osdbu/small-business-specialists",
+          "previousEmail": "fema-osdbu@fema.dhs.gov",
+          "note": "DHS small-business specialists page is marked archived (\"may be outdated\"); DHS SB Specialists page is in DHS content archive (labelled possibly outdated) but shows Last Updated 10/01/2026. DHS OSDBU Executive Director per https://www.dhs.gov/osdbu: Dina Thompson. Amy Connolly (202) 714-2706 FEMA-SB@fema.dhs.gov; Mary Klock (202) 445-7922 Mary.Klock@fema.dhs.gov."
+        }
       },
       "acquisitionOffice": {
         "name": "FEMA Office of the Chief Procurement Officer",
@@ -1113,8 +1357,17 @@
         "name": "USSS Office of Procurement",
         "director": "USSS OSDBU Director",
         "phone": "(202) 406-5800",
-        "email": "usss.osdbu@usss.dhs.gov",
-        "address": "950 H Street NW, Washington, DC 20223"
+        "email": "kimberly.witcher@usss.dhs.gov",
+        "address": "950 H Street NW, Washington, DC 20223",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.dhs.gov/osdbu/small-business-specialists",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.dhs.gov/osdbu/small-business-specialists",
+          "previousEmail": "usss.osdbu@usss.dhs.gov",
+          "note": "DHS small-business specialists page is marked archived (\"may be outdated\"); DHS SB Specialists page is in DHS content archive (labelled possibly outdated) but shows Last Updated 10/01/2026. DHS OSDBU Executive Director per https://www.dhs.gov/osdbu: Dina Thompson. Personal address only: Kimberly Witcher, Small Business Specialist; alternate Riquelme Torres-Aviles (202) 768-1076 riquelme.torres-avi"
+        }
       },
       "acquisitionOffice": {
         "name": "USSS Office of Procurement",
@@ -1133,8 +1386,17 @@
         "name": "CISA Office of Small and Disadvantaged Business Utilization",
         "director": "CISA OSDBU Director",
         "phone": "(703) 235-8000",
-        "email": "cisa.osdbu@cisa.dhs.gov",
-        "address": "245 Murray Lane SW, Washington, DC 20528"
+        "email": "melody.hinkle@mail.cisa.dhs.gov",
+        "address": "245 Murray Lane SW, Washington, DC 20528",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.dhs.gov/osdbu/small-business-specialists",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.dhs.gov/osdbu/small-business-specialists",
+          "previousEmail": "cisa.osdbu@cisa.dhs.gov",
+          "note": "DHS small-business specialists page is marked archived (\"may be outdated\"); DHS SB Specialists page is in DHS content archive (labelled possibly outdated) but shows Last Updated 10/01/2026. DHS OSDBU Executive Director per https://www.dhs.gov/osdbu: Dina Thompson. Melody Hinkle, Small Business Specialist, CISA, listed under DHS HQ Office of Procurement Operations (OPO mailbox OPOSmallBusiness@hq.d"
+        }
       },
       "acquisitionOffice": {
         "name": "CISA Acquisition Division",
@@ -1151,10 +1413,19 @@
       "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Department%20Justice",
       "smallBusinessOffice": {
         "name": "DOJ Office of Small and Disadvantaged Business Utilization",
-        "director": "Robert Connolly",
+        "director": "Bob Connolly",
         "phone": "(202) 616-0521",
-        "email": "OSDBU@usdoj.gov",
-        "address": "145 N Street NE, Washington, DC 20530"
+        "email": "",
+        "address": "145 N Street NE, Washington, DC 20530",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "not_published",
+          "sourceUrl": "https://www.justice.gov/osdbu",
+          "withheldEmail": "OSDBU@usdoj.gov",
+          "note": "OSDBU page lists no email; OSDBU@usdoj.gov not found. Stored director \"Robert Connolly\" matches \"Bob Connolly, Director\". Component reps page: https://www.justice.gov/osdbu/contact-doj-representative"
+        },
+        "directorVerified": "2026-11",
+        "contactSourceUrl": "https://www.justice.gov/osdbu"
       },
       "acquisitionOffice": {
         "name": "DOJ Justice Management Division",
@@ -1173,8 +1444,17 @@
         "name": "FBI Procurement Section",
         "director": "FBI OSDBU Director",
         "phone": "(202) 324-3000",
-        "email": "fbi.procurement@fbi.gov",
-        "address": "935 Pennsylvania Avenue NW, Washington, DC 20535"
+        "email": "smallbusiness@fbi.gov",
+        "address": "935 Pennsylvania Avenue NW, Washington, DC 20535",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.justice.gov/osdbu/contact-doj-representative",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.justice.gov/osdbu/contact-doj-representative",
+          "previousEmail": "fbi.procurement@fbi.gov",
+          "note": "Rep: Denise Kirkpatrick (no title, no phone). FBI Property Procurement & Management Section phone (202) 324-2143 (procurement, not SB). fbi.gov forecastUrl returned 403 (not confirmed broken)."
+        }
       },
       "acquisitionOffice": {
         "name": "FBI Procurement Section",
@@ -1193,8 +1473,17 @@
         "name": "DEA Small Business Office",
         "director": "DEA OSDBU Director",
         "phone": "(202) 307-7165",
-        "email": "dea.osdbu@usdoj.gov",
-        "address": "700 Army Navy Drive, Arlington, VA 22202"
+        "email": "DEAsmallbusinessprogram@dea.gov",
+        "address": "700 Army Navy Drive, Arlington, VA 22202",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.justice.gov/osdbu/contact-doj-representative",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.justice.gov/osdbu/contact-doj-representative",
+          "previousEmail": "dea.osdbu@usdoj.gov",
+          "note": "Rep: Che Logan (no title). dea.gov forecastUrl returned 403."
+        }
       },
       "acquisitionOffice": {
         "name": "DEA Office of Acquisition and Relocation Management",
@@ -1213,8 +1502,17 @@
         "name": "ATF Small Business Office",
         "director": "ATF OSDBU Director",
         "phone": "(202) 648-8010",
-        "email": "atf.osdbu@atf.gov",
-        "address": "99 New York Avenue NE, Washington, DC 20226"
+        "email": "john.klar@atf.gov",
+        "address": "99 New York Avenue NE, Washington, DC 20226",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.justice.gov/osdbu/contact-doj-representative",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.justice.gov/osdbu/contact-doj-representative",
+          "previousEmail": "atf.osdbu@atf.gov",
+          "note": "Only a personal rep address (John Klar). Procurement (Acquisition and Property Management Division) phone (202) 927-8820, not SB-specific. atf.gov forecastUrl returned 403."
+        }
       },
       "acquisitionOffice": {
         "name": "ATF Office of Management",
@@ -1233,8 +1531,17 @@
         "name": "BOP Acquisition, Construction & Environmental Branch",
         "director": "BOP OSDBU Director",
         "phone": "(202) 307-3120",
-        "email": "bop.acquisitions@usdoj.gov",
-        "address": "320 First Street NW, Washington, DC 20534"
+        "email": "BOP-ADM-SmallBusinessProgram-S@bop.gov",
+        "address": "320 First Street NW, Washington, DC 20534",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.justice.gov/osdbu/contact-doj-representative",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.justice.gov/osdbu/contact-doj-representative",
+          "previousEmail": "bop.acquisitions@usdoj.gov",
+          "note": "Rep: Sarah Dean. National Contracts and Policy Section phone (202) 307-3067 (procurement). bop.gov/business/small_business_office.jsp shows same mailbox Cloudflare-obfuscated."
+        }
       },
       "acquisitionOffice": {
         "name": "BOP Acquisition, Construction & Environmental Branch",
@@ -1253,8 +1560,17 @@
         "name": "USMS Acquisition Management Division",
         "director": "USMS OSDBU Director",
         "phone": "(703) 740-1400",
-        "email": "usms.osdbu@usdoj.gov",
-        "address": "CS-3, 12th Floor, Washington, DC 20530"
+        "email": "shandora.acrey@usdoj.gov",
+        "address": "CS-3, 12th Floor, Washington, DC 20530",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.justice.gov/osdbu/contact-doj-representative",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.justice.gov/osdbu/contact-doj-representative",
+          "previousEmail": "usms.osdbu@usdoj.gov",
+          "note": "Personal rep address only (Shandora Acrey). usmarshals.gov forecastUrl returned 403."
+        }
       },
       "acquisitionOffice": {
         "name": "USMS Acquisition Management Division",
@@ -1293,10 +1609,18 @@
       "smallBusinessOffice": {
         "name": "VA Office of Small and Disadvantaged Business Utilization",
         "director": "Chanel Bankston-Carter",
-        "directorVerified": "2026-06",
+        "directorVerified": "2026-11",
         "phone": "(202) 461-4300",
-        "email": "osdbu@va.gov",
-        "address": "810 Vermont Avenue NW, Washington, DC 20420"
+        "email": "vetbiz@va.gov",
+        "address": "810 Vermont Avenue NW, Washington, DC 20420",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.va.gov/osdbu/",
+          "previousEmail": "osdbu@va.gov"
+        },
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.va.gov/osdbu/"
       },
       "acquisitionOffice": {
         "name": "VA Office of Acquisition, Logistics and Construction",
@@ -1315,8 +1639,17 @@
         "name": "VHA Small Business Office",
         "director": "VHA OSDBU Director",
         "phone": "(202) 461-4300",
-        "email": "vha.osdbu@va.gov",
-        "address": "810 Vermont Avenue NW, Washington, DC 20420"
+        "email": "vetbiz@va.gov",
+        "address": "810 Vermont Avenue NW, Washington, DC 20420",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.va.gov/osdbu/",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.va.gov/osdbu/",
+          "previousEmail": "vha.osdbu@va.gov",
+          "note": "VA-wide OSDBU contact (no administration-specific SB mailbox found). Phone is OSDBU Call Operations, 8-4 ET."
+        }
       },
       "acquisitionOffice": {
         "name": "VHA Procurement and Logistics Office",
@@ -1356,8 +1689,15 @@
         "name": "CDC Small Business Office",
         "director": "CDC OSDBU Director",
         "phone": "(770) 488-2814",
-        "email": "cdcosdbu@cdc.gov",
-        "address": "1600 Clifton Road NE, Atlanta, GA 30329"
+        "email": "",
+        "address": "1600 Clifton Road NE, Atlanta, GA 30329",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "not_published",
+          "sourceUrl": "https://www.cdc.gov/contracts/small-business/index.html",
+          "withheldEmail": "cdcosdbu@cdc.gov",
+          "note": "CDC SB page lists no email/phone; refers to HHS Small Business Program Managers list on seed.nih.gov (403, unreachable). Only general CDC line 800-232-4636."
+        }
       },
       "acquisitionOffice": {
         "name": "CDC Office of Acquisition Services",
@@ -1377,7 +1717,13 @@
         "director": "NIH OSDBU Director",
         "phone": "(301) 496-9639",
         "email": "nihsbo@od.nih.gov",
-        "address": "9000 Rockville Pike, Bethesda, MD 20892"
+        "address": "9000 Rockville Pike, Bethesda, MD 20892",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://oamp.od.nih.gov/staff-directory/hhs-small-business-specialist",
+          "note": "inconclusive: staff-directory emails are obfuscated on the page; Staff directory emails are obfuscated (\"[email protected]\") so nihsbo@od.nih.gov could not be confirmed. Phone 301-496-9639 is published on https://www.ihs.gov/DAP/smallbusiness/ for Jonathan Ferguson, Small Business Specialist supporting NIH & IHS and HHS/OSDBU. Same NIH page also lists Shannon Jackson \"OSDBU Director\" and Tiffany C"
+        }
       },
       "acquisitionOffice": {
         "name": "NIH Office of Acquisition and Logistics Management",
@@ -1396,8 +1742,17 @@
         "name": "FDA Small Business Office",
         "director": "FDA OSDBU Director",
         "phone": "(301) 796-9440",
-        "email": "fda.osdbu@fda.hhs.gov",
-        "address": "10903 New Hampshire Avenue, Silver Spring, MD 20993"
+        "email": "cynthia.anderson@hhs.gov",
+        "address": "10903 New Hampshire Avenue, Silver Spring, MD 20993",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.fda.gov/about-fda/doing-business-fda/small-business-resources",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.fda.gov/about-fda/doing-business-fda/small-business-resources",
+          "previousEmail": "fda.osdbu@fda.hhs.gov",
+          "note": "Cindy Anderson, \"Small Business Professional\" (HHS OSDBU). Also FDA-Small_Business_Outreach@fda.hhs.gov (for Small Business Fair/events). Only phone is general 1-888-INFO-FDA (1-888-463-6332)."
+        }
       },
       "acquisitionOffice": {
         "name": "FDA Office of Acquisitions and Grants Services",
@@ -1417,7 +1772,13 @@
         "director": "CMS OSDBU Director",
         "phone": "(410) 786-5157",
         "email": "cms.osdbu@cms.hhs.gov",
-        "address": "7500 Security Boulevard, Baltimore, MD 21244"
+        "address": "7500 Security Boulevard, Baltimore, MD 21244",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.cms.gov/about-cms/contracting/contracting-small-business",
+          "note": "no page could be read; sourceUrl is the official URL attempted; No current CMS SB page found on cms.gov; hhs.gov OSDBU pages return 403."
+        }
       },
       "acquisitionOffice": {
         "name": "CMS Office of Acquisition and Grants Management",
@@ -1457,8 +1818,17 @@
         "name": "NNSA Office of Small Business Programs",
         "director": "NNSA OSDBU Director",
         "phone": "(505) 845-4403",
-        "email": "nnsa.osbp@nnsa.doe.gov",
-        "address": "1000 Independence Avenue SW, Washington, DC 20585"
+        "email": "Chelsea.Murphy@nnsa.doe.gov",
+        "address": "1000 Independence Avenue SW, Washington, DC 20585",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.energy.gov/nnsa/nnsa-small-business-program",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.energy.gov/nnsa/nnsa-small-business-program",
+          "previousEmail": "nnsa.osbp@nnsa.doe.gov",
+          "note": "Phone from DOE SBPM directory https://www.energy.gov/osbp/small-business-program-manager-directory, which also lists Temidayo \"Temi\" Osinuga, Small Business Program Manager, Acting (temidayo.osinuga@nnsa.doe.gov). Not a shared mailbox."
+        }
       },
       "acquisitionOffice": {
         "name": "NNSA Office of Acquisition and Project Management",
@@ -1519,8 +1889,17 @@
         "name": "IRS Office of Small Business Programs",
         "director": "IRS OSDBU Director",
         "phone": "(202) 317-6420",
-        "email": "irs.smallbusiness@irs.gov",
-        "address": "1111 Constitution Avenue NW, Washington, DC 20224"
+        "email": "Procurement.SBRO@irs.gov",
+        "address": "1111 Constitution Avenue NW, Washington, DC 20224",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.irs.gov/about-irs/procurement/procurement-small-business-program-office",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.irs.gov/about-irs/procurement/procurement-small-business-program-office",
+          "previousEmail": "irs.smallbusiness@irs.gov",
+          "note": "Contacts: Romona Kelly, Section Chief, Procurement Analyst; LaTonya Bowman, Small Business Specialist. Treasury page lists PROCUREMENT.SBRO@irs.gov."
+        }
       },
       "acquisitionOffice": {
         "name": "IRS Office of Procurement",
@@ -1561,7 +1940,13 @@
         "director": "Gail Clark",
         "phone": "(703) 875-6824",
         "email": "sdbupolicy@state.gov",
-        "address": "2201 C Street NW, Washington, DC 20520"
+        "address": "2201 C Street NW, Washington, DC 20520",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.state.gov/about-us-office-of-the-procurement-executive/",
+          "note": "no page could be read; sourceUrl is the official URL attempted; state.gov returned 403 for the stored forecastUrl, the OSDBU About page and the biography page. Could NOT confirm whether a current OSDBU director or acting director is named. Stored \"Gail Clark\" unverified. A search snippet (not evidence) indicated former director George L. Price term ended 2025-04-01; unconfirmed."
+        }
       },
       "acquisitionOffice": {
         "name": "State Department Office of the Procurement Executive",
@@ -1601,8 +1986,17 @@
         "name": "NOAA Small Business Office",
         "director": "NOAA OSDBU Director",
         "phone": "(301) 628-1700",
-        "email": "noaa.osdbu@noaa.gov",
-        "address": "1401 Constitution Avenue NW, Washington, DC 20230"
+        "email": "noaasb@noaa.gov",
+        "address": "1401 Constitution Avenue NW, Washington, DC 20230",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.noaa.gov/organization/acquisition-grants/small-business",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.noaa.gov/organization/acquisition-grants/small-business",
+          "previousEmail": "noaa.osdbu@noaa.gov",
+          "note": "No phone listed."
+        }
       },
       "acquisitionOffice": {
         "name": "NOAA Acquisition and Grants Office",
@@ -1663,8 +2057,17 @@
         "name": "USFS Small Business Office",
         "director": "USFS OSDBU Director",
         "phone": "(505) 842-3292",
-        "email": "usfs.osdbu@usda.gov",
-        "address": "1400 Independence Avenue SW, Washington, DC 20250"
+        "email": "sm.fs.smallbusiness@usda.gov",
+        "address": "1400 Independence Avenue SW, Washington, DC 20250",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.fs.usda.gov/business/small-business/",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.fs.usda.gov/business/small-business/",
+          "previousEmail": "usfs.osdbu@usda.gov",
+          "note": "No phone or named person on page."
+        }
       },
       "acquisitionOffice": {
         "name": "USFS Acquisition Management",
@@ -1704,8 +2107,15 @@
         "name": "FAA Small Business Office",
         "director": "FAA OSDBU Director",
         "phone": "(202) 267-8111",
-        "email": "faa.osdbu@faa.gov",
-        "address": "800 Independence Avenue SW, Washington, DC 20591"
+        "email": "",
+        "address": "800 Independence Avenue SW, Washington, DC 20591",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "not_published",
+          "sourceUrl": "https://sbo.faa.gov/page/?pageName=The+SBO+Team",
+          "withheldEmail": "faa.osdbu@faa.gov",
+          "note": "No shared SB mailbox; only individual staff emails (e.g. allen.bresley@faa.gov, (609) 485-4380). General (866) 835-5322. Stored faa.gov forecastUrl returned 403. Page mailto for Christine Sager points to a different address than displayed."
+        }
       },
       "acquisitionOffice": {
         "name": "FAA Office of Acquisitions",
@@ -1722,10 +2132,18 @@
       "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=HUD",
       "smallBusinessOffice": {
         "name": "HUD Office of Small and Disadvantaged Business Utilization",
-        "director": "Jean Shao",
+        "director": "Jean Lin Pao",
         "phone": "(202) 402-5477",
         "email": "SDB@hud.gov",
-        "address": "451 7th Street SW, Washington, DC 20410"
+        "address": "451 7th Street SW, Washington, DC 20410",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.hud.gov/contactus/principal-directory",
+          "note": "inconclusive: the OSDBU page body did not load (header/footer only); NAME MISMATCH: stored \"Jean Shao\", published \"Jean Lin Pao\". SDB@hud.gov not shown; hud.gov/program_offices/sdb loaded only header/footer (main body not captured)."
+        },
+        "directorVerified": "2026-11",
+        "contactSourceUrl": "https://www.hud.gov/contactus/principal-directory"
       },
       "acquisitionOffice": {
         "name": "HUD Office of the Chief Procurement Officer",
@@ -1745,7 +2163,13 @@
         "director": "ED OSDBU Director",
         "phone": "(202) 245-6301",
         "email": "ed.osdbu@ed.gov",
-        "address": "400 Maryland Avenue SW, Washington, DC 20202"
+        "address": "400 Maryland Avenue SW, Washington, DC 20202",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.ed.gov/about/offices/list/ocfo/contracts/sbinfo.html",
+          "note": "no page could be read; sourceUrl is the official URL attempted; ed.gov and www2.ed.gov OSDBU pages returned 403."
+        }
       },
       "acquisitionOffice": {
         "name": "ED Contracts and Acquisitions Management",
@@ -1785,8 +2209,15 @@
         "name": "SBA Office of the Chief Acquisition Officer",
         "director": "SBA Director",
         "phone": "(202) 205-6618",
-        "email": "sbacacao@sba.gov",
-        "address": "409 3rd Street SW, Washington, DC 20416"
+        "email": "",
+        "address": "409 3rd Street SW, Washington, DC 20416",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "not_published",
+          "sourceUrl": "https://www.sba.gov/about-sba/organization/contact-sba",
+          "withheldEmail": "sbacacao@sba.gov",
+          "note": "sbacacao@sba.gov not shown; no contact for SBA internal procurement/small business program. Only Answer Desk 1-800-827-5722 / answerdesk@sba.gov."
+        }
       },
       "acquisitionOffice": {
         "name": "SBA Office of the Chief Acquisition Officer",
@@ -1826,8 +2257,17 @@
         "name": "OPM Office of Small and Disadvantaged Business Utilization",
         "director": "OPM OSDBU Director",
         "phone": "(202) 606-2180",
-        "email": "OSDBU@opm.gov",
-        "address": "1900 E Street NW, Washington, DC 20415"
+        "email": "Small.Business@opm.gov",
+        "address": "1900 E Street NW, Washington, DC 20415",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.opm.gov/about-us/doing-business-with-opm/",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.opm.gov/about-us/doing-business-with-opm/",
+          "previousEmail": "OSDBU@opm.gov",
+          "note": "No phone or named person."
+        }
       },
       "acquisitionOffice": {
         "name": "OPM Contracting Division",
@@ -1865,10 +2305,16 @@
       "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Nuclear%20Regulatory%20Commission",
       "smallBusinessOffice": {
         "name": "NRC Office of Small Business and Civil Rights",
-        "director": "Vonna Ordaz",
+        "director": "NRC SBCR Director",
         "phone": "(301) 415-7380",
         "email": "sbcr@nrc.gov",
-        "address": "11555 Rockville Pike, Rockville, MD 20852"
+        "address": "11555 Rockville Pike, Rockville, MD 20852",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.nrc.gov/about-nrc/civil-rights/programs/contactus/contactus-sb.html",
+          "note": "inconclusive: nrc.gov small-business pages returned 403; sbcr@nrc.gov not shown (only OPA.resource@nrc.gov in footer). nrc.gov contracting and small-business pages returned 403. Stored director Vonna Ordaz not confirmed."
+        }
       },
       "acquisitionOffice": {
         "name": "NRC Office of Administration - Division of Contracts and Property Management",
@@ -1888,7 +2334,13 @@
         "director": "FCC OCBO Director",
         "phone": "(202) 418-0990",
         "email": "ocbo@fcc.gov",
-        "address": "45 L Street NE, Washington, DC 20554"
+        "address": "45 L Street NE, Washington, DC 20554",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.fcc.gov/about-fcc/fcc-initiatives/contract-opportunities",
+          "note": "no page could be read; sourceUrl is the official URL attempted; fcc.gov forecastUrl and OCBO page returned 403."
+        }
       },
       "acquisitionOffice": {
         "name": "FCC Office of Managing Director - Contracts and Purchasing Center",
@@ -1908,7 +2360,13 @@
         "director": "SEC OMWI Director",
         "phone": "(202) 551-6040",
         "email": "omwi@sec.gov",
-        "address": "100 F Street NE, Washington, DC 20549"
+        "address": "100 F Street NE, Washington, DC 20549",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.sec.gov/about/offices/omo",
+          "note": "no page could be read; sourceUrl is the official URL attempted; No reachable SEC OMWI page."
+        }
       },
       "acquisitionOffice": {
         "name": "SEC Office of Acquisitions",
@@ -1925,10 +2383,19 @@
       "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=FDIC",
       "smallBusinessOffice": {
         "name": "FDIC Office of Minority and Women Inclusion",
-        "director": "Nikita Pearson",
+        "director": "Brian Guy",
         "phone": "(877) 275-3342",
-        "email": "omwi@fdic.gov",
-        "address": "550 17th Street NW, Washington, DC 20429"
+        "email": "",
+        "address": "550 17th Street NW, Washington, DC 20429",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "not_published",
+          "sourceUrl": "https://www.fdic.gov/about/organization-directory-headquarters",
+          "withheldEmail": "omwi@fdic.gov",
+          "note": "NAME MISMATCH: stored \"Nikita Pearson\" not listed; OMWI Director is Brian Guy. Phone is the general FDIC Contact Center (877-ASKFDIC). omwi@fdic.gov not shown on org directory or https://www.fdic.gov/doing-business-fdic/key-contacts-acquisition-services-branch."
+        },
+        "directorVerified": "2026-11",
+        "contactSourceUrl": "https://www.fdic.gov/about/organization-directory-headquarters"
       },
       "acquisitionOffice": {
         "name": "FDIC Division of Administration - Acquisition Services Branch",
@@ -1948,7 +2415,13 @@
         "director": "TVA Supplier Diversity Director",
         "phone": "(865) 632-3000",
         "email": "supplierdiversity@tva.com",
-        "address": "400 W. Summit Hill Drive, Knoxville, TN 37902"
+        "address": "400 W. Summit Hill Drive, Knoxville, TN 37902",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.tva.com/about-tva/doing-business-with-tva",
+          "note": "no page could be read; sourceUrl is the official URL attempted; tva.com pages returned 403."
+        }
       },
       "acquisitionOffice": {
         "name": "TVA Supply Chain",
@@ -1968,7 +2441,13 @@
         "director": "SI OSDBU Director",
         "phone": "(202) 633-1000",
         "email": "osp@si.edu",
-        "address": "600 Maryland Avenue SW, Washington, DC 20024"
+        "address": "600 Maryland Avenue SW, Washington, DC 20024",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.si.edu/ocon",
+          "note": "no page could be read; sourceUrl is the official URL attempted; si.edu pages returned 403."
+        }
       },
       "acquisitionOffice": {
         "name": "Smithsonian Office of Contracting",
@@ -1987,8 +2466,15 @@
         "name": "NARA Office of Small and Disadvantaged Business Utilization",
         "director": "NARA OSDBU Director",
         "phone": "(301) 837-0830",
-        "email": "small.business@nara.gov",
-        "address": "8601 Adelphi Road, College Park, MD 20740"
+        "email": "",
+        "address": "8601 Adelphi Road, College Park, MD 20740",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "not_published",
+          "sourceUrl": "https://www.archives.gov/contracts",
+          "withheldEmail": "small.business@nara.gov",
+          "note": "Contracts page and https://www.archives.gov/contact show no SB email/phone (only inquire@nara.gov, 1-866-272-6272)."
+        }
       },
       "acquisitionOffice": {
         "name": "NARA Acquisition Services Division",
@@ -2007,8 +2493,15 @@
         "name": "GPO Office of Small Disadvantaged Business Utilization",
         "director": "GPO OSDBU Director",
         "phone": "(202) 512-0327",
-        "email": "vendorservices@gpo.gov",
-        "address": "732 North Capitol Street NW, Washington, DC 20401"
+        "email": "",
+        "address": "732 North Capitol Street NW, Washington, DC 20401",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "not_published",
+          "sourceUrl": "https://www.gpo.gov/how-to-work-with-us/vendors/contract-opportunities",
+          "withheldEmail": "vendorservices@gpo.gov",
+          "note": "No SB office/mailbox. Only Bid Section mailbox (bidsection@gpo.gov, Cloudflare-obfuscated, decoded by fetch tool). vendorservices@gpo.gov not shown."
+        }
       },
       "acquisitionOffice": {
         "name": "GPO Acquisitions Division",
@@ -2028,7 +2521,13 @@
         "director": "NPS OSBP Director",
         "phone": "(202) 354-1820",
         "email": "nps_osdbu@nps.gov",
-        "address": "1849 C Street NW, Washington, DC 20240"
+        "address": "1849 C Street NW, Washington, DC 20240",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.nps.gov/aboutus/doingbusinesswithus.htm",
+          "note": "inconclusive: page shows \"e-mail us\" links without addresses; NPS page gives only \"e-mail us\" links (no addresses). DOI OSDBU (https://www.doi.gov/osdbu) publishes doi_osdbu@ios.doi.gov, 202-208-3493."
+        }
       },
       "acquisitionOffice": {
         "name": "NPS Contracting and Property Management Division",
@@ -2048,7 +2547,13 @@
         "director": "FWS OSBP Director",
         "phone": "(703) 358-2548",
         "email": "fws_osdbu@fws.gov",
-        "address": "5275 Leesburg Pike, Falls Church, VA 22041"
+        "address": "5275 Leesburg Pike, Falls Church, VA 22041",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.doi.gov/osdbu",
+          "note": "inconclusive: only the DOI-wide page was readable; the bureau specialist PDF was not machine-readable; Bureau forecastUrl 404. DOI OSDBU page lists only doi_osdbu@ios.doi.gov / 202-208-3493; no bureau mailbox. DOI SB specialist PDF (2025-07) fetched but not machine-readable."
+        }
       },
       "acquisitionOffice": {
         "name": "FWS Contracting and General Services",
@@ -2068,7 +2573,13 @@
         "director": "BLM OSBP Director",
         "phone": "(202) 912-7400",
         "email": "blm_osdbu@blm.gov",
-        "address": "1849 C Street NW, Washington, DC 20240"
+        "address": "1849 C Street NW, Washington, DC 20240",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.doi.gov/osdbu",
+          "note": "inconclusive: only the DOI-wide page was readable; the bureau specialist PDF was not machine-readable; Bureau forecastUrl 404. DOI OSDBU page lists only doi_osdbu@ios.doi.gov / 202-208-3493; no bureau mailbox. DOI SB specialist PDF (2025-07) fetched but not machine-readable."
+        }
       },
       "acquisitionOffice": {
         "name": "BLM National Acquisition Office",
@@ -2088,7 +2599,13 @@
         "director": "USGS OSBP Director",
         "phone": "(703) 648-7373",
         "email": "usgs_osdbu@usgs.gov",
-        "address": "12201 Sunrise Valley Drive, Reston, VA 20192"
+        "address": "12201 Sunrise Valley Drive, Reston, VA 20192",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.doi.gov/osdbu",
+          "note": "inconclusive: only the DOI-wide page was readable; the bureau specialist PDF was not machine-readable; Bureau forecastUrl 404. DOI OSDBU page lists only doi_osdbu@ios.doi.gov / 202-208-3493; no bureau mailbox. DOI SB specialist PDF (2025-07) fetched but not machine-readable."
+        }
       },
       "acquisitionOffice": {
         "name": "USGS Office of Acquisition and Grants",
@@ -2108,7 +2625,13 @@
         "director": "BOR OSBP Director",
         "phone": "(303) 445-2684",
         "email": "bor_osdbu@usbr.gov",
-        "address": "1849 C Street NW, Washington, DC 20240"
+        "address": "1849 C Street NW, Washington, DC 20240",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.doi.gov/osdbu",
+          "note": "inconclusive: only the DOI-wide page was readable; the bureau specialist PDF was not machine-readable; Bureau forecastUrl 404. DOI OSDBU page lists only doi_osdbu@ios.doi.gov / 202-208-3493; no bureau mailbox. DOI SB specialist PDF (2025-07) fetched but not machine-readable."
+        }
       },
       "acquisitionOffice": {
         "name": "Bureau of Reclamation Acquisitions Division",
@@ -2128,7 +2651,13 @@
         "director": "ARS OSBP Director",
         "phone": "(301) 504-1702",
         "email": "ars_osdbu@usda.gov",
-        "address": "5601 Sunnyside Avenue, Beltsville, MD 20705"
+        "address": "5601 Sunnyside Avenue, Beltsville, MD 20705",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.ars.usda.gov/office-of-administrative-and-financial-management/",
+          "note": "no page could be read; sourceUrl is the official URL attempted; usda.gov OSDBU and small-business-specialists pages returned 403; bureau page (404)."
+        }
       },
       "acquisitionOffice": {
         "name": "ARS Acquisition and Property Division",
@@ -2148,7 +2677,13 @@
         "director": "APHIS OSBP Director",
         "phone": "(301) 851-2900",
         "email": "aphis_osdbu@usda.gov",
-        "address": "4700 River Road, Riverdale, MD 20737"
+        "address": "4700 River Road, Riverdale, MD 20737",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.aphis.usda.gov/aphis/resources/business",
+          "note": "no page could be read; sourceUrl is the official URL attempted; usda.gov OSDBU and small-business-specialists pages returned 403; bureau page (404)."
+        }
       },
       "acquisitionOffice": {
         "name": "APHIS Marketing and Regulatory Programs Business Services",
@@ -2168,7 +2703,13 @@
         "director": "NRCS OSBP Director",
         "phone": "(202) 720-1845",
         "email": "nrcs_osdbu@usda.gov",
-        "address": "1400 Independence Avenue SW, Washington, DC 20250"
+        "address": "1400 Independence Avenue SW, Washington, DC 20250",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.nrcs.usda.gov/about/business",
+          "note": "no page could be read; sourceUrl is the official URL attempted; usda.gov OSDBU and small-business-specialists pages returned 403; bureau page (timeout)."
+        }
       },
       "acquisitionOffice": {
         "name": "NRCS Acquisitions Division",
@@ -2187,8 +2728,17 @@
         "name": "FLETC Office of Small Business Programs",
         "director": "FLETC OSBP Director",
         "phone": "(912) 267-2100",
-        "email": "fletc.osdbu@fletc.dhs.gov",
-        "address": "1131 Chapel Crossing Road, Glynco, GA 31524"
+        "email": "allan.w.gray@fletc.dhs.gov",
+        "address": "1131 Chapel Crossing Road, Glynco, GA 31524",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.dhs.gov/osdbu/small-business-specialists",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.dhs.gov/osdbu/small-business-specialists",
+          "previousEmail": "fletc.osdbu@fletc.dhs.gov",
+          "note": "DHS small-business specialists page is marked archived (\"may be outdated\"); DHS SB Specialists page is in DHS content archive (labelled possibly outdated) but shows Last Updated 10/01/2026. DHS OSDBU Executive Director per https://www.dhs.gov/osdbu: Dina Thompson. Personal address only: Allan Gray, Small Business Specialist; alternates James Frye (912) 267-2628, Joshua Fejeran (912) 267-3090."
+        }
       },
       "acquisitionOffice": {
         "name": "FLETC Office of Acquisitions",
@@ -2207,8 +2757,17 @@
         "name": "GSA Office of Small Business Utilization",
         "director": "GSA OSBU Director",
         "phone": "(202) 501-1021",
-        "email": "small.business@gsa.gov",
-        "address": "1800 F Street NW, Washington, DC 20405"
+        "email": "smallbusiness@gsa.gov",
+        "address": "1800 F Street NW, Washington, DC 20405",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.gsa.gov/node/162028",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.gsa.gov/node/162028",
+          "previousEmail": "small.business@gsa.gov",
+          "note": "Stored small.business@gsa.gov differs from published smallbusiness@gsa.gov. Also OSB_gethelp@gsa.gov. No HQ phone; only regional SBS phones. No director/associate administrator named."
+        }
       },
       "acquisitionOffice": {
         "name": "PBS Acquisition Management",
@@ -2227,8 +2786,17 @@
         "name": "GSA Office of Small Business Utilization",
         "director": "GSA OSBU Director",
         "phone": "(202) 501-1021",
-        "email": "small.business@gsa.gov",
-        "address": "1800 F Street NW, Washington, DC 20405"
+        "email": "smallbusiness@gsa.gov",
+        "address": "1800 F Street NW, Washington, DC 20405",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.gsa.gov/node/162028",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.gsa.gov/node/162028",
+          "previousEmail": "small.business@gsa.gov",
+          "note": "Stored small.business@gsa.gov differs from published smallbusiness@gsa.gov. Also OSB_gethelp@gsa.gov. No HQ phone; only regional SBS phones. No director/associate administrator named."
+        }
       },
       "acquisitionOffice": {
         "name": "FAS Acquisition Operations",
@@ -2247,8 +2815,17 @@
         "name": "DOL Office of Small and Disadvantaged Business Utilization",
         "director": "DOL OSDBU Director",
         "phone": "(202) 693-6460",
-        "email": "osdbu@dol.gov",
-        "address": "200 Constitution Avenue NW, Washington, DC 20210"
+        "email": "osdbucustomerservice@dol.gov",
+        "address": "200 Constitution Avenue NW, Washington, DC 20210",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.dol.gov/agencies/oasam/centers-offices/office-of-the-senior-procurement-executive/office-of-small-and-disadvantaged-business-utilization/procurement-information",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.dol.gov/agencies/oasam/centers-offices/office-of-the-senior-procurement-executive/office-of-small-and-disadvantaged-business-utilization/procurement-information",
+          "previousEmail": "osdbu@dol.gov",
+          "note": "DOL-wide OSDBU. Director role listed but unnamed. Peter Kontakos, Program Manager (Small Business Procurements & Contracts)."
+        }
       },
       "acquisitionOffice": {
         "name": "DOL Business Operations Center",
@@ -2268,7 +2845,13 @@
         "director": "HHS OSDBU Director",
         "phone": "(202) 690-7300",
         "email": "osdbu@hhs.gov",
-        "address": "200 Independence Avenue SW, Washington, DC 20201"
+        "address": "200 Independence Avenue SW, Washington, DC 20201",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.ihs.gov/DAP/smallbusiness/",
+          "note": "inconclusive: hhs.gov OSDBU pages returned 403; Jonathan Ferguson, Small Business Specialist, supporting NIH & IHS and HHS/OSDBU. No email on page. hhs.gov OSDBU pages 403."
+        }
       },
       "acquisitionOffice": {
         "name": "IHS Office of Acquisition Management",
@@ -2288,7 +2871,13 @@
         "director": "DOT OSDBU Director",
         "phone": "(202) 366-1930",
         "email": "osdbu@dot.gov",
-        "address": "1200 New Jersey Avenue SE, Washington, DC 20590"
+        "address": "1200 New Jersey Avenue SE, Washington, DC 20590",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.fhwa.dot.gov/resources/acquisition/",
+          "note": "no page could be read; sourceUrl is the official URL attempted; transportation.gov OSDBU / SB-specialist pages returned 403."
+        }
       },
       "acquisitionOffice": {
         "name": "FHWA Office of Acquisition and Grants Management",
@@ -2308,7 +2897,13 @@
         "director": "DOT OSDBU Director",
         "phone": "(202) 366-1930",
         "email": "osdbu@dot.gov",
-        "address": "1200 New Jersey Avenue SE, Washington, DC 20590"
+        "address": "1200 New Jersey Avenue SE, Washington, DC 20590",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://railroads.dot.gov/about-fra/office-administrator/office-acquisition-and-grants-management",
+          "note": "no page could be read; sourceUrl is the official URL attempted; transportation.gov OSDBU / SB-specialist pages returned 403; stored forecastUrl also 403."
+        }
       },
       "acquisitionOffice": {
         "name": "FRA Office of Acquisition and Grants Management",
@@ -2328,7 +2923,13 @@
         "director": "DOT OSDBU Director",
         "phone": "(202) 366-1930",
         "email": "osdbu@dot.gov",
-        "address": "1200 New Jersey Avenue SE, Washington, DC 20590"
+        "address": "1200 New Jersey Avenue SE, Washington, DC 20590",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.transit.dot.gov/about/regional-offices/headquarters/office-administration",
+          "note": "no page could be read; sourceUrl is the official URL attempted; transportation.gov OSDBU / SB-specialist pages returned 403; stored forecastUrl also 403."
+        }
       },
       "acquisitionOffice": {
         "name": "FTA Office of Administration",
@@ -2348,7 +2949,13 @@
         "director": "DOT OSDBU Director",
         "phone": "(202) 366-1930",
         "email": "osdbu@dot.gov",
-        "address": "1200 New Jersey Avenue SE, Washington, DC 20590"
+        "address": "1200 New Jersey Avenue SE, Washington, DC 20590",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.maritime.dot.gov/about-us/contracting-opportunities",
+          "note": "no page could be read; sourceUrl is the official URL attempted; transportation.gov OSDBU / SB-specialist pages returned 403; stored forecastUrl also 403."
+        }
       },
       "acquisitionOffice": {
         "name": "MARAD Office of Acquisition",
@@ -2367,8 +2974,17 @@
         "name": "DOL Office of Small and Disadvantaged Business Utilization",
         "director": "DOL OSDBU Director",
         "phone": "(202) 693-6460",
-        "email": "osdbu@dol.gov",
-        "address": "200 Constitution Avenue NW, Washington, DC 20210"
+        "email": "osdbucustomerservice@dol.gov",
+        "address": "200 Constitution Avenue NW, Washington, DC 20210",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.dol.gov/agencies/oasam/centers-offices/office-of-the-senior-procurement-executive/office-of-small-and-disadvantaged-business-utilization/procurement-information",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.dol.gov/agencies/oasam/centers-offices/office-of-the-senior-procurement-executive/office-of-small-and-disadvantaged-business-utilization/procurement-information",
+          "previousEmail": "osdbu@dol.gov",
+          "note": "DOL-wide OSDBU. Director role listed but unnamed. Peter Kontakos, Program Manager (Small Business Procurements & Contracts). Stored forecastUrl is a homepage/grants page with no SB contact."
+        }
       },
       "acquisitionOffice": {
         "name": "OSHA Acquisition and Assistance Branch",
@@ -2387,8 +3003,17 @@
         "name": "DOL Office of Small and Disadvantaged Business Utilization",
         "director": "DOL OSDBU Director",
         "phone": "(202) 693-6460",
-        "email": "osdbu@dol.gov",
-        "address": "200 Constitution Avenue NW, Washington, DC 20210"
+        "email": "osdbucustomerservice@dol.gov",
+        "address": "200 Constitution Avenue NW, Washington, DC 20210",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.dol.gov/agencies/oasam/centers-offices/office-of-the-senior-procurement-executive/office-of-small-and-disadvantaged-business-utilization/procurement-information",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.dol.gov/agencies/oasam/centers-offices/office-of-the-senior-procurement-executive/office-of-small-and-disadvantaged-business-utilization/procurement-information",
+          "previousEmail": "osdbu@dol.gov",
+          "note": "DOL-wide OSDBU. Director role listed but unnamed. Peter Kontakos, Program Manager (Small Business Procurements & Contracts). Stored forecastUrl is a homepage/grants page with no SB contact."
+        }
       },
       "acquisitionOffice": {
         "name": "ETA Office of Grants Management",
@@ -2407,8 +3032,17 @@
         "name": "DOL Office of Small and Disadvantaged Business Utilization",
         "director": "DOL OSDBU Director",
         "phone": "(202) 693-6460",
-        "email": "osdbu@dol.gov",
-        "address": "200 Constitution Avenue NW, Washington, DC 20210"
+        "email": "osdbucustomerservice@dol.gov",
+        "address": "200 Constitution Avenue NW, Washington, DC 20210",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.dol.gov/agencies/oasam/centers-offices/office-of-the-senior-procurement-executive/office-of-small-and-disadvantaged-business-utilization/procurement-information",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.dol.gov/agencies/oasam/centers-offices/office-of-the-senior-procurement-executive/office-of-small-and-disadvantaged-business-utilization/procurement-information",
+          "previousEmail": "osdbu@dol.gov",
+          "note": "DOL-wide OSDBU. Director role listed but unnamed. Peter Kontakos, Program Manager (Small Business Procurements & Contracts). Stored forecastUrl is a homepage/grants page with no SB contact."
+        }
       },
       "acquisitionOffice": {
         "name": "MSHA Office of Administration and Management",
@@ -2428,7 +3062,13 @@
         "director": "DOC OSDBU Director",
         "phone": "(202) 482-1472",
         "email": "osdbu@doc.gov",
-        "address": "1401 Constitution Avenue NW, Washington, DC 20230"
+        "address": "1401 Constitution Avenue NW, Washington, DC 20230",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.census.gov/about/business-opportunities/opportunities/sm-bus-opps.html",
+          "note": "address is Cloudflare-obfuscated on the page; the decoded value was not adopted; Address is Cloudflare-obfuscated on page and was decoded by the fetch tool; verify before use. Brighid Boykin, Small Business Specialist. Page revised 2026-09-24. commerce.gov OSDBU pages 403."
+        }
       },
       "acquisitionOffice": {
         "name": "Census Bureau Acquisitions Division",
@@ -2447,8 +3087,17 @@
         "name": "DOC Office of Small and Disadvantaged Business Utilization",
         "director": "DOC OSDBU Director",
         "phone": "(202) 482-1472",
-        "email": "osdbu@doc.gov",
-        "address": "1401 Constitution Avenue NW, Washington, DC 20230"
+        "email": "derek.greene@nist.gov",
+        "address": "1401 Constitution Avenue NW, Washington, DC 20230",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.nist.gov/oaam/acquisition-management-division",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.nist.gov/oaam/acquisition-management-division",
+          "previousEmail": "osdbu@doc.gov",
+          "note": "Personal address of Derek Greene, Small Business Specialist (shown as \"derek.greene [at] nist.gov\"). Stored forecastUrl nist.gov/oam is the Office of Advanced Manufacturing (wrong page, loads)."
+        }
       },
       "acquisitionOffice": {
         "name": "NIST Office of Acquisition and Agreements Management",
@@ -2467,8 +3116,17 @@
         "name": "DOC Office of Small and Disadvantaged Business Utilization",
         "director": "DOC OSDBU Director",
         "phone": "(202) 482-1472",
-        "email": "osdbu@doc.gov",
-        "address": "1401 Constitution Avenue NW, Washington, DC 20230"
+        "email": "SmallBusiness@uspto.gov",
+        "address": "1401 Constitution Avenue NW, Washington, DC 20230",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.uspto.gov/about-us/vendor-information",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.uspto.gov/about-us/vendor-information",
+          "previousEmail": "osdbu@doc.gov",
+          "note": "No phone or named person."
+        }
       },
       "acquisitionOffice": {
         "name": "USPTO Office of Procurement",
@@ -2488,7 +3146,13 @@
         "director": "USDA OSDBU Director",
         "phone": "(202) 720-7117",
         "email": "osdbu@usda.gov",
-        "address": "1400 Independence Avenue SW, Washington, DC 20250"
+        "address": "1400 Independence Avenue SW, Washington, DC 20250",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.fsa.usda.gov/",
+          "note": "no page could be read; sourceUrl is the official URL attempted; usda.gov OSDBU and small-business-specialists pages returned 403; bureau page (timeout)."
+        }
       },
       "acquisitionOffice": {
         "name": "FSA Administrative Services Division",
@@ -2508,7 +3172,13 @@
         "director": "USDA OSDBU Director",
         "phone": "(202) 720-7117",
         "email": "osdbu@usda.gov",
-        "address": "1400 Independence Avenue SW, Washington, DC 20250"
+        "address": "1400 Independence Avenue SW, Washington, DC 20250",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.rd.usda.gov/about-rd",
+          "note": "no page could be read; sourceUrl is the official URL attempted; usda.gov OSDBU and small-business-specialists pages returned 403; bureau page (403)."
+        }
       },
       "acquisitionOffice": {
         "name": "Rural Development Procurement",
@@ -2527,8 +3197,17 @@
         "name": "VA Office of Small and Disadvantaged Business Utilization",
         "director": "VA OSDBU Director",
         "phone": "(202) 461-4300",
-        "email": "osdbu@va.gov",
-        "address": "810 Vermont Avenue NW, Washington, DC 20420"
+        "email": "vetbiz@va.gov",
+        "address": "810 Vermont Avenue NW, Washington, DC 20420",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.va.gov/osdbu/",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.va.gov/osdbu/",
+          "previousEmail": "osdbu@va.gov",
+          "note": "VA-wide OSDBU contact (no administration-specific SB mailbox found). Phone is OSDBU Call Operations, 8-4 ET. Stored forecastUrl va.gov/opal/nac/fss/ not checked."
+        }
       },
       "acquisitionOffice": {
         "name": "VBA Office of Resource Management",
@@ -2547,8 +3226,17 @@
         "name": "VA Office of Small and Disadvantaged Business Utilization",
         "director": "VA OSDBU Director",
         "phone": "(202) 461-4300",
-        "email": "osdbu@va.gov",
-        "address": "810 Vermont Avenue NW, Washington, DC 20420"
+        "email": "vetbiz@va.gov",
+        "address": "810 Vermont Avenue NW, Washington, DC 20420",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.va.gov/osdbu/",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.va.gov/osdbu/",
+          "previousEmail": "osdbu@va.gov",
+          "note": "VA-wide OSDBU contact (no administration-specific SB mailbox found). Phone is OSDBU Call Operations, 8-4 ET. Stored forecastUrl va.gov/opal/nac/fss/ not checked."
+        }
       },
       "acquisitionOffice": {
         "name": "NCA Contracting Office",
@@ -2567,8 +3255,17 @@
         "name": "DOI Office of Small and Disadvantaged Business Utilization",
         "director": "DOI OSDBU Director",
         "phone": "(202) 208-3493",
-        "email": "osdbu@ios.doi.gov",
-        "address": "1849 C Street NW, Washington, DC 20240"
+        "email": "doi_osdbu@ios.doi.gov",
+        "address": "1849 C Street NW, Washington, DC 20240",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.doi.gov/osdbu",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.doi.gov/osdbu",
+          "previousEmail": "osdbu@ios.doi.gov",
+          "note": "Stored osdbu@ios.doi.gov differs from published doi_osdbu@ios.doi.gov. No director named on page."
+        }
       },
       "acquisitionOffice": {
         "name": "BIA Acquisition Services",
@@ -2587,8 +3284,17 @@
         "name": "DOI Office of Small and Disadvantaged Business Utilization",
         "director": "DOI OSDBU Director",
         "phone": "(202) 208-3493",
-        "email": "osdbu@ios.doi.gov",
-        "address": "1849 C Street NW, Washington, DC 20240"
+        "email": "doi_osdbu@ios.doi.gov",
+        "address": "1849 C Street NW, Washington, DC 20240",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.doi.gov/osdbu",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.doi.gov/osdbu",
+          "previousEmail": "osdbu@ios.doi.gov",
+          "note": "Stored osdbu@ios.doi.gov differs from published doi_osdbu@ios.doi.gov. No director named on page."
+        }
       },
       "acquisitionOffice": {
         "name": "BOEM Procurement Division",
@@ -2607,8 +3313,17 @@
         "name": "DOI Office of Small and Disadvantaged Business Utilization",
         "director": "DOI OSDBU Director",
         "phone": "(202) 208-3493",
-        "email": "osdbu@ios.doi.gov",
-        "address": "1849 C Street NW, Washington, DC 20240"
+        "email": "doi_osdbu@ios.doi.gov",
+        "address": "1849 C Street NW, Washington, DC 20240",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.doi.gov/osdbu",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.doi.gov/osdbu",
+          "previousEmail": "osdbu@ios.doi.gov",
+          "note": "Stored osdbu@ios.doi.gov differs from published doi_osdbu@ios.doi.gov. No director named on page."
+        }
       },
       "acquisitionOffice": {
         "name": "BSEE Procurement Division",
@@ -2627,8 +3342,17 @@
         "name": "Treasury Office of Small and Disadvantaged Business Utilization",
         "director": "Treasury OSDBU Director",
         "phone": "(202) 622-0530",
-        "email": "osdbu@treasury.gov",
-        "address": "1500 Pennsylvania Avenue NW, Washington, DC 20220"
+        "email": "Smallbusiness@fiscal.treasury.gov",
+        "address": "1500 Pennsylvania Avenue NW, Washington, DC 20220",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://home.treasury.gov/policy-issues/small-business-programs/small-and-disadvantaged-business-utilization/how-to-contact-us",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://home.treasury.gov/policy-issues/small-business-programs/small-and-disadvantaged-business-utilization/how-to-contact-us",
+          "previousEmail": "osdbu@treasury.gov",
+          "note": "Treasury lists Smallbusiness@fiscal.treasury.gov for TTB, Fiscal Service, CDFI Fund, FinCEN, TIGTA. Main OSDBU: OSDBU_Team@Treasury.gov. No phones on page."
+        }
       },
       "acquisitionOffice": {
         "name": "FinCEN Procurement Division",
@@ -2647,8 +3371,17 @@
         "name": "Treasury Office of Small and Disadvantaged Business Utilization",
         "director": "Treasury OSDBU Director",
         "phone": "(202) 622-0530",
-        "email": "osdbu@treasury.gov",
-        "address": "1500 Pennsylvania Avenue NW, Washington, DC 20220"
+        "email": "SmallBusinessProgram@occ.treas.gov",
+        "address": "1500 Pennsylvania Avenue NW, Washington, DC 20220",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://home.treasury.gov/policy-issues/small-business-programs/small-and-disadvantaged-business-utilization/how-to-contact-us",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://home.treasury.gov/policy-issues/small-business-programs/small-and-disadvantaged-business-utilization/how-to-contact-us",
+          "previousEmail": "osdbu@treasury.gov",
+          "note": "Main Treasury OSDBU: OSDBU_Team@Treasury.gov. No phones on page."
+        }
       },
       "acquisitionOffice": {
         "name": "OCC Procurement Services",
@@ -2667,8 +3400,17 @@
         "name": "Treasury Office of Small and Disadvantaged Business Utilization",
         "director": "Treasury OSDBU Director",
         "phone": "(202) 622-0530",
-        "email": "osdbu@treasury.gov",
-        "address": "1500 Pennsylvania Avenue NW, Washington, DC 20220"
+        "email": "Smallbusiness@fiscal.treasury.gov",
+        "address": "1500 Pennsylvania Avenue NW, Washington, DC 20220",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://home.treasury.gov/policy-issues/small-business-programs/small-and-disadvantaged-business-utilization/how-to-contact-us",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://home.treasury.gov/policy-issues/small-business-programs/small-and-disadvantaged-business-utilization/how-to-contact-us",
+          "previousEmail": "osdbu@treasury.gov",
+          "note": "Treasury lists Smallbusiness@fiscal.treasury.gov for TTB, Fiscal Service, CDFI Fund, FinCEN, TIGTA. Main OSDBU: OSDBU_Team@Treasury.gov. No phones on page."
+        }
       },
       "acquisitionOffice": {
         "name": "TTB Procurement Division",
@@ -2688,7 +3430,13 @@
         "director": "State OSDBU Director",
         "phone": "(703) 875-6822",
         "email": "smallbusiness@state.gov",
-        "address": "2201 C Street NW, Washington, DC 20520"
+        "address": "2201 C Street NW, Washington, DC 20520",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.state.gov/obo-industry-partners/",
+          "note": "no page could be read; sourceUrl is the official URL attempted; state.gov returned 403."
+        }
       },
       "acquisitionOffice": {
         "name": "OBO Industry Partners",
@@ -2708,7 +3456,13 @@
         "director": "State OSDBU Director",
         "phone": "(703) 875-6822",
         "email": "smallbusiness@state.gov",
-        "address": "2201 C Street NW, Washington, DC 20520"
+        "address": "2201 C Street NW, Washington, DC 20520",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.state.gov/doing-business-with-the-department-of-state/",
+          "note": "no page could be read; sourceUrl is the official URL attempted; state.gov returned 403."
+        }
       },
       "acquisitionOffice": {
         "name": "DS Contracting Office",
@@ -2728,7 +3482,13 @@
         "director": "HHS OSDBU Director",
         "phone": "(202) 690-7300",
         "email": "osdbu@hhs.gov",
-        "address": "200 Independence Avenue SW, Washington, DC 20201"
+        "address": "200 Independence Avenue SW, Washington, DC 20201",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.hrsa.gov/grants/contracts",
+          "note": "no page could be read; sourceUrl is the official URL attempted; hrsa.gov and hhs.gov OSDBU pages returned 403."
+        }
       },
       "acquisitionOffice": {
         "name": "HRSA Division of Acquisition Management",
@@ -2748,7 +3508,13 @@
         "director": "HHS OSDBU Director",
         "phone": "(202) 690-7300",
         "email": "osdbu@hhs.gov",
-        "address": "200 Independence Avenue SW, Washington, DC 20201"
+        "address": "200 Independence Avenue SW, Washington, DC 20201",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.acf.hhs.gov/grants",
+          "note": "no page could be read; sourceUrl is the official URL attempted; acf.hhs.gov and hhs.gov pages returned 403."
+        }
       },
       "acquisitionOffice": {
         "name": "ACF Office of Grants Management",
@@ -2768,7 +3534,13 @@
         "director": "HHS OSDBU Director",
         "phone": "(202) 690-7300",
         "email": "osdbu@hhs.gov",
-        "address": "200 Independence Avenue SW, Washington, DC 20201"
+        "address": "200 Independence Avenue SW, Washington, DC 20201",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.samhsa.gov/about/budget/contracts",
+          "note": "inconclusive: hhs.gov OSDBU pages returned 403; SAMHSA contracts page has no SB contact (general 1-877-726-4727 only). Stored forecastUrl returned 403. hhs.gov OSDBU 403."
+        }
       },
       "acquisitionOffice": {
         "name": "SAMHSA Division of Acquisition Management",
@@ -2830,7 +3602,13 @@
         "director": "NGA OSBP Director",
         "phone": "(571) 557-5400",
         "email": "NGASmallBusiness@nga.mil",
-        "address": "7500 GEOINT Drive, Springfield, VA 22150"
+        "address": "7500 GEOINT Drive, Springfield, VA 22150",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.nga.mil/resources/Doing_Business_with_NGA.html",
+          "note": "stored URL is a 404"
+        }
       },
       "acquisitionOffice": {
         "name": "NGA Acquisition Directorate",
@@ -2849,8 +3627,15 @@
         "name": "NSA Office of Small Business Programs",
         "director": "NSA OSBP Director",
         "phone": "(443) 634-4333",
-        "email": "SmallBusiness@nsa.gov",
-        "address": "9800 Savage Road, Fort Meade, MD 20755"
+        "email": "",
+        "address": "9800 Savage Road, Fort Meade, MD 20755",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "not_published",
+          "sourceUrl": "https://www.nsa.gov/Business/",
+          "withheldEmail": "SmallBusiness@nsa.gov",
+          "note": "official Business page reached; no small-business mailbox published (links to business.defense.gov)"
+        }
       },
       "acquisitionOffice": {
         "name": "NSA Acquisition and Procurement",
@@ -2869,8 +3654,15 @@
         "name": "DIA Office of Small Business Programs",
         "director": "DIA OSBP Director",
         "phone": "(202) 231-5554",
-        "email": "DIASmallBusiness@dia.mil",
-        "address": "200 MacDill Boulevard, Washington, DC 20340"
+        "email": "",
+        "address": "200 MacDill Boulevard, Washington, DC 20340",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "not_published",
+          "sourceUrl": "https://www.dia.mil/Business/Office-of-Small-Business-Programs/",
+          "withheldEmail": "DIASmallBusiness@dia.mil",
+          "note": "official OSBP page reached; no mailbox published"
+        }
       },
       "acquisitionOffice": {
         "name": "DIA Acquisition Directorate",
@@ -2889,8 +3681,17 @@
         "name": "WHS Office of Small Business Programs",
         "director": "WHS OSBP Director",
         "phone": "(703) 545-0790",
-        "email": "whs.smallbusiness@mail.mil",
-        "address": "1155 Defense Pentagon, Washington, DC 20301"
+        "email": "whs.osbp@mail.mil",
+        "address": "1155 Defense Pentagon, Washington, DC 20301",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://www.whs.mil/About-WHS/Offices/Office-of-Small-Business-Programs-OSBP/",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://www.whs.mil/About-WHS/Offices/Office-of-Small-Business-Programs-OSBP/",
+          "previousEmail": "whs.smallbusiness@mail.mil",
+          "note": "official OSBP page publishes whs.osbp@mail.mil; stored whs.smallbusiness@mail.mil not on page"
+        }
       },
       "acquisitionOffice": {
         "name": "WHS Acquisition Directorate",
@@ -2909,8 +3710,15 @@
         "name": "AFLCMC Office of Small Business",
         "director": "AFLCMC Small Business Director",
         "phone": "(937) 255-5437",
-        "email": "aflcmc.sb@us.af.mil",
-        "address": "2275 D Street, Wright-Patterson AFB, OH 45433"
+        "email": "",
+        "address": "2275 D Street, Wright-Patterson AFB, OH 45433",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "not_published",
+          "sourceUrl": "https://www.aflcmc.af.mil/SMALL-BUSINESS-OFFICE/",
+          "withheldEmail": "aflcmc.sb@us.af.mil",
+          "note": "official Small Business Office page reached; no mailbox in page HTML"
+        }
       },
       "acquisitionOffice": {
         "name": "AFLCMC Contracting Directorate",
@@ -2930,7 +3738,13 @@
         "director": "SMC Small Business Director",
         "phone": "(310) 653-3095",
         "email": "smc.sb@spaceforce.mil",
-        "address": "483 N Aviation Blvd, El Segundo, CA 90245"
+        "address": "483 N Aviation Blvd, El Segundo, CA 90245",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.losangeles.spaceforce.mil/About-Us/Fact-Sheets/",
+          "note": "'Access Denied' in an ordinary browser session; not bypassed"
+        }
       },
       "acquisitionOffice": {
         "name": "SMC Contracting Directorate",
@@ -2992,7 +3806,13 @@
         "director": "AFCEC Small Business Director",
         "phone": "(210) 395-8000",
         "email": "afcec.sb@us.af.mil",
-        "address": "2261 Hughes Ave, JBSA-Lackland, TX 78236"
+        "address": "2261 Hughes Ave, JBSA-Lackland, TX 78236",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.afcec.af.mil/Home/AFCEC-Contracting/",
+          "note": "'Access Denied' in an ordinary browser session; not bypassed"
+        }
       },
       "acquisitionOffice": {
         "name": "AFCEC Contracting Directorate",
@@ -3180,7 +4000,13 @@
         "director": "PEO STRI Small Business Director",
         "phone": "(407) 384-3843",
         "email": "usarmy.orlando.peo-stri.mbx.small-business@army.mil",
-        "address": "12350 Research Parkway, Orlando, FL 32826"
+        "address": "12350 Research Parkway, Orlando, FL 32826",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "no_official_sb_page",
+          "sourceUrl": "https://www.peostri.army.mil/doing-business",
+          "note": "page reached (now titled CPE ST3); no small-business link or mailbox"
+        }
       },
       "acquisitionOffice": {
         "name": "PEO STRI Contracting",
@@ -3200,7 +4026,13 @@
         "director": "CECOM Small Business Director",
         "phone": "(443) 395-6405",
         "email": "usarmy.apg.cecom.mbx.small-business@army.mil",
-        "address": "6585 Surveillance Loop, Aberdeen Proving Ground, MD 21005"
+        "address": "6585 Surveillance Loop, Aberdeen Proving Ground, MD 21005",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "no_official_sb_page",
+          "sourceUrl": "https://www.cecom.army.mil/contracting/",
+          "note": "page reached; no small-business link or mailbox"
+        }
       },
       "acquisitionOffice": {
         "name": "CECOM Contracting Center",
@@ -3219,8 +4051,17 @@
         "name": "TACOM Office of Small Business",
         "director": "TACOM Small Business Director",
         "phone": "(586) 282-5890",
-        "email": "usarmy.detroit.tacom.mbx.small-business@army.mil",
-        "address": "6501 E 11 Mile Road, Warren, MI 48397"
+        "email": "usarmy.detroit.tacom.mbx.lcmc-osbp@army.mil",
+        "address": "6501 E 11 Mile Road, Warren, MI 48397",
+        "emailVerified": "2026-11",
+        "contactSourceUrl": "https://tacom.army.mil/osbp",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "different_published",
+          "sourceUrl": "https://tacom.army.mil/osbp",
+          "previousEmail": "usarmy.detroit.tacom.mbx.small-business@army.mil",
+          "note": "official OSBP page publishes a different mailbox; stored ...mbx.small-business@army.mil not on page"
+        }
       },
       "acquisitionOffice": {
         "name": "TACOM Contracting Center",
@@ -3240,7 +4081,13 @@
         "director": "AMCOM Small Business Director",
         "phone": "(256) 842-9675",
         "email": "usarmy.redstone.amcom.mbx.small-business@army.mil",
-        "address": "Building 5681, Redstone Arsenal, AL 35898"
+        "address": "Building 5681, Redstone Arsenal, AL 35898",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "no_official_sb_page",
+          "sourceUrl": "https://www.amcom.army.mil/",
+          "note": "homepage reached; no small-business link or mailbox"
+        }
       },
       "acquisitionOffice": {
         "name": "AMCOM Contracting Center",
@@ -3344,7 +4191,13 @@
         "director": "NSWCDD Small Business Director",
         "phone": "(540) 653-8753",
         "email": "nswcdd_smallbusiness@navy.mil",
-        "address": "17632 Dahlgren Road, Dahlgren, VA 22448"
+        "address": "17632 Dahlgren Road, Dahlgren, VA 22448",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.navsea.navy.mil/Home/Warfare-Centers/NSWC-Dahlgren/Partnerships/Small-Business/",
+          "note": "NAVSEA page returned 'Access Denied' in an ordinary browser session; not bypassed"
+        }
       },
       "acquisitionOffice": {
         "name": "NSWCDD Contracts Department",
@@ -3364,7 +4217,13 @@
         "director": "NSWC Crane Small Business Director",
         "phone": "(812) 854-1631",
         "email": "crane_smallbusiness@navy.mil",
-        "address": "300 Highway 361, Crane, IN 47522"
+        "address": "300 Highway 361, Crane, IN 47522",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.navsea.navy.mil/Home/Warfare-Centers/NSWC-Crane/Partnerships/Small-Business/",
+          "note": "NAVSEA page returned 'Access Denied' in an ordinary browser session; not bypassed"
+        }
       },
       "acquisitionOffice": {
         "name": "NSWC Crane Contracts Department",
@@ -3384,7 +4243,13 @@
         "director": "NSWC Corona Small Business Director",
         "phone": "(951) 273-5201",
         "email": "corona_smallbusiness@navy.mil",
-        "address": "1999 4th Street, Norco, CA 92860"
+        "address": "1999 4th Street, Norco, CA 92860",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.navsea.navy.mil/Home/Warfare-Centers/NSWC-Corona/",
+          "note": "NAVSEA page returned 'Access Denied' in an ordinary browser session; not bypassed"
+        }
       },
       "acquisitionOffice": {
         "name": "NSWC Corona Contracts Department",
@@ -3404,7 +4269,13 @@
         "director": "NUWC Small Business Director",
         "phone": "(401) 832-3573",
         "email": "nuwc_smallbusiness@navy.mil",
-        "address": "1176 Howell Street, Newport, RI 02841"
+        "address": "1176 Howell Street, Newport, RI 02841",
+        "emailAudit": {
+          "checkedAt": "2026-11-17",
+          "status": "unreachable",
+          "sourceUrl": "https://www.navsea.navy.mil/Home/Warfare-Centers/NUWC-Newport/Partnerships/Small-Business/",
+          "note": "NAVSEA page returned 'Access Denied' in an ordinary browser session; not bypassed"
+        }
       },
       "acquisitionOffice": {
         "name": "NUWC Contracts Department",

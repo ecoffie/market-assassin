@@ -23,7 +23,25 @@ export interface SmallBusinessOffice {
    */
   directorVerified?: string;
   phone: string;
+  /** Empty when no mailbox could be confirmed on an official page (see emailAudit). */
   email: string;
+  /** "YYYY-MM" when this exact mailbox was last seen on an official agency page. Absent → unverified. */
+  emailVerified?: string;
+  /** Official page the contact (director / mailbox) was checked against. */
+  contactSourceUrl?: string;
+  /**
+   * Audit record (2026-11-17 placeholder-mailbox audit). `withheldEmail` keeps an address that
+   * was NOT found on a fully read official small-business page. Present in the JSON file only:
+   * stripped when the directory is loaded, so it is never served.
+   */
+  emailAudit?: {
+    checkedAt: string;
+    status: 'published' | 'different_published' | 'not_published' | 'no_official_sb_page' | 'unreachable';
+    sourceUrl: string;
+    previousEmail?: string;
+    withheldEmail?: string;
+    note?: string;
+  };
   address: string;
   /**
    * Set when the contact is a labeled generic fallback, not a directory OSBP.
@@ -33,6 +51,20 @@ export interface SmallBusinessOffice {
 }
 
 export const GENERIC_OSBP_FALLBACK_LABEL = 'Generic fallback';
+
+/**
+ * The directory as served. `emailAudit` (incl. any withheldEmail) is an internal research record:
+ * it stays in the JSON file for history and review, and is stripped here so no route, report or
+ * tool can return a withheld address or audit notes.
+ */
+const DIRECTORY_COMMANDS: Record<string, CommandInfo> = Object.fromEntries(
+  Object.entries(commandInfoData.commands as unknown as Record<string, CommandInfo>).map(([key, info]) => {
+    const { emailAudit: _internal, ...office } = info.smallBusinessOffice ?? ({} as SmallBusinessOffice);
+    void _internal;
+    return [key, { ...info, smallBusinessOffice: office as SmallBusinessOffice }];
+  }),
+);
+
 
 export interface AcquisitionOffice {
   name: string;
@@ -91,7 +123,7 @@ function commandMatchesService(info: CommandInfo, service: string): boolean {
 }
 
 export function getCommandInfo(command: string): CommandInfo | null {
-  const commands = commandInfoData.commands as Record<string, CommandInfo>;
+  const commands = DIRECTORY_COMMANDS;
 
   // Direct match
   if (commands[command]) {
@@ -144,12 +176,12 @@ export function getServiceBranchInfo(branch: string): ServiceBranchInfo | null {
 
 // Get all commands
 export function getAllCommands(): CommandInfo[] {
-  return Object.values(commandInfoData.commands as Record<string, CommandInfo>);
+  return Object.values(DIRECTORY_COMMANDS);
 }
 
 // Get commands by parent agency
 export function getCommandsByParentAgency(parentAgency: string): CommandInfo[] {
-  const commands = commandInfoData.commands as Record<string, CommandInfo>;
+  const commands = DIRECTORY_COMMANDS;
   return parentAgencyCommands(parentAgency, commands);
 }
 
@@ -234,7 +266,7 @@ export function osbpContactForAgency(agency: string): {
   if (!q || !identityKey(q)) {
     return { contact: null, command: null, reason: 'not_established', emailDomainFlag: false };
   }
-  const commands = commandInfoData.commands as Record<string, CommandInfo>;
+  const commands = DIRECTORY_COMMANDS;
   const command = getCommandInfo(q) || getAgencyInfoByParentAgency(q);
   const contact = command?.smallBusinessOffice || null;
   const emailDomainFlag = !!(
@@ -785,7 +817,7 @@ export function isCivilianAgency(parentAgency: string): boolean {
 
 // Get agency info by parent agency name (for civilian agencies)
 export function getAgencyInfoByParentAgency(parentAgency: string): CommandInfo | null {
-  const commands = commandInfoData.commands as Record<string, CommandInfo>;
+  const commands = DIRECTORY_COMMANDS;
 
   // Common abbreviations mapping
   const abbreviationMap: Record<string, string[]> = {
@@ -834,19 +866,19 @@ export function getAgencyInfoByParentAgency(parentAgency: string): CommandInfo |
 
 // Get all civilian agencies
 export function getCivilianAgencies(): CommandInfo[] {
-  const commands = commandInfoData.commands as Record<string, CommandInfo>;
+  const commands = DIRECTORY_COMMANDS;
   return Object.values(commands).filter(cmd => !isDoDAgency(cmd.parentAgency));
 }
 
 // Get all DoD commands
 export function getDoDCommands(): CommandInfo[] {
-  const commands = commandInfoData.commands as Record<string, CommandInfo>;
+  const commands = DIRECTORY_COMMANDS;
   return Object.values(commands).filter(cmd => isDoDAgency(cmd.parentAgency));
 }
 
 // Get commands by sub-agency (e.g., "Department of the Navy" -> NAVFAC, NAVSEA, etc.)
 export function getCommandsBySubAgency(subAgency: string): CommandInfo[] {
-  const commands = commandInfoData.commands as Record<string, CommandInfo>;
+  const commands = DIRECTORY_COMMANDS;
 
   // Map sub-agency names to parent agency for matching
   const subAgencyToParent: Record<string, string> = {
