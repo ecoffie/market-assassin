@@ -23,7 +23,7 @@
  */
 import { resolveChatActingScope, type ChatActingScope } from '@/lib/chat/chat-acting-scope';
 import { extractPdf, extractDocx, extractTxt } from '@/lib/sam/pdf-extract';
-import { detectProhibitedMarkings, markingRefusalMessage, type ProhibitedMarkingKind } from './marking-detect';
+import { detectProhibitedMarkings, docxHeaderFooterText, markingRefusalMessage, type ProhibitedMarkingKind } from './marking-detect';
 import type { DocClass } from './doc-class';
 
 export const VAULT_BUCKET = 'vault-assets';
@@ -166,18 +166,21 @@ export async function saveVaultUpload(input: VaultUploadInput, deps: VaultUpload
   } catch {
     text = '';
   }
+  // 4) Classification / CUI — checked even when the body is empty (a banner may sit
+  //    only in a DOCX header). Refuse before ANY write. DOCX headers/footers (where
+  //    banners live) are dropped by the body extractor, so read them separately.
+  const headerFooter = type.ext === 'docx' ? await docxHeaderFooterText(file.buffer) : '';
+  const verdict = detectProhibitedMarkings({ body: text, headerFooter });
+  if (verdict.blocked && verdict.kind) {
+    console.warn(`[vault/upload] refused ${verdict.kind} marking (source=${input.source}, class=${input.docClass})`);
+    return { ok: false, status: 422, code: 'prohibited_marking', markingKind: verdict.kind, message: markingRefusalMessage(verdict.kind) };
+  }
+
   if (text.trim().length === 0) {
     return {
       ok: false, status: 422, code: 'unreadable',
       message: "Mindy couldn't read any text in this file (it may be a scanned image), so it couldn't be checked and wasn't saved. Upload a text-based PDF, Word or text file.",
     };
-  }
-
-  // 4) Classification / CUI. Refuse before ANY write.
-  const verdict = detectProhibitedMarkings(text);
-  if (verdict.blocked && verdict.kind) {
-    console.warn(`[vault/upload] refused ${verdict.kind} marking (source=${input.source}, class=${input.docClass})`);
-    return { ok: false, status: 422, code: 'prohibited_marking', markingKind: verdict.kind, message: markingRefusalMessage(verdict.kind) };
   }
 
   // 5) Private bucket only.
