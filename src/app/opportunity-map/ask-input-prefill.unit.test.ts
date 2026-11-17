@@ -1,6 +1,6 @@
 /**
  * D7 (Agent 4 live scorecard, 2026-11-16): opening Ask Mindy put the map's search term INTO the question box,
- * so a customer who clicked in and typed sent the two glued together ("hvac servicesFind HVAC opportunities…").
+ * so a customer who clicked in and typed sent the two glued together ("hvac servicesFind HVAC opportunities\u2026").
  * Runs the REAL ASK_MINDY_JS in jsdom and pins the exact string sent: the question in the message is exactly
  * what is in the box — the view term is shown as a hint (placeholder) and reaches the answer through the
  * grounded view preamble, never as typed text.
@@ -21,7 +21,7 @@ function drawerScript(): string {
 function boot(view: Record<string, unknown>) {
   const dom = new JSDOM(
     '<!doctype html><html><body><div id="amkOv"></div><div id="amk" aria-hidden="true"><div id="amkCtx"></div><button id="amkX"></button>'
-    + '<div id="amkBody"></div><div class="amk-foot"><div class="amk-in"><textarea id="amkIn" placeholder="Ask about this view…"></textarea><button id="amkSend"></button></div></div></div></body></html>',
+    + '<div id="amkBody"></div><div class="amk-foot"><div class="amk-in"><textarea id="amkIn" placeholder="Ask about this view\u2026"></textarea><button id="amkSend"></button></div></div></div></body></html>',
     { url: 'https://getmindy.ai/opportunity-map', runScripts: 'outside-only' },
   );
   const w = dom.window as unknown as Record<string, unknown> & Window & { eval: (s: string) => unknown };
@@ -72,12 +72,12 @@ describe('Ask Mindy sends exactly what is in the box (D7)', () => {
     const t = boot(VIEW);
     (t.w.openAskMindy as (s?: string) => void)();
     expect(t.box().value).toBe('');
-    expect(t.box().placeholder).toBe('Ask about “hvac services”…');
+    expect(t.box().placeholder).toBe('Ask about \u201chvac services\u201d\u2026');
     await t.typeAndSend(TYPED);
     expect(question(t.chat[0].message)).toBe(TYPED);
     expect(String(t.chat[0].message)).not.toContain('hvac servicesFind');
     // The view term still grounds the answer, through the preamble (not as the customer's words).
-    expect(String(t.chat[0].message)).toContain('“hvac services”');
+    expect(String(t.chat[0].message)).toContain('\u201chvac services\u201d');
     // The bubble shows the same words that were sent.
     const bubbles = t.w.document.querySelectorAll('.amk-msg.u');
     expect(bubbles[bubbles.length - 1].textContent).toBe(TYPED);
@@ -89,11 +89,36 @@ describe('Ask Mindy sends exactly what is in the box (D7)', () => {
     await t.typeAndSend('');
     expect(question(t.chat[0].message)).toBe('who buys roofing in Texas?');
   });
+  it('a later open without a seed clears text the opener put there', async () => {
+    const t = boot(VIEW);
+    const open = t.w.openAskMindy as (s?: string) => void;
+    open('who buys roofing in Texas?');
+    expect(t.box().value).toBe('who buys roofing in Texas?');
+    open();
+    expect(t.box().value).toBe('');
+    await t.typeAndSend(TYPED);
+    expect(question(t.chat[0].message)).toBe(TYPED);
+  });
+  it('a later open without a seed keeps a draft the customer typed', async () => {
+    const t = boot(VIEW);
+    const open = t.w.openAskMindy as (s?: string) => void;
+    open();
+    t.box().value = 'Which of these are set aside for';
+    open();
+    expect(t.box().value).toBe('Which of these are set aside for');
+    // An opener seed the customer then edited is their draft too.
+    open('who buys roofing');
+    t.box().value = 'who buys roofing in Florida';
+    open();
+    expect(t.box().value).toBe('who buys roofing in Florida');
+    await t.typeAndSend('?');
+    expect(question(t.chat[0].message)).toBe('who buys roofing in Florida?');
+  });
   it('without a search term the default hint is kept', () => {
     const t = boot({ count: 42, scope: 'open', state: 'TX' });
     (t.w.openAskMindy as (s?: string) => void)();
     expect(t.box().value).toBe('');
-    expect(t.box().placeholder).toBe('Ask about this view…');
+    expect(t.box().placeholder).toBe('Ask about this view\u2026');
   });
   it('the greeting has no how-to chip dressed as an action', () => {
     const t = boot(VIEW);

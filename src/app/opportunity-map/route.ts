@@ -11115,13 +11115,20 @@ const ASK_MINDY_JS = `<script>(function(){
   // Public opener (does NOT auto-send). An explicit question (typed in the search bar, then "Ask") goes into the
   // box as the customer's own words. The map's search term only becomes the HINT: it already reaches the answer
   // through the view preamble, and putting it in the box made "click in and type" send the two glued together
-  // ("hvac servicesFind HVAC\u2026", D7, Agent 4 live scorecard 2026-11-16). What is sent = what is in the box.
+  // ("hvac servicesFind HVAC\\u2026", D7, Agent 4 live scorecard 2026-11-16). What is sent = what is in the box.
+  // A later open without a seed clears the box only if it still holds the text the opener itself put there
+  // (openerSeed); a draft the customer typed is kept.
+  var openerSeed='';
   window.openAskMindy=function(seed){
     leaveCard();
     var q=(seed!=null?String(seed):'').trim();
     if(input){
-      if(q){ input.value=q; input.placeholder=viewPlaceholder; }
-      else { var c=viewCtx(), vq=(c&&c.q)?String(c.q).trim():''; input.placeholder=vq?('Ask about \u201c'+vq+'\u201d\u2026'):viewPlaceholder; }
+      if(q){ input.value=q; openerSeed=q; input.placeholder=viewPlaceholder; }
+      else {
+        if(openerSeed&&input.value===openerSeed) input.value='';
+        openerSeed='';
+        var c=viewCtx(), vq=(c&&c.q)?String(c.q).trim():''; input.placeholder=vq?('Ask about \\u201c'+vq+'\\u201d\\u2026'):viewPlaceholder;
+      }
     }
     setOpen(true);
   };
