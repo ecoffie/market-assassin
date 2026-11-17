@@ -73,7 +73,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const title = contractNo
     ? `Contract ${contractNo} — ${recipient}, ${amount} | Mindy`
     : `${recipient} — ${amount} ${agency} Contract Award | Mindy`;
-  const description = `Federal contract ${contractNo}: ${recipient} received ${amount} from ${agency}${award.naics_description ? ` for ${award.naics_description}` : ''}. Action date ${fmtDate(award.action_date)}. View award details, period of performance, and NAICS.`;
+  // The snippet answers the four things a contract-number searcher wants before clicking:
+  // who has it, who bought it, how much, and when it ends (the recompete signal). The end date
+  // is shown only when FPDS reports one — never guessed.
+  const endDate = fmtDate(award.pop_end_date);
+  const endsOn = endDate !== '—' ? ` Ends ${endDate}.` : '';
+  const description = `Contract ${contractNo}: ${recipient}, ${amount} from ${agency}${award.naics_description ? ` for ${award.naics_description}` : ''}.${endsOn} Action date ${fmtDate(award.action_date)}. See the full award, period of performance and recompete timing.`;
 
   return {
     title,

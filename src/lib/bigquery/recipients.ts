@@ -1187,9 +1187,12 @@ export const allAgenciesCacheKey = (rollupUei: string) => `rollup:${rollupUei}:a
 export async function getAllNaicsForRecipient(
   ueis: string[],
   rollupUei: string,
+  liveBq = false,
 ): Promise<TopNaicsRow[]> {
   return queryCached<TopNaicsRow>({
     cacheKey: allNaicsCacheKey(rollupUei),
+    // Pages stay cache-only; only the warm-contractor-pages cron passes liveBq=true.
+    cacheOnly: !liveBq,
     query: `
       SELECT
         naics_code,
@@ -1227,9 +1230,12 @@ export async function getAllNaicsForRecipientWithState(
 export async function getAllAgenciesForRecipient(
   ueis: string[],
   rollupUei: string,
+  liveBq = false,
 ): Promise<TopAgencyRow[]> {
   return queryCached<TopAgencyRow>({
     cacheKey: allAgenciesCacheKey(rollupUei),
+    // Pages stay cache-only; only the warm-contractor-pages cron passes liveBq=true.
+    cacheOnly: !liveBq,
     // Heaviest query on the site (82% of daily BQ scan per
     // INFORMATION_SCHEMA). Two fixes vs. the original:
     //  1) removed the correlated `WITH totals` subquery that scanned
