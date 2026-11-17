@@ -30,15 +30,24 @@ export default function TrialOfferBanner({ email }: { email: string | null }) {
     try { localStorage.setItem(KEY, String(Date.now())); } catch { /* ignore */ }
     setShow(false);
   };
+  // The WHOLE strip is one link (owner: "completely clickable"); the hide button sits beside it, not
+  // inside it, so it stays a real button. Solid brand blue + white text: the strongest thing on the page.
   return (
-    <div data-testid="trial-offer-banner" className="shrink-0 border-b border-[#cfe1ff] bg-[#eff5ff] px-4 md:px-6 py-2.5 flex flex-wrap items-center gap-3">
-      <span className="h-8 w-8 shrink-0 rounded-lg bg-[#006aff] text-white inline-flex items-center justify-center" aria-hidden><Sparkles className="h-5 w-5" /></span>
-      <div className="min-w-[220px] flex-1">
-        <p className="text-[15px] font-semibold text-[#111c26]">Try Mindy Pro free for 14 days</p>
-        <p className="text-sm text-[#3a4654]">AI briefings, recompetes 12 months out, full market research and the proposal editor. $0 today, cancel anytime.</p>
-      </div>
-      <a href={trialBannerHref(email)} className="h-9 px-4 rounded-lg bg-[#006aff] hover:bg-[#0057d1] text-white text-sm font-semibold inline-flex items-center">Start free trial</a>
-      <button type="button" onClick={dismiss} aria-label="Hide this for now" className="h-9 w-9 rounded-lg inline-flex items-center justify-center text-[#5a6675] hover:bg-white">
+    <div data-testid="trial-offer-banner" className="shrink-0 flex items-stretch bg-[#006aff] text-white shadow-[0_2px_8px_rgba(0,106,255,.35)]">
+      <a
+        href={trialBannerHref(email)}
+        className="group flex-1 min-w-0 flex flex-wrap items-center gap-x-4 gap-y-2 px-4 md:px-6 py-3 hover:bg-[#0057d1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-white transition-colors"
+      >
+        <span className="h-9 w-9 shrink-0 rounded-lg bg-white/15 inline-flex items-center justify-center" aria-hidden><Sparkles className="h-5 w-5" /></span>
+        <span className="min-w-[220px] flex-1">
+          <span className="block text-base font-bold leading-snug">Try Mindy Pro free for 14 days</span>
+          <span className="block text-sm text-white">AI briefings, recompetes 12 months out, full market research and the proposal editor. $0 today, cancel anytime.</span>
+        </span>
+        <span className="h-10 px-5 rounded-lg bg-white text-[#005ee0] text-sm font-bold inline-flex items-center gap-1.5 shadow-sm group-hover:bg-[#eff5ff]">
+          Start free trial <span aria-hidden>→</span>
+        </span>
+      </a>
+      <button type="button" onClick={dismiss} aria-label="Hide this for now" className="w-12 shrink-0 inline-flex items-center justify-center text-white/80 hover:text-white hover:bg-[#0057d1] border-l border-white/20">
         <X className="h-4 w-4" />
       </button>
     </div>
