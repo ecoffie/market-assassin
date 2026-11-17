@@ -249,6 +249,7 @@ Tool-use rules:
 - A tool result with ok:false and an error_category (state "unavailable") means that data COULD NOT BE RETRIEVED. Say the lookup was unavailable or not permitted from chat. NEVER describe it as "none", "no contracts", or zero.
 - Filters cover the whole request. get_expiring_contracts accepts several NAICS codes and several states comma-separated in ONE call: when the user names several kinds of work or several states, pass them all there (for example "janitorial and landscaping" -> naics "561720,561730"; "VA, MD and DC" -> state "VA,MD,DC"). Other tools take ONE NAICS code and ONE state per call unless their own description says they accept lists: call them once per code or state instead of joining values. Never drop part of what the user asked for.
 - Expiring-contract records are rendered for the user by the system from the tool data (every record, or a stated page with the total). When the user asks to continue a list (for example "show expiring records 21 to 40"), call get_expiring_contracts again with exactly the same filters as the previous search plus display_offset = the first requested record number minus 1. Never present a subset as the full list.
+- Buying-office lists show 10 offices at a time. When the user asks for more (for example "show offices 11 to 20" or "the next 10"), call get_buying_offices again with exactly the same filters plus display_offset = the first requested office number minus 1.
 - Only pass search filters the user stated or clearly implied. A city, metro or installation the user named implies its state ("Memphis" means TN): pass that state. Never add a state, agency, NAICS or date range they did not name or imply; the server removes a state the conversation does not imply.
 - Is a contract still active / who replaced it: call search_past_contracts ONCE with include_status=true plus a keyword from the description in formal wording ("identification card", not "ID card"), the agency and the state implied by the place (or piid_prefix / the number the user gave). Report each status_checks entry: status, the end date and the successor result: name each candidate with its evidence, or say "checked, none found" and what was checked. Do not ask the user for a contract number first.
 - If a result has _meta.lag_note, say the data is current through that date and recent awards may not be published yet. Never say no award was made.
@@ -1042,7 +1043,7 @@ export async function POST(request: NextRequest) {
                 const renderers: Record<string, (p: Record<string, unknown>) => RenderedRecords | null> = {
                   [EXPIRING_TOOL]: (p) => renderExpiringRecords(p, { offset: displayOffsets.get(r.tool_call_id) ?? 0, relevancePhrases: capabilityPhrases, requestedLabels: capabilityLabels }),
                   [PAST_CONTRACTS_TOOL]: renderStatusChecks,
-                  [BUYING_OFFICES_TOOL]: renderBuyingOffices,
+                  [BUYING_OFFICES_TOOL]: (p) => renderBuyingOffices(p, { offset: displayOffsets.get(r.tool_call_id) ?? 0 }),
                   [PRICING_TOOL]: renderPricing,
                   [KEYWORDS_TOOL]: renderKeywords,
                   [VEHICLE_MIX_TOOL]: renderVehicleMix,

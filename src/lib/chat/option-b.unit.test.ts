@@ -47,15 +47,17 @@ describe('R11: region-wide work is never presented as specific to the office\'s 
     const expiring = renderExpiringRecords({ contracts: recs, expiring_orders_in_window: [], _meta: { total: recs.length } }, { requestedLabels: ['security guards'] })!;
     expect(expiring.ids).not.toContain('70RFP426FRE700022'); // not on the shown page
     crossCheckOffices([offices, expiring]);
-    expect(offices.text).toMatch(/PLACE NOTE: FPS EAST CCG DIV 4 ACQ DIV \(70RFP4\): for its award 70RFP426FRE700022 \(listed above for this office\), its own description says the work is "THROUGHOUT THE SOUTHERN BORDER", so it is not limited to one city/);
+    expect(offices.text).toMatch(/PLACE NOTE: FPS East CCG DIV 4 ACQ DIV \(70RFP4\): for its award 70RFP426FRE700022 \(listed above for this office\), its own description says the work is "THROUGHOUT THE SOUTHERN BORDER", so it is not limited to one city/);
     expect(offices.text).not.toMatch(/\b(CA|AZ|NM)\b/);
     expect(offices.text).toMatch(/not a limit on where this work happens/);
     expect(offices.text).not.toMatch(/San-Antonio-specific/);
   });
   it('a shown row carries the qualifier inline', () => {
     const r = renderExpiringRecords({ contracts: [{ piid: 'A1', description: desc, place_of_performance_state: 'TX', period_of_performance_current_end: '2027-01-01', total_obligation: 5 }], expiring_orders_in_window: [], _meta: { total: 1 } })!;
-    expect(r.text).toMatch(/A1 · .* · note: its own description says the work is "THROUGHOUT THE SOUTHERN BORDER", so it is not limited to one city/);
-    expect(r.text).not.toMatch(/A1 · [^\n]*CHECK/);
+    // The row is in the table; its qualifier is the note line for row 1 directly under the table.
+    expect(r.text).toMatch(/^\| 1\. A1 \|/m);
+    expect(r.text).toMatch(/^- \*\*1\.\*\* note: its own description says the work is "THROUGHOUT THE SOUTHERN BORDER", so it is not limited to one city/m);
+    expect(r.text).not.toMatch(/^- \*\*1\.\*\*[^\n]*CHECK/m);
   });
   it('no office qualifier without evidence (award not in any list)', () => {
     const offices = { tool: 'get_buying_offices', text: 'offices', total: 1, retrieved: 1, from: 1, to: 1, shown: 1, exhaustive: true, ids: [], allowedCounts: [], standalone: 0, orders: 0, officeExamples: [{ office: 'X (X1)', ids: ['Z9'] }] } as RenderedRecords;
