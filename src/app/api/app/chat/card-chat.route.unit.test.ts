@@ -603,6 +603,44 @@ describe('plain /app chat: the notice the user named (scorecard 2026-11-16, C1/C
     expect(cites?.sources?.[0]).toMatchObject({ doc_type: 'sam_notice', url: 'https://sam.gov/opp/x/view', document_id: null, source_path: `sam_notice:${NID}` });
   });
 
+  it('sticky chip: a notice from an EARLIER turn stays as context but is not cited when the answer did not use it', async () => {
+    state.answer = 'The top janitorial buyers in Florida are the VA and the Coast Guard.';
+    const { events } = await post({ message: 'Who are the top janitorial buyers in Florida?', history: [
+      { role: 'user', content: 'Tell me about solicitation W912PL26Q0042' }, { role: 'assistant', content: 'It is open.' },
+    ] });
+    expect(system(state.answerMessages[0])).toContain('MENTIONED OPPORTUNITY');
+    const cites = events.find((e) => e.type === 'citations') as { sources?: unknown[] } | undefined;
+    expect(cites?.sources).toEqual([]);
+    // The saved copy (what a reload shows) carries no chip either.
+    const rows = state.inserts.filter((i) => i.table === 'mindy_chat_messages').flatMap((i) => (Array.isArray(i.row) ? i.row : [i.row])) as Array<Record<string, unknown>>;
+    const assistant = rows.filter((r) => r.role === 'assistant');
+    expect(assistant.length).toBeGreaterThan(0);
+    expect(assistant.at(-1)!.cited_sources).toEqual([]);
+  });
+
+  it('sticky chip: an earlier-turn notice the answer DID use ("email the CO") keeps its SAM.gov chip', async () => {
+    state.answer = 'Here is a draft to jane.buyer@usace.army.mil about W912PL26Q0042.';
+    const { events } = await post({ message: 'Email the contracting officer for me', history: [
+      { role: 'user', content: 'Tell me about solicitation W912PL26Q0042' }, { role: 'assistant', content: 'It is open.' },
+    ] });
+    const cites = events.find((e) => e.type === 'citations') as { sources?: Array<Record<string, unknown>> } | undefined;
+    expect(cites?.sources?.[0]).toMatchObject({ doc_type: 'sam_notice' });
+  });
+
+  it('sticky chip pin: an ATTACHED notice keeps its chip even when the answer does not quote it', async () => {
+    state.answer = 'Plenty of small businesses bid on work like this.';
+    const { events } = await post({ message: 'Is this a good fit for a small business?', context: { kind: 'opportunity', notice_id: NID } });
+    const cites = events.find((e) => e.type === 'citations') as { sources?: Array<Record<string, unknown>> } | undefined;
+    expect(cites?.sources?.[0]).toMatchObject({ doc_type: 'sam_notice', source_path: `sam_notice:${NID}` });
+  });
+
+  it('sticky chip pin: a notice named in THIS message keeps its chip even when the answer does not quote it', async () => {
+    state.answer = 'Plenty of small businesses bid on work like this.';
+    const { events } = await post({ message: 'Is W912PL26Q0042 a good fit for a small business?' });
+    const cites = events.find((e) => e.type === 'citations') as { sources?: Array<Record<string, unknown>> } | undefined;
+    expect(cites?.sources?.[0]).toMatchObject({ doc_type: 'sam_notice' });
+  });
+
   it('an id that appears only in an assistant answer never attaches a notice', async () => {
     await post({ message: 'Which one should I start with?', history: [{ role: 'user', content: 'Find janitorial work' }, { role: 'assistant', content: 'Open now: W912PL26Q0042 …' }] });
     expect(system(state.answerMessages[0])).not.toContain('MENTIONED OPPORTUNITY');

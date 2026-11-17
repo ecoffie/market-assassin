@@ -83,7 +83,7 @@ import {
   CARD_CHAT_TOOLS, buildOpportunityContextBlock,
 } from '@/lib/chat/card-chat';
 import { SELECTED_NOTICE_COLUMNS, loadSelectedNoticeFacts, formatSelectedNoticeFacts, type SelectedNoticeRecord } from '@/lib/chat/selected-notice';
-import { resolveMentionedNotice, type MentionedNoticeResult } from '@/lib/chat/mentioned-notice';
+import { resolveMentionedNotice, answerUsesNotice, type MentionedNoticeResult } from '@/lib/chat/mentioned-notice';
 import { abilityOneCaveat } from '@/lib/chat/category-caveats';
 import { parseTurnId, claimCardTurn, completeCardTurn, failCardTurn, type ClaimResult } from '@/lib/chat/card-chat-turns';
 
@@ -1230,7 +1230,13 @@ export async function POST(request: NextRequest) {
           turnTrace.notices.push('truncated');
           send({ type: 'truncated', message: 'This answer hit its length limit and was cut off. Ask Mindy to continue, or narrow the question.' });
         }
-        const citedSources: CitedSource[] = cardContext
+        // A notice carried over from an EARLIER turn stays as context (so "Email the contracting officer" still
+        // works), but the SAM.gov chip is shown only if this answer actually used it. Otherwise every later,
+        // unrelated answer was cited to that notice, and the saved copy kept the wrong chip on reload.
+        const staleMention = noticeOrigin === 'mentioned' && mentionedNotice?.status === 'resolved'
+          && mentionedNotice.notice.fromEarlierTurn && !answerUsesNotice(assistantContent, cardRecord);
+        if (staleMention) turnTrace.notices.push('mentioned_notice:chip_dropped_unused');
+        const citedSources: CitedSource[] = cardContext && !staleMention
           ? [{ title: cardContext.source.label, url: cardContext.source.url, doc_type: 'sam_notice', source_path: cardRecord ? `sam_notice:${cardRecord.notice_id}` : null, document_id: null }]
           : [];
         send({ type: 'citations', sources: citedSources });

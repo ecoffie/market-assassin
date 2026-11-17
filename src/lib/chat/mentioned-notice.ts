@@ -136,3 +136,30 @@ export async function resolveMentionedNotice(db: Db, message: string, history: M
   }
   return { status: 'none' };
 }
+
+type NoticeCitable = { notice_id?: string | null; solicitation_number?: string | null; title?: string | null; points_of_contact?: unknown };
+
+/**
+ * Did this answer actually USE the notice? Agent 4 (2026-11-17, PLAUSIBLE): a notice named turns ago stays as
+ * context for every later turn, so an unrelated answer ("top janitorial buyers in Florida") was still cited to
+ * that notice on SAM.gov, and the wrong chip came back on reload. Evidence of use is something only the notice
+ * gives the answer: its solicitation number, its notice id, one of its contact emails, or its full title.
+ * Conservative: a follow-up that names none of these ("Email the contracting officer" answered with the CO's
+ * email) still counts, because the email is there.
+ */
+export function answerUsesNotice(answer: string, rec: NoticeCitable | null | undefined): boolean {
+  if (!rec) return false;
+  const text = String(answer || '').toLowerCase();
+  if (!text.trim()) return false;
+  const needles: string[] = [];
+  if (rec.solicitation_number) needles.push(String(rec.solicitation_number));
+  if (rec.notice_id) needles.push(String(rec.notice_id));
+  const title = String(rec.title || '').trim();
+  if (title.length >= 12) needles.push(title);
+  if (Array.isArray(rec.points_of_contact)) {
+    for (const p of rec.points_of_contact as Array<{ email?: unknown }>) {
+      if (p && typeof p.email === 'string' && p.email.includes('@')) needles.push(p.email);
+    }
+  }
+  return needles.some((n) => n.trim() && text.includes(n.trim().toLowerCase()));
+}
