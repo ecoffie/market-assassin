@@ -31,7 +31,7 @@ import { resolveVaultWriteOwner, saveVaultUpload } from '@/lib/vault/upload';
 import {
   isVaultChatDocumentsEnabled, countSessionDocuments, listChatDocuments, archiveChatDocument,
   MAX_DOCS_PER_SESSION, type ChatDocsDb,
-} from '@/lib/documents/chat-store';
+} from '@/lib/vault/chat-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

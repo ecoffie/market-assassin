@@ -5,8 +5,12 @@
 -- are now rows in user_boilerplate_docs, told apart by doc_class.
 --
 -- ⚠️ NOT APPLIED. Committed for review. Applying it needs Eric's approval of the
--- production migration plan: `npm run migrate` (dry run) → `npm run migrate -- --go`
--- → verify the columns through PostgREST (`npm run db:check -- user_boilerplate_docs doc_class`).
+-- production migration plan: `npm run migrate -- --only 20261117_vault_doc_class.sql` (dry run)
+-- → `npm run migrate -- --go --only 20261117_vault_doc_class.sql` (never a bare `--go`: it would
+-- also apply other pending files) → verify the columns through PostgREST
+-- (`npm run db:check -- user_boilerplate_docs doc_class`).
+-- Rollback: supabase/rollbacks/20261117_vault_doc_class.down.sql (refuses while reference/generated
+-- rows exist; tested in src/lib/vault/vault-doc-class-migration.prod-schema.pglite.unit.test.ts).
 --
 -- Additive and idempotent:
 --   * every column is NULLABLE with no default, so no existing row is rewritten

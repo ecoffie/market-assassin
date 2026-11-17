@@ -11204,7 +11204,7 @@ const ASK_MINDY_JS = `<script>(function(){
     var aEl=addMsg('assistant',''); var bub=aEl.querySelector('.bub');
     bub.innerHTML='<span class="amk-typing"><i></i><i></i><i></i></span>';
     busy=true; if(send)send.disabled=true; clearFollowups();
-    var acc='', started=false, gotDone=false, gotError=false;
+    var acc='', started=false, gotDone=false, gotError=false, ledger=null;
     // Prepend the grounded view context to the MESSAGE (not shown to the user) so the answer
     // is about "these"/"here" — the map\\u2019s real filters + count, never fabricated.
     // Card chat sends NO view preamble: the server supplies the opportunity from its own record.
@@ -11250,6 +11250,7 @@ const ASK_MINDY_JS = `<script>(function(){
           parts.forEach(function(p){ var line=p.split('\\n').filter(function(l){return l.indexOf('data:')===0;}).map(function(l){return l.slice(5).trim();}).join(''); if(!line)return;
             var ev; try{ ev=JSON.parse(line); }catch(e){ return; }
             if(ev.type==='session'){ sessionId=ev.sessionId||sessionId; }
+            else if(ev.type==='sources'){ ledger=(ev.ledger&&typeof ev.ledger==='object')?ev.ledger:null; }
             else if(ev.type==='token'){ if(!started){ bub.textContent=''; started=true; } acc+=(ev.content||''); paint(bub,acc); body.scrollTop=body.scrollHeight; }
             // citations event is now always empty (RAG corpus removed 2026-08-02) \\u2014 ignored.
             else if(ev.type==='error'){ gotError=true; if(!started)bub.textContent=(ev.message||'Something went wrong.'); }
@@ -11267,7 +11268,7 @@ const ASK_MINDY_JS = `<script>(function(){
           if(turnId&&!gotDone){ if(oppCtx===cardAtSend){ offerRetry(acc?'The connection dropped before the answer finished.':'The connection dropped before the answer arrived.'); } release(); body.scrollTop=body.scrollHeight; return; }
           if(turnId&&oppCtx===cardAtSend){ pendingTurn=null; }
           if(!started&&!acc&&!gotError)bub.textContent='Mindy had no answer for that \\u2014 try rephrasing.';
-          if(!(turnId&&gotError&&!acc)){ history.push({role:'user',content:q}); history.push({role:'assistant',content:acc}); }
+          if(!(turnId&&gotError&&!acc)){ history.push({role:'user',content:q}); history.push(ledger?{role:'assistant',content:acc,sources:ledger}:{role:'assistant',content:acc}); }
           saveCard(); if(acc)paint(bub,acc); if(acc&&!oppCtx)followups(aEl,q,acc); busy=false; if(send)send.disabled=false; body.scrollTop=body.scrollHeight; }
         return pump().catch(function(){ if(turnId){ if(oppCtx===cardAtSend)offerRetry('The connection dropped before the answer finished.'); release(); return; } bub.textContent='Connection failed. Check your network and try again.'; release(); });
       })

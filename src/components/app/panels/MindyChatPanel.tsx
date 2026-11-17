@@ -27,6 +27,7 @@ import { DEFAULT_STARTER_PROMPTS } from '@/lib/chat/starter-prompts';
 import { renderSafeMarkdown } from '@/lib/chat/safe-markdown';
 import { startProposalFromNotice } from '@/lib/chat/start-proposal';
 import { CHAT_HANDOFF_KEY, parseChatHandoff, opportunityContextField, type AttachedOpportunity } from '@/lib/chat/chat-handoff';
+import { customerText } from '@/lib/chat/view-preamble';
 
 interface MindyChatPanelProps {
   email: string | null;
@@ -44,6 +45,17 @@ interface CitedSource {
   document_id: string | null;
 }
 
+/**
+ * Where a citation chip goes. A Knowledge Base doc opens the KB; a SAM.gov notice (doc_type 'sam_notice') is
+ * NEVER a KB doc, even when an older saved answer carries its notice id in document_id: it opens its SAM.gov
+ * link (review on #2106: the chip opened the Knowledge Base on a non-KB id).
+ */
+export function citationTarget(c: Pick<CitedSource, 'doc_type' | 'url' | 'document_id'>): 'kb' | 'url' | 'none' {
+  if (c.document_id && c.doc_type !== 'sam_notice') return 'kb';
+  if (c.url) return 'url';
+  return 'none';
+}
+
 interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -53,6 +65,8 @@ interface ChatMessage {
   errored?: boolean;
   followups?: string[]; // contextual "what next?" chips, fetched after the answer completes
   notices?: string[];   // server notices: data tools unavailable, a lookup failed, answer cut off
+  /** P3: the compact source ledger returned with this answer; re-sent with history so "#12" resolves. */
+  ledger?: unknown;
 }
 
 
@@ -184,7 +198,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
     const historyForServer = messages
       .filter(m => !m.errored)
       .slice(-6)
-      .map(m => ({ role: m.role, content: m.content }));
+      .map(m => ({ role: m.role, content: m.content, ...(m.role === 'assistant' && m.ledger ? { sources: m.ledger } : {}) }));
 
     const userMsg: ChatMessage = {
       id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -264,6 +278,10 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
               finalContent += evt.content;
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id ? { ...m, content: m.content + evt.content } : m
+              ));
+            } else if (evt.type === 'sources' && evt.ledger && typeof evt.ledger === 'object') {
+              setMessages(prev => prev.map(m =>
+                m.id === assistantMsg.id ? { ...m, ledger: evt.ledger } : m
               ));
             } else if (evt.type === 'citations' && Array.isArray(evt.sources)) {
               setMessages(prev => prev.map(m =>
@@ -632,14 +650,16 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                   )}
                   <div className={`text-[14.5px] leading-relaxed ${msg.errored ? 'text-red-300' : msg.role === 'user' ? 'text-slate-100' : 'text-slate-200'}`}>
                     {msg.content
-                      ? renderMessageContent(msg.content, msg.role === 'assistant' && !msg.errored)
+                      // A Map conversation's user turn carries the Map view preamble for the model; the
+                      // bubble shows only what the customer typed (history still sends msg.content as stored).
+                      ? renderMessageContent(msg.role === 'user' ? customerText(msg.content) : msg.content, msg.role === 'assistant' && !msg.errored)
                       : msg.isStreaming
                         ? <span className="text-faint italic">Thinking…</span>
                         : null}
                   </div>
                   {msg.role === 'assistant' && !!msg.citations?.length && !msg.isStreaming && (
                     <div className="mt-3 pt-3 border-t border-surface/50">
-                      <div className="text-[10px] font-semibold tracking-wider text-faint mb-1.5">DOCUMENTS REFERENCED</div>
+                      <div className="text-[10px] font-semibold tracking-wider text-faint mb-1.5">SOURCES</div>
                       <div className="flex flex-wrap gap-1.5">
                         {msg.citations.slice(0, 6).map((c, i) => {
                           const label = c.title.slice(0, 50) + (c.title.length > 50 ? '…' : '');
@@ -648,7 +668,8 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                           // lands on the real, searchable doc — not a dead end.
                           // Falls back to the inline drawer if navigation isn't
                           // wired.
-                          if (c.document_id) {
+                          const target = citationTarget(c);
+                          if (target === 'kb' && c.document_id) {
                             return (
                               <button
                                 key={i}
@@ -663,7 +684,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                             );
                           }
                           // External URL (podcast libsyn) — open in new tab
-                          if (c.url) {
+                          if (target === 'url' && c.url) {
                             return (
                               <a
                                 key={i}

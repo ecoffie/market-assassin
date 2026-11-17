@@ -246,3 +246,42 @@ describe('narrowing allow-list (Opportunity Map card chat)', () => {
     expect(make().offeredToolDefs().length).toBeGreaterThan(makeNarrow().offeredToolDefs().length);
   });
 });
+
+describe('A7: timeouts and the round deadline', () => {
+  function timed(ms: number) {
+    return createChatToolExecutor({
+      userEmail: 'u@example.com', chatSessionId: null, tier0, deps: { runMcpTool, logCall }, toolTimeoutMs: () => ms,
+    });
+  }
+  it('a tool that never resolves is reported failed with tool_timeout, never as an empty result', async () => {
+    runMcpTool.mockImplementation(() => new Promise(() => {}));
+    const [r] = await timed(20).executeRound([call('get_expiring_contracts', { naics: '541512' })], planner);
+    expect(r.record).toMatchObject({ status: 'failed', error_category: 'tool_timeout' });
+    expect(JSON.parse(r.content)).toMatchObject({ ok: false, state: 'unavailable', error_category: 'tool_timeout' });
+  });
+  it('a timed-out WRITE is reported as unknown, not as done or not done', async () => {
+    runMcpTool.mockImplementation(() => new Promise(() => {}));
+    const [r] = await timed(20).executeRound([call('schedule_market_search', { naics: '541512', cadence: 'weekly', name: 'x' })], planner);
+    expect(r.record).toMatchObject({ status: 'failed', error_category: 'tool_timeout' });
+    expect(JSON.parse(r.content).message).toMatch(/may still complete/);
+  });
+  it('a cancelled turn refuses every remaining call before it starts', async () => {
+    runMcpTool.mockClear();
+    let cancelled = false;
+    runMcpTool.mockImplementation(async () => { cancelled = true; return { result: { ok: true }, credits: 0 }; });
+    const out = await make().executeRound([call('get_expiring_contracts', { naics: '541512' }, 'a'), call('schedule_market_search', { naics: '541512', cadence: 'weekly', name: 'x' }, 'b')], planner, { isCancelled: () => cancelled });
+    expect(runMcpTool).toHaveBeenCalledTimes(1);
+    expect(out[1].record).toMatchObject({ status: 'blocked_policy', error_category: 'turn_cancelled' });
+  });
+  it('calls after the round deadline are refused and never started', async () => {
+    runMcpTool.mockClear();
+    const out = await make().executeRound([call('get_expiring_contracts', { naics: '541512' })], planner, { deadlineAt: Date.now() - 1 });
+    expect(runMcpTool).not.toHaveBeenCalled();
+    expect(out[0].record).toMatchObject({ status: 'blocked_policy', error_category: 'round_deadline_exceeded' });
+  });
+  it('without a timeout option, behavior is unchanged (a slow tool still completes)', async () => {
+    runMcpTool.mockImplementation(async () => { await new Promise((r) => setTimeout(r, 30)); return { result: { ok: true }, credits: 0 }; });
+    const [r] = await make().executeRound([call('get_expiring_contracts', { naics: '541512' })], planner);
+    expect(r.record.status).toBe('success');
+  });
+});
