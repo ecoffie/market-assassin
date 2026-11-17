@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 // @ts-expect-error — plain .mjs script, no type declarations
-import { auditClaudeMd, ROOT_BUDGET_CHARS } from '../../../scripts/audit-claude-md.mjs';
+import { auditClaudeMd, ROOT_BUDGET_CHARS, extractInflightLikeHook } from '../../../scripts/audit-claude-md.mjs';
 
 const repo = path.resolve(__dirname, '../../..');
 const read = (p: string) => { try { return fs.readFileSync(path.join(repo, p), 'utf8'); } catch { return null; } };
@@ -37,5 +37,17 @@ describe('instruction cleanup: no rule is silently lost', () => {
     expect(rules).not.toContain('Use `npm run deploy` (runs tests first)');
     expect(rules).toContain('[Release control 2026-11-17]');
     expect(read('docs/agents/release-and-worktrees.md')).toContain('Builders never run it');
+  });
+
+  it('the SessionStart hook extraction returns the full In-flight section from the root', () => {
+    const lines: string[] = extractInflightLikeHook(read('CLAUDE.md')!);
+    expect(lines.length).toBeGreaterThan(100);
+    expect(lines[0]).toMatch(/^## In-flight work — READ THIS FIRST/);
+  });
+
+  it('moving the In-flight heading out of the root fails the audit (the hook would inject nothing)', () => {
+    const moved = (p: string) => (p === 'CLAUDE.md' ? read(p)!.replace('## In-flight work — READ THIS FIRST', '## In flight') : read(p));
+    const f: string[] = auditClaudeMd({ read: moved, exists });
+    expect(f.some((x) => x.includes('SessionStart'))).toBe(true);
   });
 });

@@ -78,7 +78,7 @@
   {
    "kind": "heading",
    "text": "## In-flight work — READ THIS FIRST before re-deriving anything",
-   "location": "docs/agents/current-state.md",
+   "location": "CLAUDE.md",
    "status": "moved"
   },
   {
@@ -529,85 +529,85 @@
   {
    "kind": "warning",
    "text": "- ⛔ Migration `20260929_pooled_team_credits.sql` is NOT applied and the one Team subscriber is NOT migrated; each needs Eric's approval (runbook §11). Apply with `--only`, never bare `--go`.",
-   "location": "docs/agents/current-state.md",
+   "location": "CLAUDE.md",
    "status": "moved"
   },
   {
    "kind": "warning",
    "text": "- ⛔ No public pricing/copy change and no `POOLED_PLAN_DEFAULTS` change until Eric approves the seat-and-credit proposal (private repo `ecoffie/govcon-proposals`, `mindy-pricing/`).",
-   "location": "docs/agents/current-state.md",
+   "location": "CLAUDE.md",
    "status": "moved"
   },
   {
    "kind": "warning",
    "text": "- ⚠️ A client abort does NOT cancel the PostgREST/Postgres statement (`authenticator` statement_timeout=8s), so every duplicate round is real DB load. Remove duplicates at the source; never rely on the abort.",
-   "location": "docs/agents/current-state.md",
+   "location": "CLAUDE.md",
    "status": "moved"
   },
   {
    "kind": "warning",
    "text": "- ⚠️ Building your market is CSS-revealed from the SERVER HTML (`.app mfb-booting`, 300 ms opacity animation) — never",
-   "location": "docs/agents/current-state.md",
+   "location": "CLAUDE.md",
    "status": "moved"
   },
   {
    "kind": "warning",
    "text": "- ⚠️ Measure Maps timing with NATIVE arm64 Chrome (`arch -arm64 … --remote-debugging-port`). Node here is x64, so",
-   "location": "docs/agents/current-state.md",
+   "location": "CLAUDE.md",
    "status": "moved"
   },
   {
    "kind": "warning",
    "text": "- ⚠️ A USER ACTION supersedes in-flight work AT ONCE (`_actionNow()` bumps `_fetchGen`) — the dispatch now yields a",
-   "location": "docs/agents/current-state.md",
+   "location": "CLAUDE.md",
    "status": "moved"
   },
   {
    "kind": "warning",
    "text": "- ⚠️ Mark stale with INLINE writes + composited VEILS (z 450, over the map pane, under every control). Measured:",
-   "location": "docs/agents/current-state.md",
+   "location": "CLAUDE.md",
    "status": "moved"
   },
   {
    "kind": "warning",
    "text": "- ⚠️ `npm run migrate -- --go` applies EVERY pending file. `20260924_saved_search_forecast_watermark.sql` (#1683) is",
-   "location": "docs/agents/current-state.md",
+   "location": "CLAUDE.md",
    "status": "moved"
   },
   {
    "kind": "warning",
    "text": "- ⛔ Do not fix Maps/saved-search search locally — migrate the consumer. The **cross-surface gate**",
-   "location": "docs/agents/current-state.md",
+   "location": "CLAUDE.md",
    "status": "moved"
   },
   {
    "kind": "warning",
    "text": "- ⚠️ **DIRECT_MATCH needs BUY-SIDE evidence** (`match-evidence.ts`). A holder-name-only hit is `HOLDER_SIGNAL`;",
-   "location": "docs/agents/current-state.md",
+   "location": "CLAUDE.md",
    "status": "moved"
   },
   {
    "kind": "warning",
    "text": "- ⚠️ **The cursor is `sam_opportunities.created_at`, never `posted_date`.** 34,906 notices",
-   "location": "docs/agents/current-state.md",
+   "location": "CLAUDE.md",
    "status": "moved"
   },
   {
    "kind": "warning",
    "text": "- ⚠️ **Registered + enabled + firing on time ≠ working.** The first scheduled fire **401'd**:",
-   "location": "docs/agents/current-state.md",
+   "location": "CLAUDE.md",
    "status": "moved"
   },
   {
    "kind": "warning",
    "text": "- ⚠️ **`source` / `source_table` on `federal_contacts` are column DEFAULTS**, not provenance. The",
-   "location": "docs/agents/current-state.md",
+   "location": "CLAUDE.md",
    "status": "moved"
   },
   {
    "kind": "warning",
    "text": "- ⛔ While parked: do NOT wire SBIR.gov, expand SBIR coverage, investigate DARPA, repair NSF, add DIBBS monitoring, change grant retention, dedupe grant populations, change sync schedules, or add specialty feeds.",
-   "location": "docs/agents/current-state.md",
+   "location": "CLAUDE.md",
    "status": "moved"
   },
   {
