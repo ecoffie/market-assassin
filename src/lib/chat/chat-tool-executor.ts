@@ -108,6 +108,8 @@ export const LOG_TIMEOUT_MS = 5_000;
 export interface RoundOptions {
   /** Epoch ms after which no further call in this round starts, and running calls are cut off. */
   deadlineAt?: number;
+  /** True once the turn has ended for the customer (watchdog): no further call starts, writes included. */
+  isCancelled?: () => boolean;
 }
 
 /** Registry tools that read the acting user's Vault (bound to the acting scope in chat). */
@@ -260,6 +262,14 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
       await log(planner, name, 'blocked_policy', executionId, { errorCategory: 'round_budget_exceeded' });
       return done('blocked_policy', 'not_evaluated', 'round_budget_exceeded',
         refusal('round_budget_exceeded', `Only ${MAX_CALLS_PER_ROUND} lookups run per step; this one was skipped. Do not treat it as an empty result.`));
+    }
+
+    // 1a) Turn cancelled (A7 watchdog): the customer has already been told the turn timed out, so nothing
+    // further may run on their behalf — above all no write.
+    if (round.isCancelled?.()) {
+      await log(planner, name, 'blocked_policy', executionId, { errorCategory: 'turn_cancelled' });
+      return done('blocked_policy', 'not_evaluated', 'turn_cancelled',
+        refusal('turn_cancelled', 'The turn ended before this lookup could run, so it did not run.'));
     }
 
     // 1b) Round deadline (A7): once the round's time is spent, later calls are refused, never started.

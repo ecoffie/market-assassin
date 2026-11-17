@@ -18,6 +18,7 @@ const h = vi.hoisted(() => ({
   loadBidderProfile: vi.fn(async () => ({})),
   failCardTurn: vi.fn(async () => {}),
   claimCardTurn: vi.fn(),
+  recordLlmUsage: vi.fn(async () => {}),
   table: '',
   record: null as Record<string, unknown> | null,
 }));
@@ -37,7 +38,7 @@ vi.mock('@/lib/api-auth', () => ({ verifyUserOwnsEmail: vi.fn(async (_r: unknown
 vi.mock('@/lib/access/resolve-access', () => ({ hasProAccess: vi.fn(async () => true) }));
 vi.mock('@/lib/entitlements/shadow', () => ({ shadowEntitlement: vi.fn() }));
 vi.mock('@/lib/proposal/loaders', () => ({ loadBidderProfile: h.loadBidderProfile, formatProfileForPrompt: () => '' }));
-vi.mock('@/lib/llm/usage-cost', () => ({ isUserOverBudget: vi.fn(async () => false), recordLlmUsage: vi.fn(async () => {}) }));
+vi.mock('@/lib/llm/usage-cost', () => ({ isUserOverBudget: vi.fn(async () => false), recordLlmUsage: h.recordLlmUsage }));
 vi.mock('@/lib/chat/provider-events', () => ({ recordProviderEvent: vi.fn(async () => {}) }));
 vi.mock('@/lib/chat/mentioned-notice', () => ({ resolveMentionedNotice: vi.fn(async () => ({ status: 'none' })), answerUsesNotice: () => false }));
 vi.mock('@/lib/chat/card-chat-turns', () => ({
@@ -72,6 +73,7 @@ beforeEach(() => {
   h.runMcpTool.mockReset();
   h.runMcpTool.mockResolvedValue({ result: { ok: true, agency: 'Department of Energy', pain_points: ['grid'], _meta: { grounded: true, degraded: false, result_state: 'known', ignored_args: [] } }, credits: 0 });
   h.failCardTurn.mockClear();
+  h.recordLlmUsage.mockClear();
   h.claimCardTurn.mockReset();
   h.record = null;
   h.loadBidderProfile.mockReset();
@@ -185,6 +187,35 @@ describe('A7: timeouts — a hang never silently ends the response', () => {
     const ev = await ask('hello');
     expect(types(ev).slice(-2)).toEqual(['error', 'done']);
     expect(ev.find((e) => e.type === 'error')!.code).toBe('turn_timeout');
+  });
+});
+
+describe('LOW-1: nothing runs after the customer has seen the timeout', () => {
+  it('a planner slower than the turn deadline runs no tool (not even a write) and sends no answer request', async () => {
+    process.env.CHAT_TURN_DEADLINE_MS = '300';
+    process.env.CHAT_PLANNER_TIMEOUT_MS = '5000';
+    plan.planner = () => new Promise((r) => setTimeout(() => r(plannerResponse([
+      { name: 'schedule_market_search', args: { naics: '541512', cadence: 'weekly', name: 'x' } },
+    ])), 600));
+    const ev = await ask('Set up a weekly search for 541512');
+    expect(types(ev).slice(-2)).toEqual(['error', 'done']);
+    expect(ev.find((e) => e.type === 'error')!.code).toBe('turn_timeout');
+    // The route keeps running in the background: let the late planner response land.
+    await new Promise((r) => setTimeout(r, 700));
+    expect(h.runMcpTool).not.toHaveBeenCalled();
+    expect(fetchCalls.filter((c) => c.kind === 'answer')).toHaveLength(0);
+  });
+});
+
+describe('LOW-2: answer usage is recorded even when the watchdog cuts the stream', () => {
+  it('records the chat answer usage on a watchdog cut', async () => {
+    process.env.CHAT_TURN_DEADLINE_MS = '400';
+    process.env.CHAT_ANSWER_IDLE_TIMEOUT_MS = '5000';
+    plan.answer = async () => stallingAnswerStream(['Partial ']);
+    const ev = await ask('hello');
+    expect(types(ev).slice(-2)).toEqual(['error', 'done']);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(h.recordLlmUsage).toHaveBeenCalledWith(expect.objectContaining({ tool: 'chat', provider: 'openai' }));
   });
 });
 

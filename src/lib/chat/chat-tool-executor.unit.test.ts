@@ -265,6 +265,14 @@ describe('A7: timeouts and the round deadline', () => {
     expect(r.record).toMatchObject({ status: 'failed', error_category: 'tool_timeout' });
     expect(JSON.parse(r.content).message).toMatch(/may still complete/);
   });
+  it('a cancelled turn refuses every remaining call before it starts', async () => {
+    runMcpTool.mockClear();
+    let cancelled = false;
+    runMcpTool.mockImplementation(async () => { cancelled = true; return { result: { ok: true }, credits: 0 }; });
+    const out = await make().executeRound([call('get_expiring_contracts', { naics: '541512' }, 'a'), call('schedule_market_search', { naics: '541512', cadence: 'weekly', name: 'x' }, 'b')], planner, { isCancelled: () => cancelled });
+    expect(runMcpTool).toHaveBeenCalledTimes(1);
+    expect(out[1].record).toMatchObject({ status: 'blocked_policy', error_category: 'turn_cancelled' });
+  });
   it('calls after the round deadline are refused and never started', async () => {
     runMcpTool.mockClear();
     const out = await make().executeRound([call('get_expiring_contracts', { naics: '541512' })], planner, { deadlineAt: Date.now() - 1 });

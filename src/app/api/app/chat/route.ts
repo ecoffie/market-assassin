@@ -531,6 +531,8 @@ export async function POST(request: NextRequest) {
       // A7: the turn watchdog fired: error + done were sent and the card turn released.
       let turnTimedOut = false;
       let answerAbort: AbortController | null = null;
+      // The answer stream's reader, so the watchdog can end a pending read even if the abort is not honored.
+      let answerReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
       // A client that disconnected makes enqueue/close throw. That must never be mistaken for a
       // tool failure (it would inject a "tools unavailable" note after a completed write), and it
       // must never skip cost recording or persistence: both are wrapped and never throw.
@@ -551,6 +553,7 @@ export async function POST(request: NextRequest) {
         turnTimedOut = true;
         console.error('[chat] turn deadline reached after', deadlines.turnMs, 'ms');
         try { answerAbort?.abort(new ChatTimeoutError('turn', deadlines.turnMs)); } catch { /* already done */ }
+        void answerReader?.cancel().catch(() => {});
         send({ type: 'error', code: 'turn_timeout', message: customerErrorMessage('turn_timeout') });
         send({ type: 'done' });
         closeStream();
@@ -720,6 +723,13 @@ export async function POST(request: NextRequest) {
         const notify = (code: string, text: string) => {
           turnTrace.notices.push(code);
           send({ type: 'notice', code, message: text });
+        };
+        // Usage is recorded once per step, including on paths the watchdog cut short (review LOW-2).
+        let plannerUsageRecorded = false;
+        const recordPlannerUsage = () => {
+          if (plannerUsageRecorded || !toolProvider) return;
+          plannerUsageRecorded = true;
+          void recordLlmUsage({ userEmail: auth.email, tool: 'chat_tool_round', provider: toolProvider, model: toolModel, usage: toolUsageForCost || undefined });
         };
         let plannerUnavailable = false;
         // Index of an assistant tool_calls turn whose results have not all been appended yet.
@@ -907,7 +917,10 @@ export async function POST(request: NextRequest) {
                 for (const n of notes?.applied ?? []) scopeApplied.add(n);
                 for (const n of notes?.unapplied ?? []) scopeUnapplied.add(n);
               }
-              const results = await executor.executeRound(toolCalls.filter((tc) => keepIds.has(tc.id)), { provider: first.provider, model: first.model }, { deadlineAt: Date.now() + deadlines.toolRoundBudgetMs });
+              // A7 (review LOW-1): a planner that answered after the watchdog fired runs nothing — the customer
+              // has already seen "took too long". Each call re-checks too (isCancelled), so a write never starts late.
+              if (turnTimedOut) { recordPlannerUsage(); return; }
+              const results = await executor.executeRound(toolCalls.filter((tc) => keepIds.has(tc.id)), { provider: first.provider, model: first.model }, { deadlineAt: Date.now() + deadlines.toolRoundBudgetMs, isCancelled: () => turnTimedOut });
               // B2: the model sees a BOUNDED copy of each result (structural shortening with a
               // shown-of-total report); the renderers below still read the full r.content.
               const perResultCap = perResultBudget(results.length);
@@ -1001,9 +1014,9 @@ export async function POST(request: NextRequest) {
           });
         }
         // Log the tool-round LLM spend separately (fire-and-forget).
-        if (toolProvider) {
-          void recordLlmUsage({ userEmail: auth.email, tool: 'chat_tool_round', provider: toolProvider, model: toolModel, usage: toolUsageForCost || undefined });
-        }
+        recordPlannerUsage();
+        // A7 (review LOW-1): no answer request after the watchdog ended the turn.
+        if (turnTimedOut) return;
         // ── end Tier-0 tool round ──
         if (renderedRecords.length) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1148,7 +1161,14 @@ export async function POST(request: NextRequest) {
         let tokensUsed: number | null = null;
         // Full usage object (prompt/completion split) for cost attribution.
         let usageForCost: { prompt_tokens?: number; completion_tokens?: number } | null = null;
+        let answerUsageRecorded = false;
+        const recordAnswerUsage = () => {
+          if (answerUsageRecorded) return;
+          answerUsageRecorded = true;
+          void recordLlmUsage({ userEmail: auth.email, tool: 'chat', provider: usedProvider, model: usedModel, usage: usageForCost || undefined });
+        };
         const reader = groqRes.body.getReader();
+        answerReader = reader;
         const decoder = new TextDecoder();
         let leftover = '';
         let finishReason: string | null = null;
@@ -1218,7 +1238,7 @@ export async function POST(request: NextRequest) {
           }
           notify('answer_incomplete', 'Mindy stopped responding partway through this answer, so it is incomplete. Please try again.');
         }
-        if (turnTimedOut) return;
+        if (turnTimedOut) { recordAnswerUsage(); return; }
 
         // Emit citations after the response completes. v2 (May 31): no
         // longer parse inline [→ X] markers from the response — those
@@ -1356,13 +1376,7 @@ export async function POST(request: NextRequest) {
 
         // Cost attribution — this route calls the LLM provider directly (bypasses
         // callLLM), so log usage explicitly. Fire-and-forget; never throws.
-        void recordLlmUsage({
-          userEmail: auth.email,
-          tool: 'chat',
-          provider: usedProvider,
-          model: usedModel,
-          usage: usageForCost || undefined,
-        });
+        recordAnswerUsage();
 
         // Fire-and-forget persistence (no await — don't block response close)
         const latencyMs = Date.now() - startedAt;
