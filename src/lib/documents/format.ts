@@ -28,33 +28,83 @@ export function formatCell(v: CellValue, format: ColumnFormat = 'text'): string 
 /** Drop a trailing ".0" / ".00" so $30.0M reads $30M and $1.50B reads $1.5B. */
 const trimZeros = (x: string) => x.replace(/\.0+$/, '').replace(/(\.\d*[1-9])0+$/, '$1');
 
-/** Client-ready dollars: $1.93B · $412.5M · $5.25M · $850K · $12.5K · $31.40. Never a raw 412500000. */
-export function formatUsd(v: number): string {
+const USD_TIERS: Array<[number, string]> = [[1e9, 'B'], [1e6, 'M'], [1e3, 'K']];
+
+/** Natural precision for a compact dollar figure: 2 decimals under 10 (of its unit), 1 under 100, 0 above. */
+function usdNaturalDecimals(abs: number): number {
+  for (const [div] of USD_TIERS) {
+    if (abs >= div) {
+      const n = abs / div;
+      if (div === 1e3) return n >= 100 ? 0 : 1;
+      return n >= 10 ? 1 : 2;
+    }
+  }
+  return abs % 1 === 0 ? 0 : 2;
+}
+
+/**
+ * Client-ready dollars: $1.93B · $412.5M · $5.25M · $850K · $12.5K · $31.40. Never a raw 412500000.
+ * With `decimals`, every compact figure uses exactly that precision (one column, one precision).
+ */
+export function formatUsd(v: number, decimals?: number): string {
   const abs = Math.abs(v);
   const sign = v < 0 ? '-' : '';
-  if (abs >= 1e9) return `${sign}$${trimZeros((abs / 1e9).toFixed(abs >= 1e10 ? 1 : 2))}B`;
-  if (abs >= 1e6) return `${sign}$${trimZeros((abs / 1e6).toFixed(abs >= 1e7 ? 1 : 2))}M`;
-  if (abs >= 1e3) return `${sign}$${trimZeros((abs / 1e3).toFixed(abs >= 1e5 ? 0 : 1))}K`;
+  for (const [div, unit] of USD_TIERS) {
+    if (abs >= div) {
+      const n = (abs / div).toFixed(decimals ?? usdNaturalDecimals(abs));
+      return `${sign}$${decimals === undefined ? trimZeros(n) : n}${unit}`;
+    }
+  }
   return `${sign}$${abs.toFixed(abs % 1 === 0 ? 0 : 2)}`;
 }
 
+/** The one precision a set of compact dollar figures should share: the most any of them needs (max 2). */
+export function usdColumnDecimals(values: Array<number | null | undefined>): number {
+  let d = 0;
+  for (const v of values) {
+    if (typeof v !== 'number' || Math.abs(v) < 1e3) continue;
+    const natural = trimZeros(formatUsd(v).replace(/[^\d.]/g, ''));
+    d = Math.max(d, natural.includes('.') ? natural.split('.')[1].length : 0);
+  }
+  return Math.min(d, 2);
+}
+
+/** Format a whole table column consistently ($151.0M beside $412.5M, never $151M). */
+export function formatColumn(values: CellValue[], format: ColumnFormat = 'text'): string[] {
+  if (format !== 'usd') return values.map((v) => formatCell(v, format));
+  const d = usdColumnDecimals(values.map((v) => (typeof v === 'number' ? v : null)));
+  return values.map((v) => (typeof v === 'number' && Math.abs(v) >= 1e3 ? formatUsd(v, d) : formatCell(v, format)));
+}
+
 /** A chart value in the chart's declared format; with none, large numbers still get separators. */
-export function formatChartValue(v: number, format?: 'usd' | 'int' | 'pct'): string {
-  if (format === 'usd') return formatUsd(v);
+export function formatChartValue(v: number, format?: 'usd' | 'int' | 'pct', usdDecimals?: number): string {
+  if (format === 'usd') return formatUsd(v, usdDecimals);
   if (format === 'pct') return `${trimZeros((v * 100).toFixed(1))}%`;
   if (format === 'int' || Math.abs(v) >= 1e4) return Math.round(v).toLocaleString('en-US');
   return Number.isInteger(v) ? String(v) : v.toFixed(1);
 }
 
 /**
- * Prose safety net: a raw "$412500000" becomes "$412.5M" and a bare run of 7+ digits gets
- * separators (30000000 → 30,000,000). Leaves years, NAICS codes (6 digits), already-separated
- * numbers, decimals and anything glued to letters or hyphens (PIIDs, UEIs, IDs) alone.
+ * Prose safety net. A raw "$412500000" becomes "$412.5M". A bare 7+ digit run gets separators ONLY
+ * when it is plainly a quantity — a quantity word right after it ("30000000 dollars", "1250000 square
+ * feet") or a quantity lead-in before it ("a total of", "about", "roughly", "over") — and never when an
+ * identifier word precedes it (DUNS, UEI, PIID, IDIQ, contract, order, number, no., #, ZIP, phone, tel,
+ * call, account, ID) or it starts with 0. Identifiers are text, not numbers: "DUNS 080053272" must keep
+ * its leading zero (A4 MED-1).
  */
+const QUANTITY_AFTER = /^\s+(?:dollars|usd|obligations|people|persons|users|employees|staff|square feet|sq\.? ?ft|acres|units|hours|contracts|awards|records|transactions|visits|students|veterans|beneficiaries|patients|miles|gallons|pounds|tons)\b/i;
+const QUANTITY_BEFORE = /(?:\btotal(?: of)?|\babout|\bapproximately|\broughly|\bover|\bnearly|\balmost|\bmore than|\bless than|\bfewer than|\bup to)\s+$/i;
+const ID_BEFORE = /(?:\b(?:DUNS|UEI|PIID|IDIQ|CAGE|contract|order|number|no\.|account|acct|ID|ZIP(?:\+4)?|phone|tel|fax|call|notice|solicitation|ref(?:erence)?)|#)\s*:?\s*$/i;
+
 export function formatProseNumbers(text: string): string {
   return text
     .replace(/\$(\d{4,})(?![\d,.]*\d)/g, (_m, d: string) => formatUsd(Number(d)))
-    .replace(/(?<![\w$.,-])(\d{7,})(?![\w.,-]*\d|[A-Za-z-])/g, (_m, d: string) => Number(d).toLocaleString('en-US'));
+    .replace(/(?<![\w$.,#-])([1-9]\d{6,})(?![\w.,-]*\d|[A-Za-z-])/g, (m, d: string, offset: number, whole: string) => {
+      const before = whole.slice(Math.max(0, offset - 30), offset);
+      const after = whole.slice(offset + m.length, offset + m.length + 30);
+      if (ID_BEFORE.test(before)) return m;
+      return QUANTITY_AFTER.test(after) || QUANTITY_BEFORE.test(before) ? Number(d).toLocaleString('en-US') : m;
+    });
 }
 
 export type InlineRun = { text: string; bold?: boolean; italic?: boolean };

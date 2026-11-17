@@ -149,6 +149,16 @@ const NEVER_ASSUMPTION_PARTS: RegExp[] = [
   // Contract awards and who won.
   /\b(?:awarded|contract awards?|award (?:of|to)|won (?:the|a|an|this|that|it|its)|winner of|(?:was|were|been) awarded)\b/i,
 ];
+// A CITED statement of a measured market figure is an observation — a fact — not an assumption
+// ("no vendor appears to hold more than about 5% of obligations [1]"). An assumption about the market
+// is forward-looking (a projection from the evidence), so it carries a projection word.
+const PROJECTION = /\b(?:likely|unlikely|will|would|could|may|might|expect\w*|forecast\w*|project(?:ed|ion|ions|s)?|anticipat\w*|at the current pace|if|should|estimate[sd]?|plan(?:ned|ning)?)\b/i;
+
+/** A cited assumption that reports a measured market figure without projecting it: mislabeled. */
+export function citedObservationAsAssumption(u: { claim?: string; cites?: string[]; text: string }, sourceIds: Set<string>): boolean {
+  return u.claim === 'assumption' && (u.cites ?? []).some((c) => sourceIds.has(c)) && assumptionAssertsFact(u.text) && !PROJECTION.test(u.text.replace(/\*\*|_/g, ''));
+}
+
 export function neverAnAssumption(text: string): boolean {
   const plain = text.replace(/\*\*|_/g, '');
   return NEVER_ASSUMPTION_PARTS.some((re) => re.test(plain));
@@ -180,28 +190,36 @@ export function hardenedAssumptions(prev: DocModel, next: DocModel): string[] {
   return out;
 }
 
-// ── No per-section boilerplate (Eric, 2026-11-17) ────────────────────────────────────────────────
-// Method text belongs ONCE, in the 'about' section ("Method and limitations"); claim-specific
-// qualifications stay next to their claims. A long sentence repeated in two or more blocks is
-// boilerplate: the validator refuses it and demotion keeps only the first occurrence.
+// ── Per-section boilerplate: a SIGNAL for the producer, not a rule (A4 MED-2) ────────────────────
+// Method text belongs once, in the 'about' section. But a long sentence repeated across blocks is
+// not reliably boilerplate: a cited fact can be true of two bullets ("No forecast has been published
+// by this office in the last 24 months"), and a qualification belongs next to EACH claim it qualifies.
+// The engine therefore never refuses or cuts on repetition — silently deleting a cited fact is worse
+// than a repeated sentence. repeatedSentences() reports UNCITED repeats across different sections so
+// the producer (the generate tool's retry) can rewrite them; cited units are never reported.
 const BOILERPLATE_MIN_CHARS = 60;
 const sentencesOf = (t: string) => t.replace(/\*\*|_/g, '').split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter(Boolean);
 const sentenceKey = (x: string) => x.replace(/\s+/g, ' ').toLowerCase();
 
-/** Long sentences that appear in more than one block (block ids in reading order). */
+/** Long sentences repeated in uncited units across two or more sections (unit locations, reading order). */
 export function repeatedSentences(model: DocModel): Array<{ sentence: string; where: string[] }> {
-  const seen = new Map<string, { sentence: string; where: string[] }>();
-  for (const sec of model.sections) for (const b of sec.blocks) for (const u of labeledUnits(b)) {
+  const ids = new Set(model.sources.map((x) => x.id));
+  const seen = new Map<string, { sentence: string; where: string[]; sections: Set<string> }>();
+  for (const sec of model.sections) for (const b of sec.blocks) {
     if (b.type === 'table' || b.type === 'chart') continue;
-    for (const x of new Set(sentencesOf(u.text))) {
-      if (x.length < BOILERPLATE_MIN_CHARS) continue;
-      const k = sentenceKey(x);
-      const e = seen.get(k) ?? { sentence: x, where: [] };
-      e.where.push(u.where);
-      seen.set(k, e);
+    for (const u of labeledUnits(b)) {
+      if ((u.cites ?? []).some((c) => ids.has(c))) continue;
+      for (const x of new Set(sentencesOf(u.text))) {
+        if (x.length < BOILERPLATE_MIN_CHARS) continue;
+        const k = sentenceKey(x);
+        const e = seen.get(k) ?? { sentence: x, where: [], sections: new Set<string>() };
+        e.where.push(u.where);
+        e.sections.add(sec.id);
+        seen.set(k, e);
+      }
     }
   }
-  return [...seen.values()].filter((e) => e.where.length > 1);
+  return [...seen.values()].filter((e) => e.sections.size > 1).map(({ sentence, where }) => ({ sentence, where }));
 }
 
 /** Must this unit cite a source, given its label? (recommendation: any figure; assumption: a factual claim) */
@@ -366,6 +384,9 @@ export function validateDocModel(input: unknown): ValidationResult {
               ? `an assumption may state a planning figure, but a factual claim (an award, obligation, ceiling, incumbent, date, or a count of buyers, vendors or contracts) must cite its source (${u.where})`
               : `a recommendation that states a count or amount must cite its source (${u.where})`);
           }
+          if (citedObservationAsAssumption(u, sourceIds)) {
+            add(`${bp}`, `a cited measurement of the market is a fact, not an assumption (${u.where}); label it fact (an assumption about the market projects from the evidence)`);
+          }
           if (u.claim === 'assumption' && neverAnAssumption(u.text)) {
             add(`${bp}`, `certifications, contract awards, past performance and eligibility/set-aside status can never be an assumption (${u.where}); label it fact and cite a source, or omit it`);
           }
@@ -388,11 +409,6 @@ export function validateDocModel(input: unknown): ValidationResult {
     });
   }
   if (blockCount > DOC_LIMITS.maxBlocks) add('sections', `more than ${DOC_LIMITS.maxBlocks} blocks`);
-  if (Array.isArray((input as { sections?: unknown }).sections) && issues.length === 0) {
-    for (const r of repeatedSentences(input as unknown as DocModel)) {
-      add('sections', `repeated boilerplate in ${r.where.join(', ')}: "${r.sentence.slice(0, 80)}${r.sentence.length > 80 ? '…' : ''}" — state method text once in the 'about' section and keep qualifications next to their claims`);
-    }
-  }
   if (chars > DOC_LIMITS.maxTotalChars) add('sections', `more than ${DOC_LIMITS.maxTotalChars} characters of content`);
 
   return issues.length ? { ok: false, issues } : { ok: true, model: input as unknown as DocModel };
@@ -441,6 +457,10 @@ export function demoteUncitedFacts(model: DocModel): DemotionResult {
     // Never an assumption: cited or not, it is omitted — never relabeled a fact (assumptions do not
     // harden) and never shown as unverified (these topics cite or are left out).
     if (u.claim === 'assumption' && neverAnAssumption(text)) { omitted.push(where); return null; }
+    // Mislabeled cited observation: OMITTED, never relabeled — an assumption never becomes a fact
+    // (Eric's rule 3; hardenedAssumptions would refuse that on a revision). The producer's retry is
+    // where it gets relabeled fact, before demotion runs.
+    if (citedObservationAsAssumption({ claim: u.claim, cites: u.cites, text }, ids)) { omitted.push(where); return null; }
     const mustCite =
       u.claim === 'fact' || u.claim === undefined ||
       labelNeedsSource(u.claim, text) ||
@@ -459,32 +479,7 @@ export function demoteUncitedFacts(model: DocModel): DemotionResult {
     const { origin: _origin, ...rest } = withoutCites(u);
     return { ...rest, claim: 'unverified' } as T;
   };
-  // Per-section boilerplate: keep the first occurrence of a repeated long sentence, drop the rest.
-  const firstSeen = new Set<string>();
-  const dedupe = <T extends { text?: string }>(u: T): T | null => {
-    if (typeof u.text !== 'string') return u;
-    const kept = sentencesOf(u.text).filter((x) => {
-      if (x.length < BOILERPLATE_MIN_CHARS) return true;
-      const k = sentenceKey(x);
-      if (firstSeen.has(k)) return false;
-      firstSeen.add(k);
-      return true;
-    });
-    if (!kept.length) return null;
-    return kept.join(' ') === sentencesOf(u.text).join(' ') ? u : { ...u, text: kept.join(' ') };
-  };
-  const deduped = model.sections.map((sec) => ({
-    ...sec,
-    blocks: sec.blocks.flatMap((b): Block[] => {
-      if (b.type === 'bullets') {
-        const items = b.items.map((it) => dedupe(it)).filter((it): it is NonNullable<typeof it> => it !== null);
-        return items.length ? [{ ...b, items }] : [];
-      }
-      if (b.type === 'paragraph' || b.type === 'callout') { const d = dedupe(b); return d ? [d as Block] : []; }
-      return [b];
-    }),
-  }));
-  const sections = deduped.map((sec) => ({
+  const sections = model.sections.map((sec) => ({
     ...sec,
     blocks: sec.blocks.flatMap((b): Block[] => {
       const about = sec.role === 'about';

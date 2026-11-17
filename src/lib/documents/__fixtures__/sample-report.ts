@@ -125,8 +125,8 @@ export const SAMPLE_REPORT: DocModel = {
           ],
           rows: vendors,
         },
-        { type: 'callout', id: 'comp-c1', tone: 'warning', claim: 'assumption', origin: 'This is how to read the ranking, not a measured win rate.', text: 'Vendor rankings reflect obligations, not win rates. A firm with fewer, larger awards can rank above a firm that wins more often.' },
-        { type: 'paragraph', id: 'comp-p2', claim: 'assumption', cites: ['s1'], text: 'The market is moderately fragmented: no vendor appears to hold more than about 5% of obligations.' },
+        { type: 'callout', id: 'comp-c1', tone: 'note', claim: 'fact', cites: ['s1'], text: 'Vendor rankings reflect obligations, not win rates. A firm with fewer, larger awards can rank above a firm that wins more often.' },
+        { type: 'paragraph', id: 'comp-p2', claim: 'fact', cites: ['s1'], text: 'The market is moderately fragmented: no vendor appears to hold more than about 5% of obligations.' },
       ],
     },
     {

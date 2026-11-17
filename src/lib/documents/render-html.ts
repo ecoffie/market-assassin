@@ -8,7 +8,7 @@
  */
 import type { Block, Claim, DocModel, TableBlock } from './model';
 import { chartToSvg } from './charts';
-import { assumptionOrigin, citationIndex, citeMarker, claimClass, claimLabel, claimsPresent, formatCell, formatDocDate, parseInline, unverifiedStatements } from './format';
+import { assumptionOrigin, citationIndex, citeMarker, claimClass, claimLabel, claimsPresent, formatColumn, formatDocDate, parseInline, unverifiedStatements } from './format';
 
 /**
  * The document page may load nothing but itself: no scripts, no network, no frames; only its own
@@ -99,11 +99,12 @@ function labelChip(claim: Claim | undefined): string {
 
 function tableHtml(b: TableBlock, marker: string): string {
   const head = b.columns.map((c) => `<th class="${c.align === 'right' || ['usd', 'int', 'pct'].includes(c.format ?? '') ? 'num' : ''}">${escapeHtml(c.label)}</th>`).join('');
+  const cells = b.columns.map((c) => formatColumn(b.rows.map((r) => r[c.key] ?? null), c.format));
   const body = b.rows
-    .map((r) => `<tr>${b.columns
-      .map((c) => {
+    .map((r, ri) => `<tr>${b.columns
+      .map((c, ci) => {
         const v = r[c.key] ?? null;
-        const txt = formatCell(v, c.format);
+        const txt = cells[ci][ri];
         const num = c.align === 'right' || ['usd', 'int', 'pct'].includes(c.format ?? '');
         return `<td class="${[num ? 'num' : '', v === null ? 'na' : ''].filter(Boolean).join(' ')}">${escapeHtml(txt)}</td>`;
       })

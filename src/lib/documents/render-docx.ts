@@ -32,7 +32,7 @@ import {
   WidthType,
 } from 'docx';
 import type { Block, ChartBlock, DocModel, TableBlock, TableColumn } from './model';
-import { assumptionOrigin, chartShownByAdjacentTable, citationIndex, citeMarker, claimLabel, claimsPresent, formatCell, formatChartValue, formatDocDate, parseInline, unverifiedStatements } from './format';
+import { assumptionOrigin, chartShownByAdjacentTable, citationIndex, citeMarker, claimLabel, claimsPresent, formatColumn, formatChartValue, formatDocDate, usdColumnDecimals, parseInline, unverifiedStatements } from './format';
 
 const NAVY = '1E3A8A';
 const INK = '1F2937';
@@ -102,7 +102,7 @@ function bodyCell(text: string, opts: { right: boolean; na: boolean; zebra: bool
  */
 function columnWidths(columns: TableColumn[], rows: TableBlock['rows']): number[] {
   const want = columns.map((c) => {
-    const longest = Math.max(c.label.length, ...rows.map((r) => formatCell(r[c.key] ?? null, c.format).length));
+    const longest = Math.max(c.label.length, ...formatColumn(rows.map((r) => r[c.key] ?? null), c.format).map((x) => x.length));
     return isNumCol(c) ? Math.min(Math.max(longest, 8), 16) : Math.min(Math.max(longest, 6), 42);
   });
   const total = want.reduce((a, b) => a + b, 0);
@@ -113,6 +113,7 @@ function columnWidths(columns: TableColumn[], rows: TableBlock['rows']): number[
 
 function table(columns: TableColumn[], rows: TableBlock['rows']): Table {
   const widths = columnWidths(columns, rows);
+  const cells = columns.map((c) => formatColumn(rows.map((r) => r[c.key] ?? null), c.format));
   return new Table({
     width: { size: CONTENT_DXA, type: WidthType.DXA },
     columnWidths: widths,
@@ -122,7 +123,7 @@ function table(columns: TableColumn[], rows: TableBlock['rows']): Table {
         cantSplit: true,
         children: columns.map((c, ci) => {
           const v = r[c.key] ?? null;
-          return bodyCell(formatCell(v, c.format), { right: isNumCol(c), na: v === null, zebra: i % 2 === 1, width: widths[ci] });
+          return bodyCell(cells[ci][i], { right: isNumCol(c), na: v === null, zebra: i % 2 === 1, width: widths[ci] });
         }),
       })),
     ],
@@ -154,9 +155,10 @@ function chartAsTable(b: ChartBlock): Table {
   // document ($30M, 1,234), never raw (30000000).
   const valueHeader = (name: string) => (b.yLabel && b.series.length === 1 ? `${name} (${b.yLabel})` : name);
   const columns: TableColumn[] = [{ key: 'x', label: b.xLabel || 'Category' }, ...b.series.map((s, i) => ({ key: `s${i}`, label: valueHeader(s.name), align: 'right' as const }))];
+  const usdDecimals = usdColumnDecimals(b.series.flatMap((s) => s.points.map((p) => p.y)));
   const rows = b.series[0].points.map((p, pi) => {
     const row: Record<string, string | number | null> = { x: p.x };
-    b.series.forEach((s, si) => { const y = s.points[pi]?.y; row[`s${si}`] = y === undefined || y === null ? null : formatChartValue(y, b.valueFormat); });
+    b.series.forEach((s, si) => { const y = s.points[pi]?.y; row[`s${si}`] = y === undefined || y === null ? null : formatChartValue(y, b.valueFormat, usdDecimals); });
     return row;
   });
   return table(columns, rows);

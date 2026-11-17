@@ -6,7 +6,7 @@
  * when there is more than one series, direct value labels, no gridline clutter.
  */
 import type { ChartBlock } from './model';
-import { formatChartValue } from './format';
+import { formatChartValue, usdColumnDecimals } from './format';
 
 const INK = '#1f2937';
 const MUTED = '#6b7280';
@@ -19,10 +19,13 @@ function esc(s: string): string {
 }
 
 /** Axis/value labels: compact, and in the chart's format ($412.5M when valueFormat is 'usd'). */
-function label(n: number, format?: ChartBlock['valueFormat']): string {
-  if (format === 'usd' || format === 'pct') return formatChartValue(n, format);
+function label(n: number, format?: ChartBlock['valueFormat'], usdDecimals?: number): string {
+  if (format === 'usd' || format === 'pct') return formatChartValue(n, format, usdDecimals);
   return compact(n);
 }
+
+/** One precision for every dollar label on a chart ($22.0M beside $22.5M). */
+const chartUsdDecimals = (chart: ChartBlock) => usdColumnDecimals(chart.series.flatMap((s) => s.points.map((p) => p.y)));
 
 function compact(n: number): string {
   const a = Math.abs(n);
@@ -75,7 +78,7 @@ function barSvg(chart: ChartBlock, width: number): string {
       const w = Math.max(v > 0 ? 1 : 0, v * scale);
       const y = gy + si * barH;
       parts.push(`<rect x="${labelW}" y="${y}" width="${w.toFixed(1)}" height="${barH - 3}" rx="2" fill="${multi ? SERIES[si % SERIES.length] : PRIMARY}"/>`);
-      parts.push(`<text x="${labelW + w + 5}" y="${y + barH - 6}" font-size="10.5" fill="${MUTED}">${label(v, chart.valueFormat)}</text>`);
+      parts.push(`<text x="${labelW + w + 5}" y="${y + barH - 6}" font-size="10.5" fill="${MUTED}">${label(v, chart.valueFormat, chartUsdDecimals(chart))}</text>`);
     });
   });
   parts.push(`<line x1="${labelW}" y1="${top - 4}" x2="${labelW}" y2="${height - 6 - valueTitleH}" stroke="${AXIS}"/>`);
@@ -104,7 +107,7 @@ function lineSvg(chart: ChartBlock, width: number): string {
     const v = min + (span * t) / 4;
     const y = yAt(v);
     parts.push(`<line x1="${left}" y1="${y.toFixed(1)}" x2="${width - right}" y2="${y.toFixed(1)}" stroke="${t === 0 ? AXIS : '#f1f5f9'}"/>`);
-    parts.push(`<text x="${left - 6}" y="${(y + 4).toFixed(1)}" font-size="10" text-anchor="end" fill="${MUTED}">${label(v, chart.valueFormat)}</text>`);
+    parts.push(`<text x="${left - 6}" y="${(y + 4).toFixed(1)}" font-size="10" text-anchor="end" fill="${MUTED}">${label(v, chart.valueFormat, chartUsdDecimals(chart))}</text>`);
   }
   // Label spacing from the labels' real width, so adjacent labels ("FY26 Q3" / "FY26 Q4") never
   // overlap: ~6px per character at 10px, plus a gap.
@@ -127,7 +130,7 @@ function lineSvg(chart: ChartBlock, width: number): string {
     parts.push(`<path d="${d}" fill="none" stroke="${color}" stroke-width="2"/>`);
     s.points.forEach((p, i) => parts.push(`<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="2.6" fill="${color}"/>`));
     const lastP = s.points[s.points.length - 1];
-    if (lastP) parts.push(`<text x="${Math.min(width - right, xAt(s.points.length - 1) + 4).toFixed(1)}" y="${(yAt(lastP.y) - 6).toFixed(1)}" font-size="10" text-anchor="end" fill="${color}">${label(lastP.y, chart.valueFormat)}</text>`);
+    if (lastP) parts.push(`<text x="${Math.min(width - right, xAt(s.points.length - 1) + 4).toFixed(1)}" y="${(yAt(lastP.y) - 6).toFixed(1)}" font-size="10" text-anchor="end" fill="${color}">${label(lastP.y, chart.valueFormat, chartUsdDecimals(chart))}</text>`);
     if (chart.series.length > 1) {
       parts.push(`<rect x="${left + si * 150}" y="6" width="10" height="10" fill="${color}"/>`);
       parts.push(`<text x="${left + si * 150 + 14}" y="15" font-size="11" fill="${INK}">${esc(truncate(s.name, 20))}</text>`);

@@ -18,7 +18,7 @@ vi.mock('@/lib/pdf/launch-browser', () => ({
 import { SAMPLE_REPORT } from './__fixtures__/sample-report';
 import { DOC_SCHEMA, type DocModel } from './model';
 import { validateDocModel, demoteUncitedFacts, hardenedAssumptions, DEFAULT_ASSUMPTION_ORIGIN, repeatedSentences, fixtureMarkers } from './validate';
-import { citationIndex, citeMarker, formatCell, formatChartValue, chartDuplicatesTable, parseInline, NOT_AVAILABLE, fileBaseName } from './format';
+import { citationIndex, citeMarker, formatCell, formatColumn, formatChartValue, chartDuplicatesTable, parseInline, NOT_AVAILABLE, fileBaseName } from './format';
 import { renderHtml } from './render-html';
 import { renderDocx } from './render-docx';
 import { renderPdf, pdfOptions } from './render-pdf';
@@ -163,7 +163,33 @@ describe('validateDocModel', () => {
 
     it.each(factual)('a factual claim dressed as an assumption must cite (%s)', (_why, text) => {
       expect(issuesOf(one(text)).join(' ')).toMatch(/an assumption may state a planning figure, but a factual claim .* must cite its source \(p\)/);
-      expect(issuesOf(one(text, { cites: ['s1'] }))).toEqual([]); // verified: cited to a source in the doc
+      // Cited: it is verified — so it must be LABELED a fact, unless it projects forward (A5, 2026-11-17).
+      const cited = issuesOf(one(text, { cites: ['s1'] }));
+      if (/\b(?:will|expect|planning)/i.test(text)) expect(cited).toEqual([]); // projections and planning premises stay assumptions
+      else expect(cited.join(' ')).toMatch(/a cited measurement of the market is a fact, not an assumption \(p\)/);
+      const asFact = tiny({ sections: [{ id: 'a', heading: 'A', blocks: [{ type: 'paragraph', id: 'p', text, claim: 'fact', cites: ['s1'] }] }] });
+      expect(issuesOf(asFact)).toEqual([]);
+    });
+
+    it('a cited OBSERVATION labeled assumption is refused; demotion omits it (never relabels it a fact)', () => {
+      const text = 'The market is moderately fragmented: no vendor appears to hold more than about 5% of obligations.';
+      expect(issuesOf(one(text, { cites: ['s1'] })).join(' ')).toMatch(/a cited measurement of the market is a fact, not an assumption/);
+      const d = demoteUncitedFacts(one(text, { cites: ['s1'] }));
+      expect(d.omitted).toEqual(['p']);
+      expect(d.model.sections[0].blocks).toEqual([]);
+      expect(issuesOf(d.model)).toEqual([]);
+    });
+
+    it('a cited PROJECTION stays an assumption (forward-looking, from the evidence)', () => {
+      const text = 'At the current pace, roughly $640M a year is likely to be competed again within 24 months as existing contracts expire.';
+      expect(issuesOf(one(text, { cites: ['s1'] }))).toEqual([]);
+      expect(demoteUncitedFacts(one(text, { cites: ['s1'] })).model.sections[0].blocks[0]).toMatchObject({ claim: 'assumption' });
+    });
+
+    it('the fixture labels its cited observations and its reading note as facts, not assumptions', () => {
+      const all = SAMPLE_REPORT.sections.flatMap((s) => s.blocks) as Array<{ id: string; claim?: string }>;
+      expect(all.find((b) => b.id === 'comp-p2')?.claim).toBe('fact');
+      expect(all.find((b) => b.id === 'comp-c1')?.claim).toBe('fact');
     });
 
     it('demotion: an uncited factual assumption becomes "Unverified — no source"; a critical one is omitted', () => {
@@ -466,8 +492,33 @@ describe('client-ready numbers (Eric, 2026-11-17)', () => {
     expect(formatCell(1234567, 'int')).toBe('1,234,567');
   });
 
-  it('prose: a raw $412500000 or 30000000 is normalized; codes, years and IDs are left alone', () => {
-    expect(parseInline('Obligations were $412500000 and 30000000 units.').map((r) => r.text).join('')).toBe('Obligations were $412.5M and 30,000,000 units.');
+  it('one precision per column: $151.0M beside $412.5M, $24.0M beside $22.9M (A5, v2 review)', () => {
+    expect(formatColumn([412_500_000, 151_000_000, 17_500_000, null], 'usd')).toEqual(['$412.5M', '$151.0M', '$17.5M', NOT_AVAILABLE]);
+    expect(formatColumn([24_000_000, 22_900_000, 7_500_000], 'usd')).toEqual(['$24.0M', '$22.9M', '$7.5M']);
+    expect(formatColumn([1_930_000_000, 412_500_000], 'usd')).toEqual(['$1.93B', '$412.50M']);
+    expect(formatColumn([30_000_000, 22_000_000], 'usd')).toEqual(['$30M', '$22M']);
+    expect(formatColumn([31.4, 27], 'usd')).toEqual(['$31.40', '$27']);
+  });
+
+  it('DOCX and PDF tables use one precision per dollar column', async () => {
+    const doc = strFromU8(unzipSync(new Uint8Array(await renderDocx(SAMPLE_REPORT)))['word/document.xml']);
+    const html = renderHtml(SAMPLE_REPORT);
+    for (const out of [doc, html]) {
+      expect(out).toContain('>$151.0M<');
+      expect(out).toContain('>$24.0M<');
+      expect(out).not.toMatch(/>\$151M<|>\$24M</);
+    }
+  });
+
+  it('prose: identifiers are never reformatted — DUNS, phone, ZIP+4, IDIQ, all-digit PIID (A4 MED-1)', () => {
+    for (const keep of ['DUNS 080053272', 'DUNS 123456789', 'Call 2157373861', 'ZIP+4 205900001', 'IDIQ 1234567', 'The PIID is 1234567890', 'Reference 9876543 applies.', 'a bare 1234567 with no unit']) {
+      expect(parseInline(keep).map((r) => r.text).join('')).toBe(keep);
+    }
+  });
+
+  it('prose: a raw $412500000, or a bare quantity with a unit or lead-in, is normalized', () => {
+    expect(parseInline('Obligations were $412500000 and 30000000 dollars.').map((r) => r.text).join('')).toBe('Obligations were $412.5M and 30,000,000 dollars.');
+    expect(parseInline('A total of 2500000 square feet.').map((r) => r.text).join('')).toBe('A total of 2,500,000 square feet.');
     for (const keep of ['NAICS 561720 in FY2026 and 2027.', 'W912PL21C0001 and EX-FIXTURE-1001', 'UEI ABC1234567890', '$1,930,000,000', '$27–$36 per hour']) {
       expect(parseInline(keep).map((r) => r.text).join('')).toBe(keep);
     }
@@ -480,26 +531,43 @@ describe('client-ready numbers (Eric, 2026-11-17)', () => {
   });
 });
 
-describe('no per-section boilerplate (Eric, 2026-11-17)', () => {
+describe('per-section boilerplate is a producer signal, never a cut (A4 MED-2)', () => {
   const boiler = 'The figures are drawn from the cited records and are reported as recorded without adjustment.';
-  const m = () => tiny({ sections: [
-    { id: 'a', heading: 'A', blocks: [{ type: 'paragraph', id: 'p1', text: `First point. ${boiler}`, claim: 'fact', cites: ['s1'] }] },
-    { id: 'b', heading: 'B', blocks: [{ type: 'paragraph', id: 'p2', text: `Second point. ${boiler}`, claim: 'fact', cites: ['s1'] }, { type: 'paragraph', id: 'p3', text: boiler, claim: 'fact', cites: ['s1'] }] },
-  ] });
 
-  it('a long sentence repeated across blocks is refused', () => {
-    expect(issuesOf(m()).join(' ')).toMatch(/repeated boilerplate in p1, p2, p3/);
+  it('uncited repeats across sections are REPORTED for the producer, and nothing is refused or cut', () => {
+    const m = tiny({ sections: [
+      { id: 'a', heading: 'A', blocks: [{ type: 'paragraph', id: 'p1', text: `First point. ${boiler}`, claim: 'recommendation' }] },
+      { id: 'b', heading: 'B', blocks: [{ type: 'paragraph', id: 'p2', text: `Second point. ${boiler}`, claim: 'recommendation' }] },
+    ] });
+    expect(repeatedSentences(m)).toEqual([{ sentence: boiler, where: ['p1', 'p2'] }]);
+    expect(issuesOf(m)).toEqual([]);
+    expect(demoteUncitedFacts(m).model).toEqual(m);
   });
 
-  it('demotion keeps the first occurrence only (a block left empty is dropped)', () => {
-    const d = demoteUncitedFacts(m());
-    const texts = d.model.sections.flatMap((s) => s.blocks.map((b) => (b as { text: string }).text));
-    expect(texts).toEqual([`First point. ${boiler}`, 'Second point.']);
-    expect(issuesOf(d.model)).toEqual([]);
+  it('a cited fact true of two bullets is valid and untouched', () => {
+    const fact = 'No procurement forecast has been published by this office in the last 24 months.';
+    const m = tiny({ sections: [{ id: 'a', heading: 'A', blocks: [{ type: 'bullets', id: 'b', items: [
+      { text: `NAVFAC Southeast. ${fact}`, claim: 'fact', cites: ['s1'] },
+      { text: `USACE Savannah District. ${fact}`, claim: 'fact', cites: ['s1'] },
+    ] }] }] });
+    expect(issuesOf(m)).toEqual([]);
+    expect(repeatedSentences(m)).toEqual([]);
+    expect(demoteUncitedFacts(m).model).toEqual(m);
+  });
+
+  it('a cited caveat repeated next to each claim it qualifies is valid and untouched', () => {
+    const caveat = 'Figures exclude classified obligations, which the source does not report by office.';
+    const m = tiny({ sections: [
+      { id: 'a', heading: 'A', blocks: [{ type: 'paragraph', id: 'p1', text: `Navy spent $5M. ${caveat}`, claim: 'fact', cites: ['s1'] }] },
+      { id: 'b', heading: 'B', blocks: [{ type: 'paragraph', id: 'p2', text: `Army spent $3M. ${caveat}`, claim: 'fact', cites: ['s1'] }] },
+    ] });
+    expect(issuesOf(m)).toEqual([]);
+    expect(demoteUncitedFacts(m).model).toEqual(m);
   });
 
   it('the fixture report no longer repeats its method paragraph', () => {
-    expect(repeatedSentences(SAMPLE_REPORT)).toEqual([]);
+    const texts = SAMPLE_REPORT.sections.flatMap((s) => s.blocks).map((b) => (b as { text?: string }).text ?? '');
+    expect(texts.filter((x) => /drawn from the cited records/.test(x))).toEqual([]);
   });
 });
 
@@ -574,7 +642,7 @@ describe('render-html', () => {
   it('shows labels, citations, Not available and a numbered Sources section', () => {
     const html = renderHtml(SAMPLE_REPORT);
     expect(html).toContain('class="label assumption">Planning assumption</span>');
-    expect(html).toContain('<span class="origin">This is how to read the ranking, not a measured win rate.</span>');
+    expect(html).toContain('<span class="origin">This is Mindy&#39;s reading of the monthly pattern above, not a forecast from the agencies.</span>');
     expect(html).not.toMatch(/Estimate/);
     expect(html).toContain('class="label recommendation">Recommendation</span>');
     expect(html).toContain('<sup class="cite">[1]</sup>');
@@ -687,7 +755,7 @@ describe('render-docx', () => {
     expect(doc).toContain('w:tblHeader');
     expect(doc).toContain('w:val="Heading1"');
     expect(doc).toContain('PLANNING ASSUMPTION');
-    expect(doc).toContain('This is how to read the ranking, not a measured win rate.');
+    expect(doc).toContain('reading of the monthly pattern above, not a forecast from the agencies.');
     expect(doc).not.toContain('ESTIMATE');
     expect(doc).toContain('RECOMMENDATION');
     expect(doc).toContain(NOT_AVAILABLE);
