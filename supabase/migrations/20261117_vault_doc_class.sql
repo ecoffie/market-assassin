@@ -66,5 +66,8 @@ CREATE INDEX IF NOT EXISTS idx_boilerplate_class
   ON user_boilerplate_docs (user_email, doc_class, archived_at);
 CREATE INDEX IF NOT EXISTS idx_boilerplate_session
   ON user_boilerplate_docs (chat_session_id) WHERE chat_session_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_boilerplate_parent
-  ON user_boilerplate_docs (parent_id) WHERE parent_id IS NOT NULL;
+-- One version number per parent: two concurrent revisions of the same document cannot both become
+-- "v3". saveGeneratedDocument re-reads the latest sibling version and retries on a conflict. Also serves
+-- as the parent_id lookup index.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_boilerplate_parent_version
+  ON user_boilerplate_docs (parent_id, version) WHERE parent_id IS NOT NULL;
