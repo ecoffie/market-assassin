@@ -21,7 +21,7 @@
  * Offered only when VAULT_GENERATED_FILES is on for the verified caller ('true' or 'allowlist').
  */
 import { DOC_SCHEMA, labeledUnits, type DocModel } from '@/lib/documents/model';
-import { validateDocModel, demoteUncitedFacts, hardenedAssumptions, repeatedSentences, fixtureMarkers, BLOCK_TYPE_VALUES, CLAIM_VALUES, SOURCE_KIND_VALUES } from '@/lib/documents/validate';
+import { validateDocModel, demoteUncitedFacts, hardenedAssumptions, repeatedSentences, fixtureMarkers, neverAnAssumption, citedObservationAsAssumption, BLOCK_TYPE_VALUES, CLAIM_VALUES, SOURCE_KIND_VALUES } from '@/lib/documents/validate';
 import { renderDocument } from '@/lib/documents';
 import { saveGeneratedDocument, type GeneratedDb } from '@/lib/vault/generated';
 import type { VaultStorage, VaultUploadInput } from '@/lib/vault/upload';
@@ -101,7 +101,7 @@ export const CREATE_DOCUMENT_TOOL_DEF = {
   function: {
     name: CREATE_DOCUMENT,
     description:
-      "Create a document file — a client-ready PDF and an editable Word file — and save it privately to the user's Vault. CALL THIS whenever the user asks to create, make, write up, export, download or save a document, report, PDF, Word file, capability statement, brief or deliverable; build it from what is already in this conversation (do not run new searches first unless the user asks for new research). Label every block (fact must cite a source id; an uncited fact is saved labeled \"Unverified — no source\"). Certifications, contract awards, past performance and eligibility can never be assumptions. To revise a document Mindy made earlier, pass its document_id as revises_document_id: a new version is saved and the old one is kept.",
+      "Create a document file — a client-ready PDF and an editable Word file — and save it privately to the user's Vault. CALL THIS whenever the user asks to create, make, write up, export, download or save a document, report, PDF, Word file, capability statement, brief or deliverable. Build it from the content already prepared in this conversation — INCLUDING the user's uploaded company material (capabilities, approach, company facts) and any rewrite you just gave them — not only the market research; do not run new searches first unless the user asks for new research. The user's own description of their company from their upload is a 'fact' that cites the upload: declare a source { kind: 'upload', recordId: <the upload's document_id>, label: <file name> } and cite it; never label it an assumption and never leave it out. Certifications, contract awards, past performance and eligibility may appear ONLY when the uploaded text states them, as facts citing the upload — never invented and never as assumptions. Label every block (an uncited fact is saved labeled \"Unverified — no source\"). Every declared source should be cited by at least one block. To revise a document Mindy made earlier, pass its document_id as revises_document_id: a new version is saved and the old one is kept.",
     parameters: {
       type: 'object',
       properties: {
@@ -183,6 +183,29 @@ export function markingText(m: DocModel): string {
 
 const baseName = (f: string) => f.replace(/\.(pdf|docx)$/i, '');
 
+/**
+ * Do the CUSTOMER's own words ask for a document file? Only then does the planner see uploaded text (and
+ * the longer latest answer). Uploaded text in the planner is a prompt-injection surface, so it is given
+ * only on the turns that need it — and on those turns create_document is the only write tool.
+ */
+const DOC_VERB = /\b(?:create|make|write\s+up|export|download|save|generate|produce|draft|build|turn\s+(?:this|that|it)\s+into|put\s+(?:this|that|it)\s+(?:in|into)|give\s+me)\b/i;
+const DOC_NOUN = /\b(?:document|doc|docx|report|pdf|word(?:\s+(?:doc|file|document))?|file|capability\s+statement|cap\s+statement|brief|one[-\s]?pager|deliverable|white\s*paper)\b/i;
+export function isDocumentCreationRequest(customerWords: string): boolean {
+  const t = (customerWords || '').slice(0, 2000);
+  const verb = DOC_VERB.exec(t);
+  if (!verb) return false;
+  // The document word must come after the verb, within the same sentence.
+  const rest = t.slice(verb.index, verb.index + 160).split(/[.?!\n]/)[0];
+  return DOC_NOUN.test(rest);
+}
+
+/** Labeled units in a model (a bullet item counts as one), for diagnostics. */
+function countUnits(m: DocModel): number {
+  let n = 0;
+  for (const s of m.sections ?? []) for (const b of s.blocks ?? []) n += labeledUnits(b).length;
+  return n;
+}
+
 export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
   const owner = vaultEmailFor(deps.scope);
   const workspaceNote = deps.scope.kind === 'client' ? { workspace: 'client' as const } : {};
@@ -235,6 +258,11 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
     // document is repaired right away: uncited facts are saved labeled "Unverified — no source" and
     // decision-critical ones are omitted (never refused just because a fact lacked a cite). Anything the
     // repair cannot fix — structure, unknown values — is refused with the exact allowed values.
+    // Diagnostics (no content): what came in, what the repair changed and why, and declared sources nothing cites.
+    const unitsIn = countUnits(model);
+    const omittedByReason: Record<string, number> = {};
+    const preRepair = new Map<string, { claim?: string; text: string; critical?: boolean; cites?: string[] }>();
+    for (const sec of model.sections ?? []) for (const b of sec.blocks ?? []) for (const u of labeledUnits(b)) preRepair.set(u.where, u);
     let v = validateDocModel(model);
     let unverified: string[] = [];
     let omitted: string[] = [];
@@ -251,7 +279,21 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
         };
       }
       model = d.model; unverified = d.unverified; omitted = d.omitted; v = repaired;
+      const ids = new Set((model.sources ?? []).map((s) => s.id));
+      for (const where of omitted) {
+        const u = preRepair.get(where);
+        const reason = !u ? 'unknown'
+          : u.claim === 'assumption' && neverAnAssumption(u.text) ? 'never_an_assumption'
+            : citedObservationAsAssumption({ claim: u.claim, cites: u.cites, text: u.text }, ids) ? 'cited_observation_as_assumption'
+              : u.critical === true ? 'critical_without_source' : 'other';
+        omittedByReason[reason] = (omittedByReason[reason] ?? 0) + 1;
+      }
     }
+    const citedIds = new Set<string>();
+    for (const sec of model.sections) for (const b of sec.blocks) for (const u of labeledUnits(b)) for (const c of u.cites ?? []) citedIds.add(c);
+    const uncitedSources = model.sources.filter((s) => !citedIds.has(s.id)).map((s) => ({ id: s.id, kind: s.kind, label: s.label }));
+    const diagnostics = { units_in: unitsIn, units_out: countUnits(model), unverified: unverified.length, omitted_by_reason: omittedByReason, uncited_sources: uncitedSources.map((s) => `${s.id}:${s.kind}`) };
+    console.info('[create_document] diagnostics', JSON.stringify(diagnostics));
     // Method boilerplate repeated across sections is reported, never a reason to refuse or cut.
     const repeats = repeatedSentences(model);
 
@@ -322,9 +364,13 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
       omitted_count: omitted.length,
       ...(pdfNote ? { pdf_note: pdfNote } : {}),
       ...(repeats.length ? { repeated_sentences: repeats.length } : {}),
+      diagnostics,
       note: 'Saved privately to the Vault (Documents → Generated). Tell the user the file names and that they can download them there; do not paste download links.'
         + (unverified.length ? ` ${unverified.length} statement(s) are labeled "Unverified — no source"; say so.` : '')
-        + (omitted.length ? ` ${omitted.length} decision-critical statement(s) without a source were left out; say so.` : ''),
+        + (omitted.length ? ` ${omitted.length} decision-critical statement(s) without a source were left out; say so.` : '')
+        + (uncitedSources.some((s) => s.kind === 'upload')
+          ? ` Warning: the uploaded file(s) ${uncitedSources.filter((s) => s.kind === 'upload').map((s) => `"${s.label}"`).join(', ')} were declared as sources but NO block cites them, so the document does not include their content. Tell the user plainly and offer to make a new version that includes it.`
+          : uncitedSources.length ? ` Note: ${uncitedSources.length} declared source(s) are not cited by any block.` : ''),
     };
   }
 
