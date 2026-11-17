@@ -50,6 +50,7 @@ export const SITEMAP_CHILDREN = [
   'sitemap-opportunities.xml',
   'sitemap-facets.xml',
   'sitemap-opportunities-closed.xml',
+  'sitemap-forecasts.xml',
 ] as const;
 
 /** The index document, served at /sitemap.xml and /sitemap-index.xml. */

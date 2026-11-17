@@ -104,9 +104,10 @@ describe('the sitemap is split by page family', () => {
       'sitemap-static.xml', 'sitemap-contractors.xml', 'sitemap-contracts.xml',
       'sitemap-contractor-tabs.xml', 'sitemap-opportunities.xml', 'sitemap-facets.xml',
       'sitemap-opportunities-closed.xml',
+      'sitemap-forecasts.xml',
     ]);
     const xml = renderSitemapIndex(SITEMAP_CHILDREN.map((c) => ({ loc: `https://getmindy.ai/${c}` })));
-    expect(xml.match(/<sitemap>/g)).toHaveLength(7);
+    expect(xml.match(/<sitemap>/g)).toHaveLength(SITEMAP_CHILDREN.length);
     expect(xml).not.toContain('<lastmod>');
   });
 });
