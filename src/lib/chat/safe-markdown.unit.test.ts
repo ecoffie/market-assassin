@@ -136,3 +136,32 @@ describe('renderSafeMarkdown: GFM tables', () => {
     expect(browserMd(t)).toBe(md(t));
   });
 });
+
+describe('renderSafeMarkdown: lists keep their numbering (2026-11-16 "1., 1., 1." bug)', () => {
+  it('indented sub-bullets nest inside the numbered item instead of restarting the list', () => {
+    const html = md('1. **Alpha**\n   - due Nov 20\n   - Navy\n2. **Beta**\n   - due Nov 22\n3. Gamma');
+    expect(html).toBe('<ol><li><strong>Alpha</strong><ul><li>due Nov 20</li><li>Navy</li></ul></li><li><strong>Beta</strong><ul><li>due Nov 22</li></ul></li><li>Gamma</li></ol>');
+    expect(html.match(/<ol/g)).toHaveLength(1);
+  });
+  it('blank lines between numbered items keep one list', () => {
+    expect(md('1. One\n\n2. Two\n\n\n3. Three')).toBe('<ol><li>One</li><li>Two</li><li>Three</li></ol>');
+  });
+  it('blank lines between bullets keep one list', () => {
+    expect(md('- a\n\n- b')).toBe('<ul><li>a</li><li>b</li></ul>');
+  });
+  it('a list that resumes after a paragraph keeps its number', () => {
+    expect(md('1. One\n\nSome text\n\n2. Two')).toBe('<ol><li>One</li></ol><p>Some text</p><ol start="2"><li>Two</li></ol>');
+  });
+  it('a blank line then a paragraph still ends the list', () => {
+    expect(md('1. One\n\nAfter')).toBe('<ol><li>One</li></ol><p>After</p>');
+  });
+  it('an unindented bullet after a numbered list starts a new list', () => {
+    expect(md('1. One\n- loose')).toBe('<ol><li>One</li></ol><ul><li>loose</li></ul>');
+  });
+  it('an indented continuation line stays in its item', () => {
+    expect(md('1. One\n   more about one\n2. Two')).toBe('<ol><li>One<br>more about one</li><li>Two</li></ol>');
+  });
+  it('nested items are still escaped', () => {
+    expect(md('1. x\n   - <script>alert(1)</script>')).toBe('<ol><li>x<ul><li>&lt;script&gt;alert(1)&lt;/script&gt;</li></ul></li></ol>');
+  });
+});

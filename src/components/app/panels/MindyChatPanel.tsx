@@ -77,7 +77,7 @@ export function renderMessageContent(content: string, asMarkdown = false) {
 
 const MD_CLASSES = [
   'mindy-md [overflow-wrap:anywhere] break-words',
-  '[&_p]:my-0 [&_p+p]:mt-2.5 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5',
+  '[&_p]:my-0 [&_p+p]:mt-2.5 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_li>ul]:my-1',
   '[&_strong]:font-semibold [&_strong]:text-slate-50 [&_em]:italic',
   '[&_.md-h]:font-semibold [&_.md-h]:text-slate-50 [&_.md-h]:mt-3 [&_.md-h]:mb-1 [&_.md-h:first-child]:mt-0 [&_.md-h1]:text-[16px] [&_.md-h2]:text-[15px] [&_.md-h3]:text-[14.5px]',
   '[&_a]:text-purple-300 [&_a]:underline [&_a]:underline-offset-2 hover:[&_a]:text-purple-200 [&_a]:break-words',
