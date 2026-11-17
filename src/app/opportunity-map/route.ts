@@ -11106,19 +11106,30 @@ const ASK_MINDY_JS = `<script>(function(){
     else { chips.push(['Who buys 541512 work?','Which agencies buy the most NAICS 541512 (custom computer programming) work?']);
       chips.push(['Find the incumbent','How do I find who currently holds a contract before it recompetes?']); }
     chips.push(['Write a capability statement','What should my capability statement include for the agencies in this view?']);
-    chips.push(['Add a target to my pipeline','How do I track one of these opportunities in my pipeline?']);
     var h='<div class="amk-empty"><b>Ask about what you\\u2019re looking at</b><div class="lead">Agencies, incumbents, set-asides, teaming \\u2014 answered from live federal data for this view.</div><div class="amk-chips">';
     chips.forEach(function(ch){ h+='<button data-q="'+esc(ch[1])+'">'+esc(ch[0])+'</button>'; });
     h+='</div></div>';
     body.innerHTML=h;
     Array.prototype.forEach.call(body.querySelectorAll('.amk-chips button'),function(b){ b.onclick=function(){ ask(b.getAttribute('data-q')); }; });
   }
-  // Public opener — context-aware: seed the input with the current search term (does NOT auto-send).
+  // Public opener (does NOT auto-send). An explicit question (typed in the search bar, then "Ask") goes into the
+  // box as the customer's own words. The map's search term only becomes the HINT: it already reaches the answer
+  // through the view preamble, and putting it in the box made "click in and type" send the two glued together
+  // ("hvac servicesFind HVAC\\u2026", D7, Agent 4 live scorecard 2026-11-16). What is sent = what is in the box.
+  // A later open without a seed clears the box only if it still holds the text the opener itself put there
+  // (openerSeed); a draft the customer typed is kept.
+  var openerSeed='';
   window.openAskMindy=function(seed){
     leaveCard();
     var q=(seed!=null?String(seed):'').trim();
-    if(!q){ var c=viewCtx(); if(c&&c.q)q=String(c.q).trim(); }
-    if(q&&input)input.value=q;
+    if(input){
+      if(q){ input.value=q; openerSeed=q; input.placeholder=viewPlaceholder; }
+      else {
+        if(openerSeed&&input.value===openerSeed) input.value='';
+        openerSeed='';
+        var c=viewCtx(), vq=(c&&c.q)?String(c.q).trim():''; input.placeholder=vq?('Ask about \\u201c'+vq+'\\u201d\\u2026'):viewPlaceholder;
+      }
+    }
     setOpen(true);
   };
   var x=document.getElementById('amkX'); if(x)x.onclick=function(){ setOpen(false); };
