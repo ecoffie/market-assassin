@@ -62,14 +62,15 @@ describe('nav groups', () => {
 
   it('uses the approved labels and order', () => {
     expect(NAV_GROUPS.map((g) => g.label)).toEqual([
-      'Ask Mindy', 'Opportunities', 'Coming up', 'My Pursuits', 'Win the bid',
+      'Ask Mindy', 'Opportunities', 'Coming up', 'My Pursuits', 'Proposals', 'Pricing',
       'Market Research', 'Players', 'Account', 'For government',
     ]);
     const tabs = Object.fromEntries(NAV_GROUPS.map((g) => [g.id, g.members.map((m) => `${m.panel}:${m.tab}`)]));
     expect(tabs.opportunities).toEqual(['dashboard:For you', 'alerts:All matches', 'market-intel:Charts & export', 'grants:Grants']);
     expect(tabs['coming-up']).toEqual(['forecasts:Upcoming buys', 'recompetes:Expiring contracts', 'disa-watch:Vehicle watch']);
     expect(tabs.pursuits).toEqual(['pipeline:Opportunities', 'target-list:Offices']);
-    expect(tabs.win).toEqual(['pricing:Pricing', 'proposals:Proposals']);
+    expect(tabs.proposals).toEqual(['proposals:Proposals']);
+    expect(tabs.pricing).toEqual(['pricing:Pricing']);
     expect(tabs.players).toEqual(['contractors:Companies', 'decision-makers:Government contacts']);
     expect(tabs.account).toEqual(['vault:My Vault', 'team:Team', 'coach:Clients']);
     expect(tabs.government).toEqual(['osbp-smb:SMB market research', 'micc-mrr:KO research workspace']);
@@ -108,10 +109,12 @@ describe('nav groups', () => {
 
   it('a fully locked group keeps the old locked behaviour on its first member', () => {
     const pursuits = NAV_GROUPS.find((g) => g.id === 'pursuits')!;
-    const win = NAV_GROUPS.find((g) => g.id === 'win')!;
+    const proposals = NAV_GROUPS.find((g) => g.id === 'proposals')!;
+    const pricing = NAV_GROUPS.find((g) => g.id === 'pricing')!;
     expect(isGroupLocked(pursuits, free)).toBe(true);
     expect(clickActionFor(primaryMember(pursuits, free)!.panel, free)).toBe('free_preview');
-    expect(clickActionFor(primaryMember(win, free)!.panel, free)).toBe('upgrade');
+    expect(clickActionFor(primaryMember(proposals, free)!.panel, free)).toBe('upgrade');
+    expect(clickActionFor(primaryMember(pricing, free)!.panel, free)).toBe('upgrade');
   });
 
   it('keeps per-panel tier locks (Team / Clients, coach mode)', () => {
