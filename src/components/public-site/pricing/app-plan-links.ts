@@ -8,6 +8,18 @@ export const PRO_TRIAL_ANNUAL = process.env.NEXT_PUBLIC_PRO_TRIAL_CHECKOUT_ANNUA
 export const TEAM_TRIAL_MONTHLY = process.env.NEXT_PUBLIC_TEAM_TRIAL_CHECKOUT_MONTHLY || 'https://buy.stripe.com/eVq28s8QK3MS34VdpefnO1a';
 export const TEAM_TRIAL_ANNUAL = process.env.NEXT_PUBLIC_TEAM_TRIAL_CHECKOUT_ANNUAL || 'https://buy.stripe.com/3cI9AU2sm5V020R2KAfnO1b';
 
+/**
+ * Mindy's own trial checkout page (2026-11-17). /start-trial sends the buyer to the matching
+ * payment link above whenever it cannot run, so these hrefs never dead-end.
+ */
+export function trialCheckoutHref(plan: 'pro' | 'team', cycle: 'monthly' | 'annual', src?: string): string {
+  return `/start-trial?plan=${plan}&cycle=${cycle}${src ? `&src=${encodeURIComponent(src)}` : ''}`;
+}
+export const TRIAL_CHECKOUT_HREFS = [
+  trialCheckoutHref('pro', 'monthly'), trialCheckoutHref('pro', 'annual'),
+  trialCheckoutHref('team', 'monthly'), trialCheckoutHref('team', 'annual'),
+] as const;
+
 export const PRO_MONTHLY_USD = 149;
 export const PRO_ANNUAL_USD = 1490;          // $124.17/mo, 17% off
 export const TEAM_MONTHLY_USD = 499;

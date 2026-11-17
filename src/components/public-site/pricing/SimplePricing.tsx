@@ -22,8 +22,8 @@ import {
   trialUpgradeChargeNote, type TrialUpgradeOffer,
 } from '@/lib/billing/trial-upgrade-offer';
 import {
-  PRO_ANNUAL_USD, PRO_MONTHLY_USD, PRO_TRIAL_ANNUAL, PRO_TRIAL_MONTHLY, SALES_URL,
-  TEAM_ANNUAL_PER_MONTH, TEAM_ANNUAL_USD, TEAM_MONTHLY_USD, TEAM_TRIAL_ANNUAL, TEAM_TRIAL_MONTHLY, pctOff,
+  PRO_ANNUAL_USD, PRO_MONTHLY_USD, SALES_URL,
+  TEAM_ANNUAL_PER_MONTH, TEAM_ANNUAL_USD, TEAM_MONTHLY_USD, pctOff, trialCheckoutHref,
 } from './app-plan-links';
 
 type Feature = [title: string, detail: string];
@@ -199,7 +199,7 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
       price: annual ? `$${fmt(Math.round(PRO_ANNUAL_USD / 12))}` : `$${PRO_MONTHLY_USD}`,
       was: annual ? `$${PRO_MONTHLY_USD}` : undefined,
       per: annual ? '/ mo, billed annually' : '/ mo, billed monthly', trial: true,
-      cta: 'Start free trial', href: annual ? PRO_TRIAL_ANNUAL : PRO_TRIAL_MONTHLY,
+      cta: 'Start free trial', href: trialCheckoutHref('pro', annual ? 'annual' : 'monthly'),
       lead: 'Find and win your own contracts.', base: 'Everything you need to start',
       features: [
         ['Opportunities matched to you', 'Daily alerts and briefings for your NAICS, keywords and agencies.'],
@@ -214,7 +214,7 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
       price: annual ? `$${fmt(TEAM_ANNUAL_PER_MONTH)}` : `$${TEAM_MONTHLY_USD}`,
       was: annual ? `$${TEAM_MONTHLY_USD}` : undefined,
       per: annual ? '/ mo, billed annually' : '/ mo, billed monthly', trial: true,
-      cta: 'Start free trial', href: annual ? TEAM_TRIAL_ANNUAL : TEAM_TRIAL_MONTHLY,
+      cta: 'Start free trial', href: trialCheckoutHref('team', annual ? 'annual' : 'monthly'),
       lead: 'Win more as a team.', base: 'All Pro features, plus',
       features: [
         ['Up to 5 users', 'One plan for your whole BD team.'],
@@ -288,7 +288,7 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
         {(!me || me === 'free') && (
           <>
             <p className="sub">$0 today. Cancel anytime before day 14 and you won&apos;t be charged.</p>
-            <a className="cta hero-cta" href={annual ? PRO_TRIAL_ANNUAL : PRO_TRIAL_MONTHLY}
+            <a className="cta hero-cta" href={trialCheckoutHref('pro', annual ? 'annual' : 'monthly')}
               onClick={() => trackTrialClick('pro', annual ? 'annual' : 'monthly', 'hero')}>Start my free trial</a>
             <NoRefundNote style={{ margin: '8px 0 0' }} />
           </>

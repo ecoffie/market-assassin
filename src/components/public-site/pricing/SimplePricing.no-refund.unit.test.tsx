@@ -7,11 +7,11 @@ import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { JSDOM } from 'jsdom';
 import SimplePricing from './SimplePricing';
-import { PRO_TRIAL_ANNUAL, PRO_TRIAL_MONTHLY, SALES_URL, TEAM_TRIAL_ANNUAL, TEAM_TRIAL_MONTHLY } from './app-plan-links';
+import { SALES_URL, TRIAL_CHECKOUT_HREFS } from './app-plan-links';
 
 const html = renderToStaticMarkup(<SimplePricing proCredits={1500} teamCredits={1000} forecastsLabel="33,000+" faqs={[]} />);
 const doc = new JSDOM(`<!doctype html><body>${html}</body>`).window.document;
-const trialHrefs = new Set([PRO_TRIAL_ANNUAL, PRO_TRIAL_MONTHLY, TEAM_TRIAL_ANNUAL, TEAM_TRIAL_MONTHLY]);
+const trialHrefs = new Set<string>(TRIAL_CHECKOUT_HREFS);
 
 describe('/pricing: no-refund line under each trial button', () => {
   const trialButtons = [...doc.querySelectorAll('a.cta')].filter((a) => trialHrefs.has(a.getAttribute('href') ?? ''));

@@ -27,6 +27,7 @@ import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
 import { parseAppDeepLink } from '@/lib/app/deep-link-params';
 import { MAP_SHELL_HOME_EVENT, isMapShellPanel } from '@/lib/app/map-shell';
 import { KNOWN_PANELS } from '@/lib/app/known-panels';
+import TrialOfferBanner from '@/components/app/TrialOfferBanner';
 
 /** The shared account-menu script (map + public pages) without its <script> wrapper. */
 const ACCOUNT_MENU_SCRIPT = ACCOUNT_MENU_JS.replace(/^<script>/, '').replace(/<\/script>[\s\S]*$/, '');
@@ -71,6 +72,8 @@ export default function AppPage() {
 function AppDashboard() {
   const [email, setEmail] = useState<string | null>(null);
   const [tier, setTier] = useState<AppTier>('free');
+  // True once /api/access/check has answered, so the free-only trial banner never flashes for Pro.
+  const [tierResolved, setTierResolved] = useState(false);
   const [coachModeAllowed, setCoachModeAllowed] = useState(false);
   // Internal staff (govcongiants / getmindy team). Kept for staff-only treatment;
   // no longer gates the prototype demo tabs.
@@ -310,6 +313,7 @@ function AppDashboard() {
 
       setEmail(userEmail);
       setTier(userTier);
+      setTierResolved(true);
       setCoachModeAllowed(!!accessData?.coachMode?.allowed);
       setIsStaff(!!accessData?.isStaff);
       setCanSeePrototypes(!!accessData?.canSeePrototypes);
@@ -1554,6 +1558,9 @@ function AppDashboard() {
         {/* Thin-profile nudge: users on generic-only codes get a one-line describe
             prompt → real keywords + sharper matches (reuses onboarding's describe path). */}
         {!isMapShell && <CapabilityNudge email={email} />}
+
+        {/* Free members only: start the 14-day Pro trial (owner, 2026-11-17). */}
+        {!isMapShell && tierResolved && tier === 'free' && !isStaff && <TrialOfferBanner email={email} />}
 
         {/* Tabs for the active sidebar group (nav-groups.ts) — only when it has 2+ pages.
             Tab clicks use the same handlePanelChange as the sidebar. */}

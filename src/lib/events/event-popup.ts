@@ -61,7 +61,7 @@ export function eventPopupScript(now: Date = new Date()): string {
     + 'if(window.__lcbPop)return;window.__lcbPop=1;'
     + 'var K=' + js(KEY) + ';function seen(){return document.cookie.split("; ").some(function(c){return c.indexOf(K+"=")===0;});}if(seen())return;'
     + 'function excluded(){var p=location.pathname;'
-    + 'return p.indexOf(' + js(LCB.path) + ')===0||/^\\/(admin|app\\/signup|signup|signin|app\\/sign-in|oauth|setup-password|reset-password|forgot-password|auth)/.test(p)||/[?&]embed=/.test(location.search);}'
+    + 'return p.indexOf(' + js(LCB.path) + ')===0||/^\\/(admin|app\\/signup|signup|signin|app\\/sign-in|oauth|setup-password|reset-password|forgot-password|auth|start-trial|checkout)/.test(p)||/[?&]embed=/.test(location.search);}'
     + 'if(excluded())return;'
     + 'function typing(){var a=document.activeElement;if(!a)return false;if(a.isContentEditable||a.tagName==="TEXTAREA"||a.tagName==="SELECT")return true;'
     + 'return a.tagName==="INPUT"&&!/^(button|submit|reset|checkbox|radio|range|color|file|image|hidden)$/i.test(a.type||"");}'
