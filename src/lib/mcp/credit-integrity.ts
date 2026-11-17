@@ -29,7 +29,12 @@ export type BillingOutcome =
   | 'nonbillable_not_configured'
   | 'nonbillable_system_failure'
   /** The tool ran and established that nothing defensible matched — not a sold answer. */
-  | 'nonbillable_no_market';
+  | 'nonbillable_no_market'
+  /**
+   * Free by design: the tool is an action or a lookup, not a new intelligence answer (Ask Mindy
+   * create_document / find_my_documents). Assigned by the caller (chat executor), never inferred.
+   */
+  | 'nonbillable_free_tool';
 
 const OUTCOMES: ReadonlySet<string> = new Set<BillingOutcome>([
   'billable_success',
@@ -39,6 +44,7 @@ const OUTCOMES: ReadonlySet<string> = new Set<BillingOutcome>([
   'nonbillable_not_configured',
   'nonbillable_system_failure',
   'nonbillable_no_market',
+  'nonbillable_free_tool',
 ]);
 
 /**

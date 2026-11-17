@@ -64,7 +64,8 @@ import { sessionTitleFrom } from '@/lib/chat/view-preamble';
 import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, renderSbloContact, lintAnalysis, deterministicNextSteps, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, SBLO_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
 import { mixedTurnNote, composeMixedAnswer, type UnrenderedResult } from '@/lib/chat/mixed-turn';
-import { sourceFromToolResult, renderedStub, citationsFromSources, ledgerFromSources, parseLedger, ledgerNotes, type ContextSource, type SourceLedger } from '@/lib/chat/context-sources';
+import { sourceFromToolResult, renderedStub, citationsFromSources, ledgerFromSources, parseLedger, ledgerNotes, resolveRevisionTarget, type ContextSource, type SourceLedger, type RevisionTarget } from '@/lib/chat/context-sources';
+import { fenceUntrusted, UNTRUSTED_TEXT_RULE } from '@/lib/chat/untrusted-text';
 import { guardFacts } from '@/lib/proposal/fact-guard';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
 import { chatDeadlines, toolTimeoutMs, readWithIdleTimeout, incompleteToolNotice, withTimeout, ChatTimeoutError } from '@/lib/chat/turn-deadlines';
@@ -112,6 +113,12 @@ const MAX_TOKENS = 2048;
 // Tool round output cap. Raised 512 → 1024: several parallel tool calls with filters can
 // exceed 512 tokens, and a truncated argument string used to run as {} (an unfiltered query).
 const TOOL_ROUND_MAX_TOKENS = 1024;
+// When create_document is offered, the planner's tool call carries the WHOLE document (doc_model). 1024
+// tokens cut a capability statement mid-JSON and the executor refused the unreadable arguments. A cap, not a
+// spend: only generated tokens are billed by the provider.
+const DOC_TOOL_ROUND_MAX_TOKENS = 4096;
+/** Characters of the document being revised given to the planner (≈4K tokens). */
+const REVISION_DOC_CHARS = 12_000;
 const HISTORY_LIMIT = 6;          // last 3 exchanges (6 messages) for continuity
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -660,6 +667,49 @@ export async function POST(request: NextRequest) {
           .slice(0, 3);
         const ledgerSystemNotes = ledgerNotes(splitViewPreamble(message).rest || message, priorLedgers);
         for (const n of ledgerSystemNotes) messages.push({ role: 'system', content: n });
+        // "Revise that document" (Agent 4 prod test 2026-11-17): with ONE tool round, the planner must write the
+        // revised doc_model in the same call, so the document it refers to is loaded here — from the signed
+        // ledger's id, owner-checked against the acting scope — and create_document is forced below. No
+        // resolvable document (none, several, or not this owner's) → nothing is loaded or forced, and
+        // find_my_documents stays the right call. Never in card chat (create_document is not offered there).
+        const turnTrace0: string[] = []; // notices recorded before the turn trace exists
+        let revision: (RevisionTarget & { block: string }) | null = null;
+        const revisionTarget = !cardCtx && profileEmail && vaultDocEnabledFor('generate', auth.email)
+          ? resolveRevisionTarget(customerWords, priorLedgers) : null;
+        if (revisionTarget) {
+          const { data: doc, error: docErr } = await getSupabase().from('user_boilerplate_docs')
+            .select('id, original_filename, doc_class, version, doc_model, extracted_text')
+            .eq('id', revisionTarget.id).eq('user_email', profileEmail).is('archived_at', null).maybeSingle();
+          const row = (docErr ? null : doc) as { id: string; original_filename: string; doc_class: string | null; version: number | null; doc_model: unknown; extracted_text: string | null } | null;
+          if (!row) {
+            turnTrace0.push(docErr ? 'revision_target:unavailable' : 'revision_target:not_found');
+          } else {
+            const generated = row.doc_class === 'generated';
+            const body = generated && row.doc_model && typeof row.doc_model === 'object'
+              ? JSON.stringify(row.doc_model) : String(row.extracted_text || '');
+            if (body.trim()) {
+              const content = body.slice(0, REVISION_DOC_CHARS);
+              revision = {
+                id: row.id, kind: generated ? 'generated' : (row.doc_class === 'reference' ? 'reference' : 'company'),
+                ...(row.version ? { version: row.version } : {}),
+                block: [
+                  `DOCUMENT TO REVISE: the user asked for a revised version of their Vault document "${row.original_filename.replace(/["\n]/g, ' ').slice(0, 120)}"${generated ? ` (generated, version ${row.version ?? 1})` : ''}.`,
+                  'Call create_document ONCE with the complete revised doc_model: keep what is still correct, apply the changes the user asked for, keep every assumption labeled assumption, and cite sources for facts.',
+                  generated
+                    ? `Pass revises_document_id "${row.id}": a new version is saved and the original is kept.`
+                    : 'Do not pass revises_document_id: this is the user\'s own file, which stays unchanged; the revision is saved as a new generated document.',
+                  'Do not call find_my_documents for this document again: its content is below.',
+                  UNTRUSTED_TEXT_RULE,
+                  fenceUntrusted(content, { name: row.original_filename, chars: body.length, excerpted: content.length < body.length, truncatedAtUpload: false }),
+                ].join('\n\n'),
+              };
+              turnTrace0.push(`revision_target:${revision.kind}`);
+              messages.push({ role: 'system', content: revision.block });
+            } else {
+              turnTrace0.push('revision_target:no_text');
+            }
+          }
+        }
         for (const h of history) {
           if (h.role === 'user' || h.role === 'assistant') {
             messages.push({ role: h.role, content: String(h.content || '').slice(0, 2000) });
@@ -709,6 +759,7 @@ export async function POST(request: NextRequest) {
         // The planner sees which documents exist, not their text.
         if (documentContext) toolRoundMessages.push({ role: 'system', content: documentContext.manifest });
         for (const n of ledgerSystemNotes) toolRoundMessages.push({ role: 'system', content: n });
+        if (revision) toolRoundMessages.push({ role: 'system', content: revision.block });
         for (const h of history) {
           if (h.role === 'user' || h.role === 'assistant') {
             toolRoundMessages.push({ role: h.role, content: String(h.content || '').slice(0, 2000) });
@@ -758,6 +809,7 @@ export async function POST(request: NextRequest) {
         if (capabilityNote) turnTrace.notices.push('capability_interpreted');
         if (documentContext) turnTrace.notices.push(`documents:${documentContext.docCount}`);
         if (documentsNotice) turnTrace.notices.push(documentsNotice);
+        turnTrace.notices.push(...turnTrace0);
         if (staging) turnTrace.notices.push(`staging_model_config:${staging.name}`);
         const notify = (code: string, text: string) => {
           turnTrace.notices.push(code);
@@ -849,12 +901,17 @@ export async function POST(request: NextRequest) {
           };
 
           // One planner attempt. Returns the OpenAI-shaped JSON, or the failure details.
+          // create_document offered → room for a whole doc_model; a resolved revision → that call is forced.
+          const createOffered = ALL_TOOL_DEFS.some((d) => (d.function as { name?: string })?.name === CREATE_DOCUMENT);
+          const plannerMaxTokens = createOffered ? DOC_TOOL_ROUND_MAX_TOKENS : TOOL_ROUND_MAX_TOKENS;
+          const forceCreate = !!revision && createOffered;
+          if (forceCreate) turnTrace.notices.push('revision:create_document_forced');
           const callPlanner = async (t: PlannerTarget): Promise<{ ok: true; json: unknown } | { ok: false; status: number | null; detail: string }> => {
             // B2: whole-request budget for the planner (instructions + history + question + tool
             // catalog + output headroom). Oldest history goes first; a request that still cannot
             // fit is never sent.
             const plannerKinds: MsgKind[] = toolRoundMessages.map((m, i) => (i === toolRoundMessages.length - 1 ? 'user' : m.role === 'system' ? 'system' : 'history'));
-            const plannerFit = fitMessages(toolRoundMessages, plannerKinds, { budget: inputBudget(t.model, TOOL_ROUND_MAX_TOKENS), tools: ALL_TOOL_DEFS });
+            const plannerFit = fitMessages(toolRoundMessages, plannerKinds, { budget: inputBudget(t.model, plannerMaxTokens), tools: ALL_TOOL_DEFS });
             if (plannerFit.droppedHistory) turnTrace.notices.push(`planner_history_dropped:${plannerFit.droppedHistory}`);
             if (!plannerFit.fits) return { ok: false, status: null, detail: `request_too_large: est ${plannerFit.estimate} > budget ${plannerFit.budget} tokens` };
             const plannerMessages = plannerFit.messages;
@@ -864,10 +921,11 @@ export async function POST(request: NextRequest) {
                 const convo = plannerMessages
                   .filter((m) => m.role === 'user' || m.role === 'assistant')
                   .map((m) => ({ role: m.role, content: m.content }));
-                const forced = OPP_INTENT && anthropicSupportsForcedToolChoice(t.model);
+                const forced = (OPP_INTENT || forceCreate) && anthropicSupportsForcedToolChoice(t.model);
                 const cbody: Record<string, unknown> = {
-                  model: t.model, max_tokens: TOOL_ROUND_MAX_TOKENS, system: sys,
-                  messages: convo, tools: anthropicTools, tool_choice: forced ? { type: 'any' } : { type: 'auto' },
+                  model: t.model, max_tokens: plannerMaxTokens, system: sys,
+                  messages: convo, tools: anthropicTools,
+                  tool_choice: forced ? (forceCreate ? { type: 'tool', name: CREATE_DOCUMENT } : { type: 'any' }) : { type: 'auto' },
                 };
                 if (/haiku-4-5|sonnet-4-|opus-4-[0-5]|claude-3/i.test(t.model)) cbody.temperature = 0;
                 const cr = await fetch('https://api.anthropic.com/v1/messages', {
@@ -881,9 +939,10 @@ export async function POST(request: NextRequest) {
               const r = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST', signal: AbortSignal.timeout(deadlines.plannerMs), headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  model: t.model, messages: plannerMessages, ...openAiChatParams(t.model, { temperature: 0, maxTokens: TOOL_ROUND_MAX_TOKENS }),
+                  model: t.model, messages: plannerMessages, ...openAiChatParams(t.model, { temperature: 0, maxTokens: plannerMaxTokens }),
                   // OPP_INTENT (Andre fix) → 'required' so an opportunity search can't decline the tool.
-                  tools: ALL_TOOL_DEFS, tool_choice: OPP_INTENT ? 'required' : 'auto',
+                  tools: ALL_TOOL_DEFS,
+                  tool_choice: forceCreate ? { type: 'function', function: { name: CREATE_DOCUMENT } } : OPP_INTENT ? 'required' : 'auto',
                 }),
               });
               if (r.ok) return { ok: true, json: await r.json() };
@@ -959,7 +1018,20 @@ export async function POST(request: NextRequest) {
                 // F1: a find_opportunities call on a CURRENT_FIND turn keeps all three horizons unless the customer limited it.
                 const findArgs = enforceFindArgs(String(tc.function?.name || ''), guardedCities.args, toolOffer.intent, toolOffer.openOnly, customerTypedCodes);
                 for (const c of findArgs.changes) turnTrace.notices.push(`find_args_enforced:${c}`);
-                const guarded = { args: findArgs.args, removed: [...guardedStates.removed, ...guardedCities.removed] };
+                // A resolved revision decides revises_document_id, not the model: the generated document's real id,
+                // or none for the user's own file (create_document only versions documents Mindy generated).
+                let docArgs = findArgs.args;
+                if (revision && String(tc.function?.name || '') === CREATE_DOCUMENT) {
+                  try {
+                    const a = JSON.parse(docArgs || '{}');
+                    if (a && typeof a === 'object' && !Array.isArray(a)) {
+                      if (revision.kind === 'generated') a.revises_document_id = revision.id; else delete a.revises_document_id;
+                      docArgs = JSON.stringify(a);
+                      turnTrace.notices.push(`revision:revises_id_${revision.kind === 'generated' ? 'set' : 'cleared'}`);
+                    }
+                  } catch { /* unreadable arguments: the executor refuses them */ }
+                }
+                const guarded = { args: docArgs, removed: [...guardedStates.removed, ...guardedCities.removed] };
                 for (const r of guarded.removed) turnTrace.notices.push(`unstated_filter_removed:${tc.function?.name}:${r}`);
                 return { ...tc, id, type: 'function' as const, function: { ...tc.function, arguments: guarded.args } };
               });
