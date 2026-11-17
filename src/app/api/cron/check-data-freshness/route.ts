@@ -288,9 +288,10 @@ const REFRESH_SCRIPTS: Record<string, string> = {
     'MANUAL curated refresh — no automated producer. See docs/DATA-SOURCES-REGISTRY.md §SBLO lineage. '
     + 'Jun-2026 method: SBA Prime Directory roster → clean to official legal names → re-research each '
     + 'contact against live sources → data/imports/sblo-refresh-<YYYY-MM>.csv → canonical SBLO roster '
-    + '(src/data/sblo-roster-2026-06.json). NOTE: scripts/import-sblo-refresh.js is DOWNSTREAM only '
-    + '(merges the CSV into prime-contractors-database.json) and currently HARDCODES the Jun-2026 CSV '
-    + 'path — it must be parameterized or deliberately updated before any future refresh. '
+    + '(src/data/sblo-roster-2026-06.json). Apply the researched CSV with '
+    + '`npx tsx scripts/import-sblo-refresh.ts --csv <path>` (diff only, writes nothing), then '
+    + '`--write --out src/data/sblo-roster-<YYYY-MM>.json` (new file; every field needs status/verifiedAt/sourceUrl). '
+    + 'The importer researches nothing — it is not the producer. '
     + 'Do NOT run ~/Bootcamp/compile-sblo-list.py — superseded regex scraper; its output was replaced for quality.',
   dod_command_osbp: 'refresh director names vs agency OSBP pages (structure is stable)',
   agency_pain_points: 'scripts/merge-agency-intelligence.js + ~/Bootcamp/scan-ndaa-sections.py (new GAO/NDAA)',
