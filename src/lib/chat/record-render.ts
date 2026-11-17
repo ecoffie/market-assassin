@@ -346,8 +346,11 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
   // The tool's total counts matching rows; never show a total smaller than what was retrieved.
   const total = Math.max(reportedTotal ?? retrieved, retrieved);
   const state = str(meta.result_state);
-  const offset = Math.max(0, Math.min(Math.floor(opts.offset ?? 0), Math.max(retrieved - 1, 0)));
-  const page = records.slice(offset, offset + pageSize);
+  // A page past the end shows nothing and says so; it never re-shows the last record (#2141 review, Agent 4).
+  const requestedOffset = Math.max(0, Math.floor(opts.offset ?? 0));
+  const pastEnd = retrieved > 0 && requestedOffset >= retrieved;
+  const offset = pastEnd ? requestedOffset : Math.min(requestedOffset, Math.max(retrieved - 1, 0));
+  const page = pastEnd ? [] : records.slice(offset, offset + pageSize);
   const from = page.length ? offset + 1 : 0;
   const to = page.length ? offset + page.length : 0;
   const standalone = records.filter((r) => r._kind === 'contract').length;
@@ -370,9 +373,11 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
     const flaggedRecs = records.filter((r) => describedPlaceConflict(str(r.description), str(r.place_of_performance_state)) || describedOtherWork(str(r.description), REQUESTED_LABELS));
     flaggedIdsOut = flaggedRecs.map((r) => str(r.piid) || str(r.contract_id));
     const exhaustiveNow = from === 1 && to === total && retrieved === total;
-    lines.push(exhaustiveNow
-      ? `Showing all ${total}, soonest end date first.`
-      : `Showing ${from}–${to} of ${total}, soonest end date first.`);
+    lines.push(pastEnd
+      ? `No more expiring records beyond #${retrieved}.${retrieved === total ? ` All ${total} were shown.` : ''}`
+      : exhaustiveNow
+        ? `Showing all ${total}, soonest end date first.`
+        : `Showing ${from}–${to} of ${total}, soonest end date first.`);
   }
   if (ignored) lines.push(ignored);
   if (page.length) {
@@ -386,7 +391,8 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
     }
   }
   const pageIds = new Set(page.map((r) => str(r.contract_id) || str(r.piid)));
-  const offPage = records
+  // Past the end, the CHECK records were already listed on earlier pages; nothing is repeated.
+  const offPage = pastEnd ? [] : records
     .map((r, i) => ({ r, i }))
     .filter(({ r }) => !pageIds.has(str(r.contract_id) || str(r.piid)))
     .filter(({ r }) => describedPlaceConflict(str(r.description), str(r.place_of_performance_state)) || describedOtherWork(str(r.description), REQUESTED_LABELS));
@@ -406,7 +412,7 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
   const exhaustive = retrieved > 0 && from === 1 && to === total && retrieved === total;
   if (retrieved > 0 && !exhaustive) {
     lines.push('');
-    if (to < retrieved) {
+    if (!pastEnd && to < retrieved) {
       const nextTo = Math.min(to + pageSize, retrieved);
       lines.push(`This is not the full list. Ask "show expiring records ${to + 1} to ${nextTo}" to continue.`);
     }
@@ -620,8 +626,11 @@ export function renderBuyingOffices(result: Rec, opts: { offset?: number } = {})
   const buyers = offices.filter((o) => (num(o.obligated) ?? 0) > 0);
   const nonBuyers = offices.filter((o) => (num(o.obligated) ?? 0) <= 0);
   const officeCount = num(totals?.office_count) ?? offices.length;
-  const offset = Math.max(0, Math.min(Math.floor(opts.offset ?? 0), Math.max(buyers.length - 1, 0)));
-  const page = buyers.slice(offset, offset + OFFICE_PAGE);
+  // A page past the end shows nothing and says so; it never re-shows the last office or re-adds its id.
+  const requestedOffset = Math.max(0, Math.floor(opts.offset ?? 0));
+  const pastEnd = buyers.length > 0 && requestedOffset >= buyers.length;
+  const offset = pastEnd ? requestedOffset : Math.min(requestedOffset, Math.max(buyers.length - 1, 0));
+  const page = pastEnd ? [] : buyers.slice(offset, offset + OFFICE_PAGE);
   const from = page.length ? offset + 1 : 0;
   const to = page.length ? offset + page.length : 0;
   const notRetrieved = Math.max(0, officeCount - offices.length);
@@ -679,8 +688,9 @@ export function renderBuyingOffices(result: Rec, opts: { offset?: number } = {})
     lines.push('');
     // 4. The honest count and how to continue.
     const countBits: string[] = [];
-    countBits.push(exhaustive ? `Showing all ${buyers.length} offices.` : `Showing ${from}–${to} of the ${buyers.length} offices with positive net obligations.`);
-    if (to < buyers.length) countBits.push(`Ask "show offices ${to + 1} to ${Math.min(to + OFFICE_PAGE, buyers.length)}" for the next ${Math.min(OFFICE_PAGE, buyers.length - to)}.`);
+    if (pastEnd) countBits.push(`No more offices beyond #${buyers.length}.${notRetrieved ? '' : ` All ${buyers.length} offices with positive net obligations were shown.`}`);
+    else countBits.push(exhaustive ? `Showing all ${buyers.length} offices.` : `Showing ${from}–${to} of the ${buyers.length} offices with positive net obligations.`);
+    if (!pastEnd && to < buyers.length) countBits.push(`Ask "show offices ${to + 1} to ${Math.min(to + OFFICE_PAGE, buyers.length)}" for the next ${Math.min(OFFICE_PAGE, buyers.length - to)}.`);
     if (notRetrieved) countBits.push(`${notRetrieved} more office${notRetrieved === 1 ? ' ranks' : 's rank'} below the top ${offices.length} retrieved; narrow the search to see ${notRetrieved === 1 ? 'it' : 'them'}.`);
     lines.push(countBits.join(' '));
     if (nonBuyers.length) {
