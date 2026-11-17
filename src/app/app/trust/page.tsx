@@ -124,6 +124,16 @@ export default function TrustPage() {
           ))}
         </div>
 
+        {/* Prohibited material — the policy only. Automatic-rejection claims wait
+            until the upload safeguards are tested (Eric, 2026-11-17). */}
+        <section className="mt-10 rounded-xl border border-surface bg-ground/30 p-6">
+          <h2 className="text-base font-semibold text-white">What not to upload</h2>
+          <p className="mt-2 leading-relaxed text-muted">
+            Do not upload classified information or Controlled Unclassified
+            Information (CUI). Mindy is not authorized to process these materials.
+          </p>
+        </section>
+
         {/* Honest scope — the measured note that builds more trust than overclaiming */}
         <section className="mt-10 rounded-xl border border-surface bg-ground/30 p-6">
           <h2 className="text-base font-semibold text-white">
@@ -133,9 +143,8 @@ export default function TrustPage() {
             We’re honest about the roadmap. For teams and agencies that need it,
             we’re adding organization-level workspaces and, where a contract
             requires it, deployment inside your own government-authorized cloud
-            environment. Mindy provides the secure application; your prime or
-            hosting partner carries the FedRAMP boundary. Ask us — we’ll tell you
-            exactly where a capability stands today.
+            environment. Ask us — we’ll tell you exactly where a capability
+            stands today.
           </p>
           <p className="mt-3 leading-relaxed text-muted">
             Need these commitments in writing — a signed DPA, SSO, audit logs, or
