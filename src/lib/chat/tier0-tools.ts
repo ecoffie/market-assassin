@@ -22,7 +22,7 @@
  */
 
 import { loadVaultContext, ALL_VAULT_SECTIONS } from '@/lib/proposal/loaders';
-import { vaultEmailFor, type ChatActingScope } from '@/lib/chat/chat-acting-scope';
+import { vaultEmailFor, WORKSPACE_UNCONFIRMED_NOTE, type ChatActingScope } from '@/lib/chat/chat-acting-scope';
 import { matchRequirementsToEvidence } from '@/lib/proposal/evidence-match';
 import { parseRetrieveArgs, retrieveVault, RETRIEVAL_POOL_LIMITS, type VaultRetrievalDeps } from './vault-retrieval';
 
@@ -143,7 +143,7 @@ export function makeTier0Tools(
   const boundEmail = scope.email;
   const workspaceNote = scope.kind === 'client' ? { workspace: 'client' as const } : {};
   const unavailable = { ok: false, error: 'workspace_unavailable', count: 0, items: [],
-    note: "Couldn't confirm which workspace you're working in, so no private data was read. Try again." };
+    note: WORKSPACE_UNCONFIRMED_NOTE };
 
   async function getMyPipeline(args: { stage?: unknown }): Promise<Record<string, unknown>> {
     // Validate the ONLY model-supplied field. Anything unexpected is ignored.

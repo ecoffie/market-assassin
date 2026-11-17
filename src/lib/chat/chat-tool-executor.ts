@@ -18,6 +18,7 @@
  * chat-private tools through the tier-0 executor.
  */
 import { randomUUID } from 'node:crypto';
+import { WORKSPACE_UNCONFIRMED_NOTE } from '@/lib/chat/chat-acting-scope';
 import { listMcpTools, isMcpTool, runMcpTool, creditsFor } from '@/lib/mcp/tool-registry';
 import { logCall, type CallStatus } from '@/lib/mcp/credits';
 import { preflightPaidInput } from '@/lib/mcp/credit-integrity';
@@ -301,7 +302,7 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
     if (opts.privateScopeUnavailable && VAULT_GROUNDED_TOOLS.has(name)) {
       await log(planner, name, 'blocked_policy', executionId, { args, errorCategory: 'workspace_unavailable' });
       return done('blocked_policy', policy.decision, 'workspace_unavailable',
-        refusal('workspace_unavailable', "Couldn't confirm which workspace you're working in, so no Vault was read. Try again."));
+        refusal('workspace_unavailable', WORKSPACE_UNCONFIRMED_NOTE));
     }
 
     // 6) Execute with per-tool error capture. ONLY the tool call itself is inside this try:
