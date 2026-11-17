@@ -85,6 +85,8 @@ const providerApprovedForPrivate = (provider: string): boolean =>
 // Never on a production deployment, even if the variable is set there by mistake.
 const TRACE_EVENTS = process.env.ASK_MINDY_TRACE_EVENTS === 'true' && process.env.VERCEL_ENV !== 'production';
 const TRACE_RESULT_CHARS = Number(process.env.ASK_MINDY_TRACE_RESULT_CHARS) || 6000;
+/** create_document only: how much of the most recent answer the planner sees (it may be building a file from it). */
+const PLANNER_LAST_ANSWER_CHARS = 12_000;
 import { shadowEntitlement } from '@/lib/entitlements/shadow';
 import {
   isCardChatEnabled, cardChatTurnCredits, parseOpportunityContext, cardChatAccess, isBillableTurn,
@@ -92,7 +94,7 @@ import {
 } from '@/lib/chat/card-chat';
 import { SELECTED_NOTICE_COLUMNS, loadSelectedNoticeFacts, formatSelectedNoticeFacts, type SelectedNoticeRecord } from '@/lib/chat/selected-notice';
 import { isVaultChatDocumentsEnabled, loadChatDocumentTexts } from '@/lib/vault/chat-store';
-import { buildDocumentContext, type DocumentBlock } from '@/lib/chat/document-context';
+import { buildDocumentContext, buildPlannerDocumentContext, type DocumentBlock } from '@/lib/chat/document-context';
 import { resolveMentionedNotice, answerUsesNotice, type MentionedNoticeResult } from '@/lib/chat/mentioned-notice';
 import { abilityOneCaveat } from '@/lib/chat/category-caveats';
 import { parseTurnId, claimCardTurn, completeCardTurn, failCardTurn, type ClaimResult } from '@/lib/chat/card-chat-turns';
@@ -638,10 +640,16 @@ export async function POST(request: NextRequest) {
         // nothing. Never fed into the stated-filters guard (conversationText stays the customer's words).
         let documentContext: DocumentBlock | null = null;
         let documentsNotice: string | null = null;
+        // create_document (allowlisted callers only) builds the document in the PLANNER call, so that call
+        // must see the uploaded text and the latest answer; otherwise the company's own content is missing.
+        const plannerBuildsDocuments = vaultDocEnabledFor('generate', auth.email);
+        let plannerDocumentText: string | null = null;
         if (isVaultChatDocumentsEnabled(auth.email) && profileEmail && body.sessionId === sessionId) {
           const loaded = await loadChatDocumentTexts(getSupabase(), { sessionId, ownerEmail: profileEmail });
-          if (loaded.ok) documentContext = buildDocumentContext(loaded.value, customerWords);
-          else documentsNotice = `documents:${loaded.reason}`;
+          if (loaded.ok) {
+            documentContext = buildDocumentContext(loaded.value, customerWords);
+            if (plannerBuildsDocuments) plannerDocumentText = buildPlannerDocumentContext(loaded.value, customerWords);
+          } else documentsNotice = `documents:${loaded.reason}`;
         }
         if (documentContext) messages.push({ role: 'system', content: documentContext.block });
         // Category caveat grounded by the work the customer named in THIS message (janitorial → AbilityOne).
@@ -708,12 +716,17 @@ export async function POST(request: NextRequest) {
         if (cardContext) toolRoundMessages.push({ role: 'system', content: cardContext.block });
         // The planner sees which documents exist, not their text.
         if (documentContext) toolRoundMessages.push({ role: 'system', content: documentContext.manifest });
+        // create_document only: the uploaded text (fenced, with document ids) so the document can include it.
+        if (plannerDocumentText) toolRoundMessages.push({ role: 'system', content: plannerDocumentText });
         for (const n of ledgerSystemNotes) toolRoundMessages.push({ role: 'system', content: n });
-        for (const h of history) {
+        // create_document only: the most recent answer (e.g. a rewrite the user wants as a file) is passed at up
+        // to PLANNER_LAST_ANSWER_CHARS, not 2,000 — a 2,000-char cut is why the document lost it (2026-11-17).
+        const lastAssistantIdx = plannerBuildsDocuments ? history.map((h) => h.role).lastIndexOf('assistant') : -1;
+        history.forEach((h, i) => {
           if (h.role === 'user' || h.role === 'assistant') {
-            toolRoundMessages.push({ role: h.role, content: String(h.content || '').slice(0, 2000) });
+            toolRoundMessages.push({ role: h.role, content: String(h.content || '').slice(0, i === lastAssistantIdx ? PLANNER_LAST_ANSWER_CHARS : 2000) });
           }
-        }
+        });
         toolRoundMessages.push({ role: 'user', content: message });
 
         // Preview-only per-request model configuration (staging acceptance); null on production by construction.
