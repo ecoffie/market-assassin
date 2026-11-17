@@ -6,7 +6,8 @@
  * and that the tool is non-billable (never offered in the billed card chat).
  */
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { makeGenerateDocumentTool, CREATE_DOCUMENT } from './generate-document-tool';
+import { makeGenerateDocumentTool, CREATE_DOCUMENT, CREATE_DOCUMENT_TOOL_DEF } from './generate-document-tool';
+import { SOURCE_KIND_VALUES, BLOCK_TYPE_VALUES, CLAIM_VALUES } from '@/lib/documents/validate';
 import { CARD_CHAT_TOOLS } from './card-chat';
 import { chatToolPolicy } from './chat-tool-policy';
 import { VAULT_GROUNDED_TOOLS } from './chat-tool-executor';
@@ -116,32 +117,63 @@ describe('create_document', () => {
     expect(s.docs()[0].doc_model.theme).toBe('briefing');
   });
 
-  it('retry then label: an uncited fact is returned once to fix; the second attempt saves it labeled Unverified', async () => {
+  it('label, don\'t refuse: an uncited fact is saved on the FIRST call, labeled Unverified (Ask Mindy runs one tool round per turn)', async () => {
     const s = setup();
     const bad = model({ sections: [{ id: 'a', heading: 'Summary', blocks: [
       { type: 'paragraph', id: 'p1', text: 'VA obligated $412.5M for janitorial services.', claim: 'fact', cites: ['s1'] },
       { type: 'paragraph', id: 'p2', text: 'Most buyers prefer local firms.', claim: 'fact' },
+      { type: 'paragraph', id: 'p3', text: 'Proposals are due December 4.', claim: 'fact', critical: true },
     ] }] });
-    const first = await s.tool.execute({ doc_model: bad });
-    expect(first).toMatchObject({ ok: false, error: 'grounding_failed' });
-    expect(JSON.stringify(first.issues)).toMatch(/a fact must cite/);
-    expect(s.docs()).toEqual([]);
-    const second = await s.tool.execute({ doc_model: bad });
-    expect(second).toMatchObject({ ok: true, unverified_count: 1, omitted_count: 0 });
-    const saved = s.docs()[0].doc_model.sections[0].blocks[1];
-    expect(saved).toMatchObject({ id: 'p2', claim: 'unverified' });
-    expect(String(second.note)).toMatch(/Unverified — no source/);
+    const r = await s.tool.execute({ doc_model: bad });
+    expect(r).toMatchObject({ ok: true, unverified_count: 1, omitted_count: 1 });
+    const blocks = s.docs()[0].doc_model.sections[0].blocks;
+    expect(blocks.map((b: R) => [b.id, b.claim])).toEqual([['p1', 'fact'], ['p2', 'unverified']]); // critical p3 omitted
+    expect(String(r.note)).toMatch(/Unverified — no source/);
+    expect(String(r.note)).toMatch(/left out/);
   });
 
-  it('repeated method boilerplate across sections is returned once to rewrite', async () => {
+  it('repeated method boilerplate is reported, never a reason to refuse', async () => {
     const s = setup();
     const boiler = 'The figures are drawn from the cited records and are reported as recorded without adjustment.';
     const m = model({ sections: [
       { id: 'a', heading: 'A', blocks: [{ type: 'paragraph', id: 'r1', text: `Track these offices. ${boiler}`, claim: 'recommendation' }] },
       { id: 'b', heading: 'B', blocks: [{ type: 'paragraph', id: 'r2', text: `Call early. ${boiler}`, claim: 'recommendation' }] },
     ] });
-    expect(await s.tool.execute({ doc_model: m })).toMatchObject({ ok: false, error: 'repeated_boilerplate' });
-    expect(await s.tool.execute({ doc_model: m })).toMatchObject({ ok: true });
+    expect(await s.tool.execute({ doc_model: m })).toMatchObject({ ok: true, repeated_sentences: 1 });
+  });
+
+  describe('source kinds (live failure 2026-11-17: guessed kinds were refused)', () => {
+    it.each([
+      ['uploaded_file', 'upload'], ['document', 'upload'], ['File', 'upload'],
+      ['federal_data', 'usaspending'], ['FPDS', 'usaspending'], ['usaspending.gov', 'usaspending'],
+      ['sam', 'sam_notice'], ['SAM.gov', 'sam_notice'], ['vault', 'vault'],
+    ])('a guessed kind "%s" is normalized to "%s" and the document is saved', async (guess, expected) => {
+      const s = setup();
+      const r = await s.tool.execute({ doc_model: model({ sources: [{ id: 's1', kind: guess, label: 'Source', url: 'https://www.usaspending.gov/search' }] }) });
+      expect(r).toMatchObject({ ok: true });
+      expect(s.docs()[0].doc_model.sources[0].kind).toBe(expected);
+    });
+
+    it('an unknown kind is refused with the exact allowed values; nothing saved', async () => {
+      const s = setup();
+      const r = await s.tool.execute({ doc_model: model({ sources: [{ id: 's1', kind: 'press_release', label: 'Source' }] }) });
+      expect(r).toMatchObject({ ok: false, error: 'invalid_document' });
+      expect(JSON.stringify(r.issues)).toMatch(/unknown source kind \\"press_release\\"; allowed values: sam_notice, usaspending, upload, vault, tool, web, other/);
+      expect((r.allowed as R).source_kind).toEqual(['sam_notice', 'usaspending', 'upload', 'vault', 'tool', 'web', 'other']);
+      expect(s.docs()).toEqual([]);
+    });
+  });
+
+  it('the tool schema states every allowed value, exactly as the validator accepts them', () => {
+    const dm = (CREATE_DOCUMENT_TOOL_DEF.function.parameters.properties.doc_model) as R;
+    expect(dm.properties.sources.items.properties.kind.enum).toEqual([...SOURCE_KIND_VALUES]);
+    const block = dm.properties.sections.items.properties.blocks.items.properties;
+    expect(block.type.enum).toEqual([...BLOCK_TYPE_VALUES]);
+    expect(block.claim.enum).toEqual([...CLAIM_VALUES]);
+    expect(block.tone.enum).toEqual(['note', 'warning', 'key_finding']);
+    expect(block.kind.enum).toEqual(['bar', 'line', 'pie']);
+    expect(block.items.items.properties.claim.enum).toEqual([...CLAIM_VALUES]);
+    expect(CREATE_DOCUMENT_TOOL_DEF.function.description).toMatch(/CALL THIS whenever the user asks to create, make, write up, export, download or save a document, report, PDF, Word file, capability statement/);
   });
 
   it('revision: an earlier ASSUMPTION re-emitted as a fact is refused; nothing saved', async () => {

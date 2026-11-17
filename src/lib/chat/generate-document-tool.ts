@@ -3,11 +3,11 @@
  * and save both privately to the Vault as doc_class='generated' rows (#2116), owned by the acting scope.
  *
  * Rules (Eric, 2026-11-17), enforced here, never trusted to the model:
- *   - GROUNDING: the engine validator (src/lib/documents/validate.ts) decides. RETRY THEN LABEL: the
- *     first attempt that fails grounding (or repeats method boilerplate across sections) is returned
- *     with the issues so the model fixes it once; the second attempt is repaired by demoteUncitedFacts
- *     (uncited facts → "Unverified — no source", decision-critical ones omitted) and saved only if it then
- *     validates. Structural errors are never "repaired" — they are refused.
+ *   - GROUNDING: the engine validator (src/lib/documents/validate.ts) decides. LABEL, DON'T REFUSE: Ask
+ *     Mindy runs one tool round per turn, so an uncited or unsupported fact is repaired on the FIRST call
+ *     by demoteUncitedFacts (→ "Unverified — no source"; decision-critical ones omitted) and saved.
+ *     Structural errors and unknown values are refused with the exact allowed values. Common source-kind
+ *     names are normalized first (uploaded_file → upload, fpds → usaspending, sam.gov → sam_notice).
  *   - ASSUMPTIONS NEVER HARDEN: a revision whose model re-emits a prior ASSUMPTION as a fact is refused
  *     (hardenedAssumptions against the parent's stored DocModel).
  *   - No test fixture or example-domain content (fixtureMarkers), no CUI or classified markings
@@ -21,7 +21,7 @@
  * Offered only when VAULT_GENERATED_FILES is on for the verified caller ('true' or 'allowlist').
  */
 import { DOC_SCHEMA, labeledUnits, type DocModel } from '@/lib/documents/model';
-import { validateDocModel, demoteUncitedFacts, hardenedAssumptions, repeatedSentences, fixtureMarkers } from '@/lib/documents/validate';
+import { validateDocModel, demoteUncitedFacts, hardenedAssumptions, repeatedSentences, fixtureMarkers, BLOCK_TYPE_VALUES, CLAIM_VALUES, SOURCE_KIND_VALUES } from '@/lib/documents/validate';
 import { renderDocument } from '@/lib/documents';
 import { saveGeneratedDocument, type GeneratedDb } from '@/lib/vault/generated';
 import type { VaultStorage, VaultUploadInput } from '@/lib/vault/upload';
@@ -33,19 +33,79 @@ export const CREATE_DOCUMENT = 'create_document';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
+const str = { type: 'string' };
+const cites = { type: 'array', items: { type: 'string' }, description: 'Source ids from doc_model.sources that support this statement.' };
+const claim = { type: 'string', enum: [...CLAIM_VALUES], description: "fact = cites a source; assumption = a planning premise (add origin if uncited); recommendation; unverified; context = only in a role 'about' section, no numbers." };
+
+/** The document schema the model fills, with every allowed value stated (live failure 2026-11-17: guessed source kinds were refused). */
+const DOC_MODEL_SCHEMA = {
+  type: 'object',
+  properties: {
+    title: str,
+    subtitle: str,
+    preparedFor: str,
+    sources: {
+      type: 'array',
+      description: 'Every source a fact cites. kind must be one of the listed values (an uploaded file is "upload", a Vault document "vault", USAspending/FPDS award data "usaspending", a SAM.gov notice "sam_notice").',
+      items: {
+        type: 'object',
+        properties: { id: str, label: str, kind: { type: 'string', enum: [...SOURCE_KIND_VALUES] }, url: str, retrievedAt: { type: 'string', description: 'YYYY-MM-DD' }, recordId: str },
+        required: ['id', 'label', 'kind'],
+      },
+    },
+    sections: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: str,
+          heading: str,
+          role: { type: 'string', enum: ['about'], description: "Only for a short 'how to read / method / limitations' section." },
+          blocks: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                type: { type: 'string', enum: [...BLOCK_TYPE_VALUES] },
+                id: str,
+                text: str,
+                claim,
+                cites,
+                origin: { type: 'string', description: 'For an uncited assumption: where it comes from (e.g. "This analysis models these figures; they were not verified against the customer\'s records.").' },
+                critical: { type: 'boolean', description: 'True when the statement drives a decision (a dollar figure, deadline, eligibility rule).' },
+                tone: { type: 'string', enum: ['note', 'warning', 'key_finding'] },
+                ordered: { type: 'boolean' },
+                items: { type: 'array', items: { type: 'object', properties: { text: str, claim, cites, origin: str }, required: ['text', 'claim'] } },
+                caption: str,
+                columns: { type: 'array', items: { type: 'object', properties: { key: str, label: str, format: { type: 'string', enum: ['text', 'usd', 'int', 'pct', 'date'] }, align: { type: 'string', enum: ['left', 'right'] } }, required: ['key', 'label'] } },
+                rows: { type: 'array', items: { type: 'object' } },
+                kind: { type: 'string', enum: ['bar', 'line', 'pie'] },
+                valueFormat: { type: 'string', enum: ['usd', 'int', 'pct'] },
+                xLabel: str,
+                yLabel: str,
+                series: { type: 'array', items: { type: 'object', properties: { name: str, points: { type: 'array', items: { type: 'object', properties: { x: str, y: { type: 'number' } }, required: ['x', 'y'] } } }, required: ['name', 'points'] } },
+              },
+              required: ['type', 'id'],
+            },
+          },
+        },
+        required: ['id', 'heading', 'blocks'],
+      },
+    },
+  },
+  required: ['title', 'sources', 'sections'],
+};
+
 export const CREATE_DOCUMENT_TOOL_DEF = {
   type: 'function' as const,
   function: {
     name: CREATE_DOCUMENT,
     description:
-      "Create a client-ready document (a PDF and an editable Word file) from research in this conversation, saved privately to the user's Vault. Use it only when the user asks for a document, report or deliverable. Every block needs a claim label: 'fact' (must cite a source id from `sources`), 'assumption' (a planning premise, with an `origin` sentence if uncited), 'recommendation', 'unverified' or 'context' (only in an 'about' section, no numbers). Certifications, contract awards, past performance and eligibility can never be assumptions. To revise a document Mindy made earlier, pass its document_id as revises_document_id: a new version is saved and the old one is kept. If the result asks you to fix issues, fix them and call once more.",
+      "Create a document file — a client-ready PDF and an editable Word file — and save it privately to the user's Vault. CALL THIS whenever the user asks to create, make, write up, export, download or save a document, report, PDF, Word file, capability statement, brief or deliverable; build it from what is already in this conversation (do not run new searches first unless the user asks for new research). Label every block (fact must cite a source id; an uncited fact is saved labeled \"Unverified — no source\"). Certifications, contract awards, past performance and eligibility can never be assumptions. To revise a document Mindy made earlier, pass its document_id as revises_document_id: a new version is saved and the old one is kept.",
     parameters: {
       type: 'object',
       properties: {
-        doc_model: {
-          type: 'object',
-          description: "The document: { title, subtitle?, preparedFor?, sources: [{id,label,kind,url?,retrievedAt?,recordId?}], sections: [{id, heading, role?: 'about', blocks: [...]}] }. Blocks: paragraph {type,id,text,claim,cites?,origin?}, bullets {type,id,items:[{text,claim,cites?}]}, table {type,id,caption?,claim,cites?,columns:[{key,label,format?}],rows:[{...}]}, chart {type,id,kind:'bar'|'line'|'pie',caption?,claim,cites?,valueFormat?,series:[{name,points:[{x,y}]}]}, callout {type,id,tone:'note'|'warning'|'key_finding',text,claim,cites?}.",
-        },
+        doc_model: DOC_MODEL_SCHEMA,
         revises_document_id: { type: 'string', description: 'The document_id of a document Mindy generated earlier, when this is a revision of it.' },
         theme: { type: 'string', enum: ['mindy', 'briefing'], description: "Visual style. Default 'mindy'." },
       },
@@ -54,6 +114,21 @@ export const CREATE_DOCUMENT_TOOL_DEF = {
     },
   },
 };
+
+/** Common names a model uses for a source kind → the engine's value. Anything else stays as given (and is refused with the allowed values). */
+const KIND_SYNONYMS: Record<string, (typeof SOURCE_KIND_VALUES)[number]> = {
+  uploaded_file: 'upload', uploaded: 'upload', file: 'upload', document: 'upload', attachment: 'upload', uploaded_document: 'upload', user_upload: 'upload',
+  federal_data: 'usaspending', fpds: 'usaspending', 'usaspending.gov': 'usaspending', usa_spending: 'usaspending', award_data: 'usaspending', awards: 'usaspending',
+  sam: 'sam_notice', 'sam.gov': 'sam_notice', sam_gov: 'sam_notice', notice: 'sam_notice', solicitation: 'sam_notice', sam_opportunity: 'sam_notice',
+  vault_document: 'vault', my_vault: 'vault',
+  website: 'web', url: 'web', internet: 'web', mindy_tool: 'tool', mindy: 'tool',
+};
+export function normalizeSourceKind(kind: unknown): unknown {
+  if (typeof kind !== 'string') return kind;
+  const k = kind.trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if ((SOURCE_KIND_VALUES as readonly string[]).includes(k)) return k;
+  return KIND_SYNONYMS[k] ?? kind;
+}
 
 export interface GenerateDocumentDeps {
   db: GeneratedDb;
@@ -111,7 +186,6 @@ const baseName = (f: string) => f.replace(/\.(pdf|docx)$/i, '');
 export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
   const owner = vaultEmailFor(deps.scope);
   const workspaceNote = deps.scope.kind === 'client' ? { workspace: 'client' as const } : {};
-  let attempts = 0; // retry-then-label is per turn: this closure lives for one turn
 
   async function loadParent(id: string): Promise<Row | null | 'error'> {
     const { data, error } = await deps.db.from('user_boilerplate_docs')
@@ -137,7 +211,6 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
     // ('true' or allowlisted) behaves exactly like off — nothing is rendered, read or saved.
     if (!vaultDocEnabledFor('generate', deps.callerEmail)) return { ok: false, error: 'not_available', note: 'Creating documents is not available here.' };
     if (!owner) return { ok: false, error: 'workspace_unavailable', note: WORKSPACE_UNCONFIRMED_NOTE };
-    attempts += 1;
     const raw = args?.doc_model;
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ok: false, error: 'invalid_document', note: 'doc_model must be an object.' };
 
@@ -149,32 +222,38 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
       date: (deps.today ?? (() => new Date().toISOString().slice(0, 10)))(),
       theme,
       meta: { ...(((raw as { meta?: Record<string, unknown> }).meta) ?? {}), generatedBy: 'ask_mindy' },
+      ...(Array.isArray((raw as { sources?: unknown }).sources)
+        ? { sources: ((raw as { sources: Array<Record<string, unknown>> }).sources).map((src) => (src && typeof src === 'object' ? { ...src, kind: normalizeSourceKind(src.kind) } : src)) }
+        : {}),
     } as unknown as DocModel;
 
     const markers = fixtureMarkers(model);
     if (markers.length) return { ok: false, error: 'fixture_content', note: 'Example or test content cannot be saved as a document. Use the research from this conversation.' };
 
-    // Retry then label.
+    // One call, one answer (Ask Mindy runs ONE tool round per turn, so a "fix and call again" retry is
+    // unreachable live — 2026-11-17 production test). When the only problems are unsupported facts, the
+    // document is repaired right away: uncited facts are saved labeled "Unverified — no source" and
+    // decision-critical ones are omitted (never refused just because a fact lacked a cite). Anything the
+    // repair cannot fix — structure, unknown values — is refused with the exact allowed values.
     let v = validateDocModel(model);
-    const repeats = v.ok ? repeatedSentences(model) : [];
-    if ((!v.ok || repeats.length) && attempts === 1) {
-      return {
-        ok: false,
-        error: v.ok ? 'repeated_boilerplate' : 'grounding_failed',
-        issues: v.ok ? repeats.map((r) => `repeated in ${r.where.join(', ')}: "${r.sentence.slice(0, 80)}"`) : v.issues.slice(0, 25).map((i) => `${i.path}: ${i.message}`),
-        note: v.ok
-          ? 'State method text once, in the "about" section; keep qualifications next to their claims. Fix this and call create_document once more.'
-          : 'Fix these issues (cite a source for each fact, label every block) and call create_document once more. On the next attempt, any fact still without a source will be labeled "Unverified — no source", and decision-critical ones omitted.',
-      };
-    }
     let unverified: string[] = [];
     let omitted: string[] = [];
     if (!v.ok) {
       const d = demoteUncitedFacts(model);
-      model = d.model; unverified = d.unverified; omitted = d.omitted;
-      v = validateDocModel(model);
-      if (!v.ok) return { ok: false, error: 'invalid_document', issues: v.issues.slice(0, 25).map((i) => `${i.path}: ${i.message}`), note: 'The document could not be built. Nothing was saved.' };
+      const repaired = validateDocModel(d.model);
+      if (!repaired.ok) {
+        return {
+          ok: false,
+          error: 'invalid_document',
+          issues: repaired.issues.slice(0, 25).map((i) => `${i.path}: ${i.message}`),
+          allowed: { source_kind: [...SOURCE_KIND_VALUES], claim: [...CLAIM_VALUES], block_type: [...BLOCK_TYPE_VALUES] },
+          note: 'The document could not be built and nothing was saved. Fix exactly these fields using the allowed values, then the user can ask again.',
+        };
+      }
+      model = d.model; unverified = d.unverified; omitted = d.omitted; v = repaired;
     }
+    // Method boilerplate repeated across sections is reported, never a reason to refuse or cut.
+    const repeats = repeatedSentences(model);
 
     const text = docModelText(model);
     const marking = detectProhibitedMarkings(markingText(model));
@@ -242,6 +321,7 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
       unverified_count: unverified.length,
       omitted_count: omitted.length,
       ...(pdfNote ? { pdf_note: pdfNote } : {}),
+      ...(repeats.length ? { repeated_sentences: repeats.length } : {}),
       note: 'Saved privately to the Vault (Documents → Generated). Tell the user the file names and that they can download them there; do not paste download links.'
         + (unverified.length ? ` ${unverified.length} statement(s) are labeled "Unverified — no source"; say so.` : '')
         + (omitted.length ? ` ${omitted.length} decision-critical statement(s) without a source were left out; say so.` : ''),
