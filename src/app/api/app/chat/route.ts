@@ -39,6 +39,8 @@ import { loadBidderProfile, formatProfileForPrompt } from '@/lib/proposal/loader
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
 import { makeMyDocumentsTool, MY_DOCUMENTS_TOOL_DEF, FIND_MY_DOCUMENTS } from '@/lib/chat/my-documents-tool';
+import { makeGenerateDocumentTool, CREATE_DOCUMENT_TOOL_DEF, CREATE_DOCUMENT } from '@/lib/chat/generate-document-tool';
+import { vaultDocEnabledFor } from '@/lib/vault/flags';
 // Tools run ONLY through the chat tool executor (policy check at offer AND execution,
 // preflight, per-tool error capture, execution log). Never import runMcpTool here.
 import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/chat-tool-executor';
@@ -791,14 +793,19 @@ export async function POST(request: NextRequest) {
           const turnSessionId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId) ? sessionId : null;
           // find_my_documents (Vault documents, metadata then excerpts) — behind VAULT_ASK_MINDY_UPLOADS.
           const myDocs = isVaultChatDocumentsEnabled(auth.email) ? makeMyDocumentsTool(getSupabase(), actingScope, { chatSessionId: body.sessionId === sessionId ? turnSessionId : null }) : null;
-          const privateDefs = myDocs ? [...TIER0_TOOL_DEFS, MY_DOCUMENTS_TOOL_DEF] : TIER0_TOOL_DEFS;
-          const privateNames = myDocs ? new Set([...TIER0_TOOL_NAMES, FIND_MY_DOCUMENTS]) : TIER0_TOOL_NAMES;
+          // create_document (PDF + Word saved to the Vault) — behind VAULT_GENERATED_FILES for the VERIFIED caller
+          // ('true' or 'allowlist'). Non-billable; never offered in card chat (CARD_CHAT_TOOLS excludes it).
+          const genDoc = vaultDocEnabledFor('generate', auth.email)
+            ? makeGenerateDocumentTool({ db: getSupabase(), storage: getSupabase().storage, scope: actingScope, callerEmail: auth.email!, request, chatSessionId: body.sessionId === sessionId ? turnSessionId : null })
+            : null;
+          const privateDefs = [...TIER0_TOOL_DEFS, ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : [])];
+          const privateNames = new Set([...TIER0_TOOL_NAMES, ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : [])]);
           const executor = createChatToolExecutor({
             userEmail: auth.email!,
             ...(actingScope.kind === 'client' ? { vaultEmail: actingScope.vaultEmail } : {}),
             ...(actingScope.kind === 'unavailable' ? { privateScopeUnavailable: true } : {}),
             chatSessionId: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId) ? sessionId : null,
-            tier0: { defs: privateDefs, names: privateNames, execute: (n, a) => (myDocs && n === FIND_MY_DOCUMENTS ? myDocs.execute(a) : tier0Runtime.execute(n, a)) },
+            tier0: { defs: privateDefs, names: privateNames, execute: (n, a) => (myDocs && n === FIND_MY_DOCUMENTS ? myDocs.execute(a) : genDoc && n === CREATE_DOCUMENT ? genDoc.execute(a) : tier0Runtime.execute(n, a)) },
             // Card chat offers only its opportunity tools (narrowing; the policy still applies).
             ...(cardCtx ? { allowedToolNames: CARD_CHAT_TOOLS } : {}),
             toolTimeoutMs: (n) => toolTimeoutMs(n, deadlines),
