@@ -17,14 +17,18 @@ const h = vi.hoisted(() => ({
   runMcpTool: vi.fn(),
   loadBidderProfile: vi.fn(async () => ({})),
   failCardTurn: vi.fn(async () => {}),
+  claimCardTurn: vi.fn(),
+  table: '',
+  record: null as Record<string, unknown> | null,
 }));
 
 vi.mock('@supabase/supabase-js', () => {
   // Every query resolves to "no row, no error"; writes succeed.
   const chain: Record<string, unknown> = {};
   const self = () => chain;
-  for (const m of ['from', 'select', 'eq', 'in', 'order', 'limit', 'update', 'upsert', 'insert', 'ilike', 'or', 'gte', 'lte', 'neq', 'is']) chain[m] = vi.fn(self);
-  chain.maybeSingle = vi.fn(async () => ({ data: null, error: null }));
+  chain.from = vi.fn((t: string) => { h.table = t; return chain; });
+  for (const m of ['select', 'eq', 'in', 'order', 'limit', 'update', 'upsert', 'insert', 'ilike', 'or', 'gte', 'lte', 'neq', 'is']) chain[m] = vi.fn(self);
+  chain.maybeSingle = vi.fn(async () => ({ data: h.table === 'sam_opportunities' ? h.record : null, error: null }));
   chain.single = vi.fn(async () => ({ data: null, error: null }));
   chain.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(res);
   return { createClient: () => chain };
@@ -38,12 +42,12 @@ vi.mock('@/lib/chat/provider-events', () => ({ recordProviderEvent: vi.fn(async 
 vi.mock('@/lib/chat/mentioned-notice', () => ({ resolveMentionedNotice: vi.fn(async () => ({ status: 'none' })), answerUsesNotice: () => false }));
 vi.mock('@/lib/chat/card-chat-turns', () => ({
   parseTurnId: (v: unknown) => (typeof v === 'string' ? v : null),
-  claimCardTurn: vi.fn(), completeCardTurn: vi.fn(), failCardTurn: h.failCardTurn,
+  claimCardTurn: h.claimCardTurn, completeCardTurn: vi.fn(), failCardTurn: h.failCardTurn,
 }));
 vi.mock('@/lib/mcp/credits', async (orig) => ({ ...(await orig<typeof import('@/lib/mcp/credits')>()), logCall: vi.fn(async () => {}) }));
 vi.mock('@/lib/mcp/tool-registry', async (orig) => ({ ...(await orig<typeof import('@/lib/mcp/tool-registry')>()), runMcpTool: h.runMcpTool }));
 
-const ENV_KEYS = ['OPENAI_API_KEY', 'CHAT_TOOL_TIMEOUT_MS', 'CHAT_PLANNER_TIMEOUT_MS', 'CHAT_ANSWER_CONNECT_TIMEOUT_MS', 'CHAT_ANSWER_IDLE_TIMEOUT_MS', 'CHAT_TURN_DEADLINE_MS', 'CHAT_TOOL_ROUND_BUDGET_MS'] as const;
+const ENV_KEYS = ['OPENAI_API_KEY', 'MAP_CARD_CHAT_ENABLED', 'CHAT_TOOL_TIMEOUT_MS', 'CHAT_PLANNER_TIMEOUT_MS', 'CHAT_ANSWER_CONNECT_TIMEOUT_MS', 'CHAT_ANSWER_IDLE_TIMEOUT_MS', 'CHAT_TURN_DEADLINE_MS', 'CHAT_TOOL_ROUND_BUDGET_MS'] as const;
 const savedEnv: Record<string, string | undefined> = {};
 
 type FetchPlan = {
@@ -67,6 +71,9 @@ beforeEach(() => {
   plan = {};
   h.runMcpTool.mockReset();
   h.runMcpTool.mockResolvedValue({ result: { ok: true, agency: 'Department of Energy', pain_points: ['grid'], _meta: { grounded: true, degraded: false, result_state: 'known', ignored_args: [] } }, credits: 0 });
+  h.failCardTurn.mockClear();
+  h.claimCardTurn.mockReset();
+  h.record = null;
   h.loadBidderProfile.mockReset();
   h.loadBidderProfile.mockResolvedValue({});
   vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
@@ -178,6 +185,19 @@ describe('A7: timeouts — a hang never silently ends the response', () => {
     const ev = await ask('hello');
     expect(types(ev).slice(-2)).toEqual(['error', 'done']);
     expect(ev.find((e) => e.type === 'error')!.code).toBe('turn_timeout');
+  });
+});
+
+describe('B2: a card turn is released when the turn deadline fires', () => {
+  it('the watchdog marks the claimed card turn failed (free, re-askable) instead of leaving it in progress', async () => {
+    process.env.MAP_CARD_CHAT_ENABLED = 'true';
+    process.env.CHAT_TURN_DEADLINE_MS = '300';
+    h.record = { notice_id: '6ba812a7e0284f79bc44c4932777c340', title: 'Janitorial Services', solicitation_number: 'W912PL26Q0042', department: 'DEPT OF DEFENSE', ui_link: 'https://sam.gov/opp/x/view', active: true };
+    h.claimCardTurn.mockImplementation(async (p: { replayOnly: boolean }) => (p.replayOnly ? { outcome: 'not_completed', sessionId: null } : { outcome: 'claimed', claimToken: 'tok-1', sessionId: null }));
+    h.loadBidderProfile.mockImplementation(() => new Promise(() => {}));
+    const ev = await ask('When is it due?', { context: { kind: 'opportunity', notice_id: '6ba812a7e0284f79bc44c4932777c340' }, turn_id: '0a0a0a0a-1111-4222-8333-444444444444' });
+    expect(types(ev).slice(-2)).toEqual(['error', 'done']);
+    expect(h.failCardTurn).toHaveBeenCalledWith(expect.objectContaining({ claimToken: 'tok-1', reason: 'turn_timeout' }));
   });
 });
 
