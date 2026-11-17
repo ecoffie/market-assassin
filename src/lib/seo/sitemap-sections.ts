@@ -36,7 +36,7 @@ import { getFacetSlugsForSitemap } from '@/lib/seo/facets';
 import { COMPETITORS } from '@/data/competitors';
 import { LISTICLES } from '@/data/top-listicles';
 import { publishedPublications } from '@/lib/analytics/research-publications';
-import { getOpportunitySitemapEntries } from '@/lib/seo/opportunities';
+import { getOpportunitySitemapEntries, getClosedOpportunitySitemapEntries } from '@/lib/seo/opportunities';
 import { toLastmod, renderSitemapIndex, SITEMAP_URL_LIMIT, type SitemapEntry } from '@/lib/seo/sitemap-xml';
 
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai';
@@ -49,6 +49,7 @@ export const SITEMAP_CHILDREN = [
   'sitemap-contractor-tabs.xml',
   'sitemap-opportunities.xml',
   'sitemap-facets.xml',
+  'sitemap-opportunities-closed.xml',
 ] as const;
 
 /** The index document, served at /sitemap.xml and /sitemap-index.xml. */
@@ -277,7 +278,24 @@ export async function contractorSections(need: { contracts?: boolean; tabs?: boo
   return out;
 }
 
-/** Active opportunities: open and awarded (closed notices render but are not advertised). */
+/**
+ * Closed notices (response deadline passed within the last 24 months, not award notices), each
+ * a page labelled "Closed — responses were due <date>". Same thin gate as the open set. Capped
+ * at SITEMAP_URL_LIMIT by keeping the newest deadlines (explicit, logged — see the source fn).
+ * lastmod is the notice's own posting/enrichment date; a closed notice rarely changes, so it is
+ * crawled monthly at a lower priority than live work.
+ */
+export async function closedOpportunityEntries(): Promise<SitemapEntry[]> {
+  const { rows } = await getClosedOpportunitySitemapEntries(new Date(), SITEMAP_URL_LIMIT);
+  return rows.map((r) => ({
+    url: `${SITE_URL}/opportunity/${r.slug}`,
+    lastModified: r.lastModified,
+    changeFrequency: 'monthly',
+    priority: 0.3,
+  }));
+}
+
+/** Active opportunities: open and awarded. Closed notices are their own child (above). */
 export async function opportunityEntries(): Promise<SitemapEntry[]> {
   const rows = await getOpportunitySitemapEntries();
   if (rows.length > SITEMAP_URL_LIMIT) {

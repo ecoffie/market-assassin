@@ -36,6 +36,9 @@ export interface SeoOpportunity {
   uiLink: string | null;
   active: boolean;
   seoSummary: string | null;
+  /** Typed award columns — set by the SAM sync only when the award notice carries a winner. */
+  awardeeName: string | null;
+  awardDate: string | null;
 }
 
 export interface SimilarOpportunity {
@@ -96,7 +99,7 @@ export async function getOpportunityBySlug(slug: string): Promise<SeoOpportunity
   const { data, error } = await client
     .from('sam_opportunities')
     .select(
-      'notice_id, solicitation_number, title, description, sow_text, naics_code, psc_code, department, sub_tier, office, notice_type, set_aside_description, posted_date, response_deadline, pop_state, pop_city, ui_link, active, seo_summary',
+      'notice_id, solicitation_number, title, description, sow_text, naics_code, psc_code, department, sub_tier, office, notice_type, set_aside_description, posted_date, response_deadline, pop_state, pop_city, ui_link, active, seo_summary, awardee_name, award_date',
     )
     .ilike('notice_id', `%${tail}`)
     .limit(5);
@@ -132,52 +135,80 @@ export async function getOpportunityBySlug(slug: string): Promise<SeoOpportunity
     uiLink: row.ui_link || null,
     active: !!row.active,
     seoSummary: row.seo_summary || null,
+    awardeeName: (row.awardee_name || '').trim() || null,
+    awardDate: row.award_date || null,
   };
 }
 
-/**
- * "Similar Active Opportunities" — the internal-link web (SEO juice + dwell).
- * Same NAICS, active, excluding self, most-recent first. NAICS match is the
- * simplest reliable signal available now; semantic match is a later upgrade.
- */
-export async function getSimilarOpportunities(
-  opp: SeoOpportunity,
-  limit = 6,
-): Promise<SimilarOpportunity[]> {
-  const client = sb();
-  if (!client || !opp.naicsCode) return [];
-  const { data, error } = await client
-    .from('sam_opportunities')
-    .select('notice_id, title, description, sow_text, department, notice_type, response_deadline, naics_code')
-    .eq('active', true)
-    .eq('naics_code', opp.naicsCode)
-    .neq('notice_id', opp.noticeId)
-    .order('posted_date', { ascending: false })
-    .limit(limit * 3); // over-fetch; filter thin below
-  if (error) {
-    // A related-links block must not take the page down; log it so a broken column is visible.
-    console.error('[seo/opportunities] similar-opportunities read failed:', error.message);
-    return [];
-  }
-  if (!data?.length) return [];
-  return data
-    .filter(isIndexableOpp)
-    .slice(0, limit)
-    .map((r) => ({
-      slug: opportunitySlug(r.title, r.notice_id),
-      title: r.title,
-      department: r.department || null,
-      noticeType: r.notice_type || null,
-      responseDeadline: r.response_deadline || null,
-      naicsCode: r.naics_code || null,
-    }));
+/** LIKE pattern matching strings of at least `n` characters (PostgREST: `*` is `%`). */
+const atLeast = (n: number) => `${'_'.repeat(n)}*`;
+
+export interface RelatedOpenOpportunities {
+  /** Which scope produced the list: same NAICS first, then the same department. */
+  scope: 'naics' | 'agency';
+  items: SimilarOpportunity[];
 }
 
 /**
- * Slugs for the sitemap — only indexable (non-thin) active opps. Capped so the
- * sitemap stays sane; ordered by most recent. (Sitemap has a 50k URL limit;
- * we cap well under and can paginate later if needed.)
+ * Related OPEN opportunities — the internal-link web, and the next step a visitor on a CLOSED
+ * notice actually wants. `active` does not mean open (see opportunityStatus), so the old
+ * "Similar Active Opportunities" block could link a past-deadline notice under an "active"
+ * heading. Every scope — NAICS/department, open-ness, the thin gate — is applied IN THE QUERY,
+ * before the limit, so a big NAICS full of closed notices cannot starve the list (filter, then
+ * rank). The JS pass only re-checks open-ness to the second (the query is day-grained).
+ *
+ * Returns null when nothing could be read or nothing qualifies — the page then renders no block.
+ * A read error is logged, never presented as "no related opportunities".
  */
+export async function getRelatedOpenOpportunities(
+  opp: Pick<SeoOpportunity, 'noticeId' | 'naicsCode' | 'department'>,
+  limit = 6,
+  now: Date = new Date(),
+): Promise<RelatedOpenOpportunities | null> {
+  const client = sb();
+  if (!client) return null;
+  const today = now.toISOString().slice(0, 10);
+
+  const scopes: Array<{ scope: 'naics' | 'agency'; column: string; value: string | null }> = [
+    { scope: 'naics', column: 'naics_code', value: opp.naicsCode },
+    { scope: 'agency', column: 'department', value: opp.department },
+  ];
+  for (const sc of scopes) {
+    if (!sc.value) continue;
+    const { data, error } = await client
+      .from('sam_opportunities')
+      .select('notice_id, title, department, notice_type, response_deadline, naics_code')
+      .eq('active', true)
+      .eq(sc.column, sc.value)
+      .neq('notice_id', opp.noticeId)
+      .or(`response_deadline.gte.${today},response_deadline.is.null`)
+      .or('notice_type.is.null,notice_type.not.ilike.*award*')
+      .like('title', atLeast(8))
+      .like('description', atLeast(MIN_BODY)) // a subset of isIndexableOpp: never links a 404
+      .order('posted_date', { ascending: false })
+      .limit(limit * 2);
+    if (error) {
+      // A related-links block must not take the page down; log it so a broken column is visible.
+      console.error(`[seo/opportunities] related-open (${sc.scope}) read failed:`, error.message);
+      return null;
+    }
+    const items = (data ?? [])
+      .filter((r) => r.title && r.title.trim().length >= 8)
+      .filter((r) => opportunityStatus(r, now) === 'open')
+      .slice(0, limit)
+      .map((r) => ({
+        slug: opportunitySlug(r.title, r.notice_id),
+        title: r.title,
+        department: r.department || null,
+        noticeType: r.notice_type || null,
+        responseDeadline: r.response_deadline || null,
+        naicsCode: r.naics_code || null,
+      }));
+    if (items.length > 0) return { scope: sc.scope, items };
+  }
+  return null;
+}
+
 export type OpportunityStatus = 'open' | 'closed' | 'awarded';
 
 /**
@@ -186,7 +217,7 @@ export type OpportunityStatus = 'open' | 'closed' | 'awarded';
  * were award notices. The sitemap and the page must not present those as open solicitations.
  */
 export function opportunityStatus(
-  o: { notice_type?: string | null; response_deadline?: string | null },
+  o: { notice_type?: string | null; response_deadline?: string | null; active?: boolean | null },
   now: Date = new Date(),
 ): OpportunityStatus {
   if (o.notice_type && /award/i.test(o.notice_type)) return 'awarded';
@@ -194,7 +225,48 @@ export function opportunityStatus(
     const d = new Date(o.response_deadline);
     if (!Number.isNaN(d.getTime()) && d.getTime() < now.getTime()) return 'closed';
   }
+  // SAM archived it (active=false) — no longer accepting responses even if the deadline field is
+  // empty or still in the future (cancelled / archived early). Never call an archived notice open.
+  if (o.active === false) return 'closed';
   return 'open';
+}
+
+function fmtUtcDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? null
+    : d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+}
+
+/**
+ * The status banner a page shows. Every clause is a fact from the row: "responses were due"
+ * only with a real deadline, "awarded to" only when the award notice names the winner. An
+ * award notice without a named winner says so plainly instead of guessing one.
+ */
+export function opportunityStatusLabel(
+  o: { notice_type?: string | null; response_deadline?: string | null; active?: boolean | null;
+       awardee_name?: string | null; award_date?: string | null },
+  now: Date = new Date(),
+): { status: OpportunityStatus; label: string } {
+  const status = opportunityStatus(o, now);
+  if (status === 'awarded') {
+    const winner = (o.awardee_name || '').trim();
+    const on = fmtUtcDate(o.award_date);
+    return {
+      status,
+      label: winner ? `Awarded to ${winner}${on ? ` on ${on}` : ''}` : 'Award notice',
+    };
+  }
+  if (status === 'closed') {
+    const due = fmtUtcDate(o.response_deadline);
+    const pastDue = due && new Date(o.response_deadline!).getTime() < now.getTime();
+    return {
+      status,
+      label: pastDue ? `Closed — responses were due ${due}` : 'Closed — this notice has been archived on SAM.gov',
+    };
+  }
+  return { status, label: 'Open for responses' };
 }
 
 export interface OpportunitySitemapRow {
@@ -204,57 +276,55 @@ export interface OpportunitySitemapRow {
   lastModified: string | null;
 }
 
-/** LIKE pattern matching strings of at least `n` characters (PostgREST: `*` is `%`). */
-const atLeast = (n: number) => `${'_'.repeat(n)}*`;
+export interface ClosedOpportunitySitemapRow {
+  slug: string;
+  status: 'closed';
+  /** The response deadline — the page states it ("responses were due …"). */
+  responseDeadline: string;
+  lastModified: string | null;
+}
+
 const PAGE = 1000; // PostgREST max-rows: a larger .limit() is silently clipped to this
 
+type SitemapSourceRow = {
+  notice_id: string; title: string | null; notice_type: string | null; active?: boolean | null;
+  response_deadline: string | null; posted_date: string | null; seo_enriched_at: string | null;
+};
+// The PostgREST filter builder, without spelling out supabase-js's generics.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Filterable = any;
+
 /**
- * Every sitemap-worthy opportunity: active, non-thin, and OPEN or AWARDED.
- * Closed (past-deadline) notices still render and stay indexable; they are simply not
- * advertised — a sitemap is a claim that a URL deserves crawl priority.
- *
- * Replaces getOpportunitySlugsForSitemap(45000), which asked for 45,000 rows in ONE request:
- * PostgREST clipped it to 1,000, the thin filter left 798, and the error was never checked.
+ * Read every non-thin sam_opportunities row matching `scope`, paged past PostgREST's 1,000-row
+ * clip.
  *
  * Cost shape: the thin test runs IN POSTGRES as a LIKE over N single-char wildcards, so the
  * 2 KB descriptions and 20 KB sow_text never leave the database (pulling them for ~40K rows
  * would be ~800 MB per build). Rows whose description is short qualify only if sow_text alone
- * reaches MIN_BODY — a strict SUBSET of isIndexableOpp(), so the sitemap can never assert a
+ * reaches MIN_BODY — a strict SUBSET of isIndexableOpp(), so a sitemap can never assert a
  * page the renderer would 404. Throws on any read error: the caller answers 503, never an
  * empty family.
  */
-export async function getOpportunitySitemapEntries(now: Date = new Date()): Promise<OpportunitySitemapRow[]> {
-  const client = sb();
-  if (!client) throw new Error('opportunity sitemap: no Supabase client');
-  const today = now.toISOString().slice(0, 10);
-  const statusOr = `response_deadline.gte.${today},response_deadline.is.null,notice_type.ilike.*award*`;
-  const select = 'notice_id, title, notice_type, response_deadline, posted_date, seo_enriched_at';
-
-  type Row = {
-    notice_id: string; title: string | null; notice_type: string | null;
-    response_deadline: string | null; posted_date: string | null; seo_enriched_at: string | null;
-  };
-  async function drain(build: (q: ReturnType<typeof base>) => ReturnType<typeof base>, label: string): Promise<Row[]> {
-    const rows: Row[] = [];
+async function drainIndexable(
+  client: SupabaseClient,
+  label: string,
+  select: string,
+  scope: (q: Filterable) => Filterable,
+): Promise<SitemapSourceRow[]> {
+  const base = (): Filterable => scope(client.from('sam_opportunities').select(select).like('title', atLeast(8)));
+  async function drain(thin: (q: Filterable) => Filterable, part: string): Promise<SitemapSourceRow[]> {
+    const rows: SitemapSourceRow[] = [];
     for (let from = 0; ; from += PAGE) {
-      const { data, error } = await build(base())
+      const { data, error } = await thin(base())
         .order('notice_id', { ascending: true })
         .range(from, from + PAGE - 1);
-      if (error) throw new Error(`opportunity sitemap (${label}) page ${from / PAGE}: ${error.message}`);
-      const page = (data ?? []) as Row[];
+      if (error) throw new Error(`${label} (${part}) page ${from / PAGE}: ${error.message}`);
+      const page = (data ?? []) as SitemapSourceRow[];
       rows.push(...page);
       if (page.length < PAGE) break;
-      if (rows.length > 200_000) throw new Error(`opportunity sitemap (${label}): runaway pagination`);
+      if (rows.length > 200_000) throw new Error(`${label} (${part}): runaway pagination`);
     }
     return rows;
-  }
-  function base() {
-    return client!
-      .from('sam_opportunities')
-      .select(select)
-      .eq('active', true)
-      .like('title', atLeast(8))
-      .or(statusOr);
   }
 
   const [byDescription, bySow] = await Promise.all([
@@ -263,11 +333,37 @@ export async function getOpportunitySitemapEntries(now: Date = new Date()): Prom
   ]);
 
   const seen = new Set<string>();
-  const out: OpportunitySitemapRow[] = [];
+  const out: SitemapSourceRow[] = [];
   for (const r of [...byDescription, ...bySow]) {
     if (seen.has(r.notice_id)) continue;
     seen.add(r.notice_id);
     if (!r.title || r.title.trim().length < 8) continue; // mirror isIndexableOpp's trim
+    out.push(r);
+  }
+  return out;
+}
+
+/**
+ * Every sitemap-worthy active opportunity that is OPEN or AWARDED.
+ * Closed notices are listed in their own child (getClosedOpportunitySitemapEntries →
+ * sitemap-opportunities-closed.xml), so Search Console reports them separately.
+ *
+ * Replaces getOpportunitySlugsForSitemap(45000), which asked for 45,000 rows in ONE request:
+ * PostgREST clipped it to 1,000, the thin filter left 798, and the error was never checked.
+ */
+export async function getOpportunitySitemapEntries(now: Date = new Date()): Promise<OpportunitySitemapRow[]> {
+  const client = sb();
+  if (!client) throw new Error('opportunity sitemap: no Supabase client');
+  const today = now.toISOString().slice(0, 10);
+  const statusOr = `response_deadline.gte.${today},response_deadline.is.null,notice_type.ilike.*award*`;
+  const rows = await drainIndexable(
+    client,
+    'opportunity sitemap',
+    'notice_id, title, notice_type, response_deadline, posted_date, seo_enriched_at',
+    (q) => q.eq('active', true).or(statusOr),
+  );
+  const out: OpportunitySitemapRow[] = [];
+  for (const r of rows) {
     const status = opportunityStatus(r, now);
     if (status === 'closed') continue; // the date filter is day-grained; this is exact
     out.push({
@@ -277,4 +373,69 @@ export async function getOpportunitySitemapEntries(now: Date = new Date()): Prom
     });
   }
   return out;
+}
+
+/** How far back closed notices are listed. Old solicitation numbers are still searched. */
+export const CLOSED_SITEMAP_WINDOW_MONTHS = 24;
+
+/**
+ * Closed notices for sitemap-opportunities-closed.xml (2026-11-17).
+ *
+ * WHY THEY WERE EXCLUDED, AND WHY LISTING THEM IS NOW SAFE. On 2026-11-12 closed notices were
+ * dropped from the sitemap because `active` ≠ open (19,182 of 28,010 indexable active rows were
+ * past their deadline): advertising them presented dead solicitations as live ones. The page
+ * now states the status as a fact from the row — "Closed — responses were due <date>", or
+ * "archived" for active=false — and leads to related OPEN notices. Listed under that label, a
+ * closed notice is an honest record, which is what a search for an old solicitation number wants.
+ *
+ * Scope: non-thin, NOT an award notice, response deadline in the past and within the last
+ * CLOSED_SITEMAP_WINDOW_MONTHS. Active AND archived (active=false) rows: the page route renders
+ * either (getOpportunityBySlug has no `active` filter). Rows with no deadline are left out —
+ * the page could not say when responses were due. Disjoint from the open/awarded child, which
+ * requires deadline ≥ today, no deadline, or an award notice.
+ *
+ * Size cap, explicit: Google allows `limit` (SITEMAP_URL_LIMIT) URLs per file. If the window
+ * holds more, the MOST RECENT deadlines are kept and the cut is returned (`dropped`) and logged
+ * — never a silent slice.
+ */
+export async function getClosedOpportunitySitemapEntries(
+  now: Date = new Date(),
+  limit = 50_000,
+): Promise<{ rows: ClosedOpportunitySitemapRow[]; dropped: number }> {
+  const client = sb();
+  if (!client) throw new Error('closed opportunity sitemap: no Supabase client');
+  const windowStart = new Date(now);
+  windowStart.setUTCMonth(windowStart.getUTCMonth() - CLOSED_SITEMAP_WINDOW_MONTHS);
+  const rows = await drainIndexable(
+    client,
+    'closed opportunity sitemap',
+    'notice_id, title, notice_type, active, response_deadline, posted_date, seo_enriched_at',
+    (q) => q
+      .lt('response_deadline', now.toISOString())
+      .gte('response_deadline', windowStart.toISOString())
+      .or('notice_type.is.null,notice_type.not.ilike.*award*'),
+  );
+
+  const closed: ClosedOpportunitySitemapRow[] = [];
+  for (const r of rows) {
+    if (!r.response_deadline) continue;
+    if (opportunityStatus(r, now) !== 'closed') continue; // exact re-check of the query
+    const due = new Date(r.response_deadline);
+    if (Number.isNaN(due.getTime()) || due.getTime() < windowStart.getTime()) continue;
+    closed.push({
+      slug: opportunitySlug(r.title, r.notice_id),
+      status: 'closed',
+      responseDeadline: due.toISOString(),
+      lastModified: latestLastmod([r.posted_date, r.seo_enriched_at], now),
+    });
+  }
+  // Newest deadline first; the ISO strings sort lexically.
+  closed.sort((a, b) => (a.responseDeadline < b.responseDeadline ? 1 : a.responseDeadline > b.responseDeadline ? -1 : 0));
+  const dropped = Math.max(0, closed.length - limit);
+  if (dropped > 0) {
+    console.warn(
+      `[seo/opportunities] closed sitemap: ${closed.length} eligible, keeping the ${limit} most recent deadlines (${dropped} older left out)`,
+    );
+  }
+  return { rows: closed.slice(0, limit), dropped };
 }
