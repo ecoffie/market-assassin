@@ -10,15 +10,10 @@
  *
  * Never touches a real database. Runs in `npm run test:unit` and the pre-push gate.
  */
-import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
-
-import { PGLITE_HOOK_TIMEOUT_MS } from '@/test/pglite-timeouts';
-
-// PGlite boot + migrations can exceed the 10s default hook limit under full-suite load (see the constant).
-vi.setConfig({ hookTimeout: PGLITE_HOOK_TIMEOUT_MS });
 
 const mig = (f: string) => readFileSync(join(process.cwd(), 'supabase/migrations', f), 'utf8');
 const MIGRATION = mig('20260929_pooled_team_credits.sql');

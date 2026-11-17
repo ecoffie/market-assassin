@@ -34,11 +34,6 @@ import { recompeteOnePassSql } from '@/lib/recompete/maps-recompete-sql';
 import { RECOMPETE_PIN_COLS } from '@/lib/recompete/map-pin';
 import { isUnattributedOrder, UNATTRIBUTED_ORDERS_OR } from './parent-scope';
 
-import { PGLITE_HOOK_TIMEOUT_MS } from '@/test/pglite-timeouts';
-
-// PGlite boot + migrations can exceed the 10s default hook limit under full-suite load (see the constant).
-vi.setConfig({ hookTimeout: PGLITE_HOOK_TIMEOUT_MS });
-
 const iso = (months: number) => { const d = new Date(); d.setMonth(d.getMonth() + months); return d.toISOString().slice(0, 10); };
 const A = '47QRCA25DA002', B = '47QRCA24DH016';
 const order = (id: string, over: Row = {}): Row => ({

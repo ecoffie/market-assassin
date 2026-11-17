@@ -10,16 +10,11 @@
  *   3. Deleting a chat session (what account deletion does via USER_EMAIL_TABLES) removes its
  *      messages, including the new trace column, through the existing ON DELETE CASCADE.
  */
-import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
 import { MCP_CHANNEL_SQL } from '@/lib/mcp/channel-filter';
-
-import { PGLITE_HOOK_TIMEOUT_MS } from '@/test/pglite-timeouts';
-
-// PGlite boot + migrations can exceed the 10s default hook limit under full-suite load (see the constant).
-vi.setConfig({ hookTimeout: PGLITE_HOOK_TIMEOUT_MS });
 
 const mig = (f: string) => readFileSync(join(process.cwd(), 'supabase/migrations', f), 'utf8');
 const db = new PGlite();

@@ -7,7 +7,8 @@
  * 2026-11-17: Agent 5's research branch x4, #2111 x1). This is a time budget for SETUP, not a retry and not a
  * skip: a hook that genuinely hangs still fails, just after 60s instead of 10s.
  *
- * Every *.pglite.unit.test.ts that has a before/after hook must apply it — guarded by
+ * Applied to every *.pglite.* test file by src/test/pglite-timeouts.setup.ts (a vitest setupFile, scoped by file
+ * name, so future PGlite suites are covered without editing them) — guarded by
  * src/test/pglite-timeouts.unit.test.ts.
  */
 export const PGLITE_HOOK_TIMEOUT_MS = 60_000;
