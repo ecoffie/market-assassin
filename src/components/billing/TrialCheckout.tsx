@@ -8,6 +8,7 @@
  * cannot be made or Stripe.js fails to load, the buyer gets a button to the plan's hosted Stripe page.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { loadStripe, type Stripe as StripeJs, type StripeCheckout } from '@stripe/stripe-js';
 import { Check, Lock, Loader2, ShieldCheck, CalendarClock, CreditCard } from 'lucide-react';
 
@@ -149,11 +150,11 @@ export default function TrialCheckout({ publishableKey, initialPlan, initialCycl
     <div className="min-h-screen bg-[#f7f9fb] text-[#111c26]" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
       <header className="bg-white border-b border-[#e6eaef]">
         <div className="mx-auto max-w-5xl px-4 h-16 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-2" aria-label="Mindy home">
+          <Link href="/" className="flex items-center gap-2" aria-label="Mindy home">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/brand/mindy-logo-icon.svg" alt="" width={30} height={30} />
             <span className="text-xl font-bold" style={{ fontFamily: '"Space Grotesk", Inter, sans-serif' }}>Mindy</span>
-          </a>
+          </Link>
           <span className="inline-flex items-center gap-1.5 text-sm text-[#5a6675]"><Lock className="h-4 w-4" aria-hidden />Secure checkout</span>
         </div>
       </header>
