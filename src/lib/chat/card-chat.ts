@@ -63,6 +63,13 @@ export function answerCredits(p: { billable: boolean; usedData: boolean; turnCre
   return p.billable && p.usedData ? p.turnCredits : 0;
 }
 
+/**
+ * Tools whose success does NOT make an answer billable: selection / reopen / metadata lookups that Eric listed
+ * as free ("select / reopen"). Agent 3 owns find_my_documents (document metadata + reopen, no analysis).
+ * A failed tool (status !== 'success') is never counted either.
+ */
+export const NON_BILLABLE_TOOLS: ReadonlySet<string> = new Set(['find_my_documents']);
+
 export type CardChatAccess =
   | { allow: true; billable: boolean }
   | { allow: false; status: 403 | 402; error: 'pro_required' | 'credits_required'; balance?: number };

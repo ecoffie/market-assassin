@@ -27,6 +27,8 @@ const state: {
   mentionLookups: unknown[];
   /** When set, the first planner round calls one data tool and it returns this status. */
   dataTool: 'success' | 'error' | null;
+  /** Name of that data tool (default search_sam_opportunities). */
+  dataToolName?: string;
 } = {} as never;
 
 // In-memory turn store with the SQL functions' semantics (claim / complete = save + debit once / fail).
@@ -155,7 +157,7 @@ beforeEach(() => {
       _meta: { grounded_notice: true, grounded_incumbent: false, degraded: false, notice_source: 'cache', incumbent_finding: 'candidate_not_confirmed' },
     },
     recordError: false, sessions: {}, answer: 'The response deadline is 2026-12-04 (SAM.gov notice W912PL26Q0042).', answerFails: false, finishReason: 'stop',
-    plannerMessages: [], answerMessages: [], inserts: [], allowedToolNames: null, mentionLookups: [], dataTool: null,
+    plannerMessages: [], answerMessages: [], inserts: [], allowedToolNames: null, mentionLookups: [], dataTool: null, dataToolName: undefined,
   });
   turns.clear(); tokenSeq = 0;
   claimCardTurn.mockClear(); completeCardTurn.mockClear(); failCardTurn.mockClear();
@@ -171,7 +173,7 @@ beforeEach(() => {
     }
     state.plannerMessages.push(b.messages);
     if (state.dataTool && state.plannerMessages.length === 1) {
-      return new Response(JSON.stringify({ choices: [{ message: { content: null, tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'search_sam_opportunities', arguments: '{"query":"janitorial"}' } }] } }], usage: { prompt_tokens: 5, completion_tokens: 1 } }), { status: 200 });
+      return new Response(JSON.stringify({ choices: [{ message: { content: null, tool_calls: [{ id: 'call_1', type: 'function', function: { name: state.dataToolName ?? 'search_sam_opportunities', arguments: '{"query":"janitorial"}' } }] } }], usage: { prompt_tokens: 5, completion_tokens: 1 } }), { status: 200 });
     }
     return new Response(JSON.stringify({ choices: [{ message: { content: 'no tools needed' } }], usage: { prompt_tokens: 5, completion_tokens: 1 } }), { status: 200 });
   }));
@@ -719,6 +721,7 @@ describe('C2: answer first, AbilityOne by category, OSBP/OSDBU fallback', () => 
 
 describe('answer billing: 10 credits per successful intelligence answer (Eric decision 3, ASK_MINDY_ANSWER_BILLING)', () => {
   const PLAIN_TURN = '0b0b0b0b-1111-4222-8333-555555555555';
+  const system = (msgs: Array<{ role: string; content: string }>) => msgs.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
   beforeEach(() => { state.pro = true; vi.stubEnv('MAP_CARD_CHAT_ENABLED', ''); vi.stubEnv('ASK_MINDY_ANSWER_BILLING', 'true'); });
 
   it('flag off: Pro main chat is not tracked or charged (unchanged)', async () => {
@@ -789,10 +792,52 @@ describe('answer billing: 10 credits per successful intelligence answer (Eric de
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('a billed question without a turn id is refused before any model call (400)', async () => {
+  it('a Pro question WITHOUT a turn id (stale tab) is answered UNBILLED, never refused', async () => {
+    state.dataTool = 'success';
     const { res } = await post({});
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
+    expect(claimCardTurn).not.toHaveBeenCalled();
+    expect(charges()).toBe(0);
+    expect(state.balance).toBe(100);
+  });
+
+  it('a failed balance read is an outage (503 balance_unavailable), never "out of credits" (402)', async () => {
+    state.balanceError = true;
+    const { res } = await post({ turn_id: PLAIN_TURN });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ error: 'balance_unavailable' });
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('a notice named on turn 1, a clarifying reply on turn 3 → 0 credits (carried-over notice is not "used data")', async () => {
+    state.answer = 'Which agency did you have in mind?';
+    const { events } = await post({ turn_id: PLAIN_TURN, message: 'ok, and what else?', history: [
+      { role: 'user', content: 'Tell me about solicitation W912PL26Q0042' }, { role: 'assistant', content: 'It is open.' },
+      { role: 'user', content: 'thanks' }, { role: 'assistant', content: 'You are welcome.' },
+    ] });
+    expect(system(state.answerMessages[0])).toContain('MENTIONED OPPORTUNITY');
+    expect(completeCardTurn.mock.calls[0][0]).toMatchObject({ credits: 0 });
+    expect(events.find((e) => e.type === 'credits')).toMatchObject({ charged: 0 });
+  });
+
+  it('a carried-over notice the answer DID use is an intelligence answer → charged 10', async () => {
+    state.answer = 'Draft to jane.buyer@usace.army.mil about W912PL26Q0042.';
+    await post({ turn_id: PLAIN_TURN, message: 'Email the contracting officer for me', history: [
+      { role: 'user', content: 'Tell me about solicitation W912PL26Q0042' }, { role: 'assistant', content: 'It is open.' },
+    ] });
+    expect(completeCardTurn.mock.calls[0][0]).toMatchObject({ credits: 10 });
+  });
+
+  it('an ATTACHED notice grounds the answer → charged 10 even without a tool call', async () => {
+    state.answer = 'Plenty of small businesses bid on work like this.';
+    await post({ turn_id: PLAIN_TURN, context: { kind: 'opportunity', notice_id: NID } });
+    expect(completeCardTurn.mock.calls[0][0]).toMatchObject({ credits: 10 });
+  });
+
+  it('a turn whose only successful tool is find_my_documents (select / reopen) is free', async () => {
+    state.dataTool = 'success'; state.dataToolName = 'find_my_documents';
+    await post({ turn_id: PLAIN_TURN });
+    expect(completeCardTurn.mock.calls[0][0]).toMatchObject({ credits: 0 });
   });
 
   it('non-Pro stays refused on main chat (entitlements unchanged)', async () => {

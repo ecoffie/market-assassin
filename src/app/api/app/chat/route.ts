@@ -80,7 +80,7 @@ const TRACE_RESULT_CHARS = Number(process.env.ASK_MINDY_TRACE_RESULT_CHARS) || 6
 import { shadowEntitlement } from '@/lib/entitlements/shadow';
 import {
   isCardChatEnabled, cardChatTurnCredits, parseOpportunityContext, cardChatAccess, isBillableTurn,
-  isAnswerBillingEnabled, answerCredits,
+  isAnswerBillingEnabled, answerCredits, NON_BILLABLE_TOOLS,
   CARD_CHAT_TOOLS, buildOpportunityContextBlock,
 } from '@/lib/chat/card-chat';
 import { SELECTED_NOTICE_COLUMNS, loadSelectedNoticeFacts, formatSelectedNoticeFacts, type SelectedNoticeRecord } from '@/lib/chat/selected-notice';
@@ -421,7 +421,13 @@ export async function POST(request: NextRequest) {
   // Ask Mindy and the map go through the SAME once-per-question turn record as card chat. A turn without a
   // notice is stored with notice_id '' (the column is NOT NULL text; no migration). Its question key is the
   // customer's words WITHOUT the map-view preamble, so a retry after the map moved is the same question.
-  const answerBilling = chatPro && isAnswerBillingEnabled();
+  // A Pro turn WITHOUT a turn id (a tab still running the old page script when the flag flips) is answered
+  // unbilled and logged, never refused: without an id a retry could not be recognized, so charging it could
+  // charge twice, and refusing it would break open tabs.
+  const answerBillingOn = chatPro && isAnswerBillingEnabled();
+  const answerBilling = answerBillingOn && !!parseTurnId(body.turn_id);
+  const answerBillingSkippedNoTurnId = answerBillingOn && !answerBilling;
+  if (answerBillingSkippedNoTurnId) console.warn('[chat] answer billing skipped: Pro turn without turn_id (stale client?)');
   const turnTracked = !!cardCtx || answerBilling;
   const turnNoticeId = cardCtx ? cardCtx.noticeId : '';
   const turnQuestion = cardCtx ? message : (splitViewPreamble(message).rest || message);
@@ -447,6 +453,8 @@ export async function POST(request: NextRequest) {
       .from('mcp_credit_balance').select('balance').eq('user_email', auth.email).maybeSingle();
     // A failed read is UNKNOWN, never "has credits" (and never a fabricated 0 shown as truth).
     cardBalance = balErr ? null : Number((bal as { balance?: number } | null)?.balance ?? 0);
+    // Pro answer billing: a failed balance read is an OUTAGE, not "out of credits". Say so (503), never 402.
+    if (balErr && answerBilling) return jsonResponse({ error: 'balance_unavailable' }, 503);
   }
   const access = cardChatAccess({ isPro: chatPro, flagOn: cardFlag, context: cardCtx, balance: cardBalance, turnCredits, answerBilling });
   if (!access.allow) {
@@ -908,7 +916,7 @@ export async function POST(request: NextRequest) {
               }
               pendingToolTurnIdx = null;
               turnTrace.tool_executions = results.map((r) => r.record);
-              dataToolSuccesses += results.filter((r) => r.record.status === 'success').length;
+              dataToolSuccesses += results.filter((r) => r.record.status === 'success' && !NON_BILLABLE_TOOLS.has(r.record.tool)).length;
               // Ported release-hardening R6/R10: disclose codes Mindy chose, from what each strict-filter tool
               // reports it APPLIED (src/lib/chat/code-disclosure.ts).
               scopeInferred = inferredCodeDisclosure(
@@ -1249,6 +1257,11 @@ export async function POST(request: NextRequest) {
         const staleMention = noticeOrigin === 'mentioned' && mentionedNotice?.status === 'resolved'
           && mentionedNotice.notice.fromEarlierTurn && !answerUsesNotice(assistantContent, cardRecord);
         if (staleMention) turnTrace.notices.push('mentioned_notice:chip_dropped_unused');
+        if (answerBillingSkippedNoTurnId) turnTrace.notices.push('answer_billing:skipped_no_turn_id');
+        // The notice makes this an intelligence answer only when it is ATTACHED or this answer actually used it.
+        // A notice merely carried over from an earlier turn (mentioned-notice.ts) does not: "thanks" or a
+        // clarifying reply three turns later costs nothing.
+        const noticeGroundedAnswer = !!cardRecord && (noticeOrigin === 'selected' || answerUsesNotice(assistantContent, cardRecord));
         const citedSources: CitedSource[] = cardContext && !staleMention
           ? [{ title: cardContext.source.label, url: cardContext.source.url, doc_type: 'sam_notice', source_path: cardRecord ? `sam_notice:${cardRecord.notice_id}` : null, document_id: null }]
           : [];
@@ -1267,7 +1280,7 @@ export async function POST(request: NextRequest) {
               const c = await completeCardTurn({
                 turnId, claimToken, email: auth.email!, answer: assistantContent, citedSources, sessionId,
                 // Only an intelligence answer is charged: data read this turn, or a notice record behind it.
-                credits: answerCredits({ billable: cardBillable, usedData: dataToolSuccesses > 0 || !!cardRecord, turnCredits }),
+                credits: answerCredits({ billable: cardBillable, usedData: dataToolSuccesses > 0 || noticeGroundedAnswer, turnCredits }),
               });
               turnSettled = true;
               if (c.outcome === 'charged') creditsCharged = c.creditsCharged;
