@@ -627,6 +627,20 @@ describe('plain /app chat: the notice the user named (scorecard 2026-11-16, C1/C
     expect(cites?.sources?.[0]).toMatchObject({ doc_type: 'sam_notice' });
   });
 
+  it('sticky chip pin: an ATTACHED notice keeps its chip even when the answer does not quote it', async () => {
+    state.answer = 'Plenty of small businesses bid on work like this.';
+    const { events } = await post({ message: 'Is this a good fit for a small business?', context: { kind: 'opportunity', notice_id: NID } });
+    const cites = events.find((e) => e.type === 'citations') as { sources?: Array<Record<string, unknown>> } | undefined;
+    expect(cites?.sources?.[0]).toMatchObject({ doc_type: 'sam_notice', source_path: `sam_notice:${NID}` });
+  });
+
+  it('sticky chip pin: a notice named in THIS message keeps its chip even when the answer does not quote it', async () => {
+    state.answer = 'Plenty of small businesses bid on work like this.';
+    const { events } = await post({ message: 'Is W912PL26Q0042 a good fit for a small business?' });
+    const cites = events.find((e) => e.type === 'citations') as { sources?: Array<Record<string, unknown>> } | undefined;
+    expect(cites?.sources?.[0]).toMatchObject({ doc_type: 'sam_notice' });
+  });
+
   it('an id that appears only in an assistant answer never attaches a notice', async () => {
     await post({ message: 'Which one should I start with?', history: [{ role: 'user', content: 'Find janitorial work' }, { role: 'assistant', content: 'Open now: W912PL26Q0042 …' }] });
     expect(system(state.answerMessages[0])).not.toContain('MENTIONED OPPORTUNITY');
