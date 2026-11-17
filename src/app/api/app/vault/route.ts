@@ -1,3 +1,4 @@
+import { vaultDocFlags } from '@/lib/vault/flags';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
@@ -41,7 +42,9 @@ export async function GET(request: NextRequest) {
     supabase.from('user_past_performance').select('*').eq('user_email', userEmail).is('archived_at', null).order('updated_at', { ascending: false }),
     supabase.from('user_capabilities_library').select('*').eq('user_email', userEmail).is('archived_at', null).order('updated_at', { ascending: false }),
     supabase.from('user_team_members').select('*').eq('user_email', userEmail).is('archived_at', null).order('is_key_personnel', { ascending: false }),
-    supabase.from('user_boilerplate_docs').select('id,doc_type,original_filename,mime_type,size_bytes,page_count,parse_status,created_at').eq('user_email', userEmail).is('archived_at', null).order('created_at', { ascending: false }),
+    // doc_class/version/parent_id exist only after migration 20261117_vault_doc_class.sql; they are
+    // requested only when the grouped Documents view is switched on (which happens after it is applied).
+    supabase.from('user_boilerplate_docs').select(`id,doc_type,original_filename,mime_type,size_bytes,page_count,parse_status,created_at${vaultDocFlags.groupedView ? ',doc_class,version,parent_id' : ''}`).eq('user_email', userEmail).is('archived_at', null).order('created_at', { ascending: false }),
   ]);
 
   return NextResponse.json({

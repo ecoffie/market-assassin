@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { IdCard, Trophy, Wrench, User, FileText, BookOpen, FolderArchive, Zap, Check, PenLine, type LucideIcon } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
+import { vaultDocFlags } from '@/lib/vault/flags';
 import { authedFetch } from '../authHeaders';
 import { NaicsPicker } from '@/components/codes/NaicsPicker';
 import { NaicsAutocompleteInput } from '@/components/codes/NaicsAutocompleteInput';
@@ -94,6 +95,9 @@ interface TeamMember {
 interface BoilerplateDoc {
   id: string;
   doc_type: string;
+  /** Present when the grouped Documents view is on (migration 20261117_vault_doc_class.sql). NULL = company. */
+  doc_class?: 'company' | 'reference' | 'generated' | null;
+  version?: number | null;
   original_filename: string;
   size_bytes?: number | null;
   page_count?: number | null;
@@ -1276,7 +1280,34 @@ const IDENTITY_LABELS: { key: keyof ParsedIdentityFields; label: string }[] = [
 // src/lib/vault/normalize.ts (used by /api/app/vault/documents/commit). The client
 // no longer maps parser output → columns — it just sends the kept selections.
 
+const DOC_GROUPS: Array<{ key: 'company' | 'reference' | 'generated'; label: string; blurb: string; empty: string }> = [
+  { key: 'company', label: 'Company', blurb: 'Your own material: capability statements, past performance, boilerplate. Only these can be pulled into your Vault facts.', empty: 'No company documents yet.' },
+  { key: 'reference', label: 'Reference', blurb: 'Files you attached in Ask Mindy to ask about (an RFP, a SOW). Saved privately; not treated as facts about your company.', empty: 'No reference files yet.' },
+  { key: 'generated', label: 'Generated', blurb: 'Files Mindy made for you. Each revision is kept as its own version.', empty: 'Nothing generated yet.' },
+];
+function docClassOf(d: BoilerplateDoc): 'company' | 'reference' | 'generated' {
+  return d.doc_class === 'reference' || d.doc_class === 'generated' ? d.doc_class : 'company';
+}
+
 function DocumentsSection({ email, items, onChanged }: { email: string; items: BoilerplateDoc[]; onChanged: () => void }) {
+  // Grouped view (Company / Reference / Generated) + private download, behind a flag (default off).
+  const grouped = vaultDocFlags.groupedView;
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const downloadDoc = async (id: string) => {
+    setDownloadError(null);
+    setDownloadingId(id);
+    try {
+      const res = await authedFetch(`/api/app/vault/documents/download?email=${encodeURIComponent(email)}&id=${encodeURIComponent(id)}`, email);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.url) { setDownloadError('That document could not be downloaded. Refresh and try again.'); return; }
+      window.location.assign(String(data.url));
+    } catch {
+      setDownloadError('That document could not be downloaded. Refresh and try again.');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
   const [uploading, setUploading] = useState(false);
   const [parsing, setParsing] = useState(false);
   // The parse→review modal state. `review` holds the parsed sections awaiting confirm.
@@ -1370,14 +1401,14 @@ function DocumentsSection({ email, items, onChanged }: { email: string; items: B
         <UploadCard
           title="Upload Capability Statement"
           body="PDF or Word. Mindy reads it and pulls out your Overview, Past Performance, and Capabilities into editable Vault sections — you review each before it's saved."
-          accept=".pdf,.docx,.doc"
+          accept=".pdf,.docx"
           disabled={uploading || parsing}
           onFile={onCapStatement}
         />
         <UploadCard
           title="Upload Company Overview / Other"
           body="Any boilerplate doc — company overview, cover letter template, past perf table. Mindy extracts the text and uses it as reference material."
-          accept=".pdf,.docx,.doc,.txt"
+          accept=".pdf,.docx,.txt"
           disabled={uploading || parsing}
           onFile={(f) => upload(f, 'other')}
         />
@@ -1397,14 +1428,24 @@ function DocumentsSection({ email, items, onChanged }: { email: string; items: B
           body="Upload your existing capability statement to get started. Mindy pulls it apart into structured sections you can review, edit, and reuse."
         />
       ) : (
-        <div className="space-y-2">
-          <h2 className="text-sm font-medium text-ink-soft mb-3">Uploaded documents</h2>
-          {items.map((d) => (
+        grouped ? (
+          <div className="space-y-6" data-testid="vault-docs-grouped">
+            {DOC_GROUPS.map((g) => {
+              const list = items.filter((d) => docClassOf(d) === g.key);
+              return (
+                <section key={g.key} data-testid={`vault-docs-${g.key}`}>
+                  <h2 className="text-sm font-medium text-ink-soft">{g.label} <span className="text-faint">({list.length})</span></h2>
+                  <p className="mb-2 text-xs text-faint">{g.blurb}</p>
+                  {list.length === 0 ? (
+                    <p className="text-xs text-faint italic">{g.empty}</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {list.map((d) => (
             <div key={d.id} className="flex justify-between items-center border border-surface rounded-lg p-3 bg-ground/40">
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm truncate">{d.original_filename}</p>
                 <p className="text-xs text-muted">
-                  {d.doc_type} · {d.page_count ? `${d.page_count} pages · ` : ''}{d.size_bytes ? `${Math.round(d.size_bytes / 1024)} KB · ` : ''}
+                  {grouped && d.version && d.version > 1 ? `v${d.version} · ` : ''}{d.doc_type} · {d.page_count ? `${d.page_count} pages · ` : ''}{d.size_bytes ? `${Math.round(d.size_bytes / 1024)} KB · ` : ''}
                   <span className={d.parse_status === 'parsed' ? 'text-emerald-400' : d.parse_status === 'failed' ? 'text-rose-400' : 'text-amber-400'}>
                     {d.parse_status}
                   </span>
@@ -1415,13 +1456,79 @@ function DocumentsSection({ email, items, onChanged }: { email: string; items: B
                     routinely upload a cap statement through the "Other" card;
                     gating on doc_type left those docs stuck with no way to pull.
                     The parser runs on the extracted text regardless of the tag. */}
-                {d.parse_status === 'parsed' && (
+                {d.parse_status === 'parsed' && (!grouped || docClassOf(d) === 'company') && (
                   <button
                     onClick={() => parseDoc(d.id, d.original_filename)}
                     disabled={parsing}
                     className="text-xs px-2.5 py-1 rounded border border-emerald-700/60 text-emerald-300 hover:bg-emerald-900/30 disabled:opacity-50"
                   >
                     Pull into sections
+                  </button>
+                )}
+                {grouped && (
+                  <button
+                    onClick={() => downloadDoc(d.id)}
+                    disabled={downloadingId === d.id}
+                    title="Download this document (private, link expires in a minute)"
+                    className="text-xs px-2 py-1 rounded border border-hairline text-ink-soft hover:bg-surface disabled:opacity-50"
+                  >
+                    {downloadingId === d.id ? 'Preparing…' : 'Download'}
+                  </button>
+                )}
+                <button
+                  onClick={() => removeDoc(d.id, d.original_filename)}
+                  disabled={removingId === d.id}
+                  title="Remove this document"
+                  className="text-xs px-2 py-1 rounded text-faint hover:text-rose-400 hover:bg-rose-950/30 disabled:opacity-50"
+                >
+                  {removingId === d.id ? 'Removing…' : 'Remove'}
+                </button>
+              </div>
+            </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              );
+            })}
+            {downloadError && <p role="alert" className="text-xs text-rose-400">{downloadError}</p>}
+          </div>
+        ) : (
+        <div className="space-y-2">
+          <h2 className="text-sm font-medium text-ink-soft mb-3">Uploaded documents</h2>
+          {items.map((d) => (
+            <div key={d.id} className="flex justify-between items-center border border-surface rounded-lg p-3 bg-ground/40">
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-sm truncate">{d.original_filename}</p>
+                <p className="text-xs text-muted">
+                  {grouped && d.version && d.version > 1 ? `v${d.version} · ` : ''}{d.doc_type} · {d.page_count ? `${d.page_count} pages · ` : ''}{d.size_bytes ? `${Math.round(d.size_bytes / 1024)} KB · ` : ''}
+                  <span className={d.parse_status === 'parsed' ? 'text-emerald-400' : d.parse_status === 'failed' ? 'text-rose-400' : 'text-amber-400'}>
+                    {d.parse_status}
+                  </span>
+                </p>
+              </div>
+              <div className="ml-3 shrink-0 flex items-center gap-2">
+                {/* Pull ANY parsed doc into sections — not just cap_stmt. Users
+                    routinely upload a cap statement through the "Other" card;
+                    gating on doc_type left those docs stuck with no way to pull.
+                    The parser runs on the extracted text regardless of the tag. */}
+                {d.parse_status === 'parsed' && (!grouped || docClassOf(d) === 'company') && (
+                  <button
+                    onClick={() => parseDoc(d.id, d.original_filename)}
+                    disabled={parsing}
+                    className="text-xs px-2.5 py-1 rounded border border-emerald-700/60 text-emerald-300 hover:bg-emerald-900/30 disabled:opacity-50"
+                  >
+                    Pull into sections
+                  </button>
+                )}
+                {grouped && (
+                  <button
+                    onClick={() => downloadDoc(d.id)}
+                    disabled={downloadingId === d.id}
+                    title="Download this document (private, link expires in a minute)"
+                    className="text-xs px-2 py-1 rounded border border-hairline text-ink-soft hover:bg-surface disabled:opacity-50"
+                  >
+                    {downloadingId === d.id ? 'Preparing…' : 'Download'}
                   </button>
                 )}
                 <button
@@ -1436,6 +1543,7 @@ function DocumentsSection({ email, items, onChanged }: { email: string; items: B
             </div>
           ))}
         </div>
+        )
       )}
 
       {review && (
