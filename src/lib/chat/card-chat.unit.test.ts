@@ -1,3 +1,4 @@
+import { FIND_MY_DOCUMENTS } from './my-documents-tool';
 import { describe, it, expect } from 'vitest';
 import {
   isCardChatEnabled, cardChatTurnCredits, parseOpportunityContext, cardChatAccess, isBillableTurn,
@@ -137,7 +138,8 @@ describe('describeDeadline — time zones are converted in code, never by the mo
 
 describe('CARD_CHAT_TOOLS — a narrowing list of real, chat-allowed tools', () => {
   it('every name is a registered tool and passes the chat tool policy', () => {
-    const registered = new Set<string>([...listMcpTools().map((d) => String((d.function as { name?: string }).name)), ...TIER0_TOOL_NAMES]);
+    // find_my_documents is a private tool registered by the chat route when VAULT_ASK_MINDY_UPLOADS is on.
+    const registered = new Set<string>([...listMcpTools().map((d) => String((d.function as { name?: string }).name)), ...TIER0_TOOL_NAMES, FIND_MY_DOCUMENTS]);
     for (const n of CARD_CHAT_TOOLS) {
       expect(registered.has(n), n).toBe(true);
       expect(isChatOfferable(chatToolPolicy(n, true)), n).toBe(true);

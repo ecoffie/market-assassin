@@ -12,7 +12,7 @@
  *      or reopen of the same question replays the saved answer for free. Failed, empty, degraded or
  *      incomplete turns cost nothing. Pro card turns are not charged (unchanged).
  */
-import { selectRelevantRfp } from '@/lib/proposal/select-relevant';
+import { selectRelevantRfp } from '@/lib/text/select-relevant';
 
 /** Server flag. Off unless exactly "true" (case-insensitive). */
 export function isCardChatEnabled(env: Record<string, string | undefined> = process.env): boolean {
@@ -95,6 +95,7 @@ export const CARD_CHAT_TOOLS: ReadonlySet<string> = new Set([
   'get_contractor_profile',
   'get_contractor_award_history',
   'search_my_vault',
+  'find_my_documents',
   'get_my_pipeline',
 ]);
 

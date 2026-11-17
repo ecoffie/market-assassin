@@ -38,6 +38,7 @@ import { hasProAccess } from '@/lib/access/resolve-access';
 import { loadBidderProfile, formatProfileForPrompt } from '@/lib/proposal/loaders';
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
+import { makeMyDocumentsTool, MY_DOCUMENTS_TOOL_DEF, FIND_MY_DOCUMENTS } from '@/lib/chat/my-documents-tool';
 // Tools run ONLY through the chat tool executor (policy check at offer AND execution,
 // preflight, per-tool error capture, execution log). Never import runMcpTool here.
 import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/chat-tool-executor';
@@ -83,6 +84,8 @@ import {
   CARD_CHAT_TOOLS, buildOpportunityContextBlock,
 } from '@/lib/chat/card-chat';
 import { SELECTED_NOTICE_COLUMNS, loadSelectedNoticeFacts, formatSelectedNoticeFacts, type SelectedNoticeRecord } from '@/lib/chat/selected-notice';
+import { isVaultChatDocumentsEnabled, loadChatDocumentTexts } from '@/lib/documents/chat-store';
+import { buildDocumentContext, type DocumentBlock } from '@/lib/chat/document-context';
 import { parseTurnId, claimCardTurn, completeCardTurn, failCardTurn, type ClaimResult } from '@/lib/chat/card-chat-turns';
 
 export const dynamic = 'force-dynamic';
@@ -564,6 +567,19 @@ export async function POST(request: NextRequest) {
           ? buildOpportunityContextBlock(cardRecord, splitViewPreamble(message).rest || message, noticeFacts ? formatSelectedNoticeFacts(noticeFacts) : [])
           : null;
         if (cardContext) messages.push({ role: 'system', content: cardContext.block });
+        const customerWords = splitViewPreamble(message).rest || message;
+        // Uploaded documents (src/lib/chat/document-context.ts): loaded server-side for THIS conversation and the
+        // acting-scope owner on every turn, fenced as untrusted data. Only when the conversation id was accepted
+        // as the caller's (above) AND the workspace resolved: an unresolved scope (profileEmail null) reads
+        // nothing. Never fed into the stated-filters guard (conversationText stays the customer's words).
+        let documentContext: DocumentBlock | null = null;
+        let documentsNotice: string | null = null;
+        if (isVaultChatDocumentsEnabled() && profileEmail && body.sessionId === sessionId) {
+          const loaded = await loadChatDocumentTexts(getSupabase(), { sessionId, ownerEmail: profileEmail });
+          if (loaded.ok) documentContext = buildDocumentContext(loaded.value, customerWords);
+          else documentsNotice = `documents:${loaded.reason}`;
+        }
+        if (documentContext) messages.push({ role: 'system', content: documentContext.block });
 
         // Trim history to last HISTORY_LIMIT messages for prompt-size budget.
         const history = Array.isArray(body.history) ? body.history.slice(-HISTORY_LIMIT) : [];
@@ -613,6 +629,8 @@ export async function POST(request: NextRequest) {
           { role: 'system', content: capabilityNote ? `${systemPrompt}\n\n${capabilityNote}` : systemPrompt },
         ];
         if (cardContext) toolRoundMessages.push({ role: 'system', content: cardContext.block });
+        // The planner sees which documents exist, not their text.
+        if (documentContext) toolRoundMessages.push({ role: 'system', content: documentContext.manifest });
         for (const h of history) {
           if (h.role === 'user' || h.role === 'assistant') {
             toolRoundMessages.push({ role: h.role, content: String(h.content || '').slice(0, 2000) });
@@ -659,6 +677,8 @@ export async function POST(request: NextRequest) {
         if (selectedNoticeMiss) turnTrace.notices.push(`selected_notice:${selectedNoticeMiss}`);
         if (noticeFacts) turnTrace.notices.push(`selected_notice_incumbent:${noticeFacts.incumbent.finding}`);
         if (capabilityNote) turnTrace.notices.push('capability_interpreted');
+        if (documentContext) turnTrace.notices.push(`documents:${documentContext.docCount}`);
+        if (documentsNotice) turnTrace.notices.push(documentsNotice);
         if (staging) turnTrace.notices.push(`staging_model_config:${staging.name}`);
         const notify = (code: string, text: string) => {
           turnTrace.notices.push(code);
@@ -674,12 +694,17 @@ export async function POST(request: NextRequest) {
           if (actingScope.kind === 'client') turnTrace.notices.push('acting_scope:client_workspace');
           if (actingScope.kind === 'unavailable') turnTrace.notices.push('acting_scope:unavailable');
           const tier0Runtime = makeTier0Tools(getSupabase(), actingScope);
+          const turnSessionId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId) ? sessionId : null;
+          // find_my_documents (Vault documents, metadata then excerpts) — behind VAULT_ASK_MINDY_UPLOADS.
+          const myDocs = isVaultChatDocumentsEnabled() ? makeMyDocumentsTool(getSupabase(), actingScope, { chatSessionId: body.sessionId === sessionId ? turnSessionId : null }) : null;
+          const privateDefs = myDocs ? [...TIER0_TOOL_DEFS, MY_DOCUMENTS_TOOL_DEF] : TIER0_TOOL_DEFS;
+          const privateNames = myDocs ? new Set([...TIER0_TOOL_NAMES, FIND_MY_DOCUMENTS]) : TIER0_TOOL_NAMES;
           const executor = createChatToolExecutor({
             userEmail: auth.email!,
             ...(actingScope.kind === 'client' ? { vaultEmail: actingScope.vaultEmail } : {}),
             ...(actingScope.kind === 'unavailable' ? { privateScopeUnavailable: true } : {}),
             chatSessionId: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId) ? sessionId : null,
-            tier0: { defs: TIER0_TOOL_DEFS, names: TIER0_TOOL_NAMES, execute: (n, a) => tier0Runtime.execute(n, a) },
+            tier0: { defs: privateDefs, names: privateNames, execute: (n, a) => (myDocs && n === FIND_MY_DOCUMENTS ? myDocs.execute(a) : tier0Runtime.execute(n, a)) },
             // Card chat offers only its opportunity tools (narrowing; the policy still applies).
             ...(cardCtx ? { allowedToolNames: CARD_CHAT_TOOLS } : {}),
           });
