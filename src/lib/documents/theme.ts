@@ -77,7 +77,9 @@ export const THEMES: Record<ThemeName, Theme> = {
       ...SHARED,
       accent: '1E3A8A', accent2: '7C3AED', title: '1E3A8A',
       tableHeaderBg: '1E3A8A', tableHeaderFg: 'FFFFFF', rowFill: 'F5F6FB', rule: 'E2E5F0',
-      pageBg: 'F7F7FB', panelBg: 'FFFFFF',
+      // White, not a tint: Chromium never paints the @page margins, so a tinted page prints as a framed
+      // gray panel; full-bleed would need zero page margins, which removes the header/footer (A5, v5).
+      pageBg: 'FFFFFF', panelBg: 'FFFFFF',
       caution: { fill: 'FDECEC', border: 'B91C1C', text: '7F1D1D' },
       keyMessage: { fill: 'EEF0FB', border: '1E3A8A', text: '1F2937' },
       note: { fill: 'F8FAFC', border: '94A3B8', text: '1F2937' },

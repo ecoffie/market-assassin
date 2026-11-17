@@ -680,7 +680,9 @@ describe('theme layer (Eric, 2026-11-17: styling must be flexible)', () => {
     expect(html).toContain('<h2><span class="num">2.</span>Market size and trend</h2>');
     expect(html).toMatch(/th:first-child \{ border-top-left-radius: 6px; \}/);
     expect(html).toMatch(/td:first-child \{ font-weight: 600; color: #1e3a8a; \}/);
-    expect(html).toMatch(/body \{[^}]*background: #f7f7fb;/);
+    // White page in PDF: a tinted page prints as a framed panel inside Chromium's unpainted margins.
+    expect(html).toMatch(/body \{[^}]*background: #ffffff;/);
+    expect(html).not.toContain('#f7f7fb');
   });
 
   it('briefing (PDF): navy title + gold rule, full-width navy bands in white uppercase, uppercase headers, blue-gray rows, no numbering', () => {
