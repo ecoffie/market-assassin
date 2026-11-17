@@ -20,6 +20,7 @@
  * Ask Mindy retries sourcing first and only then calls this.
  */
 import { DOC_LIMITS, DOC_SCHEMA, labeledUnits, type Block, type DocModel } from './model';
+import agencyAliases from '@/data/agency-aliases.json';
 
 export type ValidationIssue = { path: string; message: string };
 export type ValidationResult = { ok: true; model: DocModel } | { ok: false; issues: ValidationIssue[] };
@@ -72,13 +73,25 @@ export function statesFigure(text: string): boolean {
 // contracts… — without a cite; those get cite / "Unverified — no source" / omit, like any fact.
 
 // Nouns that make a figure a claim about the federal market rather than the author's plan.
-const WORLD_NOUN = /\b(?:agenc(?:y|ies)|departments?|offices?|buyers?|vendors?|bidders?|offerors?|competitors?|incumbents?|contractors?|firms?|compan(?:y|ies)|recompetes?|contracts?|awards?|obligat\w*|spend(?:ing)?|ceilings?|solicitations?|opportunit(?:y|ies)|(?:task|delivery) orders?|market)\b/i;
+// Nouns AND verb forms that make a figure a claim about the federal market rather than the author's
+// plan (A4 round 2: "awarded", "spends", "buys", "% of" used to slip past a noun-only list).
+const WORLD_TERM = /\b(?:agenc(?:y|ies)|departments?|offices?|buyers?|vendors?|bidders?|offerors?|competitors?|incumbents?|contractors?|firms?|compan(?:y|ies)|recompet\w*|contracts?|awar\w*|obligat\w*|spen(?:d|ds|ding|t)|ceilings?|solicitations?|opportunit(?:y|ies)|(?:task|delivery) orders?|market|buy|buys|bought|buying|purchas\w*|procur\w*|share)\b|\bpercent of\b|%\s+of\b/i;
+// A federal buyer named in the text. Acronyms come from the repo's agency alias list, matched
+// case-sensitively as whole words; acronyms that collide with ordinary usage are left out
+// (BPA = blanket purchase agreement, USA = the country, and two-letter codes like AG/ED/AF).
+const ACRONYM_COLLISIONS = new Set(['BPA', 'USA', 'AG', 'ED', 'CG', 'AF', 'RD', 'SC', 'FE', 'NE', 'EM']);
+const AGENCY_ACRONYM = new RegExp(`\\b(?:${Object.keys(agencyAliases.aliases).filter((k) => /^[A-Z]{2,8}$/.test(k) && !ACRONYM_COLLISIONS.has(k)).join('|')})\\b`);
+const AGENCY_NAME = /\b(?:the )?(?:Army|Navy|Air Force|Marine Corps|Coast Guard|Space Force|Pentagon)\b|\bDepartment of (?:the )?[A-Z]|\b[A-Z][a-z]+ (?:Agency|Administration|Command|Bureau)\b/;
+const namesAgency = (t: string) => AGENCY_ACRONYM.test(t) || AGENCY_NAME.test(t);
 // A named company (capitalized legal/trade suffix) — the same test context uses.
 const NAMED_COMPANY = /\b[A-Z][\w&'-]*\s+(?:Inc|LLC|L\.L\.C|Corp|Corporation|Company|Co|Ltd|LLP|PLLC|Holdings|Federal|Technologies|Solutions|Group|Systems|Services)\b/;
 // A contract/solicitation number: 6-char office code, 2-digit FY, type letter, serial (W912PL21C0001, 36C24226Q0857).
 const CONTRACT_NUMBER = /\b[A-Z0-9]{6}-?\d{2}-?[A-Z]-?[A-Z0-9]{4,}\b/;
 // Who holds the work is a fact, figure or not.
 const INCUMBENT_CLAIM = /\b(?:incumbent\w*|holds? the (?:current )?contract|current (?:contract )?holder)\b/i;
+// Who won is the same kind of fact as who holds it — figure or not ("the Army awarded it to Acme").
+const AWARD_CLAIM = /\b(?:awarded (?:\w+ )?to|(?:was|were|been) awarded|won (?:the|a|an|this|that|it|its)|winner of)\b/i;
+const WENT_TO_COMPANY = /\bwent to (?:[A-Z][\w&'-]*)/;
 // A specific date or a deadline. A bare month ("buying peaks in July through September") is seasonal
 // planning language and is allowed; a day ("March 15", "12 Dec", "2026-12-12") or a due date is not.
 const MONTH = '(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)';
@@ -89,16 +102,18 @@ const PLANNING_FRAME = /\b(?:assum\w*|for planning|planning|plan(?:ned)? (?:for|
 
 /**
  * Does an ASSUMPTION assert a factual claim about the world (so it must cite)? True when it states a
- * figure about the market (an award, obligation, ceiling, contract, agency, buyer, vendor… or a named
- * company / contract number), states a figure NOT framed as the author's planning premise, names an
- * incumbent, or gives a specific date or deadline. A framed planning figure with none of those passes.
+ * figure about the market (an award, obligation, ceiling, contract, buyer, vendor, spending, share…
+ * in noun or verb form, a named agency, a named company or a contract number), states a figure NOT
+ * framed as the author's planning premise, names an incumbent or a winner, or gives a specific date or
+ * deadline. A figure about the customer's own environment ("250 users across 12 sites"), framed as a
+ * planning premise, is a strategic assumption and passes (Eric's rule, settled 2026-11-17). A framed planning figure with none of those passes.
  */
 export function assumptionAssertsFact(text: string): boolean {
   const plain = text.replace(/\*\*|_/g, '');
   const figure = statesFigure(plain);
-  if (figure && (WORLD_NOUN.test(plain) || NAMED_COMPANY.test(plain) || CONTRACT_NUMBER.test(plain))) return true;
+  if (figure && (WORLD_TERM.test(plain) || namesAgency(plain) || NAMED_COMPANY.test(plain) || CONTRACT_NUMBER.test(plain))) return true;
   if (figure && !PLANNING_FRAME.test(plain)) return true;
-  return INCUMBENT_CLAIM.test(plain) || SPECIFIC_DATE.test(plain) || DEADLINE.test(plain);
+  return INCUMBENT_CLAIM.test(plain) || AWARD_CLAIM.test(plain) || WENT_TO_COMPANY.test(plain) || SPECIFIC_DATE.test(plain) || DEADLINE.test(plain);
 }
 
 /** Must this unit cite a source, given its label? (recommendation: any figure; assumption: a factual claim) */

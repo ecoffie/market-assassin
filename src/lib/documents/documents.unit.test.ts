@@ -127,6 +127,12 @@ describe('validateDocModel', () => {
       'We will target two proposals a quarter.',
       'Fourth-quarter spikes suggest year-end buying; expect the largest award volume in July through September.',
       'Vendor rankings reflect obligations, not win rates.',
+      // Customer-environment planning figures, framed as premises: strategic assumptions (Eric's rule,
+      // settled 2026-11-17 — allowed, pinned so a later tightening cannot silently reject them).
+      'Assume the program has 250 users across 12 sites.',
+      'We assume 400 employees for planning.',
+      'For planning, assume a 10% win rate.',
+      'We assume the RFP drops in Q2 FY2027 for planning.',
     ];
     const factual: Array<[string, string]> = [
       ['award value about a named company', 'We assume Acme Federal holds a $40M ceiling.'],
@@ -139,6 +145,14 @@ describe('validateDocModel', () => {
       ['specific date', 'We assume the RFP releases March 15.'],
       ['deadline', 'Assume proposals are due by the end of the quarter.'],
       ['unframed figure', 'Expect $640M a year to recompete.'],
+      // A4 round 2 probes — verb forms, agency names, a winner with no figure:
+      ['agency + "awarded" (verb)', 'We assume DHS awarded $3M for this work last year.'],
+      ['agency + "spends" (verb)', 'We assume the VA spends $5M a year on janitorial services.'],
+      ['agency + "buys" + share', 'Assume GSA buys 40% of this work.'],
+      ['who won, no figure', 'Assume the Army awarded it to Acme last year.'],
+      ['obligated (verb), named service', 'We assume the Navy obligated $12M.'],
+      ['agency acronym + count of orders', 'We assume NASA will issue two task orders.'],
+      ['"went to" a company, no figure', 'Assume the contract went to Acme.'],
     ];
     const one = (text: string, extra: Record<string, unknown> = {}) =>
       tiny({ sections: [{ id: 'a', heading: 'A', blocks: [{ type: 'paragraph', id: 'p', text, claim: 'assumption', ...extra }] }] });
