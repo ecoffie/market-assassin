@@ -104,6 +104,14 @@ describe('POST /api/app/documents/render', () => {
     expect(await res.text()).toContain('<!doctype html>');
   });
 
+  it('the inline degraded HTML carries a no-script, no-network CSP and nosniff', async () => {
+    state.pdf = { pdf: null, error: 'no browser' };
+    const res = await POST(ok('pdf'));
+    expect(res.headers.get('x-export-degraded')).toBe('pdf-unavailable');
+    expect(res.headers.get('content-security-policy')).toBe("default-src 'none'; style-src 'unsafe-inline'; img-src data:");
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+  });
+
   it('refuses oversized bodies', async () => {
     expect((await POST(req({ email: 'a@b.c', format: 'pdf', model: { pad: 'x'.repeat(1_600_000) } }))).status).toBe(413);
     expect((await POST(req({ email: 'a@b.c', format: 'pdf', model: SAMPLE_REPORT }, { 'content-length': '9999999' }))).status).toBe(413);

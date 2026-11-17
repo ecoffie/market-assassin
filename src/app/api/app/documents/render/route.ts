@@ -35,6 +35,8 @@ const MAX_BODY_BYTES = 1_500_000;
 const FORMATS: ReadonlySet<string> = new Set(['pdf', 'docx']);
 
 const NO_STORE = { 'Cache-Control': 'private, no-store' };
+/** For the inline degraded-HTML fallback (the PDF renderer's page, served from our origin). */
+export const DEGRADED_HTML_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:";
 
 /**
  * Per-account render limits over a rolling 10 minutes. A PDF runs headless Chromium for up to 60 s,
@@ -117,6 +119,10 @@ export async function POST(request: NextRequest) {
         'X-Export-Degraded': 'pdf-unavailable',
         // And why, so a production failure is diagnosable from a single request.
         'X-Export-Degraded-Reason': out.degraded.reason.replace(/[^\x20-\x7E]/g, ' ').slice(0, 200),
+        // This HTML is served inline from getmindy.ai and carries LLM/upload text: no scripts, no
+        // network, no frames; only its own inline styles and data: images. And never MIME-sniffed.
+        'Content-Security-Policy': DEGRADED_HTML_CSP,
+        'X-Content-Type-Options': 'nosniff',
       },
     });
   }

@@ -10,9 +10,9 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { unzipSync, strFromU8 } from 'fflate';
 
-const pdfState = vi.hoisted(() => ({ result: { pdf: null as Buffer | null, error: 'no browser' as string | null }, calls: [] as Array<{ html: string; opts: Record<string, unknown> }> }));
+const pdfState = vi.hoisted(() => ({ result: { pdf: null as Buffer | null, error: 'no browser' as string | null }, calls: [] as Array<{ html: string; opts: Record<string, unknown>; options?: Record<string, unknown> }> }));
 vi.mock('@/lib/pdf/launch-browser', () => ({
-  htmlToPdf: async (html: string, opts: Record<string, unknown>) => { pdfState.calls.push({ html, opts }); return pdfState.result; },
+  htmlToPdf: async (html: string, opts: Record<string, unknown>, options?: Record<string, unknown>) => { pdfState.calls.push({ html, opts, options }); return pdfState.result; },
 }));
 
 import { SAMPLE_REPORT } from './__fixtures__/sample-report';
@@ -463,6 +463,12 @@ describe('render-pdf', () => {
     expect(r.pdf?.subarray(0, 5).toString()).toBe('%PDF-');
     expect(r.error).toBeNull();
     expect(pdfState.calls[0].html).toContain('<h2>Executive summary</h2>');
+  });
+
+  it('renders the PDF locked down (JavaScript off, network blocked) — the HTML carries LLM/upload text', async () => {
+    pdfState.result = { pdf: Buffer.from('%PDF-1.7 test'), error: null };
+    await renderPdf(SAMPLE_REPORT);
+    expect(pdfState.calls[0].options).toMatchObject({ lockdown: true });
   });
 
   it('never silent: no browser → null PDF, the reason, and the printable HTML', async () => {

@@ -3,6 +3,9 @@
  * (src/lib/pdf/launch-browser.ts: @sparticuz/chromium + puppeteer-core on Vercel, full puppeteer
  * locally). Chromium output is real, selectable text with vector charts.
  *
+ * Locked down: JavaScript off and every request except about:blank / data: aborted (htmlToPdf
+ * `lockdown`). Scoped to this renderer; other callers of the shared launcher are unchanged.
+ *
  * Never silent: when no browser can start, the result carries `pdf: null`, the reason, and the same
  * HTML so the caller can return a printable page WITH a degrade header. A route that launches
  * Chromium must be listed in next.config.ts `outputFileTracingIncludes`, or the binary never reaches
@@ -38,7 +41,9 @@ export async function renderPdf(
   deps: { htmlToPdf: typeof htmlToPdf } = { htmlToPdf },
 ): Promise<PdfRender> {
   const html = renderHtml(model);
-  const { pdf, error } = await deps.htmlToPdf(html, pdfOptions(model));
+  // The model's text comes from an LLM and user uploads: render it with JavaScript off and no network
+  // (the HTML is self-contained; charts are inline SVG).
+  const { pdf, error } = await deps.htmlToPdf(html, pdfOptions(model), { lockdown: true });
   if (!pdf) return { pdf: null, html, error: error || 'pdf_unavailable' };
   return { pdf, html, error: null };
 }
