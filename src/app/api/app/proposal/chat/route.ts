@@ -23,6 +23,7 @@ import { loadBidderProfile, formatProfileForPrompt, loadVaultContext, ALL_VAULT_
 import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
 import { selectRelevantRfp } from '@/lib/proposal/select-relevant';
 import { authorizePursuitRead } from '@/lib/proposal/pursuit-access';
+import { loadSolicitationFactsBlock, type FactsDb } from '@/lib/chat/selected-notice';
 
 // RAG-as-standard: Manual Drive answers are informed by Mindy's real proposal
 // corpus (winning technical/pricing/past-perf volumes, templates, cap
@@ -59,6 +60,7 @@ Rules:
 - Write in the user's voice: concrete, specific, no marketing fluff, no "we are pleased to".
 - When asked to draft a section, return clean prose ready to paste into the proposal. When asked a question about the RFP, answer directly and cite the relevant requirement.
 - If the RFP text or Vault is missing what's needed, say so plainly and tell the user what to upload or add.
+- SOLICITATION FACTS (when present) are Mindy's record of this pursuit's notice: buyer office, contact, deadline and the incumbent finding. State the incumbent ONLY as the finding says: name one only when the finding is "identified"; otherwise say it could not be confirmed, and never say there is no incumbent.
 - Never say "as an AI" — you're Mindy.`;
 
 function sseEvent(obj: unknown): string {
@@ -130,6 +132,8 @@ export async function POST(request: NextRequest) {
   let rfpText = String(body.rfpText || '').slice(0, RFP_MAX_CHARS);
   let rfpFileName = String(body.rfpFileName || '');
   let cachedRequirements: Array<{ requirement: string; category?: string; section?: string }> = [];
+  // The pursuit's SAM notice id (Step 7): Proposal AI recomputes the solicitation facts from it.
+  let pursuitNoticeId: string | null = null;
   if (pipelineId) {
     // The documents are read with the service-role key, so ownership is checked
     // here: the caller must own the pursuit or share its workspace.
@@ -144,6 +148,12 @@ export async function POST(request: NextRequest) {
         ? NextResponse.json({ success: false, error: 'Could not load this pursuit. Try again.' }, { status: 503 })
         : NextResponse.json({ success: false, error: 'Pursuit not found' }, { status: 404 });
     }
+    // Read only after access is granted above. A failed read just means no facts block.
+    const { data: pursuitRow, error: pursuitErr } = await createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+      .from('user_pipeline').select('notice_id').eq('id', pipelineId).maybeSingle();
+    if (pursuitErr) console.error('[proposal/chat] pursuit notice read failed:', pursuitErr.message);
+    const nid = String((pursuitRow as { notice_id?: string | null } | null)?.notice_id || '').trim().toLowerCase();
+    pursuitNoticeId = /^[0-9a-f]{32}$/.test(nid) ? nid : null;
     const loaded = await loadPursuitContext(pipelineId);
     if (loaded.rfpText) { rfpText = loaded.rfpText; rfpFileName = loaded.rfpFileName || rfpFileName; }
     cachedRequirements = loaded.requirements;
@@ -158,7 +168,7 @@ export async function POST(request: NextRequest) {
         // proposal RAG as the build standard. RAG query = the user's message +
         // a slice of the RFP so retrieval is relevant to what they're writing.
         const ragQuery = `${message}\n${rfpText.slice(0, 1500)}`.trim();
-        const [profile, vault, ragChunks] = await Promise.all([
+        const [profile, vault, ragChunks, solFacts] = await Promise.all([
           loadBidderProfile(email),
           // A general Vault read: identity, past performance, capabilities AND team. 'exec_summary'
           // alone never loaded capabilities or team, although this comment used to claim it did
@@ -167,6 +177,11 @@ export async function POST(request: NextRequest) {
           loadVaultContext(email, 'exec_summary', { sections: ALL_VAULT_SECTIONS }),
           retrieveRagContext({ query: ragQuery, docTypes: PROPOSAL_DOC_TYPES, limit: 4, maxChars: 3000, maxPerDoc: 1 })
             .catch(() => []),
+          // Solicitation facts from the pursuit's notice_id: buyer/DoDAAC/contact + the incumbent finding,
+          // computed by the same functions Ask Mindy's tools use (incumbent bounded at 4s). Never stored.
+          pursuitNoticeId
+            ? loadSolicitationFactsBlock(createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!) as unknown as FactsDb, pursuitNoticeId, { cacheKey: `pursuit:${pipelineId}` }).catch(() => null)
+            : Promise.resolve(null),
         ]);
 
         const profileBlock = formatProfileForPrompt(profile);
@@ -176,6 +191,7 @@ export async function POST(request: NextRequest) {
         if (rfpText) sources.push(rfpFileName || 'Uploaded RFP');
         if (vault.has_any) sources.push('Your Vault (profile, past performance, capabilities, team)');
         if (cachedRequirements.length) sources.unshift(`${cachedRequirements.length} extracted requirements (cached matrix)`);
+        if (solFacts) sources.push(`Solicitation facts (${solFacts.label}, buyer and incumbent lookup)`);
         if (ragChunks.length) sources.push(`Proposal corpus (${ragChunks.length} winning-volume references)`);
         send({ type: 'sources', sources });
 
@@ -190,6 +206,7 @@ export async function POST(request: NextRequest) {
         const relevantRfp = rfpText ? selectRelevantRfp(rfpText, message, RFP_CONTEXT_BUDGET) : '';
         const contextParts = [
           reqBlock ? `EXTRACTED REQUIREMENTS (the solicitation's obligations, already parsed — answer specific questions from THIS first):\n${reqBlock}` : '',
+          solFacts ? solFacts.block : '',
           profileBlock ? `COMPANY PROFILE:\n${profileBlock}` : '',
           vaultBlock ? `VAULT:\n${vaultBlock}` : '',
           relevantRfp ? `RFP / SOLICITATION TEXT${rfpFileName ? ` (${rfpFileName})` : ''} — relevant excerpts:\n${relevantRfp}` : '',
