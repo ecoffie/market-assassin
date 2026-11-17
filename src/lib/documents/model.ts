@@ -17,9 +17,12 @@
  *                    in a section with role 'about', and never with a number (digits or words):
  *                    a figure is always a claim about the world.
  *
- * A recommendation or assumption that states a count or an amount (digits or number words) must
- * cite the source of that figure. `unverified` can never be `critical` — a decision-critical
- * statement without a source is omitted, not shown.
+ * A recommendation that states a count or an amount (digits or number words) must cite the source
+ * of that figure. An assumption may state a PLANNING figure ("we assume a ~$2M annual budget for
+ * planning"), but one asserting a factual claim about the world — an award value, obligation,
+ * ceiling, incumbent, date, or a count of buyers, vendors or contracts — must cite (Eric,
+ * 2026-11-17; validate.ts assumptionAssertsFact). `unverified` can never be `critical` — a
+ * decision-critical statement without a source is omitted, not shown.
  *
  * There is no "estimate" label (Eric, 2026-11-17): a statement is verified, an ASSUMPTION, or
  * omitted. A decision-critical statement with no source (`critical: true`) is omitted, not labeled.

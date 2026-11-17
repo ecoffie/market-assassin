@@ -109,13 +109,61 @@ describe('validateDocModel', () => {
     const m = tiny({ sections: [{ id: 'a', heading: 'A', blocks: [
       { type: 'paragraph', id: 'r1', text: 'Track the eight VA recompetes.', claim: 'recommendation' },
       { type: 'paragraph', id: 'r2', text: 'Expect $640M a year to recompete.', claim: 'assumption' },
-      { type: 'paragraph', id: 'r3', text: 'Budget roughly 5% for travel.', claim: 'assumption' },
       { type: 'paragraph', id: 'ok1', text: 'Track the eight VA recompetes.', claim: 'recommendation', cites: ['s1'] },
       { type: 'paragraph', id: 'ok2', text: 'Pursue teaming with an 8(a) firm for FY26 Q3 set-asides.', claim: 'recommendation' },
       { type: 'paragraph', id: 'ok3', text: 'Call one of the buying offices first.', claim: 'recommendation' },
     ] }] });
     const msgs = issuesOf(m).filter((x) => /must cite its source/.test(x));
-    expect(msgs.map((x) => x.match(/\((\w+)\)$/)?.[1])).toEqual(['r1', 'r2', 'r3']);
+    expect(msgs.map((x) => x.match(/\((\w+)\)$/)?.[1])).toEqual(['r1', 'r2']);
+  });
+
+  // Eric, 2026-11-17: strategic assumptions are allowed when labeled ASSUMPTION and may state a planning
+  // figure; an unsupported FACTUAL claim must be cited, shown "Unverified — no source", or omitted.
+  describe('ASSUMPTION: may plan, may not assert', () => {
+    const planning = [
+      'We assume a ~$2M annual budget for planning.',
+      'Budget roughly 5% for travel.',
+      'For planning, assume three FTEs on the transition team.',
+      'We will target two proposals a quarter.',
+      'Fourth-quarter spikes suggest year-end buying; expect the largest award volume in July through September.',
+      'Vendor rankings reflect obligations, not win rates.',
+    ];
+    const factual: Array<[string, string]> = [
+      ['award value about a named company', 'We assume Acme Federal holds a $40M ceiling.'],
+      ['obligation figure', 'We assume the agency obligated $12M last year.'],
+      ['contract ceiling', 'Assume a $250M ceiling on the follow-on contract.'],
+      ['count of buyers', 'We assume 12 offices buy this service.'],
+      ['count of bidders', 'For planning, assume 5 bidders.'],
+      ['contract number', 'Assume W912PL21C0001 runs $8M a year.'],
+      ['incumbent (no figure)', 'We assume Delta Corp is the incumbent.'],
+      ['specific date', 'We assume the RFP releases March 15.'],
+      ['deadline', 'Assume proposals are due by the end of the quarter.'],
+      ['unframed figure', 'Expect $640M a year to recompete.'],
+    ];
+    const one = (text: string, extra: Record<string, unknown> = {}) =>
+      tiny({ sections: [{ id: 'a', heading: 'A', blocks: [{ type: 'paragraph', id: 'p', text, claim: 'assumption', ...extra }] }] });
+
+    it.each(planning)('a planning assumption passes uncited: %s', (text) => {
+      expect(issuesOf(one(text))).toEqual([]);
+      expect(demoteUncitedFacts(one(text)).unverified).toEqual([]);
+    });
+
+    it.each(factual)('a factual claim dressed as an assumption must cite (%s)', (_why, text) => {
+      expect(issuesOf(one(text)).join(' ')).toMatch(/an assumption may state a planning figure, but a factual claim .* must cite its source \(p\)/);
+      expect(issuesOf(one(text, { cites: ['s1'] }))).toEqual([]); // verified: cited to a source in the doc
+    });
+
+    it('demotion: an uncited factual assumption becomes "Unverified — no source"; a critical one is omitted', () => {
+      const d = demoteUncitedFacts(one('We assume Acme Federal holds a $40M ceiling.'));
+      expect(d.unverified).toEqual(['p']);
+      expect(d.model.sections[0].blocks[0]).toMatchObject({ claim: 'unverified' });
+      expect(issuesOf(d.model)).toEqual([]);
+      const c = demoteUncitedFacts(one('Assume proposals are due by the end of the quarter.', { critical: true }));
+      expect(c.omitted).toEqual(['p']);
+      expect(c.model.sections[0].blocks).toEqual([]);
+      const keep = demoteUncitedFacts(one('We assume a ~$2M annual budget for planning.'));
+      expect(keep.model.sections[0].blocks[0]).toMatchObject({ claim: 'assumption' });
+    });
   });
 
   it('context in an ABOUT section cannot carry a decision-critical claim (Agent 4 probes, round 4)', () => {

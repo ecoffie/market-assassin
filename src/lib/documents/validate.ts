@@ -10,6 +10,8 @@
  *     a source in `sources`. A fact with no resolvable cite is an error, not a warning — an uncited
  *     "fact" in a client-facing PDF is exactly the claim Mindy cannot defend;
  *   - CONTEXT HAS NO NUMBERS: `context` describes the document; a digit means it is a claim;
+ *   - ASSUMPTIONS MAY PLAN, NOT ASSERT (Eric, 2026-11-17): an assumption may state a planning figure,
+ *     but one asserting a factual claim about the world must cite (assumptionAssertsFact);
  *   - numbers: table/chart values must be finite; a missing value is null ("Not available"), never 0.
  *
  * `demoteUncitedFacts` is the one sanctioned repair (Eric's rule: verified, ASSUMPTION, or omitted —
@@ -61,6 +63,49 @@ const CONTEXT_MAX_CHARS = 600;
 export function statesFigure(text: string): boolean {
   const plain = text.replace(/\*\*|_/g, '');
   return NUMERIC_TOKEN.test(plain) || NUMBER_WORD.test(plain) || FRACTION_WORD.test(plain);
+}
+
+// ── ASSUMPTION rule (Eric, 2026-11-17) ───────────────────────────────────────────────────────────
+// A strategic assumption is allowed when labeled ASSUMPTION, and may state a PLANNING figure
+// ("we assume a ~$2M annual budget for planning"). It may not smuggle a FACTUAL claim about the
+// world — an award value, obligation, ceiling, incumbent, date, or a count of buyers, vendors,
+// contracts… — without a cite; those get cite / "Unverified — no source" / omit, like any fact.
+
+// Nouns that make a figure a claim about the federal market rather than the author's plan.
+const WORLD_NOUN = /\b(?:agenc(?:y|ies)|departments?|offices?|buyers?|vendors?|bidders?|offerors?|competitors?|incumbents?|contractors?|firms?|compan(?:y|ies)|recompetes?|contracts?|awards?|obligat\w*|spend(?:ing)?|ceilings?|solicitations?|opportunit(?:y|ies)|(?:task|delivery) orders?|market)\b/i;
+// A named company (capitalized legal/trade suffix) — the same test context uses.
+const NAMED_COMPANY = /\b[A-Z][\w&'-]*\s+(?:Inc|LLC|L\.L\.C|Corp|Corporation|Company|Co|Ltd|LLP|PLLC|Holdings|Federal|Technologies|Solutions|Group|Systems|Services)\b/;
+// A contract/solicitation number: 6-char office code, 2-digit FY, type letter, serial (W912PL21C0001, 36C24226Q0857).
+const CONTRACT_NUMBER = /\b[A-Z0-9]{6}-?\d{2}-?[A-Z]-?[A-Z0-9]{4,}\b/;
+// Who holds the work is a fact, figure or not.
+const INCUMBENT_CLAIM = /\b(?:incumbent\w*|holds? the (?:current )?contract|current (?:contract )?holder)\b/i;
+// A specific date or a deadline. A bare month ("buying peaks in July through September") is seasonal
+// planning language and is allowed; a day ("March 15", "12 Dec", "2026-12-12") or a due date is not.
+const MONTH = '(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)';
+const SPECIFIC_DATE = new RegExp(`\\b\\d{1,2}\\s+${MONTH}\\b|\\b${MONTH}\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?\\b|\\b\\d{1,2}/\\d{1,2}/\\d{2,4}\\b|\\b\\d{4}-\\d{2}-\\d{2}\\b`);
+const DEADLINE = /\b(?:deadline|due date|due by|due on|is due|are due|closes on|closing date)\b/i;
+// Words that present a figure as the author's own planning premise.
+const PLANNING_FRAME = /\b(?:assum\w*|for planning|planning|plan(?:ned)? (?:for|on)|budget(?:ed|ing|s)?|target(?:ed|ing|s)?|goal|we (?:will|would|plan|intend)|our)\b/i;
+
+/**
+ * Does an ASSUMPTION assert a factual claim about the world (so it must cite)? True when it states a
+ * figure about the market (an award, obligation, ceiling, contract, agency, buyer, vendor… or a named
+ * company / contract number), states a figure NOT framed as the author's planning premise, names an
+ * incumbent, or gives a specific date or deadline. A framed planning figure with none of those passes.
+ */
+export function assumptionAssertsFact(text: string): boolean {
+  const plain = text.replace(/\*\*|_/g, '');
+  const figure = statesFigure(plain);
+  if (figure && (WORLD_NOUN.test(plain) || NAMED_COMPANY.test(plain) || CONTRACT_NUMBER.test(plain))) return true;
+  if (figure && !PLANNING_FRAME.test(plain)) return true;
+  return INCUMBENT_CLAIM.test(plain) || SPECIFIC_DATE.test(plain) || DEADLINE.test(plain);
+}
+
+/** Must this unit cite a source, given its label? (recommendation: any figure; assumption: a factual claim) */
+function labelNeedsSource(claim: string | undefined, text: string): boolean {
+  if (claim === 'recommendation') return statesFigure(text);
+  if (claim === 'assumption') return assumptionAssertsFact(text);
+  return false;
 }
 
 function isObj(v: unknown): v is Record<string, unknown> {
@@ -213,8 +258,10 @@ export function validateDocModel(input: unknown): ValidationResult {
           // "Unverified — no source" next to a [n] citation contradicts itself, and the cited source would
           // still be listed under Sources as if it supported the statement.
           if (u.claim === 'unverified' && Array.isArray(u.cites) && u.cites.length) add(`${bp}`, `an unverified statement carries no cites (${u.where}); if the source supports it, label it fact`);
-          if ((u.claim === 'recommendation' || u.claim === 'assumption') && statesFigure(u.text) && (u.cites ?? []).filter((c) => sourceIds.has(c)).length === 0) {
-            add(`${bp}`, `${u.claim === 'assumption' ? 'an assumption' : 'a recommendation'} that states a count or amount must cite its source (${u.where})`);
+          if (labelNeedsSource(u.claim, u.text) && (u.cites ?? []).filter((c) => sourceIds.has(c)).length === 0) {
+            add(`${bp}`, u.claim === 'assumption'
+              ? `an assumption may state a planning figure, but a factual claim (an award, obligation, ceiling, incumbent, date, or a count of buyers, vendors or contracts) must cite its source (${u.where})`
+              : `a recommendation that states a count or amount must cite its source (${u.where})`);
           }
           if (u.cites !== undefined && !Array.isArray(u.cites)) { add(`${bp}`, `cites must be an array at ${u.where}`); continue; }
           const cites = u.cites ?? [];
@@ -260,8 +307,8 @@ export function demoteUncitedFacts(model: DocModel): DemotionResult {
   const droppedCites: Array<{ where: string; ids: string[] }> = [];
   type Unit = { claim?: string; cites?: string[]; critical?: boolean; text?: string; caption?: string };
   // Returns the repaired unit, or null when it must be omitted. A unit is held to the
-  // facts-must-cite rule when it is a fact, unlabeled, a recommendation/assumption stating a
-  // figure, or `context` the validator would refuse (outside an 'about' section, or with a number).
+  // facts-must-cite rule when it is a fact, unlabeled, a recommendation stating a figure, an
+  // assumption asserting a factual claim (assumptionAssertsFact), or `context` the validator would refuse (outside an 'about' section, or with a number).
   const withoutCites = <T extends Unit>(x: T): T => { const { cites: _dropped, ...rest } = x; return rest as T; };
   const fix = <T extends Unit>(input: T, where: string, about: boolean, isTableOrChart: boolean): T | null => {
     // A cite id with no source behind it is not evidence. Drop it so the repaired model validates
@@ -274,7 +321,7 @@ export function demoteUncitedFacts(model: DocModel): DemotionResult {
     const cited = resolved.length > 0;
     const mustCite =
       u.claim === 'fact' || u.claim === undefined ||
-      ((u.claim === 'recommendation' || u.claim === 'assumption') && statesFigure(text)) ||
+      labelNeedsSource(u.claim, text) ||
       (u.claim === 'context' && (!about || isTableOrChart || /\d/.test(text) || NUMBER_WORD.test(text) || CONTEXT_FORBIDDEN.test(text) || text.length > CONTEXT_MAX_CHARS)) ||
       (u.claim === 'unverified' && u.critical === true);
     // An explicitly unverified (non-critical) statement keeps the producer's own doubt; only its cites go.
