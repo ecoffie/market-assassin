@@ -25,6 +25,8 @@ const state = vi.hoisted(() => ({
   prompts: [] as string[],
   pursuit: null as Record<string, unknown> | null,
   tables: [] as string[],
+  vaultOpts: [] as unknown[],
+  factsCalls: [] as string[],
 }));
 
 vi.mock('@/lib/two-factor-session', () => ({
@@ -39,7 +41,11 @@ vi.mock('@/lib/llm/usage-cost', () => ({
 vi.mock('@/lib/proposal/loaders', () => ({
   loadBidderProfile: async (e: string) => { state.profileEmails.push(e); return { companyName: 'Loaded Co' }; },
   formatProfileForPrompt: () => '',
-  loadVaultContext: async (e: string) => { state.vaultEmails.push(e); return { has_any: true, identity: { company_name: 'Loaded Co' } }; },
+  loadVaultContext: async (e: string, _kind?: string, opts?: unknown) => { state.vaultEmails.push(e); state.vaultOpts.push(opts); return { has_any: true, identity: { company_name: 'Loaded Co' } }; },
+  ALL_VAULT_SECTIONS: ['identity', 'past_performance', 'capabilities', 'team'],
+}));
+vi.mock('@/lib/chat/selected-notice', () => ({
+  loadSolicitationFactsBlock: async (_db: unknown, noticeId: string) => { state.factsCalls.push(noticeId); return { label: 'notice', block: 'SOLICITATION FACTS' }; },
 }));
 vi.mock('@/lib/rag/retrieve', () => ({ retrieveRagContext: async () => [], formatChunksForPrompt: () => '' }));
 vi.mock('@/lib/proposal/select-relevant', () => ({ selectRelevantRfp: () => '' }));
@@ -66,7 +72,7 @@ vi.mock('@supabase/supabase-js', () => ({
 
 beforeEach(() => {
   state.profileEmails = []; state.vaultEmails = []; state.budgetEmails = []; state.usageEmails = []; state.sources = [];
-  state.prompts = []; state.pursuit = null; state.tables = [];
+  state.prompts = []; state.pursuit = null; state.tables = []; state.vaultOpts = []; state.factsCalls = [];
   vi.stubEnv('OPENAI_API_KEY', 'ok');
   vi.stubEnv('GROQ_API_KEY', 'gk');
   vi.stubGlobal('fetch', vi.fn(async (_u: unknown, init?: { body?: string }) => {
@@ -104,7 +110,9 @@ describe('Manual Drive follows the acting scope', () => {
     expect(state.profileEmails).toEqual([CLIENT_VAULT]);
     expect(state.budgetEmails).toEqual([COACH]);
     expect(state.usageEmails.every((e) => e === COACH)).toBe(true);
-    expect(state.sources.join(' ')).toMatch(/This client's Vault/);
+    expect(state.sources.join(' ')).toMatch(/This client's Vault \(profile, past performance, capabilities, team\)/);
+    // I4: the full Vault (all sections, incl. team) is preloaded for the client too.
+    expect(state.vaultOpts).toEqual([{ sections: ['identity', 'past_performance', 'capabilities', 'team'] }]);
   });
 
   it("unresolvable scope → empty Vault and profile, never the coach's own", async () => {
@@ -124,7 +132,7 @@ describe('Manual Drive follows the acting scope', () => {
     expect(state.vaultEmails).toEqual([COACH]);
     expect(state.profileEmails).toEqual([COACH]);
     expect(state.budgetEmails).toEqual([COACH]);
-    expect(state.sources.join(' ')).toMatch(/Your Vault/);
+    expect(state.sources.join(' ')).toMatch(/Your Vault \(profile, past performance, capabilities, team\)/);
   });
 
   it('an unauthorized header is ignored → own data (same as every screen)', async () => {
@@ -183,13 +191,23 @@ describe("client scope reads only the client's pursuits (N1-MD)", () => {
 
 describe('unresolved workspace loads no pursuit data (U1-b)', () => {
   const PID = '11111111-2222-4333-8444-555555555555';
+  const NID = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  it('control: a confirmed scope with the same pursuit DOES preload solicitation facts', async () => {
+    state.resolve = 'own';
+    state.pursuit = { id: PID, user_email: COACH, workspace_id: null, notice_id: NID };
+    const res = await ask(null, PID);
+    expect(res.status).toBe(200);
+    expect(state.factsCalls).toEqual([NID]);
+  });
   it("a pursuit the coach owns: no user_pipeline / pursuit_documents read, and the note is present", async () => {
     state.resolve = 'throw';
-    state.pursuit = { id: PID, user_email: COACH, workspace_id: null };
+    state.pursuit = { id: PID, user_email: COACH, workspace_id: null, notice_id: NID };
     const res = await ask(WS, PID);
     expect(res.status).toBe(200);
     expect(state.tables).not.toContain('pursuit_documents');
-    expect(state.tables).not.toContain('user_pipeline');
+    expect(state.tables).not.toContain('user_pipeline'); // no access check, scope check or notice_id read
+    expect(state.factsCalls).toEqual([]); // no solicitation facts
+    expect(state.sources.join(' ')).not.toMatch(/Solicitation facts/);
     expect(state.prompts.join('\n')).toContain("The active workspace couldn't be confirmed, so no Vault, profile or pursuit data was loaded. Ask the user to retry.");
   });
 });
