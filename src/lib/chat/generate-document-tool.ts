@@ -79,6 +79,33 @@ export function docModelText(m: DocModel): string {
   return parts.filter(Boolean).join('\n');
 }
 
+/**
+ * EVERY string that can appear in the rendered files — what the CUI/classified detector must see (A4):
+ * the readable text above PLUS table column labels and every cell value, chart series names, point
+ * labels and axis titles, source labels / record ids / urls, and the cover "Attention" line. A marking
+ * copied into a table or the Sources list must not reach a saved client file. One string per line, so
+ * a banner keeps its own line for the line-based detector.
+ */
+export function markingText(m: DocModel): string {
+  const parts: string[] = [docModelText(m), String((m.meta as { attention?: unknown } | undefined)?.attention ?? '')];
+  for (const s of m.sections) {
+    for (const b of s.blocks) {
+      if (b.type === 'table') {
+        for (const c of b.columns ?? []) parts.push(String(c.label ?? ''));
+        for (const r of b.rows ?? []) for (const v of Object.values(r ?? {})) if (v !== null && v !== undefined) parts.push(String(v));
+      } else if (b.type === 'chart') {
+        parts.push(String(b.xLabel ?? ''), String(b.yLabel ?? ''));
+        for (const ser of b.series ?? []) {
+          parts.push(String(ser.name ?? ''));
+          for (const pt of ser.points ?? []) parts.push(String(pt.x ?? ''));
+        }
+      }
+    }
+  }
+  for (const src of m.sources ?? []) parts.push(String(src.label ?? ''), String(src.recordId ?? ''), String(src.url ?? ''));
+  return parts.filter(Boolean).join('\n');
+}
+
 const baseName = (f: string) => f.replace(/\.(pdf|docx)$/i, '');
 
 export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
@@ -150,7 +177,7 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
     }
 
     const text = docModelText(model);
-    const marking = detectProhibitedMarkings(text);
+    const marking = detectProhibitedMarkings(markingText(model));
     if (marking.blocked && marking.kind) return { ok: false, error: 'prohibited_marking', note: markingRefusalMessage(marking.kind) };
 
     // Revision: the parent (and its other-format pair) must be this owner's generated document, and no

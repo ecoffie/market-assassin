@@ -204,6 +204,35 @@ describe('create_document', () => {
     expect(s.docs()).toEqual([]);
   });
 
+  describe('CUI/classified refusal sees EVERY rendered string (A4)', () => {
+    const BANNER = 'CUI//SP-PROCURE';
+    const withTable = (cell: string, label: string) => ({ type: 'table', id: 't1', claim: 'fact', cites: ['s1'], columns: [{ key: 'a', label }, { key: 'v', label: 'Value', format: 'usd' }], rows: [{ a: cell, v: 5_000_000 }] });
+    const withChart = (series: string, x: string) => ({ type: 'chart', id: 'c1', kind: 'bar', claim: 'fact', cites: ['s1'], series: [{ name: series, points: [{ x, y: 3 }] }] });
+    const cases: Array<[string, R]> = [
+      ['paragraph', model({ sections: [{ id: 'a', heading: 'Summary', blocks: [{ type: 'paragraph', id: 'p1', text: BANNER, claim: 'fact', cites: ['s1'] }] }] })],
+      ['table cell', model({ sections: [{ id: 'a', heading: 'Summary', blocks: [withTable(BANNER, 'Agency')] }] })],
+      ['column label', model({ sections: [{ id: 'a', heading: 'Summary', blocks: [withTable('VA', BANNER)] }] })],
+      ['chart series name', model({ sections: [{ id: 'a', heading: 'Summary', blocks: [withChart(BANNER, 'VA')] }] })],
+      ['chart point label', model({ sections: [{ id: 'a', heading: 'Summary', blocks: [withChart('Obligations', BANNER)] }] })],
+      ['source label', model({ sources: [{ id: 's1', kind: 'upload', label: BANNER }] })],
+      ['source record id', model({ sources: [{ id: 's1', kind: 'tool', label: 'Query', recordId: BANNER }] })],
+      ['cover attention line', model({ meta: { attention: BANNER } })],
+    ];
+    it.each(cases)('a banner in a %s is refused; nothing rendered or saved', async (_where, m) => {
+      const s = setup();
+      expect(await s.tool.execute({ doc_model: m })).toMatchObject({ ok: false, error: 'prohibited_marking' });
+      expect(s.renders).toEqual([]);
+      expect(s.docs()).toEqual([]);
+      expect(s.storage.blobs).toEqual([]);
+    });
+
+    it('ordinary tables, charts and sources are not refused', async () => {
+      const s = setup();
+      const m = model({ sections: [{ id: 'a', heading: 'Summary', blocks: [withTable('VA', 'Agency'), withChart('Obligations', 'VA')] }] });
+      expect(await s.tool.execute({ doc_model: m })).toMatchObject({ ok: true });
+    });
+  });
+
   it('PDF unavailable: the Word file is saved, the PDF is reported unavailable, and no HTML is saved as a PDF', async () => {
     const s = setup({ pdfDegraded: true });
     const r = await s.tool.execute({ doc_model: model() });
