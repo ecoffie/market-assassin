@@ -122,7 +122,19 @@ export async function saveGeneratedDocument(
     ...(chatSessionId ? { chat_session_id: chatSessionId } : {}),
     ...(input.noticeId ? { notice_id: String(input.noticeId).slice(0, 64) } : {}),
   };
-  const { data, error: insErr } = await deps.db.from('user_boilerplate_docs').insert(row).select().maybeSingle();
+  // A concurrent revision of the same parent may have taken this version number: the unique
+  // (parent_id, version) index refuses the duplicate (23505). Re-read the latest sibling version and
+  // retry, so two revisions never share a number and neither is lost.
+  let { data, error: insErr } = await deps.db.from('user_boilerplate_docs').insert(row).select().maybeSingle();
+  for (let attempt = 0; attempt < 3 && parentId && insErr && String((insErr as { code?: string }).code) === '23505'; attempt++) {
+    const { data: sibs, error: sibErr } = await deps.db.from('user_boilerplate_docs')
+      .select('version').eq('parent_id', parentId).order('version', { ascending: false }).limit(1);
+    if (sibErr) break;
+    const latest = Number((sibs as { version?: number }[] | null)?.[0]?.version ?? 0);
+    version = Math.max(version, latest + 1);
+    row.version = version;
+    ({ data, error: insErr } = await deps.db.from('user_boilerplate_docs').insert(row).select().maybeSingle());
+  }
   if (insErr || !data) {
     const { error: rmErr } = await deps.storage.from(VAULT_BUCKET).remove([storagePath]);
     if (rmErr) console.error('[vault/generated] orphan blob left after insert failure:', storagePath, rmErr.message);

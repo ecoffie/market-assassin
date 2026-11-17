@@ -13,7 +13,8 @@ const SRC_OTHER = '33333333-3333-4333-8333-333333333333';
 const SID = '0b0b0b0b-1111-4222-8333-444444444444';
 
 type Row = Record<string, unknown>;
-function world(rows: Row[], opts: { insertError?: boolean; sessions?: Record<string, string> } = {}) {
+function world(rows: Row[], opts: { insertError?: boolean; sessions?: Record<string, string>; conflicts?: number } = {}) {
+  let conflicts = opts.conflicts ?? 0;
   const inserts: Row[] = [];
   const updates: Row[] = [];
   const blobs: string[] = [];
@@ -34,9 +35,20 @@ function world(rows: Row[], opts: { insertError?: boolean; sessions?: Record<str
         is: (k: string, v: unknown) => { filters.push(['is', k, v]); return q; },
         in: (k: string, v: unknown) => { filters.push(['in', k, v]); return q; },
         update: (r: Row) => { updates.push(r); return q; },
+        order: () => q,
+        limit: () => q,
         maybeSingle: async () => ({ data: pick()[0] ?? null, error: null }),
-        then: (resolve: (v: unknown) => void) => resolve({ data: pick(), error: null }),
-        insert: (r: Row) => { inserts.push(r); return { select: () => ({ maybeSingle: async () => (opts.insertError ? { data: null, error: { message: 'x' } } : { data: { id: 'new', ...r }, error: null }) }) }; },
+        then: (resolve: (v: unknown) => void) => resolve({ data: pick().sort((a, b) => Number(b.version ?? 0) - Number(a.version ?? 0)), error: null }),
+        insert: (r: Row) => {
+          inserts.push({ ...r });
+          if (conflicts > 0) {
+            conflicts--;
+            // Simulate a concurrent sibling that took this version.
+            rows.push({ id: `sib-${conflicts}`, user_email: r.user_email, doc_class: 'generated', parent_id: r.parent_id, version: r.version, archived_at: null });
+            return { select: () => ({ maybeSingle: async () => ({ data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "uq_boilerplate_parent_version"' } }) }) };
+          }
+          return { select: () => ({ maybeSingle: async () => (opts.insertError ? { data: null, error: { message: 'x' } } : { data: { id: 'new', ...r }, error: null }) }) };
+        },
       };
       return q;
     },
@@ -133,5 +145,20 @@ describe('saveGeneratedDocument', () => {
       expect((await saveGeneratedDocument(bad, { db: w.db, storage: w.storage, resolveScope: own })).ok).toBe(false);
     }
     expect(w.blobs).toEqual([]);
+  });
+
+  it('concurrent revision took the version (unique conflict) → re-reads the latest sibling and retries with the next number', async () => {
+    const w = world([{ id: P1, user_email: 'o@x.com', doc_class: 'generated', version: 2, archived_at: null }], { conflicts: 1 });
+    const r = await saveGeneratedDocument(input({ parentId: P1 }), { db: w.db, storage: w.storage, resolveScope: own });
+    expect(r).toMatchObject({ ok: true, version: 4 });
+    expect(w.inserts.map((x) => x.version)).toEqual([3, 4]);
+    expect(w.removed).toEqual([]); // the blob is kept; only the row number moved
+  });
+
+  it('a non-conflict insert error is not retried', async () => {
+    const w = world([{ id: P1, user_email: 'o@x.com', doc_class: 'generated', version: 1, archived_at: null }], { insertError: true });
+    const r = await saveGeneratedDocument(input({ parentId: P1 }), { db: w.db, storage: w.storage, resolveScope: own });
+    expect(r).toMatchObject({ ok: false, code: 'insert_failed' });
+    expect(w.inserts).toHaveLength(1);
   });
 });
