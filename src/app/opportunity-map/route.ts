@@ -11182,10 +11182,13 @@ const ASK_MINDY_JS = `<script>(function(){
     };
     amkDocs={reload:reload};
   }
+  // The capability check must never break the drawer: any error (thrown or rejected) just shows no row.
   if(drawer && tok() && email()){
-    fetch('/api/app/vault/doc-access?email='+encodeURIComponent(email()),{headers:{'x-mi-auth-token':tok()||'','x-user-email':email()}})
-      .then(function(r){ return r.ok?r.json():null; },function(){ return null; })
-      .then(function(d){ if(d && d.uploads===true && !amkDocs) buildAttach(); });
+    try{
+      fetch('/api/app/vault/doc-access?email='+encodeURIComponent(email()),{headers:{'x-mi-auth-token':tok()||'','x-user-email':email()}})
+        .then(function(r){ return r.ok?r.json():null; },function(){ return null; })
+        .then(function(d){ if(d && d.uploads===true && !amkDocs) buildAttach(); },function(){});
+    }catch(e){}
   }
   function addMsg(role, text){ var d=document.createElement('div'); d.className='amk-msg '+(role==='user'?'u':'a'); d.innerHTML=(role==='user')?esc(text):('<div class="bub"></div>'); if(role!=='user'){ var bb=d.querySelector('.bub'); if(text) paint(bb,text); else bb.textContent=''; } body.appendChild(d); body.scrollTop=body.scrollHeight; return d; }
   function upsell(){ body.innerHTML='<div class="amk-up"><h4>\\ud83d\\udd12 Ask Mindy is a Pro feature</h4><p>Get grounded, real-data answers on set-asides, agencies, opportunities, teaming and proposals \\u2014 with sources.</p><a href="/market-intelligence">Upgrade to Pro</a></div>'; }
