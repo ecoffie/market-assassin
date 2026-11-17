@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-17 — Ask Mindy context contract v1 (Agent 2, audit A2/A5/A8)
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-17 | Ask Mindy context contract v1 (P3) | **Follow-ups lost context and answers had no sources.** Only 2,000 chars of earlier answer text survived, with no record ids, so "who's the incumbent on #12?" made the planner guess or re-search; `citations` was always `[]`; a rendered tool's JSON was sent to the answer model twice. Now every tool result is a `ContextSource` (identity, provenance, owner/scope, status, retrievedAt/asOf); each answer returns a compact source LEDGER (`sources` event: ids, labels, record keys numbered as displayed, the public search args; no raw JSON) that both chat clients re-send with history; the server parses it as UNTRUSTED (id/key charset, item labels discarded, private entries from another acting scope dropped) and resolves "#N" to the exact key or says it was not found; `citations` come from this turn's sources that returned data; a rendered tool's JSON is replaced by a short stub (A8); `guardFacts` grounding runs LOG-ONLY (trace notice grounding_unverified, never changes the answer). No server storage, no migration. Chip heading "DOCUMENTS REFERENCED" → "SOURCES". | `export function parseLedger(` → `src/lib/chat/context-sources.ts` · `send({ type: 'sources', ledger: ledgerFromSources(turnSources) });` → `src/app/api/app/chat/route.ts` | `ask-mindy-context.route.unit.test.ts` (10, real route + executor; 7 red on main) + `context-sources.unit.test.ts` (22); chat + map + components suites 2,313 pass; tsc clean | DRAFT PR |
+
 ## 2026-11-17 — Ask Mindy card-chat billing safety (Agent 2, audit B1)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

@@ -63,6 +63,8 @@ interface ChatMessage {
   errored?: boolean;
   followups?: string[]; // contextual "what next?" chips, fetched after the answer completes
   notices?: string[];   // server notices: data tools unavailable, a lookup failed, answer cut off
+  /** P3: the compact source ledger returned with this answer; re-sent with history so "#12" resolves. */
+  ledger?: unknown;
 }
 
 
@@ -186,7 +188,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
     const historyForServer = messages
       .filter(m => !m.errored)
       .slice(-6)
-      .map(m => ({ role: m.role, content: m.content }));
+      .map(m => ({ role: m.role, content: m.content, ...(m.role === 'assistant' && m.ledger ? { sources: m.ledger } : {}) }));
 
     const userMsg: ChatMessage = {
       id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -266,6 +268,10 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
               finalContent += evt.content;
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id ? { ...m, content: m.content + evt.content } : m
+              ));
+            } else if (evt.type === 'sources' && evt.ledger && typeof evt.ledger === 'object') {
+              setMessages(prev => prev.map(m =>
+                m.id === assistantMsg.id ? { ...m, ledger: evt.ledger } : m
               ));
             } else if (evt.type === 'citations' && Array.isArray(evt.sources)) {
               setMessages(prev => prev.map(m =>
@@ -643,7 +649,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                   </div>
                   {msg.role === 'assistant' && !!msg.citations?.length && !msg.isStreaming && (
                     <div className="mt-3 pt-3 border-t border-surface/50">
-                      <div className="text-[10px] font-semibold tracking-wider text-faint mb-1.5">DOCUMENTS REFERENCED</div>
+                      <div className="text-[10px] font-semibold tracking-wider text-faint mb-1.5">SOURCES</div>
                       <div className="flex flex-wrap gap-1.5">
                         {msg.citations.slice(0, 6).map((c, i) => {
                           const label = c.title.slice(0, 50) + (c.title.length > 50 ? '…' : '');
