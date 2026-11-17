@@ -20,7 +20,7 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { WORKSPACE_UNCONFIRMED_NOTE } from '@/lib/chat/chat-acting-scope';
 import { resolveVaultWriteOwner, VAULT_BUCKET } from '@/lib/vault/upload';
-import { vaultDocFlags } from '@/lib/vault/flags';
+import { vaultDocEnabledFor, vaultDocFeatureLive } from '@/lib/vault/flags';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -38,7 +38,7 @@ function db(): any {
 }
 
 export async function GET(request: NextRequest) {
-  if (!vaultDocFlags.generatedFiles && !vaultDocFlags.askMindyUploads) return notFound();
+  if (!vaultDocFeatureLive('generate') && !vaultDocFeatureLive('uploads')) return notFound();
   const email = (request.nextUrl.searchParams.get('email') || '').trim().toLowerCase();
   const id = (request.nextUrl.searchParams.get('id') || '').trim();
   if (!email) return NextResponse.json({ success: false, error: 'email_required' }, { status: 400, headers: NO_STORE });
@@ -47,7 +47,10 @@ export async function GET(request: NextRequest) {
   if (!auth.authenticated || !auth.email) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401, headers: NO_STORE });
   }
-  const owner = await resolveVaultWriteOwner(auth.email.toLowerCase(), request);
+  // Per-caller flags (controlled test): not allowlisted for either feature = the same 404 as off.
+  const caller = auth.email.toLowerCase();
+  if (!vaultDocEnabledFor('generate', caller) && !vaultDocEnabledFor('uploads', caller)) return notFound();
+  const owner = await resolveVaultWriteOwner(caller, request);
   if (!owner) {
     return NextResponse.json({ success: false, error: 'workspace_unconfirmed', message: WORKSPACE_UNCONFIRMED_NOTE }, { status: 409, headers: NO_STORE });
   }

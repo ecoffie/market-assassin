@@ -94,6 +94,17 @@ describe('GET /api/app/vault/documents/download', () => {
     expect(state.signed).toEqual([]);
   });
 
+  it('allowlist mode: only an allowlisted verified caller gets a signed URL; anyone else the same 404, nothing signed', async () => {
+    vi.stubEnv('VAULT_GENERATED_FILES', 'allowlist');
+    vi.stubEnv('VAULT_DOC_ALLOWLIST', 'someone-else@example.com');
+    const denied = await GET(req(MINE));
+    expect(denied.status).toBe(404);
+    expect(state.signed).toEqual([]);
+    vi.stubEnv('VAULT_DOC_ALLOWLIST', ME);
+    expect((await GET(req(MINE))).status).toBe(200);
+    expect(state.signed).toHaveLength(1);
+  });
+
   it('flag off → the same 404, no auth work', async () => {
     vi.stubEnv('VAULT_GENERATED_FILES', '');
     vi.stubEnv('VAULT_ASK_MINDY_UPLOADS', '');

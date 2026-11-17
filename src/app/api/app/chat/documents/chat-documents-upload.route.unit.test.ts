@@ -96,6 +96,18 @@ describe('POST /api/app/chat/documents (Vault-backed)', () => {
     expect(state.strongAuthAsked).toEqual([]);
   });
 
+  it('allowlist mode (controlled test): an allowlisted verified email can attach; anyone else gets the same 404 as "off"', async () => {
+    vi.stubEnv('VAULT_ASK_MINDY_UPLOADS', 'allowlist');
+    vi.stubEnv('VAULT_DOC_ALLOWLIST', 'someone-else@example.com');
+    const denied = await POST(req('POST', { file: txt() }));
+    expect(denied.status).toBe(404);
+    expect(state.docInserts).toEqual([]);
+    expect(state.blobs).toEqual([]);
+    vi.stubEnv('VAULT_DOC_ALLOWLIST', `someone-else@example.com, ${ME.toUpperCase()}`);
+    expect((await POST(req('POST', { file: txt() }))).status).toBe(201);
+    expect(state.docInserts[0]).toMatchObject({ user_email: ME, doc_class: 'reference' });
+  });
+
   it('requires STRONG auth and Pro', async () => {
     await POST(req('POST', { file: txt() }));
     expect(state.strongAuthAsked[0]).toEqual({ requireStrongAuth: true });

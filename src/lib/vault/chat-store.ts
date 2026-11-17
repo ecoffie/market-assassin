@@ -15,7 +15,7 @@
  * applied. Until then every query errors with a missing-column code, which is reported as
  * `unavailable` — never as "no documents" (CLAUDE.md bug rule #11).
  */
-import { vaultDocFlags } from '@/lib/vault/flags';
+import { vaultDocEnabledFor } from '@/lib/vault/flags';
 
 /** Minimal client surface (the service-role Supabase client satisfies it; tests pass a fake). */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -24,9 +24,12 @@ export type ChatDocsDb = { from(table: string): any };
 export const VAULT_DOCS_TABLE = 'user_boilerplate_docs';
 export const MAX_DOCS_PER_SESSION = 5;
 
-/** Ask Mindy uploads are behind VAULT_ASK_MINDY_UPLOADS=true (default OFF). */
-export function isVaultChatDocumentsEnabled(): boolean {
-  return vaultDocFlags.askMindyUploads;
+/**
+ * Ask Mindy uploads for THIS caller: VAULT_ASK_MINDY_UPLOADS='true' (everyone) or 'allowlist' (only
+ * VAULT_DOC_ALLOWLIST emails). Pass the VERIFIED session email. Default OFF.
+ */
+export function isVaultChatDocumentsEnabled(verifiedEmail: string | null | undefined): boolean {
+  return vaultDocEnabledFor('uploads', verifiedEmail);
 }
 
 export interface ChatDocumentMeta {
