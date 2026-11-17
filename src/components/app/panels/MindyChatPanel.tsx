@@ -17,12 +17,13 @@
 
 import { customerErrorMessage, CUSTOMER_ERROR_MESSAGES } from '@/lib/chat/customer-errors';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Menu, MessageCircle, BookOpen, Lock, FileText } from 'lucide-react';
+import { Menu, MessageCircle, BookOpen, Lock, FileText, X } from 'lucide-react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 import { UpgradeModal } from '../UpgradeModal';
 import { DEFAULT_STARTER_PROMPTS } from '@/lib/chat/starter-prompts';
 import { renderSafeMarkdown } from '@/lib/chat/safe-markdown';
+import { CHAT_HANDOFF_KEY, parseChatHandoff, opportunityContextField, type AttachedOpportunity } from '@/lib/chat/chat-handoff';
 
 interface MindyChatPanelProps {
   email: string | null;
@@ -104,6 +105,9 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
   const [showUpgrade, setShowUpgrade] = useState(false);
   const isFree = tier === 'free';
   const [sessionId, setSessionId] = useState<string | null>(null);
+  // The opportunity this conversation is about (from the Map drawer's "Open in full workspace"). Shown as a
+  // removable chip; only its id is sent.
+  const [attachedOpp, setAttachedOpp] = useState<AttachedOpportunity | null>(null);
   // Conversation history sidebar.
   const [sessions, setSessions] = useState<Array<{ id: string; title: string | null; message_count: number; updated_at: string }>>([]);
   const [loadingSession, setLoadingSession] = useState(false);
@@ -200,6 +204,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
           message: text,
           sessionId: sessionId || undefined,
           history: historyForServer,
+          ...opportunityContextField(attachedOpp),
         }),
         signal: controller.signal,
       });
@@ -302,7 +307,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
       abortRef.current = null;
       inputRef.current?.focus();
     }
-  }, [email, isStreaming, messages, sessionId, isFree]);
+  }, [email, isStreaming, messages, sessionId, isFree, attachedOpp]);
 
   // --- Conversation history ----------------------------------------
   const loadSessions = useCallback(async () => {
@@ -348,6 +353,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
   const startNewChat = useCallback(() => {
     setMessages([]);
     setSessionId(null);
+    setAttachedOpp(null);
     inputRef.current?.focus();
   }, []);
 
@@ -388,6 +394,24 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
       setTimeout(() => sendMessage(seed!.trim()), 50);
     }
   }, [email, sendMessage]);
+
+  // Map drawer handoff ("Open in full workspace"): continue that conversation and keep its attached notice.
+  // Read once, never auto-sends. The session is loaded through the owner-checked chat-sessions API.
+  const handoffHandledRef = useRef(false);
+  useEffect(() => {
+    if (handoffHandledRef.current || !email) return;
+    handoffHandledRef.current = true;
+    let raw: string | null = null;
+    try {
+      raw = sessionStorage.getItem(CHAT_HANDOFF_KEY);
+      if (raw) sessionStorage.removeItem(CHAT_HANDOFF_KEY);
+    } catch { /* sessionStorage unavailable */ }
+    const h = parseChatHandoff(raw);
+    if (!h) return;
+    if (h.opportunity) setAttachedOpp(h.opportunity);
+    if (h.sessionId) openSession(h.sessionId);
+    inputRef.current?.focus();
+  }, [email, openSession]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Enter sends; Shift+Enter inserts a newline (Claude-style). Cmd/Ctrl+Enter still sends.
@@ -675,6 +699,21 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
       {/* Input */}
       <div className="px-6 py-4 border-t border-surface bg-ground-deep shrink-0">
         <div className="max-w-3xl mx-auto">
+          {attachedOpp && (
+            <div data-testid="attached-opp" className="mb-2 flex items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-1.5 text-[12.5px] text-purple-100">
+              <span className="text-faint shrink-0">Asking about</span>
+              <span className="font-medium truncate" title={attachedOpp.title}>{attachedOpp.title || 'this opportunity'}</span>
+              {attachedOpp.deadline && <span className="text-faint shrink-0">· due {attachedOpp.deadline.slice(0, 10)}</span>}
+              <button
+                type="button"
+                onClick={() => setAttachedOpp(null)}
+                aria-label="Remove this opportunity from the question"
+                className="ml-auto shrink-0 rounded p-0.5 text-faint hover:text-white"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
           <div className="relative">
             <textarea
               ref={inputRef}

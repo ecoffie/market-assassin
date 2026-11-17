@@ -6398,7 +6398,7 @@ const DRAWER_JS = `<script>
   // 'open' | 'dla' | 'recompete' | 'forecast' | 'company' | 'buyer', or null when closed.
   // Read-only for other modules; set by each drawer opener below.
   window.__drawerKind=null;
-  function close(){ dr.classList.remove('show'); bd.classList.remove('show'); clearTaskOrderPins(); window.__drawerKind=null; }
+  function close(){ dr.classList.remove('show'); bd.classList.remove('show'); clearTaskOrderPins(); window.__drawerKind=null; window.__selectedOpp=null; }
   // listing_open for drawers that can be reached WITHOUT openOppDrawer (typed ?recompete= /
   // ?forecast= deep links, similar-listing cards). openOppDrawer already emits it before routing
   // to these drawers and leaves a one-shot marker, so the same open is never counted twice.
@@ -7018,6 +7018,10 @@ const DRAWER_JS = `<script>
     // SAM notice id (32 hex) gets it — the server refuses anything else anyway.
     var _cc=!!window.__CARD_CHAT_ENABLED && /^[0-9a-f]{32}$/.test(String(o.id||'').toLowerCase());
     if(_cc) window.__cardChatOpp={id:String(o.id).toLowerCase(),title:o.title||'',deadline:o.deadline||''};
+    // The SELECTED NOTICE for the main Ask Mindy chat (no flag): the chat shows it as a removable chip and
+    // sends only its id; the server loads the record. Cleared when this drawer closes.
+    window.__selectedOpp=/^[0-9a-f]{32}$/.test(String(o.id||'').toLowerCase())?{id:String(o.id).toLowerCase(),title:o.title||'',deadline:o.deadline||''}:null;
+    try{ if(window.__onSelectedOpp) window.__onSelectedOpp(); }catch(e){}
     return '<div class="oact" id="osec-actions">'
       + (_cc?'<button class="b ask" onclick="window.__askAboutOpp&&window.__askAboutOpp(window.__cardChatOpp)">Ask Mindy about this opportunity</button>':'')
       + '<button class="b pri" onclick="saveCurrentOpp(this)">Start pursuit</button>'
@@ -10871,6 +10875,11 @@ const ASK_MINDY_CSS =
   + '.amk-chips button{font:600 12.5px Inter;color:#243a52;background:#f0f5fb;border:1px solid #e0e8f2;border-radius:10px;padding:9px 12px;cursor:pointer;text-align:left;line-height:1.3}'
   + '.amk-chips button:hover{background:#e6eef8;border-color:#c9d8ea}'
   + '.amk-foot{border-top:1px solid #eef1f5;padding:12px 14px}'
+  // Attached notice chip (the selected opportunity rides along with the main chat) + the full-workspace link.
+  + '.amk-att{display:flex;align-items:center;gap:6px;margin:0 0 8px;padding:6px 8px 6px 10px;background:#eef4ff;border:1px solid #d3e2fc;border-radius:9px;font:500 12px/1.35 Inter,system-ui,sans-serif;color:#1e3a8a}'
+  + '.amk-att .lbl{color:#64748b;flex:none}.amk-att .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}'
+  + '.amk-att button{flex:none;border:0;background:none;color:#64748b;cursor:pointer;font:600 15px/1 Inter;padding:0 2px}.amk-att button:hover{color:#1e3a8a}'
+  + '.amk-ws{display:block;margin-top:8px;text-align:right;font:600 11.5px Inter,system-ui,sans-serif;color:#2563eb;text-decoration:none}.amk-ws:hover{text-decoration:underline}'
   + '.amk-in{display:flex;gap:8px;align-items:flex-end}'
   + '.amk-in textarea{flex:1;resize:none;border:1px solid #dde3ec;border-radius:12px;padding:10px 12px;font:400 13.5px Inter;color:#111c26;max-height:120px;outline:none}'
   + '.amk-in textarea:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}'
@@ -10878,7 +10887,7 @@ const ASK_MINDY_CSS =
   + '.amk-send:disabled{opacity:.45;cursor:default}.amk-send svg{width:18px;height:18px}'
   + '.amk-up{text-align:center;padding:30px 20px}.amk-up h4{font:800 16px Inter;margin:0 0 6px;color:#111c26}.amk-up p{font:500 13px Inter;color:#6b7787;margin:0 0 14px}'
   + '.amk-up a{display:inline-block;background:#0a8f57;color:#fff;text-decoration:none;border-radius:10px;padding:10px 20px;font:700 13px Inter}'
-  + '@media(prefers-color-scheme:dark){.amk{background:#111823}.amk-hd{border-color:#202b39}.amk-hd h3{color:#eaf1f8}.amk-msg.a{color:#eaf1f8}.amk-msg.a .bub{background:#0d141d;border-color:#202b39}.amk-msg.a .bub.md .md-h,.amk-msg.a .bub.md>p:first-child{color:#eaf1f8}.amk-msg.a .bub.md code{background:#18222f}.amk-msg.a .bub a{color:#7fb0ff}.amk-chips button{background:#0d141d;border-color:#202b39;color:#cdd8e4}.amk-foot{border-color:#202b39}.amk-in textarea{background:#0d141d;border-color:#202b39;color:#eaf1f8}.amk-empty b,.amk-up h4{color:#eaf1f8}.amk-act button{background:#122033;border-color:#1f3a5c}}';
+  + '@media(prefers-color-scheme:dark){.amk{background:#111823}.amk-hd{border-color:#202b39}.amk-hd h3{color:#eaf1f8}.amk-msg.a{color:#eaf1f8}.amk-msg.a .bub{background:#0d141d;border-color:#202b39}.amk-msg.a .bub.md .md-h,.amk-msg.a .bub.md>p:first-child{color:#eaf1f8}.amk-msg.a .bub.md code{background:#18222f}.amk-msg.a .bub a{color:#7fb0ff}.amk-chips button{background:#0d141d;border-color:#202b39;color:#cdd8e4}.amk-foot{border-color:#202b39}.amk-in textarea{background:#0d141d;border-color:#202b39;color:#eaf1f8}.amk-empty b,.amk-up h4{color:#eaf1f8}.amk-act button{background:#122033;border-color:#1f3a5c}.amk-att{background:#122033;border-color:#1f3a5c;color:#cfe0ff}.amk-ws{color:#7fb0ff}}';
 
 const ASK_MINDY_HTML =
   '<div class="amk-ov" id="amkOv"></div>'
@@ -10920,6 +10929,43 @@ const ASK_MINDY_JS = `<script>(function(){
   // The class is amk-card, NOT card: the map already styles .card (listing cards, incl. a :hover transform)
   // and a shared name let that hover rule pin the closed drawer on screen on touch devices.
   var oppCtx=null, viewState={sessionId:'',history:[]}, viewPlaceholder=(input&&input.placeholder)||'';
+  // ── ATTACHED NOTICE (main chat, no flag): the opportunity open in the listing drawer rides along with the
+  // SAME conversation as a removable chip. Only its id is sent (context:{kind:'opportunity',notice_id}); the
+  // server loads the record. There is no separate thread. Removing the chip keeps it off until another
+  // notice is selected.
+  var attached=null, dismissedId='';
+  var foot=input&&input.parentNode&&input.parentNode.parentNode;
+  var attEl=document.getElementById('amkAtt');
+  if(!attEl&&foot&&input.parentNode){ attEl=document.createElement('div'); attEl.id='amkAtt'; foot.insertBefore(attEl,input.parentNode); }
+  var wsEl=document.getElementById('amkWs');
+  if(!wsEl&&foot){ wsEl=document.createElement('a'); wsEl.id='amkWs'; wsEl.className='amk-ws'; wsEl.href='/app?panel=chat'; wsEl.textContent='Open in full workspace \u2197'; foot.appendChild(wsEl); }
+  function syncAttached(){
+    if(oppCtx) return;
+    var s=window.__selectedOpp;
+    var id=s&&/^[0-9a-f]{32}$/.test(String(s.id||''))?String(s.id):'';
+    // Mirrors the listing drawer: the notice open there now, or nothing (a closed listing never lingers).
+    attached=(id&&id!==dismissedId)?{id:id,title:String(s.title||''),deadline:String(s.deadline||'')}:null;
+    renderAttached();
+  }
+  function renderAttached(){
+    if(attEl){
+      if(attached&&!oppCtx){
+        attEl.className='amk-att';
+        attEl.innerHTML='<span class="lbl">Asking about</span><span class="t" title="'+esc(attached.title)+'">'+esc(attached.title||'this opportunity')+'</span><button type="button" aria-label="Remove this opportunity from the question">\u00d7</button>';
+        attEl.querySelector('button').onclick=function(){ if(attached) dismissedId=attached.id; attached=null; renderAttached(); };
+      } else { attEl.className=''; attEl.innerHTML=''; }
+    }
+    renderCtx();
+  }
+  window.__onSelectedOpp=function(){ if(drawer.classList.contains('show')) syncAttached(); };
+  // Continue this conversation (and the attached notice) in the full Ask Mindy workspace. The panel reads
+  // mindy_chat_handoff once and does not auto-send. Inside the /app shell the frame hands this link to the
+  // parent window; standalone it navigates normally. Same-origin frames share sessionStorage.
+  if(wsEl) wsEl.addEventListener('click',function(){
+    try{ sessionStorage.setItem('mindy_chat_handoff',JSON.stringify({v:1,sessionId:oppCtx?'':(sessionId||''),
+      context:(attached&&!oppCtx)?{kind:'opportunity',notice_id:attached.id,title:attached.title,deadline:attached.deadline}:(oppCtx?{kind:'opportunity',notice_id:oppCtx.id,title:oppCtx.title,deadline:oppCtx.deadline}:null)})); }catch(e){}
+    try{ if(window.__track) window.__track('tool_use','ask_mindy_open_workspace',{attached:!!(attached||oppCtx)}); }catch(e){}
+  });
   // CHARGE ONCE PER QUESTION: every card question gets a stable turn id. It is saved here as "pending" BEFORE
   // the request and cleared only when the answer has fully arrived, so a dropped connection, a refresh or a
   // reopen asks the server for THAT question again (same id): the server returns the saved answer for free
@@ -10962,7 +11008,8 @@ const ASK_MINDY_JS = `<script>(function(){
     return 'Location: unknown for this view. If the question needs a place, ask which state or city before searching.';
   }
   function renderCtx(){ if(!ctxEl)return;
-    if(oppCtx){ ctxEl.innerHTML='<span class="dim">About:</span> '+esc(oppCtx.title||'this opportunity')+(oppCtx.deadline?' <span class="dim">\\u00b7 due '+esc(String(oppCtx.deadline).slice(0,10))+'</span>':''); return; }
+    var about=oppCtx||attached;
+    if(about){ ctxEl.innerHTML='<span class="dim">About:</span> '+esc(about.title||'this opportunity')+(about.deadline?' <span class="dim">\\u00b7 due '+esc(String(about.deadline).slice(0,10))+'</span>':''); return; }
     var c=viewCtx(); var parts=ctxParts(c);
     ctxEl.innerHTML='<span class="dim">Context:</span> '+parts.map(esc).join(' \\u00b7 '); }
   // Threaded to the chat so answers are about THIS view — a compact, factual preface (no invented numbers).
@@ -10972,7 +11019,7 @@ const ASK_MINDY_JS = `<script>(function(){
   // display:'narrow_panel'. The server adds the presentation rule (answer first, short sections) to the answer
   // prompt as a SYSTEM note (src/lib/chat/display-hint.ts). It is never part of the message, so it is never
   // stored as the customer's words or read as their intent (review F3).
-  function setOpen(o){ ov.classList.toggle('show',o); drawer.classList.toggle('show',o); drawer.setAttribute('aria-hidden',o?'false':'true'); if(o){ renderCtx(); if(!body.children.length){ if(oppCtx)greetCard(); else greet(); } setTimeout(function(){ input&&input.focus(); },220); } }
+  function setOpen(o){ ov.classList.toggle('show',o); drawer.classList.toggle('show',o); drawer.setAttribute('aria-hidden',o?'false':'true'); if(o){ syncAttached(); if(!body.children.length){ if(oppCtx)greetCard(); else greet(); } setTimeout(function(){ input&&input.focus(); },220); } }
   function greetCard(){
     var chips=[['What does it require?','Summarize what this solicitation requires: scope, deliverables, and key dates.'],
       ['Who held this before?','Who held this work before, and what did the prior contract cost?'],
@@ -10990,7 +11037,7 @@ const ASK_MINDY_JS = `<script>(function(){
     if(!oppCtx) viewState={sessionId:sessionId,history:history.slice()}; else saveCard();
     oppCtx={id:id,title:String(op.title||''),deadline:String(op.deadline||'')};
     var st=loadCard(id); sessionId=st.sessionId; history=st.history; pendingTurn=st.pending;
-    drawer.classList.add('amk-card'); if(input)input.placeholder='Ask about this opportunity\\u2026'; body.innerHTML='';
+    drawer.classList.add('amk-card'); if(input)input.placeholder='Ask about this opportunity\\u2026'; body.innerHTML=''; renderAttached();
     if(history.length){ history.forEach(function(m){ addMsg(m.role==='user'?'user':'assistant', m.content); }); }
     try{ if(window.__track) window.__track('tool_use','card_chat_open',{has_history:history.length>0,pending:!!pendingTurn}); }catch(e){}
     setOpen(true);
@@ -11053,8 +11100,12 @@ const ASK_MINDY_JS = `<script>(function(){
     // Prepend the grounded view context to the MESSAGE (not shown to the user) so the answer
     // is about "these"/"here" — the map\\u2019s real filters + count, never fabricated.
     // Card chat sends NO view preamble: the server supplies the opportunity from its own record.
+    // An attached notice travels as context (below); the map-view preface stays in the message exactly as
+    // without one (server contract, Agent 1, 2026-11-16: the server reconciles the two).
+    var attAtSend=oppCtx?null:attached;
     var sendMsg=oppCtx?q:(ctxPreamble()+q);
     var payload={email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8),display:'narrow_panel'};
+    if(attAtSend){ payload.context={kind:'opportunity',notice_id:attAtSend.id}; try{ if(window.__track) window.__track('tool_use','ask_mindy_with_notice',{}); }catch(e){} }
     if(oppCtx){ payload.context={kind:'opportunity',notice_id:oppCtx.id}; payload.turn_id=turnId; if(opts.replay)payload.replay_only=true;
       if(!opts.turnId){ try{ if(window.__track) window.__track('tool_use','card_chat_ask',{turn:Math.floor(history.length/2)+1}); }catch(e){} } }
     var cardAtSend=oppCtx;
