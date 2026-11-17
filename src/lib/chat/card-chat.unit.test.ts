@@ -96,7 +96,10 @@ describe('toolBillingOutcome', () => {
     ['success', '{"_meta":{"degraded":true}}', 'degraded'],
     ['success', '{"_meta":{"result_state":"unavailable"}}', 'degraded'],
     ['success', '{"ok":true,"_meta":{"grounded":false,"degraded":false,"result_state":"none_found"}}', 'ok'],
-    ['success', '{"ok":true,"_meta":{"result_state":"partial"}}', 'ok'],
+    // Eric's rule: failed or incomplete = free. A partial result (part of the request not checked) is incomplete.
+    ['success', '{"ok":true,"_meta":{"result_state":"partial"}}', 'degraded'],
+    ['success', '{"ok":true,"_meta":{"result_state":"filter_not_applied"}}', 'degraded'],
+    ['success', '{"ok":true,"_meta":{"result_state":"results","ignored_args":[]}}', 'ok'],
     ['success', 'not json', 'ok'],
   ])('%s + %s → %s', (status, content, expected) => {
     expect(toolBillingOutcome(status, content)).toBe(expected);

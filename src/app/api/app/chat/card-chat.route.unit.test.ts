@@ -321,6 +321,7 @@ describe('credits: exactly once for a successful free card turn, never for failu
     ['a tool returning ok:false', { status: 'success', content: { ok: false, error_category: 'sam_unavailable', message: 'SAM is down' } }, 'tool_degraded'],
     ['a degraded tool result', { status: 'success', content: { ok: true, notice: null, _meta: { grounded: false, degraded: true } } }, 'tool_degraded'],
     ['an unavailable result state', { status: 'success', content: { ok: true, _meta: { result_state: 'unavailable' } } }, 'tool_degraded'],
+    ['a partial result (part of the request not checked)', { status: 'success', content: { ok: true, notice: { notice_id: NID }, _meta: { result_state: 'partial', ignored_args: ['city'] } } }, 'tool_degraded'],
     ['a policy refusal', { status: 'blocked_policy', error_category: 'not_offered_here', content: { ok: false, state: 'unavailable', error_category: 'not_offered_here' } }, 'tool_refused'],
     ['an invalid-input rejection', { status: 'rejected_invalid_input', error_category: 'invalid_input', content: { ok: false, state: 'unavailable', error_category: 'invalid_input' } }, 'tool_refused'],
   ])('%s → no charge; the turn is free and re-askable', async (_n, round, reason) => {

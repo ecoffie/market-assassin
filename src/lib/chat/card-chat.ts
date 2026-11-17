@@ -87,14 +87,19 @@ export function isBillableTurn(t: {
  * degraded answer is free.
  *   failed   — the call ran and threw or timed out
  *   refused  — the call was refused before it ran (policy, budget, invalid input)
- *   degraded — the call returned, but its data could not be retrieved (ok:false, state/result_state
- *              'unavailable', or _meta.degraded)
+ *   degraded — the call returned, but its data was not fully retrieved (ok:false, state 'unavailable',
+ *              _meta.degraded, or result_state 'unavailable' / 'partial' / 'filter_not_applied')
  *   ok       — anything else, including an honest empty result (grounded:false, none_found). An empty
- *              result is a real answer, not a failure, and stays billable. So does result_state 'partial'
- *              (a filter the tool could not apply is disclosed to the customer); that is a pricing call
- *              left to Eric, not changed here.
+ *              result is a real, complete answer and stays billable.
  */
 export type ToolBillingOutcome = 'ok' | 'failed' | 'refused' | 'degraded';
+
+/**
+ * Result states that mean the data was not fully retrieved. 'partial' and 'filter_not_applied' mean part of
+ * the request was NOT checked (the customer is told which part): incomplete, so free under Eric's rule
+ * "failed or incomplete = free" (confirmed 2026-11-17).
+ */
+const INCOMPLETE_RESULT_STATES: ReadonlySet<string> = new Set(['unavailable', 'partial', 'filter_not_applied']);
 
 export function toolBillingOutcome(status: string, content: string): ToolBillingOutcome {
   if (status === 'failed') return 'failed';
@@ -105,7 +110,7 @@ export function toolBillingOutcome(status: string, content: string): ToolBilling
   const r = parsed as { ok?: unknown; state?: unknown; _meta?: { degraded?: unknown; result_state?: unknown } | null };
   if (r.ok === false || r.state === 'unavailable') return 'degraded';
   const meta = r._meta && typeof r._meta === 'object' ? r._meta : null;
-  if (meta && (meta.degraded === true || meta.result_state === 'unavailable')) return 'degraded';
+  if (meta && (meta.degraded === true || INCOMPLETE_RESULT_STATES.has(String(meta.result_state)))) return 'degraded';
   return 'ok';
 }
 
