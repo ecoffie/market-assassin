@@ -75,7 +75,7 @@ describe('Tier-0 tool definitions — isolation by schema', () => {
   });
 
   it('registers exactly the two Phase-1 tools', () => {
-    expect([...TIER0_TOOL_NAMES].sort()).toEqual(['get_my_pipeline', 'search_my_vault']);
+    expect([...TIER0_TOOL_NAMES].sort()).toEqual(['get_my_pipeline', 'search_my_pursuit_documents', 'search_my_vault']);
   });
 });
 
