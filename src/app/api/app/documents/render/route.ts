@@ -44,6 +44,23 @@ const NO_STORE = { 'Cache-Control': 'private, no-store' };
 export const RENDER_LIMITS: Record<'pdf' | 'docx', number> = { pdf: 10, docx: 30 };
 const RENDER_WINDOW_SECONDS = 600;
 
+/**
+ * Per-instance backstop. The KV limiter ALLOWS when KV is down (so a KV outage can't block
+ * users), which would leave Chromium unbounded during that outage. This in-memory window
+ * applies the same limit per server instance, always; it only bites when KV did not.
+ */
+const localHits = new Map<string, number[]>();
+function localLimitExceeded(key: string, limit: number, now = Date.now()): boolean {
+  const since = now - RENDER_WINDOW_SECONDS * 1000;
+  const hits = (localHits.get(key) ?? []).filter((t) => t > since);
+  hits.push(now);
+  localHits.set(key, hits);
+  if (localHits.size > 5000) localHits.delete(localHits.keys().next().value as string);
+  return hits.length > limit;
+}
+/** Test hook. */
+export function __resetLocalRenderLimit() { localHits.clear(); }
+
 function json(body: unknown, status: number) {
   return NextResponse.json(body, { status, headers: NO_STORE });
 }
@@ -72,7 +89,10 @@ export async function POST(request: NextRequest) {
 
   const verifiedEmail = (auth.session.email ?? email).toLowerCase();
   const rl = await checkRateLimit(`docrender:${format}:${verifiedEmail}`, RENDER_LIMITS[format as 'pdf' | 'docx'], RENDER_WINDOW_SECONDS);
-  if (!rl.allowed) {
+  const rlKey = `docrender:${format}:${verifiedEmail}`;
+  const localExceeded = localLimitExceeded(rlKey, RENDER_LIMITS[format as 'pdf' | 'docx']);
+  if (rl.allowed && localExceeded) console.warn(`[documents/render] per-instance limit hit (KV limiter allowed; KV may be unavailable) format=${format}`);
+  if (!rl.allowed || localExceeded) {
     const retryAfter = Math.max(1, rl.resetAt - Math.floor(Date.now() / 1000));
     return NextResponse.json(
       { success: false, error: 'rate_limited', message: `Too many ${format.toUpperCase()} exports. Try again in a few minutes.`, retry_after_seconds: retryAfter },

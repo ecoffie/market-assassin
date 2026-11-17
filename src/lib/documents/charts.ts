@@ -99,11 +99,17 @@ function lineSvg(chart: ChartBlock, width: number): string {
     parts.push(`<line x1="${left}" y1="${y.toFixed(1)}" x2="${width - right}" y2="${y.toFixed(1)}" stroke="${t === 0 ? AXIS : '#f1f5f9'}"/>`);
     parts.push(`<text x="${left - 6}" y="${(y + 4).toFixed(1)}" font-size="10" text-anchor="end" fill="${MUTED}">${compact(v)}</text>`);
   }
-  const step = Math.max(1, Math.ceil(xs.length / 8));
+  // Label spacing from the labels' real width, so adjacent labels ("FY26 Q3" / "FY26 Q4") never
+  // overlap: ~6px per character at 10px, plus a gap.
+  const labelPx = Math.max(...xs.map((x) => truncate(x, 12).length)) * 6 + 12;
+  const spacing = xs.length > 1 ? pw / (xs.length - 1) : pw;
+  const step = Math.max(1, Math.ceil(labelPx / spacing));
   const lastIdx = xs.length - 1;
   xs.forEach((x, i) => {
     // Every `step`-th label, plus the last one; drop a stepped label that would collide with the last.
-    const show = i === lastIdx || (i % step === 0 && lastIdx - i >= Math.max(1, step / 2));
+    // The last label is end-anchored (its full width sits left of its point), so a centred
+    // stepped label needs 1.5 label widths of clearance from it.
+    const show = i === lastIdx || (i % step === 0 && (lastIdx - i) * spacing >= labelPx * 1.5);
     if (!show) return;
     const anchor = xs.length > 1 && i === lastIdx ? 'end' : i === 0 && xs.length > 1 ? 'start' : 'middle';
     parts.push(`<text x="${xAt(i).toFixed(1)}" y="${height - bottom + 16}" font-size="10" text-anchor="${anchor}" fill="${MUTED}">${esc(truncate(x, 12))}</text>`);

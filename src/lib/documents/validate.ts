@@ -27,6 +27,17 @@ const CLAIMS = new Set(['fact', 'assumption', 'recommendation', 'unverified', 'c
 const SOURCE_KINDS = new Set(['sam_notice', 'usaspending', 'upload', 'vault', 'tool', 'web', 'other']);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+// A count or an amount: a free-standing number ("$640M", "16", "24 months", "5%") or a number
+// word ("eight", "forty-two", "million"). Not a digit glued to letters (FY26, Q3, W912PL) and not
+// a program name like 8(a). "one" is excluded: "one of the offices" is not a figure.
+const NUMERIC_TOKEN = /(?<![A-Za-z0-9])\$?\d[\d,]*(?:\.\d+)?(?![A-Za-z0-9(])|(?<![A-Za-z0-9])\$?\d[\d,]*(?:\.\d+)?(?:[KkMmBb]|%)(?![A-Za-z0-9])/;
+const NUMBER_WORD = /\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|trillion|dozen|percent)\b/i;
+/** Does this text state a count or an amount? */
+export function statesFigure(text: string): boolean {
+  const plain = text.replace(/\*\*|_/g, '');
+  return NUMERIC_TOKEN.test(plain) || NUMBER_WORD.test(plain);
+}
+
 function isObj(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === 'object' && !Array.isArray(v);
 }
@@ -96,6 +107,8 @@ export function validateDocModel(input: unknown): ValidationResult {
       else ids.add(sec.id);
       if (!str(sec.heading)) add(`${sp}.heading`, 'required');
       if (sec.level !== undefined && ![1, 2, 3].includes(sec.level as number)) add(`${sp}.level`, 'must be 1, 2 or 3');
+      if (sec.role !== undefined && sec.role !== 'body' && sec.role !== 'about') add(`${sp}.role`, "must be 'body' or 'about'");
+      const isAbout = sec.role === 'about';
       if (!Array.isArray(sec.blocks)) return add(`${sp}.blocks`, 'must be an array');
       sec.blocks.forEach((b, bi) => {
         const bp = `${sp}.blocks[${bi}]`;
@@ -163,7 +176,14 @@ export function validateDocModel(input: unknown): ValidationResult {
           if (u.claim === undefined) add(`${bp}`, `a claim label is required (fact, assumption, recommendation, unverified or context) at ${u.where}`);
           else if (!CLAIMS.has(u.claim)) add(`${bp}`, `unknown claim "${String(u.claim)}" at ${u.where}${String(u.claim) === 'estimate' ? ' — there is no estimate label; use assumption, or cite a source' : ''}`);
           if (u.critical !== undefined && typeof u.critical !== 'boolean') add(`${bp}`, `critical must be a boolean at ${u.where}`);
-          if (u.claim === 'context' && (/\d/.test(u.text) || blk.type === 'table' || blk.type === 'chart')) add(`${bp}`, `context may not contain numbers, tables or charts (${u.where}); label it fact and cite a source`);
+          if (u.claim === 'context') {
+            if (!isAbout) add(`${bp}`, `context is allowed only in a section with role 'about' (how to read, method, limitations) (${u.where}); in this section label it fact and cite a source`);
+            if (/\d/.test(u.text) || NUMBER_WORD.test(u.text) || blk.type === 'table' || blk.type === 'chart') add(`${bp}`, `context may not contain numbers (in digits or words), tables or charts (${u.where}); label it fact and cite a source`);
+          }
+          if (u.claim === 'unverified' && u.critical === true) add(`${bp}`, `a decision-critical statement cannot be unverified (${u.where}); cite a source or omit it`);
+          if ((u.claim === 'recommendation' || u.claim === 'assumption') && statesFigure(u.text) && (u.cites ?? []).filter((c) => sourceIds.has(c)).length === 0) {
+            add(`${bp}`, `a ${u.claim} that states a count or amount must cite its source (${u.where})`);
+          }
           if (u.cites !== undefined && !Array.isArray(u.cites)) { add(`${bp}`, `cites must be an array at ${u.where}`); continue; }
           const cites = u.cites ?? [];
           const unresolved = cites.filter((c) => !sourceIds.has(c));
@@ -189,8 +209,9 @@ export interface DemotionResult {
 }
 
 /**
- * Repair uncited facts (and unlabeled units, which are treated as facts): decision-critical ones are
- * OMITTED, the rest are relabeled `unverified`. Never relabels anything as an estimate or assumption —
+ * Repair everything the citation rules would refuse — uncited facts, unlabeled units, uncited
+ * figures in recommendations/assumptions, misplaced context, critical+unverified: decision-critical
+ * ones are OMITTED, the rest are relabeled `unverified`. Never relabels anything as an estimate or assumption —
  * an assumption is a premise the author states on purpose, not a demoted fact. A bullets block whose
  * items are all omitted is removed; a section can end up empty and keeps its heading.
  */
@@ -198,12 +219,20 @@ export function demoteUncitedFacts(model: DocModel): DemotionResult {
   const ids = new Set(model.sources.map((s) => s.id));
   const unverified: string[] = [];
   const omitted: string[] = [];
-  type Unit = { claim?: string; cites?: string[]; critical?: boolean };
-  // Returns the repaired unit, or null when it must be omitted.
-  const fix = <T extends Unit>(u: T, where: string): T | null => {
-    const isFact = u.claim === 'fact' || u.claim === undefined;
-    if (!isFact) return u;
-    if ((u.cites ?? []).some((c) => ids.has(c))) return u.claim === undefined ? { ...u, claim: 'fact' } : u;
+  type Unit = { claim?: string; cites?: string[]; critical?: boolean; text?: string; caption?: string };
+  // Returns the repaired unit, or null when it must be omitted. A unit is held to the
+  // facts-must-cite rule when it is a fact, unlabeled, a recommendation/assumption stating a
+  // figure, or `context` the validator would refuse (outside an 'about' section, or with a number).
+  const fix = <T extends Unit>(u: T, where: string, about: boolean, isTableOrChart: boolean): T | null => {
+    const text = u.text ?? u.caption ?? '';
+    const cited = (u.cites ?? []).some((c) => ids.has(c));
+    const mustCite =
+      u.claim === 'fact' || u.claim === undefined ||
+      ((u.claim === 'recommendation' || u.claim === 'assumption') && statesFigure(text)) ||
+      (u.claim === 'context' && (!about || isTableOrChart || /\d/.test(text) || NUMBER_WORD.test(text))) ||
+      (u.claim === 'unverified' && u.critical === true);
+    if (!mustCite) return u;
+    if (cited) return u.claim === undefined || u.claim === 'context' || u.claim === 'unverified' ? { ...u, claim: 'fact' } : u;
     if (u.critical === true) { omitted.push(where); return null; }
     unverified.push(where);
     return { ...u, claim: 'unverified' };
@@ -211,13 +240,14 @@ export function demoteUncitedFacts(model: DocModel): DemotionResult {
   const sections = model.sections.map((sec) => ({
     ...sec,
     blocks: sec.blocks.flatMap((b): Block[] => {
+      const about = sec.role === 'about';
       if (b.type === 'pagebreak') return [b];
       if (b.type === 'bullets') {
-        const items = b.items.map((it, i) => fix(it, `${b.id}[${i}]`)).filter((it): it is NonNullable<typeof it> => it !== null);
+        const items = b.items.map((it, i) => fix(it, `${b.id}[${i}]`, about, false)).filter((it): it is NonNullable<typeof it> => it !== null);
         return items.length ? [{ ...b, items }] : [];
       }
-      const fixed = fix(b, b.id);
-      return fixed ? [fixed] : [];
+      const fixed = fix(b as Block & Unit, b.id, about, b.type === 'table' || b.type === 'chart');
+      return fixed ? [fixed as Block] : [];
     }),
   }));
   return { model: { ...model, sections }, unverified, omitted };

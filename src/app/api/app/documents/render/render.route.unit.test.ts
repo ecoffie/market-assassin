@@ -31,7 +31,7 @@ vi.mock('@/lib/rate-limit', () => ({
   },
 }));
 
-import { POST } from './route';
+import { POST, __resetLocalRenderLimit } from './route';
 
 function req(body: unknown, headers: Record<string, string> = {}) {
   return new Request('https://getmindy.ai/api/app/documents/render', {
@@ -43,6 +43,7 @@ const ok = (format: string, model: unknown = SAMPLE_REPORT) => req({ email: 'Use
 beforeEach(() => {
   state.authOk = true; state.pro = true; state.proChecked = [];
   state.rl = { allowed: true, resetAt: Math.floor(Date.now() / 1000) + 300 }; state.rlKeys = [];
+  __resetLocalRenderLimit();
   state.pdf = { pdf: Buffer.from('%PDF-1.7 rendered'), error: null };
 });
 
@@ -126,6 +127,13 @@ describe('POST /api/app/documents/render', () => {
     expect(Number(res.headers.get('retry-after'))).toBeGreaterThan(0);
     expect((await res.json()).error).toBe('rate_limited');
     expect(rendered).toBe(false);
+  });
+
+  it('KV down (limiter allows) → the per-instance backstop still caps PDFs at 10 per window', async () => {
+    const statuses: number[] = [];
+    for (let i = 0; i < 11; i++) statuses.push((await POST(ok('pdf'))).status);
+    expect(statuses.slice(0, 10).every((s) => s === 200)).toBe(true);
+    expect(statuses[10]).toBe(429);
   });
 
   it('auth and Pro are checked BEFORE the limiter (an anonymous caller cannot burn a user\'s quota)', async () => {

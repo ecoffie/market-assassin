@@ -13,8 +13,13 @@
  *   recommendation — rendered with a visible "Recommendation" label (a suggested action)
  *   unverified     — rendered "Unverified — no source" and listed in an "Unverified statements"
  *                    section. Set by demoteUncitedFacts, never a way to dress up a guess.
- *   context        — describes the DOCUMENT itself (scope, method, how to read it). It may not
- *                    contain a number: a figure is always a claim about the world.
+ *   context        — describes the DOCUMENT itself (scope, method, how to read it). Allowed only
+ *                    in a section with role 'about', and never with a number (digits or words):
+ *                    a figure is always a claim about the world.
+ *
+ * A recommendation or assumption that states a count or an amount (digits or number words) must
+ * cite the source of that figure. `unverified` can never be `critical` — a decision-critical
+ * statement without a source is omitted, not shown.
  *
  * There is no "estimate" label (Eric, 2026-11-17): a statement is verified, an ASSUMPTION, or
  * omitted. A decision-critical statement with no source (`critical: true`) is omitted, not labeled.
@@ -123,6 +128,11 @@ export interface DocSection {
   id: string;
   heading: string;
   level?: 1 | 2 | 3;
+  /**
+   * 'about' = a section that describes the DOCUMENT (how to read it, method, limitations).
+   * Only an 'about' section may hold `context` blocks; every other section holds claims.
+   */
+  role?: 'body' | 'about';
   blocks: Block[];
 }
 

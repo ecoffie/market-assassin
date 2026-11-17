@@ -77,9 +77,58 @@ describe('validateDocModel', () => {
       { type: 'paragraph', id: 'p1', text: 'Likely', claim: 'assumption' },
       { type: 'paragraph', id: 'p2', text: 'Do this', claim: 'recommendation' },
       { type: 'paragraph', id: 'p3', text: 'Untraced', claim: 'unverified' },
-      { type: 'paragraph', id: 'p4', text: 'This section covers buyers.', claim: 'context' },
+    ] }, { id: 'm', heading: 'Method', role: 'about', blocks: [
+      { type: 'paragraph', id: 'p4', text: 'This report covers buyers and how to read it.', claim: 'context' },
     ] }] });
     expect(issuesOf(m)).toEqual([]);
+  });
+
+  it('context is allowed only in an "about" section (cover / how to read / method)', () => {
+    const body = tiny({ sections: [{ id: 'a', heading: 'Competition', blocks: [
+      { type: 'paragraph', id: 'p', text: 'The incumbent is Acme and the award was sole-source.', claim: 'context' },
+      { type: 'paragraph', id: 'q', text: 'SDVOSB only.', claim: 'context' },
+    ] }] });
+    expect(issuesOf(body).filter((x) => /context is allowed only in a section with role 'about'/.test(x))).toHaveLength(2);
+  });
+
+  it('context with a number written in WORDS is rejected, even in an about section', () => {
+    const m = tiny({ sections: [{ id: 'a', heading: 'Method', role: 'about', blocks: [
+      { type: 'paragraph', id: 'p', text: 'The market is worth forty-two million dollars.', claim: 'context' },
+    ] }] });
+    expect(issuesOf(m).join(' ')).toMatch(/context may not contain numbers \(in digits or words\)/);
+  });
+
+  it('unverified + critical set directly by the model is rejected by the validator', () => {
+    const m = tiny({ sections: [{ id: 'a', heading: 'A', blocks: [
+      { type: 'paragraph', id: 'p', text: 'Proposals due 12 Dec.', claim: 'unverified', critical: true },
+    ] }] });
+    expect(issuesOf(m).join(' ')).toMatch(/decision-critical statement cannot be unverified/);
+  });
+
+  it('a recommendation or assumption stating a count/amount (digits or words) must cite', () => {
+    const m = tiny({ sections: [{ id: 'a', heading: 'A', blocks: [
+      { type: 'paragraph', id: 'r1', text: 'Track the eight VA recompetes.', claim: 'recommendation' },
+      { type: 'paragraph', id: 'r2', text: 'Expect $640M a year to recompete.', claim: 'assumption' },
+      { type: 'paragraph', id: 'r3', text: 'Budget roughly 5% for travel.', claim: 'assumption' },
+      { type: 'paragraph', id: 'ok1', text: 'Track the eight VA recompetes.', claim: 'recommendation', cites: ['s1'] },
+      { type: 'paragraph', id: 'ok2', text: 'Pursue teaming with an 8(a) firm for FY26 Q3 set-asides.', claim: 'recommendation' },
+      { type: 'paragraph', id: 'ok3', text: 'Call one of the buying offices first.', claim: 'recommendation' },
+    ] }] });
+    const msgs = issuesOf(m).filter((x) => /must cite its source/.test(x));
+    expect(msgs.map((x) => x.match(/\((\w+)\)$/)?.[1])).toEqual(['r1', 'r2', 'r3']);
+  });
+
+  it('demoteUncitedFacts output always validates (misplaced context, uncited figures, critical+unverified)', () => {
+    const m = tiny({ sections: [{ id: 'a', heading: 'A', blocks: [
+      { type: 'paragraph', id: 'c1', text: 'Incumbent is Acme.', claim: 'context' },
+      { type: 'paragraph', id: 'r1', text: 'Track the eight recompetes.', claim: 'recommendation' },
+      { type: 'paragraph', id: 'u1', text: 'Due 12 Dec.', claim: 'unverified', critical: true },
+      { type: 'paragraph', id: 'r2', text: 'Introduce yourself early.', claim: 'recommendation' },
+    ] }] });
+    const { model, unverified, omitted } = demoteUncitedFacts(m);
+    expect(unverified).toEqual(['c1', 'r1']);
+    expect(omitted).toEqual(['u1']);
+    expect(issuesOf(model)).toEqual([]);
   });
 
   it('M1: an UNLABELED block or bullet item is rejected (it used to skip facts-must-cite)', () => {
@@ -233,6 +282,18 @@ describe('charts', () => {
       expect(svg).not.toContain('<1>');
       expect(svg).toContain('aria-label="A &amp; &lt;B&gt;"');
     }
+  });
+});
+
+describe('line chart x labels do not overlap', () => {
+  it('quarterly labels are spaced by their width (FY26 Q3 / FY26 Q4 never collide)', () => {
+    const quarters = ['FY24 Q1', 'FY24 Q2', 'FY24 Q3', 'FY24 Q4', 'FY25 Q1', 'FY25 Q2', 'FY25 Q3', 'FY25 Q4', 'FY26 Q1', 'FY26 Q2', 'FY26 Q3', 'FY26 Q4'];
+    const svg = chartToSvg({ type: 'chart', id: 'c', kind: 'line', claim: 'fact', cites: ['s1'], series: [{ name: 's', points: quarters.map((x, i) => ({ x, y: i + 1 })) }] }, 560);
+    const labels = [...svg.matchAll(/<text x="([\d.]+)" y="[\d.]+" font-size="10" text-anchor="(start|middle|end)" fill="[^"]+">(FY\d\d Q\d)<\/text>/g)]
+      .map((m) => { const x = Number(m[1]); const w = m[3].length * 6; const l = m[2] === 'start' ? x : m[2] === 'end' ? x - w : x - w / 2; return { l, r: l + w, t: m[3] }; });
+    expect(labels.length).toBeGreaterThan(2);
+    expect(labels.some((l) => l.t === 'FY26 Q4')).toBe(true);
+    for (let i = 1; i < labels.length; i++) expect(labels[i].l, `${labels[i - 1].t} vs ${labels[i].t}`).toBeGreaterThanOrEqual(labels[i - 1].r);
   });
 });
 
