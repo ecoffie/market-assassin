@@ -65,10 +65,10 @@ _Last verified: 2026-06-08 · updated 2026-07-12 (added Mindy MCP live-API sourc
 |---|---|---|---|---|
 | **Tier-2 / SBLO contractor DB** (2,700+) | Tier-2 teaming partners, SBLO contacts | **MANUAL curated — no automated producer.** Canonical roster `src/data/sblo-roster-2026-06.json` (200 legal entities) was hand-curated Jun 2026 from the SBA Prime Directory; see [SBLO lineage](#sblo-lineage-proven-from-git-2026-09-12). ⚠️ NOT built by `~/Bootcamp/compile-sblo-list.py` — that is the superseded regex scraper this roster replaced for quality. | **Quarterly** (manual) | Jun 2026 (`last_built` 2026-06-01) |
 | **DoD command / OSBP directory** (170 commands) | OSBP-by-sub-agency, office structure | `src/data/dod-command-info.json` — gov org hierarchy. Structure is STABLE; only director names rotate. | Quarterly (names only) | Dec 2025 |
-| **Agency pain points / intelligence** (3,045 pts, 307 agencies) | Pain points, agency priorities, "similar agencies" | `scripts/merge-agency-intelligence.js` → **GAO high-risk reports** (tagged `(Source: GAO)`) + USASpending spending patterns. ⚠️ **The 45 `FY2026 NDAA:` strings here are NOT authoritative NDAA records** — they are hand-merged prose from `~/Bootcamp/scan-ndaa-sections.py` (outside the repo, bill number HARDCODED to S.2296, last run Jan 2026) with no document identity, no version, and no source URL. They cite a bill that **never became law** (S.2296 — "Held at the desk", `laws:null`). The authoritative legislative corpus is **Mindy Institute — Federal Legislation** (below); these strings are a separate open remediation. | Quarterly / on new GAO report | Apr 2026 |
+| **Agency pain points / intelligence** (3,045 pts, 307 agencies) | Pain points, agency priorities, "similar agencies" | `scripts/merge-agency-intelligence.js` → **GAO high-risk reports** (tagged `(Source: GAO)`) + USASpending spending patterns. The FY2026 NDAA strings that once cited S.2296 (a bill that never became law) were re-cited to **PL 119-60** or retired in `432701f3e` (2026-09-22); none cite S.2296 now. ⚠️ **Open (2026-11-17 audit):** all **278** pain points tagged `(Source: GAO)` trace to GAO documents published **1993–2000** (the historical GovInfo slice in `agency_intelligence`), not current GAO work, and `merge-agency-intelligence.js --merge` would re-inject them from that table. Do not run that merge; remediation is tracked separately. | Quarterly / on new GAO report | Apr 2026 |
 | **Mindy Institute — GAO reports** | Institute evidence corpus, derived pain points + `intelligence_changes` | `institute_sources` table ← **GAO RSS** (`gao.gov/rss/reports.xml`) via `/api/cron/institute-gao-sync`. ⚠️ NOT the GovInfo `GAOREPORTS` collection — that is frozen at 2008 and cannot carry a living signal. | **Weekly** (cron, daily poll) | rolling (`data_sources.institute_gao`) |
 | **Mindy Institute — Federal Legislation** | Legislative evidence corpus (NDAA + future approps), provenance for legislative claims | `institute_sources` table ← **api.congress.gov** via `/api/cron/institute-legislation-sync`. **Discovery is DYNAMIC and WATERMARKED** — two separate jobs: (A) *discovery* scans `/bill/{congress}` over a `fromDateTime`-bounded window and proves coverage by comparing rows read against the API's own `pagination.count` (a page ceiling yields `partial`, and the cursor does **not** advance); (B) *tracking* re-polls every measure already in the corpus **by identity**, so a known bill stays tracked forever even after thousands of unrelated bills push it out of the recent-update window. **No bill number, fiscal year, or Congress is hardcoded**; a Congress change discards the cursor and forces a full pass. **ONE ROW PER LEGISLATIVE VERSION** (House introduced/reported/engrossed · Senate versions · committee reports · conference text · enacted law) — never collapsed into one "NDAA" record. Authenticated with the existing api.data.gov key. | **Weekly** (cron) | rolling (`data_sources.institute_legislation`) |
-| **DoDAAC directory** | Office code → office name | `dodaac_directory` table, from BigQuery FPDS awards | As FPDS data updates | Jun 2026 |
+| **DoDAAC directory** | Office code → office name | `dodaac_directory` table, from BigQuery FPDS awards via `/api/cron/refresh-dodaac-directory` (`src/lib/gov-contacts/refresh-dodaac-directory.ts`) | **Monthly** (`0 9 6 * *`) | **Measured from the table, not a stamp** (2026-11-17): healthy = newest `updated_at` ≤ 40d **and** ≥ 90% of rows refreshed in that window (`src/lib/data-sources/table-measured.ts`). The job never writes `last_built`, which is why it once alerted as 169 days stale while 4,901/4,902 rows had been refreshed 11 days earlier. |
 | **Forecast intelligence** (9,973) | `/forecasts` | 13 agency forecast portals (Excel/CSV/Puppeteer) — see `forecast_sources` table | Weekly (per-source) | rolling |
 | **NAICS buyer vocabulary** (25,252) | keyword→NAICS lead selection, onboarding "buyers also say" terms, recompete/forecast work-word chips, alert keyword expansion (`VOCAB_ALERT_EXPANSION`) | `naics_vocabulary` table, from `scripts/build-naics-vocabulary.ts` → **live USASpending award text** (top award descriptions per NAICS) cleaned by **cross-NAICS TF-IDF** (a term appearing across too many codes = filler, dropped). Read via `src/lib/market/vocabulary.ts`. | On rebuild (static; re-run the script when NAICS spend patterns shift materially — no cron) | Jul 2026 |
 
@@ -188,23 +188,22 @@ office/portal-only rows) → `d9de8de2` (103 primes + CSV committed) →
 3. Do **not** run `~/Bootcamp/compile-sblo-list.py`. Its output was replaced
    for quality; running it risks reintroducing regex-scraped contact data.
 
-### Known integrity gap: freshness assertion without refresh evidence
+### Freshness stamps require evidence (fixed 2026-11-17)
 
-`GET /api/cron/check-data-freshness?stamp=<key>` performs
-`UPDATE data_sources SET last_built = <today>` and **accepts no evidence that a
-refresh occurred or succeeded**. A stamp therefore asserts freshness on the
-honor system — the same shape as the hand-typed audit date warned about in
-`docs/engineering/a-number-is-a-product-feature.md` ("don't assert what the
-system can derive"), and a member of the *no execution ≠ success* class in
-`docs/engineering/silent-failure-registry.md`.
+`GET /api/cron/check-data-freshness?stamp=<key>` used to perform
+`UPDATE data_sources SET last_built = <today>` with **no evidence that a refresh
+occurred** — freshness on the honor system (*no execution ≠ success*,
+`docs/engineering/silent-failure-registry.md`). It now goes through
+`src/lib/data-sources/stamp-guard.ts`:
 
-This matters most for MANUAL sources like `tier2_sblo`, where no automated job
-exists that could ever stamp it as a side effect of real work.
-
-**Documented, not fixed** (deliberately out of scope of the provenance pass). If
-addressed later, the roster already exposes bindable evidence: `companyCount` /
-`withSbloName` / `withEmail` / `withPortal` (200/41/57/104) plus a content hash,
-so a stamp could be checked against the artifact it claims to describe.
+- **Required:** `&records=<positive count>` and `&evidence=<what was refreshed and where to check it>`
+  (≥ 20 characters, citing a URL, commit, PR or file path). The evidence line is appended to the row's
+  `notes`, so every stamp can be audited later.
+- **Refused even with evidence:** table-measured sources (`dodaac_directory`), the events catalog
+  (freshness comes from the file), producer-stamped sources (`bq_awards`, `bq_award_lookups`,
+  `bq_players`, `institute_gao`, `institute_legislation`, `seo_lookup_demand`) and live APIs.
+- A stamp is never a way to clear an alert. For `tier2_sblo` the roster already exposes bindable
+  evidence (`companyCount` / `withSbloName` / `withEmail` / `withPortal` = 200/41/57/104).
 
 ### Needs attention (flagged for acquisition cleanup)
 - **Stale snapshots:** `december-hit-list.json`, `december-spend-forecast.json` — refresh or remove.
@@ -236,6 +235,6 @@ against **organizer** sites (never a third-party listing).
 ### Tooling (live — #30/#31)
 - **Registry table:** `data_sources` (migration `20260608_data_sources_registry.sql`), seeded from this doc.
 - **Command Center view:** `GET /api/admin/data-sources?password=...` — every source by category + freshness + a `needsRefresh` list.
-- **Freshness watchdog:** `GET /api/cron/check-data-freshness` — **quarterly** (dispatcher cron_jobs, `0 13 1 1,4,7,10 *`). Flags any curated source past its cadence (quarterly >100d, annual >380d) + names the refresh script. When overdue it **EMAILS the refresh checklist** (cron runs unattended). The refreshes are HUMAN-run scrapers — we never auto-stamp `last_built` (that would fake freshness); after running a script, mark it done with `?stamp=<source key>`. The discipline that keeps the data layer provably MAINTAINED.
+- **Freshness watchdog:** `GET /api/cron/check-data-freshness` — **daily** (dispatcher `cron_jobs`, `5 13 * * *`). Flags any curated source past its cadence (weekly >10d, monthly >35d, quarterly >100d, as-published >120d, annual >380d) + names the refresh procedure, and posts the checklist to the **ops Slack channel** (moved off email 2026-07). The refreshes are human-run — we never auto-stamp `last_built`; after a real refresh, stamp it **with evidence** (`?stamp=<key>&records=<n>&evidence=<...>`, see above). Sources with a scheduled producer are measured from their rows instead (`TABLE_MEASURED_SOURCES`).
   - **Live-sync monitoring (added 2026-06-25):** the watchdog also checks LIVE pipelines by table recency via `LIVE_SYNC_CHECKS` (no stamping — reads `max(updated_at)`). First covered: **`federal_contacts`** (daily SAM POC sync) — if the newest row is >3d old the cron is likely down and it alerts. Closes the gap where a silently-broken daily contacts sync raised no alarm. **For this alert to be timely the dispatcher should fire this job daily** (quarterly-only catches a down sync up to 3 months late).
 - **Office rosters (#16):** `GET /api/app/federal-contacts?facets=office-roster&agency=&office=` builds COMPLETE per-buying-office contact lists from DoDAAC-decoded offices (DoD/DLA/Navy; civilian = agency preview). Foreign-filtered.
