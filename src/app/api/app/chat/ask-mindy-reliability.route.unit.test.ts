@@ -219,6 +219,16 @@ describe('LOW-2: answer usage is recorded even when the watchdog cuts the stream
   });
 });
 
+describe('answer usage when the stream stalls before its first token', () => {
+  it('records the chat answer usage even though nothing was shown', async () => {
+    plan.answer = async () => stallingAnswerStream([]);
+    const ev = await ask('hello');
+    expect(types(ev).slice(-2)).toEqual(['error', 'done']);
+    await new Promise((r) => setTimeout(r, 30));
+    expect(h.recordLlmUsage).toHaveBeenCalledWith(expect.objectContaining({ tool: 'chat', provider: 'openai' }));
+  });
+});
+
 describe('B2: a card turn is released when the turn deadline fires', () => {
   it('the watchdog marks the claimed card turn failed (free, re-askable) instead of leaving it in progress', async () => {
     process.env.MAP_CARD_CHAT_ENABLED = 'true';
