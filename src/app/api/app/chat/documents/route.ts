@@ -32,6 +32,7 @@ import {
   isVaultChatDocumentsEnabled, countSessionDocuments, listChatDocuments, archiveChatDocument,
   MAX_DOCS_PER_SESSION, type ChatDocsDb,
 } from '@/lib/vault/chat-store';
+import { vaultDocFeatureLive } from '@/lib/vault/flags';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -62,13 +63,15 @@ type Gate =
 
 /** Flag, strong auth, entitlement, strict acting scope and conversation ownership — every method. */
 async function gate(request: NextRequest): Promise<Gate> {
-  if (!isVaultChatDocumentsEnabled()) return { ok: false, response: notFound() };
+  if (!vaultDocFeatureLive('uploads')) return { ok: false, response: notFound() };
   const email = (request.nextUrl.searchParams.get('email') || '').trim().toLowerCase();
   const sessionId = (request.nextUrl.searchParams.get('session_id') || '').trim();
   if (!email) return { ok: false, response: json({ success: false, error: 'email_required' }, 400) };
   const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
   if (!auth.authenticated || !auth.email) return { ok: false, response: json({ success: false, error: auth.error || 'Unauthorized' }, 401) };
   const caller = auth.email.toLowerCase();
+  // Per-caller flag (controlled test): not allowlisted looks exactly like "off".
+  if (!isVaultChatDocumentsEnabled(caller)) return { ok: false, response: notFound() };
   if (!(await hasProAccess(caller))) return { ok: false, response: json({ success: false, error: 'pro_required', upgrade: true }, 403) };
   if (!UUID_RE.test(sessionId)) return { ok: false, response: json({ success: false, error: 'session_id must be a UUID' }, 400) };
 
