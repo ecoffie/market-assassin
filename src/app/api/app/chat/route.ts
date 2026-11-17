@@ -83,7 +83,7 @@ const TRACE_RESULT_CHARS = Number(process.env.ASK_MINDY_TRACE_RESULT_CHARS) || 6
 import { shadowEntitlement } from '@/lib/entitlements/shadow';
 import {
   isCardChatEnabled, cardChatTurnCredits, parseOpportunityContext, cardChatAccess, isBillableTurn,
-  CARD_CHAT_TOOLS, buildOpportunityContextBlock,
+  CARD_CHAT_TOOLS, buildOpportunityContextBlock, toolBillingOutcome, unbillableToolReason, type ToolBillingOutcome,
 } from '@/lib/chat/card-chat';
 import { SELECTED_NOTICE_COLUMNS, loadSelectedNoticeFacts, formatSelectedNoticeFacts, type SelectedNoticeRecord } from '@/lib/chat/selected-notice';
 import { resolveMentionedNotice, answerUsesNotice, type MentionedNoticeResult } from '@/lib/chat/mentioned-notice';
@@ -743,6 +743,9 @@ export async function POST(request: NextRequest) {
         // A1: the results that were NOT rendered (other tools, or a rendered tool that failed). In a mixed
         // turn the no-facts rule applies to the rendered lists only; these must still reach the user.
         const unrenderedResults: UnrenderedResult[] = [];
+        // P2 / audit B1: one billing outcome per executed tool call. Any failed, refused or degraded call
+        // makes a card turn free (isBillableTurn), like any other incomplete answer.
+        const toolBillingOutcomes: ToolBillingOutcome[] = [];
         try {
           if (actingScope.kind === 'client') turnTrace.notices.push('acting_scope:client_workspace');
           if (actingScope.kind === 'unavailable') turnTrace.notices.push('acting_scope:unavailable');
@@ -948,6 +951,7 @@ export async function POST(request: NextRequest) {
               }
               pendingToolTurnIdx = null;
               turnTrace.tool_executions = results.map((r) => r.record);
+              for (const r of results) toolBillingOutcomes.push(toolBillingOutcome(r.record.status, r.content));
               // Ported release-hardening R6/R10: disclose codes Mindy chose, from what each strict-filter tool
               // reports it APPLIED (src/lib/chat/code-disclosure.ts).
               scopeInferred = inferredCodeDisclosure(
@@ -1355,7 +1359,7 @@ export async function POST(request: NextRequest) {
         // failed: free, and the same question may be asked again. Pro answers are saved with 0 credits.
         let creditsCharged = 0;
         if (claimToken && turnId && !turnTimedOut) {
-          const complete = isBillableTurn({ billable: true, answer: assistantContent, streamError: streamCut || answerStalled, plannerUnavailable, finishReason });
+          const complete = isBillableTurn({ billable: true, answer: assistantContent, streamError: streamCut || answerStalled, plannerUnavailable, finishReason, toolOutcomes: toolBillingOutcomes });
           if (complete) {
             try {
               const c = await completeCardTurn({
@@ -1374,11 +1378,14 @@ export async function POST(request: NextRequest) {
               turnTrace.notices.push('card_turn:complete_error');
             }
           } else {
+            const toolReason = unbillableToolReason(toolBillingOutcomes);
+            // Precedence (Agent 4): client_disconnected → answer_stalled → tools_unavailable → tool_* → empty → incomplete.
             const reason = streamCut ? 'client_disconnected'
               : answerStalled ? 'answer_stalled'
-              : plannerUnavailable ? 'tools_unavailable'
-                : !assistantContent.trim() ? 'empty_answer'
-                  : `incomplete:${finishReason ?? 'no_finish'}`;
+                : plannerUnavailable ? 'tools_unavailable'
+                  : toolReason ? toolReason
+                    : !assistantContent.trim() ? 'empty_answer'
+                      : `incomplete:${finishReason ?? 'no_finish'}`;
             try {
               await failCardTurn({ turnId, claimToken, reason });
               turnSettled = true;

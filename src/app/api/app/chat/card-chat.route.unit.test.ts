@@ -25,6 +25,8 @@ const state: {
   incumbent: unknown;
   /** sam_opportunities lookups by solicitation number / notice id (mentioned-notice.ts). */
   mentionLookups: unknown[];
+  /** P2: when set, the planner calls one tool and the executor returns this record + content. */
+  toolRound: { status: string; content: unknown; error_category?: string } | null;
 } = {} as never;
 
 // In-memory turn store with the SQL functions' semantics (claim / complete = save + debit once / fail).
@@ -78,7 +80,16 @@ vi.mock('@/lib/chat/card-chat-turns', async (orig) => ({
 vi.mock('@/lib/chat/chat-tool-executor', () => ({
   createChatToolExecutor: (opts: { allowedToolNames?: unknown }) => {
     state.allowedToolNames = opts.allowedToolNames ?? null;
-    return { offeredToolDefs: () => [], executeRound: async () => [], policyFor: () => ({ decision: 'allowed_read' }) };
+    return {
+      offeredToolDefs: () => (state.toolRound ? [{ type: 'function', function: { name: 'lookup_solicitation', description: 'x', parameters: { type: 'object', properties: {} } } }] : []),
+      executeRound: async (calls: Array<{ id: string; function: { name: string } }>) => calls.map((c) => ({
+        tool_call_id: c.id,
+        content: JSON.stringify(state.toolRound!.content),
+        argsRedacted: {},
+        record: { execution_id: 'x', tool: c.function.name, decision: 'allowed_read', status: state.toolRound!.status, error_category: state.toolRound!.error_category ?? null, latency_ms: 1 },
+      })),
+      policyFor: () => ({ decision: 'allowed_read' }),
+    };
   },
 }));
 // The selected-notice incumbent lookup (src/lib/chat/selected-notice.ts) — never the network in tests.
@@ -147,7 +158,7 @@ beforeEach(() => {
       _meta: { grounded_notice: true, grounded_incumbent: false, degraded: false, notice_source: 'cache', incumbent_finding: 'candidate_not_confirmed' },
     },
     recordError: false, sessions: {}, answer: 'The response deadline is 2026-12-04 (SAM.gov notice W912PL26Q0042).', answerFails: false, finishReason: 'stop',
-    plannerMessages: [], answerMessages: [], inserts: [], allowedToolNames: null, mentionLookups: [],
+    plannerMessages: [], answerMessages: [], inserts: [], allowedToolNames: null, mentionLookups: [], toolRound: null,
   });
   turns.clear(); tokenSeq = 0;
   claimCardTurn.mockClear(); completeCardTurn.mockClear(); failCardTurn.mockClear();
@@ -162,6 +173,9 @@ beforeEach(() => {
       return new Response(sseBody(state.answer), { status: 200 });
     }
     state.plannerMessages.push(b.messages);
+    if (state.toolRound) {
+      return new Response(JSON.stringify({ choices: [{ message: { content: null, tool_calls: [{ id: 'c1', type: 'function', function: { name: 'lookup_solicitation', arguments: JSON.stringify({ query: 'W912PL26Q0042' }) } }] } }], usage: { prompt_tokens: 5, completion_tokens: 1 } }), { status: 200 });
+    }
     return new Response(JSON.stringify({ choices: [{ message: { content: 'no tools needed' } }], usage: { prompt_tokens: 5, completion_tokens: 1 } }), { status: 200 });
   }));
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -294,6 +308,30 @@ describe('credits: exactly once for a successful free card turn, never for failu
     const { res } = await post(card);
     expect(res.status).toBe(503);
     expect(fetch).not.toHaveBeenCalled();
+  });
+  // P2 / audit B1: a turn whose data was not fully retrieved is free, like any other degraded answer.
+  it('a successful tool round is still charged exactly once (unchanged)', async () => {
+    state.toolRound = { status: 'success', content: { ok: true, notice: { notice_id: NID }, _meta: { grounded: true, degraded: false } } };
+    await post(card);
+    expect(charges()).toBe(1);
+    expect(completeCardTurn.mock.calls[0][0]).toMatchObject({ credits: 10 });
+  });
+  it.each([
+    ['a thrown tool (failed)', { status: 'failed', error_category: 'tool_error', content: { ok: false, state: 'unavailable', error_category: 'tool_error' } }, 'tool_failed'],
+    ['a tool returning ok:false', { status: 'success', content: { ok: false, error_category: 'sam_unavailable', message: 'SAM is down' } }, 'tool_degraded'],
+    ['a degraded tool result', { status: 'success', content: { ok: true, notice: null, _meta: { grounded: false, degraded: true } } }, 'tool_degraded'],
+    ['an unavailable result state', { status: 'success', content: { ok: true, _meta: { result_state: 'unavailable' } } }, 'tool_degraded'],
+    ['a policy refusal', { status: 'blocked_policy', error_category: 'not_offered_here', content: { ok: false, state: 'unavailable', error_category: 'not_offered_here' } }, 'tool_refused'],
+    ['an invalid-input rejection', { status: 'rejected_invalid_input', error_category: 'invalid_input', content: { ok: false, state: 'unavailable', error_category: 'invalid_input' } }, 'tool_refused'],
+  ])('%s → no charge; the turn is free and re-askable', async (_n, round, reason) => {
+    state.toolRound = round;
+    const { events } = await post(card);
+    expect(events.some((e) => e.type === 'token')).toBe(true); // the answer is still shown
+    expect(charges()).toBe(0);
+    expect(completeCardTurn).not.toHaveBeenCalled();
+    expect(failCardTurn.mock.calls[0][0]).toMatchObject({ reason });
+    expect(turns.get(TURN)?.status).toBe('failed');
+    expect(events.some((e) => e.type === 'credits')).toBe(false);
   });
   it('completion fails (unknown outcome) → reported as nothing charged; the turn is released', async () => {
     completeCardTurn.mockImplementationOnce(async () => { throw new Error('timeout'); });

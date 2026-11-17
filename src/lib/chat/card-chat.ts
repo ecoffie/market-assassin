@@ -71,10 +71,50 @@ export function cardChatAccess(p: {
  */
 export function isBillableTurn(t: {
   billable: boolean; answer: string; streamError: boolean; plannerUnavailable: boolean; finishReason: string | null;
+  /** P2 / audit B1: one entry per executed tool call (toolBillingOutcome). Any non-'ok' → free. */
+  toolOutcomes?: ReadonlyArray<ToolBillingOutcome>;
 }): boolean {
   if (!t.billable || t.streamError || t.plannerUnavailable) return false;
+  if (t.toolOutcomes?.some((o) => o !== 'ok')) return false;
   if (!t.answer || !t.answer.trim()) return false;
   return t.finishReason === 'stop';
+}
+
+/**
+ * P2 / audit B1: how one tool call affects billing. Before, isBillableTurn ignored tool outcomes, so a thrown
+ * tool, a tool returning ok:false (pipeline_unavailable, sam_unavailable) or a policy refusal still charged
+ * the full turn while the customer was told the answer "may be incomplete". The module's own rule is that a
+ * degraded answer is free.
+ *   failed   — the call ran and threw or timed out
+ *   refused  — the call was refused before it ran (policy, budget, invalid input)
+ *   degraded — the call returned, but its data could not be retrieved (ok:false, state/result_state
+ *              'unavailable', or _meta.degraded)
+ *   ok       — anything else, including an honest empty result (grounded:false, none_found). An empty
+ *              result is a real answer, not a failure, and stays billable. So does result_state 'partial'
+ *              (a filter the tool could not apply is disclosed to the customer); that is a pricing call
+ *              left to Eric, not changed here.
+ */
+export type ToolBillingOutcome = 'ok' | 'failed' | 'refused' | 'degraded';
+
+export function toolBillingOutcome(status: string, content: string): ToolBillingOutcome {
+  if (status === 'failed') return 'failed';
+  if (status !== 'success') return 'refused';
+  let parsed: unknown;
+  try { parsed = JSON.parse(content); } catch { return 'ok'; }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return 'ok';
+  const r = parsed as { ok?: unknown; state?: unknown; _meta?: { degraded?: unknown; result_state?: unknown } | null };
+  if (r.ok === false || r.state === 'unavailable') return 'degraded';
+  const meta = r._meta && typeof r._meta === 'object' ? r._meta : null;
+  if (meta && (meta.degraded === true || meta.result_state === 'unavailable')) return 'degraded';
+  return 'ok';
+}
+
+/** The failCardTurn reason for a turn made free by its tools, or null if every tool was ok. */
+export function unbillableToolReason(outcomes: ReadonlyArray<ToolBillingOutcome>): 'tool_failed' | 'tool_refused' | 'tool_degraded' | null {
+  if (outcomes.includes('failed')) return 'tool_failed';
+  if (outcomes.includes('refused')) return 'tool_refused';
+  if (outcomes.includes('degraded')) return 'tool_degraded';
+  return null;
 }
 
 /**
