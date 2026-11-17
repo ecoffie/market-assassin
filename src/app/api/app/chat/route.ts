@@ -1247,10 +1247,11 @@ export async function POST(request: NextRequest) {
         if (answerStalled) {
           turnTrace.notices.push('answer_stalled');
           if (!assistantContent.trim()) {
-            // Nothing was shown: an error, not a blank bubble.
+            // Nothing was shown: an error, not a blank bubble. The prompt was still sent, so its usage counts.
             send({ type: 'error', code: 'answer_unavailable', message: customerErrorMessage('answer_unavailable') });
             send({ type: 'done' });
             closeStream();
+            recordAnswerUsage();
             return;
           }
           notify('answer_incomplete', 'Mindy stopped responding partway through this answer, so it is incomplete. Please try again.');

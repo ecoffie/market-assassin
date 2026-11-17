@@ -334,6 +334,13 @@ describe('credits: exactly once for a successful free card turn, never for failu
     expect(turns.get(TURN)?.status).toBe('failed');
     expect(events.some((e) => e.type === 'credits')).toBe(false);
   });
+  it('reason precedence: a tool reason is reported before a length-cut answer (tool_* before incomplete)', async () => {
+    state.toolRound = { status: 'success', content: { ok: false, error_category: 'sam_unavailable' } };
+    state.finishReason = 'length';
+    await post(card);
+    expect(charges()).toBe(0);
+    expect(failCardTurn.mock.calls[0][0]).toMatchObject({ reason: 'tool_degraded' });
+  });
   it('completion fails (unknown outcome) → reported as nothing charged; the turn is released', async () => {
     completeCardTurn.mockImplementationOnce(async () => { throw new Error('timeout'); });
     const { events } = await post(card);
