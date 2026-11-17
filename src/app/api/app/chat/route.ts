@@ -60,6 +60,7 @@ import { compileIntent, enforceIntent, dedupeToolCalls, isMapScopeNote, splitVie
 import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, renderSbloContact, lintAnalysis, deterministicNextSteps, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, SBLO_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
+import { chatDeadlines, toolTimeoutMs, readWithIdleTimeout, incompleteToolNotice, withTimeout, ChatTimeoutError } from '@/lib/chat/turn-deadlines';
 
 // Every Ask Mindy turn carries customer-private context (the user's profile; often Vault or
 // pipeline results). So every provider the chat route calls directly must be on the SAME
@@ -89,6 +90,9 @@ import { parseTurnId, claimCardTurn, completeCardTurn, failCardTurn, type ClaimR
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+// A7: an explicit platform limit. Must equal CHAT_ROUTE_MAX_DURATION_S (turn-deadlines.ts): the turn
+// watchdog fires before it, so a turn always ends with `error` + `done`, never a silent cut.
+export const maxDuration = 300;
 
 // B2: the answer-step model chain lives in resolveAnswerChain (planner-config.ts). The old
 // Groq llama-3.1-8b-instant backup is retired; Groq runs only if CHAT_ANSWER_FALLBACKS lists it.
@@ -498,6 +502,8 @@ export async function POST(request: NextRequest) {
     if (claim.sessionId) sessionId = claim.sessionId;
   }
   const startedAt = Date.now();
+  // A7: every wait in this turn is bounded (src/lib/chat/turn-deadlines.ts).
+  const deadlines = chatDeadlines(process.env);
 
   // SSE response — manually constructed ReadableStream since the
   // Vercel Edge / Node runtime doesn't expose an out-of-the-box helper.
@@ -518,16 +524,42 @@ export async function POST(request: NextRequest) {
       let turnSettled = false;
       // True only when WE stopped reading the model because the browser left: the answer is incomplete.
       let streamCut = false;
+      // A7: the stream has been closed (done sent). After this, send() is a no-op.
+      let ended = false;
+      // A7: the answer provider stopped sending bytes mid-answer; the answer is cut and flagged.
+      let answerStalled = false;
+      // A7: the turn watchdog fired: error + done were sent and the card turn released.
+      let turnTimedOut = false;
+      let answerAbort: AbortController | null = null;
       // A client that disconnected makes enqueue/close throw. That must never be mistaken for a
       // tool failure (it would inject a "tools unavailable" note after a completed write), and it
       // must never skip cost recording or persistence: both are wrapped and never throw.
       const send = (obj: unknown) => {
-        if (clientGone) return;
+        if (clientGone || ended) return;
         try { controller.enqueue(encoder.encode(sseEvent(obj))); } catch { clientGone = true; }
       };
       const closeStream = () => {
+        if (ended) return;
+        ended = true;
         try { controller.close(); } catch { clientGone = true; }
       };
+      // A7 turn watchdog: whatever is still waiting (a provider, a tool, a database read), the customer gets
+      // an error and the stream ends before the platform limit. A card turn is released (free, re-askable)
+      // instead of staying locked in progress for its lease.
+      const watchdog = setTimeout(() => {
+        if (ended) return;
+        turnTimedOut = true;
+        console.error('[chat] turn deadline reached after', deadlines.turnMs, 'ms');
+        try { answerAbort?.abort(new ChatTimeoutError('turn', deadlines.turnMs)); } catch { /* already done */ }
+        send({ type: 'error', code: 'turn_timeout', message: customerErrorMessage('turn_timeout') });
+        send({ type: 'done' });
+        closeStream();
+        if (claimToken && turnId && !turnSettled) {
+          turnSettled = true;
+          void failCardTurn({ turnId, claimToken, reason: 'turn_timeout' })
+            .catch((e) => console.error('[chat] card turn fail-mark failed:', (e as Error)?.message));
+        }
+      }, deadlines.turnMs);
 
       try {
         // Tell client which session this exchange belongs to right away
@@ -707,6 +739,7 @@ export async function POST(request: NextRequest) {
             tier0: { defs: TIER0_TOOL_DEFS, names: TIER0_TOOL_NAMES, execute: (n, a) => tier0Runtime.execute(n, a) },
             // Card chat offers only its opportunity tools (narrowing; the policy still applies).
             ...(cardCtx ? { allowedToolNames: CARD_CHAT_TOOLS } : {}),
+            toolTimeoutMs: (n) => toolTimeoutMs(n, deadlines),
           });
           // Offered tools are filtered by the chat tool policy (blocked tools are never shown).
           // B2: an open-opportunity question is not offered the expiring-contracts tool (it returns
@@ -769,7 +802,7 @@ export async function POST(request: NextRequest) {
                 };
                 if (/haiku-4-5|sonnet-4-|opus-4-[0-5]|claude-3/i.test(t.model)) cbody.temperature = 0;
                 const cr = await fetch('https://api.anthropic.com/v1/messages', {
-                  method: 'POST',
+                  method: 'POST', signal: AbortSignal.timeout(deadlines.plannerMs),
                   headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
                   body: JSON.stringify(cbody),
                 });
@@ -777,7 +810,7 @@ export async function POST(request: NextRequest) {
                 return { ok: false, status: cr.status, detail: (await cr.text().catch(() => '')).slice(0, 300) };
               }
               const r = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST', headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+                method: 'POST', signal: AbortSignal.timeout(deadlines.plannerMs), headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   model: t.model, messages: plannerMessages, ...openAiChatParams(t.model, { temperature: 0, maxTokens: TOOL_ROUND_MAX_TOKENS }),
                   // OPP_INTENT (Andre fix) → 'required' so an opportunity search can't decline the tool.
@@ -874,7 +907,7 @@ export async function POST(request: NextRequest) {
                 for (const n of notes?.applied ?? []) scopeApplied.add(n);
                 for (const n of notes?.unapplied ?? []) scopeUnapplied.add(n);
               }
-              const results = await executor.executeRound(toolCalls.filter((tc) => keepIds.has(tc.id)), { provider: first.provider, model: first.model });
+              const results = await executor.executeRound(toolCalls.filter((tc) => keepIds.has(tc.id)), { provider: first.provider, model: first.model }, { deadlineAt: Date.now() + deadlines.toolRoundBudgetMs });
               // B2: the model sees a BOUNDED copy of each result (structural shortening with a
               // shown-of-total report); the renderers below still read the full r.content.
               const perResultCap = perResultBudget(results.length);
@@ -942,9 +975,9 @@ export async function POST(request: NextRequest) {
                   })),
                 });
               }
-              if (results.some((r) => r.record.status === 'failed')) {
-                notify('lookup_failed', 'One of the data lookups failed, so this answer may be incomplete.');
-              }
+              // A6: every non-success status is announced, not only `failed` (refusals, round budget, timeouts).
+              const incomplete = incompleteToolNotice(results.map((r) => r.record));
+              if (incomplete) notify(incomplete.code, incomplete.message);
             }
           }
         } catch (toolErr) {
@@ -998,8 +1031,8 @@ export async function POST(request: NextRequest) {
         // cheaper model. Protects the $149 margin now that chat leads with gpt-4o.
         // (Resolved once above for the tool round; reuse to avoid a second budget read.)
         const chatModel = chatModelEarly;
-        const streamFrom = (url: string, key: string, model: string, msgs: unknown[]) => fetch(url, {
-          method: 'POST',
+        const streamFrom = (url: string, key: string, model: string, msgs: unknown[], signal: AbortSignal) => fetch(url, {
+          method: 'POST', signal,
           headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
           // stream_options.include_usage → OpenAI/Groq emit a final usage-only
           // chunk after the deltas. Without it, a streaming call returns NO usage
@@ -1046,16 +1079,24 @@ export async function POST(request: NextRequest) {
             void recordProviderEvent({ kind: answerChain[i + 1] ? 'answer_fallback' : 'answer_failure', provider: t.provider, model: t.model, status: null, detail: `request_too_large: est ${fit.estimate} > budget ${fit.budget} tokens (not sent)`, userEmail: auth.email! });
             continue;
           }
+          // A7: the connect wait is bounded (then the next model is tried); the same controller lets the
+          // watchdog stop a stream that is already flowing.
+          const ctrl = new AbortController();
+          answerAbort = ctrl;
+          const connectTimer = setTimeout(() => ctrl.abort(new ChatTimeoutError('answer_connect', deadlines.answerConnectMs)), deadlines.answerConnectMs);
           try {
-            r = await streamFrom(ANSWER_ENDPOINTS[t.provider], answerKey(modelEnv, t) || '', t.model, fit.messages);
+            r = await streamFrom(ANSWER_ENDPOINTS[t.provider], answerKey(modelEnv, t) || '', t.model, fit.messages, ctrl.signal);
           } catch (e) {
             detail = String((e as Error)?.message || e).slice(0, 300);
+          } finally {
+            clearTimeout(connectTimer);
           }
+          if (turnTimedOut) break;
           if (r && r.ok && r.body) {
             groqRes = r; usedProvider = t.provider; usedModel = t.model; answerFallback = i > 0;
             break;
           }
-          if (r) detail = (await r.text().catch(() => '')).slice(0, 300);
+          if (r) detail = (await withTimeout(r.text(), 5_000, 'answer_error_body').catch(() => '')).slice(0, 300);
           turnTrace.answer_attempts.push({ provider: t.provider, model: t.model, status: r ? r.status : null, code: providerErrorCode(detail, r) });
           const next = answerChain[i + 1];
           void recordProviderEvent({
@@ -1115,7 +1156,22 @@ export async function POST(request: NextRequest) {
         while (true) {
           // Nobody is reading: stop the provider stream instead of generating unread tokens.
           if (clientGone) { streamCut = true; await reader.cancel().catch(() => {}); break; }
-          const { done, value } = await reader.read();
+          if (turnTimedOut) { await reader.cancel().catch(() => {}); break; }
+          // A7: a provider that stops sending mid-answer is cut after answerIdleMs, never awaited forever.
+          let read: ReadableStreamReadResult<Uint8Array> | 'timeout';
+          try {
+            read = await readWithIdleTimeout(reader, deadlines.answerIdleMs);
+          } catch (readErr) {
+            if (turnTimedOut) break; // the watchdog aborted the stream; it already ended the turn
+            throw readErr;
+          }
+          if (read === 'timeout') {
+            answerStalled = true;
+            void reader.cancel().catch(() => {});
+            try { answerAbort?.abort(new ChatTimeoutError('answer_idle', deadlines.answerIdleMs)); } catch { /* done */ }
+            break;
+          }
+          const { done, value } = read;
           if (done) break;
           const chunkStr = leftover + decoder.decode(value, { stream: true });
           const lines = chunkStr.split('\n');
@@ -1150,6 +1206,19 @@ export async function POST(request: NextRequest) {
             }
           }
         }
+
+        if (answerStalled) {
+          turnTrace.notices.push('answer_stalled');
+          if (!assistantContent.trim()) {
+            // Nothing was shown: an error, not a blank bubble.
+            send({ type: 'error', code: 'answer_unavailable', message: customerErrorMessage('answer_unavailable') });
+            send({ type: 'done' });
+            closeStream();
+            return;
+          }
+          notify('answer_incomplete', 'Mindy stopped responding partway through this answer, so it is incomplete. Please try again.');
+        }
+        if (turnTimedOut) return;
 
         // Emit citations after the response completes. v2 (May 31): no
         // longer parse inline [→ X] markers from the response — those
@@ -1247,8 +1316,8 @@ export async function POST(request: NextRequest) {
         // empty, degraded or incomplete answer (including one we stopped because the browser left) is marked
         // failed: free, and the same question may be asked again. Pro answers are saved with 0 credits.
         let creditsCharged = 0;
-        if (claimToken && turnId) {
-          const complete = isBillableTurn({ billable: true, answer: assistantContent, streamError: streamCut, plannerUnavailable, finishReason });
+        if (claimToken && turnId && !turnTimedOut) {
+          const complete = isBillableTurn({ billable: true, answer: assistantContent, streamError: streamCut || answerStalled, plannerUnavailable, finishReason });
           if (complete) {
             try {
               const c = await completeCardTurn({
@@ -1268,6 +1337,7 @@ export async function POST(request: NextRequest) {
             }
           } else {
             const reason = streamCut ? 'client_disconnected'
+              : answerStalled ? 'answer_stalled'
               : plannerUnavailable ? 'tools_unavailable'
                 : !assistantContent.trim() ? 'empty_answer'
                   : `incomplete:${finishReason ?? 'no_finish'}`;
@@ -1313,6 +1383,7 @@ export async function POST(request: NextRequest) {
         send({ type: 'done' });
         closeStream();
       } finally {
+        clearTimeout(watchdog);
         // Any path that did not settle the turn (provider failure, early return, thrown error) leaves it
         // free and re-askable. The update matches only this claim, so it can never undo a completed turn.
         if (claimToken && turnId && !turnSettled) {
