@@ -122,27 +122,50 @@ describe('Map drawer attach', () => {
     expect(doc.querySelectorAll('[data-testid="amk-doc"]')).toHaveLength(0);
   });
 
-  it('coach working AS A CLIENT: attach is disabled with a pointer to the main panel; nothing is uploaded (never the coach\'s own Vault)', async () => {
-    const { doc, calls, attach } = boot({ flag: true, store: { mindy_active_workspace: 'ws-client-1', mindy_active_workspace_owner: 'pro@example.com' } });
-    const row = doc.querySelector('[data-testid="amk-attach"]') as HTMLElement;
-    const clip = row.querySelector('.amk-clip') as HTMLButtonElement;
-    expect(row.getAttribute('data-client-mode')).toBe('1');
-    expect(clip.disabled).toBe(true);
-    expect(row.textContent).toContain('Switch to the main Ask Mindy panel to attach files for this client.');
-    await attach('client-sow.pdf'); // even a forced change event uploads nothing
-    expect(calls.some((c) => c.url.startsWith('/api/app/chat/documents') && c.method === 'POST')).toBe(false);
+  // Server half (already pinned in #2112): an authorized coach's upload is stored under the CLIENT's Vault
+  // email (chat-documents-upload.route.unit.test.ts) and chat reads documents under the CLIENT scope
+  // (chat-documents.route.unit.test.ts); an unconfirmed header is 409 on upload. This pins the browser half:
+  // the drawer sends the active workspace on BOTH its chat and its upload requests.
+  const headersOf = (w: Record<string, unknown>, pred: (u: string, i: { method?: string }) => boolean) =>
+    ((w.fetch as unknown as { mock: { calls: Array<[string, { method?: string; headers?: Record<string, string> }]> } }).mock.calls
+      .filter(([u, i]) => pred(u, i)).map(([, i]) => i.headers ?? {}));
+
+  it('coach working AS A CLIENT: the drawer upload AND the drawer chat both carry x-active-workspace', async () => {
+    const { doc, attach, settle, w } = boot({ flag: true, store: { mindy_active_workspace: 'ws-client-1', mindy_active_workspace_owner: 'pro@example.com' } });
+    await attach('client-sow.pdf');
+    (doc.getElementById('amkIn') as HTMLTextAreaElement).value = 'Summarize the attached SOW';
+    (doc.getElementById('amkSend') as HTMLButtonElement).click();
+    await settle();
+    const up = headersOf(w, (u, i) => u.startsWith('/api/app/chat/documents') && i.method === 'POST');
+    const chat = headersOf(w, (u) => u === '/api/app/chat');
+    expect(up).toHaveLength(1);
+    expect(up[0]['x-active-workspace']).toBe('ws-client-1');
+    expect(chat).toHaveLength(1);
+    expect(chat[0]['x-active-workspace']).toBe('ws-client-1');
   });
 
-  it('a workspace stamp left by ANOTHER user does not block the owner (same rule as #2101)', () => {
-    const { doc } = boot({ flag: true, store: { mindy_active_workspace: 'ws-x', mindy_active_workspace_owner: 'someone@else.com' } });
-    expect((doc.querySelector('.amk-clip') as HTMLButtonElement).disabled).toBe(false);
-  });
-
-  it('own workspace: the upload carries no x-active-workspace (matches the drawer chat scope)', async () => {
-    const { calls, attach, w } = boot({ flag: true });
+  it('a workspace stamp left by ANOTHER user is not sent (same rule as #2101)', async () => {
+    const { doc, attach, settle, w } = boot({ flag: true, store: { mindy_active_workspace: 'ws-x', mindy_active_workspace_owner: 'someone@else.com' } });
     await attach('sow.pdf');
-    const f = (w.fetch as unknown as { mock: { calls: Array<[string, { headers?: Record<string, string> }]> } }).mock.calls.find(([u, i]) => u.startsWith('/api/app/chat/documents') && (i as { method?: string }).method === 'POST')!;
-    expect(f[1].headers?.['x-active-workspace']).toBeUndefined();
-    expect(calls.length).toBeGreaterThan(0);
+    (doc.getElementById('amkIn') as HTMLTextAreaElement).value = 'hi';
+    (doc.getElementById('amkSend') as HTMLButtonElement).click();
+    await settle();
+    for (const h of headersOf(w, (u) => u.startsWith('/api/app/chat'))) expect(h['x-active-workspace']).toBeUndefined();
+  });
+
+  it('own workspace: no x-active-workspace on upload or chat', async () => {
+    const { doc, attach, settle, w } = boot({ flag: true });
+    await attach('sow.pdf');
+    (doc.getElementById('amkIn') as HTMLTextAreaElement).value = 'hi';
+    (doc.getElementById('amkSend') as HTMLButtonElement).click();
+    await settle();
+    for (const h of headersOf(w, (u) => u.startsWith('/api/app/chat'))) expect(h['x-active-workspace']).toBeUndefined();
+  });
+
+  it('an unconfirmed workspace (server 409) shows the reason and adds no chip — never filed elsewhere', async () => {
+    const { doc, attach } = boot({ flag: true, store: { mindy_active_workspace: 'ws-gone' }, uploadReply: { status: 409, json: { success: false, error: 'workspace_unconfirmed', message: "The active workspace couldn't be confirmed, so no Vault, profile or pursuit data was loaded. Ask the user to retry." } } });
+    await attach('sow.pdf');
+    expect(doc.querySelector('.amk-attach-err')?.textContent).toMatch(/couldn't be confirmed/);
+    expect(doc.querySelectorAll('[data-testid="amk-doc"]')).toHaveLength(0);
   });
 });

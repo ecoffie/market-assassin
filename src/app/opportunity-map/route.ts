@@ -10943,6 +10943,11 @@ const ASK_MINDY_JS = `<script>(function(){
   }
   function tok(){ try{return localStorage.getItem('mi_beta_auth_token');}catch(e){return null;} }
   function email(){ try{ var t=tok()||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){ return ''; } }
+  // Coach Mode for the drawer, exactly as authedFetch / startProposal (#2101): a coach working in a client's
+  // workspace sends that workspace, so the server acts in the CLIENT's scope (and refuses, never falls back,
+  // when it cannot confirm it). Withheld only when the stamp names another user.
+  function withWorkspace(hd){ try{ var ws=localStorage.getItem('mindy_active_workspace'), wso=localStorage.getItem('mindy_active_workspace_owner'), em=String(email()).toLowerCase().trim();
+    if(ws&&!(wso&&wso!==em)) hd['x-active-workspace']=ws; }catch(e){} return hd; }
   var sessionId='', history=[], busy=false;
   // ── CARD CHAT (MAP_CARD_CHAT_ENABLED): ask about ONE opportunity. The browser sends only the notice id;
   // the server loads the record and documents. Each opportunity keeps its own thread in this browser, and
@@ -11148,11 +11153,9 @@ const ASK_MINDY_JS = `<script>(function(){
   if(send)send.onclick=function(){ ask(input?input.value:''); };
   // Attach a document to THIS conversation, saved privately to the Vault (POST /api/app/chat/documents).
   // Flag: window.__VAULT_ATTACH. Free. A refused file (CUI/classified/too large) shows the server reason.
-  // Coach working AS A CLIENT (an active client workspace, detected exactly like startProposal/#2101):
-  // the drawer's chat requests do not carry the workspace, so a file attached here could neither be filed
-  // in the client's Vault AND ground the drawer's answers. Rather than fall back to the coach's own Vault
-  // (B-19), drawer attach is disabled and the user is sent to the main Ask Mindy panel. Otherwise (own
-  // workspace) uploads carry no workspace header, matching the drawer's chat scope.
+  // Uploads carry the active workspace exactly like the drawer's chat requests (withWorkspace), so a coach
+  // working as a client files into the CLIENT's Vault and the drawer's answers read the same scope. An
+  // unconfirmed workspace is refused by the server (409), never filed in the coach's own Vault.
   var amkDocs=null;
   if(window.__VAULT_ATTACH && drawer){ (function(){
     var foot=drawer.querySelector('.amk-foot'); if(!foot)return;
@@ -11161,19 +11164,15 @@ const ASK_MINDY_JS = `<script>(function(){
     foot.insertBefore(row, foot.firstChild);
     var fileIn=row.querySelector('input'), clip=row.querySelector('.amk-clip'), docsEl=row.querySelector('.amk-docs'), errEl=row.querySelector('.amk-attach-err');
     function uuid(){ try{ if(window.crypto&&crypto.randomUUID) return crypto.randomUUID(); }catch(e){} var h='0123456789abcdef',x=''; for(var i=0;i<32;i++){ x+=h.charAt(Math.floor(Math.random()*16)); } return x.slice(0,8)+'-'+x.slice(8,12)+'-4'+x.slice(13,16)+'-8'+x.slice(17,20)+'-'+x.slice(20,32); }
-    function hdrs(){ return {'x-mi-auth-token':tok()||'','x-user-email':email()}; }
-    function clientActive(){ try{ var ws=localStorage.getItem('mindy_active_workspace'), wso=localStorage.getItem('mindy_active_workspace_owner'), em=String(email()).toLowerCase().trim();
-      return !!(ws&&!(wso&&wso!==em)); }catch(e){ return false; } }
-    var CLIENT_MSG='Switch to the main Ask Mindy panel to attach files for this client.';
-    function syncMode(){ var c=clientActive(); clip.disabled=c; clip.title=c?CLIENT_MSG:''; row.setAttribute('data-client-mode',c?'1':'0'); if(c){ errEl.textContent=CLIENT_MSG; } return c; }
+    function hdrs(){ return withWorkspace({'x-mi-auth-token':tok()||'','x-user-email':email()}); }
     function url(extra){ return '/api/app/chat/documents?email='+encodeURIComponent(email())+'&session_id='+encodeURIComponent(sessionId)+(extra||''); }
     function chip(d){ var c=document.createElement('span'); c.className='amk-doc'; c.setAttribute('data-testid','amk-doc'); var n=document.createElement('span'); n.textContent=d.filename; c.appendChild(n);
       var x=document.createElement('button'); x.type='button'; x.setAttribute('aria-label','Remove '+d.filename); x.textContent='×'; x.onclick=function(){ removeDoc(d.id,c); }; c.appendChild(x); docsEl.appendChild(c); }
     function removeDoc(id,el){ errEl.textContent=''; fetch(url('&id='+encodeURIComponent(id)),{method:'DELETE',headers:hdrs()}).then(function(r){ if(r.ok){ if(el.parentNode) el.parentNode.removeChild(el); } else errEl.textContent='Could not remove that file. Try again.'; },function(){ errEl.textContent='Could not remove that file. Try again.'; }); }
-    function reload(){ docsEl.innerHTML=''; errEl.textContent=''; if(syncMode())return; if(!sessionId||!tok()||!email())return; var sid=sessionId;
+    function reload(){ docsEl.innerHTML=''; errEl.textContent=''; if(!sessionId||!tok()||!email())return; var sid=sessionId;
       fetch(url(),{headers:hdrs()}).then(function(r){ return r.ok?r.json():null; },function(){ return null; }).then(function(d){ if(sid!==sessionId||!d||!d.documents)return; for(var i=0;i<d.documents.length;i++) chip(d.documents[i]); }); }
-    clip.onclick=function(){ if(syncMode())return; if(!tok()||!email()){ if(window.openSignInModal) window.openSignInModal('attach a document',function(){}); return; } fileIn.click(); };
-    fileIn.onchange=function(){ var f=fileIn.files&&fileIn.files[0]; if(!f)return; if(syncMode()){ fileIn.value=''; return; } errEl.textContent='';
+    clip.onclick=function(){ if(!tok()||!email()){ if(window.openSignInModal) window.openSignInModal('attach a document',function(){}); return; } fileIn.click(); };
+    fileIn.onchange=function(){ var f=fileIn.files&&fileIn.files[0]; if(!f)return; errEl.textContent='';
       if(f.size>4*1024*1024){ errEl.textContent='Files can be up to 4 MB here. Larger files can be added from the Vault.'; fileIn.value=''; return; }
       if(!sessionId) sessionId=uuid();
       var fd=new FormData(); fd.append('file',f); clip.disabled=true; clip.textContent='Attaching…';
@@ -11184,7 +11183,6 @@ const ASK_MINDY_JS = `<script>(function(){
         .then(function(){ clip.disabled=false; clip.textContent='Attach'; fileIn.value=''; });
     };
     amkDocs={reload:reload};
-    syncMode();
   })(); }
   function addMsg(role, text){ var d=document.createElement('div'); d.className='amk-msg '+(role==='user'?'u':'a'); d.innerHTML=(role==='user')?esc(text):('<div class="bub"></div>'); if(role!=='user'){ var bb=d.querySelector('.bub'); if(text) paint(bb,text); else bb.textContent=''; } body.appendChild(d); body.scrollTop=body.scrollHeight; return d; }
   function upsell(){ body.innerHTML='<div class="amk-up"><h4>\\ud83d\\udd12 Ask Mindy is a Pro feature</h4><p>Get grounded, real-data answers on set-asides, agencies, opportunities, teaming and proposals \\u2014 with sources.</p><a href="/market-intelligence">Upgrade to Pro</a></div>'; }
@@ -11226,7 +11224,7 @@ const ASK_MINDY_JS = `<script>(function(){
     // comes back free, and one it did not finish is answered (and charged) once.
     function offerRetry(msg){ bub.textContent=msg; var w=document.createElement('div'); w.className='amk-act'; var b=document.createElement('button'); b.textContent='Get the answer';
       b.onclick=function(){ if(busy||oppCtx!==cardAtSend)return; dropBubbles(); ask(q,{turnId:turnId}); }; w.appendChild(b); aEl.appendChild(w); }
-    fetch('/api/app/chat',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},body:JSON.stringify(payload)})
+    fetch('/api/app/chat',{method:'POST',headers:withWorkspace({'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}),body:JSON.stringify(payload)})
       .then(function(r){
         if(r.status===403){ if(turnId){ pendingTurn=null; saveCard(); } upsell(); busy=false; if(send)send.disabled=false; return null; }
         if(r.status===402){ if(turnId){ pendingTurn=null; saveCard(); } r.json().then(function(d){ creditsWall(bub,d||{}); },function(){ creditsWall(bub,{}); }); busy=false; if(send)send.disabled=false; return null; }
