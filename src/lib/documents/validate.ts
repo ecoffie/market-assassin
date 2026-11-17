@@ -151,12 +151,22 @@ const NEVER_ASSUMPTION_PARTS: RegExp[] = [
 ];
 // A CITED statement of a measured market figure is an observation — a fact — not an assumption
 // ("no vendor appears to hold more than about 5% of obligations [1]"). An assumption about the market
-// is forward-looking (a projection from the evidence), so it carries a projection word.
-const PROJECTION = /\b(?:likely|unlikely|will|would|could|may|might|expect\w*|forecast\w*|project(?:ed|ion|ions|s)?|anticipat\w*|at the current pace|if|should|estimate[sd]?|plan(?:ned|ning)?)\b/i;
+// projects FORWARD from the evidence, so only a forward reference counts (A4, v3 early check): a hedge
+// ("may", "could", "if") on a past figure is still an observation ("Obligations may have peaked at
+// $412M"), and a sentence that reports a past measurement stays an observation even when it adds a
+// forecast ("Spending was flat at $24M, and may continue"). An explicit planning premise ("for
+// planning, assume …") is the author's assumption by Eric's rule.
+const FORWARD = /\b(?:will|expect\w*|forecast\w*|project(?:s|ed|ion|ions)?|anticipat\w*|likely to|at the current pace|next (?:year|quarter|fiscal year|FY)|by FY\s?\d{2,4})\b/i;
+const PLANNING_PREMISE = /\b(?:for planning|planning (?:figure|purposes|basis|premise|assumption))\b/i;
+const PAST_MEASURED = /\b(?:obligated|awarded|spent|was|were|peaked|totaled|totalled|grew|fell|rose|declined|increased|decreased|bought|purchased|procured|won|received|reached|averaged)\b|\b(?:may|might|could|would|must|should) have\b/i;
 
-/** A cited assumption that reports a measured market figure without projecting it: mislabeled. */
+/** A cited assumption that reports a measured market figure rather than projecting it: mislabeled. */
 export function citedObservationAsAssumption(u: { claim?: string; cites?: string[]; text: string }, sourceIds: Set<string>): boolean {
-  return u.claim === 'assumption' && (u.cites ?? []).some((c) => sourceIds.has(c)) && assumptionAssertsFact(u.text) && !PROJECTION.test(u.text.replace(/\*\*|_/g, ''));
+  if (u.claim !== 'assumption' || !(u.cites ?? []).some((c) => sourceIds.has(c))) return false;
+  const t = u.text.replace(/\*\*|_/g, '');
+  if (!assumptionAssertsFact(t)) return false;
+  if (PAST_MEASURED.test(t)) return true;
+  return !FORWARD.test(t) && !PLANNING_PREMISE.test(t);
 }
 
 export function neverAnAssumption(text: string): boolean {

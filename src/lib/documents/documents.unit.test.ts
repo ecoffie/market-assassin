@@ -23,7 +23,7 @@ import { renderHtml } from './render-html';
 import { renderDocx } from './render-docx';
 import { renderPdf, pdfOptions } from './render-pdf';
 import { renderDocument } from './index';
-import { chartToSvg } from './charts';
+import { chartToSvg, wrapWords } from './charts';
 import { inferKind, extractByKind, extractDocx } from './extract';
 
 const clone = (): DocModel => JSON.parse(JSON.stringify(SAMPLE_REPORT));
@@ -178,6 +178,25 @@ describe('validateDocModel', () => {
       expect(d.omitted).toEqual(['p']);
       expect(d.model.sections[0].blocks).toEqual([]);
       expect(issuesOf(d.model)).toEqual([]);
+    });
+
+    it.each([
+      'Obligations may have peaked at $412M in FY2025.',
+      'If the data are complete, DHS obligated $3M last year.',
+      'The Navy could have awarded 12 contracts in FY2025.',
+      'Spending was roughly flat at $24M, and may continue.',
+      'No vendor holds more than about 5% of obligations.',
+    ])('a hedged or mixed PAST measurement is still an observation → must be a fact: %s', (text) => {
+      expect(issuesOf(one(text, { cites: ['s1'] })).join(' ')).toMatch(/a cited measurement of the market is a fact, not an assumption/);
+    });
+
+    it.each([
+      'We expect $30M in FY2027.',
+      'At the current pace, obligations will exceed $500M by FY2028.',
+      'Obligations are likely to rise 10% next year.',
+      'For planning, assume 5 bidders.',
+    ])('a forward projection or explicit planning premise stays a cited assumption: %s', (text) => {
+      expect(issuesOf(one(text, { cites: ['s1'] }))).toEqual([]);
     });
 
     it('a cited PROJECTION stays an assumption (forward-looking, from the evidence)', () => {
@@ -668,7 +687,7 @@ describe('line chart x labels do not overlap', () => {
   it('quarterly labels are spaced by their width (FY26 Q3 / FY26 Q4 never collide)', () => {
     const quarters = ['FY24 Q1', 'FY24 Q2', 'FY24 Q3', 'FY24 Q4', 'FY25 Q1', 'FY25 Q2', 'FY25 Q3', 'FY25 Q4', 'FY26 Q1', 'FY26 Q2', 'FY26 Q3', 'FY26 Q4'];
     const svg = chartToSvg({ type: 'chart', id: 'c', kind: 'line', claim: 'fact', cites: ['s1'], series: [{ name: 's', points: quarters.map((x, i) => ({ x, y: i + 1 })) }] }, 560);
-    const labels = [...svg.matchAll(/<text x="([\d.]+)" y="[\d.]+" font-size="10" text-anchor="(start|middle|end)" fill="[^"]+">(FY\d\d Q\d)<\/text>/g)]
+    const labels = [...svg.matchAll(/<text x="([\d.]+)" y="[\d.]+" font-size="10" text-anchor="(start|middle|end)" fill="[^"]+"><tspan[^>]*>(FY\d\d Q\d)<\/tspan><\/text>/g)]
       .map((m) => { const x = Number(m[1]); const w = m[3].length * 6; const l = m[2] === 'start' ? x : m[2] === 'end' ? x - w : x - w / 2; return { l, r: l + w, t: m[3] }; });
     expect(labels.length).toBeGreaterThan(2);
     expect(labels.some((l) => l.t === 'FY26 Q4')).toBe(true);
@@ -784,6 +803,29 @@ describe('render-docx', () => {
     expect(chartDuplicatesTable(chart([['X', 5], ['Y', 7]]), t)).toBe(true);
     expect(chartDuplicatesTable(chart([['X', 5], ['Y', 8]]), t)).toBe(false);
     expect(chartDuplicatesTable(chart([['X', 5], ['Z', 7]]), t)).toBe(false);
+  });
+
+  it('chart labels are never truncated: long names wrap onto more lines (A5, v3 review)', () => {
+    const svgText = (svg: string) => svg.replace(/<tspan[^>]*>/g, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    const long = 'Department of Health and Human Services, Office of the Assistant Secretary';
+    const bar = chartToSvg({ type: 'chart', id: 'c', kind: 'bar', xLabel: 'A very long category axis title for departments', series: [{ name: 'A very long series name that used to be cut', points: [{ x: long, y: 5 }, { x: 'General Services Administration', y: 3 }] }, { name: 'Second', points: [{ x: long, y: 1 }, { x: 'General Services Administration', y: 2 }] }] });
+    const line = chartToSvg({ type: 'chart', id: 'l', kind: 'line', series: [{ name: 'Department of Veterans Affairs obligations', points: [{ x: 'FY2026 first quarter (Oct–Dec)', y: 1 }, { x: 'FY2026 second quarter', y: 2 }] }, { name: 'Second', points: [{ x: 'a', y: 1 }, { x: 'b', y: 2 }] }] });
+    const pie = chartToSvg({ type: 'chart', id: 'p', kind: 'pie', series: [{ name: 's', points: [{ x: long, y: 2 }, { x: 'Small business', y: 1 }] }] });
+    for (const svg of [bar, line, pie]) expect(svg).not.toContain('…');
+    expect(svgText(bar)).toContain(long);
+    expect(svgText(bar)).toContain('General Services Administration');
+    expect(svgText(bar)).toContain('A very long series name that used to be cut');
+    expect(svgText(bar)).toContain('A very long category axis title for departments');
+    expect(svgText(line)).toContain('FY2026 first quarter (Oct–Dec)');
+    expect(svgText(line)).toContain('Department of Veterans Affairs obligations');
+    expect(svgText(pie)).toContain(long);
+    expect(svgText(renderHtml(SAMPLE_REPORT))).not.toContain('…');
+  });
+
+  it('wrapWords breaks at word boundaries and never drops text', () => {
+    expect(wrapWords('General Services Administration', 26)).toEqual(['General Services', 'Administration']);
+    expect(wrapWords('VA', 26)).toEqual(['VA']);
+    expect(wrapWords('Supercalifragilisticexpialidocious word', 10)).toEqual(['Supercalifragilisticexpialidocious', 'word']);
   });
 
   it('DOCX columns get room for their content: a long vendor name is wider than a dollar column', async () => {

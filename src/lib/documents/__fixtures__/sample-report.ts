@@ -160,7 +160,8 @@ export const SAMPLE_REPORT: DocModel = {
       blocks: [
         { type: 'paragraph', id: 'price-p1', claim: 'fact', cites: ['s4'], text: 'Your uploaded pricing notes list a loaded labor rate of $31.40 per hour for custodial staff and $38.75 for supervisors.' },
         { type: 'paragraph', id: 'price-p2', claim: 'fact', cites: ['s5'], text: 'The reference range for comparable federal custodial labor is $27–$36 per hour, before wage-determination adjustments.' },
-        { type: 'paragraph', id: 'price-p3', claim: 'assumption', cites: ['s4', 's5'], text: 'Your custodial rate sits in the upper third of the reference range, which is competitive for best-value awards but may lose lowest-price, technically acceptable competitions.' },
+        { type: 'paragraph', id: 'price-p3', claim: 'fact', cites: ['s4', 's5'], text: 'Your custodial rate sits in the upper third of the reference range.' },
+        { type: 'paragraph', id: 'price-p4', claim: 'assumption', origin: 'This is Mindy\'s reading of your rate position, not an evaluation result.', text: 'That position is likely to be competitive for best-value awards but may lose lowest-price, technically acceptable competitions.' },
         {
           type: 'table', id: 'price-t1', caption: 'Rate comparison (illustrative)', claim: 'fact', cites: ['s4', 's5'],
           columns: [{ key: 'role', label: 'Labor category' }, { key: 'yours', label: 'Your rate', align: 'right' }, { key: 'low', label: 'Reference low', align: 'right' }, { key: 'high', label: 'Reference high', align: 'right' }],
