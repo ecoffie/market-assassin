@@ -10895,6 +10895,9 @@ const ASK_MINDY_CSS =
   + '.amk-att .sp{flex:none;border:1px solid #bcd3fb;background:#fff;color:#1d4ed8;cursor:pointer;font:600 11.5px/1.2 Inter,system-ui,sans-serif;border-radius:7px;padding:4px 8px;text-align:center}.amk-att .sp:hover{background:#e0ebff}.amk-att .sp:disabled{opacity:.6;cursor:default}'
   + '.amk-ws{display:block;margin-top:8px;text-align:right;font:600 11.5px Inter,system-ui,sans-serif;color:#2563eb;text-decoration:none}.amk-ws:hover{text-decoration:underline}'
   + '.amk-in{display:flex;gap:8px;align-items:flex-end}'
+  + '.amk-attach{margin-bottom:6px}.amk-attach-bar{display:flex;align-items:center;gap:8px}.amk-clip{flex:none;border:1px solid #dde3ec;background:#fff;color:#334155;cursor:pointer;font:600 11.5px Inter,system-ui,sans-serif;border-radius:7px;padding:4px 9px}.amk-clip:disabled{opacity:.5;cursor:default}'
+  + '.amk-priv{font:500 11px Inter,system-ui,sans-serif;color:#6b7787}.amk-docs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px}.amk-doc{display:inline-flex;align-items:center;gap:6px;max-width:100%;border:1px solid #dde3ec;border-radius:7px;padding:2px 4px 2px 8px;font:500 11.5px Inter,system-ui,sans-serif;color:#334155}'
+  + '.amk-doc button{border:0;background:none;color:#6b7787;cursor:pointer;font:600 12px Inter;padding:0 4px}.amk-attach-err{font:500 11.5px Inter,system-ui,sans-serif;color:#b91c1c}.amk-attach-err:empty{display:none}'
   + '.amk-in textarea{flex:1;resize:none;border:1px solid #dde3ec;border-radius:12px;padding:10px 12px;font:400 13.5px Inter;color:#111c26;max-height:120px;outline:none}'
   + '.amk-in textarea:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}'
   + '.amk-send{flex:none;width:40px;height:40px;border:0;border-radius:11px;background:#2563eb;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}'
@@ -10936,6 +10939,11 @@ const ASK_MINDY_JS = `<script>(function(){
   }
   function tok(){ try{return localStorage.getItem('mi_beta_auth_token');}catch(e){return null;} }
   function email(){ try{ var t=tok()||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){ return ''; } }
+  // Coach Mode for the drawer, exactly as authedFetch / startProposal (#2101): a coach working in a client's
+  // workspace sends that workspace, so the server acts in the CLIENT's scope (and refuses, never falls back,
+  // when it cannot confirm it). Withheld only when the stamp names another user.
+  function withWorkspace(hd){ try{ var ws=localStorage.getItem('mindy_active_workspace'), wso=localStorage.getItem('mindy_active_workspace_owner'), em=String(email()).toLowerCase().trim();
+    if(ws&&!(wso&&wso!==em)) hd['x-active-workspace']=ws; }catch(e){} return hd; }
   var sessionId='', history=[], busy=false;
   // ── CARD CHAT (MAP_CARD_CHAT_ENABLED): ask about ONE opportunity. The browser sends only the notice id;
   // the server loads the record and documents. Each opportunity keeps its own thread in this browser, and
@@ -11030,7 +11038,7 @@ const ASK_MINDY_JS = `<script>(function(){
   function cardKey(id){ return 'mindy_card_chat:'+id; }
   function loadCard(id){ try{ var j=JSON.parse(localStorage.getItem(cardKey(id))||'null'); if(j&&typeof j==='object'){ var pd=(j.pending&&typeof j.pending.turnId==='string'&&typeof j.pending.q==='string')?{turnId:j.pending.turnId,q:j.pending.q}:null; return {sessionId:String(j.sessionId||''),history:Array.isArray(j.history)?j.history.slice(-8):[],pending:pd}; } }catch(e){} return {sessionId:'',history:[],pending:null}; }
   function saveCard(){ if(!oppCtx)return; try{ localStorage.setItem(cardKey(oppCtx.id),JSON.stringify({sessionId:sessionId,history:history.slice(-8),pending:pendingTurn})); }catch(e){} }
-  function leaveCard(){ if(!oppCtx)return; saveCard(); oppCtx=null; pendingTurn=null; sessionId=viewState.sessionId; history=viewState.history; drawer.classList.remove('amk-card'); if(input)input.placeholder=viewPlaceholder; body.innerHTML=''; }
+  function leaveCard(){ if(!oppCtx)return; saveCard(); oppCtx=null; pendingTurn=null; sessionId=viewState.sessionId; history=viewState.history; if(amkDocs) amkDocs.reload(); drawer.classList.remove('amk-card'); if(input)input.placeholder=viewPlaceholder; body.innerHTML=''; }
   // ── The GROUNDED view context (approved vision: "Context: N open opps in view \\u00b7 FL \\u00b7 NAICS 236220").
   // Read fresh from the map's bridge every time the drawer opens — never a stale snapshot, never fabricated.
   function viewCtx(){ try{ if(typeof window.__mindyViewCtx==='function') return window.__mindyViewCtx()||{}; }catch(e){} return {}; }
@@ -11088,7 +11096,7 @@ const ASK_MINDY_JS = `<script>(function(){
     if(!/^[0-9a-f]{32}$/.test(id)||busy) return;
     if(!oppCtx) viewState={sessionId:sessionId,history:history.slice()}; else saveCard();
     oppCtx={id:id,title:String(op.title||''),deadline:String(op.deadline||'')};
-    var st=loadCard(id); sessionId=st.sessionId; history=st.history; pendingTurn=st.pending;
+    var st=loadCard(id); sessionId=st.sessionId; history=st.history; pendingTurn=st.pending; if(amkDocs) amkDocs.reload();
     drawer.classList.add('amk-card'); if(input)input.placeholder='Ask about this opportunity\\u2026'; body.innerHTML=''; renderAttached();
     if(history.length){ history.forEach(function(m){ addMsg(m.role==='user'?'user':'assistant', m.content); }); }
     try{ if(window.__track) window.__track('tool_use','card_chat_open',{has_history:history.length>0,pending:!!pendingTurn}); }catch(e){}
@@ -11139,6 +11147,49 @@ const ASK_MINDY_JS = `<script>(function(){
   if(input){ input.addEventListener('input',function(){ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,120)+'px'; });
     input.addEventListener('keydown',function(e){ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); ask(input.value); } }); }
   if(send)send.onclick=function(){ ask(input?input.value:''); };
+  // Attach a document to THIS conversation, saved privately to the Vault (POST /api/app/chat/documents).
+  // Shown only when the SERVER says this signed-in account may upload (/api/app/vault/doc-access —
+  // global flag or the controlled-test allowlist); never a page-baked flag. Free. A refused file
+  // (CUI/classified/too large) shows the server reason.
+  // Uploads carry the active workspace exactly like the drawer's chat requests (withWorkspace), so a coach
+  // working as a client files into the CLIENT's Vault and the drawer's answers read the same scope. An
+  // unconfirmed workspace is refused by the server (409), never filed in the coach's own Vault.
+  var amkDocs=null;
+  function buildAttach(){
+    var foot=drawer.querySelector('.amk-foot'); if(!foot)return;
+    var row=document.createElement('div'); row.className='amk-attach'; row.setAttribute('data-testid','amk-attach');
+    row.innerHTML='<div class="amk-docs"></div><div class="amk-attach-bar"><input type="file" accept=".pdf,.docx,.txt" hidden><button type="button" class="amk-clip">Attach</button><span class="amk-priv">Saved privately to your Vault</span></div><div class="amk-attach-err" role="alert"></div>';
+    foot.insertBefore(row, foot.firstChild);
+    var fileIn=row.querySelector('input'), clip=row.querySelector('.amk-clip'), docsEl=row.querySelector('.amk-docs'), errEl=row.querySelector('.amk-attach-err');
+    function uuid(){ try{ if(window.crypto&&crypto.randomUUID) return crypto.randomUUID(); }catch(e){} var h='0123456789abcdef',x=''; for(var i=0;i<32;i++){ x+=h.charAt(Math.floor(Math.random()*16)); } return x.slice(0,8)+'-'+x.slice(8,12)+'-4'+x.slice(13,16)+'-8'+x.slice(17,20)+'-'+x.slice(20,32); }
+    function hdrs(){ return withWorkspace({'x-mi-auth-token':tok()||'','x-user-email':email()}); }
+    function url(extra){ return '/api/app/chat/documents?email='+encodeURIComponent(email())+'&session_id='+encodeURIComponent(sessionId)+(extra||''); }
+    function chip(d){ var c=document.createElement('span'); c.className='amk-doc'; c.setAttribute('data-testid','amk-doc'); var n=document.createElement('span'); n.textContent=d.filename; c.appendChild(n);
+      var x=document.createElement('button'); x.type='button'; x.setAttribute('aria-label','Remove '+d.filename); x.textContent='×'; x.onclick=function(){ removeDoc(d.id,c); }; c.appendChild(x); docsEl.appendChild(c); }
+    function removeDoc(id,el){ errEl.textContent=''; fetch(url('&id='+encodeURIComponent(id)),{method:'DELETE',headers:hdrs()}).then(function(r){ if(r.ok){ if(el.parentNode) el.parentNode.removeChild(el); } else errEl.textContent='Could not remove that file. Try again.'; },function(){ errEl.textContent='Could not remove that file. Try again.'; }); }
+    function reload(){ docsEl.innerHTML=''; errEl.textContent=''; if(!sessionId||!tok()||!email())return; var sid=sessionId;
+      fetch(url(),{headers:hdrs()}).then(function(r){ return r.ok?r.json():null; },function(){ return null; }).then(function(d){ if(sid!==sessionId||!d||!d.documents)return; for(var i=0;i<d.documents.length;i++) chip(d.documents[i]); }); }
+    clip.onclick=function(){ if(!tok()||!email()){ if(window.openSignInModal) window.openSignInModal('attach a document',function(){}); return; } fileIn.click(); };
+    fileIn.onchange=function(){ var f=fileIn.files&&fileIn.files[0]; if(!f)return; errEl.textContent='';
+      if(f.size>4*1024*1024){ errEl.textContent='Files can be up to 4 MB here. Larger files can be added from the Vault.'; fileIn.value=''; return; }
+      if(!sessionId) sessionId=uuid();
+      var fd=new FormData(); fd.append('file',f); clip.disabled=true; clip.textContent='Attaching…';
+      fetch(url(),{method:'POST',headers:hdrs(),body:fd})
+        .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; },function(){ return {ok:false,d:{}}; }); })
+        .then(function(res){ if(res.ok&&res.d&&res.d.success&&res.d.document) chip(res.d.document); else errEl.textContent=(res.d&&(res.d.message||res.d.error))||'The file could not be attached. Nothing was saved.'; },
+              function(){ errEl.textContent='The file could not be attached. Nothing was saved. Try again.'; })
+        .then(function(){ clip.disabled=false; clip.textContent='Attach'; fileIn.value=''; });
+    };
+    amkDocs={reload:reload};
+  }
+  // The capability check must never break the drawer: any error (thrown or rejected) just shows no row.
+  if(drawer && tok() && email()){
+    try{
+      fetch('/api/app/vault/doc-access?email='+encodeURIComponent(email()),{headers:{'x-mi-auth-token':tok()||'','x-user-email':email()}})
+        .then(function(r){ return r.ok?r.json():null; },function(){ return null; })
+        .then(function(d){ if(d && d.uploads===true && !amkDocs) buildAttach(); },function(){});
+    }catch(e){}
+  }
   function addMsg(role, text){ var d=document.createElement('div'); d.className='amk-msg '+(role==='user'?'u':'a'); d.innerHTML=(role==='user')?esc(text):('<div class="bub"></div>'); if(role!=='user'){ var bb=d.querySelector('.bub'); if(text) paint(bb,text); else bb.textContent=''; } body.appendChild(d); body.scrollTop=body.scrollHeight; return d; }
   function upsell(){ body.innerHTML='<div class="amk-up"><h4>\\ud83d\\udd12 Ask Mindy is a Pro feature</h4><p>Get grounded, real-data answers on set-asides, agencies, opportunities, teaming and proposals \\u2014 with sources.</p><a href="/market-intelligence">Upgrade to Pro</a></div>'; }
   // opts (card chat only): turnId = reuse this question's id (retry/reopen); replay = only fetch the saved answer.
@@ -11179,7 +11230,7 @@ const ASK_MINDY_JS = `<script>(function(){
     // comes back free, and one it did not finish is answered (and charged) once.
     function offerRetry(msg){ bub.textContent=msg; var w=document.createElement('div'); w.className='amk-act'; var b=document.createElement('button'); b.textContent='Get the answer';
       b.onclick=function(){ if(busy||oppCtx!==cardAtSend)return; dropBubbles(); ask(q,{turnId:turnId}); }; w.appendChild(b); aEl.appendChild(w); }
-    fetch('/api/app/chat',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},body:JSON.stringify(payload)})
+    fetch('/api/app/chat',{method:'POST',headers:withWorkspace({'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}),body:JSON.stringify(payload)})
       .then(function(r){
         if(r.status===403){ if(turnId){ pendingTurn=null; saveCard(); } upsell(); busy=false; if(send)send.disabled=false; return null; }
         if(r.status===402){ if(turnId){ pendingTurn=null; saveCard(); } r.json().then(function(d){ creditsWall(bub,d||{}); },function(){ creditsWall(bub,{}); }); busy=false; if(send)send.disabled=false; return null; }

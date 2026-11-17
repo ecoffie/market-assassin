@@ -69,11 +69,4 @@ export const vaultDocFlags = {
   get generatedFiles(): boolean {
     return flagMode(FEATURE_ENV.generate) === 'on';
   },
-  /**
-   * Vault Documents view grouped Company / Reference / Generated. Read in the
-   * browser, so it must be a LITERAL process.env access (Next inlines only those).
-   */
-  get groupedView(): boolean {
-    return (process.env.NEXT_PUBLIC_VAULT_GROUPED_DOCUMENTS || '').trim().toLowerCase() === 'true';
-  },
 };

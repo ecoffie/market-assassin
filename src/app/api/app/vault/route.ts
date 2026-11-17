@@ -41,7 +41,8 @@ export async function GET(request: NextRequest) {
     supabase.from('user_past_performance').select('*').eq('user_email', userEmail).is('archived_at', null).order('updated_at', { ascending: false }),
     supabase.from('user_capabilities_library').select('*').eq('user_email', userEmail).is('archived_at', null).order('updated_at', { ascending: false }),
     supabase.from('user_team_members').select('*').eq('user_email', userEmail).is('archived_at', null).order('is_key_personnel', { ascending: false }),
-    supabase.from('user_boilerplate_docs').select('id,doc_type,original_filename,mime_type,size_bytes,page_count,parse_status,created_at').eq('user_email', userEmail).is('archived_at', null).order('created_at', { ascending: false }),
+    // doc_class/version/parent_id come from migration 20261117_vault_doc_class.sql (applied to production).
+    supabase.from('user_boilerplate_docs').select('id,doc_type,original_filename,mime_type,size_bytes,page_count,parse_status,created_at,doc_class,version,parent_id').eq('user_email', userEmail).is('archived_at', null).order('created_at', { ascending: false }),
   ]);
 
   return NextResponse.json({
