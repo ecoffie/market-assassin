@@ -636,7 +636,7 @@ export async function POST(request: NextRequest) {
         // nothing. Never fed into the stated-filters guard (conversationText stays the customer's words).
         let documentContext: DocumentBlock | null = null;
         let documentsNotice: string | null = null;
-        if (isVaultChatDocumentsEnabled() && profileEmail && body.sessionId === sessionId) {
+        if (isVaultChatDocumentsEnabled(auth.email) && profileEmail && body.sessionId === sessionId) {
           const loaded = await loadChatDocumentTexts(getSupabase(), { sessionId, ownerEmail: profileEmail });
           if (loaded.ok) documentContext = buildDocumentContext(loaded.value, customerWords);
           else documentsNotice = `documents:${loaded.reason}`;
@@ -790,7 +790,7 @@ export async function POST(request: NextRequest) {
           const tier0Runtime = makeTier0Tools(getSupabase(), actingScope);
           const turnSessionId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId) ? sessionId : null;
           // find_my_documents (Vault documents, metadata then excerpts) — behind VAULT_ASK_MINDY_UPLOADS.
-          const myDocs = isVaultChatDocumentsEnabled() ? makeMyDocumentsTool(getSupabase(), actingScope, { chatSessionId: body.sessionId === sessionId ? turnSessionId : null }) : null;
+          const myDocs = isVaultChatDocumentsEnabled(auth.email) ? makeMyDocumentsTool(getSupabase(), actingScope, { chatSessionId: body.sessionId === sessionId ? turnSessionId : null }) : null;
           const privateDefs = myDocs ? [...TIER0_TOOL_DEFS, MY_DOCUMENTS_TOOL_DEF] : TIER0_TOOL_DEFS;
           const privateNames = myDocs ? new Set([...TIER0_TOOL_NAMES, FIND_MY_DOCUMENTS]) : TIER0_TOOL_NAMES;
           const executor = createChatToolExecutor({
