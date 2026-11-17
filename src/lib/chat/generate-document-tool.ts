@@ -183,6 +183,22 @@ export function markingText(m: DocModel): string {
 
 const baseName = (f: string) => f.replace(/\.(pdf|docx)$/i, '');
 
+/**
+ * Do the CUSTOMER's own words ask for a document file? Only then does the planner see uploaded text (and
+ * the longer latest answer). Uploaded text in the planner is a prompt-injection surface, so it is given
+ * only on the turns that need it — and on those turns create_document is the only write tool.
+ */
+const DOC_VERB = /\b(?:create|make|write\s+up|export|download|save|generate|produce|draft|build|turn\s+(?:this|that|it)\s+into|put\s+(?:this|that|it)\s+(?:in|into)|give\s+me)\b/i;
+const DOC_NOUN = /\b(?:document|doc|docx|report|pdf|word(?:\s+(?:doc|file|document))?|file|capability\s+statement|cap\s+statement|brief|one[-\s]?pager|deliverable|white\s*paper)\b/i;
+export function isDocumentCreationRequest(customerWords: string): boolean {
+  const t = (customerWords || '').slice(0, 2000);
+  const verb = DOC_VERB.exec(t);
+  if (!verb) return false;
+  // The document word must come after the verb, within the same sentence.
+  const rest = t.slice(verb.index, verb.index + 160).split(/[.?!\n]/)[0];
+  return DOC_NOUN.test(rest);
+}
+
 /** Labeled units in a model (a bullet item counts as one), for diagnostics. */
 function countUnits(m: DocModel): number {
   let n = 0;

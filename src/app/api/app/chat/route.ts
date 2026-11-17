@@ -39,7 +39,7 @@ import { loadBidderProfile, formatProfileForPrompt } from '@/lib/proposal/loader
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
 import { makeMyDocumentsTool, MY_DOCUMENTS_TOOL_DEF, FIND_MY_DOCUMENTS } from '@/lib/chat/my-documents-tool';
-import { makeGenerateDocumentTool, CREATE_DOCUMENT_TOOL_DEF, CREATE_DOCUMENT } from '@/lib/chat/generate-document-tool';
+import { makeGenerateDocumentTool, CREATE_DOCUMENT_TOOL_DEF, CREATE_DOCUMENT, isDocumentCreationRequest } from '@/lib/chat/generate-document-tool';
 import { vaultDocEnabledFor } from '@/lib/vault/flags';
 // Tools run ONLY through the chat tool executor (policy check at offer AND execution,
 // preflight, per-tool error capture, execution log). Never import runMcpTool here.
@@ -51,7 +51,7 @@ import { fitMessages, inputBudget, type MsgKind } from '@/lib/chat/token-budget'
 import { stagingModelConfig, STAGING_CONFIG_HEADER } from '@/lib/chat/staging-model-config';
 import { customerErrorMessage } from '@/lib/chat/customer-errors';
 import { boundToolResult, perResultBudget } from '@/lib/chat/bound-tool-result';
-import { filterToolsForTurn, enforceFindArgs, SAM_ONLY_TOOL } from '@/lib/chat/tool-selection';
+import { filterToolsForTurn, enforceFindArgs, SAM_ONLY_TOOL, restrictWritesWhenDocumentText } from '@/lib/chat/tool-selection';
 import { CURRENT_FIND_CHAT_CONTRACT } from '@/lib/mcp/potato-journey';
 import { findCompletionFooter, comingBackListLeadsWithNotCompeted, type FindResultWithItems } from '@/lib/chat/find-completeness';
 import { inferredCodeDisclosure } from '@/lib/chat/code-disclosure';
@@ -640,9 +640,11 @@ export async function POST(request: NextRequest) {
         // nothing. Never fed into the stated-filters guard (conversationText stays the customer's words).
         let documentContext: DocumentBlock | null = null;
         let documentsNotice: string | null = null;
-        // create_document (allowlisted callers only) builds the document in the PLANNER call, so that call
-        // must see the uploaded text and the latest answer; otherwise the company's own content is missing.
-        const plannerBuildsDocuments = vaultDocEnabledFor('generate', auth.email);
+        // create_document (allowlisted callers only) builds the document in the PLANNER call, so on a turn where
+        // the CUSTOMER asks for a document the planner must see the uploaded text and the latest answer;
+        // otherwise the company's own content is missing. Only on that turn (uploaded text in the planner is a
+        // prompt-injection surface), and on that turn create_document is the only write tool (see executor).
+        const plannerBuildsDocuments = vaultDocEnabledFor('generate', auth.email) && isDocumentCreationRequest(customerWords);
         let plannerDocumentText: string | null = null;
         if (isVaultChatDocumentsEnabled(auth.email) && profileEmail && body.sessionId === sessionId) {
           const loaded = await loadChatDocumentTexts(getSupabase(), { sessionId, ownerEmail: profileEmail });
@@ -832,9 +834,16 @@ export async function POST(request: NextRequest) {
           const toolOffer = filterToolsForTurn(executor.offeredToolDefs(), splitViewPreamble(message).rest, priorCustomerText ? splitViewPreamble(String(priorCustomerText)).rest : null);
           // Industry codes the CUSTOMER typed (a planner-chosen code is not passed to find_opportunities).
           const customerTypedCodes = interpretCapabilityNaics(splitViewPreamble(message).rest).typedCodes;
-          const ALL_TOOL_DEFS = toolOffer.defs;
           const notOfferedThisTurn = new Set(toolOffer.removed);
           for (const n of toolOffer.removed) turnTrace.notices.push(`tool_not_offered:${n}:${n === SAM_ONLY_TOOL ? 'current_find_uses_three_horizons' : 'open_opportunity_question'}`);
+          // Document text in the planner (a create_document turn): create_document is the only write tool. Removed
+          // tools join notOfferedThisTurn, so a planned call to one is refused before execution.
+          let ALL_TOOL_DEFS = toolOffer.defs;
+          if (plannerDocumentText) {
+            const restricted = restrictWritesWhenDocumentText(ALL_TOOL_DEFS, executor.policyFor);
+            ALL_TOOL_DEFS = restricted.defs;
+            for (const n of restricted.removed) { notOfferedThisTurn.add(n); turnTrace.notices.push(`tool_not_offered:${n}:document_text_in_planner`); }
+          }
           turnTrace.tools_offered = ALL_TOOL_DEFS.length;
 
           // OpenAI {type:'function',function:{name,description,parameters}} →

@@ -169,3 +169,31 @@ export function enforceFindArgs(
   if (!Number.isFinite(lim) || lim < FIND_ROWS_PER_HORIZON) { a.limit_per_horizon = FIND_ROWS_PER_HORIZON; changes.push('limit_per_horizon'); }
   return changes.length ? { args: JSON.stringify(a), changes } : { args: rawArgs, changes };
 }
+
+/** The one write tool allowed while document text is in the planner context. */
+export const DOCUMENT_TEXT_WRITE_TOOL = 'create_document';
+
+/**
+ * Prompt-injection guard (Agent 4 / Agent 5, 2026-11-17): on any turn where uploaded or third-party
+ * document text is in the PLANNER context, a planted "delete my schedules" or "add these contacts to the
+ * CRM" must never reach a real write. Keeps every tool whose chat policy is 'allowed_read', plus
+ * create_document; drops every other tool — schedule_market_search, update/delete_market_schedule,
+ * add_contacts_to_crm, generate_market_report, and any write added later (policy-driven, not a name list).
+ *
+ * The route adds `removed` to notOfferedThisTurn, so a planned call to a removed tool is refused BEFORE
+ * execution (an execution guard, not only an offer filter). One copy: #2138 (create_document turns) and
+ * the revise turn both call this.
+ */
+export function restrictWritesWhenDocumentText<T extends { function?: Record<string, unknown> }>(
+  defs: T[],
+  policyFor: (name: string) => { decision: string },
+): { defs: T[]; removed: string[] } {
+  const kept: T[] = [];
+  const removed: string[] = [];
+  for (const d of defs) {
+    const name = String(d.function?.name ?? '');
+    if (name === DOCUMENT_TEXT_WRITE_TOOL || policyFor(name).decision === 'allowed_read') kept.push(d);
+    else removed.push(name);
+  }
+  return { defs: kept, removed };
+}
