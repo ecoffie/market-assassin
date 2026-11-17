@@ -22,17 +22,16 @@ function token(email: string): string {
 }
 
 type Call = { url: string; method: string; file?: string; body?: Record<string, unknown> };
-function boot(opts: { flag: boolean; uploadReply?: { status: number; json: Record<string, unknown> }; store?: Record<string, string> }) {
+function boot(opts: { flag: boolean; signedIn?: boolean; accessFails?: boolean; uploadReply?: { status: number; json: Record<string, unknown> }; store?: Record<string, string> }) {
   const dom = new JSDOM(
     '<!doctype html><html><body><div id="amkOv"></div><aside id="amk" aria-hidden="true"><div id="amkCtx"></div><button id="amkX"></button>'
     + '<div id="amkBody"></div><div class="amk-foot"><div class="amk-in"><textarea id="amkIn"></textarea><button id="amkSend"></button></div></div></aside></body></html>',
     { url: 'https://getmindy.ai/opportunity-map', runScripts: 'outside-only' },
   );
   const w = dom.window as unknown as Record<string, unknown> & Window & { eval: (s: string) => unknown };
-  const store: Record<string, string> = { mi_beta_auth_token: token('pro@example.com'), ...(opts.store ?? {}) };
+  const store: Record<string, string> = { ...(opts.signedIn === false ? {} : { mi_beta_auth_token: token('pro@example.com') }), ...(opts.store ?? {}) };
   Object.defineProperty(w, 'localStorage', { value: { getItem: (k: string) => store[k] ?? null, setItem: (k: string, v: string) => { store[k] = v; }, removeItem: (k: string) => { delete store[k]; } } });
   w.TextDecoder = NodeTextDecoder as never;
-  w.__VAULT_ATTACH = opts.flag;
   w.__mindyViewCtx = () => ({ count: 3, scope: 'all' });
   const calls: Call[] = [];
   const pending: Promise<unknown>[] = [];
@@ -44,7 +43,10 @@ function boot(opts: { flag: boolean; uploadReply?: { status: number; json: Recor
     else if (typeof init?.body === 'string') call.body = JSON.parse(init.body);
     calls.push(call);
     let p: Promise<unknown>;
-    if (url.startsWith('/api/app/chat/documents')) {
+    if (url.startsWith('/api/app/vault/doc-access')) {
+      // The server capability check: the drawer's ONLY source of on/off for the attach row.
+      p = opts.accessFails ? Promise.reject(new Error('network')) : Promise.resolve({ ok: true, status: 200, json: async () => ({ success: true, uploads: opts.flag, generate: false }) });
+    } else if (url.startsWith('/api/app/chat/documents')) {
       if (method === 'POST') {
         const r = opts.uploadReply ?? { status: 201, json: { success: true, document: { id: 'd1', filename: 'sow.pdf' } } };
         p = Promise.resolve({ ok: r.status < 300, status: r.status, json: async () => r.json });
@@ -55,13 +57,14 @@ function boot(opts: { flag: boolean; uploadReply?: { status: number; json: Recor
       const text = ['{"type":"token","content":"ok"}', '{"type":"done"}'].map((e) => `data: ${e}\n\n`).join('');
       p = Promise.resolve({ ok: true, status: 200, body: new ReadableStream({ start(c) { c.enqueue(enc.encode(text)); c.close(); } }), json: async () => ({}) });
     }
-    pending.push(p);
+    pending.push(p.catch(() => undefined)); // settle() waits; a simulated failure must not reject the harness
     return p;
   }) as never;
   w.eval(drawerScript());
   const settle = async () => { for (let i = 0; i < 8; i++) { await Promise.all(pending); await new Promise((r) => setTimeout(r, 0)); } };
   const doc = w.document;
   async function attach(name: string, size = 10) {
+    await settle(); // the attach row exists only after the server capability check resolves
     const input = doc.querySelector('.amk-attach input[type=file]') as HTMLInputElement;
     const file = new w.File(['x'.repeat(size)], name, { type: 'application/pdf' });
     Object.defineProperty(input, 'files', { value: [file], configurable: true });
@@ -72,14 +75,32 @@ function boot(opts: { flag: boolean; uploadReply?: { status: number; json: Recor
 }
 
 describe('Map drawer attach', () => {
-  it('flag off → no attach row at all', () => {
-    const { doc } = boot({ flag: false });
+  it('server says no (flag off or not allowlisted) → no attach row at all', async () => {
+    const { doc, calls, settle } = boot({ flag: false });
+    await settle();
+    expect(calls.some((c) => c.url.startsWith('/api/app/vault/doc-access?email=pro%40example.com'))).toBe(true);
     expect(doc.querySelector('[data-testid="amk-attach"]')).toBeNull();
   });
 
-  it('flag on → says "Saved privately to your Vault"', () => {
-    const { doc } = boot({ flag: true });
+  it('server says yes → says "Saved privately to your Vault"', async () => {
+    const { doc, settle } = boot({ flag: true });
+    await settle();
     expect(doc.querySelector('[data-testid="amk-attach"]')?.textContent).toContain('Saved privately to your Vault');
+  });
+
+  it('nothing is baked into the page: no window flag turns the row on, and a failed check shows nothing', async () => {
+    expect(MAP).not.toContain('__VAULT_ATTACH');
+    expect(MAP).not.toContain('NEXT_PUBLIC_VAULT_ASK_MINDY_UPLOADS');
+    const failed = boot({ flag: true, accessFails: true });
+    await failed.settle();
+    expect(failed.doc.querySelector('[data-testid="amk-attach"]')).toBeNull();
+  });
+
+  it('signed out → no check and no row', async () => {
+    const { doc, calls, settle } = boot({ flag: true, signedIn: false });
+    await settle();
+    expect(calls.some((c) => c.url.startsWith('/api/app/vault/doc-access'))).toBe(false);
+    expect(doc.querySelector('[data-testid="amk-attach"]')).toBeNull();
   });
 
   it('new chat: mints a conversation id, uploads to it, and the next question uses the SAME id', async () => {

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { IdCard, Trophy, Wrench, User, FileText, BookOpen, FolderArchive, Zap, Check, PenLine, type LucideIcon } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
-import { vaultDocFlags } from '@/lib/vault/flags';
+import { useVaultCapabilities } from '../chat/useVaultCapabilities';
 import { authedFetch } from '../authHeaders';
 import { NaicsPicker } from '@/components/codes/NaicsPicker';
 import { NaicsAutocompleteInput } from '@/components/codes/NaicsAutocompleteInput';
@@ -1290,8 +1290,10 @@ function docClassOf(d: BoilerplateDoc): 'company' | 'reference' | 'generated' {
 }
 
 function DocumentsSection({ email, items, onChanged }: { email: string; items: BoilerplateDoc[]; onChanged: () => void }) {
-  // Grouped view (Company / Reference / Generated) + private download, behind a flag (default off).
-  const grouped = vaultDocFlags.groupedView;
+  // Grouped view (Company / Reference / Generated) + private download: shown only when the SERVER says
+  // this account may use the Vault document features (allowlist or global flag) — not a build flag.
+  const caps = useVaultCapabilities(email);
+  const grouped = caps.uploads || caps.generate;
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const downloadDoc = async (id: string) => {

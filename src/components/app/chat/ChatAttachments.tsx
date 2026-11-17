@@ -3,7 +3,7 @@
 /**
  * Attach documents to an Ask Mindy conversation. Each file is saved privately to the user's Vault
  * (POST /api/app/chat/documents → doc_class='reference'), and the conversation's documents ground
- * Mindy's answers. Behind NEXT_PUBLIC_VAULT_ASK_MINDY_UPLOADS (UI) + VAULT_ASK_MINDY_UPLOADS (server).
+ * Mindy's answers. Shown only when /api/app/vault/doc-access says so (VAULT_ASK_MINDY_UPLOADS: 'true' or 'allowlist'); the upload route re-checks.
  *
  * Free: attaching, listing and removing never use credits.
  * A refused file (classification/CUI marking, unreadable, too large) shows the server's reason and

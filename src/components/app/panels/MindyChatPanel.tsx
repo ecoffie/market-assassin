@@ -21,7 +21,7 @@ import { Menu, MessageCircle, BookOpen, Lock, FileText, X } from 'lucide-react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 import { ChatAttachments } from '../chat/ChatAttachments';
-import { vaultDocFlags } from '@/lib/vault/flags';
+import { useVaultCapabilities } from '../chat/useVaultCapabilities';
 import { UpgradeModal } from '../UpgradeModal';
 import { DEFAULT_STARTER_PROMPTS } from '@/lib/chat/starter-prompts';
 import { renderSafeMarkdown } from '@/lib/chat/safe-markdown';
@@ -121,6 +121,8 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
   // (covers stale tier props after a downgrade).
   const [showUpgrade, setShowUpgrade] = useState(false);
   const isFree = tier === 'free';
+  // Attach button: on only when the SERVER says this account may upload (global flag or allowlist).
+  const vaultCaps = useVaultCapabilities(email);
   const [sessionId, setSessionId] = useState<string | null>(null);
   // Attaching a file before the first question needs a conversation id: mint one here; the upload route
   // creates the conversation row only when the file is actually saved.
@@ -773,7 +775,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
               </button>
             </div>
           )}
-          {vaultDocFlags.askMindyAttachUi && email && !isFree && (
+          {vaultCaps.uploads && email && !isFree && (
             <ChatAttachments email={email} sessionId={sessionId} ensureSessionId={ensureSessionId} disabled={isStreaming} />
           )}
           <div className="relative">

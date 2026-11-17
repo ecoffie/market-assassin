@@ -69,18 +69,4 @@ export const vaultDocFlags = {
   get generatedFiles(): boolean {
     return flagMode(FEATURE_ENV.generate) === 'on';
   },
-  /**
-   * Client-side switch for the Ask Mindy attach button (literal NEXT_PUBLIC access so Next inlines it).
-   * The server route is independently gated by VAULT_ASK_MINDY_UPLOADS; both must be on.
-   */
-  get askMindyAttachUi(): boolean {
-    return (process.env.NEXT_PUBLIC_VAULT_ASK_MINDY_UPLOADS || '').trim().toLowerCase() === 'true';
-  },
-  /**
-   * Vault Documents view grouped Company / Reference / Generated. Read in the
-   * browser, so it must be a LITERAL process.env access (Next inlines only those).
-   */
-  get groupedView(): boolean {
-    return (process.env.NEXT_PUBLIC_VAULT_GROUPED_DOCUMENTS || '').trim().toLowerCase() === 'true';
-  },
 };

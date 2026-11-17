@@ -5,7 +5,6 @@
  * is rebuilt.
  */
 import { isCardChatEnabled } from '@/lib/chat/card-chat';
-import { vaultDocFlags } from '@/lib/vault/flags';
 import { SAFE_MARKDOWN_SCRIPT } from '@/lib/chat/safe-markdown';
 import { NextRequest, NextResponse } from 'next/server';
 import { PLAYERS_HEADER_TEXT_JS, PROVEN_PLAYERS_LABEL, PROVEN_PLAYERS_DESCRIPTION } from '@/lib/players/copy';
@@ -1661,9 +1660,6 @@ const DIBBS_FLAG_JS = '<script>window.__DIBBS_MAP_ENABLED=' + String(DIBBS_MAP_E
 // Ask Mindy on opportunity cards (src/lib/chat/card-chat.ts). Off unless MAP_CARD_CHAT_ENABLED=true; the chat
 // route enforces the same flag, so this only controls whether the invitation is shown.
 const CARD_CHAT_FLAG_JS = '<script>window.__CARD_CHAT_ENABLED=' + String(isCardChatEnabled()) + ';</script>';
-// Ask Mindy drawer "Attach" (saved privately to the Vault). Both switches must be on: the server route
-// (VAULT_ASK_MINDY_UPLOADS) and the UI (NEXT_PUBLIC_VAULT_ASK_MINDY_UPLOADS). Default off.
-const VAULT_ATTACH_FLAG_JS = '<script>window.__VAULT_ATTACH=' + String(vaultDocFlags.askMindyUploads && vaultDocFlags.askMindyAttachUi) + ';</script>';
 // What a signed-in Save search can watch (F1). Defined before VIEWPORT_JS, whose handler calls it.
 const WATCH_SCOPE_SCRIPT = '<script>' + WATCH_SCOPE_JS + '</script>';
 const VIEWPORT_JS = `<script>
@@ -11152,12 +11148,14 @@ const ASK_MINDY_JS = `<script>(function(){
     input.addEventListener('keydown',function(e){ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); ask(input.value); } }); }
   if(send)send.onclick=function(){ ask(input?input.value:''); };
   // Attach a document to THIS conversation, saved privately to the Vault (POST /api/app/chat/documents).
-  // Flag: window.__VAULT_ATTACH. Free. A refused file (CUI/classified/too large) shows the server reason.
+  // Shown only when the SERVER says this signed-in account may upload (/api/app/vault/doc-access —
+  // global flag or the controlled-test allowlist); never a page-baked flag. Free. A refused file
+  // (CUI/classified/too large) shows the server reason.
   // Uploads carry the active workspace exactly like the drawer's chat requests (withWorkspace), so a coach
   // working as a client files into the CLIENT's Vault and the drawer's answers read the same scope. An
   // unconfirmed workspace is refused by the server (409), never filed in the coach's own Vault.
   var amkDocs=null;
-  if(window.__VAULT_ATTACH && drawer){ (function(){
+  function buildAttach(){
     var foot=drawer.querySelector('.amk-foot'); if(!foot)return;
     var row=document.createElement('div'); row.className='amk-attach'; row.setAttribute('data-testid','amk-attach');
     row.innerHTML='<div class="amk-docs"></div><div class="amk-attach-bar"><input type="file" accept=".pdf,.docx,.txt" hidden><button type="button" class="amk-clip">Attach</button><span class="amk-priv">Saved privately to your Vault</span></div><div class="amk-attach-err" role="alert"></div>';
@@ -11183,7 +11181,12 @@ const ASK_MINDY_JS = `<script>(function(){
         .then(function(){ clip.disabled=false; clip.textContent='Attach'; fileIn.value=''; });
     };
     amkDocs={reload:reload};
-  })(); }
+  }
+  if(drawer && tok() && email()){
+    fetch('/api/app/vault/doc-access?email='+encodeURIComponent(email()),{headers:{'x-mi-auth-token':tok()||'','x-user-email':email()}})
+      .then(function(r){ return r.ok?r.json():null; },function(){ return null; })
+      .then(function(d){ if(d && d.uploads===true && !amkDocs) buildAttach(); });
+  }
   function addMsg(role, text){ var d=document.createElement('div'); d.className='amk-msg '+(role==='user'?'u':'a'); d.innerHTML=(role==='user')?esc(text):('<div class="bub"></div>'); if(role!=='user'){ var bb=d.querySelector('.bub'); if(text) paint(bb,text); else bb.textContent=''; } body.appendChild(d); body.scrollTop=body.scrollHeight; return d; }
   function upsell(){ body.innerHTML='<div class="amk-up"><h4>\\ud83d\\udd12 Ask Mindy is a Pro feature</h4><p>Get grounded, real-data answers on set-asides, agencies, opportunities, teaming and proposals \\u2014 with sources.</p><a href="/market-intelligence">Upgrade to Pro</a></div>'; }
   // opts (card chat only): turnId = reuse this question's id (retry/reopen); replay = only fetch the saved answer.
@@ -11667,7 +11670,7 @@ export async function GET(request: NextRequest) {
     // <div>, so anything after it gets parsed INTO that hidden .lgm-ov (display:none) and the
     // fixed FAB/drawer compute to 0×0. Leading the body keeps the mobile chrome a direct <body> child.
     // MARKET_FEEDBACK_JS precedes VIEWPORT_JS so window.__mf exists before the first fetch round reports to it.
-    const bodyInject = MOBILE_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + DIBBS_FLAG_JS + WATCH_SCOPE_SCRIPT + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + VAULT_ATTACH_FLAG_JS + CARD_CHAT_FLAG_JS + SAFE_MARKDOWN_SCRIPT + ASK_MINDY_JS + LOGIN_MODAL_JS + ACCOUNT_MENU_JS + ZHEAD_HEIGHT_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
+    const bodyInject = MOBILE_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + DIBBS_FLAG_JS + WATCH_SCOPE_SCRIPT + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + CARD_CHAT_FLAG_JS + SAFE_MARKDOWN_SCRIPT + ASK_MINDY_JS + LOGIN_MODAL_JS + ACCOUNT_MENU_JS + ZHEAD_HEIGHT_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Code→name for the State picker (50 states + DC). Already a shared constant — the Filters
