@@ -199,7 +199,7 @@ describe('charge once per question: the browser reuses a question\'s turn id', (
   };
   const pending = (t: ReturnType<typeof boot>) => JSON.parse(t.store['mindy_card_chat:' + NID] || '{}').pending ?? null;
 
-  it('every card question gets its own turn id; a completed answer clears it; map-view chat sends none', async () => {
+  it('every card question gets its own turn id; a completed answer clears it; map-view chat sends a fresh one', async () => {
     const t = boot();
     (t.w.__askAboutOpp as (o: unknown) => void)(OPP);
     await askCard(t, 'When is it due?');
@@ -211,7 +211,10 @@ describe('charge once per question: the browser reuses a question\'s turn id', (
     expect(pending(t)).toBeNull();
     (t.w.openAskMindy as () => void)();
     await askCard(t, 'Who buys here?');
-    expect(t.calls[2].turn_id).toBeUndefined();
+    // Answer billing: map-view chat now sends its own fresh turn id (never a card's), and no replay flag.
+    expect(String(t.calls[2].turn_id)).toMatch(UUID);
+    expect(t.calls[2].turn_id).not.toBe(t.calls[1].turn_id);
+    expect(t.calls[2].replay_only).toBeUndefined();
   });
 
   it('the connection drops (no done event): the question stays pending; "Get the answer" resends the SAME turn id', async () => {

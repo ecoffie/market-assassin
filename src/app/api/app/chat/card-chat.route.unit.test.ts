@@ -25,6 +25,10 @@ const state: {
   incumbent: unknown;
   /** sam_opportunities lookups by solicitation number / notice id (mentioned-notice.ts). */
   mentionLookups: unknown[];
+  /** When set, the first planner round calls one data tool and it returns this status. */
+  dataTool: 'success' | 'error' | null;
+  /** Name of that data tool (default search_sam_opportunities). */
+  dataToolName?: string;
 } = {} as never;
 
 // In-memory turn store with the SQL functions' semantics (claim / complete = save + debit once / fail).
@@ -78,7 +82,13 @@ vi.mock('@/lib/chat/card-chat-turns', async (orig) => ({
 vi.mock('@/lib/chat/chat-tool-executor', () => ({
   createChatToolExecutor: (opts: { allowedToolNames?: unknown }) => {
     state.allowedToolNames = opts.allowedToolNames ?? null;
-    return { offeredToolDefs: () => [], executeRound: async () => [], policyFor: () => ({ decision: 'allowed_read' }) };
+    return {
+      offeredToolDefs: () => [], policyFor: () => ({ decision: 'allowed_read' }),
+      executeRound: async (calls: Array<{ id: string; function: { name: string } }>) => calls.map((c) => ({
+        tool_call_id: c.id, content: JSON.stringify({ items: [{ title: 'Janitorial' }] }),
+        record: { tool: c.function.name, status: state.dataTool ?? 'success' },
+      })),
+    };
   },
 }));
 // The selected-notice incumbent lookup (src/lib/chat/selected-notice.ts) — never the network in tests.
@@ -147,7 +157,7 @@ beforeEach(() => {
       _meta: { grounded_notice: true, grounded_incumbent: false, degraded: false, notice_source: 'cache', incumbent_finding: 'candidate_not_confirmed' },
     },
     recordError: false, sessions: {}, answer: 'The response deadline is 2026-12-04 (SAM.gov notice W912PL26Q0042).', answerFails: false, finishReason: 'stop',
-    plannerMessages: [], answerMessages: [], inserts: [], allowedToolNames: null, mentionLookups: [],
+    plannerMessages: [], answerMessages: [], inserts: [], allowedToolNames: null, mentionLookups: [], dataTool: null, dataToolName: undefined,
   });
   turns.clear(); tokenSeq = 0;
   claimCardTurn.mockClear(); completeCardTurn.mockClear(); failCardTurn.mockClear();
@@ -162,6 +172,9 @@ beforeEach(() => {
       return new Response(sseBody(state.answer), { status: 200 });
     }
     state.plannerMessages.push(b.messages);
+    if (state.dataTool && state.plannerMessages.length === 1) {
+      return new Response(JSON.stringify({ choices: [{ message: { content: null, tool_calls: [{ id: 'call_1', type: 'function', function: { name: state.dataToolName ?? 'search_sam_opportunities', arguments: '{"query":"janitorial"}' } }] } }], usage: { prompt_tokens: 5, completion_tokens: 1 } }), { status: 200 });
+    }
     return new Response(JSON.stringify({ choices: [{ message: { content: 'no tools needed' } }], usage: { prompt_tokens: 5, completion_tokens: 1 } }), { status: 200 });
   }));
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -703,5 +716,133 @@ describe('C2: answer first, AbilityOne by category, OSBP/OSDBU fallback', () => 
   it('other work gets no AbilityOne caveat', async () => {
     await post({ message: 'Which agencies buy HVAC services in Texas?' });
     expect(system(state.answerMessages[0])).not.toContain('AbilityOne Program category');
+  });
+});
+
+describe('answer billing: 10 credits per successful intelligence answer (Eric decision 3, ASK_MINDY_ANSWER_BILLING)', () => {
+  const PLAIN_TURN = '0b0b0b0b-1111-4222-8333-555555555555';
+  const system = (msgs: Array<{ role: string; content: string }>) => msgs.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
+  beforeEach(() => { state.pro = true; vi.stubEnv('MAP_CARD_CHAT_ENABLED', ''); vi.stubEnv('ASK_MINDY_ANSWER_BILLING', 'true'); });
+
+  it('flag off: Pro main chat is not tracked or charged (unchanged)', async () => {
+    vi.stubEnv('ASK_MINDY_ANSWER_BILLING', '');
+    state.dataTool = 'success';
+    const { res } = await post({ turn_id: PLAIN_TURN });
+    expect(res.status).toBe(200);
+    expect(claimCardTurn).not.toHaveBeenCalled();
+    expect(completeCardTurn).not.toHaveBeenCalled();
+  });
+
+  it('Pro answer that read data → saved and charged 10 once, credits event sent', async () => {
+    state.dataTool = 'success';
+    const { events } = await post({ turn_id: PLAIN_TURN });
+    expect(completeCardTurn).toHaveBeenCalledTimes(1);
+    expect(completeCardTurn.mock.calls[0][0]).toMatchObject({ credits: 10 });
+    expect(state.balance).toBe(90);
+    expect(events.find((e) => e.type === 'credits')).toMatchObject({ charged: 10, balance: 90, credits_per_answer: 10 });
+    expect(claimCardTurn.mock.calls.at(-1)![0]).toMatchObject({ noticeId: '' });
+  });
+
+  it('a clarifying reply with no data read → saved for replay but free', async () => {
+    const { events } = await post({ turn_id: PLAIN_TURN, message: 'Which agency did you mean?' });
+    expect(completeCardTurn).toHaveBeenCalledTimes(1);
+    expect(completeCardTurn.mock.calls[0][0]).toMatchObject({ credits: 0 });
+    expect(state.balance).toBe(100);
+    expect(events.find((e) => e.type === 'credits')).toMatchObject({ charged: 0 });
+  });
+
+  it('a data tool that ERRORED does not make it an intelligence answer → free', async () => {
+    state.dataTool = 'error';
+    await post({ turn_id: PLAIN_TURN });
+    expect(charges()).toBe(0);
+  });
+
+  it('incomplete answer (length cut) → free, turn released', async () => {
+    state.dataTool = 'success'; state.finishReason = 'length';
+    await post({ turn_id: PLAIN_TURN });
+    expect(charges()).toBe(0);
+    expect(failCardTurn).toHaveBeenCalledTimes(1);
+  });
+
+  it('a retry of the same question replays free, no model call', async () => {
+    state.dataTool = 'success';
+    await post({ turn_id: PLAIN_TURN });
+    (fetch as unknown as { mockClear: () => void }).mockClear();
+    const { events } = await post({ turn_id: PLAIN_TURN });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(events.some((e) => e.type === 'replayed')).toBe(true);
+    expect(charges()).toBe(1);
+    expect(state.balance).toBe(90);
+  });
+
+  it('the map-view preamble is not part of the question key: a retry after the map moved still replays free', async () => {
+    state.dataTool = 'success';
+    await post({ turn_id: PLAIN_TURN, message: '[Current map view (Opportunities): Location: the map is filtered to FL.]\nWhat is due soon?' });
+    (fetch as unknown as { mockClear: () => void }).mockClear();
+    const { events } = await post({ turn_id: PLAIN_TURN, message: '[Current map view (Opportunities): Location: the map is filtered to TX.]\nWhat is due soon?' });
+    expect(events.some((e) => e.type === 'replayed')).toBe(true);
+    expect(charges()).toBe(1);
+  });
+
+  it('Pro with fewer than 10 credits → 402 credits_required (pro:true), no model call', async () => {
+    state.balance = 5;
+    const { res } = await post({ turn_id: PLAIN_TURN });
+    expect(res.status).toBe(402);
+    expect(await res.json()).toMatchObject({ error: 'credits_required', pro: true, balance: 5, credits_per_answer: 10 });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('a Pro question WITHOUT a turn id (stale tab) is answered UNBILLED, never refused', async () => {
+    state.dataTool = 'success';
+    const { res } = await post({});
+    expect(res.status).toBe(200);
+    expect(claimCardTurn).not.toHaveBeenCalled();
+    expect(charges()).toBe(0);
+    expect(state.balance).toBe(100);
+  });
+
+  it('a failed balance read is an outage (503 balance_unavailable), never "out of credits" (402)', async () => {
+    state.balanceError = true;
+    const { res } = await post({ turn_id: PLAIN_TURN });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ error: 'balance_unavailable' });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('a notice named on turn 1, a clarifying reply on turn 3 → 0 credits (carried-over notice is not "used data")', async () => {
+    state.answer = 'Which agency did you have in mind?';
+    const { events } = await post({ turn_id: PLAIN_TURN, message: 'ok, and what else?', history: [
+      { role: 'user', content: 'Tell me about solicitation W912PL26Q0042' }, { role: 'assistant', content: 'It is open.' },
+      { role: 'user', content: 'thanks' }, { role: 'assistant', content: 'You are welcome.' },
+    ] });
+    expect(system(state.answerMessages[0])).toContain('MENTIONED OPPORTUNITY');
+    expect(completeCardTurn.mock.calls[0][0]).toMatchObject({ credits: 0 });
+    expect(events.find((e) => e.type === 'credits')).toMatchObject({ charged: 0 });
+  });
+
+  it('a carried-over notice the answer DID use is an intelligence answer → charged 10', async () => {
+    state.answer = 'Draft to jane.buyer@usace.army.mil about W912PL26Q0042.';
+    await post({ turn_id: PLAIN_TURN, message: 'Email the contracting officer for me', history: [
+      { role: 'user', content: 'Tell me about solicitation W912PL26Q0042' }, { role: 'assistant', content: 'It is open.' },
+    ] });
+    expect(completeCardTurn.mock.calls[0][0]).toMatchObject({ credits: 10 });
+  });
+
+  it('an ATTACHED notice grounds the answer → charged 10 even without a tool call', async () => {
+    state.answer = 'Plenty of small businesses bid on work like this.';
+    await post({ turn_id: PLAIN_TURN, context: { kind: 'opportunity', notice_id: NID } });
+    expect(completeCardTurn.mock.calls[0][0]).toMatchObject({ credits: 10 });
+  });
+
+  it('a turn whose only successful tool is find_my_documents (select / reopen) is free', async () => {
+    state.dataTool = 'success'; state.dataToolName = 'find_my_documents';
+    await post({ turn_id: PLAIN_TURN });
+    expect(completeCardTurn.mock.calls[0][0]).toMatchObject({ credits: 0 });
+  });
+
+  it('non-Pro stays refused on main chat (entitlements unchanged)', async () => {
+    state.pro = false;
+    const { res } = await post({ turn_id: PLAIN_TURN });
+    expect(res.status).toBe(403);
   });
 });

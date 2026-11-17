@@ -11155,6 +11155,9 @@ const ASK_MINDY_JS = `<script>(function(){
     // A card question is recorded as pending (with its turn id) before it is sent.
     var turnId=null, polls=opts.polls||0;
     if(oppCtx){ turnId=opts.turnId||newTurnId(); pendingTurn={turnId:turnId,q:q}; saveCard(); }
+    // View-mode questions carry a turn id too (answer billing, Eric decision 3): the server charges each
+    // question at most once and ignores the id when billing is off. View mode keeps its existing retry UI.
+    var viewTurnId=oppCtx?null:newTurnId();
     addMsg('user', q);
     var aEl=addMsg('assistant',''); var bub=aEl.querySelector('.bub');
     bub.innerHTML='<span class="amk-typing"><i></i><i></i><i></i></span>';
@@ -11168,6 +11171,7 @@ const ASK_MINDY_JS = `<script>(function(){
     var attAtSend=oppCtx?null:attached;
     var sendMsg=oppCtx?q:(ctxPreamble()+q);
     var payload={email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8),display:'narrow_panel'};
+    if(viewTurnId)payload.turn_id=viewTurnId;
     if(attAtSend){ payload.context={kind:'opportunity',notice_id:attAtSend.id}; try{ if(window.__track) window.__track('tool_use','ask_mindy_with_notice',{}); }catch(e){} }
     if(oppCtx){ payload.context={kind:'opportunity',notice_id:oppCtx.id}; payload.turn_id=turnId; if(opts.replay)payload.replay_only=true;
       if(!opts.turnId){ try{ if(window.__track) window.__track('tool_use','card_chat_ask',{turn:Math.floor(history.length/2)+1}); }catch(e){} } }
@@ -11231,8 +11235,9 @@ const ASK_MINDY_JS = `<script>(function(){
   // Card chat out of credits: say what an answer costs and what they hold; Pro is the next step. No new grant.
   function creditsWall(bub,d){
     var per=(typeof d.credits_per_answer==='number')?d.credits_per_answer:null, bal=(typeof d.balance==='number')?d.balance:null;
-    bub.innerHTML='<b>You\\u2019re out of free credits for now.</b><br>'+(per?('Each answer about an opportunity uses '+per+' credits'+(bal!=null?' and you have '+bal:'')+'. '):'')
-      +'Mindy Pro includes Ask Mindy without per-answer credits, plus deeper research. <a href="/market-intelligence">See Pro</a>';
+    bub.innerHTML='<b>You\\u2019re out of '+(d.pro?'Ask Mindy':'free')+' credits for now.</b><br>'+(per?('Each answer '+(d.pro?'that pulls Mindy\\u2019s data':'about an opportunity')+' uses '+per+' credits'+(bal!=null?' and you have '+bal:'')+'. '):'')
+      +(d.pro?'Top up on the <a href="/mcp/account?section=billing">Credits page</a>, or wait for your monthly refill.'
+        :'Mindy Pro includes a monthly credit allowance for Ask Mindy, plus deeper research. <a href="/market-intelligence">See Pro</a>');
     try{ if(window.__track) window.__track('tool_use','card_chat_credits_wall',{balance:bal}); }catch(e){}
   }
   // Follow-up chips: ONLY under the latest answer, and DERIVED from that question + answer by the same
