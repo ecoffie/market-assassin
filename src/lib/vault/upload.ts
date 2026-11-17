@@ -25,6 +25,7 @@ import { resolveChatActingScope, type ChatActingScope } from '@/lib/chat/chat-ac
 import { extractPdf, extractDocx, extractTxt } from '@/lib/sam/pdf-extract';
 import { detectProhibitedMarkings, docxHeaderFooterText, markingRefusalMessage, type ProhibitedMarkingKind } from './marking-detect';
 import type { DocClass } from './doc-class';
+import { checkVaultLimit } from './rate-limits';
 
 export const VAULT_BUCKET = 'vault-assets';
 export const VAULT_MAX_BYTES = 20 * 1024 * 1024; // 20 MB — unchanged from the Vault route
@@ -86,6 +87,8 @@ export interface VaultUploadDeps {
   db: VaultDb;
   storage: VaultStorage;
   resolveScope?: (email: string, request: VaultUploadInput['request']) => Promise<ChatActingScope>;
+  /** Per-account upload limit (default: the shared KV limiter + per-instance backstop). */
+  limit?: typeof checkVaultLimit;
   now?: () => number;
 }
 
@@ -93,12 +96,13 @@ export type VaultUploadResult =
   | { ok: true; document: Record<string, unknown>; ownerEmail: string; workspace: 'own' | 'client' }
   | {
       ok: false;
-      status: 400 | 409 | 413 | 415 | 422 | 500;
+      status: 400 | 409 | 413 | 415 | 422 | 429 | 500;
       code:
-        | 'too_large' | 'unsupported_type' | 'empty_file' | 'workspace_unconfirmed'
+        | 'too_large' | 'unsupported_type' | 'empty_file' | 'workspace_unconfirmed' | 'rate_limited'
         | 'unreadable' | 'prohibited_marking' | 'storage_failed' | 'insert_failed';
       message: string;
       markingKind?: ProhibitedMarkingKind;
+      retryAfterSeconds?: number;
     };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -146,6 +150,12 @@ export async function saveVaultUpload(input: VaultUploadInput, deps: VaultUpload
       ok: false, status: 415, code: 'unsupported_type',
       message: 'Upload a PDF, Word (.docx) or text (.txt) file. Older .doc files and other formats cannot be read.',
     };
+  }
+
+  // 1b) Per-account limit, keyed on the verified caller (before any extraction work).
+  const lim = await (deps.limit ?? checkVaultLimit)('upload', input.callerEmail);
+  if (!lim.allowed) {
+    return { ok: false, status: 429, code: 'rate_limited', message: lim.message, retryAfterSeconds: lim.retryAfterSeconds };
   }
 
   // 2) Strict acting scope.

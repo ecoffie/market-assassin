@@ -6,6 +6,9 @@
  *   - an unmarked DoD RFP as the false-positive control.
  */
 import { describe, it, expect, vi } from 'vitest';
+vi.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: vi.fn(async (_k: string, limit: number) => ({ allowed: true, remaining: limit, limit, resetAt: Math.floor(Date.now() / 1000) + 3600 })),
+}));
 import { Document, Packer, Paragraph, TextRun, Header, Footer } from 'docx';
 import { extractDocx } from '@/lib/sam/pdf-extract';
 import { detectProhibitedMarkings, docxHeaderFooterText } from './marking-detect';
@@ -113,5 +116,25 @@ describe('pinned false positives (must pass)', () => {
   it('the same RFP WITH a repeated spelled-out banner is refused (control is sensitive)', () => {
     const marked = `CONTROLLED UNCLASSIFIED INFORMATION\n${DOD_RFP_SAMPLE}\nCONTROLLED UNCLASSIFIED INFORMATION`;
     expect(detectProhibitedMarkings(marked).kind).toBe('cui');
+  });
+});
+
+// Mirrors Agent 4's customer-outcome scorecard S0 (refusal fixtures), one test per class.
+describe('S0 refusal fixtures (scorecard 2026-11-17)', () => {
+  it('S0.1 DOCX: "CUI" only in the header, "CUI//SP-PRVCY" in the footer → refused', async () => {
+    const buf = await docxWith({ header: 'CUI', footer: 'CUI//SP-PRVCY', body: ['Performance Work Statement', 'The contractor shall provide custodial services.'] });
+    const v = detectProhibitedMarkings({ body: (await extractDocx(buf)).text, headerFooter: await docxHeaderFooterText(buf) });
+    expect(v).toMatchObject({ blocked: true, kind: 'cui' });
+  });
+  it('S0.2 PDF line "CUI Page 1 of 12 Statement of Work…" → refused', () => {
+    expect(detectProhibitedMarkings('CUI Page 1 of 12 Statement of Work for Grounds Maintenance')).toMatchObject({ blocked: true, kind: 'cui' });
+  });
+  it('S0.3 DoD RFP quoting DFARS 252.204-7012 + "Controlled by: the program office" → ACCEPTED', () => {
+    const rfp = 'Controlled by: the program office\nH.12 The Contractor shall comply with DFARS 252.204-7012, Safeguarding Covered Defense Information, and protect CUI per NIST SP 800-171.';
+    expect(detectProhibitedMarkings(rfp).blocked).toBe(false);
+  });
+  it('S0.4 "SECRET//NOFORN" banner and "(U)/(S)" portion marks → refused', () => {
+    expect(detectProhibitedMarkings('SECRET//NOFORN\nOverview').kind).toBe('classified');
+    expect(detectProhibitedMarkings('(U) Background.\n(S) Collection method.').kind).toBe('classified');
   });
 });

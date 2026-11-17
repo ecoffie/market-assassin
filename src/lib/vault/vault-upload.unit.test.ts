@@ -6,10 +6,15 @@ vi.mock('@/lib/sam/pdf-extract', () => ({
   extractTxt: vi.fn((b: Buffer) => ({ text: b.toString('utf-8') })),
 }));
 
+vi.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: vi.fn(async (_k: string, limit: number) => ({ allowed: true, remaining: limit, limit, resetAt: Math.floor(Date.now() / 1000) + 3600 })),
+}));
 import { detectProhibitedMarkings } from './marking-detect';
 import { effectiveDocClass, mayCommitToFacts } from './doc-class';
 import { saveVaultUpload, resolveVaultWriteOwner, safeStorageName, type VaultUploadInput } from './upload';
 import type { ChatActingScope } from '@/lib/chat/chat-acting-scope';
+import { checkVaultLimit, __resetVaultLocalLimits, VAULT_LIMITS } from './rate-limits';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 // ── marking detection ───────────────────────────────────────────────────────
 describe('detectProhibitedMarkings', () => {
@@ -246,5 +251,45 @@ describe('helpers', () => {
   });
   it('resolveVaultWriteOwner: no header → own', async () => {
     expect(await resolveVaultWriteOwner('o@x.com', headers(), own)).toEqual({ ownerEmail: 'o@x.com', workspace: 'own' });
+  });
+});
+
+describe('C15 rate limits', () => {
+  beforeEach(() => __resetVaultLocalLimits());
+
+  it('over the upload limit: 429, nothing extracted or stored, scope never resolved', async () => {
+    const s = stubs();
+    const resolveScope = vi.fn(own);
+    const limit = vi.fn(async () => ({ allowed: false as const, retryAfterSeconds: 120, message: 'slow down' }));
+    const r = await saveVaultUpload(input(), { db: s.db, storage: s.storage, resolveScope, limit });
+    expect(r).toMatchObject({ ok: false, status: 429, code: 'rate_limited', retryAfterSeconds: 120 });
+    expect(limit).toHaveBeenCalledWith('upload', 'owner@x.com');
+    expect(resolveScope).not.toHaveBeenCalled();
+    expect(s.calls.uploads).toHaveLength(0);
+    expect(s.calls.inserts).toHaveLength(0);
+  });
+
+  it('keys on the verified caller, per kind', async () => {
+    await checkVaultLimit('upload', 'Coach@Firm.com');
+    await checkVaultLimit('parse', 'coach@firm.com');
+    const keys = vi.mocked(checkRateLimit).mock.calls.slice(-2).map((c) => [c[0], c[1], c[2]]);
+    expect(keys).toEqual([
+      ['vaultupload:coach@firm.com', VAULT_LIMITS.upload.limit, 3600],
+      ['vaultparse:coach@firm.com', VAULT_LIMITS.parse.limit, 3600],
+    ]);
+  });
+
+  it('KV down (limiter allows) → per-instance backstop still caps uploads', async () => {
+    const results: boolean[] = [];
+    for (let i = 0; i < VAULT_LIMITS.upload.limit + 1; i++) results.push((await checkVaultLimit('upload', 'a@x.com')).allowed);
+    expect(results.slice(0, VAULT_LIMITS.upload.limit).every(Boolean)).toBe(true);
+    expect(results[VAULT_LIMITS.upload.limit]).toBe(false);
+  });
+
+  it('KV says over the limit → refused with a retry time', async () => {
+    vi.mocked(checkRateLimit).mockResolvedValueOnce({ allowed: false, remaining: 0, limit: 20, resetAt: Math.floor(Date.now() / 1000) + 90 });
+    const r = await checkVaultLimit('parse', 'b@x.com');
+    expect(r.allowed).toBe(false);
+    if (!r.allowed) expect(r.retryAfterSeconds).toBeGreaterThan(0);
   });
 });

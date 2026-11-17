@@ -60,7 +60,8 @@ export async function POST(request: NextRequest) {
     { db: supabase, storage: supabase.storage },
   );
   if (!result.ok) {
-    return NextResponse.json({ success: false, error: result.message, code: result.code }, { status: result.status });
+    const headers = result.retryAfterSeconds ? { 'Retry-After': String(result.retryAfterSeconds) } : undefined;
+    return NextResponse.json({ success: false, error: result.message, code: result.code }, { status: result.status, headers });
   }
   return NextResponse.json({ success: true, document: result.document });
 }
