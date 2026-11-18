@@ -1,5 +1,5 @@
 {
   "allowed": [
-    "src/lib/gov-contacts/sblo-lookup.ts:192 :: const { rows } = await searchRecipients({ search: companyName, liveBq: true, sor"
+    "src/lib/gov-contacts/sblo-lookup.ts:202 :: const { rows } = await searchRecipients({ search: companyName, liveBq: true, sor"
   ]
 }

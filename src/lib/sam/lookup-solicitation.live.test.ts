@@ -5,6 +5,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { parse as parseEnv } from 'dotenv';
 import { lookupSolicitation } from '@/lib/sam/lookup-solicitation';
 import { firstTurnToolFor } from '@/lib/sam/solicitation-intent';
 
@@ -12,14 +13,15 @@ function loadLocalEnv() {
   const candidates = [
     resolve(process.cwd(), '.env.local'),
     resolve(process.cwd(), '../../../.env.local'),
-    '/Users/ericcoffie/Market Assasin/market-assassin/.env.local',
   ];
   for (const p of candidates) {
     if (!existsSync(p)) continue;
-    for (const line of readFileSync(p, 'utf8').split('\n')) {
-      const m = line.match(/^(NEXT_PUBLIC_SUPABASE_URL|SUPABASE_SERVICE_ROLE_KEY)=(.*)$/);
-      if (!m || process.env[m[1]]) continue;
-      process.env[m[1]] = m[2].replace(/^["']|["']$/g, '').trim();
+    // dotenv, not a hand-rolled regex: `vercel env pull` writes these values quoted with an escaped
+    // trailing "\n". The old parser kept the literal backslash-n, so every DB-backed case failed
+    // with "Invalid API key" in every pre-push gate run (2026-11-17), while the app (dotenv) worked.
+    const parsed = parseEnv(readFileSync(p, 'utf8'));
+    for (const k of ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'] as const) {
+      if (!process.env[k] && parsed[k]) process.env[k] = parsed[k].trim();
     }
   }
 }

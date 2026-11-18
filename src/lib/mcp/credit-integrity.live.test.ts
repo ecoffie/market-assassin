@@ -13,6 +13,7 @@
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
+import { parse as parseEnv } from 'dotenv';
 import { resolve } from 'node:path';
 
 for (const p of [
@@ -21,10 +22,10 @@ for (const p of [
   '/Users/ericcoffie/Market Assasin/market-assassin/.env.local',
 ]) {
   if (!existsSync(p)) continue;
-  for (const line of readFileSync(p, 'utf8').split('\n')) {
-    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
-    if (!m || process.env[m[1]]) continue;
-    process.env[m[1]] = m[2].replace(/^["']|["']$/g, '').trim();
+  // dotenv, not a regex: quoted values with an escaped trailing "\n" (vercel env pull) must decode.
+  for (const [k, v] of Object.entries(parseEnv(readFileSync(p, 'utf8')))) {
+    if (process.env[k]) continue;
+    process.env[k] = v.trim();
   }
   break;
 }

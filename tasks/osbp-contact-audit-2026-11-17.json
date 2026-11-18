@@ -1,0 +1,3680 @@
+{
+ "audit": "OSBP / small-business office contact audit",
+ "checked_at": "2026-11-17",
+ "method": {
+  "civilian": "WebFetch of the agency's own official pages only (no third-party sources, no user-agent spoofing)",
+  "military": "ordinary authorized Chrome session; same-origin page reads only; 'Access Denied'/403 recorded as unreachable, never bypassed",
+  "withhold_rule": "withheld only when an official small-business page was read in full and the address is absent; partial loads, 403s, obfuscated addresses, unreadable PDFs and homepage-only checks are inconclusive (kept, unverified)"
+ },
+ "civilian_raw": [
+  {
+   "key": "CBP",
+   "email_stored": "cbp-smallbusiness@cbp.dhs.gov",
+   "email_status": "different_published",
+   "email_published": "CBP-IPOP@cbp.dhs.gov",
+   "phone_stored": "(202) 344-1550",
+   "phone_status": "different_published",
+   "phone_published": "(202) 553-6456",
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Customs and Border Protection",
+   "source_url": "https://www.dhs.gov/osdbu/small-business-specialists",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.cbp.gov/trade/acquisition-gateway (404)"
+   ],
+   "notes": "DHS SB Specialists page is in DHS content archive (labelled possibly outdated) but shows Last Updated 10/01/2026. DHS OSDBU Executive Director per https://www.dhs.gov/osdbu: Dina Thompson. SB Specialists: David Harrod (202) 553-6456 and Ivette Jorge (202) 556-6545, both CBP-IPOP@cbp.dhs.gov."
+  },
+  {
+   "key": "ICE",
+   "email_stored": "ice-smallbusiness@ice.dhs.gov",
+   "email_status": "different_published",
+   "email_published": "Samuel.L.Thompson@ice.dhs.gov",
+   "phone_stored": "(202) 732-2600",
+   "phone_status": "different_published",
+   "phone_published": "(202) 329-0703",
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Immigration and Customs Enforcement",
+   "source_url": "https://www.dhs.gov/osdbu/small-business-specialists",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.ice.gov/about-ice/management-administration/office-acquisition-management (404)"
+   ],
+   "notes": "DHS SB Specialists page is in DHS content archive (labelled possibly outdated) but shows Last Updated 10/01/2026. DHS OSDBU Executive Director per https://www.dhs.gov/osdbu: Dina Thompson. Only a personal address is published: Samuel Thompson, Acting Small Business Specialist. No ICE shared SB mailbox shown."
+  },
+  {
+   "key": "TSA",
+   "email_stored": "tsa-smallbusiness@tsa.dhs.gov",
+   "email_status": "different_published",
+   "email_published": "TSASmallBiz@tsa.dhs.gov",
+   "phone_stored": "(571) 227-2090",
+   "phone_status": "different_published",
+   "phone_published": "(571) 227-1067",
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Transportation Security Administration",
+   "source_url": "https://www.dhs.gov/osdbu/small-business-specialists",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.tsa.gov/for-industry/doing-business-with-tsa (404)"
+   ],
+   "notes": "DHS SB Specialists page is in DHS content archive (labelled possibly outdated) but shows Last Updated 10/01/2026. DHS OSDBU Executive Director per https://www.dhs.gov/osdbu: Dina Thompson. Elizabeth Harrington, Small Business Specialist."
+  },
+  {
+   "key": "FEMA",
+   "email_stored": "fema-osdbu@fema.dhs.gov",
+   "email_status": "different_published",
+   "email_published": "FEMA-SB@fema.dhs.gov",
+   "phone_stored": "(202) 212-4220",
+   "phone_status": "different_published",
+   "phone_published": "(202) 714-2706",
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Federal Emergency Management Agency",
+   "source_url": "https://www.dhs.gov/osdbu/small-business-specialists",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.fema.gov/about/doing-business-with-fema (404)"
+   ],
+   "notes": "DHS SB Specialists page is in DHS content archive (labelled possibly outdated) but shows Last Updated 10/01/2026. DHS OSDBU Executive Director per https://www.dhs.gov/osdbu: Dina Thompson. Amy Connolly (202) 714-2706 FEMA-SB@fema.dhs.gov; Mary Klock (202) 445-7922 Mary.Klock@fema.dhs.gov."
+  },
+  {
+   "key": "USSS",
+   "email_stored": "usss.osdbu@usss.dhs.gov",
+   "email_status": "different_published",
+   "email_published": "kimberly.witcher@usss.dhs.gov",
+   "phone_stored": "(202) 406-5800",
+   "phone_status": "different_published",
+   "phone_published": "(202) 406-9683",
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "United States Secret Service",
+   "source_url": "https://www.dhs.gov/osdbu/small-business-specialists",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.secretservice.gov/about/doing-business (404)"
+   ],
+   "notes": "DHS SB Specialists page is in DHS content archive (labelled possibly outdated) but shows Last Updated 10/01/2026. DHS OSDBU Executive Director per https://www.dhs.gov/osdbu: Dina Thompson. Personal address only: Kimberly Witcher, Small Business Specialist; alternate Riquelme Torres-Aviles (202) 768-1076 riquelme.torres-aviles@usss.dhs.gov."
+  },
+  {
+   "key": "CISA",
+   "email_stored": "cisa.osdbu@cisa.dhs.gov",
+   "email_status": "different_published",
+   "email_published": "melody.hinkle@mail.cisa.dhs.gov",
+   "phone_stored": "(703) 235-8000",
+   "phone_status": "different_published",
+   "phone_published": "(202) 812-0440",
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "DHS HQ Office of Procurement Operations (CISA support)",
+   "source_url": "https://www.dhs.gov/osdbu/small-business-specialists",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "DHS SB Specialists page is in DHS content archive (labelled possibly outdated) but shows Last Updated 10/01/2026. DHS OSDBU Executive Director per https://www.dhs.gov/osdbu: Dina Thompson. Melody Hinkle, Small Business Specialist, CISA, listed under DHS HQ Office of Procurement Operations (OPO mailbox OPOSmallBusiness@hq.dhs.gov). CISA forecastUrl loads but lists no SB contact (only contact@cisa.dhs.gov / Industry Engagement Platform)."
+  },
+  {
+   "key": "DOJ",
+   "email_stored": "OSDBU@usdoj.gov",
+   "email_status": "not_published",
+   "email_published": null,
+   "phone_stored": "(202) 616-0521",
+   "phone_status": "published",
+   "phone_published": "(202) 616-0521",
+   "director_published": "Bob Connolly",
+   "director_title": "Director",
+   "office_name_published": "Office of Small and Disadvantaged Business Utilization",
+   "source_url": "https://www.justice.gov/osdbu",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.justice.gov/jmd/procurement-overview (404)"
+   ],
+   "notes": "OSDBU page lists no email; OSDBU@usdoj.gov not found. Stored director \"Robert Connolly\" matches \"Bob Connolly, Director\". Component reps page: https://www.justice.gov/osdbu/contact-doj-representative"
+  },
+  {
+   "key": "FBI",
+   "email_stored": "fbi.procurement@fbi.gov",
+   "email_status": "different_published",
+   "email_published": "smallbusiness@fbi.gov",
+   "phone_stored": "(202) 324-3000",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Federal Bureau of Investigation",
+   "source_url": "https://www.justice.gov/osdbu/contact-doj-representative",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "Rep: Denise Kirkpatrick (no title, no phone). FBI Property Procurement & Management Section phone (202) 324-2143 (procurement, not SB). fbi.gov forecastUrl returned 403 (not confirmed broken)."
+  },
+  {
+   "key": "DEA",
+   "email_stored": "dea.osdbu@usdoj.gov",
+   "email_status": "different_published",
+   "email_published": "DEAsmallbusinessprogram@dea.gov",
+   "phone_stored": "(202) 307-7165",
+   "phone_status": "different_published",
+   "phone_published": "(571) 776-3500",
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Drug Enforcement Administration",
+   "source_url": "https://www.justice.gov/osdbu/contact-doj-representative",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "Rep: Che Logan (no title). dea.gov forecastUrl returned 403."
+  },
+  {
+   "key": "ATF",
+   "email_stored": "atf.osdbu@atf.gov",
+   "email_status": "different_published",
+   "email_published": "john.klar@atf.gov",
+   "phone_stored": "(202) 648-8010",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Bureau of Alcohol, Tobacco, Firearms & Explosives",
+   "source_url": "https://www.justice.gov/osdbu/contact-doj-representative",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "Only a personal rep address (John Klar). Procurement (Acquisition and Property Management Division) phone (202) 927-8820, not SB-specific. atf.gov forecastUrl returned 403."
+  },
+  {
+   "key": "BOP",
+   "email_stored": "bop.acquisitions@usdoj.gov",
+   "email_status": "different_published",
+   "email_published": "BOP-ADM-SmallBusinessProgram-S@bop.gov",
+   "phone_stored": "(202) 307-3120",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Bureau of Prisons",
+   "source_url": "https://www.justice.gov/osdbu/contact-doj-representative",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "Rep: Sarah Dean. National Contracts and Policy Section phone (202) 307-3067 (procurement). bop.gov/business/small_business_office.jsp shows same mailbox Cloudflare-obfuscated."
+  },
+  {
+   "key": "USMS",
+   "email_stored": "usms.osdbu@usdoj.gov",
+   "email_status": "different_published",
+   "email_published": "shandora.acrey@usdoj.gov",
+   "phone_stored": "(703) 740-1400",
+   "phone_status": "different_published",
+   "phone_published": "(703) 740-9467",
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "U.S. Marshals Service",
+   "source_url": "https://www.justice.gov/osdbu/contact-doj-representative",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "Personal rep address only (Shandora Acrey). usmarshals.gov forecastUrl returned 403."
+  },
+  {
+   "key": "VHA",
+   "email_stored": "vha.osdbu@va.gov",
+   "email_status": "different_published",
+   "email_published": "vetbiz@va.gov",
+   "phone_stored": "(202) 461-4300",
+   "phone_status": "different_published",
+   "phone_published": "1-866-584-2344",
+   "director_published": "Chanel Bankston-Carter",
+   "director_title": "Executive Director, Office of Small and Disadvantaged Business Utilization (OSDBU)",
+   "office_name_published": "VA Office of Small and Disadvantaged Business Utilization",
+   "source_url": "https://www.va.gov/osdbu/",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "VA-wide OSDBU contact (no administration-specific SB mailbox found). Phone is OSDBU Call Operations, 8-4 ET."
+  },
+  {
+   "key": "CDC",
+   "email_stored": "cdcosdbu@cdc.gov",
+   "email_status": "not_published",
+   "email_published": null,
+   "phone_stored": "(770) 488-2814",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "CDC Small Businesses page",
+   "source_url": "https://www.cdc.gov/contracts/small-business/index.html",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "CDC SB page lists no email/phone; refers to HHS Small Business Program Managers list on seed.nih.gov (403, unreachable). Only general CDC line 800-232-4636."
+  },
+  {
+   "key": "NIH",
+   "email_stored": "nihsbo@od.nih.gov",
+   "email_status": "not_published",
+   "email_published": null,
+   "phone_stored": "(301) 496-9639",
+   "phone_status": "published",
+   "phone_published": "301-496-9639",
+   "director_published": "Annette Owens-Scarboro",
+   "director_title": "NIH Small Business and Minority Serving Institute Program Manager",
+   "office_name_published": "NIH Small Business Program Office (SBPO)",
+   "source_url": "https://oamp.od.nih.gov/staff-directory/hhs-small-business-specialist",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://oamp.od.nih.gov/small-business (404)"
+   ],
+   "notes": "Staff directory emails are obfuscated (\"[email protected]\") so nihsbo@od.nih.gov could not be confirmed. Phone 301-496-9639 is published on https://www.ihs.gov/DAP/smallbusiness/ for Jonathan Ferguson, Small Business Specialist supporting NIH & IHS and HHS/OSDBU. Same NIH page also lists Shannon Jackson \"OSDBU Director\" and Tiffany Chadwick \"Director\" under HHS OSDBU Support Team. SBPO About page offers only an online inquiry tool."
+  },
+  {
+   "key": "FDA",
+   "email_stored": "fda.osdbu@fda.hhs.gov",
+   "email_status": "different_published",
+   "email_published": "cynthia.anderson@hhs.gov",
+   "phone_stored": "(301) 796-9440",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "FDA Small Business Resources",
+   "source_url": "https://www.fda.gov/about-fda/doing-business-fda/small-business-resources",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.fda.gov/about-fda/jobs-and-training-fda/contracting-opportunities-fda (404)"
+   ],
+   "notes": "Cindy Anderson, \"Small Business Professional\" (HHS OSDBU). Also FDA-Small_Business_Outreach@fda.hhs.gov (for Small Business Fair/events). Only phone is general 1-888-INFO-FDA (1-888-463-6332)."
+  },
+  {
+   "key": "CMS",
+   "email_stored": "cms.osdbu@cms.hhs.gov",
+   "email_status": "unreachable",
+   "email_published": null,
+   "phone_stored": "(410) 786-5157",
+   "phone_status": "unreachable",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": null,
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.cms.gov/about-cms/contracting/contracting-small-business (404)",
+    "https://www.cms.gov/about-cms/contracting-with-cms (404)"
+   ],
+   "notes": "No current CMS SB page found on cms.gov; hhs.gov OSDBU pages return 403."
+  },
+  {
+   "key": "NNSA",
+   "email_stored": "nnsa.osbp@nnsa.doe.gov",
+   "email_status": "different_published",
+   "email_published": "Chelsea.Murphy@nnsa.doe.gov",
+   "phone_stored": "(505) 845-4403",
+   "phone_status": "different_published",
+   "phone_published": "505-845-6404",
+   "director_published": "Chelsea Murphy",
+   "director_title": "Small Business Resource Manager (also \"NNSA Small Business Program Manager\"); directory: NNSA Field Small Business Program Manager",
+   "office_name_published": "NNSA Small Business Program",
+   "source_url": "https://www.energy.gov/nnsa/nnsa-small-business-program",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.energy.gov/nnsa/nnsa-small-business-programs (404)"
+   ],
+   "notes": "Phone from DOE SBPM directory https://www.energy.gov/osbp/small-business-program-manager-directory, which also lists Temidayo \"Temi\" Osinuga, Small Business Program Manager, Acting (temidayo.osinuga@nnsa.doe.gov). Not a shared mailbox."
+  },
+  {
+   "key": "IRS",
+   "email_stored": "irs.smallbusiness@irs.gov",
+   "email_status": "different_published",
+   "email_published": "Procurement.SBRO@irs.gov",
+   "phone_stored": "(202) 317-6420",
+   "phone_status": "different_published",
+   "phone_published": "240-613-7120",
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "IRS Procurement Small Business Program Office (Small Business Section)",
+   "source_url": "https://www.irs.gov/about-irs/procurement/procurement-small-business-program-office",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "Contacts: Romona Kelly, Section Chief, Procurement Analyst; LaTonya Bowman, Small Business Specialist. Treasury page lists PROCUREMENT.SBRO@irs.gov."
+  },
+  {
+   "key": "State",
+   "email_stored": "sdbupolicy@state.gov",
+   "email_status": "unreachable",
+   "email_published": null,
+   "phone_stored": "(703) 875-6824",
+   "phone_status": "unreachable",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": null,
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "state.gov returned 403 for the stored forecastUrl, the OSDBU About page and the biography page. Could NOT confirm whether a current OSDBU director or acting director is named. Stored \"Gail Clark\" unverified. A search snippet (not evidence) indicated former director George L. Price term ended 2025-04-01; unconfirmed."
+  },
+  {
+   "key": "NOAA",
+   "email_stored": "noaa.osdbu@noaa.gov",
+   "email_status": "different_published",
+   "email_published": "noaasb@noaa.gov",
+   "phone_stored": "(301) 628-1700",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": "Lucas Payne",
+   "director_title": "Chief, Small Business Office",
+   "office_name_published": "NOAA Small Business Office",
+   "source_url": "https://www.noaa.gov/organization/acquisition-grants/small-business",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "No phone listed."
+  },
+  {
+   "key": "USFS",
+   "email_stored": "usfs.osdbu@usda.gov",
+   "email_status": "different_published",
+   "email_published": "sm.fs.smallbusiness@usda.gov",
+   "phone_stored": "(505) 842-3292",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Forest Service Small Business Program",
+   "source_url": "https://www.fs.usda.gov/business/small-business/",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.fs.usda.gov/working-with-us/contracting (404)"
+   ],
+   "notes": "No phone or named person on page."
+  },
+  {
+   "key": "FAA",
+   "email_stored": "faa.osdbu@faa.gov",
+   "email_status": "not_published",
+   "email_published": null,
+   "phone_stored": "(202) 267-8111",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": "Allen Bresley",
+   "director_title": "Manager, Small Business Program, Acquisition Policy & Oversight (AAP-20)",
+   "office_name_published": "FAA Small Business Office (SBO)",
+   "source_url": "https://sbo.faa.gov/page/?pageName=The+SBO+Team",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "No shared SB mailbox; only individual staff emails (e.g. allen.bresley@faa.gov, (609) 485-4380). General (866) 835-5322. Stored faa.gov forecastUrl returned 403. Page mailto for Christine Sager points to a different address than displayed."
+  },
+  {
+   "key": "HUD",
+   "email_stored": "SDB@hud.gov",
+   "email_status": "not_published",
+   "email_published": null,
+   "phone_stored": "(202) 402-5477",
+   "phone_status": "published",
+   "phone_published": "(202) 402-5477",
+   "director_published": "Jean Lin Pao",
+   "director_title": "Director, Office of Small and Disadvantaged Business Utilization",
+   "office_name_published": "Office of Small and Disadvantaged Business Utilization",
+   "source_url": "https://www.hud.gov/contactus/principal-directory",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "NAME MISMATCH: stored \"Jean Shao\", published \"Jean Lin Pao\". SDB@hud.gov not shown; hud.gov/program_offices/sdb loaded only header/footer (main body not captured)."
+  },
+  {
+   "key": "Education",
+   "email_stored": "ed.osdbu@ed.gov",
+   "email_status": "unreachable",
+   "email_published": null,
+   "phone_stored": "(202) 245-6301",
+   "phone_status": "unreachable",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": null,
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "ed.gov and www2.ed.gov OSDBU pages returned 403."
+  },
+  {
+   "key": "SBA",
+   "email_stored": "sbacacao@sba.gov",
+   "email_status": "not_published",
+   "email_published": null,
+   "phone_stored": "(202) 205-6618",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": "https://www.sba.gov/about-sba/organization/contact-sba",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.sba.gov/about-sba/sba-procurement (404)"
+   ],
+   "notes": "sbacacao@sba.gov not shown; no contact for SBA internal procurement/small business program. Only Answer Desk 1-800-827-5722 / answerdesk@sba.gov."
+  },
+  {
+   "key": "OPM",
+   "email_stored": "OSDBU@opm.gov",
+   "email_status": "different_published",
+   "email_published": "Small.Business@opm.gov",
+   "phone_stored": "(202) 606-2180",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "OPM's Small Business Program",
+   "source_url": "https://www.opm.gov/about-us/doing-business-with-opm/",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "No phone or named person."
+  },
+  {
+   "key": "NRC",
+   "email_stored": "sbcr@nrc.gov",
+   "email_status": "not_published",
+   "email_published": null,
+   "phone_stored": "(301) 415-7380",
+   "phone_status": "published",
+   "phone_published": "301-415-7380",
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Civil Rights/Small Business Representative",
+   "source_url": "https://www.nrc.gov/about-nrc/civil-rights/programs/contactus/contactus-sb.html",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "sbcr@nrc.gov not shown (only OPA.resource@nrc.gov in footer). nrc.gov contracting and small-business pages returned 403. Stored director Vonna Ordaz not confirmed."
+  },
+  {
+   "key": "FCC",
+   "email_stored": "ocbo@fcc.gov",
+   "email_status": "unreachable",
+   "email_published": null,
+   "phone_stored": "(202) 418-0990",
+   "phone_status": "unreachable",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": null,
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "fcc.gov forecastUrl and OCBO page returned 403."
+  },
+  {
+   "key": "SEC",
+   "email_stored": "omwi@sec.gov",
+   "email_status": "unreachable",
+   "email_published": null,
+   "phone_stored": "(202) 551-6040",
+   "phone_status": "unreachable",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": null,
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.sec.gov/about/offices/omo (404)",
+    "https://www.sec.gov/omwi (404)"
+   ],
+   "notes": "No reachable SEC OMWI page."
+  },
+  {
+   "key": "FDIC",
+   "email_stored": "omwi@fdic.gov",
+   "email_status": "not_published",
+   "email_published": null,
+   "phone_stored": "(877) 275-3342",
+   "phone_status": "published",
+   "phone_published": "877-275-3342",
+   "director_published": "Brian Guy",
+   "director_title": "Director (Office of Minority and Women Inclusion)",
+   "office_name_published": "Office of Minority and Women Inclusion",
+   "source_url": "https://www.fdic.gov/about/organization-directory-headquarters",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.fdic.gov/about/contracting/ (404)"
+   ],
+   "notes": "NAME MISMATCH: stored \"Nikita Pearson\" not listed; OMWI Director is Brian Guy. Phone is the general FDIC Contact Center (877-ASKFDIC). omwi@fdic.gov not shown on org directory or https://www.fdic.gov/doing-business-fdic/key-contacts-acquisition-services-branch."
+  },
+  {
+   "key": "TVA",
+   "email_stored": "supplierdiversity@tva.com",
+   "email_status": "unreachable",
+   "email_published": null,
+   "phone_stored": "(865) 632-3000",
+   "phone_status": "unreachable",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": null,
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "tva.com pages returned 403."
+  },
+  {
+   "key": "Smithsonian",
+   "email_stored": "osp@si.edu",
+   "email_status": "unreachable",
+   "email_published": null,
+   "phone_stored": "(202) 633-1000",
+   "phone_status": "unreachable",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": null,
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "si.edu pages returned 403."
+  },
+  {
+   "key": "NARA",
+   "email_stored": "small.business@nara.gov",
+   "email_status": "not_published",
+   "email_published": null,
+   "phone_stored": "(301) 837-0830",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": "https://www.archives.gov/contracts",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "Contracts page and https://www.archives.gov/contact show no SB email/phone (only inquire@nara.gov, 1-866-272-6272)."
+  },
+  {
+   "key": "GPO",
+   "email_stored": "vendorservices@gpo.gov",
+   "email_status": "not_published",
+   "email_published": null,
+   "phone_stored": "(202) 512-0327",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": "https://www.gpo.gov/how-to-work-with-us/vendors/contract-opportunities",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.gpo.gov/how-to-work-with-us/vendors/contracting-opportunities (404)"
+   ],
+   "notes": "No SB office/mailbox. Only Bid Section mailbox (bidsection@gpo.gov, Cloudflare-obfuscated, decoded by fetch tool). vendorservices@gpo.gov not shown."
+  },
+  {
+   "key": "NPS",
+   "email_stored": "nps_osdbu@nps.gov",
+   "email_status": "not_published",
+   "email_published": null,
+   "phone_stored": "(202) 354-1820",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": "https://www.nps.gov/aboutus/doingbusinesswithus.htm",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "NPS page gives only \"e-mail us\" links (no addresses). DOI OSDBU (https://www.doi.gov/osdbu) publishes doi_osdbu@ios.doi.gov, 202-208-3493."
+  },
+  {
+   "key": "FWS",
+   "email_stored": "fws_osdbu@fws.gov",
+   "email_status": "not_published",
+   "email_published": null,
+   "phone_stored": "(703) 358-2548",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": "https://www.doi.gov/osdbu",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.fws.gov/office/contracting-and-general-services (404)"
+   ],
+   "notes": "Bureau forecastUrl 404. DOI OSDBU page lists only doi_osdbu@ios.doi.gov / 202-208-3493; no bureau mailbox. DOI SB specialist PDF (2025-07) fetched but not machine-readable."
+  },
+  {
+   "key": "BLM",
+   "email_stored": "blm_osdbu@blm.gov",
+   "email_status": "not_published",
+   "email_published": null,
+   "phone_stored": "(202) 912-7400",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": "https://www.doi.gov/osdbu",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.blm.gov/services/contracting (404)"
+   ],
+   "notes": "Bureau forecastUrl 404. DOI OSDBU page lists only doi_osdbu@ios.doi.gov / 202-208-3493; no bureau mailbox. DOI SB specialist PDF (2025-07) fetched but not machine-readable."
+  },
+  {
+   "key": "USGS",
+   "email_stored": "usgs_osdbu@usgs.gov",
+   "email_status": "not_published",
+   "email_published": null,
+   "phone_stored": "(703) 648-7373",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": "https://www.doi.gov/osdbu",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.usgs.gov/about/organization/science-support/acquisition-grants-and-partnerships (404)"
+   ],
+   "notes": "Bureau forecastUrl 404. DOI OSDBU page lists only doi_osdbu@ios.doi.gov / 202-208-3493; no bureau mailbox. DOI SB specialist PDF (2025-07) fetched but not machine-readable."
+  },
+  {
+   "key": "BOR",
+   "email_stored": "bor_osdbu@usbr.gov",
+   "email_status": "not_published",
+   "email_published": null,
+   "phone_stored": "(303) 445-2684",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": "https://www.doi.gov/osdbu",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.usbr.gov/main/business/ (404)"
+   ],
+   "notes": "Bureau forecastUrl 404. DOI OSDBU page lists only doi_osdbu@ios.doi.gov / 202-208-3493; no bureau mailbox. DOI SB specialist PDF (2025-07) fetched but not machine-readable."
+  },
+  {
+   "key": "ARS",
+   "email_stored": "ars_osdbu@usda.gov",
+   "email_status": "unreachable",
+   "email_published": null,
+   "phone_stored": "(301) 504-1702",
+   "phone_status": "unreachable",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": null,
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.ars.usda.gov/office-of-administrative-and-financial-management/ (404)"
+   ],
+   "notes": "usda.gov OSDBU and small-business-specialists pages returned 403; bureau page (404)."
+  },
+  {
+   "key": "APHIS",
+   "email_stored": "aphis_osdbu@usda.gov",
+   "email_status": "unreachable",
+   "email_published": null,
+   "phone_stored": "(301) 851-2900",
+   "phone_status": "unreachable",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": null,
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.aphis.usda.gov/aphis/resources/business (404)"
+   ],
+   "notes": "usda.gov OSDBU and small-business-specialists pages returned 403; bureau page (404)."
+  },
+  {
+   "key": "NRCS",
+   "email_stored": "nrcs_osdbu@usda.gov",
+   "email_status": "unreachable",
+   "email_published": null,
+   "phone_stored": "(202) 720-1845",
+   "phone_status": "unreachable",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": null,
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.nrcs.usda.gov/about/business (timeout)"
+   ],
+   "notes": "usda.gov OSDBU and small-business-specialists pages returned 403; bureau page (timeout)."
+  },
+  {
+   "key": "FLETC",
+   "email_stored": "fletc.osdbu@fletc.dhs.gov",
+   "email_status": "different_published",
+   "email_published": "allan.w.gray@fletc.dhs.gov",
+   "phone_stored": "(912) 267-2100",
+   "phone_status": "different_published",
+   "phone_published": "(912) 267-3631",
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Federal Law Enforcement Training Centers",
+   "source_url": "https://www.dhs.gov/osdbu/small-business-specialists",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.fletc.gov/acquisition (404)"
+   ],
+   "notes": "DHS SB Specialists page is in DHS content archive (labelled possibly outdated) but shows Last Updated 10/01/2026. DHS OSDBU Executive Director per https://www.dhs.gov/osdbu: Dina Thompson. Personal address only: Allan Gray, Small Business Specialist; alternates James Frye (912) 267-2628, Joshua Fejeran (912) 267-3090."
+  },
+  {
+   "key": "PBS",
+   "email_stored": "small.business@gsa.gov",
+   "email_status": "different_published",
+   "email_published": "smallbusiness@gsa.gov",
+   "phone_stored": "(202) 501-1021",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "GSA Office of Small Business specialists",
+   "source_url": "https://www.gsa.gov/node/162028",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "Stored small.business@gsa.gov differs from published smallbusiness@gsa.gov. Also OSB_gethelp@gsa.gov. No HQ phone; only regional SBS phones. No director/associate administrator named."
+  },
+  {
+   "key": "FAS",
+   "email_stored": "small.business@gsa.gov",
+   "email_status": "different_published",
+   "email_published": "smallbusiness@gsa.gov",
+   "phone_stored": "(202) 501-1021",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "GSA Office of Small Business specialists",
+   "source_url": "https://www.gsa.gov/node/162028",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "Stored small.business@gsa.gov differs from published smallbusiness@gsa.gov. Also OSB_gethelp@gsa.gov. No HQ phone; only regional SBS phones. No director/associate administrator named."
+  },
+  {
+   "key": "OASAM",
+   "email_stored": "osdbu@dol.gov",
+   "email_status": "different_published",
+   "email_published": "osdbucustomerservice@dol.gov",
+   "phone_stored": "(202) 693-6460",
+   "phone_status": "different_published",
+   "phone_published": "202-693-7299",
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Office of Small and Disadvantaged Business Utilization (DOL)",
+   "source_url": "https://www.dol.gov/agencies/oasam/centers-offices/office-of-the-senior-procurement-executive/office-of-small-and-disadvantaged-business-utilization/procurement-information",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.dol.gov/agencies/oasam/business-operations-center (404)"
+   ],
+   "notes": "DOL-wide OSDBU. Director role listed but unnamed. Peter Kontakos, Program Manager (Small Business Procurements & Contracts)."
+  },
+  {
+   "key": "IHS",
+   "email_stored": "osdbu@hhs.gov",
+   "email_status": "not_published",
+   "email_published": null,
+   "phone_stored": "(202) 690-7300",
+   "phone_status": "different_published",
+   "phone_published": "301-496-9639",
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "IHS Small Business",
+   "source_url": "https://www.ihs.gov/DAP/smallbusiness/",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.ihs.gov/oam/ (404)"
+   ],
+   "notes": "Jonathan Ferguson, Small Business Specialist, supporting NIH & IHS and HHS/OSDBU. No email on page. hhs.gov OSDBU pages 403."
+  },
+  {
+   "key": "FHWA",
+   "email_stored": "osdbu@dot.gov",
+   "email_status": "unreachable",
+   "email_published": null,
+   "phone_stored": "(202) 366-1930",
+   "phone_status": "unreachable",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": null,
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.fhwa.dot.gov/resources/acquisition/ (404)"
+   ],
+   "notes": "transportation.gov OSDBU / SB-specialist pages returned 403."
+  },
+  {
+   "key": "FRA",
+   "email_stored": "osdbu@dot.gov",
+   "email_status": "unreachable",
+   "email_published": null,
+   "phone_stored": "(202) 366-1930",
+   "phone_status": "unreachable",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": null,
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "transportation.gov OSDBU / SB-specialist pages returned 403; stored forecastUrl also 403."
+  },
+  {
+   "key": "FTA",
+   "email_stored": "osdbu@dot.gov",
+   "email_status": "unreachable",
+   "email_published": null,
+   "phone_stored": "(202) 366-1930",
+   "phone_status": "unreachable",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": null,
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "transportation.gov OSDBU / SB-specialist pages returned 403; stored forecastUrl also 403."
+  },
+  {
+   "key": "MARAD",
+   "email_stored": "osdbu@dot.gov",
+   "email_status": "unreachable",
+   "email_published": null,
+   "phone_stored": "(202) 366-1930",
+   "phone_status": "unreachable",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": null,
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "transportation.gov OSDBU / SB-specialist pages returned 403; stored forecastUrl also 403."
+  },
+  {
+   "key": "OSHA",
+   "email_stored": "osdbu@dol.gov",
+   "email_status": "different_published",
+   "email_published": "osdbucustomerservice@dol.gov",
+   "phone_stored": "(202) 693-6460",
+   "phone_status": "different_published",
+   "phone_published": "202-693-7299",
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Office of Small and Disadvantaged Business Utilization (DOL)",
+   "source_url": "https://www.dol.gov/agencies/oasam/centers-offices/office-of-the-senior-procurement-executive/office-of-small-and-disadvantaged-business-utilization/procurement-information",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "DOL-wide OSDBU. Director role listed but unnamed. Peter Kontakos, Program Manager (Small Business Procurements & Contracts). Stored forecastUrl is a homepage/grants page with no SB contact."
+  },
+  {
+   "key": "ETA",
+   "email_stored": "osdbu@dol.gov",
+   "email_status": "different_published",
+   "email_published": "osdbucustomerservice@dol.gov",
+   "phone_stored": "(202) 693-6460",
+   "phone_status": "different_published",
+   "phone_published": "202-693-7299",
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Office of Small and Disadvantaged Business Utilization (DOL)",
+   "source_url": "https://www.dol.gov/agencies/oasam/centers-offices/office-of-the-senior-procurement-executive/office-of-small-and-disadvantaged-business-utilization/procurement-information",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "DOL-wide OSDBU. Director role listed but unnamed. Peter Kontakos, Program Manager (Small Business Procurements & Contracts). Stored forecastUrl is a homepage/grants page with no SB contact."
+  },
+  {
+   "key": "MSHA",
+   "email_stored": "osdbu@dol.gov",
+   "email_status": "different_published",
+   "email_published": "osdbucustomerservice@dol.gov",
+   "phone_stored": "(202) 693-6460",
+   "phone_status": "different_published",
+   "phone_published": "202-693-7299",
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Office of Small and Disadvantaged Business Utilization (DOL)",
+   "source_url": "https://www.dol.gov/agencies/oasam/centers-offices/office-of-the-senior-procurement-executive/office-of-small-and-disadvantaged-business-utilization/procurement-information",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "DOL-wide OSDBU. Director role listed but unnamed. Peter Kontakos, Program Manager (Small Business Procurements & Contracts). Stored forecastUrl is a homepage/grants page with no SB contact."
+  },
+  {
+   "key": "Census",
+   "email_stored": "osdbu@doc.gov",
+   "email_status": "different_published",
+   "email_published": "acq.small.business.specialist@census.gov",
+   "phone_stored": "(202) 482-1472",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Census Bureau Acquisition Division",
+   "source_url": "https://www.census.gov/about/business-opportunities/opportunities/sm-bus-opps.html",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "Address is Cloudflare-obfuscated on page and was decoded by the fetch tool; verify before use. Brighid Boykin, Small Business Specialist. Page revised 2026-09-24. commerce.gov OSDBU pages 403."
+  },
+  {
+   "key": "NIST",
+   "email_stored": "osdbu@doc.gov",
+   "email_status": "different_published",
+   "email_published": "derek.greene@nist.gov",
+   "phone_stored": "(202) 482-1472",
+   "phone_status": "different_published",
+   "phone_published": "301-975-2166",
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "NIST Acquisition Management Division",
+   "source_url": "https://www.nist.gov/oaam/acquisition-management-division",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "Personal address of Derek Greene, Small Business Specialist (shown as \"derek.greene [at] nist.gov\"). Stored forecastUrl nist.gov/oam is the Office of Advanced Manufacturing (wrong page, loads)."
+  },
+  {
+   "key": "USPTO",
+   "email_stored": "osdbu@doc.gov",
+   "email_status": "different_published",
+   "email_published": "SmallBusiness@uspto.gov",
+   "phone_stored": "(202) 482-1472",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Small Business Specialist and Industry Liaison",
+   "source_url": "https://www.uspto.gov/about-us/vendor-information",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "No phone or named person."
+  },
+  {
+   "key": "FSA",
+   "email_stored": "osdbu@usda.gov",
+   "email_status": "unreachable",
+   "email_published": null,
+   "phone_stored": "(202) 720-7117",
+   "phone_status": "unreachable",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": null,
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.fsa.usda.gov/ (timeout)"
+   ],
+   "notes": "usda.gov OSDBU and small-business-specialists pages returned 403; bureau page (timeout)."
+  },
+  {
+   "key": "RD",
+   "email_stored": "osdbu@usda.gov",
+   "email_status": "unreachable",
+   "email_published": null,
+   "phone_stored": "(202) 720-7117",
+   "phone_status": "unreachable",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": null,
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "usda.gov OSDBU and small-business-specialists pages returned 403; bureau page (403)."
+  },
+  {
+   "key": "VBA",
+   "email_stored": "osdbu@va.gov",
+   "email_status": "different_published",
+   "email_published": "vetbiz@va.gov",
+   "phone_stored": "(202) 461-4300",
+   "phone_status": "different_published",
+   "phone_published": "1-866-584-2344",
+   "director_published": "Chanel Bankston-Carter",
+   "director_title": "Executive Director, Office of Small and Disadvantaged Business Utilization (OSDBU)",
+   "office_name_published": "VA Office of Small and Disadvantaged Business Utilization",
+   "source_url": "https://www.va.gov/osdbu/",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "VA-wide OSDBU contact (no administration-specific SB mailbox found). Phone is OSDBU Call Operations, 8-4 ET. Stored forecastUrl va.gov/opal/nac/fss/ not checked."
+  },
+  {
+   "key": "NCA",
+   "email_stored": "osdbu@va.gov",
+   "email_status": "different_published",
+   "email_published": "vetbiz@va.gov",
+   "phone_stored": "(202) 461-4300",
+   "phone_status": "different_published",
+   "phone_published": "1-866-584-2344",
+   "director_published": "Chanel Bankston-Carter",
+   "director_title": "Executive Director, Office of Small and Disadvantaged Business Utilization (OSDBU)",
+   "office_name_published": "VA Office of Small and Disadvantaged Business Utilization",
+   "source_url": "https://www.va.gov/osdbu/",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "VA-wide OSDBU contact (no administration-specific SB mailbox found). Phone is OSDBU Call Operations, 8-4 ET. Stored forecastUrl va.gov/opal/nac/fss/ not checked."
+  },
+  {
+   "key": "BIA",
+   "email_stored": "osdbu@ios.doi.gov",
+   "email_status": "different_published",
+   "email_published": "doi_osdbu@ios.doi.gov",
+   "phone_stored": "(202) 208-3493",
+   "phone_status": "published",
+   "phone_published": "202-208-3493",
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Office of Small and Disadvantaged Business Utilization (DOI)",
+   "source_url": "https://www.doi.gov/osdbu",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.bia.gov/as-ia/acquisition (404)"
+   ],
+   "notes": "Stored osdbu@ios.doi.gov differs from published doi_osdbu@ios.doi.gov. No director named on page."
+  },
+  {
+   "key": "BOEM",
+   "email_stored": "osdbu@ios.doi.gov",
+   "email_status": "different_published",
+   "email_published": "doi_osdbu@ios.doi.gov",
+   "phone_stored": "(202) 208-3493",
+   "phone_status": "published",
+   "phone_published": "202-208-3493",
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Office of Small and Disadvantaged Business Utilization (DOI)",
+   "source_url": "https://www.doi.gov/osdbu",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.boem.gov/about-boem/procurement (404)"
+   ],
+   "notes": "Stored osdbu@ios.doi.gov differs from published doi_osdbu@ios.doi.gov. No director named on page."
+  },
+  {
+   "key": "BSEE",
+   "email_stored": "osdbu@ios.doi.gov",
+   "email_status": "different_published",
+   "email_published": "doi_osdbu@ios.doi.gov",
+   "phone_stored": "(202) 208-3493",
+   "phone_status": "published",
+   "phone_published": "202-208-3493",
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Office of Small and Disadvantaged Business Utilization (DOI)",
+   "source_url": "https://www.doi.gov/osdbu",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.bsee.gov/what-we-do/procurement (404)"
+   ],
+   "notes": "Stored osdbu@ios.doi.gov differs from published doi_osdbu@ios.doi.gov. No director named on page."
+  },
+  {
+   "key": "FinCEN",
+   "email_stored": "osdbu@treasury.gov",
+   "email_status": "different_published",
+   "email_published": "Smallbusiness@fiscal.treasury.gov",
+   "phone_stored": "(202) 622-0530",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Bureau Small Business Specialists (Treasury)",
+   "source_url": "https://home.treasury.gov/policy-issues/small-business-programs/small-and-disadvantaged-business-utilization/how-to-contact-us",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.fincen.gov/about/contracting (404)"
+   ],
+   "notes": "Treasury lists Smallbusiness@fiscal.treasury.gov for TTB, Fiscal Service, CDFI Fund, FinCEN, TIGTA. Main OSDBU: OSDBU_Team@Treasury.gov. No phones on page."
+  },
+  {
+   "key": "OCC",
+   "email_stored": "osdbu@treasury.gov",
+   "email_status": "different_published",
+   "email_published": "SmallBusinessProgram@occ.treas.gov",
+   "phone_stored": "(202) 622-0530",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Bureau Small Business Specialists (Treasury)",
+   "source_url": "https://home.treasury.gov/policy-issues/small-business-programs/small-and-disadvantaged-business-utilization/how-to-contact-us",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.occ.gov/about/who-we-are/careers/contracting-opportunities.html (404)"
+   ],
+   "notes": "Main Treasury OSDBU: OSDBU_Team@Treasury.gov. No phones on page."
+  },
+  {
+   "key": "TTB",
+   "email_stored": "osdbu@treasury.gov",
+   "email_status": "different_published",
+   "email_published": "Smallbusiness@fiscal.treasury.gov",
+   "phone_stored": "(202) 622-0530",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": "Bureau Small Business Specialists (Treasury)",
+   "source_url": "https://home.treasury.gov/policy-issues/small-business-programs/small-and-disadvantaged-business-utilization/how-to-contact-us",
+   "checked_at": "2026-11-17",
+   "broken_links": [
+    "https://www.ttb.gov/about-ttb/contracts (404)"
+   ],
+   "notes": "Treasury lists Smallbusiness@fiscal.treasury.gov for TTB, Fiscal Service, CDFI Fund, FinCEN, TIGTA. Main OSDBU: OSDBU_Team@Treasury.gov. No phones on page."
+  },
+  {
+   "key": "OBO",
+   "email_stored": "smallbusiness@state.gov",
+   "email_status": "unreachable",
+   "email_published": null,
+   "phone_stored": "(703) 875-6822",
+   "phone_status": "unreachable",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": null,
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "state.gov returned 403."
+  },
+  {
+   "key": "DS",
+   "email_stored": "smallbusiness@state.gov",
+   "email_status": "unreachable",
+   "email_published": null,
+   "phone_stored": "(703) 875-6822",
+   "phone_status": "unreachable",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": null,
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "state.gov returned 403."
+  },
+  {
+   "key": "HRSA",
+   "email_stored": "osdbu@hhs.gov",
+   "email_status": "unreachable",
+   "email_published": null,
+   "phone_stored": "(202) 690-7300",
+   "phone_status": "unreachable",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": null,
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "hrsa.gov and hhs.gov OSDBU pages returned 403."
+  },
+  {
+   "key": "ACF",
+   "email_stored": "osdbu@hhs.gov",
+   "email_status": "unreachable",
+   "email_published": null,
+   "phone_stored": "(202) 690-7300",
+   "phone_status": "unreachable",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": null,
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "acf.hhs.gov and hhs.gov pages returned 403."
+  },
+  {
+   "key": "SAMHSA",
+   "email_stored": "osdbu@hhs.gov",
+   "email_status": "not_published",
+   "email_published": null,
+   "phone_stored": "(202) 690-7300",
+   "phone_status": "not_published",
+   "phone_published": null,
+   "director_published": null,
+   "director_title": null,
+   "office_name_published": null,
+   "source_url": "https://www.samhsa.gov/about/budget/contracts",
+   "checked_at": "2026-11-17",
+   "broken_links": [],
+   "notes": "SAMHSA contracts page has no SB contact (general 1-877-726-4727 only). Stored forecastUrl returned 403. hhs.gov OSDBU 403."
+  }
+ ],
+ "military_raw": [
+  {
+   "key": "NAVSUP",
+   "email_status": "not_published",
+   "email_published": null,
+   "source_url": "https://www.navsup.navy.mil/",
+   "broken_links": [
+    "https://www.navsup.navy.mil/Business-Operations/Small-Business/ (404)"
+   ],
+   "notes": "homepage lists no small-business mailbox; stored forecastUrl is a 404"
+  },
+  {
+   "key": "SSP",
+   "email_status": "different_published",
+   "email_published": "sspsmallbusiness@ssp.navy.mil",
+   "source_url": "https://www.ssp.navy.mil/Doing-Business/Small-Business-Office/",
+   "broken_links": [],
+   "notes": "stored ssp_osbp@navy.mil not on page; phone not on page"
+  },
+  {
+   "key": "NECC",
+   "email_status": "unreachable",
+   "email_published": null,
+   "source_url": "https://www.necc.navy.mil/",
+   "broken_links": [
+    "https://www.necc.navy.mil/ (did not load: chrome-error)"
+   ],
+   "notes": ""
+  },
+  {
+   "key": "MSC",
+   "email_status": "different_published",
+   "email_published": "msc_smallbiz@us.navy.mil",
+   "source_url": "https://www.msc.usff.navy.mil/Doing-Business-with-MSC/Small-Business-Opportunities/",
+   "broken_links": [],
+   "notes": "stored msc_osbp@navy.mil not on page"
+  },
+  {
+   "key": "CNIC",
+   "email_status": "not_published",
+   "email_published": null,
+   "source_url": "https://www.cnic.navy.mil/Business-Opportunities/",
+   "broken_links": [],
+   "notes": "page reached; no small-business mailbox listed"
+  },
+  {
+   "key": "NETC",
+   "email_status": "no_official_sb_page",
+   "email_published": null,
+   "source_url": "https://www.netc.navy.mil/",
+   "broken_links": [],
+   "notes": "homepage reached; no small-business link or mailbox"
+  },
+  {
+   "key": "ONI",
+   "email_status": "no_official_sb_page",
+   "email_published": null,
+   "source_url": "https://www.oni.navy.mil/",
+   "broken_links": [],
+   "notes": "homepage reached; no small-business link or mailbox found; stored mailbox appears nowhere"
+  },
+  {
+   "key": "USINDOPACOM",
+   "email_status": "no_official_sb_page",
+   "email_published": null,
+   "source_url": "https://www.pacom.mil/",
+   "broken_links": [],
+   "notes": "homepage reached; no small-business link or mailbox found; stored mailbox appears nowhere"
+  },
+  {
+   "key": "USFF",
+   "email_status": "no_official_sb_page",
+   "email_published": null,
+   "source_url": "https://www.usff.navy.mil/",
+   "broken_links": [],
+   "notes": "homepage reached; no small-business link or mailbox found; stored mailbox appears nowhere"
+  },
+  {
+   "key": "FLTCYBER",
+   "email_status": "no_official_sb_page",
+   "email_published": null,
+   "source_url": "https://www.fcc.navy.mil/",
+   "broken_links": [],
+   "notes": "homepage reached; no small-business link or mailbox found; stored mailbox appears nowhere"
+  },
+  {
+   "key": "NPC",
+   "email_status": "no_official_sb_page",
+   "email_published": null,
+   "source_url": "https://www.mynavyhr.navy.mil/",
+   "broken_links": [],
+   "notes": "homepage reached; no small-business link or mailbox found; stored mailbox appears nowhere"
+  },
+  {
+   "key": "USNAVSO",
+   "email_status": "unreachable",
+   "email_published": null,
+   "source_url": "https://www.usnavso.navy.mil/",
+   "broken_links": [
+    "https://www.usnavso.navy.mil/ (did not load)"
+   ],
+   "notes": ""
+  },
+  {
+   "key": "Army Contracting Command",
+   "email_status": "unreachable",
+   "email_published": null,
+   "source_url": "https://acc.army.mil/smallbusiness/",
+   "broken_links": [
+    "https://acc.army.mil/smallbusiness/ (did not load in browser)"
+   ],
+   "notes": "named director Karen C. Davis remains UNVERIFIED"
+  },
+  {
+   "key": "TRADOC",
+   "email_status": "unreachable",
+   "email_published": null,
+   "source_url": "https://www.tradoc.army.mil/Resources/Contracting/",
+   "broken_links": [
+    "https://www.tradoc.army.mil/Resources/Contracting/ (chrome-error)"
+   ],
+   "notes": ""
+  },
+  {
+   "key": "ARCYBER",
+   "email_status": "no_official_sb_page",
+   "email_published": null,
+   "source_url": "https://www.arcyber.army.mil/Resources/",
+   "broken_links": [],
+   "notes": "Resources page reached; no small-business link or mailbox"
+  },
+  {
+   "key": "USARCENT",
+   "email_status": "no_official_sb_page",
+   "email_published": null,
+   "source_url": "https://www.usarcent.army.mil/",
+   "broken_links": [],
+   "notes": "homepage reached; no small-business link or mailbox"
+  },
+  {
+   "key": "USARPAC",
+   "email_status": "no_official_sb_page",
+   "email_published": null,
+   "source_url": "https://www.usarpac.army.mil/",
+   "broken_links": [],
+   "notes": "homepage reached; no small-business link or mailbox"
+  },
+  {
+   "key": "FORSCOM",
+   "email_status": "unreachable",
+   "email_published": null,
+   "source_url": "https://www.forscom.army.mil/",
+   "broken_links": [],
+   "notes": "page could not be read in browser (cannot attach)"
+  },
+  {
+   "key": "SDDC",
+   "email_status": "unreachable",
+   "email_published": null,
+   "source_url": "https://www.sddc.army.mil/Pages/Business-Opportunities.aspx",
+   "broken_links": [
+    "https://www.sddc.army.mil/Pages/Business-Opportunities.aspx (redirects off-domain)"
+   ],
+   "notes": ""
+  },
+  {
+   "key": "USASMDC",
+   "email_status": "different_published",
+   "email_published": "usarmy.redstone.smdc.mbx.small-business-office@army.mil",
+   "source_url": "https://www.smdc.army.mil/RESOURCES/SBO/",
+   "broken_links": [
+    "https://www.smdc.army.mil/Contracting/ (404)"
+   ],
+   "notes": "stored ...mbx.osbp@army.mil not published; phone not on page"
+  },
+  {
+   "key": "USAREUR-AF",
+   "email_status": "unreachable",
+   "email_published": null,
+   "source_url": "https://www.europeafrica.army.mil/Contracting/",
+   "broken_links": [
+    "https://www.europeafrica.army.mil/Contracting/ (404)"
+   ],
+   "notes": "stored contracting page is a 404; no SB page found"
+  },
+  {
+   "key": "Air Force Sustainment Center",
+   "email_status": "different_published",
+   "email_published": "afsc.sb.workflow@us.af.mil",
+   "source_url": "https://www.afsc.af.mil/Units/SBO/",
+   "broken_links": [
+    "https://www.afsc.af.mil/Units/Small-Business/ (no SB content; SBO page is /Units/SBO/)"
+   ],
+   "director_published": null,
+   "notes": "official SBO page lists no named director; stored named director 'Michael Boyd' does not appear \u2192 remove the name, use the role title. Page also lists afsc.ol.sb@us.af.mil and individual specialists."
+  },
+  {
+   "key": "ACC",
+   "email_status": "unreachable",
+   "email_published": null,
+   "source_url": "https://www.acc.af.mil/Units/ACC-AMIC-Small-Business/",
+   "broken_links": [],
+   "notes": "ACC AMIC Small Business page returned 'Access Denied' in an ordinary browser session; not bypassed"
+  },
+  {
+   "key": "AETC",
+   "email_status": "no_official_sb_page",
+   "email_published": null,
+   "source_url": "https://www.aetc.af.mil/About-Us/",
+   "broken_links": [],
+   "notes": "stored URL is an About-Us page; no small-business link or mailbox"
+  },
+  {
+   "key": "AFGSC",
+   "email_status": "unreachable",
+   "email_published": null,
+   "source_url": "https://www.afgsc.af.mil/About-Us/",
+   "broken_links": [
+    "https://www.afgsc.af.mil/About-Us/ (404)"
+   ],
+   "notes": "stored URL is a 404"
+  },
+  {
+   "key": "AFRC",
+   "email_status": "no_official_sb_page",
+   "email_published": null,
+   "source_url": "https://www.afrc.af.mil/About-Us/",
+   "broken_links": [],
+   "notes": "stored URL is an About-Us page; no small-business link or mailbox"
+  },
+  {
+   "key": "AFSOC",
+   "email_status": "unreachable",
+   "email_published": null,
+   "source_url": "https://www.afsoc.af.mil/About-Us/",
+   "broken_links": [],
+   "notes": "'Access Denied' in an ordinary browser session; not bypassed"
+  },
+  {
+   "key": "AMC AF",
+   "email_status": "unreachable",
+   "email_published": null,
+   "source_url": "https://www.amc.af.mil/About-Us/",
+   "broken_links": [],
+   "notes": "'Access Denied' in an ordinary browser session; not bypassed"
+  },
+  {
+   "key": "PACAF",
+   "email_status": "unreachable",
+   "email_published": null,
+   "source_url": "https://www.pacaf.af.mil/About-Us/",
+   "broken_links": [],
+   "notes": "'Access Denied' in an ordinary browser session; not bypassed"
+  },
+  {
+   "key": "USAFE-AFAFRICA",
+   "email_status": "no_official_sb_page",
+   "email_published": null,
+   "source_url": "https://www.usafe.af.mil/About-Us/",
+   "broken_links": [],
+   "notes": "stored URL is an About-Us page; no small-business link or mailbox"
+  },
+  {
+   "key": "NGA",
+   "email_status": "unreachable",
+   "email_published": null,
+   "source_url": "https://www.nga.mil/resources/Doing_Business_with_NGA.html",
+   "broken_links": [
+    "https://www.nga.mil/resources/Doing_Business_with_NGA.html (404)"
+   ],
+   "notes": "stored URL is a 404"
+  },
+  {
+   "key": "NSA",
+   "email_status": "not_published",
+   "email_published": null,
+   "source_url": "https://www.nsa.gov/Business/",
+   "broken_links": [
+    "https://www.nsa.gov/Business-Opportunities/ (404)"
+   ],
+   "notes": "official Business page reached; no small-business mailbox published (links to business.defense.gov)"
+  },
+  {
+   "key": "DIA",
+   "email_status": "not_published",
+   "email_published": null,
+   "source_url": "https://www.dia.mil/Business/Office-of-Small-Business-Programs/",
+   "broken_links": [
+    "https://www.dia.mil/Business-Opportunities/ (404)"
+   ],
+   "notes": "official OSBP page reached; no mailbox published"
+  },
+  {
+   "key": "NSWCDD",
+   "email_status": "unreachable",
+   "email_published": null,
+   "source_url": "https://www.navsea.navy.mil/Home/Warfare-Centers/NSWC-Dahlgren/Partnerships/Small-Business/",
+   "broken_links": [],
+   "notes": "NAVSEA page returned 'Access Denied' in an ordinary browser session; not bypassed"
+  },
+  {
+   "key": "NSWC Crane",
+   "email_status": "unreachable",
+   "email_published": null,
+   "source_url": "https://www.navsea.navy.mil/Home/Warfare-Centers/NSWC-Crane/Partnerships/Small-Business/",
+   "broken_links": [],
+   "notes": "NAVSEA page returned 'Access Denied' in an ordinary browser session; not bypassed"
+  },
+  {
+   "key": "NUWC",
+   "email_status": "unreachable",
+   "email_published": null,
+   "source_url": "https://www.navsea.navy.mil/Home/Warfare-Centers/NUWC-Newport/Partnerships/Small-Business/",
+   "broken_links": [],
+   "notes": "NAVSEA page returned 'Access Denied' in an ordinary browser session; not bypassed"
+  },
+  {
+   "key": "NSWC Corona",
+   "email_status": "unreachable",
+   "email_published": null,
+   "source_url": "https://www.navsea.navy.mil/Home/Warfare-Centers/NSWC-Corona/",
+   "broken_links": [],
+   "notes": "NAVSEA page returned 'Access Denied' in an ordinary browser session; not bypassed"
+  },
+  {
+   "key": "PEO STRI",
+   "email_status": "no_official_sb_page",
+   "email_published": null,
+   "source_url": "https://www.peostri.army.mil/doing-business",
+   "broken_links": [],
+   "notes": "page reached (now titled CPE ST3); no small-business link or mailbox"
+  },
+  {
+   "key": "CECOM",
+   "email_status": "no_official_sb_page",
+   "email_published": null,
+   "source_url": "https://www.cecom.army.mil/contracting/",
+   "broken_links": [],
+   "notes": "page reached; no small-business link or mailbox"
+  },
+  {
+   "key": "TACOM",
+   "email_status": "different_published",
+   "email_published": "usarmy.detroit.tacom.mbx.lcmc-osbp@army.mil",
+   "source_url": "https://tacom.army.mil/osbp",
+   "broken_links": [
+    "https://www.tacom.army.mil/ilsc/contracting/ (lands on TACOM homepage)"
+   ],
+   "notes": "official OSBP page publishes a different mailbox; stored ...mbx.small-business@army.mil not on page"
+  },
+  {
+   "key": "AMCOM",
+   "email_status": "no_official_sb_page",
+   "email_published": null,
+   "source_url": "https://www.amcom.army.mil/",
+   "broken_links": [],
+   "notes": "homepage reached; no small-business link or mailbox"
+  },
+  {
+   "key": "WHS",
+   "email_status": "different_published",
+   "email_published": "whs.osbp@mail.mil",
+   "source_url": "https://www.whs.mil/About-WHS/Offices/Office-of-Small-Business-Programs-OSBP/",
+   "broken_links": [
+    "https://www.whs.mil/our-services/contracting/ (404)"
+   ],
+   "notes": "official OSBP page publishes whs.osbp@mail.mil; stored whs.smallbusiness@mail.mil not on page"
+  },
+  {
+   "key": "AFLCMC",
+   "email_status": "not_published",
+   "email_published": null,
+   "source_url": "https://www.aflcmc.af.mil/SMALL-BUSINESS-OFFICE/",
+   "broken_links": [
+    "https://www.aflcmc.af.mil/Organizations/Contracting/ (404)"
+   ],
+   "notes": "official Small Business Office page reached; no mailbox in page HTML"
+  },
+  {
+   "key": "AFCEC",
+   "email_status": "unreachable",
+   "email_published": null,
+   "source_url": "https://www.afcec.af.mil/Home/AFCEC-Contracting/",
+   "broken_links": [],
+   "notes": "'Access Denied' in an ordinary browser session; not bypassed"
+  },
+  {
+   "key": "SMC",
+   "email_status": "unreachable",
+   "email_published": null,
+   "source_url": "https://www.losangeles.spaceforce.mil/About-Us/Fact-Sheets/",
+   "broken_links": [],
+   "notes": "'Access Denied' in an ordinary browser session; not bypassed"
+  },
+  {
+   "key": "WHC",
+   "email_status": "unreachable",
+   "email_published": null,
+   "source_url": "https://www.whc.army.mil/contracting/",
+   "broken_links": [
+    "https://www.whc.army.mil/contracting/ (did not load)"
+   ],
+   "notes": "page did not load (chrome-error)"
+  },
+  {
+   "key": "NSWC",
+   "email_status": "unreachable",
+   "email_published": null,
+   "source_url": "https://www.nsw.navy.mil/",
+   "broken_links": [],
+   "notes": "'Access Denied' in an ordinary browser session; not bypassed"
+  },
+  {
+   "key": "USASOC",
+   "email_status": "unreachable",
+   "email_published": null,
+   "source_url": "https://www.soc.mil/USASOC%20Contracting/USASOC%20Contracting.html",
+   "broken_links": [],
+   "notes": "redirects off-domain; not read"
+  }
+ ],
+ "applied_changes": [
+  {
+   "key": "ACC",
+   "change": "unreachable",
+   "before": {
+    "director": "ACC OSBP Director",
+    "directorVerified": null,
+    "email": "acc.sb@us.af.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "ACC OSBP Director",
+    "directorVerified": null,
+    "email": "acc.sb@us.af.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "ACF",
+   "change": "unreachable",
+   "before": {
+    "director": "HHS OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@hhs.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "HHS OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@hhs.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "AETC",
+   "change": "no_official_sb_page",
+   "before": {
+    "director": "AETC OSBP Director",
+    "directorVerified": null,
+    "email": "aetc.sb@us.af.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "AETC OSBP Director",
+    "directorVerified": null,
+    "email": "aetc.sb@us.af.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "AFCEC",
+   "change": "unreachable",
+   "before": {
+    "director": "AFCEC Small Business Director",
+    "directorVerified": null,
+    "email": "afcec.sb@us.af.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "AFCEC Small Business Director",
+    "directorVerified": null,
+    "email": "afcec.sb@us.af.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "AFGSC",
+   "change": "unreachable",
+   "before": {
+    "director": "AFGSC OSBP Director",
+    "directorVerified": null,
+    "email": "afgsc.sb@us.af.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "AFGSC OSBP Director",
+    "directorVerified": null,
+    "email": "afgsc.sb@us.af.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "AFLCMC",
+   "change": "not_published",
+   "before": {
+    "director": "AFLCMC Small Business Director",
+    "directorVerified": null,
+    "email": "aflcmc.sb@us.af.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "AFLCMC Small Business Director",
+    "directorVerified": null,
+    "email": "",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "AFRC",
+   "change": "no_official_sb_page",
+   "before": {
+    "director": "AFRC OSBP Director",
+    "directorVerified": null,
+    "email": "afrc.sb@us.af.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "AFRC OSBP Director",
+    "directorVerified": null,
+    "email": "afrc.sb@us.af.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "AFSOC",
+   "change": "unreachable",
+   "before": {
+    "director": "AFSOC OSBP Director",
+    "directorVerified": null,
+    "email": "afsoc.sb@us.af.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "AFSOC OSBP Director",
+    "directorVerified": null,
+    "email": "afsoc.sb@us.af.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "AMC AF",
+   "change": "unreachable",
+   "before": {
+    "director": "AMC OSBP Director",
+    "directorVerified": null,
+    "email": "amc.sb@us.af.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "AMC OSBP Director",
+    "directorVerified": null,
+    "email": "amc.sb@us.af.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "AMCOM",
+   "change": "no_official_sb_page",
+   "before": {
+    "director": "AMCOM Small Business Director",
+    "directorVerified": null,
+    "email": "usarmy.redstone.amcom.mbx.small-business@army.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "AMCOM Small Business Director",
+    "directorVerified": null,
+    "email": "usarmy.redstone.amcom.mbx.small-business@army.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "APHIS",
+   "change": "unreachable",
+   "before": {
+    "director": "APHIS OSBP Director",
+    "directorVerified": null,
+    "email": "aphis_osdbu@usda.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "APHIS OSBP Director",
+    "directorVerified": null,
+    "email": "aphis_osdbu@usda.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "ARCYBER",
+   "change": "no_official_sb_page",
+   "before": {
+    "director": "ARCYBER OSBP Director",
+    "directorVerified": null,
+    "email": "usarmy.meade.arcyber.mbx.osbp@army.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "ARCYBER OSBP Director",
+    "directorVerified": null,
+    "email": "usarmy.meade.arcyber.mbx.osbp@army.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "ARS",
+   "change": "unreachable",
+   "before": {
+    "director": "ARS OSBP Director",
+    "directorVerified": null,
+    "email": "ars_osdbu@usda.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "ARS OSBP Director",
+    "directorVerified": null,
+    "email": "ars_osdbu@usda.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "ATF",
+   "change": "different_published",
+   "before": {
+    "director": "ATF OSDBU Director",
+    "directorVerified": null,
+    "email": "atf.osdbu@atf.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "ATF OSDBU Director",
+    "directorVerified": null,
+    "email": "john.klar@atf.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "Air Force Sustainment Center",
+   "change": "different_published",
+   "before": {
+    "director": "Michael Boyd",
+    "directorVerified": null,
+    "email": "afsc.sb@us.af.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "Michael Boyd",
+    "directorVerified": null,
+    "email": "afsc.sb.workflow@us.af.mil",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "Army Contracting Command",
+   "change": "unreachable",
+   "before": {
+    "director": "Karen C. Davis",
+    "directorVerified": null,
+    "email": "usarmy.redstone.acc.list.acc-small-business@army.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "Karen C. Davis",
+    "directorVerified": null,
+    "email": "usarmy.redstone.acc.list.acc-small-business@army.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "BIA",
+   "change": "different_published",
+   "before": {
+    "director": "DOI OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@ios.doi.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "DOI OSDBU Director",
+    "directorVerified": null,
+    "email": "doi_osdbu@ios.doi.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "BLM",
+   "change": "unreachable",
+   "before": {
+    "director": "BLM OSBP Director",
+    "directorVerified": null,
+    "email": "blm_osdbu@blm.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "BLM OSBP Director",
+    "directorVerified": null,
+    "email": "blm_osdbu@blm.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "BOEM",
+   "change": "different_published",
+   "before": {
+    "director": "DOI OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@ios.doi.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "DOI OSDBU Director",
+    "directorVerified": null,
+    "email": "doi_osdbu@ios.doi.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "BOP",
+   "change": "different_published",
+   "before": {
+    "director": "BOP OSDBU Director",
+    "directorVerified": null,
+    "email": "bop.acquisitions@usdoj.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "BOP OSDBU Director",
+    "directorVerified": null,
+    "email": "BOP-ADM-SmallBusinessProgram-S@bop.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "BOR",
+   "change": "unreachable",
+   "before": {
+    "director": "BOR OSBP Director",
+    "directorVerified": null,
+    "email": "bor_osdbu@usbr.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "BOR OSBP Director",
+    "directorVerified": null,
+    "email": "bor_osdbu@usbr.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "BSEE",
+   "change": "different_published",
+   "before": {
+    "director": "DOI OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@ios.doi.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "DOI OSDBU Director",
+    "directorVerified": null,
+    "email": "doi_osdbu@ios.doi.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "CBP",
+   "change": "different_published",
+   "before": {
+    "director": "CBP OSDBU Director",
+    "directorVerified": null,
+    "email": "cbp-smallbusiness@cbp.dhs.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "CBP OSDBU Director",
+    "directorVerified": null,
+    "email": "CBP-IPOP@cbp.dhs.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "CDC",
+   "change": "not_published",
+   "before": {
+    "director": "CDC OSDBU Director",
+    "directorVerified": null,
+    "email": "cdcosdbu@cdc.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "CDC OSDBU Director",
+    "directorVerified": null,
+    "email": "",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "CECOM",
+   "change": "no_official_sb_page",
+   "before": {
+    "director": "CECOM Small Business Director",
+    "directorVerified": null,
+    "email": "usarmy.apg.cecom.mbx.small-business@army.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "CECOM Small Business Director",
+    "directorVerified": null,
+    "email": "usarmy.apg.cecom.mbx.small-business@army.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "CISA",
+   "change": "different_published",
+   "before": {
+    "director": "CISA OSDBU Director",
+    "directorVerified": null,
+    "email": "cisa.osdbu@cisa.dhs.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "CISA OSDBU Director",
+    "directorVerified": null,
+    "email": "melody.hinkle@mail.cisa.dhs.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "CMS",
+   "change": "unreachable",
+   "before": {
+    "director": "CMS OSDBU Director",
+    "directorVerified": null,
+    "email": "cms.osdbu@cms.hhs.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "CMS OSDBU Director",
+    "directorVerified": null,
+    "email": "cms.osdbu@cms.hhs.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "CNIC",
+   "change": "not_published",
+   "before": {
+    "director": "CNIC OSBP Director",
+    "directorVerified": null,
+    "email": "cnic_osbp@navy.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "CNIC OSBP Director",
+    "directorVerified": null,
+    "email": "",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "Census",
+   "change": "unreachable",
+   "before": {
+    "director": "DOC OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@doc.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "DOC OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@doc.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "DEA",
+   "change": "different_published",
+   "before": {
+    "director": "DEA OSDBU Director",
+    "directorVerified": null,
+    "email": "dea.osdbu@usdoj.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "DEA OSDBU Director",
+    "directorVerified": null,
+    "email": "DEAsmallbusinessprogram@dea.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "DIA",
+   "change": "not_published",
+   "before": {
+    "director": "DIA OSBP Director",
+    "directorVerified": null,
+    "email": "DIASmallBusiness@dia.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "DIA OSBP Director",
+    "directorVerified": null,
+    "email": "",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "DOJ",
+   "change": "not_published",
+   "before": {
+    "director": "Robert Connolly",
+    "directorVerified": null,
+    "email": "OSDBU@usdoj.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "Robert Connolly",
+    "directorVerified": null,
+    "email": "",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "DS",
+   "change": "unreachable",
+   "before": {
+    "director": "State OSDBU Director",
+    "directorVerified": null,
+    "email": "smallbusiness@state.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "State OSDBU Director",
+    "directorVerified": null,
+    "email": "smallbusiness@state.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "ETA",
+   "change": "different_published",
+   "before": {
+    "director": "DOL OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@dol.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "DOL OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbucustomerservice@dol.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "Education",
+   "change": "unreachable",
+   "before": {
+    "director": "ED OSDBU Director",
+    "directorVerified": null,
+    "email": "ed.osdbu@ed.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "ED OSDBU Director",
+    "directorVerified": null,
+    "email": "ed.osdbu@ed.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "FAA",
+   "change": "not_published",
+   "before": {
+    "director": "FAA OSDBU Director",
+    "directorVerified": null,
+    "email": "faa.osdbu@faa.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "FAA OSDBU Director",
+    "directorVerified": null,
+    "email": "",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "FAS",
+   "change": "different_published",
+   "before": {
+    "director": "GSA OSBU Director",
+    "directorVerified": null,
+    "email": "small.business@gsa.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "GSA OSBU Director",
+    "directorVerified": null,
+    "email": "smallbusiness@gsa.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "FBI",
+   "change": "different_published",
+   "before": {
+    "director": "FBI OSDBU Director",
+    "directorVerified": null,
+    "email": "fbi.procurement@fbi.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "FBI OSDBU Director",
+    "directorVerified": null,
+    "email": "smallbusiness@fbi.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "FCC",
+   "change": "unreachable",
+   "before": {
+    "director": "FCC OCBO Director",
+    "directorVerified": null,
+    "email": "ocbo@fcc.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "FCC OCBO Director",
+    "directorVerified": null,
+    "email": "ocbo@fcc.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "FDA",
+   "change": "different_published",
+   "before": {
+    "director": "FDA OSDBU Director",
+    "directorVerified": null,
+    "email": "fda.osdbu@fda.hhs.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "FDA OSDBU Director",
+    "directorVerified": null,
+    "email": "cynthia.anderson@hhs.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "FDIC",
+   "change": "not_published",
+   "before": {
+    "director": "Nikita Pearson",
+    "directorVerified": null,
+    "email": "omwi@fdic.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "Nikita Pearson",
+    "directorVerified": null,
+    "email": "",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "FEMA",
+   "change": "different_published",
+   "before": {
+    "director": "FEMA OSDBU Director",
+    "directorVerified": null,
+    "email": "fema-osdbu@fema.dhs.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "FEMA OSDBU Director",
+    "directorVerified": null,
+    "email": "FEMA-SB@fema.dhs.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "FHWA",
+   "change": "unreachable",
+   "before": {
+    "director": "DOT OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@dot.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "DOT OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@dot.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "FLETC",
+   "change": "different_published",
+   "before": {
+    "director": "FLETC OSBP Director",
+    "directorVerified": null,
+    "email": "fletc.osdbu@fletc.dhs.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "FLETC OSBP Director",
+    "directorVerified": null,
+    "email": "allan.w.gray@fletc.dhs.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "FLTCYBER",
+   "change": "no_official_sb_page",
+   "before": {
+    "director": "FLTCYBER OSBP Director",
+    "directorVerified": null,
+    "email": "fltcyber_osbp@navy.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "FLTCYBER OSBP Director",
+    "directorVerified": null,
+    "email": "fltcyber_osbp@navy.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "FORSCOM",
+   "change": "unreachable",
+   "before": {
+    "director": "FORSCOM OSBP Director",
+    "directorVerified": null,
+    "email": "usarmy.bragg.forscom.mbx.osbp@army.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "FORSCOM OSBP Director",
+    "directorVerified": null,
+    "email": "usarmy.bragg.forscom.mbx.osbp@army.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "FRA",
+   "change": "unreachable",
+   "before": {
+    "director": "DOT OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@dot.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "DOT OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@dot.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "FSA",
+   "change": "unreachable",
+   "before": {
+    "director": "USDA OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@usda.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "USDA OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@usda.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "FTA",
+   "change": "unreachable",
+   "before": {
+    "director": "DOT OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@dot.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "DOT OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@dot.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "FWS",
+   "change": "unreachable",
+   "before": {
+    "director": "FWS OSBP Director",
+    "directorVerified": null,
+    "email": "fws_osdbu@fws.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "FWS OSBP Director",
+    "directorVerified": null,
+    "email": "fws_osdbu@fws.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "FinCEN",
+   "change": "different_published",
+   "before": {
+    "director": "Treasury OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@treasury.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "Treasury OSDBU Director",
+    "directorVerified": null,
+    "email": "Smallbusiness@fiscal.treasury.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "GPO",
+   "change": "not_published",
+   "before": {
+    "director": "GPO OSDBU Director",
+    "directorVerified": null,
+    "email": "vendorservices@gpo.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "GPO OSDBU Director",
+    "directorVerified": null,
+    "email": "",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "HRSA",
+   "change": "unreachable",
+   "before": {
+    "director": "HHS OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@hhs.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "HHS OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@hhs.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "HUD",
+   "change": "unreachable",
+   "before": {
+    "director": "Jean Shao",
+    "directorVerified": null,
+    "email": "SDB@hud.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "Jean Shao",
+    "directorVerified": null,
+    "email": "SDB@hud.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "ICE",
+   "change": "different_published",
+   "before": {
+    "director": "ICE OSDBU Director",
+    "directorVerified": null,
+    "email": "ice-smallbusiness@ice.dhs.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "ICE OSDBU Director",
+    "directorVerified": null,
+    "email": "Samuel.L.Thompson@ice.dhs.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "IHS",
+   "change": "unreachable",
+   "before": {
+    "director": "HHS OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@hhs.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "HHS OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@hhs.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "IRS",
+   "change": "different_published",
+   "before": {
+    "director": "IRS OSDBU Director",
+    "directorVerified": null,
+    "email": "irs.smallbusiness@irs.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "IRS OSDBU Director",
+    "directorVerified": null,
+    "email": "Procurement.SBRO@irs.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "MARAD",
+   "change": "unreachable",
+   "before": {
+    "director": "DOT OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@dot.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "DOT OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@dot.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "MSC",
+   "change": "different_published",
+   "before": {
+    "director": "MSC OSBP Director",
+    "directorVerified": null,
+    "email": "msc_osbp@navy.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "MSC OSBP Director",
+    "directorVerified": null,
+    "email": "msc_smallbiz@us.navy.mil",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "MSHA",
+   "change": "different_published",
+   "before": {
+    "director": "DOL OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@dol.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "DOL OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbucustomerservice@dol.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "NARA",
+   "change": "not_published",
+   "before": {
+    "director": "NARA OSDBU Director",
+    "directorVerified": null,
+    "email": "small.business@nara.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "NARA OSDBU Director",
+    "directorVerified": null,
+    "email": "",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "NAVSUP",
+   "change": "unreachable",
+   "before": {
+    "director": "NAVSUP OSBP Director",
+    "directorVerified": null,
+    "email": "navsup_small_business@navy.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "NAVSUP OSBP Director",
+    "directorVerified": null,
+    "email": "navsup_small_business@navy.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "NCA",
+   "change": "different_published",
+   "before": {
+    "director": "VA OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@va.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "VA OSDBU Director",
+    "directorVerified": null,
+    "email": "vetbiz@va.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "NECC",
+   "change": "unreachable",
+   "before": {
+    "director": "NECC OSBP Director",
+    "directorVerified": null,
+    "email": "necc_osbp@navy.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "NECC OSBP Director",
+    "directorVerified": null,
+    "email": "necc_osbp@navy.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "NETC",
+   "change": "no_official_sb_page",
+   "before": {
+    "director": "NETC OSBP Director",
+    "directorVerified": null,
+    "email": "netc_osbp@navy.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "NETC OSBP Director",
+    "directorVerified": null,
+    "email": "netc_osbp@navy.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "NGA",
+   "change": "unreachable",
+   "before": {
+    "director": "NGA OSBP Director",
+    "directorVerified": null,
+    "email": "NGASmallBusiness@nga.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "NGA OSBP Director",
+    "directorVerified": null,
+    "email": "NGASmallBusiness@nga.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "NIH",
+   "change": "unreachable",
+   "before": {
+    "director": "NIH OSDBU Director",
+    "directorVerified": null,
+    "email": "nihsbo@od.nih.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "NIH OSDBU Director",
+    "directorVerified": null,
+    "email": "nihsbo@od.nih.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "NIST",
+   "change": "different_published",
+   "before": {
+    "director": "DOC OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@doc.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "DOC OSDBU Director",
+    "directorVerified": null,
+    "email": "derek.greene@nist.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "NNSA",
+   "change": "different_published",
+   "before": {
+    "director": "NNSA OSDBU Director",
+    "directorVerified": null,
+    "email": "nnsa.osbp@nnsa.doe.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "NNSA OSDBU Director",
+    "directorVerified": null,
+    "email": "Chelsea.Murphy@nnsa.doe.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "NOAA",
+   "change": "different_published",
+   "before": {
+    "director": "NOAA OSDBU Director",
+    "directorVerified": null,
+    "email": "noaa.osdbu@noaa.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "NOAA OSDBU Director",
+    "directorVerified": null,
+    "email": "noaasb@noaa.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "NPC",
+   "change": "no_official_sb_page",
+   "before": {
+    "director": "NPC OSBP Director",
+    "directorVerified": null,
+    "email": "npc_osbp@navy.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "NPC OSBP Director",
+    "directorVerified": null,
+    "email": "npc_osbp@navy.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "NPS",
+   "change": "unreachable",
+   "before": {
+    "director": "NPS OSBP Director",
+    "directorVerified": null,
+    "email": "nps_osdbu@nps.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "NPS OSBP Director",
+    "directorVerified": null,
+    "email": "nps_osdbu@nps.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "NRC",
+   "change": "unreachable",
+   "before": {
+    "director": "Vonna Ordaz",
+    "directorVerified": null,
+    "email": "sbcr@nrc.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "Vonna Ordaz",
+    "directorVerified": null,
+    "email": "sbcr@nrc.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "NRCS",
+   "change": "unreachable",
+   "before": {
+    "director": "NRCS OSBP Director",
+    "directorVerified": null,
+    "email": "nrcs_osdbu@usda.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "NRCS OSBP Director",
+    "directorVerified": null,
+    "email": "nrcs_osdbu@usda.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "NSA",
+   "change": "not_published",
+   "before": {
+    "director": "NSA OSBP Director",
+    "directorVerified": null,
+    "email": "SmallBusiness@nsa.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "NSA OSBP Director",
+    "directorVerified": null,
+    "email": "",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "NSWC",
+   "change": "unreachable",
+   "before": {
+    "director": "NSWC OSBP Director",
+    "directorVerified": null,
+    "email": "nswc_osbp@navy.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "NSWC OSBP Director",
+    "directorVerified": null,
+    "email": "nswc_osbp@navy.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "NSWC Corona",
+   "change": "unreachable",
+   "before": {
+    "director": "NSWC Corona Small Business Director",
+    "directorVerified": null,
+    "email": "corona_smallbusiness@navy.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "NSWC Corona Small Business Director",
+    "directorVerified": null,
+    "email": "corona_smallbusiness@navy.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "NSWC Crane",
+   "change": "unreachable",
+   "before": {
+    "director": "NSWC Crane Small Business Director",
+    "directorVerified": null,
+    "email": "crane_smallbusiness@navy.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "NSWC Crane Small Business Director",
+    "directorVerified": null,
+    "email": "crane_smallbusiness@navy.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "NSWCDD",
+   "change": "unreachable",
+   "before": {
+    "director": "NSWCDD Small Business Director",
+    "directorVerified": null,
+    "email": "nswcdd_smallbusiness@navy.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "NSWCDD Small Business Director",
+    "directorVerified": null,
+    "email": "nswcdd_smallbusiness@navy.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "NUWC",
+   "change": "unreachable",
+   "before": {
+    "director": "NUWC Small Business Director",
+    "directorVerified": null,
+    "email": "nuwc_smallbusiness@navy.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "NUWC Small Business Director",
+    "directorVerified": null,
+    "email": "nuwc_smallbusiness@navy.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "OASAM",
+   "change": "different_published",
+   "before": {
+    "director": "DOL OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@dol.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "DOL OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbucustomerservice@dol.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "OBO",
+   "change": "unreachable",
+   "before": {
+    "director": "State OSDBU Director",
+    "directorVerified": null,
+    "email": "smallbusiness@state.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "State OSDBU Director",
+    "directorVerified": null,
+    "email": "smallbusiness@state.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "OCC",
+   "change": "different_published",
+   "before": {
+    "director": "Treasury OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@treasury.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "Treasury OSDBU Director",
+    "directorVerified": null,
+    "email": "SmallBusinessProgram@occ.treas.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "ONI",
+   "change": "no_official_sb_page",
+   "before": {
+    "director": "ONI OSBP Director",
+    "directorVerified": null,
+    "email": "oni_osbp@navy.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "ONI OSBP Director",
+    "directorVerified": null,
+    "email": "oni_osbp@navy.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "OPM",
+   "change": "different_published",
+   "before": {
+    "director": "OPM OSDBU Director",
+    "directorVerified": null,
+    "email": "OSDBU@opm.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "OPM OSDBU Director",
+    "directorVerified": null,
+    "email": "Small.Business@opm.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "OSHA",
+   "change": "different_published",
+   "before": {
+    "director": "DOL OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@dol.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "DOL OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbucustomerservice@dol.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "PACAF",
+   "change": "unreachable",
+   "before": {
+    "director": "PACAF OSBP Director",
+    "directorVerified": null,
+    "email": "pacaf.sb@us.af.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "PACAF OSBP Director",
+    "directorVerified": null,
+    "email": "pacaf.sb@us.af.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "PBS",
+   "change": "different_published",
+   "before": {
+    "director": "GSA OSBU Director",
+    "directorVerified": null,
+    "email": "small.business@gsa.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "GSA OSBU Director",
+    "directorVerified": null,
+    "email": "smallbusiness@gsa.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "PEO STRI",
+   "change": "no_official_sb_page",
+   "before": {
+    "director": "PEO STRI Small Business Director",
+    "directorVerified": null,
+    "email": "usarmy.orlando.peo-stri.mbx.small-business@army.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "PEO STRI Small Business Director",
+    "directorVerified": null,
+    "email": "usarmy.orlando.peo-stri.mbx.small-business@army.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "RD",
+   "change": "unreachable",
+   "before": {
+    "director": "USDA OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@usda.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "USDA OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@usda.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "SAMHSA",
+   "change": "unreachable",
+   "before": {
+    "director": "HHS OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@hhs.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "HHS OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@hhs.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "SBA",
+   "change": "not_published",
+   "before": {
+    "director": "SBA Director",
+    "directorVerified": null,
+    "email": "sbacacao@sba.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "SBA Director",
+    "directorVerified": null,
+    "email": "",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "SDDC",
+   "change": "unreachable",
+   "before": {
+    "director": "SDDC OSBP Director",
+    "directorVerified": null,
+    "email": "usarmy.scott.sddc.mbx.osbp@army.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "SDDC OSBP Director",
+    "directorVerified": null,
+    "email": "usarmy.scott.sddc.mbx.osbp@army.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "SEC",
+   "change": "unreachable",
+   "before": {
+    "director": "SEC OMWI Director",
+    "directorVerified": null,
+    "email": "omwi@sec.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "SEC OMWI Director",
+    "directorVerified": null,
+    "email": "omwi@sec.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "SMC",
+   "change": "unreachable",
+   "before": {
+    "director": "SMC Small Business Director",
+    "directorVerified": null,
+    "email": "smc.sb@spaceforce.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "SMC Small Business Director",
+    "directorVerified": null,
+    "email": "smc.sb@spaceforce.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "SSP",
+   "change": "different_published",
+   "before": {
+    "director": "SSP OSBP Director",
+    "directorVerified": null,
+    "email": "ssp_osbp@navy.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "SSP OSBP Director",
+    "directorVerified": null,
+    "email": "sspsmallbusiness@ssp.navy.mil",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "Smithsonian",
+   "change": "unreachable",
+   "before": {
+    "director": "SI OSDBU Director",
+    "directorVerified": null,
+    "email": "osp@si.edu",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "SI OSDBU Director",
+    "directorVerified": null,
+    "email": "osp@si.edu",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "State",
+   "change": "unreachable",
+   "before": {
+    "director": "Gail Clark",
+    "directorVerified": null,
+    "email": "sdbupolicy@state.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "Gail Clark",
+    "directorVerified": null,
+    "email": "sdbupolicy@state.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "TACOM",
+   "change": "different_published",
+   "before": {
+    "director": "TACOM Small Business Director",
+    "directorVerified": null,
+    "email": "usarmy.detroit.tacom.mbx.small-business@army.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "TACOM Small Business Director",
+    "directorVerified": null,
+    "email": "usarmy.detroit.tacom.mbx.lcmc-osbp@army.mil",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "TRADOC",
+   "change": "unreachable",
+   "before": {
+    "director": "TRADOC OSBP Director",
+    "directorVerified": null,
+    "email": "usarmy.jble.tradoc.mbx.g8-osbp@army.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "TRADOC OSBP Director",
+    "directorVerified": null,
+    "email": "usarmy.jble.tradoc.mbx.g8-osbp@army.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "TSA",
+   "change": "different_published",
+   "before": {
+    "director": "TSA OSDBU Director",
+    "directorVerified": null,
+    "email": "tsa-smallbusiness@tsa.dhs.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "TSA OSDBU Director",
+    "directorVerified": null,
+    "email": "TSASmallBiz@tsa.dhs.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "TTB",
+   "change": "different_published",
+   "before": {
+    "director": "Treasury OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@treasury.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "Treasury OSDBU Director",
+    "directorVerified": null,
+    "email": "Smallbusiness@fiscal.treasury.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "TVA",
+   "change": "unreachable",
+   "before": {
+    "director": "TVA Supplier Diversity Director",
+    "directorVerified": null,
+    "email": "supplierdiversity@tva.com",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "TVA Supplier Diversity Director",
+    "directorVerified": null,
+    "email": "supplierdiversity@tva.com",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "USAFE-AFAFRICA",
+   "change": "no_official_sb_page",
+   "before": {
+    "director": "USAFE-AFAFRICA OSBP Director",
+    "directorVerified": null,
+    "email": "usafe.sb@us.af.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "USAFE-AFAFRICA OSBP Director",
+    "directorVerified": null,
+    "email": "usafe.sb@us.af.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "USARCENT",
+   "change": "no_official_sb_page",
+   "before": {
+    "director": "USARCENT OSBP Director",
+    "directorVerified": null,
+    "email": "usarmy.shaw.usarcent.mbx.osbp@army.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "USARCENT OSBP Director",
+    "directorVerified": null,
+    "email": "usarmy.shaw.usarcent.mbx.osbp@army.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "USAREUR-AF",
+   "change": "unreachable",
+   "before": {
+    "director": "USAREUR-AF OSBP Director",
+    "directorVerified": null,
+    "email": "usarmy.wiesbaden.usareur.mbx.osbp@army.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "USAREUR-AF OSBP Director",
+    "directorVerified": null,
+    "email": "usarmy.wiesbaden.usareur.mbx.osbp@army.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "USARPAC",
+   "change": "no_official_sb_page",
+   "before": {
+    "director": "USARPAC OSBP Director",
+    "directorVerified": null,
+    "email": "usarmy.shafter.usarpac.mbx.osbp@army.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "USARPAC OSBP Director",
+    "directorVerified": null,
+    "email": "usarmy.shafter.usarpac.mbx.osbp@army.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "USASMDC",
+   "change": "different_published",
+   "before": {
+    "director": "USASMDC OSBP Director",
+    "directorVerified": null,
+    "email": "usarmy.redstone.smdc.mbx.osbp@army.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "USASMDC OSBP Director",
+    "directorVerified": null,
+    "email": "usarmy.redstone.smdc.mbx.small-business-office@army.mil",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "USASOC",
+   "change": "unreachable",
+   "before": {
+    "director": "USASOC OSBP Director",
+    "directorVerified": null,
+    "email": "usarmy.bragg.usasoc.mbx.osbp@army.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "USASOC OSBP Director",
+    "directorVerified": null,
+    "email": "usarmy.bragg.usasoc.mbx.osbp@army.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "USFF",
+   "change": "no_official_sb_page",
+   "before": {
+    "director": "USFF OSBP Director",
+    "directorVerified": null,
+    "email": "usff_osbp@navy.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "USFF OSBP Director",
+    "directorVerified": null,
+    "email": "usff_osbp@navy.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "USFS",
+   "change": "different_published",
+   "before": {
+    "director": "USFS OSDBU Director",
+    "directorVerified": null,
+    "email": "usfs.osdbu@usda.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "USFS OSDBU Director",
+    "directorVerified": null,
+    "email": "sm.fs.smallbusiness@usda.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "USGS",
+   "change": "unreachable",
+   "before": {
+    "director": "USGS OSBP Director",
+    "directorVerified": null,
+    "email": "usgs_osdbu@usgs.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "USGS OSBP Director",
+    "directorVerified": null,
+    "email": "usgs_osdbu@usgs.gov",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "USINDOPACOM",
+   "change": "no_official_sb_page",
+   "before": {
+    "director": "USINDOPACOM OSBP Director",
+    "directorVerified": null,
+    "email": "usindopacom_osbp@pacom.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "USINDOPACOM OSBP Director",
+    "directorVerified": null,
+    "email": "usindopacom_osbp@pacom.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "USMS",
+   "change": "different_published",
+   "before": {
+    "director": "USMS OSDBU Director",
+    "directorVerified": null,
+    "email": "usms.osdbu@usdoj.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "USMS OSDBU Director",
+    "directorVerified": null,
+    "email": "shandora.acrey@usdoj.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "USNAVSO",
+   "change": "unreachable",
+   "before": {
+    "director": "USNAVSO OSBP Director",
+    "directorVerified": null,
+    "email": "usnavso_osbp@navy.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "USNAVSO OSBP Director",
+    "directorVerified": null,
+    "email": "usnavso_osbp@navy.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "USPTO",
+   "change": "different_published",
+   "before": {
+    "director": "DOC OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@doc.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "DOC OSDBU Director",
+    "directorVerified": null,
+    "email": "SmallBusiness@uspto.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "USSS",
+   "change": "different_published",
+   "before": {
+    "director": "USSS OSDBU Director",
+    "directorVerified": null,
+    "email": "usss.osdbu@usss.dhs.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "USSS OSDBU Director",
+    "directorVerified": null,
+    "email": "kimberly.witcher@usss.dhs.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "VBA",
+   "change": "different_published",
+   "before": {
+    "director": "VA OSDBU Director",
+    "directorVerified": null,
+    "email": "osdbu@va.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "VA OSDBU Director",
+    "directorVerified": null,
+    "email": "vetbiz@va.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "VHA",
+   "change": "different_published",
+   "before": {
+    "director": "VHA OSDBU Director",
+    "directorVerified": null,
+    "email": "vha.osdbu@va.gov",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "VHA OSDBU Director",
+    "directorVerified": null,
+    "email": "vetbiz@va.gov",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "WHC",
+   "change": "unreachable",
+   "before": {
+    "director": "WHC OSBP Director",
+    "directorVerified": null,
+    "email": "usarmy.pentagon.hqda-whc.list.contracting@army.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "WHC OSBP Director",
+    "directorVerified": null,
+    "email": "usarmy.pentagon.hqda-whc.list.contracting@army.mil",
+    "emailVerified": null
+   }
+  },
+  {
+   "key": "WHS",
+   "change": "different_published",
+   "before": {
+    "director": "WHS OSBP Director",
+    "directorVerified": null,
+    "email": "whs.smallbusiness@mail.mil",
+    "emailVerified": null
+   },
+   "after": {
+    "director": "WHS OSBP Director",
+    "directorVerified": null,
+    "email": "whs.osbp@mail.mil",
+    "emailVerified": "2026-11"
+   }
+  },
+  {
+   "key": "FDIC",
+   "change": "director",
+   "before": {
+    "director": "Nikita Pearson",
+    "directorVerified": null
+   },
+   "after": {
+    "director": "Brian Guy",
+    "directorVerified": "2026-11"
+   }
+  },
+  {
+   "key": "HUD",
+   "change": "director",
+   "before": {
+    "director": "Jean Shao",
+    "directorVerified": null
+   },
+   "after": {
+    "director": "Jean Lin Pao",
+    "directorVerified": "2026-11"
+   }
+  },
+  {
+   "key": "DOJ",
+   "change": "director",
+   "before": {
+    "director": "Robert Connolly",
+    "directorVerified": null
+   },
+   "after": {
+    "director": "Bob Connolly",
+    "directorVerified": "2026-11"
+   }
+  },
+  {
+   "key": "NRC",
+   "change": "director",
+   "before": {
+    "director": "Vonna Ordaz",
+    "directorVerified": null
+   },
+   "after": {
+    "director": "NRC SBCR Director",
+    "directorVerified": null
+   }
+  },
+  {
+   "key": "Air Force Sustainment Center",
+   "change": "director",
+   "before": {
+    "director": "Michael Boyd",
+    "directorVerified": null
+   },
+   "after": {
+    "director": "AFSC Small Business Director",
+    "directorVerified": null
+   }
+  },
+  {
+   "key": "VA",
+   "change": "different_published+director_restamp",
+   "before": {
+    "email": "osdbu@va.gov",
+    "emailVerified": null,
+    "directorVerified": "2026-06"
+   },
+   "after": {
+    "email": "vetbiz@va.gov",
+    "emailVerified": "2026-11",
+    "directorVerified": "2026-11"
+   }
+  }
+ ]
+}

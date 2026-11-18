@@ -64,12 +64,35 @@ export interface ForecastRow {
   incumbent_name: string | null;
   pop_state: string | null;
   status: string | null;
+  /** When Mindy last synced this row from its source (ISO). Manual sources can be months old. */
+  as_of: string | null;
+  /** Where the row came from (agency forecast page / file), when recorded. */
+  source_url: string | null;
 }
+
+/** Per-source freshness of the rows returned, so an answer can say how current each agency's forecast is. */
+export interface ForecastSourceFreshness {
+  agency: string;
+  /** Newest last_synced_at among this agency's returned rows. */
+  as_of: string | null;
+  age_days: number | null;
+  /** True when the newest row from this agency is older than FORECAST_STALE_DAYS. */
+  stale: boolean;
+}
+
+/** A forecast source not refreshed in this long is reported as stale (agency feeds publish monthly–quarterly). */
+export const FORECAST_STALE_DAYS = 45;
 
 export interface ForecastQueryResult {
   forecasts: ForecastRow[];
   total: number;
   degraded: boolean;
+  /** Freshness per agency among the returned rows (oldest first). */
+  sources?: ForecastSourceFreshness[];
+  /** 'live' normally; 'last_good' when the live query errored and a dated snapshot was served. */
+  served_from?: 'live' | 'last_good';
+  /** When served_from = 'last_good': the time the snapshot was taken. */
+  snapshot_at?: string | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -149,7 +172,7 @@ export async function queryForecasts(input: ForecastQueryInput): Promise<Forecas
   let q = supabase
     .from('agency_forecasts')
     .select(
-      'id,external_id,title,description,source_agency,department,contracting_office,naics_code,naics_description,psc_code,fiscal_year,anticipated_quarter,anticipated_award_date,solicitation_date,estimated_value_min,estimated_value_max,estimated_value_range,set_aside_type,contract_type,incumbent_name,pop_state,status',
+      'id,external_id,title,description,source_agency,department,contracting_office,naics_code,naics_description,psc_code,fiscal_year,anticipated_quarter,anticipated_award_date,solicitation_date,estimated_value_min,estimated_value_max,estimated_value_range,set_aside_type,contract_type,incumbent_name,pop_state,status,last_synced_at,updated_at,source_url',
       { count: 'exact' },
     );
 
@@ -269,6 +292,8 @@ export async function queryForecasts(input: ForecastQueryInput): Promise<Forecas
     incumbent_name: r.incumbent_name ?? null,
     pop_state: r.pop_state ?? null,
     status: r.status ?? null,
+    as_of: r.last_synced_at ?? r.updated_at ?? null,
+    source_url: r.source_url ?? null,
   }));
 
   // `count` is now the POST-filter total: the past-FY exclusion runs in SQL
@@ -282,5 +307,41 @@ export async function queryForecasts(input: ForecastQueryInput): Promise<Forecas
   const filteredTotal = input.includePast
     ? (count ?? forecasts.length)
     : (count ?? rowsRaw.length);
-  return { forecasts, total: filteredTotal, degraded: false };
+  return { forecasts, total: filteredTotal, degraded: false, sources: forecastSourceFreshness(forecasts), served_from: 'live' };
+}
+
+/** Newest as_of per agency among the returned rows; oldest-first so the stalest source leads. */
+export function forecastSourceFreshness(rows: Pick<ForecastRow, 'agency' | 'as_of'>[], now = Date.now()): ForecastSourceFreshness[] {
+  const newest = new Map<string, string | null>();
+  for (const r of rows) {
+    const a = r.agency || 'unknown';
+    const cur = newest.get(a);
+    if (cur === undefined || (r.as_of && (!cur || r.as_of > cur))) newest.set(a, r.as_of ?? cur ?? null);
+  }
+  return [...newest.entries()]
+    .map(([agency, as_of]) => {
+      const t = as_of ? Date.parse(as_of) : NaN;
+      const age_days = Number.isFinite(t) ? Math.floor((now - t) / 86_400_000) : null;
+      // Unknown age is reported as stale: we cannot claim it is current.
+      return { agency, as_of, age_days, stale: age_days === null || age_days > FORECAST_STALE_DAYS };
+    })
+    .sort((a, b) => (b.age_days ?? Infinity) - (a.age_days ?? Infinity));
+}
+
+/**
+ * queryForecasts with a labelled last-good fallback: live first; if the live query ERRORS, serve the
+ * most recent successful answer for the same filters, marked served_from='last_good' + snapshot_at.
+ * No snapshot → the original degraded result (never an invented empty answer).
+ */
+export async function queryForecastsWithFallback(input: ForecastQueryInput): Promise<ForecastQueryResult> {
+  const { liveWithLastGood } = await import('@/lib/mcp/external-cache');
+  const params = { v: 1, ...input } as Record<string, unknown>;
+  const r = await liveWithLastGood<ForecastQueryResult>('forecasts_query', params, async () => {
+    const res = await queryForecasts(input);
+    return { value: res, failed: res.degraded };
+  });
+  if (r.source === 'last_good') {
+    return { ...r.value, degraded: true, served_from: 'last_good', snapshot_at: r.fetchedAt };
+  }
+  return r.value ?? { forecasts: [], total: 0, degraded: true };
 }
