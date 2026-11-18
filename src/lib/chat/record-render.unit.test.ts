@@ -500,3 +500,21 @@ describe('release check: buying-office label follows rank_by', () => {
     expect(t).toMatch(/These are federal government contracting offices \(buyers\), not companies\./);
   });
 });
+
+describe('Data Core PR 3: SBLO email verification is visible in the chat answer', () => {
+  const base = { company: 'CACI INTERNATIONAL INC', sblo_name: 'Yadira Beltre', title: 'Small Business Liaison Officer', email: 'yadira.beltre@caci.com', source: 'Jun 2026 research' };
+  it('an unverified personal email carries its research date', () => {
+    const r = renderSbloContact({ contact: { ...base, verification: { email_kind: 'personal', email_status: 'unverified', fields: { email: { status: 'unverified', verified_at: '2026-06', source_url: null } } } }, _meta: { has_named_sblo: true } })!;
+    expect(r.text).toContain('yadira.beltre@caci.com (personal email, not re-verified since 2026-06)');
+  });
+  it('a stale email says the company page no longer shows it', () => {
+    const r = renderSbloContact({ contact: { ...base, verification: { email_kind: 'personal', email_status: 'stale', fields: { email: { status: 'stale', verified_at: '2026-11-17', source_url: 'https://www.caci.com/x' } } } }, _meta: { has_named_sblo: true } })!;
+    expect(r.text).toContain('yadira.beltre@caci.com (personal email, no longer shown on the company\'s page as of 2026-11-17)');
+  });
+  it('a verified email and a contact without a verification block render exactly as before', () => {
+    const v = renderSbloContact({ contact: { ...base, email: 'smallbusiness@caci.com', verification: { email_kind: 'role', email_status: 'verified', fields: { email: { status: 'verified', verified_at: '2026-11-17', source_url: 'https://www.caci.com/x' } } } }, _meta: { has_named_sblo: true } })!;
+    expect(v.text).toContain('· smallbusiness@caci.com. Source:');
+    const legacy = renderSbloContact({ contact: base, _meta: { has_named_sblo: true } })!;
+    expect(legacy.text).toContain('· yadira.beltre@caci.com. Source:');
+  });
+});

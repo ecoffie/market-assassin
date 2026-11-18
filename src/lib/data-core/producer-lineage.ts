@@ -5,7 +5,7 @@
  *   class 1  `tier2_sblo`'s registry named ~/Bootcamp/compile-sblo-list.py, the
  *            SUPERSEDED regex scraper the Jun-2026 roster was created to replace.
  *            Running it would have reintroduced the bad data (PR #1444).
- *   class 4  `import-sblo-refresh.js` was mistaken for the producer; it CONSUMES
+ *   class 4  `import-sblo-refresh.js` (now `.ts`) was mistaken for the producer; it CONSUMES
  *            the CSV and writes prime-contractors-database.json instead.
  *   class 11 `contractors.json` has NO producer at all — both candidates write
  *            elsewhere (generate-naics-top100.js -> naics-top100.ts;
@@ -197,9 +197,16 @@ export const LINEAGE_CLAIMS: LineageClaim[] = [
     namedProducer: null, // corrected by PR #1444; previously the superseded scraper
     writers: [
       {
-        producerPath: 'scripts/import-sblo-refresh.js',
+        producerPath: 'scripts/import-sblo-refresh.ts',
         writesTo: 'src/data/prime-contractors-database.json',
-        citation: 'import-sblo-refresh.js:145 writeFileSync(DB_PATH) — a CONSUMER of the CSV (class 4)',
+        citation: 'sblo-refresh.ts:578 io.writeFile(PRIME_DB_PATH) under --write --merge-prime-db — a CONSUMER of the CSV (class 4)',
+      },
+      {
+        // Data Core PR 3: --write --out writes a NEW roster file and refuses the canonical path,
+        // so it can never be read as having produced sblo-roster-2026-06.json.
+        producerPath: 'scripts/import-sblo-refresh.ts',
+        writesTo: 'src/data/sblo-roster-<YYYY-MM>.json (new file; --out must not be the base roster)',
+        citation: 'sblo-refresh.ts:562 io.writeFile(out) — applies a hand-researched CSV; researches nothing',
       },
       {
         producerPath: '~/Bootcamp/compile-sblo-list.py',

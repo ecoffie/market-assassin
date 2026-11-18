@@ -154,7 +154,7 @@ SBA Prime Directory (sba.gov)
 
 ```
 data/imports/sblo-refresh-2026-06.csv
-  → scripts/import-sblo-refresh.js --write
+  → scripts/import-sblo-refresh.js --write   (Jun 2026; replaced by the .ts importer, PR 3 below)
   → 68 matched companies merged into src/data/prime-contractors-database.json
      (sbloVerified=2026-06)
   → the remaining 132 companies (200 − 68; commit 95f6826c describes them as
@@ -169,7 +169,7 @@ data/imports/sblo-refresh-2026-06.csv
 | Claim | Proof |
 |---|---|
 | Roster is a one-off manual curation | Its own `metadata.methodology`: *"225-row SBA prime roster cleaned to 200 official legal names… every contact field re-researched Jun 2026 via parallel research agents."* |
-| No producer exists | `grep` across `scripts/` + `~/Bootcamp/` finds only `import-sblo-refresh.js` (reads the CSV) and `sblo-lookup.ts` (reads the JSON). Nothing **writes** either artifact. |
+| No producer exists | `grep` across `scripts/` + `~/Bootcamp/` finds only `import-sblo-refresh.js` (reads the CSV; now `.ts`, still researches nothing) and `sblo-lookup.ts` (reads the JSON). Nothing **writes** either artifact. |
 | CSV and JSON are one dataset | 200/200 companies, identical company sets, **200/200 emails identical, 0 differences**. |
 | `compile-sblo-list.py` is NOT the producer | It writes `sblo-list-compiled.csv` / `sblo-list.csv` in `~/Bootcamp/` — different filenames, different schema (`sblo_name`, no `vendorPortal`), and touches neither served artifact. |
 | It was replaced for quality | Commit `95f6826c`: refresh was *"re-researched against live sources — not the garbage-producing legacy regex scrapers."* Roster metadata calls itself the *"canonical replacement for the legacy TIER-2-FINAL-CONTACT-LIST (regex-scraped garbage names/emails)."* |
@@ -179,14 +179,54 @@ Commits: `e517967f` (importer) → `95f6826c` (56 primes, importer hardened for
 office/portal-only rows) → `d9de8de2` (103 primes + CSV committed) →
 `e88a2efe` (roster JSON added).
 
-**Before any future refresh**
+**Refresh procedure (Data Core PR 3, 2026-11-17)**
 
-1. There is no one-command script. A refresh repeats the manual curation above.
-2. `scripts/import-sblo-refresh.js` **hardcodes** the Jun-2026 CSV path
-   (`CSV_PATH`, line 21). It must be parameterized or deliberately updated
-   first — editing that constant ad-hoc is not a refresh procedure.
-3. Do **not** run `~/Bootcamp/compile-sblo-list.py`. Its output was replaced
-   for quality; running it risks reintroducing regex-scraped contact data.
+The research step is still manual — company pages change layout and many block bots
+(Lockheed returned 403 in the 2026-11-17 sample). What is now tooled is APPLYING that
+research without ever making the data less verified.
+
+1. Research each company on its OWN published page. Record, per contact field
+   (`sbloName`, `email`, `phone`, `portal`): `<field>_status` =
+   `confirmed | changed | not_named | unreachable`, `<field>_verifiedAt` (YYYY-MM-DD) and
+   `<field>_sourceUrl`. Optional `email_kind` = `role | personal`. Save as
+   `data/imports/sblo-refresh-<YYYY-MM>.csv` (columns: `company,title,source,email_kind,`
+   then `sbloName,sbloName_status,sbloName_verifiedAt,sbloName_sourceUrl` and the same four
+   for `email`, `phone`, `portal`; the Jun-2026 header `vendorPortal` is accepted for `portal`).
+2. Diff (the default — **writes nothing**):
+   `npx tsx scripts/import-sblo-refresh.ts --csv data/imports/sblo-refresh-<YYYY-MM>.csv`
+   prints a per-company, per-field report (readable, then JSON; `--json` for JSON only)
+   against `--base` (default `src/data/sblo-roster-2026-06.json`). `--csv` is **required**;
+   there is no default input file.
+3. Fix every `REJECTED` field, re-run until `REJECTED 0`.
+4. Apply: `... --write --out src/data/sblo-roster-<YYYY-MM>.json` writes a **new** roster file.
+   It refuses the base/canonical path, an existing file, and any run with a rejected field.
+   `--merge-prime-db` additionally applies the same rules to matched rows of
+   `prime-contractors-database.json`. Pointing `sblo-lookup.ts` at the new file is a separate,
+   reviewed change.
+
+**Merge rules** (`src/lib/gov-contacts/sblo-refresh.ts`, pinned by `sblo-refresh.unit.test.ts`):
+
+| status | effect |
+|---|---|
+| `confirmed` | value must equal the one held and carry a sourceUrl → bumps `provenance.<field>.verifiedAt` |
+| `changed` | replaces the value **only with a sourceUrl**; the old value is appended to `history.<field>` |
+| `not_named` / `unreachable` | value **kept**, `provenance.<field>.staleSince` set — never blanked |
+| (blank, no status) | no change — a blank cell never overwrites a populated field |
+| a value with no status | rejected |
+
+Role mailboxes win: a verified company mailbox replaces a personal email (the personal one
+is kept internally as `personalEmail`, `personalEmailStatus: stale`, never served), and a
+personal email never displaces a role mailbox.
+
+**Serving labels.** `sblo-lookup.ts` adds `contact.verification` (additive): per-field
+`status` (`verified | unverified | stale`), `verified_at`, `source_url`, plus `email_kind`.
+A field is `verified` only with field provenance (confirmed/changed + sourceUrl); every
+Jun-2026 snapshot value is `unverified` with `verified_at: "2026-06"`. MCP
+`get_sblo_contact` mirrors it as `_meta.email_status` / `_meta.email_kind`, and the chat
+answer labels a non-verified email (e.g. "personal email, not re-verified since 2026-06").
+
+Do **not** run `~/Bootcamp/compile-sblo-list.py`. Its output was replaced for quality;
+running it risks reintroducing regex-scraped contact data.
 
 ### Freshness stamps require evidence (fixed 2026-11-17)
 

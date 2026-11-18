@@ -158,6 +158,17 @@ function moneyColumn(values: unknown[]): string[] {
   return out.map((x, i) => (nums[i] == null ? '' : x));
 }
 
+/**
+ * Percentages for one column, already in percent units (6.36 = 6.36%): one precision for the whole
+ * column, the most any value needs, at most 2 (the same rule as moneyColumn), so 7.00% sits beside 6.36%.
+ * Missing → '—'.
+ */
+function pctColumn(values: unknown[]): string[] {
+  const nums = values.map((v) => { const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN; return Number.isFinite(n) ? n : null; });
+  const d = Math.min(2, Math.max(0, ...nums.map((n) => (n == null ? 0 : (String(Number(n.toFixed(2))).split('.')[1] ?? '').length))));
+  return nums.map((n) => (n == null ? '—' : `${n.toFixed(d)}%`));
+}
+
 /** A markdown table cell: no pipes or line breaks inside a cell. */
 function cell(s: string): string {
   return String(s ?? '').replace(/\|/g, '/').replace(/\s+/g, ' ').trim() || '—';
@@ -346,8 +357,11 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
   // The tool's total counts matching rows; never show a total smaller than what was retrieved.
   const total = Math.max(reportedTotal ?? retrieved, retrieved);
   const state = str(meta.result_state);
-  const offset = Math.max(0, Math.min(Math.floor(opts.offset ?? 0), Math.max(retrieved - 1, 0)));
-  const page = records.slice(offset, offset + pageSize);
+  // A page past the end shows nothing and says so; it never re-shows the last record (#2141 review, Agent 4).
+  const requestedOffset = Math.max(0, Math.floor(opts.offset ?? 0));
+  const pastEnd = retrieved > 0 && requestedOffset >= retrieved;
+  const offset = pastEnd ? requestedOffset : Math.min(requestedOffset, Math.max(retrieved - 1, 0));
+  const page = pastEnd ? [] : records.slice(offset, offset + pageSize);
   const from = page.length ? offset + 1 : 0;
   const to = page.length ? offset + page.length : 0;
   const standalone = records.filter((r) => r._kind === 'contract').length;
@@ -370,9 +384,11 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
     const flaggedRecs = records.filter((r) => describedPlaceConflict(str(r.description), str(r.place_of_performance_state)) || describedOtherWork(str(r.description), REQUESTED_LABELS));
     flaggedIdsOut = flaggedRecs.map((r) => str(r.piid) || str(r.contract_id));
     const exhaustiveNow = from === 1 && to === total && retrieved === total;
-    lines.push(exhaustiveNow
-      ? `Showing all ${total}, soonest end date first.`
-      : `Showing ${from}–${to} of ${total}, soonest end date first.`);
+    lines.push(pastEnd
+      ? `No more expiring records beyond #${retrieved}.${retrieved === total ? ` All ${total} were shown.` : ''}`
+      : exhaustiveNow
+        ? `Showing all ${total}, soonest end date first.`
+        : `Showing ${from}–${to} of ${total}, soonest end date first.`);
   }
   if (ignored) lines.push(ignored);
   if (page.length) {
@@ -386,7 +402,8 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
     }
   }
   const pageIds = new Set(page.map((r) => str(r.contract_id) || str(r.piid)));
-  const offPage = records
+  // Past the end, the CHECK records were already listed on earlier pages; nothing is repeated.
+  const offPage = pastEnd ? [] : records
     .map((r, i) => ({ r, i }))
     .filter(({ r }) => !pageIds.has(str(r.contract_id) || str(r.piid)))
     .filter(({ r }) => describedPlaceConflict(str(r.description), str(r.place_of_performance_state)) || describedOtherWork(str(r.description), REQUESTED_LABELS));
@@ -406,7 +423,7 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
   const exhaustive = retrieved > 0 && from === 1 && to === total && retrieved === total;
   if (retrieved > 0 && !exhaustive) {
     lines.push('');
-    if (to < retrieved) {
+    if (!pastEnd && to < retrieved) {
       const nextTo = Math.min(to + pageSize, retrieved);
       lines.push(`This is not the full list. Ask "show expiring records ${to + 1} to ${nextTo}" to continue.`);
     }
@@ -620,8 +637,11 @@ export function renderBuyingOffices(result: Rec, opts: { offset?: number } = {})
   const buyers = offices.filter((o) => (num(o.obligated) ?? 0) > 0);
   const nonBuyers = offices.filter((o) => (num(o.obligated) ?? 0) <= 0);
   const officeCount = num(totals?.office_count) ?? offices.length;
-  const offset = Math.max(0, Math.min(Math.floor(opts.offset ?? 0), Math.max(buyers.length - 1, 0)));
-  const page = buyers.slice(offset, offset + OFFICE_PAGE);
+  // A page past the end shows nothing and says so; it never re-shows the last office or re-adds its id.
+  const requestedOffset = Math.max(0, Math.floor(opts.offset ?? 0));
+  const pastEnd = buyers.length > 0 && requestedOffset >= buyers.length;
+  const offset = pastEnd ? requestedOffset : Math.min(requestedOffset, Math.max(buyers.length - 1, 0));
+  const page = pastEnd ? [] : buyers.slice(offset, offset + OFFICE_PAGE);
   const from = page.length ? offset + 1 : 0;
   const to = page.length ? offset + page.length : 0;
   const notRetrieved = Math.max(0, officeCount - offices.length);
@@ -642,6 +662,7 @@ export function renderBuyingOffices(result: Rec, opts: { offset?: number } = {})
       // Column order follows the chat panel's table styling: the name first (kept readable), the value
       // second (never wrapped); the number travels in the name cell so the detail lines can refer to it.
       const obCol = moneyColumn(page.map((o) => o.obligated));
+      const shareCol = pctColumn(page.map((o) => o.share_pct));
       // One precision for every amount in each detail list on this page (customers, contracting offices, examples).
       const customersOf = (o: Rec) => (Array.isArray(o.top_funding_offices) ? (o.top_funding_offices as Rec[]) : [])
         .filter((f) => str(f.name) && !sameName(str(f.name), str(o.office_name))).slice(0, 2);
@@ -652,7 +673,7 @@ export function renderBuyingOffices(result: Rec, opts: { offset?: number } = {})
       lines.push(...mdTable(['Office', 'Net obligations', 'Share', 'Awards', 'Agency'], page.map((o, i) => [
         `${offset + i + 1}. ${withCode(str(o.office_name), str(o.office_code))}`,
         obCol[i],
-        o.share_pct == null || str(o.share_pct) === '' ? '—' : `${str(o.share_pct)}%`,
+        shareCol[i],
         String(num(o.award_count) ?? 0),
         title(str(o.sub_agency)) || title(str(o.agency)) || 'not reported',
       ])));
@@ -679,8 +700,9 @@ export function renderBuyingOffices(result: Rec, opts: { offset?: number } = {})
     lines.push('');
     // 4. The honest count and how to continue.
     const countBits: string[] = [];
-    countBits.push(exhaustive ? `Showing all ${buyers.length} offices.` : `Showing ${from}–${to} of the ${buyers.length} offices with positive net obligations.`);
-    if (to < buyers.length) countBits.push(`Ask "show offices ${to + 1} to ${Math.min(to + OFFICE_PAGE, buyers.length)}" for the next ${Math.min(OFFICE_PAGE, buyers.length - to)}.`);
+    if (pastEnd) countBits.push(`No more offices beyond #${buyers.length}.${notRetrieved ? '' : ` All ${buyers.length} offices with positive net obligations were shown.`}`);
+    else countBits.push(exhaustive ? `Showing all ${buyers.length} offices.` : `Showing ${from}–${to} of the ${buyers.length} offices with positive net obligations.`);
+    if (!pastEnd && to < buyers.length) countBits.push(`Ask "show offices ${to + 1} to ${Math.min(to + OFFICE_PAGE, buyers.length)}" for the next ${Math.min(OFFICE_PAGE, buyers.length - to)}.`);
     if (notRetrieved) countBits.push(`${notRetrieved} more office${notRetrieved === 1 ? ' ranks' : 's rank'} below the top ${offices.length} retrieved; narrow the search to see ${notRetrieved === 1 ? 'it' : 'them'}.`);
     lines.push(countBits.join(' '));
     if (nonBuyers.length) {
@@ -809,6 +831,25 @@ export const SBLO_TOOL = 'get_sblo_contact';
  * small business liaison (acc6c R8: the free-text answer dropped that label and presented general
  * contacts as the liaison the customer asked for). Email/phone are never invented.
  */
+/**
+ * Data Core PR 3: label an email the source cannot vouch for. `verified` (field provenance with a
+ * source URL) and contacts without a verification block render unchanged; an unverified email
+ * carries its research date, a stale one says the company page no longer shows it.
+ */
+function sbloEmailCaveat(c: Rec): string {
+  const v = (c.verification && typeof c.verification === 'object' ? c.verification : null) as Rec | null;
+  if (!v) return '';
+  const status = str(v.email_status);
+  if (!status || status === 'verified') return '';
+  const fields = (v.fields && typeof v.fields === 'object' ? v.fields : {}) as Rec;
+  const ef = (fields.email && typeof fields.email === 'object' ? fields.email : {}) as Rec;
+  const at = str(ef.verified_at);
+  const kind = str(v.email_kind) === 'personal' ? 'personal email' : str(v.email_kind) === 'role' ? 'mailbox' : 'email';
+  return status === 'stale'
+    ? ` (${kind}, no longer shown on the company's page${at ? ` as of ${at}` : ''})`
+    : ` (${kind}, not re-verified${at ? ` since ${at}` : ''})`;
+}
+
 export function renderSbloContact(result: Rec): RenderedRecords | null {
   const c = (result?.contact && typeof result.contact === 'object' ? result.contact : null) as Rec | null;
   const poc = (result?.registered_points_of_contact && typeof result.registered_points_of_contact === 'object' ? result.registered_points_of_contact : null) as Rec | null;
@@ -817,7 +858,7 @@ export function renderSbloContact(result: Rec): RenderedRecords | null {
   const company = title(str(c?.company) || str(poc?.company)) || 'this company';
   const lines: string[] = [];
   if (c && str(c.sblo_name)) {
-    lines.push(`Designated small business liaison for ${company}: ${str(c.sblo_name)}${str(c.title) ? `, ${str(c.title)}` : ''}${str(c.email) ? ` · ${str(c.email)}` : ''}${str(c.phone) ? ` · ${str(c.phone)}` : ''}. Source: ${str(c.source) || 'not reported'}.`);
+    lines.push(`Designated small business liaison for ${company}: ${str(c.sblo_name)}${str(c.title) ? `, ${str(c.title)}` : ''}${str(c.email) ? ` · ${str(c.email)}${sbloEmailCaveat(c)}` : ''}${str(c.phone) ? ` · ${str(c.phone)}` : ''}. Source: ${str(c.source) || 'not reported'}.`);
   } else {
     lines.push(`No designated small business liaison is on record for ${company}${str(c?.uei) || str(poc?.uei) ? ` (UEI ${str(c?.uei) || str(poc?.uei)})` : ''}.`);
   }
@@ -888,7 +929,8 @@ export function renderVehicleMix(result: Rec): RenderedRecords | null {
   lines.push('');
   const shownBuckets = buckets.filter((b) => (num(b.obligated) ?? 0) !== 0 || (num(b.award_count) ?? 0) > 0);
   const bCol = moneyColumn(shownBuckets.map((b) => b.obligated));
-  lines.push(...mdTable(['Vehicle', 'Obligations', 'Share', 'Awards'], shownBuckets.map((b, i) => [str(b.label), bCol[i], `${str(b.share_pct)}%`, String(num(b.award_count) ?? 0)])));
+  const bPct = pctColumn(shownBuckets.map((b) => b.share_pct));
+  lines.push(...mdTable(['Vehicle', 'Obligations', 'Share', 'Awards'], shownBuckets.map((b, i) => [str(b.label), bCol[i], bPct[i], String(num(b.award_count) ?? 0)])));
   const r = (k: string) => (roll[k] && typeof roll[k] === 'object' ? roll[k] as Rec : null);
   const rl = [['all schedules', r('all_schedules')], ['all BPAs', r('all_bpas')], ['all IDIQs and GWACs', r('all_idiqs_and_gwacs')]].filter(([, v]) => v).map(([k, v]) => `${k} ${money((v as Rec).obligated)} (${str((v as Rec).share_pct)}%)`);
   if (rl.length) { lines.push(''); lines.push(`Rollups: ${rl.join('; ')}.`); }
