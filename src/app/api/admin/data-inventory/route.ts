@@ -518,7 +518,7 @@ export async function GET(request: NextRequest) {
       freshness: fresh({
         asOf: e.samEntities,
         cadenceHours: 24,
-        basis: 'MAX(sam_entities.synced_at). There is no sync-gov-buyer-data cron row. One entity slice rides sync-decision-makers when the checkpoint is older than 20h. A 7-day clock is stale, not unknown.',
+        basis: "MAX(sam_entities.synced_at). There is no cron_jobs row named 'sync-gov-buyer-data'. One entity slice rides sync-decision-makers when the checkpoint is older than 20h. A 7-day clock is stale, not unknown.",
         jobs: CRON_JOBS.samEntities,
       }),
       surface: { state: 'customer_readable', tools: ['lookup_sam_entity'], note: 'local-first entity lookup; live SAM only for gaps' },
