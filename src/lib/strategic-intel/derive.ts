@@ -14,13 +14,15 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AgencyResolution } from './agency-resolver';
+import { isBareLegacyGaoCitation } from '@/lib/institute/acquired-pain-points';
 
 export type DerivationOutcome =
   | 'evidence_only_unresolved'      // no canonical agency -> nothing can be claimed
   | 'evidence_only_not_defensible'  // resolved, but the document states no problem
   | 'pain_point_created'
   | 'pain_point_unchanged'          // already claimed; no new history
-  | 'blocked_history_unavailable';  // refused to advance state without a change record
+  | 'blocked_history_unavailable'   // refused to advance state without a change record
+  | 'blocked_legacy_gao_reinjection'; // refused the bare "(Source: GAO)" tag
 
 export interface DerivationResult {
   documentNumber: string;
@@ -72,6 +74,9 @@ export async function deriveFromInstituteSource(
 
   const agency = resolution.canonicalAgency;
   const claim = `${source.title} (Source: ${source.documentNumber})`;
+  if (isBareLegacyGaoCitation(claim)) {
+    return { documentNumber: source.documentNumber, outcome: 'blocked_legacy_gao_reinjection', changeLogged: false };
+  }
   const entityKey = `${agency}::${claim}`;
 
   const { data: prior } = await db
@@ -103,6 +108,83 @@ export async function deriveFromInstituteSource(
     agency,
     pain_point: claim,
     source: 'gao',
+    source_url: source.url,
+    status: 'emerging',
+    confidence: resolution.confidence === 'high' ? 'medium' : 'low',
+    institute_source_ids: source.instituteSourceId ? [source.instituteSourceId] : null,
+    first_seen: changedAt,
+    last_evidence_at: changedAt,
+    verified: false,
+  });
+  if (ppErr) {
+    return { documentNumber: source.documentNumber, outcome: 'blocked_history_unavailable', changeLogged: true, entityKey, error: ppErr.message };
+  }
+
+  return { documentNumber: source.documentNumber, outcome: 'pain_point_created', changeLogged: true, entityKey };
+}
+
+/**
+ * A sourced recommendation or a report that states a problem.
+ * Additive on (agency, pain_point), and the pain point embeds the source id.
+ * Never deletes. Never writes the bare "(Source: GAO)" tag.
+ * Does not apply the title-marker rule: the caller already decided the source
+ * stated a problem (an open IG recommendation, for example).
+ */
+export async function deriveAcquiredPainPoint(
+  db: SupabaseClient,
+  source: {
+    instituteSourceId: string | null;
+    documentNumber: string;
+    problem: string;
+    url: string;
+    resolution: AgencyResolution;
+    sourceKind: 'gao' | 'ig_report';
+  },
+): Promise<DerivationResult> {
+  const { resolution } = source;
+  if (!resolution.resolved || !resolution.canonicalAgency) {
+    return { documentNumber: source.documentNumber, outcome: 'evidence_only_unresolved', changeLogged: false };
+  }
+  const problem = source.problem.trim();
+  if (!problem) {
+    return { documentNumber: source.documentNumber, outcome: 'evidence_only_not_defensible', changeLogged: false };
+  }
+
+  const agency = resolution.canonicalAgency;
+  const claim = `${problem.slice(0, 2000)} (Source: ${source.documentNumber})`;
+  if (isBareLegacyGaoCitation(claim)) {
+    return { documentNumber: source.documentNumber, outcome: 'blocked_legacy_gao_reinjection', changeLogged: false };
+  }
+  const entityKey = `${agency}::${claim}`;
+
+  const { data: prior } = await db
+    .from('agency_pain_points_db')
+    // unranged-ok: single row by the unique (agency, pain_point) key.
+    .select('id')
+    .eq('agency', agency).eq('pain_point', claim).maybeSingle();
+  if (prior) {
+    return { documentNumber: source.documentNumber, outcome: 'pain_point_unchanged', changeLogged: false, entityKey };
+  }
+
+  const changedAt = new Date().toISOString();
+  const { error: histErr } = await db.from('intelligence_changes').insert({
+    domain: 'pain_point',
+    canonical_agency: agency,
+    entity_key: entityKey,
+    change_type: 'created',
+    old_value: null,
+    new_value: claim,
+    institute_source_id: source.instituteSourceId,
+    changed_at: changedAt,
+  });
+  if (histErr) {
+    return { documentNumber: source.documentNumber, outcome: 'blocked_history_unavailable', changeLogged: false, entityKey, error: histErr.message };
+  }
+
+  const { error: ppErr } = await db.from('agency_pain_points_db').insert({
+    agency,
+    pain_point: claim,
+    source: source.sourceKind,
     source_url: source.url,
     status: 'emerging',
     confidence: resolution.confidence === 'high' ? 'medium' : 'low',
