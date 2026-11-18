@@ -288,15 +288,35 @@ export interface OfficeSitemapRow {
   lastModified: string | null;
 }
 
+/** One office on the /offices hub: everything the sitemap knows, plus the directory identity. */
+export interface OfficeHubEntry {
+  dodaac: string;
+  name: string;
+  agency: string | null;
+  subAgency: string | null;
+  /** sam_opportunities rows with active=true under this prefix (the gate's count). */
+  activeNotices: number;
+  lastModified: string | null;
+}
+
 /**
  * Offices the sitemap may advertise: a DoD directory row + ≥ OFFICE_MIN_ACTIVE_NOTICES active SAM
  * notices under that prefix (officeSitemapEligible — a subset of the page's index gate).
+ */
+export async function getOfficeSitemapEntries(): Promise<OfficeSitemapRow[]> {
+  return (await getOfficeHubEntries()).map((o) => ({ dodaac: o.dodaac, lastModified: o.lastModified }));
+}
+
+/**
+ * The same population as the sitemap (so the hub never links a page the sitemap would not
+ * advertise), with the office name + parent for display.
  *
  * One paged read of active notices' solicitation numbers (the same population the opportunity
  * sitemap already drains), grouped in memory by the exact prefix rule the page's ILIKE uses, then
- * one `.in()` directory read per 200 candidates. Throws on any read error → the route answers 503.
+ * one `.in()` directory read per 200 candidates. Throws on any read error — the sitemap answers
+ * 503 and the hub renders its unavailable state; neither ever shows a partial list as complete.
  */
-export async function getOfficeSitemapEntries(): Promise<OfficeSitemapRow[]> {
+export async function getOfficeHubEntries(): Promise<OfficeHubEntry[]> {
   const client = sb();
   const counts = new Map<string, { n: number; latest: string | null }>();
   for (let from = 0; ; from += PAGE) {
@@ -326,19 +346,46 @@ export async function getOfficeSitemapEntries(): Promise<OfficeSitemapRow[]> {
     .map(([code]) => code)
     .sort();
 
-  const out: OfficeSitemapRow[] = [];
+  const out: OfficeHubEntry[] = [];
   for (let i = 0; i < candidates.length; i += 200) {
     const chunk = candidates.slice(i, i + 200);
     const { data, error } = await client
       .from('dodaac_directory_display')
-      .select('dodaac, agency, sub_agency')
+      .select('dodaac, display_name, agency, sub_agency')
       .in('dodaac', chunk);
     if (error) throw new Error(`office sitemap: directory chunk ${i / 200}: ${error.message}`);
-    for (const d of (data ?? []) as Array<{ dodaac: string; agency: string | null; sub_agency: string | null }>) {
+    for (const d of (data ?? []) as Array<{ dodaac: string; display_name: string | null; agency: string | null; sub_agency: string | null }>) {
       const code = String(d.dodaac || '').toUpperCase();
       if (!counts.has(code) || !isDodOffice(d.agency, d.sub_agency)) continue;
-      out.push({ dodaac: code, lastModified: counts.get(code)!.latest });
+      const c = counts.get(code)!;
+      out.push({
+        dodaac: code,
+        name: normalizeOfficeName(d.display_name || code, { mode: 'expand' }) || code,
+        agency: d.agency,
+        subAgency: d.sub_agency,
+        activeNotices: c.n,
+        lastModified: c.latest,
+      });
     }
   }
   return out.sort((a, b) => a.dodaac.localeCompare(b.dodaac));
+}
+
+/** Hub grouping key: the service/component (sub-agency) when stated, else the department. */
+export function officeGroupLabel(o: Pick<OfficeHubEntry, 'agency' | 'subAgency'>): string {
+  const raw = (o.subAgency || o.agency || 'Department of Defense').trim();
+  return raw || 'Department of Defense';
+}
+
+/** Group hub entries by service, largest group first, offices by name inside each group. Pure. */
+export function groupOfficesForHub(entries: OfficeHubEntry[]): Array<{ label: string; offices: OfficeHubEntry[] }> {
+  const groups = new Map<string, OfficeHubEntry[]>();
+  for (const e of entries) {
+    const k = officeGroupLabel(e);
+    const g = groups.get(k);
+    if (g) g.push(e); else groups.set(k, [e]);
+  }
+  return Array.from(groups.entries())
+    .map(([label, offices]) => ({ label, offices: offices.slice().sort((a, b) => a.name.localeCompare(b.name) || a.dodaac.localeCompare(b.dodaac)) }))
+    .sort((a, b) => b.offices.length - a.offices.length || a.label.localeCompare(b.label));
 }

@@ -8,13 +8,17 @@
  *
  * DESIGN CONSTRAINTS THIS PAGE HONOURS
  * ------------------------------------
- *  - ONE consolidated page. No URL per forecast: 35,912 rows do not become
- *    35,912 URLs. This is the authoritative subject page; the per-agency and
- *    per-NAICS detail already have their own canonical homes and are linked.
+ *  - The subject hub. Per-forecast pages now exist (/forecasts/[id], owner
+ *    decision 2026-11-17) behind a THIN GATE (forecastIndexability): only rows
+ *    with real content are indexed or listed in sitemap-forecasts.xml. This hub
+ *    links ~50 recently published, indexable ones so they are reachable from a
+ *    crawled page, not only from the sitemap; per-agency and per-NAICS detail
+ *    keep their own canonical homes and are linked.
  *  - Server-rendered facts. A crawler with JavaScript disabled gets the real
  *    counts, the real agency names and the real NAICS codes in the HTML.
- *  - No BigQuery, and no table read either: ONE small KV read of a summary
- *    materialized offline. ISR-cached for a day on top of that.
+ *  - No BigQuery. The counts are ONE small KV read of a summary materialized
+ *    offline; the "recently published" links are one small Supabase read
+ *    (getRecentForecastLinks) that is omitted — never shown empty — on failure.
  *  - Nothing estimated. `total` is an authoritative COUNT taken at build time,
  *    not a tally of rows that happened to transfer; a summary that is stale,
  *    truncated or the wrong shape renders the unavailable state and noindexes.
@@ -24,6 +28,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getForecastSummary, agencySlug } from '@/lib/seo/forecasts-summary';
+import { getRecentForecastLinks } from '@/lib/seo/forecast-pages';
 import { SeoTemporarilyUnavailableError } from '@/lib/seo/seo-unavailable';
 import { AGENCIES_SEO } from '@/data/agencies-seo';
 
@@ -46,6 +51,7 @@ export const dynamic = 'force-dynamic';
 
 const SITE_URL = 'https://getmindy.ai';
 const LINKABLE_AGENCIES = new Set(AGENCIES_SEO.map((a) => a.slug));
+const RECENT_LINKS = 50;
 
 export async function generateMetadata(): Promise<Metadata> {
   const s = await getForecastSummary();
@@ -84,6 +90,8 @@ export default async function ForecastsPage() {
     throw new SeoTemporarilyUnavailableError(`forecasts summary unavailable: ${s.reason ?? 'unknown'}`);
   }
 
+  // Links to per-forecast pages. null = the read failed (logged): the section is omitted.
+  const recent = await getRecentForecastLinks(RECENT_LINKS);
   const synced = fmtDate(s.lastSynced);
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -189,6 +197,24 @@ export default async function ForecastsPage() {
           ))}
         </ul>
 
+        {/* Recently published — links to the per-forecast pages that pass the thin gate. */}
+        {recent && recent.length > 0 && (
+          <>
+            <h2 className="mt-12 text-2xl font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">Recently published forecasts</h2>
+            <p className="mt-2 text-(--mp-muted)">The newest forecasted requirements Mindy has added, each with its own page.</p>
+            <ul className="mt-5 divide-y divide-(--mp-hair)">
+              {recent.map((f) => (
+                <li key={f.slug} className="flex items-baseline justify-between gap-4 py-2">
+                  <Link href={`/forecasts/${f.slug}`} className="text-(--mp-navy) hover:underline">{f.title}</Link>
+                  <span className="shrink-0 text-right text-sm text-(--mp-muted)">
+                    {[f.period, f.value].filter(Boolean).join(' · ')}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+
         {/* Set-asides + fiscal years */}
         <div className="mt-12 grid gap-8 md:grid-cols-2">
           <div>
@@ -235,6 +261,14 @@ export default async function ForecastsPage() {
           <li>
             <Link href="/recompete" className="text-(--mp-navy) hover:underline">Contract recompetes</Link>
             {' '}— work already under contract that comes up again.
+          </li>
+          <li>
+            <Link href="/recompetes" className="text-(--mp-navy) hover:underline">Contracts expiring soon</Link>
+            {' '}— the soonest-ending contracts, one record each.
+          </li>
+          <li>
+            <Link href="/offices" className="text-(--mp-navy) hover:underline">DoD buying offices</Link>
+            {' '}— every DoD contracting office with active notices, by DoDAAC.
           </li>
           <li>
             <Link href="/opportunity-hunter" className="text-(--mp-navy) hover:underline">Open opportunities</Link>

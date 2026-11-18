@@ -500,3 +500,115 @@ export async function getForecastSitemapEntries(now: Date = new Date()): Promise
   }
   return out;
 }
+
+// ── internal-link surfaces: the /forecasts hub + agency pages ──────────────────────────────
+
+/**
+ * The forecast source codes whose pages belong to an /agencies/<slug> page — the reverse of
+ * forecastAgencySeo(). A source code maps to the agency whose abbreviation it equals, or through
+ * SOURCE_TO_SEO_ABBR (NAVY / USACE → DOD …).
+ */
+export function forecastSourceCodesForAgencySlug(slug: string): string[] {
+  const agency = AGENCIES_SEO.find((a) => a.slug === slug);
+  if (!agency?.abbreviation) return [];
+  const abbr = agency.abbreviation.toUpperCase();
+  const codes = new Set<string>();
+  if (SEO_BY_ABBR.get(abbr)?.slug === slug) codes.add(abbr);
+  for (const [code, target] of Object.entries(SOURCE_TO_SEO_ABBR)) {
+    if (target === abbr) codes.add(code);
+  }
+  // Every code must round-trip through the forward mapping the forecast page itself uses.
+  return Array.from(codes).filter((c) => forecastAgencySeo(c)?.slug === slug).sort();
+}
+
+const LINK_SELECT_FORECAST =
+  'id, source_agency, title, naics_code, estimated_value_min, estimated_value_max, estimated_value_range, ' +
+  'anticipated_award_date, solicitation_date, fiscal_year, anticipated_quarter, status';
+
+/**
+ * Rows → links to INDEXABLE forecast pages only (the page's own gate, so a hub never links a
+ * noindex page), first duplicate-key occurrence by smallest id kept. Descriptions are not read
+ * for links: the gate is evaluated with hasDescription=false, so a listed row qualifies on its
+ * other signals alone — a strict subset of what the page would index. Pure (tested).
+ */
+export function toForecastLinks(rows: ForecastRow[], limit: number, now: Date = new Date()): RelatedForecast[] {
+  const smallest = new Map<string, string>();
+  for (const r of rows) {
+    const k = forecastDuplicateKey(r);
+    const cur = smallest.get(k);
+    if (!cur || String(r.id) < cur) smallest.set(k, String(r.id));
+  }
+  const out: RelatedForecast[] = [];
+  for (const r of rows) {
+    const id = String(r.id);
+    if (smallest.get(forecastDuplicateKey(r)) !== id) continue;
+    if (!forecastIndexability(r, false, now).indexable) continue;
+    out.push({
+      slug: forecastSlug(r.title, id),
+      title: clean(r.title)!,
+      period: fiscalPeriodLabel(r.fiscal_year, r.anticipated_quarter),
+      value: forecastValueLabel(r.estimated_value_min, r.estimated_value_max, r.estimated_value_range),
+    });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+/**
+ * "Recently published forecasts" on the /forecasts hub: newest rows Mindy ingested (created_at),
+ * gated in TS. Returns null on a read error — the hub omits the section (logged), never shows an
+ * empty list as if nothing was published.
+ */
+export async function getRecentForecastLinks(limit = 50, now: Date = new Date()): Promise<RelatedForecast[] | null> {
+  const client = sb();
+  if (!client) {
+    console.error('[seo/forecast-pages] recent forecasts: no Supabase client');
+    return null;
+  }
+  const { data, error } = await client
+    .from('agency_forecasts')
+    .select(LINK_SELECT_FORECAST)
+    .not('title', 'is', null)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: true })
+    .limit(limit * 4); // headroom: stale / thin / duplicate rows are dropped by the gate
+  if (error) {
+    console.error('[seo/forecast-pages] recent forecasts read failed:', error.message);
+    return null;
+  }
+  return toForecastLinks((data ?? []) as unknown as ForecastRow[], limit, now);
+}
+
+/**
+ * Upcoming forecasts for an /agencies/<slug> page: the agency's source codes scoped IN the query,
+ * non-stale by anticipated award date (indexed), soonest first. [] when the agency publishes no
+ * forecasts we map; null on a read error (the caller omits the block).
+ */
+export async function getForecastLinksForAgencySlug(
+  slug: string,
+  limit = 10,
+  now: Date = new Date(),
+): Promise<RelatedForecast[] | null> {
+  const codes = forecastSourceCodesForAgencySlug(slug);
+  if (codes.length === 0) return [];
+  const client = sb();
+  if (!client) {
+    console.error('[seo/forecast-pages] agency forecasts: no Supabase client');
+    return null;
+  }
+  const cutoff = new Date(now.getTime() - STALE_AFTER_DAYS * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  const { data, error } = await client
+    .from('agency_forecasts')
+    .select(LINK_SELECT_FORECAST)
+    .in('source_agency', codes)
+    .not('title', 'is', null)
+    .gte('anticipated_award_date', cutoff)
+    .order('anticipated_award_date', { ascending: true })
+    .order('id', { ascending: true })
+    .limit(limit * 4);
+  if (error) {
+    console.error('[seo/forecast-pages] agency forecasts read failed:', error.message);
+    return null;
+  }
+  return toForecastLinks((data ?? []) as unknown as ForecastRow[], limit, now);
+}

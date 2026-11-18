@@ -39,6 +39,7 @@ import {
 import { recipientSlug } from '@/lib/bigquery/recipients';
 import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoneyCompact } from '@/lib/format-money';
+import { getForecastLinksForAgencySlug, type RelatedForecast } from '@/lib/seo/forecast-pages';
 
 // Pre-compute the set of NAICS codes we have landing pages for so we
 // can conditionally link rather than 404-ing users.
@@ -137,6 +138,10 @@ export default async function AgencyPage({
       ])
     : [null, [], [], []];
 
+  // Explore links: this agency's upcoming per-forecast pages (Supabase, never BigQuery). A read
+  // failure returns null and the forecast list is omitted (logged) — never shown as "no forecasts".
+  const forecastLinks = await getForecastLinksForAgencySlug(agency.slug, 10);
+
   const jsonLd = buildJsonLd(agency);
 
   return (
@@ -217,6 +222,7 @@ export default async function AgencyPage({
 
           {/* Sidebar */}
           <aside className="lg:col-span-1 space-y-6">
+            <Explore agency={agency} forecasts={forecastLinks} />
             <RelatedAgencies related={related} group={agency.group} />
             <BackToIndex />
           </aside>
@@ -855,6 +861,48 @@ function RelatedAgencies({
             </Link>
           </li>
         ))}
+      </ul>
+    </div>
+  );
+}
+
+const DOD_SLUG = 'department-of-defense';
+
+/** Crawlable links into the per-record public pages: forecasts, recompetes and (DoD) offices. */
+function Explore({ agency, forecasts }: { agency: AgencySeo; forecasts: RelatedForecast[] | null }) {
+  const label = agency.abbreviation || agency.name;
+  return (
+    <div className="bg-white border border-(--mp-hair) rounded-lg p-6">
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-(--mp-navy) mb-4">Explore</h2>
+      {forecasts && forecasts.length > 0 && (
+        <>
+          <p className="text-xs text-(--mp-muted) mb-3">Upcoming {label} forecasts</p>
+          <ul className="space-y-2 mb-5">
+            {forecasts.map((f) => (
+              <li key={f.slug}>
+                <Link href={`/forecasts/${f.slug}`} className="text-sm text-(--mp-ink) hover:text-(--mp-navy-hover) transition">
+                  {f.title}
+                </Link>
+                {(f.period || f.value) && (
+                  <div className="text-(--mp-muted) text-xs mt-0.5">{[f.period, f.value].filter(Boolean).join(' · ')}</div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <ul className="space-y-2 text-sm">
+        {agency.slug === DOD_SLUG && (
+          <li>
+            <Link href="/offices" className="text-(--mp-navy) hover:underline">DoD buying offices by DoDAAC →</Link>
+          </li>
+        )}
+        <li>
+          <Link href="/forecasts" className="text-(--mp-navy) hover:underline">All agency forecasts →</Link>
+        </li>
+        <li>
+          <Link href="/recompetes" className="text-(--mp-navy) hover:underline">Contracts expiring soon →</Link>
+        </li>
       </ul>
     </div>
   );

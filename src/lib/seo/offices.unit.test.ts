@@ -40,7 +40,7 @@ import {
   OFFICE_MIN_ACTIVE_NOTICES,
   OFFICE_MIN_CONTACTS,
 } from './office-gate';
-import { getOfficePageData, getOfficeSitemapEntries, summarizeContacts } from './offices';
+import { getOfficeHubEntries, getOfficePageData, getOfficeSitemapEntries, groupOfficesForHub, summarizeContacts } from './offices';
 import { isSeoTemporarilyUnavailable } from './seo-unavailable';
 
 const DIR_W912PL = { dodaac: 'W912PL', display_name: 'W071 ENDIST LOS ANGELES', agency: 'Department of Defense', sub_agency: 'Department of the Army', award_count: 1200, total_obligated: 5.4e9, updated_at: '2026-10-01T00:00:00Z' };
@@ -205,5 +205,48 @@ describe('getOfficeSitemapEntries', () => {
   it('throws on a read failure instead of publishing an empty family', async () => {
     m.responses = { sam_opportunities: [{ data: null, error: { message: 'timeout' } }] };
     await expect(getOfficeSitemapEntries()).rejects.toThrow(/office sitemap/);
+  });
+});
+
+describe('getOfficeHubEntries (the /offices hub)', () => {
+  it('is the sitemap population plus the directory name and parent', async () => {
+    const rows = [
+      ...Array.from({ length: 4 }, (_, i) => ({ solicitation_number: `W912PL26R000${i}`, posted_date: '2026-10-02' })),
+      ...Array.from({ length: 3 }, (_, i) => ({ solicitation_number: `N0010426R000${i}`, posted_date: '2026-10-01' })),
+    ];
+    m.responses = {
+      sam_opportunities: [{ data: rows, error: null }],
+      dodaac_directory_display: [{
+        data: [
+          { dodaac: 'W912PL', display_name: 'W071 ENDIST LOS ANGELES', agency: 'Department of Defense', sub_agency: 'Department of the Army' },
+          { dodaac: 'N00104', display_name: 'NAVSUP WSS MECHANICSBURG', agency: 'Department of Defense', sub_agency: 'Department of the Navy' },
+        ],
+        error: null,
+      }],
+    };
+    const out = await getOfficeHubEntries();
+    expect(out.map((o) => [o.dodaac, o.activeNotices, o.subAgency])).toEqual([
+      ['N00104', 3, 'Department of the Navy'],
+      ['W912PL', 4, 'Department of the Army'],
+    ]);
+    expect(out.every((o) => o.name.length > 0)).toBe(true);
+  });
+
+  it('throws on a read failure (the hub renders unavailable, never "0 offices")', async () => {
+    m.responses = { sam_opportunities: [{ data: null, error: { message: 'timeout' } }] };
+    await expect(getOfficeHubEntries()).rejects.toThrow(/office sitemap/);
+  });
+
+  it('groups by service, largest group first, names sorted inside', () => {
+    const e = (dodaac: string, name: string, subAgency: string | null) =>
+      ({ dodaac, name, agency: 'Department of Defense', subAgency, activeNotices: 3, lastModified: null });
+    const g = groupOfficesForHub([
+      e('W912PL', 'Zeta District', 'Department of the Army'),
+      e('W912BV', 'Alpha District', 'Department of the Army'),
+      e('N00104', 'Navsup', 'Department of the Navy'),
+      e('HQ0034', 'WHS', null),
+    ]);
+    expect(g.map((x) => x.label)).toEqual(['Department of the Army', 'Department of Defense', 'Department of the Navy']);
+    expect(g[0].offices.map((o) => o.name)).toEqual(['Alpha District', 'Zeta District']);
   });
 });

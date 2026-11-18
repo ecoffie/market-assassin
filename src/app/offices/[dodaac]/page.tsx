@@ -98,7 +98,8 @@ function jsonLd(o: OfficePageData) {
         itemListElement: [
           { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
           { '@type': 'ListItem', position: 2, name: 'Department of Defense', item: `${SITE_URL}/agencies/${DOD_AGENCY_SLUG}` },
-          { '@type': 'ListItem', position: 3, name: o.name, item: url },
+          { '@type': 'ListItem', position: 3, name: 'Buying offices', item: `${SITE_URL}/offices` },
+          { '@type': 'ListItem', position: 4, name: o.name, item: url },
         ],
       },
     ],
@@ -121,6 +122,8 @@ export default async function OfficePage({ params }: { params: Promise<{ dodaac:
           <Link href="/" className="hover:underline">Home</Link>
           <span className="mx-1.5">/</span>
           <Link href={`/agencies/${DOD_AGENCY_SLUG}`} className="hover:underline">Department of Defense</Link>
+          <span className="mx-1.5">/</span>
+          <Link href="/offices" className="hover:underline">Buying offices</Link>
           <span className="mx-1.5">/</span>
           <span>{o.dodaac}</span>
         </nav>
@@ -269,8 +272,10 @@ export default async function OfficePage({ params }: { params: Promise<{ dodaac:
           <Link href={`/agencies/${DOD_AGENCY_SLUG}`} className="text-(--mp-navy) hover:underline">
             Department of Defense contracting overview →
           </Link>
+          <Link href="/offices" className="text-(--mp-navy) hover:underline">All DoD buying offices →</Link>
           <Link href="/opportunity-hunter" className="text-(--mp-navy) hover:underline">Browse all opportunities →</Link>
           <Link href="/forecasts" className="text-(--mp-navy) hover:underline">Agency forecasts →</Link>
+          <Link href="/recompetes" className="text-(--mp-navy) hover:underline">Contracts expiring soon →</Link>
         </nav>
       </div>
     </main>

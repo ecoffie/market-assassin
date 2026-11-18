@@ -176,7 +176,7 @@ export default async function RecompetePage({ params }: PageProps) {
         '@type': 'BreadcrumbList',
         itemListElement: [
           { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
-          { '@type': 'ListItem', position: 2, name: 'Recompetes', item: `${SITE_URL}/recompete` },
+          { '@type': 'ListItem', position: 2, name: 'Recompetes', item: `${SITE_URL}/recompetes` },
           { '@type': 'ListItem', position: 3, name: contractNo, item: `${SITE_URL}/recompetes/${canonicalSlug}` },
         ],
       },
@@ -190,7 +190,7 @@ export default async function RecompetePage({ params }: PageProps) {
         <nav className="text-xs text-(--mp-muted) mb-4">
           <Link href="/" className="hover:underline">Home</Link>
           <span className="mx-1.5">/</span>
-          <Link href="/recompete" className="hover:underline">Recompetes</Link>
+          <Link href="/recompetes" className="hover:underline">Recompetes</Link>
           <span className="mx-1.5">/</span>
           <span>{contractNo}</span>
         </nav>
@@ -329,7 +329,7 @@ export default async function RecompetePage({ params }: PageProps) {
           {agencyHref && <Link href={agencyHref} className="text-(--mp-navy) hover:underline">{r.awarding_agency} →</Link>}
           {naicsHref && <Link href={naicsHref} className="text-(--mp-navy) hover:underline">NAICS {r.naics_code} →</Link>}
           {awardLink && <Link href={awardLink} className="text-(--mp-navy) hover:underline">Award record →</Link>}
-          <Link href="/recompete" className="text-(--mp-navy) hover:underline">All expiring contracts →</Link>
+          <Link href="/recompetes" className="text-(--mp-navy) hover:underline">All expiring contracts →</Link>
         </nav>
       </div>
     </main>

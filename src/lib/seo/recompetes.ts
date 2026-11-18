@@ -401,3 +401,135 @@ export async function getRecompeteSitemapChunk(chunk: number, now: Date = new Da
   }
   return out;
 }
+
+// ── internal-link surfaces: the /recompetes hub + the contractor profile block ───────────────
+
+const LINK_SELECT =
+  'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,period_of_performance_current_end,potential_total_value,total_obligation';
+
+export type RecompeteLinkRaw = {
+  contract_id: string; piid: string | null; incumbent_name: string | null; incumbent_uei?: string | null;
+  awarding_agency: string | null; awarding_sub_agency: string | null; period_of_performance_current_end: string | null;
+  potential_total_value: number | string | null; total_obligation: number | string | null;
+};
+
+export interface RecompeteLink extends RelatedRecompete {
+  contract_id: string;
+  agency: string | null;
+  subAgency: string | null;
+}
+
+/**
+ * Raw rows → links, keeping ONLY rows whose page passes the thin gate (so a hub never links a
+ * page that noindexes itself), soonest end first, deduplicated by contract_id. Pure (tested).
+ */
+export function toRecompeteLinks(rows: RecompeteLinkRaw[], limit: number, now: Date = new Date()): RecompeteLink[] {
+  const seen = new Set<string>();
+  return rows
+    .map((x) => ({ ...x, potential_total_value: num(x.potential_total_value), total_obligation: num(x.total_obligation) }))
+    .filter((x) => {
+      if (!isValidContractId(x.contract_id) || seen.has(x.contract_id)) return false;
+      seen.add(x.contract_id);
+      return recompeteIndexVerdict(x, now).indexable;
+    })
+    .sort((a, b) =>
+      (a.period_of_performance_current_end || '').localeCompare(b.period_of_performance_current_end || '') ||
+      a.contract_id.localeCompare(b.contract_id))
+    .slice(0, limit)
+    .map((x) => ({
+      contract_id: x.contract_id,
+      href: recompeteHref(x),
+      piid: x.piid,
+      incumbent_name: x.incumbent_name,
+      end: x.period_of_performance_current_end,
+      value: headlineValue(x),
+      agency: x.awarding_agency,
+      subAgency: x.awarding_sub_agency,
+    }));
+}
+
+/** The real-row filters the sitemap uses, applied IN the query (before any limit). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function realRowFilters(q: any, today: string): any {
+  return q
+    .is('quality_flag', null)
+    .like('contract_id', 'CONT_%')
+    .neq('incumbent_name', 'Unknown')
+    .neq('awarding_agency', 'Unknown')
+    .gte('period_of_performance_current_end', today)
+    .or('potential_total_value.gt.0,total_obligation.gt.0');
+}
+
+/**
+ * The /recompetes hub: the soonest-expiring indexable contracts from today forward. Every gate
+ * runs in the query BEFORE the limit (filter-before-rank); the TS gate then re-checks each row
+ * (headroom covers what it drops). Throws on a read error — the hub renders "unavailable",
+ * never an empty list presented as "nothing expiring".
+ */
+export async function getRecompeteHubLinks(limit = 200, now: Date = new Date()): Promise<RecompeteLink[]> {
+  const today = federalToday(now);
+  const { data, error } = await realRowFilters(
+    sb().from('recompete_opportunities').select(LINK_SELECT),
+    today,
+  )
+    .order('period_of_performance_current_end', { ascending: true })
+    .order('contract_id', { ascending: true })
+    .limit(Math.min(PAGE, Math.ceil(limit * 1.5)));
+  if (error) throw new Error(`recompete hub read failed: ${error.message}`);
+  return toRecompeteLinks((data ?? []) as RecompeteLinkRaw[], limit, now);
+}
+
+/** Split a UEI set into `.in()`-sized chunks (URL length), uppercased, deduplicated. Pure. */
+export function ueiChunks(ueis: readonly string[], size = 150): string[][] {
+  const clean = Array.from(new Set(ueis.map((u) => String(u || '').trim().toUpperCase()).filter((u) => /^[A-Z0-9]{12}$/.test(u))));
+  const out: string[][] = [];
+  for (let i = 0; i < clean.length; i += size) out.push(clean.slice(i, i + size));
+  return out;
+}
+
+/** UEI chunks queried for one profile. A rollup beyond this is read partially and logged. */
+const MAX_UEI_CHUNKS = 20;
+
+/**
+ * "Contracts expiring soon" on a contractor profile: real rows held by ANY of the profile's UEIs
+ * (scoped in the query, before the limit), future end date, soonest first. Each chunk returns its
+ * own soonest rows, so the merged top `limit` is exact across chunks.
+ * Returns null on a read error — the caller omits the block rather than print "0 expiring".
+ */
+export async function getExpiringRecompetesForUeis(
+  ueis: readonly string[],
+  limit = 10,
+  now: Date = new Date(),
+): Promise<RecompeteLink[] | null> {
+  const chunks = ueiChunks(ueis);
+  if (chunks.length === 0) return [];
+  if (chunks.length > MAX_UEI_CHUNKS) {
+    console.error(`[seo/recompetes] profile has ${chunks.length} UEI chunks; reading the first ${MAX_UEI_CHUNKS}`);
+  }
+  const today = federalToday(now);
+  let client: SupabaseClient;
+  try {
+    client = sb();
+  } catch (e) {
+    console.error('[seo/recompetes] expiring-for-profile: no client:', (e as Error).message);
+    return null;
+  }
+  const results = (await Promise.all(
+    chunks.slice(0, MAX_UEI_CHUNKS).map((chunk) =>
+      realRowFilters(client.from('recompete_opportunities').select(LINK_SELECT), today)
+        .in('incumbent_uei', chunk)
+        .order('period_of_performance_current_end', { ascending: true })
+        .order('contract_id', { ascending: true })
+        .limit(limit * 2), // headroom for rows the TS gate drops
+    ),
+  )) as Array<{ data: unknown; error: { message: string } | null }>;
+  const rows: RecompeteLinkRaw[] = [];
+  for (const r of results) {
+    if (r.error) {
+      console.error('[seo/recompetes] expiring-for-profile read failed:', r.error.message);
+      return null;
+    }
+    rows.push(...((r.data ?? []) as RecompeteLinkRaw[]));
+  }
+  return toRecompeteLinks(rows, limit, now);
+}

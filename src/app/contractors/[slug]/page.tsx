@@ -48,6 +48,7 @@ import {
 import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import { awardHref, servableAwardIds } from '@/lib/seo/award-links';
+import { getExpiringRecompetesForUeis } from '@/lib/seo/recompetes';
 
 const SITE_URL = 'https://getmindy.ai';
 
@@ -235,7 +236,13 @@ export default async function ContractorPage({ params }: PageProps) {
     ? await getSimilarRecipients(ueis, rollupUei, topNaicsCode, 8)
     : [];
   // Link a row to its award page only when that page can serve (see src/lib/seo/award-links.ts).
-  const servableAwards = await servableAwardIds(recentAwards.map((a) => a.award_id));
+  // "Contracts expiring soon": Supabase only (a public page must never trigger BigQuery), scoped to
+  // this org's whole UEI set IN the query. null = the read failed -> the block is omitted (logged),
+  // never rendered as "0 expiring".
+  const [servableAwards, expiring] = await Promise.all([
+    servableAwardIds(recentAwards.map((a) => a.award_id)),
+    getExpiringRecompetesForUeis(ueis, 10),
+  ]);
 
   // JSON-LD: Organization + BreadcrumbList. NO `isAccessibleForFree:
   // false` directive — that signal told Google "skip ranking this".
@@ -507,6 +514,33 @@ export default async function ContractorPage({ params }: PageProps) {
           )}
         </div>
       </section>
+
+      {/* Contracts expiring soon — links to /recompetes record pages (indexable rows only). */}
+      {expiring && expiring.length > 0 && (
+        <section className="mx-auto max-w-6xl px-6 pb-10">
+          <h2 className="text-2xl font-bold mb-1 font-(family-name:--mp-font-serif)">Contracts expiring soon</h2>
+          <p className="text-sm text-(--mp-muted) mb-4">
+            {displayName} contracts whose period of performance ends soonest — each one a likely recompete.
+          </p>
+          <ul className="divide-y divide-(--mp-line) rounded-lg border border-(--mp-line) bg-(--mp-surface)">
+            {expiring.map((r) => (
+              <li key={r.contract_id} className="flex items-baseline justify-between gap-4 px-4 py-2.5">
+                <Link href={r.href} className="text-sm text-(--mp-navy) hover:underline">
+                  {r.agency || 'Agency not stated'}
+                  {r.piid && <span className="ml-2 font-(family-name:--mp-font-mono) text-xs text-(--mp-muted)">{r.piid}</span>}
+                </Link>
+                <span className="shrink-0 text-right text-xs text-(--mp-muted)">
+                  ends {fmtDate(r.end)}
+                  {r.value != null && <span className="block font-(family-name:--mp-font-mono)">{fmtMoney(r.value)}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-sm">
+            <Link href="/recompetes" className="text-(--mp-navy) hover:underline">All contracts expiring soon →</Link>
+          </p>
+        </section>
+      )}
 
       {/* Executives (FFATA disclosures) */}
       {executives.length > 0 && (

@@ -91,6 +91,10 @@ export function staticEntries(): SitemapEntry[] {
     // Supabase with no public surface at all. The route now renders those counts
     // as server HTML, and noindexes itself if the read fails.
     { url: `${SITE_URL}/forecasts`,             changeFrequency: 'daily',   priority: 0.8 },
+    // Hubs over the per-record families (2026-11-18): each links its records from a crawled
+    // page instead of leaving them reachable only through their sitemaps.
+    { url: `${SITE_URL}/recompetes`,            changeFrequency: 'daily',   priority: 0.7 },
+    { url: `${SITE_URL}/offices`,               changeFrequency: 'daily',   priority: 0.7 },
     // Comparison pages — target high-volume "alternative" keywords.
     // Priority 0.8 puts them in the top tier just below the homepage
     // since they're primary acquisition surfaces for paid + organic.

@@ -46,6 +46,7 @@ export const SITE_LINK_GROUPS: SiteLinkGroup[] = [
       { href: '/top', label: 'Top contractor rankings' },
       { href: '/awards', label: 'Federal award records' },
       { href: '/recompete', label: 'Contract recompetes' },
+      { href: '/recompetes', label: 'Contracts expiring soon' },
       { href: '/forecasts', label: 'Agency forecasts' },
       { href: '/naics', label: 'Contracts by NAICS code' },
     ],
@@ -54,6 +55,7 @@ export const SITE_LINK_GROUPS: SiteLinkGroup[] = [
     heading: 'Buyers & markets',
     links: [
       { href: '/agencies', label: 'Federal agency directory' },
+      { href: '/offices', label: 'DoD buying offices' },
       { href: '/opportunity-hunter', label: 'Open opportunities' },
       { href: '/spending', label: 'Federal spending explorer' },
       { href: '/market-intelligence', label: 'Market intelligence' },
