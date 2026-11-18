@@ -26,86 +26,13 @@ import { createClient } from '@supabase/supabase-js';
 import { ingestDibbs } from '@/lib/dibbs/ingest';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { reportCronOutcome } from '@/lib/cron-self-report';
-import { buildCollectionClockPatch, type CollectionClockPatch } from '@/lib/data-core/collection-clocks';
+import { freshnessBody, stampDibbsClocks } from '@/lib/dibbs/clock-stamp';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 // 300 (was 120): with DIBBS_PROXY_MODE=primary a bad day can run proxy, a second proxy
 // session, direct, then the actor in sequence. A normal proxy run is ~10 s.
 export const maxDuration = 300;
-
-/**
- * Stamp the control-plane clocks for this attempt. A failed stamp is logged and
- * never changes the job outcome. recordsLanded is 0 for a confirmed empty window
- * even if a stray row was touched — that touch is not a nonempty ingest.
- */
-/**
- * Naming the Supabase client here makes tsc instantiate the query builder until
- * it hits TS2589 ("excessively deep"). The argument stays `unknown`; the cast
- * is only the two calls this stamp makes.
- */
-type DibbsClockDb = {
-  from(table: string): {
-    select(cols: string): {
-      eq(col: string, value: string): {
-        maybeSingle(): PromiseLike<{ data: { last_verified_ingest?: string | null } | null }>;
-      };
-    };
-    update(values: Record<string, string | null>): {
-      eq(col: string, value: string): PromiseLike<unknown>;
-    };
-  };
-};
-
-async function stampDibbsClocks(
-  supabase: unknown,
-  input: { upstreamReadable: boolean; recordsReceived: number; recordsLanded: number },
-): Promise<{ patch: CollectionClockPatch; priorVerifiedIngest: string | null } | null> {
-  const db = supabase as DibbsClockDb;
-  const attemptedAt = new Date().toISOString();
-  try {
-    const { data } = await db
-      .from('data_source_instances')
-      .select('last_verified_ingest')
-      .eq('source_key', 'dibbs_dla_flat_files')
-      .maybeSingle();
-    const priorVerifiedIngest = (data?.last_verified_ingest as string | null) ?? null;
-    const patch = buildCollectionClockPatch({
-      attemptedAt,
-      upstreamReadable: input.upstreamReadable,
-      recordsReceived: input.recordsReceived,
-      recordsLanded: input.recordsLanded,
-      priorVerifiedIngest,
-      cadenceHours: 24,
-      now: attemptedAt,
-    });
-    await db.from('data_source_instances').update({
-      ...patch.clocks,
-      updated_at: attemptedAt,
-    }).eq('source_key', 'dibbs_dla_flat_files');
-    return { patch, priorVerifiedIngest };
-  } catch (e) {
-    console.error('[sync-dibbs] clock stamp failed:', (e as Error).message);
-    return null;
-  }
-}
-
-function freshnessBody(
-  stamped: { patch: CollectionClockPatch; priorVerifiedIngest: string | null } | null,
-  recordsReceived: number,
-) {
-  const patch = stamped?.patch ?? null;
-  return {
-    lastAttempted: patch?.clocks.last_poll ?? null,
-    lastSuccessfulCollection: patch?.clocks.last_successful_check ?? null,
-    lastNonemptyIngest: patch?.advancedNonemptyIngest
-      ? (patch.clocks.last_verified_ingest ?? null)
-      : (stamped?.priorVerifiedIngest ?? null),
-    recordsReceived,
-    sourceState: patch?.sourceState ?? null,
-    nonemptyIngestAdvanced: patch?.advancedNonemptyIngest ?? false,
-  };
-}
 
 export async function GET(request: NextRequest) {
   // AUTH FIRST — this route SPENDS REAL MONEY on every call (~$36 per 2500-item

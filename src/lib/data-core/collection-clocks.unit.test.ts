@@ -208,7 +208,9 @@ describe('DIBBS wiring', () => {
     const window = sync.slice(sync.indexOf('if (noDataWindow)'), sync.indexOf('// Healthy run'));
     expect(window).toContain('recordsLanded: 0');
     expect(window).toContain('stampDibbsClocks');
-    expect(sync).toContain('buildCollectionClockPatch');
+    const stamp = readFileSync(join(process.cwd(), 'src/lib/dibbs/clock-stamp.ts'), 'utf8');
+    expect(stamp).toContain('buildCollectionClockPatch');
+    expect(stamp).toContain('if (written.error)');
   });
 
   it('the customer DIBBS route returns the freshness warning instead of implying current', () => {
