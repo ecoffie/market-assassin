@@ -8,6 +8,7 @@ import {
   toolCallIdentityKey,
   dropDuplicateRound2Calls,
 } from './second-tool-round';
+import { splitViewPreamble } from './view-preamble';
 
 /** The eight measured R2 cases from ASK-MINDY-R2-EVALUATION-2026-11-18 (plus T7 docs outlier). */
 const EIGHT_CASES = {
@@ -164,6 +165,17 @@ describe('shouldOfferSecondToolRound / decideSecondToolRound', () => {
     expect(SECOND_ROUND_HOP_CUE.test('buying-office contact')).toBe(true);
     expect(SECOND_ROUND_HOP_CUE.test('pull the SOW')).toBe(true);
     expect(SECOND_ROUND_HOP_CUE.test('What is solicitation X about and when is it due')).toBe(false);
+  });
+
+  it('route must strip map preamble before hop matching (false contacts in view note)', () => {
+    const seed = [{ tool: 'lookup_solicitation', status: 'success' }] as const;
+    const raw =
+      '[Current map view \u2014 contacts for this NAICS; buying offices nearby. Answer for THIS view.]\n\nWhen is it due?';
+    // Raw message would falsely match hop cues living only in the preamble.
+    expect(decideSecondToolRound(seed, { customerText: raw }).offer).toBe(true);
+    expect(
+      decideSecondToolRound(seed, { customerText: splitViewPreamble(raw).rest || raw }).offer,
+    ).toBe(false);
   });
 });
 

@@ -1198,7 +1198,8 @@ export async function POST(request: NextRequest) {
                 results.map((r) => ({ tool: r.record.tool, status: r.record.status })),
                 {
                   turnTimedOut,
-                  customerText: message,
+                  // Hop cues must ignore the map view preamble (same as other customerText sites).
+                  customerText: splitViewPreamble(message).rest || message,
                 },
               );
               if (

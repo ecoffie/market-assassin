@@ -238,4 +238,16 @@ describe('R2 hygiene via chat route', () => {
     expect(state.plannerBodies).toHaveLength(1);
     expect(state.executed).toEqual([['lookup_solicitation', 'search_federal_contacts']]);
   });
+
+  it('map preamble alone must not buy R2 (hop cues stripped from view note)', async () => {
+    state.plannerQueue = [
+      [tc('lookup_solicitation', { solicitation: '36C24626B0031' })],
+      [tc('search_federal_contacts', { agency: 'VA' })],
+    ];
+    await ask(
+      '[Current map view \u2014 contacts for this NAICS; buying offices nearby. Answer for THIS view.]\n\nWhat is solicitation 36C24626B0031 about and when is it due',
+    );
+    expect(state.plannerBodies).toHaveLength(1);
+    expect(state.executed).toEqual([['lookup_solicitation']]);
+  });
 });
