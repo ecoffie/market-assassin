@@ -13,6 +13,7 @@
  * Unknown is not zero.
  */
 import { existsSync, readFileSync } from 'node:fs';
+import { basename } from 'node:path';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -151,8 +152,8 @@ function measured(value) {
   return { value, status: 'measured', reason: null };
 }
 
-/** GET only. Refuses every other method. */
-async function restGet(base, key, path, { count = false } = {}) {
+/** GET only. Refuses every other method. Shared with the daily scorecard. */
+export async function restGet(base, key, path, { count = false } = {}) {
   if (!path.startsWith('/rest/v1/')) throw new Error('refusing a non-read path');
   const res = await fetch(`${base}${path}`, {
     method: 'GET',
@@ -181,7 +182,7 @@ async function restGet(base, key, path, { count = false } = {}) {
   return { ok: true, error: null, rows: Array.isArray(body) ? body : [], count: n };
 }
 
-function q(params) {
+export function q(params) {
   const u = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v != null && v !== '') u.set(k, String(v));
   return u.toString();
@@ -336,4 +337,4 @@ async function main() {
   console.log(JSON.stringify(report, null, 2));
 }
 
-if (process.argv[1] && process.argv[1].endsWith('acquisition-scorecard.mjs')) main();
+if (process.argv[1] && basename(process.argv[1]) === 'acquisition-scorecard.mjs') main();
