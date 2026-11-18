@@ -42,6 +42,32 @@ const TYPES: Record<Ext, string> = {
 };
 const SPREADSHEET_EXT = new Set<Ext>(['xlsx', 'xls', 'csv']);
 
+/**
+ * Spreadsheet extractors pad short rows with empty CSV fields (`CUI` → `CUI,,`).
+ * Banner detectors require a line that IS the marking, so strip leading/trailing
+ * empty fields. Only a row that collapses to exactly ONE non-empty cell is kept
+ * as a banner candidate — never every cell (a clearance column like
+ * `LCAT,Clearance,Rate / Sys Engineer,SECRET,150` must still upload).
+ * Does not change stored text — only the marking scan input.
+ */
+export function spreadsheetMarkingBody(text: string): string {
+  const lines: string[] = [];
+  for (const raw of String(text || '').split(/\r?\n/)) {
+    const cells = String(raw).split(',').map((c) => c.trim());
+    while (cells.length && !cells[0]) cells.shift();
+    while (cells.length && !cells[cells.length - 1]) cells.pop();
+    if (!cells.length) continue;
+    // Multi-column data rows (including a SECRET/CUI clearance cell) stay as-is.
+    if (cells.length > 1) {
+      lines.push(cells.join(','));
+      continue;
+    }
+    // Single remaining cell: the padded-banner case (`CUI,,`, `,,SECRET,,`).
+    lines.push(cells[0]);
+  }
+  return lines.join('\n');
+}
+
 export function detectUploadType(filename: string): { ext: Ext; mime: string } | null {
   const lower = filename.toLowerCase();
   for (const ext of Object.keys(TYPES) as Ext[]) {
@@ -192,7 +218,8 @@ export async function saveVaultUpload(input: VaultUploadInput, deps: VaultUpload
   //    only in a DOCX header). Refuse before ANY write. DOCX headers/footers (where
   //    banners live) are dropped by the body extractor, so read them separately.
   const headerFooter = type.ext === 'docx' ? await docxHeaderFooterText(file.buffer) : '';
-  const verdict = detectProhibitedMarkings({ body: text, headerFooter });
+  const markingBody = SPREADSHEET_EXT.has(type.ext) ? spreadsheetMarkingBody(text) : text;
+  const verdict = detectProhibitedMarkings({ body: markingBody, headerFooter });
   if (verdict.blocked && verdict.kind) {
     console.warn(`[vault/upload] refused ${verdict.kind} marking (source=${input.source}, class=${input.docClass})`);
     return { ok: false, status: 422, code: 'prohibited_marking', markingKind: verdict.kind, message: markingRefusalMessage(verdict.kind) };

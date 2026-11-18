@@ -12,13 +12,39 @@ vi.mock('@/lib/rate-limit', () => ({
 }));
 import { detectProhibitedMarkings } from './marking-detect';
 import { effectiveDocClass, mayCommitToFacts } from './doc-class';
-import { saveVaultUpload, resolveVaultWriteOwner, safeStorageName, type VaultUploadInput } from './upload';
+import { saveVaultUpload, resolveVaultWriteOwner, safeStorageName, spreadsheetMarkingBody, type VaultUploadInput } from './upload';
 import type { ChatActingScope } from '@/lib/chat/chat-acting-scope';
 import { checkVaultLimit, __resetVaultLocalLimits, VAULT_LIMITS } from './rate-limits';
 import { checkRateLimit } from '@/lib/rate-limit';
 
+// ── spreadsheet marking scan ────────────────────────────────────────────────
+describe('spreadsheetMarkingBody', () => {
+  it('exposes bare banner cells hidden by CSV padding', () => {
+    const cuiBody = spreadsheetMarkingBody('=== Sheet: S ===\nCUI,,\nName,SSN,Role');
+    expect(cuiBody.split('\n')).toContain('CUI');
+    expect(detectProhibitedMarkings(cuiBody)).toMatchObject({ blocked: true, kind: 'cui' });
+    expect(detectProhibitedMarkings(spreadsheetMarkingBody('SECRET,,\na,b,c'))).toMatchObject({
+      blocked: true, kind: 'classified',
+    });
+    expect(detectProhibitedMarkings(spreadsheetMarkingBody(',,CUI,,\na,b,c'))).toMatchObject({
+      blocked: true, kind: 'cui',
+    });
+  });
+
+  it('does not treat a clearance/data cell as a document banner', () => {
+    const staffing = spreadsheetMarkingBody(
+      '=== Sheet: Rates ===\nLCAT,Clearance,Rate\nSys Engineer,SECRET,150\nAnalyst,TOP SECRET,175',
+    );
+    expect(detectProhibitedMarkings(staffing)).toMatchObject({ blocked: false });
+    expect(detectProhibitedMarkings(spreadsheetMarkingBody('R1,CUI\nR2,Public'))).toMatchObject({
+      blocked: false,
+    });
+  });
+});
+
 // ── marking detection ───────────────────────────────────────────────────────
 describe('detectProhibitedMarkings', () => {
+
   const blockedClassified = [
     'SECRET',
     'TOP SECRET//SCI',
@@ -206,6 +232,26 @@ describe('saveVaultUpload', () => {
     const r = await saveVaultUpload(input({ file: file('roster.csv', 'CUI\nName,SSN') }), { db: s.db, storage: s.storage, resolveScope: own });
     expect(r).toMatchObject({ ok: false, code: 'prohibited_marking', status: 422 });
     expect(s.calls.uploads).toHaveLength(0);
+  });
+
+  it('padded spreadsheet banner cells still refuse (CUI,/SECRET,,)', async () => {
+    // Real extractXlsx pads short rows — marking scan must see bare CUI/SECRET cells.
+    const { extractXlsx } = await import('@/lib/sam/pdf-extract');
+    // Replace mock for this test only
+    const pdf = await import('@/lib/sam/pdf-extract');
+    vi.mocked(pdf.extractXlsx).mockImplementation(async (b: Buffer) => {
+      // Simulate padded CSV body the real extractor produces for a 3-col sheet
+      const raw = b.toString('utf-8');
+      if (raw.startsWith('CUI')) return { text: '=== Sheet: Sheet1 ===\nCUI,,\nName,SSN,Role\nA,1,x' };
+      if (raw.startsWith('SECRET')) return { text: '=== Sheet: Sheet1 ===\nSECRET,,\nName,SSN,Role\nA,1,x' };
+      return { text: raw };
+    });
+    for (const [name, body] of [['cui.xlsx', 'CUI'], ['sec.xlsx', 'SECRET']] as const) {
+      s.calls.uploads = []; s.calls.inserts = [];
+      const r = await saveVaultUpload(input({ file: file(name, body) }), { db: s.db, storage: s.storage, resolveScope: own });
+      expect(r, name).toMatchObject({ ok: false, code: 'prohibited_marking', status: 422 });
+      expect(s.calls.uploads, name).toHaveLength(0);
+    }
   });
 
   it('too large refused', async () => {

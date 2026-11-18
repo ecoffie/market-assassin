@@ -6,7 +6,7 @@
  * and that the tool is non-billable (never offered in the billed card chat).
  */
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { makeGenerateDocumentTool, CREATE_DOCUMENT, CREATE_DOCUMENT_TOOL_DEF } from './generate-document-tool';
+import { makeGenerateDocumentTool, CREATE_DOCUMENT, CREATE_DOCUMENT_TOOL_DEF, parseCreateDocumentDeliverables } from './generate-document-tool';
 import { SOURCE_KIND_VALUES, BLOCK_TYPE_VALUES, CLAIM_VALUES } from '@/lib/documents/validate';
 import { CARD_CHAT_TOOLS } from './card-chat';
 import { chatToolPolicy } from './chat-tool-policy';
@@ -300,5 +300,28 @@ describe('create_document', () => {
     expect(CARD_CHAT_TOOLS.has(CREATE_DOCUMENT)).toBe(false);
     expect(chatToolPolicy(CREATE_DOCUMENT, true).decision).toBe('allowed_write');
     expect(VAULT_GROUNDED_TOOLS.has(CREATE_DOCUMENT)).toBe(true);
+  });
+});
+
+describe('parseCreateDocumentDeliverables', () => {
+  it('extracts files and pdf_note from a successful save', () => {
+    const parsed = parseCreateDocumentDeliverables(JSON.stringify({
+      ok: true,
+      title: 'Strategy',
+      pdf_note: 'The PDF could not be produced right now; the Word file was saved.',
+      files: [
+        { format: 'docx', document_id: '00000000-0000-4000-8000-000000000001', file_name: 'Strategy.docx', version: 1 },
+        { format: 'pdf', document_id: '00000000-0000-4000-8000-000000000002', file_name: 'Strategy.pdf', version: 1 },
+      ],
+    }));
+    expect(parsed?.title).toBe('Strategy');
+    expect(parsed?.pdf_note).toMatch(/PDF could not be produced/);
+    expect(parsed?.files.map((f) => f.format)).toEqual(['docx', 'pdf']);
+  });
+
+  it('returns null for refused or empty results', () => {
+    expect(parseCreateDocumentDeliverables(JSON.stringify({ ok: false, error: 'prohibited_marking' }))).toBeNull();
+    expect(parseCreateDocumentDeliverables(JSON.stringify({ ok: true, files: [] }))).toBeNull();
+    expect(parseCreateDocumentDeliverables('not-json')).toBeNull();
   });
 });

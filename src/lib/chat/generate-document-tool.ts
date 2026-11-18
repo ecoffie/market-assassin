@@ -365,7 +365,7 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
       ...(pdfNote ? { pdf_note: pdfNote } : {}),
       ...(repeats.length ? { repeated_sentences: repeats.length } : {}),
       diagnostics,
-      note: 'Saved privately to the Vault (Documents → Generated). Tell the user the file names and that they can download them there; do not paste download links.'
+      note: 'Saved privately to the Vault (Documents → Generated). Download buttons appear under this answer — tell the user the file names and that they can download from those buttons or from Documents → Generated; do not paste download links.'
         + (unverified.length ? ` ${unverified.length} statement(s) are labeled "Unverified — no source"; say so.` : '')
         + (omitted.length ? ` ${omitted.length} decision-critical statement(s) without a source were left out; say so.` : '')
         + (uncitedSources.some((s) => s.kind === 'upload')
@@ -375,4 +375,56 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
   }
 
   return { execute };
+}
+
+/** One saved file from a successful create_document result (for the in-chat download chips). */
+export type CreateDocumentDeliverable = {
+  format: string;
+  document_id: string;
+  file_name?: string;
+  version?: number;
+  download_path?: string;
+};
+
+/**
+ * Parse create_document tool JSON into the SSE `deliverables` payload.
+ * Returns null when the result is not a successful save with at least one file id.
+ */
+export function parseCreateDocumentDeliverables(content: string): {
+  files: CreateDocumentDeliverable[];
+  pdf_note?: string;
+  title?: string;
+} | null {
+  try {
+    const p = JSON.parse(content) as {
+      ok?: unknown;
+      title?: unknown;
+      pdf_note?: unknown;
+      files?: unknown;
+    };
+    if (!p || p.ok !== true || !Array.isArray(p.files)) return null;
+    const files: CreateDocumentDeliverable[] = [];
+    for (const raw of p.files) {
+      if (!raw || typeof raw !== 'object') continue;
+      const f = raw as Record<string, unknown>;
+      const document_id = typeof f.document_id === 'string' ? f.document_id.trim() : '';
+      const format = typeof f.format === 'string' ? f.format.trim().toLowerCase() : '';
+      if (!document_id || !format) continue;
+      files.push({
+        format,
+        document_id,
+        ...(typeof f.file_name === 'string' ? { file_name: f.file_name } : {}),
+        ...(typeof f.version === 'number' ? { version: f.version } : {}),
+        ...(typeof f.download_path === 'string' ? { download_path: f.download_path } : {}),
+      });
+    }
+    if (!files.length) return null;
+    return {
+      files,
+      ...(typeof p.pdf_note === 'string' && p.pdf_note.trim() ? { pdf_note: p.pdf_note.trim() } : {}),
+      ...(typeof p.title === 'string' && p.title.trim() ? { title: p.title.trim() } : {}),
+    };
+  } catch {
+    return null;
+  }
 }
