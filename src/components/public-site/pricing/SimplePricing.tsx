@@ -18,10 +18,6 @@ import LogoMarquee from '@/components/public-site/LogoMarquee';
 import NoRefundNote from '@/components/NoRefundNote';
 import { trackTrialClick } from '@/lib/ga4';
 import {
-  TRIAL_UPGRADE_ENDPOINT, TRIAL_UPGRADE_SUCCESS_TEXT, TRIAL_UPGRADE_TITLE,
-  trialUpgradeChargeNote, type TrialUpgradeOffer,
-} from '@/lib/billing/trial-upgrade-offer';
-import {
   PRO_ANNUAL_USD, PRO_MONTHLY_USD, PRO_TRIAL_ANNUAL, PRO_TRIAL_MONTHLY, SALES_URL,
   TEAM_ANNUAL_PER_MONTH, TEAM_ANNUAL_USD, TEAM_MONTHLY_USD, TEAM_TRIAL_ANNUAL, TEAM_TRIAL_MONTHLY, pctOff,
 } from './app-plan-links';
@@ -61,60 +57,8 @@ export function applyCurrentPlan(plans: Plan[], me: MePlan | null): Plan[] {
   });
 }
 
-/**
- * The trial offer to show on the signed-in user's current-plan card: their Stripe trial for
- * that same plan, if the server returned one. Partner (no-card) trials have no Stripe
- * subscription, so the server returns no offer and nothing is shown.
- */
-export function trialOfferForCard(planName: string, me: MePlan | null, offers: TrialUpgradeOffer[] | null): TrialUpgradeOffer | null {
-  if (!me || !offers?.length) return null;
-  if (PLAN_NAME[me] !== planName) return null;
-  return offers.find((o) => o.tier === me) ?? null;
-}
-
-/** "Upgrade now, get the 1,000-credit upgrade bonus" on the current-plan card, with a confirm step. */
-function TrialUpgradeBox({ offer, email, token, onDone }: {
-  offer: TrialUpgradeOffer; email: string; token: string; onDone: () => void;
-}) {
-  const [confirm, setConfirm] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const go = async () => {
-    setBusy(true);
-    setErr(null);
-    try {
-      const r = await fetch(TRIAL_UPGRADE_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-mi-auth-token': token },
-        credentials: 'same-origin',
-        body: JSON.stringify({ email, subscriptionId: offer.subscriptionId }),
-      });
-      const j = await r.json().catch(() => null);
-      if (r.ok && j?.success) onDone();
-      else setErr(j?.error || 'Could not upgrade right now. Nothing was charged.');
-    } catch {
-      setErr('Could not upgrade right now. Please try again.');
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <div className="tu" data-testid="pricing-trial-upgrade">
-      <p className="tu-h">{TRIAL_UPGRADE_TITLE}</p>
-      <p className="tu-n">{trialUpgradeChargeNote(offer.amount, offer.interval)}</p>
-      {confirm ? (
-        <div className="tu-row">
-          <button type="button" className="tu-go" onClick={go} disabled={busy}>{busy ? 'Upgrading…' : 'Confirm: charge my card now'}</button>
-          <button type="button" className="tu-no" onClick={() => setConfirm(false)} disabled={busy}>Keep my trial</button>
-        </div>
-      ) : (
-        <button type="button" className="tu-go" onClick={() => setConfirm(true)}>Upgrade now</button>
-      )}
-      <NoRefundNote style={{ margin: '8px 0 0' }} />
-      {err && <p className="tu-err" role="alert">{err}</p>}
-    </div>
-  );
-}
+// The early-upgrade bonus offer is IN-APP ONLY (owner 2026-11-18: "these are not public
+// incentives"). It lives on the billing card in Settings, never on this public page.
 
 const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
@@ -164,11 +108,6 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
   // Same token every Mindy page sends; /api/app/me verifies it server-side. Any failure leaves the
   // public page as is (never guesses a plan).
   const [me, setMe] = useState<MePlan | null>(null);
-  // A signed-in Pro/Team user in a Stripe trial may upgrade now for bonus credits. Looked up
-  // only for those plans; any failure shows no offer (never a guessed one).
-  const [session, setSession] = useState<{ email: string; token: string } | null>(null);
-  const [offers, setOffers] = useState<TrialUpgradeOffer[] | null>(null);
-  const [upgraded, setUpgraded] = useState(false);
   useEffect(() => {
     let t: string | null = null;
     try { t = localStorage.getItem('mi_beta_auth_token'); } catch { /* private mode */ }
@@ -180,13 +119,6 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
       .then((d) => {
         if (!live || !d?.email || !d.plan || !(d.plan in PLAN_NAME)) return;
         setMe(d.plan as MePlan);
-        if (d.plan !== 'pro' && d.plan !== 'team') return;
-        setSession({ email: d.email, token });
-        return fetch(`${TRIAL_UPGRADE_ENDPOINT}?email=${encodeURIComponent(d.email)}`, {
-          headers: { 'x-mi-auth-token': token }, credentials: 'same-origin',
-        })
-          .then((r) => (r.ok ? r.json() : null))
-          .then((o) => { if (live && o?.success && Array.isArray(o.offers)) setOffers(o.offers as TrialUpgradeOffer[]); });
       })
       .catch(() => {});
     return () => { live = false; };
@@ -318,11 +250,6 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
             {p.current
               ? <span className="cta is-current" aria-current="true">Current plan</span>
               : <a className={`cta ${p.outline ? 'outline' : ''}`} href={p.href} onClick={p.trial ? () => trackTrialClick(p.name === 'Team' ? 'team' : 'pro', annual ? 'annual' : 'monthly', 'card') : undefined}>{p.cta}</a>}
-            {p.current && upgraded && <p className="tu-ok" role="status">{TRIAL_UPGRADE_SUCCESS_TEXT}</p>}
-            {p.current && !upgraded && session && (() => {
-              const offer = trialOfferForCard(p.name, me, offers);
-              return offer ? <TrialUpgradeBox offer={offer} email={session.email} token={session.token} onDone={() => { setUpgraded(true); setOffers([]); }} /> : null;
-            })()}
             {/* Next to every button that takes money (Eric 2026-11-12: "add the no refunds line under each trial button"). */}
             {p.trial && <NoRefundNote style={{ margin: '-14px 0 18px' }} />}
             <p className="lead">{p.lead}</p>

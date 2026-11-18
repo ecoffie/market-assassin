@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   canOfferTrialUpgrade, formatPlanPrice, trialUpgradeChargeNote, TRIAL_UPGRADE_SUCCESS_TEXT, TRIAL_UPGRADE_TITLE,
 } from './trial-upgrade-offer';
-import { trialOfferForCard } from '@/components/public-site/pricing/SimplePricing';
 
 describe('trial upgrade copy', () => {
   it('states the charge, that the trial ends now, and no refunds', () => {
@@ -29,16 +28,3 @@ describe('canOfferTrialUpgrade', () => {
   });
 });
 
-describe('trialOfferForCard (/pricing)', () => {
-  const offer = { subscriptionId: 'sub_1', tier: 'pro' as const, planName: 'Mindy Pro', amount: 149, interval: 'month', trialEnd: null, billedTo: 'a@x.com' };
-  it('shows the offer only on the current plan\'s card', () => {
-    expect(trialOfferForCard('Pro', 'pro', [offer])).toBe(offer);
-    expect(trialOfferForCard('Team', 'pro', [offer])).toBeNull();
-    expect(trialOfferForCard('Pro', 'team', [offer])).toBeNull();
-  });
-  it('no offers (partner no-card trial, signed out, lookup failed) → nothing', () => {
-    expect(trialOfferForCard('Pro', 'pro', [])).toBeNull();
-    expect(trialOfferForCard('Pro', 'pro', null)).toBeNull();
-    expect(trialOfferForCard('Pro', null, [offer])).toBeNull();
-  });
-});
