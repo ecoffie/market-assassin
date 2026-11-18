@@ -15,8 +15,10 @@ name: Daily acquisition scorecard
 on:
   workflow_dispatch:
   schedule:
-    # 12:00 UTC Monday–Friday.
-    - cron: '0 12 * * 1-5'
+    # 12:45 UTC Monday–Friday.
+    # 7:45 AM Eastern Standard Time, after the 7:20 AM ET collector and before
+    # the 8:00 AM ET reader. During daylight time this same cron is 8:45 AM ET.
+    - cron: '45 12 * * 1-5'
 
 permissions:
   contents: read

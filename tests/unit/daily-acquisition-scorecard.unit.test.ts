@@ -504,7 +504,8 @@ describe('the script and the workflow stay read-only', () => {
   });
 
   it('schedules weekdays, publishes the artifact and summary, and uses the existing Actions secrets', () => {
-    expect(workflow).toContain("cron: '0 12 * * 1-5'");
+    expect(workflow).toContain("cron: '45 12 * * 1-5'");
+    expect(workflow).toContain('8:45 AM ET');
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).toContain('./node_modules/.bin/tsx scripts/daily-acquisition-scorecard.mjs');
     expect(workflow).toContain('contents: read');
