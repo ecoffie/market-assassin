@@ -7,14 +7,17 @@ import { validateDocModel, type ValidationIssue } from './validate';
 import { renderDocx } from './render-docx';
 import { renderPdf } from './render-pdf';
 import { renderHtml } from './render-html';
+import { renderXlsx, renderCsv, spreadsheetFilename } from './render-spreadsheet';
 import { fileBaseName } from './format';
 
-export type DocFormat = 'pdf' | 'docx' | 'html';
+export type DocFormat = 'pdf' | 'docx' | 'html' | 'xlsx' | 'csv';
 
 export const DOC_MIME: Record<DocFormat, string> = {
   pdf: 'application/pdf',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   html: 'text/html; charset=utf-8',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  csv: 'text/csv; charset=utf-8',
 };
 
 export type RenderOutcome =
@@ -33,6 +36,12 @@ export async function renderDocument(input: unknown, format: DocFormat): Promise
   }
   if (format === 'html') {
     return { ok: true, format, bytes: Buffer.from(renderHtml(model), 'utf-8'), mime: DOC_MIME.html, filename: `${base}.html`, degraded: null };
+  }
+  if (format === 'xlsx') {
+    return { ok: true, format, bytes: await renderXlsx(model), mime: DOC_MIME.xlsx, filename: spreadsheetFilename(model, 'xlsx'), degraded: null };
+  }
+  if (format === 'csv') {
+    return { ok: true, format, bytes: renderCsv(model), mime: DOC_MIME.csv, filename: spreadsheetFilename(model, 'csv'), degraded: null };
   }
   const r = await renderPdf(model);
   if (r.pdf) return { ok: true, format: 'pdf', bytes: r.pdf, mime: DOC_MIME.pdf, filename: `${base}.pdf`, degraded: null };

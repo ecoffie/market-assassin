@@ -19,7 +19,7 @@ export interface AttachedDoc {
   page_count?: number | null;
 }
 
-export const ATTACH_ACCEPT = '.pdf,.docx,.txt';
+export const ATTACH_ACCEPT = '.pdf,.docx,.txt,.xlsx,.xls,.csv';
 export const ATTACH_MAX_MB = 4;
 
 export function ChatAttachments({

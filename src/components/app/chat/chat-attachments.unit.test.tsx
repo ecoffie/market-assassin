@@ -54,6 +54,13 @@ describe('ChatAttachments', () => {
     expect(el.textContent).toContain('Saved privately to your Vault');
   });
 
+  it('accept list includes spreadsheet uploads (xlsx/xls/csv)', async () => {
+    const { el } = await mount({ sessionId: null });
+    const input = el.querySelector('[data-testid="attach-input"]') as HTMLInputElement;
+    expect(input.accept).toContain('.xlsx');
+    expect(input.accept).toContain('.csv');
+  });
+
   it('new chat: mints a conversation, uploads to it, shows the chip', async () => {
     const { el, ensure } = await mount({ sessionId: null });
     await pick(el, 'rfp.pdf');

@@ -7651,3 +7651,25 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 **Honest scope.** Customer-facing copy only. No DB writes. MCP `as_of` / `stale_sources` (#2143) unchanged.
 
 **Proof.** `src/lib/alerts/forecast-alert-row.ts` + `dateActivityChip` in `saved-search-email.ts`; unit tests in `forecast-alert-row.unit.test.ts` and `saved-search-email.unit.test.ts`.
+
+## Ask Mindy workspace: spreadsheet uploads + in-chat document downloads (2026-11-18)
+
+**What.** Ask Mindy accepts Excel and CSV uploads alongside PDF and Word, and when Mindy saves a generated strategy or capability document, Download PDF / Download Word buttons appear under the answer.
+
+**Why it matters.** A research conversation should end with a file the customer can send — without leaving chat to hunt the Vault, and without pasting private download links into the reply.
+
+**Honest scope.** Uploads and generated-file saves stay behind the existing Vault flags and CUI/classified gates. Spreadsheet clearance columns (e.g. a SECRET cell in a rate sheet) are not treated as document banners. XLSX/CSV *export* generation is a later package.
+
+**SEO.** Ask Mindy upload Excel / download capability statement PDF / GovCon AI research report.
+
+**Proof.** PR #2185 — `spreadsheetMarkingBody` + `GeneratedDownloadChips` + SSE `deliverables`; vault/create-document/chip unit tests.
+
+## Ask Mindy delivers Excel and CSV alongside Word and PDF (2026-11-18)
+
+**What.** When a generated Ask Mindy document includes tables — or you ask for a spreadsheet — Mindy also saves Excel and CSV copies you can download from the same in-chat buttons.
+
+**Why it matters.** Strategy work often needs a sheet for the numbers, not only a narrative PDF. One research turn can hand the customer a Word brief, a PDF, and a spreadsheet without leaving the conversation.
+
+**Honest scope.** Spreadsheet export uses the document's table blocks (or a Summary sheet when there are none). CSV cells are formula-injection safe. Still behind the Vault generated-files flag.
+
+**Proof.** `render-spreadsheet.ts` + `create_document` W4 path; sample deliverables in the release package.

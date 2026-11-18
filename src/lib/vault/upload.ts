@@ -22,8 +22,8 @@
  * than the one the user is looking at.
  */
 import { resolveChatActingScope, type ChatActingScope } from '@/lib/chat/chat-acting-scope';
-import { extractPdf, extractDocx, extractTxt } from '@/lib/sam/pdf-extract';
-import { detectProhibitedMarkings, docxHeaderFooterText, markingRefusalMessage, type ProhibitedMarkingKind } from './marking-detect';
+import { extractPdf, extractDocx, extractTxt, extractXlsx } from '@/lib/sam/pdf-extract';
+import { detectProhibitedMarkings, docxHeaderFooterText, xlsxHeaderFooterText, markingRefusalMessage, type ProhibitedMarkingKind } from './marking-detect';
 import type { DocClass } from './doc-class';
 import { checkVaultLimit } from './rate-limits';
 
@@ -31,12 +31,48 @@ export const VAULT_BUCKET = 'vault-assets';
 export const VAULT_MAX_BYTES = 20 * 1024 * 1024; // 20 MB — unchanged from the Vault route
 const MAX_STORED_TEXT = 500_000;
 
-type Ext = 'pdf' | 'docx' | 'txt';
+export type VaultUploadExt = 'pdf' | 'docx' | 'txt' | 'xlsx' | 'xls' | 'csv';
+type Ext = VaultUploadExt;
 const TYPES: Record<Ext, string> = {
   pdf: 'application/pdf',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   txt: 'text/plain',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  xls: 'application/vnd.ms-excel',
+  csv: 'text/csv',
 };
+const SPREADSHEET_EXT = new Set<Ext>(['xlsx', 'xls', 'csv']);
+
+/** Vault panel / documents API — no spreadsheets (xlsx parser stays behind Ask Mindy flag). */
+export const VAULT_PANEL_EXTS: readonly VaultUploadExt[] = ['pdf', 'docx', 'txt'];
+/** Ask Mindy chat attach — includes spreadsheets when the uploads flag is on for the caller. */
+export const ASK_MINDY_UPLOAD_EXTS: readonly VaultUploadExt[] = ['pdf', 'docx', 'txt', 'xlsx', 'xls', 'csv'];
+
+/**
+ * Spreadsheet extractors pad short rows with empty CSV fields (`CUI` → `CUI,,`).
+ * Banner detectors require a line that IS the marking, so strip leading/trailing
+ * empty fields. Only a row that collapses to exactly ONE non-empty cell is kept
+ * as a banner candidate — never every cell (a clearance column like
+ * `LCAT,Clearance,Rate / Sys Engineer,SECRET,150` must still upload).
+ * Does not change stored text — only the marking scan input.
+ */
+export function spreadsheetMarkingBody(text: string): string {
+  const lines: string[] = [];
+  for (const raw of String(text || '').split(/\r?\n/)) {
+    const cells = String(raw).split(',').map((c) => c.trim());
+    while (cells.length && !cells[0]) cells.shift();
+    while (cells.length && !cells[cells.length - 1]) cells.pop();
+    if (!cells.length) continue;
+    // Multi-column data rows (including a SECRET/CUI clearance cell) stay as-is.
+    if (cells.length > 1) {
+      lines.push(cells.join(','));
+      continue;
+    }
+    // Single remaining cell: the padded-banner case (`CUI,,`, `,,SECRET,,`).
+    lines.push(cells[0]);
+  }
+  return lines.join('\n');
+}
 
 export function detectUploadType(filename: string): { ext: Ext; mime: string } | null {
   const lower = filename.toLowerCase();
@@ -81,6 +117,12 @@ export interface VaultUploadInput {
   docType?: string;
   chatSessionId?: string | null;
   noticeId?: string | null;
+  /**
+   * Which extensions this route may accept. Vault panel stays PDF/Word/TXT so a
+   * merge does not open the xlsx parser to every signed-in user. Ask Mindy passes
+   * ASK_MINDY_UPLOAD_EXTS (behind VAULT_ASK_MINDY_UPLOADS).
+   */
+  allowedExts?: readonly VaultUploadExt[];
 }
 
 export interface VaultUploadDeps {
@@ -138,6 +180,7 @@ async function extractText(ext: Ext, buffer: Buffer): Promise<{ text: string; pa
     return { text: r.text || '', pageCount: r.pageCount ?? null };
   }
   if (ext === 'docx') return { text: (await extractDocx(buffer)).text || '', pageCount: null };
+  if (SPREADSHEET_EXT.has(ext)) return { text: (await extractXlsx(buffer)).text || '', pageCount: null };
   return { text: extractTxt(buffer).text || '', pageCount: null };
 }
 
@@ -152,10 +195,15 @@ export async function saveVaultUpload(input: VaultUploadInput, deps: VaultUpload
     return { ok: false, status: 400, code: 'empty_file', message: 'The file is empty.' };
   }
   const type = detectUploadType(file.name);
-  if (!type) {
+  // Default restrictive (Vault panel). Ask Mindy must pass ASK_MINDY_UPLOAD_EXTS explicitly.
+  const allowed = input.allowedExts ?? VAULT_PANEL_EXTS;
+  if (!type || !allowed.includes(type.ext)) {
+    const allowsSheets = allowed.some((e) => SPREADSHEET_EXT.has(e));
     return {
       ok: false, status: 415, code: 'unsupported_type',
-      message: 'Upload a PDF, Word (.docx) or text (.txt) file. Older .doc files and other formats cannot be read.',
+      message: allowsSheets
+        ? 'Upload a PDF, Word (.docx), text (.txt), Excel (.xlsx/.xls), or CSV file. Older .doc files and other formats cannot be read.'
+        : 'Upload a PDF, Word (.docx), or text (.txt) file. Older .doc files and other formats cannot be read.',
     };
   }
 
@@ -184,10 +232,15 @@ export async function saveVaultUpload(input: VaultUploadInput, deps: VaultUpload
     text = '';
   }
   // 4) Classification / CUI — checked even when the body is empty (a banner may sit
-  //    only in a DOCX header). Refuse before ANY write. DOCX headers/footers (where
-  //    banners live) are dropped by the body extractor, so read them separately.
-  const headerFooter = type.ext === 'docx' ? await docxHeaderFooterText(file.buffer) : '';
-  const verdict = detectProhibitedMarkings({ body: text, headerFooter });
+  //    only in a DOCX/XLSX print header). Refuse before ANY write. Body extractors
+  //    drop those regions, so read them separately (.xls has no zip headers → '').
+  const headerFooter = type.ext === 'docx'
+    ? await docxHeaderFooterText(file.buffer)
+    : type.ext === 'xlsx'
+      ? await xlsxHeaderFooterText(file.buffer)
+      : '';
+  const markingBody = SPREADSHEET_EXT.has(type.ext) ? spreadsheetMarkingBody(text) : text;
+  const verdict = detectProhibitedMarkings({ body: markingBody, headerFooter });
   if (verdict.blocked && verdict.kind) {
     console.warn(`[vault/upload] refused ${verdict.kind} marking (source=${input.source}, class=${input.docClass})`);
     return { ok: false, status: 422, code: 'prohibited_marking', markingKind: verdict.kind, message: markingRefusalMessage(verdict.kind) };
@@ -196,7 +249,7 @@ export async function saveVaultUpload(input: VaultUploadInput, deps: VaultUpload
   if (text.trim().length === 0) {
     return {
       ok: false, status: 422, code: 'unreadable',
-      message: "Mindy couldn't read any text in this file (it may be a scanned image), so it couldn't be checked and wasn't saved. Upload a text-based PDF, Word or text file.",
+      message: "Mindy couldn't read any text in this file (it may be a scanned image or empty sheet), so it couldn't be checked and wasn't saved. Upload a text-based PDF, Word, text, Excel, or CSV file.",
     };
   }
 

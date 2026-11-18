@@ -15,7 +15,15 @@
 import { readFileSync } from 'fs';
 import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
-import { DOE_FORECAST_URL, parseDoeForecast, doeExternalId } from '../src/lib/forecasts/doe-forecast';
+import {
+  DOE_FORECAST_PAGE,
+  DOE_FORECAST_URL,
+  absoluteDoeUrl,
+  doeExternalId,
+  extractDoeForecastDocuments,
+  parseDoeCsv,
+  parseDoeForecast,
+} from '../src/lib/forecasts/doe-forecast';
 import { parseMoneyRange, parseSetAside, parseNaics } from '../src/lib/forecasts/usace-district-parse';
 
 const argOf = (n: string) => { const i = process.argv.indexOf(`--${n}`); return i > -1 ? process.argv[i + 1] : undefined; };
@@ -37,23 +45,36 @@ function loadEnv() {
 async function main() {
   loadEnv();
 
-  let buf: Buffer;
+  let parsed;
   if (LOCAL) {
-    buf = readFileSync(LOCAL);
+    const buf = readFileSync(LOCAL);
     console.log(`source      ${LOCAL} (local)`);
+    const wb = XLSX.read(buf, { type: 'buffer' });
+    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' }) as unknown[][];
+    parsed = parseDoeForecast(aoa, { parseMoneyRange, parseSetAside, parseNaics });
+  } else if (URL_OVERRIDE) {
+    console.log(`source      ${URL_OVERRIDE}`);
+    const res = await fetch(URL_OVERRIDE, { headers: { 'User-Agent': 'Mozilla/5.0 Chrome/120' } });
+    if (!res.ok) throw new Error(`fetch ${res.status}`);
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (URL_OVERRIDE.endsWith('csv') || buf[0] !== 0x50) {
+      parsed = parseDoeCsv(buf.toString('utf8'), { parseMoneyRange, parseSetAside, parseNaics });
+    } else {
+      const wb = XLSX.read(buf, { type: 'buffer' });
+      const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' }) as unknown[][];
+      parsed = parseDoeForecast(aoa, { parseMoneyRange, parseSetAside, parseNaics });
+    }
   } else {
-    const url = URL_OVERRIDE || DOE_FORECAST_URL;
-    console.log(`source      ${url}`);
+    const page = await fetch(DOE_FORECAST_PAGE, { headers: { 'User-Agent': 'Mozilla/5.0 Chrome/120' } });
+    if (!page.ok) throw new Error(`forecast page HTTP ${page.status}`);
+    const docs = extractDoeForecastDocuments(await page.text());
+    if (!docs[0]) throw new Error(`no dated file on ${DOE_FORECAST_PAGE} — not falling back to ${DOE_FORECAST_URL}`);
+    const url = absoluteDoeUrl(docs[0].href);
+    console.log(`source      ${docs[0].edition} ${url}`);
     const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 Chrome/120' } });
-    // A moved monthly file 404s — that must fail the run, not quietly import 0.
-    if (!res.ok) throw new Error(`fetch ${res.status} — DOE may have moved the monthly file; check the OSDBU page for the current URL`);
-    buf = Buffer.from(await res.arrayBuffer());
-    console.log(`downloaded  ${buf.length.toLocaleString()} bytes`);
+    if (!res.ok) throw new Error(`fetch ${res.status} ${url}`);
+    parsed = parseDoeCsv(await res.text(), { parseMoneyRange, parseSetAside, parseNaics });
   }
-
-  const wb = XLSX.read(buf, { type: 'buffer' });
-  const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' }) as unknown[][];
-  const parsed = parseDoeForecast(aoa, { parseMoneyRange, parseSetAside, parseNaics });
 
   if (parsed.headerRow === -1) throw new Error('no header row found — DOE changed the layout');
   if (!parsed.rows.length) throw new Error('0 rows parsed — layout changed, or the file is empty');

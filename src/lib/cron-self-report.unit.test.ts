@@ -43,7 +43,7 @@ vi.mock('@supabase/supabase-js', () => ({
   }),
 }));
 
-import { reportCronOutcome } from './cron-self-report';
+import { cronOutcomeHttpStatus, reportCronOutcome } from './cron-self-report';
 
 describe('reportCronOutcome terminal overwrite', () => {
   beforeEach(() => {
@@ -59,6 +59,7 @@ describe('reportCronOutcome terminal overwrite', () => {
     expect(cronJobEq).toHaveBeenCalledWith('job_name', 'saved-search-alerts');
     expect(runUpdate).toHaveBeenCalledWith(expect.objectContaining({
       status: 'success',
+      http_status: 200,
       error: null,
       finished_at: expect.any(String),
     }));
@@ -75,6 +76,7 @@ describe('reportCronOutcome terminal overwrite', () => {
     expect(cronJobUpdate).toHaveBeenCalledWith({ last_status: 'error' });
     expect(runUpdate).toHaveBeenCalledWith(expect.objectContaining({
       status: 'error',
+      http_status: 500,
       error: 'email_send_failed=2,state_update_failed=1',
     }));
   });
@@ -85,7 +87,14 @@ describe('reportCronOutcome terminal overwrite', () => {
     expect(cronJobUpdate).toHaveBeenCalledWith({ last_status: 'partial' });
     expect(runUpdate).toHaveBeenCalledWith(expect.objectContaining({
       status: 'partial',
+      http_status: 503,
       error: 'capacity_exhausted=1,backlog=5',
     }));
+  });
+
+  it('maps outcomes to HTTP statuses the inventory can judge', () => {
+    expect(cronOutcomeHttpStatus('success')).toBe(200);
+    expect(cronOutcomeHttpStatus('partial')).toBeGreaterThanOrEqual(400);
+    expect(cronOutcomeHttpStatus('error')).toBeGreaterThanOrEqual(400);
   });
 });

@@ -7,18 +7,22 @@ import { describe, expect, it } from 'vitest';
 import { parseGaoRss } from './sources';
 import {
   ACQUISITION_NEW_ROW_CAP,
+  ACQUISITION_PAGE_CAP,
   agencyFromOigName,
   annotateGaoRssDocument,
   capNewAcquisition,
+  collectOpenRecommendations,
   fetchTextSource,
   gaoRssAcquisition,
   igReportStatesProblem,
   isBareLegacyGaoCitation,
   laneFromFetch,
+  oversightPageUrl,
   parseOversightFederalReports,
   parseOversightOpenRecommendations,
   readAcquiredFields,
   resolutionFromSourceStatus,
+  takeNewFromPage,
 } from './acquired-pain-points';
 
 const fixture = (name: string) =>
@@ -183,10 +187,101 @@ describe('a source that is down is not a quiet zero', () => {
   });
 });
 
+describe('open recommendations walk newest-first and stop when caught up', () => {
+  const doc = (id: string) => ({ documentNumber: id });
+
+  it('a page whose ids are all held stops the walk', () => {
+    const decision = takeNewFromPage(
+      [doc('a'), doc('b')],
+      new Set(['a', 'b']),
+      0,
+      200,
+    );
+    expect(decision.stop).toBe('all_held');
+    expect(decision.take).toEqual([]);
+  });
+
+  it('takes new ids and stops at the row cap instead of reading further', () => {
+    const decision = takeNewFromPage(
+      [doc('new-1'), doc('held'), doc('new-2'), doc('new-3')],
+      new Set(['held']),
+      0,
+      2,
+    );
+    expect(decision.take.map((row) => row.documentNumber)).toEqual(['new-1', 'new-2']);
+    expect(decision.stop).toBe('row_cap');
+    expect(decision.heldOnPage).toBe(1);
+  });
+
+  it('an empty parse is not treated as caught up', () => {
+    expect(takeNewFromPage([], new Set(), 0, 200).stop).toBe('continue');
+  });
+
+  it('fetches page 1 only while page 0 still has new ids, and never past an all-held page', async () => {
+    const page0 = fixture('oversight-itc-recommendations.html');
+    const urls: string[] = [];
+    const fetchImpl = (async (url: string) => {
+      urls.push(url);
+      return new Response(page0, { status: 200 });
+    }) as typeof fetch;
+    const held = new Set<string>();
+    const first = await collectOpenRecommendations({
+      fetchImpl,
+      heldIds: async (ids) => ({ ids: new Set(ids.filter((id) => held.has(id))), error: null }),
+      rowCap: 200,
+      pageCap: 3,
+    });
+    // Page 1 repeats the same source ids, so the walk stops instead of reading page 2.
+    expect(first.stop).toBe('all_held');
+    expect(first.pagesFetched).toBe(2);
+    expect(first.documents).toHaveLength(7);
+    expect(urls.some((url) => url.includes('page=1'))).toBe(true);
+    expect(urls.some((url) => url.includes('page=2'))).toBe(false);
+
+    const caughtUpUrls: string[] = [];
+    const caughtUp = await collectOpenRecommendations({
+      fetchImpl: (async (url: string) => {
+        caughtUpUrls.push(String(url));
+        return new Response(page0, { status: 200 });
+      }) as typeof fetch,
+      heldIds: async (ids) => ({ ids: new Set(ids), error: null }),
+      rowCap: 200,
+      pageCap: 3,
+    });
+    expect(caughtUp.stop).toBe('all_held');
+    expect(caughtUp.pagesFetched).toBe(1);
+    expect(caughtUp.documents).toEqual([]);
+    expect(caughtUpUrls.some((url) => url.includes('page=1'))).toBe(false);
+    expect(oversightPageUrl('https://www.oversight.gov/reports/recommendations', 0))
+      .toBe('https://www.oversight.gov/reports/recommendations');
+    expect(ACQUISITION_PAGE_CAP).toBe(8);
+  });
+
+  it('a later page that is down keeps the earlier page and is not a quiet zero', async () => {
+    const page0 = fixture('oversight-itc-recommendations.html');
+    const fetchImpl = (async (url: string) => {
+      if (String(url).includes('page=1')) return new Response('no', { status: 503 });
+      return new Response(page0, { status: 200 });
+    }) as typeof fetch;
+    const walked = await collectOpenRecommendations({
+      fetchImpl,
+      heldIds: async () => ({ ids: new Set<string>(), error: null }),
+      rowCap: 200,
+      pageCap: 4,
+    });
+    expect(walked.stop).toBe('source_down');
+    expect(walked.pagesFetched).toBe(2);
+    expect(walked.documents.length).toBe(7);
+    expect(walked.error).toBe('HTTP 503');
+  });
+});
+
 describe('the collector stays on the existing pipeline', () => {
   it('caps the batch, reports a down source, and does not delete pain points', () => {
     const route = readFileSync(join(process.cwd(), 'src/app/api/cron/institute-gao-sync/route.ts'), 'utf8');
     expect(route).toContain('ACQUISITION_NEW_ROW_CAP');
+    expect(route).toContain('ACQUISITION_PAGE_CAP');
+    expect(route).toContain('resolveOversightStatedAgency');
     expect(route).toContain("reportCronOutcome(\n    'institute-gao-sync'");
     expect(route).not.toMatch(/from\('agency_pain_points_db'\)[\s\S]{0,120}\.delete/);
     expect(route).not.toMatch(/from\('agency_intelligence'\)/);

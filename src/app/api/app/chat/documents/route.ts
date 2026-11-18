@@ -27,7 +27,7 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { hasProAccess } from '@/lib/access/resolve-access';
 import { WORKSPACE_UNCONFIRMED_NOTE } from '@/lib/chat/chat-acting-scope';
-import { resolveVaultWriteOwner, saveVaultUpload } from '@/lib/vault/upload';
+import { resolveVaultWriteOwner, saveVaultUpload, ASK_MINDY_UPLOAD_EXTS } from '@/lib/vault/upload';
 import {
   isVaultChatDocumentsEnabled, countSessionDocuments, listChatDocuments, archiveChatDocument,
   MAX_DOCS_PER_SESSION, type ChatDocsDb,
@@ -126,6 +126,7 @@ export async function POST(request: NextRequest) {
       docClass: 'reference',
       source: 'ask_mindy',
       chatSessionId: g.sessionId,
+      allowedExts: ASK_MINDY_UPLOAD_EXTS,
     },
     {
       db: g.sb,

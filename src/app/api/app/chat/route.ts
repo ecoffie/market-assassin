@@ -39,7 +39,7 @@ import { loadBidderProfile, formatProfileForPrompt } from '@/lib/proposal/loader
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
 import { makeMyDocumentsTool, MY_DOCUMENTS_TOOL_DEF, FIND_MY_DOCUMENTS } from '@/lib/chat/my-documents-tool';
-import { makeGenerateDocumentTool, CREATE_DOCUMENT_TOOL_DEF, CREATE_DOCUMENT, isDocumentCreationRequest } from '@/lib/chat/generate-document-tool';
+import { makeGenerateDocumentTool, CREATE_DOCUMENT_TOOL_DEF, CREATE_DOCUMENT, isDocumentCreationRequest, parseCreateDocumentDeliverables, type CreateDocumentDeliverable } from '@/lib/chat/generate-document-tool';
 import { vaultDocEnabledFor } from '@/lib/vault/flags';
 // Tools run ONLY through the chat tool executor (policy check at offer AND execution,
 // preflight, per-tool error capture, execution log). Never import runMcpTool here.
@@ -866,6 +866,9 @@ export async function POST(request: NextRequest) {
         // for the log-only grounding check.
         const turnSources: ContextSource[] = [];
         const groundingTexts: string[] = [];
+        // W2: in-chat download chips for create_document — ids only; client mints signed URLs.
+        const turnDeliverables: CreateDocumentDeliverable[] = [];
+        let turnDeliverablePdfNote: string | null = null;
         try {
           if (actingScope.kind === 'client') turnTrace.notices.push('acting_scope:client_workspace');
           if (actingScope.kind === 'unavailable') turnTrace.notices.push('acting_scope:unavailable');
@@ -1160,6 +1163,13 @@ export async function POST(request: NextRequest) {
               const retrievedAt = new Date().toISOString();
               for (const r of results) {
                 groundingTexts.push(r.content);
+                if (r.record.tool === CREATE_DOCUMENT && r.record.status === 'success') {
+                  const d = parseCreateDocumentDeliverables(r.content);
+                  if (d) {
+                    turnDeliverables.push(...d.files);
+                    if (d.pdf_note) turnDeliverablePdfNote = d.pdf_note;
+                  }
+                }
                 const src = sourceFromToolResult({
                   tool: r.record.tool, toolCallId: r.tool_call_id, status: r.record.status, content: r.content,
                   rendered: renderedByCall.get(r.tool_call_id) ?? null, argsRedacted: r.argsRedacted,
@@ -1716,6 +1726,19 @@ export async function POST(request: NextRequest) {
           }
         } catch (gErr) {
           console.error('[chat] grounding check failed (non-fatal):', (gErr as Error)?.message);
+        }
+        // W2: deliverable download chips (document ids only — never signed URLs on the wire).
+        if (turnDeliverables.length) {
+          send({
+            type: 'deliverables',
+            files: turnDeliverables.map((f) => ({
+              format: f.format,
+              document_id: f.document_id,
+              ...(f.file_name ? { file_name: f.file_name } : {}),
+              ...(f.version != null ? { version: f.version } : {}),
+            })),
+            ...(turnDeliverablePdfNote ? { pdf_note: turnDeliverablePdfNote } : {}),
+          });
         }
         // P3 (A2): the compact source ledger, kept by the client and re-sent with history.
         send({ type: 'sources', ledger: ledgerFromSources(turnSources) });

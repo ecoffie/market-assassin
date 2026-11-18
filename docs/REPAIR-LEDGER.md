@@ -32,6 +32,24 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 |---|---|---|---|---|---|
 | 2026-11-18 | Budget authority / programs / priorities | The four budget tables were empty and customer budget figures came from `agency-budget-data.json`. One cron slice now upserts USASpending budgetary resources and one page of federal accounts into the existing tables (source URL, fiscal year, fetched date, stable source key, no deletes). performance.gov is read for structured objectives only. A live row replaces the fixed file only for that agency and fiscal year (`usaspending_live`); every other year stays on the file (`static_file`, as-of date). Migration `20261118_budget_intel_usaspending_acquire.sql` is not applied. | `export function buildBudgetSlice` → `src/lib/budget-intel/slice.ts` | `budget-intel.unit.test.ts` with recorded USASpending fixtures. Live dry run writes nothing. | BUILT, NOT MERGED |
 
+## 2026-11-18 — DOE forecast current file
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | Forecasts: DOE dated CSV | `sync-forecasts` fetched the July 2026 XLSX, which still returns HTTP 200, so it never read the OSDBU page's current file (2026-11-16 CSV, 869 rows). The cron now follows the newest dated link on that page and refuses the July workbook. A nonempty write stamps `forecast_doe_osbp`; a failed DHS read stamps `forecast_dhs_apfs` unreachable. | `refusing the July XLSX fallback` → `src/app/api/cron/sync-forecasts/route.ts` | `doe-forecast.unit.test.ts` + live parse of the 2026-11-16 CSV: 869 rows, edition 2026-11-16, 869/869 performance dates. No production sync. | BUILT, NOT MERGED |
+
+## 2026-11-18 — Collector terminal status
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | SAM opportunities + recompetes terminal status | Long runs stay `dispatched` with a null http_status because the dispatcher stops listening at 12s and these routes never called `reportCronOutcome`. Legislation and contacts did call it, but the run row still had no http_status, so the inventory read "ran status unrecorded". The self-report now writes http_status (200 / 503 / 500). SAM and recompete report on the way out. A SAM upstream failure with zero rows is HTTP 503, not a 200 success. | `cronOutcomeHttpStatus` → `src/lib/cron-self-report.ts` · `sync-sam-opportunities-full` → `src/app/api/cron/sync-sam-opportunities/route.ts` | `cron-self-report.unit.test.ts`. No production run. | BUILT, NOT MERGED |
+
+## 2026-11-18 — Oversight office aliases and incremental page walk
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | Data Core / pain points | All 14 page-0 open recommendations that were unresolved now have an agency. Seven International Trade Commission rows map to U.S. International Trade Commission because that office's oversight.gov page names USITC. CPSC, ARC, and the Election Assistance Commission are added to the canonical name list under their official names. USASpending's live toptier list (2026-11-18) assigns 061 to CPSC and 034 to the International Trade Commission; this file had 061 on USITC, which no USASpending query builder reads, so USITC is corrected to 034 and CPSC gets 061. Open recommendations walk forward from page 0 and stop at the first fully held page, 8 pages, or 200 new rows. Insert-only. No migration. Discovery ranking is not in this path. Existing GAO rows are not rewritten. | `U.S. International Trade Commission programs and operations` → `src/lib/institute/oig-stated-agency.ts` · `ACQUISITION_PAGE_CAP = 8` → `src/lib/institute/acquired-pain-points.ts` | `oig-stated-agency.unit.test.ts` (ITC fixture 7, plus CPSC/ARC/EAC resolve to themselves; code 061 still resolves to USITC). Walk tests stop on an all-held page and on a 503. | DRAFT PR |
+
 ## 2026-11-18 — DIBBS clock stamp checks the Supabase error
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

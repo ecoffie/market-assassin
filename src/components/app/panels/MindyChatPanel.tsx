@@ -21,6 +21,7 @@ import { Menu, MessageCircle, BookOpen, Lock, FileText, X } from 'lucide-react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 import { ChatAttachments } from '../chat/ChatAttachments';
+import { GeneratedDownloadChips, type GeneratedDownloadFile } from '../chat/GeneratedDownloadChips';
 import { useVaultCapabilities } from '../chat/useVaultCapabilities';
 import { UpgradeModal } from '../UpgradeModal';
 import { DEFAULT_STARTER_PROMPTS } from '@/lib/chat/starter-prompts';
@@ -77,6 +78,9 @@ interface ChatMessage {
   notices?: string[];   // server notices: data tools unavailable, a lookup failed, answer cut off
   /** P3: the compact source ledger returned with this answer; re-sent with history so "#12" resolves. */
   ledger?: unknown;
+  /** W2: create_document files saved this turn — in-chat download chips mint signed URLs on click. */
+  deliverables?: GeneratedDownloadFile[];
+  deliverablePdfNote?: string | null;
 }
 
 
@@ -291,6 +295,21 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id ? { ...m, content: m.content + evt.content } : m
               ));
+            } else if (evt.type === 'deliverables' && Array.isArray(evt.files)) {
+              const files = (evt.files as GeneratedDownloadFile[]).filter(
+                (f) => f && typeof f.document_id === 'string' && typeof f.format === 'string',
+              );
+              if (files.length) {
+                setMessages(prev => prev.map(m =>
+                  m.id === assistantMsg.id
+                    ? {
+                        ...m,
+                        deliverables: files,
+                        ...(typeof evt.pdf_note === 'string' ? { deliverablePdfNote: evt.pdf_note } : {}),
+                      }
+                    : m
+                ));
+              }
             } else if (evt.type === 'sources' && evt.ledger && typeof evt.ledger === 'object') {
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id ? { ...m, ledger: evt.ledger } : m
@@ -690,6 +709,13 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                         ? <span className="text-faint italic">Thinking…</span>
                         : null}
                   </div>
+                  {msg.role === 'assistant' && !!msg.deliverables?.length && !msg.isStreaming && email && (
+                    <GeneratedDownloadChips
+                      email={email}
+                      files={msg.deliverables}
+                      pdfNote={msg.deliverablePdfNote}
+                    />
+                  )}
                   {msg.role === 'assistant' && !!msg.citations?.length && !msg.isStreaming && (
                     <div className="mt-3 pt-3 border-t border-surface/50">
                       <div className="text-[10px] font-semibold tracking-wider text-faint mb-1.5">SOURCES</div>

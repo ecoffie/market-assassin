@@ -18,9 +18,17 @@
  * edits that preamble between monthly editions.
  */
 
-/** Current public file. DOE updates it monthly under a dated directory. */
+/**
+ * Legacy July 2026 workbook. It still returns HTTP 200, so a collector that
+ * fetches only this URL keeps succeeding on a frozen edition.
+ * The living file is the dated CSV linked from DOE_FORECAST_PAGE
+ * (measured 2026-11-18: /documents/osbp-acquisition-forecast-public-2026-11-16csv).
+ */
 export const DOE_FORECAST_URL =
   'https://www.energy.gov/sites/default/files/2026-07/OSBP%20Acquisition%20Forecast%20Public%20Version%20for%20Web.xlsx';
+
+/** Page that links the current public forecast. The href carries the edition date. */
+export const DOE_FORECAST_PAGE = 'https://www.energy.gov/osbp/acquisition-forecast';
 
 export interface DoeForecastRow {
   title: string;
@@ -36,10 +44,12 @@ export interface DoeForecastRow {
   contractType?: string;
   popState?: string;
   performanceEndDate?: string;
+  /** Report-run date from the CSV's CURRENT_DATE column, when present. */
+  editionDate?: string;
   raw: Record<string, string>;
 }
 
-const BLANK = /^(tbd|tbd\.|n\/?a|na|none|unknown|-{1,}|\.)$/i;
+const BLANK = /^(tbd|tbd\.|n\/?a|na|none|unknown|unavailable|-{1,}|\.)$/i;
 
 /** "TBD"/"N/A" mean ABSENT — storing them puts "TBD" on a card as if it were data. */
 export function doeCell(v: unknown): string | undefined {
@@ -61,7 +71,14 @@ export function doeFieldFor(header: string): string | null {
   if (h === 'program office') return 'office';
   if (h.includes('current incumbent')) return 'incumbent';
   if (h.includes('current contract number')) return 'contractnum';
+  // The Nov 2026 CSV has BOTH a precise "Estimated Dollar Value" and a band
+  // "Estimated Value Range". The precise column must not be stored as the band.
+  if (h.includes('dollar value')) return 'amount';
   if (h.includes('estimated') && (h.includes('value') || h.includes('dollar'))) return 'value';
+  // "IDV Type of Set Aside" sits before the real "Type of Set Aside" and is
+  // often "Unavailable". It must not win the set-aside field.
+  if (h.includes('idv') && h.includes('set aside')) return null;
+  if (h === 'current date' || h === 'current_date') return 'edition';
   if (h.includes('set aside')) return 'setaside';
   if (h.includes('contract type')) return 'contracttype';
   if (h.includes('place of performance')) return 'popstate';
@@ -70,9 +87,25 @@ export function doeFieldFor(header: string): string | null {
 }
 
 /**
- * Excel serial date → ISO. DOE stores dates as serials (45597 = 2024-11-01),
- * which would otherwise be stored as the literal string "45597".
+ * Excel serial OR M/D/YYYY OR YYYY-MM-DD.
+ * The July workbook stores serials (45597 = 2024-11-01). The Nov 2026 CSV uses M/D/YYYY.
  */
+export function doeDate(v: unknown): string | undefined {
+  const serial = excelSerialToIso(v);
+  if (serial && typeof v !== 'string') return serial;
+  const s = doeCell(v);
+  if (!s) return undefined;
+  const mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mdy) {
+    const month = Number(mdy[1]);
+    const day = Number(mdy[2]);
+    if (month < 1 || month > 12 || day < 1 || day > 31) return undefined;
+    return `${mdy[3]}-${mdy[1].padStart(2, '0')}-${mdy[2].padStart(2, '0')}`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  return excelSerialToIso(v);
+}
+
 export function excelSerialToIso(v: unknown): string | undefined {
   const n = Number(v);
   if (!Number.isFinite(n) || n < 20000 || n > 80000) return undefined;
@@ -129,7 +162,13 @@ export function parseDoeForecast(
     if (!title || title.length < 5) { skipped++; continue; }
 
     const valueRaw = get('value');
-    const money = helpers.parseMoneyRange(valueRaw);
+    const amountRaw = get('amount');
+    const amount = amountRaw != null && Number.isFinite(Number(amountRaw.replace(/,/g, '')))
+      ? Number(amountRaw.replace(/,/g, ''))
+      : undefined;
+    const money = amount != null && amount > 0
+      ? { min: amount, max: amount }
+      : helpers.parseMoneyRange(valueRaw);
     const endIdx = map.indexOf('endsdate');
 
     rows.push({
@@ -139,13 +178,14 @@ export function parseDoeForecast(
       programOffice: get('office'),
       incumbentName: get('incumbent'),
       incumbentContractNumber: get('contractnum'),
-      estimatedValueRange: valueRaw,
+      estimatedValueRange: valueRaw || (amount != null ? amountRaw : undefined),
       estimatedValueMin: money.min,
       estimatedValueMax: money.max,
       setAside: helpers.parseSetAside(get('setaside')),
       contractType: get('contracttype'),
       popState: get('popstate'),
-      performanceEndDate: endIdx === -1 ? undefined : excelSerialToIso(r[endIdx]),
+      performanceEndDate: endIdx === -1 ? undefined : doeDate(r[endIdx]),
+      editionDate: doeDate(get('edition')),
       raw,
     });
   }
@@ -163,4 +203,61 @@ export function doeExternalId(r: DoeForecastRow): string {
     ? `C:${r.incumbentContractNumber}`
     : `T:${r.programOffice || ''}|${r.title}`;
   return `DOE-${basis.toUpperCase().replace(/[^A-Z0-9:]+/g, '-').replace(/^-|-$/g, '').slice(0, 120)}`;
+}
+
+export interface DoeForecastDocument {
+  /** YYYY-MM-DD edition from the href. */
+  edition: string;
+  href: string;
+}
+
+/**
+ * Dated public files linked from the OSDBU forecast page.
+ * Newest edition first. The July XLSX is not on this page and is not returned.
+ */
+export function extractDoeForecastDocuments(html: string): DoeForecastDocument[] {
+  const found = new Map<string, string>();
+  const dated = /href="([^"]*osbp-acquisition-forecast-public-(\d{4}-\d{2}-\d{2})csv[^"]*)"/gi;
+  let m: RegExpExecArray | null;
+  while ((m = dated.exec(html))) found.set(m[2], m[1].replace(/&amp;/g, '&'));
+  const compact = /href="([^"]*acquisition-forecast[^"]*?(\d{4})(\d{2})(\d{2})\.csv[^"]*)"/gi;
+  while ((m = compact.exec(html))) found.set(`${m[2]}-${m[3]}-${m[4]}`, m[1].replace(/&amp;/g, '&'));
+  return [...found.entries()]
+    .map(([edition, href]) => ({ edition, href }))
+    .sort((a, b) => (a.edition < b.edition ? 1 : a.edition > b.edition ? -1 : 0));
+}
+
+export function absoluteDoeUrl(href: string): string {
+  if (href.startsWith('http://') || href.startsWith('https://')) return href;
+  return `https://www.energy.gov${href.startsWith('/') ? '' : '/'}${href}`;
+}
+
+/** RFC-style CSV. DOE quotes descriptions that contain commas. */
+export function parseCsvRows(text: string): string[][] {
+  const src = text.replace(/^\uFEFF/, '');
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cur = '';
+  let quoted = false;
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (quoted) {
+      if (c === '"') {
+        if (src[i + 1] === '"') { cur += '"'; i++; }
+        else quoted = false;
+      } else cur += c;
+    } else if (c === '"') quoted = true;
+    else if (c === ',') { row.push(cur); cur = ''; }
+    else if (c === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+    else if (c !== '\r') cur += c;
+  }
+  if (cur.length > 0 || row.length > 0) { row.push(cur); rows.push(row); }
+  return rows.filter((r) => r.some((c) => c.trim()));
+}
+
+export function parseDoeCsv(
+  text: string,
+  helpers: Parameters<typeof parseDoeForecast>[1],
+): DoeParseResult {
+  return parseDoeForecast(parseCsvRows(text), helpers);
 }

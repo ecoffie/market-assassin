@@ -23,7 +23,8 @@
 import { DOC_SCHEMA, labeledUnits, type DocModel } from '@/lib/documents/model';
 import { validateDocModel, demoteUncitedFacts, hardenedAssumptions, repeatedSentences, fixtureMarkers, neverAnAssumption, citedObservationAsAssumption, BLOCK_TYPE_VALUES, CLAIM_VALUES, SOURCE_KIND_VALUES } from '@/lib/documents/validate';
 import { renderDocument } from '@/lib/documents';
-import { saveGeneratedDocument, type GeneratedDb } from '@/lib/vault/generated';
+import { modelHasTables } from '@/lib/documents/render-spreadsheet';
+import { saveGeneratedDocument, type GeneratedDb, type GeneratedFormat } from '@/lib/vault/generated';
 import type { VaultStorage, VaultUploadInput } from '@/lib/vault/upload';
 import { detectProhibitedMarkings, markingRefusalMessage } from '@/lib/vault/marking-detect';
 import { vaultEmailFor, WORKSPACE_UNCONFIRMED_NOTE, type ChatActingScope } from './chat-acting-scope';
@@ -101,13 +102,17 @@ export const CREATE_DOCUMENT_TOOL_DEF = {
   function: {
     name: CREATE_DOCUMENT,
     description:
-      "Create a document file — a client-ready PDF and an editable Word file — and save it privately to the user's Vault. CALL THIS whenever the user asks to create, make, write up, export, download or save a document, report, PDF, Word file, capability statement, brief or deliverable. Build it from the content already prepared in this conversation — INCLUDING the user's uploaded company material (capabilities, approach, company facts) and any rewrite you just gave them — not only the market research; do not run new searches first unless the user asks for new research. The user's own description of their company from their upload is a 'fact' that cites the upload: declare a source { kind: 'upload', recordId: <the upload's document_id>, label: <file name> } and cite it; never label it an assumption and never leave it out. Certifications, contract awards, past performance and eligibility may appear ONLY when the uploaded text states them, as facts citing the upload — never invented and never as assumptions. Label every block (an uncited fact is saved labeled \"Unverified — no source\"). Every declared source should be cited by at least one block. To revise a document Mindy made earlier, pass its document_id as revises_document_id: a new version is saved and the old one is kept.",
+      "Create a document file — a client-ready PDF and an editable Word file (and Excel/CSV when the model has tables or the user asks for a spreadsheet) — and save it privately to the user's Vault. CALL THIS whenever the user asks to create, make, write up, export, download or save a document, report, PDF, Word file, Excel, spreadsheet, CSV, capability statement, brief or deliverable. Build it from the content already prepared in this conversation — INCLUDING the user's uploaded company material (capabilities, approach, company facts) and any rewrite you just gave them — not only the market research; do not run new searches first unless the user asks for new research. The user's own description of their company from their upload is a 'fact' that cites the upload: declare a source { kind: 'upload', recordId: <the upload's document_id>, label: <file name> } and cite it; never label it an assumption and never leave it out. Certifications, contract awards, past performance and eligibility may appear ONLY when the uploaded text states them, as facts citing the upload — never invented and never as assumptions. Label every block (an uncited fact is saved labeled \"Unverified — no source\"). Every declared source should be cited by at least one block. To revise a document Mindy made earlier, pass its document_id as revises_document_id: a new version is saved and the old one is kept.",
     parameters: {
       type: 'object',
       properties: {
         doc_model: DOC_MODEL_SCHEMA,
         revises_document_id: { type: 'string', description: 'The document_id of a document Mindy generated earlier, when this is a revision of it.' },
         theme: { type: 'string', enum: ['mindy', 'briefing'], description: "Visual style. Default 'mindy'." },
+        include_spreadsheet: {
+          type: 'boolean',
+          description: 'When true, also save Excel (.xlsx) and CSV. Pass true when the user asked for Excel/CSV/spreadsheet. Defaults to true when the document has table blocks (omit or true); pass false for Word/PDF only.',
+        },
       },
       required: ['doc_model'],
       additionalProperties: false,
@@ -181,7 +186,9 @@ export function markingText(m: DocModel): string {
   return parts.filter(Boolean).join('\n');
 }
 
-const baseName = (f: string) => f.replace(/\.(pdf|docx)$/i, '');
+const baseName = (f: string) => f.replace(/\.(pdf|docx|xlsx|csv)$/i, '');
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const CSV_MIME = 'text/csv; charset=utf-8';
 
 /**
  * Do the CUSTOMER's own words ask for a document file? Only then does the planner see uploaded text (and
@@ -189,7 +196,7 @@ const baseName = (f: string) => f.replace(/\.(pdf|docx)$/i, '');
  * only on the turns that need it — and on those turns create_document is the only write tool.
  */
 const DOC_VERB = /\b(?:create|make|write\s+up|export|download|save|generate|produce|draft|build|turn\s+(?:this|that|it)\s+into|put\s+(?:this|that|it)\s+(?:in|into)|give\s+me)\b/i;
-const DOC_NOUN = /\b(?:document|doc|docx|report|pdf|word(?:\s+(?:doc|file|document))?|file|capability\s+statement|cap\s+statement|brief|one[-\s]?pager|deliverable|white\s*paper)\b/i;
+const DOC_NOUN = /\b(?:document|doc|docx|report|pdf|word(?:\s+(?:doc|file|document))?|file|capability\s+statement|cap\s+statement|brief|one[-\s]?pager|deliverable|white\s*paper|excel|spreadsheet|xlsx|csv)\b/i;
 export function isDocumentCreationRequest(customerWords: string): boolean {
   const t = (customerWords || '').slice(0, 2000);
   const verb = DOC_VERB.exec(t);
@@ -218,15 +225,16 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
     return (data as Row) ?? null;
   }
 
-  /** The other-format file saved together with `row` (same name, version and parent). */
-  async function loadPair(row: Row): Promise<Row | null> {
+  /** Same-basename siblings saved with `row` (same version + parent chain) — PDF/Word/Excel/CSV. */
+  async function loadSiblings(row: Row): Promise<Row[]> {
     let q = deps.db.from('user_boilerplate_docs')
       .select('id, original_filename, mime_type, version, parent_id, doc_model')
       .eq('user_email', owner).eq('doc_class', 'generated').is('archived_at', null).eq('version', row.version ?? 1);
     q = row.parent_id ? q.eq('parent_id', row.parent_id) : q.is('parent_id', null);
     const { data, error } = await q.limit(20);
-    if (error || !Array.isArray(data)) return null;
-    return (data as Row[]).find((r) => r.id !== row.id && r.mime_type !== row.mime_type && baseName(r.original_filename) === baseName(row.original_filename)) ?? null;
+    if (error || !Array.isArray(data)) return [];
+    const base = baseName(row.original_filename);
+    return (data as Row[]).filter((r) => baseName(r.original_filename) === base);
   }
 
   async function execute(args: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -301,10 +309,12 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
     const marking = detectProhibitedMarkings(markingText(model));
     if (marking.blocked && marking.kind) return { ok: false, error: 'prohibited_marking', note: markingRefusalMessage(marking.kind) };
 
-    // Revision: the parent (and its other-format pair) must be this owner's generated document, and no
+    // Revision: the parent (and its other-format siblings) must be this owner's generated document, and no
     // assumption may come back as a fact.
     let parentDocx: string | null = null;
     let parentPdf: string | null = null;
+    let parentXlsx: string | null = null;
+    let parentCsv: string | null = null;
     const revId = typeof args?.revises_document_id === 'string' ? args.revises_document_id.trim() : '';
     if (revId) {
       if (!UUID_RE.test(revId)) return { ok: false, error: 'not_found', note: 'No generated document has that id. Nothing was saved.' };
@@ -317,22 +327,26 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
           return { ok: false, error: 'assumption_hardened', where: hardened, note: 'A revision cannot turn an earlier assumption into a fact. Keep those statements labeled assumption (or cite them as facts with a real source in a new statement). Nothing was saved.' };
         }
       }
-      const pair = await loadPair(parent);
-      const isDocx = parent.mime_type === DOCX_MIME;
-      parentDocx = isDocx ? parent.id : pair?.id ?? null;
-      parentPdf = isDocx ? pair?.id ?? null : parent.id;
+      const siblings = await loadSiblings(parent);
+      const byMime = (mime: string) => siblings.find((r) => r.mime_type === mime)?.id
+        ?? (parent.mime_type === mime ? parent.id : null);
+      parentDocx = byMime(DOCX_MIME);
+      parentPdf = byMime('application/pdf');
+      parentXlsx = byMime(XLSX_MIME);
+      parentCsv = byMime(CSV_MIME) ?? byMime('text/csv');
     }
 
     const render = deps.render ?? renderDocument;
     const files: Array<Record<string, unknown>> = [];
     let version: number | null = null;
-    const save = async (format: 'docx' | 'pdf', bytes: Buffer, filename: string, parentId: string | null) => {
+    const save = async (format: GeneratedFormat, bytes: Buffer, filename: string, parentId: string | null) => {
       const saved = await saveGeneratedDocument(
         { callerEmail: deps.callerEmail, request: deps.request, format, filename, bytes, docModel: model, text, parentId, chatSessionId: deps.chatSessionId },
         { db: deps.db, storage: deps.storage, resolveScope: async () => deps.scope },
       );
       if (!saved.ok) return saved;
-      version = saved.version;
+      // Version comes from the Word save (primary). Later unparented spreadsheet v1s must not overwrite it.
+      if (version == null) version = saved.version;
       const id = String(saved.document.id);
       files.push({ format, document_id: id, file_name: saved.document.original_filename, version: saved.version, download_path: `/api/app/vault/documents/download?id=${id}` });
       return saved;
@@ -353,6 +367,28 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
       pdfNote = 'The PDF could not be produced right now; the Word file was saved. Ask again later for the PDF.';
     }
 
+    // W4: Excel + CSV when the model has tables, the caller opts in, or a prior spreadsheet sibling exists.
+    // Explicit false skips sheets even when tables exist (Word/PDF-only deliverable).
+    const includeSpreadsheet = args?.include_spreadsheet === true
+      || (args?.include_spreadsheet !== false && (modelHasTables(model) || !!parentXlsx || !!parentCsv));
+    let spreadsheetNote: string | null = null;
+    if (includeSpreadsheet) {
+      const sheetFails: string[] = [];
+      const xlsx = await render(model, 'xlsx');
+      if (xlsx.ok && !xlsx.degraded) {
+        const savedXlsx = await save('xlsx', xlsx.bytes, xlsx.filename, parentXlsx);
+        if (!savedXlsx.ok) sheetFails.push('Excel');
+      } else sheetFails.push('Excel');
+      const csv = await render(model, 'csv');
+      if (csv.ok && !csv.degraded) {
+        const savedCsv = await save('csv', csv.bytes, csv.filename, parentCsv);
+        if (!savedCsv.ok) sheetFails.push('CSV');
+      } else sheetFails.push('CSV');
+      if (sheetFails.length) {
+        spreadsheetNote = `The ${sheetFails.join(' and ')} file(s) could not be saved; the Word${pdfNote ? '' : ' and PDF'} file(s) were saved.`;
+      }
+    }
+
     return {
       ok: true,
       ...workspaceNote,
@@ -363,9 +399,10 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
       unverified_count: unverified.length,
       omitted_count: omitted.length,
       ...(pdfNote ? { pdf_note: pdfNote } : {}),
+      ...(spreadsheetNote ? { spreadsheet_note: spreadsheetNote } : {}),
       ...(repeats.length ? { repeated_sentences: repeats.length } : {}),
       diagnostics,
-      note: 'Saved privately to the Vault (Documents → Generated). Tell the user the file names and that they can download them there; do not paste download links.'
+      note: 'Saved privately to the Vault (Documents → Generated). Download buttons appear under this answer — tell the user the file names and that they can download from those buttons or from Documents → Generated; do not paste download links.'
         + (unverified.length ? ` ${unverified.length} statement(s) are labeled "Unverified — no source"; say so.` : '')
         + (omitted.length ? ` ${omitted.length} decision-critical statement(s) without a source were left out; say so.` : '')
         + (uncitedSources.some((s) => s.kind === 'upload')
@@ -375,4 +412,56 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
   }
 
   return { execute };
+}
+
+/** One saved file from a successful create_document result (for the in-chat download chips). */
+export type CreateDocumentDeliverable = {
+  format: string;
+  document_id: string;
+  file_name?: string;
+  version?: number;
+  download_path?: string;
+};
+
+/**
+ * Parse create_document tool JSON into the SSE `deliverables` payload.
+ * Returns null when the result is not a successful save with at least one file id.
+ */
+export function parseCreateDocumentDeliverables(content: string): {
+  files: CreateDocumentDeliverable[];
+  pdf_note?: string;
+  title?: string;
+} | null {
+  try {
+    const p = JSON.parse(content) as {
+      ok?: unknown;
+      title?: unknown;
+      pdf_note?: unknown;
+      files?: unknown;
+    };
+    if (!p || p.ok !== true || !Array.isArray(p.files)) return null;
+    const files: CreateDocumentDeliverable[] = [];
+    for (const raw of p.files) {
+      if (!raw || typeof raw !== 'object') continue;
+      const f = raw as Record<string, unknown>;
+      const document_id = typeof f.document_id === 'string' ? f.document_id.trim() : '';
+      const format = typeof f.format === 'string' ? f.format.trim().toLowerCase() : '';
+      if (!document_id || !format) continue;
+      files.push({
+        format,
+        document_id,
+        ...(typeof f.file_name === 'string' ? { file_name: f.file_name } : {}),
+        ...(typeof f.version === 'number' ? { version: f.version } : {}),
+        ...(typeof f.download_path === 'string' ? { download_path: f.download_path } : {}),
+      });
+    }
+    if (!files.length) return null;
+    return {
+      files,
+      ...(typeof p.pdf_note === 'string' && p.pdf_note.trim() ? { pdf_note: p.pdf_note.trim() } : {}),
+      ...(typeof p.title === 'string' && p.title.trim() ? { title: p.title.trim() } : {}),
+    };
+  } catch {
+    return null;
+  }
 }
