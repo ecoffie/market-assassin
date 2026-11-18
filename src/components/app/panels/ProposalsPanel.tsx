@@ -15,6 +15,7 @@ import { mapLinkForOpportunity } from '@/lib/maps/map-links';
 import { samNoticeIdFrom } from '@/components/app/mapRecordIds';
 import { PROPOSAL_ACTION_TARGETS, parseProposalAction } from '@/lib/app/deep-link-params';
 import { useScrollToAnchor } from '../useScrollToAnchor';
+import { ProposalsHome, NewProposalStart, NewProposalReady } from '@/components/app/proposal/ProposalHome';
 import { ProposalStepTracker, MoreMenu, proposalStep, type ProposalStep, type MoreMenuItem } from '@/components/app/proposal/ProposalSteps';
 import { alignRequirement, priorityOf, type ReqPriority } from '@/lib/proposal/section-alignment';
 import { Zap, Gauge, PenLine, Search, FileText, ClipboardList, AlertTriangle, Sparkles, CheckCircle2, X, FolderArchive, BookOpen, Scale, Check, Circle } from 'lucide-react';
@@ -1144,6 +1145,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const [editorOpen, setEditorOpen] = useState(false);
   // Once a source is loaded, its documents section folds to one line (step 1 done) until reopened.
   const [sourceExpanded, setSourceExpanded] = useState(false);
+  // Simple page (owner 2026-11-18): home list → new (drop RFP / pick pursuit) → ready → editor.
+  // 'tools' is the old full page, kept one click away.
+  const [view, setView] = useState<'home' | 'new' | 'tools'>('home');
   const onEditorSectionChange = useCallback((id: string, text: string, html: string) => {
     const sectionType = id as SectionType;
     setDrafts(prev => {
@@ -1510,6 +1514,8 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   // Simple (LOI / Sources Sought) responses keep the matrix behind "More options" — open it.
   useEffect(() => {
     if (actionPursuitMatches && contextAction === 'compliance') setShowAdvancedOutputs(true);
+    // A deep link to a specific tool (compliance, bid/no-bid…) opens the full tools page.
+    if (actionPursuitMatches) setView('tools');
   }, [actionPursuitMatches, contextAction]);
   const actionAnchorId = (() => {
     if (!contextAction || !actionPursuitMatches || !actionDocsSettled || driveMode !== 'auto') return null;
@@ -1755,7 +1761,68 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         findingRequirements={complianceLoading}
         onExportPackage={() => exportProposalPackage()}
         exportingPackage={exporting}
+        documents={sourceDocuments.map(d => ({ name: d.fileName, pages: d.pageCount }))}
+        onAddDocuments={(files) => { for (const f of files) void handleRfpFile(f); }}
+        addingDocuments={uploading}
+        onRunCheck={() => { void runReferee(); }}
+        checkRunning={refereeRunning}
+        checkResult={refereeResult}
+        checkError={refereeError}
         onClose={() => setEditorOpen(false)}
+      />
+    );
+  }
+
+  const goHome = () => { startAnotherProposal(); setView('home'); };
+  const pickPursuit = (id: string) => { setSelectedId(id); setLocalPursuitId(id); setView('new'); };
+  const hasSourceChosen = !!activePursuitId || !!uploadedRfp;
+
+  if (view !== 'tools' && !hasSourceChosen) {
+    return view === 'new' ? (
+      <NewProposalStart
+        pursuits={opportunities}
+        uploading={uploading}
+        uploadError={uploadError}
+        onFiles={(files) => { for (const f of files) void handleRfpFile(f); }}
+        onPickPursuit={pickPursuit}
+        onBack={() => setView('home')}
+      />
+    ) : (
+      <ProposalsHome
+        pursuits={opportunities}
+        loading={loading || !pipelineLoaded}
+        lastDraftName={hasAnyDraft ? (restoredDraftFile || 'Your saved draft') : null}
+        onNew={() => setView('new')}
+        onOpenPursuit={pickPursuit}
+        onContinueDraft={() => setEditorOpen(true)}
+        onAllTools={() => setView('tools')}
+      />
+    );
+  }
+
+  if (view !== 'tools') {
+    const due = activePursuit?.response_deadline ? formatDate(activePursuit.response_deadline) : '';
+    return (
+      <NewProposalReady
+        title={activePursuit?.title || uploadedRfp?.fileName || proposalFlowName}
+        subtitle={[activePursuit?.agency, noticeTypeLabel(activePursuit?.notice_type), due ? `Due ${due}` : ''].filter(Boolean).join(' · ') || undefined}
+        documentNames={sourceDocuments.map(d => d.fileName)}
+        loadingDocs={autoLoadStatus === 'loading' || uploading}
+        loadMessage={autoLoadStatus === 'no-docs' || autoLoadStatus === 'error' ? autoLoadMessage : (uploading ? 'Mindy is reading your file…' : autoLoadMessage)}
+        sectionLabels={currentSectionTabs.map(t => t.label)}
+        requirementCount={compliance.length}
+        hasSource={!!uploadedRfp?.text?.trim()}
+        canDraft={canDraftAll}
+        drafting={draftAllLoading}
+        elapsedSec={draftAllElapsedSec}
+        draftError={draftError || uploadError}
+        cancelled={draftAllCancelled}
+        onDraft={() => { void generateAllDrafts(); }}
+        onStop={cancelDraftAll}
+        onOpenEditor={() => setEditorOpen(true)}
+        onAddFiles={(files) => { for (const f of files) void handleRfpFile(f); }}
+        onBack={goHome}
+        onAllTools={() => setView('tools')}
       />
     );
   }
@@ -1764,6 +1831,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     <div className="p-6 space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
+          <button type="button" onClick={() => setView(hasSourceChosen ? 'new' : 'home')} className="mb-2 text-sm text-muted hover:text-white">
+            ← {hasSourceChosen ? 'Back to the simple view' : 'All proposals'}
+          </button>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold text-white">Proposal Assist</h1>
             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide bg-purple-500/20 text-purple-300 border border-purple-500/30">
