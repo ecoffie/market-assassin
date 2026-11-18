@@ -32,6 +32,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 |---|---|---|---|---|---|
 | 2026-11-18 | Ask Mindy SAM status | The card context told the model `Status: active` from `sam_opportunities.active`, which means not archived. A past deadline and an award notice with no deadline both read as active. Ask Mindy now gets the #1557 solicitation status (unchanged), a separate archive-flag line, and an explicit statement that a missing deadline is not "open for responses" when the notice type has nothing to submit. Award status and the contract performance period are named as different clocks. SEO `opportunityStatus` and the runway badge no longer call justification, presolicitation, or special notice open solely because the deadline is blank. | `export function askMindyNoticeStatusLines` → `src/lib/sam/ask-mindy-notice-status.ts` · `Solicitation status:` → `src/lib/chat/card-chat.ts` | `card-chat.unit.test.ts` red before (block contained `Status: active`), green after. `deriveSolicitationStatus` tests unchanged. | BUILT, NOT MERGED |
 
+## 2026-11-18 — GAO reinjection and events prune-report
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | GAO merge guard + events prune log | #2165 (merge `b4d275843`) already skips `gao_high_risk`, refuses `--merge` on a `(Source: GAO)` leak, and returns 500 when the prune-report insert fails. This row locks that code with a regression test after rebasing off the duplicate edit. Prune stays report-only unless `SAM_EVENTS_PRUNE=apply`. The 278 served strings, the 51 replacements, and the 53 event ids are not changed. Decision-pack files from #2165 stay documentation; they are not a data write. | `REFUSED: converted set still contains "(Source: GAO)" pain points.` → `scripts/merge-agency-intelligence.js` · `prune report not recorded:` → `src/app/api/cron/extract-sam-events/route.ts` | `gao-events-safeguards.unit.test.ts` against main's #2165 code. No pain-point JSON edit. No event delete. | BUILT, NOT MERGED |
+
 ## 2026-11-18 — Forecast currency release + Ask Mindy Map bridge
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
