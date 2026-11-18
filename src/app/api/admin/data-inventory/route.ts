@@ -83,6 +83,16 @@ const CRON_JOBS = {
   samEntities: ['sync-decision-makers'],
 } as const;
 
+/**
+ * Cron route directory → the cron_jobs row that runs it, when the names differ.
+ * The inventory truth test counts the directory as represented only when this
+ * target is attached to a dataset schedule. A quoted mention of the directory
+ * is not enough.
+ */
+export const COLLECTOR_ROUTE_TO_JOB = {
+  'sync-gov-buyer-data': 'sync-decision-makers',
+} as const;
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Sb = any;
 
@@ -518,7 +528,7 @@ export async function GET(request: NextRequest) {
       freshness: fresh({
         asOf: e.samEntities,
         cadenceHours: 24,
-        basis: "MAX(sam_entities.synced_at). There is no cron_jobs row named 'sync-gov-buyer-data'. One entity slice rides sync-decision-makers when the checkpoint is older than 20h. A 7-day clock is stale, not unknown.",
+        basis: 'MAX(sam_entities.synced_at). The route directory is scheduled as sync-decision-makers. One entity slice rides that job when the checkpoint is older than 20h. A 7-day clock is stale, not unknown.',
         jobs: CRON_JOBS.samEntities,
       }),
       surface: { state: 'customer_readable', tools: ['lookup_sam_entity'], note: 'local-first entity lookup; live SAM only for gaps' },

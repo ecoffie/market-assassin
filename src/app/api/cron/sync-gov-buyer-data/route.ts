@@ -172,6 +172,34 @@ export function entityRidealongDue(
   return nowMs - t >= staleMs;
 }
 
+/**
+ * Checkpoint written after one NAICS slice.
+ * A failure records the error and does not move last_synced_at or last_page.
+ * Those two fields are what the 20h ridealong reads; stamping them on a
+ * failed slice would hide the failure until the window elapsed.
+ */
+export function entitySliceCheckpoint(input: {
+  ok: boolean;
+  done: boolean;
+  nextPage: number;
+  totalCount: number;
+  entitiesUpserted: number;
+  error: string | null;
+  nowIso: string;
+}): Record<string, string | number | null> {
+  if (!input.ok) {
+    return { status: 'error', last_error: input.error ?? 'entity slice failed' };
+  }
+  return {
+    last_page: input.done ? 0 : input.nextPage,
+    total_records: input.totalCount,
+    entities_upserted: input.entitiesUpserted,
+    status: input.done ? 'complete' : 'in_progress',
+    last_error: null,
+    last_synced_at: input.nowIso,
+  };
+}
+
 async function syncEntities(opts: { maxSlices?: number } = {}) {
   const sb = getSupabase();
   let slicesRun = 0;
@@ -210,6 +238,7 @@ async function syncEntities(opts: { maxSlices?: number } = {}) {
       let sliceRows = 0;
       let totalCount = slice.total_records || 0;
       let hasMore = true;
+      let sliceError: string | null = null;
       for (let p = 0; p < ENTITY_PAGES_PER_SLICE && hasMore; p++) {
         const result = await searchEntities({
           naicsCode: slice.naics_code,
@@ -227,7 +256,11 @@ async function syncEntities(opts: { maxSlices?: number } = {}) {
           const { error } = await sb
             .from('sam_entities')
             .upsert(rows, { onConflict: 'uei', ignoreDuplicates: false });
-          if (error) { errors.push(`entities ${slice.naics_code} p${page}: ${error.message}`); break; }
+          if (error) {
+            sliceError = `entities ${slice.naics_code} p${page}: ${error.message}`;
+            errors.push(sliceError);
+            break;
+          }
           upserted += rows.length;
           sliceRows += rows.length;
         }
@@ -236,22 +269,31 @@ async function syncEntities(opts: { maxSlices?: number } = {}) {
 
       debug.push({ naics: slice.naics_code, fromPage: (slice.last_page || 0) + 1, toPage: page - 1, totalCount, sliceRows });
 
-      // Advance / complete the checkpoint. last_page = next page to fetch;
-      // reset to 0 when we've swept the whole NAICS so it re-checks later.
-      const done = !hasMore;
-      await sb.from('sam_entities_sync_state').update({
-        last_page: done ? 0 : page - 1,
-        total_records: totalCount,
-        entities_upserted: (slice.entities_upserted || 0) + sliceRows,
-        status: done ? 'complete' : 'in_progress',
-        last_error: null,
-        last_synced_at: new Date().toISOString(),
-      }).eq('id', slice.id);
+      // Advance the checkpoint only when this slice finished cleanly.
+      // last_page is the next page to fetch; reset to 0 after a full sweep.
+      const done = !hasMore && !sliceError;
+      await sb.from('sam_entities_sync_state').update(entitySliceCheckpoint({
+        ok: !sliceError,
+        done,
+        nextPage: page - 1,
+        totalCount,
+        entitiesUpserted: (slice.entities_upserted || 0) + sliceRows,
+        error: sliceError,
+        nowIso: new Date().toISOString(),
+      })).eq('id', slice.id);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       errors.push(`entities ${slice.naics_code}: ${msg}`);
       await sb.from('sam_entities_sync_state')
-        .update({ status: 'error', last_error: msg, last_synced_at: new Date().toISOString() })
+        .update(entitySliceCheckpoint({
+          ok: false,
+          done: false,
+          nextPage: slice.last_page || 0,
+          totalCount: slice.total_records || 0,
+          entitiesUpserted: slice.entities_upserted || 0,
+          error: msg,
+          nowIso: new Date().toISOString(),
+        }))
         .eq('id', slice.id);
     }
   }

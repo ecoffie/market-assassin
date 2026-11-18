@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { entityRidealongDue, ENTITY_RIDEALONG_STALE_MS } from './route';
+import { entityRidealongDue, entitySliceCheckpoint, ENTITY_RIDEALONG_STALE_MS } from './route';
 
 const NOW = Date.parse('2026-11-18T19:53:00Z');
 
@@ -25,6 +25,28 @@ describe('entityRidealongDue', () => {
     const sevenDays = new Date(NOW - 7 * 24 * 60 * 60 * 1000).toISOString();
     expect(entityRidealongDue(sevenDays, NOW)).toBe(true);
     expect(ENTITY_RIDEALONG_STALE_MS).toBe(20 * 60 * 60 * 1000);
+  });
+});
+
+describe('entitySliceCheckpoint', () => {
+  it('a successful slice advances last_synced_at and last_page', () => {
+    const patch = entitySliceCheckpoint({
+      ok: true, done: false, nextPage: 6, totalCount: 40, entitiesUpserted: 10,
+      error: null, nowIso: '2026-11-18T20:00:00.000Z',
+    });
+    expect(patch.last_synced_at).toBe('2026-11-18T20:00:00.000Z');
+    expect(patch.last_page).toBe(6);
+    expect(patch.status).toBe('in_progress');
+  });
+
+  it('a failed slice does not move the ridealong clock or the page cursor', () => {
+    const patch = entitySliceCheckpoint({
+      ok: false, done: false, nextPage: 6, totalCount: 40, entitiesUpserted: 10,
+      error: 'sam 429', nowIso: '2026-11-18T20:00:00.000Z',
+    });
+    expect(patch).toEqual({ status: 'error', last_error: 'sam 429' });
+    expect(patch).not.toHaveProperty('last_synced_at');
+    expect(patch).not.toHaveProperty('last_page');
   });
 });
 
