@@ -15,6 +15,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@supabase/supabase-js';
 import agencyPainPointsJson from '@/data/agency-pain-points.json';
 import { resolveAgency } from '@/lib/strategic-intel/agency-resolver';
+import {
+  labelHistoricalGaoPainPoint,
+  legacyGaoPublicationDate,
+} from '@/lib/strategic-intel/legacy-gao-painpoints';
 import { isUnsupportedBudgetClaim } from '@/lib/strategic-intel/unsupported-budget-claim';
 
 export type ClaimProvenance =
@@ -286,7 +290,8 @@ export function loadLegacyPainPointsForAgency(agencyQuery: string, limit = 50): 
         source_type: 'legacy_manual',
         source_url: null,
         document_number: extractDocumentNumber(claim),
-        published_at: null,
+        // Government date from the bare-(Source: GAO) map when the original string matches.
+        published_at: legacyGaoPublicationDate(pp),
         institute_source_id: null,
         provenance: 'LEGACY_MANUAL',
         legacy_source_tag: legacyTag(pp),
@@ -372,7 +377,15 @@ export function formatPainPointForDisplay(p: SourcedPainPoint): string {
     // bypassed loadLegacyPainPointsForAgency. Empty = omit (do not restore).
     const claim = sanitizeLegacyClaimText(p.pain_point);
     if (!claim) return '';
-    if (/\(legacy/i.test(claim) || /provenance unavailable/i.test(claim)) return claim;
+    if (/\(legacy/i.test(claim) || /provenance unavailable/i.test(claim) || /historical GAO finding/i.test(claim)) {
+      return claim;
+    }
+    // Bare "(Source: GAO)" → historical date + LEGACY_MANUAL (same as raw paths).
+    const labeled = labelHistoricalGaoPainPoint(claim);
+    if (labeled !== claim) return labeled;
+    if (p.published_at) {
+      return `${claim} (historical GAO finding, published ${p.published_at}) [LEGACY_MANUAL — provenance unavailable]`;
+    }
     return `${claim} [LEGACY_MANUAL — provenance unavailable]`;
   }
   if (p.provenance === 'MINDY_INTERPRETATION') {

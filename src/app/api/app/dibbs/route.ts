@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { reportedCollectionFreshness } from '@/lib/data-core/collection-clocks';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -90,6 +91,70 @@ export async function GET(request: NextRequest) {
     pdfUrl: r.pdf_url,
   }));
 
+  // Freshness is the last nonempty ingest, not "this request ran" and not MAX(synced_at).
+  // A missing clock is reported, never filled in as current.
+  let freshness: {
+    state: string;
+    asOf: string | null;
+    lastAttempted: string | null;
+    lastSuccessfulCollection: string | null;
+    lastNonemptyIngest: string | null;
+    recordsReceived: number | null;
+    warning: string | null;
+  } = {
+    state: 'UNKNOWN',
+    asOf: null,
+    lastAttempted: null,
+    lastSuccessfulCollection: null,
+    lastNonemptyIngest: null,
+    recordsReceived: null,
+    warning: 'DIBBS freshness could not be read. Do not describe these RFQs as current.',
+  };
+  try {
+    const [touch, inst, job] = await Promise.all([
+      sb.from('dibbs_rfqs').select('synced_at').order('synced_at', { ascending: false }).limit(1).maybeSingle(),
+      sb.from('data_source_instances')
+        .select('source_state, last_poll, last_successful_check, last_verified_ingest, last_data_advance')
+        .eq('source_key', 'dibbs_dla_flat_files')
+        .maybeSingle(),
+      sb.from('cron_jobs').select('enabled').eq('job_name', 'sync-dibbs').maybeSingle(),
+    ]);
+    const row = (inst.data ?? {}) as {
+      source_state?: string | null;
+      last_poll?: string | null;
+      last_successful_check?: string | null;
+      last_verified_ingest?: string | null;
+      last_data_advance?: string | null;
+    };
+    const enabled = (job.data as { enabled?: boolean | string | null } | null)?.enabled;
+    const producerEnabled = job.error || !job.data
+      ? null
+      : enabled === true || enabled === 'true';
+    const report = reportedCollectionFreshness({
+      sourceState: row.source_state ?? null,
+      lastPoll: row.last_poll ?? null,
+      lastSuccessfulCheck: row.last_successful_check ?? null,
+      lastVerifiedIngest: row.last_verified_ingest ?? null,
+      lastDataAdvance: row.last_data_advance ?? null,
+      recordsReceived: null,
+      rowTouchAt: (touch.data?.synced_at as string | null) ?? null,
+      cadenceHours: 24,
+      now: new Date(),
+      producerEnabled,
+    });
+    freshness = {
+      state: report.state,
+      asOf: report.asOf,
+      lastAttempted: report.lastAttempted,
+      lastSuccessfulCollection: report.lastSuccessfulCheck,
+      lastNonemptyIngest: report.lastNonemptyIngest,
+      recordsReceived: report.recordsReceived,
+      warning: report.warning,
+    };
+  } catch (e) {
+    console.error('[dibbs] freshness read failed:', (e as Error).message);
+  }
+
   return NextResponse.json({
     success: true,
     total: count ?? rows.length,
@@ -97,6 +162,7 @@ export async function GET(request: NextRequest) {
     offset,
     limit,
     hasMore: (count ?? 0) > offset + rows.length,
+    freshness,
     rfqs: rows,
   });
 }

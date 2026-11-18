@@ -2,6 +2,7 @@
 import agencyPainPointsData from '@/data/agency-pain-points.json';
 import componentAgencyRulesData from '@/data/component-agency-rules.json';
 import usaceOfficePainPointsData from '@/data/usace-office-specific-pain-points.json';
+import { labelHistoricalGaoPainPoint } from '@/lib/strategic-intel/legacy-gao-painpoints';
 import { stripUnsupportedBudgetClaims } from '@/lib/strategic-intel/unsupported-budget-claim';
 
 interface AgencyData {
@@ -26,20 +27,25 @@ interface ComponentAgencyRules {
  * Sanitize the legacy corpus ONCE, at load.
  *
  * Every accessor in this module reads `painPointsDB`, and this module is the raw-JSON
- * path used by proposal drafting (`lib/proposal/agency-context.ts`), market research and
- * the agency-hierarchy linker — surfaces that never see the provenance-aware reader. A
- * single sanitized load covers all of them, so an unsupported government-wide budget
- * figure cannot re-enter through any of them even if a stale corpus ships.
+ * path used by proposal drafting (`lib/proposal/agency-context.ts`), Content Reaper,
+ * Market Assassin reports, and other surfaces that never see the provenance-aware
+ * reader. A single sanitized load covers all of them, so an unsupported government-
+ * wide budget figure cannot re-enter, and a bare "(Source: GAO)" 1993–2000 testimony
+ * cannot read as a current finding (labeled with date + LEGACY_MANUAL).
  *
- * Only the fabricated claim is removed. Every other claim passes through untouched.
+ * Fabricated budget claims are removed. Historical GAO strings are labeled, not retired.
  */
+function labelCorpusStrings(items: string[] | undefined): string[] {
+  return stripUnsupportedBudgetClaims(items).map(labelHistoricalGaoPainPoint);
+}
+
 function sanitizeCorpus(raw: PainPointsDatabase): PainPointsDatabase {
   const agencies: Record<string, AgencyData> = {};
   for (const [name, data] of Object.entries(raw.agencies ?? {})) {
     agencies[name] = {
       ...data,
-      painPoints: stripUnsupportedBudgetClaims(data.painPoints),
-      priorities: stripUnsupportedBudgetClaims(data.priorities),
+      painPoints: labelCorpusStrings(data.painPoints),
+      priorities: labelCorpusStrings(data.priorities),
     };
   }
   return { agencies };
