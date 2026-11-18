@@ -12,6 +12,7 @@
 import { BudgetShift, PainPointUpdate, CompetitorActivity, CaptureSignal, MAUserProfile } from './types';
 import { fetchAllRSSFeeds, filterRSSByKeywords, filterRecentRSS } from '../web-intel/rss';
 import agencyPainPoints from '@/data/agency-pain-points.json';
+import { labelHistoricalGaoPainPoint } from '@/lib/strategic-intel/legacy-gao-painpoints';
 import { sanitizeLegacyClaimText } from '@/lib/strategic-intel/sourced-pain-points';
 import agencyBudgetData from '@/data/agency-budget-data.json';
 
@@ -215,6 +216,7 @@ export async function fetchPainPointUpdates(
     // along into the deliverable. Dollar-only claims sanitize to "" and drop.
     const sanitizedPainPoints = (data.painPoints || [])
       .map(sanitizeLegacyClaimText)
+      .map(labelHistoricalGaoPainPoint)
       .filter((t): t is string => Boolean(t && t.trim()));
 
     if (profile.capabilities.length > 0) {

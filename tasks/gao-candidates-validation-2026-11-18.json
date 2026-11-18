@@ -1,0 +1,427 @@
+{
+  "validated_at": "2026-11-18",
+  "status": "PREPARE_ONLY — do not write src/data/agency-pain-points.json (Agent 4 / Eric gate)",
+  "preserve_legacy_278": true,
+  "summary": {
+    "candidates_total": 111,
+    "already_served_living": 60,
+    "net_new": 51,
+    "net_new_clear_to_adopt": 41,
+    "net_new_requires_review": 10,
+    "validation_pass": 51,
+    "validation_fail": 0
+  },
+  "clear_to_adopt_if_eric_approves_write": [
+    {
+      "agency": "Department of Energy",
+      "document_number": "GAO-25-107743",
+      "publication_date": "2025-02-25",
+      "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970316",
+      "origin": "gao_high_risk_2025",
+      "pain_point": "Acquisition and Program Management for DOE's National Nuclear Security Administration and Office of Environmental Management (GAO High-Risk List, GAO-25-107743, February 2025)"
+    },
+    {
+      "agency": "Department of Defense",
+      "document_number": "GAO-25-107743",
+      "publication_date": "2025-02-25",
+      "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970303",
+      "origin": "gao_high_risk_2025",
+      "pain_point": "DOD Approach to Business Transformation (GAO High-Risk List, GAO-25-107743, February 2025)"
+    },
+    {
+      "agency": "Department of Defense",
+      "document_number": "GAO-25-107743",
+      "publication_date": "2025-02-25",
+      "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970304",
+      "origin": "gao_high_risk_2025",
+      "pain_point": "DOD Business Systems Modernization (GAO High-Risk List, GAO-25-107743, February 2025)"
+    },
+    {
+      "agency": "Department of Defense",
+      "document_number": "GAO-25-107743",
+      "publication_date": "2025-02-25",
+      "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970305",
+      "origin": "gao_high_risk_2025",
+      "pain_point": "DOD Contract Management (GAO High-Risk List, GAO-25-107743, February 2025)"
+    },
+    {
+      "agency": "Department of Defense",
+      "document_number": "GAO-25-107743",
+      "publication_date": "2025-02-25",
+      "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970317",
+      "origin": "gao_high_risk_2025",
+      "pain_point": "DOD Financial Management (GAO High-Risk List, GAO-25-107743, February 2025)"
+    },
+    {
+      "agency": "Department of Defense",
+      "document_number": "GAO-25-107743",
+      "publication_date": "2025-02-25",
+      "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970313",
+      "origin": "gao_high_risk_2025",
+      "pain_point": "DOD Weapon Systems Acquisition (GAO High-Risk List, GAO-25-107743, February 2025)"
+    },
+    {
+      "agency": "Department of Health and Human Services",
+      "document_number": "GAO-25-107743",
+      "publication_date": "2025-02-25",
+      "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970300",
+      "origin": "gao_high_risk_2025",
+      "pain_point": "HHS Leadership and Coordination of Public Health Emergencies (GAO High-Risk List, GAO-25-107743, February 2025)"
+    },
+    {
+      "agency": "Department of Veterans Affairs",
+      "document_number": "GAO-25-107743",
+      "publication_date": "2025-02-25",
+      "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970325",
+      "origin": "gao_high_risk_2025",
+      "pain_point": "Managing Risks and Improving VA Health Care (GAO High-Risk List, GAO-25-107743, February 2025)"
+    },
+    {
+      "agency": "National Aeronautics and Space Administration",
+      "document_number": "GAO-25-107743",
+      "publication_date": "2025-02-25",
+      "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970328",
+      "origin": "gao_high_risk_2025",
+      "pain_point": "NASA Acquisition Management (GAO High-Risk List, GAO-25-107743, February 2025)"
+    },
+    {
+      "agency": "Department of Homeland Security",
+      "document_number": "GAO-25-107743",
+      "publication_date": "2025-02-25",
+      "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970332",
+      "origin": "gao_high_risk_2025",
+      "pain_point": "Strengthening Department of Homeland Security IT and Financial Management Functions (GAO High-Risk List, GAO-25-107743, February 2025)"
+    },
+    {
+      "agency": "Environmental Protection Agency",
+      "document_number": "GAO-25-107743",
+      "publication_date": "2025-02-25",
+      "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970334",
+      "origin": "gao_high_risk_2025",
+      "pain_point": "Transforming EPA's Process for Assessing and Managing Chemical Risks (GAO High-Risk List, GAO-25-107743, February 2025)"
+    },
+    {
+      "agency": "Department of Veterans Affairs",
+      "document_number": "GAO-25-107743",
+      "publication_date": "2025-02-25",
+      "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970335",
+      "origin": "gao_high_risk_2025",
+      "pain_point": "VA Acquisition Management (GAO High-Risk List, GAO-25-107743, February 2025)"
+    },
+    {
+      "agency": "Department of Housing and Urban Development",
+      "document_number": "GAO-26-108442",
+      "publication_date": "2026-10-14",
+      "source_url": "https://www.gao.gov/products/gao-26-108442",
+      "origin": "institute_gao_report",
+      "pain_point": "Department of Housing and Urban Development: 2025 Workforce and Spending Changes (Source: GAO-26-108442)"
+    },
+    {
+      "agency": "General Services Administration",
+      "document_number": "GAO-26-108521",
+      "publication_date": "2026-09-16",
+      "source_url": "https://www.gao.gov/products/gao-26-108521",
+      "origin": "institute_gao_report",
+      "pain_point": "Federal Personal Property: GSA Can Better Assess the Effectiveness of Its Disposal Efforts (Source: GAO-26-108521)"
+    },
+    {
+      "agency": "Office of Personnel Management",
+      "document_number": "GAO-26-108477",
+      "publication_date": "2026-09-15",
+      "source_url": "https://www.gao.gov/products/gao-26-108477",
+      "origin": "institute_gao_report",
+      "pain_point": "Federal Workforce: Deferred Resignation Program Largely Responsible for Sixfold Increase in Paid Administrative Leave Salary Costs (Source: GAO-26-108477)"
+    },
+    {
+      "agency": "Federal Deposit Insurance Corporation",
+      "document_number": "GAO-27-108190",
+      "publication_date": "2026-11-05",
+      "source_url": "https://www.gao.gov/products/gao-27-108190",
+      "origin": "institute_gao_report",
+      "pain_point": "International Collaboration: Federal Banking Agencies Actively Participated in Standard-Setting Bodies (Source: GAO-27-108190)"
+    },
+    {
+      "agency": "Department of Homeland Security",
+      "document_number": "GAO-26-107774",
+      "publication_date": "2026-09-24",
+      "source_url": "https://www.gao.gov/products/gao-26-107774",
+      "origin": "institute_gao_report",
+      "pain_point": "FEMA: Billions in Building Resilient Infrastructure and Communities Subgrants Remain Unawarded (Source: GAO-26-107774)"
+    },
+    {
+      "agency": "Department of Energy",
+      "document_number": "GAO-27-109127",
+      "publication_date": "2026-10-16",
+      "source_url": "https://www.gao.gov/products/gao-27-109127",
+      "origin": "institute_gao_report",
+      "pain_point": "National Nuclear Security Administration: Reductions to Federal Workforce (Source: GAO-27-109127)"
+    },
+    {
+      "agency": "Department of Health and Human Services",
+      "document_number": "GAO-27-108163",
+      "publication_date": "2026-11-09",
+      "source_url": "https://www.gao.gov/products/gao-27-108163",
+      "origin": "institute_gao_report",
+      "pain_point": "Opioid Overdose Reversal Medications: Medicare and Medicaid Enrollees Generally Had Coverage in Selected Recent Years (Source: GAO-27-108163)"
+    },
+    {
+      "agency": "Department of Justice",
+      "document_number": "GAO-26-107448",
+      "publication_date": "2026-09-28",
+      "source_url": "https://www.gao.gov/products/gao-26-107448",
+      "origin": "institute_gao_report",
+      "pain_point": "Criminal Justice: Data on Noncitizen Incarcerations, Convictions, Removals, and Costs (Source: GAO-26-107448)"
+    },
+    {
+      "agency": "Department of Veterans Affairs",
+      "document_number": "GAO-26-108467",
+      "publication_date": "2026-09-23",
+      "source_url": "https://www.gao.gov/products/gao-26-108467",
+      "origin": "institute_gao_report",
+      "pain_point": "Veterans Health Care: Information on Eligibility for and Use of Dental Benefits (Source: GAO-26-108467)"
+    },
+    {
+      "agency": "Department of Housing and Urban Development",
+      "document_number": "GAO-26-109173",
+      "publication_date": "2026-09-16",
+      "source_url": "https://www.gao.gov/products/gao-26-109173",
+      "origin": "institute_gao_report",
+      "pain_point": "Native American Issues: Preliminary Observations on Housing and Homelessness (Source: GAO-26-109173)"
+    },
+    {
+      "agency": "Department of the Treasury",
+      "document_number": "GAO-27-108795",
+      "publication_date": "2026-11-09",
+      "source_url": "https://www.gao.gov/products/gao-27-108795",
+      "origin": "institute_gao_report",
+      "pain_point": "Financial Audit: Bureau of the Fiscal Service’s FY 2026 and FY 2025 Schedules of Federal Debt (Source: GAO-27-108795)"
+    },
+    {
+      "agency": "Department of State",
+      "document_number": "GAO-26-107965",
+      "publication_date": "2026-08-10",
+      "source_url": "https://www.gao.gov/products/gao-26-107965",
+      "origin": "institute_gao_report",
+      "pain_point": "State Department: Standards for Overseas Housing Need Review [Reissued with revisions on Oct. 21, 2026] (Source: GAO-26-107965)"
+    },
+    {
+      "agency": "General Services Administration",
+      "document_number": "GAO-27-108779",
+      "publication_date": "2026-10-02",
+      "source_url": "https://www.gao.gov/products/gao-27-108779",
+      "origin": "institute_gao_report",
+      "pain_point": "U.S. Interagency Council on Homelessness: Staff Placed on Administrative Leave Have Returned and Await Direction (Source: GAO-27-108779)"
+    },
+    {
+      "agency": "Department of Transportation",
+      "document_number": "GAO-26-108439",
+      "publication_date": "2026-09-21",
+      "source_url": "https://www.gao.gov/products/gao-26-108439",
+      "origin": "institute_gao_report",
+      "pain_point": "Aviation Cybersecurity: Enhanced Air Safety Requires FAA to Better Mitigate Threats to Aircraft Communications (Source: GAO-26-108439)"
+    },
+    {
+      "agency": "Department of Health and Human Services",
+      "document_number": "GAO-26-108623",
+      "publication_date": "2026-09-23",
+      "source_url": "https://www.gao.gov/products/gao-26-108623",
+      "origin": "institute_gao_report",
+      "pain_point": "Drug Scheduling: While DEA Decisions Have Aligned with Recent HHS Recommendations, Both Need Comprehensive Policies (Source: GAO-26-108623)"
+    },
+    {
+      "agency": "Department of the Treasury",
+      "document_number": "GAO-27-108094",
+      "publication_date": "2026-10-16",
+      "source_url": "https://www.gao.gov/products/gao-27-108094",
+      "origin": "institute_gao_report",
+      "pain_point": "Critical Minerals: Limited Available Information on the Full Extent of Foreign Investment in Mining on Federal Lands (Source: GAO-27-108094)"
+    },
+    {
+      "agency": "Department of State",
+      "document_number": "GAO-26-109086",
+      "publication_date": "2026-09-08",
+      "source_url": "https://www.gao.gov/products/gao-26-109086",
+      "origin": "institute_gao_report",
+      "pain_point": "Priority Open Recommendations: Department of State (Source: GAO-26-109086)"
+    },
+    {
+      "agency": "Department of Energy",
+      "document_number": "GAO-26-108409",
+      "publication_date": "2026-09-23",
+      "source_url": "https://www.gao.gov/products/gao-26-108409",
+      "origin": "institute_gao_report",
+      "pain_point": "National Nuclear Security Administration: Use of Line Items in Management and Operating Contracts Could Be Improved (Source: GAO-26-108409)"
+    },
+    {
+      "agency": "Securities and Exchange Commission",
+      "document_number": "GAO-27-108840",
+      "publication_date": "2026-11-16",
+      "source_url": "https://www.gao.gov/products/gao-27-108840",
+      "origin": "institute_gao_report",
+      "pain_point": "Financial Audit: Securities and Exchange Commission’s FY 2026 and FY 2025 Financial Statements (Source: GAO-27-108840)"
+    },
+    {
+      "agency": "Department of Labor",
+      "document_number": "GAO-27-106779",
+      "publication_date": "2026-11-10",
+      "source_url": "https://www.gao.gov/products/gao-27-106779",
+      "origin": "institute_gao_report",
+      "pain_point": "401(k) Plan Investments: DOL Can Take Steps to Prepare for Expected Private Equity Growth (Source: GAO-27-106779)"
+    },
+    {
+      "agency": "Department of Defense",
+      "document_number": "GAO-27-107837",
+      "publication_date": "2026-10-14",
+      "source_url": "https://www.gao.gov/products/gao-27-107837",
+      "origin": "institute_gao_report",
+      "pain_point": "Artificial Intelligence: Actions and Opportunities to Implement Responsible Use in DOD (Source: GAO-27-107837)"
+    },
+    {
+      "agency": "Department of Veterans Affairs",
+      "document_number": "GAO-27-108908",
+      "publication_date": "2026-11-10",
+      "source_url": "https://www.gao.gov/products/gao-27-108908",
+      "origin": "institute_gao_report",
+      "pain_point": "Veteran Lending: Early Planning Is Critical to Assessing VA’s New Foreclosure Avoidance Program (Source: GAO-27-108908)"
+    },
+    {
+      "agency": "Department of Energy",
+      "document_number": "GAO-27-108063",
+      "publication_date": "2026-10-16",
+      "source_url": "https://www.gao.gov/products/gao-27-108063",
+      "origin": "institute_gao_report",
+      "pain_point": "Nuclear Waste: Future Land Use Planning at Selected DOE Cleanup Sites (Source: GAO-27-108063)"
+    },
+    {
+      "agency": "Department of Defense",
+      "document_number": "GAO-26-108732",
+      "publication_date": "2026-09-21",
+      "source_url": "https://www.gao.gov/products/gao-26-108732",
+      "origin": "institute_gao_report",
+      "pain_point": "Global Aging: Key Implications for U.S. Foreign Policy and Federal Agencies (Source: GAO-26-108732)"
+    },
+    {
+      "agency": "Department of Homeland Security",
+      "document_number": "GAO-26-109097",
+      "publication_date": "2026-09-17",
+      "source_url": "https://www.gao.gov/products/gao-26-109097",
+      "origin": "institute_gao_report",
+      "pain_point": "DHS Grants: Approach to Terminations and Pauses Disrupted Some Program Activities (Source: GAO-26-109097)"
+    },
+    {
+      "agency": "Department of Homeland Security",
+      "document_number": "GAO-26-109096",
+      "publication_date": "2026-09-03",
+      "source_url": "https://www.gao.gov/products/gao-26-109096",
+      "origin": "institute_gao_report",
+      "pain_point": "DHS Contracts: Reported Potential Cost Avoidance from Terminations Will Not Fully Materialize (Source: GAO-26-109096)"
+    },
+    {
+      "agency": "Department of Education",
+      "document_number": "GAO-26-107970",
+      "publication_date": "2026-09-14",
+      "source_url": "https://www.gao.gov/products/gao-26-107970",
+      "origin": "institute_gao_report",
+      "pain_point": "K-12 Education: Facility Issues Led About One in Five Districts to Cancel School in 2024-25, Affecting 2 Million Students (Source: GAO-26-107970)"
+    },
+    {
+      "agency": "Department of Health and Human Services",
+      "document_number": "GAO-27-108927",
+      "publication_date": "2026-10-16",
+      "source_url": "https://www.gao.gov/products/gao-27-108927",
+      "origin": "institute_gao_report",
+      "pain_point": "Private Health Insurance: Market Concentration in 2024 Was Generally Higher Than in 2011 (Source: GAO-27-108927)"
+    },
+    {
+      "agency": "Department of Education",
+      "document_number": "GAO-27-108796",
+      "publication_date": "2026-11-12",
+      "source_url": "https://www.gao.gov/products/gao-27-108796",
+      "origin": "institute_gao_report",
+      "pain_point": "K-12 Education: Data Show That Less than Half of Students Were Ready for Kindergarten in Selected States (Source: GAO-27-108796)"
+    }
+  ],
+  "requires_review": [
+    {
+      "agency": "Small Business Administration",
+      "document_number": "GAO-25-107743",
+      "publication_date": "2025-02-25",
+      "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970306",
+      "high_risk_area": 8,
+      "pain_point": "Emergency Loans for Small Businesses (GAO High-Risk List, GAO-25-107743, February 2025)"
+    },
+    {
+      "agency": "Department of the Treasury",
+      "document_number": "GAO-25-107743",
+      "publication_date": "2025-02-25",
+      "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970318",
+      "high_risk_area": 9,
+      "pain_point": "Enforcement of Tax Laws (GAO High-Risk List, GAO-25-107743, February 2025)"
+    },
+    {
+      "agency": "Department of Transportation",
+      "document_number": "GAO-25-107743",
+      "publication_date": "2025-02-25",
+      "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970299",
+      "high_risk_area": 11,
+      "pain_point": "Funding the Nation's Surface Transportation System (GAO High-Risk List, GAO-25-107743, February 2025)"
+    },
+    {
+      "agency": "Department of the Interior",
+      "document_number": "GAO-25-107743",
+      "publication_date": "2025-02-25",
+      "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970324",
+      "high_risk_area": 19,
+      "pain_point": "Management of Federal Oil and Gas Resources (GAO High-Risk List, GAO-25-107743, February 2025)"
+    },
+    {
+      "agency": "Department of Health and Human Services",
+      "document_number": "GAO-25-107743",
+      "publication_date": "2025-02-25",
+      "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970326",
+      "high_risk_area": 22,
+      "pain_point": "Medicare Program & Improper Payments (GAO High-Risk List, GAO-25-107743, February 2025)"
+    },
+    {
+      "agency": "Department of Homeland Security",
+      "document_number": "GAO-25-107743",
+      "publication_date": "2025-02-25",
+      "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970309",
+      "high_risk_area": 26,
+      "pain_point": "National Flood Insurance Program (GAO High-Risk List, GAO-25-107743, February 2025)"
+    },
+    {
+      "agency": "Department of Health and Human Services",
+      "document_number": "GAO-25-107743",
+      "publication_date": "2025-02-25",
+      "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970329",
+      "high_risk_area": 27,
+      "pain_point": "Protecting Public Health through Enhanced Oversight of Medical Products (GAO High-Risk List, GAO-25-107743, February 2025)"
+    },
+    {
+      "agency": "Department of Justice",
+      "document_number": "GAO-25-107743",
+      "publication_date": "2025-02-25",
+      "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970301",
+      "high_risk_area": 32,
+      "pain_point": "Strengthening Management of the Federal Prison System (GAO High-Risk List, GAO-25-107743, February 2025)"
+    },
+    {
+      "agency": "Department of Health and Human Services",
+      "document_number": "GAO-25-107743",
+      "publication_date": "2025-02-25",
+      "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970333",
+      "high_risk_area": 33,
+      "pain_point": "Strengthening Medicaid Program Integrity (GAO High-Risk List, GAO-25-107743, February 2025)"
+    },
+    {
+      "agency": "Department of Labor",
+      "document_number": "GAO-25-107743",
+      "publication_date": "2025-02-25",
+      "source_url": "https://files.gao.gov/reports/GAO-25-107743/index.html#_Toc190970302",
+      "high_risk_area": 35,
+      "pain_point": "Unemployment Insurance System (GAO High-Risk List, GAO-25-107743, February 2025)"
+    }
+  ],
+  "failures": []
+}

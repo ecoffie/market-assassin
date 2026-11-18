@@ -7,6 +7,7 @@
 
 import agencyPainPointsData from '@/data/agency-pain-points.json';
 import agencyAliasesData from '@/data/agency-aliases.json';
+import { labelHistoricalGaoPainPoint } from '@/lib/strategic-intel/legacy-gao-painpoints';
 import { sanitizeLegacyClaimText } from '@/lib/strategic-intel/sourced-pain-points';
 
 // Types
@@ -44,8 +45,16 @@ function initializeCaches() {
       // LEGACY_MANUAL dollar figures are not sourced budget data — omit from
       // default customer responses; keep qualitative program framing.
       // Dollar-only claims sanitize to "" and are dropped (never restored).
-      painPoints: (data.painPoints || []).map(sanitizeLegacyClaimText).filter(Boolean),
-      priorities: (data.priorities || []).map(sanitizeLegacyClaimText).filter(Boolean),
+      // Bare "(Source: GAO)" strings get a historical date + LEGACY_MANUAL label
+      // so a 1993–2000 testimony cannot read as a current finding on this raw path.
+      painPoints: (data.painPoints || [])
+        .map(sanitizeLegacyClaimText)
+        .map(labelHistoricalGaoPainPoint)
+        .filter(Boolean),
+      priorities: (data.priorities || [])
+        .map(sanitizeLegacyClaimText)
+        .map(labelHistoricalGaoPainPoint)
+        .filter(Boolean),
       matchedAliases: []
     });
   }

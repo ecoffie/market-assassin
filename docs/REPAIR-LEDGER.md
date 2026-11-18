@@ -26,6 +26,17 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-18 — Inventory honesty (no SBIR park) + historical GAO labels + SBIR retries
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | Data inventory / DIBBS + null clocks | Migration demotes false-green `current` without clocks (DIBBS → content_stale/blocked + live held_population; SAM/grants/DHS/DOE forecast instances → unmeasured). **Does NOT park sync-dod-sbir** (prior draft section removed; never applied to prod). Documents keep-ENABLED recovery policy on the cron row. | `Do NOT park sync-dod-sbir` → `supabase/migrations/20261118_park_false_green_freshness.sql` · `held_population    = (SELECT count(*)::integer FROM public.dibbs_rfqs)` → same file | Unit n/a (SQL). Apply **waiting Agent 4 APPROVE** — measured pre-apply: dibbs still `current`/57816, four null-clock keys still `current`, sync-dod-sbir `enabled=true`. | WAITING AGENT 4 APPLY |
+| 2026-11-18 | SBIR sync recovery | Keep empty/api-down → HTTP 503 honesty; add bounded in-run probe retries so temporary sbir.gov unavailability recovers on a later attempt/tick without parking the job. | `probeDodSbirWithRetries` → `src/lib/sbir/dod-sbir-outcome.ts` · `cron stays enabled for recovery` → `src/app/api/cron/sync-dod-sbir/route.ts` | `dod-sbir-outcome.unit.test.ts` 8/8 | SHIPPING |
+| 2026-11-18 | GAO pain points / raw surfaces | Raw paths (pain-points.ts, agency-hierarchy linker, briefings aggregator) + shared display helper now label bare `(Source: GAO)` with government date + `[LEGACY_MANUAL — provenance unavailable]`. **278 preserved** (no retirement). Dates from `legacy-gao-publication-dates.json` (archive file still unreferenced by src). | `historical GAO finding` → `src/lib/strategic-intel/legacy-gao-painpoints.ts` · `labelHistoricalGaoPainPoint` → same | `legacy-gao-painpoints.unit.test.ts` 13/13; `sourced-pain-points.unit.test.ts` 9/9 | SHIPPING |
+| 2026-11-18 | GAO candidates (prepare only) | Validated all **51** net-new candidates: citations, https URLs, publication dates ≥2001, agency present. **0 failures.** No served-JSON write. | `"validation_pass": 51` → `tasks/gao-candidates-validation-2026-11-18.json` | node validator against proposal JSON | PREPARE ONLY |
+
+---
+
 ## 2026-11-18 — Forecast currency release + Ask Mindy Map bridge
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
