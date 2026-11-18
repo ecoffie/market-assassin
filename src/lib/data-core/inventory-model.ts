@@ -349,6 +349,37 @@ export function mapSourceState(sourceState: string | null | undefined): Freshnes
   }
 }
 
+/**
+ * Display freshness for one control-plane instance — refuses false greens.
+ *
+ * Measured 2026-11-18: dibbs_dla_flat_files / sam_opportunities_sam_gov /
+ * grants_gov_api / forecast_dhs_apfs / forecast_doe_osbp all stored
+ * source_state=current with NULL last_verified_ingest AND last_data_advance
+ * while DIBBS sync was disabled. `current` without an advancement clock is
+ * UNKNOWN; a disabled producer can never read CURRENT (STALE at best).
+ *
+ * Distinguishes last-attempt (scheduleTruth / last_poll) from last-real-data
+ * (last_data_advance / last_verified_ingest) — this function only grants CURRENT
+ * when a data clock exists.
+ */
+export function honestInstanceState(input: {
+  sourceState: string | null | undefined;
+  lastVerifiedIngest?: string | null;
+  lastDataAdvance?: string | null;
+  producerEnabled?: boolean | null;
+}): FreshnessState {
+  if (input.producerEnabled === false) {
+    const base = mapSourceState(input.sourceState);
+    return base === 'CURRENT' ? 'STALE' : base;
+  }
+  const mapped = mapSourceState(input.sourceState);
+  if (mapped === 'CURRENT') {
+    const hasProof = Boolean(input.lastVerifiedIngest || input.lastDataAdvance);
+    if (!hasProof) return 'UNKNOWN';
+  }
+  return mapped;
+}
+
 const SEVERITY: FreshnessState[] = ['UNREACHABLE', 'STALE', 'UNKNOWN', 'CURRENT'];
 
 /** A multi-feed dataset is only as fresh as its worst feed — never averaged away. */

@@ -162,7 +162,7 @@ describe('opportunities: open / closed / awarded', () => {
     expect(opportunityStatus({ notice_type: 'Award Notice', response_deadline: null }, NOW)).toBe('awarded');
     expect(opportunityStatus({ notice_type: 'Solicitation', response_deadline: '2026-11-01T00:00:00Z' }, NOW)).toBe('closed');
     expect(opportunityStatus({ notice_type: 'Solicitation', response_deadline: '2026-12-01T00:00:00Z' }, NOW)).toBe('open');
-    expect(opportunityStatus({ notice_type: 'Sources Sought', response_deadline: null }, NOW)).toBe('open');
+    expect(opportunityStatus({ notice_type: 'Sources Sought', response_deadline: null }, NOW)).toBe('closed');
   });
 });
 
@@ -270,8 +270,8 @@ describe('closed opportunities: honest label, own sitemap child', () => {
     expect(opportunityStatus({ notice_type: 'Solicitation', response_deadline: '2027-01-01T00:00:00Z', active: false }, NOW)).toBe('closed');
     expect(opportunityStatus({ notice_type: 'Solicitation', response_deadline: null, active: false }, NOW)).toBe('closed');
     expect(opportunityStatus({ notice_type: 'Award Notice', response_deadline: null, active: false }, NOW)).toBe('awarded');
-    // `active` omitted keeps the old behaviour (callers that never read the column).
-    expect(opportunityStatus({ notice_type: 'Solicitation', response_deadline: null }, NOW)).toBe('open');
+    // Null deadline cannot claim open (active omitted or true) — unknown ≠ open.
+    expect(opportunityStatus({ notice_type: 'Solicitation', response_deadline: null }, NOW)).toBe('closed');
   });
 
   it('labels state only what the row establishes', () => {

@@ -224,11 +224,16 @@ export function opportunityStatus(
   if (o.response_deadline) {
     const d = new Date(o.response_deadline);
     if (!Number.isNaN(d.getTime()) && d.getTime() < now.getTime()) return 'closed';
+    if (!Number.isNaN(d.getTime()) && d.getTime() >= now.getTime()) {
+      // SAM archived it (active=false) — no longer accepting responses even if the deadline is
+      // still in the future (cancelled / archived early). Never call an archived notice open.
+      if (o.active === false) return 'closed';
+      return 'open';
+    }
   }
-  // SAM archived it (active=false) — no longer accepting responses even if the deadline field is
-  // empty or still in the future (cancelled / archived early). Never call an archived notice open.
+  // No usable deadline: cannot claim open (active=true + null deadline is unknown, not open).
   if (o.active === false) return 'closed';
-  return 'open';
+  return 'closed';
 }
 
 function fmtUtcDate(iso: string | null | undefined): string | null {

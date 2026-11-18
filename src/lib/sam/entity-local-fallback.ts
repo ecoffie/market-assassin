@@ -33,6 +33,7 @@ import { createClient } from '@supabase/supabase-js';
 import { legalNameIlikePattern } from '@/lib/contractor/legal-name-stem';
 import type { SAMEntity } from './entity-api';
 import { CERT_PROGRAMS, certFlag, type CertProgram, type CertificationRecord } from './certification-status';
+import { deriveRegistrationStatus } from './registration-status';
 
 export interface LocalEntityHit {
   entity: SAMEntity;
@@ -143,9 +144,13 @@ function toSamEntity(r: Record<string, unknown>): SAMEntity {
     cageCode: str(r.cage_code),
     legalBusinessName: str(r.legal_business_name),
     dbaName: str(r.dba_name) || undefined,
-    // Honest provenance: this is the status AS OF `synced_at`, not a live re-check. The
-    // caller receives `as_of` alongside it and must present it that way.
-    registrationStatus: str(r.registration_status) || 'Unknown',
+    // Honest provenance: derived from registration_expiry when present, so an
+    // Active flag with a past expiry never reads Active (157k-row class, 2026-11-18).
+    // Still AS OF `synced_at` — the caller receives `as_of` alongside it.
+    registrationStatus: deriveRegistrationStatus(
+      str(r.registration_status) || null,
+      str(r.registration_expiry) || null,
+    ),
     registrationExpirationDate: str(r.registration_expiry) || undefined,
     ...(typeof r.exclusion_flag === 'boolean' ? { hasExclusions: r.exclusion_flag } : {}),
     physicalAddress: {
