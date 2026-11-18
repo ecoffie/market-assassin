@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-18 — GAO reinjection and events prune-report
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | GAO merge guard + events prune log | #2165 (merge `b4d275843`) already skips `gao_high_risk`, refuses `--merge` on a `(Source: GAO)` leak, and returns 500 when the prune-report insert fails. This row locks that code with a regression test after rebasing off the duplicate edit. Prune stays report-only unless `SAM_EVENTS_PRUNE=apply`. The 278 served strings, the 51 replacements, and the 53 event ids are not changed. Decision-pack files from #2165 stay documentation; they are not a data write. | `REFUSED: converted set still contains "(Source: GAO)" pain points.` → `scripts/merge-agency-intelligence.js` · `prune report not recorded:` → `src/app/api/cron/extract-sam-events/route.ts` | `gao-events-safeguards.unit.test.ts` against main's #2165 code. No pain-point JSON edit. No event delete. | BUILT, NOT MERGED |
+
 ## 2026-11-18 — Forecast currency release + Ask Mindy Map bridge
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
