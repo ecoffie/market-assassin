@@ -72,7 +72,7 @@ export function trialOfferForCard(planName: string, me: MePlan | null, offers: T
   return offers.find((o) => o.tier === me) ?? null;
 }
 
-/** "Upgrade now, get +500 credits" on the current-plan card, with a confirm step. */
+/** "Upgrade now, get the 1,000-credit upgrade bonus" on the current-plan card, with a confirm step. */
 function TrialUpgradeBox({ offer, email, token, onDone }: {
   offer: TrialUpgradeOffer; email: string; token: string; onDone: () => void;
 }) {

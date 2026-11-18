@@ -8,6 +8,7 @@
  * "don't allow them to x out of it"). Solid brand blue + white text: the strongest thing on the page.
  */
 import { Sparkles } from 'lucide-react';
+import { UPGRADE_BONUS_CREDITS } from '@/lib/mcp/packages';
 
 /**
  * The existing Pro trial checkout hop (/checkout/<product> records first-party attribution and
@@ -26,6 +27,8 @@ export default function TrialOfferBanner() {
       <span className="min-w-[220px] flex-1">
         <span className="block text-base font-bold leading-snug">Try Mindy Pro free for 14 days</span>
         <span className="block text-sm text-white">AI briefings, recompetes 12 months out, full market research and the proposal editor. $0 today, cancel anytime.</span>
+        {/* Upgrade incentive (owner 2026-11-18): the bonus lands on their first payment. */}
+        <span className="block text-sm font-semibold text-white" data-testid="trial-banner-bonus">+ {UPGRADE_BONUS_CREDITS.toLocaleString('en-US')} bonus Mindy credits when you upgrade</span>
       </span>
       <span className="h-10 px-5 rounded-lg bg-white text-[#005ee0] text-sm font-bold inline-flex items-center gap-1.5 shadow-sm group-hover:bg-[#eff5ff]">
         Start free trial <span aria-hidden>→</span>

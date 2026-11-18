@@ -59,13 +59,13 @@ describe('upgradeTrialNow', () => {
   it('ends the trial now, with no proration, refusing to leave an unpaid invoice, and stamps the flag', async () => {
     const { stripe, update } = fakeStripe(sub());
     const r = await upgradeTrialNow(stripe, ['me@x.com'], 'sub_abc', new Date(120_000));
-    expect(r).toMatchObject({ ok: true, status: 'upgraded', amountCharged: 149, bonusCredits: 500 });
+    expect(r).toMatchObject({ ok: true, status: 'upgraded', amountCharged: 149, bonusCredits: 1000 });
     expect(update).toHaveBeenCalledTimes(1);
     const [id, params, options] = update.mock.calls[0] as unknown as [string, Record<string, unknown>, Record<string, unknown>];
     expect(id).toBe('sub_abc');
     expect(params).toMatchObject({
       trial_end: 'now', proration_behavior: 'none', payment_behavior: 'error_if_incomplete',
-      metadata: { [EARLY_UPGRADE_FLAG]: '500' },
+      metadata: { [EARLY_UPGRADE_FLAG]: '1000' },
     });
     expect(options).toEqual({ idempotencyKey: trialUpgradeIdempotencyKey('sub_abc', new Date(120_000)) });
   });

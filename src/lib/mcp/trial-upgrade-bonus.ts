@@ -1,39 +1,42 @@
 /**
- * "Upgrade now, get +500 credits" — the GRANT side (owner, 2026-11-13).
+ * The upgrade bonus — the GRANT side.
  *
- * A Pro/Team subscriber in a 14-day card trial can end the trial early and pay today
- * (POST /api/app/billing/trial-upgrade). That endpoint stamps the subscription with
- * `metadata.early_upgrade_bonus` IN THE SAME Stripe update that ends the trial. Nothing is
- * granted there: the bonus is granted HERE, from `invoice.paid`, because the paid invoice is
- * the only proof the customer actually paid.
+ * Owner, 2026-11-18: "give the free members incentive to upgrade, 1000 credits — give the trial
+ * members the same incentive." (Was: +500 only for ending a trial early, 2026-11-13.)
  *
- *   - no paid invoice (card declined)  → no `invoice.paid` → no bonus
- *   - $0 invoice                        → not a payment → no bonus
- *   - Stripe redelivery / a later renewal invoice on the same flagged subscription
- *                                       → same key `trial_upgrade_bonus:<sub_id>` → no-op
+ * Rule: UPGRADE_BONUS_CREDITS (1,000), ONCE PER PERSON, on their FIRST paid Pro/Team payment:
+ *   - a free member who upgrades and pays          → subscription_create
+ *   - a trial that ends early ("Upgrade now")       → subscription_update
+ *   - a trial that converts on its own at day 14    → subscription_cycle
+ * Never on a renewal: a person with an EARLIER paid invoice already made their first payment.
  *
- * The amount is the server constant TRIAL_UPGRADE_BONUS_CREDITS, never the metadata value
- * (metadata only says "this subscription was upgraded early").
+ * Granted only from `invoice.paid` with money actually paid:
+ *   - card declined → no invoice.paid → no bonus
+ *   - $0 invoice    → not a payment → no bonus
+ *   - redelivery    → same key `upgrade_bonus:<email>` → no-op
  *
  * ⚠️ The bonus is a PERSONAL grant to the invoice's email. For a Team whose calls bill an
  * organization POOL, personal credits are not spent by pooled calls (payer.ts never crosses
- * payers). There is no fixed-amount pool grant RPC today, so a pooled Team owner's bonus sits
- * on their personal balance. Recorded as a known bound.
+ * payers). Recorded as a known bound.
+ * ⚠️ "First payment" is checked on the paying Stripe customer. A long-time subscriber who comes
+ * back on a NEW Stripe customer record looks like a first payment; the per-email key still caps
+ * that at one bonus ever.
  */
 import type Stripe from 'stripe';
 import { applyCreditOnce } from './credits';
-import { TRIAL_UPGRADE_BONUS_CREDITS } from './packages';
+import { UPGRADE_BONUS_CREDITS } from './packages';
 import { subscriptionIdFromInvoice } from './team-pools';
-import { resolveInvoiceEmail } from './app-tier-subscription';
+import { resolveInvoiceEmail, appTierForAmount } from './app-tier-subscription';
 import { getStripe } from '@/lib/stripe';
 
 /** Subscription metadata key set by the trial-upgrade endpoint. */
 export const EARLY_UPGRADE_FLAG = 'early_upgrade_bonus';
-/** Ledger reason (classified in grant-reasons.ts). */
-export const TRIAL_UPGRADE_BONUS_REASON = 'trial_upgrade_bonus';
+/** Ledger reason (classified in grant-reasons.ts). The old per-subscription +500 used 'trial_upgrade_bonus'. */
+export const UPGRADE_BONUS_REASON = 'upgrade_bonus';
 
-export function trialUpgradeBonusKey(subscriptionId: string): string {
-  return `trial_upgrade_bonus:${subscriptionId}`;
+/** Once per person, ever. */
+export function upgradeBonusKey(email: string): string {
+  return `upgrade_bonus:${email.trim().toLowerCase()}`;
 }
 
 /** True when subscription metadata carries the early-upgrade flag. */
@@ -43,13 +46,14 @@ export function hasEarlyUpgradeFlag(metadata: Record<string, string> | null | un
 }
 
 export interface TrialUpgradeBonusOutcome {
-  handled: boolean;      // false => not an early-upgrade paid invoice
+  handled: boolean;      // false => not a paid Pro/Team invoice
   applied?: boolean;     // true => granted now; false => already granted for this subscription
   credits?: number;
   email?: string;
   subscriptionId?: string;
   newBalance?: number;
   error?: string;        // permanent problem (e.g. no email) — logged, not retried
+  skipped?: 'not_first_payment';
 }
 
 /** The invoice's snapshot of subscription metadata, when Stripe included one. */
@@ -64,13 +68,31 @@ function invoiceSubscriptionMetadata(invoice: Stripe.Invoice): Record<string, st
 export interface TrialUpgradeBonusDeps {
   retrieveSubscriptionMetadata?: (id: string) => Promise<Record<string, string>>;
   resolveEmail?: (invoice: Stripe.Invoice) => Promise<string | null>;
+  /** True when this customer has a paid invoice (money paid) other than this one, created no later. */
+  hasEarlierPaidInvoice?: (invoice: Stripe.Invoice) => Promise<boolean>;
   apply?: typeof applyCreditOnce;
 }
 
+/** The Pro/Team price on the invoice's first line, else the amount paid. */
+function invoiceTier(invoice: Stripe.Invoice): 'pro' | 'team' | null {
+  const line = invoice.lines?.data?.[0] as unknown as { price?: { unit_amount?: number | null } } | undefined;
+  return appTierForAmount(line?.price?.unit_amount ?? null) ?? appTierForAmount(invoice.amount_paid ?? null);
+}
+
+async function stripeHasEarlierPaidInvoice(invoice: Stripe.Invoice): Promise<boolean> {
+  const customer = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
+  if (!customer) return false;
+  for await (const inv of getStripe().invoices.list({ customer, status: 'paid', limit: 100 })) {
+    if (inv.id === invoice.id) continue;
+    if ((inv.amount_paid ?? 0) > 0 && (inv.created ?? 0) <= (invoice.created ?? Number.MAX_SAFE_INTEGER)) return true;
+  }
+  return false;
+}
+
 /**
- * Grant the early-upgrade bonus for a PAID invoice. Throws on a transient failure (Stripe
- * read or the ledger write) so the webhook can return 500 and Stripe retries; the grant is
- * idempotent, so a retry can never double-grant.
+ * Grant the upgrade bonus for a PAID invoice that is the person's first Pro/Team payment.
+ * Throws on a transient failure (Stripe read or the ledger write) so the webhook returns 500
+ * and Stripe retries; the grant is idempotent, so a retry can never double-grant.
  */
 export async function handleTrialUpgradeBonusInvoice(
   invoice: Stripe.Invoice,
@@ -81,26 +103,30 @@ export async function handleTrialUpgradeBonusInvoice(
   const subscriptionId = subscriptionIdFromInvoice(invoice);
   if (!subscriptionId) return { handled: false };
 
-  // The invoice usually carries the subscription's metadata. When it doesn't — or when this
-  // is the subscription_update invoice that ending a trial creates — read the subscription.
-  let metadata = invoiceSubscriptionMetadata(invoice);
-  if (!hasEarlyUpgradeFlag(metadata) && (metadata === undefined || invoice.billing_reason === 'subscription_update')) {
-    const retrieve = deps.retrieveSubscriptionMetadata
-      ?? (async (id: string) => (await getStripe().subscriptions.retrieve(id)).metadata ?? {});
-    metadata = await retrieve(subscriptionId);
+  // A Pro/Team invoice: by price, or (an early-upgrade invoice whose line is unusual) by the flag.
+  if (!invoiceTier(invoice)) {
+    let metadata = invoiceSubscriptionMetadata(invoice);
+    if (!hasEarlyUpgradeFlag(metadata)) {
+      const retrieve = deps.retrieveSubscriptionMetadata
+        ?? (async (id: string) => (await getStripe().subscriptions.retrieve(id)).metadata ?? {});
+      metadata = await retrieve(subscriptionId);
+    }
+    if (!hasEarlyUpgradeFlag(metadata)) return { handled: false };
   }
-  if (!hasEarlyUpgradeFlag(metadata)) return { handled: false };
 
   const email = await (deps.resolveEmail ?? resolveInvoiceEmail)(invoice);
   if (!email) {
-    console.error('[trial-upgrade-bonus] no email on invoice', invoice.id);
+    console.error('[upgrade-bonus] no email on invoice', invoice.id);
     return { handled: true, subscriptionId, error: 'no_email' };
   }
 
+  // Renewals never qualify: an earlier paid invoice means the first payment already happened.
+  if (await (deps.hasEarlierPaidInvoice ?? stripeHasEarlierPaidInvoice)(invoice)) {
+    return { handled: true, subscriptionId, email, skipped: 'not_first_payment' };
+  }
+
   const apply = deps.apply ?? applyCreditOnce;
-  const { applied, newBalance } = await apply(
-    trialUpgradeBonusKey(subscriptionId), email, TRIAL_UPGRADE_BONUS_CREDITS, 'trial_upgrade_bonus',
-  );
-  console.log(`[trial-upgrade-bonus] ${email} +${TRIAL_UPGRADE_BONUS_CREDITS} (applied=${applied}, balance=${newBalance}) sub ${subscriptionId} invoice ${invoice.id}`);
-  return { handled: true, applied, credits: TRIAL_UPGRADE_BONUS_CREDITS, email, subscriptionId, newBalance };
+  const { applied, newBalance } = await apply(upgradeBonusKey(email), email, UPGRADE_BONUS_CREDITS, UPGRADE_BONUS_REASON);
+  console.log(`[upgrade-bonus] ${email} +${UPGRADE_BONUS_CREDITS} (applied=${applied}, balance=${newBalance}) sub ${subscriptionId} invoice ${invoice.id}`);
+  return { handled: true, applied, credits: UPGRADE_BONUS_CREDITS, email, subscriptionId, newBalance };
 }

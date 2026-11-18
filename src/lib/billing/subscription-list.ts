@@ -30,7 +30,7 @@ export interface SubscriptionRow {
   /** The email whose Stripe customer holds this plan (the portal must open on it). */
   billedTo: string;
   /**
-   * A live Pro/Team trial that can take the "Upgrade now, get +500 credits" offer
+   * A live Pro/Team trial that can take the "Upgrade now, get the 1,000-credit upgrade bonus" offer
    * (POST /api/app/billing/trial-upgrade re-checks everything server-side).
    */
   trialUpgradeEligible: boolean;

@@ -1,5 +1,5 @@
 /**
- * "Upgrade now, get +500 credits" — the CHARGE side (owner, 2026-11-13).
+ * "Upgrade now, get the 1,000-credit upgrade bonus" — the CHARGE side (owner, 2026-11-13).
  *
  * Ends the caller's own Pro/Team Stripe trial now so the first invoice is charged today. The
  * bonus is NOT granted here: this only stamps `metadata.early_upgrade_bonus` in the same Stripe

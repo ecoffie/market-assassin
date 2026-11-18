@@ -51,7 +51,7 @@ export default function SubscriptionsCard({ email, upgradeHref = '/pricing' }: {
   const [failed, setFailed] = useState(false);
   const [opening, setOpening] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  // "Upgrade now, get +500 credits": confirm step, then POST; refresh the list after.
+  // "Upgrade now, get the 1,000-credit upgrade bonus": confirm step, then POST; refresh the list after.
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [upgrading, setUpgrading] = useState<string | null>(null);
   const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);

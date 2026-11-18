@@ -12,9 +12,9 @@ describe('trial upgrade copy', () => {
     expect(formatPlanPrice(335.58, 'month')).toBe('$335.58/mo');
   });
 
-  it('title and success text name the 500 credits', () => {
-    expect(TRIAL_UPGRADE_TITLE).toBe('Upgrade now and get 500 bonus credits');
-    expect(TRIAL_UPGRADE_SUCCESS_TEXT).toBe('Upgraded — 500 bonus credits will be added once payment clears.');
+  it('title and success text name the 1,000 credits', () => {
+    expect(TRIAL_UPGRADE_TITLE).toBe('Upgrade now and get 1,000 bonus credits');
+    expect(TRIAL_UPGRADE_SUCCESS_TEXT).toBe('Upgraded — 1,000 bonus credits will be added once payment clears.');
   });
 });
 
