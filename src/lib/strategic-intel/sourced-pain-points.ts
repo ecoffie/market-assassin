@@ -54,13 +54,15 @@ export interface AgencyIntelligenceBundle {
   legacy: SourcedPainPoint[];
   /** Sourced first, then legacy — never merged into one provenance class. */
   painPoints: SourcedPainPoint[];
-  /** Legacy priorities only (no living priority pipeline yet). */
+  /** Live agency_priorities_db when that table has rows; otherwise the fixed file. */
   priorities: SourcedPainPoint[];
   meta: {
     sourcedCount: number;
     legacyCount: number;
     legacyPriorityCount: number;
     provenanceAvailable: boolean;
+    /** Which store `priorities` came from. legacyPriorityCount stays the file count so sort inputs that use it do not move. */
+    priorityBasis?: 'live_table' | 'static_file' | 'static_file_live_unmeasured';
   };
 }
 
@@ -341,11 +343,62 @@ export function loadLegacyPainPointsForAgency(agencyQuery: string, limit = 50): 
 /**
  * THE shared customer read: sourced-first, legacy-fallback, distinguishable.
  */
+export function choosePriorities(
+  table: 'empty' | 'unmeasured' | 'ready',
+  live: SourcedPainPoint[],
+  legacy: SourcedPainPoint[],
+): { priorities: SourcedPainPoint[]; priorityBasis: 'live_table' | 'static_file' | 'static_file_live_unmeasured' } {
+  if (table === 'ready') return { priorities: live, priorityBasis: 'live_table' };
+  if (table === 'unmeasured') return { priorities: legacy, priorityBasis: 'static_file_live_unmeasured' };
+  return { priorities: legacy, priorityBasis: 'static_file' };
+}
+
+async function probePriorityTable(
+  client: SupabaseClient,
+  agencyKeys: string[],
+): Promise<{ table: 'empty' | 'unmeasured' | 'ready'; rows: SourcedPainPoint[] }> {
+  try {
+    const { count, error } = await client.from('agency_priorities_db').select('id', { count: 'exact', head: true });
+    if (error || count == null) return { table: 'unmeasured', rows: [] };
+    if (count === 0) return { table: 'empty', rows: [] };
+    const { data, error: readError } = await client.from('agency_priorities_db')
+      .select('agency, priority_description, source_url, fiscal_year')
+      .in('agency', agencyKeys.length ? agencyKeys : ['__none__'])
+      .limit(40);
+    if (readError) return { table: 'unmeasured', rows: [] };
+    const rows: SourcedPainPoint[] = [];
+    for (const row of (data ?? []) as Array<Record<string, unknown>>) {
+      const text = typeof row.priority_description === 'string' ? row.priority_description.trim() : '';
+      const sourceUrl = typeof row.source_url === 'string' ? row.source_url : null;
+      if (!text || !sourceUrl) continue;
+      rows.push({
+        agency: String(row.agency ?? ''),
+        pain_point: text,
+        source_type: 'other',
+        source_url: sourceUrl,
+        document_number: null,
+        published_at: null,
+        institute_source_id: null,
+        provenance: 'SOURCE_FACT',
+        legacy_source_tag: null,
+      });
+    }
+    return { table: 'ready', rows };
+  } catch {
+    return { table: 'unmeasured', rows: [] };
+  }
+}
+
 export async function getAgencySourcedIntelligence(
   agencyQuery: string,
-  opts: { client?: SupabaseClient; sourcedLimit?: number; legacyLimit?: number } = {},
+  opts: {
+    client?: SupabaseClient;
+    sourcedLimit?: number;
+    legacyLimit?: number;
+    priorityProbe?: () => Promise<{ table: 'empty' | 'unmeasured' | 'ready'; rows: SourcedPainPoint[] }>;
+  } = {},
 ): Promise<AgencyIntelligenceBundle> {
-  const { canonical } = resolveAgencyQuery(agencyQuery);
+  const { canonical, searchKeys } = resolveAgencyQuery(agencyQuery);
   let sourced: SourcedPainPoint[] = [];
   try {
     sourced = await loadSourcedPainPointsForAgency(agencyQuery, {
@@ -360,6 +413,18 @@ export async function getAgencySourcedIntelligence(
 
   const legacyBundle = loadLegacyPainPointsForAgency(agencyQuery, opts.legacyLimit ?? 50);
   const legacy = dedupeLegacyAgainstSourced(sourced, legacyBundle.painPoints);
+  let priorityBasis: AgencyIntelligenceBundle['meta']['priorityBasis'] = 'static_file_live_unmeasured';
+  let priorities = legacyBundle.priorities;
+  try {
+    const probe = opts.priorityProbe
+      ? await opts.priorityProbe()
+      : await probePriorityTable(opts.client ?? sb(), searchKeys);
+    const chosen = choosePriorities(probe.table, probe.rows, legacyBundle.priorities);
+    priorities = chosen.priorities;
+    priorityBasis = chosen.priorityBasis;
+  } catch (err) {
+    console.error('[sourced-pain-points] priority table read failed:', err);
+  }
 
   return {
     agency: agencyQuery,
@@ -367,18 +432,24 @@ export async function getAgencySourcedIntelligence(
     sourced,
     legacy,
     painPoints: [...sourced, ...legacy],
-    priorities: legacyBundle.priorities,
+    priorities,
     meta: {
       sourcedCount: sourced.length,
       legacyCount: legacy.length,
       legacyPriorityCount: legacyBundle.priorities.length,
       provenanceAvailable: sourced.length > 0,
+      priorityBasis,
     },
   };
 }
 
 /** Display helper: string list for surfaces that still need strings, with provenance suffix. */
 export function formatPainPointForDisplay(p: SourcedPainPoint): string {
+  if (p.provenance === 'SOURCE_FACT' && p.source_url && !p.document_number) {
+    let host = 'source';
+    try { host = new URL(p.source_url).host; } catch { /* keep the generic label */ }
+    return `${p.pain_point} (Source: ${host})`;
+  }
   if (p.provenance === 'SOURCE_FACT' && p.document_number && p.source_url) {
     // Claim already carries (Source: GAO-…) from derive; ensure provenance is visible.
     return p.pain_point.includes(p.document_number)

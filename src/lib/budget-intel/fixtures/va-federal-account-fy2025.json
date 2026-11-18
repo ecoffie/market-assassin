@@ -1,0 +1,21 @@
+{
+  "toptier_code": "036",
+  "fiscal_year": 2025,
+  "page_metadata": { "page": 1, "total": 43, "limit": 10, "next": 2, "previous": null, "hasNext": true, "hasPrevious": false },
+  "results": [
+    {
+      "code": "036-0102",
+      "name": "Compensation and Pensions, Veterans Benefits Administration, Veterans Affairs",
+      "obligated_amount": 203144226696.96,
+      "gross_outlay_amount": 201510355302.63,
+      "children": [
+        {
+          "name": "Compensation and Pensions, Veterans Benefits Administration, Veterans Affairs",
+          "code": "036-X-0102-000",
+          "obligated_amount": 203144226696.96,
+          "gross_outlay_amount": 201510355302.63
+        }
+      ]
+    }
+  ]
+}

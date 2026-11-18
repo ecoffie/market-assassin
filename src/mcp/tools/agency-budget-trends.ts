@@ -12,6 +12,7 @@
 import budgetData from '@/data/agency-budget-data.json';
 import agencyAliases from '@/data/agency-aliases.json';
 import { mcpFlags } from '@/lib/mcp/flags';
+import { decideAuthorityDisplay, probeLiveAuthority, type FileAuthority } from '@/lib/budget-intel/read';
 
 export interface AgencyBudgetTrendsInput {
   /** Agency name or abbreviation, e.g. "VA", "Department of Defense", "NASA". */
@@ -37,6 +38,13 @@ export interface AgencyBudgetTrendsResult {
   trend: string | null;
   source: string;
   last_updated: string;
+  /** Which store the numbers came from. */
+  shown?: 'live_table' | 'static_file';
+  shown_reason?: string;
+  /** Percent change. -18.3 means down 18.3%. change_percent stays a ratio. */
+  change_percent_points?: number | null;
+  source_url?: string | null;
+  fetched_at?: string | null;
   /** Close name matches when no exact hit. */
   candidates: string[];
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
@@ -78,7 +86,7 @@ function usd(n: number): string {
   return b >= 1 ? `$${b.toFixed(1)}B` : `$${(n / 1e6).toFixed(0)}M`;
 }
 
-export function getAgencyBudgetTrends(input: AgencyBudgetTrendsInput): AgencyBudgetTrendsResult {
+export function getAgencyBudgetTrendsFromFile(input: AgencyBudgetTrendsInput): AgencyBudgetTrendsResult {
   const raw = (input.agency || '').trim();
   const base: Omit<AgencyBudgetTrendsResult, '_meta' | 'candidates'> = {
     agency: null,
@@ -183,4 +191,73 @@ export function getAgencyBudgetTrends(input: AgencyBudgetTrendsInput): AgencyBud
     };
   }
   return result;
+}
+
+export async function getAgencyBudgetTrends(input: AgencyBudgetTrendsInput): Promise<AgencyBudgetTrendsResult> {
+  const file = getAgencyBudgetTrendsFromFile(input);
+  const names = [file.agency, input.agency].filter((name): name is string => !!name && name.trim().length > 0);
+  const probe = await probeLiveAuthority(names);
+  const fileAuthority: FileAuthority | null = file._meta.grounded && file.agency ? {
+    agency: file.agency,
+    toptierCode: file.toptier_code,
+    fy2025: file.fy2025_budget_authority,
+    fy2026: file.fy2026_budget_authority,
+    changeAmount: file.change_amount,
+    changeRatio: file.change_percent,
+    trend: file.trend,
+  } : null;
+  const decided = decideAuthorityDisplay({
+    table: probe.table,
+    live: probe.live,
+    file: fileAuthority,
+    fileSource: file.source,
+  });
+  if (decided.shown === 'static_file') {
+    return {
+      ...file,
+      shown: 'static_file',
+      shown_reason: decided.shown_reason,
+      change_percent_points: decided.change_percent_points,
+      source_url: null,
+      fetched_at: null,
+    };
+  }
+  return {
+    ...file,
+    agency: decided.agency,
+    toptier_code: decided.toptier_code,
+    fiscal_years: decided.fiscal_years.length ? decided.fiscal_years : file.fiscal_years,
+    fy2025_budget_authority: decided.fy2025_budget_authority,
+    fy2026_budget_authority: decided.fy2026_budget_authority,
+    change_amount: decided.change_amount,
+    change_percent: decided.change_percent,
+    change_percent_points: decided.change_percent_points,
+    trend: decided.trend,
+    source: decided.source,
+    last_updated: decided.fetched_at ?? '',
+    shown: 'live_table',
+    shown_reason: decided.shown_reason,
+    source_url: decided.source_url,
+    fetched_at: decided.fetched_at,
+    candidates: [],
+    _meta: {
+      grounded: decided.grounded,
+      degraded: probe.table === 'unmeasured',
+      trend: decided.trend,
+      match_type: decided.grounded ? (file._meta.match_type === 'none' ? 'exact' : file._meta.match_type) : 'none',
+      ...(file._meta.note ? { note: file._meta.note } : {}),
+    },
+    ...(file._ai_hint ? {
+      _ai_hint: {
+        ...file._ai_hint,
+        summary: decided.grounded
+          ? `${decided.agency}: live USASpending budgetary resources, trend ${decided.trend ?? 'unknown'}.`
+          : 'This agency is not in the live budget table. The fixed file is not substituted once that table has rows.',
+        key_caveats: [
+          'Live figures are USASpending agency budgetary resources, not the fixed OMB discretionary file.',
+          'change_percent is a ratio (1.05 = +5%). change_percent_points is the percent change.',
+        ],
+      },
+    } : {}),
+  };
 }

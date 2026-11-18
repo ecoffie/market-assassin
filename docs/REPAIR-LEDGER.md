@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-18 — Budget tables acquire from USASpending
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | Budget authority / programs / priorities | The four budget tables were empty and customer budget figures came from `agency-budget-data.json`. One cron slice now upserts USASpending budgetary resources and one page of federal accounts into the existing tables (source URL, fiscal year, fetched date, stable source key, no deletes). performance.gov is read for structured objectives only. A live row replaces the fixed file only for that agency and fiscal year (`usaspending_live`); every other year stays on the file (`static_file`, as-of date). Migration `20261118_budget_intel_usaspending_acquire.sql` is not applied. | `export function buildBudgetSlice` → `src/lib/budget-intel/slice.ts` | `budget-intel.unit.test.ts` with recorded USASpending fixtures. Live dry run writes nothing. | BUILT, NOT MERGED |
+
 ## 2026-11-18 — DIBBS clock stamp checks the Supabase error
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
