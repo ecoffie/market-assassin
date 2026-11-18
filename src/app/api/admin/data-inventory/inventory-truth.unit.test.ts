@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { COLLECTOR_ROUTE_TO_JOB } from './route';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -347,7 +348,19 @@ describe('Data Core inventory truth', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const jobsSeen = new Set(body.datasets.flatMap((d: any) => (d.freshness.schedules ?? []).map((s: any) => s.job)));
     const SRC = readFileSync(join(__dirname, 'route.ts'), 'utf8');
-    const missing = collectors.filter((n) => !jobsSeen.has(n) && !new RegExp(`'${n}(-[a-z]+)?'`).test(SRC));
+    const alias = COLLECTOR_ROUTE_TO_JOB as Record<string, string>;
+    const missing = collectors.filter((n) => {
+      if (jobsSeen.has(n)) return false;
+      // A renamed route counts only when its real cron_jobs name is on a dataset.
+      if (alias[n]) return !jobsSeen.has(alias[n]);
+      // Suffix form still counts: 'sync-sam-opportunities-full' covers that directory.
+      if (new RegExp(`'${n}(-[a-z]+)?'`).test(SRC)) return false;
+      return true;
+    });
     expect(missing, 'collector crons with no inventory row').toEqual([]);
+    for (const [route, job] of Object.entries(COLLECTOR_ROUTE_TO_JOB)) {
+      expect(collectors, `${route} is not a collector directory`).toContain(route);
+      expect(jobsSeen.has(job), `${route} aliases ${job}, which is not on a dataset schedule`).toBe(true);
+    }
   });
 });
