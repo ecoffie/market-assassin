@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { acquisitionWindow, latencySummary } from '../../scripts/acquisition-scorecard.mjs';
+import { acquisitionWindow, applyEnvFile, latencySummary } from '../../scripts/acquisition-scorecard.mjs';
 
 describe('acquisitionWindow', () => {
   it('is seven UTC days ending the day after the given instant', () => {
@@ -13,6 +13,15 @@ describe('acquisitionWindow', () => {
     expect(w.days).toBe(7);
     expect(w.end).toBe('2026-11-19T00:00:00.000Z');
     expect(w.start).toBe('2026-11-12T00:00:00.000Z');
+  });
+});
+
+describe('applyEnvFile', () => {
+  it('reads a service-role style file and does not override an existing value', () => {
+    const env = { SUPABASE_SERVICE_ROLE_KEY: 'already' };
+    applyEnvFile('NEXT_PUBLIC_SUPABASE_URL="https://example.supabase.co"\nSUPABASE_SERVICE_ROLE_KEY=from-file\n# comment\n', env);
+    expect(env.NEXT_PUBLIC_SUPABASE_URL).toBe('https://example.supabase.co');
+    expect(env.SUPABASE_SERVICE_ROLE_KEY).toBe('already');
   });
 });
 
@@ -32,11 +41,19 @@ describe('latencySummary', () => {
 describe('the script stays read-only', () => {
   const src = readFileSync(join(process.cwd(), 'scripts/acquisition-scorecard.mjs'), 'utf8');
 
-  it('has no insert, update, or delete', () => {
+  it('has no insert, update, delete, upsert, or rpc, and only GETs PostgREST', () => {
     expect(src).not.toMatch(/\.insert\(/);
     expect(src).not.toMatch(/\.update\(/);
     expect(src).not.toMatch(/\.delete\(/);
     expect(src).not.toMatch(/\.upsert\(/);
+    expect(src).not.toMatch(/\.rpc\(/);
+    expect(src).not.toMatch(/from '@supabase\//);
+    expect(src).not.toMatch(/from 'dotenv'/);
+    expect(src).toContain("method: 'GET'");
+    expect(src).toContain('/rest/v1/');
+    expect(src).not.toMatch(/method:\s*'POST'/);
+    expect(src).not.toMatch(/method:\s*'PATCH'/);
+    expect(src).not.toMatch(/method:\s*'DELETE'/);
   });
 
   it('says unknown instead of zero when a count cannot be made', () => {

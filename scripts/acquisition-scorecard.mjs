@@ -1,24 +1,18 @@
 /**
  * READ-ONLY seven-day acquisition scorecard.
  *
- * Counts genuinely new rows (created in the window) separately from rows that
- * were only re-touched (synced_at / last_seen_at). A "material change" is
- * counted only when the table has a source field that is not our write clock
- * (SAM last_modified, forecast updated_at). Otherwise the cell is unknown.
- *
- * Does not insert, update, delete, or call a sync route.
- *
- *   node scripts/acquisition-scorecard.mjs
+ * Run from a checkout, no app server and no extra runner:
  *   node scripts/acquisition-scorecard.mjs --json
  *
- * Needs NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (vercel env pull
- * .env.local). Without them the script prints unknown for every count and
- * exits 2. It does not invent zeros.
+ * Reads NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY
+ * from the environment or from .env.local in the current directory. Every
+ * database call is HTTP GET against PostgREST (/rest/v1). No insert, update,
+ * delete, upsert, or RPC.
+ *
+ * Without those two values it prints unknown for every count and exits 2.
+ * Unknown is not zero.
  */
-import dotenv from 'dotenv';
-import { createClient } from '@supabase/supabase-js';
-
-dotenv.config({ path: '.env.local', quiet: true });
+import { existsSync, readFileSync } from 'node:fs';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -35,9 +29,7 @@ export function percentile(sorted, p) {
   return sorted[idx];
 }
 
-/**
- * @param {number[]} hours latency samples, already finite
- */
+/** @param {number[]} hours */
 export function latencySummary(hours) {
   if (!hours.length) return { medianHours: null, p90Hours: null, sample: 0 };
   const sorted = [...hours].sort((a, b) => a - b);
@@ -46,6 +38,28 @@ export function latencySummary(hours) {
     p90Hours: Math.round(percentile(sorted, 90) * 10) / 10,
     sample: sorted.length,
   };
+}
+
+/** Fill missing keys from .env.local. Never overrides a value already in the environment. */
+export function applyEnvFile(text, env = process.env) {
+  for (const line of String(text).split('\n')) {
+    const t = line.trim();
+    if (!t || t.startsWith('#')) continue;
+    const i = t.indexOf('=');
+    if (i < 1) continue;
+    const k = t.slice(0, i).trim();
+    let v = t.slice(i + 1).trim();
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+    if (env[k] == null || env[k] === '') env[k] = v;
+  }
+  return env;
+}
+
+function loadCredentials() {
+  if (existsSync('.env.local')) applyEnvFile(readFileSync('.env.local', 'utf8'));
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  return { url: url.replace(/\/$/, ''), key };
 }
 
 const SOURCES = [
@@ -81,7 +95,7 @@ const SOURCES = [
     material: null,
     published: null,
     customer: 'get_sba_goaling_share reads sba_goaling',
-    note: 'Annual scorecard snapshot. No daily collector. New-in-7d is unknown unless a created_at exists.',
+    note: 'Annual scorecard snapshot. No daily collector.',
   },
   {
     key: 'agency_forecasts',
@@ -103,7 +117,7 @@ const SOURCES = [
     touched: 'synced_at',
     material: null,
     published: null,
-    customer: '/api/app/dibbs reads dibbs_rfqs. Collection is disabled; do not treat a touch as new.',
+    customer: '/api/app/dibbs reads dibbs_rfqs. Collection stays disabled; a touch is not a new RFQ.',
   },
   {
     key: 'dod_sbir_topics',
@@ -133,116 +147,161 @@ function unknown(reason) {
   return { value: null, status: 'unknown', reason };
 }
 
-async function countWhere(sb, table, column, start, end) {
-  let q = sb.from(table).select(column, { count: 'exact', head: true });
-  if (column && start) q = q.gte(column, start);
-  if (column && end) q = q.lt(column, end);
-  const { count, error } = await q;
-  if (error) return unknown(error.message);
-  if (count == null) return unknown('count returned null');
-  return { value: count, status: 'measured', reason: null };
+function measured(value) {
+  return { value, status: 'measured', reason: null };
 }
 
-async function newest(sb, table, column) {
-  const { data, error } = await sb.from(table).select(column).not(column, 'is', null)
-    .order(column, { ascending: false }).limit(1);
-  if (error) return unknown(error.message);
-  const v = data?.[0]?.[column];
+/** GET only. Refuses every other method. */
+async function restGet(base, key, path, { count = false } = {}) {
+  if (!path.startsWith('/rest/v1/')) throw new Error('refusing a non-read path');
+  const res = await fetch(`${base}${path}`, {
+    method: 'GET',
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      Accept: 'application/json',
+      ...(count ? { Prefer: 'count=exact', Range: '0-0' } : {}),
+    },
+  });
+  const text = await res.text();
+  let body = null;
+  if (text) {
+    try { body = JSON.parse(text); } catch { body = text; }
+  }
+  if (!res.ok) {
+    const msg = body && typeof body === 'object' ? (body.message || body.error || res.status) : res.status;
+    return { ok: false, error: String(msg), rows: [], count: null };
+  }
+  let n = null;
+  if (count) {
+    const range = res.headers.get('content-range') || '';
+    const m = /\/(\d+)$/.exec(range);
+    n = m ? Number(m[1]) : null;
+  }
+  return { ok: true, error: null, rows: Array.isArray(body) ? body : [], count: n };
+}
+
+function q(params) {
+  const u = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v != null && v !== '') u.set(k, String(v));
+  return u.toString();
+}
+
+async function countRows(base, key, table, filters) {
+  const path = `/rest/v1/${table}?${q({ select: '*', ...filters })}`;
+  const res = await restGet(base, key, path, { count: true });
+  if (!res.ok) return unknown(res.error);
+  if (res.count == null) return unknown('count header missing');
+  return measured(res.count);
+}
+
+async function newest(base, key, table, column) {
+  const path = `/rest/v1/${table}?${q({ select: column, [column]: 'not.is.null', order: `${column}.desc`, limit: '1' })}`;
+  const res = await restGet(base, key, path);
+  if (!res.ok) return unknown(res.error);
+  const v = res.rows[0]?.[column];
   if (v == null) return unknown(`no non-null ${column}`);
-  return { value: String(v), status: 'measured', reason: null };
+  return measured(String(v));
 }
 
-async function latencyFor(sb, source, window) {
-  if (!source.created || !source.published) {
-    return unknown(`no created+published pair on ${source.table}`);
-  }
-  const { data, error } = await sb.from(source.table)
-    .select(`${source.created},${source.published}`)
-    .gte(source.created, window.start)
-    .lt(source.created, window.end)
-    .limit(2000);
-  if (error) return unknown(error.message);
-  const hours = [];
-  for (const row of data ?? []) {
-    const landed = Date.parse(row[source.created]);
-    const published = Date.parse(row[source.published]);
-    if (!Number.isFinite(landed) || !Number.isFinite(published)) continue;
-    hours.push((landed - published) / 3600_000);
-  }
-  const summary = latencySummary(hours);
-  const capped = (data?.length ?? 0) >= 2000;
-  return {
-    value: summary,
-    status: capped ? 'unknown' : 'measured',
-    reason: capped
-      ? 'read cap of 2000 rows hit; median/p90 would be a slice, not the population'
-      : (hours.length ? null : 'no rows in the window had both timestamps'),
+async function rowsInWindow(base, key, table, select, filters) {
+  const path = `/rest/v1/${table}?${q({ select, limit: '2000', ...filters })}`;
+  return restGet(base, key, path);
+}
+
+async function measureSource(base, key, source, window) {
+  const held = await countRows(base, key, source.table, {});
+  // URLSearchParams cannot hold two values for the same key. Use an and() group.
+  const inRange = (column, start, end, extra) => {
+    const parts = [`${column}.gte.${start}`, `${column}.lt.${end}`];
+    if (extra) parts.push(extra);
+    return { and: `(${parts.join(',')})` };
   };
-}
 
-async function spotCheck(sb, source, window) {
-  if (!source.created) return unknown(`no created_at on ${source.table}; cannot pick a new id`);
-  const { data, error } = await sb.from(source.table)
-    .select(source.id)
-    .gte(source.created, window.start)
-    .lt(source.created, window.end)
-    .limit(1);
-  if (error) return unknown(error.message);
-  const id = data?.[0]?.[source.id];
-  if (id == null) return { value: null, status: 'measured', reason: 'no new id in the window to spot-check', customer: source.customer };
-  const again = await sb.from(source.table).select(source.id).eq(source.id, id).limit(1);
-  if (again.error) return unknown(again.error.message);
-  const found = (again.data ?? []).length === 1;
-  return {
-    value: found,
-    status: 'measured',
-    reason: found
-      ? `id ${id} is readable by selecting ${source.table}.${source.id}. ${source.customer}`
-      : `id ${id} was not readable on a second select`,
-    customer: source.customer,
-  };
-}
+  const freshNew = source.created
+    ? await countRows(base, key, source.table, inRange(source.created, window.start, window.end))
+    : unknown(`no created column on ${source.table}`);
+  const retouched = source.created && source.touched
+    ? await countRows(base, key, source.table, inRange(source.touched, window.start, window.end, `${source.created}.lt.${window.start}`))
+    : unknown(source.touched ? `no created column; a ${source.touched} count would mix new rows with re-touches` : `no touch column on ${source.table}`);
+  const material = source.material && source.created
+    ? await countRows(base, key, source.table, inRange(source.material, window.start, window.end, `${source.created}.lt.${window.start}`))
+    : unknown(source.material ? `no created column; cannot separate new rows from ${source.material}` : `${source.table} has no source field distinct from the write clock`);
+  const lastCreated = source.created ? await newest(base, key, source.table, source.created) : unknown('no created column');
+  const lastTouched = source.touched ? await newest(base, key, source.table, source.touched) : unknown('no touch column');
 
-export async function measureSource(sb, source, window) {
-  const [held, created, touched, material, lastCreated, lastTouched] = await Promise.all([
-    countWhere(sb, source.table, source.id, null, null),
-    source.created ? countWhere(sb, source.table, source.created, window.start, window.end) : Promise.resolve(unknown(`no created column on ${source.table}`)),
-    source.touched ? countWhere(sb, source.table, source.touched, window.start, window.end) : Promise.resolve(unknown(`no touch column on ${source.table}`)),
-    source.material
-      ? countWhere(sb, source.table, source.material, window.start, window.end)
-      : Promise.resolve(unknown(`${source.table} has no source field distinct from the write clock`)),
-    source.created ? newest(sb, source.table, source.created) : Promise.resolve(unknown('no created column')),
-    source.touched ? newest(sb, source.table, source.touched) : Promise.resolve(unknown('no touch column')),
-  ]);
-  const latency = await latencyFor(sb, source, window);
-  const reach = await spotCheck(sb, source, window);
+  let latency = unknown(`no created+published pair on ${source.table}`);
+  if (source.created && source.published) {
+    const got = await rowsInWindow(base, key, source.table, `${source.created},${source.published}`, inRange(source.created, window.start, window.end));
+    if (!got.ok) latency = unknown(got.error);
+    else {
+      const hours = [];
+      for (const row of got.rows) {
+        const landed = Date.parse(row[source.created]);
+        const published = Date.parse(row[source.published]);
+        if (!Number.isFinite(landed) || !Number.isFinite(published)) continue;
+        hours.push((landed - published) / 3600_000);
+      }
+      const capped = got.rows.length >= 2000;
+      latency = {
+        value: latencySummary(hours),
+        status: capped ? 'unknown' : 'measured',
+        reason: capped ? 'read cap of 2000 rows hit; median/p90 would be a slice, not the population' : (hours.length ? null : 'no rows in the window had both timestamps'),
+      };
+    }
+  }
+
+  let customerReachable = unknown(source.created ? 'not checked' : `no created column on ${source.table}; cannot pick a new id`);
+  if (source.created) {
+    const sample = await rowsInWindow(base, key, source.table, source.id, { ...inRange(source.created, window.start, window.end), limit: '1' });
+    if (!sample.ok) customerReachable = unknown(sample.error);
+    else if (!sample.rows[0] || sample.rows[0][source.id] == null) {
+      customerReachable = { value: null, status: 'measured', reason: 'no new id in the window to spot-check', customer: source.customer };
+    } else {
+      const id = sample.rows[0][source.id];
+      const again = await restGet(base, key, `/rest/v1/${source.table}?${q({ select: source.id, [source.id]: `eq.${id}`, limit: '1' })}`);
+      if (!again.ok) customerReachable = unknown(again.error);
+      else {
+        const found = again.rows.length === 1;
+        customerReachable = {
+          value: found,
+          status: 'measured',
+          reason: found
+            ? `id ${id} is readable by GET ${source.table}?${source.id}=eq.${id}. ${source.customer}`
+            : `id ${id} was not readable on a second GET`,
+          customer: source.customer,
+        };
+      }
+    }
+  }
+
   return {
     key: source.key,
     tile: source.tile,
     table: source.table,
     note: source.note ?? null,
     held,
-    newInWindow: created,
-    retouchedInWindow: touched,
+    newInWindow: freshNew,
+    retouchedInWindow: retouched,
     materialClockInWindow: material,
     lastCreated,
     lastTouched,
     latency,
-    customerReachable: reach,
+    customerReachable,
   };
 }
 
 async function main() {
   const window = acquisitionWindow(new Date());
   const json = process.argv.includes('--json');
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const { url, key } = loadCredentials();
   if (!url || !key) {
     const body = {
       label: 'READ-ONLY acquisition scorecard',
       measured: false,
+      queries: 'GET /rest/v1 only',
       window,
-      reason: 'missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. Run: vercel env pull .env.local — then node scripts/acquisition-scorecard.mjs',
+      reason: 'missing NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL) or SUPABASE_SERVICE_ROLE_KEY in the environment or .env.local',
       sources: SOURCES.map((s) => ({
         key: s.key,
         tile: s.tile,
@@ -261,16 +320,17 @@ async function main() {
     process.exit(2);
   }
 
-  const sb = createClient(url, key, { auth: { persistSession: false } });
   const sources = [];
-  for (const source of SOURCES) sources.push(await measureSource(sb, source, window));
-  const { data: dibbsJob, error: dibbsErr } = await sb.from('cron_jobs')
-    .select('job_name,enabled,cron_expr').eq('job_name', 'sync-dibbs').limit(1);
+  for (const source of SOURCES) {
+    sources.push(await measureSource(url, key, source, window));
+  }
+  const dibbs = await restGet(url, key, `/rest/v1/cron_jobs?${q({ select: 'job_name,enabled,cron_expr', job_name: 'eq.sync-dibbs', limit: '1' })}`);
   const report = {
     label: 'READ-ONLY acquisition scorecard',
     measured: true,
+    queries: 'GET /rest/v1 only',
     window,
-    dibbsCron: dibbsErr ? unknown(dibbsErr.message) : { value: dibbsJob?.[0] ?? null, status: 'measured', reason: null },
+    dibbsCron: dibbs.ok ? measured(dibbs.rows[0] ?? null) : unknown(dibbs.error),
     sources,
   };
   console.log(JSON.stringify(report, null, 2));
