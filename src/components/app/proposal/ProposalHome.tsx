@@ -147,10 +147,9 @@ export function NewProposalStart({
   const list = sortPursuits(pursuits).filter(respondable).slice(0, 5);
   return (
     <div className="p-6 flex flex-col items-center gap-8" data-testid="new-proposal-step-1">
-      <div className="w-full max-w-3xl flex items-center justify-between gap-3">
-        <button type="button" onClick={onBack} className="text-sm text-muted hover:text-ink inline-flex items-center gap-1.5"><ArrowLeft className="h-4 w-4" />All proposals</button>
+      <div className="w-full max-w-3xl flex flex-col items-center gap-4">
+        <button type="button" onClick={onBack} className="self-start text-sm text-muted hover:text-ink inline-flex items-center gap-1.5"><ArrowLeft className="h-4 w-4" />All proposals</button>
         <ProposalStepTracker step={1} />
-        <span className="w-24 hidden sm:block" aria-hidden />
       </div>
       <div className="text-center">
         <h1 className="text-3xl font-bold text-ink">What are you responding to?</h1>
@@ -230,10 +229,9 @@ export function NewProposalReady({
   const pct = Math.min(92, Math.round((elapsedSec / 70) * 92));
   return (
     <div className="p-6 flex flex-col items-center gap-8" data-testid="new-proposal-step-2">
-      <div className="w-full max-w-3xl flex items-center justify-between gap-3">
-        <button type="button" onClick={onBack} className="text-sm text-muted hover:text-ink inline-flex items-center gap-1.5"><ArrowLeft className="h-4 w-4" />Back</button>
+      <div className="w-full max-w-3xl flex flex-col items-center gap-4">
+        <button type="button" onClick={onBack} className="self-start text-sm text-muted hover:text-ink inline-flex items-center gap-1.5"><ArrowLeft className="h-4 w-4" />Back</button>
         <ProposalStepTracker step={2} />
-        <span className="w-24 hidden sm:block" aria-hidden />
       </div>
 
       <div className={`${card} w-full max-w-2xl p-8 flex flex-col gap-6`}>

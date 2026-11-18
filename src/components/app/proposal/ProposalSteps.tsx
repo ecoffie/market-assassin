@@ -25,20 +25,20 @@ export const PROPOSAL_STEP_LABELS: Record<ProposalStep, string> = {
 
 export function ProposalStepTracker({ step, onStepClick }: { step: ProposalStep; onStepClick?: (s: ProposalStep) => void }) {
   return (
-    <ol className="flex flex-wrap items-center gap-2 sm:gap-3" aria-label="Proposal steps" data-testid="proposal-steps">
+    <ol className="flex flex-nowrap items-center justify-center gap-2 sm:gap-3 max-w-full overflow-x-auto" aria-label="Proposal steps" data-testid="proposal-steps">
       {([1, 2, 3] as ProposalStep[]).map((s, i) => {
         const done = s < step;
         const current = s === step;
         const clickable = !!onStepClick && s <= step;
         return (
-          <li key={s} className="flex items-center gap-2 sm:gap-3">
+          <li key={s} className="flex shrink-0 items-center gap-2 sm:gap-3">
             {i > 0 && <span aria-hidden className="h-px w-4 sm:w-8 bg-hairline" />}
             <button
               type="button"
               disabled={!clickable}
               onClick={() => onStepClick?.(s)}
               aria-current={current ? 'step' : undefined}
-              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+              className={`inline-flex items-center gap-2 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm transition-colors ${
                 current
                   ? 'border-[#006aff] bg-[#006aff]/10 font-semibold text-ink'
                   : done
