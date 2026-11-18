@@ -32,6 +32,18 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 |---|---|---|---|---|---|
 | 2026-11-18 | DIBBS clock write | `stampDibbsClocks` treated a Supabase `{ error }` as success because the client does not throw. A failed read or a failed update now returns null, so the cron body does not report `nonemptyIngestAdvanced`. Rows are not deleted. | `if (written.error)` → `src/lib/dibbs/clock-stamp.ts` | `clock-stamp.unit.test.ts`. No production stamp, no sync. | BUILT, NOT MERGED |
 
+## 2026-11-18 — Living pain points: GAO RSS + oversight.gov
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | Data Core / pain points | The existing `institute-gao-sync` collector now also reads oversight.gov open recommendations and the federal report listing (page 0 only, ≤200 new Institute rows, additive on source id). A recommendation the source lists as open is `confirmed_unresolved`; a status the source does not state stays `unknown`. The bare `(Source: GAO)` writer stays blocked. No migration. | `ACQUISITION_NEW_ROW_CAP = 200` → `src/lib/institute/acquired-pain-points.ts` · `blocked_legacy_gao_reinjection` → `src/lib/strategic-intel/derive.ts` | `acquired-pain-points.unit.test.ts` on recorded fixtures (no network). Live dry-run counts are in the PR. | DRAFT PR |
+
+## 2026-11-18 — Cron run history lands in cron_job_runs
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | Cron observability | extract-sam-events and refresh-contracts wrote run detail to `cron_logs`, which has 0 production rows and is not what the admin cron page or the watchdog read. The prune proposal and the refresh outcome now go to `cron_job_runs` via a direct insert and `reportCronOutcome`. Prune stays report-only unless `SAM_EVENTS_PRUNE=apply`. A failed prune-report insert still returns 500. | `from('cron_job_runs').insert` → `src/app/api/cron/extract-sam-events/route.ts` · `mode=preview; contract file not written` → `src/app/api/cron/refresh-contracts/route.ts` | extract-sam-events route test (report-only, apply, failed insert) + refresh-contracts source test. `SAM_EVENTS_PRUNE` left unset. | DRAFT PR |
+
 ## 2026-11-18 — Collection freshness clocks (DIBBS and grants)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
