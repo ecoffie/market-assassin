@@ -36,6 +36,20 @@ dashboards unless something is **materially broken**.
 
 Lives verbatim at the end of the root `CLAUDE.md` (the SessionStart hook `~/.claude/hooks/inflight-context.sh` extracts it from there).
 
+### Data Core reliability handoff (2026-11-18)
+
+Open, not merged, not deployed. Reviewer and release are outside this session.
+
+| PR | Head to review | What it changes |
+|---|---|---|
+| [#2168](https://github.com/ecoffie/market-assassin/pull/2168) | `445186168` | DoD SBIR: non-2xx unless a parsed empty list or a real write. `search_sbir` `_meta.dod_cache` is `unverified_empty` when the cache holds nothing. Builds on #2167's `decideDodSbirExecuteOutcome` by requiring list evidence for a zero. |
+| [#2169](https://github.com/ecoffie/market-assassin/pull/2169) | `ca1c614ea` | DIBBS/grants clocks: attempt vs nonempty ingest. `/api/app/dibbs` returns `freshness.warning`. Disabled collector cannot stay CURRENT. |
+| [#2170](https://github.com/ecoffie/market-assassin/pull/2170) | `6098237b3` | Ask Mindy solicitation status. Restores #1557 (active + no deadline stays open). Unarchived is not "open for responses" for non-respondable notice types. |
+| [#2171](https://github.com/ecoffie/market-assassin/pull/2171) | `8a57e7702` | Locks #2165 GAO merge refusal and events prune-report 500. No retire, no adopt, no prune. |
+| [#2172](https://github.com/ecoffie/market-assassin/pull/2172) | `8f670de67` (code) | Grants partial ingest is non-2xx. Zero fetch stays an error, not a verified empty. The branch head is the handoff commit on top of that code. |
+
+Dashboard tiles (forecasts, SAM registrations, SBIR, research funding, collector warnings, DIBBS Current while disabled) are a separate agent. For SBIR tiles use `_meta.dod_cache` and the sync `status` field, and do not render an empty cache as "no opportunities". For DIBBS tiles use `freshness` from `/api/app/dibbs` and `honestInstanceState` with the collector disabled; do not use `MAX(synced_at)` as current. Do not set `SAM_EVENTS_PRUNE=apply`. Do not apply `20261118_park_false_green_freshness.sql` without Eric.
+
 ## 🔔 Pending Tasks
 
 ### Batch Enroll Bootcamp Attendees (April 12-19, 2026)

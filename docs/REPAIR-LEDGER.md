@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-18 — Grants partial ingest was success
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | sync-grants partial false success | A mid-run Grants.gov failure set `degraded` and the cron still returned HTTP 200 `success: true`, so the dispatcher recorded a healthy run over a partial corpus. Zero fetches were already errors. A degraded run is now non-2xx. Rows already upserted stay. This is not a retention or dedupe change. | `export function classifyGrantsSync` → `src/lib/grants/sync-outcome.ts` | `sync-outcome.unit.test.ts`. No live Grants.gov call. | BUILT, NOT MERGED |
+
 ## 2026-11-18 — Forecast currency release + Ask Mindy Map bridge
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
