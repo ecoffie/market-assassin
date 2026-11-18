@@ -40,9 +40,9 @@ export const maxDuration = 300;
  * even if a stray row was touched — that touch is not a nonempty ingest.
  */
 /**
- * The route's client is `createClient(url, key)` (schema `public`).
- * `ReturnType<typeof createClient>` is the zero-arg default, whose schema is
- * `never`, so tsc rejected both the call and `last_verified_ingest`.
+ * Naming the Supabase client here makes tsc instantiate the query builder until
+ * it hits TS2589 ("excessively deep"). The argument stays `unknown`; the cast
+ * is only the two calls this stamp makes.
  */
 type DibbsClockDb = {
   from(table: string): {
@@ -58,12 +58,13 @@ type DibbsClockDb = {
 };
 
 async function stampDibbsClocks(
-  supabase: DibbsClockDb,
+  supabase: unknown,
   input: { upstreamReadable: boolean; recordsReceived: number; recordsLanded: number },
 ): Promise<{ patch: CollectionClockPatch; priorVerifiedIngest: string | null } | null> {
+  const db = supabase as DibbsClockDb;
   const attemptedAt = new Date().toISOString();
   try {
-    const { data } = await supabase
+    const { data } = await db
       .from('data_source_instances')
       .select('last_verified_ingest')
       .eq('source_key', 'dibbs_dla_flat_files')
@@ -78,7 +79,7 @@ async function stampDibbsClocks(
       cadenceHours: 24,
       now: attemptedAt,
     });
-    await supabase.from('data_source_instances').update({
+    await db.from('data_source_instances').update({
       ...patch.clocks,
       updated_at: attemptedAt,
     }).eq('source_key', 'dibbs_dla_flat_files');
