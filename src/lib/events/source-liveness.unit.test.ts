@@ -10,6 +10,7 @@ const state: { rows: Row[]; retired: string[] | null; nots: string[] } = { rows:
 
 vi.mock('@/lib/events/event-currency-live', () => ({
   loadRetiredSourceNoticeIds: async () => state.retired,
+  loadHiddenRows: async () => (state.retired ? state.retired.map((notice_id) => ({ notice_id, reason: 'retired_source' })) : null),
   notInList: (ids: string[] | null) => (ids && ids.length ? `(${ids.join(',')})` : null),
 }));
 vi.mock('@/lib/events/ai-event-discovery', () => ({ searchEventsViaAI: vi.fn() }));
@@ -53,6 +54,15 @@ describe('R5: retired-source rows are not listed', () => {
   it('opportunity/office-scoped events exclude them too', async () => {
     const r = await queryScopedEvents({ agency: 'Army' });
     expect(r.events.map((e) => e.notice_id)).toEqual(['live1']);
+  });
+
+  it('history view (includeHidden): hidden rows are returned, untouched, with the reason recorded', async () => {
+    const r = await queryFederalEvents({ agency: 'Army', currentYear: 2026, includeHidden: true });
+    expect(r.events.map((e) => [e.title, e.hidden_reason])).toEqual([
+      ['Live Industry Day', null],
+      ['Dead Industry Day', 'retired_source'],
+    ]);
+    expect(state.nots).toEqual([]);
   });
 
   it('when liveness cannot be established the reader still answers (unfiltered), never empty', async () => {

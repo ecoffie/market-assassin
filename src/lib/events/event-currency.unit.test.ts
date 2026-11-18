@@ -12,11 +12,14 @@ import {
   familyKeyOf,
   isRetiredSource,
   isUnlistableRow,
+  hiddenReason,
+  findFutureConfirmations,
+  catalogNameMatches,
   readNoticeEvent,
   reconcileFamilyEvents,
   type EventSourceNotice,
 } from './event-currency';
-import { buildCandidateSet, planEvents, planRetirements, RETIRE_MAX_ROWS } from './extract-run';
+import { buildCandidateSet, planEvents, planRetirements, pruneMode, RETIRE_MAX_ROWS } from './extract-run';
 import { notInList } from './event-currency-live';
 
 const N = Object.fromEntries((fixture.notices as EventSourceNotice[]).map((n) => [n.notice_id, n]));
@@ -136,6 +139,48 @@ describe('R5 — retired source notices', () => {
   });
 });
 
+describe('R5 safeguard — never hide an independently confirmed future event', () => {
+  const today = new Date('2026-11-17T00:00:00Z');
+  const closed = { active: true, response_deadline: '2026-11-01' };
+  const undated = { notice_id: 'old', title: 'Widget Industry Day', event_type: 'industry_day', event_date: null, source: 'sam_gov', solicitation_number: 'W912PL26R0001' };
+
+  it('records the reason it hides', () => {
+    expect(hiddenReason(undated, closed, today)).toBe('undated_closed_notice');
+    expect(hiddenReason({ event_type: 'industry_day', event_date: '2026-12-01' }, { active: false, response_deadline: '2026-11-01' }, today)).toBe('retired_source');
+  });
+
+  it('a NEWER notice in the same solicitation family with a future date confirms it', () => {
+    const newer = { notice_id: 'new', title: 'Widget Industry Day (Amendment 1)', event_type: 'industry_day', event_date: '2026-12-03', source: 'sam_gov', solicitation_number: 'w912pl26r0001' };
+    const posted = new Map([['old', '2026-10-01'], ['new', '2026-10-20']]);
+    const c = findFutureConfirmations([undated], { rows: [undated, newer], postedById: posted, catalog: [] }, today);
+    expect(c.get('old')).toEqual({ kind: 'family_newer_notice', date: '2026-12-03', ref: 'new' });
+    expect(hiddenReason(undated, closed, today, c.get('old'))).toBeNull();
+  });
+
+  it('an OLDER family notice, a past date, or a different family does not confirm it', () => {
+    const older = { notice_id: 'older', title: 'x', event_type: 'industry_day', event_date: '2026-12-03', source: 'sam_gov', solicitation_number: 'W912PL26R0001' };
+    const past = { notice_id: 'past', title: 'x', event_type: 'industry_day', event_date: '2026-11-10', source: 'sam_gov', solicitation_number: 'W912PL26R0001' };
+    const other = { notice_id: 'other', title: 'x', event_type: 'industry_day', event_date: '2026-12-03', source: 'sam_gov', solicitation_number: 'N0017426R1003' };
+    const posted = new Map([['old', '2026-10-01'], ['older', '2026-09-01'], ['past', '2026-10-20'], ['other', '2026-10-20']]);
+    expect(findFutureConfirmations([undated], { rows: [undated, older, past, other], postedById: posted, catalog: [] }, today).size).toBe(0);
+  });
+
+  it('a curated catalog next_occurrence in the future that names the event confirms it', () => {
+    const nvsbe = { ...undated, notice_id: 'va', title: 'VA OSDBU NVSBE 2026 Vendor Outreach Session', solicitation_number: null };
+    const c = findFutureConfirmations([nvsbe], { rows: [nvsbe], postedById: new Map(), catalog: [{ name: 'National Veterans Small Business Engagement (NVSBE)', start: '2026-12-08' }] }, today);
+    expect(c.get('va')).toEqual({ kind: 'catalog', date: '2026-12-08', ref: 'National Veterans Small Business Engagement (NVSBE)' });
+    expect(catalogNameMatches('Small business forum', 'National Veterans Small Business Engagement (NVSBE)')).toBe(false);
+    expect(findFutureConfirmations([nvsbe], { rows: [nvsbe], postedById: new Map(), catalog: [{ name: 'National Veterans Small Business Engagement (NVSBE)', start: '2026-10-01' }] }, today).size).toBe(0);
+  });
+
+  it('another source\'s row for the same event with a future date confirms it; a low-confidence one does not', () => {
+    const ai = { notice_id: 'ai-1', title: 'Widget Industry Day', event_type: 'industry_day', event_date: '2026-12-10', source: 'ai_web_search', confidence: 0.9, solicitation_number: null };
+    expect(findFutureConfirmations([undated], { rows: [undated, ai], postedById: new Map(), catalog: [] }, today).get('old')).toEqual({ kind: 'other_source', date: '2026-12-10', ref: 'ai-1' });
+    const weak = { ...ai, confidence: 0.4 };
+    expect(findFutureConfirmations([undated], { rows: [undated, weak], postedById: new Map(), catalog: [] }, today).size).toBe(0);
+  });
+});
+
 describe('R6 — drift', () => {
   it('stored rows that disagree with the current family version are drift; corrected rows are not', () => {
     const stored = [
@@ -183,21 +228,28 @@ describe('R6 — drift waits for the next run, not forever', () => {
 
 describe('retirement guard', () => {
   const src = (id: string, description = 'text') => notice({ notice_id: id, description });
-  it('retires listed rows the extractor no longer reads as events', () => {
+  const row = (id: string, source: string | null = 'sam_gov') => ({ id: `row-${id}`, notice_id: id, event_type: 'industry_day', event_date: null, source });
+  it('proposes listed rows the extractor no longer reads as events, with id and reason', () => {
     const listed = Array.from({ length: 20 }, (_, i) => `n${i}`);
-    const plan = planRetirements(listed, listed.map((id) => src(id)), new Set(listed.slice(2)));
-    expect(plan.noticeIds).toEqual(['n0', 'n1']);
+    const plan = planRetirements(listed.map((id) => row(id)), listed.map((id) => src(id)), new Set(listed.slice(2)));
+    expect(plan.proposals.map((p) => [p.id, p.notice_id, p.reason])).toEqual([['row-n0', 'n0', 'no_event_on_reread'], ['row-n1', 'n1', 'no_event_on_reread']]);
     expect(plan.skipped).toBeNull();
   });
-  it('a title-only reading (no description) never retires a row', () => {
-    const plan = planRetirements(['a', 'b', 'c', 'd'], [src('a', ''), src('b'), src('c'), src('d')], new Set(['b', 'c', 'd']));
-    expect(plan.noticeIds).toEqual([]);
+  it('a title-only reading (no description) is never proposed; AI rows are never proposed', () => {
+    const plan = planRetirements([row('a'), row('b'), row('c'), row('d'), row('e', 'ai_web_search')], [src('a', ''), src('b'), src('c'), src('d'), src('e')], new Set(['b', 'c', 'd']));
+    expect(plan.proposals).toEqual([]);
   });
-  it('a mass "no longer an event" result retires nothing and says why (classifier regression guard)', () => {
+  it('a mass "no longer an event" result proposes nothing and says why (classifier regression guard)', () => {
     const listed = Array.from({ length: 1000 }, (_, i) => `n${i}`);
-    const plan = planRetirements(listed, listed.map((id) => src(id)), new Set());
-    expect(plan.noticeIds).toEqual([]);
+    const plan = planRetirements(listed.map((id) => row(id)), listed.map((id) => src(id)), new Set());
+    expect(plan.proposals).toEqual([]);
     expect(plan.wouldRetire).toBe(1000);
     expect(plan.skipped).toContain(String(RETIRE_MAX_ROWS));
+  });
+  it('pruning is report-only unless SAM_EVENTS_PRUNE is exactly "apply"', () => {
+    expect(pruneMode({})).toBe('report');
+    expect(pruneMode({ SAM_EVENTS_PRUNE: 'true' })).toBe('report');
+    expect(pruneMode({ SAM_EVENTS_PRUNE: 'APPLY' })).toBe('report');
+    expect(pruneMode({ SAM_EVENTS_PRUNE: 'apply' })).toBe('apply');
   });
 });

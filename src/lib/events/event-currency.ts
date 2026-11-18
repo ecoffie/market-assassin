@@ -144,23 +144,125 @@ export function isRetiredSource(
   return deadline < today.toISOString().slice(0, 10);
 }
 
+export type HiddenReason = 'retired_source' | 'undated_closed_notice';
+
+/** Independent evidence that the event still has a FUTURE date (Eric, 2026-11-17 safeguard). */
+export interface FutureConfirmation {
+  kind: 'family_newer_notice' | 'catalog' | 'other_source';
+  /** YYYY-MM-DD, today or later. */
+  date: string;
+  /** What confirmed it: the newer notice id, the catalog entry name, or the other row's notice id. */
+  ref: string;
+}
+
 /**
- * Whether a stored row may be listed at all. Hidden when its source notice is retired (above), or
- * when it is an UNDATED attendable event behind a notice whose response window has closed: before
- * R2 the extractor only re-read ~5 days of notices, so "re-read recently" implied "current"; now
- * every active notice is re-read daily, and an industry day with no stated date on a notice whose
- * responses closed has, as far as Mindy can tell, already happened (102 of 143 undated rows after a
- * simulated run, 2026-11-17). A dated row is judged by its own date, never by the deadline.
+ * Why a stored row is not listed, or null when it is listed. Hiding never deletes or alters a row;
+ * hidden rows stay in sam_events and are returned by readers asked for `includeHidden`.
+ *
+ *  - `retired_source`: the source notice is inactive AND past its response window.
+ *  - `undated_closed_notice`: an UNDATED attendable event behind a notice whose response window has
+ *    closed. Before R2 the extractor only re-read ~5 days of notices, so "re-read recently" implied
+ *    "current"; now every active notice is re-read daily, and an industry day with no stated date on
+ *    a notice whose responses closed has, as far as Mindy can tell, already happened (102 of 143
+ *    undated rows after a simulated run, 2026-11-17). A dated row is judged by its own date.
+ *
+ * Safeguard: a row with an independent confirmation of a future date is NEVER hidden.
  */
+export function hiddenReason(
+  row: { event_type: string | null; event_date: string | null },
+  n: { active?: boolean | null; response_deadline?: string | null } | null | undefined,
+  today: Date = new Date(),
+  confirmation: FutureConfirmation | null = null,
+): HiddenReason | null {
+  const todayStr = today.toISOString().slice(0, 10);
+  if (confirmation && confirmation.date >= todayStr) return null;
+  if (isRetiredSource(n, today)) return 'retired_source';
+  if (row.event_date || !isAttendable(row.event_type)) return null;
+  const deadline = (n?.response_deadline || '').slice(0, 10);
+  return deadline && deadline < todayStr ? 'undated_closed_notice' : null;
+}
+
 export function isUnlistableRow(
   row: { event_type: string | null; event_date: string | null },
   n: { active?: boolean | null; response_deadline?: string | null } | null | undefined,
   today: Date = new Date(),
+  confirmation: FutureConfirmation | null = null,
 ): boolean {
-  if (isRetiredSource(n, today)) return true;
-  if (row.event_date || !isAttendable(row.event_type)) return false;
-  const deadline = (n?.response_deadline || '').slice(0, 10);
-  return Boolean(deadline) && deadline < today.toISOString().slice(0, 10);
+  return hiddenReason(row, n, today, confirmation) !== null;
+}
+
+/** Minimum confidence for another source's row to count as confirmation (when it carries one). */
+export const CONFIRM_MIN_CONFIDENCE = 0.7;
+
+export interface ConfirmationRow {
+  notice_id: string;
+  title: string | null;
+  event_type: string | null;
+  event_date: string | null;
+  source?: string | null;
+  confidence?: number | null;
+  solicitation_number?: string | null;
+}
+
+export interface CatalogFutureDate {
+  name: string;
+  /** YYYY-MM-DD */
+  start: string;
+}
+
+/** Same-event key the readers already dedup on: lowercased title, first 60 chars. */
+export function eventTitleKey(title: string | null | undefined): string {
+  return (title || '').toLowerCase().slice(0, 60);
+}
+
+/** A catalog entry names this event: its full name (parenthetical removed) or its acronym appears in the title. */
+export function catalogNameMatches(title: string | null | undefined, name: string): boolean {
+  const t = (title || '').toLowerCase();
+  if (!t) return false;
+  const full = name.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  if (full.length >= 8 && t.includes(full)) return true;
+  const acronym = /\(([A-Z][A-Z0-9&-]{2,})\)/.exec(name)?.[1];
+  return Boolean(acronym && new RegExp(`\\b${acronym.replace(/[&-]/g, '\\$&')}\\b`, 'i').test(title || ''));
+}
+
+/**
+ * Independent future-date confirmation for each target row, from (in order):
+ *  1. a NEWER notice in the same solicitation family (posted on or after this one) whose stored
+ *     attendable row has a future date;
+ *  2. a curated catalog entry whose verified `next_occurrence` is in the future and names the event;
+ *  3. another source's row (not SAM-extracted) for the same event (same title key) with a future
+ *     date and, when it carries a confidence, at least CONFIRM_MIN_CONFIDENCE.
+ */
+export function findFutureConfirmations(
+  targets: ConfirmationRow[],
+  ctx: { rows: ConfirmationRow[]; postedById: Map<string, string | null>; catalog: CatalogFutureDate[] },
+  today: Date = new Date(),
+): Map<string, FutureConfirmation> {
+  const todayStr = today.toISOString().slice(0, 10);
+  const future = ctx.rows.filter((r) => isAttendable(r.event_type) && r.event_date && r.event_date.slice(0, 10) >= todayStr);
+  const byFamily = groupFamilies(future.map((r) => ({ ...r, solicitation_number: r.solicitation_number ?? null })));
+  const otherByTitle = new Map<string, ConfirmationRow>();
+  for (const r of future) {
+    if (!r.source || r.source === 'sam_gov') continue;
+    if (typeof r.confidence === 'number' && r.confidence < CONFIRM_MIN_CONFIDENCE) continue;
+    const k = eventTitleKey(r.title);
+    if (k && !otherByTitle.has(k)) otherByTitle.set(k, r);
+  }
+  const catalog = ctx.catalog.filter((c) => c.start >= todayStr);
+  const out = new Map<string, FutureConfirmation>();
+  for (const t of targets) {
+    const key = familyKeyOf(t.solicitation_number);
+    const mine = ctx.postedById.get(t.notice_id) || '';
+    const newer = key
+      ? (byFamily.get(key) || []).find((r) => r.notice_id !== t.notice_id && (ctx.postedById.get(r.notice_id) || '') >= mine && Boolean(ctx.postedById.get(r.notice_id)))
+      : undefined;
+    if (newer) { out.set(t.notice_id, { kind: 'family_newer_notice', date: newer.event_date!.slice(0, 10), ref: newer.notice_id }); continue; }
+    const cat = catalog.find((c) => catalogNameMatches(t.title, c.name));
+    if (cat) { out.set(t.notice_id, { kind: 'catalog', date: cat.start, ref: cat.name }); continue; }
+    const other = otherByTitle.get(eventTitleKey(t.title));
+    if (other && other.notice_id !== t.notice_id) out.set(t.notice_id, { kind: 'other_source', date: other.event_date!.slice(0, 10), ref: other.notice_id });
+  }
+  return out;
 }
 
 // ── Drift (R6) ──────────────────────────────────────────────────────────────────────────────
@@ -208,6 +310,7 @@ export function computeEventDrift(
   today: Date = new Date(),
   /** The last extractor run (max sam_events.extracted_at). Rows touched by notices stored after it are pending. */
   lastRunAt: string | null = null,
+  confirmations: Map<string, FutureConfirmation> = new Map(),
 ): DriftReport {
   const families = groupFamilies([...familyPool, ...sources]);
   const arrivedAfterRun = (n: EventSourceNotice | undefined): boolean => {
@@ -220,7 +323,7 @@ export function computeEventDrift(
   const live: StoredEventRow[] = [];
   let retiredSourceHidden = 0;
   for (const row of stored) {
-    if (isUnlistableRow(row, sourceById.get(row.notice_id), today)) retiredSourceHidden++;
+    if (isUnlistableRow(row, sourceById.get(row.notice_id), today, confirmations.get(row.notice_id) ?? null)) retiredSourceHidden++;
     else live.push(row);
   }
   const targets = live.map((r) => sourceById.get(r.notice_id)).filter((s): s is EventSourceNotice => Boolean(s));

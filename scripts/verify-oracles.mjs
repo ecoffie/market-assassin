@@ -618,12 +618,15 @@ if (want('events')) {
   try {
     const { measureEventDrift } = await import('@/lib/events/event-currency-live');
     const d = await measureEventDrift(sb);
-    const sample = d.drift.filter((f) => !f.blankSolBound && !f.pendingNextRun).slice(0, 3)
+    const counted = d.drift.filter((f) => !f.blankSolBound && !f.pendingNextRun);
+    // no_event rows stay listed until pruning is approved (SAM_EVENTS_PRUNE=apply) — still drift.
+    const byReason = Object.entries(counted.reduce((a, f) => ((a[f.reason] = (a[f.reason] || 0) + 1), a), {})).map(([k, v]) => `${k}=${v}`).join(' ');
+    const sample = counted.slice(0, 3)
       .map((f) => `${f.notice_id.slice(0, 8)} ${f.reason} ${f.stored.type}/${f.stored.date}→${f.expected.type}/${f.expected.date}`).join('; ');
     record(
       'events: listed attendable rows == extractor(current family version)',
       d.countable === 0,
-      `drift=${d.countable} of ${d.examined} examined (listed ${d.listed}); excluded: blank-sol=${d.blankSolBound}, pending-next-run=${d.pendingNextRun}; retired-source hidden=${d.retiredSourceHidden}; last run ${d.lastRunAt ?? 'never'}${sample ? ` — e.g. ${sample}` : ''}`,
+      `drift=${d.countable}${byReason ? ` (${byReason}${counted.some((f) => f.reason === 'no_event') ? '; no_event awaits prune approval' : ''})` : ''} of ${d.examined} examined (listed ${d.listed}); excluded: blank-sol=${d.blankSolBound}, pending-next-run=${d.pendingNextRun}; retired-source hidden=${d.retiredSourceHidden}; last run ${d.lastRunAt ?? 'never'}${sample ? ` — e.g. ${sample}` : ''}`,
     );
   } catch (e) {
     record('events: listed attendable rows == extractor(current family version)', false, `probe errored: ${e?.message ?? e}`, 'unmeasured');

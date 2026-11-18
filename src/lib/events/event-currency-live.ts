@@ -4,7 +4,8 @@
  * 1,000 rows, which is exactly the kind of truncation that hid the frozen rows in the first place.
  * Every error is surfaced, never coalesced to an empty list.
  */
-import { CURRENCY_ATTENDABLE_TYPES, computeEventDrift, familyKeyOf, isUnlistableRow, type DriftReport, type EventSourceNotice, type StoredEventRow } from './event-currency';
+import { CURRENCY_ATTENDABLE_TYPES, computeEventDrift, familyKeyOf, findFutureConfirmations, hiddenReason, type DriftReport, type EventSourceNotice, type HiddenReason, type StoredEventRow } from './event-currency';
+import { catalogFutureDates } from './catalog-occurrences';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Sb = any;
@@ -53,17 +54,34 @@ export async function loadListedAttendableRows(sb: Sb, today: Date = new Date())
   return rows;
 }
 
-/** Notice ids behind every upcoming row of ANY type (the frozen-row set R2 must re-read). */
-export async function loadUpcomingEventNoticeIds(sb: Sb, today: Date = new Date()): Promise<string[]> {
+/** A listed sam_events row of ANY type (dated upcoming, or undated and re-read recently). */
+export interface ListedEventRow {
+  id: string;
+  notice_id: string;
+  title: string | null;
+  event_type: string | null;
+  event_date: string | null;
+  source: string | null;
+  confidence: number | null;
+  solicitation_number: string | null;
+}
+
+/** Every listed row of ANY type — the frozen-row set R2 must re-read. */
+export async function loadListedRows(sb: Sb, today: Date = new Date()): Promise<ListedEventRow[]> {
   const todayStr = today.toISOString().slice(0, 10);
   const undatedSince = new Date(today.getTime() - CURRENCY_UNDATED_DAYS * 86400_000).toISOString().slice(0, 10);
-  const { rows } = await pageAll<{ notice_id: string }>((from, to) =>
+  const { rows } = await pageAll<ListedEventRow>((from, to) =>
     sb.from('sam_events')
-      .select('notice_id')
+      .select('id, notice_id, title, event_type, event_date, source, confidence, solicitation_number')
       .or(`event_date.gte.${todayStr},and(event_date.is.null,extracted_at.gte.${undatedSince})`)
       .order('notice_id', { ascending: true })
       .range(from, to));
-  return Array.from(new Set(rows.map((r) => r.notice_id)));
+  return rows;
+}
+
+/** Notice ids behind every listed row of ANY type. */
+export async function loadUpcomingEventNoticeIds(sb: Sb, today: Date = new Date()): Promise<string[]> {
+  return Array.from(new Set((await loadListedRows(sb, today)).map((r) => r.notice_id)));
 }
 
 export async function loadNoticesById<T = EventSourceNotice>(sb: Sb, ids: string[], cols = SOURCE_NOTICE_COLS): Promise<T[]> {
@@ -100,49 +118,84 @@ export async function measureEventDrift(sb: Sb, today: Date = new Date()): Promi
     .select('extracted_at').order('extracted_at', { ascending: false }).limit(1).maybeSingle();
   if (error) throw new Error(error.message);
   const lastRunAt = (last?.extracted_at as string | undefined) ?? null;
-  const stored = await loadListedAttendableRows(sb, today);
+  const all = await loadListedRows(sb, today);
+  const stored = all.filter((r) => (CURRENCY_ATTENDABLE_TYPES as readonly string[]).includes(r.event_type || ''));
   const sources = await loadNoticesById(sb, stored.map((r) => r.notice_id));
   const pool = await loadFamilyPool(sb, sources.map((s) => s.solicitation_number));
-  return { listed: stored.length, lastRunAt, ...computeEventDrift(stored, sources, pool, today, lastRunAt) };
+  // The same future-date safeguard the readers apply, so the probe examines exactly what is listed.
+  const postedById = new Map<string, string | null>([...pool, ...sources].map((n) => [n.notice_id, n.posted_date]));
+  const confirmations = findFutureConfirmations(stored, { rows: all, postedById, catalog: catalogFutureDates(today.toISOString().slice(0, 10)) }, today);
+  return { listed: stored.length, lastRunAt, ...computeEventDrift(stored, sources, pool, today, lastRunAt, confirmations) };
 }
 
 // ── R5: rows no reader lists (retired source, or undated behind a closed notice) ─────────
 
 const RETIRED_TTL_MS = 15 * 60_000;
-let _retired: { day: string; at: number; ids: string[] } | null = null;
+export interface HiddenRow {
+  notice_id: string;
+  reason: HiddenReason;
+}
+let _hidden: { day: string; at: number; rows: HiddenRow[] } | null = null;
 
 /**
- * Notice ids of listed rows that `isUnlistableRow` hides: the source notice is inactive AND past its
- * response window, or the row is an undated attendable event behind a closed notice. Readers exclude
- * them with `.not('notice_id','in',…)` so their counts stay exact. Cached per instance for 15 min.
+ * Listed rows that `hiddenReason` hides, with the reason. Rows with an independent confirmation of a
+ * future date (newer family notice, curated catalog occurrence, another source) are never included.
+ * Nothing is deleted or altered — readers exclude these with `.not('notice_id','in',…)` (exact
+ * totals) and return them, labelled, when asked for `includeHidden`. Cached per instance for 15 min.
  * Returns null when it could not be established — the caller then does not filter.
  */
-export async function loadRetiredSourceNoticeIds(sb: Sb, today: Date = new Date()): Promise<string[] | null> {
+export async function loadHiddenRows(sb: Sb, today: Date = new Date()): Promise<HiddenRow[] | null> {
   const day = today.toISOString().slice(0, 10);
-  if (_retired && _retired.day === day && Date.now() - _retired.at < RETIRED_TTL_MS) return _retired.ids;
+  if (_hidden && _hidden.day === day && Date.now() - _hidden.at < RETIRED_TTL_MS) return _hidden.rows;
   try {
-    const todayStr = day;
-    const undatedSince = new Date(today.getTime() - CURRENCY_UNDATED_DAYS * 86400_000).toISOString().slice(0, 10);
-    const { rows } = await pageAll<StoredEventRow>((from, to) =>
-      sb.from('sam_events')
-        .select('notice_id, event_type, event_date')
-        .or(`event_date.gte.${todayStr},and(event_date.is.null,extracted_at.gte.${undatedSince})`)
-        .order('notice_id', { ascending: true })
-        .range(from, to));
-    // Only notices that could be hidden: inactive ones, or ones behind an undated attendable row.
-    const undated = new Set(rows.filter((r) => !r.event_date && CURRENCY_ATTENDABLE_TYPES.includes(r.event_type as never)).map((r) => r.notice_id));
-    const inactive = await inChunks<{ notice_id: string; active: boolean | null; response_deadline: string | null }>(Array.from(new Set(rows.map((r) => r.notice_id))), (chunk) =>
-      sb.from('sam_opportunities').select('notice_id, active, response_deadline').in('notice_id', chunk).or('active.eq.false,response_deadline.lt.' + todayStr));
-    const rowById = new Map(rows.map((r) => [r.notice_id, r]));
-    const ids = inactive
-      .filter((n) => (n.active === false || undated.has(n.notice_id)) && isUnlistableRow(rowById.get(n.notice_id)!, n, today))
-      .map((n) => n.notice_id);
-    _retired = { day, at: Date.now(), ids };
-    return ids;
+    const rows = await loadListedRows(sb, today);
+    const ids = Array.from(new Set(rows.map((r) => r.notice_id)));
+    // Only notices that could be hidden: inactive, or past their response window.
+    const notices = await inChunks<{ notice_id: string; active: boolean | null; response_deadline: string | null; posted_date: string | null }>(ids, (chunk) =>
+      sb.from('sam_opportunities').select('notice_id, active, response_deadline, posted_date').in('notice_id', chunk).or('active.eq.false,response_deadline.lt.' + day));
+    const noticeById = new Map(notices.map((n) => [n.notice_id, n]));
+    const candidates = rows.filter((r) => noticeById.has(r.notice_id) && hiddenReason(r, noticeById.get(r.notice_id), today) !== null);
+    const hidden = await withSafeguard(sb, rows, candidates, noticeById, today);
+    _hidden = { day, at: Date.now(), rows: hidden };
+    return hidden;
   } catch (e) {
-    console.error('[events:liveness] could not establish unlistable rows:', e instanceof Error ? e.message : e);
+    console.error('[events:liveness] could not establish hidden rows:', e instanceof Error ? e.message : e);
     return null;
   }
+}
+
+/** Apply the future-date safeguard to hide candidates; returns the rows that stay hidden, with reasons. */
+async function withSafeguard(
+  sb: Sb,
+  rows: ListedEventRow[],
+  candidates: ListedEventRow[],
+  noticeById: Map<string, { active: boolean | null; response_deadline: string | null; posted_date: string | null }>,
+  today: Date,
+): Promise<HiddenRow[]> {
+  if (!candidates.length) return [];
+  // Posted dates for the candidates' family siblings that carry a future attendable date.
+  const fams = new Set(candidates.map((c) => familyKeyOf(c.solicitation_number)).filter(Boolean));
+  const todayStr = today.toISOString().slice(0, 10);
+  const siblings = rows.filter((r) => fams.has(familyKeyOf(r.solicitation_number)) && r.event_date && r.event_date >= todayStr && !noticeById.has(r.notice_id));
+  const postedById = new Map<string, string | null>(Array.from(noticeById.entries()).map(([id, n]) => [id, n.posted_date]));
+  if (siblings.length) {
+    const sib = await inChunks<{ notice_id: string; posted_date: string | null }>(siblings.map((r) => r.notice_id), (chunk) =>
+      sb.from('sam_opportunities').select('notice_id, posted_date').in('notice_id', chunk));
+    for (const n of sib) postedById.set(n.notice_id, n.posted_date);
+  }
+  const confirmations = findFutureConfirmations(candidates, { rows, postedById, catalog: catalogFutureDates(todayStr) }, today);
+  const out: HiddenRow[] = [];
+  for (const c of candidates) {
+    const reason = hiddenReason(c, noticeById.get(c.notice_id), today, confirmations.get(c.notice_id) ?? null);
+    if (reason) out.push({ notice_id: c.notice_id, reason });
+  }
+  return out;
+}
+
+/** Notice ids of hidden rows (see loadHiddenRows); null when unknown. */
+export async function loadRetiredSourceNoticeIds(sb: Sb, today: Date = new Date()): Promise<string[] | null> {
+  const rows = await loadHiddenRows(sb, today);
+  return rows ? rows.map((r) => r.notice_id) : null;
 }
 
 /** PostgREST list literal for `.not('notice_id', 'in', …)`; null when there is nothing to exclude. */
@@ -153,5 +206,5 @@ export function notInList(ids: string[] | null): string | null {
 
 /** Test hook: clear the per-instance cache. */
 export function _resetRetiredCache(): void {
-  _retired = null;
+  _hidden = null;
 }

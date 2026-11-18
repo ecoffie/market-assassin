@@ -19,14 +19,16 @@ import { resolveEventOffice } from '@/lib/gov-contacts/event-office';
 import { classifyEventRadarRun } from '@/lib/data-core/event-radar-advancement';
 import { extractLocation } from '@/lib/events/location';
 import { readNoticeEvent } from '@/lib/events/event-currency';
-import { loadActiveCandidates, loadFamilyPool, loadNoticesById, loadUpcomingEventNoticeIds } from '@/lib/events/event-currency-live';
-import { buildCandidateSet, familiesToLoad, planEvents, planRetirements } from '@/lib/events/extract-run';
+import { loadActiveCandidates, loadFamilyPool, loadListedRows, loadNoticesById, type ListedEventRow } from '@/lib/events/event-currency-live';
+import { buildCandidateSet, familiesToLoad, planEvents, planRetirements, pruneMode } from '@/lib/events/extract-run';
 
 export const maxDuration = 300;
 
 /** Wall-clock budget for loading candidates (the listed rows are always read first). */
 const DEFAULT_BUDGET_MS = 200_000;
 const UPSERT_CHUNK = 500;
+/** cron_logs.job_name of the durable prune report (one row per non-dry run). */
+const PRUNE_REPORT_JOB = 'extract-sam-events:prune-report';
 const CANDIDATE_TYPES = ['Special Notice', 'Presolicitation', 'Sources Sought'];
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
@@ -96,11 +98,13 @@ export async function GET(request: NextRequest) {
   const deadline = startTime + budgetMs;
   const today = new Date();
   const runAt = today.toISOString();
+  let listedRows: ListedEventRow[];
   let listedIds: string[];
   let listedSources: SamOpportunity[];
   let active: { rows: SamOpportunity[]; complete: boolean };
   try {
-    listedIds = await loadUpcomingEventNoticeIds(getSupabase(), today);
+    listedRows = await loadListedRows(getSupabase(), today);
+    listedIds = Array.from(new Set(listedRows.map((r) => r.notice_id)));
     listedSources = await loadNoticesById<SamOpportunity>(getSupabase(), listedIds);
     active = await loadActiveCandidates<SamOpportunity>(getSupabase(), CANDIDATE_TYPES, deadline);
   } catch (e) {
@@ -207,19 +211,35 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Retire listed rows whose notice no longer reads as an event (guarded; see extract-run.ts).
-  const retirement = planRetirements(listedIds, listedSources, new Set(planned.map((p) => p.notice.notice_id)));
+  // Listed rows whose notice no longer reads as an event. REPORT-ONLY by default: nothing is
+  // deleted unless SAM_EVENTS_PRUNE=apply (not set anywhere; Eric's approval is separate). Every
+  // non-dry run records the proposal durably in cron_logs so it can be reviewed before approval.
+  const mode = pruneMode();
+  const retirement = planRetirements(listedRows, listedSources, new Set(planned.map((p) => p.notice.notice_id)));
   let retiredCount = 0;
-  if (!dryRun && retirement.noticeIds.length > 0) {
+  if (!dryRun && mode === 'apply' && retirement.proposals.length > 0) {
     const { count, error: retireError } = await getSupabase()
       .from('sam_events')
       .delete({ count: 'exact' })
-      .in('notice_id', retirement.noticeIds)
+      .in('id', retirement.proposals.map((p) => p.id))
       .or('source.is.null,source.eq.sam_gov');
     if (retireError) {
       return NextResponse.json({ success: false, status: 'ingest_broken', error: `retire failed: ${retireError.message}`, upsertedCount }, { status: 500 });
     }
     retiredCount = count ?? -1; // -1 = deleted but uncounted; never reported as 0
+  }
+  let pruneReportRecorded: boolean | null = null;
+  let pruneReportError: string | null = null;
+  if (!dryRun) {
+    const { error: logError } = await getSupabase().from('cron_logs').insert({
+      job_name: PRUNE_REPORT_JOB,
+      run_date: runAt,
+      status: mode === 'apply' ? 'applied' : 'report',
+      result: { mode, proposed: retirement.proposals.length, deleted: mode === 'apply' ? retiredCount : 0, guardSkipped: retirement.skipped, wouldRetire: retirement.wouldRetire, proposals: retirement.proposals },
+    });
+    pruneReportRecorded = !logError;
+    pruneReportError = logError?.message ?? null;
+    if (logError) console.error('[extract-sam-events] prune report not recorded:', logError.message);
   }
   if (Date.now() > deadline) truncated = true;
 
@@ -286,6 +306,15 @@ export async function GET(request: NextRequest) {
       eventsFound: events.length,
       eventsUpserted: upsertedCount,
       durationSeconds: duration,
+    },
+    prune: {
+      mode,
+      proposed: retirement.proposals.length,
+      deleted: dryRun ? null : retiredCount,
+      guardSkipped: retirement.skipped,
+      recorded: pruneReportRecorded,
+      recordError: pruneReportError,
+      proposals: retirement.proposals,
     },
     eventsByType,
     sampleEvents: events.slice(0, 5).map((e) => ({

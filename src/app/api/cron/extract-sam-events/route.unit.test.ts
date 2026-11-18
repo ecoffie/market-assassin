@@ -9,17 +9,18 @@ import { NextRequest } from 'next/server';
 import fixture from '@/lib/events/__fixtures__/event-currency-notices.json';
 
 type Row = Record<string, unknown>;
-const db: { sam_opportunities: Row[]; sam_events: Row[]; upserts: Row[][]; deletes: string[][] } = {
-  sam_opportunities: [], sam_events: [], upserts: [], deletes: [],
+const db: { sam_opportunities: Row[]; sam_events: Row[]; cron_logs: Row[]; upserts: Row[][]; deletes: string[][] } = {
+  sam_opportunities: [], sam_events: [], cron_logs: [], upserts: [], deletes: [],
 };
+type Table = 'sam_opportunities' | 'sam_events' | 'cron_logs';
 
-function query(table: 'sam_opportunities' | 'sam_events') {
+function query(table: Table) {
   const filters: Array<(r: Row) => boolean> = [];
   const orders: Array<{ col: string; asc: boolean }> = [];
   let lo = 0;
   let hi = Infinity;
   let single = false;
-  let op: 'select' | 'upsert' | 'delete' = 'select';
+  let op: 'select' | 'upsert' | 'delete' | 'insert' = 'select';
   let payload: Row[] = [];
   const b: Record<string, unknown> = {
     select: () => b,
@@ -43,7 +44,12 @@ function query(table: 'sam_opportunities' | 'sam_events') {
     maybeSingle: () => { single = true; return b; },
     upsert: (rows: Row[]) => { op = 'upsert'; payload = rows; return b; },
     delete: () => { op = 'delete'; return b; },
+    insert: (row: Row) => { op = 'insert'; payload = [row]; return b; },
     then: (resolve: (v: unknown) => void) => {
+      if (op === 'insert') {
+        db.cron_logs.push(...payload);
+        return resolve({ data: null, error: null });
+      }
       if (op === 'upsert') {
         db.upserts.push(payload);
         for (const p of payload) {
@@ -73,7 +79,7 @@ function query(table: 'sam_opportunities' | 'sam_events') {
 }
 
 vi.mock('@supabase/supabase-js', () => ({
-  createClient: () => ({ from: (t: 'sam_opportunities' | 'sam_events') => query(t) }),
+  createClient: () => ({ from: (t: Table) => query(t) }),
 }));
 vi.mock('@/lib/gov-contacts/event-office', () => ({
   resolveEventOffice: async () => ({ dodaac: null, office: null, subAgency: null }),
@@ -101,9 +107,10 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://fake';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'fake';
   vi.useFakeTimers({ toFake: ['Date'] });
-  db.sam_opportunities = []; db.sam_events = []; db.upserts = []; db.deletes = [];
+  db.sam_opportunities = []; db.sam_events = []; db.cron_logs = []; db.upserts = []; db.deletes = [];
+  delete process.env.SAM_EVENTS_PRUNE;
 });
-afterEach(() => vi.useRealTimers());
+afterEach(() => { vi.useRealTimers(); delete process.env.SAM_EVENTS_PRUNE; });
 
 describe('extract-sam-events route', () => {
   it('T2: a 30-day-old notice behind an upcoming event is re-read past 600 newer notices and corrected', async () => {
@@ -142,18 +149,44 @@ describe('extract-sam-events route', () => {
     for (const r of rows) expect(r.extracted_at).toBe('2026-11-09T07:00:00.000Z');
   });
 
-  it('a listed row whose notice no longer reads as an event is retired; AI rows are never touched', async () => {
+  const seedRetirement = () => {
     vi.setSystemTime(new Date('2026-11-09T07:00:00Z'));
     const notEvent = opp({ notice_id: 'not-event', title: 'Draft Solicitation for Crypto Systems', description: 'This is a pre-solicitation notice. The RFP will follow.', notice_type: 'Presolicitation', posted_date: '2026-11-05T00:00:00+00:00', response_deadline: null, solicitation_number: 'N6523627R0004', active: true });
     db.sam_opportunities = [notEvent, ...Array.from({ length: 8 }, (_, i) => filler(i, '2026-11-08T00:00:00+00:00'))];
     db.sam_events = [
-      { notice_id: 'not-event', event_type: 'industry_day', event_date: null, source: 'sam_gov', extracted_at: '2026-11-07T07:00:00Z' },
-      ...Array.from({ length: 8 }, (_, i) => ({ notice_id: `filler-${String(i).padStart(4, '0')}`, event_type: 'rfi', event_date: '2026-12-30', source: 'sam_gov', extracted_at: '2026-11-07T07:00:00Z' })),
-      { notice_id: 'ai-1', event_type: 'conference', event_date: '2026-12-01', source: 'ai_web_search', extracted_at: '2026-11-07T07:00:00Z' },
+      { id: 'row-not-event', notice_id: 'not-event', event_type: 'industry_day', event_date: null, source: 'sam_gov', extracted_at: '2026-11-07T07:00:00Z' },
+      ...Array.from({ length: 8 }, (_, i) => ({ id: `row-${i}`, notice_id: `filler-${String(i).padStart(4, '0')}`, event_type: 'rfi', event_date: '2026-12-30', source: 'sam_gov', extracted_at: '2026-11-07T07:00:00Z' })),
+      { id: 'row-ai', notice_id: 'ai-1', event_type: 'conference', event_date: '2026-12-01', source: 'ai_web_search', extracted_at: '2026-11-07T07:00:00Z' },
     ];
+  };
+
+  it('default (no flag): deletes NOTHING, reports the proposal in the response and durably in cron_logs', async () => {
+    seedRetirement();
+    const { body } = await run();
+    expect(db.deletes).toEqual([]);
+    expect(db.sam_events.some((r) => r.notice_id === 'not-event')).toBe(true);
+    const prune = (body as unknown as { prune: Record<string, unknown> }).prune;
+    expect(prune).toMatchObject({ mode: 'report', proposed: 1, deleted: 0, recorded: true });
+    expect(prune.proposals).toEqual([{ id: 'row-not-event', notice_id: 'not-event', reason: 'no_event_on_reread', stored_type: 'industry_day', stored_date: null }]);
+    expect(db.cron_logs).toHaveLength(1);
+    expect(db.cron_logs[0]).toMatchObject({ job_name: 'extract-sam-events:prune-report', status: 'report' });
+    expect((db.cron_logs[0].result as { proposals: unknown[]; deleted: number }).deleted).toBe(0);
+  });
+
+  it('any flag value other than "apply" is still report-only', async () => {
+    seedRetirement();
+    process.env.SAM_EVENTS_PRUNE = 'true';
+    await run();
+    expect(db.deletes).toEqual([]);
+  });
+
+  it('SAM_EVENTS_PRUNE=apply: deletes exactly the capped proposal; AI rows are never touched', async () => {
+    seedRetirement();
+    process.env.SAM_EVENTS_PRUNE = 'apply';
     const { body } = await run();
     expect(db.deletes.flat()).toEqual(['not-event']);
     expect(body.stats.retired).toBe(1);
     expect(db.sam_events.some((r) => r.notice_id === 'ai-1')).toBe(true);
+    expect(db.cron_logs[0]).toMatchObject({ status: 'applied' });
   });
 });

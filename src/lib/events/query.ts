@@ -20,7 +20,8 @@ import { displayContactName } from '@/lib/gov-contacts/contact-quality';
 import { searchEventsViaAI } from '@/lib/events/ai-event-discovery';
 import { catalogOccurrencesForAgency } from '@/lib/events/catalog-occurrences';
 import { cleanEventLocation } from '@/lib/events/location';
-import { loadRetiredSourceNoticeIds, notInList } from '@/lib/events/event-currency-live';
+import { loadHiddenRows, loadRetiredSourceNoticeIds, notInList } from '@/lib/events/event-currency-live';
+import type { HiddenReason } from '@/lib/events/event-currency';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -40,6 +41,12 @@ export interface FederalEventsInput {
    * not count a curated row as a SAM event.
    */
   includeCatalog?: boolean;
+  /**
+   * History view: also return rows readers normally hide (retired source notice, or an undated event
+   * behind a closed notice), each labelled with `hidden_reason`. Hidden rows are never deleted or
+   * altered, so this is the complete record. Default false.
+   */
+  includeHidden?: boolean;
   /** Current year, passed in for the AI year-biasing (e.g. "AFCEA 2026"). */
   currentYear: number;
   limit?: number;
@@ -60,6 +67,8 @@ export interface FederalEvent {
   description: string | null;
   matched_office: string | null; // the decoded buying office, not "DEFENSE"
   confidence: number | null; // AI rows only (0..1); null for grounded SAM rows
+  /** Set only with `includeHidden`: why a normal listing leaves this row out. */
+  hidden_reason?: HiddenReason | null;
 }
 
 export interface FederalEventsResult {
@@ -76,6 +85,7 @@ export interface FederalEventsResult {
 }
 
 type SamEventRow = {
+  notice_id?: string | null;
   title: string;
   event_type: string | null;
   event_date: string | null;
@@ -144,7 +154,9 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
     const typeList = `(${ATTENDABLE_TYPES.join(',')})`;
     // R5: a row whose source notice is inactive AND past its response window is not listed.
     // Excluded inside the query, so the totals stay exact.
-    const retired = notInList(await loadRetiredSourceNoticeIds(supabase, today));
+    const hiddenRows = await loadHiddenRows(supabase, today);
+    const hiddenById = new Map((hiddenRows || []).map((h) => [h.notice_id, h.reason]));
+    const retired = input.includeHidden ? null : notInList(hiddenRows ? hiddenRows.map((h) => h.notice_id) : null);
     const live = <Q extends { not: (c: string, o: string, v: string) => Q }>(q: Q): Q => (retired ? q.not('notice_id', 'in', retired) : q);
     const [attendableRes, noticeRes] = await Promise.all([
       live(byAgency(supabase.from('sam_events').select(COLUMNS, { count: 'exact' }))
@@ -189,6 +201,7 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
         description: row.description ?? null,
         matched_office: row.inferred_office || row.inferred_subagency || row.agency || null,
         confidence: isAi && typeof row.confidence === 'number' ? row.confidence : null,
+        ...(input.includeHidden ? { hidden_reason: hiddenById.get(row.notice_id || '') ?? null } : {}),
       });
     }
   }
