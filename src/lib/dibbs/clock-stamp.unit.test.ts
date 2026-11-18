@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { freshnessBody, stampDibbsClocks } from './clock-stamp';
 
-function clockDb(opts: { readError?: string; writeError?: string; prior?: string | null }) {
+function clockDb(opts: { readError?: string; writeError?: string; writeCount?: number; prior?: string | null }) {
   return {
     from() {
       return {
@@ -26,7 +26,8 @@ function clockDb(opts: { readError?: string; writeError?: string; prior?: string
         update() {
           return {
             async eq() {
-              return { error: opts.writeError ? { message: opts.writeError } : null };
+              if (opts.writeError) return { error: { message: opts.writeError }, count: null };
+              return { error: null, count: opts.writeCount ?? 1 };
             },
           };
         },
@@ -48,6 +49,12 @@ describe('stampDibbsClocks', () => {
 
   it('a failed clock read does not invent a prior and a successful stamp', async () => {
     const stamped = await stampDibbsClocks(clockDb({ readError: 'statement timeout' }), landed);
+    expect(stamped).toBeNull();
+    expect(freshnessBody(stamped, landed.recordsReceived).nonemptyIngestAdvanced).toBe(false);
+  });
+
+  it('an update that matches zero rows does not report the nonempty ingest as advanced', async () => {
+    const stamped = await stampDibbsClocks(clockDb({ writeCount: 0 }), landed);
     expect(stamped).toBeNull();
     expect(freshnessBody(stamped, landed.recordsReceived).nonemptyIngestAdvanced).toBe(false);
   });

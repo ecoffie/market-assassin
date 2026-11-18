@@ -21,8 +21,8 @@ type DibbsClockDb = {
         }>;
       };
     };
-    update(values: Record<string, string | null>): {
-      eq(col: string, value: string): PromiseLike<{ error: ClockError }>;
+    update(values: Record<string, string | null>, options?: { count?: 'exact' }): {
+      eq(col: string, value: string): PromiseLike<{ error: ClockError; count: number | null }>;
     };
   };
 };
@@ -56,9 +56,14 @@ export async function stampDibbsClocks(
     const written = await db.from('data_source_instances').update({
       ...patch.clocks,
       updated_at: attemptedAt,
-    }).eq('source_key', 'dibbs_dla_flat_files');
+    }, { count: 'exact' }).eq('source_key', 'dibbs_dla_flat_files');
     if (written.error) {
       console.error('[sync-dibbs] clock write failed:', written.error.message);
+      return null;
+    }
+    // A filter that matches nothing returns error: null. That is not a write.
+    if ((written.count ?? 0) < 1) {
+      console.error('[sync-dibbs] clock write failed: update matched 0 rows');
       return null;
     }
     return { patch, priorVerifiedIngest };
