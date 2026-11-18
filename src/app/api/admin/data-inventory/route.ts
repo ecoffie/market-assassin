@@ -402,17 +402,13 @@ export async function GET(request: NextRequest) {
         rowTouchAt: o.asOf,
         cadenceHours: o.cadenceHours,
         now,
+        producerEnabled: inst ? producerEnabled(inst.source_key) : null,
       });
-      const disabled = inst ? producerEnabled(inst.source_key) === false : false;
-      const state = disabled && report.state === 'CURRENT' ? 'STALE' : report.state;
-      const disabledNote = disabled
-        ? 'Collector is disabled. A past ingest does not make this feed current.'
-        : null;
       return {
-        state,
+        state: report.state,
         asOf: report.asOf,
         basis: `${report.basis}. Row-touch clock was ${o.basis}.`,
-        detail: [o.detail, report.warning, disabledNote].filter(Boolean).join(' '),
+        detail: [o.detail, report.warning].filter(Boolean).join(' '),
         schedules: o.jobs ? schedules(o.jobs) : undefined,
       };
     }

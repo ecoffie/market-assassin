@@ -111,12 +111,13 @@ export async function GET(request: NextRequest) {
     warning: 'DIBBS freshness could not be read. Do not describe these RFQs as current.',
   };
   try {
-    const [touch, inst] = await Promise.all([
+    const [touch, inst, job] = await Promise.all([
       sb.from('dibbs_rfqs').select('synced_at').order('synced_at', { ascending: false }).limit(1).maybeSingle(),
       sb.from('data_source_instances')
         .select('source_state, last_poll, last_successful_check, last_verified_ingest, last_data_advance')
         .eq('source_key', 'dibbs_dla_flat_files')
         .maybeSingle(),
+      sb.from('cron_jobs').select('enabled').eq('job_name', 'sync-dibbs').maybeSingle(),
     ]);
     const row = (inst.data ?? {}) as {
       source_state?: string | null;
@@ -125,6 +126,10 @@ export async function GET(request: NextRequest) {
       last_verified_ingest?: string | null;
       last_data_advance?: string | null;
     };
+    const enabled = (job.data as { enabled?: boolean | string | null } | null)?.enabled;
+    const producerEnabled = job.error || !job.data
+      ? null
+      : enabled === true || enabled === 'true';
     const report = reportedCollectionFreshness({
       sourceState: row.source_state ?? null,
       lastPoll: row.last_poll ?? null,
@@ -135,6 +140,7 @@ export async function GET(request: NextRequest) {
       rowTouchAt: (touch.data?.synced_at as string | null) ?? null,
       cadenceHours: 24,
       now: new Date(),
+      producerEnabled,
     });
     freshness = {
       state: report.state,

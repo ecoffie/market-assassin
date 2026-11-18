@@ -121,6 +121,33 @@ export function reportedCollectionFreshness(input: {
   rowTouchAt: string | null;
   cadenceHours: number | null;
   now: Date;
+  /**
+   * False when the producer cron is disabled. A recent nonempty ingest is then
+   * STALE: the collector is not running, so that clock is a past ingest.
+   * Null means the schedule was not read; it does not invent a disabled flag.
+   */
+  producerEnabled?: boolean | null;
+}): ReportedCollectionFreshness {
+  const report = collectionFreshness(input);
+  if (input.producerEnabled !== false) return report;
+  const note = 'Collector is disabled. A past ingest does not make this feed current.';
+  return {
+    ...report,
+    state: report.state === 'CURRENT' ? 'STALE' : report.state,
+    warning: report.warning ? `${report.warning} ${note}` : note,
+  };
+}
+
+function collectionFreshness(input: {
+  sourceState: string | null;
+  lastPoll: string | null;
+  lastSuccessfulCheck: string | null;
+  lastVerifiedIngest: string | null;
+  lastDataAdvance: string | null;
+  recordsReceived: number | null;
+  rowTouchAt: string | null;
+  cadenceHours: number | null;
+  now: Date;
 }): ReportedCollectionFreshness {
   const nonempty = input.lastVerifiedIngest || input.lastDataAdvance || null;
   const base = {

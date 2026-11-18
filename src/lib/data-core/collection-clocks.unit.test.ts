@@ -145,6 +145,42 @@ describe('reportedCollectionFreshness', () => {
     expect(r.warning).toBeNull();
   });
 
+  it('a disabled collector with a recent nonempty ingest is not CURRENT', () => {
+    const r = reportedCollectionFreshness({
+      sourceState: 'current',
+      lastPoll: ATTEMPT,
+      lastSuccessfulCheck: ATTEMPT,
+      lastVerifiedIngest: '2026-11-17T08:00:00Z',
+      lastDataAdvance: null,
+      recordsReceived: 400,
+      rowTouchAt: ATTEMPT,
+      cadenceHours: 24,
+      now: NOW,
+      producerEnabled: false,
+    });
+    expect(r.state).toBe('STALE');
+    expect(r.asOf).toBe('2026-11-17T08:00:00Z');
+    expect(r.warning).toMatch(/Collector is disabled/);
+    expect(r.warning).toMatch(/does not make this feed current/);
+  });
+
+  it('an enabled collector with a recent nonempty ingest stays CURRENT', () => {
+    const r = reportedCollectionFreshness({
+      sourceState: 'current',
+      lastPoll: ATTEMPT,
+      lastSuccessfulCheck: ATTEMPT,
+      lastVerifiedIngest: '2026-11-17T08:00:00Z',
+      lastDataAdvance: null,
+      recordsReceived: 400,
+      rowTouchAt: ATTEMPT,
+      cadenceHours: 24,
+      now: NOW,
+      producerEnabled: true,
+    });
+    expect(r.state).toBe('CURRENT');
+    expect(r.warning).toBeNull();
+  });
+
   it('an old nonempty ingest is stale even if the job ran today', () => {
     const r = reportedCollectionFreshness({
       sourceState: 'current',
@@ -177,5 +213,7 @@ describe('DIBBS wiring', () => {
   it('the customer DIBBS route returns the freshness warning instead of implying current', () => {
     expect(api).toContain('reportedCollectionFreshness');
     expect(api).toContain('freshness');
+    expect(api).toContain("eq('job_name', 'sync-dibbs')");
+    expect(api).toContain('producerEnabled');
   });
 });
