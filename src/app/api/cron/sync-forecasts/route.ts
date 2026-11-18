@@ -301,7 +301,7 @@ const SOURCE_FLOOR: Record<string, number> = { DHS: 1, DOE: 1 };
  * last_verified_ingest. A missing instance row is left alone (update matches 0).
  */
 async function stampForecastClocks(
-  supabase: { from: (table: string) => { update: (values: Record<string, unknown>) => { eq: (col: string, value: string) => Promise<unknown> } } },
+  supabase: { from: (table: string) => { update: (values: Record<string, unknown>) => { eq: (col: string, value: string) => PromiseLike<unknown> } } },
   input: { perSource: Record<string, number>; failures: string[]; wrote: boolean },
 ): Promise<void> {
   const now = new Date().toISOString();
