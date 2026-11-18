@@ -22,7 +22,8 @@ describe('trial banner', () => {
     expect(doc.querySelector('button')).toBeNull();
   });
   it('shows only to free members once the tier is known, never to staff, above the top bar', () => {
-    expect(page).toContain("{tierResolved && tier === 'free' && !isStaff && <TrialOfferBanner />}");
+    // Also never inside the Mindy phone app (src/app/app/phone).
+    expect(page).toContain("{tierResolved && tier === 'free' && !isStaff && !inPhoneShell && <TrialOfferBanner />}");
     expect(page.indexOf('<TrialOfferBanner />')).toBeLessThan(page.indexOf('{/* Top Bar */}'));
   });
 });
