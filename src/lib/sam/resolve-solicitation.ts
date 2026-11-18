@@ -26,7 +26,11 @@ export const SOLICITATION_RESOLVE_COLS =
 const FAMILY_CAP = 50;
 const DESCRIPTION_HIT_CAP = 25;
 
-export type SolicitationStatus = 'open' | 'closed' | 'archived' | 'unknown';
+/**
+ * `active_no_deadline`: SAM still lists the notice as active, but it publishes no response deadline
+ * (presolicitations, special notices, sources sought). It is NOT an open solicitation and not biddable.
+ */
+export type SolicitationStatus = 'open' | 'closed' | 'archived' | 'active_no_deadline' | 'unknown';
 export type SolicitationMatchBy = 'notice_id' | 'solicitation_number' | 'description_identifier';
 
 export interface SolicitationVersionRow {
@@ -147,17 +151,35 @@ export function selectCanonicalVersion<T extends { posted_date?: string | null; 
   return ranked[0] ?? null;
 }
 
+/**
+ * Notice types that never accept offers: an award notice reports an award, a justification (J&A)
+ * explains a sole-source decision. 9,673 of 9,962 active no-deadline notices were one of these on
+ * 2026-11-17, and every one of them used to read as "Open solicitation".
+ */
+const NEVER_OPEN_TYPES = /^(award notice|justification)/i;
+
+/**
+ * Status a customer is told. Rules (Data Core 2026-11-17; consistent with #1963, which decides when a
+ * row is DEACTIVATED, not how an active row is described):
+ *   1. SAM's own archive date has passed → archived (even while `active` still says true; the
+ *      stale-cleanup that would flip it is report-only).
+ *   2. Award notices and justifications are never open.
+ *   3. Active with a FUTURE response deadline → open.
+ *   4. Active with NO response deadline → active_no_deadline (never "open").
+ *   5. Otherwise closed / unknown as before.
+ */
 export function deriveSolicitationStatus(
-  row: { active: boolean | null; response_deadline: string | null; archive_date: string | null },
+  row: { active: boolean | null; response_deadline: string | null; archive_date: string | null; notice_type?: string | null },
   now: Date = new Date(),
 ): SolicitationStatus {
   const nowMs = now.getTime();
   const deadlineMs = row.response_deadline ? Date.parse(row.response_deadline) : NaN;
   const archiveMs = row.archive_date ? Date.parse(row.archive_date) : NaN;
   const deadlineExists = Number.isFinite(deadlineMs);
-  const deadlineFuture = !deadlineExists || deadlineMs > nowMs;
-  if (row.active === true && deadlineFuture) return 'open';
   if (Number.isFinite(archiveMs) && archiveMs <= nowMs) return 'archived';
+  if (row.notice_type && NEVER_OPEN_TYPES.test(row.notice_type.trim())) return 'closed';
+  if (row.active === true && deadlineExists && deadlineMs > nowMs) return 'open';
+  if (row.active === true && !deadlineExists) return 'active_no_deadline';
   if (row.active === false) return 'closed';
   if (deadlineExists && deadlineMs <= nowMs) return 'closed';
   if (row.active == null) return 'unknown';
@@ -169,6 +191,7 @@ export function solicitationStatusLabel(status: SolicitationStatus): string {
     case 'open': return 'Open solicitation';
     case 'closed': return 'Closed solicitation';
     case 'archived': return 'Archived solicitation';
+    case 'active_no_deadline': return 'Active notice (no response deadline posted; not an open solicitation)';
     default: return 'Solicitation';
   }
 }

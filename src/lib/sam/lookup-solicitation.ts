@@ -446,6 +446,7 @@ const HOST_RULES = [
   'MATCHED_CANDIDATE is not identity. Never silently merge or pick the top hit as "the" solicitation.',
   'Same solicitation_number may collapse amendments; different numbers stay separate candidates.',
   'Closed/archived means not_biddable=true. Closed is not awarded. award_status is independent.',
+  'active_no_deadline = SAM lists the notice as active but publishes no response deadline (presolicitation, special notice, sources sought): not an open solicitation, not_biddable=true. Never call it open.',
   'After the user confirms ("yes, that\'s the one"), call lookup_solicitation with confirm_notice_id.',
   'Offer at most ONE next_prompt. Wait. Do not invent awards, debrief timing, or a post-award checklist. Do not auto-call paid tools.',
   'No web search for facts already returned.',

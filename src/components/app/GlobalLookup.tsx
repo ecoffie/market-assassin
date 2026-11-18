@@ -120,7 +120,7 @@ export default function GlobalLookup({ email }: { email: string | null }) {
         if (solData?.success && solData?.notice) {
           const n = solData.notice;
           const inc = solData.incumbent;
-          const statusAdj = n.status === 'open' ? 'open ' : n.status === 'closed' ? 'closed ' : n.status === 'archived' ? 'archived ' : '';
+          const statusAdj = n.status === 'open' ? 'open ' : n.status === 'closed' ? 'closed ' : n.status === 'archived' ? 'archived ' : n.status === 'active_no_deadline' ? 'active (no deadline) ' : '';
           if (inc?.awardId) {
             // Land the user ON the data: open the contract drawer for the likely
             // incumbent's PRIOR award, with a context line so it's clear this is the
