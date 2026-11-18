@@ -56,7 +56,7 @@ describe('buying offices: presentation', () => {
     expect(lines[header + 1]).toMatch(/^\|---/);
     const rows = lines.slice(header + 2).filter((l) => /^\| \d+\. /.test(l));
     expect(rows.length).toBe(10);
-    expect(rows[0]).toBe('| 1. FLETC Glynco Procurement Office (70LGLY) | $30.0M | 10% | 20 | Federal Law Enforcement Training Center |');
+    expect(rows[0]).toBe('| 1. FLETC Glynco Procurement Office (70LGLY) | $30.0M | 10.00% | 20 | Federal Law Enforcement Training Center |');
     expect(r.text).toMatch(/Showing 1–10 of the 47 offices with positive net obligations\./);
     expect(r.text).toMatch(/Ask "show offices 11 to 20" for the next 10\./);
     expect(r.text).toMatch(/2 more offices rank below the top 50 retrieved/);
