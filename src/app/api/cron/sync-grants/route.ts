@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { ingestGrants } from '@/lib/grants/ingest';
+import { classifyGrantsSync } from '@/lib/grants/sync-outcome';
 import { reportCronOutcome } from '@/lib/cron-self-report';
 
 export const runtime = 'nodejs';
@@ -40,19 +41,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const r = await ingestGrants(supabase);
-
-    // A run that fetched ZERO grants but did not error is a silent-failure red flag (Grants.gov
-    // always has ~1,200+ posted). Surface it as an error so the dispatcher records it + the watchdog
-    // sees it, rather than a green 200 that hides a broken upstream. `degraded` (partial fetch) is a
-    // 200 — the next run finishes it via upsert/dedupe, same as sync-dibbs' `truncated`.
-    if (r.fetched === 0) {
-      await reportCronOutcome('sync-grants', 'error', 'STARVED: fetched 0 grants (Grants.gov empty/blocked)');
-      return NextResponse.json({ success: false, error: 'STARVED: fetched 0 grants', ...r }, { status: 500 });
+    const outcome = classifyGrantsSync({ fetched: r.fetched, degraded: r.degraded });
+    await reportCronOutcome('sync-grants', outcome.cronOutcome, outcome.disclosure ?? undefined);
+    if (!outcome.success) {
+      return NextResponse.json({ success: false, error: outcome.disclosure, ...r }, { status: outcome.httpStatus });
     }
-
-    // `degraded` (a partial fetch) is still a SUCCESS — the next daily run finishes it via
-    // upsert/dedupe (same as sync-dibbs' `truncated`). Only a 0-fetch is an error (handled above).
-    await reportCronOutcome('sync-grants', 'success');
     return NextResponse.json({ success: true, ...r });
   } catch (e) {
     const msg = (e as Error).message;
