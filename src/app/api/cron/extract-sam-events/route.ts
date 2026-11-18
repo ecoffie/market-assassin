@@ -7,6 +7,10 @@
  * webinars, RFI responses, and other events.
  *
  * Runs daily at 7 AM UTC.
+ *
+ * Re-reads every notice behind a listed event plus every active candidate (R2), reconciles each
+ * against its solicitation family's current version (R3), and stamps extracted_at on every write
+ * (R4). See tasks/intelligence-infrastructure-audit-2026-11-09.md and src/lib/events/extract-run.ts.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -14,7 +18,18 @@ import { createClient } from '@supabase/supabase-js';
 import { resolveEventOffice } from '@/lib/gov-contacts/event-office';
 import { classifyEventRadarRun } from '@/lib/data-core/event-radar-advancement';
 import { extractLocation } from '@/lib/events/location';
-import { classifyEvent, extractEventDate } from '@/lib/events/classify';
+import { readNoticeEvent } from '@/lib/events/event-currency';
+import { loadActiveCandidates, loadFamilyPool, loadListedRows, loadNoticesById, type ListedEventRow } from '@/lib/events/event-currency-live';
+import { buildCandidateSet, familiesToLoad, planEvents, planRetirements, pruneMode } from '@/lib/events/extract-run';
+
+export const maxDuration = 300;
+
+/** Wall-clock budget for loading candidates (the listed rows are always read first). */
+const DEFAULT_BUDGET_MS = 200_000;
+const UPSERT_CHUNK = 500;
+/** cron_logs.job_name of the durable prune report (one row per non-dry run). */
+const PRUNE_REPORT_JOB = 'extract-sam-events:prune-report';
+const CANDIDATE_TYPES = ['Special Notice', 'Presolicitation', 'Sources Sought'];
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -42,6 +57,7 @@ interface SamOpportunity {
   solicitation_number: string | null;
   office: string | null;
   sub_tier: string | null;
+  active: boolean | null;
 }
 
 export async function GET(request: NextRequest) {
@@ -73,18 +89,41 @@ export async function GET(request: NextRequest) {
   }
   const priorIngestAt = (priorRow?.extracted_at as string | undefined) ?? null;
 
-  // Fetch Special Notices and Presolicitations from sam_opportunities
-  const { data: notices, error: fetchError } = await getSupabase()
-    .from('sam_opportunities')
-    .select('notice_id, title, description, department, notice_type, posted_date, response_deadline, ui_link, solicitation_number, office, sub_tier')
-    .in('notice_type', ['Special Notice', 'Presolicitation', 'Sources Sought'])
-    .eq('active', true)
-    .order('posted_date', { ascending: false })
-    .limit(500);
-
-  if (fetchError) {
-    return NextResponse.json({ error: fetchError.message }, { status: 500 });
+  // ── CANDIDATES (R2) ─────────────────────────────────────────────────────
+  // Was: the 500 newest active notices by posted_date (~5 days). After that a row was frozen
+  // forever — 144 of 158 upcoming attendable rows came from notices it never read again
+  // (measured 2026-11-17). Now: every notice behind a listed row FIRST (so a time-budget cut can
+  // never drop them), then every active candidate, newest first, paged.
+  const budgetMs = Math.min(Math.max(Number(searchParams.get('budgetMs')) || DEFAULT_BUDGET_MS, 10_000), DEFAULT_BUDGET_MS);
+  const deadline = startTime + budgetMs;
+  const today = new Date();
+  const runAt = today.toISOString();
+  let listedRows: ListedEventRow[];
+  let listedIds: string[];
+  let listedSources: SamOpportunity[];
+  let active: { rows: SamOpportunity[]; complete: boolean };
+  try {
+    listedRows = await loadListedRows(getSupabase(), today);
+    listedIds = Array.from(new Set(listedRows.map((r) => r.notice_id)));
+    listedSources = await loadNoticesById<SamOpportunity>(getSupabase(), listedIds);
+    active = await loadActiveCandidates<SamOpportunity>(getSupabase(), CANDIDATE_TYPES, deadline);
+  } catch (e) {
+    return NextResponse.json({ success: false, status: 'ingest_broken', error: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }
+  const notices = buildCandidateSet(listedSources, active.rows);
+  let truncated = !active.complete;
+
+  // ── FAMILY (R3) ─────────────────────────────────────────────────────────
+  // Group by solicitation number; when the family's current version reads the same event type
+  // with a date, older rows adopt it. Blank solicitation numbers have no family (known bound).
+  const ownReadings = new Map(notices.map((n) => [n.notice_id, readNoticeEvent(n, today)]));
+  let familyPool: SamOpportunity[];
+  try {
+    familyPool = await loadFamilyPool<SamOpportunity>(getSupabase(), familiesToLoad(notices, ownReadings));
+  } catch (e) {
+    return NextResponse.json({ success: false, status: 'ingest_broken', error: `family read failed: ${e instanceof Error ? e.message : String(e)}` }, { status: 500 });
+  }
+  const planned = planEvents(notices, familyPool, today);
 
   const events: {
     notice_id: string;
@@ -99,14 +138,16 @@ export async function GET(request: NextRequest) {
     inferred_dodaac: string | null;
     inferred_office: string | null;
     inferred_subagency: string | null;
+    extracted_at: string;
   }[] = [];
 
   // A candidate is NEW when it postdates the destination's prior watermark. This is
   // what separates "upstream quiet" from "examined and filtered out".
   let newCandidates = 0;
   let evaluatedWithoutDescription = 0;
+  let adopted = 0;
 
-  for (const notice of notices as SamOpportunity[]) {
+  for (const notice of notices) {
     const isNew = !priorIngestAt || (notice.posted_date ?? '') >= priorIngestAt.slice(0, 10);
     if (isNew) {
       newCandidates++;
@@ -115,57 +156,92 @@ export async function GET(request: NextRequest) {
       // result is partly a judgement on incomplete text — and must say so.
       if (!notice.description || !notice.description.trim()) evaluatedWithoutDescription++;
     }
-    const classification = classifyEvent(notice.title, notice.description);
-
-    if (classification) {
-      const eventType = classification.type;
-      const fullText = `${notice.title} ${notice.description || ''}`;
-      const eventDate = extractEventDate(notice.title, notice.description, classification, notice.response_deadline);
-      const location = extractLocation(fullText);
-      // Resolve the buying office: DoD via the solicitation-number DoDAAC, civilian
-      // via SAM's own office/sub_tier columns — so events scope to the real command
-      // (GSA/VA/HHS included), not just "DEPT OF DEFENSE" (cached lookup).
-      const office = await resolveEventOffice(notice.solicitation_number, notice.office, notice.sub_tier);
-
-      events.push({
-        notice_id: notice.notice_id,
-        title: notice.title,
-        event_type: eventType,
-        agency: notice.department,
-        event_date: eventDate,
-        event_location: location,
-        description: notice.description?.substring(0, 2000) || null,
-        source_notice_type: notice.notice_type,
-        solicitation_number: notice.solicitation_number || null,
-        inferred_dodaac: office.dodaac,
-        inferred_office: office.office,
-        inferred_subagency: office.subAgency,
-      });
-    }
   }
 
-  // Upsert events
+  for (const { notice, event } of planned) {
+    if (event.adoptedFrom) adopted++;
+    const fullText = `${notice.title} ${notice.description || ''}`;
+    const location = extractLocation(fullText);
+    // Resolve the buying office: DoD via the solicitation-number DoDAAC, civilian
+    // via SAM's own office/sub_tier columns — so events scope to the real command
+    // (GSA/VA/HHS included), not just "DEPT OF DEFENSE" (cached lookup).
+    const office = await resolveEventOffice(notice.solicitation_number, notice.office, notice.sub_tier);
+
+    events.push({
+      notice_id: notice.notice_id,
+      title: notice.title,
+      event_type: event.type,
+      agency: notice.department,
+      event_date: event.date,
+      event_location: location,
+      description: notice.description?.substring(0, 2000) || null,
+      source_notice_type: notice.notice_type,
+      solicitation_number: notice.solicitation_number || null,
+      inferred_dodaac: office.dodaac,
+      inferred_office: office.office,
+      inferred_subagency: office.subAgency,
+      // R4: the column means "last re-read" to queryFederalEvents and to the watermark.
+      extracted_at: runAt,
+    });
+  }
+
+  // Upsert events in chunks — one statement for thousands of rows is what times out the SAM
+  // full sync (audit 2026-11-09 §2.4).
   let upsertedCount = 0;
   if (!dryRun && events.length > 0) {
-    const { data: upsertData, error: upsertError } = await getSupabase()
-      .from('sam_events')
-      // The count is only corroborating evidence — the advancement classifier checks it
-      // against the destination watermark, so a capped payload cannot fake advancement.
-      // truncation-ok: upsert RECEIPT bounded by the .limit(500) source read above; it can
-      // never return 1,000 rows (sam_events holds 4,945 total, measured 2026-09-13).
-      .upsert(events, { onConflict: 'notice_id', ignoreDuplicates: false })
-      .select('id');
+    for (let i = 0; i < events.length; i += UPSERT_CHUNK) {
+      const { data: upsertData, error: upsertError } = await getSupabase()
+        .from('sam_events')
+        // The count is only corroborating evidence — the advancement classifier checks it
+        // against the destination watermark, so a capped payload cannot fake advancement.
+        // truncation-ok: upsert RECEIPT per chunk of UPSERT_CHUNK (500) rows, always < 1,000.
+        .upsert(events.slice(i, i + UPSERT_CHUNK), { onConflict: 'notice_id', ignoreDuplicates: false })
+        .select('id');
 
-    if (upsertError) {
-      console.error('[extract-sam-events] Upsert error:', upsertError);
-      return NextResponse.json({
-        success: false,
-        error: upsertError.message,
-      }, { status: 500 });
+      if (upsertError) {
+        console.error('[extract-sam-events] Upsert error:', upsertError);
+        return NextResponse.json({
+          success: false,
+          status: 'ingest_broken',
+          error: upsertError.message,
+          upsertedBeforeError: upsertedCount,
+        }, { status: 500 });
+      }
+      upsertedCount += upsertData?.length || 0;
     }
-
-    upsertedCount = upsertData?.length || 0;
   }
+
+  // Listed rows whose notice no longer reads as an event. REPORT-ONLY by default: nothing is
+  // deleted unless SAM_EVENTS_PRUNE=apply (not set anywhere; Eric's approval is separate). Every
+  // non-dry run records the proposal durably in cron_logs so it can be reviewed before approval.
+  const mode = pruneMode();
+  const retirement = planRetirements(listedRows, listedSources, new Set(planned.map((p) => p.notice.notice_id)));
+  let retiredCount = 0;
+  if (!dryRun && mode === 'apply' && retirement.proposals.length > 0) {
+    const { count, error: retireError } = await getSupabase()
+      .from('sam_events')
+      .delete({ count: 'exact' })
+      .in('id', retirement.proposals.map((p) => p.id))
+      .or('source.is.null,source.eq.sam_gov');
+    if (retireError) {
+      return NextResponse.json({ success: false, status: 'ingest_broken', error: `retire failed: ${retireError.message}`, upsertedCount }, { status: 500 });
+    }
+    retiredCount = count ?? -1; // -1 = deleted but uncounted; never reported as 0
+  }
+  let pruneReportRecorded: boolean | null = null;
+  let pruneReportError: string | null = null;
+  if (!dryRun) {
+    const { error: logError } = await getSupabase().from('cron_logs').insert({
+      job_name: PRUNE_REPORT_JOB,
+      run_date: runAt,
+      status: mode === 'apply' ? 'applied' : 'report',
+      result: { mode, proposed: retirement.proposals.length, deleted: mode === 'apply' ? retiredCount : 0, guardSkipped: retirement.skipped, wouldRetire: retirement.wouldRetire, proposals: retirement.proposals },
+    });
+    pruneReportRecorded = !logError;
+    pruneReportError = logError?.message ?? null;
+    if (logError) console.error('[extract-sam-events] prune report not recorded:', logError.message);
+  }
+  if (Date.now() > deadline) truncated = true;
 
   // Destination watermark AFTER the run.
   const { data: afterRow } = await getSupabase()
@@ -175,8 +251,8 @@ export async function GET(request: NextRequest) {
   const currentIngestAt = (afterRow?.extracted_at as string | undefined) ?? null;
 
   const advancement = classifyEventRadarRun({
-    noticesScanned: notices?.length ?? null,
-    newestCandidatePosted: (notices as SamOpportunity[])?.[0]?.posted_date ?? null,
+    noticesScanned: notices.length,
+    newestCandidatePosted: active.rows[0]?.posted_date ?? null,
     newCandidates,
     qualified: events.length,
     upserted: dryRun ? null : upsertedCount,
@@ -195,8 +271,12 @@ export async function GET(request: NextRequest) {
 
   console.log(`[extract-sam-events] Found ${events.length} events, upserted ${upsertedCount}`);
 
+  // A run cut short by its time budget did not re-read every candidate: report it as a failed
+  // job (non-2xx) instead of a success. The listed rows were read first, so they are never the
+  // ones dropped.
   return NextResponse.json({
-    success: true,
+    success: !truncated,
+    truncated,
     dryRun,
     // The four states are now distinguishable AFTER the fact, which is the whole
     // point of this change: "success" alone never was evidence of advancement.
@@ -206,17 +286,35 @@ export async function GET(request: NextRequest) {
     partialEvidence: advancement.partialEvidence,
     clocks: {
       lastPoll: new Date().toISOString(),
-      newestCandidatePosted: (notices as SamOpportunity[])?.[0]?.posted_date ?? null,
+      newestCandidatePosted: active.rows[0]?.posted_date ?? null,
       priorIngestAt,
       currentIngestAt,
     },
     stats: {
-      noticesScanned: notices?.length || 0,
+      noticesScanned: notices.length,
+      listedRowsReread: listedSources.length,
+      listedRowsMissingSource: listedIds.length - listedSources.length,
+      activeCandidates: active.rows.length,
+      activeCandidatesComplete: active.complete,
+      familyPool: familyPool.length,
+      adoptedFromCurrentVersion: adopted,
+      retired: dryRun ? null : retiredCount,
+      wouldRetire: retirement.wouldRetire,
+      retireSkipped: retirement.skipped,
       newCandidates,
       evaluatedWithoutDescription,
       eventsFound: events.length,
       eventsUpserted: upsertedCount,
       durationSeconds: duration,
+    },
+    prune: {
+      mode,
+      proposed: retirement.proposals.length,
+      deleted: dryRun ? null : retiredCount,
+      guardSkipped: retirement.skipped,
+      recorded: pruneReportRecorded,
+      recordError: pruneReportError,
+      proposals: retirement.proposals,
     },
     eventsByType,
     sampleEvents: events.slice(0, 5).map((e) => ({
@@ -225,5 +323,5 @@ export async function GET(request: NextRequest) {
       agency: e.agency,
       date: e.event_date,
     })),
-  });
+  }, { status: truncated ? 503 : 200 });
 }

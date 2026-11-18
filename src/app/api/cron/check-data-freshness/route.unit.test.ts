@@ -56,6 +56,13 @@ function builder(table: string) {
 
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ from: (t: string) => builder(t) }) }));
 vi.mock('@/lib/ops-alert', () => ({ sendOpsAlert: vi.fn(async () => ({ ok: true })) }));
+const drift = vi.hoisted(() => ({ value: null as null | Record<string, unknown> | Error }));
+vi.mock('@/lib/events/event-currency-live', () => ({
+  measureEventDrift: async () => {
+    if (drift.value instanceof Error) throw drift.value;
+    return drift.value ?? { listed: 0, examined: 0, drift: [], countable: 0, blankSolBound: 0, pendingNextRun: 0, retiredSourceHidden: 0, lastRunAt: '2026-11-17T07:00:00Z' };
+  },
+}));
 
 const { GET } = await import('./route');
 const call = (qs: string) => GET(new NextRequest(`https://getmindy.ai/api/cron/check-data-freshness?password=pw&notify=false&${qs}`));
@@ -66,6 +73,7 @@ beforeEach(() => {
   dodaac = { newest: '2026-11-06T09:00:31Z', total: 4902, inWindow: 4901 };
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-11-17T13:05:00Z'));
+  drift.value = null;
 });
 
 describe('?stamp= cannot advance a freshness stamp without evidence', () => {
@@ -109,5 +117,27 @@ describe('DoDAAC freshness comes from its rows', () => {
     dodaac = { newest: '2026-09-06T09:00:00Z', total: 4902, inWindow: 0 };
     const body = await (await call('')).json();
     expect(body.stale.find((s: { key: string }) => s.key === 'dodaac_directory')?.refreshWith).toMatch(/^stale:/);
+  });
+});
+
+describe('event currency (R6) is a live check', () => {
+  it('no drift: current, no alert', async () => {
+    const body = await (await call('')).json();
+    expect(body.eventCurrency.status).toBe('current');
+    expect(body.stale.map((s: { key: string }) => s.key)).not.toContain('sam_events_currency');
+  });
+
+  it('listed events that disagree with the current notice version raise an alert; blank-sol and pending are not counted', async () => {
+    drift.value = { listed: 158, examined: 152, drift: [], countable: 64, blankSolBound: 18, pendingNextRun: 2, retiredSourceHidden: 6, lastRunAt: '2026-11-17T07:00:00Z' };
+    const body = await (await call('')).json();
+    expect(body.eventCurrency).toMatchObject({ status: 'drift', drift: 64, blankSolBound: 18, pendingNextRun: 2 });
+    expect(body.stale.find((s: { key: string }) => s.key === 'sam_events_currency')?.name).toContain('64');
+  });
+
+  it('a failed probe is unmeasured and alerts — never reported as current', async () => {
+    drift.value = new Error('statement timeout');
+    const body = await (await call('')).json();
+    expect(body.eventCurrency.status).toBe('unmeasured');
+    expect(body.stale.find((s: { key: string }) => s.key === 'sam_events_currency')?.refreshWith).toContain('statement timeout');
   });
 });

@@ -71,3 +71,14 @@ export function catalogOccurrencesForAgency(agency: string, todayStr: string, ho
   }
   return rows.sort((a, b) => a.event_date.localeCompare(b.event_date));
 }
+
+/** Every catalog entry with a verified, not-yet-finished occurrence (name + start), any agency. */
+export function catalogFutureDates(todayStr: string): Array<{ name: string; start: string }> {
+  const conferences = (eventsStaticData as { majorAnnualConferences?: DatedConference[] }).majorAnnualConferences || [];
+  const out: Array<{ name: string; start: string }> = [];
+  for (const c of conferences) {
+    const o = currentOccurrence(c.next_occurrence, todayStr);
+    if (o && c.name) out.push({ name: c.name, start: o.start });
+  }
+  return out;
+}
