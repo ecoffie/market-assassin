@@ -134,6 +134,28 @@ describe('buildOpportunityContextBlock — facts only from the record', () => {
     expect(block).toContain('3 references of similar value');
     expect(block.length).toBeLessThan(25000);
   });
+  it('does not call a past-deadline notice active just because SAM has not archived it', () => {
+    const { block } = buildOpportunityContextBlock({
+      ...rec,
+      active: true,
+      response_deadline: '2020-01-02T00:00:00Z',
+    }, 'is this still open?');
+    expect(block).not.toMatch(/Status: active/);
+    expect(block).toMatch(/Solicitation status: closed/);
+    expect(block).toMatch(/not archived/);
+    expect(block).toMatch(/not an award/);
+    expect(block).toMatch(/not a contract performance period/);
+  });
+  it('does not treat a missing deadline on an award notice as open for responses', () => {
+    const { block } = buildOpportunityContextBlock({
+      ...rec,
+      notice_type: 'Award Notice',
+      active: true,
+      response_deadline: null,
+    }, 'is this open?');
+    expect(block).not.toMatch(/Status: active/);
+    expect(block).toMatch(/Do not describe it as open for responses/);
+  });
   it('says what is absent instead of filling it in', () => {
     const { block } = buildOpportunityContextBlock({ ...rec, set_aside_description: null, description: 'https://api.sam.gov/prod/opportunities/v1/noticedesc?noticeid=x', sow_text: null }, 'q');
     expect(block).toContain('Set-aside: not stated in the record');
