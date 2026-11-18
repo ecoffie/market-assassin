@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import {
   extractDocumentNumber,
   dedupeLegacyAgainstSourced,
+  getAgencySourcedIntelligence,
   loadLegacyPainPointsForAgency,
   formatPainPointForDisplay,
   omitUnsourcedDollarAmounts,
@@ -12,6 +13,7 @@ import {
   toCitation,
   type SourcedPainPoint,
 } from './sourced-pain-points';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 const sourced = (o: Partial<SourcedPainPoint>): SourcedPainPoint => ({
   agency: 'Department of Transportation',
@@ -128,5 +130,33 @@ describe('sourced pain points — provenance contract', () => {
     });
     expect(formatPainPointForDisplay(s)).toMatch(/\$16\.1B/);
     expect(toCitation(s).claim).toMatch(/\$16\.1B/);
+  });
+
+  it('marks a thrown living read as failed and an empty result as not failed', async () => {
+    const down = {
+      from() {
+        throw new Error('down');
+      },
+    } as unknown as SupabaseClient;
+    const failed = await getAgencySourcedIntelligence('Department of Defense', { client: down });
+    expect(failed.meta.sourcedReadFailed).toBe(true);
+    expect(failed.sourced).toEqual([]);
+    expect(failed.legacy.length).toBeGreaterThan(0);
+
+    const empty = {
+      from() {
+        const chain = {
+          select: () => chain,
+          in: () => chain,
+          eq: () => chain,
+          order: () => chain,
+          limit: async () => ({ data: [], error: null }),
+        };
+        return chain;
+      },
+    } as unknown as SupabaseClient;
+    const none = await getAgencySourcedIntelligence('Department of Defense', { client: empty });
+    expect(none.meta.sourcedReadFailed).toBe(false);
+    expect(none.sourced).toEqual([]);
   });
 });

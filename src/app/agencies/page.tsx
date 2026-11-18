@@ -3,7 +3,7 @@
  *
  * Programmatic SEO surface for buyer-intent queries like
  * "federal agencies that buy [X]" and "[agency] contract opportunities".
- * Groups the 49-agency canonical list by Cabinet / independent /
+ * Groups the public agency directory by Cabinet / independent /
  * small so the page is scannable, sorted within each group by FY26
  * budget so the biggest buyers surface first.
  *
@@ -14,23 +14,20 @@
 import type { Metadata } from 'next';
 import MeetMindyStrip from '@/components/MeetMindyStrip';
 import Link from 'next/link';
-import {
-  AGENCIES_SEO,
-  getAgenciesByGroup,
-  type AgencySeo,
-} from '@/data/agencies-seo';
+import type { AgencySeo } from '@/data/agencies-seo';
+import { listPublicAgencies } from '@/lib/seo/public-agency-pages';
 
 export const metadata: Metadata = {
   title:
     'Federal Agency Directory — Contract Opportunities by Buyer | Mindy',
   description:
-    'Browse 49 federal agencies by spending, pain points, and procurement portals. Find the right buyer for your NAICS — and get daily opportunity alerts from Mindy.',
+    `Browse ${listPublicAgencies().length} federal agencies by spending, pain points, and procurement portals. Find the right buyer for your NAICS — and get daily opportunity alerts from Mindy.`,
   alternates: { canonical: 'https://getmindy.ai/agencies' },
   openGraph: {
     title:
       'Federal Agency Directory — Contract Opportunities by Buyer | Mindy',
     description:
-      'Browse 49 federal agencies by spending, pain points, and procurement portals. Find the right buyer for your NAICS.',
+      `Browse ${listPublicAgencies().length} federal agencies by spending, pain points, and procurement portals. Find the right buyer for your NAICS.`,
     type: 'website',
     url: 'https://getmindy.ai/agencies',
   },
@@ -47,17 +44,18 @@ export const metadata: Metadata = {
 // Total spend across agencies that have budget data. Used in the hero
 // stat block. Computed at module scope (not inside render) because
 // AGENCIES_SEO is a static import.
-const TOTAL_BUDGET_B = AGENCIES_SEO.reduce(
+const PUBLIC_AGENCIES = listPublicAgencies();
+const TOTAL_BUDGET_B = PUBLIC_AGENCIES.reduce(
   (sum, a) => sum + (a.fy26BudgetB ?? 0),
   0,
 );
 
 export default function AgenciesIndexPage() {
-  const defense = getAgenciesByGroup('defense');
-  const health = getAgenciesByGroup('health');
-  const civilian = getAgenciesByGroup('civilian');
-  const independent = getAgenciesByGroup('independent');
-  const small = getAgenciesByGroup('small');
+  const defense = PUBLIC_AGENCIES.filter((a) => a.group === 'defense');
+  const health = PUBLIC_AGENCIES.filter((a) => a.group === 'health');
+  const civilian = PUBLIC_AGENCIES.filter((a) => a.group === 'civilian');
+  const independent = PUBLIC_AGENCIES.filter((a) => a.group === 'independent');
+  const small = PUBLIC_AGENCIES.filter((a) => a.group === 'small');
 
   // ItemList JSON-LD signals to Google that this is a curated list of
   // entities. Each entry points at its detail page so the crawl graph
@@ -88,8 +86,8 @@ export default function AgenciesIndexPage() {
         name: 'Federal Agency Directory',
         description:
           'Federal agencies with spending, pain points, and procurement portals.',
-        numberOfItems: AGENCIES_SEO.length,
-        itemListElement: AGENCIES_SEO.map((a, i) => ({
+        numberOfItems: PUBLIC_AGENCIES.length,
+        itemListElement: PUBLIC_AGENCIES.map((a, i) => ({
           '@type': 'ListItem',
           position: i + 1,
           url: `https://getmindy.ai/agencies/${a.slug}`,
@@ -141,20 +139,20 @@ export default function AgenciesIndexPage() {
             <span className="text-(--mp-navy)">Contract Opportunities by Buyer</span>
           </h1>
           <p className="text-lg md:text-xl text-(--mp-body) max-w-2xl mx-auto mb-10">
-            {AGENCIES_SEO.length} federal agencies, ranked by FY26 budget.
+            {PUBLIC_AGENCIES.length} federal agencies, ranked by FY26 budget.
             Click any agency to see what they buy, where they post
             opportunities, and what they actually struggle with.
           </p>
 
           <div className="grid grid-cols-3 gap-4 max-w-2xl mx-auto">
-            <Stat label="Agencies" value={AGENCIES_SEO.length.toString()} />
+            <Stat label="Agencies" value={PUBLIC_AGENCIES.length.toString()} />
             <Stat
               label="FY26 Budget Tracked"
               value={`$${Math.round(TOTAL_BUDGET_B).toLocaleString()}B`}
             />
             <Stat
               label="Procurement Portals"
-              value={`${AGENCIES_SEO.reduce(
+              value={`${PUBLIC_AGENCIES.reduce(
                 (n, a) => n + a.procurement.secondarySources.length,
                 0,
               )}+`}
