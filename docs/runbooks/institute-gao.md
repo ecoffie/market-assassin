@@ -41,7 +41,7 @@ coerced to one department. Phrase map: `src/lib/institute/document-agency.ts`.
 - Merge legacy GovInfo `GAOREPORTS` / `agency_intelligence` into these clocks
 - Delete `agency-pain-points.json`
 - Start Federal Register or CRS from this runbook without an explicit task
-- Page through the full oversight.gov history. One run reads page 0 only and inserts at most 200 new Institute rows
+- Walk oversight.gov past the first page whose source ids are all already held, or past 8 pages, or past 200 new Institute rows. That is the whole backfill guard.
 - Delete or rewrite `agency_pain_points_db` rows, the 278 legacy `(Source: GAO)` strings, the replacement candidates, or `gao_high_risk`
 - Present AI `build-pain-points` output as SOURCE_FACT
 

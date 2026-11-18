@@ -17,22 +17,28 @@
  * Failure modes report as THEMSELVES — never as a quiet upstream.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
   fetchGaoReports,
   ingestInstituteDocument,
   reconcileUnresolvedGaoAgencies,
 } from '@/lib/institute/sources';
 import { deriveAcquiredPainPoint, deriveFromInstituteSource } from '@/lib/strategic-intel/derive';
-import { resolveAgency } from '@/lib/strategic-intel/agency-resolver';
 import {
   ACQUISITION_NEW_ROW_CAP,
+  ACQUISITION_PAGE_CAP,
   annotateGaoRssDocument,
   capNewAcquisition,
-  loadOversightLanes,
+  collectOpenRecommendations,
+  fetchTextSource,
+  laneFromFetch,
+  OVERSIGHT_FEDERAL_REPORTS_URL,
+  parseOversightFederalReports,
   toInstituteDocument,
   type AcquisitionLane,
+  type OpenRecommendationWalk,
 } from '@/lib/institute/acquired-pain-points';
+import { resolveOversightStatedAgency } from '@/lib/institute/oig-stated-agency';
 import { reportCronOutcome } from '@/lib/cron-self-report';
 import {
   GAO_SOURCE_KEY,
@@ -70,9 +76,28 @@ async function dispatchAlerts(db: ReturnType<typeof sb>, alerts: GaoAlertCandida
   return fired;
 }
 
-function acquisitionSummary(lanes: AcquisitionLane[]) {
+async function lookupHeldIgIds(
+  db: SupabaseClient,
+  numbers: string[],
+): Promise<{ ids: Set<string>; error: string | null }> {
+  if (numbers.length === 0) return { ids: new Set(), error: null };
+  const { data, error } = await db.from('institute_sources')
+    .select('document_number')
+    .eq('source_type', 'ig_report')
+    .in('document_number', numbers)
+    .limit(numbers.length);
+  if (error) return { ids: new Set(), error: error.message };
+  return { ids: new Set((data ?? []).map((row) => row.document_number)), error: null };
+}
+
+function acquisitionSummary(lanes: AcquisitionLane[], openRecs: OpenRecommendationWalk) {
   return {
     cap: ACQUISITION_NEW_ROW_CAP,
+    pageCap: ACQUISITION_PAGE_CAP,
+    openRecommendations: {
+      pagesFetched: openRecs.pagesFetched,
+      stop: openRecs.stop,
+    },
     lanes: lanes.map((lane) => ({
       name: lane.name,
       ok: lane.ok,
@@ -180,9 +205,22 @@ export async function GET(request: NextRequest) {
     }, { status: 502 });
   }
 
-  // Inspector General reports and open recommendations. Same pipeline, page 0
-  // only. A non-2xx or an empty parse is a down source, not "0 new rows".
-  const oversight = await loadOversightLanes();
+  // Open recommendations walk newest-first and stop at the first fully held
+  // page, the row cap, or the page cap. Federal reports stay on page 0.
+  // A non-2xx or an empty parse is a down source, not "0 new rows".
+  const openRecs = await collectOpenRecommendations({
+    heldIds: (numbers) => lookupHeldIgIds(db, numbers),
+  });
+  const federalFetched = await fetchTextSource(OVERSIGHT_FEDERAL_REPORTS_URL);
+  const federalLane = laneFromFetch('oversight_federal_reports', federalFetched, parseOversightFederalReports);
+  const openLane: AcquisitionLane = {
+    name: 'oversight_open_recommendations',
+    ok: openRecs.stop !== 'source_down',
+    httpStatus: openRecs.httpStatus,
+    error: openRecs.stop === 'source_down' ? openRecs.error : null,
+    documents: openRecs.documents,
+  };
+  const oversight = [openLane, federalLane];
   const sourceDown = oversight.filter((lane) => !lane.ok);
 
   // Watermark comes ONLY from documents we actually parsed — never Mindy time.
@@ -192,7 +230,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: sourceDown.length === 0,
       mode, pollOk: true, documentsSeen: docs.length, sourceWatermark,
-      acquisition: acquisitionSummary(oversight),
+      acquisition: acquisitionSummary(oversight, openRecs),
       note: sourceDown.length === 0
         ? 'preview — nothing written'
         : 'preview — a source is down, nothing written. This is not "0 new rows".',
@@ -266,47 +304,45 @@ export async function GET(request: NextRequest) {
   }
 
   // ── 3c. IG open recommendations + federal reports (additive, capped) ────
+  // Open-recommendation documents are already the new rows inside the cap.
+  // Federal page 0 uses whatever room is left. Neither path updates or deletes.
   let igInserted = 0;
-  let igHeldSkipped = 0;
-  let igDeferred = 0;
-  const igCandidates = oversight.flatMap((lane) => lane.documents);
-  if (igCandidates.length > 0) {
-    const numbers = igCandidates.map((d) => d.documentNumber);
-    const { data: heldRows, error: heldErr } = await db.from('institute_sources')
-      .select('document_number')
-      .eq('source_type', 'ig_report')
-      .in('document_number', numbers)
-      .limit(numbers.length);
-    if (heldErr) {
+  let igHeldSkipped = openRecs.heldSkipped;
+  let igDeferred = openRecs.deferredOverCap;
+  const igCandidates = [...openRecs.documents];
+  if (federalLane.ok && federalLane.documents.length > 0) {
+    const lookup = await lookupHeldIgIds(db, federalLane.documents.map((doc) => doc.documentNumber));
+    if (lookup.error) {
       failed++;
-      console.error('[institute-gao-sync] held IG id read failed:', heldErr.message);
+      console.error('[institute-gao-sync] held IG id read failed:', lookup.error);
     } else {
-      const held = new Set((heldRows ?? []).map((r) => r.document_number as string));
-      const batch = capNewAcquisition(igCandidates, held, ACQUISITION_NEW_ROW_CAP);
-      igHeldSkipped = batch.heldSkipped;
-      igDeferred = batch.deferredOverCap;
-      for (const doc of batch.selected) {
-        if (Date.now() - started > budgetMs) { partial = true; break; }
-        const resolution = resolveAgency({ agencyName: doc.agencyAsStated });
-        const ing = await ingestInstituteDocument(db, toInstituteDocument(doc), names, {
-          agencyResolution: resolution,
-        });
-        if (ing.error) { failed++; continue; }
-        if (ing.inserted) { evidenceInserted++; igInserted++; }
-        else alreadyHeld++;
-        if (!doc.statesProblem || !doc.problem) continue;
-        const der = await deriveAcquiredPainPoint(db, {
-          instituteSourceId: ing.instituteSourceId,
-          documentNumber: doc.documentNumber,
-          problem: doc.problem,
-          url: doc.url,
-          resolution,
-          sourceKind: 'ig_report',
-        });
-        if (der.outcome === 'pain_point_created') painPointsCreated++;
-        else if (der.outcome === 'blocked_history_unavailable' || der.outcome === 'blocked_legacy_gao_reinjection') blocked++;
-      }
+      const room = ACQUISITION_NEW_ROW_CAP - igCandidates.length;
+      const batch = capNewAcquisition(federalLane.documents, lookup.ids, Math.max(0, room));
+      igHeldSkipped += batch.heldSkipped;
+      igDeferred += batch.deferredOverCap;
+      igCandidates.push(...batch.selected);
     }
+  }
+  for (const doc of igCandidates) {
+    if (Date.now() - started > budgetMs) { partial = true; break; }
+    const resolution = resolveOversightStatedAgency(doc.agencyAsStated);
+    const ing = await ingestInstituteDocument(db, toInstituteDocument(doc), names, {
+      agencyResolution: resolution,
+    });
+    if (ing.error) { failed++; continue; }
+    if (ing.inserted) { evidenceInserted++; igInserted++; }
+    else alreadyHeld++;
+    if (!doc.statesProblem || !doc.problem) continue;
+    const der = await deriveAcquiredPainPoint(db, {
+      instituteSourceId: ing.instituteSourceId,
+      documentNumber: doc.documentNumber,
+      problem: doc.problem,
+      url: doc.url,
+      resolution,
+      sourceKind: 'ig_report',
+    });
+    if (der.outcome === 'pain_point_created') painPointsCreated++;
+    else if (der.outcome === 'blocked_history_unavailable' || der.outcome === 'blocked_legacy_gao_reinjection') blocked++;
   }
 
   // ── 4. FIVE CLOCKS on data_source_instances ─────────────────────────────
@@ -406,7 +442,7 @@ export async function GET(request: NextRequest) {
     freshness,
     alertsFired,
     acquisition: {
-      ...acquisitionSummary(oversight),
+      ...acquisitionSummary(oversight, openRecs),
       igInserted,
       igHeldSkipped,
       igDeferred,

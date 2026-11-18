@@ -18,6 +18,8 @@
 import type { InstituteDocument } from './sources';
 
 export const ACQUISITION_NEW_ROW_CAP = 200;
+/** Hard stop on how many open-recommendation pages one run may fetch. */
+export const ACQUISITION_PAGE_CAP = 8;
 export const OVERSIGHT_ORIGIN = 'https://www.oversight.gov';
 export const OVERSIGHT_OPEN_RECOMMENDATIONS_URL = `${OVERSIGHT_ORIGIN}/reports/recommendations`;
 export const OVERSIGHT_FEDERAL_REPORTS_URL = `${OVERSIGHT_ORIGIN}/reports/federal`;
@@ -318,6 +320,141 @@ export function parseOversightFederalReports(html: string): AcquiredDocument[] {
     });
   }
   return out;
+}
+
+export function oversightPageUrl(base: string, page: number): string {
+  if (page <= 0) return base;
+  const url = new URL(base);
+  url.searchParams.set('page', String(page));
+  return url.toString();
+}
+
+export type PageWalkStop = 'continue' | 'all_held' | 'row_cap';
+
+/**
+ * Newest page first. A page whose ids are all already held means we have
+ * caught up: do not read older pages. A page that still has new ids is taken
+ * until the row cap, and the rest of that page is deferred.
+ */
+export function takeNewFromPage<T extends { documentNumber: string }>(
+  documents: readonly T[],
+  held: ReadonlySet<string>,
+  alreadySelected: number,
+  rowCap: number,
+): { take: T[]; heldOnPage: number; stop: PageWalkStop } {
+  const fresh = documents.filter((doc) => !held.has(doc.documentNumber));
+  const heldOnPage = documents.length - fresh.length;
+  if (documents.length > 0 && fresh.length === 0) {
+    return { take: [], heldOnPage, stop: 'all_held' };
+  }
+  const room = Math.max(0, rowCap - alreadySelected);
+  return {
+    take: fresh.slice(0, room),
+    heldOnPage,
+    stop: fresh.length > room ? 'row_cap' : 'continue',
+  };
+}
+
+export interface OpenRecommendationWalk {
+  documents: AcquiredDocument[];
+  pagesFetched: number;
+  stop: 'all_held' | 'row_cap' | 'page_cap' | 'source_down';
+  error: string | null;
+  httpStatus: number | null;
+  heldSkipped: number;
+  deferredOverCap: number;
+}
+
+/**
+ * Walk oversight.gov open recommendations from page 0 forward.
+ * Stops at the first page whose source ids are all already held, at the row
+ * cap, at the page cap, or when a page is down. Older pages after a fully
+ * held page are not requested.
+ */
+export async function collectOpenRecommendations(opts: {
+  fetchImpl?: typeof fetch;
+  heldIds: (documentNumbers: string[]) => Promise<{ ids: ReadonlySet<string>; error: string | null }>;
+  rowCap?: number;
+  pageCap?: number;
+}): Promise<OpenRecommendationWalk> {
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  const rowCap = opts.rowCap ?? ACQUISITION_NEW_ROW_CAP;
+  const pageCap = opts.pageCap ?? ACQUISITION_PAGE_CAP;
+  const selected: AcquiredDocument[] = [];
+  const seen = new Set<string>();
+  let heldSkipped = 0;
+  let deferredOverCap = 0;
+
+  for (let page = 0; page < pageCap; page++) {
+    const url = oversightPageUrl(OVERSIGHT_OPEN_RECOMMENDATIONS_URL, page);
+    const fetched = await fetchTextSource(url, fetchImpl);
+    const lane = laneFromFetch('oversight_open_recommendations', fetched, parseOversightOpenRecommendations);
+    if (!lane.ok) {
+      return {
+        documents: selected,
+        pagesFetched: page + 1,
+        stop: 'source_down',
+        error: lane.error,
+        httpStatus: lane.httpStatus,
+        heldSkipped,
+        deferredOverCap,
+      };
+    }
+    const lookup = await opts.heldIds(lane.documents.map((doc) => doc.documentNumber));
+    if (lookup.error) {
+      return {
+        documents: selected,
+        pagesFetched: page + 1,
+        stop: 'source_down',
+        error: lookup.error,
+        httpStatus: lane.httpStatus,
+        heldSkipped,
+        deferredOverCap,
+      };
+    }
+    const novel = lane.documents.filter((doc) => !seen.has(doc.documentNumber));
+    if (lane.documents.length > 0 && novel.length === 0) {
+      return {
+        documents: selected,
+        pagesFetched: page + 1,
+        stop: 'all_held',
+        error: null,
+        httpStatus: 200,
+        heldSkipped,
+        deferredOverCap,
+      };
+    }
+    const decision = takeNewFromPage(novel, lookup.ids, selected.length, rowCap);
+    heldSkipped += decision.heldOnPage;
+    for (const doc of decision.take) {
+      selected.push(doc);
+      seen.add(doc.documentNumber);
+    }
+    if (decision.stop === 'row_cap') {
+      deferredOverCap += novel.filter((doc) => !lookup.ids.has(doc.documentNumber)).length - decision.take.length;
+    }
+    if (decision.stop !== 'continue') {
+      return {
+        documents: selected,
+        pagesFetched: page + 1,
+        stop: decision.stop,
+        error: null,
+        httpStatus: 200,
+        heldSkipped,
+        deferredOverCap,
+      };
+    }
+  }
+
+  return {
+    documents: selected,
+    pagesFetched: pageCap,
+    stop: 'page_cap',
+    error: null,
+    httpStatus: 200,
+    heldSkipped,
+    deferredOverCap,
+  };
 }
 
 export function capNewAcquisition<T extends { documentNumber: string }>(
