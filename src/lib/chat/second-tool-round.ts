@@ -156,6 +156,9 @@ export function toolCallIdentityKey(tool: string, args: string | Record<string, 
     if (DEDUPE_IGNORE_KEYS.has(k)) continue;
     const v = parsed[k];
     if (v == null) continue;
+    // Omit zero offsets so "no display_offset" and "display_offset:0" compare equal
+    // (avoids a harmless redundant page-1 replay when the planner restates offset 0).
+    if ((k === 'display_offset' || k === 'offset' || k === 'page' || k === '__page') && Number(v) === 0) continue;
     if (Array.isArray(v)) {
       norm[k] = [...v].map((x) => String(x).trim().toUpperCase()).filter(Boolean).sort();
     } else if (typeof v === 'string') {

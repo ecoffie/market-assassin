@@ -187,6 +187,8 @@ describe('toolCallIdentityKey + dropDuplicateRound2Calls', () => {
     const page0 = toolCallIdentityKey('search_past_contracts', '{"keyword":"snow","state":"MA","display_offset":0}');
     const page1 = toolCallIdentityKey('search_past_contracts', '{"keyword":"snow","state":"MA","display_offset":10}');
     expect(page0).not.toBe(page1);
+    // Omitted offset ≡ explicit 0 (no false "new page")
+    expect(page0).toBe(toolCallIdentityKey('search_past_contracts', '{"keyword":"snow","state":"MA"}'));
     const cross = dropDuplicateRound2Calls(
       [{ id: 'p2', function: { name: 'search_past_contracts', arguments: '{"keyword":"snow","state":"MA","display_offset":10}' } }],
       [{ tool: 'search_past_contracts', args: '{"keyword":"snow","state":"MA","display_offset":0}' }],
