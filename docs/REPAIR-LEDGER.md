@@ -26,6 +26,16 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-18 — Inventory honesty (no SBIR park) + historical GAO labels + SBIR retries
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | Data inventory / DIBBS + null clocks | Migration demotes false-green `current` without clocks (DIBBS → content_stale/blocked + live held_population; SAM/grants/DHS/DOE forecast instances → unmeasured). **Does NOT park sync-dod-sbir** (prior draft section removed; never applied to prod). Documents keep-ENABLED recovery policy on the cron row. | `never park this job for an empty corpus` → `supabase/migrations/20261118_park_false_green_freshness.sql` · `held_population    = (SELECT count(*)::integer FROM public.dibbs_rfqs)` → same file · `does NOT park sync-dod-sbir` → `src/lib/data-core/freshness-honesty.unit.test.ts` | Unit locks no enabled=FALSE. Apply waiting Agent 4 APPROVE. Measured pre-apply: dibbs still current/57816, four null-clock keys still current, sync-dod-sbir enabled=true. | WAITING AGENT 4 APPLY |
+| 2026-11-18 | SBIR sync recovery | Keep empty/api-down → HTTP 503 honesty; add bounded in-run probe retries so temporary sbir.gov unavailability recovers on a later attempt/tick without parking the job. | `probeDodSbirWithRetries` → `src/lib/sbir/dod-sbir-outcome.ts` · `cron stays enabled for recovery` → `src/app/api/cron/sync-dod-sbir/route.ts` | `dod-sbir-outcome.unit.test.ts` 8/8 | SHIPPING |
+| 2026-11-18 | GAO pain points / raw surfaces | Raw paths (pain-points.ts, agency-hierarchy linker, briefings aggregator) + shared display helper now label bare `(Source: GAO)` with government date + `[LEGACY_MANUAL — provenance unavailable]`. **278 preserved** (no retirement). Dates from `legacy-gao-publication-dates.json` (archive file still unreferenced by src). | `historical GAO finding` → `src/lib/strategic-intel/legacy-gao-painpoints.ts` · `labelHistoricalGaoPainPoint` → same | `legacy-gao-painpoints.unit.test.ts` 13/13; `sourced-pain-points.unit.test.ts` 9/9 | SHIPPING |
+| 2026-11-18 | GAO candidates (prepare only) | Validated all **51** net-new candidates: citations, https URLs, publication dates ≥2001, agency present. **0 failures.** No served-JSON write. | `"validation_pass": 51` → `tasks/gao-candidates-validation-2026-11-18.json` | node validator against proposal JSON | PREPARE ONLY |
+
+---
 ## 2026-11-18 — SAM status contradictions
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
@@ -37,6 +47,8 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 | Date | Area | Fix | Proof anchor | Verified | Status |
 |---|---|---|---|---|---|
 | 2026-11-18 | GAO merge guard + events prune log | #2165 (merge `b4d275843`) already skips `gao_high_risk`, refuses `--merge` on a `(Source: GAO)` leak, and returns 500 when the prune-report insert fails. This row locks that code with a regression test after rebasing off the duplicate edit. Prune stays report-only unless `SAM_EVENTS_PRUNE=apply`. The 278 served strings, the 51 replacements, and the 53 event ids are not changed. Decision-pack files from #2165 stay documentation; they are not a data write. | `REFUSED: converted set still contains "(Source: GAO)" pain points.` → `scripts/merge-agency-intelligence.js` · `prune report not recorded:` → `src/app/api/cron/extract-sam-events/route.ts` | `gao-events-safeguards.unit.test.ts` against main's #2165 code. No pain-point JSON edit. No event delete. | BUILT, NOT MERGED |
+
+---
 
 ## 2026-11-18 — Forecast currency release + Ask Mindy Map bridge
 

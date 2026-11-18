@@ -11,12 +11,20 @@
  *
  * Honesty (2026-11-18): api-down / empty corpus MUST NOT report success. The prior reachability gate
  * returned HTTP 200 + success:true while dod_sbir_topics stayed at 0 — a false green. Outcome is
- * decided by decideDodSbirExecuteOutcome; the job is also parked in cron_jobs pending upstream recovery.
+ * decided by decideDodSbirExecuteOutcome.
+ *
+ * Recovery (Eric 2026-11-18): keep this cron ENABLED. A down probe retries a few times inside the
+ * run, then returns HTTP 503. The next dispatcher tick drains automatically when the source returns.
+ * Do not park sync-dod-sbir for temporary unavailability.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchDodSbirPage, type DodSbirTopic } from '@/lib/sbir/dod-sbir';
-import { decideDodSbirExecuteOutcome, type DodSbirStop } from '@/lib/sbir/dod-sbir-outcome';
+import {
+  decideDodSbirExecuteOutcome,
+  probeDodSbirWithRetries,
+  type DodSbirStop,
+} from '@/lib/sbir/dod-sbir-outcome';
 import { reportCronOutcome } from '@/lib/cron-self-report';
 
 export const runtime = 'nodejs';
@@ -69,19 +77,25 @@ export async function GET(request: NextRequest) {
   let stopped: DodSbirStop = 'last-page';
   const client = sb();
 
-  // Reachability gate: one page up front. api-down is reported as failure (not success) so
-  // cron_jobs / cron_job_runs cannot manufacture health over an empty corpus.
-  const probe = await fetchDodSbirPage({ scope, rows: PAGE, start: 0 });
+  // Reachability gate with controlled retries. api-down is reported as failure (not success)
+  // so cron_jobs / cron_job_runs cannot manufacture health over an empty corpus — and the
+  // job stays enabled so a later tick recovers when sbir.gov returns.
+  const { page: probe, attemptsUsed: probeAttempts } = await probeDodSbirWithRetries(
+    () => fetchDodSbirPage({ scope, rows: PAGE, start: 0 }),
+  );
   if (probe.rateLimited || probe.degraded) {
     const held = await heldCount(client);
     const outcome = decideDodSbirExecuteOutcome({ stopped: 'api-down', upserted: 0, heldRows: held });
-    await reportCronOutcome(JOB_NAME, outcome.cronOutcome, outcome.disclosure);
+    const disclosure =
+      `${outcome.disclosure} (probeAttempts=${probeAttempts}; cron stays enabled for recovery)`;
+    await reportCronOutcome(JOB_NAME, outcome.cronOutcome, disclosure);
     return NextResponse.json({
       success: outcome.success, mode, scope, pages: 0, upserted: 0,
       stopped: 'api-down' as const, apiReachable: false,
       heldRows: held,
-      disclosure: outcome.disclosure,
-      note: outcome.disclosure,
+      probeAttempts,
+      disclosure,
+      note: disclosure,
       elapsedMs: Date.now() - started,
     }, { status: outcome.httpStatus });
   }
@@ -122,6 +136,7 @@ export async function GET(request: NextRequest) {
     success: outcome.success,
     mode, scope, pages, upserted, rateLimitHits, stopped,
     heldRows: held,
+    probeAttempts,
     disclosure: outcome.disclosure || undefined,
     nextStart: stopped === 'budget' ? start : 0,
     elapsedMs: Date.now() - started,
