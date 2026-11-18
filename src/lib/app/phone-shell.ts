@@ -1,7 +1,7 @@
 /**
  * The Mindy phone app (/app/phone) shows the Mindy app (/app and /app?panel=map) inside
  * its own tabs. /app trims its header to the menu button when — and only when —
- * they are running INSIDE that shell: framed by another page AND this browser has the
+ * it is running INSIDE that shell: framed by another page AND this browser has the
  * shell flag (set by /app/phone, which only the phone app opens). The frame check means
  * a desktop browser that once opened /app/phone still shows every page normally.
  */
