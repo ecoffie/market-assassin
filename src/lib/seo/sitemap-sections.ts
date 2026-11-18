@@ -31,6 +31,7 @@ import { BLOG_POSTS } from '@/data/blog-posts';
 import { NAICS_TOP_100 } from '@/data/naics-top100';
 import { getSubpageRowCounts } from '@/lib/seo/subpage-row-counts';
 import { subpageSitemapEligible } from '@/lib/seo/subpage-contract';
+import { contractorIndexable, CONTRACTOR_TABS_INDEXABLE } from '@/lib/seo/contractor-index-tier';
 import { AGENCIES_SEO } from '@/data/agencies-seo';
 import { getFacetSlugsForSitemap } from '@/lib/seo/facets';
 import { COMPETITORS } from '@/data/competitors';
@@ -51,9 +52,18 @@ export const SITEMAP_CHILDREN = [
   'sitemap-contractor-tabs.xml',
   'sitemap-opportunities.xml',
   'sitemap-facets.xml',
-  'sitemap-opportunities-closed.xml',
   'sitemap-forecasts.xml',
   'sitemap-offices.xml',
+] as const;
+
+/**
+ * Families built but NOT yet listed in the index (phased release, 2026-11-18). Search Console
+ * showed 20,628 "Crawled — currently not indexed" against 401 indexed: adding ~100K more URLs
+ * now would mostly join that bucket. Their routes still serve and their pages still render; move
+ * one into SITEMAP_CHILDREN once the indexed share of the listed families rises.
+ */
+export const HELD_SITEMAP_CHILDREN = [
+  'sitemap-opportunities-closed.xml',
   'sitemap-recompetes-1.xml',
   'sitemap-recompetes-2.xml',
   'sitemap-recompetes-3.xml',
@@ -233,7 +243,8 @@ export async function contractorSections(need: { contracts?: boolean; tabs?: boo
   }
   let naicsRowCounts = new Map<string, number>();
   let agencyRowCounts = new Map<string, number>();
-  if (need.tabs) {
+  // Tabs are never offered to Google (contractor-index-tier.ts), so skip the KV row-count probe.
+  if (need.tabs && CONTRACTOR_TABS_INDEXABLE) {
     const tabUeis = recipients.map((c) => c.rollup_uei).filter((u): u is string => !!u);
     [naicsRowCounts, agencyRowCounts] = await Promise.all([
       getSubpageRowCounts('naics', tabUeis),
@@ -248,8 +259,9 @@ export async function contractorSections(need: { contracts?: boolean; tabs?: boo
     const slug = recipientSlug(c.recipient_name);
     if (!slug || seen.has(slug)) continue;
     seen.add(slug);
-    // Thin-content gate — MUST match the noindex predicate in contractors/[slug]/page.tsx.
-    if ((c.total_obligated || 0) < 25000 || (c.award_count || 0) < 2) continue;
+    // Index tier — MUST match the noindex predicate in contractors/[slug]/page.tsx
+    // (src/lib/seo/contractor-index-tier.ts: thin gate + spend floor).
+    if (!contractorIndexable(c.total_obligated, c.award_count)) continue;
     const profile = serveable.get(slug);
     if (!profile) continue;
 
@@ -278,11 +290,11 @@ export async function contractorSections(need: { contracts?: boolean; tabs?: boo
         priority: subPriority,
       });
     }
-    // NAICS / agency tabs: only when the renderer's own row cache clears SUBPAGE_MIN_ROWS.
-    if (subpageSitemapEligible(agencyRowCounts.get(c.rollup_uei), SUBPAGE_MIN_ROWS)) {
+    // NAICS / agency tabs: only when indexable at all AND the renderer's row cache clears SUBPAGE_MIN_ROWS.
+    if (CONTRACTOR_TABS_INDEXABLE && subpageSitemapEligible(agencyRowCounts.get(c.rollup_uei), SUBPAGE_MIN_ROWS)) {
       out.tabs.push({ url: `${SITE_URL}/contractors/${slug}/agencies`, lastModified: toLastmod(profile.lastActionDate), changeFrequency: 'weekly', priority: subPriority });
     }
-    if (subpageSitemapEligible(naicsRowCounts.get(c.rollup_uei), SUBPAGE_MIN_ROWS)) {
+    if (CONTRACTOR_TABS_INDEXABLE && subpageSitemapEligible(naicsRowCounts.get(c.rollup_uei), SUBPAGE_MIN_ROWS)) {
       out.tabs.push({ url: `${SITE_URL}/contractors/${slug}/naics`, lastModified: toLastmod(profile.lastActionDate), changeFrequency: 'weekly', priority: subPriority });
     }
   }

@@ -49,6 +49,7 @@ import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import { awardHref, servableAwardIds } from '@/lib/seo/award-links';
 import { getExpiringRecompetesForUeis } from '@/lib/seo/recompetes';
+import { contractorIndexable } from '@/lib/seo/contractor-index-tier';
 
 const SITE_URL = 'https://getmindy.ai';
 
@@ -136,7 +137,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title,
     description,
-    robots: isThinContractor ? { index: false, follow: true } : undefined,
+    // Index tier (src/lib/seo/contractor-index-tier.ts): the thin gate above PLUS a spend floor.
+    robots: isThinContractor || !contractorIndexable(totalObligated, recipient.award_count)
+      ? { index: false, follow: true }
+      : undefined,
     alternates: { canonical: `${SITE_URL}/contractors/${recipient.canonical_slug}` },
     openGraph: {
       title,

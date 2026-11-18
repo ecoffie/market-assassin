@@ -18,6 +18,7 @@ import { resolveContractorForPage } from '@/lib/seo/contractor-page-data';
 import { SeoTemporarilyUnavailableError } from '@/lib/seo/seo-unavailable';
 import { SubpageLayout } from '@/components/contractors/SubpageLayout';
 import { NAICS_TOP_100 } from '@/data/naics-top100';
+import { CONTRACTOR_TABS_INDEXABLE } from '@/lib/seo/contractor-index-tier';
 
 const SITE_URL = 'https://getmindy.ai';
 
@@ -82,7 +83,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     description,
     // noindex,follow unless the page renders a real, non-thin table. follow keeps equity
     // flowing to the parent profile and NAICS landing pages.
-    robots: decision.indexable ? undefined : { index: false, follow: true },
+    // Tabs restate the profile; never offered to Google (src/lib/seo/contractor-index-tier.ts).
+    robots: decision.indexable && CONTRACTOR_TABS_INDEXABLE ? undefined : { index: false, follow: true },
     alternates: { canonical: `${SITE_URL}/contractors/${canonical}/naics` },
     openGraph: {
       title,

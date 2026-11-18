@@ -52,7 +52,7 @@ import {
   opportunityStatus, opportunityStatusLabel, getOpportunitySitemapEntries, getClosedOpportunitySitemapEntries,
   getRelatedOpenOpportunities, isIndexableOpp,
 } from './opportunities';
-import { contractorSections, staticEntries, SITEMAP_CHILDREN } from './sitemap-sections';
+import { contractorSections, staticEntries, SITEMAP_CHILDREN, HELD_SITEMAP_CHILDREN } from './sitemap-sections';
 import { servableAwardIds, isLinkableAwardId, awardHref } from './award-links';
 import { resolveHubTargets } from './hub-links';
 
@@ -105,13 +105,15 @@ describe('the sitemap is split by page family', () => {
       'sitemap-static.xml', 'sitemap-contractors.xml', 'sitemap-contracts.xml',
       'sitemap-contractor-tabs.xml', 'sitemap-opportunities.xml', 'sitemap-facets.xml',
     ]);
-    // Families added 2026-11-17 (closed opps, forecasts, offices, expiring contracts).
-    expect(SITEMAP_CHILDREN).toEqual(expect.arrayContaining([
-      'sitemap-opportunities-closed.xml', 'sitemap-forecasts.xml', 'sitemap-offices.xml',
+    // Families added 2026-11-17: listed now, or held back for a phased release.
+    expect(SITEMAP_CHILDREN).toEqual(expect.arrayContaining(['sitemap-forecasts.xml', 'sitemap-offices.xml']));
+    expect(HELD_SITEMAP_CHILDREN).toEqual(expect.arrayContaining([
+      'sitemap-opportunities-closed.xml',
       'sitemap-recompetes-1.xml', 'sitemap-recompetes-2.xml', 'sitemap-recompetes-3.xml',
     ]));
-    expect(new Set(SITEMAP_CHILDREN).size).toBe(SITEMAP_CHILDREN.length);
-    for (const c of SITEMAP_CHILDREN) expect(() => read(`src/app/${c}/route.ts`)).not.toThrow();
+    const all = [...SITEMAP_CHILDREN, ...HELD_SITEMAP_CHILDREN];
+    expect(new Set(all).size).toBe(all.length);
+    for (const c of all) expect(() => read(`src/app/${c}/route.ts`)).not.toThrow();
     const xml = renderSitemapIndex(SITEMAP_CHILDREN.map((c) => ({ loc: `https://getmindy.ai/${c}` })));
     expect(xml.match(/<sitemap>/g)).toHaveLength(SITEMAP_CHILDREN.length);
     expect(xml).not.toContain('<lastmod>');
