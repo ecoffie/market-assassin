@@ -137,7 +137,7 @@ export default function GettingStartedPanel({
       </div>
 
       {completed === JOURNEYS.length && (
-        <p className="mt-4 text-sm text-emerald-400">🎉 You've completed Getting Started — you're set up to win. Mindy Pro unlocks AI briefings, unlimited research, and full pipeline tracking when you're ready.</p>
+        <p className="mt-4 text-sm text-emerald-400">🎉 You've completed Getting Started — you're set up to win. Mindy Pro unlocks daily briefings, unlimited research, and full pipeline tracking when you're ready.</p>
       )}
     </div>
   );

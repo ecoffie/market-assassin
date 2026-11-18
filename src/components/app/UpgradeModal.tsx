@@ -39,7 +39,7 @@ const FEATURE_PITCH: Record<string, { title: string; line: string }> = {
 };
 
 const PRO_BENEFITS = [
-  'AI daily briefings — ranked & explained',
+  'Daily briefings — ranked & explained',
   'Forecasts, recompetes, grants & pricing intel',
   'Mindy Chat — your 24/7 analyst',
   'Pipeline tracking + proposal assist',

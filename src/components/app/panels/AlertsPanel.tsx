@@ -1199,7 +1199,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
         <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
           <h2 className="text-sm font-semibold text-emerald-200">Included raw feed for paid accounts</h2>
           <p className="text-sm text-emerald-100/80 mt-1">
-            Use this when you want to search or validate every SAM.gov match. AI Briefings remains the prioritized daily view with summaries and recommendations.
+            Use this when you want to search or validate every SAM.gov match. Daily Briefings remains the prioritized daily view with summaries and recommendations.
           </p>
         </div>
       )}

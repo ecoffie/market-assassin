@@ -1468,7 +1468,7 @@ function AppDashboard() {
           {/* Feature Preview */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-16">
             {[
-              { icon: '📊', title: 'AI Briefings', desc: 'Daily/Weekly/Pursuit' },
+              { icon: '📊', title: 'Daily Briefings', desc: 'Daily + Weekly' },
               { icon: '🎯', title: 'Market Research', desc: '10 reports' },
               { icon: '🔮', title: 'Forecasts', desc: '33,000+ opps' },
               { icon: '📈', title: 'Pipeline', desc: 'Track pursuits' },
