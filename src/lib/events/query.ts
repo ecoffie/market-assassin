@@ -20,6 +20,7 @@ import { displayContactName } from '@/lib/gov-contacts/contact-quality';
 import { searchEventsViaAI } from '@/lib/events/ai-event-discovery';
 import { catalogOccurrencesForAgency } from '@/lib/events/catalog-occurrences';
 import { cleanEventLocation } from '@/lib/events/location';
+import { loadRetiredSourceNoticeIds, notInList } from '@/lib/events/event-currency-live';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -141,14 +142,18 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
     const undatedSince = new Date(today);
     undatedSince.setDate(undatedSince.getDate() - UNDATED_EVENT_DAYS);
     const typeList = `(${ATTENDABLE_TYPES.join(',')})`;
+    // R5: a row whose source notice is inactive AND past its response window is not listed.
+    // Excluded inside the query, so the totals stay exact.
+    const retired = notInList(await loadRetiredSourceNoticeIds(supabase, today));
+    const live = <Q extends { not: (c: string, o: string, v: string) => Q }>(q: Q): Q => (retired ? q.not('notice_id', 'in', retired) : q);
     const [attendableRes, noticeRes] = await Promise.all([
-      byAgency(supabase.from('sam_events').select(COLUMNS, { count: 'exact' }))
+      live(byAgency(supabase.from('sam_events').select(COLUMNS, { count: 'exact' }))
         .in('event_type', ATTENDABLE_TYPES)
-        .or(`and(event_date.gte.${todayStr},event_date.lte.${horizonStr}),and(event_date.is.null,extracted_at.gte.${undatedSince.toISOString().slice(0, 10)})`),
-      byAgency(supabase.from('sam_events').select(COLUMNS, { count: 'exact' }))
+        .or(`and(event_date.gte.${todayStr},event_date.lte.${horizonStr}),and(event_date.is.null,extracted_at.gte.${undatedSince.toISOString().slice(0, 10)})`)),
+      live(byAgency(supabase.from('sam_events').select(COLUMNS, { count: 'exact' }))
         .gte('event_date', todayStr)
         .lte('event_date', horizonStr)
-        .or(`event_type.is.null,event_type.not.in.${typeList}`),
+        .or(`event_type.is.null,event_type.not.in.${typeList}`)),
     ]);
 
     if (attendableRes.error || noticeRes.error) {
@@ -335,8 +340,10 @@ export async function queryScopedEvents(input: {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const COLS = 'title, event_type, event_date, event_location, agency, inferred_office, inferred_dodaac, notice_id, solicitation_number';
 
-  const base = () =>
-    supabase
+  // R5: never list an event whose source notice is inactive AND past its response window.
+  const retired = notInList(await loadRetiredSourceNoticeIds(supabase, today));
+  const base = () => {
+    const q = supabase
       .from('sam_events')
       .select(COLS)
       .in('event_type', ATTENDABLE_TYPES)      // never RFIs — those are opportunities
@@ -344,6 +351,8 @@ export async function queryScopedEvents(input: {
       .lte('event_date', horizonStr)
       .order('event_date', { ascending: true })
       .limit(limit);
+    return retired ? q.not('notice_id', 'in', retired) : q;
+  };
 
   // The extractor's event_location is UNRELIABLE: measured 2026-08-14, 57 of 68 upcoming events
   // carry a truncated fragment rather than a place ("ion Number: N6134027R1002" — the tail of
