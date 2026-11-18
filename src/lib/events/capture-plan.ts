@@ -4,6 +4,8 @@
  */
 export const NEW_SAM_EVENTS_PER_RUN = 25;
 export const NEW_CALENDAR_EVENTS_PER_RUN = 15;
+/** Past rows marked per run. Requires the expired_at column. Not a delete. */
+export const EXPIRE_PER_RUN = 200;
 
 export function capNewEvents<T extends { notice_id: string }>(
   events: T[],
@@ -27,4 +29,22 @@ export function capNewEvents<T extends { notice_id: string }>(
     }
   }
   return { writes, deferred, fresh };
+}
+
+/**
+ * Ids whose event_date is before today. Undated rows are not expired.
+ * The caller writes expired_at. It does not delete.
+ */
+export function expireIds(
+  rows: Array<{ id: string; event_date: string | null }>,
+  todayStr: string,
+  cap = EXPIRE_PER_RUN,
+): string[] {
+  const ids: string[] = [];
+  for (const row of rows) {
+    if (!row.id || !row.event_date || row.event_date >= todayStr) continue;
+    ids.push(row.id);
+    if (ids.length >= cap) break;
+  }
+  return ids;
 }
