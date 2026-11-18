@@ -184,6 +184,30 @@ describe('POST /api/app/chat/documents (Vault-backed)', () => {
     expect((await POST(req('POST', { file: { name: 'x.exe', text: 'MZ' } }))).status).toBe(415);
   });
 
+  it('xlsx and csv uploads succeed (Ask W1 spreadsheet parity)', async () => {
+    const XLSX = await import('xlsx');
+    const wb = XLSX.utils.book_new();
+    const sheet = XLSX.utils.aoa_to_sheet([['CLIN', 'Qty', 'Price'], ['0001', 2, 100]]);
+    XLSX.utils.book_append_sheet(wb, sheet, 'Rates');
+    const xlsxBuf = Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
+
+    // CSV as text through the existing FormData helper
+    Object.assign(state, { sessionOwner: null, count: 0 });
+    state.docInserts = []; state.blobs = []; state.sessionInserts = [];
+    expect((await POST(req('POST', { file: { name: 'rates.csv', text: 'CLIN,Qty,Price\n0001,2,100\n' } }))).status).toBe(201);
+    expect(state.docInserts[0]).toMatchObject({ source: 'ask_mindy', doc_class: 'reference' });
+
+    // Real .xlsx bytes (not CSV disguised as xlsx)
+    Object.assign(state, { sessionOwner: null, count: 0 });
+    state.docInserts = []; state.blobs = []; state.sessionInserts = [];
+    const fd = new FormData();
+    fd.append('file', new File([xlsxBuf], 'pricing.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    const r = new NextRequest(`https://getmindy.ai/api/app/chat/documents?email=${ME}&session_id=${SID}`, { method: 'POST', body: fd });
+    expect((await POST(r)).status).toBe(201);
+    expect(state.docInserts[0]).toMatchObject({ source: 'ask_mindy', doc_class: 'reference' });
+    expect(state.blobs[0].startsWith(`${ME}/`)).toBe(true);
+  });
+
   it('store unavailable (migration not applied) → 503, never a fake success', async () => {
     state.count = 'unavailable';
     expect((await POST(req('POST', { file: txt() }))).status).toBe(503);

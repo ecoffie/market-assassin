@@ -84,13 +84,21 @@ async function ask(message: string): Promise<SseEvent[]> {
 
 describe('create_document through the real chat route', () => {
   it('ONE tool round with a guessed source kind and an uncited fact → Word + PDF saved on that call', async () => {
-    await ask('Create my improved capability statement as a document');
+    const events = await ask('Create my improved capability statement as a document');
     expect(h.saved.map((s) => s.format)).toEqual(['docx', 'pdf']);
     const model = h.saved[0].docModel as { sources: Array<{ kind: string }>; theme: string; sections: Array<{ blocks: Array<{ id: string; claim: string }> }> };
     expect(model.sources[0].kind).toBe('upload');
     expect(model.theme).toBe('mindy');
     expect(model.sections[0].blocks.map((b) => [b.id, b.claim])).toEqual([['p1', 'fact'], ['p2', 'unverified']]);
     expect(toolResultsSeen.join(' ')).toMatch(/"ok":true/);
+    // W2: client download chips — document ids only (no signed URLs on the wire).
+    const deliverables = events.find((e) => e.type === 'deliverables') as SseEvent & {
+      files?: Array<{ format: string; document_id: string; file_name?: string }>;
+      pdf_note?: string;
+    };
+    expect(deliverables?.files?.map((f) => f.format)).toEqual(['docx', 'pdf']);
+    expect(deliverables?.files?.every((f) => /^[0-9a-f-]{36}$/i.test(f.document_id))).toBe(true);
+    expect(JSON.stringify(deliverables)).not.toMatch(/https?:\/\//);
   });
 
   it('a truly unknown kind is refused with the allowed values (nothing saved), visible to the answer model', async () => {
