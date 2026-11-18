@@ -26,6 +26,18 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-18 — Forecast currency release + Ask Mindy Map bridge
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | Forecasts: date-label honesty (#2159) | Sync clock was presented as an agency posting date. Alert adapter and map/panel now keep `posted_date` null for forecasts and label Mindy's clock as "Last synced". | `posted_date: null,` → `src/lib/alerts/forecast-alert-row.ts` · `Last synced by Mindy` → `src/app/opportunity-map/route.ts` | Reviewed head `8ac0e3cbf`; merge `002585570`; prod `maps-account-build:002585570…` + live string `Last synced by Mindy`. Evidence: `reports/forecast-release-close-2026-11-18.md`. | VERIFIED IN PRODUCTION 2026-11-18 |
+| 2026-11-18 | Forecasts: Gateway CSV writer (#2161) | Restored missing `gsa_gateway_csv` / `GW-L:` writer. Dry-run default; apply needs `--apply` + `--i-authorize-apply`; never deletes; API twins report-only. | `--i-authorize-apply` → `scripts/ingest-gateway-csv.ts` · `GW-L:` → `src/lib/forecasts/gateway-csv-reconcile.ts` | Reviewed head `c87192efa`; merge `cf8898cca`; prod stamp `cf8898cca…`. No production import. | VERIFIED IN PRODUCTION 2026-11-18 (code only; no apply) |
+| 2026-11-18 | Forecasts: DHS allRecords ingest (#2160) | apfs-cloud HTML fail-loud; controlled public-file importer dry-run default; orphans report-only. | `DHS APFS returned HTML (not JSON)` → `src/app/api/cron/sync-forecasts/route.ts` · `--i-authorize-apply` → `scripts/ingest-dhs-forecast-allrecords.ts` | Reviewed head `e6833e6fa`; merge `d9fd12797`; prod stamp `d9fd12797…`; **`DHS_FORECAST_ALLRECORDS_URL` unset** in Vercel production. | VERIFIED IN PRODUCTION 2026-11-18 (path inactive) |
+| 2026-11-18 | Forecasts: packet dry-run readiness docs (#2162) | Checklist for COMPLETE Gateway packet → DOI dry-run; apply forbidden under this auth. | `Next milestone — COMPLETE packet → DOI dry-run (ACTIVE)` → `tasks/forecast-gateway-packet-dryrun-2026-11-18.md` | Reviewed head `65b857d0d`; merge `3bedca523`; prod tip stamp `3bedca523…`. Release CLOSED; packet obtain OPEN. Evidence: `reports/forecast-release-close-2026-11-18.md`. | VERIFIED IN PRODUCTION 2026-11-18 |
+| 2026-11-18 | Ask Mindy: Map selection → App Chat (#2158) | **Not in the forecast authorization set.** Merged `bba00ec8` between #2160 and #2162 (2026-11-18T17:24:13Z) during the forecast release train. Framed Opportunity Map posts the open SAM listing into `/app` Ask Mindy (`context.notice_id`); closing the listing clears selection; last in-tab chat session restores across Map↔Chat remounts. No forecast/Gateway/DHS ingest mutation. Briefly served as production tip before #2162. | `MAP_SELECTED_OPP_KEY` → `src/lib/chat/chat-handoff.ts` · `MAP_SHELL_SELECTED_OPP_MESSAGE` → `src/lib/app/map-shell.ts` | Merge `bba00ec8`; observed mid-train prod stamp `maps-account-build:bba00ec8…`; tip after close is `3bedca523` (contains #2158). | VERIFIED IN PRODUCTION 2026-11-18 |
+
+---
+
 ## 2026-11-17 — Federal events stay current (audit 2026-11-09 R2–R6)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
