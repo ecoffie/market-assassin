@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-18 — DoD SBIR false-success
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | sync-dod-sbir false success | The reachability gate returned HTTP 200 and `success: true` when sbir.gov was rate-limited, under maintenance, or returned a body that was not a solicitation list, so the dispatcher recorded success into `dod_sbir_topics` (0 rows) every six hours. A zero now counts as success only when the body is a parsed JSON array or known envelope of length 0 (`empty_verified`). Unavailable, unrecognized, parser-empty, and partial runs return non-2xx and `reportCronOutcome('error')`. `search_sbir` marks an empty or uncounted DoD cache `unverified_empty` / `unmeasured` and degraded, so Ask Mindy does not treat it as a current empty market. | `export function classifyDodSbirSync` → `src/lib/sbir/dod-sbir.ts` · `dod_cache: res.dodCache` → `src/mcp/tools/sbir.ts` | `dod-sbir.unit.test.ts` red on the pre-fix route (api-down hard-coded success), green after. No live sync, no production write. | BUILT, NOT MERGED |
+
 ## 2026-11-18 — Forecast currency release + Ask Mindy Map bridge
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
