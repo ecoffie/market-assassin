@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-18 — DIBBS clock stamp checks the Supabase error
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | DIBBS clock write | `stampDibbsClocks` treated a Supabase `{ error }` as success because the client does not throw. A failed read or a failed update now returns null, so the cron body does not report `nonemptyIngestAdvanced`. Rows are not deleted. | `if (written.error)` → `src/lib/dibbs/clock-stamp.ts` | `clock-stamp.unit.test.ts`. No production stamp, no sync. | BUILT, NOT MERGED |
+
 ## 2026-11-18 — Living pain points: GAO RSS + oversight.gov
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
