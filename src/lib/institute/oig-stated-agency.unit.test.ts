@@ -45,6 +45,8 @@ describe('the 14 unresolved page-0 recommendations', () => {
     expect(resolveOversightStatedAgency('Election Assistance Commission').canonicalAgency)
       .toBe('Election Assistance Commission');
     expect(resolveAgency({ toptierCode: '061' }).canonicalAgency)
+      .toBe('Consumer Product Safety Commission');
+    expect(resolveAgency({ toptierCode: '034' }).canonicalAgency)
       .toBe('U.S. International Trade Commission');
   });
 });

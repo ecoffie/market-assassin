@@ -37,12 +37,12 @@ export const OIG_STATED_ALIASES: readonly OigStatedAlias[] = [
  * not the EAC OIG's parent. A DOT mention on the CPSC page is a referral for
  * vehicle complaints.
  *
- * CPSC's USASpending toptier code is 061 (api.usaspending.gov toptier
- * agencies, read 2026-11-18). This file already assigns 061 to the U.S.
- * International Trade Commission, and USASpending's current code for the
- * Trade Commission is 034. CPSC is listed before that existing entry so a
- * code lookup of 061 stays the Trade Commission. The name match is what
- * surfaces the recommendations.
+ * USASpending's toptier list (read 2026-11-18) assigns 061 to CPSC and 034
+ * to the International Trade Commission. This file had given 061 to USITC.
+ * That was wrong against the live list, and no reader of this file queries
+ * USASpending with 061 for USITC (get_agency_intel spending uses the live
+ * toptier list). USITC is 034. CPSC is 061. Codes are unique except the
+ * pre-existing 011 pair (Peace Corps and the Executive Office of the President).
  */
 export const OIG_SELF_NAMED: readonly { stated: string; code: string; citation: string }[] = [
   {
