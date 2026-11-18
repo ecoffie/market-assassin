@@ -30,9 +30,17 @@ jobs:
   scorecard:
     name: Acquisition scorecard
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
 
       - name: Build scorecard
         env:
@@ -40,7 +48,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           set +x
-          node scripts/daily-acquisition-scorecard.mjs --out-dir "$RUNNER_TEMP/scorecard"
+          ./node_modules/.bin/tsx scripts/daily-acquisition-scorecard.mjs --out-dir "$RUNNER_TEMP/scorecard"
 
       - name: Publish job summary
         if: always()

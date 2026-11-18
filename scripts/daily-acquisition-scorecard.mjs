@@ -472,6 +472,202 @@ function jobsToRead(bindings, corpora) {
   return [...names].sort();
 }
 
+export const FINDABILITY_CAP = 200;
+const INSTITUTE_PAIN_TYPES = new Set(['gao_report', 'ig_report']);
+const DOC_NUMBER = /\b(GAO-\d{2}-\d{5,6}|OIG-\d{2}-\d+)\b/i;
+
+export function claimFingerprint(text) {
+  return String(text ?? '')
+    .toLowerCase()
+    .replace(/\(\s*source:\s*[^)]+\)/gi, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .slice(0, 120);
+}
+
+export function documentNumberOf(text) {
+  const m = String(text ?? '').match(DOC_NUMBER);
+  return m ? m[1].toUpperCase() : null;
+}
+
+/** A customer-reader sourced claim that is this inserted row. Legacy JSON does not count. */
+export function matchCustomerClaim(row, sourcesById, bundle) {
+  const sourced = Array.isArray(bundle?.sourced) ? bundle.sourced : [];
+  const ids = new Set(Array.isArray(row.institute_source_ids) ? row.institute_source_ids.filter(Boolean) : []);
+  const docs = new Set();
+  for (const id of ids) {
+    const doc = sourcesById.get(id)?.document_number;
+    if (doc) docs.add(String(doc).toUpperCase());
+  }
+  const fromText = documentNumberOf(row.pain_point);
+  if (fromText) docs.add(fromText);
+  const fp = claimFingerprint(row.pain_point);
+  return sourced.find((item) => {
+    if (item?.institute_source_id && ids.has(item.institute_source_id)) return true;
+    if (item?.document_number && docs.has(String(item.document_number).toUpperCase())) return true;
+    if (fp && claimFingerprint(item?.pain_point) === fp) return true;
+    return false;
+  }) ?? null;
+}
+
+function instituteIds(row) {
+  return Array.isArray(row?.institute_source_ids) ? row.institute_source_ids.filter(Boolean) : [];
+}
+
+export function isInstituteGaoOrIg(row, sourcesById) {
+  return instituteIds(row).some((id) => INSTITUTE_PAIN_TYPES.has(sourcesById.get(id)?.source_type));
+}
+
+async function loadInstituteSources(io, ids) {
+  const byId = new Map();
+  const unique = [...new Set(ids)];
+  for (let i = 0; i < unique.length; i += 50) {
+    const slice = unique.slice(i, i + 50);
+    const res = await io.rows('institute_sources', {
+      select: 'id,source_type,document_number,source_url,title',
+      id: `in.(${slice.join(',')})`,
+      limit: '50',
+    });
+    if (!res || res.ok !== true || !Array.isArray(res.rows)) return { ok: false };
+    for (const row of res.rows) if (row?.id) byId.set(row.id, row);
+  }
+  return { ok: true, byId };
+}
+
+function emptyFindability(reason) {
+  const field = () => unknown(reason);
+  return {
+    status: 'unknown',
+    reason,
+    checked: field(),
+    found: field(),
+    notFound: field(),
+    citationPresent: field(),
+    unknownRows: field(),
+    rows: null,
+  };
+}
+
+export async function probeCitation(url) {
+  const link = publicLink(url);
+  if (!link) return unknown('citation is not a public http(s) link');
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    let res = await fetch(link, { method: 'HEAD', redirect: 'follow', signal: ctrl.signal });
+    if (res.status === 405 || res.status === 501) {
+      res = await fetch(link, { method: 'GET', redirect: 'follow', signal: ctrl.signal });
+      await res.body?.cancel?.();
+    }
+    if (typeof res.status !== 'number') return unknown(READ_FAILED);
+    return measured(res.status);
+  } catch {
+    return unknown(READ_FAILED);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Recent Institute GAO and Inspector General pain points, checked through the
+ * customer reader. A thrown or failed read is unknown, never a not-found.
+ */
+export async function measureCustomerFindability(io, window, readCustomer, probe = probeCitation) {
+  if (typeof readCustomer !== 'function') return emptyFindability('the customer reader was not attached');
+  const listed = await io.rows('agency_pain_points_db', {
+    select: 'id,agency,pain_point,source,source_url,institute_source_ids,created_at',
+    order: 'created_at.desc',
+    limit: String(FINDABILITY_CAP),
+    and: `(created_at.gte.${window.start},created_at.lt.${window.end})`,
+  });
+  if (!listed || listed.ok !== true || !Array.isArray(listed.rows)) return emptyFindability(READ_FAILED);
+  if (listed.rows.length >= FINDABILITY_CAP) {
+    return emptyFindability('read cap hit; the new pain-point list would be a slice, not the population');
+  }
+  const ids = listed.rows.flatMap(instituteIds);
+  const sources = ids.length ? await loadInstituteSources(io, ids) : { ok: true, byId: new Map() };
+  if (!sources.ok) return emptyFindability(READ_FAILED);
+  const candidates = listed.rows.filter((row) => isInstituteGaoOrIg(row, sources.byId));
+
+  const byAgency = new Map();
+  for (const row of candidates) {
+    const agency = String(row.agency ?? '').trim();
+    if (!byAgency.has(agency)) byAgency.set(agency, []);
+    byAgency.get(agency).push(row);
+  }
+  const bundles = new Map();
+  for (const agency of byAgency.keys()) {
+    if (!agency) {
+      bundles.set(agency, { ok: false });
+      continue;
+    }
+    try {
+      const bundle = await readCustomer(agency);
+      if (!bundle || typeof bundle !== 'object' || !Array.isArray(bundle.sourced)) bundles.set(agency, { ok: false });
+      else bundles.set(agency, { ok: true, bundle });
+    } catch {
+      bundles.set(agency, { ok: false });
+    }
+  }
+
+  const rows = [];
+  for (const row of candidates) {
+    const agency = String(row.agency ?? '').trim();
+    const loaded = bundles.get(agency);
+    if (!loaded?.ok) {
+      rows.push({
+        agency: agency || null,
+        title: row.pain_point ?? null,
+        citation: null,
+        found: unknown(READ_FAILED),
+        citationPresent: unknown(READ_FAILED),
+        httpStatus: unknown(READ_FAILED),
+      });
+      continue;
+    }
+    const match = matchCustomerClaim(row, sources.byId, loaded.bundle);
+    const citation = publicLink(match?.source_url);
+    const httpStatus = citation ? await probe(citation) : unknown('no public citation on the customer claim');
+    rows.push({
+      agency: agency || null,
+      title: row.pain_point ?? null,
+      citation,
+      found: measured(!!match),
+      citationPresent: measured(!!citation),
+      httpStatus,
+    });
+  }
+
+  const count = (pred) => rows.filter(pred).length;
+  const unknownN = count((r) => r.found.status !== 'measured');
+  const failed = unknownN > 0;
+  const reason = failed
+    ? READ_FAILED
+    : (candidates.length
+      ? 'checked with getAgencySourcedIntelligence, the reader behind /api/pain-points, Ask Mindy, and get_agency_intel'
+      : 'no Institute GAO or Inspector General pain point was inserted in this window');
+  return {
+    status: failed ? 'unknown' : 'measured',
+    reason,
+    checked: measured(rows.length),
+    found: failed ? unknown(READ_FAILED) : measured(count((r) => r.found.value === true)),
+    notFound: failed ? unknown(READ_FAILED) : measured(count((r) => r.found.value === false)),
+    citationPresent: failed ? unknown(READ_FAILED) : measured(count((r) => r.citationPresent.value === true)),
+    unknownRows: measured(unknownN),
+    rows,
+  };
+}
+
+export async function loadCustomerReader() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  if (!url || !key) return null;
+  const mod = await import('../src/lib/strategic-intel/sourced-pain-points.ts');
+  const { createClient } = await import('@supabase/supabase-js');
+  const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  return (agency) => mod.getAgencySourcedIntelligence(agency, { client });
+}
+
 export async function buildDailyScorecard(io, opts = {}) {
   const now = opts.now instanceof Date ? opts.now : new Date();
   const windows = dailyWindows(now);
@@ -548,10 +744,16 @@ export async function buildDailyScorecard(io, opts = {}) {
   const runHistory = [];
   for (const job of jobs) runHistory.push(await latestRun(io, job));
 
+  const probe = opts.probeCitation ?? probeCitation;
+  const findability = {
+    h24: await measureCustomerFindability(io, windows.h24, opts.readCustomer, probe),
+    d7: await measureCustomerFindability(io, windows.d7, opts.readCustomer, probe),
+  };
+
   return {
     label: 'Daily acquisition scorecard',
     measured: true,
-    queries: 'GET /rest/v1 only',
+    queries: 'GET /rest/v1 for counts. Customer findability calls getAgencySourcedIntelligence (read) and may HEAD a public citation.',
     generatedAt: now.toISOString(),
     windows,
     counting: 'New records are rows whose created_at, first_seen, or insert-only discovered_at falls in the window. A cron_job_runs success, a synced_at touch, and an unchanged upsert are not new.',
@@ -559,6 +761,7 @@ export async function buildDailyScorecard(io, opts = {}) {
     sources,
     corpora: corpusReports,
     examples,
+    findability,
     runHistory,
   };
 }
@@ -598,7 +801,7 @@ export function renderMarkdown(report) {
       ? `24h ${report.windows.h24.start} → ${report.windows.h24.end}. 7d ${report.windows.d7.start} → ${report.windows.d7.end}.`
       : `Not measured. ${report.reason}`,
     '',
-    'Reads are GET /rest/v1 only. A failed read is unknown, not zero. Cron successes are under run history and are not counts.',
+    'A failed read is unknown, not zero. Cron successes are under run history and are not counts. Customer findability uses the same reader as /api/pain-points, Ask Mindy, and get_agency_intel.',
     '',
   ];
   if (!report.measured) {
@@ -650,6 +853,28 @@ export function renderMarkdown(report) {
     lines.push('');
   }
 
+  lines.push('## Customer findability', '');
+  lines.push('Institute GAO and Inspector General pain points inserted in the window, read back with the customer reader. Not found means that reader did not return the claim. A failed read is unknown.', '');
+  for (const [label, block] of [['Last 24h', report.findability?.h24], ['Last 7d', report.findability?.d7]]) {
+    lines.push(`### ${label}`, '');
+    if (!block) {
+      lines.push('unknown — not read', '');
+      continue;
+    }
+    lines.push(`- checked: ${showCount(block.checked)}`);
+    lines.push(`- found: ${showCount(block.found)}`);
+    lines.push(`- not found: ${showCount(block.notFound)}`);
+    lines.push(`- citation present: ${showCount(block.citationPresent)}`);
+    lines.push(`- unknown: ${showCount(block.unknownRows)}`);
+    for (const row of (block.rows ?? []).slice(0, FINDABILITY_CAP)) {
+      const found = row.found?.status === 'measured' ? (row.found.value ? 'found' : 'not found') : 'unknown';
+      const cite = row.citation || 'no public citation';
+      const http = row.httpStatus?.status === 'measured' ? `http ${row.httpStatus.value}` : 'http unknown';
+      lines.push(`- ${row.agency || 'agency unknown'} — ${clip(row.title)} — ${found} — ${cite} — ${http}`);
+    }
+    lines.push('');
+  }
+
   lines.push('## Run history', '');
   lines.push('Latest cron_job_runs row per job. A success is not new records and not a nonempty ingest.', '');
   for (const run of report.runHistory) {
@@ -697,7 +922,7 @@ function unmeasured(now, reason) {
   return {
     label: 'Daily acquisition scorecard',
     measured: false,
-    queries: 'GET /rest/v1 only',
+    queries: 'GET /rest/v1 for counts. Customer findability calls getAgencySourcedIntelligence (read) and may HEAD a public citation.',
     generatedAt: now.toISOString(),
     windows,
     reason,
@@ -716,6 +941,7 @@ function unmeasured(now, reason) {
       stalled: field(),
     })),
     examples: Object.fromEntries(CORPORA.map((c) => [c.key, field()])),
+    findability: { h24: emptyFindability(reason), d7: emptyFindability(reason) },
     runHistory: RUN_JOBS.map((job) => ({ job, latest: field() })),
   };
 }
@@ -747,16 +973,22 @@ async function main() {
     writeReport(report, outDir);
     process.exit(2);
   }
+  let readCustomer = null;
+  try {
+    readCustomer = await loadCustomerReader();
+  } catch {
+    readCustomer = null;
+  }
   let report;
   try {
-    report = await buildDailyScorecard(createPostgrestReader(url, key), { now });
-  } catch (err) {
+    report = await buildDailyScorecard(createPostgrestReader(url, key), { now, readCustomer });
+  } catch {
     report = unmeasured(now, READ_FAILED);
     writeReport(report, outDir);
     process.exit(1);
   }
   writeReport(report, outDir);
-  if (report.instanceList.readOk === false) process.exit(1);
+  if (report.instanceList.readOk === false || !readCustomer) process.exit(1);
 }
 
 if (process.argv[1] && basename(process.argv[1]) === 'daily-acquisition-scorecard.mjs') main();

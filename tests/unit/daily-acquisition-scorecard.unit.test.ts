@@ -16,6 +16,7 @@ import {
   SOURCE_BINDINGS,
   buildDailyScorecard,
   classifyStalled,
+  measureCustomerFindability,
   dailyWindows,
   lastNonemptyIngest,
   publicJson,
@@ -371,6 +372,107 @@ describe('buildDailyScorecard', () => {
     expect(scrubPublicText('see https://db.example.supabase.co/rest and sk_live_abc123')).not.toMatch(/supabase|sk_live_/);
   });
 
+  it('customer findability reports found, not found, and a public citation from the customer reader', async () => {
+    const seen: string[] = [];
+    const readCustomer = async (agency: string) => {
+      seen.push(agency);
+      if (agency === 'Department of Energy') {
+        return {
+          sourced: [{
+            institute_source_id: 'ig-1',
+            document_number: 'OIG-26-3',
+            pain_point: 'Scheduling delays (Source: OIG-26-3)',
+            source_url: 'https://www.oversight.gov/report/oig-26-3?api_key=supersecret',
+          }],
+        };
+      }
+      return {
+        sourced: [],
+        legacy: [{ pain_point: 'Legacy only (Source: GAO-26-100001)', document_number: 'GAO-26-100001', source_url: 'https://www.gao.gov/products/GAO-26-100001' }],
+      };
+    };
+    const io = fakeIo({
+      rows(table) {
+        if (table === 'agency_pain_points_db') {
+          return okRows([
+            { id: 'a', agency: 'Department of Energy', pain_point: 'Scheduling delays (Source: OIG-26-3)', institute_source_ids: ['ig-1'], created_at: '2026-11-18T01:00:00.000Z' },
+            { id: 'b', agency: 'Department of Veterans Affairs', pain_point: 'Legacy only (Source: GAO-26-100001)', institute_source_ids: ['gao-1'], created_at: '2026-11-18T02:00:00.000Z' },
+            { id: 'c', agency: 'Library of Congress', pain_point: 'not an institute pain point', institute_source_ids: ['crs-1'], created_at: '2026-11-18T03:00:00.000Z' },
+          ]);
+        }
+        if (table === 'institute_sources') {
+          return okRows([
+            { id: 'ig-1', source_type: 'ig_report', document_number: 'OIG-26-3', title: 'Scheduling' },
+            { id: 'gao-1', source_type: 'gao_report', document_number: 'GAO-26-100001', title: 'A GAO report' },
+            { id: 'crs-1', source_type: 'crs_report', document_number: 'R12345', title: 'CRS' },
+          ]);
+        }
+        return okRows([]);
+      },
+    });
+    const block = await measureCustomerFindability(io, dailyWindows(NOW).h24, readCustomer, async () => ({ value: 200, status: 'measured', reason: null, column: null }));
+    expect(block.status).toBe('measured');
+    expect(block.checked.value).toBe(2);
+    expect(block.found.value).toBe(1);
+    expect(block.notFound.value).toBe(1);
+    expect(block.citationPresent.value).toBe(1);
+    expect(seen.sort()).toEqual(['Department of Energy', 'Department of Veterans Affairs']);
+    const energy = block.rows.find((r) => r.agency === 'Department of Energy');
+    expect(energy.found.value).toBe(true);
+    expect(energy.citation).toBe('https://www.oversight.gov/report/oig-26-3');
+    expect(energy.httpStatus.value).toBe(200);
+    const va = block.rows.find((r) => r.agency === 'Department of Veterans Affairs');
+    expect(va.found.value).toBe(false);
+    expect(va.citation).toBeNull();
+    const md = publicMarkdown({
+      measured: true,
+      generatedAt: NOW.toISOString(),
+      windows: dailyWindows(NOW),
+      sources: [],
+      corpora: [],
+      examples: {},
+      findability: { h24: block, d7: block },
+      runHistory: [],
+    });
+    expect(md).toContain('https://www.oversight.gov/report/oig-26-3');
+    expect(md).not.toContain('api_key');
+    expectNoSecrets(md);
+  });
+
+  it('a thrown customer read is unknown and is not counted as not found', async () => {
+    const io = fakeIo({
+      rows(table) {
+        if (table === 'agency_pain_points_db') {
+          return okRows([{ id: 'a', agency: 'Department of Energy', pain_point: 'Scheduling delays', institute_source_ids: ['ig-1'], created_at: '2026-11-18T01:00:00.000Z' }]);
+        }
+        if (table === 'institute_sources') return okRows([{ id: 'ig-1', source_type: 'ig_report', document_number: 'OIG-26-1', title: 'Scheduling' }]);
+        return okRows([]);
+      },
+    });
+    const block = await measureCustomerFindability(
+      io,
+      dailyWindows(NOW).h24,
+      async () => { throw new Error('postgres://svc:secret@10.1.1.5/postgres Bearer eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.sigvalue'); },
+    );
+    expect(block.status).toBe('unknown');
+    expect(block.found.status).toBe('unknown');
+    expect(block.found.value).toBeNull();
+    expect(block.notFound.value).toBeNull();
+    expect(block.unknownRows.value).toBe(1);
+    expect(JSON.stringify(block)).not.toMatch(/postgres:\/\/|10\.1\.1\.5|eyJ/);
+  });
+
+  it('a failed pain-point read does not become zero new claims', async () => {
+    const block = await measureCustomerFindability(
+      { rows: async () => ({ ok: false, error: 'supabase host db.abcd.supabase.co key=secret', rows: [], count: 0 }) },
+      dailyWindows(NOW).h24,
+      async () => ({ sourced: [] }),
+    );
+    expect(block.checked.value).toBeNull();
+    expect(block.rows).toBeNull();
+    expect(JSON.stringify(block)).not.toMatch(/supabase\.co|key=secret/);
+  });
+
   it('the real catalog never binds extracted_at or synced_at as a new-row clock', () => {
     for (const spec of [...Object.values(SOURCE_BINDINGS), ...CORPORA]) {
       expect(spec.newColumn).not.toBe('synced_at');
@@ -396,6 +498,7 @@ describe('the script and the workflow stay read-only', () => {
     expect(src).not.toMatch(/method:\s*'POST'/);
     expect(src).not.toMatch(/method:\s*'PATCH'/);
     expect(src).not.toMatch(/method:\s*'DELETE'/);
+    expect(src).toContain('getAgencySourcedIntelligence');
     expect(src).toContain('restGet');
     expect(src).toContain("fact(null, 'unknown'");
   });
@@ -403,6 +506,7 @@ describe('the script and the workflow stay read-only', () => {
   it('schedules weekdays, publishes the artifact and summary, and uses the existing Actions secrets', () => {
     expect(workflow).toContain("cron: '0 12 * * 1-5'");
     expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).toContain('./node_modules/.bin/tsx scripts/daily-acquisition-scorecard.mjs');
     expect(workflow).toContain('contents: read');
     expect(workflow).not.toMatch(/contents:\s*write/);
     expect(workflow).not.toMatch(/pull_request:/);
