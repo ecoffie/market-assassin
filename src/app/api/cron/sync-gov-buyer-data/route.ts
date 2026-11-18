@@ -154,7 +154,25 @@ export function entityToRow(e: any) {
 
 // ───────────────────────── SB entity pull ─────────────────────────
 
-async function syncEntities() {
+/** A contacts run may pull one entity slice when the checkpoint is at least this old. */
+export const ENTITY_RIDEALONG_STALE_MS = 20 * 60 * 60 * 1000;
+
+/**
+ * True when the newest entity checkpoint is missing or older than the stale window.
+ * Unknown timestamps are due — a missing clock is not "synced recently".
+ */
+export function entityRidealongDue(
+  lastSyncedAt: string | null | undefined,
+  nowMs: number,
+  staleMs = ENTITY_RIDEALONG_STALE_MS,
+): boolean {
+  if (!lastSyncedAt) return true;
+  const t = Date.parse(lastSyncedAt);
+  if (!Number.isFinite(t)) return true;
+  return nowMs - t >= staleMs;
+}
+
+async function syncEntities(opts: { maxSlices?: number } = {}) {
   const sb = getSupabase();
   let slicesRun = 0;
   let upserted = 0;
@@ -176,7 +194,7 @@ async function syncEntities() {
     .from('sam_entities_sync_state')
     .select('*')
     .order('last_synced_at', { ascending: true, nullsFirst: true })
-    .limit(ENTITY_SLICES_PER_RUN);
+    .limit(Math.min(ENTITY_SLICES_PER_RUN, opts.maxSlices ?? ENTITY_SLICES_PER_RUN));
 
   const debug: Array<Record<string, unknown>> = [];
   for (const slice of slices || []) {
@@ -292,17 +310,41 @@ export async function GET(request: NextRequest) {
     if ((pull === 'both' || pull === 'entities') && !dry) {
       out.entities = await syncEntities();
     }
+    // The scheduled row is `?pull=contacts` (sync-decision-makers). Entity
+    // slices had no cron of their own — only an unawaited fetch at the end of
+    // the SAM opportunity sync, which the function often freezes before it
+    // runs. One slice, at most every 20h, rides this job. An entity error must
+    // not fail the contacts outcome or burn the daily SAM quota (8 slices).
+    if (pull === 'contacts' && !dry) {
+      try {
+        const { data: newest } = await getSupabase()
+          .from('sam_entities_sync_state')
+          .select('last_synced_at')
+          .order('last_synced_at', { ascending: false, nullsFirst: false })
+          .limit(1)
+          .maybeSingle();
+        if (entityRidealongDue(newest?.last_synced_at)) {
+          out.entities = await syncEntities({ maxSlices: 1 });
+        } else {
+          out.entities = { skipped: true, reason: 'checkpoint newer than 20h' };
+        }
+      } catch (err) {
+        out.entityError = err instanceof Error ? err.message : String(err);
+      }
+    }
     out.durationSeconds = Math.round((Date.now() - started) / 1000);
     out.success = true;
     // The dispatcher fire-and-forgets this route (timeout_ms 290s > its 55s await
     // cap) and records `dispatched` at 12s, which the watchdog ignores. Without
     // this the run's real outcome is invisible forever — 71 such runs in 30 days.
     // A `dry` rehearsal must not overwrite the scheduled job's status.
-    if (!dry) await reportCronOutcome(CRON_JOB_NAME, 'success');
+    // pull=entities is the SAM-sync chain, not this cron row. Reporting it here
+    // would overwrite sync-decision-makers with the chain's outcome.
+    if (!dry && pull !== 'entities') await reportCronOutcome(CRON_JOB_NAME, 'success');
     return NextResponse.json(out);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (!dry) await reportCronOutcome(CRON_JOB_NAME, 'error', msg).catch(() => {});
+    if (!dry && pull !== 'entities') await reportCronOutcome(CRON_JOB_NAME, 'error', msg).catch(() => {});
     return NextResponse.json({ success: false, error: msg, ...out }, { status: 500 });
   }
 }

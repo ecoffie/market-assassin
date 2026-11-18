@@ -86,6 +86,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-18 — SAM entity registrations
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | SAM entity registrations | No `sync-gov-buyer-data` cron row exists. Entities ran only from an unawaited fetch at the end of the opportunity sync, and `pull=entities` reported onto `sync-decision-makers`. The contacts job now pulls one entity slice when the checkpoint is older than 20h, and an entity-only call does not overwrite that job. The inventory judges `MAX(sam_entities.synced_at)` on a 24h cadence, so a 7-day clock is STALE rather than UNKNOWN. | `entityRidealongDue` → `src/app/api/cron/sync-gov-buyer-data/route.ts` | `entity-ridealong.unit.test.ts`. No production sync. | BUILT, NOT MERGED |
+
 ## 2026-11-18 — Forecast currency release + Ask Mindy Map bridge
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

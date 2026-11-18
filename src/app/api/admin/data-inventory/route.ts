@@ -80,7 +80,7 @@ const CRON_JOBS = {
   legislation: ['institute-legislation-sync'],
   dodSbir: ['sync-dod-sbir'],
   usaspendingAwards: ['sync-usaspending-awards'],
-  samEntities: ['sync-gov-buyer-data'],
+  samEntities: ['sync-decision-makers'],
 } as const;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -515,7 +515,12 @@ export async function GET(request: NextRequest) {
       key: 'sam_entities', label: 'SAM entity registrations', kind: 'source_corpus',
       stored: c.samEntities, unit: 'entity records',
       headlineContribution: c.samEntities,
-      freshness: fresh({ asOf: e.samEntities, cadenceHours: null, basis: 'MAX(sam_entities.synced_at) — sync-gov-buyer-data has no registered schedule', jobs: CRON_JOBS.samEntities }),
+      freshness: fresh({
+        asOf: e.samEntities,
+        cadenceHours: 24,
+        basis: 'MAX(sam_entities.synced_at). There is no sync-gov-buyer-data cron row. One entity slice rides sync-decision-makers when the checkpoint is older than 20h. A 7-day clock is stale, not unknown.',
+        jobs: CRON_JOBS.samEntities,
+      }),
       surface: { state: 'customer_readable', tools: ['lookup_sam_entity'], note: 'local-first entity lookup; live SAM only for gaps' },
       upstreams: ['sam_gov'], provenance: 'SAM.gov entity export (UEI, CAGE, NAICS, certifications). Overlaps the award-derived contractor companies — different record type, not deduplicated.',
     },
