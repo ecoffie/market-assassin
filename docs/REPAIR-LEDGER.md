@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-18 — Living pain points: GAO RSS + oversight.gov
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | Data Core / pain points | The existing `institute-gao-sync` collector now also reads oversight.gov open recommendations and the federal report listing (page 0 only, ≤200 new Institute rows, additive on source id). A recommendation the source lists as open is `confirmed_unresolved`; a status the source does not state stays `unknown`. The bare `(Source: GAO)` writer stays blocked. No migration. | `ACQUISITION_NEW_ROW_CAP = 200` → `src/lib/institute/acquired-pain-points.ts` · `blocked_legacy_gao_reinjection` → `src/lib/strategic-intel/derive.ts` | `acquired-pain-points.unit.test.ts` on recorded fixtures (no network). Live dry-run counts are in the PR. | DRAFT PR |
+
 ## 2026-11-18 — GAO reinjection and events prune-report
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

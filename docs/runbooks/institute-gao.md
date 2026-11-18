@@ -40,7 +40,9 @@ coerced to one department. Phrase map: `src/lib/institute/document-agency.ts`.
 
 - Merge legacy GovInfo `GAOREPORTS` / `agency_intelligence` into these clocks
 - Delete `agency-pain-points.json`
-- Start IG / Federal Register / CRS from this runbook without an explicit task
+- Start Federal Register or CRS from this runbook without an explicit task
+- Page through the full oversight.gov history. One run reads page 0 only and inserts at most 200 new Institute rows
+- Delete or rewrite `agency_pain_points_db` rows, the 278 legacy `(Source: GAO)` strings, the replacement candidates, or `gao_high_risk`
 - Present AI `build-pain-points` output as SOURCE_FACT
 
 ## Verify
@@ -49,8 +51,10 @@ coerced to one department. Phrase map: `src/lib/institute/document-agency.ts`.
 # Instance clocks
 npm run db -- data_source_instances --eq source_key=institute_gao
 
-# Living pain points
+# Living pain points (GAO and Inspector General)
 npm run db -- agency_pain_points_db --eq source=gao --limit 20
+npm run db -- agency_pain_points_db --eq source=ig_report --limit 20
+npm run db -- institute_sources --eq source_type=ig_report --limit 20
 
 # Cron
 curl -s "https://getmindy.ai/api/cron/institute-gao-sync?password=$ADMIN_PASSWORD&mode=preview"

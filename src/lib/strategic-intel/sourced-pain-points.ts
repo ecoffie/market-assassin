@@ -16,13 +16,14 @@ import { createClient } from '@supabase/supabase-js';
 import agencyPainPointsJson from '@/data/agency-pain-points.json';
 import { resolveAgency } from '@/lib/strategic-intel/agency-resolver';
 import { isUnsupportedBudgetClaim } from '@/lib/strategic-intel/unsupported-budget-claim';
+import { readAcquiredFields, type ResolutionFlag, type ResolutionStatus } from '@/lib/institute/acquired-pain-points';
 
 export type ClaimProvenance =
   | 'SOURCE_FACT'           // GAO wording (title) cited with Institute evidence
   | 'MINDY_INTERPRETATION'  // derived/rewritten claim — not direct GAO wording
   | 'LEGACY_MANUAL';        // static JSON / unsourced historical corpus
 
-export type ClaimSourceType = 'gao' | 'legacy_manual' | 'other';
+export type ClaimSourceType = 'gao' | 'ig_report' | 'legacy_manual' | 'other';
 
 export interface SourcedPainPoint {
   agency: string;
@@ -35,6 +36,11 @@ export interface SourcedPainPoint {
   provenance: ClaimProvenance;
   /** Soft legacy tag like "(Source: GAO)" when present — never upgraded to SOURCE_FACT. */
   legacy_source_tag: string | null;
+  /** Present when the Institute row stored what the source said. Unknown when it did not. */
+  recommendation?: string | null;
+  resolution_status?: ResolutionStatus;
+  resolution_flag?: ResolutionFlag;
+  source_identifier?: string | null;
 }
 
 export interface AgencyIntelligenceBundle {
@@ -141,6 +147,7 @@ interface InstituteRow {
   publication_date: string | null;
   title: string;
   canonical_agency: string | null;
+  raw: unknown;
 }
 
 /**
@@ -163,7 +170,8 @@ export async function loadSourcedPainPointsForAgency(
     .from('agency_pain_points_db')
     .select('id,agency,pain_point,source,source_url,institute_source_ids,confidence,status')
     .in('agency', agencyKeys)
-    .eq('source', 'gao')
+    .in('source', ['gao', 'ig_report'])
+    .order('last_evidence_at', { ascending: false, nullsFirst: false })
     .limit(limit);
   if (error) throw new Error(`loadSourcedPainPointsForAgency: ${error.message}`);
   if (!rows?.length) return [];
@@ -176,7 +184,7 @@ export async function loadSourcedPainPointsForAgency(
   if (sourceIds.length > 0) {
     const { data: sources, error: sErr } = await client
       .from('institute_sources')
-      .select('id,document_number,source_url,publication_date,title,canonical_agency')
+      .select('id,document_number,source_url,publication_date,title,canonical_agency,raw')
       .in('id', sourceIds);
     if (sErr) throw new Error(`loadSourcedPainPointsForAgency institute: ${sErr.message}`);
     for (const s of (sources ?? []) as InstituteRow[]) byId.set(s.id, s);
@@ -188,8 +196,9 @@ export async function loadSourcedPainPointsForAgency(
     const inst = sid ? byId.get(sid) : undefined;
     const docNum = inst?.document_number ?? extractDocumentNumber(row.pain_point);
     const url = row.source_url || inst?.source_url || null;
+    const acquired = readAcquiredFields(inst?.raw);
 
-    // Living pipeline cites the GAO title as the claim → SOURCE_FACT.
+    // Living pipeline cites the source's own wording → SOURCE_FACT.
     // Anything without an Institute id or URL is not promoted to SOURCE_FACT.
     const provenance: ClaimProvenance =
       sid && url ? 'SOURCE_FACT' : 'MINDY_INTERPRETATION';
@@ -197,13 +206,17 @@ export async function loadSourcedPainPointsForAgency(
     out.push({
       agency: row.agency,
       pain_point: row.pain_point,
-      source_type: 'gao',
+      source_type: row.source === 'ig_report' ? 'ig_report' : 'gao',
       source_url: url,
       document_number: docNum,
       published_at: inst?.publication_date ?? null,
       institute_source_id: sid,
       provenance,
       legacy_source_tag: null,
+      recommendation: acquired?.recommendation ?? null,
+      resolution_status: acquired?.resolution_status ?? 'unknown',
+      resolution_flag: acquired?.resolution_flag ?? 'unknown',
+      source_identifier: acquired?.source_identifier || docNum,
     });
   }
   return out;
@@ -391,6 +404,10 @@ export function toCitation(p: SourcedPainPoint): {
   published_at: string | null;
   institute_source_id: string | null;
   agency: string;
+  recommendation: string | null;
+  resolution_status: ResolutionStatus;
+  resolution_flag: ResolutionFlag;
+  source_identifier: string | null;
 } {
   const claim =
     p.provenance === 'LEGACY_MANUAL' ? sanitizeLegacyClaimText(p.pain_point) : p.pain_point;
@@ -405,5 +422,9 @@ export function toCitation(p: SourcedPainPoint): {
     published_at: p.published_at,
     institute_source_id: p.institute_source_id,
     agency: p.agency,
+    recommendation: p.recommendation ?? null,
+    resolution_status: p.resolution_status ?? 'unknown',
+    resolution_flag: p.resolution_flag ?? 'unknown',
+    source_identifier: p.source_identifier ?? p.document_number,
   };
 }

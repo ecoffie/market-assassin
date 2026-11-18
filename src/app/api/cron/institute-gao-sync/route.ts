@@ -23,7 +23,17 @@ import {
   ingestInstituteDocument,
   reconcileUnresolvedGaoAgencies,
 } from '@/lib/institute/sources';
-import { deriveFromInstituteSource } from '@/lib/strategic-intel/derive';
+import { deriveAcquiredPainPoint, deriveFromInstituteSource } from '@/lib/strategic-intel/derive';
+import { resolveAgency } from '@/lib/strategic-intel/agency-resolver';
+import {
+  ACQUISITION_NEW_ROW_CAP,
+  annotateGaoRssDocument,
+  capNewAcquisition,
+  loadOversightLanes,
+  toInstituteDocument,
+  type AcquisitionLane,
+} from '@/lib/institute/acquired-pain-points';
+import { reportCronOutcome } from '@/lib/cron-self-report';
 import {
   GAO_SOURCE_KEY,
   measureGaoHeldPopulation,
@@ -58,6 +68,20 @@ async function dispatchAlerts(db: ReturnType<typeof sb>, alerts: GaoAlertCandida
     fired.push(a.kind);
   }
   return fired;
+}
+
+function acquisitionSummary(lanes: AcquisitionLane[]) {
+  return {
+    cap: ACQUISITION_NEW_ROW_CAP,
+    lanes: lanes.map((lane) => ({
+      name: lane.name,
+      ok: lane.ok,
+      httpStatus: lane.httpStatus,
+      error: lane.error,
+      documents: lane.documents.length,
+      painPointCandidates: lane.documents.filter((doc) => doc.statesProblem).length,
+    })),
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -106,6 +130,9 @@ export async function GET(request: NextRequest) {
     } catch (stampErr) {
       console.error('[institute-gao-sync] stamp after poll failure:', stampErr);
     }
+    if (mode !== 'preview') {
+      await reportCronOutcome('institute-gao-sync', 'error', `source_fetch_failed: ${message}`);
+    }
     return NextResponse.json({
       success: false, pollOk: false, status: 'ingest_broken',
       reason: 'source_fetch_failed', error: message,
@@ -141,6 +168,9 @@ export async function GET(request: NextRequest) {
     } catch (stampErr) {
       console.error('[institute-gao-sync] stamp after empty feed:', stampErr);
     }
+    if (mode !== 'preview') {
+      await reportCronOutcome('institute-gao-sync', 'error', 'feed_parsed_zero_documents');
+    }
     return NextResponse.json({
       success: false, pollOk: true, feedMalformed: true, status: 'ingest_broken',
       reason: 'feed_parsed_zero_documents',
@@ -150,14 +180,23 @@ export async function GET(request: NextRequest) {
     }, { status: 502 });
   }
 
+  // Inspector General reports and open recommendations. Same pipeline, page 0
+  // only. A non-2xx or an empty parse is a down source, not "0 new rows".
+  const oversight = await loadOversightLanes();
+  const sourceDown = oversight.filter((lane) => !lane.ok);
+
   // Watermark comes ONLY from documents we actually parsed — never Mindy time.
   const sourceWatermark = docs.map((d) => d.publicationDate).filter(Boolean).sort().at(-1) ?? null;
 
   if (mode === 'preview') {
     return NextResponse.json({
-      success: true, mode, pollOk: true, documentsSeen: docs.length, sourceWatermark,
-      note: 'preview — nothing written',
-    });
+      success: sourceDown.length === 0,
+      mode, pollOk: true, documentsSeen: docs.length, sourceWatermark,
+      acquisition: acquisitionSummary(oversight),
+      note: sourceDown.length === 0
+        ? 'preview — nothing written'
+        : 'preview — a source is down, nothing written. This is not "0 new rows".',
+    }, { status: sourceDown.length ? 502 : 200 });
   }
 
   // ── 2. INSTITUTE INGEST + 3. DERIVATION ─────────────────────────────────
@@ -168,7 +207,7 @@ export async function GET(request: NextRequest) {
   for (const doc of docs) {
     if (Date.now() - started > budgetMs) { partial = true; break; }
     processed++;
-    const ing = await ingestInstituteDocument(db, doc, names);
+    const ing = await ingestInstituteDocument(db, annotateGaoRssDocument(doc), names);
     if (ing.error) { failed++; continue; }
     if (ing.inserted) evidenceInserted++; else alreadyHeld++;
     if (ing.resolution.resolved) resolved++; else unresolved++;
@@ -226,12 +265,56 @@ export async function GET(request: NextRequest) {
     blocked++;
   }
 
+  // ── 3c. IG open recommendations + federal reports (additive, capped) ────
+  let igInserted = 0;
+  let igHeldSkipped = 0;
+  let igDeferred = 0;
+  const igCandidates = oversight.flatMap((lane) => lane.documents);
+  if (igCandidates.length > 0) {
+    const numbers = igCandidates.map((d) => d.documentNumber);
+    const { data: heldRows, error: heldErr } = await db.from('institute_sources')
+      .select('document_number')
+      .eq('source_type', 'ig_report')
+      .in('document_number', numbers)
+      .limit(numbers.length);
+    if (heldErr) {
+      failed++;
+      console.error('[institute-gao-sync] held IG id read failed:', heldErr.message);
+    } else {
+      const held = new Set((heldRows ?? []).map((r) => r.document_number as string));
+      const batch = capNewAcquisition(igCandidates, held, ACQUISITION_NEW_ROW_CAP);
+      igHeldSkipped = batch.heldSkipped;
+      igDeferred = batch.deferredOverCap;
+      for (const doc of batch.selected) {
+        if (Date.now() - started > budgetMs) { partial = true; break; }
+        const resolution = resolveAgency({ agencyName: doc.agencyAsStated });
+        const ing = await ingestInstituteDocument(db, toInstituteDocument(doc), names, {
+          agencyResolution: resolution,
+        });
+        if (ing.error) { failed++; continue; }
+        if (ing.inserted) { evidenceInserted++; igInserted++; }
+        else alreadyHeld++;
+        if (!doc.statesProblem || !doc.problem) continue;
+        const der = await deriveAcquiredPainPoint(db, {
+          instituteSourceId: ing.instituteSourceId,
+          documentNumber: doc.documentNumber,
+          problem: doc.problem,
+          url: doc.url,
+          resolution,
+          sourceKind: 'ig_report',
+        });
+        if (der.outcome === 'pain_point_created') painPointsCreated++;
+        else if (der.outcome === 'blocked_history_unavailable' || der.outcome === 'blocked_legacy_gao_reinjection') blocked++;
+      }
+    }
+  }
+
   // ── 4. FIVE CLOCKS on data_source_instances ─────────────────────────────
   const heldPopulation = await measureGaoHeldPopulation(db);
   const resolutionRate = await measureGaoResolutionRate(db);
   const dataAdvanced = evidenceInserted > 0 || painPointsCreated > 0
     || (reconcile?.newlyResolved ?? 0) > 0;
-  const verifiedComplete = !partial && failed === 0 && blocked === 0;
+  const verifiedComplete = !partial && failed === 0 && blocked === 0 && sourceDown.length === 0;
 
   const extraAlerts: GaoAlertCandidate[] = [];
   const withoutHeld = sourceAdvanceWithoutHeldAlert({
@@ -291,12 +374,19 @@ export async function GET(request: NextRequest) {
     },
     now: pollAt,
   });
-  const status = failed > 0 || blocked > 0 ? 'degraded'
+  const status = sourceDown.length > 0 || failed > 0 || blocked > 0 ? 'degraded'
     : evidenceInserted === 0 ? (freshness.status === 'upstream_quiet' ? 'upstream_quiet' : 'no_new_evidence')
     : 'advanced';
 
+  const sourceDownSummary = sourceDown.map((lane) => `${lane.name}: ${lane.error}`).join('; ');
+  await reportCronOutcome(
+    'institute-gao-sync',
+    sourceDown.length > 0 || failed > 0 || blocked > 0 ? 'partial' : 'success',
+    sourceDownSummary || undefined,
+  );
+
   return NextResponse.json({
-    success: failed === 0 && blocked === 0,
+    success: failed === 0 && blocked === 0 && sourceDown.length === 0,
     mode, pollOk: true, status, partial,
     documentsSeen: docs.length, documentsProcessed: processed,
     evidenceInserted, alreadyHeld, resolved, unresolved,
@@ -315,6 +405,12 @@ export async function GET(request: NextRequest) {
     },
     freshness,
     alertsFired,
+    acquisition: {
+      ...acquisitionSummary(oversight),
+      igInserted,
+      igHeldSkipped,
+      igDeferred,
+    },
     elapsedMs: Date.now() - started,
-  });
+  }, { status: sourceDown.length ? 502 : 200 });
 }
