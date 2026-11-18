@@ -52,8 +52,8 @@ describe('gate-slot: queue, never skip', () => {
   it('two slots admit two concurrent runs; a third waits until one finishes', async () => {
     const dir = slotDir();
     const env = { MINDY_GATE_SLOT_DIR: dir, MINDY_GATE_SLOTS: '2', MINDY_GATE_SLOT_POLL_S: '0.1' };
-    const a = bash('gate_slot_acquire && sleep 2; gate_slot_release', env);
-    const b = bash('gate_slot_acquire && sleep 2; gate_slot_release', env);
+    const a = bash('gate_slot_acquire && sleep 4; gate_slot_release', env);
+    const b = bash('gate_slot_acquire && sleep 4; gate_slot_release', env);
     await waitForHeld(dir, 2);
     expect(heldSlots(dir)).toHaveLength(2);
     const c = await bash('gate_slot_acquire && echo GOT', { ...env, MINDY_GATE_SLOT_TIMEOUT_S: '15' });
