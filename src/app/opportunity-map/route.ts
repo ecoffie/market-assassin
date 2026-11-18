@@ -8551,6 +8551,11 @@ const DRAWER_JS = `<script>
       if(det.length)oppInner+='<div class="osec-sub" style="margin-top:14px">Published forecast detail</div>'
         + '<div class="bf-grid">'+det.map(function(x){return '<div class="bf-row"><div class="bf-k">'+esc(x.k)+'</div><div class="bf-v">'+esc(String(x.v))+'</div></div>';}).join('')+'</div>'
         + (function(){ var s=forecastSource(f.source_url); return s?('<div class="ai-note">Source: <a href="'+esc(s.href)+'" target="_blank" rel="noopener">'+esc(s.label)+'</a></div>'):''; })();
+      // last_synced_at is Mindy's sync clock, not an agency posting date — never label it "Posted".
+      if(f.last_synced_at){
+        var _syncRel=relTime(f.last_synced_at);
+        oppInner+='<div class="snapfresh" style="margin-top:12px">Last synced by Mindy'+(_syncRel?' \\u00b7 '+_syncRel:'')+'</div>';
+      }
       if(!oppInner)oppInner=empty('The agency listed this requirement without further detail. Track it \\u2014 the description usually fills in as the buy nears solicitation.');
       oppBox.innerHTML=sec('Opportunity intelligence',oppInner,'fcdesc');
 
