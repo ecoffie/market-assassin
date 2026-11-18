@@ -39,8 +39,26 @@ export const maxDuration = 300;
  * never changes the job outcome. recordsLanded is 0 for a confirmed empty window
  * even if a stray row was touched — that touch is not a nonempty ingest.
  */
+/**
+ * The route's client is `createClient(url, key)` (schema `public`).
+ * `ReturnType<typeof createClient>` is the zero-arg default, whose schema is
+ * `never`, so tsc rejected both the call and `last_verified_ingest`.
+ */
+type DibbsClockDb = {
+  from(table: string): {
+    select(cols: string): {
+      eq(col: string, value: string): {
+        maybeSingle(): PromiseLike<{ data: { last_verified_ingest?: string | null } | null }>;
+      };
+    };
+    update(values: Record<string, string | null>): {
+      eq(col: string, value: string): PromiseLike<unknown>;
+    };
+  };
+};
+
 async function stampDibbsClocks(
-  supabase: ReturnType<typeof createClient>,
+  supabase: DibbsClockDb,
   input: { upstreamReadable: boolean; recordsReceived: number; recordsLanded: number },
 ): Promise<{ patch: CollectionClockPatch; priorVerifiedIngest: string | null } | null> {
   const attemptedAt = new Date().toISOString();
