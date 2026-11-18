@@ -20,6 +20,7 @@ import { getNsnReference } from '@/lib/nsn/reference';
 import { formatAgencyDisplay } from '@/lib/mindy/agency-display';
 import { isNoticeUuid, resolveCanonicalSolicitation } from '@/lib/sam/resolve-solicitation';
 import { resolveFamilyForQuery } from '@/lib/sam/solicitation-family';
+import { reportedCollectionFreshness } from '@/lib/data-core/collection-clocks';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -221,7 +222,54 @@ export async function GET(request: NextRequest) {
       // + manufacturer part numbers). Honest {grounded,degraded} — null-grounded on a genuine miss,
       // never fabricated. Drives the drawer's "DLA reference: $X" price anchor + part#/maker.
       const nsnReference = await getNsnReference(d.nsn || null);
-      return NextResponse.json({ success: true, opp, bidFacts: null, similar: [], nsnDecodes, nsnReference, trackingCount: 0, savedCount: 0, viewCount: 0, source: 'dibbs' });
+      let freshness: { state: string; warning: string | null; asOf: string | null } | null = null;
+      try {
+        const [inst, job] = await Promise.all([
+          db.from('data_source_instances')
+            .select('source_state, last_poll, last_successful_check, last_verified_ingest, last_data_advance')
+            .eq('source_key', 'dibbs_dla_flat_files')
+            .maybeSingle(),
+          db.from('cron_jobs').select('enabled').eq('job_name', 'sync-dibbs').maybeSingle(),
+        ]);
+        const row = (inst.data ?? {}) as {
+          source_state?: string | null;
+          last_poll?: string | null;
+          last_successful_check?: string | null;
+          last_verified_ingest?: string | null;
+          last_data_advance?: string | null;
+        };
+        const enabled = (job.data as { enabled?: boolean | string | null } | null)?.enabled;
+        const producerEnabled = job.error || !job.data
+          ? null
+          : enabled === true || enabled === 'true';
+        const report = reportedCollectionFreshness({
+          sourceState: row.source_state ?? null,
+          lastPoll: row.last_poll ?? null,
+          lastSuccessfulCheck: row.last_successful_check ?? null,
+          lastVerifiedIngest: row.last_verified_ingest ?? null,
+          lastDataAdvance: row.last_data_advance ?? null,
+          recordsReceived: null,
+          rowTouchAt: (d.synced_at as string | null) ?? null,
+          cadenceHours: 24,
+          now: new Date(),
+          producerEnabled,
+        });
+        freshness = { state: report.state, warning: report.warning, asOf: report.asOf };
+      } catch (e) {
+        console.error('[opportunity-detail] dibbs freshness read failed:', (e as Error).message);
+      }
+      return NextResponse.json({
+        success: true,
+        opp: { ...opp, freshness },
+        bidFacts: null,
+        similar: [],
+        nsnDecodes,
+        nsnReference,
+        trackingCount: 0,
+        savedCount: 0,
+        viewCount: 0,
+        source: 'dibbs',
+      });
     }
     return NextResponse.json({ success: false, error: 'not found' }, { status: 404 });
   }

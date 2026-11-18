@@ -5,9 +5,10 @@
  * ingest clock, or if `current` with no ingest clock is reported CURRENT.
  */
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildCollectionClockPatch, reportedCollectionFreshness } from './collection-clocks';
+import { honestInstanceState } from './inventory-model';
 
 const NOW = new Date('2026-11-18T18:00:00Z');
 const ATTEMPT = '2026-11-18T08:00:00.000Z';
@@ -215,5 +216,55 @@ describe('DIBBS wiring', () => {
     expect(api).toContain('freshness');
     expect(api).toContain("eq('job_name', 'sync-dibbs')");
     expect(api).toContain('producerEnabled');
+  });
+
+  it('a disabled collector with last_verified_ingest inside the cadence is not CURRENT on any surface', () => {
+    const recent = '2026-11-17T08:00:00Z';
+    const clocks = {
+      sourceState: 'current',
+      lastPoll: ATTEMPT,
+      lastSuccessfulCheck: ATTEMPT,
+      lastVerifiedIngest: recent,
+      lastDataAdvance: null,
+      recordsReceived: 400,
+      rowTouchAt: ATTEMPT,
+      cadenceHours: 24,
+      now: NOW,
+    };
+    const enabled = reportedCollectionFreshness({ ...clocks, producerEnabled: true });
+    const disabled = reportedCollectionFreshness({ ...clocks, producerEnabled: false });
+    expect(enabled.state).toBe('CURRENT');
+    expect(disabled.state).toBe('STALE');
+    expect(disabled.warning).toBe('Collector is disabled. A past ingest does not make this feed current.');
+    expect(honestInstanceState({
+      sourceState: 'current',
+      lastVerifiedIngest: recent,
+      producerEnabled: false,
+    })).toBe('STALE');
+
+    const root = process.cwd();
+    const app = readFileSync(join(root, 'src/app/api/app/dibbs/route.ts'), 'utf8');
+    const detail = readFileSync(join(root, 'src/app/api/app/opportunity-detail/route.ts'), 'utf8');
+    const admin = readFileSync(join(root, 'src/app/api/admin/data-inventory/route.ts'), 'utf8');
+    const map = readFileSync(join(root, 'src/app/opportunity-map/route.ts'), 'utf8');
+    const panel = readFileSync(join(root, 'src/components/app/panels/DibbsPanel.tsx'), 'utf8');
+    for (const surface of [app, detail, admin]) {
+      expect(surface).toContain('reportedCollectionFreshness');
+      expect(surface).toContain('producerEnabled');
+    }
+    expect(app).toContain("eq('job_name', 'sync-dibbs')");
+    expect(detail).toContain("eq('job_name', 'sync-dibbs')");
+    expect(admin).toContain('producerEnabled: inst ? producerEnabled(inst.source_key) : null');
+    expect(map).toContain("o.freshness && o.freshness.state === 'CURRENT'");
+    expect(map).toContain('Collector is disabled. A past ingest does not make this feed current.');
+    expect(map).not.toContain("snapdot\"></span>Live from DLA DIBBS");
+    expect(panel).toContain('data.freshness?.warning');
+
+    const mcpDir = join(root, 'src/mcp/tools');
+    for (const name of readdirSync(mcpDir)) {
+      if (!name.endsWith('.ts')) continue;
+      const text = readFileSync(join(mcpDir, name), 'utf8');
+      expect(text, name).not.toMatch(/dibbs_rfqs|Live from DLA DIBBS/);
+    }
   });
 });

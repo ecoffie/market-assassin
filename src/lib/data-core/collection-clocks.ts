@@ -9,7 +9,12 @@
  * source_state of `current` that was inserted with every clock null. A weekend
  * no-data run and a re-upsert of unchanged rows both looked like a fresh feed.
  */
-import { timestampState, type FreshnessState } from './inventory-model';
+import {
+  DISABLED_COLLECTOR_WARNING,
+  freshnessStateForCollector,
+  timestampState,
+  type FreshnessState,
+} from './inventory-model';
 
 export interface CollectionClockInput {
   /** When this run tried. Always last_poll. Never a freshness claim. */
@@ -129,12 +134,14 @@ export function reportedCollectionFreshness(input: {
   producerEnabled?: boolean | null;
 }): ReportedCollectionFreshness {
   const report = collectionFreshness(input);
+  const state = freshnessStateForCollector(report.state, input.producerEnabled);
   if (input.producerEnabled !== false) return report;
-  const note = 'Collector is disabled. A past ingest does not make this feed current.';
   return {
     ...report,
-    state: report.state === 'CURRENT' ? 'STALE' : report.state,
-    warning: report.warning ? `${report.warning} ${note}` : note,
+    state,
+    warning: report.warning
+      ? `${report.warning} ${DISABLED_COLLECTOR_WARNING}`
+      : DISABLED_COLLECTOR_WARNING,
   };
 }
 
