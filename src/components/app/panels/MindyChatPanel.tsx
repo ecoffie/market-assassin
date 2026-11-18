@@ -33,6 +33,7 @@ import {
   parseChatHandoff,
   parseLastChatSessionId,
   parseMapSelectedOpp,
+  serializeMapSelectedOpp,
   opportunityContextField,
   type AttachedOpportunity,
 } from '@/lib/chat/chat-handoff';
@@ -390,14 +391,20 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
     }
   }, [email, loadingSession, sessionId]);
 
+  // Drop a Map selection the customer explicitly dismissed (chip X / New chat) so remount does not re-attach it.
+  const clearMapSelectedOpp = useCallback(() => {
+    try { sessionStorage.setItem(MAP_SELECTED_OPP_KEY, serializeMapSelectedOpp(null)); } catch { /* unavailable */ }
+  }, []);
+
   // Start a fresh conversation.
   const startNewChat = useCallback(() => {
     setMessages([]);
     setSessionId(null);
     setAttachedOpp(null);
     try { sessionStorage.removeItem(LAST_CHAT_SESSION_KEY); } catch { /* unavailable */ }
+    clearMapSelectedOpp();
     inputRef.current?.focus();
-  }, []);
+  }, [clearMapSelectedOpp]);
 
   // Delete a conversation from history.
   const deleteSession = useCallback(async (sid: string) => {
@@ -791,7 +798,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
               </button>
               <button
                 type="button"
-                onClick={() => { setAttachedOpp(null); setProposalState('idle'); }}
+                onClick={() => { setAttachedOpp(null); setProposalState('idle'); clearMapSelectedOpp(); }}
                 aria-label="Remove this opportunity from the question"
                 className="shrink-0 rounded p-0.5 text-faint hover:text-white"
               >

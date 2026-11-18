@@ -6398,7 +6398,7 @@ const DRAWER_JS = `<script>
   // 'open' | 'dla' | 'recompete' | 'forecast' | 'company' | 'buyer', or null when closed.
   // Read-only for other modules; set by each drawer opener below.
   window.__drawerKind=null;
-  function close(){ dr.classList.remove('show'); bd.classList.remove('show'); clearTaskOrderPins(); window.__drawerKind=null; window.__selectedOpp=null; }
+  function close(){ dr.classList.remove('show'); bd.classList.remove('show'); clearTaskOrderPins(); window.__drawerKind=null; window.__selectedOpp=null; try{ if(window.__onSelectedOpp) window.__onSelectedOpp(); }catch(e){} /* shell → Ask Mindy clears chip */ }
   // listing_open for drawers that can be reached WITHOUT openOppDrawer (typed ?recompete= /
   // ?forecast= deep links, similar-listing cards). openOppDrawer already emits it before routing
   // to these drawers and leaves a one-shot marker, so the same open is never counted twice.

@@ -152,9 +152,10 @@ describe('Open in full workspace', () => {
 });
 
 describe('the listing drawer publishes the selection', () => {
-  it('sets window.__selectedOpp for SAM notices (no flag) and clears it on close', () => {
+  it('sets window.__selectedOpp for SAM notices (no flag) and clears + notifies on close', () => {
     expect(MAP).toMatch(/window\.__selectedOpp=\/\^\[0-9a-f\]\{32\}\$\/\.test/);
-    expect(MAP).toMatch(/function close\(\)\{[^}]*window\.__selectedOpp=null;/);
+    // close() must call __onSelectedOpp after nulling so the App shell posts a clear to Ask Mindy.
+    expect(MAP).toMatch(/function close\(\)\{[\s\S]*?window\.__selectedOpp=null;[\s\S]*?window\.__onSelectedOpp/);
   });
 });
 
