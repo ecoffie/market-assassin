@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-18 — Cron run history lands in cron_job_runs
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | Cron observability | extract-sam-events and refresh-contracts wrote run detail to `cron_logs`, which has 0 production rows and is not what the admin cron page or the watchdog read. The prune proposal and the refresh outcome now go to `cron_job_runs` via a direct insert and `reportCronOutcome`. Prune stays report-only unless `SAM_EVENTS_PRUNE=apply`. A failed prune-report insert still returns 500. | `from('cron_job_runs').insert` → `src/app/api/cron/extract-sam-events/route.ts` · `mode=preview; contract file not written` → `src/app/api/cron/refresh-contracts/route.ts` | extract-sam-events route test (report-only, apply, failed insert) + refresh-contracts source test. `SAM_EVENTS_PRUNE` left unset. | DRAFT PR |
+
 ## 2026-11-18 — Collection freshness clocks (DIBBS and grants)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

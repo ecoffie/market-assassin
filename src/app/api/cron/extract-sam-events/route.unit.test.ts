@@ -13,14 +13,15 @@ const db: {
   sam_opportunities: Row[];
   sam_events: Row[];
   cron_logs: Row[];
+  cron_job_runs: Row[];
   upserts: Row[][];
   deletes: string[][];
   cronLogInsertError: string | null;
 } = {
-  sam_opportunities: [], sam_events: [], cron_logs: [], upserts: [], deletes: [],
+  sam_opportunities: [], sam_events: [], cron_logs: [], cron_job_runs: [], upserts: [], deletes: [],
   cronLogInsertError: null,
 };
-type Table = 'sam_opportunities' | 'sam_events' | 'cron_logs';
+type Table = 'sam_opportunities' | 'sam_events' | 'cron_logs' | 'cron_job_runs';
 
 function query(table: Table) {
   const filters: Array<(r: Row) => boolean> = [];
@@ -55,10 +56,11 @@ function query(table: Table) {
     insert: (row: Row) => { op = 'insert'; payload = [row]; return b; },
     then: (resolve: (v: unknown) => void) => {
       if (op === 'insert') {
-        if (db.cronLogInsertError) {
+        if (table === 'cron_job_runs' && db.cronLogInsertError) {
           return resolve({ data: null, error: { message: db.cronLogInsertError } });
         }
-        db.cron_logs.push(...payload);
+        const dest = table === 'cron_job_runs' ? db.cron_job_runs : db.cron_logs;
+        dest.push(...payload);
         return resolve({ data: null, error: null });
       }
       if (op === 'upsert') {
@@ -92,6 +94,7 @@ function query(table: Table) {
 vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({ from: (t: Table) => query(t) }),
 }));
+vi.mock('@/lib/cron-self-report', () => ({ reportCronOutcome: vi.fn(async () => undefined) }));
 vi.mock('@/lib/gov-contacts/event-office', () => ({
   resolveEventOffice: async () => ({ dodaac: null, office: null, subAgency: null }),
 }));
@@ -118,7 +121,7 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://fake';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'fake';
   vi.useFakeTimers({ toFake: ['Date'] });
-  db.sam_opportunities = []; db.sam_events = []; db.cron_logs = []; db.upserts = []; db.deletes = [];
+  db.sam_opportunities = []; db.sam_events = []; db.cron_logs = []; db.cron_job_runs = []; db.upserts = []; db.deletes = [];
   db.cronLogInsertError = null;
   delete process.env.SAM_EVENTS_PRUNE;
 });
@@ -172,7 +175,7 @@ describe('extract-sam-events route', () => {
     ];
   };
 
-  it('default (no flag): deletes NOTHING, reports the proposal in the response and durably in cron_logs', async () => {
+  it('default (no flag): deletes NOTHING, reports the proposal in the response and durably in cron_job_runs', async () => {
     seedRetirement();
     const { body } = await run();
     expect(db.deletes).toEqual([]);
@@ -180,9 +183,10 @@ describe('extract-sam-events route', () => {
     const prune = (body as unknown as { prune: Record<string, unknown> }).prune;
     expect(prune).toMatchObject({ mode: 'report', proposed: 1, deleted: 0, recorded: true });
     expect(prune.proposals).toEqual([{ id: 'row-not-event', notice_id: 'not-event', reason: 'no_event_on_reread', stored_type: 'industry_day', stored_date: null }]);
-    expect(db.cron_logs).toHaveLength(1);
-    expect(db.cron_logs[0]).toMatchObject({ job_name: 'extract-sam-events:prune-report', status: 'report' });
-    expect((db.cron_logs[0].result as { proposals: unknown[]; deleted: number }).deleted).toBe(0);
+    expect(db.cron_logs).toHaveLength(0);
+    expect(db.cron_job_runs).toHaveLength(1);
+    expect(db.cron_job_runs[0]).toMatchObject({ job_name: 'extract-sam-events:prune-report', status: 'report' });
+    expect(JSON.parse(String(db.cron_job_runs[0].error)).deleted).toBe(0);
   });
 
   it('any flag value other than "apply" is still report-only', async () => {
@@ -199,7 +203,8 @@ describe('extract-sam-events route', () => {
     expect(db.deletes.flat()).toEqual(['not-event']);
     expect(body.stats.retired).toBe(1);
     expect(db.sam_events.some((r) => r.notice_id === 'ai-1')).toBe(true);
-    expect(db.cron_logs[0]).toMatchObject({ status: 'applied' });
+    expect(db.cron_job_runs[0]).toMatchObject({ status: 'applied' });
+    expect(db.cron_logs).toHaveLength(0);
   });
 
   it('fails the job (500) when the durable prune report cannot be recorded', async () => {
@@ -213,6 +218,7 @@ describe('extract-sam-events route', () => {
       prune: { recorded: false, proposed: 1 },
     });
     expect(db.deletes).toEqual([]);
+    expect(db.cron_job_runs).toHaveLength(0);
     expect(db.cron_logs).toHaveLength(0);
   });
 });
