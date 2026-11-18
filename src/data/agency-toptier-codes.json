@@ -43,9 +43,12 @@
   "Export-Import Bank of the United States": { "code": "083", "abbreviation": "EXIM" },
   "Millennium Challenge Corporation": { "code": "184", "abbreviation": "MCC" },
   "Federal Housing Finance Agency": { "code": "537", "abbreviation": "FHFA" },
+  "Consumer Product Safety Commission": { "code": "061", "abbreviation": "CPSC" },
   "U.S. International Trade Commission": { "code": "061", "abbreviation": "USITC" },
   "Broadcasting Board of Governors": { "code": "095", "abbreviation": "BBG" },
   "Commodity Futures Trading Commission": { "code": "339", "abbreviation": "CFTC" },
   "Executive Office of the President": { "code": "011", "abbreviation": "EOP" },
-  "International Boundary and Water Commission": { "code": "519", "abbreviation": "IBWC" }
+  "International Boundary and Water Commission": { "code": "519", "abbreviation": "IBWC" },
+  "Appalachian Regional Commission": { "code": "309", "abbreviation": "ARC" },
+  "Election Assistance Commission": { "code": "525", "abbreviation": "EAC" }
 }

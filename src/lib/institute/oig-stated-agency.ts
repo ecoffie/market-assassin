@@ -30,26 +30,38 @@ export const OIG_STATED_ALIASES: readonly OigStatedAlias[] = [
 ];
 
 /**
- * Offices on that same page that are their own agency and are not one of the
- * canonical toptier names. A sentence on the EAC page that names the
- * Department of Justice is where to report election crime, not the EAC OIG's
- * parent. A DOT mention on the CPSC page is a referral for vehicle complaints.
+ * Independent agencies the source names as themselves. They are canonical
+ * under that official name (agency-toptier-codes.json), with the USASpending
+ * toptier code where it does not have to be invented. A sentence on the EAC
+ * page that names the Department of Justice is where to report election crime,
+ * not the EAC OIG's parent. A DOT mention on the CPSC page is a referral for
+ * vehicle complaints.
+ *
+ * CPSC's USASpending toptier code is 061 (api.usaspending.gov toptier
+ * agencies, read 2026-11-18). This file already assigns 061 to the U.S.
+ * International Trade Commission, and USASpending's current code for the
+ * Trade Commission is 034. CPSC is listed before that existing entry so a
+ * code lookup of 061 stays the Trade Commission. The name match is what
+ * surfaces the recommendations.
  */
-export const OIG_STATED_NOT_CANONICAL: readonly { stated: string; citation: string }[] = [
+export const OIG_SELF_NAMED: readonly { stated: string; code: string; citation: string }[] = [
   {
     stated: 'Consumer Product Safety Commission',
+    code: '061',
     citation:
-      'https://www.oversight.gov/inspectors-general/consumer-product-safety-commission-oig (read 2026-11-18) lists Agencies: Consumer Product Safety Commission and https://oig.cpsc.gov/. It is not a component of a canonical department.',
+      'https://www.oversight.gov/inspectors-general/consumer-product-safety-commission-oig (read 2026-11-18) lists Agencies: Consumer Product Safety Commission and https://oig.cpsc.gov/. USASpending toptier code 061, abbreviation CPSC.',
   },
   {
     stated: 'Appalachian Regional Commission',
+    code: '309',
     citation:
-      'https://www.oversight.gov/inspectors-general/appalachian-regional-commission-oig (read 2026-11-18) lists Agencies: Appalachian Regional Commission and https://www.arc.gov/office-of-inspector-general/. It is not a component of a canonical department.',
+      'https://www.oversight.gov/inspectors-general/appalachian-regional-commission-oig (read 2026-11-18) lists Agencies: Appalachian Regional Commission and https://www.arc.gov/office-of-inspector-general/. USASpending toptier code 309, abbreviation ARC.',
   },
   {
     stated: 'Election Assistance Commission',
+    code: '525',
     citation:
-      'https://www.oversight.gov/inspectors-general/election-assistance-commission-oig (read 2026-11-18) lists Agencies: Election Assistance Commission and https://oig.eac.gov/. The Department of Justice mention on that page is where to report election crime, not this office\'s parent.',
+      'https://www.oversight.gov/inspectors-general/election-assistance-commission-oig (read 2026-11-18) lists Agencies: Election Assistance Commission and https://oig.eac.gov/. USASpending toptier code 525, abbreviation EAC. The Department of Justice mention on that page is where to report election crime, not this office\'s parent.',
   },
 ];
 
@@ -69,7 +81,11 @@ export function oigStatedAlias(stated: string): OigStatedAlias | null {
  */
 export function resolveOversightStatedAgency(stated: string): AgencyResolution {
   const direct = resolveAgency({ agencyName: stated });
-  if (direct.resolved) return direct;
+  if (direct.resolved) {
+    const self = OIG_SELF_NAMED.find((row) => norm(row.stated) === norm(stated));
+    if (!self || direct.canonicalAgency !== self.stated) return direct;
+    return { ...direct, note: self.citation };
+  }
   const alias = oigStatedAlias(stated);
   if (!alias) return direct;
   const via = resolveAgency({ agencyName: alias.canonical });

@@ -3,9 +3,10 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseOversightOpenRecommendations } from './acquired-pain-points';
 import {
-  OIG_STATED_NOT_CANONICAL,
+  OIG_SELF_NAMED,
   resolveOversightStatedAgency,
 } from './oig-stated-agency';
+import { resolveAgency } from '@/lib/strategic-intel/agency-resolver';
 
 const fixture = (name: string) =>
   readFileSync(join(__dirname, '__fixtures__', name), 'utf8');
@@ -25,15 +26,25 @@ describe('the 14 unresolved page-0 recommendations', () => {
     }
   });
 
-  it('leaves CPSC, ARC, and the Election Assistance Commission unresolved', () => {
-    for (const row of OIG_STATED_NOT_CANONICAL) {
+  it('maps CPSC, ARC, and the Election Assistance Commission to themselves', () => {
+    expect(OIG_SELF_NAMED.map((row) => row.stated)).toEqual([
+      'Consumer Product Safety Commission',
+      'Appalachian Regional Commission',
+      'Election Assistance Commission',
+    ]);
+    for (const row of OIG_SELF_NAMED) {
       const resolved = resolveOversightStatedAgency(row.stated);
-      expect(resolved.resolved, row.stated).toBe(false);
-      expect(resolved.canonicalAgency).toBeNull();
+      expect(resolved.resolved, row.stated).toBe(true);
+      expect(resolved.canonicalAgency).toBe(row.stated);
+      expect(resolved.method).toBe('exact_name');
+      expect(resolved.toptierCode).toBe(row.code);
+      expect(resolved.note).toContain(row.code);
     }
     // The EAC page names Justice as the place to report election crime.
-    // That sentence is not a parent-agency relationship.
-    expect(resolveOversightStatedAgency('Election Assistance Commission').canonicalAgency).toBeNull();
-    expect(resolveOversightStatedAgency('Department of Justice').canonicalAgency).toBe('Department of Justice');
+    // That sentence does not move the EAC recommendations onto Justice.
+    expect(resolveOversightStatedAgency('Election Assistance Commission').canonicalAgency)
+      .toBe('Election Assistance Commission');
+    expect(resolveAgency({ toptierCode: '061' }).canonicalAgency)
+      .toBe('U.S. International Trade Commission');
   });
 });
