@@ -159,12 +159,14 @@ export function selectCanonicalVersion<T extends { posted_date?: string | null; 
 const NEVER_OPEN_TYPES = /^(award notice|justification)/i;
 
 /**
- * Status a customer is told. Rules (Data Core 2026-11-17; consistent with #1963, which decides when a
- * row is DEACTIVATED, not how an active row is described):
- *   1. SAM's own archive date has passed → archived (even while `active` still says true; the
+ * Status a customer is told. Rules, in order (Data Core 2026-11-17; consistent with #1963, which
+ * decides when a row is DEACTIVATED, not how an active row is described):
+ *   1. Award notices and justifications are never open → closed.
+ *   2. Active with a FUTURE response deadline → open. The DEADLINE WINS over archive_date: 22 live
+ *      notices carry a future deadline with a passed archive_date (Agent 4, 2026-11-17), and
+ *      archive_date is date-only, so "archive <= now" fires at midnight on the due day.
+ *   3. SAM's own archive date has passed → archived (even while `active` still says true; the
  *      stale-cleanup that would flip it is report-only).
- *   2. Award notices and justifications are never open.
- *   3. Active with a FUTURE response deadline → open.
  *   4. Active with NO response deadline → active_no_deadline (never "open").
  *   5. Otherwise closed / unknown as before.
  */
@@ -176,9 +178,9 @@ export function deriveSolicitationStatus(
   const deadlineMs = row.response_deadline ? Date.parse(row.response_deadline) : NaN;
   const archiveMs = row.archive_date ? Date.parse(row.archive_date) : NaN;
   const deadlineExists = Number.isFinite(deadlineMs);
-  if (Number.isFinite(archiveMs) && archiveMs <= nowMs) return 'archived';
   if (row.notice_type && NEVER_OPEN_TYPES.test(row.notice_type.trim())) return 'closed';
   if (row.active === true && deadlineExists && deadlineMs > nowMs) return 'open';
+  if (Number.isFinite(archiveMs) && archiveMs <= nowMs) return 'archived';
   if (row.active === true && !deadlineExists) return 'active_no_deadline';
   if (row.active === false) return 'closed';
   if (deadlineExists && deadlineMs <= nowMs) return 'closed';

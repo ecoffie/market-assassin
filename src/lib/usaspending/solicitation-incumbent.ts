@@ -283,6 +283,7 @@ async function fromSamApi(q: string): Promise<ResolvedNotice | null> {
               active,
               response_deadline,
               archive_date: opp.archiveDate || null,
+              notice_type: opp.type || opp.typeOfNotice || null,
             }),
             version_count: 0,
             deadline_source,
@@ -351,6 +352,7 @@ async function fromSamPublic(q: string): Promise<ResolvedNotice | null> {
           active: null,
           response_deadline,
           archive_date: null,
+          notice_type: opp.type?.value || null,
         }),
         deadline_source: 'responseDate',
         version_count: 0,
@@ -731,6 +733,7 @@ export function summarizeSolicitationIncumbent(
       active: notice.active ?? null,
       response_deadline: notice.response_deadline,
       archive_date: notice.archive_date ?? null,
+      notice_type: notice.notice_type ?? null,
     });
     parts.push(
       `${solicitationStatusLabel(status)} ${notice.solicitation_number || notice.notice_id}` +
