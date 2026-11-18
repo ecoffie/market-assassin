@@ -20,7 +20,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bold, Check, ChevronLeft, Copy, Download, Image as ImageIcon, Italic, List, ListOrdered, Loader2, Redo2,
-  Search, Send, Sparkles, Underline, Undo2, Upload, X,
+  FileText, Search, Send, Sparkles, Underline, Undo2, Upload, X,
 } from 'lucide-react';
 import { authedFetch } from '../authHeaders';
 import {
@@ -58,8 +58,31 @@ interface Props {
   findingRequirements?: boolean;
   onExportPackage?: () => void;
   exportingPackage?: boolean;
+  /** The solicitation documents Mindy has read (Documents tab). */
+  documents?: { name: string; pages?: number }[];
+  onAddDocuments?: (files: File[]) => void;
+  addingDocuments?: boolean;
+  /** Independent compliance check of the whole draft against the requirements (Check tab). */
+  onRunCheck?: () => void;
+  checkRunning?: boolean;
+  checkResult?: EditorCheckResult | null;
+  checkError?: string | null;
   onClose: () => void;
 }
+
+export interface EditorCheckResult {
+  verdicts: Array<{ id: string; requirement: string; status: 'met' | 'partial' | 'missing'; evidence?: string }>;
+  summary: { total: number; met: number; partial: number; missing: number; score: number };
+}
+
+/** The side panel's tabs, in order. "Images" is opened from Ask Mindy, not a tab of its own. */
+export const SIDE_TABS = [
+  { id: 'ask', label: 'Ask Mindy' },
+  { id: 'requirements', label: 'Requirements' },
+  { id: 'documents', label: 'Documents' },
+  { id: 'check', label: 'Check' },
+] as const;
+type SideTab = (typeof SIDE_TABS)[number]['id'] | 'images';
 
 type SaveState = 'saved' | 'saving' | 'unsaved' | 'error';
 type Msg = { role: 'user' | 'assistant'; content: string; done: boolean; target?: 'replace' | 'insert'; error?: boolean };
@@ -192,6 +215,7 @@ export default function ProposalEditor(props: Props) {
     onSectionChange, onDraftSection, draftingSection, canDraft, draftError,
     requirements = [], onRequirementStatus, onFindRequirements, findingRequirements,
     onExportPackage, exportingPackage, onClose,
+    documents = [], onAddDocuments, addingDocuments, onRunCheck, checkRunning, checkResult, checkError,
   } = props;
 
   // Full-screen editor: the page behind it does not scroll.
@@ -370,7 +394,8 @@ export default function ProposalEditor(props: Props) {
   const pages = Math.max(1, Math.ceil(totalWords / WORDS_PER_PAGE));
 
   /* ── Ask Mindy ── */
-  const [tab, setTab] = useState<'ask' | 'images'>('ask');
+  const [tab, setTab] = useState<SideTab>('ask');
+  const docInput = useRef<HTMLInputElement>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [streaming, setStreaming] = useState(false);
@@ -758,16 +783,113 @@ export default function ProposalEditor(props: Props) {
               <p className="text-xs text-[#5a6675] truncate">Helping with: {label}</p>
             </div>
           </div>
-          <div className="flex border-b border-[#e6eaef] px-2" role="tablist">
-            {(['ask', 'images'] as const).map((t) => (
-              <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => (t === 'images' ? openImages() : setTab('ask'))}
-                className={`px-3 py-2.5 text-sm font-semibold border-b-2 -mb-px ${tab === t ? 'border-[#006aff] text-[#005ee0]' : 'border-transparent text-[#5a6675] hover:text-[#111c26]'}`}>
-                {t === 'ask' ? 'Ask Mindy' : 'Images'}
-              </button>
-            ))}
+          <div className="flex border-b border-[#e6eaef] px-1" role="tablist" data-testid="editor-side-tabs">
+            {SIDE_TABS.map((t) => {
+              const on = tab === t.id || (t.id === 'ask' && tab === 'images');
+              return (
+                <button key={t.id} type="button" role="tab" aria-selected={on} onClick={() => setTab(t.id)}
+                  className={`flex-1 px-1.5 py-2.5 text-[13px] font-semibold border-b-2 -mb-px ${on ? 'border-[#006aff] text-[#005ee0]' : 'border-transparent text-[#5a6675] hover:text-[#111c26]'}`}>
+                  {t.label}
+                </button>
+              );
+            })}
           </div>
 
-          {tab === 'ask' ? (
+          {tab === 'requirements' ? (
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-3">
+              {counted.length > 0 ? (
+                <>
+                  <p className={`text-sm font-semibold ${allCovered ? 'text-[#137a4e]' : 'text-[#92400e]'}`}>{coveredCount} of {counted.length} requirements covered</p>
+                  <p className="text-xs text-[#5a6675]">Tick a requirement once your proposal covers it.</p>
+                  <ul className="flex flex-col gap-1">
+                    {counted.map((r) => (
+                      <li key={r.id}>
+                        <label className="flex gap-2.5 rounded-lg px-2 py-2 hover:bg-[#f7f9fb] cursor-pointer">
+                          <input type="checkbox" checked={r.status === 'done'} disabled={!onRequirementStatus}
+                            onChange={(e) => onRequirementStatus?.(r.id, e.target.checked ? 'done' : 'open')}
+                            className="mt-0.5 h-4 w-4 accent-[#006aff]" />
+                          <span className="text-sm leading-snug">
+                            {r.section && <span className="font-semibold text-[#5a6675]">{r.section} · </span>}
+                            {r.text}
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-[#5a6675] leading-relaxed">Mindy can list everything the solicitation asks for, so you can tick each one off as you write.</p>
+                  {onFindRequirements ? (
+                    <button type="button" onClick={onFindRequirements} disabled={findingRequirements}
+                      className="self-start h-10 px-4 rounded-lg bg-[#006aff] hover:bg-[#0057d1] text-white text-[13px] font-semibold inline-flex items-center gap-2 disabled:opacity-60">
+                      {findingRequirements ? <><Loader2 className="h-4 w-4 animate-spin" />Finding requirements…</> : 'Find the requirements'}
+                    </button>
+                  ) : (
+                    <p className="text-sm text-[#5a6675]">Add the solicitation in Documents first.</p>
+                  )}
+                </>
+              )}
+            </div>
+          ) : tab === 'documents' ? (
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-3">
+              {documents.length > 0 ? (
+                <ul className="flex flex-col gap-1.5" aria-label="Documents Mindy has read">
+                  {documents.map((d, i) => (
+                    <li key={`${d.name}-${i}`} className="flex items-center gap-2.5 rounded-lg border border-[#e6eaef] px-3 py-2.5">
+                      <FileText className="h-4 w-4 shrink-0 text-[#5a6675]" aria-hidden />
+                      <span className="min-w-0 flex-1 text-sm truncate">{d.name}</span>
+                      {d.pages ? <span className="text-xs text-[#5a6675] shrink-0">{d.pages} pp</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-[#5a6675]">No documents yet. Add the RFP so Mindy can write from it.</p>
+              )}
+              {onAddDocuments && (
+                <>
+                  <button type="button" onClick={() => docInput.current?.click()} disabled={addingDocuments}
+                    className="self-start h-10 px-4 rounded-lg border border-[#d4dae2] bg-white text-[13px] font-semibold inline-flex items-center gap-2 disabled:opacity-60">
+                    {addingDocuments ? <><Loader2 className="h-4 w-4 animate-spin" />Reading…</> : <><Upload className="h-4 w-4" />Add documents</>}
+                  </button>
+                  <input ref={docInput} type="file" multiple className="hidden"
+                    accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                    onChange={(e) => { onAddDocuments(Array.from(e.target.files || [])); e.target.value = ''; }} />
+                  <p className="text-xs text-[#5a6675]">Amendments, Q&amp;A, the SOW or a pricing sheet: Mindy reads them all.</p>
+                </>
+              )}
+            </div>
+          ) : tab === 'check' ? (
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-3">
+              <p className="text-sm text-[#5a6675] leading-relaxed">A second reader goes through your whole draft and marks each requirement met, partly met or missing.</p>
+              {onRunCheck && (
+                <button type="button" onClick={onRunCheck} disabled={checkRunning || counted.length === 0}
+                  title={counted.length === 0 ? 'Find the requirements first' : undefined}
+                  className="self-start h-10 px-4 rounded-lg bg-[#006aff] hover:bg-[#0057d1] text-white text-[13px] font-semibold inline-flex items-center gap-2 disabled:opacity-60">
+                  {checkRunning ? <><Loader2 className="h-4 w-4 animate-spin" />Checking…</> : checkResult ? 'Check again' : 'Check my draft'}
+                </button>
+              )}
+              {counted.length === 0 && <p className="text-xs text-[#92400e]">Find the requirements first (Requirements tab).</p>}
+              {checkError && <p className="text-sm text-[#b42318]">{checkError}</p>}
+              {checkResult && (
+                <>
+                  <p className="text-sm font-semibold">
+                    {checkResult.summary.met} met · {checkResult.summary.partial} partly · {checkResult.summary.missing} missing
+                  </p>
+                  <ul className="flex flex-col gap-1.5">
+                    {checkResult.verdicts.map((v) => (
+                      <li key={v.id} className="rounded-lg border border-[#e6eaef] px-3 py-2 text-sm leading-snug">
+                        <span className={`mr-1.5 text-xs font-bold uppercase ${v.status === 'met' ? 'text-[#137a4e]' : v.status === 'partial' ? 'text-[#92400e]' : 'text-[#b42318]'}`}>
+                          {v.status === 'met' ? 'Met' : v.status === 'partial' ? 'Partly' : 'Missing'}
+                        </span>
+                        {v.requirement}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          ) : tab === 'ask' ? (
             <>
               <div ref={chatScroll} className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-3">
                 <div className="grid grid-cols-2 gap-2">
@@ -815,6 +937,7 @@ export default function ProposalEditor(props: Props) {
             </>
           ) : (
             <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-3">
+              <button type="button" onClick={() => setTab('ask')} className="self-start text-[13px] font-semibold text-[#005ee0]">← Back to Ask Mindy</button>
               <form onSubmit={(e) => { e.preventDefault(); void searchImages(); }}>
                 <label className="flex items-center gap-2 min-h-11 pl-3 pr-1.5 border border-[#d4dae2] rounded-xl focus-within:border-[#006aff]">
                   <Search className="h-4 w-4 text-[#5a6675]" aria-hidden />
