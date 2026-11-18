@@ -11,15 +11,24 @@
  * the FETCH year, not the government's date). Some are filed under the wrong
  * agency, e.g. an NLRB strategic-plan testimony under Veterans Affairs.
  *
- * This module only DEFINES and MATCHES the set. It never edits the served JSON.
- * Retirement is a separate, approved step (Eric, 2026-11-17).
+ * This module DEFINES and MATCHES the set, and labels raw customer strings so a
+ * 1997 testimony cannot read as a current finding. It never edits the served JSON.
+ * Retirement is a separate, approved step (Eric, 2026-11-17). Keep all 278.
  *
- * Pure: no DB, no network, no filesystem. Scripts pass the data in.
+ * Pure: no DB, no network, no filesystem. Scripts pass the data in. Display dates
+ * come from `legacy-gao-publication-dates.json` (not the full historical archive).
  */
 import { createHash } from 'node:crypto';
+import legacyGaoDates from '@/data/legacy-gao-publication-dates.json';
 
 /** The exact suffix that marks a legacy GovInfo-derived pain point. */
 export const LEGACY_GAO_TAG = '(Source: GAO)';
+
+/** Customer-facing label shared with the provenance-aware reader. */
+export const LEGACY_MANUAL_DISPLAY_SUFFIX = '[LEGACY_MANUAL — provenance unavailable]';
+
+const PUBLICATION_DATES: Record<string, string> =
+  (legacyGaoDates as { by_text?: Record<string, string> }).by_text ?? {};
 
 export interface LegacyTaggedPainPoint {
   /** The agency key the string is filed under in the served JSON (verbatim). */
@@ -48,6 +57,29 @@ export function extractLegacyGaoTagged(json: PainPointJson): LegacyTaggedPainPoi
     }
   }
   return out;
+}
+
+/** Government publication date for a bare "(Source: GAO)" string, when known. */
+export function legacyGaoPublicationDate(text: string): string | null {
+  const d = PUBLICATION_DATES[text];
+  return typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null;
+}
+
+/**
+ * Label a raw corpus string so historical GAO cannot read as current.
+ * Living citations (`(Source: GAO-26-…)`) and already-labeled strings pass through.
+ * Idempotent: re-labeling a labeled string returns it unchanged.
+ */
+export function labelHistoricalGaoPainPoint(text: string): string {
+  if (!text) return text;
+  if (/provenance unavailable/i.test(text) || /historical GAO finding/i.test(text)) {
+    return text;
+  }
+  if (!text.endsWith(LEGACY_GAO_TAG)) return text;
+  const title = text.slice(0, -LEGACY_GAO_TAG.length).trim();
+  const date = legacyGaoPublicationDate(text);
+  const when = date ? `published ${date}` : 'published 1993–2000';
+  return `${title} (historical GAO finding, ${when}) ${LEGACY_MANUAL_DISPLAY_SUFFIX}`;
 }
 
 /**
