@@ -3,10 +3,13 @@
  *
  * WHY ONLY THESE TWO: a health sweep of all 9 registered scrapers on 2026-07-31
  * found 2 alive; a second sweep of all 13 stale sources on 2026-08-01 found
- * exactly one more that can be automated. DHS returns ~754 records from a plain
- * JSON API (apfs-cloud.dhs.gov); DOE publishes a public XLSX on energy.gov with
- * no WAF and no login (~870 rows, updated monthly, incumbent + contract number
- * on every row). Everything else is blocked, not merely broken:
+ * exactly one more that can be automated. DHS historically returned ~754 records
+ * from apfs-cloud.dhs.gov JSON — that host now serves migration HTML, so the
+ * default path FAIL-LOUDs (never upserts empty). Optional
+ * `DHS_FORECAST_ALLRECORDS_URL` switches to the DHS.gov public allRecords file
+ * (see src/lib/forecasts/dhs-allrecords.ts). DOE publishes a public XLSX on
+ * energy.gov with no WAF and no login (~870 rows, updated monthly, incumbent +
+ * contract number on every row). Everything else is blocked, not merely broken:
  *
  *   HHS                      login-gated SPA (osdbu.hhs.gov) — no file, no API
  *   VA, DOT                  migrated to the GSA Acquisition Gateway, which is
@@ -32,6 +35,11 @@
  * re-post of the same forecast updates rather than duplicates.
  */
 import { canonicalDhsExternalId } from '@/lib/forecasts/dhs-identity';
+import {
+  DHS_ALLRECORDS_SOURCE_TYPE,
+  dhsAllrecordsToDbRow,
+  parseDhsAllrecordsBuffer,
+} from '@/lib/forecasts/dhs-allrecords';
 import { NextRequest, NextResponse } from 'next/server';
 import { forecastWriterClient, guardForecastInserts, countNewForecastRows, quarantineRefusedLoad } from '@/lib/forecasts/writer';
 import { sendOpsAlert } from '@/lib/ops-alert';
@@ -82,18 +90,82 @@ function parseRange(v: unknown): [number | null, number | null] {
 
 interface DhsForecast { [k: string]: unknown }
 
-/** Fetch + map DHS APFS. Same field mapping as import-forecasts-live.js. */
+/**
+ * Optional override: when `DHS_FORECAST_ALLRECORDS_URL` is set, the cron uses the
+ * DHS.gov public allRecords file instead of apfs-cloud JSON. Default remains the
+ * API path — which now FAIL-LOUDs on HTML/non-JSON so a migration page cannot
+ * upsert empty. Do not set the env in prod without a reviewed dry-run
+ * (scripts/ingest-dhs-forecast-allrecords.ts).
+ */
+async function fetchDhsAllrecordsFile(url: string): Promise<Record<string, unknown>[]> {
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'GovConGiants-Mindy/1.0' },
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    throw new Error(
+      `DHS allRecords HTTP ${res.status} — check DHS.gov Advance Acquisition Planning download URL`,
+    );
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (!buf.length) throw new Error('DHS allRecords returned an empty body');
+  const parsed = parseDhsAllrecordsBuffer(buf);
+  if (parsed.headerRow === -1) throw new Error('DHS allRecords: no APFS Number header — layout changed');
+  if (!parsed.rows.length) {
+    throw new Error('DHS allRecords parsed to 0 rows — refusing empty upsert');
+  }
+  const now = new Date().toISOString();
+  return parsed.rows.map((r) => ({
+    ...dhsAllrecordsToDbRow(r, { sourceUrl: url }),
+    source_agency: 'DHS',
+    source_type: DHS_ALLRECORDS_SOURCE_TYPE,
+    last_synced_at: now,
+  }));
+}
+
+/**
+ * Fetch + map DHS APFS.
+ *
+ * Default: apfs-cloud JSON. When that host returns HTML / non-JSON (Login.gov
+ * migration page), FAIL LOUD — never treat it as an empty success and never
+ * upsert zero DHS rows from a soft-failure body.
+ *
+ * Override: `DHS_FORECAST_ALLRECORDS_URL` → public CSV/XLSX parser (explicit ops).
+ */
 async function fetchDHS(): Promise<Record<string, unknown>[]> {
+  const fileUrl = process.env.DHS_FORECAST_ALLRECORDS_URL?.trim();
+  if (fileUrl) return fetchDhsAllrecordsFile(fileUrl);
+
   const res = await fetch(DHS_API, {
     headers: { Accept: 'application/json', 'User-Agent': 'GovConGiants-Mindy/1.0' },
     cache: 'no-store',
   });
   if (!res.ok) throw new Error(`DHS APFS HTTP ${res.status}`);
-  const data = (await res.json()) as DhsForecast[];
+
+  const text = await res.text();
+  const trimmed = text.trim();
+  // Migration / Login.gov pages return 200 with HTML. That is a hard failure —
+  // never JSON.parse into [] and never upsert empty.
+  if (/^<!DOCTYPE\s+html/i.test(trimmed) || /^<html[\s>]/i.test(trimmed)) {
+    throw new Error(
+      'DHS APFS returned HTML (not JSON) — apfs-cloud migrated; ' +
+        'use scripts/ingest-dhs-forecast-allrecords.ts dry-run, or set DHS_FORECAST_ALLRECORDS_URL after review',
+    );
+  }
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(
+      'DHS APFS returned non-JSON body — refusing empty upsert. ' +
+        'Official public file: DHS.gov APFS_forecast_allRecords.csv',
+    );
+  }
   if (!Array.isArray(data)) throw new Error('DHS APFS returned a non-array payload');
+  if (data.length === 0) throw new Error('DHS APFS returned 0 rows — refusing empty upsert');
 
   const now = new Date().toISOString();
-  return data.map((r) => {
+  return (data as DhsForecast[]).map((r) => {
     const [code, , desc] = (clean(r.naics) + ' - ').split(' - ');
     const city = clean(r.place_of_performance_city);
     const st = clean(r.place_of_performance_state);

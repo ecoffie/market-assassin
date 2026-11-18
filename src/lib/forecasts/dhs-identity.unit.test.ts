@@ -35,6 +35,9 @@ describe('every live DHS ingest path uses the canonical identity', () => {
   it('scrapers/dhs-apfs', () => {
     expect(read('src/lib/forecasts/scrapers/dhs-apfs.ts')).toContain('canonicalDhsApfsNumber(');
   });
+  it('dhs-allrecords public-file parser', () => {
+    expect(read('src/lib/forecasts/dhs-allrecords.ts')).toContain('canonicalDhsApfsNumber(');
+  });
 });
 
 describe('post-migration republish updates the canonical row (executed: dhs-republish.pglite.unit.test.ts)', () => {
