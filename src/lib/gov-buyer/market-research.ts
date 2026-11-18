@@ -515,13 +515,21 @@ const GENERAL_SMALL_BUSINESS = new Set(['small business', 'sba', 'sb', 'small'])
   const setAsideRaw = (params.setAside || '').trim();
   const isGeneralSmallBusiness = GENERAL_SMALL_BUSINESS.has(setAsideRaw.toLowerCase());
 
+  // Expiry gate: stored Active + past registration_expiry is a contradiction
+  // (157k rows measured 2026-11-18). Require expiry >= today so the pool cannot
+  // treat expired registrations as active. Null expiry keeps the stored-flag path.
+  const registrationExpiryFloor = new Date().toISOString().slice(0, 10);
+  const activeRegistration = <Q extends { eq: Function; or: Function }>(q: Q): Q =>
+    q.eq('registration_status', 'Active')
+      .or(`registration_expiry.is.null,registration_expiry.gte.${registrationExpiryFloor}`) as Q;
+
   const buildQuery = () => {
-    let q = sb
-      .from('sam_entities')
-      .select(select)
-      .contains('naics_codes', [params.naics])
-      .eq('registration_status', 'Active')
-      .eq('exclusion_flag', false);
+    let q = activeRegistration(
+      sb
+        .from('sam_entities')
+        .select(select)
+        .contains('naics_codes', [params.naics]),
+    ).eq('exclusion_flag', false);
     if (params.state) q = q.eq('physical_state', params.state.toUpperCase());
     if (setAsideRaw) {
       if (isGeneralSmallBusiness) {
@@ -604,11 +612,12 @@ const GENERAL_SMALL_BUSINESS = new Set(['small business', 'sba', 'sb', 'small'])
     const MATCH_BATCH = 200;
     for (let i = 0; i < performerUeis.length; i += MATCH_BATCH) {
       const batch = performerUeis.slice(i, i + MATCH_BATCH);
-      let q = sb
-        .from('sam_entities')
-        .select('uei', { count: 'exact', head: true })
-        .contains('naics_codes', [params.naics])
-        .eq('registration_status', 'Active')
+      let q = activeRegistration(
+        sb
+          .from('sam_entities')
+          .select('uei', { count: 'exact', head: true })
+          .contains('naics_codes', [params.naics]),
+      )
         .eq('exclusion_flag', false)
         .in('uei', batch);
       if (params.state) q = q.eq('physical_state', params.state.toUpperCase());
@@ -753,12 +762,12 @@ const GENERAL_SMALL_BUSINESS = new Set(['small business', 'sba', 'sb', 'small'])
   // 20,074 eligible firms. A bounded count is precisely the defect this field exists to
   // remove, so it gets its own unbounded head:true query with identical filters.
   const countQuery = () => {
-    let q = sb
-      .from('sam_entities')
-      .select('uei', { count: 'exact', head: true })
-      .contains('naics_codes', [params.naics])
-      .eq('registration_status', 'Active')
-      .eq('exclusion_flag', false);
+    let q = activeRegistration(
+      sb
+        .from('sam_entities')
+        .select('uei', { count: 'exact', head: true })
+        .contains('naics_codes', [params.naics]),
+    ).eq('exclusion_flag', false);
     if (params.state) q = q.eq('physical_state', params.state.toUpperCase());
     if (setAsideRaw) {
       // ⚠️ MUST MIRROR the pool query's predicate exactly. If the count and the pool disagree,
@@ -811,11 +820,12 @@ const GENERAL_SMALL_BUSINESS = new Set(['small business', 'sba', 'sb', 'small'])
   //   retrieval/sample coverage  AND  size-status determination coverage
   const sizeCounts = { y: 0, n: 0, exception: 0, unknown: 0 };
   if (isGeneralSmallBusiness) {
-    const { data: comp } = await sb
-      .from('sam_entities')
-      .select('naics_small_business')
-      .contains('naics_codes', [params.naics])
-      .eq('registration_status', 'Active')
+    const { data: comp } = await activeRegistration(
+      sb
+        .from('sam_entities')
+        .select('naics_small_business')
+        .contains('naics_codes', [params.naics]),
+    )
       .eq('exclusion_flag', false)
       .range(0, 4999);
     for (const r of (comp || []) as Array<{ naics_small_business?: Record<string, string> | null }>) {

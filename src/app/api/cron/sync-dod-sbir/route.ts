@@ -8,18 +8,31 @@
  *
  * Auth: x-vercel-cron OR Bearer CRON_SECRET OR ?password=ADMIN_PASSWORD (same as the other crons).
  * ?mode=preview does ONE page (no writes) so you can see the shape; ?mode=execute drains + upserts.
- * Deploy the route → curl a 200 on prod → THEN add the cron_jobs row (CLAUDE.md #5, never the reverse).
+ *
+ * Honesty (2026-11-18): api-down / empty corpus MUST NOT report success. The prior reachability gate
+ * returned HTTP 200 + success:true while dod_sbir_topics stayed at 0 — a false green. Outcome is
+ * decided by decideDodSbirExecuteOutcome; the job is also parked in cron_jobs pending upstream recovery.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchDodSbirPage, type DodSbirTopic } from '@/lib/sbir/dod-sbir';
+import { decideDodSbirExecuteOutcome, type DodSbirStop } from '@/lib/sbir/dod-sbir-outcome';
+import { reportCronOutcome } from '@/lib/cron-self-report';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
+const JOB_NAME = 'sync-dod-sbir';
+
 function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+}
+
+async function heldCount(client: ReturnType<typeof sb>): Promise<number> {
+  const { count, error } = await client.from('dod_sbir_topics').select('*', { count: 'exact', head: true });
+  if (error || count == null) return 0;
+  return count;
 }
 
 export async function GET(request: NextRequest) {
@@ -53,22 +66,24 @@ export async function GET(request: NextRequest) {
   // EXECUTE — page through under the wall-clock budget, upserting each page. Back off on a rate-limit.
   const started = Date.now();
   let start = 0, upserted = 0, pages = 0, rateLimitHits = 0;
-  let stopped: 'budget' | 'last-page' | 'rate-limit' | 'error' | 'api-down' = 'last-page';
+  let stopped: DodSbirStop = 'last-page';
   const client = sb();
 
-  // AUTO-DRAIN REACHABILITY GATE (2026-07-28): this route is fired on a schedule so it drains the
-  // instant sbir.gov recovers — but the API has been down for weeks. A cheap ONE-page probe up front
-  // lets a down-API run return in ~1 request instead of burning the 3×8s rate-limit backoff every fire.
-  // Still returns 200 (not error) so the dispatcher records success and the watchdog stays quiet while
-  // the source is down; the real drain runs the moment the probe comes back clean.
+  // Reachability gate: one page up front. api-down is reported as failure (not success) so
+  // cron_jobs / cron_job_runs cannot manufacture health over an empty corpus.
   const probe = await fetchDodSbirPage({ scope, rows: PAGE, start: 0 });
   if (probe.rateLimited || probe.degraded) {
+    const held = await heldCount(client);
+    const outcome = decideDodSbirExecuteOutcome({ stopped: 'api-down', upserted: 0, heldRows: held });
+    await reportCronOutcome(JOB_NAME, outcome.cronOutcome, outcome.disclosure);
     return NextResponse.json({
-      success: true, mode, scope, pages: 0, upserted: 0,
-      stopped: 'api-down', apiReachable: false,
-      note: 'sbir.gov not reachable this run (rate-limited/maintenance) — will drain automatically when it recovers.',
+      success: outcome.success, mode, scope, pages: 0, upserted: 0,
+      stopped: 'api-down' as const, apiReachable: false,
+      heldRows: held,
+      disclosure: outcome.disclosure,
+      note: outcome.disclosure,
       elapsedMs: Date.now() - started,
-    }, { status: 200 });
+    }, { status: outcome.httpStatus });
   }
 
   // Reuse the reachability probe as the first page (start=0) instead of re-fetching it.
@@ -78,16 +93,15 @@ export async function GET(request: NextRequest) {
     firstPage = null;
     if (page.rateLimited) {
       rateLimitHits++;
-      if (rateLimitHits >= 3) { stopped = 'rate-limit'; break; } // give up this run; the next fire retries
-      await new Promise((r) => setTimeout(r, 8000)); // back off, retry the SAME page
+      if (rateLimitHits >= 3) { stopped = 'rate-limit'; break; }
+      await new Promise((r) => setTimeout(r, 8000));
       continue;
     }
     if (page.degraded) { stopped = 'error'; break; }
-    if (page.raw === 0) { stopped = 'last-page'; break; } // no more solicitations
+    if (page.raw === 0) { stopped = 'last-page'; break; }
     pages++;
 
     if (page.rows.length) {
-      // Dedup by topic_number within the page (a topic can't appear twice), then upsert.
       const byNum = new Map<string, DodSbirTopic>();
       for (const t of page.rows) byNum.set(t.topic_number, t);
       const rows = [...byNum.values()].map((t) => ({ ...t, synced_at: new Date().toISOString() }));
@@ -95,15 +109,21 @@ export async function GET(request: NextRequest) {
       if (error) { console.error('[sync-dod-sbir] upsert failed:', error.message); stopped = 'error'; break; }
       upserted += rows.length;
     }
-    if (page.raw < PAGE) { stopped = 'last-page'; break; } // short page = done
+    if (page.raw < PAGE) { stopped = 'last-page'; break; }
     start += PAGE;
   }
   if (stopped === 'last-page' && Date.now() - started >= budgetMs) stopped = 'budget';
 
+  const held = await heldCount(client);
+  const outcome = decideDodSbirExecuteOutcome({ stopped, upserted, heldRows: held });
+  await reportCronOutcome(JOB_NAME, outcome.cronOutcome, outcome.disclosure || undefined);
+
   return NextResponse.json({
-    success: stopped !== 'error',
+    success: outcome.success,
     mode, scope, pages, upserted, rateLimitHits, stopped,
+    heldRows: held,
+    disclosure: outcome.disclosure || undefined,
     nextStart: stopped === 'budget' ? start : 0,
     elapsedMs: Date.now() - started,
-  }, { status: stopped === 'error' ? 502 : 200 });
+  }, { status: outcome.httpStatus });
 }

@@ -309,6 +309,25 @@ const LIVE_SYNC_CHECKS: Array<{ key: string; name: string; table: string; column
     staleDays: 3, // daily sync; 3d of silence = pipeline likely broken
     refreshWith: 'live sync — verify /api/cron/sync-gov-buyer-data is running',
   },
+  {
+    // Honesty only (specialty repair stays PARKED): max(synced_at) is last REAL data, not last
+    // cron attempt. sync-dibbs disabled 2026-11-02; control plane still said current.
+    key: 'dibbs_rfqs_data',
+    name: 'DLA DIBBS RFQs (last real data via synced_at)',
+    table: 'dibbs_rfqs',
+    column: 'synced_at',
+    staleDays: 3,
+    refreshWith: 'sync-dibbs is DISABLED (Apify cost) — do not re-enable without Eric; mark control plane content_stale',
+  },
+  {
+    // Empty table / no synced_at → ageDays 9999 in the loop above. Stops silent false green.
+    key: 'dod_sbir_topics_data',
+    name: 'DoD SBIR topics cache (dod_sbir_topics)',
+    table: 'dod_sbir_topics',
+    column: 'synced_at',
+    staleDays: 2,
+    refreshWith: 'sync-dod-sbir — empty corpus or api-down must not report success; park until sbir.gov advances',
+  },
 ];
 
 // How to refresh each curated source (the runnable path — keep in sync with the

@@ -36,6 +36,7 @@ import {
   countUpstreamPublishers,
   inventoryViolations,
   mapSourceState,
+  honestInstanceState,
   registryDebt,
   scheduleTruth,
   STATIC_FILE_AS_OF,
@@ -277,11 +278,11 @@ export async function GET(request: NextRequest) {
       try {
         const [ds, dsi] = await Promise.all([
           sb.from('data_sources').select('key, record_count, last_built, notes'),
-          sb.from('data_source_instances').select('dataset_key, source_key, source_state, intervention_state, held_population, last_data_advance, last_poll'),
+          sb.from('data_source_instances').select('dataset_key, source_key, source_state, intervention_state, held_population, last_data_advance, last_verified_ingest, last_poll'),
         ]);
         return {
           sources: ds.error ? null : (ds.data as Array<{ key: string; record_count: number | null; last_built: string | null; notes: string | null }>),
-          instances: dsi.error ? null : (dsi.data as Array<{ dataset_key: string; source_key: string; source_state: string | null; intervention_state: string | null; held_population: number | null; last_data_advance: string | null; last_poll: string | null }>),
+          instances: dsi.error ? null : (dsi.data as Array<{ dataset_key: string; source_key: string; source_state: string | null; intervention_state: string | null; held_population: number | null; last_data_advance: string | null; last_verified_ingest: string | null; last_poll: string | null }>),
         };
       } catch { return { sources: null, instances: null }; }
     })(),
@@ -323,10 +324,33 @@ export async function GET(request: NextRequest) {
 
   // ── Control-plane helpers ─────────────────────────────────────────────────────
   const instances = controlPlane.instances ?? [];
+  /** Known producer bindings — null when we have no schedule to judge. */
+  const PRODUCER_JOBS: Record<string, readonly string[]> = {
+    dibbs_dla_flat_files: CRON_JOBS.dibbs,
+    sam_opportunities_sam_gov: CRON_JOBS.sam,
+    grants_gov_api: CRON_JOBS.grants,
+    research_nih_reporter: ['snapshot-multisite-nih'],
+    research_darpa_baa: ['snapshot-multisite-darpa'],
+    research_nsf_sbir: ['snapshot-multisite-nsf'],
+  };
+  const producerEnabled = (sourceKey: string): boolean | null => {
+    const jobNames = PRODUCER_JOBS[sourceKey];
+    if (!jobNames) return null;
+    const rows = jobNames
+      .map((j) => (cronRows ?? []).find((x) => x.job_name === j))
+      .filter(Boolean);
+    if (!rows.length) return null;
+    return rows.some((r) => r && (r.enabled === true || r.enabled === 'true'));
+  };
   const instanceFreshness = (datasetKey: string): InstanceFreshness[] =>
     instances.filter((i) => i.dataset_key === datasetKey).map((i) => ({
       sourceKey: i.source_key,
-      state: mapSourceState(i.source_state),
+      state: honestInstanceState({
+        sourceState: i.source_state,
+        lastVerifiedIngest: i.last_verified_ingest,
+        lastDataAdvance: i.last_data_advance,
+        producerEnabled: producerEnabled(i.source_key),
+      }),
       sourceState: i.source_state,
       interventionState: i.intervention_state,
       heldPopulation: i.held_population,
@@ -361,12 +385,21 @@ export async function GET(request: NextRequest) {
     detail?: string;
   }): Freshness => {
     const inst = o.instanceKey ? instance(o.instanceKey) : null;
-    const instState = inst ? mapSourceState(inst.source_state) : null;
+    const instState = inst
+      ? honestInstanceState({
+          sourceState: inst.source_state,
+          lastVerifiedIngest: inst.last_verified_ingest,
+          lastDataAdvance: inst.last_data_advance,
+          producerEnabled: producerEnabled(inst.source_key),
+        })
+      : null;
     const useInstance = instState != null && instState !== 'UNKNOWN';
     return {
       state: useInstance ? instState! : timestampState(o.asOf, o.cadenceHours, now),
       asOf: o.asOf,
-      basis: useInstance ? `control plane ${o.instanceKey} (${inst!.source_state}); data clock ${o.basis}` : o.basis,
+      basis: useInstance
+        ? `control plane ${o.instanceKey} (${inst!.source_state}); data clock ${o.basis}`
+        : o.basis,
       detail: o.detail,
       schedules: o.jobs ? schedules(o.jobs) : undefined,
     };
