@@ -259,6 +259,8 @@ export interface FederalContact {
   dodaac: string | null;
   is_osbp?: boolean;
   director_verified?: string | null;
+  /** OSBP rows only: "YYYY-MM" when the mailbox was seen on an official page; null = unverified. */
+  email_verified?: string | null;
 }
 
 export interface ContactRosterInput {
@@ -483,6 +485,7 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
           dodaac: null,
           is_osbp: true,
           director_verified: osbp.directorVerified || null,
+          email_verified: osbp.email ? (osbp.emailVerified || null) : null,
         });
         if (emailDomainFlag) {
           trace.push('osbp email domain flags a different directory mailbox (not excluded)');

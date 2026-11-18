@@ -5,9 +5,12 @@
  * curated DoD command / OSBP directory (src/data/dod-command-info.json), served
  * through the pure src/lib/utils/command-info.ts helpers (no LLM, no network).
  *
- * Honest about staleness: the org STRUCTURE + mailboxes are stable; director NAMES
- * rotate. Each office carries `director_verified` ("YYYY-MM" when the name was last
- * checked) — absent means treat the name as unverified/role-title. tier: metered,
+ * Honest about staleness: director NAMES rotate, and mailboxes are NOT assumed stable.
+ * The 2026-11-17 audit found none of the 48 military placeholder mailboxes published on
+ * any official page (several were pattern-generated). Each office carries
+ * `director_verified` and `email_verified` ("YYYY-MM" when last seen on an official
+ * page) — absent means unverified. A mailbox the audit could not find on a reached
+ * official page is not served at all. tier: metered,
  * credits: 5. `_meta` always ships; `_ai_hint` OFF by default.
  */
 import {
@@ -41,6 +44,19 @@ interface OsbpOffice {
    */
   director_status: 'verified' | 'unverified' | 'none';
   email: string | null;
+  /** "YYYY-MM" when this exact mailbox was last seen on an official agency page; null = unverified. */
+  email_verified: string | null;
+  /** ALWAYS present: never present an unverified mailbox as a confirmed address. */
+  email_status: 'verified' | 'unverified' | 'none';
+  /** The official page the contact was checked against, when known. */
+  contact_source_url: string | null;
+  /**
+   * 'parent_osdbu' = the mailbox is the PARENT department's small-business office (say so; never
+   * present it as this component's own office). 'own_office' = stored for this office. null = no mailbox.
+   */
+  contact_scope: 'own_office' | 'parent_osdbu' | null;
+  /** The parent office the mailbox belongs to, when contact_scope = 'parent_osdbu'. */
+  contact_scope_of: string | null;
   phone: string | null;
   address: string | null;
   website: string | null;
@@ -64,6 +80,9 @@ export interface FederalOsbpToolResult {
     /** How many returned offices carry a verification stamp, and how many do not. */
     directors_verified: number;
     directors_unverified: number;
+    /** Returned offices whose mailbox was seen on an official page vs. not. */
+    emails_verified: number;
+    emails_unverified: number;
     /**
      * Distinguish "this agency is not in the curated directory" from
      * "the directory lists the command but has no OSBP office".
@@ -95,6 +114,11 @@ function directorStatus(director: string | null, verified: string | null): 'veri
   return verified ? 'verified' : 'unverified';
 }
 
+function emailStatus(email: string | null | undefined, verified: string | null | undefined): 'verified' | 'unverified' | 'none' {
+  if (!email) return 'none';
+  return verified ? 'verified' : 'unverified';
+}
+
 function toOffice(info: CommandInfo): OsbpOffice {
   const sb = info.smallBusinessOffice;
   return {
@@ -105,7 +129,12 @@ function toOffice(info: CommandInfo): OsbpOffice {
     osbp_director: sb?.director ?? null,
     director_verified: sb?.directorVerified ?? null,
     director_status: directorStatus(sb?.director ?? null, sb?.directorVerified ?? null),
-    email: sb?.email ?? null,
+    email: sb?.email || null,
+    email_verified: sb?.email ? (sb?.emailVerified ?? null) : null,
+    email_status: emailStatus(sb?.email, sb?.emailVerified),
+    contact_source_url: sb?.contactSourceUrl ?? null,
+    contact_scope: sb?.email ? (sb?.contactScope ?? 'own_office') : null,
+    contact_scope_of: sb?.email ? (sb?.contactScopeOf ?? null) : null,
     phone: sb?.phone ?? null,
     address: sb?.address ?? null,
     website: info.website ?? null,
@@ -125,6 +154,7 @@ export function lookupFederalOsbp(input: FederalOsbpToolInput): FederalOsbpToolR
       _meta: {
         grounded: false, degraded: false, match: 'none', office_count: 0,
         director_verified: false, directors_verified: 0, directors_unverified: 0,
+        emails_verified: 0, emails_unverified: 0,
         coverage: 'empty_query',
         email_domain_flag: false,
       },
@@ -155,7 +185,12 @@ export function lookupFederalOsbp(input: FederalOsbpToolInput): FederalOsbpToolR
         osbp_director: sb.contact.director ?? null,
         director_verified: sb.contact.directorVerified ?? null,
         director_status: directorStatus(sb.contact.director ?? null, sb.contact.directorVerified ?? null),
-        email: sb.contact.email ?? null,
+        email: sb.contact.email || null,
+        email_verified: sb.contact.email ? (sb.contact.emailVerified ?? null) : null,
+        email_status: emailStatus(sb.contact.email, sb.contact.emailVerified),
+        contact_source_url: sb.contact.contactSourceUrl ?? null,
+        contact_scope: sb.contact.email ? (sb.contact.contactScope ?? 'own_office') : null,
+        contact_scope_of: sb.contact.email ? (sb.contact.contactScopeOf ?? null) : null,
         phone: sb.contact.phone ?? null,
         address: sb.contact.address ?? null,
         website: null,
@@ -194,6 +229,8 @@ export function lookupFederalOsbp(input: FederalOsbpToolInput): FederalOsbpToolR
       // was verified read as "these names are checked". Report the split.
       directors_verified: allOffices.filter((o) => o.director_status === 'verified').length,
       directors_unverified: allOffices.filter((o) => o.director_status === 'unverified').length,
+      emails_verified: allOffices.filter((o) => o.email_status === 'verified').length,
+      emails_unverified: allOffices.filter((o) => o.email_status === 'unverified').length,
       coverage,
       email_domain_flag: prepend.emailDomainFlag,
     },
@@ -207,12 +244,13 @@ export function lookupFederalOsbp(input: FederalOsbpToolInput): FederalOsbpToolR
         ? `The directory has "${agency}" but lists no OSBP/OSDBU office for it. Do not invent a mailbox.`
         : match === 'parent_agency'
         ? `"${agency}" is a parent agency — returned ${related.length} of its commands' OSBP offices. Pick the one whose mission matches the buy.`
-        : `OSBP for ${resolvedOffice?.abbreviation}: ${resolvedOffice?.osbp_office || 'office'}${resolvedOffice?.email ? ` (${resolvedOffice.email})` : ''}.`,
+        : `OSBP for ${resolvedOffice?.abbreviation}: ${resolvedOffice?.osbp_office || 'office'}${resolvedOffice?.email ? ` (${resolvedOffice.email}${resolvedOffice.email_status === 'verified' ? '' : ', unverified'})` : ''}.`,
       how_to_use: grounded
         ? 'The OSBP/OSDBU is the small-business front door — email/call them to request a capability-statement review or a match to upcoming buys. Pair with search_federal_contacts for the buying-office engineers/POCs on a specific solicitation.'
         : 'Not in the directory; do NOT invent a name or email. Suggest the buying office POC on the actual SAM solicitation instead (search_federal_contacts).',
       key_caveats: [
-        'Office structure + mailboxes are STABLE, but director NAMES rotate — trust `director_verified` (YYYY-MM); when it is null, treat the name as an unverified role-title and lead with the office mailbox, not the person.',
+        'Director names rotate and mailboxes are not assumed stable: trust `director_verified` / `email_verified` (YYYY-MM). When `email_status` is "unverified", say the address is unconfirmed and point the user to `contact_source_url` / `forecast_url` to confirm it; never present it as a confirmed address. When there is no email, do not invent one.',
+        'When `contact_scope` is "parent_osdbu", the mailbox is the parent department\'s small-business office (`contact_scope_of`), not this component\'s own office — say so.',
         'Curated directory is DoD/DLA/Navy/Army-weighted — coverage=not_in_directory is a gap, not proof the office does not exist. coverage=no_osbp_listed means the command is known but no OSBP row is stored.',
       ],
     };
