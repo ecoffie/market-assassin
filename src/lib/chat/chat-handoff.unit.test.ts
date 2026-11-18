@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { parseChatHandoff, opportunityContextField } from './chat-handoff';
+import {
+  parseChatHandoff,
+  parseMapSelectedOpp,
+  parseLastChatSessionId,
+  serializeMapSelectedOpp,
+  opportunityContextField,
+} from './chat-handoff';
 
 const NID = '6ba812a7e0284f79bc44c4932777c340';
 
@@ -19,5 +25,25 @@ describe('parseChatHandoff', () => {
   it('the request field carries only the id', () => {
     expect(opportunityContextField({ notice_id: NID, title: 'T', deadline: 'd' })).toEqual({ context: { kind: 'opportunity', notice_id: NID } });
     expect(opportunityContextField(null)).toEqual({});
+  });
+});
+
+describe('parseMapSelectedOpp', () => {
+  it('reads a live Map selection and clears on null context', () => {
+    expect(parseMapSelectedOpp(serializeMapSelectedOpp({ notice_id: NID, title: 'Bridge', deadline: '2026-12-04' })))
+      .toEqual({ notice_id: NID, title: 'Bridge', deadline: '2026-12-04' });
+    expect(parseMapSelectedOpp(serializeMapSelectedOpp(null))).toBeNull();
+  });
+  it('rejects non-SAM ids and junk', () => {
+    expect(parseMapSelectedOpp(JSON.stringify({ v: 1, context: { kind: 'opportunity', notice_id: 'N0016426R0012' } }))).toBeNull();
+    expect(parseMapSelectedOpp('nope')).toBeNull();
+  });
+});
+
+describe('parseLastChatSessionId', () => {
+  it('accepts a normal session id and rejects path junk', () => {
+    expect(parseLastChatSessionId('11111111-2222-4333-8444-555555555555')).toBe('11111111-2222-4333-8444-555555555555');
+    expect(parseLastChatSessionId('../x')).toBeNull();
+    expect(parseLastChatSessionId(null)).toBeNull();
   });
 });

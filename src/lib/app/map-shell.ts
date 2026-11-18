@@ -57,6 +57,11 @@ export const SHELL_VALUE = 'app';
 /** postMessage types the framed map sends to /app. Same-origin only (checked on both ends). */
 export const MAP_SHELL_URL_MESSAGE = 'mindy:map-shell-url';
 export const MAP_SHELL_NAV_MESSAGE = 'mindy:map-shell-nav';
+/**
+ * iframe → parent: the open SAM listing changed (`window.__selectedOpp`). Parent persists it so
+ * Ask Mindy can attach that notice when the customer opens Chat — no second chat engine.
+ */
+export const MAP_SHELL_SELECTED_OPP_MESSAGE = 'mindy:map-shell-selected-opp';
 /** Window event the app page fires when the active map panel's sidebar item is clicked again. */
 export const MAP_SHELL_HOME_EVENT = 'mindy:map-shell-home';
 
@@ -181,6 +186,16 @@ export interface MapShellMessage {
   hash?: string;
 }
 
+export interface MapShellSelectedOppMessage {
+  type: typeof MAP_SHELL_SELECTED_OPP_MESSAGE;
+  /** 32-hex lowercase SAM notice id, or null when the listing drawer closed / non-SAM pin. */
+  id: string | null;
+  title: string;
+  deadline: string;
+}
+
+const NOTICE_ID = /^[0-9a-f]{32}$/;
+
 /** Shape check for a message from the framed map (origin + source are checked by the caller). */
 export function parseMapShellMessage(data: unknown): MapShellMessage | null {
   if (!data || typeof data !== 'object') return null;
@@ -191,4 +206,20 @@ export function parseMapShellMessage(data: unknown): MapShellMessage | null {
   const hash = typeof d.hash === 'string' && (d.hash === '' || d.hash.startsWith('#')) ? d.hash : '';
   if (/[\s\\]/.test(d.path)) return null;
   return { type: d.type, path: d.path, search: d.search, hash };
+}
+
+/** Shape check for the selected-opportunity bridge (origin + source checked by the caller). */
+export function parseMapSelectedOppMessage(data: unknown): MapShellSelectedOppMessage | null {
+  if (!data || typeof data !== 'object') return null;
+  const d = data as Record<string, unknown>;
+  if (d.type !== MAP_SHELL_SELECTED_OPP_MESSAGE) return null;
+  if (d.id !== null && typeof d.id !== 'string') return null;
+  const id = typeof d.id === 'string' ? d.id.toLowerCase() : null;
+  if (id !== null && !NOTICE_ID.test(id)) return null;
+  return {
+    type: MAP_SHELL_SELECTED_OPP_MESSAGE,
+    id,
+    title: typeof d.title === 'string' ? d.title.slice(0, 300) : '',
+    deadline: typeof d.deadline === 'string' ? d.deadline.slice(0, 40) : '',
+  };
 }
