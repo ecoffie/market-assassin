@@ -146,6 +146,11 @@ const nextConfig: NextConfig = {
         source: '/fonts/mp/v1/:file*',
         headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
       },
+      // Self-hosted app fonts (formerly next/font/google): same versioned-path rule.
+      {
+        source: '/fonts/app/v1/:file*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
     ];
   },
   // Rewrites for host-based routing
