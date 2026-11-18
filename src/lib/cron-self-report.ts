@@ -31,6 +31,18 @@ import { createClient } from '@supabase/supabase-js';
 export type CronOutcome = 'success' | 'error' | 'partial';
 
 /**
+ * HTTP status written onto cron_job_runs when the route finishes after the
+ * dispatcher has already stored `dispatched` with a null http_status.
+ * success must be 2xx or the inventory keeps reading "ran status unrecorded".
+ * partial is non-2xx so a short run cannot look proven.
+ */
+export function cronOutcomeHttpStatus(outcome: CronOutcome): number {
+  if (outcome === 'success') return 200;
+  if (outcome === 'partial') return 503;
+  return 500;
+}
+
+/**
  * Write a terminal status for `jobName` into cron_jobs (and close out its most
  * recent cron_job_runs row, so run history matches).
  *
@@ -71,6 +83,7 @@ export async function reportCronOutcome(
         .from('cron_job_runs')
         .update({
           status: outcome,
+          http_status: cronOutcomeHttpStatus(outcome),
           finished_at: new Date().toISOString(),
           error: errorMessage ?? null,
         })

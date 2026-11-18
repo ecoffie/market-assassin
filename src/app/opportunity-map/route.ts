@@ -7121,11 +7121,17 @@ const DRAWER_JS = `<script>
       + (o.dibbsUrl?'<a class="b" href="'+esc(o.dibbsUrl)+'" target="_blank" rel="noopener">View RFQ spec \\u2197</a>':'')
       + '</div>';
     var upd=relTime(o.syncedAt);
+    // Same rule as reportedCollectionFreshness: a disabled collector is never "live".
+    // Missing freshness fails closed. CURRENT is the only case that may say Live.
+    var dibbsLive = o.freshness && o.freshness.state === 'CURRENT';
+    var dibbsFresh = dibbsLive
+      ? 'Live from DLA DIBBS'
+      : ((o.freshness && o.freshness.warning) || 'Collector is disabled. A past ingest does not make this feed current.');
     return '<section class="osec dla-drawer" id="osec-overview">'
       + hero
       + sec('Price to quote', quote, 'quote')
       + sec('Bid facts', facts, 'facts')
-      + '<div class="snapfresh"><span class="snapdot"></span>Live from DLA DIBBS'+(upd?' \\u00b7 updated '+upd:'')+' \\u00b7 Solicitation '+esc(o.solicitation||o.id)+'</div>'
+      + '<div class="snapfresh"><span class="snapdot"></span>'+dibbsFresh+(upd?' \\u00b7 synced '+upd:'')+' \\u00b7 Solicitation '+esc(o.solicitation||o.id)+'</div>'
       + '</section>'
       + cta;
   }

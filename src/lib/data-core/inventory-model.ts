@@ -362,6 +362,21 @@ export function mapSourceState(sourceState: string | null | undefined): Freshnes
  * (last_data_advance / last_verified_ingest) — this function only grants CURRENT
  * when a data clock exists.
  */
+/**
+ * One rule for every surface: a disabled collector is never CURRENT.
+ * A recent last_verified_ingest does not override a disabled producer.
+ */
+export function freshnessStateForCollector(
+  state: FreshnessState,
+  producerEnabled: boolean | null | undefined,
+): FreshnessState {
+  if (producerEnabled === false && state === 'CURRENT') return 'STALE';
+  return state;
+}
+
+export const DISABLED_COLLECTOR_WARNING =
+  'Collector is disabled. A past ingest does not make this feed current.';
+
 export function honestInstanceState(input: {
   sourceState: string | null | undefined;
   lastVerifiedIngest?: string | null;
@@ -369,8 +384,7 @@ export function honestInstanceState(input: {
   producerEnabled?: boolean | null;
 }): FreshnessState {
   if (input.producerEnabled === false) {
-    const base = mapSourceState(input.sourceState);
-    return base === 'CURRENT' ? 'STALE' : base;
+    return freshnessStateForCollector(mapSourceState(input.sourceState), false);
   }
   const mapped = mapSourceState(input.sourceState);
   if (mapped === 'CURRENT') {

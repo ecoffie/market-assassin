@@ -83,6 +83,11 @@ export default defineConfig({
     // hung test still fails — it now takes 45s to say so instead of 10s, which is the right
     // trade against a gate that cries wolf.
     testTimeout: 45_000,
+    // beforeEach/afterEach use a separate clock that still defaulted to 10s.
+    // Measured 2026-11-18 during this gate: link-env-local and the poisoned-GIT
+    // fixture hooks exceeded 10s under a full parallel run (the test bodies
+    // themselves did not fail). Same clock as testTimeout, not a skipped test.
+    hookTimeout: 45_000,
     passWithNoTests: false,
   },
 });

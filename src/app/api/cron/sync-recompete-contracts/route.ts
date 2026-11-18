@@ -38,6 +38,9 @@ import { fetchExpiringForNaics, type SyncedContract } from '@/lib/recompete/usas
 import { diffContracts, TRACKED_FIELDS, type ExistingRow } from '@/lib/recompete/change-log';
 import { findFollowOnAward, type FollowOnParent } from '@/lib/recompete/find-followon';
 import { preserveRicherEnrichment, type EnrichmentFields } from '@/lib/recompete/preserve-enrichment';
+import { reportCronOutcome } from '@/lib/cron-self-report';
+
+const RECOMPETE_JOB = 'sync-recompete-contracts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -156,6 +159,9 @@ export async function GET(request: NextRequest) {
     lim: limit,
   });
   if (targetErr) {
+    if (mode === 'execute') {
+      await reportCronOutcome(RECOMPETE_JOB, 'error', `staleness scan failed: ${targetErr.message}`).catch(() => {});
+    }
     return NextResponse.json(
       { error: `staleness scan failed: ${targetErr.message}` },
       { status: 500 },
@@ -345,6 +351,15 @@ export async function GET(request: NextRequest) {
   // is the exact shape of every bug in this series: an incomplete run that looks
   // complete. The dispatcher records the non-2xx against cron_jobs.
   const incomplete = truncated.length > 0 || Object.keys(failed).length > 0;
+
+  // Long runs outlive the dispatcher's 12s ack. The row stays `dispatched`
+  // unless this write lands. Preview is not the scheduled job.
+  if (mode === 'execute') {
+    const detail = incomplete
+      ? `truncated=${truncated.length} failed=${Object.keys(failed).length}`
+      : undefined;
+    await reportCronOutcome(RECOMPETE_JOB, incomplete ? 'error' : 'success', detail).catch(() => {});
+  }
 
   return NextResponse.json(
     {

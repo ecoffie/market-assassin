@@ -32,6 +32,66 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 |---|---|---|---|---|---|
 | 2026-11-18 | Forecasts: DOE dated CSV | `sync-forecasts` fetched the July 2026 XLSX, which still returns HTTP 200, so it never read the OSDBU page's current file (2026-11-16 CSV, 869 rows). The cron now follows the newest dated link on that page and refuses the July workbook. A nonempty write stamps `forecast_doe_osbp`; a failed DHS read stamps `forecast_dhs_apfs` unreachable. | `refusing the July XLSX fallback` → `src/app/api/cron/sync-forecasts/route.ts` | `doe-forecast.unit.test.ts` + live parse of the 2026-11-16 CSV: 869 rows, edition 2026-11-16, 869/869 performance dates. No production sync. | BUILT, NOT MERGED |
 
+## 2026-11-18 — Collector terminal status
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | SAM opportunities + recompetes terminal status | Long runs stay `dispatched` with a null http_status because the dispatcher stops listening at 12s and these routes never called `reportCronOutcome`. Legislation and contacts did call it, but the run row still had no http_status, so the inventory read "ran status unrecorded". The self-report now writes http_status (200 / 503 / 500). SAM and recompete report on the way out. A SAM upstream failure with zero rows is HTTP 503, not a 200 success. | `cronOutcomeHttpStatus` → `src/lib/cron-self-report.ts` · `sync-sam-opportunities-full` → `src/app/api/cron/sync-sam-opportunities/route.ts` | `cron-self-report.unit.test.ts`. No production run. | BUILT, NOT MERGED |
+
+## 2026-11-18 — Oversight office aliases and incremental page walk
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | Data Core / pain points | All 14 page-0 open recommendations that were unresolved now have an agency. Seven International Trade Commission rows map to U.S. International Trade Commission because that office's oversight.gov page names USITC. CPSC, ARC, and the Election Assistance Commission are added to the canonical name list under their official names. USASpending's live toptier list (2026-11-18) assigns 061 to CPSC and 034 to the International Trade Commission; this file had 061 on USITC, which no USASpending query builder reads, so USITC is corrected to 034 and CPSC gets 061. Open recommendations walk forward from page 0 and stop at the first fully held page, 8 pages, or 200 new rows. Insert-only. No migration. Discovery ranking is not in this path. Existing GAO rows are not rewritten. | `U.S. International Trade Commission programs and operations` → `src/lib/institute/oig-stated-agency.ts` · `ACQUISITION_PAGE_CAP = 8` → `src/lib/institute/acquired-pain-points.ts` | `oig-stated-agency.unit.test.ts` (ITC fixture 7, plus CPSC/ARC/EAC resolve to themselves; code 061 still resolves to USITC). Walk tests stop on an all-held page and on a 503. | DRAFT PR |
+
+## 2026-11-18 — DIBBS clock stamp checks the Supabase error
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | DIBBS clock write | `stampDibbsClocks` treated a Supabase `{ error }` as success because the client does not throw. A failed read or a failed update now returns null, so the cron body does not report `nonemptyIngestAdvanced`. Rows are not deleted. | `if (written.error)` → `src/lib/dibbs/clock-stamp.ts` | `clock-stamp.unit.test.ts`. No production stamp, no sync. | BUILT, NOT MERGED |
+
+## 2026-11-18 — Living pain points: GAO RSS + oversight.gov
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | Data Core / pain points | The existing `institute-gao-sync` collector now also reads oversight.gov open recommendations and the federal report listing (page 0 only, ≤200 new Institute rows, additive on source id). A recommendation the source lists as open is `confirmed_unresolved`; a status the source does not state stays `unknown`. The bare `(Source: GAO)` writer stays blocked. No migration. | `ACQUISITION_NEW_ROW_CAP = 200` → `src/lib/institute/acquired-pain-points.ts` · `blocked_legacy_gao_reinjection` → `src/lib/strategic-intel/derive.ts` | `acquired-pain-points.unit.test.ts` on recorded fixtures (no network). Live dry-run counts are in the PR. | DRAFT PR |
+
+## 2026-11-18 — Cron run history lands in cron_job_runs
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | Cron observability | extract-sam-events and refresh-contracts wrote run detail to `cron_logs`, which has 0 production rows and is not what the admin cron page or the watchdog read. The prune proposal and the refresh outcome now go to `cron_job_runs` via a direct insert and `reportCronOutcome`. Prune stays report-only unless `SAM_EVENTS_PRUNE=apply`. A failed prune-report insert still returns 500. | `from('cron_job_runs').insert` → `src/app/api/cron/extract-sam-events/route.ts` · `mode=preview; contract file not written` → `src/app/api/cron/refresh-contracts/route.ts` | extract-sam-events route test (report-only, apply, failed insert) + refresh-contracts source test. `SAM_EVENTS_PRUNE` left unset. | DRAFT PR |
+
+## 2026-11-18 — Collection freshness clocks (DIBBS and grants)
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | DIBBS / grants freshness | A scheduled run and `MAX(synced_at)` were read as freshness. DIBBS was registered `source_state=current` with null clocks, and a weekend no-data success did not say it was not an ingest. Clocks now separate last attempt (`last_poll`), last successful read (`last_successful_check`), and last nonempty ingest (`last_verified_ingest`). A confirmed empty window does not move the nonempty clock, including a stray one-row touch. Inventory and `/api/app/dibbs` report UNKNOWN or STALE with a warning when no nonempty ingest is recorded, so a job run cannot be described as current. Grants uses the same reader. No rows are deleted or rewritten. | `export function buildCollectionClockPatch` → `src/lib/data-core/collection-clocks.ts` · `separateAttemptFromIngest: true` → `src/app/api/admin/data-inventory/route.ts` | `collection-clocks.unit.test.ts`. No production stamp, no sync. | BUILT, NOT MERGED |
+
+## 2026-11-18 — Inventory honesty (no SBIR park) + historical GAO labels + SBIR retries
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | Data inventory / DIBBS + null clocks | Migration demotes false-green `current` without clocks (DIBBS → content_stale/blocked + live held_population; SAM/grants/DHS/DOE forecast instances → unmeasured). **Does NOT park sync-dod-sbir** (prior draft section removed; never applied to prod). Documents keep-ENABLED recovery policy on the cron row. | `never park this job for an empty corpus` → `supabase/migrations/20261118_park_false_green_freshness.sql` · `held_population    = (SELECT count(*)::integer FROM public.dibbs_rfqs)` → same file · `does NOT park sync-dod-sbir` → `src/lib/data-core/freshness-honesty.unit.test.ts` | Unit locks no enabled=FALSE. Apply waiting Agent 4 APPROVE. Measured pre-apply: dibbs still current/57816, four null-clock keys still current, sync-dod-sbir enabled=true. | WAITING AGENT 4 APPLY |
+| 2026-11-18 | SBIR sync recovery | Keep empty/api-down → HTTP 503 honesty; add bounded in-run probe retries so temporary sbir.gov unavailability recovers on a later attempt/tick without parking the job. | `probeDodSbirWithRetries` → `src/lib/sbir/dod-sbir-outcome.ts` · `cron stays enabled for recovery` → `src/app/api/cron/sync-dod-sbir/route.ts` | `dod-sbir-outcome.unit.test.ts` 8/8 | SHIPPING |
+| 2026-11-18 | GAO pain points / raw surfaces | Raw paths (pain-points.ts, agency-hierarchy linker, briefings aggregator) + shared display helper now label bare `(Source: GAO)` with government date + `[LEGACY_MANUAL — provenance unavailable]`. **278 preserved** (no retirement). Dates from `legacy-gao-publication-dates.json` (archive file still unreferenced by src). | `historical GAO finding` → `src/lib/strategic-intel/legacy-gao-painpoints.ts` · `labelHistoricalGaoPainPoint` → same | `legacy-gao-painpoints.unit.test.ts` 13/13; `sourced-pain-points.unit.test.ts` 9/9 | SHIPPING |
+| 2026-11-18 | GAO candidates (prepare only) | Validated all **51** net-new candidates: citations, https URLs, publication dates ≥2001, agency present. **0 failures.** No served-JSON write. | `"validation_pass": 51` → `tasks/gao-candidates-validation-2026-11-18.json` | node validator against proposal JSON | PREPARE ONLY |
+
+---
+## 2026-11-18 — SAM status contradictions
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | Ask Mindy SAM status | The card context told the model `Status: active` from `sam_opportunities.active`, which means not archived. A past deadline and an award notice with no deadline both read as active. Ask Mindy now gets the #1557 solicitation status (unchanged), a separate archive-flag line, and an explicit statement that a missing deadline is not "open for responses" when the notice type has nothing to submit. Award status and the contract performance period are named as different clocks. SEO `opportunityStatus` and the runway badge no longer call justification, presolicitation, or special notice open solely because the deadline is blank. | `export function askMindyNoticeStatusLines` → `src/lib/sam/ask-mindy-notice-status.ts` · `Solicitation status:` → `src/lib/chat/card-chat.ts` | `card-chat.unit.test.ts` red before (block contained `Status: active`), green after. `deriveSolicitationStatus` tests unchanged. | BUILT, NOT MERGED |
+
+## 2026-11-18 — GAO reinjection and events prune-report
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | GAO merge guard + events prune log | #2165 (merge `b4d275843`) already skips `gao_high_risk`, refuses `--merge` on a `(Source: GAO)` leak, and returns 500 when the prune-report insert fails. This row locks that code with a regression test after rebasing off the duplicate edit. Prune stays report-only unless `SAM_EVENTS_PRUNE=apply`. The 278 served strings, the 51 replacements, and the 53 event ids are not changed. Decision-pack files from #2165 stay documentation; they are not a data write. | `REFUSED: converted set still contains "(Source: GAO)" pain points.` → `scripts/merge-agency-intelligence.js` · `prune report not recorded:` → `src/app/api/cron/extract-sam-events/route.ts` | `gao-events-safeguards.unit.test.ts` against main's #2165 code. No pain-point JSON edit. No event delete. | BUILT, NOT MERGED |
+
+---
+
 ## 2026-11-18 — Forecast currency release + Ask Mindy Map bridge
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
