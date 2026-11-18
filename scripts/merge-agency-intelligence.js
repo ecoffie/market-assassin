@@ -81,11 +81,11 @@ function convertToPainPointsFormat(dbRecords) {
 
     // Convert based on type
     if (record.intelligence_type === 'gao_high_risk') {
-      // GAO reports become pain points
-      const painPoint = `${record.title} (Source: GAO)`;
-      if (!byAgency[agency].painPoints.includes(painPoint)) {
-        byAgency[agency].painPoints.push(painPoint);
-      }
+      // REFUSED (2026-11-18). --merge used to append `${title} (Source: GAO)` from every
+      // gao_high_risk row — the same path that created the 278 legacy 1993–2000 strings
+      // archived by #2146. Replacements go through scripts/painpoints/* + Eric approval,
+      // never this merge. Skipping here keeps --preview/--merge from undoing that pin.
+      continue;
     } else if (record.intelligence_type === 'contract_pattern') {
       // Spending patterns become priorities
       const priority = record.description || record.title;
@@ -181,6 +181,16 @@ async function main() {
 
   } else if (mode === '--merge') {
     console.log('\n=== MERGING ===');
+
+    // Defense in depth: never write a "(Source: GAO)" string even if a future converter regresses.
+    const gaoLeak = Object.values(converted).some((d) =>
+      (d.painPoints || []).some((p) => /\(Source:\s*GAO\)\s*$/i.test(p)),
+    );
+    if (gaoLeak) {
+      console.error('✗ REFUSED: converted set still contains "(Source: GAO)" pain points.');
+      console.error('  Legacy GAO strings are pinned/archived (#2146). See tasks/gao-painpoints-decision-pack-2026-11-18.md');
+      process.exit(1);
+    }
 
     let addedAgencies = 0;
     let addedPainPoints = 0;

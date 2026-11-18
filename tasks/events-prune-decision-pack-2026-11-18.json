@@ -1,0 +1,409 @@
+{
+  "measured_at": "2026-11-18T18:58:41.893Z",
+  "mode": "report",
+  "SAM_EVENTS_PRUNE_set": null,
+  "vercel_env_note": "vercel env ls production had no SAM_EVENTS_PRUNE line (unset)",
+  "cron_logs_prune_reports": 0,
+  "cron_logs_total": 0,
+  "extract_sam_events_last": {
+    "last_run_at": "2026-11-18T07:00:27Z",
+    "http_status": 200,
+    "duration_ms": 5477
+  },
+  "production_serving_sha": "c6c9c08644ba51153ab80c764ab23bb718a3a4e0",
+  "counts": {
+    "listedRows": 1167,
+    "listedSourcesFound": 1167,
+    "listedMissingSource": 0,
+    "activeCandidates": 7911,
+    "activeComplete": true,
+    "plannedEvents": 3405,
+    "wouldRetire": 53,
+    "proposed": 53,
+    "guardSkipped": null,
+    "RETIRE_MAX_ROWS": 100,
+    "RETIRE_MAX_SHARE": 0.25
+  },
+  "proposals": [
+    {
+      "id": "095bee33-b08f-4c52-829d-c88e2d094d9d",
+      "notice_id": "0436f905830d429989bd424be88648f5",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": null
+    },
+    {
+      "id": "4e08c287-fb5c-47b6-a008-3a49a1421e8b",
+      "notice_id": "1404e4db29c0464988ab5aeff09efcb8",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2029-01-09"
+    },
+    {
+      "id": "4add0447-240a-4cb1-9ed8-ddef6bf6b216",
+      "notice_id": "1c1e4e7584a24119bf2a2c33411e88e3",
+      "reason": "no_event_on_reread",
+      "stored_type": "industry_day",
+      "stored_date": null
+    },
+    {
+      "id": "5042930f-938b-4de7-810a-178470a4d716",
+      "notice_id": "215cae344957439d89ad2704c352ae85",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2027-08-10"
+    },
+    {
+      "id": "bbf68cbb-5c2f-43cb-abf8-1ddeb00a1740",
+      "notice_id": "23d0f9ec368a423488ecedeabf313104",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2029-01-09"
+    },
+    {
+      "id": "feba4062-6dbf-4fe9-8463-cbbc8502a557",
+      "notice_id": "2e43ee51ca86480bae66369b91918437",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2029-01-09"
+    },
+    {
+      "id": "73f0af7e-ac9e-4c88-825f-f693398ba39b",
+      "notice_id": "377f1c3467ca4f5586ee4fc5819b552c",
+      "reason": "no_event_on_reread",
+      "stored_type": "industry_day",
+      "stored_date": null
+    },
+    {
+      "id": "6b8f8c81-ccea-4f9f-b162-51011de1a30e",
+      "notice_id": "3e89ac100b284b6b907f826ea904a4cc",
+      "reason": "no_event_on_reread",
+      "stored_type": "industry_day",
+      "stored_date": "2027-05-16"
+    },
+    {
+      "id": "7c7a3324-925f-4e02-a1f2-d12b1f96e131",
+      "notice_id": "449d4ab6fe8d48619e3b3e4940bddec2",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2027-10-01"
+    },
+    {
+      "id": "814c2a3f-78f5-4b8b-bf91-cd235a5d43b7",
+      "notice_id": "57951c00700043a69501dbec17d12a5b",
+      "reason": "no_event_on_reread",
+      "stored_type": "industry_day",
+      "stored_date": null
+    },
+    {
+      "id": "5793f1ca-fd46-4f7d-b36a-5e9c03d92243",
+      "notice_id": "59b98c2e547f4c52afb8f07d167b4008",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2029-01-09"
+    },
+    {
+      "id": "ef8f188a-f42d-4331-a6cf-e92e1fa8f8d1",
+      "notice_id": "5afcf406ed2c4ad7b355bbe0f29bcca3",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2028-07-03"
+    },
+    {
+      "id": "ae3d2908-80f7-421a-a8e9-f0076db4e1d1",
+      "notice_id": "644ab0dac18146bb8668970b7e0257af",
+      "reason": "no_event_on_reread",
+      "stored_type": "industry_day",
+      "stored_date": null
+    },
+    {
+      "id": "4aa8e17a-8957-443b-b7a3-7898651cb907",
+      "notice_id": "6785c01dbc8f49e6acf889415bf6e062",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": null
+    },
+    {
+      "id": "edaf27de-7467-4fbb-aada-fe0b38606067",
+      "notice_id": "68190d90f8fa4fef89770c7754b85504",
+      "reason": "no_event_on_reread",
+      "stored_type": "industry_day",
+      "stored_date": "2026-11-30"
+    },
+    {
+      "id": "7add773d-2668-442a-8965-a5d1079d6620",
+      "notice_id": "6e41a85d722a4ad08ab0bd4ff857349d",
+      "reason": "no_event_on_reread",
+      "stored_type": "industry_day",
+      "stored_date": "2027-01-01"
+    },
+    {
+      "id": "f8dfd900-39b5-4075-ba64-1685cb678fd3",
+      "notice_id": "6e7c3331b4ef405b88a995229a0be936",
+      "reason": "no_event_on_reread",
+      "stored_type": "industry_day",
+      "stored_date": "2027-09-30"
+    },
+    {
+      "id": "22757463-66ba-4069-8096-293630ff3aaf",
+      "notice_id": "72540dcf3a2640e880d7e659119e5d3d",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2028-10-01"
+    },
+    {
+      "id": "7d9ff918-168c-4282-9577-919fe8a1be94",
+      "notice_id": "7d3f105a09734cbb9b3742fbaca5998f",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2028-10-18"
+    },
+    {
+      "id": "f0726c3f-4e67-4c73-9ee9-815d7c815650",
+      "notice_id": "843a7410579e49868222b53dee0c3f5a",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2031-10-14"
+    },
+    {
+      "id": "fa8caf66-77fe-46d6-8a3b-04eccc995813",
+      "notice_id": "8480f6b40fd348aab0c4ef818215c50d",
+      "reason": "no_event_on_reread",
+      "stored_type": "webinar",
+      "stored_date": "2026-12-10"
+    },
+    {
+      "id": "72b2d28a-44b8-41dc-9adb-a175019d56bf",
+      "notice_id": "86be3b0f8b914ca3af4150b23376b618",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2027-10-01"
+    },
+    {
+      "id": "a5e2be14-682b-4544-8de3-1bea37d180d6",
+      "notice_id": "87a56625bd0148f386f1a40b413f31dd",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2027-09-30"
+    },
+    {
+      "id": "9744e442-606f-4c5b-9d74-a8205d0c7cba",
+      "notice_id": "8a75a70fc12640c182b1d4e5c7ea8dee",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2026-12-01"
+    },
+    {
+      "id": "b057ece5-9b89-4c1b-8482-e76bf793aa25",
+      "notice_id": "936366f008ad4843a9528cbf3bbf0b5b",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2029-01-09"
+    },
+    {
+      "id": "1ed7cda3-1e3d-4ea3-b86a-5e8c9a12395e",
+      "notice_id": "a8706a7e4b1d4b08bb5a9daf9004f688",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": null
+    },
+    {
+      "id": "98ee8806-9ebc-4cf4-842a-606b0ac6fb46",
+      "notice_id": "adf5af6cb5e54101bcc9d2ea3bcd2688",
+      "reason": "no_event_on_reread",
+      "stored_type": "industry_day",
+      "stored_date": null
+    },
+    {
+      "id": "7c03211f-476c-4592-b3c4-2b9301775d7e",
+      "notice_id": "ae91695290414673bf9cee2ea75db592",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2027-02-01"
+    },
+    {
+      "id": "341ff202-dad7-444d-ae62-edda099130a8",
+      "notice_id": "aed6e32905054cbd9bba24d844aa8e18",
+      "reason": "no_event_on_reread",
+      "stored_type": "industry_day",
+      "stored_date": null
+    },
+    {
+      "id": "f6a967fa-8c17-496b-8b59-0f9eee75a022",
+      "notice_id": "afe25a3c842645c3b73e874b4b5b5cf2",
+      "reason": "no_event_on_reread",
+      "stored_type": "industry_day",
+      "stored_date": "2026-12-23"
+    },
+    {
+      "id": "86a85ca3-c2a1-4da6-b91b-eeae65dccd00",
+      "notice_id": "b027c168f07e425d9f85b2b552aae761",
+      "reason": "no_event_on_reread",
+      "stored_type": "industry_day",
+      "stored_date": "2026-11-30"
+    },
+    {
+      "id": "055f5190-d57c-436f-93f9-d78309eeeb5f",
+      "notice_id": "b22fd802611348eeb379f06fb6b99a9f",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2027-11-30"
+    },
+    {
+      "id": "10953be2-072c-44d5-be83-78003196e72a",
+      "notice_id": "b392d606cee8440397c4393a3f186877",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2029-09-30"
+    },
+    {
+      "id": "e843baf6-3aaf-4e9a-999f-53e03a743b09",
+      "notice_id": "b49351c7687545ba93c3ba8a051051e9",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2031-05-28"
+    },
+    {
+      "id": "b1512a85-3f46-4710-afdb-6b5788443e5e",
+      "notice_id": "b82fcbd7a0954471bef4d03fdf691894",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2031-10-14"
+    },
+    {
+      "id": "507851cf-fc9f-4693-9910-527173490713",
+      "notice_id": "ba6562415c9941e3a39f0ef2d387b7da",
+      "reason": "no_event_on_reread",
+      "stored_type": "webinar",
+      "stored_date": "2026-11-19"
+    },
+    {
+      "id": "e11e1a61-e444-494f-ac35-1d243abc722f",
+      "notice_id": "bc27ec181ac047b3af586fc33afc74c7",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2028-10-01"
+    },
+    {
+      "id": "e123625b-ab12-406c-9886-c8020d66159e",
+      "notice_id": "bd71f84068534e5680335d83e31fc9df",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2029-08-26"
+    },
+    {
+      "id": "1294c0da-f939-4599-aa60-937124a94e23",
+      "notice_id": "bd77424c2f0840dcb1bcfcbfb74a18a6",
+      "reason": "no_event_on_reread",
+      "stored_type": "industry_day",
+      "stored_date": "2026-12-23"
+    },
+    {
+      "id": "8ff405b4-a0d4-448a-b889-6770714762f4",
+      "notice_id": "c1d244e1113845169249e8351a84b96d",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2026-11-30"
+    },
+    {
+      "id": "a38e933b-ac02-4101-aa79-742639964d12",
+      "notice_id": "c277e935161a45fb9071209ce0177010",
+      "reason": "no_event_on_reread",
+      "stored_type": "industry_day",
+      "stored_date": "2026-12-23"
+    },
+    {
+      "id": "6b5e2016-4932-432e-bb16-e020fd7ba910",
+      "notice_id": "c32527b925bd42629d26a18a592bbcc5",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2026-11-20"
+    },
+    {
+      "id": "2bad01a8-26ff-494a-b96e-94fbb149c0ad",
+      "notice_id": "c7962301870e4dd4b927e4bb329c0836",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2029-01-09"
+    },
+    {
+      "id": "b2cc8241-cb1d-4abd-bb39-8767537a06b0",
+      "notice_id": "d2d7eae711a14923a0329665c110d326",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2027-09-30"
+    },
+    {
+      "id": "42e0c2e6-70b9-4396-93f7-05e34e9362dd",
+      "notice_id": "d6da16e3b6574952a348713239290307",
+      "reason": "no_event_on_reread",
+      "stored_type": "industry_day",
+      "stored_date": "2026-11-30"
+    },
+    {
+      "id": "930fe41b-de58-4670-ad90-c081749729de",
+      "notice_id": "e3cd5e889e9f470facb0bc27a8ca5faf",
+      "reason": "no_event_on_reread",
+      "stored_type": "industry_day",
+      "stored_date": "2027-01-01"
+    },
+    {
+      "id": "8ccafcd3-87ad-49d5-bcb9-f2401c3e81b1",
+      "notice_id": "e435253f8ef24fc6bb07688b2fe852f7",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2030-05-29"
+    },
+    {
+      "id": "a70b768e-e57e-44e5-882f-a58472ba26fe",
+      "notice_id": "ea0c0850522c461ab2d73f5cb4a29780",
+      "reason": "no_event_on_reread",
+      "stored_type": "industry_day",
+      "stored_date": "2026-12-23"
+    },
+    {
+      "id": "9e966513-0f54-4d1f-804a-f9f1751154c3",
+      "notice_id": "f3e87de1f7114dca9a374cec62ad558e",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2029-01-09"
+    },
+    {
+      "id": "5369b807-2dff-40b2-a986-99ed863d5013",
+      "notice_id": "f86920ef287d44e58fb53bcaa9326c29",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2026-12-18"
+    },
+    {
+      "id": "76d6d6a0-6df7-4ffd-8b0a-7c53456578d5",
+      "notice_id": "fbb2436ff3644fe18c369b9ad258ceab",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2027-09-30"
+    },
+    {
+      "id": "3695497e-ab1a-474b-a5cf-10c2eaef64ce",
+      "notice_id": "fd8daf9429824814882419486b899606",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2029-01-09"
+    },
+    {
+      "id": "27bcb053-0b06-453a-9d78-8b45aceeb1e2",
+      "notice_id": "ff41905dc0864f419c8f60b673b6292b",
+      "reason": "no_event_on_reread",
+      "stored_type": "rfi",
+      "stored_date": "2026-12-01"
+    }
+  ],
+  "rollback": {
+    "apply_forbidden_until": "Eric + Agent 5 authorize SAM_EVENTS_PRUNE=apply + redeploy",
+    "if_applied": "Re-upsert deleted rows from a pre-apply export of sam_events for those ids; AI rows never deleted; next extract recreates a row if the notice reads as an event again",
+    "report_only_default": true
+  },
+  "evidence": {
+    "source": "read-only replay of extract-run planRetirements against live listed rows + notice bodies",
+    "note": "cron_logs has 0 rows total — durable prune-report inserts have never landed; this pack is the replacement evidence until fail-loud recording ships"
+  }
+}
