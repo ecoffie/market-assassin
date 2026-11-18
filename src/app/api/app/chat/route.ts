@@ -69,6 +69,7 @@ import { fenceUntrusted, UNTRUSTED_TEXT_RULE } from '@/lib/chat/untrusted-text';
 import { guardFacts } from '@/lib/proposal/fact-guard';
 import { isSensitiveApprovedProvider } from '@/lib/llm/call-llm';
 import { chatDeadlines, toolTimeoutMs, readWithIdleTimeout, incompleteToolNotice, withTimeout, ChatTimeoutError } from '@/lib/chat/turn-deadlines';
+import { shouldOfferSecondToolRound } from '@/lib/chat/second-tool-round';
 
 // Every Ask Mindy turn carries customer-private context (the user's profile; often Vault or
 // pipeline results). So every provider the chat route calls directly must be on the SAME
@@ -1179,6 +1180,109 @@ export async function POST(request: NextRequest) {
               // A6: every non-success status is announced, not only `failed` (refusals, round budget, timeouts).
               const incomplete = incompleteToolNotice(results.map((r) => r.record));
               if (incomplete) notify(incomplete.code, incomplete.message);
+
+              // Bounded second planner round (multi-hop): only when round 1 already returned a
+              // successful seed tool (notice / award / open search). Same executor budgets, policy,
+              // timeouts and write caps. Never a third round. Never a blank-slate retry.
+              if (
+                !turnTimedOut
+                && shouldOfferSecondToolRound(
+                  results.map((r) => ({ tool: r.record.tool, status: r.record.status })),
+                )
+              ) {
+                turnTrace.notices.push('tool_round:2_offered');
+                const round1Digest = results
+                  .map((r) => `${r.record.tool} [${r.record.status}]: ${String(r.content || '').slice(0, 3500)}`)
+                  .join('\n\n');
+                toolRoundMessages.push({
+                  role: 'system',
+                  content:
+                    'ROUND 1 TOOL RESULTS (already executed this turn). Call another tool ONLY if the customer question still needs a hop these results enable (e.g. competitors after an incumbent, contacts after a notice). If you can answer from these results, call no tools.\n\n'
+                    + round1Digest,
+                });
+                const planner2: PlannerTarget = { provider: first.provider as PlannerTarget['provider'], model: first.model };
+                const r2 = await callPlanner(planner2);
+                turnTrace.planner_attempts.push({
+                  provider: planner2.provider,
+                  model: planner2.model,
+                  ok: r2.ok,
+                  status: r2.ok ? null : r2.status,
+                });
+                if (r2.ok) {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const u2 = (r2.json as any)?.usage;
+                  if (u2) {
+                    toolUsageForCost = {
+                      prompt_tokens: (toolUsageForCost?.prompt_tokens || 0) + (u2.prompt_tokens || 0),
+                      completion_tokens: (toolUsageForCost?.completion_tokens || 0) + (u2.completion_tokens || 0),
+                    };
+                  }
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const choice2 = (r2.json as any)?.choices?.[0]?.message;
+                  const planned2 = (choice2?.tool_calls ?? []) as Array<{ id?: string; function?: { name?: string; arguments?: string } }>;
+                  const rawCalls2 = (Array.isArray(planned2) ? planned2 : []).filter((tc) => {
+                    const n = String(tc.function?.name || '');
+                    if (!notOfferedThisTurn.has(n)) return true;
+                    turnTrace.notices.push(`unoffered_tool_call_dropped:${n}`);
+                    return false;
+                  });
+                  if (rawCalls2.length > 0) {
+                    turnTrace.notices.push('tool_round:2_executed');
+                    const toolCalls2 = rawCalls2.map((tc, i) => {
+                      const id = tc.id || `call2_${i}`;
+                      const prepared = prepareChatToolArgs(String(tc.function?.name || ''), String(tc.function?.arguments ?? ''));
+                      const enforced = enforceIntent(String(tc.function?.name || ''), prepared.args, intent);
+                      for (const n of enforced.applied) turnTrace.notices.push(`intent_applied:${tc.function?.name}:${n}`);
+                      for (const n of enforced.unapplied) turnTrace.notices.push(`intent_unapplied:${tc.function?.name}:${n}`);
+                      const guardedStates = guardUnstatedStates(enforced.args, conversationText);
+                      const guardedCities = guardUnstatedCities(guardedStates.args, conversationText);
+                      const findArgs = enforceFindArgs(String(tc.function?.name || ''), guardedCities.args, toolOffer.intent, toolOffer.openOnly, customerTypedCodes);
+                      for (const c of findArgs.changes) turnTrace.notices.push(`find_args_enforced:${c}`);
+                      return { ...tc, id, type: 'function' as const, function: { ...tc.function, arguments: findArgs.args } };
+                    });
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    pendingToolTurnIdx = (messages as any[]).push({ role: 'assistant', content: choice2?.content ?? null, tool_calls: toolCalls2 }) - 1;
+                    if (turnTimedOut) { recordPlannerUsage(); return; }
+                    const results2 = await executor.executeRound(
+                      toolCalls2,
+                      { provider: planner2.provider, model: planner2.model },
+                      { deadlineAt: Date.now() + deadlines.toolRoundBudgetMs, isCancelled: () => turnTimedOut },
+                    );
+                    const perResultCap2 = perResultBudget(results2.length);
+                    for (const r of results2) {
+                      toolOriginals.set(r.tool_call_id, r.content);
+                      if (r.record.tool === 'find_opportunities' && r.record.status === 'success') {
+                        try { const p = JSON.parse(r.content) as FindResultWithItems; if (p && typeof p === 'object') findResult = p; } catch { /* ignore */ }
+                      }
+                      const bounded = boundToolResult(r.content, perResultCap2);
+                      if (bounded.truncated) turnTrace.notices.push(`tool_result_bounded:${r.record.tool}:${bounded.originalChars}->${bounded.content.length}`);
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      (messages as any[]).push({ role: 'tool', tool_call_id: r.tool_call_id, content: bounded.content });
+                    }
+                    pendingToolTurnIdx = null;
+                    turnTrace.tool_executions = [...turnTrace.tool_executions, ...results2.map((r) => r.record)];
+                    for (const r of results2) toolBillingOutcomes.push(toolBillingOutcome(r.record.status, r.content));
+                    const retrievedAt2 = new Date().toISOString();
+                    for (const r of results2) {
+                      groundingTexts.push(r.content);
+                      allResultsRendered = false;
+                      unrenderedResults.push({ tool: r.record.tool, status: r.record.status });
+                      turnSources.push(sourceFromToolResult({
+                        tool: r.record.tool, toolCallId: r.tool_call_id, status: r.record.status, content: r.content,
+                        rendered: null, argsRedacted: r.argsRedacted,
+                        owner: { email: (actingScope.kind === 'client' ? actingScope.vaultEmail : auth.email!) || auth.email!, scope: actingScopeKey },
+                        retrievedAt: retrievedAt2,
+                      }));
+                    }
+                    const incomplete2 = incompleteToolNotice(results2.map((r) => r.record));
+                    if (incomplete2) notify(incomplete2.code, incomplete2.message);
+                  } else {
+                    turnTrace.notices.push('tool_round:2_no_calls');
+                  }
+                } else {
+                  turnTrace.notices.push('tool_round:2_planner_failed');
+                }
+              }
             }
           }
         } catch (toolErr) {
