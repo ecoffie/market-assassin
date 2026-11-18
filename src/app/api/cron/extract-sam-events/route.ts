@@ -239,7 +239,26 @@ export async function GET(request: NextRequest) {
     });
     pruneReportRecorded = !logError;
     pruneReportError = logError?.message ?? null;
-    if (logError) console.error('[extract-sam-events] prune report not recorded:', logError.message);
+    // Fail loud: a successful extract with no durable prune report is how approval evidence
+    // disappeared (cron_logs stayed at 0 rows after #2147). Do not return 200 when recording fails.
+    if (logError) {
+      console.error('[extract-sam-events] prune report not recorded:', logError.message);
+      return NextResponse.json({
+        success: false,
+        status: 'ingest_broken',
+        error: `prune report not recorded: ${logError.message}`,
+        upsertedCount,
+        prune: {
+          mode,
+          proposed: retirement.proposals.length,
+          deleted: mode === 'apply' ? retiredCount : 0,
+          guardSkipped: retirement.skipped,
+          recorded: false,
+          recordError: logError.message,
+          proposals: retirement.proposals,
+        },
+      }, { status: 500 });
+    }
   }
   if (Date.now() > deadline) truncated = true;
 

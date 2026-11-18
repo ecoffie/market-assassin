@@ -9,8 +9,16 @@ import { NextRequest } from 'next/server';
 import fixture from '@/lib/events/__fixtures__/event-currency-notices.json';
 
 type Row = Record<string, unknown>;
-const db: { sam_opportunities: Row[]; sam_events: Row[]; cron_logs: Row[]; upserts: Row[][]; deletes: string[][] } = {
+const db: {
+  sam_opportunities: Row[];
+  sam_events: Row[];
+  cron_logs: Row[];
+  upserts: Row[][];
+  deletes: string[][];
+  cronLogInsertError: string | null;
+} = {
   sam_opportunities: [], sam_events: [], cron_logs: [], upserts: [], deletes: [],
+  cronLogInsertError: null,
 };
 type Table = 'sam_opportunities' | 'sam_events' | 'cron_logs';
 
@@ -47,6 +55,9 @@ function query(table: Table) {
     insert: (row: Row) => { op = 'insert'; payload = [row]; return b; },
     then: (resolve: (v: unknown) => void) => {
       if (op === 'insert') {
+        if (db.cronLogInsertError) {
+          return resolve({ data: null, error: { message: db.cronLogInsertError } });
+        }
         db.cron_logs.push(...payload);
         return resolve({ data: null, error: null });
       }
@@ -108,6 +119,7 @@ beforeEach(() => {
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'fake';
   vi.useFakeTimers({ toFake: ['Date'] });
   db.sam_opportunities = []; db.sam_events = []; db.cron_logs = []; db.upserts = []; db.deletes = [];
+  db.cronLogInsertError = null;
   delete process.env.SAM_EVENTS_PRUNE;
 });
 afterEach(() => { vi.useRealTimers(); delete process.env.SAM_EVENTS_PRUNE; });
@@ -188,5 +200,19 @@ describe('extract-sam-events route', () => {
     expect(body.stats.retired).toBe(1);
     expect(db.sam_events.some((r) => r.notice_id === 'ai-1')).toBe(true);
     expect(db.cron_logs[0]).toMatchObject({ status: 'applied' });
+  });
+
+  it('fails the job (500) when the durable prune report cannot be recorded', async () => {
+    seedRetirement();
+    db.cronLogInsertError = 'simulated cron_logs insert failure';
+    const { status, body } = await run();
+    expect(status).toBe(500);
+    expect(body).toMatchObject({
+      success: false,
+      status: 'ingest_broken',
+      prune: { recorded: false, proposed: 1 },
+    });
+    expect(db.deletes).toEqual([]);
+    expect(db.cron_logs).toHaveLength(0);
   });
 });
