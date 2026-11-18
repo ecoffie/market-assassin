@@ -87,3 +87,4 @@ tmp/full-open-reconcile/
 
 # Diligence register run outputs (workbooks, raw USASpending downloads) — never commit
 .claude/diligence/
+.claude/settings.local.json
