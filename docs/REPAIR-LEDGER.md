@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-18 — Collection freshness clocks (DIBBS and grants)
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | DIBBS / grants freshness | A scheduled run and `MAX(synced_at)` were read as freshness. DIBBS was registered `source_state=current` with null clocks, and a weekend no-data success did not say it was not an ingest. Clocks now separate last attempt (`last_poll`), last successful read (`last_successful_check`), and last nonempty ingest (`last_verified_ingest`). A confirmed empty window does not move the nonempty clock, including a stray one-row touch. Inventory and `/api/app/dibbs` report UNKNOWN or STALE with a warning when no nonempty ingest is recorded, so a job run cannot be described as current. Grants uses the same reader. No rows are deleted or rewritten. | `export function buildCollectionClockPatch` → `src/lib/data-core/collection-clocks.ts` · `separateAttemptFromIngest: true` → `src/app/api/admin/data-inventory/route.ts` | `collection-clocks.unit.test.ts`. No production stamp, no sync. | BUILT, NOT MERGED |
+
 ## 2026-11-18 — Inventory honesty (no SBIR park) + historical GAO labels + SBIR retries
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
