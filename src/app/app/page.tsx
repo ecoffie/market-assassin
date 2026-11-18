@@ -1526,7 +1526,8 @@ function AppDashboard() {
         : 'flex-1 min-h-screen overflow-y-auto overflow-x-hidden pb-24 md:pb-0 w-full min-w-0'}>
         {/* Free members only: start the 14-day Pro trial — the first thing on the page, above the
             top bar, whole strip clickable, no close button (owner, 2026-11-17). */}
-        {tierResolved && tier === 'free' && !isStaff && <TrialOfferBanner />}
+        {/* Not inside the Mindy phone app (src/app/app/phone), which keeps its screens free of website banners. */}
+        {tierResolved && tier === 'free' && !isStaff && !inPhoneShell && <TrialOfferBanner />}
 
         {/* Top Bar */}
         <header className="sticky top-0 z-30 bg-ground-deep/90 backdrop-blur border-b border-surface px-4 md:px-6 py-3 md:py-4">
