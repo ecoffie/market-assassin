@@ -323,7 +323,7 @@ export async function GET(request: NextRequest) {
           .order('last_synced_at', { ascending: false, nullsFirst: false })
           .limit(1)
           .maybeSingle();
-        if (entityRidealongDue(newest?.last_synced_at)) {
+        if (entityRidealongDue(newest?.last_synced_at, Date.now())) {
           out.entities = await syncEntities({ maxSlices: 1 });
         } else {
           out.entities = { skipped: true, reason: 'checkpoint newer than 20h' };
