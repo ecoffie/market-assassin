@@ -20,6 +20,8 @@ import { displayContactName } from '@/lib/gov-contacts/contact-quality';
 import { searchEventsViaAI } from '@/lib/events/ai-event-discovery';
 import { catalogOccurrencesForAgency } from '@/lib/events/catalog-occurrences';
 import { cleanEventLocation } from '@/lib/events/location';
+import { loadHiddenRows, loadRetiredSourceNoticeIds, notInList } from '@/lib/events/event-currency-live';
+import type { HiddenReason } from '@/lib/events/event-currency';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -39,6 +41,12 @@ export interface FederalEventsInput {
    * not count a curated row as a SAM event.
    */
   includeCatalog?: boolean;
+  /**
+   * History view: also return rows readers normally hide (retired source notice, or an undated event
+   * behind a closed notice), each labelled with `hidden_reason`. Hidden rows are never deleted or
+   * altered, so this is the complete record. Default false.
+   */
+  includeHidden?: boolean;
   /** Current year, passed in for the AI year-biasing (e.g. "AFCEA 2026"). */
   currentYear: number;
   limit?: number;
@@ -59,6 +67,8 @@ export interface FederalEvent {
   description: string | null;
   matched_office: string | null; // the decoded buying office, not "DEFENSE"
   confidence: number | null; // AI rows only (0..1); null for grounded SAM rows
+  /** Set only with `includeHidden`: why a normal listing leaves this row out. */
+  hidden_reason?: HiddenReason | null;
 }
 
 export interface FederalEventsResult {
@@ -75,6 +85,7 @@ export interface FederalEventsResult {
 }
 
 type SamEventRow = {
+  notice_id?: string | null;
   title: string;
   event_type: string | null;
   event_date: string | null;
@@ -141,14 +152,20 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
     const undatedSince = new Date(today);
     undatedSince.setDate(undatedSince.getDate() - UNDATED_EVENT_DAYS);
     const typeList = `(${ATTENDABLE_TYPES.join(',')})`;
+    // R5: a row whose source notice is inactive AND past its response window is not listed.
+    // Excluded inside the query, so the totals stay exact.
+    const hiddenRows = await loadHiddenRows(supabase, today);
+    const hiddenById = new Map((hiddenRows || []).map((h) => [h.notice_id, h.reason]));
+    const retired = input.includeHidden ? null : notInList(hiddenRows ? hiddenRows.map((h) => h.notice_id) : null);
+    const live = <Q extends { not: (c: string, o: string, v: string) => Q }>(q: Q): Q => (retired ? q.not('notice_id', 'in', retired) : q);
     const [attendableRes, noticeRes] = await Promise.all([
-      byAgency(supabase.from('sam_events').select(COLUMNS, { count: 'exact' }))
+      live(byAgency(supabase.from('sam_events').select(COLUMNS, { count: 'exact' }))
         .in('event_type', ATTENDABLE_TYPES)
-        .or(`and(event_date.gte.${todayStr},event_date.lte.${horizonStr}),and(event_date.is.null,extracted_at.gte.${undatedSince.toISOString().slice(0, 10)})`),
-      byAgency(supabase.from('sam_events').select(COLUMNS, { count: 'exact' }))
+        .or(`and(event_date.gte.${todayStr},event_date.lte.${horizonStr}),and(event_date.is.null,extracted_at.gte.${undatedSince.toISOString().slice(0, 10)})`)),
+      live(byAgency(supabase.from('sam_events').select(COLUMNS, { count: 'exact' }))
         .gte('event_date', todayStr)
         .lte('event_date', horizonStr)
-        .or(`event_type.is.null,event_type.not.in.${typeList}`),
+        .or(`event_type.is.null,event_type.not.in.${typeList}`)),
     ]);
 
     if (attendableRes.error || noticeRes.error) {
@@ -184,6 +201,7 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
         description: row.description ?? null,
         matched_office: row.inferred_office || row.inferred_subagency || row.agency || null,
         confidence: isAi && typeof row.confidence === 'number' ? row.confidence : null,
+        ...(input.includeHidden ? { hidden_reason: hiddenById.get(row.notice_id || '') ?? null } : {}),
       });
     }
   }
@@ -335,8 +353,10 @@ export async function queryScopedEvents(input: {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const COLS = 'title, event_type, event_date, event_location, agency, inferred_office, inferred_dodaac, notice_id, solicitation_number';
 
-  const base = () =>
-    supabase
+  // R5: never list an event whose source notice is inactive AND past its response window.
+  const retired = notInList(await loadRetiredSourceNoticeIds(supabase, today));
+  const base = () => {
+    const q = supabase
       .from('sam_events')
       .select(COLS)
       .in('event_type', ATTENDABLE_TYPES)      // never RFIs — those are opportunities
@@ -344,6 +364,8 @@ export async function queryScopedEvents(input: {
       .lte('event_date', horizonStr)
       .order('event_date', { ascending: true })
       .limit(limit);
+    return retired ? q.not('notice_id', 'in', retired) : q;
+  };
 
   // The extractor's event_location is UNRELIABLE: measured 2026-08-14, 57 of 68 upcoming events
   // carry a truncated fragment rather than a place ("ion Number: N6134027R1002" — the tail of

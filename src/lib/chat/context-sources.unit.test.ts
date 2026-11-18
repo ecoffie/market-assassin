@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
   sourceFromToolResult, renderedStub, citationsFromSources, ledgerFromSources, parseLedger, referencedNumbers,
-  resolveReferences, ledgerNotes, safeLabel, signLedger, LEDGER_MAX_ITEMS, type LedgerEntry,
+  resolveReferences, ledgerNotes, safeLabel, signLedger, resolveRevisionTarget, LEDGER_MAX_ITEMS, type LedgerEntry,
 } from './context-sources';
 
 const savedKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -134,5 +134,38 @@ describe('safeLabel', () => {
   it('strips markup and odd characters, caps length', () => {
     expect(safeLabel('<b>Acme</b> {LLC} `x`')).toBe('Acme LLC x');
     expect(safeLabel('a'.repeat(200), 10)).toHaveLength(10);
+  });
+});
+
+describe('Vault documents in the ledger (revise across turns)', () => {
+  const U1 = '11111111-1111-4111-8111-111111111111';
+  const U2 = '22222222-2222-4222-8222-222222222222';
+  const findOne = sourceFromToolResult({ tool: 'find_my_documents', toolCallId: 'f', status: 'success', content: JSON.stringify({ ok: true, document: { document_id: U1, file_name: 'Cap Statement.docx', kind: 'company' }, excerpts: 'x' }), owner, retrievedAt: at });
+  const created = sourceFromToolResult({ tool: 'create_document', toolCallId: 'c', status: 'success', content: JSON.stringify({ ok: true, version: 3, files: [{ format: 'pdf', document_id: U2.replace('2222-4', '3333-4'), version: 3 }, { format: 'docx', document_id: U2, file_name: 'Cap v3.docx', version: 3 }] }), owner, retrievedAt: at });
+  it('find_my_documents and create_document produce one owner-scoped doc item each (create_document → the Word file id)', () => {
+    expect(findOne).toMatchObject({ kind: 'account_record', owner, items: [{ key: U1, doc: { kind: 'company' } }] });
+    expect(created.items).toEqual([{ key: U2, label: 'Cap v3.docx', doc: { kind: 'generated', version: 3 } }]);
+  });
+  it('a failed create_document carries no document', () => {
+    const s = sourceFromToolResult({ tool: 'create_document', toolCallId: 'c', status: 'success', content: '{"ok":false,"error":"invalid_document"}', owner, retrievedAt: at });
+    expect(s.items).toEqual([]);
+  });
+  it('the doc kind and version survive the signed round trip; a forged kind is dropped', () => {
+    const l = parseLedger(JSON.parse(JSON.stringify(ledgerFromSources([created]))), 'own')!;
+    expect(l.entries[0].items![0].doc).toEqual({ kind: 'generated', version: 3 });
+    const forged = parseLedger(signed([{ id: 'src:create_document:c', tool: 'create_document', status: 'ok', private: true, scope: 'own', items: [{ key: U1, doc: { kind: 'root', version: -1 } }] }]), 'own')!;
+    expect(forged.entries[0].items![0].doc).toBeUndefined();
+  });
+  it.each([
+    ['Revise that capability statement (keep the original)', true], ['make a new version of it', true], ['update the document', true],
+    ['what NAICS codes does it list?', false], ['revise my bid strategy', false],
+  ])('isReviseIntent(%j) → %s', (m, expected) => {
+    expect(resolveRevisionTarget(m, [ledgerFromSources([findOne])]) !== null).toBe(expected);
+  });
+  it('resolves only a single document; several → null (ask which); newest ledger wins', () => {
+    const both = ledgerFromSources([findOne, created]);
+    expect(resolveRevisionTarget('revise that document', [both])).toBeNull();
+    expect(resolveRevisionTarget('revise that document', [ledgerFromSources([created]), ledgerFromSources([findOne])])).toEqual({ id: U2, kind: 'generated', version: 3 });
+    expect(resolveRevisionTarget('revise that document', [])).toBeNull();
   });
 });

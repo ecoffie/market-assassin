@@ -27,7 +27,7 @@ describe('every record, once, in order', () => {
       _meta: meta({ total: 3 }),
     })!;
     expect(r.ids).toEqual(['U1', 'S1', '36C24927N0097']); // soonest end first
-    expect(r.text).toMatch(/36C24927N0097 · Allpro Staffnet LLC · Department of Veterans Affairs · Memphis, TN · ends 2027-03-31 · order under 36C24918D0001/);
+    expect(r.text).toMatch(/^\| 3\. 36C24927N0097 \(order under 36C24918D0001\) \| \$123K \| 2027-03-31 \| Allpro Staffnet LLC \| Department of Veterans Affairs \| Memphis, TN \|/m);
     expect(r.text).toMatch(/Showing all 3/);
     expect(r.exhaustive).toBe(true);
   });
@@ -43,7 +43,7 @@ describe('every record, once, in order', () => {
   });
   it('a record with a missing field says so instead of dropping the record', () => {
     const r = renderExpiringRecords({ contracts: [rec('M1', '2027-01-01', { place_of_performance_state: null, incumbent_name: null })], _meta: meta({ total: 1 }) })!;
-    expect(r.text).toMatch(/M1 · incumbent not recorded · .* · place of performance not reported/);
+    expect(r.text).toMatch(/^\| 1\. M1 \| \$123K \| 2027-01-01 \| not recorded \| Department of Veterans Affairs \| not reported \|/m);
   });
 });
 
@@ -51,10 +51,10 @@ describe('counts, pages and continuation', () => {
   const many = Array.from({ length: 26 }, (_, i) => rec(`P${String(i + 1).padStart(2, '0')}`, `2027-01-${String((i % 28) + 1).padStart(2, '0')}`));
   it('distinguishes the full count from the displayed range and gives an explicit continuation', () => {
     const r = renderExpiringRecords({ contracts: many, _meta: meta({ total: 26 }) })!;
-    expect(r.shown).toBe(20);
+    expect(r.shown).toBe(10); // 10 per page (2026-11-17)
     expect(r.text).toMatch(/^26 expiring records match/);
-    expect(r.text).toMatch(/Showing 1–20 of 26/);
-    expect(r.text).toMatch(/This is not the full list\. Ask "show expiring records 21 to 26" to continue\./);
+    expect(r.text).toMatch(/Showing 1–10 of 26/);
+    expect(r.text).toMatch(/This is not the full list\. Ask "show expiring records 11 to 20" to continue\./);
     expect(r.exhaustive).toBe(false);
   });
   it('a continuation page shows the next records with the same total', () => {
@@ -173,10 +173,12 @@ describe('buying offices', () => {
   };
   it('renders offices with codes, exact dollars, customers and place of performance, and says it is the top N of M', () => {
     const r = renderBuyingOffices(res)!;
-    expect(r.text).toMatch(/^10 contracting offices recorded award actions for this work \(NAICS 5613, 5611 · work performed in TN · Memphis metro \(cities within 30 miles, in TN only\) · FY2024-FY2026\), \$65,723,501 net obligated \(after deobligations\) across 74 awards/);
-    expect(r.text).toMatch(/Showing the top 2 of 10 by net obligations: 2 with positive net obligations are listed below\./);
-    expect(r.text).toMatch(/1\. NAVSUP FLT LOG CTR NORFOLK \(N00189\) · Department Of Defense \/ Department Of The Navy|1\. NAVSUP FLT LOG CTR NORFOLK \(N00189\) · Department of Defense \/ Department of the Navy/);
-    expect(r.text).toMatch(/customers: Navy Personnel Command \$50,000,000 · work performed in Millington, TN/);
+    expect(r.text).toMatch(/^\*\*10 contracting offices\*\* recorded award actions for this work: \*\*\$65\.7M\*\* net obligated across 74 awards\./);
+    expect(r.text).toMatch(/Search: NAICS 5613, 5611 · work performed in TN · Memphis metro \(cities within 30 miles, in TN only\) · FY2024-FY2026\./);
+    expect(r.text).toMatch(/Showing all 2 offices\.|Showing 1–2 of the 2 offices with positive net obligations\./);
+    expect(r.text).toMatch(/8 more offices rank below the top 2 retrieved/);
+    expect(r.text).toMatch(/^\| 1\. NAVSUP FLT LOG CTR Norfolk \(N00189\) \| \$58\.88M \| 89\.6% \| 12 \| Department of the Navy \|$/m);
+    expect(r.text).toMatch(/^- \*\*1\.\*\* customers: Navy Personnel Command \$50M · work in Millington, TN$/m);
     expect(r.text).toMatch(/These are federal government contracting offices \(buyers\), not companies\./);
   });
   it('no offices is stated with its filters', () => {
@@ -259,7 +261,7 @@ describe('independent-review fixes', () => {
       _meta: meta({ total: 2 }),
     })!;
     expect(r.text).toMatch(/By awarding agency: Department of Justice 1; Department of Veterans Affairs 1\./);
-    expect(r.text).toMatch(/Mindy marked 1 record CHECK because the description names a place outside the reported state or describes different work\. This check only catches wording it recognizes/);
+    expect(r.text).toMatch(/Mindy marked 1 record CHECK because the description names a place outside the reported state or describes different work; this check only catches wording it recognizes/);
   });
   it('plain award search: every award with dates, the date-filter meaning, not-the-full-list and data status', () => {
     const r = renderStatusChecks({
@@ -270,7 +272,7 @@ describe('independent-review fixes', () => {
     expect(r.text).toMatch(/^14 awards match \(office W912EQ W07V ENDIST MEMPHIS · NAICS 561320 · activity 2019-01-01 to today\)/);
     expect(r.text).toMatch(/Showing 1 of 14 \(largest first\); this is not the full list\./);
     expect(r.text).toMatch(/Date filter: .*started earlier can appear/);
-    expect(r.text).toMatch(/W912EQ17P0020 · Grand Slam · chefs · 2017-03-03 to 2017-04-21/);
+    expect(r.text).toMatch(/^\| 1\. W912EQ17P0020 \| \$1K \| Grand Slam \| 2017-03-03 to 2017-04-21 \| TN \| chefs \|$/m);
     expect(r.text).toMatch(/Data status: may be incomplete\./);
     expect(r.text).toMatch(/1 of the awards shown started before 2019-01-01 \(W912EQ17P0020 started 2017-03-03\)/);
     expect(r.text).toMatch(/Other office codes matching "Memphis" were found but not searched: W500TW W07V ENDIST MEMPHIS\./);
@@ -282,9 +284,9 @@ describe('independent-review fixes', () => {
       rollups: { all_schedules: { obligated: 921000000, share_pct: 33.98 } },
       classification: { verified_share_of_parented_pct: 89.07, heuristic_share_of_total_pct: 3.83, unresolved_share_of_total_pct: 0.87 },
     })!;
-    expect(r.text).toMatch(/\$2,712,483,325 obligated across 12941 awards\. Every bucket is listed/);
-    expect(r.text).toMatch(/2\. Standalone contracts: \$503,000,000 \(18\.6%\)/);
-    expect(r.text).toMatch(/Rollups: all schedules \$921,000,000 \(33\.98%\)/);
+    expect(r.text).toMatch(/\$2\.71B obligated across 12941 awards\. Every bucket is listed/);
+    expect(r.text).toMatch(/^\| Standalone contracts \| \$503M \| 18\.6% \| 3000 \|$/m);
+    expect(r.text).toMatch(/Rollups: all schedules \$921M \(33\.98%\)/);
   });
 });
 
@@ -327,7 +329,7 @@ describe('run-E review: place conflicts from the record text', () => {
   });
   it('expiring lists carry the industry-code caveat', () => {
     const r = renderExpiringRecords({ contracts: [rec('A1', '2027-01-01')], _meta: meta({ total: 1 }) })!;
-    expect(r.text).toMatch(/Matched by industry \(NAICS\) code: .* check each description/);
+    expect(r.text).toMatch(/Matched by industry \(NAICS\) code, .* check each description/);
   });
   it('an empty lagged search points to SAM.gov award notices', () => {
     const r = renderStatusChecks({ awards: [], _meta: { lag_note: 'published with a ~90-day delay, so the data is only reliably current through about 2026-08-15.' } })!;
@@ -355,7 +357,7 @@ describe('different work: positive evidence only', () => {
 describe('run-G review: buying offices show the example awards they reference', () => {
   it('lists up to two example awards per office', () => {
     const r = renderBuyingOffices({ scope: { state: 'TN', naics: ['5613'] }, offices: [{ office_name: 'NCO 9', office_code: '36C249', obligated: 100, share_pct: 50, award_count: 2, example_awards: [{ piid: '36C24926N0041', obligated: 60 }, { piid: '36C24925P0001', obligated: 40 }, { piid: 'X3', obligated: 1 }] }], totals: { obligated: 200, award_count: 4, office_count: 2 }, notes: [], _meta: {} })!;
-    expect(r.text).toMatch(/example awards \(obligations in this window\): 36C24926N0041 \$60; 36C24925P0001 \$40$/m);
+    expect(r.text).toMatch(/example awards: 36C24926N0041 \(\$60\), 36C24925P0001 \(\$40\)$/m);
   });
 });
 
@@ -365,28 +367,28 @@ describe('Phase B: semantic relevance vs industry-code match', () => {
       contracts: [rec('S1', '2027-01-01', { description: 'TEMPORARY LABORATORY STAFFING' }), rec('S2', '2027-01-02', { description: 'FACT WITNESS CLERK' })],
       _meta: meta({ total: 2 }),
     }, { requestedLabels: ['temporary staffing', 'clerical and administrative support'] })!;
-    expect(r.text).toMatch(/S1 · [^\n]*description confirms: temporary staffing/);
+    expect(r.text).toMatch(/^- \*\*1\.\*\* description confirms: temporary staffing/m);
     // FACT WITNESS CLERK now confirms (clerk is clerical); nothing is labelled code-only or counted as unconfirmed.
-    expect(r.text).toMatch(/S2 · [^\n]*description confirms: clerical and administrative support/);
+    expect(r.text).toMatch(/^- \*\*2\.\*\* description confirms: clerical and administrative support/m);
     expect(r.text).not.toMatch(/industry-code match|of 2 retrieved records/);
-    expect(r.text).toMatch(/Untagged records match by industry code/);
+    expect(r.text).toMatch(/untagged records match by industry code/i);
   });
   it('a zero or negative net office is flagged, not presented as a buyer', () => {
     const r = renderBuyingOffices({ scope: { naics: ['561612'] }, offices: [{ office_name: 'X', office_code: 'X1', obligated: -1200, share_pct: -1, award_count: 1 }], totals: { obligated: 100, award_count: 5, office_count: 3 }, notes: [], _meta: {} })!;
-    expect(r.text).toMatch(/Also returned, with zero or negative net obligations in this window \(deobligations, so not evidence of buying\): X \(X1\) -\$1,200\./);
-    expect(r.text).not.toMatch(/^1\. X/m);
+    expect(r.text).toMatch(/Also returned, with zero or negative net obligations in this window \(deobligations, so not evidence of buying\): X \(X1\) -\$1\.2K\./);
+    expect(r.text).not.toMatch(/^\| 1\. X/m);
   });
 });
 
 describe('run-1 acceptance fixes', () => {
   it('term match handles underscores and clerk/guard-service wording', () => {
     const r = renderExpiringRecords({ contracts: [rec('W91YTZ24P0018', '2027-01-01', { description: 'APPOINTMENT CLERKS_FORT CAMPBELL' }), rec('G1', '2027-01-02', { description: 'FY26 TIS GUARD SERVICE QTR1' })], _meta: meta({ total: 2 }) }, { requestedLabels: ['clerical and administrative support', 'security guards'] })!;
-    expect(r.text).toMatch(/W91YTZ24P0018 · [^\n]*description confirms: clerical and administrative support/);
-    expect(r.text).toMatch(/G1 · [^\n]*description confirms: security guards/);
+    expect(r.text).toMatch(/^\| 1\. W91YTZ24P0018 \|[^\n]*\n[\s\S]*^- \*\*1\.\*\* description confirms: clerical and administrative support/m);
+    expect(r.text).toMatch(/^\| 2\. G1 \|[\s\S]*^- \*\*2\.\*\* description confirms: security guards/m);
   });
   it('no rendered text states a reporting-lag figure the tool did not provide', () => {
     const b = renderBuyingOffices({ scope: { naics: ['5613'] }, offices: [{ office_name: 'A', obligated: 10, share_pct: 100, award_count: 1 }], totals: { obligated: 10, award_count: 1, office_count: 1 }, notes: [], _meta: { as_of: '2026-09-30', lag_note: 'prime contracts only; ingested weekly' } })!;
-    expect(b.text).toMatch(/Data freshness: latest action loaded 2026-09-30; prime contracts only; ingested weekly\./);
+    expect(b.text).toMatch(/Data: latest action loaded 2026-09-30\./); // the 'ingested weekly' storage note is internal (2026-11-17)
     expect(b.text).not.toMatch(/90 days/);
   });
 });
@@ -406,9 +408,15 @@ describe('attempt-2 fixes', () => {
     expect(r.text).toMatch(/Also marked CHECK \(outside the rows shown above\):\n22\. PA1 · /);
     expect(r.ids).toContain('PA1');
   });
+  it('a window the customer named carries no "Mindy used this one" note', () => {
+    const r = renderBuyingOffices({ scope: { naics: ['5613'], window: 'FY2025' }, offices: [{ office_name: 'A', obligated: 5, share_pct: 100, award_count: 1 }], totals: { obligated: 5, award_count: 1, office_count: 1 }, notes: [], _meta: {} })!;
+    expect(r.text).toMatch(/Search: NAICS 5613 · FY2025\. /);
+    expect(r.text).not.toMatch(/Mindy used this one/);
+  });
   it('tool-internal notes are not shown; a defaulted window is stated in plain words', () => {
     const r = renderBuyingOffices({ scope: { naics: ['5613'], window: 'FY2024-FY2026' }, offices: [{ office_name: 'A', obligated: 5, share_pct: 100, award_count: 1 }], totals: { obligated: 5, award_count: 1, office_count: 1 }, notes: ['No window given: defaulted to FY2024-FY2026.', 'see top_places'], _meta: {} })!;
-    expect(r.text).toMatch(/FY2024-FY2026 \(default window; none was given\)/);
+    expect(r.text).toMatch(/FY2024-FY2026; you didn't name a period, so Mindy used this one\./);
+    expect(r.text).not.toMatch(/default window|none was given/);
     expect(r.text).not.toMatch(/top_places|No window given/);
   });
 });
@@ -482,13 +490,31 @@ describe('release check: buying-office label follows rank_by', () => {
       { office_name: 'NAVY PERSONNEL COMMAND', agency: 'Department of Defense', obligated: 18120, share_pct: 100, award_count: 1, top_awarding_offices: [{ code: 'N00189', name: 'NAVSUP FLT LOG CTR NORFOLK', obligated: 18120 }] },
       { office_name: 'MRPBS MINNEAPOLIS MN', agency: 'Department of Agriculture', obligated: -6895.2, share_pct: -61, award_count: 1 },
     ]);
-    expect(t).toMatch(/^2 customer \(funding\) offices have award actions recorded for this work/);
-    expect(t).not.toMatch(/paid for|contracting offices? recorded award actions/);
-    expect(t).toMatch(/contracting offices: NAVSUP FLT LOG CTR NORFOLK \(N00189\) \$18,120/);
+    expect(t).toMatch(/^\*\*2 customer \(funding\) offices\*\* have award actions recorded for this work/);
+    expect(t).not.toMatch(/paid for|contracting offices?\*\* recorded award actions/);
+    expect(t).toMatch(/contracting offices: NAVSUP FLT LOG CTR Norfolk \(N00189\) \$18\.1K/);
   });
   it('an awarding ranking keeps the accepted wording exactly', () => {
     const t = base('awarding', [{ office_name: 'W07V ENDIST MEMPHIS', office_code: 'W912EQ', agency: 'Department of Defense', obligated: 5, share_pct: 100, award_count: 2 }]);
-    expect(t).toMatch(/^1 contracting office recorded award actions for this work/);
+    expect(t).toMatch(/^\*\*1 contracting office\*\* recorded award actions for this work/);
     expect(t).toMatch(/These are federal government contracting offices \(buyers\), not companies\./);
+  });
+});
+
+describe('Data Core PR 3: SBLO email verification is visible in the chat answer', () => {
+  const base = { company: 'CACI INTERNATIONAL INC', sblo_name: 'Yadira Beltre', title: 'Small Business Liaison Officer', email: 'yadira.beltre@caci.com', source: 'Jun 2026 research' };
+  it('an unverified personal email carries its research date', () => {
+    const r = renderSbloContact({ contact: { ...base, verification: { email_kind: 'personal', email_status: 'unverified', fields: { email: { status: 'unverified', verified_at: '2026-06', source_url: null } } } }, _meta: { has_named_sblo: true } })!;
+    expect(r.text).toContain('yadira.beltre@caci.com (personal email, not re-verified since 2026-06)');
+  });
+  it('a stale email says the company page no longer shows it', () => {
+    const r = renderSbloContact({ contact: { ...base, verification: { email_kind: 'personal', email_status: 'stale', fields: { email: { status: 'stale', verified_at: '2026-11-17', source_url: 'https://www.caci.com/x' } } } }, _meta: { has_named_sblo: true } })!;
+    expect(r.text).toContain('yadira.beltre@caci.com (personal email, no longer shown on the company\'s page as of 2026-11-17)');
+  });
+  it('a verified email and a contact without a verification block render exactly as before', () => {
+    const v = renderSbloContact({ contact: { ...base, email: 'smallbusiness@caci.com', verification: { email_kind: 'role', email_status: 'verified', fields: { email: { status: 'verified', verified_at: '2026-11-17', source_url: 'https://www.caci.com/x' } } } }, _meta: { has_named_sblo: true } })!;
+    expect(v.text).toContain('· smallbusiness@caci.com. Source:');
+    const legacy = renderSbloContact({ contact: base, _meta: { has_named_sblo: true } })!;
+    expect(legacy.text).toContain('· yadira.beltre@caci.com. Source:');
   });
 });

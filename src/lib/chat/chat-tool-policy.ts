@@ -47,6 +47,10 @@ const CHAT_OVERRIDES: Readonly<Record<string, ChatToolPolicy>> = {
     decision: 'allowed_write',
     reason: 'Creates a saved-search alert owned by the session user; fingerprint-idempotent (saved-searches/service.ts).',
   },
+  create_document: {
+    decision: 'allowed_write',
+    reason: "Saves a NEW generated document (PDF + Word) to the acting scope's own Vault; never overwrites (a revision is a new version row). Non-billable. Offered only when VAULT_GENERATED_FILES is on for the verified caller.",
+  },
   update_market_schedule: {
     decision: 'allowed_write',
     reason: 'Renames or changes the cadence/enabled state of the session user\'s own alert; reversible.',
@@ -96,7 +100,7 @@ const CHAT_OVERRIDES: Readonly<Record<string, ChatToolPolicy>> = {
 };
 
 /** The chat-only private tools (session-email-bound). Read-only. */
-export const CHAT_PRIVATE_READ_TOOLS: ReadonlySet<string> = new Set(['get_my_pipeline', 'search_my_vault']);
+export const CHAT_PRIVATE_READ_TOOLS: ReadonlySet<string> = new Set(['get_my_pipeline', 'search_my_vault', 'find_my_documents']);
 
 /**
  * Decide what chat may do with a tool.

@@ -26,13 +26,15 @@
  *      instead of the cap-as-a-hard-total lie (the documented "9,450 total in database" bug).
  *  10. FORECAST MATCH — an Upcoming-Buys NAICS filter returns forecasts that ALL carry that exact
  *      code (no sibling-code leak), and a bogus NAICS returns 0 (honest miss, never fabricated).
+ *  14. EVENTS CURRENCY — every listed attendable event equals what the extractor reads on the current
+ *      version of its notice's solicitation family (frozen rows / amendment drift, audit 2026-11-09).
  *  11. AWARDS SCHEMA — live `usaspending.awards` columns/types match awards-schema.ts (the list the
  *      MERGE, the IDV DDL and the destructive full rebuild all derive from).
  *
  * Run:  npm run verify:oracles          (needs .env.local — vercel env pull)
  *       npm run verify:oracles -- --json
  *       npm run verify:oracles -- --only contacts   (run one check while iterating)
- *       --only <scope|report|contacts|alert|pricing|mwin|filters|strategy|freshness|recompete-count|forecast-match|awards-schema|players>
+ *       --only <scope|report|contacts|alert|pricing|mwin|filters|strategy|freshness|recompete-count|forecast-match|awards-schema|players|events>
  *       --players-preview  (with --only players) build Players in an ephemeral BQ session — code proof, not acceptance
  */
 
@@ -602,6 +604,32 @@ if (want('players')) {
       (failed.length ? ` e.g. ${failed.filter((f) => !PLAYERS_REGRESSION_FIXTURES.some((x) => x.naics === f.naics && x.state === f.state)).slice(0, 4).map((f) => `${f.naics}/${f.state} ${f.players ?? '?'}/${f.truth}`).join(', ')}` : '') + datasetNote);
   } catch (e) {
     record('players: reconciliation unmeasured', false, 'could not observe Players or truth: ' + String(e?.message || e).slice(0, 200), 'unmeasured');
+  }
+}
+
+// ── 14. EVENTS CURRENCY — listed events equal extractor(current version of their notice family) ──
+// Oracle: re-run the production classifier over the CURRENT text of each listed attendable event's
+// notice, reconciled against its solicitation family's newest version (selectCanonicalVersion).
+// A stored row that disagrees is drift. Excluded and reported, never hidden: the documented
+// blank-solicitation bound (no linkable identity — title merges are forbidden) and rows whose
+// notice or family member arrived after the last extractor run (the next run's job).
+// Measured 2026-11-17 before the fix: 64 countable drift rows, 144 of 158 upcoming rows frozen.
+if (want('events')) {
+  try {
+    const { measureEventDrift } = await import('@/lib/events/event-currency-live');
+    const d = await measureEventDrift(sb);
+    const counted = d.drift.filter((f) => !f.blankSolBound && !f.pendingNextRun);
+    // no_event rows stay listed until pruning is approved (SAM_EVENTS_PRUNE=apply) — still drift.
+    const byReason = Object.entries(counted.reduce((a, f) => ((a[f.reason] = (a[f.reason] || 0) + 1), a), {})).map(([k, v]) => `${k}=${v}`).join(' ');
+    const sample = counted.slice(0, 3)
+      .map((f) => `${f.notice_id.slice(0, 8)} ${f.reason} ${f.stored.type}/${f.stored.date}→${f.expected.type}/${f.expected.date}`).join('; ');
+    record(
+      'events: listed attendable rows == extractor(current family version)',
+      d.countable === 0,
+      `drift=${d.countable}${byReason ? ` (${byReason}${counted.some((f) => f.reason === 'no_event') ? '; no_event awaits prune approval' : ''})` : ''} of ${d.examined} examined (listed ${d.listed}); excluded: blank-sol=${d.blankSolBound}, pending-next-run=${d.pendingNextRun}; retired-source hidden=${d.retiredSourceHidden}; last run ${d.lastRunAt ?? 'never'}${sample ? ` — e.g. ${sample}` : ''}`,
+    );
+  } catch (e) {
+    record('events: listed attendable rows == extractor(current family version)', false, `probe errored: ${e?.message ?? e}`, 'unmeasured');
   }
 }
 

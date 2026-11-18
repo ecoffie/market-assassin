@@ -107,6 +107,19 @@ if [ ! -x node_modules/.bin/vitest ] || [ ! -x node_modules/.bin/tsc ]; then
   exit 1
 fi
 
+# 0c) Machine-wide concurrency limit (2026-11-17). Queue behind other gate runs instead of
+#     overloading the machine (load 65 → pglite timeouts, "Channel closed" worker crashes).
+#     Waiting is fine; skipping is not: no slot within the timeout BLOCKS the push.
+# shellcheck source=gate-slot.sh
+. "$HOOK_DIR/gate-slot.sh"
+GATE_SLOT_LABEL="$ROOT ($GATE_BRANCH)"
+if ! gate_slot_acquire; then
+  echo -e "  ${RED}✗ no gate slot available — push blocked (fail closed).${NC}"
+  exit 1
+fi
+trap gate_slot_release EXIT
+echo -e "  ${BOLD}slot${NC}     ${GATE_SLOT_HELD##*/} of ${MINDY_GATE_SLOTS:-2} (machine-wide gate limit)"
+
 # 1) HARD BLOCK: TypeScript must compile. (Would have blocked today's Error deploy.)
 echo -e "  ${BOLD}1/13${NC} typecheck (tsc --noEmit)…"
 if npx tsc --noEmit > $PREPUSH_LOG_DIR/tsc.log 2>&1; then

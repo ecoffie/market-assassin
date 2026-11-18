@@ -113,15 +113,25 @@ export interface RoundOptions {
 }
 
 /** Registry tools that read the acting user's Vault (bound to the acting scope in chat). */
-export const VAULT_GROUNDED_TOOLS: ReadonlySet<string> = new Set(['draft_proposal', 'draft_proposal_section']);
+export const VAULT_GROUNDED_TOOLS: ReadonlySet<string> = new Set(['draft_proposal', 'draft_proposal_section', 'create_document']);
 
 function refusal(category: string, message: string): Record<string, unknown> {
   return { ok: false, state: 'unavailable', error_category: category, message };
 }
 
+/**
+ * Chat tools that are free by design (an action or a lookup, not a new intelligence answer). Their log rows
+ * carry billing_outcome 'nonbillable_free_tool', so they stay free if per-answer billing (#2110) is ever
+ * enabled, whatever their result looks like. The success/failure outcome is still classified normally.
+ */
+export const CHAT_FREE_TOOLS: ReadonlySet<string> = new Set(['create_document', 'find_my_documents']);
+
 /** Outcome telemetry is best-effort: a classifier error must not cost the log row. */
-function safeOutcome(result: unknown): { outcome?: ReturnType<typeof classifyCallOutcome> } {
-  try { return { outcome: classifyCallOutcome(result) }; } catch { return {}; }
+function safeOutcome(name: string, result: unknown): { outcome?: ReturnType<typeof classifyCallOutcome> } {
+  try {
+    const o = classifyCallOutcome(result);
+    return { outcome: CHAT_FREE_TOOLS.has(name) ? { ...o, billingOutcome: 'nonbillable_free_tool' } : o };
+  } catch { return {}; }
 }
 
 /** JSON for the model; survives BigInt / circular values instead of throwing after a write. */
@@ -213,7 +223,7 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
       creditsCharged: 0, // observation period: price recorded, nothing deducted
       latencyMs: fields.latencyMs,
       channel: 'app_chat',
-      ...(fields.result !== undefined ? safeOutcome(fields.result) : {}),
+      ...(fields.result !== undefined ? safeOutcome(name, fields.result) : {}),
       trace: {
         executionId,
         chatSessionId: opts.chatSessionId,

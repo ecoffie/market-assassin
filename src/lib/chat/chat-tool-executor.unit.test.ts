@@ -285,3 +285,27 @@ describe('A7: timeouts and the round deadline', () => {
     expect(r.record.status).toBe('success');
   });
 });
+
+describe('free-by-design chat tools are logged NON-billable (so they stay free if per-answer billing is enabled)', () => {
+  const docTier0: Tier0Like = {
+    defs: [
+      { type: 'function', function: { name: 'create_document', description: 'x', parameters: { type: 'object' } } },
+      { type: 'function', function: { name: 'find_my_documents', description: 'x', parameters: { type: 'object' } } },
+      { type: 'function', function: { name: 'get_my_pipeline', description: 'x', parameters: { type: 'object' } } },
+    ],
+    names: new Set(['create_document', 'find_my_documents', 'get_my_pipeline']),
+    execute: vi.fn(async () => ({ ok: true, saved_to: 'vault', files: [] })),
+  };
+  const ex = () => createChatToolExecutor({ userEmail: 'u@example.com', chatSessionId: null, tier0: docTier0, deps: { runMcpTool, logCall } });
+  const loggedBilling = () => (logCall.mock.calls.at(-1) as unknown as [{ outcome?: { billingOutcome?: string } }])[0].outcome?.billingOutcome;
+  it.each(['create_document', 'find_my_documents'])('%s → nonbillable_free_tool', async (name) => {
+    logCall.mockClear();
+    await ex().executeRound([call(name, { doc_model: { title: 't' } })], planner);
+    expect(loggedBilling()).toBe('nonbillable_free_tool');
+  });
+  it('an ordinary private read keeps its normal classification', async () => {
+    logCall.mockClear();
+    await ex().executeRound([call('get_my_pipeline', {})], planner);
+    expect(loggedBilling()).toBe('billable_success');
+  });
+});

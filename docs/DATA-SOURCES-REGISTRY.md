@@ -50,7 +50,7 @@ _Last verified: 2026-06-08 · updated 2026-07-12 (added Mindy MCP live-API sourc
 | **Federal events** | MCP `search_federal_events` — upcoming industry days / matchmaking / sources-sought + association conferences for an agency | Supabase `sam_events` (cron-populated SAM.gov Special Notices, DoDAAC-office-anchored) + optional `searchEventsViaAI` (Serper web + Groq) via `src/lib/events/query.ts` | `source="sam"` rows are grounded SAM notices (trust the date); `source="ai"` rows are web-discovered — carry a `confidence` and MUST be verified before attending (misdated/loosely attributed possible). Agency matched via `normalizeAgencyKey`. AI pass off by default; `ai_discovery="unavailable"` when Serper/Groq unconfigured. |
 | **Proposal compliance (no external source)** | MCP `scan_proposal_compliance` — pre-submit disqualification scan (deadline, set-aside eligibility, page limits, reps/certs, unaddressed eval factors) against the requirements + draft the CALLER passes | Pure deterministic logic (`src/mcp/tools/scan-compliance.ts` → `src/lib/proposal/*`); NO external API/DB | Runs entirely on caller-supplied inputs — coverage is only as complete as the requirements passed in (a missed requirement can't be checked). `grounded=false` = empty requirements or draft. Not AI; not a legal guarantee of responsiveness. |
 | **Bid/no-bid framework (no external source)** | MCP `evaluate_bid_decision` — GovCon Giants' 5 eliminator gates + 10-factor scorecard; returns the rubric always, and scores the card when gate answers + ratings are supplied | Pure deterministic logic (`src/mcp/tools/bid-decision.ts` → `src/lib/proposal/bid-decision.ts`); NO external API/DB | Scores a bidder's SELF-ASSESSMENT — ratings are judgment calls, not measured facts. A failed gate = automatic No-Bid regardless of score. `grounded=true` always (the framework itself is the data). |
-| **OSBP / Small Business Office directory** | MCP `lookup_federal_osbp` — the small-business front door (OSBP/OSDBU office, director, contact, acquisition office, forecast URL) for a command/agency | Curated `src/data/dod-command-info.json` via `src/lib/utils/command-info.ts` (static, no LLM/IO) | Curated DoD/DLA/Navy/Army-weighted directory. Office structure + mailboxes are STABLE; director NAMES rotate — each carries a `director_verified` (YYYY-MM) stamp; absent = unverified/role-title. grounded=false = coverage gap, not proof the office doesn't exist. Quarterly refresh (names). |
+| **OSBP / Small Business Office directory** | MCP `lookup_federal_osbp` — the small-business front door (OSBP/OSDBU office, director, contact, acquisition office, forecast URL) for a command/agency | Curated `src/data/dod-command-info.json` via `src/lib/utils/command-info.ts` (static, no LLM/IO) | Curated DoD/DLA/Navy/Army-weighted directory. Office structure is stable; director NAMES rotate — `director_verified` (YYYY-MM), absent = unverified/role-title. **Mailboxes are NOT assumed stable** (2026-11-17 audit: of 121 unverified offices, **0** stored mailboxes appeared on an official page; 41 were replaced by the officially published address, 11 withheld because a fully read official small-business page did not list them, 69 kept but served as unverified). Each office returns `email_status` (verified/unverified/none) + `email_verified` (YYYY-MM); the audit record (`emailAudit`, incl. any withheld address) stays in the JSON and is stripped by the loader, never served. grounded=false = coverage gap, not proof the office doesn't exist. Quarterly refresh (names). |
 | **Office-anchored open opps** | MCP `search_agency_opps_by_office` — open SAM.gov solicitations for a specific BUYING OFFICE, anchored on the 6-char DoDAAC prefixing the solicitation number (W912PL = USACE LA District) | Supabase `sam_opportunities` filtered by `solicitation_number ILIKE '<DODAAC>%'`; DoDAACs resolved via `src/lib/gov-contacts/dodaac-directory.ts` (`src/lib/opportunities/by-office.ts`) | Official SAM data; the DoDAAC anchoring avoids the whole-DoD firehose a department filter returns. `_meta.anchor`: "dodaac" = office-precise (DoD/DLA/Navy/Army); "department" = broad civilian preview (no DoDAAC path). grounded=false + anchor="dodaac" = genuinely nothing open now. |
 | **SBLO teaming contacts** | MCP `get_sblo_contact` — the Small Business Liaison Officer at a prime (name, title, email, phone, supplier portal) | Curated `src/data/sblo-roster-2026-06.json` (200 legal names, re-researched Jun 2026) → fallback `src/data/prime-contractors-database.json` (3,502 primes), via `src/lib/gov-contacts/sblo-lookup.ts` | Canonical roster is verified Jun-2026; blank fields = "no public SBLO found" (NO fabrication — surfaces the supplier portal). prime_db matches carry older provenance. grounded=false = company not in the curated set. Quarterly refresh — **MANUAL curation, no automated producer** ([lineage](#sblo-lineage-proven-from-git-2026-09-12)). |
 | **Federal buying-office contacts** | MCP `search_federal_contacts` — named POCs (contracting officers, contract specialists, small-business) at a buying office, DoDAAC-anchored + OSBP prepended | Supabase `federal_contacts` (SAM POC rows) filtered by `solicitation_number ILIKE '<DODAAC>%'`; office decoded via `dodaac_directory`; `src/lib/gov-contacts/contact-roster.ts` | Official SAM POC data. DoDAAC anchoring returns the office's OWN people, not the whole-DoD firehose (`_meta.anchor`: dodaac/agency-dodaac = office-precise; department = broad civilian preview). Overseas offices filtered out. grounded=false = no matching POC (never invented). POC data can lag staff changes. |
@@ -64,7 +64,7 @@ _Last verified: 2026-06-08 · updated 2026-07-12 (added Mindy MCP live-API sourc
 | Source | What it powers | Built from | Refresh cadence | Last built |
 |---|---|---|---|---|
 | **Tier-2 / SBLO contractor DB** (2,700+) | Tier-2 teaming partners, SBLO contacts | **MANUAL curated — no automated producer.** Canonical roster `src/data/sblo-roster-2026-06.json` (200 legal entities) was hand-curated Jun 2026 from the SBA Prime Directory; see [SBLO lineage](#sblo-lineage-proven-from-git-2026-09-12). ⚠️ NOT built by `~/Bootcamp/compile-sblo-list.py` — that is the superseded regex scraper this roster replaced for quality. | **Quarterly** (manual) | Jun 2026 (`last_built` 2026-06-01) |
-| **DoD command / OSBP directory** (170 commands) | OSBP-by-sub-agency, office structure | `src/data/dod-command-info.json` — gov org hierarchy. Structure is STABLE; only director names rotate. | Quarterly (names only) | Dec 2025 |
+| **DoD command / OSBP directory** (169 commands) | OSBP-by-sub-agency, office structure | `src/data/dod-command-info.json` — gov org hierarchy. Structure is stable; director names **and mailboxes** need verification. | Quarterly (names + mailboxes, against official agency pages only; ordinary browser session for .mil, never bypass a block) | Contact audit 2026-11-17 (121 unverified offices; 54 still unreachable/unconfirmed — see `emailAudit`) |
 | **Agency pain points / intelligence** (3,045 pts, 307 agencies) | Pain points, agency priorities, "similar agencies" | `scripts/merge-agency-intelligence.js` → **GAO high-risk reports** (tagged `(Source: GAO)`) + USASpending spending patterns. The FY2026 NDAA strings that once cited S.2296 (a bill that never became law) were re-cited to **PL 119-60** or retired in `432701f3e` (2026-09-22); none cite S.2296 now. ⚠️ **Open (2026-11-17 audit):** all **278** pain points tagged `(Source: GAO)` trace to GAO documents published **1993–2000** (the historical GovInfo slice in `agency_intelligence`), not current GAO work, and `merge-agency-intelligence.js --merge` would re-inject them from that table. Do not run that merge; remediation is tracked separately. | Quarterly / on new GAO report | Apr 2026 |
 | **Mindy Institute — GAO reports** | Institute evidence corpus, derived pain points + `intelligence_changes` | `institute_sources` table ← **GAO RSS** (`gao.gov/rss/reports.xml`) via `/api/cron/institute-gao-sync`. ⚠️ NOT the GovInfo `GAOREPORTS` collection — that is frozen at 2008 and cannot carry a living signal. | **Weekly** (cron, daily poll) | rolling (`data_sources.institute_gao`) |
 | **Mindy Institute — Federal Legislation** | Legislative evidence corpus (NDAA + future approps), provenance for legislative claims | `institute_sources` table ← **api.congress.gov** via `/api/cron/institute-legislation-sync`. **Discovery is DYNAMIC and WATERMARKED** — two separate jobs: (A) *discovery* scans `/bill/{congress}` over a `fromDateTime`-bounded window and proves coverage by comparing rows read against the API's own `pagination.count` (a page ceiling yields `partial`, and the cursor does **not** advance); (B) *tracking* re-polls every measure already in the corpus **by identity**, so a known bill stays tracked forever even after thousands of unrelated bills push it out of the recent-update window. **No bill number, fiscal year, or Congress is hardcoded**; a Congress change discards the cursor and forces a full pass. **ONE ROW PER LEGISLATIVE VERSION** (House introduced/reported/engrossed · Senate versions · committee reports · conference text · enacted law) — never collapsed into one "NDAA" record. Authenticated with the existing api.data.gov key. | **Weekly** (cron) | rolling (`data_sources.institute_legislation`) |
@@ -154,7 +154,7 @@ SBA Prime Directory (sba.gov)
 
 ```
 data/imports/sblo-refresh-2026-06.csv
-  → scripts/import-sblo-refresh.js --write
+  → scripts/import-sblo-refresh.js --write   (Jun 2026; replaced by the .ts importer, PR 3 below)
   → 68 matched companies merged into src/data/prime-contractors-database.json
      (sbloVerified=2026-06)
   → the remaining 132 companies (200 − 68; commit 95f6826c describes them as
@@ -169,7 +169,7 @@ data/imports/sblo-refresh-2026-06.csv
 | Claim | Proof |
 |---|---|
 | Roster is a one-off manual curation | Its own `metadata.methodology`: *"225-row SBA prime roster cleaned to 200 official legal names… every contact field re-researched Jun 2026 via parallel research agents."* |
-| No producer exists | `grep` across `scripts/` + `~/Bootcamp/` finds only `import-sblo-refresh.js` (reads the CSV) and `sblo-lookup.ts` (reads the JSON). Nothing **writes** either artifact. |
+| No producer exists | `grep` across `scripts/` + `~/Bootcamp/` finds only `import-sblo-refresh.js` (reads the CSV; now `.ts`, still researches nothing) and `sblo-lookup.ts` (reads the JSON). Nothing **writes** either artifact. |
 | CSV and JSON are one dataset | 200/200 companies, identical company sets, **200/200 emails identical, 0 differences**. |
 | `compile-sblo-list.py` is NOT the producer | It writes `sblo-list-compiled.csv` / `sblo-list.csv` in `~/Bootcamp/` — different filenames, different schema (`sblo_name`, no `vendorPortal`), and touches neither served artifact. |
 | It was replaced for quality | Commit `95f6826c`: refresh was *"re-researched against live sources — not the garbage-producing legacy regex scrapers."* Roster metadata calls itself the *"canonical replacement for the legacy TIER-2-FINAL-CONTACT-LIST (regex-scraped garbage names/emails)."* |
@@ -179,14 +179,54 @@ Commits: `e517967f` (importer) → `95f6826c` (56 primes, importer hardened for
 office/portal-only rows) → `d9de8de2` (103 primes + CSV committed) →
 `e88a2efe` (roster JSON added).
 
-**Before any future refresh**
+**Refresh procedure (Data Core PR 3, 2026-11-17)**
 
-1. There is no one-command script. A refresh repeats the manual curation above.
-2. `scripts/import-sblo-refresh.js` **hardcodes** the Jun-2026 CSV path
-   (`CSV_PATH`, line 21). It must be parameterized or deliberately updated
-   first — editing that constant ad-hoc is not a refresh procedure.
-3. Do **not** run `~/Bootcamp/compile-sblo-list.py`. Its output was replaced
-   for quality; running it risks reintroducing regex-scraped contact data.
+The research step is still manual — company pages change layout and many block bots
+(Lockheed returned 403 in the 2026-11-17 sample). What is now tooled is APPLYING that
+research without ever making the data less verified.
+
+1. Research each company on its OWN published page. Record, per contact field
+   (`sbloName`, `email`, `phone`, `portal`): `<field>_status` =
+   `confirmed | changed | not_named | unreachable`, `<field>_verifiedAt` (YYYY-MM-DD) and
+   `<field>_sourceUrl`. Optional `email_kind` = `role | personal`. Save as
+   `data/imports/sblo-refresh-<YYYY-MM>.csv` (columns: `company,title,source,email_kind,`
+   then `sbloName,sbloName_status,sbloName_verifiedAt,sbloName_sourceUrl` and the same four
+   for `email`, `phone`, `portal`; the Jun-2026 header `vendorPortal` is accepted for `portal`).
+2. Diff (the default — **writes nothing**):
+   `npx tsx scripts/import-sblo-refresh.ts --csv data/imports/sblo-refresh-<YYYY-MM>.csv`
+   prints a per-company, per-field report (readable, then JSON; `--json` for JSON only)
+   against `--base` (default `src/data/sblo-roster-2026-06.json`). `--csv` is **required**;
+   there is no default input file.
+3. Fix every `REJECTED` field, re-run until `REJECTED 0`.
+4. Apply: `... --write --out src/data/sblo-roster-<YYYY-MM>.json` writes a **new** roster file.
+   It refuses the base/canonical path, an existing file, and any run with a rejected field.
+   `--merge-prime-db` additionally applies the same rules to matched rows of
+   `prime-contractors-database.json`. Pointing `sblo-lookup.ts` at the new file is a separate,
+   reviewed change.
+
+**Merge rules** (`src/lib/gov-contacts/sblo-refresh.ts`, pinned by `sblo-refresh.unit.test.ts`):
+
+| status | effect |
+|---|---|
+| `confirmed` | value must equal the one held and carry a sourceUrl → bumps `provenance.<field>.verifiedAt` |
+| `changed` | replaces the value **only with a sourceUrl**; the old value is appended to `history.<field>` |
+| `not_named` / `unreachable` | value **kept**, `provenance.<field>.staleSince` set — never blanked |
+| (blank, no status) | no change — a blank cell never overwrites a populated field |
+| a value with no status | rejected |
+
+Role mailboxes win: a verified company mailbox replaces a personal email (the personal one
+is kept internally as `personalEmail`, `personalEmailStatus: stale`, never served), and a
+personal email never displaces a role mailbox.
+
+**Serving labels.** `sblo-lookup.ts` adds `contact.verification` (additive): per-field
+`status` (`verified | unverified | stale`), `verified_at`, `source_url`, plus `email_kind`.
+A field is `verified` only with field provenance (confirmed/changed + sourceUrl); every
+Jun-2026 snapshot value is `unverified` with `verified_at: "2026-06"`. MCP
+`get_sblo_contact` mirrors it as `_meta.email_status` / `_meta.email_kind`, and the chat
+answer labels a non-verified email (e.g. "personal email, not re-verified since 2026-06").
+
+Do **not** run `~/Bootcamp/compile-sblo-list.py`. Its output was replaced for quality;
+running it risks reintroducing regex-scraped contact data.
 
 ### Freshness stamps require evidence (fixed 2026-11-17)
 

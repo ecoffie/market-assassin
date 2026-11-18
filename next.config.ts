@@ -66,6 +66,7 @@ const nextConfig: NextConfig = {
         '/api/pipeline/**/*',
         '/api/app/vault/documents/**/*',
         '/api/app/proposal/upload/**/*',
+        '/api/app/chat/documents/**/*',
         '/api/app/proposal/pursuit-docs/**/*',
         '/api/actions/add-to-pipeline/**/*',
         '/api/admin/heal-pursuit-attachments/**/*',
@@ -143,6 +144,11 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/fonts/mp/v1/:file*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
+      // Self-hosted app fonts (formerly next/font/google): same versioned-path rule.
+      {
+        source: '/fonts/app/v1/:file*',
         headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
       },
     ];

@@ -57,6 +57,7 @@ describe('credit integrity — the full inventory of tier-1/tier-2 refusal codes
     sam_unavailable: 'nonbillable_system_failure',
     rate_limited: 'nonbillable_system_failure',
     lookup_failed: 'nonbillable_system_failure',
+    source_unavailable: 'nonbillable_system_failure',
   };
 
   it('every code in the source is classified and none is billable', () => {

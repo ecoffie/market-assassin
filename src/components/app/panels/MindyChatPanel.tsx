@@ -20,6 +20,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Menu, MessageCircle, BookOpen, Lock, FileText, X } from 'lucide-react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
+import { ChatAttachments } from '../chat/ChatAttachments';
+import { useVaultCapabilities } from '../chat/useVaultCapabilities';
 import { UpgradeModal } from '../UpgradeModal';
 import { DEFAULT_STARTER_PROMPTS } from '@/lib/chat/starter-prompts';
 import { renderSafeMarkdown } from '@/lib/chat/safe-markdown';
@@ -119,7 +121,17 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
   // (covers stale tier props after a downgrade).
   const [showUpgrade, setShowUpgrade] = useState(false);
   const isFree = tier === 'free';
+  // Attach button: on only when the SERVER says this account may upload (global flag or allowlist).
+  const vaultCaps = useVaultCapabilities(email);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  // Attaching a file before the first question needs a conversation id: mint one here; the upload route
+  // creates the conversation row only when the file is actually saved.
+  const ensureSessionId = useCallback((): string => {
+    if (sessionId) return sessionId;
+    const sid = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now().toString(16).padStart(8, '0').slice(0, 8)}-0000-4000-8000-${Math.random().toString(16).slice(2, 14).padEnd(12, '0')}`;
+    setSessionId(sid);
+    return sid;
+  }, [sessionId]);
   // The opportunity this conversation is about (from the Map drawer's "Open in full workspace"). Shown as a
   // removable chip; only its id is sent.
   const [attachedOpp, setAttachedOpp] = useState<AttachedOpportunity | null>(null);
@@ -762,6 +774,9 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
+          )}
+          {vaultCaps.uploads && email && !isFree && (
+            <ChatAttachments email={email} sessionId={sessionId} ensureSessionId={ensureSessionId} disabled={isStreaming} />
           )}
           <div className="relative">
             <textarea

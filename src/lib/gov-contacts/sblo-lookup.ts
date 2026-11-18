@@ -20,6 +20,7 @@
 import sbloRoster from '@/data/sblo-roster-2026-06.json';
 import primeDb from '@/data/prime-contractors-database.json';
 import { searchRecipients } from '@/lib/bigquery/recipients';
+import { buildSbloVerification, type SbloVerification, type SbloProvenanceFields } from './sblo-provenance';
 
 export type SbloSource = 'roster' | 'prime_db' | 'bigquery';
 
@@ -35,6 +36,13 @@ export interface SbloContact {
   matched_from: SbloSource;
   /** "YYYY-MM" verification stamp when the source carries one. */
   verified: string | null;
+  /**
+   * Per-field verification (additive, Data Core PR 3). A field is `verified` only when the row
+   * carries field-level provenance (confirmed/changed + source URL) from a refresh run; a Jun-2026
+   * snapshot value is `unverified` (verified_at = the research month), a value the source no longer
+   * shows is `stale`. Absent on the BigQuery tier, which carries no contact fields at all.
+   */
+  verification?: SbloVerification;
   /** Award context (prime_db + bigquery). */
   contract_count?: number | null;
   total_contract_value?: number | null;
@@ -54,7 +62,7 @@ export interface SbloLookupResult {
   bqDegraded?: boolean;
 }
 
-interface RosterRow {
+interface RosterRow extends SbloProvenanceFields {
   company?: string;
   sbloName?: string | null;
   title?: string | null;
@@ -99,6 +107,7 @@ function rosterToContact(r: RosterRow): SbloContact {
     source: r.source ?? null,
     matched_from: 'roster',
     verified: rosterVerified,
+    verification: buildSbloVerification(r, rosterVerified),
   };
 }
 
@@ -113,6 +122,7 @@ function primeToContact(r: PrimeRow): SbloContact {
     source: r.source ?? null,
     matched_from: 'prime_db',
     verified: null,
+    verification: buildSbloVerification(r, null),
     contract_count: r.contractCount ?? null,
     total_contract_value: r.totalContractValue ?? null,
     agencies: Array.isArray(r.agencies) ? r.agencies : null,

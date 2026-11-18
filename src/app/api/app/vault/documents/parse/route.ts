@@ -22,6 +22,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { callLLM } from '@/lib/llm/call-llm';
+import { checkVaultLimit } from '@/lib/vault/rate-limits';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 export const runtime = 'nodejs';
@@ -171,6 +172,14 @@ export async function POST(request: NextRequest) {
   const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
   if (!auth.authenticated) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
+  }
+  // C15: parse runs an LLM extraction (gpt-4o) — per-account limit before any work.
+  const lim = await checkVaultLimit('parse', auth.email!);
+  if (!lim.allowed) {
+    return NextResponse.json(
+      { success: false, error: lim.message, code: 'rate_limited' },
+      { status: 429, headers: { 'Retry-After': String(lim.retryAfterSeconds) } },
+    );
   }
   // Coach Mode: parse the CLIENT's document (stored under the synthetic email),
   // not the coach's — the owner-scoped lookup below must match the same email the

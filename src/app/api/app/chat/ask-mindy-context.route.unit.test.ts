@@ -125,17 +125,25 @@ async function listTurn() {
   plan.planner = async () => plannerResponse([{ name: 'get_expiring_contracts', args: { naics: '561320' } }]);
   return ask('Expiring staffing contracts for 561320');
 }
+// Lists show 10 rows per page (2026-11-17), so record #12 is on page 2: display_offset 10 shows #11-#15.
+async function listTurnPage2() {
+  plan.planner = async () => plannerResponse([{ name: 'get_expiring_contracts', args: { naics: '561320', display_offset: 10 } }]);
+  return ask('Show expiring records 11 to 15');
+}
 
 describe('A2/A5: the source ledger', () => {
   it('each answer returns a compact ledger: one entry per source, rendered records numbered as shown', async () => {
-    const ev = await listTurn();
+    const page1 = ledgerOf(await listTurn())!.entries.find((x) => x.tool === 'get_expiring_contracts')!;
+    expect(page1.status).toBe('truncated'); // 10 of 15 shown
+    expect(page1.items).toHaveLength(10);
+    expect(page1.items![9]).toMatchObject({ n: 10, key: piid(10) });
+    const ev = await listTurnPage2();
     const ledger = ledgerOf(ev)!;
     expect(ledger.v).toBe(1);
     const e = ledger.entries.find((x) => x.tool === 'get_expiring_contracts')!;
-    expect(e.status).toBe('ok');
-    expect(e.items).toHaveLength(15);
-    expect(e.items![11]).toMatchObject({ n: 12, key: piid(12) });
-    expect(e.items![11].label).toContain('Incumbent 12');
+    expect(e.items).toHaveLength(5);
+    expect(e.items![1]).toMatchObject({ n: 12, key: piid(12) });
+    expect(e.items![1].label).toContain('Incumbent 12');
     // "show the next 20" can repeat exactly this search: the public search arguments travel with the entry.
     expect(JSON.stringify((e as { query?: unknown }).query)).toContain('561320');
     // Compact: no raw tool JSON in the ledger.
@@ -144,7 +152,7 @@ describe('A2/A5: the source ledger', () => {
   });
 
   it('"who\'s the incumbent on #12?" resolves to the 12th record\'s real id for the planner and the answer', async () => {
-    const first = await listTurn();
+    const first = await listTurnPage2();
     const ledger = ledgerOf(first)!;
     fetchCalls.length = 0;
     plan.planner = async () => plannerResponse([]);
@@ -238,7 +246,7 @@ describe('A8: a rendered tool result is not sent twice', () => {
     expect(JSON.parse(tool.content)).toMatchObject({ rendered_as_verified_list: true });
     expect(tool.content).not.toContain('total_obligation');
     // The verified list itself is still in the answer request.
-    expect(msgsOf('answer').some((m) => m.role === 'system' && m.content.startsWith('VERIFIED RECORD LIST') && m.content.includes(piid(12)))).toBe(true);
+    expect(msgsOf('answer').some((m) => m.role === 'system' && m.content.startsWith('VERIFIED RECORD LIST') && m.content.includes(piid(7)))).toBe(true);
   });
   it('an unrendered tool result is still sent in full', async () => {
     plan.planner = async () => plannerResponse([{ name: 'get_agency_intel', args: { agency: 'Department of Energy' } }]);

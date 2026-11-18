@@ -29,6 +29,7 @@ import { TABLE_MEASURED_SOURCES, classifyTableFreshness, isTableMeasured } from 
 import { decideStamp } from '@/lib/data-sources/stamp-guard';
 import eventsCatalog from '@/data/federal-events-sources.json';
 import { CATALOG_KEY, catalogDateFindings, catalogLinkFindings, type EventCatalog } from '@/lib/events/catalog-freshness';
+import { measureEventDrift } from '@/lib/events/event-currency-live';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -182,6 +183,30 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Event currency (R6): a listed attendable event whose stored type/date differs from what the
+  // extractor reads on the CURRENT version of its notice's solicitation family. Counts and job runs
+  // could never see this — rows froze after ~5 days while every run reported success (audit
+  // 2026-11-09). Rows whose notice arrived after the last extractor run are the next run's job, and
+  // blank-solicitation rows are the documented bound; both are reported, neither is counted.
+  let eventCurrency: Record<string, unknown> = { status: 'unmeasured' };
+  try {
+    const d = await measureEventDrift(sb);
+    eventCurrency = {
+      status: d.countable === 0 ? 'current' : 'drift',
+      listed: d.listed, examined: d.examined, drift: d.countable,
+      blankSolBound: d.blankSolBound, pendingNextRun: d.pendingNextRun, retiredSourceHidden: d.retiredSourceHidden,
+      lastRunAt: d.lastRunAt,
+      sample: d.drift.filter((f) => !f.blankSolBound && !f.pendingNextRun).slice(0, 5),
+    };
+    if (d.countable > 0) {
+      stale.push({ key: EVENT_CURRENCY_KEY, name: `Federal events — ${d.countable} listed event(s) disagree with the current version of their notice`, cadence: 'live-sync', ageDays: d.lastRunAt ? Math.round((now - Date.parse(d.lastRunAt)) / 86400_000) : -1, refreshWith: 'check /api/cron/extract-sam-events (re-reads every listed notice daily); npm run verify:oracles -- --only events' });
+    }
+  } catch (e) {
+    // Unmeasured is never "current".
+    eventCurrency = { status: 'unmeasured', error: e instanceof Error ? e.message : String(e) };
+    stale.push({ key: EVENT_CURRENCY_KEY, name: 'Federal events currency', cadence: 'live-sync', ageDays: -1, refreshWith: `check failed: ${eventCurrency.error}` });
+  }
+
   // Table-measured sources: freshness = what the scheduled producer actually wrote
   // (age of the newest row AND the share of rows refreshed in its window). Replaces the
   // stamp for sources whose producer never writes last_built (dodaac_directory: a false
@@ -249,6 +274,7 @@ export async function GET(request: NextRequest) {
     staleCount: stale.length,
     stale,
     tableMeasured,
+    eventCurrency,
     eventsCatalog: { lastFullReview: (eventsCatalog as EventCatalog).lastFullReview ?? null, findings: catalogFindings, links: catalogLinks },
     notified,
     message: notifyFailed
@@ -262,7 +288,19 @@ export async function GET(request: NextRequest) {
 // Live syncs we monitor by table recency (max updated_at), NOT by a stamped
 // last_built. If the newest row is older than staleDays, the cron is probably
 // down. Add a row here to bring another live pipeline under the watchdog.
+const EVENT_CURRENCY_KEY = 'sam_events_currency';
+
 const LIVE_SYNC_CHECKS: Array<{ key: string; name: string; table: string; column: string; staleDays: number; refreshWith: string }> = [
+  {
+    // extracted_at is written on EVERY upsert (R4), so its max is "when the extractor last re-read
+    // the corpus" — it used to be first-insert only and could not serve as this clock.
+    key: 'sam_events_reread',
+    name: 'Federal events (SAM notice re-read, daily 07:00 UTC)',
+    table: 'sam_events',
+    column: 'extracted_at',
+    staleDays: 2,
+    refreshWith: 'live sync — verify /api/cron/extract-sam-events is running (cron_job_runs.http_status)',
+  },
   {
     key: 'federal_contacts_sync',
     name: 'Government contacts (SAM POC daily sync)',
@@ -288,9 +326,10 @@ const REFRESH_SCRIPTS: Record<string, string> = {
     'MANUAL curated refresh — no automated producer. See docs/DATA-SOURCES-REGISTRY.md §SBLO lineage. '
     + 'Jun-2026 method: SBA Prime Directory roster → clean to official legal names → re-research each '
     + 'contact against live sources → data/imports/sblo-refresh-<YYYY-MM>.csv → canonical SBLO roster '
-    + '(src/data/sblo-roster-2026-06.json). NOTE: scripts/import-sblo-refresh.js is DOWNSTREAM only '
-    + '(merges the CSV into prime-contractors-database.json) and currently HARDCODES the Jun-2026 CSV '
-    + 'path — it must be parameterized or deliberately updated before any future refresh. '
+    + '(src/data/sblo-roster-2026-06.json). Apply the researched CSV with '
+    + '`npx tsx scripts/import-sblo-refresh.ts --csv <path>` (diff only, writes nothing), then '
+    + '`--write --out src/data/sblo-roster-<YYYY-MM>.json` (new file; every field needs status/verifiedAt/sourceUrl). '
+    + 'The importer researches nothing — it is not the producer. '
     + 'Do NOT run ~/Bootcamp/compile-sblo-list.py — superseded regex scraper; its output was replaced for quality.',
   dod_command_osbp: 'refresh director names vs agency OSBP pages (structure is stable)',
   agency_pain_points: 'scripts/merge-agency-intelligence.js + ~/Bootcamp/scan-ndaa-sections.py (new GAO/NDAA)',

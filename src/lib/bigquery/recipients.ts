@@ -902,7 +902,7 @@ export async function findCapableSmallBusinesses(opts: {
   limit?: number;
   offset?: number;
   liveBq?: boolean;
-}): Promise<{ rows: CapableSmbRow[]; total: number | null }> {
+}): Promise<{ rows: CapableSmbRow[]; total: number | null; unavailable?: boolean }> {
   const psc = (opts.psc || '').trim().toUpperCase();
   const naics = (opts.naics || '').trim();
   if (!psc && !naics) return { rows: [], total: 0 };  // a real, measured zero
@@ -989,7 +989,9 @@ export async function findCapableSmallBusinesses(opts: {
   // real answer was unknown. This figure can back a Rule-of-Two determination, so an unknown
   // total must stay null and let the caller refuse to present it (INT-002).
   const n = totalRows[0]?.n;
-  return { rows, total: typeof n === 'number' ? n : null };
+  // `unavailable`: the empty `rows` mean "BigQuery could not answer" (quota, budget, error), not
+  // "no capable suppliers". Callers must never render that as a zero.
+  return { rows, total: typeof n === 'number' ? n : null, unavailable: bqUnavailable(key, rows.length) };
 }
 
 // ── Procurement history (Army MRR §9) ──────────────────────────────────

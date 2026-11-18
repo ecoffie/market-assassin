@@ -15,6 +15,8 @@ import { mapLinkForOpportunity } from '@/lib/maps/map-links';
 import { samNoticeIdFrom } from '@/components/app/mapRecordIds';
 import { PROPOSAL_ACTION_TARGETS, parseProposalAction } from '@/lib/app/deep-link-params';
 import { useScrollToAnchor } from '../useScrollToAnchor';
+import { ProposalsHome, NewProposalStart, NewProposalReady } from '@/components/app/proposal/ProposalHome';
+import { ProposalStepTracker, MoreMenu, proposalStep, type ProposalStep, type MoreMenuItem } from '@/components/app/proposal/ProposalSteps';
 import { alignRequirement, priorityOf, type ReqPriority } from '@/lib/proposal/section-alignment';
 import { Zap, Gauge, PenLine, Search, FileText, ClipboardList, AlertTriangle, Sparkles, CheckCircle2, X, FolderArchive, BookOpen, Scale, Check, Circle } from 'lucide-react';
 
@@ -1141,6 +1143,11 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   // does not rebuild a section from text under the user's caret. A section typed from scratch is
   // created with generatedAt 0 (the editor's own marker for "already in sync").
   const [editorOpen, setEditorOpen] = useState(false);
+  // Once a source is loaded, its documents section folds to one line (step 1 done) until reopened.
+  const [sourceExpanded, setSourceExpanded] = useState(false);
+  // Simple page (owner 2026-11-18): home list → new (drop RFP / pick pursuit) → ready → editor.
+  // 'tools' is the old full page, kept one click away.
+  const [view, setView] = useState<'home' | 'new' | 'tools'>('home');
   const onEditorSectionChange = useCallback((id: string, text: string, html: string) => {
     const sectionType = id as SectionType;
     setDrafts(prev => {
@@ -1507,6 +1514,8 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   // Simple (LOI / Sources Sought) responses keep the matrix behind "More options" — open it.
   useEffect(() => {
     if (actionPursuitMatches && contextAction === 'compliance') setShowAdvancedOutputs(true);
+    // A deep link to a specific tool (compliance, bid/no-bid…) opens the full tools page.
+    if (actionPursuitMatches) setView('tools');
   }, [actionPursuitMatches, contextAction]);
   const actionAnchorId = (() => {
     if (!contextAction || !actionPursuitMatches || !actionDocsSettled || driveMode !== 'auto') return null;
@@ -1699,6 +1708,33 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     );
   }
 
+  // ── The three steps + one primary button (Eric 2026-11-17: make the page simpler) ──
+  const canDraftAll = driveMode === 'auto' && !isRfqMode && !!uploadedRfp?.text?.trim();
+  const currentStep: ProposalStep = proposalStep({ hasSource: responseOutputsReady, hasDraft: hasAnyDraft });
+  const scrollToId = (id: string) => {
+    if (typeof document === 'undefined') return;
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  const goToStep = (s: ProposalStep) => {
+    if (s === 1) { setSourceExpanded(true); setTimeout(() => scrollToId('proposal-source-document'), 0); return; }
+    if (s === 2) { scrollToId('proposal-step-2'); return; }
+    setEditorOpen(true);
+  };
+  const primaryAction: { label: string; onClick: () => void; disabled?: boolean } =
+    currentStep === 3
+      ? { label: 'Review and download', onClick: () => setEditorOpen(true) }
+      : currentStep === 2
+        ? canDraftAll
+          ? { label: draftAllLoading ? 'Mindy is drafting…' : 'Draft my proposal', onClick: () => { void generateAllDrafts(); }, disabled: draftAllLoading }
+          : { label: 'Write in the editor', onClick: () => setEditorOpen(true) }
+        : { label: 'Pick a solicitation', onClick: () => goToStep(1) };
+  const moreMenuItems: MoreMenuItem[] = [
+    ...(currentStep === 2 && canDraftAll ? [{ label: 'Write it myself in the editor', onClick: () => setEditorOpen(true) }] : []),
+    ...(activePursuitId || uploadedRfp ? [{ label: 'Start another proposal', onClick: startAnotherProposal }] : []),
+    { label: loading ? 'Refreshing…' : 'Refresh pursuits', onClick: () => { void loadPipeline(); }, disabled: loading },
+  ];
+  const sourceFolded = driveMode === 'auto' && !!uploadedRfp && !sourceExpanded;
+
   const pack = selectedOpportunity ? buildPrepPack(selectedOpportunity) : null;
 
   if (editorOpen && email) {
@@ -1725,7 +1761,68 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         findingRequirements={complianceLoading}
         onExportPackage={() => exportProposalPackage()}
         exportingPackage={exporting}
+        documents={sourceDocuments.map(d => ({ name: d.fileName, pages: d.pageCount }))}
+        onAddDocuments={(files) => { for (const f of files) void handleRfpFile(f); }}
+        addingDocuments={uploading}
+        onRunCheck={() => { void runReferee(); }}
+        checkRunning={refereeRunning}
+        checkResult={refereeResult}
+        checkError={refereeError}
         onClose={() => setEditorOpen(false)}
+      />
+    );
+  }
+
+  const goHome = () => { startAnotherProposal(); setView('home'); };
+  const pickPursuit = (id: string) => { setSelectedId(id); setLocalPursuitId(id); setView('new'); };
+  const hasSourceChosen = !!activePursuitId || !!uploadedRfp;
+
+  if (view !== 'tools' && !hasSourceChosen) {
+    return view === 'new' ? (
+      <NewProposalStart
+        pursuits={opportunities}
+        uploading={uploading}
+        uploadError={uploadError}
+        onFiles={(files) => { for (const f of files) void handleRfpFile(f); }}
+        onPickPursuit={pickPursuit}
+        onBack={() => setView('home')}
+      />
+    ) : (
+      <ProposalsHome
+        pursuits={opportunities}
+        loading={loading || !pipelineLoaded}
+        lastDraftName={hasAnyDraft ? (restoredDraftFile || 'Your saved draft') : null}
+        onNew={() => setView('new')}
+        onOpenPursuit={pickPursuit}
+        onContinueDraft={() => setEditorOpen(true)}
+        onAllTools={() => setView('tools')}
+      />
+    );
+  }
+
+  if (view !== 'tools') {
+    const due = activePursuit?.response_deadline ? formatDate(activePursuit.response_deadline) : '';
+    return (
+      <NewProposalReady
+        title={activePursuit?.title || uploadedRfp?.fileName || proposalFlowName}
+        subtitle={[activePursuit?.agency, noticeTypeLabel(activePursuit?.notice_type), due ? `Due ${due}` : ''].filter(Boolean).join(' · ') || undefined}
+        documentNames={sourceDocuments.map(d => d.fileName)}
+        loadingDocs={autoLoadStatus === 'loading' || uploading}
+        loadMessage={autoLoadStatus === 'no-docs' || autoLoadStatus === 'error' ? autoLoadMessage : (uploading ? 'Mindy is reading your file…' : autoLoadMessage)}
+        sectionLabels={currentSectionTabs.map(t => t.label)}
+        requirementCount={compliance.length}
+        hasSource={!!uploadedRfp?.text?.trim()}
+        canDraft={canDraftAll}
+        drafting={draftAllLoading}
+        elapsedSec={draftAllElapsedSec}
+        draftError={draftError || uploadError}
+        cancelled={draftAllCancelled}
+        onDraft={() => { void generateAllDrafts(); }}
+        onStop={cancelDraftAll}
+        onOpenEditor={() => setEditorOpen(true)}
+        onAddFiles={(files) => { for (const f of files) void handleRfpFile(f); }}
+        onBack={goHome}
+        onAllTools={() => setView('tools')}
       />
     );
   }
@@ -1734,6 +1831,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     <div className="p-6 space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
+          <button type="button" onClick={() => setView(hasSourceChosen ? 'new' : 'home')} className="mb-2 text-sm text-muted hover:text-white">
+            ← {hasSourceChosen ? 'Back to the simple view' : 'All proposals'}
+          </button>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold text-white">Proposal Assist</h1>
             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide bg-purple-500/20 text-purple-300 border border-purple-500/30">
@@ -1749,36 +1849,23 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             A starting draft, not a finished submission — review, edit, and add your own proof before you submit.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {(hasAnyDraft || responseOutputsReady) && (
-            <button
-              type="button"
-              onClick={() => setEditorOpen(true)}
-              data-testid="open-proposal-editor"
-              className="px-4 py-2 bg-[#006aff] hover:bg-[#0057d1] text-white text-sm font-semibold rounded-lg transition-colors inline-flex items-center gap-2"
-            >
-              <PenLine className="h-4 w-4" strokeWidth={2} />
-              {hasAnyDraft ? 'Open in editor' : 'Write in the editor'}
-            </button>
-          )}
-          {(activePursuitId || uploadedRfp) && (
-            <button
-              type="button"
-              onClick={startAnotherProposal}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg transition-colors"
-            >
-              Start another
-            </button>
-          )}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* ONE next-step button (Eric 2026-11-17: make the page simpler); the rest lives in More. */}
           <button
-            onClick={loadPipeline}
-            disabled={loading}
-            className="px-4 py-2 bg-surface hover:bg-input disabled:opacity-50 text-ink-soft text-sm rounded-lg transition-colors"
+            type="button"
+            onClick={primaryAction.onClick}
+            disabled={primaryAction.disabled}
+            data-testid="proposal-primary-action"
+            className="px-5 py-2.5 bg-[#006aff] hover:bg-[#0057d1] disabled:opacity-60 text-white text-sm font-semibold rounded-lg transition-colors inline-flex items-center gap-2"
           >
-            {loading ? 'Refreshing...' : 'Refresh Pursuits'}
+            <PenLine className="h-4 w-4" strokeWidth={2} />
+            {primaryAction.label}
           </button>
+          <MoreMenu items={moreMenuItems} />
         </div>
       </div>
+
+      <ProposalStepTracker step={currentStep} onStepClick={goToStep} />
 
       {complianceLoading && (
         <ComplianceMatrixProgress
@@ -2080,7 +2167,23 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         );
       })()}
 
-      {/* Document Workbench */}
+      {/* Document Workbench — folds to one line once a source is loaded (step 1 done). */}
+      {sourceFolded ? (
+        <section id="proposal-source-document" data-testid="proposal-source-folded" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.06] px-4 py-3">
+          <p className="text-sm text-emerald-300 min-w-0 truncate">
+            <Check className="mr-1.5 inline h-4 w-4" strokeWidth={2.5} />
+            Step 1 done · Mindy has read{' '}
+            <span className="font-semibold">{sourceDocuments.length > 1 ? `${sourceDocuments.length} documents` : (uploadedRfp?.fileName || 'your solicitation')}</span>
+          </p>
+          <button
+            type="button"
+            onClick={() => setSourceExpanded(true)}
+            className="px-3 py-1.5 rounded-lg bg-surface hover:bg-input text-xs text-ink-soft"
+          >
+            Show or add documents
+          </button>
+        </section>
+      ) : (
       <section id="proposal-source-document" className="bg-ground border border-surface rounded-xl p-5">
         {/* Step cue (#55 — Eric: the start screen looked like Open workbench did
             nothing because the docs section sat below it with no relationship).
@@ -2089,7 +2192,10 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         <div className={`mb-4 rounded-lg border px-3 py-2 text-xs ${activePursuitId ? 'border-emerald-500/30 bg-emerald-500/[0.06] text-emerald-300' : 'border-purple-500/30 bg-purple-500/[0.06] text-purple-200'}`}>
           {activePursuitId
             ? '✓ Workbench open — add or extract your documents below, then generate the outputs.'
-            : '② This is your workbench. Pick a pursuit above and click “Open workbench”, or upload a document right here to start — Mindy reads it either way.'}
+            : 'Step 1: pick a pursuit above and click “Open workbench”, or upload a document right here — Mindy reads it either way.'}
+          {driveMode === 'auto' && uploadedRfp && (
+            <button type="button" onClick={() => setSourceExpanded(false)} className="ml-2 underline hover:no-underline">Hide</button>
+          )}
         </div>
         <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
           <div>
@@ -2384,6 +2490,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           </div>
         )}
       </section>
+      )}
+
+      <div id="proposal-step-2" className="scroll-mt-4" aria-hidden />
 
       {/* MANUAL MODE — Perplexity-style proposal chat over your uploaded files
           + Vault. You type what you want; Mindy drafts grounded in YOUR docs. */}

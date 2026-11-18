@@ -1250,8 +1250,8 @@ server.registerTool(
     description:
       'The Office of Small Business Programs (OSBP/OSDBU) — the small-business front door — for a federal command ' +
       'or agency. Pass a command/agency name or abbreviation ("NAVFAC", "USACE", "Department of the Navy"). Returns ' +
-      'the OSBP office, director (+ director_verified YYYY-MM stamp; names rotate, mailboxes are stable), contact ' +
-      'info, acquisition office, forecast URL, and key capabilities. A parent-agency input returns all its commands\' ' +
+      'the OSBP office, director (+ director_verified YYYY-MM stamp; names rotate), contact info with email_status ' +
+      '(verified|unverified|none — never present an unverified address as confirmed), acquisition office, forecast URL, and key capabilities. A parent-agency input returns all its commands\' ' +
       'offices. grounded=false = not in the curated (DoD/DLA/Navy/Army-weighted) directory — do NOT invent a contact.',
     inputSchema: {
       agency: z
