@@ -36,6 +36,11 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 | 2026-11-18 | GAO candidates (prepare only) | Validated all **51** net-new candidates: citations, https URLs, publication dates ≥2001, agency present. **0 failures.** No served-JSON write. | `"validation_pass": 51` → `tasks/gao-candidates-validation-2026-11-18.json` | node validator against proposal JSON | PREPARE ONLY |
 
 ---
+## 2026-11-18 — SAM status contradictions
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | Ask Mindy SAM status | The card context told the model `Status: active` from `sam_opportunities.active`, which means not archived. A past deadline and an award notice with no deadline both read as active. Ask Mindy now gets the #1557 solicitation status (unchanged), a separate archive-flag line, and an explicit statement that a missing deadline is not "open for responses" when the notice type has nothing to submit. Award status and the contract performance period are named as different clocks. SEO `opportunityStatus` and the runway badge no longer call justification, presolicitation, or special notice open solely because the deadline is blank. | `export function askMindyNoticeStatusLines` → `src/lib/sam/ask-mindy-notice-status.ts` · `Solicitation status:` → `src/lib/chat/card-chat.ts` | `card-chat.unit.test.ts` red before (block contained `Status: active`), green after. `deriveSolicitationStatus` tests unchanged. | BUILT, NOT MERGED |
 
 ## 2026-11-18 — GAO reinjection and events prune-report
 
