@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-18 — DIBBS clock stamp ignores a zero-row update
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | DIBBS clock write | An update that matches no `data_source_instances` row returns `{ error: null }`. The stamp now asks for an exact count and returns null when that count is under 1, so the cron body does not say the nonempty clock advanced. | `update matched 0 rows` → `src/lib/dibbs/clock-stamp.ts` | `clock-stamp.unit.test.ts`. No production stamp. | BUILT, NOT MERGED |
+
 ## 2026-11-18 — DIBBS clock stamp checks the Supabase error
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
