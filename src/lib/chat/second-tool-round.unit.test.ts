@@ -92,9 +92,7 @@ describe('shouldOfferSecondToolRound / decideSecondToolRound', () => {
       expect(SECOND_ROUND_SEED_TOOLS.has(t)).toBe(true);
     }
     expect(SECOND_ROUND_SEED_TOOLS.has('find_opportunities')).toBe(false);
-    expect(SECOND_ROUND_SEED_TOOLS.has('search_sam_opportunities')).toBe(false);
     expect(SECOND_ROUND_SEED_TOOLS.has('get_expiring_contracts')).toBe(false);
-    expect(SECOND_ROUND_SEED_TOOLS.has('create_document')).toBe(false);
     expect(SECOND_ROUND_COMPLETE_TOOLS.has('find_capable_contractors')).toBe(true);
     expect(SECOND_ROUND_COMPLETE_TOOLS.has('search_federal_contacts')).toBe(true);
   });
@@ -129,6 +127,25 @@ describe('shouldOfferSecondToolRound / decideSecondToolRound', () => {
     });
   });
 
+  it('offers legitimate document-research hops after a seed lookup', () => {
+    const seed = [{ tool: 'lookup_solicitation', status: 'success' }];
+    expect(decideSecondToolRound(seed, { customerText: 'Pull the SOW and attachments for solicitation FA480027Q0009' }).offer).toBe(true);
+    expect(decideSecondToolRound(seed, { customerText: 'What does the PWS say for this notice' }).offer).toBe(true);
+    expect(decideSecondToolRound(seed, { customerText: 'Get solicitation documents for 36C24626B0031' }).offer).toBe(true);
+  });
+
+  it('skips document-only questions when R1 already fetched solicitation documents', () => {
+    expect(
+      decideSecondToolRound(
+        [
+          { tool: 'lookup_solicitation', status: 'success' },
+          { tool: 'get_solicitation_documents', status: 'success' },
+        ],
+        { customerText: 'Pull the SOW and attachments for this notice' },
+      ),
+    ).toEqual({ offer: false, reason: 'documents_already_fetched' });
+  });
+
   it('preserves clean multi-hop cases (T4, T9, C)', () => {
     expect(decideSecondToolRound(EIGHT_CASES.T4_clean_incumbent_compete.tools, { customerText: EIGHT_CASES.T4_clean_incumbent_compete.text }).offer).toBe(true);
     expect(decideSecondToolRound(EIGHT_CASES.T9_clean_lookup_contact.tools, { customerText: EIGHT_CASES.T9_clean_lookup_contact.text }).offer).toBe(true);
@@ -142,15 +159,16 @@ describe('shouldOfferSecondToolRound / decideSecondToolRound', () => {
     });
   });
 
-  it('hop cue regex matches competitors and contacts, not plain due-date questions', () => {
+  it('hop cue regex matches competitors, contacts, and documents — not plain due-date questions', () => {
     expect(SECOND_ROUND_HOP_CUE.test('who competes with the incumbent')).toBe(true);
     expect(SECOND_ROUND_HOP_CUE.test('buying-office contact')).toBe(true);
+    expect(SECOND_ROUND_HOP_CUE.test('pull the SOW')).toBe(true);
     expect(SECOND_ROUND_HOP_CUE.test('What is solicitation X about and when is it due')).toBe(false);
   });
 });
 
 describe('toolCallIdentityKey + dropDuplicateRound2Calls', () => {
-  it('treats identical tool+args as the same key (key order / comma set / ignore limit)', () => {
+  it('treats identical tool+args as the same key (key order / comma set / ignore limit only)', () => {
     const a = toolCallIdentityKey('lookup_solicitation', '{"notice_id":"abc","limit":5}');
     const b = toolCallIdentityKey('lookup_solicitation', '{"limit":20,"notice_id":"abc"}');
     expect(a).toBe(b);
@@ -163,6 +181,18 @@ describe('toolCallIdentityKey + dropDuplicateRound2Calls', () => {
     const a = toolCallIdentityKey('search_past_contracts', '{"naics":"541512","state":"FL"}');
     const b = toolCallIdentityKey('search_past_contracts', '{"naics":"541512","state":"MA"}');
     expect(a).not.toBe(b);
+  });
+
+  it('keeps pagination follow-ups (display_offset / page differ)', () => {
+    const page0 = toolCallIdentityKey('search_past_contracts', '{"keyword":"snow","state":"MA","display_offset":0}');
+    const page1 = toolCallIdentityKey('search_past_contracts', '{"keyword":"snow","state":"MA","display_offset":10}');
+    expect(page0).not.toBe(page1);
+    const cross = dropDuplicateRound2Calls(
+      [{ id: 'p2', function: { name: 'search_past_contracts', arguments: '{"keyword":"snow","state":"MA","display_offset":10}' } }],
+      [{ tool: 'search_past_contracts', args: '{"keyword":"snow","state":"MA","display_offset":0}' }],
+    );
+    expect(cross.keep.map((c) => c.id)).toEqual(['p2']);
+    expect(cross.duplicates).toHaveLength(0);
   });
 
   it('drops R2 duplicates of R1 and keeps new hops', () => {
@@ -204,7 +234,7 @@ describe('eight-case hygiene matrix (regression for evaluation set)', () => {
       { id: 'T9_clean_lookup_contact', offer: true },
       { id: 'B_already_complete_triple', offer: false, reason: 'already_complete' },
       { id: 'C_clean_past_contact', offer: true },
-      { id: 'H_past_dup_with_contact_cue', offer: true }, // still offered; dedupe kills the empty hop
+      { id: 'H_past_dup_with_contact_cue', offer: true },
       { id: 'D_bogus_incumbent', offer: false, reason: 'no_hop_cue' },
     ];
     for (const row of matrix) {

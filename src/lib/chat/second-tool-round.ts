@@ -2,23 +2,22 @@
  * Bounded second planner tool round for Ask Mindy (multi-hop research).
  *
  * Round 1 often resolves a notice / prior award but cannot also call the hop
- * (competitors, contacts, capable contractors) in the same planner turn. A second
- * round is offered only when round 1 already returned a successful seed tool —
- * never as a blank-slate retry, never a third round.
+ * (competitors, contacts, capable contractors, solicitation documents) in the
+ * same planner turn. A second round is offered only when round 1 already returned
+ * a successful seed tool — never as a blank-slate retry, never a third round.
  *
- * Hygiene (2026-11-18): skip plain lookups and already-complete R1 turns; R2
- * callers must use tool_choice:auto and drop R2 calls identical to R1
- * (name + normalized args).
+ * Hygiene: skip plain lookups and already-complete R1 turns; R2 callers must use
+ * tool_choice:auto and drop R2 calls identical to R1 (name + normalized args).
+ * Pagination fields stay in the identity key so page-2 of the same filters is kept.
  *
  * Policy, write caps, confirmations, timeouts and billing stay with the executor;
  * this module only decides whether to ask the planner again and how to dedupe.
  */
 
 /**
- * Tools whose success can unlock a useful follow-on hop in the same customer turn
- * (competitors after an incumbent, contacts after a notice). Open/expiring *list*
- * tools are deliberately excluded — they usually finish the turn as a rendered list
- * and must not spend a second planner pass by default.
+ * Tools whose success can unlock a useful follow-on hop in the same customer turn.
+ * Open/expiring *list* tools are deliberately excluded — they usually finish the
+ * turn as a rendered list and must not spend a second planner pass by default.
  */
 export const SECOND_ROUND_SEED_TOOLS: ReadonlySet<string> = new Set([
   'lookup_solicitation',
@@ -28,7 +27,7 @@ export const SECOND_ROUND_SEED_TOOLS: ReadonlySet<string> = new Set([
 
 /**
  * Tools that already complete the common multi-hop. If round 1 succeeded on any of
- * these, a second planner pass adds no customer value.
+ * these, a second planner pass adds no customer value for the usual hop shapes.
  */
 export const SECOND_ROUND_COMPLETE_TOOLS: ReadonlySet<string> = new Set([
   'find_capable_contractors',
@@ -36,12 +35,17 @@ export const SECOND_ROUND_COMPLETE_TOOLS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Customer-question cues that still need a hop after a seed (competitors / contacts).
- * Plain "what is this solicitation / due date / largest awards" do not match — those
- * are answerable from round 1 and must not buy a second planner pass (T6/T7/T8 class).
+ * Customer-question cues that still need a hop after a seed:
+ * - competitors / capable firms
+ * - contacts / buying office
+ * - solicitation document / SOW / PWS / attachment text
+ *
+ * Plain "what is this solicitation / due date / largest awards" do not match —
+ * those are answerable from round 1 and must not buy a second planner pass
+ * (T6/T7/T8 class). Document *research* cues do match so lookup→documents works.
  */
 export const SECOND_ROUND_HOP_CUE =
-  /\b(compet(?:e|es|ing|itor|itors)?|who else|similar (?:firms?|companies|contractors)|capable contractors?|contacts?|poc|points? of contact|buying[- ]?offices?|roster|contracting officers?|who (?:do i|should i) (?:call|email|contact)|emails? for)\b/i;
+  /\b(compet(?:e|es|ing|itor|itors)?|who else|similar (?:firms?|companies|contractors)|capable contractors?|contacts?|poc|points? of contact|buying[- ]?offices?|roster|contracting officers?|who (?:do i|should i) (?:call|email|contact)|emails? for|sow|pws|statement of work|performance work statement|attachments?|solicitation documents?|rfp (?:text|docs?|documents?)|full (?:document |attachment )?text|document (?:text|body|contents?|pack)|download(?:able)? (?:the )?(?:docs?|documents?|pdf|attachments?))\b/i;
 
 export interface SecondRoundSeed {
   tool: string;
@@ -54,11 +58,15 @@ export type SecondRoundSkipReason =
   | 'planner_unavailable'
   | 'no_seed'
   | 'already_complete'
-  | 'no_hop_cue';
+  | 'no_hop_cue'
+  | 'documents_already_fetched';
 
 export type SecondRoundDecision =
   | { offer: true }
   | { offer: false; reason: SecondRoundSkipReason };
+
+const DOCUMENT_HOP_CUE =
+  /\b(sow|pws|statement of work|performance work statement|attachments?|solicitation documents?|rfp (?:text|docs?|documents?)|full (?:document |attachment )?text|document (?:text|body|contents?|pack)|download(?:able)? (?:the )?(?:docs?|documents?|pdf|attachments?))\b/i;
 
 /**
  * Decide whether to spend a second planner pass. Preserves clean multi-hop
@@ -88,6 +96,12 @@ export function decideSecondToolRound(
   if (!text || !SECOND_ROUND_HOP_CUE.test(text)) {
     return { offer: false, reason: 'no_hop_cue' };
   }
+  // Document-only questions: if R1 already pulled solicitation documents, do not
+  // spend another planner pass unless a non-document hop cue remains.
+  const docOnly = DOCUMENT_HOP_CUE.test(text) && !/\b(compet(?:e|es|ing|itor|itors)?|who else|contacts?|poc|buying[- ]?offices?|roster|contracting officers?)\b/i.test(text);
+  if (docOnly && success.some((r) => r.tool === 'get_solicitation_documents')) {
+    return { offer: false, reason: 'documents_already_fetched' };
+  }
   return { offer: true };
 }
 
@@ -106,19 +120,22 @@ export function shouldOfferSecondToolRound(
   return decideSecondToolRound(round1, opts).offer;
 }
 
-/** Keys ignored when comparing args across rounds (display / pagination only). */
+/**
+ * Cross-round identity ignores nothing about which page of a list the customer asked
+ * for. `display_offset` / `page` / `__page` / `offset` stay in the key so a page-2
+ * follow-up is not dropped as a duplicate of page 1.
+ *
+ * `limit` alone still does not distinguish two searches (same filters, different
+ * row caps) — matching the R1 `dedupeToolCalls` contract.
+ */
 const DEDUPE_IGNORE_KEYS = new Set([
   'limit',
-  '__page',
-  'display_offset',
-  'offset',
-  'page',
 ]);
 
 /**
  * Stable identity for a tool call: tool name + normalized JSON args.
- * Changed arguments (e.g. a different NAICS or state) keep a different key so
- * legitimate follow-on searches are preserved.
+ * Changed arguments (e.g. a different NAICS, state, or display_offset) keep a
+ * different key so legitimate follow-on searches and pagination are preserved.
  */
 export function toolCallIdentityKey(tool: string, args: string | Record<string, unknown> | null | undefined): string {
   const name = String(tool || '').trim();
@@ -144,10 +161,12 @@ export function toolCallIdentityKey(tool: string, args: string | Record<string, 
     } else if (typeof v === 'string') {
       // Comma-joined code/state lists compare as sets.
       if (/^(naics|state|states|psc|psc_codes)$/i.test(k) && v.includes(',')) {
-        norm[k] = v.split(',').map((x) => x.trim().toUpperCase()).filter(Boolean).sort();
+        norm[k] = v.split(',').map((x) => x.trim().toUpperCase()).sort();
       } else {
         norm[k] = v.trim();
       }
+    } else if (typeof v === 'number' || typeof v === 'boolean') {
+      norm[k] = v;
     } else {
       norm[k] = v;
     }
@@ -162,7 +181,7 @@ export interface Round1CallFingerprint {
 
 /**
  * Drop round-2 planned calls whose (tool, normalized args) already ran in round 1.
- * Calls with changed arguments are kept.
+ * Calls with changed arguments (including pagination offset) are kept.
  */
 export function dropDuplicateRound2Calls<T extends { id?: string; function?: { name?: string; arguments?: string } }>(
   round2Calls: ReadonlyArray<T>,

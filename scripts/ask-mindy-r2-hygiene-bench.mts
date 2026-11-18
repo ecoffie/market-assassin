@@ -107,6 +107,14 @@ const CASES: Array<{
     r2_planned: [{ id: 'd1', function: { name: 'lookup_solicitation', arguments: '{"solicitation":"ZZZ999NOTREAL0001"}' } }],
     before: { offered: true, class: 'ambiguous', wall_s: 10.8, planner_prompt_tok: 41_636, planner_usd_terra: 0.042, r2_tools: ['lookup_solicitation'] },
   },
+  {
+    id: 'DOC',
+    text: 'Pull the SOW and attachments for solicitation FA480027Q0009',
+    r1: [{ tool: 'lookup_solicitation', status: 'success', args: '{"solicitation":"FA480027Q0009"}' }],
+    r2_planned: [{ id: 'c2', function: { name: 'get_solicitation_documents', arguments: '{"solicitation":"FA480027Q0009"}' } }],
+    // Before hygiene there was no document cue; after, this is a preserved hop.
+    before: { offered: false, class: 'clean_hop', wall_s: null, planner_prompt_tok: 22_000, planner_usd_terra: 0.022, r2_tools: [] },
+  },
 ];
 
 function afterProjection(c: (typeof CASES)[number]) {

@@ -1201,7 +1201,12 @@ export async function POST(request: NextRequest) {
                   customerText: message,
                 },
               );
-              if (!secondRound.offer && (secondRound.reason === 'already_complete' || secondRound.reason === 'no_hop_cue')) {
+              if (
+                !secondRound.offer
+                && (secondRound.reason === 'already_complete'
+                  || secondRound.reason === 'no_hop_cue'
+                  || secondRound.reason === 'documents_already_fetched')
+              ) {
                 // Observable skips for hygiene. Keep quiet on the common no-seed path so ordinary
                 // list turns stay notice-clean.
                 turnTrace.notices.push(`tool_round:2_skipped_${secondRound.reason}`);
