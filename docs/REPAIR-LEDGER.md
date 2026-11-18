@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-18 — Collector terminal status
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | SAM opportunities + recompetes terminal status | Long runs stay `dispatched` with a null http_status because the dispatcher stops listening at 12s and these routes never called `reportCronOutcome`. Legislation and contacts did call it, but the run row still had no http_status, so the inventory read "ran status unrecorded". The self-report now writes http_status (200 / 503 / 500). SAM and recompete report on the way out. A SAM upstream failure with zero rows is HTTP 503, not a 200 success. | `cronOutcomeHttpStatus` → `src/lib/cron-self-report.ts` · `sync-sam-opportunities-full` → `src/app/api/cron/sync-sam-opportunities/route.ts` | `cron-self-report.unit.test.ts`. No production run. | BUILT, NOT MERGED |
+
 ## 2026-11-18 — Oversight office aliases and incremental page walk
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
