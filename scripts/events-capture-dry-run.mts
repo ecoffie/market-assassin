@@ -11,7 +11,7 @@ import { NEW_CALENDAR_EVENTS_PER_RUN, NEW_SAM_EVENTS_PER_RUN } from '../src/lib/
 
 const today = new Date();
 const result = await collectSbaEvents({ today, runAt: today.toISOString(), cap: NEW_CALENDAR_EVENTS_PER_RUN });
-const wouldAdd = result.events.length;
+const wouldAdd = result.status === 'ok' ? result.events.length : null;
 
 console.log(JSON.stringify({
   measuredAt: today.toISOString(),
@@ -19,11 +19,11 @@ console.log(JSON.stringify({
   samApiCalled: false,
   calendar: {
     source: 'https://legacy.sba.gov/events',
+    status: result.status,
     relevantInWindow: result.relevant,
     wouldInsertThisRun: wouldAdd,
     deferredPastCap: result.deferred,
     cap: NEW_CALENDAR_EVENTS_PER_RUN,
-    truncated: result.truncated,
     error: result.error,
     sample: result.events.slice(0, 8).map((e) => ({
       notice_id: e.notice_id,
@@ -43,4 +43,4 @@ console.log(JSON.stringify({
   },
 }, null, 2));
 
-if (result.error && wouldAdd === 0) process.exit(2);
+if (result.status !== 'ok') process.exit(2);

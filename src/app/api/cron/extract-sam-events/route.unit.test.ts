@@ -224,16 +224,16 @@ describe('extract-sam-events route', () => {
     expect(db.cron_logs).toHaveLength(0);
   });
 
-  it('a past event is marked expired and is not deleted', async () => {
-    vi.setSystemTime(new Date('2026-11-18T07:00:00Z'));
-    db.sam_opportunities = [opp(VA)];
-    db.sam_events = [
-      { id: 'past-row', notice_id: 'past-notice', event_type: 'industry_day', event_date: '2026-11-01', source: 'sam_gov', extracted_at: '2026-10-01T00:00:00Z' },
-    ];
-    const { body } = await run();
-    expect(db.deletes).toEqual([]);
-    expect(db.sam_events.find((r) => r.id === 'past-row')?.expired_at).toBe('2026-11-18T07:00:00.000Z');
-    expect((body as unknown as { capture: { expire: { marked: number } } }).capture.expire.marked).toBe(1);
+  it('an SBA fetch failure is unavailable, not zero, and the SAM extract still returns 200', async () => {
+    vi.setSystemTime(new Date('2026-11-09T07:00:00Z'));
+    db.sam_opportunities = [opp(TSA_AMD1)];
+    const { status, body } = await run();
+    expect(status).toBe(200);
+    const calendar = (body as unknown as { capture: { calendar: { status: string; wouldAdd: number | null; relevant: number | null } } }).capture.calendar;
+    expect(calendar.status).toBe('unavailable');
+    expect(calendar.wouldAdd).toBeNull();
+    expect(calendar.relevant).toBeNull();
+    expect(written(TSA_AMD1.notice_id).length).toBe(1);
   });
 
   it('fails the job (500) when the durable prune report cannot be recorded', async () => {

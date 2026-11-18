@@ -22,7 +22,7 @@ import { readNoticeEvent } from '@/lib/events/event-currency';
 import { loadActiveCandidates, loadFamilyPool, loadListedRows, loadNoticesById, type ListedEventRow } from '@/lib/events/event-currency-live';
 import { buildCandidateSet, familiesToLoad, planEvents, planRetirements, pruneMode } from '@/lib/events/extract-run';
 import { reportCronOutcome } from '@/lib/cron-self-report';
-import { capNewEvents, EXPIRE_PER_RUN, NEW_SAM_EVENTS_PER_RUN } from '@/lib/events/capture-plan';
+import { capNewEvents, NEW_SAM_EVENTS_PER_RUN } from '@/lib/events/capture-plan';
 import { extractCapturedLinks, linkColumns, samNoticeSourceUrl } from '@/lib/events/event-links';
 import { collectSbaEvents } from '@/lib/events/sba-calendar';
 
@@ -223,11 +223,11 @@ export async function GET(request: NextRequest) {
     knownCalendar = new Set();
   }
   const calendar = await collectSbaEvents({ today, runAt, existingIds: knownCalendar }).catch((e: unknown) => ({
+    status: 'unavailable' as const,
     events: [],
-    relevant: 0,
-    deferred: 0,
+    relevant: null,
+    deferred: null,
     error: e instanceof Error ? e.message : String(e),
-    truncated: false,
   }));
 
   // Cap NEW SAM notice ids. Already-stored rows stay in the write so a date correction still lands.
@@ -340,33 +340,6 @@ export async function GET(request: NextRequest) {
   }
   if (Date.now() > deadline) truncated = true;
 
-  // Past events stay in the table. expired_at is a mark, not a delete. SAM_EVENTS_PRUNE is not involved.
-  // If the column is not applied yet, say so and continue — do not fail the extract.
-  const todayStr = today.toISOString().slice(0, 10);
-  let expireWouldMark = 0;
-  let expireMarked: number | null = dryRun ? null : 0;
-  let expireError: string | null = null;
-  try {
-    const { data: past, error: pastErr } = await getSupabase()
-      .from('sam_events')
-      .select('id, event_date')
-      .lt('event_date', todayStr)
-      .is('expired_at', null)
-      .order('event_date', { ascending: true })
-      .limit(EXPIRE_PER_RUN);
-    if (pastErr) throw new Error(pastErr.message);
-    const ids = (past || []).map((r: { id?: string }) => r.id).filter((id: string | undefined): id is string => Boolean(id));
-    expireWouldMark = ids.length;
-    if (!dryRun && ids.length) {
-      const { error: markErr } = await getSupabase().from('sam_events').update({ expired_at: runAt }).in('id', ids);
-      if (markErr) throw new Error(markErr.message);
-      expireMarked = ids.length;
-    }
-  } catch (e) {
-    expireError = e instanceof Error ? e.message : String(e);
-    expireMarked = null;
-  }
-
   // Destination watermark AFTER the run.
   const { data: afterRow } = await getSupabase()
     .from('sam_events')
@@ -454,12 +427,15 @@ export async function GET(request: NextRequest) {
       samNewCap: NEW_SAM_EVENTS_PER_RUN,
       samNew: existingIds ? samCap.fresh : null,
       samDeferred: existingIds ? samCap.deferred : null,
-      calendarRelevant: calendar.relevant,
-      calendarWouldAdd: calendar.events.length,
-      calendarDeferred: calendar.deferred,
-      calendarError: calendar.error,
-      calendarTruncated: calendar.truncated,
-      expire: { wouldMark: expireWouldMark, marked: expireMarked, error: expireError, cap: EXPIRE_PER_RUN },
+      // A failed SBA read is unavailable or degraded with a null count. It is not zero,
+      // and it does not change the SAM extract's HTTP status.
+      calendar: {
+        status: calendar.status,
+        relevant: calendar.relevant,
+        wouldAdd: calendar.status === 'ok' ? calendar.events.length : null,
+        deferred: calendar.deferred,
+        error: calendar.error,
+      },
     },
     eventsByType,
     sampleEvents: events.slice(0, 5).map((e) => ({

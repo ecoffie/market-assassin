@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { classifyEvent, extractEventDate } from './classify';
-import { capNewEvents, expireIds, NEW_CALENDAR_EVENTS_PER_RUN, NEW_SAM_EVENTS_PER_RUN } from './capture-plan';
+import { capNewEvents, NEW_CALENDAR_EVENTS_PER_RUN, NEW_SAM_EVENTS_PER_RUN } from './capture-plan';
 import { extractCapturedLinks, linkColumns, samNoticeSourceUrl } from './event-links';
 import { collectSbaEvents, parseSbaDetail, parseSbaListing, sbaEventFromParts, sbaNoticeId } from './sba-calendar';
 
@@ -59,7 +59,7 @@ describe('event links', () => {
   });
 });
 
-describe('insert cap and expire', () => {
+describe('insert cap', () => {
   it('updates every stored notice and inserts only up to the cap', () => {
     const events = ['a', 'b', 'c', 'd', 'e'].map((notice_id) => ({ notice_id }));
     const { writes, deferred, fresh } = capNewEvents(events, new Set(['a', 'b']), 2);
@@ -75,15 +75,6 @@ describe('insert cap and expire', () => {
     expect(capNewEvents(events, null, 1).writes).toEqual(events);
   });
 
-  it('past dates are marked, undated and future dates are not, and nothing is a delete', () => {
-    const ids = expireIds([
-      { id: 'past', event_date: '2026-11-01' },
-      { id: 'today', event_date: '2026-11-18' },
-      { id: 'future', event_date: '2026-12-01' },
-      { id: 'undated', event_date: null },
-    ], '2026-11-18');
-    expect(ids).toEqual(['past']);
-  });
 });
 
 describe('SBA calendar parser', () => {
@@ -124,21 +115,40 @@ describe('SBA calendar parser', () => {
 
   it('collects one new event from a fake fetch and does not call SAM', async () => {
     const calls: string[] = [];
+    const empty = '<div class="sba-events-header"><p>of 0 events</p></div>';
     const fetchImpl = (async (url: string) => {
       calls.push(String(url));
       if (String(url).includes('/event/86550')) return new Response(detailHtml, { status: 200 });
-      if (String(url).includes('keyword=matchmaking')) return new Response(listing, { status: 200 });
-      return new Response('<div></div>', { status: 200 });
+      if (String(url).includes('keyword=matchmaking') && String(url).includes('page=0')) return new Response(listing, { status: 200 });
+      return new Response(empty, { status: 200 });
     }) as typeof fetch;
     const result = await collectSbaEvents({
       fetchImpl, today: TODAY, runAt: '2026-11-18T12:00:00.000Z', cap: 5, budgetMs: 5_000,
       existingIds: new Set(['sba:91010']),
     });
+    expect(result.status).toBe('ok');
+    expect(result.relevant).toBeGreaterThan(0);
     expect(result.error).toBeNull();
     expect(result.events.map((e) => e.notice_id)).toEqual(['sba:86550']);
     expect(calls.some((u) => u.includes('api.sam.gov'))).toBe(false);
     expect(result.events[0].registration_url).toMatch(/^https:\/\//);
     expect(result.events[0].event_date).toBe('2026-12-15');
     expect(result.events[0].inferred_office).toBeTruthy();
+  });
+
+  it('a failed listing is unavailable, not zero events', async () => {
+    const fetchImpl = (async () => new Response('upstream', { status: 503 })) as typeof fetch;
+    const result = await collectSbaEvents({ fetchImpl, today: TODAY, runAt: '2026-11-18T12:00:00.000Z', budgetMs: 5_000 });
+    expect(result.status).toBe('unavailable');
+    expect(result.relevant).toBeNull();
+    expect(result.deferred).toBeNull();
+    expect(result.events).toEqual([]);
+  });
+
+  it('a 200 that is not the events page is unavailable, not an empty calendar', async () => {
+    const fetchImpl = (async () => new Response('<html><body>Just a moment</body></html>', { status: 200 })) as typeof fetch;
+    const result = await collectSbaEvents({ fetchImpl, today: TODAY, runAt: '2026-11-18T12:00:00.000Z', budgetMs: 5_000 });
+    expect(result.status).toBe('unavailable');
+    expect(result.relevant).toBeNull();
   });
 });

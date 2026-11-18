@@ -176,6 +176,25 @@ async function getText(fetchImpl: typeof fetch, url: string, deadline: number): 
   return res.text();
 }
 
+/** A listing page we could read. `unreadable` is not an empty calendar. */
+export function classifySbaListing(html: string): 'rows' | 'empty' | 'unreadable' {
+  if (html.includes('class="views-row"') || html.includes("class='views-row'")) return 'rows';
+  if (/of\s+0\s+events/i.test(html) || /no (upcoming )?events/i.test(html) || html.includes('sba-events-header')) return 'empty';
+  return 'unreadable';
+}
+
+export type SbaCalendarStatus = 'ok' | 'degraded' | 'unavailable';
+
+export interface SbaCalendarResult {
+  status: SbaCalendarStatus;
+  /** Rows safe to upsert. Empty when the source was unreadable. Not a count of the source. */
+  events: CalendarEventRow[];
+  /** Set only when status is ok. A failed read is null, never 0. */
+  relevant: number | null;
+  deferred: number | null;
+  error: string | null;
+}
+
 export async function collectSbaEvents(opts: {
   fetchImpl?: typeof fetch;
   today: Date;
@@ -183,31 +202,59 @@ export async function collectSbaEvents(opts: {
   cap?: number;
   budgetMs?: number;
   existingIds?: Set<string>;
-}): Promise<{ events: CalendarEventRow[]; relevant: number; deferred: number; error: string | null; truncated: boolean }> {
+}): Promise<SbaCalendarResult> {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const cap = opts.cap ?? NEW_CALENDAR_EVENTS_PER_RUN;
   const deadline = Date.now() + (opts.budgetMs ?? CALENDAR_BUDGET_MS);
   const todayStr = opts.today.toISOString().slice(0, 10);
   const existing = opts.existingIds ?? new Set<string>();
   const teasers = new Map<string, SbaTeaser>();
-  let truncated = false;
+  let listingOk = 0;
+  let failed = false;
   let error: string | null = null;
+
+  const noteFailure = (e: unknown) => {
+    failed = true;
+    error = error || (e instanceof Error ? e.message : String(e));
+  };
+
   try {
     for (const keyword of SBA_LISTING_KEYWORDS) {
+      if (failed) break;
       for (let page = 0; page < PAGES_PER_KEYWORD; page++) {
         if (Date.now() > deadline) {
-          truncated = true;
+          noteFailure(new Error('calendar budget elapsed'));
           break;
         }
         const url = `${SBA_EVENTS_ORIGIN}/events?keyword=${encodeURIComponent(keyword)}&field_event_dates_value=3&page=${page}`;
-        const html = await getText(fetchImpl, url, deadline);
+        let html: string;
+        try {
+          html = await getText(fetchImpl, url, deadline);
+        } catch (e) {
+          noteFailure(e);
+          break;
+        }
+        let kind: 'rows' | 'empty' | 'unreadable';
+        try {
+          kind = classifySbaListing(html);
+          if (kind === 'unreadable') throw new Error(`listing did not parse: ${url}`);
+        } catch (e) {
+          noteFailure(e);
+          break;
+        }
+        listingOk++;
+        if (kind === 'empty') break;
         const rows = parseSbaListing(html);
         if (!rows.length) break;
         for (const row of rows) teasers.set(row.id, row);
       }
     }
   } catch (e) {
-    error = e instanceof Error ? e.message : String(e);
+    noteFailure(e);
+  }
+
+  if (listingOk === 0) {
+    return { status: 'unavailable', events: [], relevant: null, deferred: null, error: error || 'SBA events listing was not read' };
   }
 
   const relevant = [...teasers.values()].filter((t) => {
@@ -221,7 +268,7 @@ export async function collectSbaEvents(opts: {
   const events: CalendarEventRow[] = [];
   for (const teaser of chosen) {
     if (Date.now() > deadline) {
-      truncated = true;
+      noteFailure(new Error('calendar budget elapsed'));
       break;
     }
     try {
@@ -229,8 +276,12 @@ export async function collectSbaEvents(opts: {
       const row = sbaEventFromParts(teaser, parseSbaDetail(html), opts.runAt);
       if (row && row.event_date >= todayStr) events.push(row);
     } catch (e) {
-      error = error || (e instanceof Error ? e.message : String(e));
+      noteFailure(e);
     }
   }
-  return { events, relevant: relevant.length, deferred, error, truncated };
+
+  if (failed) {
+    return { status: 'degraded', events, relevant: null, deferred: null, error };
+  }
+  return { status: 'ok', events, relevant: relevant.length, deferred, error: null };
 }
