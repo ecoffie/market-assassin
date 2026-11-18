@@ -24,13 +24,25 @@ function bash(script: string, env: Record<string, string>): Promise<{ code: numb
   });
 }
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Slots currently held: a slot dir whose pid file has been written (acquire is complete). */
+function heldSlots(dir: string): string[] {
+  return readdirSync(dir).filter((n) => n.startsWith('slot-') && existsSync(path.join(dir, n, 'pid')));
+}
+/** Poll (bounded) instead of a fixed sleep: CI runners start background processes at unpredictable speed. */
+async function waitForHeld(dir: string, n: number, timeoutMs = 10_000): Promise<void> {
+  const t0 = Date.now();
+  while (heldSlots(dir).length < n) {
+    if (Date.now() - t0 > timeoutMs) throw new Error(`timed out waiting for ${n} held slot(s); have ${heldSlots(dir).length}`);
+    await wait(50);
+  }
+}
 
 describe('gate-slot: queue, never skip', () => {
   it('a run that cannot get a slot within the timeout is BLOCKED (exit 1), not skipped', async () => {
     const dir = slotDir();
     const env = { MINDY_GATE_SLOT_DIR: dir, MINDY_GATE_SLOTS: '1', MINDY_GATE_SLOT_POLL_S: '0.1' };
     const holder = bash('gate_slot_acquire && sleep 3', env);
-    await wait(500);
+    await waitForHeld(dir, 1);
     const second = await bash('gate_slot_acquire', { ...env, MINDY_GATE_SLOT_TIMEOUT_S: '1' });
     expect(second.code).toBe(1);
     expect(second.out).toMatch(/BLOCKED \(fail closed\)/);
@@ -40,17 +52,17 @@ describe('gate-slot: queue, never skip', () => {
   it('two slots admit two concurrent runs; a third waits until one finishes', async () => {
     const dir = slotDir();
     const env = { MINDY_GATE_SLOT_DIR: dir, MINDY_GATE_SLOTS: '2', MINDY_GATE_SLOT_POLL_S: '0.1' };
-    const a = bash('gate_slot_acquire && sleep 1.5; gate_slot_release', env);
-    const b = bash('gate_slot_acquire && sleep 1.5; gate_slot_release', env);
-    await wait(400);
-    expect(readdirSync(dir).filter((n) => n.startsWith('slot-'))).toHaveLength(2);
-    const t0 = Date.now();
-    const c = await bash('gate_slot_acquire && echo GOT', { ...env, MINDY_GATE_SLOT_TIMEOUT_S: '10' });
+    const a = bash('gate_slot_acquire && sleep 4; gate_slot_release', env);
+    const b = bash('gate_slot_acquire && sleep 4; gate_slot_release', env);
+    await waitForHeld(dir, 2);
+    expect(heldSlots(dir)).toHaveLength(2);
+    const c = await bash('gate_slot_acquire && echo GOT', { ...env, MINDY_GATE_SLOT_TIMEOUT_S: '15' });
     expect(c.code).toBe(0);
     expect(c.out).toMatch(/GOT/);
-    expect(Date.now() - t0).toBeGreaterThan(500); // it had to wait
+    // It had to wait: the script prints this only when every slot was taken on its first try.
+    expect(c.out).toMatch(/waiting for a gate slot \(2 in use/);
     await Promise.all([a, b]);
-  }, 20_000);
+  }, 30_000);
 
   it('a slot whose owner died is reclaimed', async () => {
     const dir = slotDir();
