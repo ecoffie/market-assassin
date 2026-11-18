@@ -26,7 +26,7 @@ export default function TrialOfferBanner() {
       <span className="h-9 w-9 shrink-0 rounded-lg bg-white/15 inline-flex items-center justify-center" aria-hidden><Sparkles className="h-5 w-5" /></span>
       <span className="min-w-[220px] flex-1">
         <span className="block text-base font-bold leading-snug">Try Mindy Pro free for 14 days</span>
-        <span className="block text-sm text-white">AI briefings, recompetes 12 months out, full market research and the proposal editor. $0 today, cancel anytime.</span>
+        <span className="block text-sm text-white">Daily briefings, recompetes 12 months out, full market research and the proposal editor. $0 today, cancel anytime.</span>
         {/* Upgrade incentive (owner 2026-11-18): the bonus lands on their first payment. */}
         <span className="block text-sm font-semibold text-white" data-testid="trial-banner-bonus">+ {UPGRADE_BONUS_CREDITS.toLocaleString('en-US')} bonus Mindy credits when you upgrade</span>
       </span>

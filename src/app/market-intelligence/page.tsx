@@ -245,7 +245,7 @@ function MarketIntelligenceContent() {
         </h2>
         <p className="text-(--mp-muted) text-center text-sm mb-4">
           {tier === 'pro'
-            ? 'Full Mindy AI workspace + AI briefings + FHC training.'
+            ? 'Full Mindy AI workspace + daily briefings + FHC training.'
             : '5 seats · shared pipeline · team admin dashboard · priority support.'}
         </p>
 
@@ -474,9 +474,9 @@ function MarketIntelligenceContent() {
                 <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-navy-wash)">✓ + AI</td>
                 <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-wash)">✓ + AI</td>
               </tr>
-              {/* AI Briefings */}
+              {/* Daily Briefings */}
               <tr className="border-b border-(--mp-line) hover:bg-(--mp-wash)">
-                <td className="py-2.5 px-3 text-(--mp-body)">AI Briefings</td>
+                <td className="py-2.5 px-3 text-(--mp-body)">Daily Briefings</td>
                 <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-navy-wash)">✓</td>
                 <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-navy-wash)">✓</td>
                 <td className="py-2.5 px-3 text-center text-(--mp-ok) bg-(--mp-wash)">✓</td>
@@ -581,7 +581,7 @@ function MarketIntelligenceContent() {
           <div className="grid md:grid-cols-3 gap-6 text-sm">
             <div>
               <p className="text-(--mp-navy) font-semibold mb-1">Mindy Pro: $149/mo</p>
-              <p className="text-(--mp-muted)">AI-powered briefings, personalized by your NAICS + geography. Daily and weekly briefs with win probability scoring. Includes FHC training access.</p>
+              <p className="text-(--mp-muted)">Daily briefings, personalized by your NAICS + geography. Daily and weekly briefs with win probability scoring. Includes FHC training access.</p>
             </div>
             <div>
               <p className="text-(--mp-muted) font-semibold mb-1">Deltek GovWin: $800-1,200/mo</p>
