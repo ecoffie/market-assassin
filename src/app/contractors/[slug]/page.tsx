@@ -50,6 +50,7 @@ import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import { awardHref, servableAwardIds } from '@/lib/seo/award-links';
 import { getExpiringRecompetesForUeis } from '@/lib/seo/recompetes';
 import { contractorIndexable } from '@/lib/seo/contractor-index-tier';
+import { buildContractorSummary } from '@/lib/seo/contractor-summary';
 
 const SITE_URL = 'https://getmindy.ai';
 
@@ -248,6 +249,20 @@ export default async function ContractorPage({ params }: PageProps) {
     getExpiringRecompetesForUeis(ueis, 10),
   ]);
 
+  const summary = buildContractorSummary({
+    name: displayName,
+    city: recipient.city,
+    state: recipient.state,
+    totalObligated: Number(recipient.total_obligated),
+    awardCount: Number(recipient.award_count),
+    agencyCount: Number(recipient.distinct_agency_count),
+    yearly: yearly.map((y) => ({ fiscal_year: Number(y.fiscal_year), total_obligated: Number(y.total_obligated) })),
+    topAgencies: topAgencies.map((a) => ({ awarding_agency: a.awarding_agency, total_amount: Number(a.total_amount), pct_of_total: Number(a.pct_of_total) })),
+    topNaics: topNaics.map((n) => ({ naics_code: n.naics_code, naics_description: n.naics_description, total_amount: Number(n.total_amount), award_count: Number(n.award_count) })),
+    expiring: expiring ? expiring.map((e) => ({ end: e.end, agency: e.agency })) : null,
+    expiringLimit: 10,
+  });
+
   // JSON-LD: Organization + BreadcrumbList. NO `isAccessibleForFree:
   // false` directive — that signal told Google "skip ranking this".
   // The content here IS free. Public sales history is, by definition,
@@ -330,6 +345,21 @@ export default async function ContractorPage({ params }: PageProps) {
           <Stat label="NAICS Codes" value={Number(recipient.distinct_naics_count || 0).toString()} />
         </div>
       </section>
+
+      {/* At a glance — sentences computed from this company's own figures
+          (src/lib/seo/contractor-summary.ts). Each sentence is omitted when its data is missing. */}
+      {summary.length > 0 && (
+        <section className="mx-auto max-w-6xl px-6 pb-8" aria-labelledby="at-a-glance">
+          <h2 id="at-a-glance" className="text-xl font-semibold font-(family-name:--mp-font-serif)">
+            {displayName} at a glance
+          </h2>
+          <div className="mt-3 max-w-3xl space-y-2 text-base leading-relaxed text-(--mp-body)">
+            {summary.map((line) => (
+              <p key={line}>{line}</p>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Tab nav — links to sub-pages */}
       <div className="mx-auto max-w-6xl px-6">
