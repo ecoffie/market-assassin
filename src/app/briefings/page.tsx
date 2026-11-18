@@ -1422,7 +1422,7 @@ function BriefingsDashboardContent() {
             </div>
             <div className="flex items-center gap-3 text-gray-500">
               <span className="w-6 h-6 rounded-full bg-gray-800 flex items-center justify-center text-gray-600 text-sm">—</span>
-              <span>AI Briefings, Forecasts, SBIR/STTR <span className="text-purple-400">(Pro)</span></span>
+              <span>Daily Briefings, Forecasts, SBIR/STTR <span className="text-purple-400">(Pro)</span></span>
             </div>
           </div>
 
@@ -1464,7 +1464,7 @@ function BriefingsDashboardContent() {
 
           {/* Upgrade link */}
           <p className="text-gray-500 text-sm mt-2 text-center">
-            Want AI briefings?{' '}
+            Want daily briefings?{' '}
             <Link href="/market-intelligence" className="text-purple-400 hover:underline">
               See Mindy Pro — $149/mo
             </Link>

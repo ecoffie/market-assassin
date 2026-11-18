@@ -570,7 +570,7 @@ async function sendWelcomeEmailWithOpportunities(
       <div style="background:linear-gradient(135deg,#1e3a8a 0%,#7c3aed 100%);border-radius:12px;padding:24px;margin:24px 0;text-align:center;">
         <h3 style="margin:0 0 8px;color:#ffffff;font-size:18px;">🚀 Want More Intelligence?</h3>
         <p style="margin:0 0 16px;color:#e0e7ff;font-size:14px;">
-          Upgrade to <strong>Market Intelligence Pro</strong> for AI briefings, win probability scoring, and weekly deep dives.
+          Upgrade to <strong>Market Intelligence Pro</strong> for daily briefings, win probability scoring, and weekly deep dives.
         </p>
         <a href="https://getmindy.ai/market-intelligence"
            style="display:inline-block;background:#ffffff;color:#7c3aed;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">

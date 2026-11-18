@@ -25,7 +25,7 @@ export default function TrialOfferBanner() {
       <span className="h-9 w-9 shrink-0 rounded-lg bg-white/15 inline-flex items-center justify-center" aria-hidden><Sparkles className="h-5 w-5" /></span>
       <span className="min-w-[220px] flex-1">
         <span className="block text-base font-bold leading-snug">Try Mindy Pro free for 14 days</span>
-        <span className="block text-sm text-white">AI briefings, recompetes 12 months out, full market research and the proposal editor. $0 today, cancel anytime.</span>
+        <span className="block text-sm text-white">Daily briefings, recompetes 12 months out, full market research and the proposal editor. $0 today, cancel anytime.</span>
       </span>
       <span className="h-10 px-5 rounded-lg bg-white text-[#005ee0] text-sm font-bold inline-flex items-center gap-1.5 shadow-sm group-hover:bg-[#eff5ff]">
         Start free trial <span aria-hidden>→</span>

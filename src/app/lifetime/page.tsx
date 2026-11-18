@@ -64,7 +64,7 @@ const founderPerks = [
 const faqs: Array<{ q: string; a: string }> = [
   {
     q: 'Why $4,997?',
-    a: `That's what lifetime course access cost before Mindy existed — and Mindy delivers far more (daily AI briefings, live federal data, full Pro platform). At $${PRO_MONTHLY}/mo you'd break even in about ${breakEvenMonths} months; most serious contractors stay longer.`,
+    a: `That's what lifetime course access cost before Mindy existed — and Mindy delivers far more (daily briefings, live federal data, full Pro platform). At $${PRO_MONTHLY}/mo you'd break even in about ${breakEvenMonths} months; most serious contractors stay longer.`,
   },
   {
     q: 'Is this really lifetime?',
