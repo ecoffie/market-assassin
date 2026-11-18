@@ -83,6 +83,7 @@
     "verify:forecast-agency": "npx tsx scripts/verify-forecast-agency-identity.ts",
     "verify:maps-account": "node scripts/verify-maps-account.mjs",
     "verify:gateway-exports": "npx tsx scripts/verify-gateway-exports.ts",
+    "ingest:gateway-csv:dry": "npx tsx scripts/ingest-gateway-csv.ts",
     "retention:cohorts": "npx tsx scripts/retention-cohorts.ts"
   },
   "dependencies": {
