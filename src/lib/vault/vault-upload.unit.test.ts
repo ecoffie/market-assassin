@@ -4,6 +4,7 @@ vi.mock('@/lib/sam/pdf-extract', () => ({
   extractPdf: vi.fn(async (b: Buffer) => ({ text: b.toString('utf-8'), pageCount: 1 })),
   extractDocx: vi.fn(async (b: Buffer) => ({ text: b.toString('utf-8') })),
   extractTxt: vi.fn((b: Buffer) => ({ text: b.toString('utf-8') })),
+  extractXlsx: vi.fn(async (b: Buffer) => ({ text: b.toString('utf-8') })),
 }));
 
 vi.mock('@/lib/rate-limit', () => ({
@@ -188,6 +189,22 @@ describe('saveVaultUpload', () => {
       const r = await saveVaultUpload(input({ file: file(n, 'hello') }), { db: s.db, storage: s.storage, resolveScope: own });
       expect(r).toMatchObject({ ok: false, code: 'unsupported_type', status: 415 });
     }
+    expect(s.calls.uploads).toHaveLength(0);
+  });
+
+  it('xlsx/xls/csv spreadsheets extract and store (Ask W1 parity)', async () => {
+    for (const n of ['pricing.xlsx', 'legacy.xls', 'rates.csv']) {
+      s.calls.uploads = []; s.calls.inserts = [];
+      const r = await saveVaultUpload(input({ file: file(n, 'CLIN,Qty\n0001,2') }), { db: s.db, storage: s.storage, resolveScope: own, now: () => 7 });
+      expect(r).toMatchObject({ ok: true });
+      expect(s.calls.uploads).toHaveLength(1);
+      expect(s.calls.inserts).toHaveLength(1);
+    }
+  });
+
+  it('CUI in a CSV is refused before write', async () => {
+    const r = await saveVaultUpload(input({ file: file('roster.csv', 'CUI\nName,SSN') }), { db: s.db, storage: s.storage, resolveScope: own });
+    expect(r).toMatchObject({ ok: false, code: 'prohibited_marking', status: 422 });
     expect(s.calls.uploads).toHaveLength(0);
   });
 

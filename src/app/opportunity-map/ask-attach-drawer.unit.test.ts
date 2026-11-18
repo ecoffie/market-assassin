@@ -75,6 +75,10 @@ function boot(opts: { flag: boolean; signedIn?: boolean; accessFails?: boolean; 
 }
 
 describe('Map drawer attach', () => {
+  it('file input accept includes spreadsheet extensions', () => {
+    expect(MAP).toContain('accept=".pdf,.docx,.txt,.xlsx,.xls,.csv"');
+  });
+
   it('server says no (flag off or not allowlisted) → no attach row at all', async () => {
     const { doc, calls, settle } = boot({ flag: false });
     await settle();

@@ -22,7 +22,7 @@
  * than the one the user is looking at.
  */
 import { resolveChatActingScope, type ChatActingScope } from '@/lib/chat/chat-acting-scope';
-import { extractPdf, extractDocx, extractTxt } from '@/lib/sam/pdf-extract';
+import { extractPdf, extractDocx, extractTxt, extractXlsx } from '@/lib/sam/pdf-extract';
 import { detectProhibitedMarkings, docxHeaderFooterText, markingRefusalMessage, type ProhibitedMarkingKind } from './marking-detect';
 import type { DocClass } from './doc-class';
 import { checkVaultLimit } from './rate-limits';
@@ -31,12 +31,16 @@ export const VAULT_BUCKET = 'vault-assets';
 export const VAULT_MAX_BYTES = 20 * 1024 * 1024; // 20 MB — unchanged from the Vault route
 const MAX_STORED_TEXT = 500_000;
 
-type Ext = 'pdf' | 'docx' | 'txt';
+type Ext = 'pdf' | 'docx' | 'txt' | 'xlsx' | 'xls' | 'csv';
 const TYPES: Record<Ext, string> = {
   pdf: 'application/pdf',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   txt: 'text/plain',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  xls: 'application/vnd.ms-excel',
+  csv: 'text/csv',
 };
+const SPREADSHEET_EXT = new Set<Ext>(['xlsx', 'xls', 'csv']);
 
 export function detectUploadType(filename: string): { ext: Ext; mime: string } | null {
   const lower = filename.toLowerCase();
@@ -138,6 +142,7 @@ async function extractText(ext: Ext, buffer: Buffer): Promise<{ text: string; pa
     return { text: r.text || '', pageCount: r.pageCount ?? null };
   }
   if (ext === 'docx') return { text: (await extractDocx(buffer)).text || '', pageCount: null };
+  if (SPREADSHEET_EXT.has(ext)) return { text: (await extractXlsx(buffer)).text || '', pageCount: null };
   return { text: extractTxt(buffer).text || '', pageCount: null };
 }
 
@@ -155,7 +160,7 @@ export async function saveVaultUpload(input: VaultUploadInput, deps: VaultUpload
   if (!type) {
     return {
       ok: false, status: 415, code: 'unsupported_type',
-      message: 'Upload a PDF, Word (.docx) or text (.txt) file. Older .doc files and other formats cannot be read.',
+      message: 'Upload a PDF, Word (.docx), text (.txt), Excel (.xlsx/.xls), or CSV file. Older .doc files and other formats cannot be read.',
     };
   }
 
@@ -196,7 +201,7 @@ export async function saveVaultUpload(input: VaultUploadInput, deps: VaultUpload
   if (text.trim().length === 0) {
     return {
       ok: false, status: 422, code: 'unreadable',
-      message: "Mindy couldn't read any text in this file (it may be a scanned image), so it couldn't be checked and wasn't saved. Upload a text-based PDF, Word or text file.",
+      message: "Mindy couldn't read any text in this file (it may be a scanned image or empty sheet), so it couldn't be checked and wasn't saved. Upload a text-based PDF, Word, text, Excel, or CSV file.",
     };
   }
 

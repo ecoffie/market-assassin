@@ -11169,7 +11169,7 @@ const ASK_MINDY_JS = `<script>(function(){
   function buildAttach(){
     var foot=drawer.querySelector('.amk-foot'); if(!foot)return;
     var row=document.createElement('div'); row.className='amk-attach'; row.setAttribute('data-testid','amk-attach');
-    row.innerHTML='<div class="amk-docs"></div><div class="amk-attach-bar"><input type="file" accept=".pdf,.docx,.txt" hidden><button type="button" class="amk-clip">Attach</button><span class="amk-priv">Saved privately to your Vault</span></div><div class="amk-attach-err" role="alert"></div>';
+    row.innerHTML='<div class="amk-docs"></div><div class="amk-attach-bar"><input type="file" accept=".pdf,.docx,.txt,.xlsx,.xls,.csv" hidden><button type="button" class="amk-clip">Attach</button><span class="amk-priv">Saved privately to your Vault</span></div><div class="amk-attach-err" role="alert"></div>';
     foot.insertBefore(row, foot.firstChild);
     var fileIn=row.querySelector('input'), clip=row.querySelector('.amk-clip'), docsEl=row.querySelector('.amk-docs'), errEl=row.querySelector('.amk-attach-err');
     function uuid(){ try{ if(window.crypto&&crypto.randomUUID) return crypto.randomUUID(); }catch(e){} var h='0123456789abcdef',x=''; for(var i=0;i<32;i++){ x+=h.charAt(Math.floor(Math.random()*16)); } return x.slice(0,8)+'-'+x.slice(8,12)+'-4'+x.slice(13,16)+'-8'+x.slice(17,20)+'-'+x.slice(20,32); }
