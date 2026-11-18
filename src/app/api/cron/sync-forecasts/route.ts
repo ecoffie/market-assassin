@@ -7,9 +7,9 @@
  * from apfs-cloud.dhs.gov JSON — that host now serves migration HTML, so the
  * default path FAIL-LOUDs (never upserts empty). Optional
  * `DHS_FORECAST_ALLRECORDS_URL` switches to the DHS.gov public allRecords file
- * (see src/lib/forecasts/dhs-allrecords.ts). DOE publishes a public XLSX on
- * energy.gov with no WAF and no login (~870 rows, updated monthly, incumbent +
- * contract number on every row). Everything else is blocked, not merely broken:
+ * (see src/lib/forecasts/dhs-allrecords.ts). DOE's current file is the dated
+ * CSV linked from energy.gov/osbp/acquisition-forecast (not the July 2026 XLSX,
+ * which still returns 200). Everything else is blocked, not merely broken:
  *
  *   HHS                      login-gated SPA (osdbu.hhs.gov) — no file, no API
  *   VA, DOT                  migrated to the GSA Acquisition Gateway, which is
@@ -44,8 +44,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { forecastWriterClient, guardForecastInserts, countNewForecastRows, quarantineRefusedLoad } from '@/lib/forecasts/writer';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { reportCronOutcome } from '@/lib/cron-self-report';
-import * as XLSX from 'xlsx';
-import { DOE_FORECAST_URL, parseDoeForecast, doeExternalId } from '@/lib/forecasts/doe-forecast';
+import {
+  DOE_FORECAST_PAGE,
+  absoluteDoeUrl,
+  doeExternalId,
+  extractDoeForecastDocuments,
+  parseDoeCsv,
+} from '@/lib/forecasts/doe-forecast';
 import { parseMoneyRange, parseSetAside, parseNaics } from '@/lib/forecasts/usace-district-parse';
 import { normalizeForecastRow, type ForecastRowFields } from '@/lib/forecasts/normalize-row';
 
@@ -219,33 +224,51 @@ async function fetchDHS(): Promise<Record<string, unknown>[]> {
  * Richer than DHS: carries the CURRENT INCUMBENT and contract number per row,
  * which is what makes a forecast a recompete target rather than a heads-up.
  */
+const DOE_INSTANCE = 'forecast_doe_osbp';
+const DHS_INSTANCE = 'forecast_dhs_apfs';
+
+/**
+ * The OSDBU page links a dated CSV. The July XLSX still returns 200, so fetching
+ * only that URL never sees a newer edition (measured 2026-11-18: page links
+ * 2026-11-16, 869 rows; July workbook is a different file).
+ */
 async function fetchDOE(): Promise<Record<string, unknown>[]> {
-  const res = await fetch(DOE_FORECAST_URL, {
-    headers: { 'User-Agent': 'GovConGiants-Mindy/1.0' },
+  const page = await fetch(DOE_FORECAST_PAGE, {
+    headers: { 'User-Agent': 'GovConGiants-Mindy/1.0', Accept: 'text/html' },
     cache: 'no-store',
   });
-  // DOE republishes monthly under a DATED directory, so a moved file 404s.
-  // That must fail loudly — it is the one predictable way this source breaks.
-  if (!res.ok) {
+  if (!page.ok) {
+    throw new Error(`DOE forecast page HTTP ${page.status} — ${DOE_FORECAST_PAGE}`);
+  }
+  const html = await page.text();
+  const docs = extractDoeForecastDocuments(html);
+  const current = docs[0];
+  if (!current) {
     throw new Error(
-      `DOE forecast HTTP ${res.status} — the monthly file likely moved; ` +
-      'check energy.gov/osdbu/small-business-toolbox/acquisition-forecast for the current URL',
+      `DOE forecast page has no dated public file — refusing the July XLSX fallback (${DOE_FORECAST_PAGE})`,
     );
   }
-  const buf = Buffer.from(await res.arrayBuffer());
-  const wb = XLSX.read(buf, { type: 'buffer' });
-  const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {
-    header: 1, defval: '',
-  }) as unknown[][];
-
-  const parsed = parseDoeForecast(aoa, { parseMoneyRange, parseSetAside, parseNaics });
-  if (parsed.headerRow === -1) throw new Error('DOE forecast: no header row found — layout changed');
+  const sourceUrl = absoluteDoeUrl(current.href);
+  const res = await fetch(sourceUrl, {
+    headers: { 'User-Agent': 'GovConGiants-Mindy/1.0', Accept: 'text/csv' },
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    throw new Error(`DOE forecast ${current.edition} HTTP ${res.status} — ${sourceUrl}`);
+  }
+  const text = await res.text();
+  if (/^<!DOCTYPE\s+html/i.test(text.trim()) || /^<html[\s>]/i.test(text.trim())) {
+    throw new Error(`DOE forecast ${current.edition} returned HTML, not a CSV — ${sourceUrl}`);
+  }
+  const parsed = parseDoeCsv(text, { parseMoneyRange, parseSetAside, parseNaics });
+  if (parsed.headerRow === -1) throw new Error(`DOE forecast ${current.edition}: no header row — layout changed`);
+  if (!parsed.rows.length) throw new Error(`DOE forecast ${current.edition} parsed to 0 rows — refusing empty upsert`);
 
   const now = new Date().toISOString();
   return parsed.rows.map((r) => ({
     source_agency: 'DOE',
     source_type: 'osdbu_xlsx',
-    source_url: DOE_FORECAST_URL,
+    source_url: sourceUrl,
     external_id: doeExternalId(r),
     title: r.title,
     description: r.naicsDescription || null,
@@ -271,6 +294,43 @@ async function fetchDOE(): Promise<Record<string, unknown>[]> {
 /** Per-source baselines. A source that drops far below its observed floor has
  *  broken upstream, even when the HTTP call succeeded. */
 const SOURCE_FLOOR: Record<string, number> = { DHS: 1, DOE: 1 };
+
+/**
+ * Record attempt vs nonempty ingest on the existing forecast instances.
+ * A failed source becomes unreachable. A source whose rows were written gets
+ * last_verified_ingest. A missing instance row is left alone (update matches 0).
+ */
+async function stampForecastClocks(
+  supabase: { from: (table: string) => { update: (values: Record<string, unknown>) => { eq: (col: string, value: string) => Promise<unknown> } } },
+  input: { perSource: Record<string, number>; failures: string[]; wrote: boolean },
+): Promise<void> {
+  const now = new Date().toISOString();
+  const failed = (name: string) =>
+    input.failures.some((f) => f.startsWith(`${name}:`) || f.startsWith(`${name} `));
+  const touch = async (key: string, patch: Record<string, unknown>) => {
+    try {
+      await supabase.from('data_source_instances').update(patch).eq('source_key', key);
+    } catch (e) {
+      console.error(`[${JOB_NAME}] clock stamp ${key} failed:`, (e as Error).message);
+    }
+  };
+  const jobs: Array<Promise<void>> = [];
+  for (const [name, key] of [['DHS', DHS_INSTANCE], ['DOE', DOE_INSTANCE]] as const) {
+    const landed = input.wrote && (input.perSource[name] ?? 0) > 0 && !failed(name);
+    if (landed) {
+      jobs.push(touch(key, {
+        last_poll: now,
+        last_successful_check: now,
+        last_verified_ingest: now,
+        last_data_advance: now,
+        source_state: 'current',
+      }));
+    } else if (failed(name)) {
+      jobs.push(touch(key, { last_poll: now, source_state: 'unreachable' }));
+    }
+  }
+  await Promise.all(jobs);
+}
 
 export async function GET(request: NextRequest) {
   // Auth first — same gate as the other cron routes.
@@ -334,6 +394,7 @@ export async function GET(request: NextRequest) {
     // Only a TOTAL wipeout is a 500 — otherwise the good source still lands.
     if (rows.length === 0) {
       const msg = `All forecast sources failed: ${failures.join(' | ')}`;
+      if (!dryRun) await stampForecastClocks(supabase, { perSource, failures, wrote: false });
       await reportCronOutcome(JOB_NAME, 'error', msg);
       return NextResponse.json({ success: false, error: msg, perSource }, { status: 500 });
     }
@@ -394,6 +455,7 @@ export async function GET(request: NextRequest) {
 
     // A partial run reports 'error' so the watchdog sees it — a source that
     // silently stops is worse than one that loudly fails.
+    await stampForecastClocks(supabase, { perSource, failures, wrote: upserted > 0 });
     await reportCronOutcome(JOB_NAME, failures.length ? 'error' : 'success',
       failures.length ? failures.join(' | ') : undefined);
     return NextResponse.json({

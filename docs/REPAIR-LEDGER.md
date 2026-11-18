@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-18 — DOE forecast current file
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | Forecasts: DOE dated CSV | `sync-forecasts` fetched the July 2026 XLSX, which still returns HTTP 200, so it never read the OSDBU page's current file (2026-11-16 CSV, 869 rows). The cron now follows the newest dated link on that page and refuses the July workbook. A nonempty write stamps `forecast_doe_osbp`; a failed DHS read stamps `forecast_dhs_apfs` unreachable. | `refusing the July XLSX fallback` → `src/app/api/cron/sync-forecasts/route.ts` | `doe-forecast.unit.test.ts` + live parse of the 2026-11-16 CSV: 869 rows, edition 2026-11-16, 869/869 performance dates. No production sync. | BUILT, NOT MERGED |
+
 ## 2026-11-18 — Forecast currency release + Ask Mindy Map bridge
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
