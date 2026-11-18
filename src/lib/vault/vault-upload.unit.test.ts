@@ -10,9 +10,9 @@ vi.mock('@/lib/sam/pdf-extract', () => ({
 vi.mock('@/lib/rate-limit', () => ({
   checkRateLimit: vi.fn(async (_k: string, limit: number) => ({ allowed: true, remaining: limit, limit, resetAt: Math.floor(Date.now() / 1000) + 3600 })),
 }));
-import { detectProhibitedMarkings } from './marking-detect';
 import { effectiveDocClass, mayCommitToFacts } from './doc-class';
-import { saveVaultUpload, resolveVaultWriteOwner, safeStorageName, spreadsheetMarkingBody, type VaultUploadInput } from './upload';
+import { saveVaultUpload, resolveVaultWriteOwner, safeStorageName, spreadsheetMarkingBody, ASK_MINDY_UPLOAD_EXTS, VAULT_PANEL_EXTS, type VaultUploadInput } from './upload';
+import { xlsxHeaderFooterText, detectProhibitedMarkings } from './marking-detect';
 import type { ChatActingScope } from '@/lib/chat/chat-acting-scope';
 import { checkVaultLimit, __resetVaultLocalLimits, VAULT_LIMITS } from './rate-limits';
 import { checkRateLimit } from '@/lib/rate-limit';
@@ -221,23 +221,38 @@ describe('saveVaultUpload', () => {
   it('xlsx/xls/csv spreadsheets extract and store (Ask W1 parity)', async () => {
     for (const n of ['pricing.xlsx', 'legacy.xls', 'rates.csv']) {
       s.calls.uploads = []; s.calls.inserts = [];
-      const r = await saveVaultUpload(input({ file: file(n, 'CLIN,Qty\n0001,2') }), { db: s.db, storage: s.storage, resolveScope: own, now: () => 7 });
+      const r = await saveVaultUpload(
+        input({ file: file(n, 'CLIN,Qty\n0001,2'), allowedExts: ASK_MINDY_UPLOAD_EXTS }),
+        { db: s.db, storage: s.storage, resolveScope: own, now: () => 7 },
+      );
       expect(r).toMatchObject({ ok: true });
       expect(s.calls.uploads).toHaveLength(1);
       expect(s.calls.inserts).toHaveLength(1);
     }
   });
 
+  it('Vault panel allow-list refuses spreadsheet types (A4: no fleet xlsx on merge)', async () => {
+    for (const n of ['pricing.xlsx', 'rates.csv']) {
+      const r = await saveVaultUpload(
+        input({ file: file(n, 'CLIN,Qty\n0001,2'), allowedExts: VAULT_PANEL_EXTS, source: 'vault', docClass: 'company' }),
+        { db: s.db, storage: s.storage, resolveScope: own },
+      );
+      expect(r).toMatchObject({ ok: false, code: 'unsupported_type', status: 415 });
+    }
+    expect(s.calls.uploads).toHaveLength(0);
+  });
+
   it('CUI in a CSV is refused before write', async () => {
-    const r = await saveVaultUpload(input({ file: file('roster.csv', 'CUI\nName,SSN') }), { db: s.db, storage: s.storage, resolveScope: own });
+    const r = await saveVaultUpload(
+      input({ file: file('roster.csv', 'CUI\nName,SSN'), allowedExts: ASK_MINDY_UPLOAD_EXTS }),
+      { db: s.db, storage: s.storage, resolveScope: own },
+    );
     expect(r).toMatchObject({ ok: false, code: 'prohibited_marking', status: 422 });
     expect(s.calls.uploads).toHaveLength(0);
   });
 
   it('padded spreadsheet banner cells still refuse (CUI,/SECRET,,)', async () => {
     // Real extractXlsx pads short rows — marking scan must see bare CUI/SECRET cells.
-    const { extractXlsx } = await import('@/lib/sam/pdf-extract');
-    // Replace mock for this test only
     const pdf = await import('@/lib/sam/pdf-extract');
     vi.mocked(pdf.extractXlsx).mockImplementation(async (b: Buffer) => {
       // Simulate padded CSV body the real extractor produces for a 3-col sheet
@@ -248,10 +263,50 @@ describe('saveVaultUpload', () => {
     });
     for (const [name, body] of [['cui.xlsx', 'CUI'], ['sec.xlsx', 'SECRET']] as const) {
       s.calls.uploads = []; s.calls.inserts = [];
-      const r = await saveVaultUpload(input({ file: file(name, body) }), { db: s.db, storage: s.storage, resolveScope: own });
+      const r = await saveVaultUpload(
+        input({ file: file(name, body), allowedExts: ASK_MINDY_UPLOAD_EXTS }),
+        { db: s.db, storage: s.storage, resolveScope: own },
+      );
       expect(r, name).toMatchObject({ ok: false, code: 'prohibited_marking', status: 422 });
       expect(s.calls.uploads, name).toHaveLength(0);
     }
+  });
+
+  async function xlsxWithOddHeader(headerXml: string): Promise<Buffer> {
+    const { zipSync, strToU8 } = await import('fflate');
+    const sheet = `<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><headerFooter><oddHeader>${headerXml}</oddHeader><oddFooter></oddFooter></headerFooter><sheetData/></worksheet>`;
+    return Buffer.from(zipSync({
+      'xl/worksheets/sheet1.xml': strToU8(sheet),
+      '[Content_Types].xml': strToU8('<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>'),
+    }));
+  }
+
+  it('xlsx print-header CUI is refused (A4)', async () => {
+    const cases: Array<{ header: string; kind: 'cui' | 'classified'; name: string }> = [
+      { name: 'center-plain', header: '&amp;C CUI', kind: 'cui' },
+      { name: 'bold-font', header: '&amp;C&amp;"-,Bold"CUI', kind: 'cui' },
+      { name: 'font-size', header: '&amp;C&amp;"Arial,Bold"&amp;14CUI', kind: 'cui' },
+      { name: 'red-color', header: '&amp;C&amp;KFF0000CUI', kind: 'cui' },
+      { name: 'left-with-page', header: '&amp;LCUI&amp;RPage &amp;P of &amp;N', kind: 'cui' },
+      { name: 'secret-control', header: '&amp;CSECRET//NOFORN', kind: 'classified' },
+    ];
+    for (const c of cases) {
+      const buf = await xlsxWithOddHeader(c.header);
+      const hf = await xlsxHeaderFooterText(buf);
+      expect(hf, c.name).toMatch(c.kind === 'cui' ? /CUI/ : /SECRET/);
+      expect(detectProhibitedMarkings({ body: 'Agency,Rate\nVA,10', headerFooter: hf }), c.name)
+        .toMatchObject({ blocked: true, kind: c.kind });
+    }
+    // Cell extract alone is clean — styled print header must still refuse the upload
+    const pdf = await import('@/lib/sam/pdf-extract');
+    vi.mocked(pdf.extractXlsx).mockResolvedValue({ text: 'Agency,Rate\nVA,10' });
+    const buf = await xlsxWithOddHeader('&amp;C&amp;"-,Bold"CUI');
+    const r = await saveVaultUpload(
+      input({ file: { name: 'marked.xlsx', size: buf.length, buffer: buf }, allowedExts: ASK_MINDY_UPLOAD_EXTS }),
+      { db: s.db, storage: s.storage, resolveScope: own },
+    );
+    expect(r).toMatchObject({ ok: false, code: 'prohibited_marking', status: 422 });
+    expect(s.calls.uploads).toHaveLength(0);
   });
 
   it('too large refused', async () => {

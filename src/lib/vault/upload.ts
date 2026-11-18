@@ -23,7 +23,7 @@
  */
 import { resolveChatActingScope, type ChatActingScope } from '@/lib/chat/chat-acting-scope';
 import { extractPdf, extractDocx, extractTxt, extractXlsx } from '@/lib/sam/pdf-extract';
-import { detectProhibitedMarkings, docxHeaderFooterText, markingRefusalMessage, type ProhibitedMarkingKind } from './marking-detect';
+import { detectProhibitedMarkings, docxHeaderFooterText, xlsxHeaderFooterText, markingRefusalMessage, type ProhibitedMarkingKind } from './marking-detect';
 import type { DocClass } from './doc-class';
 import { checkVaultLimit } from './rate-limits';
 
@@ -31,7 +31,8 @@ export const VAULT_BUCKET = 'vault-assets';
 export const VAULT_MAX_BYTES = 20 * 1024 * 1024; // 20 MB — unchanged from the Vault route
 const MAX_STORED_TEXT = 500_000;
 
-type Ext = 'pdf' | 'docx' | 'txt' | 'xlsx' | 'xls' | 'csv';
+export type VaultUploadExt = 'pdf' | 'docx' | 'txt' | 'xlsx' | 'xls' | 'csv';
+type Ext = VaultUploadExt;
 const TYPES: Record<Ext, string> = {
   pdf: 'application/pdf',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -41,6 +42,11 @@ const TYPES: Record<Ext, string> = {
   csv: 'text/csv',
 };
 const SPREADSHEET_EXT = new Set<Ext>(['xlsx', 'xls', 'csv']);
+
+/** Vault panel / documents API — no spreadsheets (xlsx parser stays behind Ask Mindy flag). */
+export const VAULT_PANEL_EXTS: readonly VaultUploadExt[] = ['pdf', 'docx', 'txt'];
+/** Ask Mindy chat attach — includes spreadsheets when the uploads flag is on for the caller. */
+export const ASK_MINDY_UPLOAD_EXTS: readonly VaultUploadExt[] = ['pdf', 'docx', 'txt', 'xlsx', 'xls', 'csv'];
 
 /**
  * Spreadsheet extractors pad short rows with empty CSV fields (`CUI` → `CUI,,`).
@@ -111,6 +117,12 @@ export interface VaultUploadInput {
   docType?: string;
   chatSessionId?: string | null;
   noticeId?: string | null;
+  /**
+   * Which extensions this route may accept. Vault panel stays PDF/Word/TXT so a
+   * merge does not open the xlsx parser to every signed-in user. Ask Mindy passes
+   * ASK_MINDY_UPLOAD_EXTS (behind VAULT_ASK_MINDY_UPLOADS).
+   */
+  allowedExts?: readonly VaultUploadExt[];
 }
 
 export interface VaultUploadDeps {
@@ -183,10 +195,15 @@ export async function saveVaultUpload(input: VaultUploadInput, deps: VaultUpload
     return { ok: false, status: 400, code: 'empty_file', message: 'The file is empty.' };
   }
   const type = detectUploadType(file.name);
-  if (!type) {
+  // Default restrictive (Vault panel). Ask Mindy must pass ASK_MINDY_UPLOAD_EXTS explicitly.
+  const allowed = input.allowedExts ?? VAULT_PANEL_EXTS;
+  if (!type || !allowed.includes(type.ext)) {
+    const allowsSheets = allowed.some((e) => SPREADSHEET_EXT.has(e));
     return {
       ok: false, status: 415, code: 'unsupported_type',
-      message: 'Upload a PDF, Word (.docx), text (.txt), Excel (.xlsx/.xls), or CSV file. Older .doc files and other formats cannot be read.',
+      message: allowsSheets
+        ? 'Upload a PDF, Word (.docx), text (.txt), Excel (.xlsx/.xls), or CSV file. Older .doc files and other formats cannot be read.'
+        : 'Upload a PDF, Word (.docx), or text (.txt) file. Older .doc files and other formats cannot be read.',
     };
   }
 
@@ -215,9 +232,13 @@ export async function saveVaultUpload(input: VaultUploadInput, deps: VaultUpload
     text = '';
   }
   // 4) Classification / CUI — checked even when the body is empty (a banner may sit
-  //    only in a DOCX header). Refuse before ANY write. DOCX headers/footers (where
-  //    banners live) are dropped by the body extractor, so read them separately.
-  const headerFooter = type.ext === 'docx' ? await docxHeaderFooterText(file.buffer) : '';
+  //    only in a DOCX/XLSX print header). Refuse before ANY write. Body extractors
+  //    drop those regions, so read them separately (.xls has no zip headers → '').
+  const headerFooter = type.ext === 'docx'
+    ? await docxHeaderFooterText(file.buffer)
+    : type.ext === 'xlsx'
+      ? await xlsxHeaderFooterText(file.buffer)
+      : '';
   const markingBody = SPREADSHEET_EXT.has(type.ext) ? spreadsheetMarkingBody(text) : text;
   const verdict = detectProhibitedMarkings({ body: markingBody, headerFooter });
   if (verdict.blocked && verdict.kind) {
