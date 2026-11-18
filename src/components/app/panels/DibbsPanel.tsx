@@ -63,6 +63,7 @@ export default function DibbsPanel({ email }: Props) {
   const [fsc, setFsc] = useState('');
   const [sort, setSort] = useState<'deadline' | 'newest'>('deadline');
   const [includeExpired, setIncludeExpired] = useState(false);
+  const [freshnessWarning, setFreshnessWarning] = useState<string | null>(null);
 
   const search = useCallback(
     async (offset = 0) => {
@@ -88,6 +89,10 @@ export default function DibbsPanel({ email }: Props) {
         setRfqs(prev => (offset === 0 ? data.rfqs : [...prev, ...data.rfqs]));
         setTotal(data.total || 0);
         setHasMore(!!data.hasMore);
+        if (offset === 0) {
+          const warning = data.freshness?.warning;
+          setFreshnessWarning(typeof warning === 'string' && warning ? warning : null);
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Search failed');
       } finally {
@@ -120,6 +125,9 @@ export default function DibbsPanel({ email }: Props) {
           DLA Internet Bid Board solicitations (NSN / parts) — the small-buy market that
           isn&apos;t on SAM.gov. Search by keyword, NSN, or FSC.
         </p>
+        {freshnessWarning && (
+          <p className="text-sm text-amber-300 mt-2">{freshnessWarning}</p>
+        )}
       </div>
 
       {/* Search / filters */}
@@ -198,8 +206,8 @@ export default function DibbsPanel({ email }: Props) {
         <div className="text-center py-12 text-muted">
           <p className="text-lg mb-1">No DIBBS RFQs match.</p>
           <p className="text-sm text-faint">
-            Try a broader keyword, or a shorter NSN/FSC prefix (e.g. just the 4-digit FSC). New
-            RFQs sync daily.
+            Try a broader keyword, or a shorter NSN/FSC prefix (e.g. just the 4-digit FSC).
+            {freshnessWarning ? '' : ' New RFQs sync daily.'}
           </p>
         </div>
       )}

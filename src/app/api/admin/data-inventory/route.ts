@@ -51,6 +51,7 @@ import {
   type ScheduleTruth,
   type ScheduledRun,
 } from '@/lib/data-core/inventory-model';
+import { reportedCollectionFreshness } from '@/lib/data-core/collection-clocks';
 import painPointsData from '@/data/agency-pain-points.json';
 import budgetData from '@/data/agency-budget-data.json';
 
@@ -278,11 +279,11 @@ export async function GET(request: NextRequest) {
       try {
         const [ds, dsi] = await Promise.all([
           sb.from('data_sources').select('key, record_count, last_built, notes'),
-          sb.from('data_source_instances').select('dataset_key, source_key, source_state, intervention_state, held_population, last_data_advance, last_verified_ingest, last_poll'),
+          sb.from('data_source_instances').select('dataset_key, source_key, source_state, intervention_state, held_population, last_data_advance, last_verified_ingest, last_successful_check, last_poll'),
         ]);
         return {
           sources: ds.error ? null : (ds.data as Array<{ key: string; record_count: number | null; last_built: string | null; notes: string | null }>),
-          instances: dsi.error ? null : (dsi.data as Array<{ dataset_key: string; source_key: string; source_state: string | null; intervention_state: string | null; held_population: number | null; last_data_advance: string | null; last_verified_ingest: string | null; last_poll: string | null }>),
+          instances: dsi.error ? null : (dsi.data as Array<{ dataset_key: string; source_key: string; source_state: string | null; intervention_state: string | null; held_population: number | null; last_data_advance: string | null; last_verified_ingest: string | null; last_successful_check: string | null; last_poll: string | null }>),
         };
       } catch { return { sources: null, instances: null }; }
     })(),
@@ -383,8 +384,34 @@ export async function GET(request: NextRequest) {
     basis: string;
     jobs?: readonly string[];
     detail?: string;
+    /**
+     * DIBBS and grants stamp synced_at on every touched row and were registered
+     * source_state=current with null clocks. For those, a job run is not freshness.
+     */
+    separateAttemptFromIngest?: boolean;
   }): Freshness => {
     const inst = o.instanceKey ? instance(o.instanceKey) : null;
+    if (o.separateAttemptFromIngest) {
+      const report = reportedCollectionFreshness({
+        sourceState: inst?.source_state ?? null,
+        lastPoll: inst?.last_poll ?? null,
+        lastSuccessfulCheck: inst?.last_successful_check ?? null,
+        lastVerifiedIngest: inst?.last_verified_ingest ?? null,
+        lastDataAdvance: inst?.last_data_advance ?? null,
+        recordsReceived: null,
+        rowTouchAt: o.asOf,
+        cadenceHours: o.cadenceHours,
+        now,
+        producerEnabled: inst ? producerEnabled(inst.source_key) : null,
+      });
+      return {
+        state: report.state,
+        asOf: report.asOf,
+        basis: `${report.basis}. Row-touch clock was ${o.basis}.`,
+        detail: [o.detail, report.warning].filter(Boolean).join(' '),
+        schedules: o.jobs ? schedules(o.jobs) : undefined,
+      };
+    }
     const instState = inst
       ? honestInstanceState({
           sourceState: inst.source_state,
@@ -549,7 +576,8 @@ export async function GET(request: NextRequest) {
       stored: c.dibbs, unit: 'RFQs',
       headlineContribution: c.dibbs,
       freshness: fresh({ instanceKey: 'dibbs_dla_flat_files', asOf: e.dibbs, cadenceHours: 24, basis: 'MAX(dibbs_rfqs.synced_at)', jobs: CRON_JOBS.dibbs,
-        detail: 'Stored total, not currently-open: dibbs_rfqs.status is not populated, so an open/closed split cannot be measured.' }),
+        separateAttemptFromIngest: true,
+        detail: 'Stored total, not currently-open: dibbs_rfqs.status is not populated, so an open/closed split cannot be measured. synced_at is a row-touch clock, not a nonempty ingest.' }),
       surface: { state: 'customer_readable', tools: [], app: ['DIBBS panel', 'Opportunity Map', 'Opportunity detail'] },
       upstreams: ['dla_dibbs'], provenance: 'DLA DIBBS solicitations mirrored nightly — defense buys below the SAM.gov posting threshold.',
     },
@@ -558,7 +586,9 @@ export async function GET(request: NextRequest) {
       stored: c.grants, unit: 'grant opportunities',
       breakdown: [{ label: 'posted', count: c.grantsPosted }, { label: 'forecasted', count: c.grantsForecasted }],
       headlineContribution: c.grants,
-      freshness: fresh({ instanceKey: 'grants_gov_api', asOf: e.grants, cadenceHours: 24, basis: 'MAX(grants_cache.synced_at)', jobs: CRON_JOBS.grants }),
+      freshness: fresh({ instanceKey: 'grants_gov_api', asOf: e.grants, cadenceHours: 24, basis: 'MAX(grants_cache.synced_at)', jobs: CRON_JOBS.grants,
+        separateAttemptFromIngest: true,
+        detail: 'synced_at moves when a row is touched. Freshness is the last nonempty ingest, which a scheduled run does not reset.' }),
       surface: { state: 'customer_readable', tools: ['search_grants'], app: ['Opportunity Map grants layer'] },
       upstreams: ['grants_gov'], provenance: 'Grants.gov mirrored nightly into grants_cache.',
       note: 'The research corpus below also holds a small Grants.gov slice from a different producer. Not deduplicated.',

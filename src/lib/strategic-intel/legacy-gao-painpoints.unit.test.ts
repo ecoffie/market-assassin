@@ -4,6 +4,8 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   extractLegacyGaoTagged,
+  labelHistoricalGaoPainPoint,
+  legacyGaoPublicationDate,
   legacySetHash,
   matchLegacyToGovinfo,
   type ArchivedLegacyPainPoint,
@@ -87,6 +89,23 @@ describe('the historical archive matches the set exactly', () => {
     };
     walk(join(ROOT, 'src'));
     expect(hits).toEqual([]);
+  });
+});
+
+describe('labelHistoricalGaoPainPoint — raw surfaces get date + LEGACY_MANUAL', () => {
+  it('labels a bare (Source: GAO) string with its government date', () => {
+    const text = 'Contract Management: DOD\'s Anthrax Vaccine Manufacturer (Source: GAO)';
+    expect(legacyGaoPublicationDate(text)).toBe('2000-04-14');
+    const labeled = labelHistoricalGaoPainPoint(text);
+    expect(labeled).toContain('historical GAO finding, published 2000-04-14');
+    expect(labeled).toContain('[LEGACY_MANUAL — provenance unavailable]');
+    expect(labeled).not.toMatch(/\(Source: GAO\)$/);
+  });
+
+  it('leaves living citations and already-labeled strings alone', () => {
+    expect(labelHistoricalGaoPainPoint('X (Source: GAO-26-107726)')).toBe('X (Source: GAO-26-107726)');
+    const once = labelHistoricalGaoPainPoint('Y (Source: GAO)');
+    expect(labelHistoricalGaoPainPoint(once)).toBe(once);
   });
 });
 

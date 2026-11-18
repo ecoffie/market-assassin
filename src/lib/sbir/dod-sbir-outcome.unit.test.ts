@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { decideDodSbirExecuteOutcome } from './dod-sbir-outcome';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  decideDodSbirExecuteOutcome,
+  probeDodSbirWithRetries,
+} from './dod-sbir-outcome';
 
 describe('decideDodSbirExecuteOutcome — false green cannot claim success', () => {
   it('api-down with empty corpus is not success (the 2026-11-18 defect)', () => {
@@ -43,5 +46,34 @@ describe('decideDodSbirExecuteOutcome — false green cannot claim success', () 
     const o = decideDodSbirExecuteOutcome({ stopped: 'rate-limit', upserted: 10, heldRows: 10 });
     expect(o.success).toBe(false);
     expect(o.cronOutcome).toBe('partial');
+  });
+});
+
+describe('probeDodSbirWithRetries — temporary unavailability ≠ permanent disable', () => {
+  it('recovers when a later probe succeeds', async () => {
+    const sleep = vi.fn(async () => {});
+    let n = 0;
+    const { page, attemptsUsed } = await probeDodSbirWithRetries(
+      async () => {
+        n += 1;
+        return n < 3
+          ? { rateLimited: true, degraded: false }
+          : { rateLimited: false, degraded: false };
+      },
+      { attempts: 3, delayMs: 1, sleep },
+    );
+    expect(page.rateLimited).toBe(false);
+    expect(attemptsUsed).toBe(3);
+    expect(sleep).toHaveBeenCalledTimes(2);
+  });
+
+  it('exhausts retries and leaves the down page for the 503 path', async () => {
+    const sleep = vi.fn(async () => {});
+    const { page, attemptsUsed } = await probeDodSbirWithRetries(
+      async () => ({ rateLimited: false, degraded: true }),
+      { attempts: 3, delayMs: 1, sleep },
+    );
+    expect(page.degraded).toBe(true);
+    expect(attemptsUsed).toBe(3);
   });
 });

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { resolveAgency, isValidOfficeCode } from './agency-resolver';
+import toptierCodes from '@/data/agency-toptier-codes.json';
 
 /**
  * REGRESSION FIXTURES FOR PROVEN MIS-ATTRIBUTIONS.
@@ -169,5 +170,25 @@ describe('resolveAgency — resolution paths', () => {
 
   it('empty input is unresolved, not a crash', () => {
     expect(resolveAgency({}).resolved).toBe(false);
+  });
+});
+
+describe('agency-toptier-codes.json codes', () => {
+  it('are unique except the pre-existing 011 pair', () => {
+    const by = new Map<string, string[]>();
+    for (const [name, entry] of Object.entries(toptierCodes)) {
+      const code = String(entry.code).padStart(3, '0');
+      const names = by.get(code) ?? [];
+      names.push(name);
+      by.set(code, names);
+    }
+    const shared = [...by.entries()].filter(([, names]) => names.length > 1);
+    // Peace Corps and the Executive Office of the President already share 011.
+    // That pair is not part of this change. Every other code, including 061, is one agency.
+    expect(shared).toEqual([
+      ['011', ['Peace Corps', 'Executive Office of the President']],
+    ]);
+    expect(by.get('061')).toEqual(['Consumer Product Safety Commission']);
+    expect(by.get('034')).toEqual(['U.S. International Trade Commission']);
   });
 });

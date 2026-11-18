@@ -13,9 +13,12 @@ const MIGRATION = readFileSync(
 const SQL = MIGRATION.replace(/--.*$/gm, '');
 
 describe('20261118 park false-green freshness', () => {
-  it('disables sync-dod-sbir so it cannot keep claiming success over 0 rows', () => {
-    expect(SQL).toMatch(/UPDATE public\.cron_jobs[\s\S]*?SET enabled = FALSE/);
+  it('does NOT park sync-dod-sbir — retries + 503 honesty stay enabled (Eric 2026-11-18)', () => {
+    // Prior draft parked the job; that section was removed before any prod apply.
+    expect(SQL).not.toMatch(/SET\s+enabled\s*=\s*FALSE/);
     expect(SQL).toMatch(/job_name = 'sync-dod-sbir'/);
+    expect(SQL).toMatch(/keep ENABLED/);
+    expect(MIGRATION).toMatch(/never park this job for an empty corpus/);
   });
 
   it('DIBBS control plane becomes content_stale + blocked, not current', () => {

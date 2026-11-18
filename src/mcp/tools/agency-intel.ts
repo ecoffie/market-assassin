@@ -41,6 +41,10 @@ export interface AgencyIntelCitation {
   published_at: string | null;
   institute_source_id: string | null;
   agency: string;
+  recommendation: string | null;
+  resolution_status: 'open' | 'closed' | 'unknown';
+  resolution_flag: 'historical' | 'confirmed_unresolved' | 'unknown';
+  source_identifier: string | null;
 }
 
 export interface AgencyIntelSpending {
@@ -185,7 +189,7 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
         : bundle.priorities.map((p) => p.pain_point)
       ).filter((s) => s.trim().length > 0);
       provenanceNote = hasSourced
-        ? `${sourcedCount} living GAO-sourced claim(s) with citations; ${legacyCount} legacy-manual fallback claim(s).`
+        ? `${sourcedCount} living sourced claim(s) from GAO reports or Inspector General recommendations, with citations; ${legacyCount} legacy-manual fallback claim(s).`
         : legacyCount > 0
           ? `Provenance unavailable — ${legacyCount} legacy-manual claim(s) only. Do not treat as GAO fact. Unsourced dollar amounts are omitted from default priority text until sourced.`
           : 'No pain-point claims for this agency.';

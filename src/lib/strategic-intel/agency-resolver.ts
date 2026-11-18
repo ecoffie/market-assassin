@@ -33,7 +33,7 @@
  * competition data as this buyer's"). This extends that contract with a resolution
  * METHOD and CONFIDENCE, which no existing resolver carries.
  *
- * Canonical target: the 49 names in src/data/agency-toptier-codes.json.
+ * Canonical target: the names in src/data/agency-toptier-codes.json.
  */
 
 import TOPTIER_CODES from '@/data/agency-toptier-codes.json';
@@ -113,7 +113,7 @@ for (const [name, entry] of Object.entries(CODES)) {
 }
 
 /**
- * Curated alias table. Only aliases whose TARGET is one of the 49 canonical
+ * Curated alias table. Only aliases whose TARGET is one of the canonical
  * names are admitted — an alias pointing at a non-canonical string cannot
  * establish canonical identity.
  */
@@ -179,7 +179,7 @@ function unresolved(input: string, note: string, extra?: Partial<AgencyResolutio
 }
 
 /**
- * Resolve an agency to one of the 49 canonical toptier names.
+ * Resolve an agency to one of the canonical toptier names.
  *
  * Returns `resolved: false` rather than guessing. A caller MUST NOT persist a
  * derived claim against an unresolved agency — store the evidence as
@@ -277,7 +277,7 @@ export function resolveAgency(input: ResolveAgencyInput): AgencyResolution {
 
   // ── 5. THE SAFE STRUCTURAL PATTERN: "X, DEPARTMENT OF [THE]" ────────────
   // Borrowed from resolveToptier. Only accepted when the rebuilt name is itself
-  // one of the 49 canonical names — so the pattern cannot mint a new agency.
+  // one of the canonical names — so the pattern cannot mint a new agency.
   const m = key.match(/^(.*),\s*DEPARTMENT OF( THE)?$/);
   if (m && m[1] && !GENERIC_TOKENS.has(m[1])) {
     const titled = m[1].split(' ').map((w) => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
