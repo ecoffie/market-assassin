@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MAP_SHELL_NAV_MESSAGE,
   MAP_SHELL_URL_MESSAGE,
+  MAP_SHELL_SELECTED_OPP_MESSAGE,
   appUrlForMapUrl,
   IN_APP_PATH_RE,
   framePageForPath,
@@ -10,6 +11,7 @@ import {
   isShellFrameUrl,
   mapShellSrc,
   parseMapShellMessage,
+  parseMapSelectedOppMessage,
   shellPanelForPath,
 } from './map-shell';
 
@@ -119,5 +121,14 @@ describe('map shell — message validation', () => {
       { type: MAP_SHELL_NAV_MESSAGE, path: '/a', search: 'q=1' }]) {
       expect(parseMapShellMessage(bad)).toBeNull();
     }
+  });
+
+  it('accepts a SAM notice selection and a clear, rejects non-SAM ids', () => {
+    const id = '6ba812a7e0284f79bc44c4932777c340';
+    expect(parseMapSelectedOppMessage({ type: MAP_SHELL_SELECTED_OPP_MESSAGE, id: id.toUpperCase(), title: 'T', deadline: 'd' }))
+      .toEqual({ type: MAP_SHELL_SELECTED_OPP_MESSAGE, id, title: 'T', deadline: 'd' });
+    expect(parseMapSelectedOppMessage({ type: MAP_SHELL_SELECTED_OPP_MESSAGE, id: null, title: '', deadline: '' })?.id).toBeNull();
+    expect(parseMapSelectedOppMessage({ type: MAP_SHELL_SELECTED_OPP_MESSAGE, id: 'N0016426R0012', title: '', deadline: '' })).toBeNull();
+    expect(parseMapShellMessage({ type: MAP_SHELL_SELECTED_OPP_MESSAGE, id, title: '', deadline: '' })).toBeNull();
   });
 });

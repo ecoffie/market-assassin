@@ -26,7 +26,17 @@ import { UpgradeModal } from '../UpgradeModal';
 import { DEFAULT_STARTER_PROMPTS } from '@/lib/chat/starter-prompts';
 import { renderSafeMarkdown } from '@/lib/chat/safe-markdown';
 import { startProposalFromNotice } from '@/lib/chat/start-proposal';
-import { CHAT_HANDOFF_KEY, parseChatHandoff, opportunityContextField, type AttachedOpportunity } from '@/lib/chat/chat-handoff';
+import {
+  CHAT_HANDOFF_KEY,
+  LAST_CHAT_SESSION_KEY,
+  MAP_SELECTED_OPP_KEY,
+  parseChatHandoff,
+  parseLastChatSessionId,
+  parseMapSelectedOpp,
+  serializeMapSelectedOpp,
+  opportunityContextField,
+  type AttachedOpportunity,
+} from '@/lib/chat/chat-handoff';
 import { customerText } from '@/lib/chat/view-preamble';
 
 interface MindyChatPanelProps {
@@ -381,13 +391,20 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
     }
   }, [email, loadingSession, sessionId]);
 
+  // Drop a Map selection the customer explicitly dismissed (chip X / New chat) so remount does not re-attach it.
+  const clearMapSelectedOpp = useCallback(() => {
+    try { sessionStorage.setItem(MAP_SELECTED_OPP_KEY, serializeMapSelectedOpp(null)); } catch { /* unavailable */ }
+  }, []);
+
   // Start a fresh conversation.
   const startNewChat = useCallback(() => {
     setMessages([]);
     setSessionId(null);
     setAttachedOpp(null);
+    try { sessionStorage.removeItem(LAST_CHAT_SESSION_KEY); } catch { /* unavailable */ }
+    clearMapSelectedOpp();
     inputRef.current?.focus();
-  }, []);
+  }, [clearMapSelectedOpp]);
 
   // Delete a conversation from history.
   const deleteSession = useCallback(async (sid: string) => {
@@ -427,22 +444,36 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
     }
   }, [email, sendMessage]);
 
-  // Map drawer handoff ("Open in full workspace"): continue that conversation and keep its attached notice.
-  // Read once, never auto-sends. The session is loaded through the owner-checked chat-sessions API.
+  // Persist the active session so Map ↔ Chat remounts do not wipe an in-progress conversation.
+  // Never clear on the initial null mount — that would erase the key before the boot restore runs.
+  useEffect(() => {
+    if (!sessionId) return;
+    try { sessionStorage.setItem(LAST_CHAT_SESSION_KEY, sessionId); } catch { /* unavailable */ }
+  }, [sessionId]);
+
+  // Boot once: drawer handoff (consume) → else last session + Map selection (peek). Never auto-sends.
+  // Map selection uses the same context.notice_id path the server already loads authoritatively.
   const handoffHandledRef = useRef(false);
   useEffect(() => {
     if (handoffHandledRef.current || !email) return;
     handoffHandledRef.current = true;
-    let raw: string | null = null;
+    let handoffRaw: string | null = null;
+    let mapRaw: string | null = null;
+    let lastRaw: string | null = null;
     try {
-      raw = sessionStorage.getItem(CHAT_HANDOFF_KEY);
-      if (raw) sessionStorage.removeItem(CHAT_HANDOFF_KEY);
+      handoffRaw = sessionStorage.getItem(CHAT_HANDOFF_KEY);
+      if (handoffRaw) sessionStorage.removeItem(CHAT_HANDOFF_KEY);
+      mapRaw = sessionStorage.getItem(MAP_SELECTED_OPP_KEY);
+      lastRaw = sessionStorage.getItem(LAST_CHAT_SESSION_KEY);
     } catch { /* sessionStorage unavailable */ }
-    const h = parseChatHandoff(raw);
-    if (!h) return;
-    if (h.opportunity) setAttachedOpp(h.opportunity);
-    if (h.sessionId) openSession(h.sessionId);
-    inputRef.current?.focus();
+    const h = parseChatHandoff(handoffRaw);
+    const mapOpp = parseMapSelectedOpp(mapRaw);
+    const lastSid = parseLastChatSessionId(lastRaw);
+    if (h?.opportunity) setAttachedOpp(h.opportunity);
+    else if (mapOpp) setAttachedOpp(mapOpp);
+    if (h?.sessionId) openSession(h.sessionId);
+    else if (lastSid) openSession(lastSid);
+    if (h || mapOpp || lastSid) inputRef.current?.focus();
   }, [email, openSession]);
 
   // "Start a proposal" (user click only): track the attached notice, make sure its documents are fetched,
@@ -767,7 +798,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
               </button>
               <button
                 type="button"
-                onClick={() => { setAttachedOpp(null); setProposalState('idle'); }}
+                onClick={() => { setAttachedOpp(null); setProposalState('idle'); clearMapSelectedOpp(); }}
                 aria-label="Remove this opportunity from the question"
                 className="shrink-0 rounded p-0.5 text-faint hover:text-white"
               >

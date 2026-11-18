@@ -16,7 +16,14 @@
  * The parent (/app) is the only reader of the messages below and checks origin + source.
  * Address translation lives in src/lib/app/map-shell.ts.
  */
-import { IN_APP_PATH_RE, MAP_SHELL_NAV_MESSAGE, MAP_SHELL_URL_MESSAGE, SHELL_PARAM, SHELL_VALUE } from '@/lib/app/map-shell';
+import {
+  IN_APP_PATH_RE,
+  MAP_SHELL_NAV_MESSAGE,
+  MAP_SHELL_SELECTED_OPP_MESSAGE,
+  MAP_SHELL_URL_MESSAGE,
+  SHELL_PARAM,
+  SHELL_VALUE,
+} from '@/lib/app/map-shell';
 
 export function isAppShellRequest(url: URL): boolean {
   return url.searchParams.get(SHELL_PARAM) === SHELL_VALUE;
@@ -95,6 +102,14 @@ export const APP_SHELL_JS = '<script>(function(){'
   + 'H.pushState=function(){var r=ps.apply(H,arguments);url();return r;};'
   + 'window.addEventListener("popstate",url);'
   + 'url();'
+  // Selected SAM listing → parent (Ask Mindy chip). Wraps any prior __onSelectedOpp; close clears.
+  + 'function postOpp(){var s=window.__selectedOpp;'
+  +   'if(s&&typeof s.id==="string"&&/^[0-9a-f]{32}$/.test(s.id)){'
+  +     'post({type:"' + MAP_SHELL_SELECTED_OPP_MESSAGE + '",id:s.id,title:String(s.title||""),deadline:String(s.deadline||"")});'
+  +   '}else{post({type:"' + MAP_SHELL_SELECTED_OPP_MESSAGE + '",id:null,title:"",deadline:""});}}'
+  + 'var _prevOnSel=window.__onSelectedOpp;'
+  + 'window.__onSelectedOpp=function(){try{if(typeof _prevOnSel==="function")_prevOnSel();}catch(e){}postOpp();};'
+  + 'postOpp();'
   + 'document.addEventListener("click",function(e){'
   +   'if(e.defaultPrevented||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;'
   +   'var a=e.target&&e.target.closest?e.target.closest("a[href]"):null;if(!a)return;'
