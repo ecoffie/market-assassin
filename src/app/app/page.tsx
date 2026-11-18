@@ -917,22 +917,10 @@ function AppDashboard() {
   }, []);
 
   // Deep-link to a specific panel via ?panel=<id> (e.g. onboarding lands the user
-  // on the Vault: /app?panel=vault). Hard refresh always returns to Today's Intel
-  // so stale ?panel=research from an old search doesn't stick around.
+  // on the Vault: /app?panel=vault). A reload keeps the panel the user was on: syncAppUrl keeps
+  // ?panel= aligned with the open panel, so the URL is never stale. (Reloads used to reset to the
+  // home panel, so refreshing Proposals or Settings dropped people back on Mindy chat.)
   useEffect(() => {
-    const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
-    const isReload = nav?.type === 'reload';
-
-    // A reload of the in-app map keeps its view: the URL mirrors the map's own (src/lib/app/map-shell.ts).
-    if (isReload && !isMapShellPanel(searchParams.get('panel'))) {
-      setActivePanel('dashboard');
-      activePanelRef.current = 'dashboard';
-      if (typeof window !== 'undefined') {
-        window.history.replaceState(null, '', '/app');
-      }
-      return;
-    }
-
     const panelParam = searchParams.get('panel');
     if (panelParam && KNOWN_PANELS.has(panelParam as AppPanel)) {
       setActivePanel(panelParam as AppPanel);
@@ -962,9 +950,14 @@ function AppDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load user profile on mount
+  // Load user profile on mount. Keyed on the ?email= VALUE, not the searchParams object: panels
+  // rewrite the URL in place (Settings tabs, panel switches via replaceState), which hands
+  // useSearchParams a new object. Depending on that object re-ran this sign-in check on every
+  // tab click, flashed the loading screen and remounted Settings on its default tab — clicking
+  // "Billing & credits" bounced back to "Alerts & matching".
+  const emailParamValue = searchParams.get('email');
   useEffect(() => {
-    const emailParam = searchParams.get('email')?.toLowerCase().trim() || null;
+    const emailParam = emailParamValue?.toLowerCase().trim() || null;
 
     // Pre-fill the sign-in form regardless — if we end up needing to show it,
     // the email field will already be populated.
@@ -1053,7 +1046,7 @@ function AppDashboard() {
     });
 
     return () => subscription.unsubscribe();
-  }, [searchParams, loadUserProfile, bootstrapFromSupabaseSession, peekSupabaseSessionEmail, maybeRefreshMIToken, returnToNextAfterSignIn]);
+  }, [emailParamValue, loadUserProfile, bootstrapFromSupabaseSession, peekSupabaseSessionEmail, maybeRefreshMIToken, returnToNextAfterSignIn]);
 
   // Loading state
   if (isLoading) {
