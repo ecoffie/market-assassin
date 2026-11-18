@@ -462,7 +462,7 @@ server.registerTool(
     annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Target-research read on a federal agency: resolves it by name / abbreviation / CGAC code, then returns ' +
-      'identity + hierarchy, pain points, and priorities (live agency_priorities_db when that table has rows, ' +
+      'identity + hierarchy, pain points, and priorities (live rows for an agency that has been acquired, ' +
       'otherwise the fixed file — priorityBasis says which). program_keyword lists growing federal-account ' +
       'obligations for that word from budget_programs; an empty table is unavailable, not zero agencies. ' +
       'Also (when available) live USASpending ' +

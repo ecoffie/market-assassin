@@ -128,12 +128,40 @@ async function persist(db: SupabaseClient, slice: BudgetSlice, links: LinkRow[])
   if (error) throw new Error(`budget_intel_sync_runs: ${error.message}`);
 }
 
+/** True when the unapplied migration's source_key column is already on the table. */
+export async function budgetAcquireReady(db: SupabaseClient): Promise<boolean> {
+  try {
+    const { error } = await db.from('agency_budget_authority').select('source_key').limit(1);
+    if (!error) return true;
+    return !missingColumn(error.message);
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(request: NextRequest) {
   const preview = request.nextUrl.searchParams.get('mode') === 'preview';
   const auth = await authorizeCronRequest(request, { isTest: preview });
   if (!auth.ok) return auth.response;
 
-  const db = sb();
+  let db: SupabaseClient;
+  try {
+    db = sb();
+  } catch {
+    return NextResponse.json({
+      success: true, degraded: true, wrote: false, reason: 'database_unconfigured',
+    }, { status: 200 });
+  }
+  if (!await budgetAcquireReady(db)) {
+    return NextResponse.json({
+      success: true,
+      degraded: true,
+      wrote: false,
+      reason: 'migration_not_applied',
+      note: 'agency_budget_authority.source_key is not present. Nothing was fetched or written. Nothing schedules this route until the migration inserts the cron row.',
+    }, { status: 200 });
+  }
+
   const cursor = await readCursor(db);
   if (cursor === 'unmeasured') {
     const http = sliceHttp({ sourceDown: false, prioritiesSourceDown: false, writeFailed: true, migrationMissing: false });

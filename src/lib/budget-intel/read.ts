@@ -1,10 +1,17 @@
 /**
- * Customer reads. The live table wins when it has any row. The fixed file is
- * used only when that table is confirmed empty, or when the read itself failed
- * (labeled unmeasured — not labeled empty). Search ranking does not call this.
+ * Customer reads. A live USASpending row replaces the fixed file only for that
+ * agency and fiscal year. Every other year stays on the file, with its as-of
+ * date, so an agency that has not been acquired yet still shows today's figures.
+ * Search ranking does not call this.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getBudgetForAgency } from '@/lib/utils/budget-authority';
+import budgetFile from '@/data/agency-budget-data.json';
+import { yearOverYear } from './slice';
+
+export const STATIC_BUDGET_AS_OF = (budgetFile as { lastUpdated?: string }).lastUpdated ?? null;
+export const STATIC_BUDGET_SOURCE = (budgetFile as { source?: string }).source
+  ?? 'OMB FY2026 discretionary request + agency CBJs (agency-budget-data.json)';
 
 export interface FileAuthority {
   agency: string;
@@ -36,9 +43,23 @@ export interface LiveAuthority {
   years: LiveAuthorityYear[];
 }
 
+export type BudgetLabel = 'usaspending_live' | 'static_file';
+
+export interface LabeledBudgetYear {
+  fiscal_year: number;
+  budget_authority: number | null;
+  label: BudgetLabel;
+  /** Set on usaspending_live years. */
+  fetched_at: string | null;
+  /** Set on static_file years. The fixed file's lastUpdated. */
+  as_of: string | null;
+  source_url: string | null;
+}
+
 export interface AuthorityDisplay {
-  shown: 'live_table' | 'static_file';
-  shown_reason: 'live_table' | 'live_table_empty' | 'live_table_unmeasured' | 'agency_not_in_live_table';
+  /** usaspending_live only when every displayed year was acquired. Otherwise static_file, including a mix (see years). */
+  shown: BudgetLabel;
+  shown_reason: 'acquired' | 'static_file' | 'mixed' | 'live_unmeasured';
   agency: string | null;
   toptier_code: string | null;
   fiscal_years: number[];
@@ -53,6 +74,9 @@ export interface AuthorityDisplay {
   source: string;
   source_url: string | null;
   fetched_at: string | null;
+  /** Fixed-file date when any displayed year came from the file. */
+  as_of: string | null;
+  years: LabeledBudgetYear[];
   grounded: boolean;
 }
 
@@ -81,74 +105,104 @@ function points(ratio: number | null): number | null {
   return Math.round((ratio - 1) * 10000) / 100;
 }
 
+const FILE_YEARS = [2025, 2026] as const;
+
 export function decideAuthorityDisplay(input: {
   table: TableProbe;
   live: LiveAuthority | null;
   file: FileAuthority | null;
   fileSource: string;
+  fileAsOf?: string | null;
 }): AuthorityDisplay {
-  const blank: AuthorityDisplay = {
-    shown: 'static_file',
-    shown_reason: 'live_table_empty',
-    agency: input.file?.agency ?? null,
-    toptier_code: input.file?.toptierCode ?? null,
-    fiscal_years: [],
-    fy2025_budget_authority: null,
-    fy2026_budget_authority: null,
-    change_amount: null,
-    change_percent: null,
-    change_percent_points: null,
-    trend: null,
-    source: input.fileSource,
-    source_url: null,
-    fetched_at: null,
-    grounded: false,
-  };
-  if (input.table === 'ready') {
-    if (!input.live || input.live.years.length === 0) {
-      return {
-        ...blank,
-        shown: 'live_table',
-        shown_reason: 'agency_not_in_live_table',
-        agency: null,
-        toptier_code: null,
-        source: 'USASpending budgetary resources (agency_budget_authority)',
-        grounded: false,
-      };
+  const asOf = input.fileAsOf === undefined ? STATIC_BUDGET_AS_OF : input.fileAsOf;
+  const liveByYear = new Map<number, LiveAuthorityYear>();
+  if (input.table === 'ready' && input.live) {
+    for (const year of input.live.years) {
+      if (year.budgetAuthority != null) liveByYear.set(year.fiscalYear, year);
     }
-    const newest = [...input.live.years].sort((a, b) => b.fiscalYear - a.fiscalYear)[0];
-    const y2025 = input.live.years.find((year) => year.fiscalYear === 2025);
-    const y2026 = input.live.years.find((year) => year.fiscalYear === 2026);
-    return {
-      shown: 'live_table',
-      shown_reason: 'live_table',
-      agency: input.live.agency,
-      toptier_code: input.live.toptierCode,
-      fiscal_years: input.live.years.map((year) => year.fiscalYear).sort((a, b) => a - b),
-      fy2025_budget_authority: y2025?.budgetAuthority ?? null,
-      fy2026_budget_authority: y2026?.budgetAuthority ?? null,
-      change_amount: newest?.changeAmount ?? null,
-      change_percent: newest?.changeRatio ?? null,
-      change_percent_points: points(newest?.changeRatio ?? null),
-      trend: newest?.trend ?? null,
-      source: 'USASpending budgetary resources (agency_budget_authority)',
-      source_url: newest?.sourceUrl ?? null,
-      fetched_at: newest?.fetchedAt ?? null,
-      grounded: newest?.budgetAuthority != null,
-    };
   }
-  if (!input.file) return { ...blank, shown_reason: input.table === 'unmeasured' ? 'live_table_unmeasured' : 'live_table_empty' };
+  const fileByYear = new Map<number, number>();
+  if (input.file?.fy2025 != null) fileByYear.set(2025, input.file.fy2025);
+  if (input.file?.fy2026 != null) fileByYear.set(2026, input.file.fy2026);
+
+  const fiscalYears = [...new Set<number>([...FILE_YEARS, ...liveByYear.keys()])].sort((a, b) => a - b);
+  const years: LabeledBudgetYear[] = [];
+  for (const fiscalYear of fiscalYears) {
+    const live = liveByYear.get(fiscalYear);
+    if (live && live.budgetAuthority != null) {
+      years.push({
+        fiscal_year: fiscalYear,
+        budget_authority: live.budgetAuthority,
+        label: 'usaspending_live',
+        fetched_at: live.fetchedAt,
+        as_of: null,
+        source_url: live.sourceUrl,
+      });
+      continue;
+    }
+    const fileAmount = fileByYear.get(fiscalYear);
+    if (fileAmount != null) {
+      years.push({
+        fiscal_year: fiscalYear,
+        budget_authority: fileAmount,
+        label: 'static_file',
+        fetched_at: null,
+        as_of: asOf,
+        source_url: null,
+      });
+    }
+  }
+
+  const liveYears = years.filter((year) => year.label === 'usaspending_live');
+  const staticYears = years.filter((year) => year.label === 'static_file');
+  const y2025 = years.find((year) => year.fiscal_year === 2025) ?? null;
+  const y2026 = years.find((year) => year.fiscal_year === 2026) ?? null;
+  const bothStatic = y2025?.label === 'static_file' && y2026?.label === 'static_file';
+  const bothLive = y2025?.label === 'usaspending_live' && y2026?.label === 'usaspending_live';
+  let changeAmount = input.file?.changeAmount ?? null;
+  let changeRatio = input.file?.changeRatio ?? null;
+  let trend = input.file?.trend ?? null;
+  if (bothLive) {
+    const newest = [...(input.live?.years ?? [])].sort((a, b) => b.fiscalYear - a.fiscalYear)[0];
+    changeAmount = newest?.changeAmount ?? null;
+    changeRatio = newest?.changeRatio ?? null;
+    trend = newest?.trend ?? null;
+  } else if (!bothStatic && y2025?.budget_authority != null && y2026?.budget_authority != null) {
+    const change = yearOverYear(y2026.budget_authority, y2025.budget_authority);
+    changeAmount = change?.amount ?? null;
+    changeRatio = change?.ratio ?? null;
+    trend = change?.trend ?? null;
+  }
+
+  const newestLabeled = [...years].sort((a, b) => b.fiscal_year - a.fiscal_year)[0];
+  const shown: BudgetLabel = newestLabeled?.label ?? 'static_file';
+  const newestLive = [...liveYears].sort((a, b) => b.fiscal_year - a.fiscal_year)[0] ?? null;
   return {
-    ...blank,
-    shown_reason: input.table === 'unmeasured' ? 'live_table_unmeasured' : 'live_table_empty',
-    fiscal_years: [2025, 2026],
-    fy2025_budget_authority: input.file.fy2025,
-    fy2026_budget_authority: input.file.fy2026,
-    change_amount: input.file.changeAmount,
-    change_percent: input.file.changeRatio,
-    change_percent_points: points(input.file.changeRatio),
-    trend: input.file.trend,
-    grounded: true,
+    shown,
+    shown_reason: input.table === 'unmeasured'
+      ? 'live_unmeasured'
+      : liveYears.length > 0 && staticYears.length > 0
+        ? 'mixed'
+        : liveYears.length > 0
+          ? 'acquired'
+          : 'static_file',
+    agency: (liveYears.length > 0 ? input.live?.agency : null) ?? input.file?.agency ?? null,
+    toptier_code: input.live?.toptierCode ?? input.file?.toptierCode ?? null,
+    fiscal_years: years.map((year) => year.fiscal_year),
+    fy2025_budget_authority: y2025?.budget_authority ?? null,
+    fy2026_budget_authority: y2026?.budget_authority ?? null,
+    change_amount: changeAmount,
+    change_percent: changeRatio,
+    change_percent_points: points(changeRatio),
+    trend,
+    source: shown === 'usaspending_live'
+      ? 'USASpending budgetary resources (agency_budget_authority)'
+      : input.fileSource,
+    source_url: newestLive?.source_url ?? null,
+    fetched_at: newestLive?.fetched_at ?? null,
+    as_of: staticYears.length > 0 ? asOf : null,
+    years,
+    grounded: years.some((year) => year.budget_authority != null),
   };
 }
 
@@ -266,16 +320,16 @@ export async function probeLiveAuthority(
 
 export async function listLiveAuthority(
   client?: SupabaseClient | null,
-): Promise<{ table: TableProbe; rows: AuthorityDisplay[] }> {
+): Promise<{ table: TableProbe; agencies: LiveAuthority[] }> {
   const sb = client === undefined ? db() : client;
-  if (!sb) return { table: 'unmeasured', rows: [] };
+  if (!sb) return { table: 'unmeasured', agencies: [] };
   try {
     const table = await tableState(sb, 'agency_budget_authority');
-    if (table !== 'ready') return { table, rows: [] };
+    if (table !== 'ready') return { table, agencies: [] };
     const { data, error } = await sb.from('agency_budget_authority').select(
       'agency, toptier_code, fiscal_year, budget_authority, obligated, outlays, change_amount, change_percent, trend, source_url, fetched_at',
     ).limit(500);
-    if (error || !data) return { table: 'unmeasured', rows: [] };
+    if (error || !data) return { table: 'unmeasured', agencies: [] };
     const byAgency = new Map<string, LiveAuthority>();
     for (const row of data as Array<Record<string, unknown>>) {
       const agency = String(row.agency ?? '');
@@ -298,15 +352,38 @@ export async function listLiveAuthority(
         years: [year],
       });
     }
-    return {
-      table: 'ready',
-      rows: [...byAgency.values()].map((live) => decideAuthorityDisplay({
-        table: 'ready', live, file: null, fileSource: '',
-      })),
-    };
+    return { table: 'ready', agencies: [...byAgency.values()] };
   } catch {
-    return { table: 'unmeasured', rows: [] };
+    return { table: 'unmeasured', agencies: [] };
   }
+}
+
+export function presentAuthorityBoard(
+  live: { table: TableProbe; agencies: LiveAuthority[] },
+  fileRows: FileAuthority[],
+): AuthorityDisplay[] {
+  const liveByAgency = new Map(live.agencies.map((agency) => [agency.agency, agency]));
+  const seen = new Set<string>();
+  const out: AuthorityDisplay[] = [];
+  for (const file of fileRows) {
+    seen.add(file.agency);
+    out.push(decideAuthorityDisplay({
+      table: live.table,
+      live: liveByAgency.get(file.agency) ?? null,
+      file,
+      fileSource: STATIC_BUDGET_SOURCE,
+    }));
+  }
+  for (const agency of live.agencies) {
+    if (seen.has(agency.agency)) continue;
+    out.push(decideAuthorityDisplay({
+      table: live.table,
+      live: agency,
+      file: null,
+      fileSource: STATIC_BUDGET_SOURCE,
+    }));
+  }
+  return out;
 }
 
 export async function presentAgencyBudget(agencyName: string, client?: SupabaseClient | null): Promise<AuthorityDisplay> {
@@ -320,10 +397,14 @@ export async function presentAgencyBudget(agencyName: string, client?: SupabaseC
     changeRatio: row.change?.percent ?? null,
     trend: row.change?.trend ?? null,
   } : null;
-  const fileSource = 'OMB FY2026 discretionary request + agency CBJs (agency-budget-data.json)';
   const names = [file?.agency, agencyName].filter((name): name is string => !!name);
   const probe = await probeLiveAuthority(names, client);
-  return decideAuthorityDisplay({ table: probe.table, live: probe.live, file, fileSource });
+  return decideAuthorityDisplay({
+    table: probe.table,
+    live: probe.live,
+    file,
+    fileSource: STATIC_BUDGET_SOURCE,
+  });
 }
 
 export async function readIncreasingPrograms(input: {

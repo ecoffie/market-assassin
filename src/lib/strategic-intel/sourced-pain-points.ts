@@ -348,8 +348,8 @@ export function choosePriorities(
   live: SourcedPainPoint[],
   legacy: SourcedPainPoint[],
 ): { priorities: SourcedPainPoint[]; priorityBasis: 'live_table' | 'static_file' | 'static_file_live_unmeasured' } {
-  if (table === 'ready') return { priorities: live, priorityBasis: 'live_table' };
   if (table === 'unmeasured') return { priorities: legacy, priorityBasis: 'static_file_live_unmeasured' };
+  if (live.length > 0) return { priorities: live, priorityBasis: 'live_table' };
   return { priorities: legacy, priorityBasis: 'static_file' };
 }
 

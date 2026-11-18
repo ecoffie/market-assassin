@@ -1,9 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getAllBudgetData } from '@/lib/utils/budget-authority';
 import {
-  getAllBudgetData,
-  getWinnersAndLosers,
-} from '@/lib/utils/budget-authority';
-import { listLiveAuthority, presentAgencyBudget } from '@/lib/budget-intel/read';
+  listLiveAuthority,
+  presentAgencyBudget,
+  presentAuthorityBoard,
+  type FileAuthority,
+} from '@/lib/budget-intel/read';
+
+function fileRows(): FileAuthority[] {
+  return getAllBudgetData().map((row) => ({
+    agency: row.agency,
+    toptierCode: row.toptierCode,
+    fy2025: row.fy2025?.budgetAuthority ?? null,
+    fy2026: row.fy2026?.budgetAuthority ?? null,
+    changeAmount: row.change?.amount ?? null,
+    changeRatio: row.change?.percent ?? null,
+    trend: row.change?.trend ?? null,
+  }));
+}
 
 /**
  * GET /api/budget-authority
@@ -30,9 +44,7 @@ export async function GET(request: NextRequest) {
           success: false,
           shown: presented.shown,
           shown_reason: presented.shown_reason,
-          error: presented.shown_reason === 'agency_not_in_live_table'
-            ? `No live budget row for "${agencyName}". The fixed file is not used once agency_budget_authority has rows.`
-            : `No budget data found for "${agencyName}"`,
+          error: `No budget data found for "${agencyName}"`,
         }, { status: 404 });
       }
       return NextResponse.json({
@@ -42,64 +54,32 @@ export async function GET(request: NextRequest) {
         source: presented.source,
         source_url: presented.source_url,
         fetched_at: presented.fetched_at,
+        as_of: presented.as_of,
         data: presented,
       });
     }
 
     // Winners or losers
+    const board = presentAuthorityBoard(await listLiveAuthority(), fileRows());
     if (type === 'winners' || type === 'losers') {
-      const live = await listLiveAuthority();
-      if (live.table === 'ready') {
-        const ranked = live.rows.filter((row) => row.change_percent != null);
-        const winners = ranked.filter((row) => (row.change_percent ?? 0) > 1).sort((a, b) => (b.change_percent ?? 0) - (a.change_percent ?? 0)).slice(0, limit);
-        const losers = ranked.filter((row) => (row.change_percent ?? 0) < 1).sort((a, b) => (a.change_percent ?? 0) - (b.change_percent ?? 0)).slice(0, limit);
-        const results = type === 'winners' ? winners : losers;
-        return NextResponse.json({
-          success: true,
-          shown: 'live_table',
-          shown_reason: 'live_table',
-          type,
-          count: results.length,
-          data: results,
-          note: 'USASpending budgetary resources in agency_budget_authority. change_percent is a ratio.',
-        });
-      }
-      const { winners, losers } = getWinnersAndLosers(limit);
+      const ranked = board.filter((row) => row.change_percent != null);
+      const winners = ranked.filter((row) => (row.change_percent as number) > 1).sort((a, b) => (b.change_percent as number) - (a.change_percent as number)).slice(0, limit);
+      const losers = ranked.filter((row) => (row.change_percent as number) < 1).sort((a, b) => (a.change_percent as number) - (b.change_percent as number)).slice(0, limit);
       const results = type === 'winners' ? winners : losers;
       return NextResponse.json({
         success: true,
-        shown: 'static_file',
-        shown_reason: live.table === 'empty' ? 'live_table_empty' : 'live_table_unmeasured',
         type,
         count: results.length,
         data: results,
-        note: live.table === 'empty'
-          ? 'Fixed OMB file. agency_budget_authority has no rows.'
-          : 'Fixed OMB file. agency_budget_authority could not be read, so this is not a measured empty table.',
+        note: 'Each year is usaspending_live or static_file. Agencies not yet acquired stay on the fixed file.',
       });
     }
 
-    // All agencies
-    const live = await listLiveAuthority();
-    if (live.table === 'ready') {
-      return NextResponse.json({
-        success: true,
-        shown: 'live_table',
-        shown_reason: 'live_table',
-        count: live.rows.length,
-        data: live.rows.slice(0, limit),
-      });
-    }
-    const allData = getAllBudgetData();
     return NextResponse.json({
       success: true,
-      shown: 'static_file',
-      shown_reason: live.table === 'empty' ? 'live_table_empty' : 'live_table_unmeasured',
-      count: allData.length,
-      data: allData.slice(0, limit),
-      note: live.table === 'empty'
-        ? 'Fixed OMB file. agency_budget_authority has no rows.'
-        : 'Fixed OMB file. agency_budget_authority could not be read, so this is not a measured empty table.',
+      count: board.length,
+      data: board.slice(0, limit),
+      note: 'Each year is usaspending_live or static_file. Agencies not yet acquired stay on the fixed file.',
     });
   } catch (error: any) {
     return NextResponse.json({

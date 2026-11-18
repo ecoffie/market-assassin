@@ -38,13 +38,22 @@ export interface AgencyBudgetTrendsResult {
   trend: string | null;
   source: string;
   last_updated: string;
-  /** Which store the numbers came from. */
-  shown?: 'live_table' | 'static_file';
+  /** Which store the numbers came from. Mixed years are labeled on `years`. */
+  shown?: 'usaspending_live' | 'static_file';
   shown_reason?: string;
   /** Percent change. -18.3 means down 18.3%. change_percent stays a ratio. */
   change_percent_points?: number | null;
   source_url?: string | null;
   fetched_at?: string | null;
+  /** Fixed-file date when a displayed year came from agency-budget-data.json. */
+  as_of?: string | null;
+  years?: Array<{
+    fiscal_year: number;
+    budget_authority: number | null;
+    label: 'usaspending_live' | 'static_file';
+    fetched_at: string | null;
+    as_of: string | null;
+  }>;
   /** Close name matches when no exact hit. */
   candidates: string[];
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
@@ -212,49 +221,37 @@ export async function getAgencyBudgetTrends(input: AgencyBudgetTrendsInput): Pro
     file: fileAuthority,
     fileSource: file.source,
   });
-  if (decided.shown === 'static_file') {
-    return {
-      ...file,
-      shown: 'static_file',
-      shown_reason: decided.shown_reason,
-      change_percent_points: decided.change_percent_points,
-      source_url: null,
-      fetched_at: null,
-    };
-  }
   return {
     ...file,
-    agency: decided.agency,
-    toptier_code: decided.toptier_code,
+    agency: decided.agency ?? file.agency,
+    toptier_code: decided.toptier_code ?? file.toptier_code,
     fiscal_years: decided.fiscal_years.length ? decided.fiscal_years : file.fiscal_years,
-    fy2025_budget_authority: decided.fy2025_budget_authority,
-    fy2026_budget_authority: decided.fy2026_budget_authority,
-    change_amount: decided.change_amount,
-    change_percent: decided.change_percent,
+    fy2025_budget_authority: decided.grounded ? decided.fy2025_budget_authority : file.fy2025_budget_authority,
+    fy2026_budget_authority: decided.grounded ? decided.fy2026_budget_authority : file.fy2026_budget_authority,
+    change_amount: decided.grounded ? decided.change_amount : file.change_amount,
+    change_percent: decided.grounded ? decided.change_percent : file.change_percent,
     change_percent_points: decided.change_percent_points,
-    trend: decided.trend,
-    source: decided.source,
-    last_updated: decided.fetched_at ?? '',
-    shown: 'live_table',
+    trend: decided.grounded ? decided.trend : file.trend,
+    source: decided.grounded ? decided.source : file.source,
+    last_updated: decided.shown === 'usaspending_live' ? (decided.fetched_at ?? file.last_updated) : file.last_updated,
+    shown: decided.shown,
     shown_reason: decided.shown_reason,
     source_url: decided.source_url,
     fetched_at: decided.fetched_at,
-    candidates: [],
+    as_of: decided.as_of,
+    years: decided.years,
     _meta: {
-      grounded: decided.grounded,
+      ...file._meta,
+      grounded: file._meta.grounded || decided.grounded,
       degraded: probe.table === 'unmeasured',
-      trend: decided.trend,
-      match_type: decided.grounded ? (file._meta.match_type === 'none' ? 'exact' : file._meta.match_type) : 'none',
-      ...(file._meta.note ? { note: file._meta.note } : {}),
+      trend: (decided.grounded ? decided.trend : file.trend) ?? file._meta.trend,
     },
-    ...(file._ai_hint ? {
+    ...(file._ai_hint && decided.shown === 'usaspending_live' ? {
       _ai_hint: {
         ...file._ai_hint,
-        summary: decided.grounded
-          ? `${decided.agency}: live USASpending budgetary resources, trend ${decided.trend ?? 'unknown'}.`
-          : 'This agency is not in the live budget table. The fixed file is not substituted once that table has rows.',
+        summary: `${decided.agency}: USASpending budgetary resources, fetched ${decided.fetched_at ?? 'unknown'}.`,
         key_caveats: [
-          'Live figures are USASpending agency budgetary resources, not the fixed OMB discretionary file.',
+          'Years labeled usaspending_live were acquired from USASpending. Years labeled static_file are the fixed OMB file.',
           'change_percent is a ratio (1.05 = +5%). change_percent_points is the percent change.',
         ],
       },

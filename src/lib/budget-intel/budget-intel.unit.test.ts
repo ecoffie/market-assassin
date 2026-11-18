@@ -205,23 +205,34 @@ describe('customer source choice', () => {
     trend: 'declining',
   };
 
-  it('uses the fixed file only when the live table is empty, and labels it', () => {
-    const shown = decideAuthorityDisplay({ table: 'empty', live: null, file, fileSource: 'fixed file' });
+  it('uses the fixed file when the live table is empty, and labels it', () => {
+    const shown = decideAuthorityDisplay({ table: 'empty', live: null, file, fileSource: 'fixed file', fileAsOf: '2026-02-18T00:00:00.000Z' });
     expect(shown.shown).toBe('static_file');
-    expect(shown.shown_reason).toBe('live_table_empty');
+    expect(shown.as_of).toBe('2026-02-18T00:00:00.000Z');
     expect(shown.fy2026_budget_authority).toBe(22e9);
     expect(shown.change_percent_points).toBeCloseTo(-18.32, 1);
   });
 
-  it('does not substitute the file once the live table has rows', () => {
-    const missing = decideAuthorityDisplay({ table: 'ready', live: null, file, fileSource: 'fixed file' });
-    expect(missing.shown).toBe('live_table');
-    expect(missing.shown_reason).toBe('agency_not_in_live_table');
-    expect(missing.fy2026_budget_authority).toBeNull();
-    expect(missing.grounded).toBe(false);
+  it('live table has DoD only; a civilian agency still returns the static file', () => {
+    const shown = decideAuthorityDisplay({
+      table: 'ready',
+      live: null,
+      file,
+      fileSource: 'fixed file',
+      fileAsOf: '2026-02-18T00:00:00.000Z',
+    });
+    expect(file.agency).toBe('Department of Veterans Affairs');
+    expect(shown.shown).toBe('static_file');
+    expect(shown.as_of).toBe('2026-02-18T00:00:00.000Z');
+    expect(shown.fy2025_budget_authority).toBe(27e9);
+    expect(shown.fy2026_budget_authority).toBe(22e9);
+    expect(shown.trend).toBe('declining');
+    expect(shown.change_amount).toBe(-5e9);
+    expect(shown.years.map((year) => year.label)).toEqual(['static_file', 'static_file']);
+    expect(shown.grounded).toBe(true);
   });
 
-  it('shows live budgetary resources with the source url', () => {
+  it('prefers an acquired year and keeps the static file for a year not yet acquired', () => {
     const shown = decideAuthorityDisplay({
       table: 'ready',
       live: {
@@ -241,18 +252,44 @@ describe('customer source choice', () => {
       },
       file,
       fileSource: 'fixed file',
+      fileAsOf: '2026-02-18T00:00:00.000Z',
     });
-    expect(shown.shown).toBe('live_table');
+    const y2025 = shown.years.find((year) => year.fiscal_year === 2025);
+    const y2026 = shown.years.find((year) => year.fiscal_year === 2026);
+    expect(y2025).toMatchObject({ label: 'static_file', budget_authority: 27e9, as_of: '2026-02-18T00:00:00.000Z' });
+    expect(y2026).toMatchObject({ label: 'usaspending_live', budget_authority: 520360602282.9, fetched_at: fetchedAt });
+    expect(shown.fy2025_budget_authority).toBe(27e9);
     expect(shown.fy2026_budget_authority).toBe(520360602282.9);
-    expect(shown.fy2025_budget_authority).toBeNull();
-    expect(shown.source_url).toContain('budgetary_resources');
-    expect(shown.change_percent_points).toBeCloseTo(13, 5);
   });
 
-  it('an unmeasured live read is not reported as an empty table', () => {
-    const shown = decideAuthorityDisplay({ table: 'unmeasured', live: null, file, fileSource: 'fixed file' });
-    expect(shown.shown_reason).toBe('live_table_unmeasured');
+  it('labels a fully acquired agency usaspending_live', () => {
+    const shown = decideAuthorityDisplay({
+      table: 'ready',
+      live: {
+        agency: 'Department of Defense',
+        toptierCode: '097',
+        years: [
+          { fiscalYear: 2025, budgetAuthority: 100, obligated: null, outlays: null, changeAmount: null, changeRatio: null, trend: null, sourceUrl: 'https://api.usaspending.gov/api/v2/agency/097/budgetary_resources/', fetchedAt },
+          { fiscalYear: 2026, budgetAuthority: 110, obligated: null, outlays: null, changeAmount: 10, changeRatio: 1.1, trend: 'growing', sourceUrl: 'https://api.usaspending.gov/api/v2/agency/097/budgetary_resources/', fetchedAt },
+        ],
+      },
+      file: { ...file, agency: 'Department of Defense', fy2025: 1, fy2026: 2 },
+      fileSource: 'fixed file',
+      fileAsOf: '2026-02-18T00:00:00.000Z',
+    });
+    expect(shown.shown).toBe('usaspending_live');
+    expect(shown.fetched_at).toBe(fetchedAt);
+    expect(shown.fy2025_budget_authority).toBe(100);
+    expect(shown.fy2026_budget_authority).toBe(110);
+    expect(shown.as_of).toBeNull();
+  });
+
+  it('an unmeasured live read still returns the static file', () => {
+    const shown = decideAuthorityDisplay({ table: 'unmeasured', live: null, file, fileSource: 'fixed file', fileAsOf: '2026-02-18T00:00:00.000Z' });
+    expect(shown.shown).toBe('static_file');
+    expect(shown.shown_reason).toBe('live_unmeasured');
     expect(shown.fy2026_budget_authority).toBe(22e9);
+    expect(shown.as_of).toBe('2026-02-18T00:00:00.000Z');
   });
 
   it('an empty program table is not a list of zero agencies', () => {
@@ -264,12 +301,13 @@ describe('customer source choice', () => {
     expect(none.shown_reason).toBe('none_found');
   });
 
-  it('live priorities replace the file only when the table is non-empty', () => {
+  it('an agency with no live priorities keeps the fixed file even if another agency was acquired', () => {
     const legacy = [{ pain_point: 'file priority', provenance: 'LEGACY_MANUAL' as const, agency: 'VA', source_type: 'legacy_manual' as const, source_url: null, document_number: null, published_at: null, institute_source_id: null, legacy_source_tag: null }];
     const live = [{ ...legacy[0], pain_point: 'Cut the disability claims backlog', provenance: 'SOURCE_FACT' as const, source_type: 'other' as const, source_url: 'https://www.performance.gov/agencies/va/goals/1/' }];
     expect(choosePriorities('empty', [], legacy).priorityBasis).toBe('static_file');
     expect(choosePriorities('ready', live, legacy).priorities[0].pain_point).toMatch(/backlog/);
-    expect(choosePriorities('ready', [], legacy).priorities).toEqual([]);
+    expect(choosePriorities('ready', [], legacy).priorities).toEqual(legacy);
+    expect(choosePriorities('ready', [], legacy).priorityBasis).toBe('static_file');
     expect(choosePriorities('unmeasured', [], legacy).priorityBasis).toBe('static_file_live_unmeasured');
     expect(formatPainPointForDisplay(live[0])).toContain('performance.gov');
     expect(formatPainPointForDisplay(live[0])).not.toContain('LEGACY_MANUAL');

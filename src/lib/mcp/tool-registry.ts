@@ -501,8 +501,8 @@ const AGENCY_INTEL_TOOL_DEF = {
     name: 'get_agency_intel',
     description:
       'Target-research read on a federal agency: resolves it by name / abbreviation / CGAC code, then returns ' +
-      'identity + hierarchy, pain points, and priorities. Priorities prefer agency_priorities_db when that table ' +
-      'has any rows (priorityBasis says live_table or static_file). Pass program_keyword to list agencies whose ' +
+      'identity + hierarchy, pain points, and priorities. An agency keeps its fixed-file budget and priorities ' +
+      'until that agency has live rows (priorityBasis and budget year labels say which). Pass program_keyword to list agencies whose ' +
       'live federal-account obligations for that word are growing or surging; an empty budget_programs table is ' +
       'unavailable, not zero. Also (when available) live USASpending ' +
       'obligations for the fiscal year with top NAICS. The "size up a buyer before I pursue them" lookup. Pain ' +
