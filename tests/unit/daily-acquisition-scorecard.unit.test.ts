@@ -10,13 +10,36 @@ import { describe, expect, it } from 'vitest';
 import {
   CORPORA,
   EXAMPLE_CAP,
+  READ_FAILED,
+  SCORECARD_BEGIN,
+  SCORECARD_END,
   SOURCE_BINDINGS,
   buildDailyScorecard,
   classifyStalled,
   dailyWindows,
   lastNonemptyIngest,
+  publicJson,
+  publicLink,
+  publicMarkdown,
   renderMarkdown,
+  scrubPublicText,
 } from '../../scripts/daily-acquisition-scorecard.mjs';
+
+const SECRET_LEAK = [
+  /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i,
+  /eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/,
+  /supabase\.(co|in|net)/i,
+  /Bearer\s+\S+/i,
+  /postgres:\/\//i,
+  /api[_-]?key\s*[=:]/i,
+  /service[_-]?role/i,
+  /SUPABASE_SERVICE_ROLE_KEY/,
+  /sk_live_/,
+];
+
+function expectNoSecrets(text: string) {
+  for (const pattern of SECRET_LEAK) expect(text).not.toMatch(pattern);
+}
 
 const NOW = new Date('2026-11-18T12:00:00.000Z');
 
@@ -272,9 +295,13 @@ describe('buildDailyScorecard', () => {
     const sam = report.sources[0];
     expect(sam.newUnique24h.status).toBe('unknown');
     expect(sam.newUnique24h.value).toBeNull();
-    expect(sam.newUnique24h.reason).toBe('column created_at does not exist');
-    expect(renderMarkdown(report)).toContain('unknown — column created_at does not exist');
-    expect(renderMarkdown(report)).not.toContain('new unique 24h: 0');
+    expect(sam.newUnique24h.reason).toBe(READ_FAILED);
+    const published = publicMarkdown(report);
+    expect(published).toContain(`unknown — ${READ_FAILED}`);
+    expect(published).not.toContain('column created_at does not exist');
+    expect(published).not.toContain('new unique 24h: 0');
+    expectNoSecrets(published);
+    expectNoSecrets(publicJson(report));
   });
 
   it('a failed instance read does not become an empty source list counted as zero', async () => {
@@ -290,6 +317,58 @@ describe('buildDailyScorecard', () => {
     expect(report.instanceList.value).toBeNull();
     expect(report.sources).toEqual([]);
     expect(report.corpora[0].newUnique24h.status).toBe('measured');
+  });
+
+  it('public output keeps a government link and drops secrets, emails, and internal hosts', async () => {
+    const io = fakeIo({
+      rows(table) {
+        if (table === 'data_source_instances') {
+          return okRows([{
+            source_key: 'sam_opportunities_sam_gov',
+            name: 'SAM.gov buyer alice@agency.gov',
+            dataset_key: 'sam_opportunities',
+            source_state: 'current',
+            watch_cadence_days: 1,
+            last_verified_ingest: '2026-11-18T00:00:00.000Z',
+          }]);
+        }
+        if (table === 'agency_pain_points_db') {
+          return okRows([{
+            pain_point: 'Grid contact bob@energy.gov and Bearer eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.sig',
+            agency: 'Department of Energy',
+            source_url: 'https://www.gao.gov/products/GAO-26-1?api_key=supersecret',
+            created_at: '2026-11-18T01:00:00.000Z',
+          }, {
+            pain_point: 'internal',
+            agency: 'VA',
+            source_url: 'https://abcdcompany.supabase.co/rest/v1/agency_pain_points_db?apikey=sb_secret_value',
+            created_at: '2026-11-18T01:00:00.000Z',
+          }]);
+        }
+        if (table === 'cron_job_runs') {
+          return { ok: false, error: 'postgres://svc:p@10.1.1.5/postgres password=hunter2', rows: [], count: null };
+        }
+        return okRows([]);
+      },
+    });
+    const report = await buildDailyScorecard(io, { now: NOW, jobs: ['sync-dibbs'], corpora: CORPORA.filter((c) => c.key === 'pain_points') });
+    const md = publicMarkdown(report);
+    const json = publicJson(report);
+    expect(publicLink('https://www.gao.gov/products/GAO-26-1?api_key=supersecret')).toBe('https://www.gao.gov/products/GAO-26-1');
+    expect(publicLink('https://abcdcompany.supabase.co/rest/v1/x')).toBeNull();
+    expect(publicLink('https://user:pass@www.gao.gov/x')).toBeNull();
+    expect(md).toContain('https://www.gao.gov/products/GAO-26-1');
+    expect(md).toContain('Department of Energy');
+    expect(md).not.toContain('api_key=');
+    expect(md).not.toContain('bob@energy.gov');
+    expect(md).not.toContain('alice@agency.gov');
+    expect(md).not.toContain('abcdcompany');
+    expect(md).not.toContain('hunter2');
+    expect(md).not.toContain('10.1.1.5');
+    expect(json).not.toContain('eyJ');
+    expectNoSecrets(md);
+    expectNoSecrets(json);
+    expect(scrubPublicText('see https://db.example.supabase.co/rest and sk_live_abc123')).not.toMatch(/supabase|sk_live_/);
   });
 
   it('the real catalog never binds extracted_at or synced_at as a new-row clock', () => {
@@ -323,30 +402,48 @@ describe('the script and the workflow stay read-only', () => {
 
   it('schedules weekdays, publishes the artifact and summary, and uses the existing Actions secrets', () => {
     expect(workflow).toContain("cron: '0 12 * * 1-5'");
-    expect(workflow).toContain('secrets.NEXT_PUBLIC_SUPABASE_URL');
-    expect(workflow).toContain('secrets.SUPABASE_SERVICE_ROLE_KEY');
+    expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).toContain('contents: read');
+    expect(workflow).not.toMatch(/contents:\s*write/);
+    expect(workflow).not.toMatch(/pull_request:/);
+    expect(workflow).not.toMatch(/pull_request_target:/);
     expect(workflow).toContain('daily-acquisition-scorecard');
     expect(workflow).toContain('GITHUB_STEP_SUMMARY');
     expect(workflow).toContain('actions/upload-artifact');
     expect(workflow).toContain('set +x');
-    expect(workflow).not.toMatch(/^\s*pull_request:/m);
+    expect(workflow).toContain(SCORECARD_BEGIN);
     expect(workflow).not.toMatch(/echo\s+.*SUPABASE_SERVICE_ROLE_KEY/);
     expect(workflow).not.toMatch(/echo\s+.*secrets\./);
+    const build = workflow.split('- name: Build scorecard')[1].split('- name:')[0];
+    expect(build).toContain('secrets.NEXT_PUBLIC_SUPABASE_URL');
+    expect(build).toContain('secrets.SUPABASE_SERVICE_ROLE_KEY');
+    expect(workflow.replace(build, '')).not.toContain('SUPABASE_SERVICE_ROLE_KEY');
+    expect(workflow.replace(build, '')).not.toContain('NEXT_PUBLIC_SUPABASE_URL');
   });
 
   it('the daily command does not run the seven-day scorecard', () => {
     const dir = mkdtempSync(join(tmpdir(), 'scorecard-'));
     const script = join(process.cwd(), 'scripts/daily-acquisition-scorecard.mjs');
+    const planted = 'eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.sigvalue';
     let code = 0;
+    let stdout = '';
     try {
-      execFileSync(process.execPath, [script, '--out-dir', dir], {
+      stdout = execFileSync(process.execPath, [script, '--out-dir', dir], {
         cwd: dir,
-        env: { PATH: process.env.PATH },
+        encoding: 'utf8',
+        env: {
+          PATH: process.env.PATH,
+          SUPABASE_SERVICE_ROLE_KEY: planted,
+        },
       });
     } catch (err) {
-      code = (err as { status?: number }).status ?? 1;
+      const thrown = err as { status?: number; stdout?: string };
+      code = thrown.status ?? 1;
+      stdout = thrown.stdout ?? '';
     }
     expect(code).toBe(2);
+    expect(stdout.indexOf(SCORECARD_BEGIN)).toBeGreaterThanOrEqual(0);
+    expect(stdout.indexOf(SCORECARD_END)).toBeGreaterThan(stdout.indexOf(SCORECARD_BEGIN));
     const report = JSON.parse(readFileSync(join(dir, 'acquisition-scorecard.json'), 'utf8'));
     expect(report.label).toBe('Daily acquisition scorecard');
     expect(report.measured).toBe(false);
@@ -354,5 +451,10 @@ describe('the script and the workflow stay read-only', () => {
     const md = readFileSync(join(dir, 'acquisition-scorecard.md'), 'utf8');
     expect(md).toContain('None of them are zero.');
     expect(md).not.toMatch(/\b0\b/);
+    expectNoSecrets(stdout);
+    expectNoSecrets(md);
+    expectNoSecrets(JSON.stringify(report));
+    expect(stdout).not.toContain(planted);
+    expect(md).not.toContain(planted);
   });
 });

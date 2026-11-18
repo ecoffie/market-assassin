@@ -1,25 +1,21 @@
-# Weekday acquisition scorecard. Runs on GitHub-hosted runners, not a laptop.
-# Schedule fires only after this file is on the default branch. workflow_dispatch
-# can run it from a branch.
+# Weekday acquisition scorecard. Runs on GitHub-hosted runners.
+# Schedule fires only after this file is on the default branch.
+# workflow_dispatch can run it from a branch.
 #
-# Secrets (already used by bq-awards-ingest.yml and bq-awards-idv-migration.yml):
-#   NEXT_PUBLIC_SUPABASE_URL
-#   SUPABASE_SERVICE_ROLE_KEY
-# The scorecard issues GET /rest/v1 only. The job must not print those values.
+# The database credential is an existing Actions secret, passed only as
+# environment on the build step. The step does not print it.
 #
-# An automated reader with Actions read on this repo:
-#   1. GET /repos/ecoffie/market-assassin/actions/workflows/daily-acquisition-scorecard.yml/runs?status=success&per_page=1
-#   2. GET /repos/ecoffie/market-assassin/actions/runs/<run_id>/artifacts
-#   3. GET /repos/ecoffie/market-assassin/actions/artifacts/<artifact_id>/zip
-# The zip is artifact `daily-acquisition-scorecard` and holds
-# acquisition-scorecard.json and acquisition-scorecard.md.
-# The same markdown is the job summary on that run.
+# A reader that can list runs and read job logs (and cannot download artifacts)
+# takes the scorecard from the build step log, between the lines
+# === SCORECARD BEGIN === and === SCORECARD END ===.
+# The same markdown is the job summary. The artifact of the same name is the
+# JSON and markdown files.
 name: Daily acquisition scorecard
 
 on:
   workflow_dispatch:
   schedule:
-    # 12:00 UTC Monday–Friday. Morning in US Eastern (07:00 EST / 08:00 EDT).
+    # 12:00 UTC Monday–Friday.
     - cron: '0 12 * * 1-5'
 
 permissions:

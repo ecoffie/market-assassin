@@ -22,6 +22,92 @@ import { applyEnvFile, q, restGet } from './acquisition-scorecard.mjs';
 const HOUR = 60 * 60 * 1000;
 export const EXAMPLE_CAP = 5;
 export const INSTANCE_CAP = 1000;
+export const SCORECARD_BEGIN = '=== SCORECARD BEGIN ===';
+export const SCORECARD_END = '=== SCORECARD END ===';
+/** Server text never reaches a public log. A failed read stays unknown. */
+export const READ_FAILED = 'the read failed';
+
+const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
+const JWT = /eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]{8,})?/g;
+const BEARER = /\bBearer\s+[A-Za-z0-9._~+/-]{8,}/gi;
+const CONN = /\b(?:postgres|postgresql|mysql|mongodb|redis):\/\/\S+/gi;
+const KEY_ASSIGN = /\b(?:api[_-]?key|apikey|access[_-]?token|refresh[_-]?token|secret|password|sig|signature|service[_-]?role(?:[_-]?key)?)\s*[=:]\s*\S+/gi;
+const AWS_KEY = /\bAKIA[0-9A-Z]{16}\b/g;
+const STRIPE_KEY = /\b(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]+\b/g;
+
+function isInternalHost(host) {
+  const h = host.toLowerCase().replace(/\.$/, '');
+  if (h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal') || h.endsWith('.localdomain')) return true;
+  if (h.endsWith('.supabase.co') || h.endsWith('.supabase.in') || h.endsWith('.supabase.net')) return true;
+  if (h === '0.0.0.0' || h === '::1') return true;
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) return true;
+  return false;
+}
+
+/** A public http(s) link, or null. Query strings and userinfo are dropped. */
+export function publicLink(value) {
+  if (value == null || String(value).trim() === '') return null;
+  let url;
+  try { url = new URL(String(value).trim()); } catch { return null; }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+  if (url.username || url.password) return null;
+  if (isInternalHost(url.hostname)) return null;
+  if (/token|apikey|api_key|secret|password|signature|eyJ/i.test(`${url.username}${url.password}${url.pathname}`)) return null;
+  url.username = '';
+  url.password = '';
+  url.search = '';
+  url.hash = '';
+  return url.toString();
+}
+
+/** Redact emails, keys, connection strings, and non-public URLs inside free text. */
+export function scrubPublicText(value) {
+  if (value == null) return value;
+  let s = String(value);
+  s = s.replace(/https?:\/\/[^\s)]+/gi, (raw) => {
+    const trimmed = raw.replace(/[),.;]+$/g, '');
+    const tail = raw.slice(trimmed.length);
+    const link = publicLink(trimmed);
+    return (link ?? '[redacted]') + tail;
+  });
+  s = s.replace(EMAIL, '[redacted]');
+  s = s.replace(BEARER, '[redacted]');
+  s = s.replace(JWT, '[redacted]');
+  s = s.replace(CONN, '[redacted]');
+  s = s.replace(KEY_ASSIGN, '[redacted]');
+  s = s.replace(AWS_KEY, '[redacted]');
+  s = s.replace(STRIPE_KEY, '[redacted]');
+  s = s.replace(/\b[a-z0-9-]+\.supabase\.(?:co|in|net)\b/gi, '[redacted]');
+  return s;
+}
+
+function publishString(value) {
+  const text = String(value);
+  if (/^\s*https?:\/\//i.test(text)) return publicLink(text.trim()) ?? '';
+  return scrubPublicText(text);
+}
+
+/** Walk a report and publish every string. Failed-read server bodies are not copied in. */
+export function toPublicReport(value) {
+  if (value == null) return value;
+  if (typeof value === 'string') return publishString(value);
+  if (typeof value === 'number' || typeof value === 'boolean') return value;
+  if (Array.isArray(value)) return value.map((item) => toPublicReport(item));
+  if (typeof value === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) out[k] = toPublicReport(v);
+    return out;
+  }
+  return null;
+}
+
+export function publicMarkdown(report) {
+  return scrubPublicText(renderMarkdown(toPublicReport(report)));
+}
+
+export function publicJson(report) {
+  return scrubPublicText(JSON.stringify(toPublicReport(report), null, 2));
+}
 
 /** Rolling windows ending at `now`. 24h is not "today so far". */
 export function dailyWindows(now = new Date()) {
@@ -219,7 +305,7 @@ async function countWhere(io, spec, column, start, end, extra) {
   if (extra) parts.push(extra);
   const res = await io.count(spec.table, { ...(spec.filters || {}), and: `(${parts.join(',')})` });
   if (!res || res.ok !== true || typeof res.count !== 'number' || !Number.isFinite(res.count)) {
-    return unknown((res && res.error) || 'count header missing', column);
+    return unknown(READ_FAILED, column);
   }
   return measured(res.count, null, column);
 }
@@ -263,7 +349,7 @@ function resolveProducer(cronJob, enabledByJob) {
   if (!enabledByJob || enabledByJob.error) {
     return {
       mode: 'unreadable',
-      fact: unknown(enabledByJob?.error || 'cron_jobs could not be read'),
+      fact: unknown(READ_FAILED),
     };
   }
   if (!Object.prototype.hasOwnProperty.call(enabledByJob.map, cronJob)) {
@@ -277,8 +363,7 @@ function resolveProducer(cronJob, enabledByJob) {
 
 export function rollupClock(instanceRead, datasetKey, now, producerEnabled) {
   if (!instanceRead.ok) {
-    const reason = instanceRead.error || 'data_source_instances could not be read';
-    return { lastNonemptyIngest: unknown(reason), stalled: unknown(reason) };
+    return { lastNonemptyIngest: unknown(READ_FAILED), stalled: unknown(READ_FAILED) };
   }
   const mine = instanceRead.rows.filter((row) => row.dataset_key === datasetKey);
   if (!mine.length) {
@@ -338,12 +423,12 @@ async function measureExamples(io, corpus, window) {
     and: `(${corpus.newColumn}.gte.${window.start},${corpus.newColumn}.lt.${window.end})`,
   });
   if (!res || res.ok !== true || !Array.isArray(res.rows)) {
-    return unknown((res && res.error) || 'example read failed');
+    return unknown(READ_FAILED);
   }
   const value = res.rows.slice(0, EXAMPLE_CAP).map((row) => ({
     title: row[corpus.example.title] ?? null,
     agency: row[corpus.example.agency] ?? null,
-    link: row[corpus.example.link] ?? null,
+    link: publicLink(row[corpus.example.link]) ?? null,
     seenAt: row[corpus.newColumn] ?? null,
   }));
   return measured(value, value.length ? null : 'no new rows in the 7d window');
@@ -357,7 +442,7 @@ async function latestRun(io, job) {
     limit: '1',
   });
   if (!res || res.ok !== true || !Array.isArray(res.rows)) {
-    return { job, latest: unknown((res && res.error) || 'cron_job_runs could not be read') };
+    return { job, latest: unknown(READ_FAILED) };
   }
   const row = res.rows[0];
   if (!row) {
@@ -402,7 +487,7 @@ export async function buildDailyScorecard(io, opts = {}) {
   const rows = instanceRead && instanceRead.ok && Array.isArray(instanceRead.rows) ? instanceRead.rows : [];
   const capped = instanceRead && instanceRead.ok === true && rows.length >= INSTANCE_CAP;
   const instanceList = !instanceRead || instanceRead.ok !== true
-    ? { ...unknown(instanceRead?.error || 'data_source_instances could not be read'), capped: false, readOk: false }
+    ? { ...unknown(READ_FAILED), capped: false, readOk: false }
     : capped
       ? { ...unknown('read cap of 1000 data_source_instances rows hit; the source list is a slice, not the population'), capped: true, readOk: true }
       : { ...measured(rows.length), capped: false, readOk: true };
@@ -416,7 +501,7 @@ export async function buildDailyScorecard(io, opts = {}) {
       limit: '100',
     });
     if (!enabled || enabled.ok !== true || !Array.isArray(enabled.rows)) {
-      enabledByJob = { map: {}, error: (enabled && enabled.error) || 'cron_jobs could not be read' };
+      enabledByJob = { map: {}, error: READ_FAILED };
     } else {
       const map = {};
       for (const row of enabled.rows) if (row && row.job_name) map[row.job_name] = row.enabled;
@@ -560,7 +645,7 @@ export function renderMarkdown(report) {
       continue;
     }
     for (const row of ex.value.slice(0, EXAMPLE_CAP)) {
-      lines.push(`- ${row.agency ?? 'agency unknown'} — ${clip(row.title)} — ${row.link ?? 'no source link'}`);
+      lines.push(`- ${row.agency || 'agency unknown'} — ${clip(row.title)} — ${row.link || 'no source link'}`);
     }
     lines.push('');
   }
@@ -636,18 +721,16 @@ function unmeasured(now, reason) {
 }
 
 function writeReport(report, outDir) {
-  const markdown = renderMarkdown(report);
+  const markdown = publicMarkdown(report);
+  const json = publicJson(report);
   if (outDir) {
     mkdirSync(outDir, { recursive: true });
-    writeFileSync(join(outDir, 'acquisition-scorecard.json'), JSON.stringify(report, null, 2));
+    writeFileSync(join(outDir, 'acquisition-scorecard.json'), json);
     writeFileSync(join(outDir, 'acquisition-scorecard.md'), markdown);
-    console.log(`wrote ${join(outDir, 'acquisition-scorecard.json')}`);
-    console.log(`wrote ${join(outDir, 'acquisition-scorecard.md')}`);
-  } else if (process.argv.includes('--markdown')) {
-    console.log(markdown);
-  } else {
-    console.log(JSON.stringify(report, null, 2));
   }
+  console.log(SCORECARD_BEGIN);
+  console.log(markdown);
+  console.log(SCORECARD_END);
 }
 
 async function main() {
@@ -660,7 +743,7 @@ async function main() {
   }
   const { url, key } = loadCredentials();
   if (!url || !key) {
-    const report = unmeasured(now, 'missing NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL) or SUPABASE_SERVICE_ROLE_KEY in the environment or .env.local');
+    const report = unmeasured(now, 'credentials are not available in this environment');
     writeReport(report, outDir);
     process.exit(2);
   }
@@ -668,7 +751,7 @@ async function main() {
   try {
     report = await buildDailyScorecard(createPostgrestReader(url, key), { now });
   } catch (err) {
-    report = unmeasured(now, err instanceof Error ? err.message : 'scorecard read failed');
+    report = unmeasured(now, READ_FAILED);
     writeReport(report, outDir);
     process.exit(1);
   }
