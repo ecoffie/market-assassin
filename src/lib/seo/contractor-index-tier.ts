@@ -13,13 +13,17 @@
  *  - /naics and /agencies tabs: never indexed (they restate the profile's own breakdowns).
  * Pages below the tier still render (noindex, follow) so links and visitors keep working.
  *
- * The threshold is an ESTIMATE aimed at roughly the top 3,000 contractors; verify it after
- * deploy against the URL count of sitemap-contractors.xml and adjust here. One constant, read by
- * the pages and the sitemap alike, so the sitemap never lists a page that noindexes itself.
+ * Threshold history (one constant, read by the pages and the sitemap alike, so the sitemap never
+ * lists a page that noindexes itself):
+ *  - $10M (first cut) removed nothing: on the PR #2154 preview, all 11,770 sitemap contractors
+ *    were already >= $10M (priority tiers: 1,007 at $1B+, 5,533 at $100M–$1B, 5,230 at $10M–$100M).
+ *  - $500M targets ~3,000: 1,007 at $1B+ plus an estimated ~1,700 of the $100M–$1B band
+ *    (log-uniform assumption). Verify against the URL count of sitemap-contractors.xml after
+ *    deploy and adjust here.
  */
 import { isThinContractor } from '@/lib/seo/warm-priority';
 
-export const CONTRACTOR_INDEX_MIN_OBLIGATED = 10_000_000;
+export const CONTRACTOR_INDEX_MIN_OBLIGATED = 500_000_000;
 
 /** Are profile and /contracts pages for this contractor offered to Google? */
 export function contractorIndexable(
