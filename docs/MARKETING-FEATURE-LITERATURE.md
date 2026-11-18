@@ -7663,3 +7663,13 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 **SEO.** Ask Mindy upload Excel / download capability statement PDF / GovCon AI research report.
 
 **Proof.** PR #2185 — `spreadsheetMarkingBody` + `GeneratedDownloadChips` + SSE `deliverables`; vault/create-document/chip unit tests.
+
+## Ask Mindy delivers Excel and CSV alongside Word and PDF (2026-11-18)
+
+**What.** When a generated Ask Mindy document includes tables — or you ask for a spreadsheet — Mindy also saves Excel and CSV copies you can download from the same in-chat buttons.
+
+**Why it matters.** Strategy work often needs a sheet for the numbers, not only a narrative PDF. One research turn can hand the customer a Word brief, a PDF, and a spreadsheet without leaving the conversation.
+
+**Honest scope.** Spreadsheet export uses the document's table blocks (or a Summary sheet when there are none). CSV cells are formula-injection safe. Still behind the Vault generated-files flag.
+
+**Proof.** `render-spreadsheet.ts` + `create_document` W4 path; sample deliverables in the release package.

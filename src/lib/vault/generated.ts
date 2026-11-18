@@ -15,9 +15,12 @@ import type { ChatActingScope } from '@/lib/chat/chat-acting-scope';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const GENERATED_MAX_BYTES = 20 * 1024 * 1024;
-const MIME: Record<'pdf' | 'docx', string> = {
+export type GeneratedFormat = 'pdf' | 'docx' | 'xlsx' | 'csv';
+const MIME: Record<GeneratedFormat, string> = {
   pdf: 'application/pdf',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  csv: 'text/csv; charset=utf-8',
 };
 
 /** The reads this module needs beyond insert (parent lookup). */
@@ -29,7 +32,7 @@ export interface GeneratedDb extends VaultDb {
 export interface SaveGeneratedInput {
   callerEmail: string;
   request: VaultUploadInput['request'];
-  format: 'pdf' | 'docx';
+  format: GeneratedFormat;
   filename: string;
   bytes: Buffer;
   /** The DocModel the file was rendered from (stored so a revision edits the model, not the file). */
@@ -52,7 +55,9 @@ export async function saveGeneratedDocument(
   input: SaveGeneratedInput,
   deps: { db: GeneratedDb; storage: VaultStorage; resolveScope?: (email: string, request: VaultUploadInput['request']) => Promise<ChatActingScope>; now?: () => number },
 ): Promise<SaveGeneratedResult> {
-  if (input.format !== 'pdf' && input.format !== 'docx') return { ok: false, status: 400, code: 'invalid', message: 'format must be pdf or docx' };
+  if (input.format !== 'pdf' && input.format !== 'docx' && input.format !== 'xlsx' && input.format !== 'csv') {
+    return { ok: false, status: 400, code: 'invalid', message: 'format must be pdf, docx, xlsx, or csv' };
+  }
   if (!input.bytes?.length) return { ok: false, status: 400, code: 'invalid', message: 'empty file' };
   if (input.bytes.length > GENERATED_MAX_BYTES) return { ok: false, status: 413, code: 'too_large', message: 'generated file too large' };
   if (input.docModel === undefined || input.docModel === null || typeof input.docModel !== 'object') {
@@ -97,7 +102,7 @@ export async function saveGeneratedDocument(
 
   const { data: buckets } = await deps.storage.listBuckets();
   if (!buckets?.find((b) => b.name === VAULT_BUCKET)) await deps.storage.createBucket(VAULT_BUCKET, { public: false });
-  const base = safeStorageName(input.filename.replace(/\.(pdf|docx)$/i, '')) || 'Mindy-document';
+  const base = safeStorageName(input.filename.replace(/\.(pdf|docx|xlsx|csv)$/i, '')) || 'Mindy-document';
   const filename = `${base}.${input.format}`;
   const storagePath = `${owner.ownerEmail}/generated/${(deps.now ?? Date.now)()}-v${version}-${filename}`;
   const { error: upErr } = await deps.storage.from(VAULT_BUCKET).upload(storagePath, input.bytes, { contentType: MIME[input.format], upsert: false });

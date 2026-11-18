@@ -194,7 +194,7 @@ describe('create_document', () => {
     expect(block.tone.enum).toEqual(['note', 'warning', 'key_finding']);
     expect(block.kind.enum).toEqual(['bar', 'line', 'pie']);
     expect(block.items.items.properties.claim.enum).toEqual([...CLAIM_VALUES]);
-    expect(CREATE_DOCUMENT_TOOL_DEF.function.description).toMatch(/CALL THIS whenever the user asks to create, make, write up, export, download or save a document, report, PDF, Word file, capability statement/);
+    expect(CREATE_DOCUMENT_TOOL_DEF.function.description).toMatch(/CALL THIS whenever the user asks to create, make, write up, export, download or save a document, report, PDF, Word file, Excel, spreadsheet, CSV, capability statement/);
   });
 
   it('revision: an earlier ASSUMPTION re-emitted as a fact is refused; nothing saved', async () => {
@@ -294,6 +294,54 @@ describe('create_document', () => {
     expect(String(r.pdf_note)).toMatch(/PDF could not be produced/);
     expect(s.docs()).toHaveLength(1);
     expect(s.docs()[0].mime_type).toBe(DOCX_MIME);
+  });
+
+  it('W4: table blocks also save Excel and CSV; include_spreadsheet:false keeps Word/PDF only', async () => {
+    const withTable = model({
+      sections: [{
+        id: 'a',
+        heading: 'Buyers',
+        blocks: [{
+          type: 'table',
+          id: 't1',
+          claim: 'fact',
+          cites: ['s1'],
+          columns: [{ key: 'agency', label: 'Agency' }, { key: 'n', label: 'Count', format: 'int' }],
+          rows: [{ agency: 'VA', n: 12 }],
+        }],
+      }],
+    });
+    const s = setup();
+    const r = await s.tool.execute({ doc_model: withTable });
+    expect(r).toMatchObject({ ok: true });
+    expect((r.files as R[]).map((f) => f.format)).toEqual(['docx', 'pdf', 'xlsx', 'csv']);
+    expect(s.renders.map((x) => x.format)).toEqual(expect.arrayContaining(['docx', 'pdf', 'xlsx', 'csv']));
+
+    const s2 = setup();
+    const r2 = await s2.tool.execute({ doc_model: withTable, include_spreadsheet: false });
+    expect((r2.files as R[]).map((f) => f.format)).toEqual(['docx', 'pdf']);
+  });
+
+  it('W4: revising a Word-only parent with a table model keeps result version from the Word save', async () => {
+    const P = '00000000-0000-4000-8000-00000000bbbb';
+    const parentModel = model();
+    const s = setup({
+      rows: [{
+        id: P, user_email: ME, doc_class: 'generated', archived_at: null,
+        original_filename: 'Brief.docx', mime_type: DOCX_MIME, version: 1, parent_id: null, doc_model: parentModel,
+      }],
+    });
+    const withTable = model({
+      sections: [{
+        id: 'a', heading: 'Buyers', blocks: [{
+          type: 'table', id: 't1', claim: 'fact', cites: ['s1'],
+          columns: [{ key: 'agency', label: 'Agency' }], rows: [{ agency: 'VA' }],
+        }],
+      }],
+    });
+    const r = await s.tool.execute({ doc_model: withTable, revises_document_id: P });
+    expect(r).toMatchObject({ ok: true, version: 2 });
+    expect((r.files as R[]).map((f) => f.format)).toEqual(['docx', 'pdf', 'xlsx', 'csv']);
   });
 
   it('non-billable and classified: never offered in the billed card chat; an explicit owner-scoped write; refused without a workspace', () => {
