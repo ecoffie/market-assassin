@@ -33,6 +33,24 @@ import { isRepeatBuyer } from '@/lib/opportunities/repeat-buyer';
 import { dodaacFromSolicitation } from '@/lib/opportunities/early-signal-pins';
 import { loadDodaacEarlySignal } from '@/lib/gov-contacts/dodaac-directory';
 import { upsertInChunks, staleCleanupOrFilters, staleCleanupMode } from '@/lib/sam/sync-upsert';
+import { reportCronOutcome, type CronOutcome } from '@/lib/cron-self-report';
+
+/**
+ * The dispatcher records `dispatched` with a null http_status at 12s and then
+ * stops listening. These are the cron_jobs rows. `recovery` is a watchdog
+ * fetch, not one of those rows — reporting it would write the wrong job.
+ */
+const SAM_CRON_JOB: Record<string, string> = {
+  full: 'sync-sam-opportunities-full',
+  delta: 'sync-sam-opportunities-delta',
+  resume: 'sync-sam-opportunities-resume',
+};
+
+async function reportSam(requestedType: string, outcome: CronOutcome, message?: string): Promise<void> {
+  const job = SAM_CRON_JOB[requestedType];
+  if (!job) return;
+  await reportCronOutcome(job, outcome, message).catch(() => {});
+}
 
 // The DoDAAC early-signal band map, loaded ONCE per sync run (an async precomputed lookup — same as
 // the map decorate). mapToDbRecord stays a pure sync fn by reading this run-scoped closure rather
@@ -429,6 +447,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (SAM_KEYS.length === 0) {
+    if (!dryRun) await reportSam(syncTypeParam, 'error', 'No SAM API keys configured');
     return NextResponse.json({ error: 'No SAM API keys configured (SAM_API_KEY / SAM_API_KEY_1..N / SAM_API_KEY_BACKUP)' }, { status: 500 });
   }
   // Start each run from the first key so keys whose quota has reset get re-tried
@@ -658,6 +677,14 @@ export async function GET(request: NextRequest) {
 
     console.log(`[sync-sam] ${finalStatus}: ${totalFetched} fetched, ${newRecords + updatedRecords} upserted, ${apiCallsMade} API calls, ${duration}s`);
 
+    // The dispatcher already closed this connection if the run passed 12s.
+    // Without this write the latest cron_job_runs row stays `dispatched`.
+    if (!dryRun) {
+      const outcome: CronOutcome =
+        isFullSuccess && errors.length === 0 ? 'success' : totalFetched > 0 ? 'partial' : 'error';
+      await reportSam(syncTypeParam, outcome, errors[0]);
+    }
+
     // STALE RECORD CLEANUP: Only run after successful FULL sync
     // This prevents SAM.gov outages from accidentally hiding valid opportunities
     let staleRecordsMarked = 0;
@@ -828,18 +855,23 @@ export async function GET(request: NextRequest) {
     const msg = err instanceof Error ? err.message : String(err);
     const isUpstreamTransient = /SAM\.gov API error:\s*(502|503|504)\b|no healthy upstream/i.test(msg);
     if (isUpstreamTransient && totalFetched === 0) {
-      console.warn('[sync-sam] soft-skip: transient SAM.gov upstream error —', msg);
+      // A 200 here was recorded as success: the dispatcher is still listening
+      // when the first page fails fast, and it is not listening when the run
+      // is long. Either way a zero-row upstream failure is not a completed sync.
+      console.warn('[sync-sam] upstream unavailable —', msg);
+      if (!dryRun) await reportSam(syncTypeParam, 'error', msg);
       return NextResponse.json({
-        success: true, // dispatcher/watchdog treat as OK; this is SAM.gov being down, not us
+        success: false,
         skipped: true,
         syncType,
-        note: 'SAM.gov upstream unavailable (transient) — will retry next run',
+        note: 'SAM.gov upstream unavailable — not a successful ingest',
         error: msg,
         stats: { totalFetched, apiCallsMade, durationSeconds: duration, lastSuccessfulPage },
         resumable: true,
-      }, { status: 200 });
+      }, { status: 503 });
     }
 
+    if (!dryRun) await reportSam(syncTypeParam, totalFetched > 0 ? 'partial' : 'error', msg);
     return NextResponse.json({
       success: false,
       syncType,
