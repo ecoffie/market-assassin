@@ -274,12 +274,34 @@ describe('status truth', () => {
       archive_date: null,
     }, NOW)).toBe('closed');
   });
-  it('OPEN requires active=true; missing deadline still opens when active', () => {
-    expect(deriveSolicitationStatus({
-      active: true,
-      response_deadline: null,
-      archive_date: null,
-    }, NOW)).toBe('open');
+  // CHANGED 2026-11-17 (Data Core, Eric: "a notice with no deadline must not read as open"). This test
+  // used to pin `active + no deadline → open`. Measured that day: 9,962 active notices had no deadline;
+  // 8,629 were Award Notices and 1,044 Justifications, and 6,772 were past SAM's own archive date. All
+  // of them read as "Open solicitation".
+  it('OPEN requires active=true AND a future deadline; active with no deadline is active_no_deadline', () => {
+    expect(deriveSolicitationStatus({ active: true, response_deadline: null, archive_date: null }, NOW)).toBe('active_no_deadline');
+    expect(deriveSolicitationStatus({ active: true, response_deadline: '2099-01-01T00:00:00Z', archive_date: null }, NOW)).toBe('open');
+  });
+  it('a passed SAM archive date is archived even while active still says true (no live deadline)', () => {
+    expect(deriveSolicitationStatus({ active: true, response_deadline: null, archive_date: '2020-01-01T00:00:00Z' }, NOW)).toBe('archived');
+  });
+  it('the DEADLINE WINS: active + future deadline stays open even with a passed archive date', () => {
+    // 22 live notices on 2026-11-17 (e.g. W912CH27RA053 due 2026-12-17) carry a passed archive_date.
+    expect(deriveSolicitationStatus({ active: true, response_deadline: '2099-01-01T00:00:00Z', archive_date: '2020-01-01T00:00:00Z' }, NOW)).toBe('open');
+  });
+  it('due later today with a date-only archive_date of today is still open', () => {
+    const now = new Date('2026-11-17T15:00:00Z');
+    expect(deriveSolicitationStatus({ active: true, response_deadline: '2026-11-17T21:00:00Z', archive_date: '2026-11-17' }, now)).toBe('open');
+  });
+  it('award notices and justifications are never open', () => {
+    for (const notice_type of ['Award Notice', 'Justification', 'justification and approval (J&A)']) {
+      expect(deriveSolicitationStatus({ active: true, response_deadline: null, archive_date: null, notice_type }, NOW), notice_type).toBe('closed');
+      expect(deriveSolicitationStatus({ active: true, response_deadline: '2099-01-01T00:00:00Z', archive_date: null, notice_type }, NOW), notice_type).toBe('closed');
+    }
+    expect(deriveSolicitationStatus({ active: true, response_deadline: null, archive_date: null, notice_type: 'Presolicitation' }, NOW)).toBe('active_no_deadline');
+  });
+  it('active_no_deadline is labelled as not an open solicitation', () => {
+    expect(solicitationStatusLabel('active_no_deadline')).toMatch(/not an open solicitation/);
   });
   it('active unknown + future deadline is STATUS UNKNOWN, not open', () => {
     expect(deriveSolicitationStatus({
