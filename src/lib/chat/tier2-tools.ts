@@ -55,6 +55,7 @@ import {
   SET_ASIDE_CONTRIBUTING_UEI_SAMPLE_LIMIT,
 } from '@/lib/contractor/award-history-shape';
 import { loadAwardsWarehouseCoverage } from '@/lib/awards-ingest/read-warehouse-coverage';
+import { getLastGood, setCached, LAST_GOOD_MAX_AGE_SECONDS } from '@/lib/mcp/external-cache';
 
 /** Clamp a caller-supplied result limit to [1, max], defaulting when absent/invalid. */
 function resolveLimit(raw: unknown, def: number, max: number): number {
@@ -553,10 +554,24 @@ export function makeTier2Tools(email: string) {
       }
       res = await findCapableSmallBusinesses({ naics, psc, setAsideOnly, state, limit, liveBq: true });
     }
+    const snapKey = { v: 1, naics, psc, setAsideOnly, state, limit };
     if (res.rows.length === 0) {
+      // BigQuery could not answer (quota, budget, outage): that is UNKNOWN, never "none found".
+      // Serve the last successful answer for the same query, labelled with its date, if we have one.
+      if (res.unavailable) {
+        const snap = await getLastGood<Record<string, unknown>>('capable_contractors', snapKey);
+        if (snap) {
+          // A saved answer during an outage is free (Eric's rule: failed/incomplete answers are never charged).
+          return { ...snap.value, degraded: true, served_from: 'last_good', snapshot_at: snap.fetchedAt,
+            _meta: { billing_outcome: 'nonbillable_system_failure' },
+            note: `The contractor data source is unavailable right now. These results are a saved answer from ${snap.fetchedAt}; they may be out of date.` };
+        }
+        return { ok: false, error: 'source_unavailable', degraded: true, count: 0, items: [],
+          note: 'The contractor data source is unavailable right now, so Mindy cannot say whether capable contractors exist. This is NOT "none found". Retry shortly.' };
+      }
       return { ok: true, count: 0, items: [], note: `No contractors found for ${psc ? `PSC ${psc}` : `NAICS ${naics}`}${setAsideOnly ? ' (set-aside only)' : ''}${inState}.` };
     }
-    return {
+    const answer = {
       ok: true,
       count: res.rows.length,
       total: res.total,
@@ -570,6 +585,8 @@ export function makeTier2Tools(email: string) {
         why: r.match_reason,
       })),
     };
+    await setCached('capable_contractors', snapKey, answer, LAST_GOOD_MAX_AGE_SECONDS);
+    return { ...answer, served_from: 'live' };
   }
 
   return {
