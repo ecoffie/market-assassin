@@ -831,6 +831,25 @@ export const SBLO_TOOL = 'get_sblo_contact';
  * small business liaison (acc6c R8: the free-text answer dropped that label and presented general
  * contacts as the liaison the customer asked for). Email/phone are never invented.
  */
+/**
+ * Data Core PR 3: label an email the source cannot vouch for. `verified` (field provenance with a
+ * source URL) and contacts without a verification block render unchanged; an unverified email
+ * carries its research date, a stale one says the company page no longer shows it.
+ */
+function sbloEmailCaveat(c: Rec): string {
+  const v = (c.verification && typeof c.verification === 'object' ? c.verification : null) as Rec | null;
+  if (!v) return '';
+  const status = str(v.email_status);
+  if (!status || status === 'verified') return '';
+  const fields = (v.fields && typeof v.fields === 'object' ? v.fields : {}) as Rec;
+  const ef = (fields.email && typeof fields.email === 'object' ? fields.email : {}) as Rec;
+  const at = str(ef.verified_at);
+  const kind = str(v.email_kind) === 'personal' ? 'personal email' : str(v.email_kind) === 'role' ? 'mailbox' : 'email';
+  return status === 'stale'
+    ? ` (${kind}, no longer shown on the company's page${at ? ` as of ${at}` : ''})`
+    : ` (${kind}, not re-verified${at ? ` since ${at}` : ''})`;
+}
+
 export function renderSbloContact(result: Rec): RenderedRecords | null {
   const c = (result?.contact && typeof result.contact === 'object' ? result.contact : null) as Rec | null;
   const poc = (result?.registered_points_of_contact && typeof result.registered_points_of_contact === 'object' ? result.registered_points_of_contact : null) as Rec | null;
@@ -839,7 +858,7 @@ export function renderSbloContact(result: Rec): RenderedRecords | null {
   const company = title(str(c?.company) || str(poc?.company)) || 'this company';
   const lines: string[] = [];
   if (c && str(c.sblo_name)) {
-    lines.push(`Designated small business liaison for ${company}: ${str(c.sblo_name)}${str(c.title) ? `, ${str(c.title)}` : ''}${str(c.email) ? ` · ${str(c.email)}` : ''}${str(c.phone) ? ` · ${str(c.phone)}` : ''}. Source: ${str(c.source) || 'not reported'}.`);
+    lines.push(`Designated small business liaison for ${company}: ${str(c.sblo_name)}${str(c.title) ? `, ${str(c.title)}` : ''}${str(c.email) ? ` · ${str(c.email)}${sbloEmailCaveat(c)}` : ''}${str(c.phone) ? ` · ${str(c.phone)}` : ''}. Source: ${str(c.source) || 'not reported'}.`);
   } else {
     lines.push(`No designated small business liaison is on record for ${company}${str(c?.uei) || str(poc?.uei) ? ` (UEI ${str(c?.uei) || str(poc?.uei)})` : ''}.`);
   }

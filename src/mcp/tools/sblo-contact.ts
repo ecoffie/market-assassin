@@ -39,6 +39,15 @@ export interface SbloContactToolResult {
     matched_from: SbloSource | null;
     has_named_sblo: boolean;
     has_email: boolean;
+    /**
+     * Data Core PR 3: how verified the returned email is — `verified` only with field-level
+     * provenance (confirmed/changed + source URL); `unverified` = Jun-2026 snapshot / prime DB,
+     * not re-checked; `stale` = the source no longer shows it. null = no email. Mirrors
+     * contact.verification.email_status.
+     */
+    email_status: 'verified' | 'unverified' | 'stale' | null;
+    /** `role` = company mailbox (preferred), `personal` = an individual's address. null = no email. */
+    email_kind: 'role' | 'personal' | 'unknown' | null;
     /** What the answer rests on: a curated SBLO, a registered SAM POC, award context only, or nothing. */
     contact_basis: 'curated_sblo' | 'registered_sam_poc' | 'award_context_only' | 'curated_no_name' | 'none';
     has_registered_poc: boolean;
@@ -111,6 +120,8 @@ export async function getSbloContact(input: SbloContactToolInput): Promise<SbloC
       matched_from: c?.matched_from ?? null,
       has_named_sblo: hasNamedSblo,
       has_email: hasEmail,
+      email_status: hasEmail ? (c?.verification?.email_status ?? 'unverified') : null,
+      email_kind: hasEmail ? (c?.verification?.email_kind ?? null) : null,
       contact_basis: contactBasis,
       has_registered_poc: hasRegisteredPoc,
       ...(pocStatus ? { registered_poc_status: pocStatus } : {}),
@@ -122,6 +133,13 @@ export async function getSbloContact(input: SbloContactToolInput): Promise<SbloC
   };
 
   if (mcpFlags.aiHint) {
+    const emailStatus = result._meta.email_status;
+    const emailVerifiedAt = c?.verification?.fields.email.verified_at ?? null;
+    const emailCaveat = !hasEmail || emailStatus === 'verified'
+      ? ''
+      : emailStatus === 'stale'
+        ? `; ${result._meta.email_kind === 'role' ? 'mailbox' : 'personal email'} no longer shown on the company's page${emailVerifiedAt ? ` as of ${emailVerifiedAt}` : ''}`
+        : `; ${result._meta.email_kind === 'personal' ? 'personal email' : 'email'} not re-verified since ${emailVerifiedAt ?? 'it was recorded'}`;
     const bqContext = fromBq
       ? `${c!.company} is a real federal prime — ${usd(c!.total_contract_value)} across ${c!.distinct_agency_count ?? 0} agencies (${c!.contract_count ?? 0} awards, live from USASpending)`
       : '';
@@ -135,7 +153,7 @@ export async function getSbloContact(input: SbloContactToolInput): Promise<SbloC
           : fromBq
             ? `${bqContext} — but NO public SBLO is on file. Start at their supplier-diversity / small-business page; do not guess a contact.`
             : hasNamedSblo
-              ? `${c!.sblo_name}${c!.title ? `, ${c!.title}` : ''} at ${c!.company}${hasEmail ? ` (${c!.email})` : ' — no public email; use the supplier portal'}.`
+              ? `${c!.sblo_name}${c!.title ? `, ${c!.title}` : ''} at ${c!.company}${hasEmail ? ` (${c!.email}${emailCaveat})` : ' — no public email; use the supplier portal'}.`
               : `${c!.company} is in the curated set but no public SBLO name was found — start at the supplier portal${c!.supplier_portal ? ` (${c!.supplier_portal})` : ''}.`,
       how_to_use: grounded
         ? 'The SBLO is the teaming front door at a prime — reach out to be added to their small-business/subcontractor pipeline. When the name/email is blank (including every BigQuery-tier match), the supplier portal / SB page is the honest next step; do NOT guess an address.'
