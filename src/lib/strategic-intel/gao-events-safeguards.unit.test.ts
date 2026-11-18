@@ -34,7 +34,9 @@ describe('event pruning stays report-only and a missed log is visible', () => {
     expect(prune).toMatch(/env\.SAM_EVENTS_PRUNE === 'apply' \? 'apply' : 'report'/);
   });
 
-  it('a failed cron_logs insert fails the job instead of returning success', () => {
+  it('a failed cron_job_runs insert fails the job instead of returning success', () => {
+    expect(route).toMatch(/from\('cron_job_runs'\)/);
+    expect(route).not.toMatch(/from\('cron_logs'\)/);
     expect(route).toMatch(/prune report not recorded/);
     expect(route).toMatch(/status: 500/);
     const fail = route.slice(route.indexOf('prune report not recorded'), route.indexOf('if (Date.now() > deadline)'));
