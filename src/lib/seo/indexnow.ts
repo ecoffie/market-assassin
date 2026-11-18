@@ -1,6 +1,7 @@
 /**
- * IndexNow — instant ping to Bing/Yandex/Seznam (and read by Google) when pages
- * publish, instead of waiting for a crawl (Phase 5 indexation engineering).
+ * IndexNow — instant ping to Bing/Yandex/Seznam/Naver when pages
+ * publish, instead of waiting for a crawl (Phase 5 indexation engineering). Google does NOT
+ * use IndexNow; it finds pages through sitemaps and internal links.
  *
  * The key is PUBLIC by design (it's verified via a key file at the domain root),
  * so a default is fine; override with INDEXNOW_KEY env if desired. The matching

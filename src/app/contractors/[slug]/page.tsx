@@ -48,6 +48,9 @@ import {
 import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import { awardHref, servableAwardIds } from '@/lib/seo/award-links';
+import { getExpiringRecompetesForUeis } from '@/lib/seo/recompetes';
+import { contractorIndexable } from '@/lib/seo/contractor-index-tier';
+import { buildContractorSummary } from '@/lib/seo/contractor-summary';
 
 const SITE_URL = 'https://getmindy.ai';
 
@@ -135,7 +138,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title,
     description,
-    robots: isThinContractor ? { index: false, follow: true } : undefined,
+    // Index tier (src/lib/seo/contractor-index-tier.ts): the thin gate above PLUS a spend floor.
+    robots: isThinContractor || !contractorIndexable(totalObligated, recipient.award_count)
+      ? { index: false, follow: true }
+      : undefined,
     alternates: { canonical: `${SITE_URL}/contractors/${recipient.canonical_slug}` },
     openGraph: {
       title,
@@ -235,7 +241,27 @@ export default async function ContractorPage({ params }: PageProps) {
     ? await getSimilarRecipients(ueis, rollupUei, topNaicsCode, 8)
     : [];
   // Link a row to its award page only when that page can serve (see src/lib/seo/award-links.ts).
-  const servableAwards = await servableAwardIds(recentAwards.map((a) => a.award_id));
+  // "Contracts expiring soon": Supabase only (a public page must never trigger BigQuery), scoped to
+  // this org's whole UEI set IN the query. null = the read failed -> the block is omitted (logged),
+  // never rendered as "0 expiring".
+  const [servableAwards, expiring] = await Promise.all([
+    servableAwardIds(recentAwards.map((a) => a.award_id)),
+    getExpiringRecompetesForUeis(ueis, 10),
+  ]);
+
+  const summary = buildContractorSummary({
+    name: displayName,
+    city: recipient.city,
+    state: recipient.state,
+    totalObligated: Number(recipient.total_obligated),
+    awardCount: Number(recipient.award_count),
+    agencyCount: Number(recipient.distinct_agency_count),
+    yearly: yearly.map((y) => ({ fiscal_year: Number(y.fiscal_year), total_obligated: Number(y.total_obligated) })),
+    topAgencies: topAgencies.map((a) => ({ awarding_agency: a.awarding_agency, total_amount: Number(a.total_amount), pct_of_total: Number(a.pct_of_total) })),
+    topNaics: topNaics.map((n) => ({ naics_code: n.naics_code, naics_description: n.naics_description, total_amount: Number(n.total_amount), award_count: Number(n.award_count) })),
+    expiring: expiring ? expiring.map((e) => ({ end: e.end, agency: e.agency })) : null,
+    expiringLimit: 10,
+  });
 
   // JSON-LD: Organization + BreadcrumbList. NO `isAccessibleForFree:
   // false` directive — that signal told Google "skip ranking this".
@@ -319,6 +345,21 @@ export default async function ContractorPage({ params }: PageProps) {
           <Stat label="NAICS Codes" value={Number(recipient.distinct_naics_count || 0).toString()} />
         </div>
       </section>
+
+      {/* At a glance — sentences computed from this company's own figures
+          (src/lib/seo/contractor-summary.ts). Each sentence is omitted when its data is missing. */}
+      {summary.length > 0 && (
+        <section className="mx-auto max-w-6xl px-6 pb-8" aria-labelledby="at-a-glance">
+          <h2 id="at-a-glance" className="text-xl font-semibold font-(family-name:--mp-font-serif)">
+            {displayName} at a glance
+          </h2>
+          <div className="mt-3 max-w-3xl space-y-2 text-base leading-relaxed text-(--mp-body)">
+            {summary.map((line) => (
+              <p key={line}>{line}</p>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Tab nav — links to sub-pages */}
       <div className="mx-auto max-w-6xl px-6">
@@ -507,6 +548,33 @@ export default async function ContractorPage({ params }: PageProps) {
           )}
         </div>
       </section>
+
+      {/* Contracts expiring soon — links to /recompetes record pages (indexable rows only). */}
+      {expiring && expiring.length > 0 && (
+        <section className="mx-auto max-w-6xl px-6 pb-10">
+          <h2 className="text-2xl font-bold mb-1 font-(family-name:--mp-font-serif)">Contracts expiring soon</h2>
+          <p className="text-sm text-(--mp-muted) mb-4">
+            {displayName} contracts whose period of performance ends soonest — each one a likely recompete.
+          </p>
+          <ul className="divide-y divide-(--mp-line) rounded-lg border border-(--mp-line) bg-(--mp-surface)">
+            {expiring.map((r) => (
+              <li key={r.contract_id} className="flex items-baseline justify-between gap-4 px-4 py-2.5">
+                <Link href={r.href} className="text-sm text-(--mp-navy) hover:underline">
+                  {r.agency || 'Agency not stated'}
+                  {r.piid && <span className="ml-2 font-(family-name:--mp-font-mono) text-xs text-(--mp-muted)">{r.piid}</span>}
+                </Link>
+                <span className="shrink-0 text-right text-xs text-(--mp-muted)">
+                  ends {fmtDate(r.end)}
+                  {r.value != null && <span className="block font-(family-name:--mp-font-mono)">{fmtMoney(r.value)}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-sm">
+            <Link href="/recompetes" className="text-(--mp-navy) hover:underline">All contracts expiring soon →</Link>
+          </p>
+        </section>
+      )}
 
       {/* Executives (FFATA disclosures) */}
       {executives.length > 0 && (

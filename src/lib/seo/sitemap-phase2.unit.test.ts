@@ -31,11 +31,15 @@ vi.mock('@supabase/supabase-js', () => ({
     from: () => {
       const filters: string[] = [];
       const q: Record<string, unknown> = {};
-      for (const f of ['select', 'eq', 'like', 'or', 'not', 'order']) {
+      for (const f of ['select', 'eq', 'neq', 'lt', 'gte', 'like', 'or', 'not', 'order']) {
         q[f] = (...a: unknown[]) => { filters.push(`${f}:${a.map(String).join('|')}`); return q; };
       }
       q.range = (from: number, to: number) => {
         m.oppCalls.push({ filters: [...filters], range: [from, to] });
+        return Promise.resolve(m.oppPages.shift() ?? { data: [], error: null });
+      };
+      q.limit = (n: number) => {
+        m.oppCalls.push({ filters: [...filters, `limit:${n}`], range: [0, n - 1] });
         return Promise.resolve(m.oppPages.shift() ?? { data: [], error: null });
       };
       return q;
@@ -44,8 +48,11 @@ vi.mock('@supabase/supabase-js', () => ({
 }));
 
 import { toLastmod, latestLastmod, renderUrlset, renderSitemapIndex } from './sitemap-xml';
-import { opportunityStatus, getOpportunitySitemapEntries, isIndexableOpp } from './opportunities';
-import { contractorSections, staticEntries, SITEMAP_CHILDREN } from './sitemap-sections';
+import {
+  opportunityStatus, opportunityStatusLabel, getOpportunitySitemapEntries, getClosedOpportunitySitemapEntries,
+  getRelatedOpenOpportunities, isIndexableOpp,
+} from './opportunities';
+import { contractorSections, staticEntries, SITEMAP_CHILDREN, HELD_SITEMAP_CHILDREN } from './sitemap-sections';
 import { servableAwardIds, isLinkableAwardId, awardHref } from './award-links';
 import { resolveHubTargets } from './hub-links';
 
@@ -93,12 +100,22 @@ describe('lastmod is a data date or nothing', () => {
 
 describe('the sitemap is split by page family', () => {
   it('the index lists one child per family and no build-time lastmod', () => {
-    expect(SITEMAP_CHILDREN).toEqual([
+    // The original six stay first and in order; later families are appended after them.
+    expect(SITEMAP_CHILDREN.slice(0, 6)).toEqual([
       'sitemap-static.xml', 'sitemap-contractors.xml', 'sitemap-contracts.xml',
       'sitemap-contractor-tabs.xml', 'sitemap-opportunities.xml', 'sitemap-facets.xml',
     ]);
+    // Families added 2026-11-17: listed now, or held back for a phased release.
+    expect(SITEMAP_CHILDREN).toEqual(expect.arrayContaining(['sitemap-forecasts.xml', 'sitemap-offices.xml']));
+    expect(HELD_SITEMAP_CHILDREN).toEqual(expect.arrayContaining([
+      'sitemap-opportunities-closed.xml',
+      'sitemap-recompetes-1.xml', 'sitemap-recompetes-2.xml', 'sitemap-recompetes-3.xml',
+    ]));
+    const all = [...SITEMAP_CHILDREN, ...HELD_SITEMAP_CHILDREN];
+    expect(new Set(all).size).toBe(all.length);
+    for (const c of all) expect(() => read(`src/app/${c}/route.ts`)).not.toThrow();
     const xml = renderSitemapIndex(SITEMAP_CHILDREN.map((c) => ({ loc: `https://getmindy.ai/${c}` })));
-    expect(xml.match(/<sitemap>/g)).toHaveLength(6);
+    expect(xml.match(/<sitemap>/g)).toHaveLength(SITEMAP_CHILDREN.length);
     expect(xml).not.toContain('<lastmod>');
   });
 });
@@ -239,5 +256,134 @@ describe('contractor hub links', () => {
   it('returns null (fall back to the unverified list) when KV cannot be read', async () => {
     m.mget.mockRejectedValue(new Error('KV down'));
     expect(await resolveHubTargets(['live-co'])).toBeNull();
+  });
+});
+
+describe('closed opportunities: honest label, own sitemap child', () => {
+  const row = (i: number, extra: Record<string, unknown> = {}) => ({
+    notice_id: `C${String(i).padStart(6, '0')}abcd`, title: `Janitorial services for building ${i}`,
+    notice_type: 'Solicitation', active: true, response_deadline: '2026-06-15T00:00:00Z',
+    posted_date: '2026-05-01T00:00:00Z', seo_enriched_at: null, ...extra,
+  });
+
+  it('an archived notice is never "open", whatever its deadline field says', () => {
+    expect(opportunityStatus({ notice_type: 'Solicitation', response_deadline: '2027-01-01T00:00:00Z', active: false }, NOW)).toBe('closed');
+    expect(opportunityStatus({ notice_type: 'Solicitation', response_deadline: null, active: false }, NOW)).toBe('closed');
+    expect(opportunityStatus({ notice_type: 'Award Notice', response_deadline: null, active: false }, NOW)).toBe('awarded');
+    // `active` omitted keeps the old behaviour (callers that never read the column).
+    expect(opportunityStatus({ notice_type: 'Solicitation', response_deadline: null }, NOW)).toBe('open');
+  });
+
+  it('labels state only what the row establishes', () => {
+    expect(opportunityStatusLabel({ notice_type: 'Solicitation', response_deadline: '2026-06-15T00:00:00Z' }, NOW))
+      .toEqual({ status: 'closed', label: 'Closed — responses were due June 15, 2026' });
+    expect(opportunityStatusLabel({ notice_type: 'Solicitation', response_deadline: null, active: false }, NOW))
+      .toEqual({ status: 'closed', label: 'Closed — this notice has been archived on SAM.gov' });
+    // A future deadline on an archived notice is not "were due": it never passed.
+    expect(opportunityStatusLabel({ notice_type: 'Solicitation', response_deadline: '2027-01-01T00:00:00Z', active: false }, NOW).label)
+      .toBe('Closed — this notice has been archived on SAM.gov');
+    expect(opportunityStatusLabel({ notice_type: 'Award Notice', awardee_name: 'Acme Corp', award_date: '2026-09-30' }, NOW).label)
+      .toBe('Awarded to Acme Corp on September 30, 2026');
+    // No named winner → no "awarded to" claim.
+    expect(opportunityStatusLabel({ notice_type: 'Award Notice', awardee_name: '  ' }, NOW).label).toBe('Award notice');
+    expect(opportunityStatusLabel({ notice_type: 'Solicitation', response_deadline: '2026-12-01T00:00:00Z', active: true }, NOW).label)
+      .toBe('Open for responses');
+  });
+
+  it('lists past-deadline, non-award notices (active or archived) within the window, newest first', async () => {
+    m.oppPages = [
+      {
+        data: [
+          row(1, { response_deadline: '2026-03-01T00:00:00Z' }),
+          row(2, { response_deadline: '2026-10-01T00:00:00Z', active: false }), // archived: still listed
+          row(3, { response_deadline: '2027-01-01T00:00:00Z' }),                // future: not closed
+          row(4, { response_deadline: '2024-01-01T00:00:00Z' }),                // outside 24 months
+          row(5, { response_deadline: null, active: false }),                   // no date to state
+          row(6, { notice_type: 'Award Notice' }),                              // awards belong elsewhere
+        ],
+        error: null,
+      },
+      { data: [], error: null },
+    ];
+    const { rows, dropped } = await getClosedOpportunitySitemapEntries(NOW);
+    expect(dropped).toBe(0);
+    expect(rows.map((r) => r.slug)).toEqual([
+      'janitorial-services-for-building-2-0002abcd',
+      'janitorial-services-for-building-1-0001abcd',
+    ]);
+    expect(rows.every((r) => r.status === 'closed')).toBe(true);
+    expect(rows[0].lastModified).toBe('2026-05-01');
+
+    // The window, the exclusions and the thin gate are all in the query, before the paging.
+    const f = m.oppCalls[0].filters;
+    expect(f).toContain(`lt:response_deadline|${NOW.toISOString()}`);
+    expect(f).toContain('gte:response_deadline|2024-11-12T12:00:00.000Z');
+    expect(f).toContain('or:notice_type.is.null,notice_type.not.ilike.*award*');
+    expect(f).toContain(`like:description|${'_'.repeat(200)}*`);
+    expect(f.some((x) => x.startsWith('eq:active'))).toBe(false); // archived rows render too
+  });
+
+  it('caps explicitly at the per-file limit, keeping the newest deadlines', async () => {
+    m.oppPages = [
+      {
+        data: [
+          row(1, { response_deadline: '2026-01-01T00:00:00Z' }),
+          row(2, { response_deadline: '2026-09-01T00:00:00Z' }),
+          row(3, { response_deadline: '2026-05-01T00:00:00Z' }),
+        ],
+        error: null,
+      },
+      { data: [], error: null },
+    ];
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { rows, dropped } = await getClosedOpportunitySitemapEntries(NOW, 2);
+    expect(dropped).toBe(1);
+    expect(rows.map((r) => r.responseDeadline.slice(0, 10))).toEqual(['2026-09-01', '2026-05-01']);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('1 older left out'));
+    warn.mockRestore();
+  });
+
+  it('a read failure fails the family (503), never an empty sitemap', async () => {
+    m.oppPages = [{ data: null, error: { message: 'statement timeout' } }];
+    await expect(getClosedOpportunitySitemapEntries(NOW)).rejects.toThrow(/closed opportunity sitemap.*statement timeout/);
+  });
+
+  it('related links are OPEN-only and scoped in the query before the limit (NAICS, then agency)', async () => {
+    const open = (i: number, extra: Record<string, unknown> = {}) => ({
+      notice_id: `O${i}xyzxyz`, title: `Custodial services ${i}`, department: 'VA', notice_type: 'Solicitation',
+      response_deadline: '2026-12-20T00:00:00Z', naics_code: '561720', ...extra,
+    });
+    m.oppPages = [
+      { data: [], error: null }, // NAICS scope: nothing open
+      { data: [open(1), open(2, { response_deadline: '2026-11-12T01:00:00Z' })], error: null }, // agency scope
+    ];
+    const r = await getRelatedOpenOpportunities({ noticeId: 'SELF', naicsCode: '561720', department: 'VA' }, 6, NOW);
+    expect(r?.scope).toBe('agency');
+    expect(r?.items.map((x) => x.title)).toEqual(['Custodial services 1']); // #2 closed earlier today
+    const [naicsCall, agencyCall] = m.oppCalls;
+    expect(naicsCall.filters).toEqual(expect.arrayContaining([
+      'eq:active|true', 'eq:naics_code|561720', 'neq:notice_id|SELF',
+      'or:response_deadline.gte.2026-11-12,response_deadline.is.null',
+      'or:notice_type.is.null,notice_type.not.ilike.*award*',
+    ]));
+    expect(agencyCall.filters).toContain('eq:department|VA');
+    // The scope is applied BEFORE the limit: the limit is the last thing on the request.
+    expect(agencyCall.filters[agencyCall.filters.length - 1]).toBe('limit:12');
+  });
+
+  it('a related-links read error renders no block (null), not a "none found" list', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    m.oppPages = [{ data: null, error: { message: 'boom' } }];
+    expect(await getRelatedOpenOpportunities({ noticeId: 'SELF', naicsCode: '561720', department: 'VA' }, 6, NOW)).toBeNull();
+    err.mockRestore();
+  });
+
+  it('closed and awarded pages offer alerts, not "track this", and the child route is wired', () => {
+    const page = read('src/app/opportunity/[slug]/page.tsx');
+    expect(page).toContain("Get alerts when {agency ? agency : 'this agency'} posts the next one");
+    expect(page).toContain('getRelatedOpenOpportunities(opp)');
+    expect(page).not.toContain('getSimilarOpportunities');
+    expect(page).toContain('active: opp.active');
+    expect(read('src/app/sitemap-opportunities-closed.xml/route.ts')).toContain('closedOpportunityEntries');
   });
 });

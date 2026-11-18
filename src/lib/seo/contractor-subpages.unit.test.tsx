@@ -96,11 +96,12 @@ for (const P of PAGES) {
       expect(out).not.toMatch(P.storedClaim);
     });
 
-    it('5+ real rows ⇒ indexable, self-canonical, headline count equals rendered rows (not the stored 227/31)', async () => {
+    it('5+ real rows ⇒ table rendered, self-canonical, headline count equals rendered rows (not the stored 227/31); tabs stay noindex (contractor-index-tier)', async () => {
       for (const n of [5, 12]) {
         P.set(P.rows(n), 'hit');
         const meta = await P.mod.generateMetadata(params());
-        expect(meta.robots).toBeUndefined();
+        // Tabs are never offered to Google since 2026-11-18 (src/lib/seo/contractor-index-tier.ts).
+        expect(meta.robots).toEqual({ index: false, follow: true });
         expect(meta.alternates?.canonical).toBe(`https://getmindy.ai/contractors/acme-defense-inc/${P.name}`);
         expect(String(meta.description)).toContain(String(n));
         const out = await html(P.mod);

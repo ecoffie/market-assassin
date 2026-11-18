@@ -31,12 +31,15 @@ import { BLOG_POSTS } from '@/data/blog-posts';
 import { NAICS_TOP_100 } from '@/data/naics-top100';
 import { getSubpageRowCounts } from '@/lib/seo/subpage-row-counts';
 import { subpageSitemapEligible } from '@/lib/seo/subpage-contract';
+import { contractorIndexable, CONTRACTOR_TABS_INDEXABLE } from '@/lib/seo/contractor-index-tier';
 import { AGENCIES_SEO } from '@/data/agencies-seo';
 import { getFacetSlugsForSitemap } from '@/lib/seo/facets';
 import { COMPETITORS } from '@/data/competitors';
 import { LISTICLES } from '@/data/top-listicles';
 import { publishedPublications } from '@/lib/analytics/research-publications';
-import { getOpportunitySitemapEntries } from '@/lib/seo/opportunities';
+import { getOpportunitySitemapEntries, getClosedOpportunitySitemapEntries } from '@/lib/seo/opportunities';
+import { getOfficeSitemapEntries } from '@/lib/seo/offices';
+import { getRecompeteSitemapChunk } from '@/lib/seo/recompetes';
 import { toLastmod, renderSitemapIndex, SITEMAP_URL_LIMIT, type SitemapEntry } from '@/lib/seo/sitemap-xml';
 
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai';
@@ -49,6 +52,21 @@ export const SITEMAP_CHILDREN = [
   'sitemap-contractor-tabs.xml',
   'sitemap-opportunities.xml',
   'sitemap-facets.xml',
+  'sitemap-forecasts.xml',
+  'sitemap-offices.xml',
+] as const;
+
+/**
+ * Families built but NOT yet listed in the index (phased release, 2026-11-18). Search Console
+ * showed 20,628 "Crawled — currently not indexed" against 401 indexed: adding ~100K more URLs
+ * now would mostly join that bucket. Their routes still serve and their pages still render; move
+ * one into SITEMAP_CHILDREN once the indexed share of the listed families rises.
+ */
+export const HELD_SITEMAP_CHILDREN = [
+  'sitemap-opportunities-closed.xml',
+  'sitemap-recompetes-1.xml',
+  'sitemap-recompetes-2.xml',
+  'sitemap-recompetes-3.xml',
 ] as const;
 
 /** The index document, served at /sitemap.xml and /sitemap-index.xml. */
@@ -83,6 +101,10 @@ export function staticEntries(): SitemapEntry[] {
     // Supabase with no public surface at all. The route now renders those counts
     // as server HTML, and noindexes itself if the read fails.
     { url: `${SITE_URL}/forecasts`,             changeFrequency: 'daily',   priority: 0.8 },
+    // Hubs over the per-record families (2026-11-18): each links its records from a crawled
+    // page instead of leaving them reachable only through their sitemaps.
+    { url: `${SITE_URL}/recompetes`,            changeFrequency: 'daily',   priority: 0.7 },
+    { url: `${SITE_URL}/offices`,               changeFrequency: 'daily',   priority: 0.7 },
     // Comparison pages — target high-volume "alternative" keywords.
     // Priority 0.8 puts them in the top tier just below the homepage
     // since they're primary acquisition surfaces for paid + organic.
@@ -221,7 +243,8 @@ export async function contractorSections(need: { contracts?: boolean; tabs?: boo
   }
   let naicsRowCounts = new Map<string, number>();
   let agencyRowCounts = new Map<string, number>();
-  if (need.tabs) {
+  // Tabs are never offered to Google (contractor-index-tier.ts), so skip the KV row-count probe.
+  if (need.tabs && CONTRACTOR_TABS_INDEXABLE) {
     const tabUeis = recipients.map((c) => c.rollup_uei).filter((u): u is string => !!u);
     [naicsRowCounts, agencyRowCounts] = await Promise.all([
       getSubpageRowCounts('naics', tabUeis),
@@ -236,8 +259,9 @@ export async function contractorSections(need: { contracts?: boolean; tabs?: boo
     const slug = recipientSlug(c.recipient_name);
     if (!slug || seen.has(slug)) continue;
     seen.add(slug);
-    // Thin-content gate — MUST match the noindex predicate in contractors/[slug]/page.tsx.
-    if ((c.total_obligated || 0) < 25000 || (c.award_count || 0) < 2) continue;
+    // Index tier — MUST match the noindex predicate in contractors/[slug]/page.tsx
+    // (src/lib/seo/contractor-index-tier.ts: thin gate + spend floor).
+    if (!contractorIndexable(c.total_obligated, c.award_count)) continue;
     const profile = serveable.get(slug);
     if (!profile) continue;
 
@@ -266,18 +290,35 @@ export async function contractorSections(need: { contracts?: boolean; tabs?: boo
         priority: subPriority,
       });
     }
-    // NAICS / agency tabs: only when the renderer's own row cache clears SUBPAGE_MIN_ROWS.
-    if (subpageSitemapEligible(agencyRowCounts.get(c.rollup_uei), SUBPAGE_MIN_ROWS)) {
+    // NAICS / agency tabs: only when indexable at all AND the renderer's row cache clears SUBPAGE_MIN_ROWS.
+    if (CONTRACTOR_TABS_INDEXABLE && subpageSitemapEligible(agencyRowCounts.get(c.rollup_uei), SUBPAGE_MIN_ROWS)) {
       out.tabs.push({ url: `${SITE_URL}/contractors/${slug}/agencies`, lastModified: toLastmod(profile.lastActionDate), changeFrequency: 'weekly', priority: subPriority });
     }
-    if (subpageSitemapEligible(naicsRowCounts.get(c.rollup_uei), SUBPAGE_MIN_ROWS)) {
+    if (CONTRACTOR_TABS_INDEXABLE && subpageSitemapEligible(naicsRowCounts.get(c.rollup_uei), SUBPAGE_MIN_ROWS)) {
       out.tabs.push({ url: `${SITE_URL}/contractors/${slug}/naics`, lastModified: toLastmod(profile.lastActionDate), changeFrequency: 'weekly', priority: subPriority });
     }
   }
   return out;
 }
 
-/** Active opportunities: open and awarded (closed notices render but are not advertised). */
+/**
+ * Closed notices (response deadline passed within the last 24 months, not award notices), each
+ * a page labelled "Closed — responses were due <date>". Same thin gate as the open set. Capped
+ * at SITEMAP_URL_LIMIT by keeping the newest deadlines (explicit, logged — see the source fn).
+ * lastmod is the notice's own posting/enrichment date; a closed notice rarely changes, so it is
+ * crawled monthly at a lower priority than live work.
+ */
+export async function closedOpportunityEntries(): Promise<SitemapEntry[]> {
+  const { rows } = await getClosedOpportunitySitemapEntries(new Date(), SITEMAP_URL_LIMIT);
+  return rows.map((r) => ({
+    url: `${SITE_URL}/opportunity/${r.slug}`,
+    lastModified: r.lastModified,
+    changeFrequency: 'monthly',
+    priority: 0.3,
+  }));
+}
+
+/** Active opportunities: open and awarded. Closed notices are their own child (above). */
 export async function opportunityEntries(): Promise<SitemapEntry[]> {
   const rows = await getOpportunitySitemapEntries();
   if (rows.length > SITEMAP_URL_LIMIT) {
@@ -313,4 +354,40 @@ export async function facetEntries(): Promise<SitemapEntry[]> {
       url: `${SITE_URL}/set-aside/${x.setAside}/${x.naics}`, changeFrequency: 'daily' as const, priority: 0.7,
     })),
   ];
+}
+
+/**
+ * DoD buying offices (/offices/<DODAAC>): a DoD directory row + enough active notices to clear the
+ * thin gate (officeSitemapEligible, a subset of the page's own index gate). lastmod = the latest
+ * posted_date among the office's active notices.
+ */
+export async function officeEntries(): Promise<SitemapEntry[]> {
+  const rows = await getOfficeSitemapEntries();
+  if (rows.length > SITEMAP_URL_LIMIT) {
+    throw new Error(`office sitemap has ${rows.length} URLs, over the ${SITEMAP_URL_LIMIT} per-file limit`);
+  }
+  return rows.map((r) => ({
+    url: `${SITE_URL}/offices/${r.dodaac}`,
+    lastModified: r.lastModified,
+    changeFrequency: 'daily' as const,
+    priority: 0.6,
+  }));
+}
+
+/**
+ * Expiring contracts (/recompetes/<slug>), one numbered child per RECOMPETE_SITEMAP_CHUNK rows of
+ * the gated set (real rows, named incumbent + agency, a stated value, ending between 90 days ago
+ * and 24 months out). Numbered rather than one file because the gated set can exceed 50,000.
+ * No lastmod — see getRecompeteSitemapChunk. `chunk` is 0-based.
+ */
+export async function recompeteEntries(chunk: number): Promise<SitemapEntry[]> {
+  const rows = await getRecompeteSitemapChunk(chunk);
+  if (rows.length > SITEMAP_URL_LIMIT) {
+    throw new Error(`recompete sitemap child ${chunk + 1} has ${rows.length} URLs, over the ${SITEMAP_URL_LIMIT} limit`);
+  }
+  return rows.map((r) => ({
+    url: `${SITE_URL}/recompetes/${r.slug}`,
+    changeFrequency: 'weekly' as const,
+    priority: 0.5,
+  }));
 }

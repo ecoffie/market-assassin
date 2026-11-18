@@ -1,6 +1,7 @@
 /**
- * /opportunity/[slug] — public, indexable landing page for one active SAM
- * opportunity. Phase 1 of Mindy's programmatic-SEO layer (own the index, like
+ * /opportunity/[slug] — public, indexable landing page for one SAM notice:
+ * open, closed (labelled "Closed — responses were due <date>", with related
+ * open notices + an alerts CTA) or awarded. Phase 1 of Mindy's programmatic-SEO layer (own the index, like
  * HigherGov: a page per opportunity + "Similar Opportunities" cross-linking).
  *
  * ISR-only (no build prerender — 34k+ opps). Each page reads one row + a
@@ -19,11 +20,22 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import MemberAwareCta from '@/components/MemberAwareCta';
 import {
-  opportunityStatus,
+  opportunityStatusLabel,
   getOpportunityBySlug,
-  getSimilarOpportunities,
+  getRelatedOpenOpportunities,
   type SeoOpportunity,
 } from '@/lib/seo/opportunities';
+
+/** The row facts the status banner is built from (shared by metadata and the page). */
+function statusOf(opp: SeoOpportunity) {
+  return opportunityStatusLabel({
+    notice_type: opp.noticeType,
+    response_deadline: opp.responseDeadline,
+    active: opp.active,
+    awardee_name: opp.awardeeName,
+    award_date: opp.awardDate,
+  });
+}
 
 export const dynamicParams = true;
 export const revalidate = 86400; // 1d — opps change (deadlines, amendments)
@@ -61,16 +73,25 @@ export async function generateMetadata({
     };
   }
   const agency = opp.department || opp.subTier || 'a federal agency';
+  const { status, label } = statusOf(opp);
+  // Never describe a closed or awarded notice as something you can still respond to.
+  const statusSentence =
+    status === 'open'
+      ? (opp.responseDeadline ? `. Responses due ${fmtDate(opp.responseDeadline)}.` : '. ') +
+        ` Track it and draft your response with Mindy.`
+      : `. ${label}. See related open opportunities and get alerts with Mindy.`;
   const desc = clampDesc(
-    `${opp.title} — federal contract opportunity from ${agency}` +
+    `${opp.title} — federal contract ${status === 'open' ? 'opportunity' : 'notice'} from ${agency}` +
       (opp.solicitationNumber ? ` (Solicitation ${opp.solicitationNumber})` : '') +
-      (opp.responseDeadline ? `. Responses due ${fmtDate(opp.responseDeadline)}.` : '. ') +
-      ` Track it and draft your response with Mindy.`,
+      statusSentence,
   );
   const url = `${SITE_URL}/opportunity/${slug}`;
-  const titleStr = `${opp.title} — Federal Contract Opportunity | Mindy`;
+  const kind = status === 'closed' ? 'Closed Federal Solicitation' : 'Federal Contract Opportunity';
+  const titleStr = `${opp.title} — ${kind} | Mindy`;
   return {
-    title: titleStr.length > 65 ? `${opp.title.slice(0, 50)}… — Federal Opportunity | Mindy` : titleStr,
+    title: titleStr.length > 65
+      ? `${opp.title.slice(0, 50)}… — ${status === 'closed' ? 'Closed' : 'Federal Opportunity'} | Mindy`
+      : titleStr,
     description: desc,
     alternates: { canonical: url },
     openGraph: { title: titleStr, description: desc, type: 'article', url },
@@ -122,8 +143,10 @@ export default async function OpportunityPage({
   const opp = await getOpportunityBySlug(slug);
   if (!opp) notFound();
 
-  const similar = await getSimilarOpportunities(opp);
+  const related = await getRelatedOpenOpportunities(opp);
   const agency = opp.department || opp.subTier || null;
+  const { status, label: statusLabel } = statusOf(opp);
+  const isOpen = status === 'open';
   const body = (opp.sowText && opp.sowText.length > opp.description.length ? opp.sowText : opp.description) || '';
 
   return (
@@ -143,19 +166,27 @@ export default async function OpportunityPage({
           <span className="text-(--mp-muted)">{opp.noticeType || 'Opportunity'}</span>
         </nav>
 
-        {/* Status — `active` in SAM data does not mean open; say what this notice is. */}
-        {(() => {
-          const status = opportunityStatus({ notice_type: opp.noticeType, response_deadline: opp.responseDeadline });
-          const label =
-            status === 'awarded' ? 'Award notice' :
-            status === 'closed' ? 'Closed: the response deadline has passed' :
-            'Open for responses';
-          return (
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-(--mp-muted)" data-opportunity-status={status}>
-              {label}
+        {/* Status — `active` in SAM data does not mean open; say what this notice is.
+            Every clause comes from the row (deadline, archived flag, named awardee). */}
+        {isOpen ? (
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-(--mp-muted)" data-opportunity-status={status}>
+            {statusLabel}
+          </p>
+        ) : (
+          <div
+            className="mb-4 rounded-lg border border-(--mp-line) bg-(--mp-wash) px-4 py-3"
+            role="status"
+            data-opportunity-status={status}
+          >
+            <p className="text-sm font-semibold text-(--mp-ink)">{statusLabel}</p>
+            <p className="mt-0.5 text-xs text-(--mp-muted)">
+              {status === 'closed'
+                ? 'This solicitation is no longer accepting responses. It is kept here as a record.'
+                : 'This is an award notice, not an open solicitation.'}
+              {related && ' Related open opportunities are listed below.'}
             </p>
-          );
-        })()}
+          </div>
+        )}
         {/* Header */}
         <h1 className="text-2xl md:text-3xl font-bold text-(--mp-ink) leading-tight font-(family-name:--mp-font-serif)">{opp.title}</h1>
         <p className="text-sm text-(--mp-muted) mt-2">
@@ -203,7 +234,34 @@ export default async function OpportunityPage({
           <p className="text-xs text-(--mp-muted) mt-3">Source: SAM.gov, as posted. Verify the current solicitation before responding.</p>
         </section>
 
-        {/* CTA — the Mindy pitch */}
+        {/* CTA — the Mindy pitch. A closed/awarded notice cannot be pursued: offer alerts for
+            the buyer's NEXT notice instead of "track this". */}
+        {!isOpen ? (
+        <div className="mt-8 border border-(--mp-line) rounded-lg p-6 bg-(--mp-wash)">
+          <h2 className="text-lg font-bold text-(--mp-ink)">
+            Get alerts when {agency ? agency : 'this agency'} posts the next one
+          </h2>
+          <p className="text-sm text-(--mp-muted) mt-1">
+            Mindy watches SAM.gov every day and emails you new notices that match what you sell
+            {opp.naicsCode ? ` — like NAICS ${opp.naicsCode}` : ''}. Free daily alerts.
+          </p>
+          <div className="mt-4">
+            <MemberAwareCta appearance="public" memberHref="/app?panel=alerts" memberLabel="Set up alerts in Mindy →">
+              <Link
+                href="/app/signup"
+                className="inline-block bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-lg px-5 py-2.5 text-sm"
+              >
+                Get free alerts →
+              </Link>
+            </MemberAwareCta>
+          </div>
+          {opp.uiLink && (
+            <a href={opp.uiLink} target="_blank" rel="noopener noreferrer" className="inline-block text-xs text-(--mp-navy) hover:underline mt-3">
+              View the original notice on SAM.gov ↗
+            </a>
+          )}
+        </div>
+        ) : (
         <div className="mt-8 border border-(--mp-line) rounded-lg p-6 bg-(--mp-wash)">
           <h2 className="text-lg font-bold text-(--mp-ink)">Pursue this opportunity with Mindy</h2>
           <p className="text-sm text-(--mp-muted) mt-1">
@@ -226,15 +284,19 @@ export default async function OpportunityPage({
             </a>
           )}
         </div>
+        )}
 
-        {/* Similar Opportunities — the internal-link web (SEO juice) */}
-        {similar.length > 0 && (
+        {/* Related OPEN opportunities — the internal-link web; scoped in the query (NAICS, then
+            department), open-only, so a closed page never links another closed notice as live. */}
+        {related && (
           <section className="mt-10">
             <h2 className="text-lg font-semibold text-(--mp-ink) mb-3">
-              Similar Active Opportunities{opp.naicsCode ? ` (NAICS ${opp.naicsCode})` : ''}
+              {related.scope === 'naics'
+                ? `Open opportunities in NAICS ${opp.naicsCode}`
+                : `Open opportunities from ${opp.department}`}
             </h2>
             <div className="grid md:grid-cols-2 gap-3">
-              {similar.map((s) => (
+              {related.items.map((s) => (
                 <Link
                   key={s.slug}
                   href={`/opportunity/${s.slug}`}

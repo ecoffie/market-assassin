@@ -125,7 +125,13 @@ export default function RecompeteLayout({
             </li>
           </ul>
 
-          <p className="mt-8 text-sm text-(--mp-muted)">
+          <p className="mt-8 text-(--mp-body)">
+            <Link href="/recompetes" className="text-(--mp-navy) hover:underline">
+              See the federal contracts expiring soonest →
+            </Link>
+          </p>
+
+          <p className="mt-4 text-sm text-(--mp-muted)">
             New to this?{' '}
             <Link href="/glossary" className="text-(--mp-navy) hover:underline">
               The GovCon glossary

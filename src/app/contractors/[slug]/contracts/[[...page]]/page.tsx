@@ -19,6 +19,7 @@ import { SeoTemporarilyUnavailableError } from '@/lib/seo/seo-unavailable';
 import { SubpageLayout } from '@/components/contractors/SubpageLayout';
 import { getAwardsSourceAsOf } from '@/lib/awards-serving';
 import { awardHref, servableAwardIds } from '@/lib/seo/award-links';
+import { contractorIndexable } from '@/lib/seo/contractor-index-tier';
 
 const SITE_URL = 'https://getmindy.ai';
 const PAGE_SIZE = 50;
@@ -105,7 +106,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     // noindex,follow when (a) past the crawl-budget page cap, or (b) the data source
     // CONFIRMED there is nothing to list. `follow` keeps equity flowing to the profile.
     robots:
-      pageNum > MAX_INDEXABLE_PAGES || confirmedEmpty
+      pageNum > MAX_INDEXABLE_PAGES || confirmedEmpty ||
+      !contractorIndexable(recipient.total_obligated, recipient.award_count)
         ? { index: false, follow: true }
         : undefined,
     openGraph: {
