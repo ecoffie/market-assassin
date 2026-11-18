@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Script from "next/script";
-import { Inter, JetBrains_Mono } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import AttributionTracker from "@/components/AttributionTracker";
 import PartnerReferralClaimer from "@/components/mindy/PartnerReferralClaimer";
 import RefCapture from "@/components/RefCapture";
 import ChunkReloadGuard from "@/components/ChunkReloadGuard";
 import "./globals.css";
+// Self-hosted fonts (formerly next/font/google, whose build-time download failed production builds).
+import "./self-hosted-fonts.css";
+import { FONT_CLASS, ROOT_PRELOADS, preloadFonts } from "@/lib/fonts/self-hosted";
 
 // GA4 measurement id for the "Mindy — Web" property (stream: getmindy.ai).
 // Env-gated: unset → the tag block below renders nothing, so preview/local builds
@@ -18,17 +20,6 @@ const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
 const GTAG_LOADER_ID = GA_ID || GOOGLE_ADS_ID;
 
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains-mono",
-  subsets: ["latin"],
-  display: "swap",
-});
 
 // Brand copy is anchored to the Mindy landing page (src/app/mindy-landing/
 // page.tsx) so link previews on getmindy.ai match what visitors see when
@@ -97,10 +88,11 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  preloadFonts(ROOT_PRELOADS);
   return (
     <html lang="en" className="dark">
       <body
-        className={`${inter.variable} ${jetbrainsMono.variable} antialiased bg-slate-950 text-slate-100`}
+        className={`${FONT_CLASS.inter} ${FONT_CLASS.jetbrainsMono} antialiased bg-slate-950 text-slate-100`}
       >
         {/* GA4 — getmindy.ai had NO analytics at all until 2026-07-28: no pageviews,
             no bounce rate, no funnel. Verified with a real browser load (0 tracking

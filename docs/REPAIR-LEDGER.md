@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-17 — Self-hosted fonts: builds no longer download from Google (Agent 2)
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-17 | Build / fonts | **Three production builds failed on 2026-11-17 downloading next/font/google** (Space Grotesk in src/app/app/layout.tsx; Inter, JetBrains Mono and IBM Plex Mono were the same exposure). All four families are now self-hosted: the exact @font-face rules next/font/google generated (40 faces with every subset's unicode-range, font-display swap, the 4 metric-adjusted "Fallback" faces) and the identical font files from that build, under public/fonts/app/v1 with the OFL licenses and a year-long immutable cache. Same CSS variables, applied by the same layouts; same latin preloads per layout. next/font/google is blocked by an ESLint rule and a gate test. A clean next build passes with Google traffic blocked. | `.mindy-font-space-grotesk{--font-space-grotesk:` → `src/app/self-hosted-fonts.css` · `export const APP_PRELOADS` → `src/lib/fonts/self-hosted.ts` | `self-hosted.unit.test.ts` (17; the import guard proven red with a re-added import); clean next build with HTTPS proxy to a dead port (positive control: next/font's own Google fetcher fails under it); built CSS = baseline's 40 + 4 faces | DRAFT PR |
+
 ## 2026-11-17 — Ask Mindy: revise a saved document across turns (Agent 2)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
