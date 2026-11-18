@@ -7,6 +7,7 @@
  * Lifted from the core of src/app/api/sbir/route.ts.
  */
 import { createClient } from '@supabase/supabase-js';
+import { dodCacheReadState } from '@/lib/sbir/dod-sbir';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -52,6 +53,9 @@ export interface SbirSearchResult {
   opportunities: SbirOpportunity[];
   total: number;
   degraded: boolean;
+  /** Set when the DoD cache cannot support a "no topics" answer. */
+  dodCacheWarning: string | null;
+  dodCache: 'unverified_empty' | 'unmeasured' | 'ok' | 'not_requested';
 }
 
 async function fetchNih(keyword: string, agency: string, phase: string, limit: number): Promise<{ rows: SbirOpportunity[]; degraded: boolean }> {
@@ -141,7 +145,7 @@ async function fetchMultisite(keyword: string, agency: string, limit: number): P
  * sync cron fills — NEVER the rate-limited sbir.gov API directly. This is the defense gap NIH RePORTER
  * (biomedical awards) can't cover: real topic numbers + close dates for Army/Navy/AF/SOCOM/DTRA etc.
  */
-async function fetchDodSbir(keyword: string, limit: number): Promise<{ rows: SbirOpportunity[]; degraded: boolean }> {
+async function fetchDodSbir(keyword: string, limit: number): Promise<{ rows: SbirOpportunity[]; degraded: boolean; warning: string | null; dodCache: 'unverified_empty' | 'unmeasured' | 'ok' }> {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     let q = supabase
@@ -155,10 +159,19 @@ async function fetchDodSbir(keyword: string, limit: number): Promise<{ rows: Sbi
       // Table missing (migration not run yet) or a transient error → degrade, never throw. The NIH
       // path still serves; the union just lacks DoD until the migration + first sync land.
       console.error('[sbir:dod] cache read failed:', error.message);
-      return { rows: [], degraded: true };
+      const state = dodCacheReadState({ matched: 0, tableCount: null });
+      return { rows: [], degraded: true, warning: state.warning, dodCache: state.dodCache };
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rows: SbirOpportunity[] = (data || []).map((r: any) => ({
+    const matchedRows = data || [];
+    let tableCount: number | null = matchedRows.length;
+    if (matchedRows.length === 0) {
+      const counted = await supabase.from('dod_sbir_topics').select('topic_number', { count: 'exact', head: true });
+      tableCount = counted.error || typeof counted.count !== 'number' ? null : counted.count;
+    }
+    const cache = dodCacheReadState({ matched: matchedRows.length, tableCount });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows: SbirOpportunity[] = matchedRows.map((r: any) => ({
       id: `dod-sbir:${r.topic_number}`,
       title: `${r.topic_number} — ${r.title}`,
       agency: [r.agency, r.branch].filter(Boolean).join(' / ') || 'DOD',
@@ -169,10 +182,11 @@ async function fetchDodSbir(keyword: string, limit: number): Promise<{ rows: Sbi
       source: 'DoD SBIR',
       url: r.url || undefined,
     }));
-    return { rows, degraded: false };
+    return { rows, degraded: cache.degraded, warning: cache.warning, dodCache: cache.dodCache };
   } catch (err) {
     console.error('[sbir:dod] failed:', err);
-    return { rows: [], degraded: true };
+    const state = dodCacheReadState({ matched: 0, tableCount: null });
+    return { rows: [], degraded: true, warning: state.warning, dodCache: state.dodCache };
   }
 }
 
@@ -183,7 +197,7 @@ export async function searchSbir(input: SbirSearchInput): Promise<SbirSearchResu
   const source = input.source || 'nih';
   const limit = Math.min(Math.max(Number(input.limit) || 25, 1), 50);
 
-  const tasks: Array<Promise<{ rows: SbirOpportunity[]; degraded: boolean }>> = [];
+  const tasks: Array<Promise<{ rows: SbirOpportunity[]; degraded: boolean; warning?: string | null; dodCache?: 'unverified_empty' | 'unmeasured' | 'ok' }>> = [];
   if (source === 'nih' || source === 'all') tasks.push(fetchNih(keyword, agency, phase, limit));
   if (source === 'multisite' || source === 'all') tasks.push(fetchMultisite(keyword, agency, limit));
   // DoD SBIR topics (from the cache). Include when explicitly asked, when source=all, OR when the caller
@@ -194,6 +208,7 @@ export async function searchSbir(input: SbirSearchInput): Promise<SbirSearchResu
   const results = await Promise.all(tasks);
   const merged = results.flatMap((r) => r.rows);
   const degraded = results.some((r) => r.degraded);
+  const dod = results.find((r) => r.dodCache);
 
   // Dedup by lowercased 50-char title prefix.
   const seen = new Set<string>();
@@ -206,5 +221,11 @@ export async function searchSbir(input: SbirSearchInput): Promise<SbirSearchResu
     if (opportunities.length >= limit) break;
   }
 
-  return { opportunities, total: opportunities.length, degraded };
+  return {
+    opportunities,
+    total: opportunities.length,
+    degraded,
+    dodCacheWarning: dod?.warning ?? null,
+    dodCache: wantsDod ? (dod?.dodCache ?? 'unmeasured') : 'not_requested',
+  };
 }

@@ -21,7 +21,14 @@ export interface SbirToolResult {
   queried: { keyword?: string; agency?: string; phase: string; source: string };
   opportunities: SbirOpportunity[];
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
-  _meta: { grounded: boolean; degraded: boolean; count: number };
+  _meta: {
+    grounded: boolean;
+    degraded: boolean;
+    count: number;
+    /** DoD cache honesty. unverified_empty is not "no topics exist". */
+    dod_cache?: 'unverified_empty' | 'unmeasured' | 'ok' | 'not_requested';
+    dod_cache_warning?: string;
+  };
 }
 
 export async function sbirSearch(input: SbirToolInput): Promise<SbirToolResult> {
@@ -37,13 +44,21 @@ export async function sbirSearch(input: SbirToolInput): Promise<SbirToolResult> 
       source,
     },
     opportunities: res.opportunities,
-    _meta: { grounded, degraded: res.degraded, count: res.opportunities.length },
+    _meta: {
+      grounded,
+      degraded: res.degraded,
+      count: res.opportunities.length,
+      dod_cache: res.dodCache,
+      ...(res.dodCacheWarning ? { dod_cache_warning: res.dodCacheWarning } : {}),
+    },
   };
   if (mcpFlags.aiHint) {
     const top = res.opportunities[0];
     result._ai_hint = {
       summary: res.degraded
-        ? 'An SBIR source (NIH RePORTER or multisite) errored — retry; partial results may be shown.'
+        ? (res.dodCacheWarning
+          ? res.dodCacheWarning
+          : 'An SBIR source (NIH RePORTER, DoD cache, or multisite) errored — retry; partial results may be shown. Do not describe an unverified source as current or as a verified empty.')
         : grounded
         ? `${res.opportunities.length} SBIR/STTR result(s). Top: ${top.title} (${top.agency}${top.phase ? `, ${top.phase}` : ''}).`
         : 'No SBIR/STTR results. Try source="all", a broader keyword, or drop the agency.',
