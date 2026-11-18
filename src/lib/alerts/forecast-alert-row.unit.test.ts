@@ -89,8 +89,19 @@ describe('toAlertRow', () => {
     expect(r.pop_city).toBeNull();
   });
 
-  it('uses last_synced_at for "posted" — a forecast is never posted', () => {
-    expect(toAlertRow(base, URL).posted_date).toBe('2026-08-02T00:00:00Z');
+  it('never invents posted_date from sync time — last_synced_at is a separate field', () => {
+    // Sync time is when Mindy last saw the row, not when an agency "posted" it.
+    // Mapping it into posted_date made alert emails say "Posted …" for forecasts.
+    const r = toAlertRow(base, URL);
+    expect(r.posted_date).toBeNull();
+    expect(r.last_synced_at).toBe('2026-08-02T00:00:00Z');
+  });
+
+  it('keeps last_synced_at null when the agency row has no sync clock', () => {
+    const { last_synced_at: _s, ...noSync } = base;
+    const r = toAlertRow(noSync, URL);
+    expect(r.posted_date).toBeNull();
+    expect(r.last_synced_at).toBeNull();
   });
 
   it('links to the forecast horizon on the map — via ?mode=, the param the map READS', () => {

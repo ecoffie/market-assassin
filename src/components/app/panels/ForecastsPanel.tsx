@@ -61,6 +61,8 @@ interface Forecast {
   responseDeadline?: string;
   rfpReleased?: boolean;
   rfpStage?: string | null;
+  /** Mindy's last sync of the agency_forecasts row — not an agency posting date. */
+  lastSynced?: string | null;
 }
 
 interface ForecastsSummary {
@@ -713,6 +715,10 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                         )}
                         {naicsDesc && (
                           <span>{naicsDesc}</span>
+                        )}
+                        {/* Real agency_forecasts only — early signals reuse lastSynced for SAM posted_date. */}
+                        {forecast.signalType !== 'dod_early_signal' && forecast.lastSynced && (
+                          <span>Last synced {formatDate(forecast.lastSynced)}</span>
                         )}
                       </div>
 

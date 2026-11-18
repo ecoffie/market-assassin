@@ -7641,3 +7641,13 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 **SEO.** expiring federal contracts by state / recompete contracts Tennessee / federal contracts expiring in the next 18 months / AI federal contract research accuracy.
 
 **Proof.** `src/lib/mcp/result-contract.ts` (shared contract) and `src/mcp/tools/expiring-contracts.ts`. Live read-only check on production data (2026-11-14): NAICS 561320 in Tennessee went from zero listed records (nine orders hidden under vehicles) to nine listed, including 36C24927N0097 (ends 2027-03-31) and 15JA4522F00000022 (ends 2027-09-07); the three-state staffing search returns 28 records with zero out-of-state rows.
+
+## Forecast date labels stay honest (2026-11-18)
+
+**What.** Forecast alert cards, the Forecasts panel, and the map forecast drawer no longer present Mindy's sync time as an agency "posted" date. Sync appears separately as "Synced …" / "Last synced" / "Last synced by Mindy" when established; SAM cards still say "Posted …".
+
+**Why it matters.** Calling a sync clock a posting date invents a fact the agency never published — the same class of honesty failure as fabricating a deadline.
+
+**Honest scope.** Customer-facing copy only. No DB writes. MCP `as_of` / `stale_sources` (#2143) unchanged.
+
+**Proof.** `src/lib/alerts/forecast-alert-row.ts` + `dateActivityChip` in `saved-search-email.ts`; unit tests in `forecast-alert-row.unit.test.ts` and `saved-search-email.unit.test.ts`.

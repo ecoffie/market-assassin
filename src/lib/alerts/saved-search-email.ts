@@ -4,8 +4,9 @@
  * `/opportunity-map` card CSS (Eric 2026-08-01), ported to email-safe table HTML (Gmail/Outlook strip
  * flexbox/grid → nested tables + inline styles only). Anatomy, per card:
  *   • a 3px green top rule (the "new match" accent, live .card-rule)
- *   • a chip row: POSTED-ago (green) + notice-type (grey) on the left, a red-dot "N days left" pill
- *     on the right when the deadline is ≤7 days
+ *   • a chip row: POSTED-ago for SAM / SYNCED-ago for Forecast (green; omitted when neither
+ *     clock exists) + notice-type (grey) on the left, a red-dot "N days left" pill on the right
+ *     when the deadline is ≤7 days
  *   • bold title (18px/700, -.01em) + a buyer line (bold agency + light location)
  *   • a boxed SET-ASIDE / NAICS / DUE grid — labels 9.5px/700 grey, VALUES 14px/600 (NOT bold),
  *     Due red when urgent (date-only — days-left lives ONLY in the pill, no redundancy)
@@ -99,6 +100,35 @@ export function postedAgo(iso: string | null | undefined): string {
   return `Posted ${fmtDate(iso)}`;
 }
 
+/** "Synced N days ago" — for forecasts whose only clock is Mindy's last sync. */
+export function syncedAgo(iso: string): string {
+  const d = Math.round((Date.now() - new Date(iso).getTime()) / 86400000);
+  if (d <= 0) return 'Synced today';
+  if (d === 1) return 'Synced 1 day ago';
+  if (d <= 30) return `Synced ${d} days ago`;
+  return `Last synced ${fmtDate(iso)}`;
+}
+
+/**
+ * Green activity chip for an alert card.
+ * Forecasts never say "Posted" — sync time is not an agency posting date.
+ * SAM cards keep postedAgo. Missing both clocks → null (omit the chip; never
+ * lie with "Recently posted").
+ */
+export function dateActivityChip(o: {
+  notice_type?: string | null;
+  posted_date?: string | null;
+  last_synced_at?: string | null;
+  synced_at?: string | null;
+}): string | null {
+  const nt = String(o.notice_type || '');
+  if (nt.startsWith('Forecast')) {
+    const synced = o.last_synced_at || o.synced_at || null;
+    return synced ? syncedAgo(synced) : null;
+  }
+  return postedAgo(o.posted_date);
+}
+
 const FONT = "-apple-system,Segoe UI,Roboto,Arial,sans-serif";
 
 // A rectangular chip (live .tag: radius 6px, 10.5px/700, .03em, UPPERCASE).
@@ -126,7 +156,8 @@ function renderCard(o: AlertOpp, last: boolean, search: SavedSearchLite): string
   const sa = SET_ASIDE_CHIP[String(o.set_aside_code || '').toUpperCase()] || '';
   const noticeLabel = noticeTypeLabel(o.notice_type);
 
-  const postedChip = chip(postedAgo(o.posted_date), '#0f7a4d', '#e8f6ee');
+  const activityLabel = dateActivityChip(o);
+  const postedChip = activityLabel ? chip(activityLabel, '#0f7a4d', '#e8f6ee') : '';
   const noticeChip = noticeLabel ? chip(noticeLabel, '#516074', '#e4e9ee') : '';
   const urgencyChip = urgent
     ? `<span style="display:inline-block;font:700 10.5px/1 ${FONT};letter-spacing:.03em;text-transform:uppercase;color:#e0322f;background:#fdecec;border:1px solid #fdecec;border-radius:6px;padding:4px 9px;white-space:nowrap"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#e0322f;vertical-align:middle;margin-right:5px"></span>${daysLeft} day${daysLeft === 1 ? '' : 's'} left</span>`

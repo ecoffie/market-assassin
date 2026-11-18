@@ -5,7 +5,9 @@
  * title-casing, and that every opportunity renders a card with its labeled fields + a link.
  */
 import { describe, it, expect } from 'vitest';
-import { buildEmail, agencyCase, SET_ASIDE_CHIP, noticeTypeLabel, postedAgo } from './saved-search-email';
+import {
+  buildEmail, agencyCase, SET_ASIDE_CHIP, noticeTypeLabel, postedAgo, syncedAgo, dateActivityChip,
+} from './saved-search-email';
 
 const soon = (days: number) => new Date(Date.now() + days * 86400000).toISOString();
 
@@ -43,6 +45,60 @@ describe('postedAgo', () => {
     expect(postedAgo(soon(-1))).toBe('Posted 1 day ago');
     expect(postedAgo(soon(-3))).toBe('Posted 3 days ago');
     expect(postedAgo(soon(0))).toBe('Posted today');
+  });
+});
+
+describe('syncedAgo', () => {
+  it('renders a relative sync string — never "Posted"', () => {
+    expect(syncedAgo(soon(-1))).toBe('Synced 1 day ago');
+    expect(syncedAgo(soon(-3))).toBe('Synced 3 days ago');
+    expect(syncedAgo(soon(0))).toBe('Synced today');
+    expect(syncedAgo(soon(-1))).not.toMatch(/Posted/i);
+  });
+});
+
+describe('dateActivityChip', () => {
+  it('SAM cards keep Posted from a real posted_date', () => {
+    expect(dateActivityChip({
+      notice_type: 'Solicitation',
+      posted_date: soon(-2),
+    })).toBe('Posted 2 days ago');
+  });
+
+  it('Forecast cards use Synced from last_synced_at — never Posted', () => {
+    const label = dateActivityChip({
+      notice_type: 'Forecast · Q3 FY2026',
+      posted_date: null,
+      last_synced_at: soon(-2),
+    });
+    expect(label).toBe('Synced 2 days ago');
+    expect(label).not.toMatch(/Posted/i);
+  });
+
+  it('Forecast with only synced_at also uses Synced', () => {
+    expect(dateActivityChip({
+      notice_type: 'Forecast',
+      synced_at: soon(-1),
+    })).toBe('Synced 1 day ago');
+  });
+
+  it('Forecast with neither posted nor synced omits the chip (no "Recently posted" lie)', () => {
+    expect(dateActivityChip({
+      notice_type: 'Forecast',
+      posted_date: null,
+      last_synced_at: null,
+    })).toBeNull();
+  });
+
+  it('does not treat a Forecast sync clock as Posted even if posted_date is wrongly set', () => {
+    // Defense in depth: notice_type wins — Forecast never calls postedAgo.
+    const label = dateActivityChip({
+      notice_type: 'Forecast · FY2027',
+      posted_date: soon(-5),
+      last_synced_at: soon(-2),
+    });
+    expect(label).toBe('Synced 2 days ago');
+    expect(label).not.toMatch(/Posted/i);
   });
 });
 
