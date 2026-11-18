@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildContractorSummary, tidyAgency, federalFiscalYear, type SummaryInput } from './contractor-summary';
+import { buildContractorSummary, tidyAgency, federalFiscalYear, latestReportedFiscalYear, type SummaryInput } from './contractor-summary';
 
 const base: SummaryInput = {
   name: 'Betah Associates Inc.',
@@ -8,7 +8,7 @@ const base: SummaryInput = {
   yearly: [
     { fiscal_year: 2024, total_obligated: 10_000_000 },
     { fiscal_year: 2025, total_obligated: 13_000_000 },
-    { fiscal_year: 2026, total_obligated: 99_000_000 }, // FY2026 ended 30 Sep 2026: complete
+    { fiscal_year: 2026, total_obligated: 99_000_000 }, // ended 30 Sep 2026: still inside the reporting lag on 18 Nov
     { fiscal_year: 2027, total_obligated: 1_000_000 },  // current, partial — must be ignored
   ],
   topAgencies: [
@@ -28,12 +28,16 @@ describe('buildContractorSummary', () => {
     expect(s[0]).toBe('Betah Associates Inc., based in Bethesda, MD, has received $129M in federal contract obligations across 412 awards from 9 agencies.');
     expect(s[1]).toBe('Its largest customer is the Department of Health and Human Services, at 70% of obligations, followed by Department of Defense (16%) and Department of the Treasury (4%).');
     expect(s[2]).toContain('NAICS 541611 (administrative management consulting): $60M across 120 awards');
-    expect(s[3]).toBe('In FY2026 it received $99M, up 662% from FY2025.');
+    expect(s[3]).toBe('In FY2025 it received $13M, up 30% from FY2024.');
     expect(s[4]).toBe('2 of its contracts are scheduled to end soon; the next with the Department of Health and Human Services ends in March 2027.');
   });
-  it('ignores the current, partial fiscal year', () => {
+  it('ignores fiscal years still inside the reporting lag', () => {
     expect(federalFiscalYear(new Date('2026-11-18T00:00:00Z'))).toBe(2027);
-    expect(buildContractorSummary(base).join(' ')).not.toContain('FY2027');
+    expect(latestReportedFiscalYear(new Date('2026-11-18T00:00:00Z'))).toBe(2025);
+    expect(latestReportedFiscalYear(new Date('2027-02-15T00:00:00Z'))).toBe(2026);
+    const text = buildContractorSummary(base).join(' ');
+    expect(text).not.toContain('FY2027');
+    expect(text).not.toContain('FY2026');
   });
   it('a full expiring list reads "at least", never an exact count', () => {
     const ten = Array.from({ length: 10 }, (_, i) => ({ end: `2027-0${(i % 9) + 1}-01`, agency: null }));
