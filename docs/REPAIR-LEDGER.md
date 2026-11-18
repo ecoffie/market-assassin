@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-18 — Oversight office aliases and incremental page walk
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | Data Core / pain points | Of the 14 page-0 open recommendations left unresolved, the 7 International Trade Commission rows map to U.S. International Trade Commission because that office's own oversight.gov page names USITC. CPSC, ARC, and the Election Assistance Commission stay unresolved. Open recommendations walk forward from page 0 and stop at the first fully held page, 8 pages, or 200 new rows. Insert-only. Existing GAO rows are not rewritten. | `U.S. International Trade Commission programs and operations` → `src/lib/institute/oig-stated-agency.ts` · `ACQUISITION_PAGE_CAP = 8` → `src/lib/institute/acquired-pain-points.ts` | `oig-stated-agency.unit.test.ts` on the recorded ITC fixture (7 map, 3 offices stay unresolved). Walk tests stop on an all-held page and on a 503. | DRAFT PR |
+
 ## 2026-11-18 — Living pain points: GAO RSS + oversight.gov
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
