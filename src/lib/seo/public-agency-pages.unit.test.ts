@@ -3,6 +3,10 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { AGENCIES_SEO, getAgencyBySlug } from '@/data/agencies-seo';
 import { staticEntries } from '@/lib/seo/sitemap-sections';
 import {
+  agencyAwardCacheConfig,
+  agencyIntelCacheConfig,
+} from './public-agency-intel-cache';
+import {
   buildPublicPainSection,
   getPublicAgencyBySlug,
   listPublicAgencies,
@@ -29,13 +33,19 @@ function sourced(over: Partial<PublicSourcedClaim> & { pain_point: string }): Pu
 
 describe('public agency pain points', () => {
   it('falls back to the snapshot verbatim when the live read fails', () => {
-    const section = buildPublicPainSection(SNAPSHOT, { ok: false });
+    const section = buildPublicPainSection(SNAPSHOT, {
+      ok: false,
+      checkedAt: '2026-11-18T23:40:00.000Z',
+    });
     expect(section.snapshotFloor).toBe(true);
     expect(section.items.map((item) => item.claim)).toEqual(SNAPSHOT);
     expect(section.items.every((item) => item.href === null)).toBe(true);
     expect(section.freshnessLabel).toMatch(/Published snapshot/);
     expect(section.freshnessLabel).toMatch(/could not be read/);
+    expect(section.freshnessLabel).toMatch(/Mindy last checked 2026-11-18 23:40 UTC/);
+    expect(section.freshnessLabel).toMatch(/refreshes daily/);
     expect(section.asOf).toBeNull();
+    expect(section.checkedAt).toBe('2026-11-18 23:40 UTC');
   });
 
   it('falls back to the snapshot when the live read has no cited rows', () => {
@@ -67,6 +77,7 @@ describe('public agency pain points', () => {
   it('adds a novel cited row without dropping the snapshot', () => {
     const section = buildPublicPainSection(SNAPSHOT, {
       ok: true,
+      checkedAt: '2026-11-18T15:05:00.000Z',
       sourced: [
         sourced({
           pain_point: 'Open recommendations on product recalls remain unresolved.',
@@ -89,7 +100,8 @@ describe('public agency pain points', () => {
     expect(novel.publishedAt).toBe('2026-11-01');
     expect(section.asOf).toBe('2026-11-01');
     expect(section.freshnessLabel).toMatch(/as of 2026-11-01/);
-    expect(section.freshnessLabel).toMatch(/refreshes weekly/);
+    expect(section.freshnessLabel).toMatch(/Mindy last checked 2026-11-18 15:05 UTC/);
+    expect(section.freshnessLabel).toMatch(/refreshes daily/);
   });
 
   it('does not link a non-government or non-https source', () => {
@@ -118,6 +130,18 @@ describe('public agency pain points', () => {
     expect(JSON.stringify(row)).not.toContain('c870f3c7');
     expect(JSON.stringify(row)).not.toContain('Do not publish');
     expect(JSON.stringify(row)).not.toContain('confirmed_unresolved');
+  });
+});
+
+describe('agency page caches', () => {
+  it('keeps intelligence on a one-day agency tag and awards on seven days', () => {
+    const intel = agencyIntelCacheConfig('Consumer Product Safety Commission');
+    expect(intel.revalidate).toBe(86_400);
+    expect(intel.tags).toEqual(['agency-intel:Consumer Product Safety Commission']);
+    expect(intel.key).toContain('Consumer Product Safety Commission');
+    const awards = agencyAwardCacheConfig('Department of Defense');
+    expect(awards.revalidate).toBe(604_800);
+    expect(awards.tags).toEqual(['agency-bq:Department of Defense']);
   });
 });
 
@@ -151,6 +175,10 @@ describe('public agency directory', () => {
     expect(urls.has('https://getmindy.ai/agencies/election-assistance-commission')).toBe(true);
   });
 });
+
+vi.mock('next/cache', () => ({
+  unstable_cache: (fn: () => unknown) => fn,
+}));
 
 vi.mock('@/lib/bigquery/agencies', () => ({
   getAgencyProfile: vi.fn(async () => null),
@@ -231,5 +259,7 @@ describe('agency pages', () => {
     const snapshotLine = 'Cybersecurity modernization and zero-trust architecture implementation';
     expect(html.split(snapshotLine)).toHaveLength(2);
     expect(html).toContain('as of 2026-10-02');
+    expect(html).toMatch(/Mindy last checked \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC/);
+    expect(html).toContain('The intelligence refreshes daily.');
   });
 });

@@ -9,7 +9,7 @@
  *
  * One page per top-tier federal agency in the public directory. The
  * generated snapshot stays the floor. Living pain points come from the
- * shared reader and ride this page's weekly ISR.
+ * shared reader on a one-day cache. Award queries stay on a seven-day cache.
  *
  * Sections conditionally rendered when source data is present —
  * we never fabricate a pain-points or procurement-portal block;
@@ -26,17 +26,12 @@ import {
   buildPublicPainSection,
   getPublicAgencyBySlug,
   listPublicAgencies,
-  selectPublicSourced,
   type PublicPainSection,
 } from '@/lib/seo/public-agency-pages';
-import { getAgencySourcedIntelligence } from '@/lib/strategic-intel/sourced-pain-points';
+import { cachedAgencyAwards, cachedPublicAgencyIntel } from '@/lib/seo/public-agency-intel-cache';
 import { getBqAgencyName } from '@/data/agency-bq-mapping';
 import { NAICS_TOP_100 } from '@/data/naics-top100';
 import {
-  getAgencyProfile,
-  getTopRecipientsForAgency,
-  getTopNaicsForAgency,
-  getSubAgenciesForAgency,
   type AgencyProfile,
   type TopRecipientForAgency,
   type TopNaicsForAgency,
@@ -51,18 +46,19 @@ import { getForecastLinksForAgencySlug, type RelatedForecast } from '@/lib/seo/f
 // can conditionally link rather than 404-ing users.
 const LINKABLE_NAICS = new Set(NAICS_TOP_100.map((n) => n.code));
 
-// ISR-only — no build-time prerender. Each agency page makes up to
-// 3 BQ queries (profile + top 25 recipients + top 15 NAICS). DoD
-// alone scans ~8 GB, so prerendering every agency at build would
-// burn ~150 GB per Vercel deploy. The living pain-point read rides
-// this same weekly revalidate. The freshness label on the page says so.
+// ISR-only — no build-time prerender. Award queries are cached for 7
+// days (DoD alone scans ~8 GB). The intelligence read is a separate
+// 1-day cache. Next uses the shorter interval for the route, so the
+// page can show a daily check time without rescanning awards.
 const PUBLIC_AGENCY_COUNT = listPublicAgencies().length;
 export async function generateStaticParams() {
   return [];
 }
 
 export const dynamicParams = true;
-export const revalidate = 604800; // 7d
+// Ceiling. The 1-day intelligence cache lowers the route to a day.
+// Award rows stay on their own 7-day cache (cachedAgencyAwards).
+export const revalidate = 604800;
 
 export async function generateMetadata({
   params,
@@ -127,37 +123,33 @@ export default async function AgencyPage({
   const agency = getPublicAgencyBySlug(slug);
   if (!agency) notFound();
 
-  // Same reader as Ask Mindy and get_agency_intel. A throw, or a read
-  // with no cited rows, keeps the snapshot list exactly as published.
+  // Same reader as Ask Mindy and get_agency_intel, behind a 1-day cache.
+  // A throw, or a read with no cited rows, keeps the snapshot list.
   let pains: PublicPainSection;
   try {
-    const bundle = await getAgencySourcedIntelligence(agency.name);
-    pains = buildPublicPainSection(
-      agency.painPoints,
-      bundle.meta.sourcedReadFailed
-        ? { ok: false }
-        : { ok: true, sourced: selectPublicSourced(bundle.sourced) },
-    );
+    const live = await cachedPublicAgencyIntel(agency.name);
+    pains = buildPublicPainSection(agency.painPoints, {
+      ok: live.ok,
+      sourced: live.sourced,
+      checkedAt: live.checkedAt,
+    });
   } catch {
-    pains = buildPublicPainSection(agency.painPoints, { ok: false });
+    pains = buildPublicPainSection(agency.painPoints, { ok: false, checkedAt: null });
   }
 
   const related = getRelatedAgencies(agency, 5);
 
-  // Federal Award Activity (BigQuery) — fetched in parallel.
-  // Falls back to nulls/empty arrays on any BQ failure so the static
-  // content above always renders. Section is omitted entirely when the
-  // agency has no BQ counterpart (e.g. TVA, FDIC) or when the profile
-  // row is missing.
+  // Federal Award Activity (BigQuery). The 7-day cache is separate from
+  // the daily intelligence read. A failure omits the section. The
+  // section is also omitted when the agency has no BQ counterpart.
   const bqAgencyName = getBqAgencyName(agency.slug, agency.name);
-  const [bqProfile, bqTopRecipients, bqTopNaics, bqSubAgencies] = bqAgencyName
-    ? await Promise.all([
-        getAgencyProfile(bqAgencyName).catch(() => null),
-        getTopRecipientsForAgency(bqAgencyName, 25).catch(() => []),
-        getTopNaicsForAgency(bqAgencyName, 15).catch(() => []),
-        getSubAgenciesForAgency(bqAgencyName, 8).catch(() => []),
-      ])
-    : [null, [], [], []];
+  const awards = bqAgencyName
+    ? await cachedAgencyAwards(bqAgencyName).catch(() => null)
+    : null;
+  const bqProfile = awards?.profile ?? null;
+  const bqTopRecipients = awards?.recipients ?? [];
+  const bqTopNaics = awards?.naics ?? [];
+  const bqSubAgencies = awards?.subAgencies ?? [];
 
   // Explore links: this agency's upcoming per-forecast pages (Supabase, never BigQuery). A read
   // failure returns null and the forecast list is omitted (logged) — never shown as "no forecasts".

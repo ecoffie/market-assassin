@@ -130,8 +130,8 @@ export function selectPublicSourced<T extends PublicSourcedClaim>(
 }
 
 export type LivePainRead =
-  | { ok: true; sourced: readonly PublicSourcedClaim[] }
-  | { ok: false };
+  | { ok: true; sourced: readonly PublicSourcedClaim[]; checkedAt?: string | null }
+  | { ok: false; checkedAt?: string | null };
 
 export interface PublicPainItem {
   claim: string;
@@ -147,10 +147,21 @@ export interface PublicPainSection {
   /** True when the section is the snapshot alone because the live read failed or returned no cited rows. */
   snapshotFloor: boolean;
   freshnessLabel: string;
+  /** Newest cited report publication day, when one is present. */
   asOf: string | null;
+  /** When this read ran. Null when the page could not record a check. */
+  checkedAt: string | null;
 }
 
-const WEEKLY = 'This page refreshes weekly.';
+const DAILY = 'The intelligence refreshes daily.';
+
+/** `2026-11-18T23:40:00.000Z` → `2026-11-18 23:40 UTC`. Invalid input is omitted. */
+export function formatCheckedAt(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return `${parsed.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+}
 
 function claimKey(text: string): string {
   return text
@@ -244,6 +255,8 @@ export function buildPublicPainSection(
     .filter((day): day is string => !!day)
     .sort()
     .at(-1) ?? null;
+  const checkedAt = formatCheckedAt(live.checkedAt);
+  const checkedClause = checkedAt ? ` Mindy last checked ${checkedAt}.` : '';
 
   if (cited.length === 0) {
     const why = live.ok
@@ -253,7 +266,8 @@ export function buildPublicPainSection(
       items,
       snapshotFloor: true,
       asOf: null,
-      freshnessLabel: `Published snapshot. ${why} ${WEEKLY}`,
+      checkedAt,
+      freshnessLabel: `Published snapshot. ${why}${checkedClause} ${DAILY}`,
     };
   }
 
@@ -262,6 +276,7 @@ export function buildPublicPainSection(
     items,
     snapshotFloor: false,
     asOf,
-    freshnessLabel: `Sourced from GAO and inspectors general${asOfClause}. ${WEEKLY}`,
+    checkedAt,
+    freshnessLabel: `Sourced from GAO and inspectors general${asOfClause}.${checkedClause} ${DAILY}`,
   };
 }
