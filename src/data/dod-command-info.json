@@ -1649,7 +1649,9 @@
           "sourceUrl": "https://www.va.gov/osdbu/",
           "previousEmail": "vha.osdbu@va.gov",
           "note": "VA-wide OSDBU contact (no administration-specific SB mailbox found). Phone is OSDBU Call Operations, 8-4 ET."
-        }
+        },
+        "contactScope": "parent_osdbu",
+        "contactScopeOf": "Department of Veterans Affairs OSDBU"
       },
       "acquisitionOffice": {
         "name": "VHA Procurement and Logistics Office",
@@ -2767,7 +2769,9 @@
           "sourceUrl": "https://www.gsa.gov/node/162028",
           "previousEmail": "small.business@gsa.gov",
           "note": "Stored small.business@gsa.gov differs from published smallbusiness@gsa.gov. Also OSB_gethelp@gsa.gov. No HQ phone; only regional SBS phones. No director/associate administrator named."
-        }
+        },
+        "contactScope": "parent_osdbu",
+        "contactScopeOf": "GSA Office of Small Business"
       },
       "acquisitionOffice": {
         "name": "PBS Acquisition Management",
@@ -2796,7 +2800,9 @@
           "sourceUrl": "https://www.gsa.gov/node/162028",
           "previousEmail": "small.business@gsa.gov",
           "note": "Stored small.business@gsa.gov differs from published smallbusiness@gsa.gov. Also OSB_gethelp@gsa.gov. No HQ phone; only regional SBS phones. No director/associate administrator named."
-        }
+        },
+        "contactScope": "parent_osdbu",
+        "contactScopeOf": "GSA Office of Small Business"
       },
       "acquisitionOffice": {
         "name": "FAS Acquisition Operations",
@@ -2825,7 +2831,9 @@
           "sourceUrl": "https://www.dol.gov/agencies/oasam/centers-offices/office-of-the-senior-procurement-executive/office-of-small-and-disadvantaged-business-utilization/procurement-information",
           "previousEmail": "osdbu@dol.gov",
           "note": "DOL-wide OSDBU. Director role listed but unnamed. Peter Kontakos, Program Manager (Small Business Procurements & Contracts)."
-        }
+        },
+        "contactScope": "parent_osdbu",
+        "contactScopeOf": "Department of Labor OSDBU"
       },
       "acquisitionOffice": {
         "name": "DOL Business Operations Center",
@@ -2984,7 +2992,9 @@
           "sourceUrl": "https://www.dol.gov/agencies/oasam/centers-offices/office-of-the-senior-procurement-executive/office-of-small-and-disadvantaged-business-utilization/procurement-information",
           "previousEmail": "osdbu@dol.gov",
           "note": "DOL-wide OSDBU. Director role listed but unnamed. Peter Kontakos, Program Manager (Small Business Procurements & Contracts). Stored forecastUrl is a homepage/grants page with no SB contact."
-        }
+        },
+        "contactScope": "parent_osdbu",
+        "contactScopeOf": "Department of Labor OSDBU"
       },
       "acquisitionOffice": {
         "name": "OSHA Acquisition and Assistance Branch",
@@ -3013,7 +3023,9 @@
           "sourceUrl": "https://www.dol.gov/agencies/oasam/centers-offices/office-of-the-senior-procurement-executive/office-of-small-and-disadvantaged-business-utilization/procurement-information",
           "previousEmail": "osdbu@dol.gov",
           "note": "DOL-wide OSDBU. Director role listed but unnamed. Peter Kontakos, Program Manager (Small Business Procurements & Contracts). Stored forecastUrl is a homepage/grants page with no SB contact."
-        }
+        },
+        "contactScope": "parent_osdbu",
+        "contactScopeOf": "Department of Labor OSDBU"
       },
       "acquisitionOffice": {
         "name": "ETA Office of Grants Management",
@@ -3042,7 +3054,9 @@
           "sourceUrl": "https://www.dol.gov/agencies/oasam/centers-offices/office-of-the-senior-procurement-executive/office-of-small-and-disadvantaged-business-utilization/procurement-information",
           "previousEmail": "osdbu@dol.gov",
           "note": "DOL-wide OSDBU. Director role listed but unnamed. Peter Kontakos, Program Manager (Small Business Procurements & Contracts). Stored forecastUrl is a homepage/grants page with no SB contact."
-        }
+        },
+        "contactScope": "parent_osdbu",
+        "contactScopeOf": "Department of Labor OSDBU"
       },
       "acquisitionOffice": {
         "name": "MSHA Office of Administration and Management",
@@ -3207,7 +3221,9 @@
           "sourceUrl": "https://www.va.gov/osdbu/",
           "previousEmail": "osdbu@va.gov",
           "note": "VA-wide OSDBU contact (no administration-specific SB mailbox found). Phone is OSDBU Call Operations, 8-4 ET. Stored forecastUrl va.gov/opal/nac/fss/ not checked."
-        }
+        },
+        "contactScope": "parent_osdbu",
+        "contactScopeOf": "Department of Veterans Affairs OSDBU"
       },
       "acquisitionOffice": {
         "name": "VBA Office of Resource Management",
@@ -3236,7 +3252,9 @@
           "sourceUrl": "https://www.va.gov/osdbu/",
           "previousEmail": "osdbu@va.gov",
           "note": "VA-wide OSDBU contact (no administration-specific SB mailbox found). Phone is OSDBU Call Operations, 8-4 ET. Stored forecastUrl va.gov/opal/nac/fss/ not checked."
-        }
+        },
+        "contactScope": "parent_osdbu",
+        "contactScopeOf": "Department of Veterans Affairs OSDBU"
       },
       "acquisitionOffice": {
         "name": "NCA Contracting Office",
@@ -3265,7 +3283,9 @@
           "sourceUrl": "https://www.doi.gov/osdbu",
           "previousEmail": "osdbu@ios.doi.gov",
           "note": "Stored osdbu@ios.doi.gov differs from published doi_osdbu@ios.doi.gov. No director named on page."
-        }
+        },
+        "contactScope": "parent_osdbu",
+        "contactScopeOf": "Department of the Interior OSDBU"
       },
       "acquisitionOffice": {
         "name": "BIA Acquisition Services",
@@ -3294,7 +3314,9 @@
           "sourceUrl": "https://www.doi.gov/osdbu",
           "previousEmail": "osdbu@ios.doi.gov",
           "note": "Stored osdbu@ios.doi.gov differs from published doi_osdbu@ios.doi.gov. No director named on page."
-        }
+        },
+        "contactScope": "parent_osdbu",
+        "contactScopeOf": "Department of the Interior OSDBU"
       },
       "acquisitionOffice": {
         "name": "BOEM Procurement Division",
@@ -3323,7 +3345,9 @@
           "sourceUrl": "https://www.doi.gov/osdbu",
           "previousEmail": "osdbu@ios.doi.gov",
           "note": "Stored osdbu@ios.doi.gov differs from published doi_osdbu@ios.doi.gov. No director named on page."
-        }
+        },
+        "contactScope": "parent_osdbu",
+        "contactScopeOf": "Department of the Interior OSDBU"
       },
       "acquisitionOffice": {
         "name": "BSEE Procurement Division",
@@ -3352,7 +3376,9 @@
           "sourceUrl": "https://home.treasury.gov/policy-issues/small-business-programs/small-and-disadvantaged-business-utilization/how-to-contact-us",
           "previousEmail": "osdbu@treasury.gov",
           "note": "Treasury lists Smallbusiness@fiscal.treasury.gov for TTB, Fiscal Service, CDFI Fund, FinCEN, TIGTA. Main OSDBU: OSDBU_Team@Treasury.gov. No phones on page."
-        }
+        },
+        "contactScope": "parent_osdbu",
+        "contactScopeOf": "Treasury (Bureau of the Fiscal Service small business mailbox)"
       },
       "acquisitionOffice": {
         "name": "FinCEN Procurement Division",
@@ -3410,7 +3436,9 @@
           "sourceUrl": "https://home.treasury.gov/policy-issues/small-business-programs/small-and-disadvantaged-business-utilization/how-to-contact-us",
           "previousEmail": "osdbu@treasury.gov",
           "note": "Treasury lists Smallbusiness@fiscal.treasury.gov for TTB, Fiscal Service, CDFI Fund, FinCEN, TIGTA. Main OSDBU: OSDBU_Team@Treasury.gov. No phones on page."
-        }
+        },
+        "contactScope": "parent_osdbu",
+        "contactScopeOf": "Treasury (Bureau of the Fiscal Service small business mailbox)"
       },
       "acquisitionOffice": {
         "name": "TTB Procurement Division",

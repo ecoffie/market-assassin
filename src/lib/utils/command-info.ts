@@ -30,6 +30,13 @@ export interface SmallBusinessOffice {
   /** Official page the contact (director / mailbox) was checked against. */
   contactSourceUrl?: string;
   /**
+   * 'parent_osdbu' when the verified mailbox belongs to the parent department's small-business
+   * office (e.g. VBA → vetbiz@va.gov), not to this component. Absent = the office's own contact.
+   */
+  contactScope?: 'parent_osdbu';
+  /** Which parent office the mailbox belongs to, when contactScope = 'parent_osdbu'. */
+  contactScopeOf?: string;
+  /**
    * Audit record (2026-11-17 placeholder-mailbox audit). `withheldEmail` keeps an address that
    * was NOT found on a fully read official small-business page. Present in the JSON file only:
    * stripped when the directory is loaded, so it is never served.

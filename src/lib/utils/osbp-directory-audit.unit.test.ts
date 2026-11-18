@@ -92,6 +92,14 @@ describe('serving path never exposes the audit record or a withheld address', ()
     expect(JSON.stringify(nsa)).not.toContain('SmallBusiness@nsa.gov');
   });
 
+  it('a component carrying its parent department mailbox says so (contact_scope)', () => {
+    const vba = lookupFederalOsbp({ agency: 'VBA' }).office!;
+    expect(vba).toMatchObject({ email: 'vetbiz@va.gov', email_status: 'verified', contact_scope: 'parent_osdbu' });
+    expect(vba.contact_scope_of).toMatch(/Veterans Affairs/);
+    expect(lookupFederalOsbp({ agency: 'VA' }).office).toMatchObject({ contact_scope: 'own_office' });
+    expect(lookupFederalOsbp({ agency: 'NSA' }).office).toMatchObject({ contact_scope: null });
+  });
+
   it('_meta reports the verified/unverified mailbox split', () => {
     const r = lookupFederalOsbp({ agency: 'Department of the Navy' });
     expect(r._meta.emails_verified + r._meta.emails_unverified).toBeLessThanOrEqual(r._meta.office_count);

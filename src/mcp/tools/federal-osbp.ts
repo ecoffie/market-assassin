@@ -50,6 +50,13 @@ interface OsbpOffice {
   email_status: 'verified' | 'unverified' | 'none';
   /** The official page the contact was checked against, when known. */
   contact_source_url: string | null;
+  /**
+   * 'parent_osdbu' = the mailbox is the PARENT department's small-business office (say so; never
+   * present it as this component's own office). 'own_office' = stored for this office. null = no mailbox.
+   */
+  contact_scope: 'own_office' | 'parent_osdbu' | null;
+  /** The parent office the mailbox belongs to, when contact_scope = 'parent_osdbu'. */
+  contact_scope_of: string | null;
   phone: string | null;
   address: string | null;
   website: string | null;
@@ -126,6 +133,8 @@ function toOffice(info: CommandInfo): OsbpOffice {
     email_verified: sb?.email ? (sb?.emailVerified ?? null) : null,
     email_status: emailStatus(sb?.email, sb?.emailVerified),
     contact_source_url: sb?.contactSourceUrl ?? null,
+    contact_scope: sb?.email ? (sb?.contactScope ?? 'own_office') : null,
+    contact_scope_of: sb?.email ? (sb?.contactScopeOf ?? null) : null,
     phone: sb?.phone ?? null,
     address: sb?.address ?? null,
     website: info.website ?? null,
@@ -180,6 +189,8 @@ export function lookupFederalOsbp(input: FederalOsbpToolInput): FederalOsbpToolR
         email_verified: sb.contact.email ? (sb.contact.emailVerified ?? null) : null,
         email_status: emailStatus(sb.contact.email, sb.contact.emailVerified),
         contact_source_url: sb.contact.contactSourceUrl ?? null,
+        contact_scope: sb.contact.email ? (sb.contact.contactScope ?? 'own_office') : null,
+        contact_scope_of: sb.contact.email ? (sb.contact.contactScopeOf ?? null) : null,
         phone: sb.contact.phone ?? null,
         address: sb.contact.address ?? null,
         website: null,
@@ -239,6 +250,7 @@ export function lookupFederalOsbp(input: FederalOsbpToolInput): FederalOsbpToolR
         : 'Not in the directory; do NOT invent a name or email. Suggest the buying office POC on the actual SAM solicitation instead (search_federal_contacts).',
       key_caveats: [
         'Director names rotate and mailboxes are not assumed stable: trust `director_verified` / `email_verified` (YYYY-MM). When `email_status` is "unverified", say the address is unconfirmed and point the user to `contact_source_url` / `forecast_url` to confirm it; never present it as a confirmed address. When there is no email, do not invent one.',
+        'When `contact_scope` is "parent_osdbu", the mailbox is the parent department\'s small-business office (`contact_scope_of`), not this component\'s own office — say so.',
         'Curated directory is DoD/DLA/Navy/Army-weighted — coverage=not_in_directory is a gap, not proof the office does not exist. coverage=no_osbp_listed means the command is known but no OSBP row is stored.',
       ],
     };
