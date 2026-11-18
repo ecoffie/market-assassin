@@ -1,14 +1,23 @@
--- Honesty park: false-green freshness (Agent 3 / Eric decisions 2026-11-18).
+-- Inventory honesty: DIBBS + null-clock demotion (Eric 2026-11-18, Agent 3 re-scope).
+--
+-- ── HISTORY ────────────────────────────────────────────────────────────────
+-- An earlier draft of this file ALSO parked sync-dod-sbir (enabled=false). That
+-- section was REMOVED before any production apply. Measured 2026-11-18: prod
+-- still has sync-dod-sbir enabled=true — this migration was never applied.
+-- Eric's approved scope: keep SBIR cron enabled; prefer controlled retries +
+-- honest 503 + automatic recovery when sbir.gov returns. Do NOT park SBIR.
+--
+-- If you find a copy of this filename that still contains
+--   UPDATE cron_jobs … WHERE job_name = 'sync-dod-sbir' … enabled = FALSE
+-- do NOT run that statement. SBIR recovery is code-side (retries + empty→503).
 --
 -- ── THE DEFECT ─────────────────────────────────────────────────────────────
 -- Measured live 2026-11-18 against production:
 --
---   sync-dod-sbir     enabled, last_status=success every 6h, HTTP 200
---                     → dod_sbir_topics = 0 rows (api-down path claimed success)
 --   sync-dibbs        enabled=false since 2026-11-02 (Apify cost)
 --                     → data_source_instances.dibbs_dla_flat_files still source_state=current
 --                       with NULL last_verified_ingest / last_data_advance
---                       held_population 57,816 vs live 103,076
+--                       held_population 57,816 vs live ~103k
 --   Same null-clock "current" on sam_opportunities_sam_gov, grants_gov_api,
 --   forecast_dhs_apfs, forecast_doe_osbp.
 --
@@ -16,27 +25,18 @@
 -- advancement clock manufactures health.
 --
 -- ── WHAT THIS DOES ─────────────────────────────────────────────────────────
--- 1. Park sync-dod-sbir (same pattern as 20260921_park_false_green_producers).
--- 2. Tell the truth on DIBBS: content_stale + blocked; held_population = live count.
--- 3. Demote automated instances that claim current with null advancement clocks
+-- 1. Tell the truth on DIBBS: content_stale + blocked; held_population = live count.
+-- 2. Demote automated instances that claim current with null advancement clocks
 --    to unmeasured (reader also refuses CURRENT without a clock).
+-- 3. Document SBIR policy on the cron_jobs row WITHOUT disabling it.
 --
 -- ── WHAT THIS DOES NOT ─────────────────────────────────────────────────────
 -- No DELETE / DROP / TRUNCATE. No specialty ingest reopen. No SAM fleet delete.
--- No forecast apply. Re-enable sync-dod-sbir only with proven DATA advancement.
+-- No forecast apply. No parking of sync-dod-sbir.
+-- Does not touch institute_gao / Grokbot fresh-intel writers — only the four
+-- false-green keys below plus dibbs_dla_flat_files.
 
--- ── 1. Stop the DoD SBIR false-green producer ──────────────────────────────
-UPDATE public.cron_jobs
-SET enabled = FALSE,
-    notes = coalesce(notes, '') ||
-      ' | PARKED 2026-11-18: reported success/HTTP 200 while dod_sbir_topics held 0 rows'
-      || ' (api-down path treated unreachable as success). Disabled so the job can no longer'
-      || ' manufacture evidence of health. Re-enable only when sbir.gov drain is proven by'
-      || ' held row advancement.'
-WHERE job_name = 'sync-dod-sbir'
-  AND enabled IS TRUE;
-
--- ── 2. DIBBS: disabled sync cannot read current ────────────────────────────
+-- ── 1. DIBBS: disabled sync cannot read current ────────────────────────────
 -- Historical rows preserved. held_population corrected to the live count.
 -- last_data_advance left null — we do not invent a verified-ingest stamp from a
 -- disabled producer; max(dibbs_rfqs.synced_at) remains the data clock.
@@ -48,7 +48,7 @@ SET source_state       = 'content_stale',
     updated_at         = NOW()
 WHERE source_key = 'dibbs_dla_flat_files';
 
--- ── 3. Automated "current" with null advancement clocks → unmeasured ───────
+-- ── 2. Automated "current" with null advancement clocks → unmeasured ───────
 -- DIBBS already set above (content_stale). Remaining false greens demoted so
 -- the control plane cannot claim current without a data clock. Inventory falls
 -- back to the table timestamp when instance state is UNKNOWN.
@@ -64,4 +64,20 @@ WHERE ingest_mode = 'automated'
     'grants_gov_api',
     'forecast_dhs_apfs',
     'forecast_doe_osbp'
+  );
+
+-- ── 3. SBIR stays ENABLED — retries + honest failure, not a park ───────────
+-- Code path: sync-dod-sbir retries a down probe, then returns HTTP 503 when
+-- still unreachable / empty. Next dispatcher tick recovers automatically.
+UPDATE public.cron_jobs
+SET notes = coalesce(nullif(trim(notes), ''), 'sync-dod-sbir')
+  || ' | 2026-11-18: keep ENABLED. Temporary sbir.gov unavailability must report'
+  || ' failure (HTTP 503), retry within the run, and recover on a later tick —'
+  || ' never park this job for an empty corpus.'
+WHERE job_name = 'sync-dod-sbir'
+  AND notes IS DISTINCT FROM (
+    coalesce(nullif(trim(notes), ''), 'sync-dod-sbir')
+    || ' | 2026-11-18: keep ENABLED. Temporary sbir.gov unavailability must report'
+    || ' failure (HTTP 503), retry within the run, and recover on a later tick —'
+    || ' never park this job for an empty corpus.'
   );

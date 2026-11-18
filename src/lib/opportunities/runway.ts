@@ -87,9 +87,12 @@ export function runwayTier(deadline?: string | null, now: Date = new Date()): Ru
 }
 
 /** Plain-language, honest badge. Never dresses up a dead opp as pursuable. */
-export function runwayLabel(deadline?: string | null, now: Date = new Date()): string {
+export function runwayLabel(deadline?: string | null, now: Date = new Date(), noticeType?: string | null): string {
   const days = daysUntil(deadline, now);
-  if (days === null) return '🟢 Open — no deadline';
+  if (days === null) {
+    if (classifyNoticeType(noticeType).respondability === 'none') return 'Not open for responses — no deadline';
+    return '🟢 Open — no deadline';
+  }
   if (days < 0) return '⛔ Closed';
   if (days === 0) return '⛔ Closes today';
   if (days === 1) return '🔴 1 day — tight, act now';
