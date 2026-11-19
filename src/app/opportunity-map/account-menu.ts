@@ -67,7 +67,16 @@ const ACCOUNT_MENU_BASE_CSS =
   + '.mindy-upg:hover{background:#14294a}'
   + '.mindy-plan{font:700 13px Inter,system-ui,sans-serif;color:#1b3a6b;text-decoration:none;white-space:nowrap;padding:6px 12px;border:1px solid #c9d6ea;border-radius:999px;background:#eef3fb}'
   + '.mindy-plan:hover{border-color:#1b3a6b}'
-  + '@media(max-width:640px){.mindy-cred{display:none}}'
+  // Streak + ranking chips beside the credits pill (owner, 2026-11-19: "the ranking and the login
+  // streak to be at the top where your credits are").
+  + '.mindy-game{display:inline-flex;align-items:center;gap:6px;font:600 14px Inter,system-ui,sans-serif;color:var(--ink,#111c26);text-decoration:none;white-space:nowrap;padding:7px 12px;border:1px solid var(--line,#e6eaef);border-radius:999px;background:#fff}'
+  + '.mindy-game:hover{border-color:#1b3a6b;color:#1b3a6b}'
+  + '.mindy-game svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}'
+  + '.mindy-game.streak{color:#92400e;border-color:#f5d9a8;background:#fff8ec}'
+  + '.mindy-game.streak svg{stroke:#b45309}'
+  + '.mindy-acct-menu a.cred-row{justify-content:space-between;font-weight:700}'
+  + '.mindy-acct-menu a.cred-row span.n{font:700 13px ui-monospace,Menlo,monospace;color:#005ee0;background:#eff5ff;padding:3px 8px;border-radius:6px}'
+  + '@media(max-width:640px){.mindy-cred,.mindy-game{display:none}}'
   + '.mindy-anon-link{font:600 14px Inter,system-ui,sans-serif;color:var(--ink,#111c26);text-decoration:none;white-space:nowrap;cursor:pointer}'
   + '.mindy-anon-link:hover{text-decoration:underline;text-underline-offset:3px}'
   + '@media(max-width:640px){.mindy-anon-link{display:none!important}}'
@@ -132,6 +141,10 @@ export function accountMenuHtml(identity?: { email?: string | null; name?: strin
   + '</button>'
   + '<div class="mindy-acct-menu" id="mindyAcctMenu" role="menu">'
   + '<div class="mindy-acct-hd" id="mindyAcctHd" style="display:' + hdDisplay + '"><div class="nm" id="mindyAcctNm">' + escText(hdName) + '</div><div class="em" id="mindyAcctEm">' + escText(hdEmail) + '</div></div>'
+  // Credits first in the menu (owner, 2026-11-19). Filled by paintPlan; hidden until the balance is
+  // known, never a fake 0.
+  + '<a href="/app?panel=settings&section=credits&tab=billing" id="mindyAcctCredRow" class="cred-row" role="menuitem" style="display:none"><span style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>Your credits</span><span class="n" id="mindyAcctCredN"></span></a>'
+  + '<div class="sep" id="mindyAcctCredSep" style="display:none"></div>'
   + '<a href="/opportunity-map" role="menuitem"><svg viewBox="0 0 24 24"><path d="M9 3 3 6v15l6-3 6 3 6-3V3l-6 3-6-3z"/><path d="M9 3v15M15 6v15"/></svg>Opportunity Map</a>'
   + '<a href="/opportunity-map/favorites" role="menuitem"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg>Favorites</a>'
   + '<a href="/opportunity-map/saved" role="menuitem"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>Updates</a>'
@@ -214,11 +227,21 @@ export const ACCOUNT_MENU_JS = '<script>'
   // plan "pro" (resolvePlan, promoted by resolveAccess — the hasProAccess verdict) OR proFeatures true
   // (isProEmail, the requirePro gate's verdict: Pro, Team, trial, staff). Pro gets a quiet "Pro" badge
   // (→ billing) and no Upgrade button. Display only; no entitlement logic changes.
-  + 'function paintPlan(d){if(document.getElementById("mindyCred"))return;var p=wrap.parentNode;if(!p)return;var scope=wrap.closest("header")||p;scope.querySelectorAll(\'a[href="/pricing"]\').forEach(function(a){if(!a.closest("#mindyAcctMenu"))a.style.display="none";});var top=d.plan==="team"||d.plan==="enterprise";if(typeof d.credits==="number"){var c=document.createElement("a");c.id="mindyCred";c.className="mindy-cred";c.href="/app?panel=settings&section=credits&tab=billing";c.title="Your Mindy credits";c.textContent=Number(d.credits).toLocaleString()+" credits";p.insertBefore(c,wrap);}var paid=top||d.plan==="pro"||d.proFeatures===true;var call=document.getElementById("mindyAcctCall");if(call&&paid)call.style.display="flex";var pro=!top&&(d.plan==="pro"||d.proFeatures===true);if(pro){var b=document.createElement("a");b.id="mindyPlan";b.className="mindy-plan";b.href="/app?panel=settings&section=credits&tab=billing";b.title="Your plan";b.textContent="Pro";p.insertBefore(b,wrap);return;}var u=document.createElement("a");u.id="mindyUpg";u.className="mindy-upg";u.href=top?"/app?panel=settings&section=credits&tab=billing":"/pricing";u.textContent=top?"Add credits":"Upgrade";p.insertBefore(u,wrap);}'
+  + 'function paintPlan(d){if(typeof d.credits==="number"){var cr=document.getElementById("mindyAcctCredRow"),cn=document.getElementById("mindyAcctCredN"),cs=document.getElementById("mindyAcctCredSep");if(cr&&cn){cn.textContent=Number(d.credits).toLocaleString();cr.style.display="flex";if(cs)cs.style.display="block";}}if(document.getElementById("mindyCred"))return;var p=wrap.parentNode;if(!p)return;var scope=wrap.closest("header")||p;scope.querySelectorAll(\'a[href="/pricing"]\').forEach(function(a){if(!a.closest("#mindyAcctMenu"))a.style.display="none";});var top=d.plan==="team"||d.plan==="enterprise";if(typeof d.credits==="number"){var c=document.createElement("a");c.id="mindyCred";c.className="mindy-cred";c.href="/app?panel=settings&section=credits&tab=billing";c.title="Your Mindy credits";c.textContent=Number(d.credits).toLocaleString()+" credits";p.insertBefore(c,wrap);}var paid=top||d.plan==="pro"||d.proFeatures===true;var call=document.getElementById("mindyAcctCall");if(call&&paid)call.style.display="flex";var pro=!top&&(d.plan==="pro"||d.proFeatures===true);if(pro){var b=document.createElement("a");b.id="mindyPlan";b.className="mindy-plan";b.href="/app?panel=settings&section=credits&tab=billing";b.title="Your plan";b.textContent="Pro";p.insertBefore(b,wrap);return;}var u=document.createElement("a");u.id="mindyUpg";u.className="mindy-upg";u.href=top?"/app?panel=settings&section=credits&tab=billing":"/pricing";u.textContent=top?"Add credits":"Upgrade";p.insertBefore(u,wrap);}'
+  // Login streak + UEI ranking chips (owner, 2026-11-19), just before the credits pill. The streak
+  // POST also records today's visit (server picks the day; idempotent). Each chip shows only on a real
+  // answer: an unreadable streak or ranking shows nothing, never a fake "0" or "#1". No UEI → "Get
+  // ranked" (opens My Vault). Rank rounding matches src/lib/ranking/top-percent.ts.
+  + 'function topPct(r,n){if(!(r>0)||!(n>0))return"";var p=r/n*100;if(p<0.1)return"top 0.1%";if(p<1)return"top "+(Math.ceil(p*10)/10).toFixed(1)+"%";return"top "+Math.ceil(p)+"%";}'
+  + 'function gameChip(id,cls,href,html,title){if(document.getElementById(id))return;var p=wrap.parentNode;if(!p)return;var a=document.createElement("a");a.id=id;a.className="mindy-game "+cls;a.href=href;a.title=title;a.innerHTML=html;var before=document.getElementById("mindyCred")||document.getElementById("mindyPlan")||document.getElementById("mindyUpg")||wrap;if(id==="mindyStreak"){var rk=document.getElementById("mindyRank");if(rk)before=rk;}p.insertBefore(a,before);}'
+  + 'function paintGame(t,em){var h={"x-mi-auth-token":t,"x-user-email":em};'
+  +   'fetch("/api/app/streak",{method:"POST",credentials:"same-origin",headers:h}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d||d.status!=="ok"||!(d.streak>0))return;var n=d.streak;var tip=d.creditsEligible===false?"Pro members earn +25 credits every 7 days in a row":(d.next&&d.next.credits?(d.next.inDays===1?"Come back tomorrow":d.next.inDays+" more days")+" for +"+d.next.credits+" credits":"");gameChip("mindyStreak","streak","/app",\'<svg viewBox="0 0 24 24"><path d="M12 22c4 0 7-3 7-7 0-4-3-6-4-10-2 2-3 4-3 6-1-1-2-2-2-4-3 3-5 5-5 8 0 4 3 7 7 7z"/></svg>\'+n+"-day streak",n+" days in a row"+(tip?" · "+tip:""));}).catch(function(){});'
+  +   'fetch("/api/app/my-ranking?email="+encodeURIComponent(em),{credentials:"same-origin",headers:h}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d)return;var icon=\'<svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0z"/><path d="M17 5h3v2a3 3 0 01-3 3M7 5H4v2a3 3 0 003 3"/></svg>\';if(d.status==="no_uei"){gameChip("mindyRank","rank","/app?panel=vault",icon+"Get ranked","Add your UEI in My Vault to see where you rank among federal contractors");return;}if(d.status!=="ok"||!d.ranking)return;var k=d.ranking;var st=k.state&&k.rankState?" · #"+Number(k.rankState).toLocaleString()+" in "+k.state:"";gameChip("mindyRank","rank","/app",icon+"#"+Number(k.rankAll).toLocaleString(),"Rank #"+Number(k.rankAll).toLocaleString()+" of "+Number(k.countAll).toLocaleString()+" federal contractors ("+topPct(k.rankAll,k.countAll)+")"+st+", by lifetime federal dollars to UEI "+k.uei);}).catch(function(){});'
+  + '}'
   + 'if(!t||tokExpired(t)){paintSignedOut();return;}'
   + 'if(em){paintInitial("",em);renderHeader("");}'
   + 'var meHdrs={"x-mi-auth-token":t};if(em)meHdrs["x-user-email"]=em;'
-  + 'fetch("/api/app/me"+(em?("?email="+encodeURIComponent(em)):""),{credentials:"same-origin",headers:meHdrs}).then(function(r){if(r.status===401){paintSignedOut();return null;}return r.ok?r.json():null;}).then(function(d){if(!d||!d.email)return;announce("valid");em=d.email;renderAvatar(d.name||"",d.picture||"");renderHeader(d.name||"");paintPlan(d);}).catch(function(){});'
+  + 'fetch("/api/app/me"+(em?("?email="+encodeURIComponent(em)):""),{credentials:"same-origin",headers:meHdrs}).then(function(r){if(r.status===401){paintSignedOut();return null;}return r.ok?r.json():null;}).then(function(d){if(!d||!d.email)return;announce("valid");em=d.email;renderAvatar(d.name||"",d.picture||"");renderHeader(d.name||"");paintPlan(d);paintGame(t,em);}).catch(function(){});'
   // Usage-gated Proposals entry: reveal it only when the signed-in user isPro OR has
   // drafted before (approved display rule). One cheap probe (exact count + Pro resolve).
   // Fails silent — the entry just stays hidden, never a broken/dead link.
