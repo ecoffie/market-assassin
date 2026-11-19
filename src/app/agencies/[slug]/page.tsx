@@ -7,9 +7,9 @@
  *   "[agency] small business contracts"
  *   "[agency] forecast"
  *
- * One page per top-tier federal agency (49 total). Statically
- * prerendered via generateStaticParams so every agency ships as a
- * cacheable HTML file off the edge.
+ * One page per top-tier federal agency in the public directory. The
+ * generated snapshot stays the floor. Living pain points come from the
+ * shared reader on a one-day cache. Award queries stay on a seven-day cache.
  *
  * Sections conditionally rendered when source data is present —
  * we never fabricate a pain-points or procurement-portal block;
@@ -19,18 +19,19 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
-  AGENCIES_SEO,
-  getAgencyBySlug,
   getRelatedAgencies,
   type AgencySeo,
 } from '@/data/agencies-seo';
+import {
+  buildPublicPainSection,
+  getPublicAgencyBySlug,
+  listPublicAgencies,
+  type PublicPainSection,
+} from '@/lib/seo/public-agency-pages';
+import { cachedAgencyAwards, cachedPublicAgencyIntel } from '@/lib/seo/public-agency-intel-cache';
 import { getBqAgencyName } from '@/data/agency-bq-mapping';
 import { NAICS_TOP_100 } from '@/data/naics-top100';
 import {
-  getAgencyProfile,
-  getTopRecipientsForAgency,
-  getTopNaicsForAgency,
-  getSubAgenciesForAgency,
   type AgencyProfile,
   type TopRecipientForAgency,
   type TopNaicsForAgency,
@@ -45,18 +46,19 @@ import { getForecastLinksForAgencySlug, type RelatedForecast } from '@/lib/seo/f
 // can conditionally link rather than 404-ing users.
 const LINKABLE_NAICS = new Set(NAICS_TOP_100.map((n) => n.code));
 
-// Pre-render every agency at build time. 49 entries — cheap, and
-// ISR-only — no build-time prerender. Each agency page now makes
-// 3 BQ queries (profile + top 25 recipients + top 15 NAICS). DoD
-// alone scans ~8 GB, so prerendering all 49 agencies at build
-// would burn ~150 GB per Vercel deploy. ISR amortizes that across
-// real Googlebot crawls.
+// ISR-only — no build-time prerender. Award queries are cached for 7
+// days (DoD alone scans ~8 GB). The intelligence read is a separate
+// 1-day cache. Next uses the shorter interval for the route, so the
+// page can show a daily check time without rescanning awards.
+const PUBLIC_AGENCY_COUNT = listPublicAgencies().length;
 export async function generateStaticParams() {
   return [];
 }
 
 export const dynamicParams = true;
-export const revalidate = 604800; // 7d
+// Ceiling. The 1-day intelligence cache lowers the route to a day.
+// Award rows stay on their own 7-day cache (cachedAgencyAwards).
+export const revalidate = 604800;
 
 export async function generateMetadata({
   params,
@@ -64,7 +66,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const agency = getAgencyBySlug(slug);
+  const agency = getPublicAgencyBySlug(slug);
 
   if (!agency) {
     return {
@@ -118,25 +120,36 @@ export default async function AgencyPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const agency = getAgencyBySlug(slug);
+  const agency = getPublicAgencyBySlug(slug);
   if (!agency) notFound();
+
+  // Same reader as Ask Mindy and get_agency_intel, behind a 1-day cache.
+  // A throw, or a read with no cited rows, keeps the snapshot list.
+  let pains: PublicPainSection;
+  try {
+    const live = await cachedPublicAgencyIntel(agency.name);
+    pains = buildPublicPainSection(agency.painPoints, {
+      ok: live.ok,
+      sourced: live.sourced,
+      checkedAt: live.checkedAt,
+    });
+  } catch {
+    pains = buildPublicPainSection(agency.painPoints, { ok: false, checkedAt: null });
+  }
 
   const related = getRelatedAgencies(agency, 5);
 
-  // Federal Award Activity (BigQuery) — fetched in parallel.
-  // Falls back to nulls/empty arrays on any BQ failure so the static
-  // content above always renders. Section is omitted entirely when the
-  // agency has no BQ counterpart (e.g. TVA, FDIC) or when the profile
-  // row is missing.
+  // Federal Award Activity (BigQuery). The 7-day cache is separate from
+  // the daily intelligence read. A failure omits the section. The
+  // section is also omitted when the agency has no BQ counterpart.
   const bqAgencyName = getBqAgencyName(agency.slug, agency.name);
-  const [bqProfile, bqTopRecipients, bqTopNaics, bqSubAgencies] = bqAgencyName
-    ? await Promise.all([
-        getAgencyProfile(bqAgencyName).catch(() => null),
-        getTopRecipientsForAgency(bqAgencyName, 25).catch(() => []),
-        getTopNaicsForAgency(bqAgencyName, 15).catch(() => []),
-        getSubAgenciesForAgency(bqAgencyName, 8).catch(() => []),
-      ])
-    : [null, [], [], []];
+  const awards = bqAgencyName
+    ? await cachedAgencyAwards(bqAgencyName).catch(() => null)
+    : null;
+  const bqProfile = awards?.profile ?? null;
+  const bqTopRecipients = awards?.recipients ?? [];
+  const bqTopNaics = awards?.naics ?? [];
+  const bqSubAgencies = awards?.subAgencies ?? [];
 
   // Explore links: this agency's upcoming per-forecast pages (Supabase, never BigQuery). A read
   // failure returns null and the forecast list is omitted (logged) — never shown as "no forecasts".
@@ -196,7 +209,7 @@ export default async function AgencyPage({
             recompete signals, and the procurement portals you can&apos;t miss.
           </p>
 
-          <HeroStats agency={agency} />
+          <HeroStats agency={agency} painCount={pains.items.length} />
         </div>
       </section>
 
@@ -206,7 +219,7 @@ export default async function AgencyPage({
           <article className="lg:col-span-2 space-y-10">
             <WhatTheyBuy agency={agency} />
             <WhereTheyPost agency={agency} />
-            <PainPoints agency={agency} />
+            <PainPoints agency={agency} section={pains} />
             <Priorities agency={agency} />
             <SmallBusinessNote agency={agency} />
             <FederalAwardActivity
@@ -257,7 +270,7 @@ export default async function AgencyPage({
 
 /* -------------------------------- sections -------------------------------- */
 
-function HeroStats({ agency }: { agency: AgencySeo }) {
+function HeroStats({ agency, painCount }: { agency: AgencySeo; painCount: number }) {
   const items: Array<{ label: string; value: string }> = [];
   if (agency.fy26BudgetB) {
     items.push({
@@ -283,10 +296,10 @@ function HeroStats({ agency }: { agency: AgencySeo }) {
       value: `${agency.procurement.topVehicles.length} tracked`,
     });
   }
-  if (agency.painPoints.length > 0) {
+  if (painCount > 0) {
     items.push({
       label: 'Pain Points',
-      value: `${agency.painPoints.length} mapped`,
+      value: `${painCount} mapped`,
     });
   }
   if (items.length === 0) return null;
@@ -468,13 +481,14 @@ function WhereTheyPost({ agency }: { agency: AgencySeo }) {
   );
 }
 
-function PainPoints({ agency }: { agency: AgencySeo }) {
-  if (agency.painPoints.length === 0) return null;
+function PainPoints({ agency, section }: { agency: AgencySeo; section: PublicPainSection }) {
+  if (section.items.length === 0) return null;
   return (
     <div>
       <h2 className="text-2xl font-bold text-(--mp-ink) mb-4 font-(family-name:--mp-font-serif)">
         {agency.abbreviation || agency.name} pain points
       </h2>
+      <p className="text-sm text-(--mp-muted) mb-4">{section.freshnessLabel}</p>
       <p className="text-(--mp-body) mb-4 leading-relaxed">
         What {agency.abbreviation || agency.name} is actively trying to fix —
         sourced from agency strategic plans, IG reports, and FY26 budget
@@ -482,7 +496,7 @@ function PainPoints({ agency }: { agency: AgencySeo }) {
         toward an evaluator&apos;s actual problem.
       </p>
       <ul className="space-y-2">
-        {agency.painPoints.map((p, i) => (
+        {section.items.map((item, i) => (
           <li
             key={i}
             className="flex items-start gap-3 bg-white border border-(--mp-hair) rounded-lg p-4"
@@ -490,7 +504,25 @@ function PainPoints({ agency }: { agency: AgencySeo }) {
             <span className="flex-shrink-0 w-6 h-6 rounded-full bg-(--mp-navy-wash) border border-(--mp-line) text-(--mp-navy) text-xs font-bold flex items-center justify-center mt-0.5">
               {i + 1}
             </span>
-            <p className="text-(--mp-body) leading-relaxed">{p}</p>
+            <div>
+              <p className="text-(--mp-body) leading-relaxed">{item.claim}</p>
+              {(item.href || item.documentNumber) && (
+                <p className="text-sm text-(--mp-muted) mt-2">
+                  {item.href ? (
+                    <a href={item.href} rel="noreferrer" className="text-(--mp-navy) hover:underline">
+                      {item.sourceLabel}
+                      {item.documentNumber ? ` ${item.documentNumber}` : ''}
+                    </a>
+                  ) : (
+                    <span>
+                      {item.sourceLabel}
+                      {item.documentNumber ? ` ${item.documentNumber}` : ''}
+                    </span>
+                  )}
+                  {item.publishedAt ? ` · published ${item.publishedAt}` : ''}
+                </p>
+              )}
+            </div>
           </li>
         ))}
       </ul>
@@ -918,7 +950,7 @@ function BackToIndex() {
         ← Back to agency directory
       </div>
       <div className="text-(--mp-body) text-sm">
-        Browse all {AGENCIES_SEO.length} federal agencies.
+        Browse all {PUBLIC_AGENCY_COUNT} federal agencies.
       </div>
     </Link>
   );

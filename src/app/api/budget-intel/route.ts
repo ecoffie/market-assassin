@@ -5,6 +5,7 @@ import { getAgencyLegacyClaimsSync } from '@/lib/strategic-intel/strategic-claim
 import budgetData from '@/data/agency-budget-data.json';
 import agencyAliases from '@/data/agency-aliases.json';
 import { getNaics } from '@/lib/codes/lookup';
+import { readIncreasingPrograms } from '@/lib/budget-intel/read';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -69,8 +70,17 @@ export async function GET(request: NextRequest) {
   const mode = searchParams.get('mode') || 'default';
   const fy = searchParams.get('fy') ? parseInt(searchParams.get('fy')!) : null;
   const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
+  const program = searchParams.get('program');
 
   try {
+    if (program) {
+      const answer = await readIncreasingPrograms({ keyword: program, agency });
+      return NextResponse.json({
+        success: answer.shown_reason !== 'keyword_rejected' && answer.shown_reason !== 'live_table_unmeasured',
+        ...answer,
+      }, { status: answer.shown_reason === 'live_table_unmeasured' ? 503 : 200 });
+    }
+
     // If database has data, use it; otherwise fall back to JSON
     const supabase = createClient(supabaseUrl, supabaseKey);
     const { count: dbCount } = await supabase
@@ -187,6 +197,9 @@ async function getAgencyIntel(
           fy2025: budgetEntry.fy2025.budgetAuthority,
           fy2026: budgetEntry.fy2026.budgetAuthority,
           change: budgetEntry.change,
+          shown: 'static_file',
+          shown_reason: 'fixed_file_on_this_block',
+          note: 'This block is the fixed OMB file. ?program= reads live budget_programs and does not use this file.',
         }
       : null,
 

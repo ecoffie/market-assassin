@@ -63,6 +63,7 @@
     "verify:ma-skills": "node scripts/verify-ma-skills.mjs",
     "ingest:awards": "npx tsx scripts/ingest-usaspending-awards.ts",
     "ingest:awards:apply": "npx tsx scripts/ingest-usaspending-awards.ts --apply",
+    "ingest:dhs-forecast:dry": "npx tsx scripts/ingest-dhs-forecast-allrecords.ts",
     "db": "node scripts/db.mjs",
     "db:check": "node scripts/db.mjs --check",
     "report:intel": "node scripts/report-intel.mjs",
@@ -83,6 +84,7 @@
     "verify:forecast-agency": "npx tsx scripts/verify-forecast-agency-identity.ts",
     "verify:maps-account": "node scripts/verify-maps-account.mjs",
     "verify:gateway-exports": "npx tsx scripts/verify-gateway-exports.ts",
+    "ingest:gateway-csv:dry": "npx tsx scripts/ingest-gateway-csv.ts",
     "retention:cohorts": "npx tsx scripts/retention-cohorts.ts"
   },
   "dependencies": {

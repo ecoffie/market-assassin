@@ -19,7 +19,8 @@
  * the card then shows "—", which is the honest answer.
  *
  * Everything here is a rename or a null. Nothing is derived, inferred, or
- * defaulted to a plausible value.
+ * defaulted to a plausible value. In particular: never map `last_synced_at`
+ * into `posted_date` — sync time is not an agency posting date.
  */
 
 export interface ForecastRowForAlert {
@@ -77,9 +78,11 @@ export function toAlertRow(r: ForecastRowForAlert, mindyUrl: string): Record<str
     set_aside_code: r.set_aside_type ?? null,
     // Label the card as a forecast, with its timing when the agency gave one.
     notice_type: timing ? `Forecast · ${timing}` : 'Forecast',
-    // A forecast is not "posted" — the closest true fact is when we last saw it
-    // in the source file.
-    posted_date: r.last_synced_at ?? null,
+    // A forecast is not "posted" on SAM. Never invent a posting date from sync
+    // time — leave posted_date null and surface last_synced_at separately so
+    // the email can say "Synced …" instead of "Posted …".
+    posted_date: null,
+    last_synced_at: r.last_synced_at ?? null,
     // See the header note: the anticipated solicitation date is the planning
     // date. NULL stays NULL — the card shows "—" rather than a guess.
     response_deadline: r.solicitation_date || r.anticipated_award_date || null,

@@ -36,6 +36,7 @@ import {
   countUpstreamPublishers,
   inventoryViolations,
   mapSourceState,
+  honestInstanceState,
   registryDebt,
   scheduleTruth,
   STATIC_FILE_AS_OF,
@@ -50,6 +51,7 @@ import {
   type ScheduleTruth,
   type ScheduledRun,
 } from '@/lib/data-core/inventory-model';
+import { reportedCollectionFreshness } from '@/lib/data-core/collection-clocks';
 import painPointsData from '@/data/agency-pain-points.json';
 import budgetData from '@/data/agency-budget-data.json';
 
@@ -77,6 +79,7 @@ const CRON_JOBS = {
   gao: ['institute-gao-sync'],
   legislation: ['institute-legislation-sync'],
   dodSbir: ['sync-dod-sbir'],
+  budgetIntel: ['sync-budget-intel'],
   usaspendingAwards: ['sync-usaspending-awards'],
   samEntities: ['sync-gov-buyer-data'],
 } as const;
@@ -277,11 +280,11 @@ export async function GET(request: NextRequest) {
       try {
         const [ds, dsi] = await Promise.all([
           sb.from('data_sources').select('key, record_count, last_built, notes'),
-          sb.from('data_source_instances').select('dataset_key, source_key, source_state, intervention_state, held_population, last_data_advance, last_poll'),
+          sb.from('data_source_instances').select('dataset_key, source_key, source_state, intervention_state, held_population, last_data_advance, last_verified_ingest, last_successful_check, last_poll'),
         ]);
         return {
           sources: ds.error ? null : (ds.data as Array<{ key: string; record_count: number | null; last_built: string | null; notes: string | null }>),
-          instances: dsi.error ? null : (dsi.data as Array<{ dataset_key: string; source_key: string; source_state: string | null; intervention_state: string | null; held_population: number | null; last_data_advance: string | null; last_poll: string | null }>),
+          instances: dsi.error ? null : (dsi.data as Array<{ dataset_key: string; source_key: string; source_state: string | null; intervention_state: string | null; held_population: number | null; last_data_advance: string | null; last_verified_ingest: string | null; last_successful_check: string | null; last_poll: string | null }>),
         };
       } catch { return { sources: null, instances: null }; }
     })(),
@@ -323,10 +326,33 @@ export async function GET(request: NextRequest) {
 
   // ── Control-plane helpers ─────────────────────────────────────────────────────
   const instances = controlPlane.instances ?? [];
+  /** Known producer bindings — null when we have no schedule to judge. */
+  const PRODUCER_JOBS: Record<string, readonly string[]> = {
+    dibbs_dla_flat_files: CRON_JOBS.dibbs,
+    sam_opportunities_sam_gov: CRON_JOBS.sam,
+    grants_gov_api: CRON_JOBS.grants,
+    research_nih_reporter: ['snapshot-multisite-nih'],
+    research_darpa_baa: ['snapshot-multisite-darpa'],
+    research_nsf_sbir: ['snapshot-multisite-nsf'],
+  };
+  const producerEnabled = (sourceKey: string): boolean | null => {
+    const jobNames = PRODUCER_JOBS[sourceKey];
+    if (!jobNames) return null;
+    const rows = jobNames
+      .map((j) => (cronRows ?? []).find((x) => x.job_name === j))
+      .filter(Boolean);
+    if (!rows.length) return null;
+    return rows.some((r) => r && (r.enabled === true || r.enabled === 'true'));
+  };
   const instanceFreshness = (datasetKey: string): InstanceFreshness[] =>
     instances.filter((i) => i.dataset_key === datasetKey).map((i) => ({
       sourceKey: i.source_key,
-      state: mapSourceState(i.source_state),
+      state: honestInstanceState({
+        sourceState: i.source_state,
+        lastVerifiedIngest: i.last_verified_ingest,
+        lastDataAdvance: i.last_data_advance,
+        producerEnabled: producerEnabled(i.source_key),
+      }),
       sourceState: i.source_state,
       interventionState: i.intervention_state,
       heldPopulation: i.held_population,
@@ -359,14 +385,49 @@ export async function GET(request: NextRequest) {
     basis: string;
     jobs?: readonly string[];
     detail?: string;
+    /**
+     * DIBBS and grants stamp synced_at on every touched row and were registered
+     * source_state=current with null clocks. For those, a job run is not freshness.
+     */
+    separateAttemptFromIngest?: boolean;
   }): Freshness => {
     const inst = o.instanceKey ? instance(o.instanceKey) : null;
-    const instState = inst ? mapSourceState(inst.source_state) : null;
+    if (o.separateAttemptFromIngest) {
+      const report = reportedCollectionFreshness({
+        sourceState: inst?.source_state ?? null,
+        lastPoll: inst?.last_poll ?? null,
+        lastSuccessfulCheck: inst?.last_successful_check ?? null,
+        lastVerifiedIngest: inst?.last_verified_ingest ?? null,
+        lastDataAdvance: inst?.last_data_advance ?? null,
+        recordsReceived: null,
+        rowTouchAt: o.asOf,
+        cadenceHours: o.cadenceHours,
+        now,
+        producerEnabled: inst ? producerEnabled(inst.source_key) : null,
+      });
+      return {
+        state: report.state,
+        asOf: report.asOf,
+        basis: `${report.basis}. Row-touch clock was ${o.basis}.`,
+        detail: [o.detail, report.warning].filter(Boolean).join(' '),
+        schedules: o.jobs ? schedules(o.jobs) : undefined,
+      };
+    }
+    const instState = inst
+      ? honestInstanceState({
+          sourceState: inst.source_state,
+          lastVerifiedIngest: inst.last_verified_ingest,
+          lastDataAdvance: inst.last_data_advance,
+          producerEnabled: producerEnabled(inst.source_key),
+        })
+      : null;
     const useInstance = instState != null && instState !== 'UNKNOWN';
     return {
       state: useInstance ? instState! : timestampState(o.asOf, o.cadenceHours, now),
       asOf: o.asOf,
-      basis: useInstance ? `control plane ${o.instanceKey} (${inst!.source_state}); data clock ${o.basis}` : o.basis,
+      basis: useInstance
+        ? `control plane ${o.instanceKey} (${inst!.source_state}); data clock ${o.basis}`
+        : o.basis,
       detail: o.detail,
       schedules: o.jobs ? schedules(o.jobs) : undefined,
     };
@@ -516,7 +577,8 @@ export async function GET(request: NextRequest) {
       stored: c.dibbs, unit: 'RFQs',
       headlineContribution: c.dibbs,
       freshness: fresh({ instanceKey: 'dibbs_dla_flat_files', asOf: e.dibbs, cadenceHours: 24, basis: 'MAX(dibbs_rfqs.synced_at)', jobs: CRON_JOBS.dibbs,
-        detail: 'Stored total, not currently-open: dibbs_rfqs.status is not populated, so an open/closed split cannot be measured.' }),
+        separateAttemptFromIngest: true,
+        detail: 'Stored total, not currently-open: dibbs_rfqs.status is not populated, so an open/closed split cannot be measured. synced_at is a row-touch clock, not a nonempty ingest.' }),
       surface: { state: 'customer_readable', tools: [], app: ['DIBBS panel', 'Opportunity Map', 'Opportunity detail'] },
       upstreams: ['dla_dibbs'], provenance: 'DLA DIBBS solicitations mirrored nightly — defense buys below the SAM.gov posting threshold.',
     },
@@ -525,7 +587,9 @@ export async function GET(request: NextRequest) {
       stored: c.grants, unit: 'grant opportunities',
       breakdown: [{ label: 'posted', count: c.grantsPosted }, { label: 'forecasted', count: c.grantsForecasted }],
       headlineContribution: c.grants,
-      freshness: fresh({ instanceKey: 'grants_gov_api', asOf: e.grants, cadenceHours: 24, basis: 'MAX(grants_cache.synced_at)', jobs: CRON_JOBS.grants }),
+      freshness: fresh({ instanceKey: 'grants_gov_api', asOf: e.grants, cadenceHours: 24, basis: 'MAX(grants_cache.synced_at)', jobs: CRON_JOBS.grants,
+        separateAttemptFromIngest: true,
+        detail: 'synced_at moves when a row is touched. Freshness is the last nonempty ingest, which a scheduled run does not reset.' }),
       surface: { state: 'customer_readable', tools: ['search_grants'], app: ['Opportunity Map grants layer'] },
       upstreams: ['grants_gov'], provenance: 'Grants.gov mirrored nightly into grants_cache.',
       note: 'The research corpus below also holds a small Grants.gov slice from a different producer. Not deduplicated.',
@@ -740,7 +804,7 @@ export async function GET(request: NextRequest) {
       headlineContribution: 0,
       freshness: { state: 'STATIC', asOf: budgetAsOf, basis: 'agency-budget-data.json lastUpdated', detail: `fiscal years ${budgetFys.join(', ') || '?'} — FY2025 enacted, FY2026 President's request` },
       surface: { state: 'customer_readable', tools: ['get_agency_budget_trends'] },
-      upstreams: ['omb'], provenance: 'Built once from the OMB FY2026 discretionary request + agency CBJs. Not a living budget feed.',
+      upstreams: ['omb'], provenance: `Fixed file (OMB FY2026 discretionary request + agency CBJs). Customer tools prefer live agency_budget_authority and budget_programs when those tables are non-empty and label which store is shown. Scheduled acquire job '${CRON_JOBS.budgetIntel[0]}' is one agency page per run. This card stays the fixed file's as-of.`,
     },
 
     // ─── DERIVED INDEX / REPRESENTATION ─────────────────────────────────────────

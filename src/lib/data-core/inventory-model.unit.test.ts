@@ -5,6 +5,7 @@ import {
   countUpstreamPublishers,
   inventoryViolations,
   mapSourceState,
+  honestInstanceState,
   nextCronRun,
   registryDebt,
   scheduleTruth,
@@ -114,6 +115,37 @@ describe('freshness', () => {
     expect(mapSourceState('unreachable')).toBe('UNREACHABLE');
     expect(mapSourceState('unmeasured')).toBe('UNKNOWN');
     expect(mapSourceState(null)).toBe('UNKNOWN');
+  });
+
+  it('honestInstanceState refuses current with null advancement clocks (false-green class)', () => {
+    expect(honestInstanceState({
+      sourceState: 'current',
+      lastVerifiedIngest: null,
+      lastDataAdvance: null,
+    })).toBe('UNKNOWN');
+    expect(honestInstanceState({
+      sourceState: 'current',
+      lastVerifiedIngest: '2026-11-17T00:00:00Z',
+      lastDataAdvance: null,
+    })).toBe('CURRENT');
+    expect(honestInstanceState({
+      sourceState: 'current',
+      lastVerifiedIngest: null,
+      lastDataAdvance: '2026-11-02T08:00:00Z',
+    })).toBe('CURRENT');
+  });
+
+  it('honestInstanceState: disabled producer never reads CURRENT (DIBBS cost-pause)', () => {
+    expect(honestInstanceState({
+      sourceState: 'current',
+      lastVerifiedIngest: '2026-11-02T08:00:00Z',
+      lastDataAdvance: '2026-11-02T08:00:00Z',
+      producerEnabled: false,
+    })).toBe('STALE');
+    expect(honestInstanceState({
+      sourceState: 'content_stale',
+      producerEnabled: false,
+    })).toBe('STALE');
   });
 
   it('a multi-feed dataset is as fresh as its worst feed', () => {

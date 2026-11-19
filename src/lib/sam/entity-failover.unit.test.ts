@@ -97,7 +97,7 @@ describe('local registry fallback keeps identity available during a SAM outage',
     //
     // What must still never happen is FABRICATING a status the row does not carry.
     const c = fb();
-    expect(c).toContain("str(r.registration_status) || 'Unknown'");   // absent -> Unknown, never 'Active'
+    expect(c).toContain('deriveRegistrationStatus');   // expiry overrides Active; absent -> Unknown
     // `code()` strips comments by design, so assert on CODE: the mapper must never
     // hardcode a status, and the hit must carry its freshness date.
     expect(c).not.toMatch(/registrationStatus:\s*'Active'/);

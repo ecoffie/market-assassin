@@ -19,7 +19,7 @@ export interface AttachedDoc {
   page_count?: number | null;
 }
 
-export const ATTACH_ACCEPT = '.pdf,.docx,.txt';
+export const ATTACH_ACCEPT = '.pdf,.docx,.txt,.xlsx,.xls,.csv';
 export const ATTACH_MAX_MB = 4;
 
 export function ChatAttachments({
@@ -136,11 +136,11 @@ export function ChatAttachments({
           aria-label="Attach a document"
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Paperclip className="h-3.5 w-3.5" aria-hidden />}
-          {busy ? 'Attaching…' : 'Attach'}
+          {busy ? 'Attaching…' : 'Attach file'}
         </button>
         <span className="inline-flex items-center gap-1 text-[11px] text-faint">
           <Lock className="h-3 w-3" aria-hidden />
-          Saved privately to your Vault
+          PDF, Word, Excel, or CSV — saved privately
         </span>
       </div>
     </div>

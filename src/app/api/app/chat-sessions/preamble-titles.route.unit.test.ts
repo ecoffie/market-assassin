@@ -106,4 +106,28 @@ describe('chat-sessions: Map view preamble titles', () => {
     expect(d.session.title).toBe('Who buys janitorial work here?');
     expect(d.messages[0].content).toBe(VIEW + 'Who buys janitorial work here?');
   });
+
+  it('projects create_document deliverables from trace and never returns the rest of the trace', async () => {
+    const files = [
+      { format: 'pdf', document_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', file_name: 'Brief.pdf', version: 1 },
+      { format: 'docx', document_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', file_name: 'Brief.docx', version: 1 },
+    ];
+    state.messages = [
+      { id: 'a', session_id: S1, role: 'user', content: 'Make a PDF', created_at: '1' },
+      {
+        id: 'b', session_id: S1, role: 'assistant', content: 'Ready.', created_at: '2',
+        trace: {
+          planner: { provider: 'openai', model: 'gpt-4o' },
+          tools_offered: 1,
+          tool_executions: [{ tool: 'create_document', status: 'ok' }],
+          deliverables: { files, pdf_note: 'Open in Preview' },
+        },
+      },
+    ];
+    const d = await get(`email=${ME}&sessionId=${S1}`);
+    expect(d.messages[1].deliverables).toEqual({ files, pdf_note: 'Open in Preview' });
+    expect(JSON.stringify(d.messages)).not.toContain('tools_offered');
+    expect(JSON.stringify(d.messages)).not.toContain('"trace"');
+    expect(JSON.stringify(d.messages)).not.toContain('gpt-4o');
+  });
 });

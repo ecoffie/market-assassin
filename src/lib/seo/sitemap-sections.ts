@@ -32,7 +32,7 @@ import { NAICS_TOP_100 } from '@/data/naics-top100';
 import { getSubpageRowCounts } from '@/lib/seo/subpage-row-counts';
 import { subpageSitemapEligible } from '@/lib/seo/subpage-contract';
 import { contractorIndexable, CONTRACTOR_TABS_INDEXABLE } from '@/lib/seo/contractor-index-tier';
-import { AGENCIES_SEO } from '@/data/agencies-seo';
+import { listPublicAgencies } from '@/lib/seo/public-agency-pages';
 import { getFacetSlugsForSitemap } from '@/lib/seo/facets';
 import { COMPETITORS } from '@/data/competitors';
 import { LISTICLES } from '@/data/top-listicles';
@@ -137,7 +137,8 @@ export function staticEntries(): SitemapEntry[] {
     { url: `${SITE_URL}/blog`,                  changeFrequency: 'daily',   priority: 0.8 },
     // Agencies index — buyer-intent SEO surface for "[agency] contract
     // opportunities" queries. Per-agency detail pages emitted in their
-    // own block below so Google sees the full set of 49 federal agencies.
+    // own block below so Google sees every public agency page, including
+    // agencies added after the generated snapshot.
     { url: `${SITE_URL}/agencies`,              changeFrequency: 'weekly',  priority: 0.7 },
     // Set-asides index — hub for the four SBA program landing pages
     // (8(a), HUBZone, SDVOSB, WOSB). Priority 0.8 because the program
@@ -195,7 +196,7 @@ export function staticEntries(): SitemapEntry[] {
   const naics: SitemapEntry[] = NAICS_TOP_100.map((e) => ({
     url: `${SITE_URL}/naics/${e.code}`, changeFrequency: 'monthly', priority: 0.5,
   }));
-  const agencies: SitemapEntry[] = AGENCIES_SEO.map((a) => ({
+  const agencies: SitemapEntry[] = listPublicAgencies().map((a) => ({
     url: `${SITE_URL}/agencies/${a.slug}`, changeFrequency: 'monthly', priority: 0.6,
   }));
   const setAsides: SitemapEntry[] = ['8a', 'hubzone', 'sdvosb', 'wosb'].map((slug) => ({

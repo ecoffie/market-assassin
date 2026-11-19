@@ -15,14 +15,19 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@supabase/supabase-js';
 import agencyPainPointsJson from '@/data/agency-pain-points.json';
 import { resolveAgency } from '@/lib/strategic-intel/agency-resolver';
+import {
+  labelHistoricalGaoPainPoint,
+  legacyGaoPublicationDate,
+} from '@/lib/strategic-intel/legacy-gao-painpoints';
 import { isUnsupportedBudgetClaim } from '@/lib/strategic-intel/unsupported-budget-claim';
+import { readAcquiredFields, type ResolutionFlag, type ResolutionStatus } from '@/lib/institute/acquired-pain-points';
 
 export type ClaimProvenance =
   | 'SOURCE_FACT'           // GAO wording (title) cited with Institute evidence
   | 'MINDY_INTERPRETATION'  // derived/rewritten claim — not direct GAO wording
   | 'LEGACY_MANUAL';        // static JSON / unsourced historical corpus
 
-export type ClaimSourceType = 'gao' | 'legacy_manual' | 'other';
+export type ClaimSourceType = 'gao' | 'ig_report' | 'legacy_manual' | 'other';
 
 export interface SourcedPainPoint {
   agency: string;
@@ -35,6 +40,11 @@ export interface SourcedPainPoint {
   provenance: ClaimProvenance;
   /** Soft legacy tag like "(Source: GAO)" when present — never upgraded to SOURCE_FACT. */
   legacy_source_tag: string | null;
+  /** Present when the Institute row stored what the source said. Unknown when it did not. */
+  recommendation?: string | null;
+  resolution_status?: ResolutionStatus;
+  resolution_flag?: ResolutionFlag;
+  source_identifier?: string | null;
 }
 
 export interface AgencyIntelligenceBundle {
@@ -44,13 +54,17 @@ export interface AgencyIntelligenceBundle {
   legacy: SourcedPainPoint[];
   /** Sourced first, then legacy — never merged into one provenance class. */
   painPoints: SourcedPainPoint[];
-  /** Legacy priorities only (no living priority pipeline yet). */
+  /** Live agency_priorities_db when that table has rows; otherwise the fixed file. */
   priorities: SourcedPainPoint[];
   meta: {
     sourcedCount: number;
     legacyCount: number;
     legacyPriorityCount: number;
     provenanceAvailable: boolean;
+    /** Which store `priorities` came from. legacyPriorityCount stays the file count so sort inputs that use it do not move. */
+    priorityBasis?: 'live_table' | 'static_file' | 'static_file_live_unmeasured';
+    /** True when the living-table read threw. Empty sourced is not the same thing. */
+    sourcedReadFailed: boolean;
   };
 }
 
@@ -141,18 +155,32 @@ interface InstituteRow {
   publication_date: string | null;
   title: string;
   canonical_agency: string | null;
+  /** Present only when includeAcquisitionRaw is true. Holds recommendation text. */
+  raw?: unknown;
 }
+
+/** Public institute columns. Omits raw (recommendation / resolution). */
+export const INSTITUTE_SOURCE_PUBLIC_SELECT =
+  'id,document_number,source_url,publication_date,title,canonical_agency';
+
+/** Full institute select used by customer surfaces that show recommendations. */
+export const INSTITUTE_SOURCE_CUSTOMER_SELECT = `${INSTITUTE_SOURCE_PUBLIC_SELECT},raw`;
 
 /**
  * Load living sourced pain points for an agency from canonical tables.
  * Requires service-role (or RLS-open) access to institute_sources + agency_pain_points_db.
+ *
+ * Set includeAcquisitionRaw: false for the scorecard findability path. That
+ * path must not select institute_sources.raw (recommendation text); the
+ * scorecard_reader role is not granted that column.
  */
 export async function loadSourcedPainPointsForAgency(
   agencyQuery: string,
-  opts: { client?: SupabaseClient; limit?: number } = {},
+  opts: { client?: SupabaseClient; limit?: number; includeAcquisitionRaw?: boolean } = {},
 ): Promise<SourcedPainPoint[]> {
   const client = opts.client ?? sb();
   const limit = opts.limit ?? 50;
+  const includeAcquisitionRaw = opts.includeAcquisitionRaw !== false;
   const { canonical, searchKeys } = resolveAgencyQuery(agencyQuery);
   if (searchKeys.length === 0) return [];
 
@@ -163,7 +191,8 @@ export async function loadSourcedPainPointsForAgency(
     .from('agency_pain_points_db')
     .select('id,agency,pain_point,source,source_url,institute_source_ids,confidence,status')
     .in('agency', agencyKeys)
-    .eq('source', 'gao')
+    .in('source', ['gao', 'ig_report'])
+    .order('last_evidence_at', { ascending: false, nullsFirst: false })
     .limit(limit);
   if (error) throw new Error(`loadSourcedPainPointsForAgency: ${error.message}`);
   if (!rows?.length) return [];
@@ -174,10 +203,16 @@ export async function loadSourcedPainPointsForAgency(
 
   const byId = new Map<string, InstituteRow>();
   if (sourceIds.length > 0) {
-    const { data: sources, error: sErr } = await client
-      .from('institute_sources')
-      .select('id,document_number,source_url,publication_date,title,canonical_agency')
-      .in('id', sourceIds);
+    // Two literal .select() calls keep the PostgREST client types happy and
+    // keep the scorecard path from asking for raw.
+    const instituteQuery = includeAcquisitionRaw
+      ? client
+        .from('institute_sources')
+        .select('id,document_number,source_url,publication_date,title,canonical_agency,raw')
+      : client
+        .from('institute_sources')
+        .select('id,document_number,source_url,publication_date,title,canonical_agency');
+    const { data: sources, error: sErr } = await instituteQuery.in('id', sourceIds);
     if (sErr) throw new Error(`loadSourcedPainPointsForAgency institute: ${sErr.message}`);
     for (const s of (sources ?? []) as InstituteRow[]) byId.set(s.id, s);
   }
@@ -188,8 +223,9 @@ export async function loadSourcedPainPointsForAgency(
     const inst = sid ? byId.get(sid) : undefined;
     const docNum = inst?.document_number ?? extractDocumentNumber(row.pain_point);
     const url = row.source_url || inst?.source_url || null;
+    const acquired = includeAcquisitionRaw ? readAcquiredFields(inst?.raw) : null;
 
-    // Living pipeline cites the GAO title as the claim → SOURCE_FACT.
+    // Living pipeline cites the source's own wording → SOURCE_FACT.
     // Anything without an Institute id or URL is not promoted to SOURCE_FACT.
     const provenance: ClaimProvenance =
       sid && url ? 'SOURCE_FACT' : 'MINDY_INTERPRETATION';
@@ -197,13 +233,17 @@ export async function loadSourcedPainPointsForAgency(
     out.push({
       agency: row.agency,
       pain_point: row.pain_point,
-      source_type: 'gao',
+      source_type: row.source === 'ig_report' ? 'ig_report' : 'gao',
       source_url: url,
       document_number: docNum,
       published_at: inst?.publication_date ?? null,
       institute_source_id: sid,
       provenance,
       legacy_source_tag: null,
+      recommendation: acquired?.recommendation ?? null,
+      resolution_status: acquired?.resolution_status ?? 'unknown',
+      resolution_flag: acquired?.resolution_flag ?? 'unknown',
+      source_identifier: acquired?.source_identifier || docNum,
     });
   }
   return out;
@@ -286,7 +326,8 @@ export function loadLegacyPainPointsForAgency(agencyQuery: string, limit = 50): 
         source_type: 'legacy_manual',
         source_url: null,
         document_number: extractDocumentNumber(claim),
-        published_at: null,
+        // Government date from the bare-(Source: GAO) map when the original string matches.
+        published_at: legacyGaoPublicationDate(pp),
         institute_source_id: null,
         provenance: 'LEGACY_MANUAL',
         legacy_source_tag: legacyTag(pp),
@@ -323,25 +364,94 @@ export function loadLegacyPainPointsForAgency(agencyQuery: string, limit = 50): 
 /**
  * THE shared customer read: sourced-first, legacy-fallback, distinguishable.
  */
+export function choosePriorities(
+  table: 'empty' | 'unmeasured' | 'ready',
+  live: SourcedPainPoint[],
+  legacy: SourcedPainPoint[],
+): { priorities: SourcedPainPoint[]; priorityBasis: 'live_table' | 'static_file' | 'static_file_live_unmeasured' } {
+  if (table === 'unmeasured') return { priorities: legacy, priorityBasis: 'static_file_live_unmeasured' };
+  if (live.length > 0) return { priorities: live, priorityBasis: 'live_table' };
+  return { priorities: legacy, priorityBasis: 'static_file' };
+}
+
+async function probePriorityTable(
+  client: SupabaseClient,
+  agencyKeys: string[],
+): Promise<{ table: 'empty' | 'unmeasured' | 'ready'; rows: SourcedPainPoint[] }> {
+  try {
+    const { count, error } = await client.from('agency_priorities_db').select('id', { count: 'exact', head: true });
+    if (error || count == null) return { table: 'unmeasured', rows: [] };
+    if (count === 0) return { table: 'empty', rows: [] };
+    const { data, error: readError } = await client.from('agency_priorities_db')
+      .select('agency, priority_description, source_url, fiscal_year')
+      .in('agency', agencyKeys.length ? agencyKeys : ['__none__'])
+      .limit(40);
+    if (readError) return { table: 'unmeasured', rows: [] };
+    const rows: SourcedPainPoint[] = [];
+    for (const row of (data ?? []) as Array<Record<string, unknown>>) {
+      const text = typeof row.priority_description === 'string' ? row.priority_description.trim() : '';
+      const sourceUrl = typeof row.source_url === 'string' ? row.source_url : null;
+      if (!text || !sourceUrl) continue;
+      rows.push({
+        agency: String(row.agency ?? ''),
+        pain_point: text,
+        source_type: 'other',
+        source_url: sourceUrl,
+        document_number: null,
+        published_at: null,
+        institute_source_id: null,
+        provenance: 'SOURCE_FACT',
+        legacy_source_tag: null,
+      });
+    }
+    return { table: 'ready', rows };
+  } catch {
+    return { table: 'unmeasured', rows: [] };
+  }
+}
+
 export async function getAgencySourcedIntelligence(
   agencyQuery: string,
-  opts: { client?: SupabaseClient; sourcedLimit?: number; legacyLimit?: number } = {},
+  opts: {
+    client?: SupabaseClient;
+    sourcedLimit?: number;
+    legacyLimit?: number;
+    /** Default true. Scorecard findability must pass false (no institute_sources.raw). */
+    includeAcquisitionRaw?: boolean;
+    priorityProbe?: () => Promise<{ table: 'empty' | 'unmeasured' | 'ready'; rows: SourcedPainPoint[] }>;
+  } = {},
 ): Promise<AgencyIntelligenceBundle> {
-  const { canonical } = resolveAgencyQuery(agencyQuery);
+  const { canonical, searchKeys } = resolveAgencyQuery(agencyQuery);
   let sourced: SourcedPainPoint[] = [];
+  let sourcedReadFailed = false;
   try {
     sourced = await loadSourcedPainPointsForAgency(agencyQuery, {
       client: opts.client,
       limit: opts.sourcedLimit ?? 50,
+      includeAcquisitionRaw: opts.includeAcquisitionRaw,
     });
   } catch (err) {
     // Fail open to legacy rather than blanking the customer surface — but never
-    // upgrade legacy to sourced.
+    // upgrade legacy to sourced. The flag keeps a failed read distinct from
+    // a completed read that found no rows.
+    sourcedReadFailed = true;
     console.error('[sourced-pain-points] living read failed:', err);
   }
 
   const legacyBundle = loadLegacyPainPointsForAgency(agencyQuery, opts.legacyLimit ?? 50);
   const legacy = dedupeLegacyAgainstSourced(sourced, legacyBundle.painPoints);
+  let priorityBasis: AgencyIntelligenceBundle['meta']['priorityBasis'] = 'static_file_live_unmeasured';
+  let priorities = legacyBundle.priorities;
+  try {
+    const probe = opts.priorityProbe
+      ? await opts.priorityProbe()
+      : await probePriorityTable(opts.client ?? sb(), searchKeys);
+    const chosen = choosePriorities(probe.table, probe.rows, legacyBundle.priorities);
+    priorities = chosen.priorities;
+    priorityBasis = chosen.priorityBasis;
+  } catch (err) {
+    console.error('[sourced-pain-points] priority table read failed:', err);
+  }
 
   return {
     agency: agencyQuery,
@@ -349,18 +459,25 @@ export async function getAgencySourcedIntelligence(
     sourced,
     legacy,
     painPoints: [...sourced, ...legacy],
-    priorities: legacyBundle.priorities,
+    priorities,
     meta: {
       sourcedCount: sourced.length,
       legacyCount: legacy.length,
       legacyPriorityCount: legacyBundle.priorities.length,
       provenanceAvailable: sourced.length > 0,
+      priorityBasis,
+      sourcedReadFailed,
     },
   };
 }
 
 /** Display helper: string list for surfaces that still need strings, with provenance suffix. */
 export function formatPainPointForDisplay(p: SourcedPainPoint): string {
+  if (p.provenance === 'SOURCE_FACT' && p.source_url && !p.document_number) {
+    let host = 'source';
+    try { host = new URL(p.source_url).host; } catch { /* keep the generic label */ }
+    return `${p.pain_point} (Source: ${host})`;
+  }
   if (p.provenance === 'SOURCE_FACT' && p.document_number && p.source_url) {
     // Claim already carries (Source: GAO-…) from derive; ensure provenance is visible.
     return p.pain_point.includes(p.document_number)
@@ -372,7 +489,15 @@ export function formatPainPointForDisplay(p: SourcedPainPoint): string {
     // bypassed loadLegacyPainPointsForAgency. Empty = omit (do not restore).
     const claim = sanitizeLegacyClaimText(p.pain_point);
     if (!claim) return '';
-    if (/\(legacy/i.test(claim) || /provenance unavailable/i.test(claim)) return claim;
+    if (/\(legacy/i.test(claim) || /provenance unavailable/i.test(claim) || /historical GAO finding/i.test(claim)) {
+      return claim;
+    }
+    // Bare "(Source: GAO)" → historical date + LEGACY_MANUAL (same as raw paths).
+    const labeled = labelHistoricalGaoPainPoint(claim);
+    if (labeled !== claim) return labeled;
+    if (p.published_at) {
+      return `${claim} (historical GAO finding, published ${p.published_at}) [LEGACY_MANUAL — provenance unavailable]`;
+    }
     return `${claim} [LEGACY_MANUAL — provenance unavailable]`;
   }
   if (p.provenance === 'MINDY_INTERPRETATION') {
@@ -391,6 +516,10 @@ export function toCitation(p: SourcedPainPoint): {
   published_at: string | null;
   institute_source_id: string | null;
   agency: string;
+  recommendation: string | null;
+  resolution_status: ResolutionStatus;
+  resolution_flag: ResolutionFlag;
+  source_identifier: string | null;
 } {
   const claim =
     p.provenance === 'LEGACY_MANUAL' ? sanitizeLegacyClaimText(p.pain_point) : p.pain_point;
@@ -405,5 +534,9 @@ export function toCitation(p: SourcedPainPoint): {
     published_at: p.published_at,
     institute_source_id: p.institute_source_id,
     agency: p.agency,
+    recommendation: p.recommendation ?? null,
+    resolution_status: p.resolution_status ?? 'unknown',
+    resolution_flag: p.resolution_flag ?? 'unknown',
+    source_identifier: p.source_identifier ?? p.document_number,
   };
 }

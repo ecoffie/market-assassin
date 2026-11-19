@@ -274,10 +274,17 @@ describe('status truth', () => {
       archive_date: null,
     }, NOW)).toBe('closed');
   });
-  it('OPEN requires active=true; missing deadline still opens when active', () => {
+  it('OPEN requires active=true; missing deadline still opens when active (#1557)', () => {
     expect(deriveSolicitationStatus({
       active: true,
       response_deadline: null,
+      archive_date: null,
+    }, NOW)).toBe('open');
+  });
+  it('OPEN with active=true and a future deadline', () => {
+    expect(deriveSolicitationStatus({
+      active: true,
+      response_deadline: '2026-12-01T19:00:00Z',
       archive_date: null,
     }, NOW)).toBe('open');
   });

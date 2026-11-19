@@ -49,22 +49,24 @@ describe('Docs chip removed from the card (Eric: "Docs doesn\'t belong on the ca
   });
 });
 
-describe('Ask Mindy removed for now (Eric 2026-08-03) — no doorway, drawer code dormant', () => {
-  it('no Ask Mindy nav link (.zh-ask) in the header markup', () => {
-    // the nav <a class="zh-ask" onclick="...openAskMindy..."> is gone (comment mentions are fine —
-    // strip line comments before asserting the RENDERED markup is absent)
+describe('Ask Mindy Map entry — drawer is the engine; no second chat', () => {
+  it('no Ask Mindy header nav link (.zh-ask)', () => {
+    // Header doorway stays gone (Eric 2026-08-03); listing + search entry call openAskMindy.
     const src = route.replace(/^\s*\/\/.*$/gm, '');
     expect(src).not.toContain("<a class=\"zh-ask\"");
-    expect(src).not.toContain('openAskMindy()');
   });
-  it('the focused-search panel renders NO "Ask Mindy" row (zsp-ask) in either state', () => {
+  it('listing CTA opens the main Ask drawer with the selected notice (not a second system)', () => {
     const src = route.replace(/^\s*\/\/.*$/gm, '');
-    // both the renderDefault empty-state row and the renderAutocomplete row are gone
-    expect(src).not.toContain('class="zsp-ask" data-act="ask"');
+    expect(src).toContain('Ask Mindy about this opportunity');
+    expect(src).toContain('window.openAskMindy&&window.openAskMindy()');
   });
-  it('the drawer code is LEFT INTACT (dormant, re-attachable) — window.openAskMindy still defined', () => {
-    // "for now" = hide the doorways, keep the engine; the drawer IIFE must still define openAskMindy
+  it('drawer opener remains the customer Map Ask engine', () => {
     expect(route).toContain('window.openAskMindy=function');
+    expect(route).toContain("act==='ask'");
+  });
+  it('focused search offers Ask Mindy (zsp-ask) without a second chat system', () => {
+    const src = route.replace(/^\s*\/\/.*$/gm, '');
+    expect(src).toContain('class="zsp-row zsp-ask" data-act="ask"');
   });
 });
 

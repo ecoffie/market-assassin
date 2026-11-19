@@ -11,6 +11,7 @@
  * Source: sam_opportunities (Supabase). Read-only, service-role.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { classifyNoticeType } from '@/lib/utils/notice-type';
 import { latestLastmod } from './sitemap-xml';
 
 const MIN_BODY = 200; // chars of real description/SOW required to be indexable
@@ -224,11 +225,20 @@ export function opportunityStatus(
   if (o.response_deadline) {
     const d = new Date(o.response_deadline);
     if (!Number.isNaN(d.getTime()) && d.getTime() < now.getTime()) return 'closed';
+    if (!Number.isNaN(d.getTime()) && d.getTime() >= now.getTime()) {
+      // SAM archived it (active=false) — no longer accepting responses even if the deadline is
+      // still in the future (cancelled / archived early). Never call an archived notice open.
+      if (o.active === false) return 'closed';
+      return 'open';
+    }
   }
-  // SAM archived it (active=false) — no longer accepting responses even if the deadline field is
-  // empty or still in the future (cancelled / archived early). Never call an archived notice open.
+  // A missing deadline is not automatically open. Respondable types (solicitation,
+  // sources sought) stay open under #1557. Award / justification / presolicitation /
+  // special notice have nothing to submit and must not be labelled open.
   if (o.active === false) return 'closed';
-  return 'open';
+  if (!o.response_deadline && classifyNoticeType(o.notice_type).respondability === 'none') return 'closed';
+  if (!o.response_deadline) return 'open';
+  return 'closed';
 }
 
 function fmtUtcDate(iso: string | null | undefined): string | null {
@@ -261,9 +271,15 @@ export function opportunityStatusLabel(
   if (status === 'closed') {
     const due = fmtUtcDate(o.response_deadline);
     const pastDue = due && new Date(o.response_deadline!).getTime() < now.getTime();
+    const noDeadlineNotRespondable = !o.response_deadline && o.active !== false
+      && classifyNoticeType(o.notice_type).respondability === 'none';
     return {
       status,
-      label: pastDue ? `Closed — responses were due ${due}` : 'Closed — this notice has been archived on SAM.gov',
+      label: pastDue
+        ? `Closed — responses were due ${due}`
+        : noDeadlineNotRespondable
+          ? 'Not open for responses — no deadline is recorded on this notice type'
+          : 'Closed — this notice has been archived on SAM.gov',
     };
   }
   return { status, label: 'Open for responses' };

@@ -1,0 +1,26 @@
+{
+  "toptier_code": "036",
+  "agency_data_by_year": [
+    {
+      "fiscal_year": 2027,
+      "agency_budgetary_resources": null,
+      "agency_total_obligated": null,
+      "agency_total_outlayed": null,
+      "total_budgetary_resources": null
+    },
+    {
+      "fiscal_year": 2026,
+      "agency_budgetary_resources": 520360602282.9,
+      "agency_total_obligated": 451995661003.72,
+      "agency_total_outlayed": 441116492868.73,
+      "total_budgetary_resources": 14142952299307.62
+    },
+    {
+      "fiscal_year": 2025,
+      "agency_budgetary_resources": 458775858774.24,
+      "agency_total_obligated": 412393503628.81,
+      "agency_total_outlayed": 404935929341.35,
+      "total_budgetary_resources": 13263700405307.76
+    }
+  ]
+}

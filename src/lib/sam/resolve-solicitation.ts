@@ -155,6 +155,10 @@ export function deriveSolicitationStatus(
   const deadlineMs = row.response_deadline ? Date.parse(row.response_deadline) : NaN;
   const archiveMs = row.archive_date ? Date.parse(row.archive_date) : NaN;
   const deadlineExists = Number.isFinite(deadlineMs);
+  // #1557, preserved: OPEN only when active=true AND (no deadline OR deadline is future).
+  // active=true alone is the archive flag, not "open for responses" — callers that
+  // speak to a customer must still name the notice type. Do not treat a missing
+  // deadline as an award or a contract performance period.
   const deadlineFuture = !deadlineExists || deadlineMs > nowMs;
   if (row.active === true && deadlineFuture) return 'open';
   if (Number.isFinite(archiveMs) && archiveMs <= nowMs) return 'archived';

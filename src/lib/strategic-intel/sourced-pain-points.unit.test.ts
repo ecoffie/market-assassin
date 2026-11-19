@@ -5,13 +5,18 @@ import { describe, it, expect } from 'vitest';
 import {
   extractDocumentNumber,
   dedupeLegacyAgainstSourced,
+  getAgencySourcedIntelligence,
+  INSTITUTE_SOURCE_CUSTOMER_SELECT,
+  INSTITUTE_SOURCE_PUBLIC_SELECT,
   loadLegacyPainPointsForAgency,
+  loadSourcedPainPointsForAgency,
   formatPainPointForDisplay,
   omitUnsourcedDollarAmounts,
   sanitizeLegacyClaimText,
   toCitation,
   type SourcedPainPoint,
 } from './sourced-pain-points';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 const sourced = (o: Partial<SourcedPainPoint>): SourcedPainPoint => ({
   agency: 'Department of Transportation',
@@ -128,5 +133,98 @@ describe('sourced pain points — provenance contract', () => {
     });
     expect(formatPainPointForDisplay(s)).toMatch(/\$16\.1B/);
     expect(toCitation(s).claim).toMatch(/\$16\.1B/);
+  });
+
+  it('marks a thrown living read as failed and an empty result as not failed', async () => {
+    const down = {
+      from() {
+        throw new Error('down');
+      },
+    } as unknown as SupabaseClient;
+    const failed = await getAgencySourcedIntelligence('Department of Defense', { client: down });
+    expect(failed.meta.sourcedReadFailed).toBe(true);
+    expect(failed.sourced).toEqual([]);
+    expect(failed.legacy.length).toBeGreaterThan(0);
+
+    const empty = {
+      from() {
+        const chain = {
+          select: () => chain,
+          in: () => chain,
+          eq: () => chain,
+          order: () => chain,
+          limit: async () => ({ data: [], error: null }),
+        };
+        return chain;
+      },
+    } as unknown as SupabaseClient;
+    const none = await getAgencySourcedIntelligence('Department of Defense', { client: empty });
+    expect(none.meta.sourcedReadFailed).toBe(false);
+    expect(none.sourced).toEqual([]);
+  });
+
+  it('scorecard findability omits institute_sources.raw from the select', async () => {
+    expect(INSTITUTE_SOURCE_PUBLIC_SELECT).not.toMatch(/\braw\b/);
+    expect(INSTITUTE_SOURCE_CUSTOMER_SELECT).toMatch(/\braw\b/);
+
+    const instituteSelects: string[] = [];
+    const painRow = {
+      id: 'p1',
+      agency: 'Department of Energy',
+      pain_point: 'Scheduling delays (Source: OIG-26-3)',
+      source: 'ig_report',
+      source_url: 'https://www.oversight.gov/report/oig-26-3',
+      institute_source_ids: ['ig-1'],
+      confidence: 'high',
+      status: 'open',
+    };
+    const instituteRow = {
+      id: 'ig-1',
+      document_number: 'OIG-26-3',
+      source_url: 'https://www.oversight.gov/report/oig-26-3',
+      publication_date: '2026-01-01',
+      title: 'Scheduling',
+      canonical_agency: 'Department of Energy',
+      raw: { acquisition: { recommendation: 'SECRET_REC', resolution_status: 'open' } },
+    };
+
+    const client = {
+      from(table: string) {
+        const result = table === 'agency_pain_points_db'
+          ? { data: [painRow], error: null }
+          : { data: [instituteRow], error: null };
+        const chain: Record<string, unknown> = {};
+        const self = () => chain;
+        chain.select = (cols: string) => {
+          if (table === 'institute_sources') instituteSelects.push(cols);
+          return chain;
+        };
+        chain.in = (..._args: unknown[]) => {
+          if (table === 'institute_sources') return Promise.resolve(result);
+          return chain;
+        };
+        chain.eq = self;
+        chain.order = self;
+        chain.limit = () => Promise.resolve(result);
+        return chain;
+      },
+    } as unknown as SupabaseClient;
+
+    const thin = await loadSourcedPainPointsForAgency('Department of Energy', {
+      client,
+      includeAcquisitionRaw: false,
+    });
+    expect(instituteSelects).toEqual([INSTITUTE_SOURCE_PUBLIC_SELECT]);
+    expect(thin[0]?.recommendation).toBeNull();
+    expect(thin[0]?.institute_source_id).toBe('ig-1');
+    expect(JSON.stringify(thin)).not.toContain('SECRET_REC');
+
+    instituteSelects.length = 0;
+    const full = await loadSourcedPainPointsForAgency('Department of Energy', {
+      client,
+      includeAcquisitionRaw: true,
+    });
+    expect(instituteSelects).toEqual([INSTITUTE_SOURCE_CUSTOMER_SELECT]);
+    expect(full[0]?.recommendation).toBe('SECRET_REC');
   });
 });

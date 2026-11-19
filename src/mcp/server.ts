@@ -462,7 +462,10 @@ server.registerTool(
     annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Target-research read on a federal agency: resolves it by name / abbreviation / CGAC code, then returns ' +
-      'identity + hierarchy, curated GovCon pain points & priorities, and (when available) live USASpending ' +
+      'identity + hierarchy, pain points, and priorities (live rows for an agency that has been acquired, ' +
+      'otherwise the fixed file — priorityBasis says which). program_keyword lists growing federal-account ' +
+      'obligations for that word from budget_programs; an empty table is unavailable, not zero agencies. ' +
+      'Also (when available) live USASpending ' +
       'obligations for the fiscal year with top NAICS. The "size up a buyer before I pursue them" lookup. Pain ' +
       'points are curated intel, not an official statement. Also returns `legislation`: the NDAA record Mindy ' +
       'holds for the department — each bill and version with its stage and law status and a congress.gov link. ' +
@@ -471,17 +474,21 @@ server.registerTool(
     inputSchema: {
       agency: z
         .string()
-        .min(1)
-        .describe('Agency name, abbreviation, or CGAC code, e.g. "VA", "Department of Defense", or "069".'),
+        .optional()
+        .describe('Agency name, abbreviation, or CGAC code, e.g. "VA", "Department of Defense", or "069". Optional when program_keyword is set.'),
       fiscal_year: z
         .number()
         .int()
         .optional()
         .describe('Optional fiscal year for spending (defaults to current federal FY).'),
+      program_keyword: z
+        .string()
+        .optional()
+        .describe('Optional. USASpending federal-account obligations whose name matches and whose trend is growing or surging. These are obligations, not agency budgetary resources.'),
     },
   },
-  async ({ agency, fiscal_year }) => {
-    const result = await getAgencyIntel({ agency, fiscal_year });
+  async ({ agency, fiscal_year, program_keyword }) => {
+    const result = await getAgencyIntel({ agency, fiscal_year, program_keyword });
     return {
       content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       structuredContent: result as unknown as Record<string, unknown>,
@@ -1394,17 +1401,17 @@ server.registerTool(
     title: 'Get Agency Budget Trends (OMB/CBJ)',
     annotations: { readOnlyHint: true, openWorldHint: true },
     description:
-      "An agency's discretionary budget authority + the FY2025→FY2026 trend (growing / cut / stable) — where the money " +
-      'is moving BEFORE it becomes awards. Pass an agency name or abbreviation ("VA", "Department of Defense", "NASA", ' +
+      "An agency's discretionary budget authority + the FY2025→FY2026 trend (growing / cut / stable) — a budget signal " +
+      'from budgetary resources. Pass an agency name or abbreviation ("VA", "Department of Defense", "NASA", ' +
       '"EPA"). Returns FY25 (enacted) + FY26 (President\'s request) budget authority, $ + % change, and the trend. ' +
-      'DISCRETIONARY budget authority only (not total obligations); FY26 is a request, not enacted. grounded=false = ' +
+      'DISCRETIONARY budget authority, not the agency\'s whole budget. FY26 on the fixed file is a request, not enacted. Live years are USASpending budgetary resources. grounded=false = ' +
       'agency not in the 47-agency toptier set — do NOT invent a number.',
     inputSchema: {
       agency: z.string().describe('Agency name or abbreviation, e.g. "VA", "Department of Defense", "NASA".'),
     },
   },
   async ({ agency }) => {
-    const result = getAgencyBudgetTrends({ agency });
+    const result = await getAgencyBudgetTrends({ agency });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );

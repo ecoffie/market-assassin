@@ -1,0 +1,90 @@
+# Weekday acquisition scorecard. Runs on GitHub-hosted runners.
+# Schedule fires only after this file is on the default branch.
+# workflow_dispatch can run it from a branch.
+#
+# Credential (supported path — no Mac JWT minting):
+#   SCORECARD_JWT_SECRET = project's legacy JWT HS256 secret (Actions secret, set once).
+#   At job start, scripts/scorecard-mint-jwt.mjs mints a 2h scorecard_reader JWT,
+#   masks it, and writes SCORECARD_READONLY_JWT into GITHUB_ENV. The build step
+#   never receives the signing secret. Do not print Action secrets. Do not mint
+#   30-day JWTs on a laptop.
+#
+# A reader that can list runs and read job logs (and cannot download artifacts)
+# takes the scorecard from the build step log, between the lines
+# === SCORECARD BEGIN === and === SCORECARD END ===.
+# The same markdown is the job summary. The artifact of the same name is the
+# JSON and markdown files.
+name: Daily acquisition scorecard
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 12:45 UTC Monday–Friday.
+    # 7:45 AM Eastern Standard Time, after the 7:20 AM ET collector and before
+    # the 8:00 AM ET reader. During daylight time this same cron is 8:45 AM ET.
+    - cron: '45 12 * * 1-5'
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: daily-acquisition-scorecard
+  cancel-in-progress: false
+
+jobs:
+  scorecard:
+    name: Acquisition scorecard
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Mint short-lived scorecard JWT
+        env:
+          SCORECARD_JWT_SECRET: ${{ secrets.SCORECARD_JWT_SECRET }}
+        run: |
+          set +x
+          node scripts/scorecard-mint-jwt.mjs --out "$RUNNER_TEMP/scorecard.jwt"
+          TOKEN=$(cat "$RUNNER_TEMP/scorecard.jwt")
+          rm -f "$RUNNER_TEMP/scorecard.jwt"
+          echo "::add-mask::$TOKEN"
+          echo "SCORECARD_READONLY_JWT=$TOKEN" >> "$GITHUB_ENV"
+
+      - name: Build scorecard
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          # SCORECARD_READONLY_JWT comes from GITHUB_ENV (mint step). The signing
+          # secret is not in this step's env.
+        run: |
+          set +x
+          node scripts/scorecard-readonly-check.mjs
+          ./node_modules/.bin/tsx scripts/daily-acquisition-scorecard.mjs --out-dir "$RUNNER_TEMP/scorecard"
+
+      - name: Publish job summary
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/scorecard/acquisition-scorecard.md" ]; then
+            cat "$RUNNER_TEMP/scorecard/acquisition-scorecard.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Scorecard file was not written." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload scorecard
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: daily-acquisition-scorecard
+          path: |
+            ${{ runner.temp }}/scorecard/acquisition-scorecard.json
+            ${{ runner.temp }}/scorecard/acquisition-scorecard.md
+          if-no-files-found: warn
+          retention-days: 30

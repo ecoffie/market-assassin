@@ -163,6 +163,10 @@ describe('opportunities: open / closed / awarded', () => {
     expect(opportunityStatus({ notice_type: 'Solicitation', response_deadline: '2026-11-01T00:00:00Z' }, NOW)).toBe('closed');
     expect(opportunityStatus({ notice_type: 'Solicitation', response_deadline: '2026-12-01T00:00:00Z' }, NOW)).toBe('open');
     expect(opportunityStatus({ notice_type: 'Sources Sought', response_deadline: null }, NOW)).toBe('open');
+    expect(opportunityStatus({ notice_type: 'Solicitation', response_deadline: null }, NOW)).toBe('open');
+    expect(opportunityStatus({ notice_type: 'Justification', response_deadline: null, active: true }, NOW)).toBe('closed');
+    expect(opportunityStatus({ notice_type: 'Presolicitation', response_deadline: null, active: true }, NOW)).toBe('closed');
+    expect(opportunityStatus({ notice_type: 'Special Notice', response_deadline: null, active: true }, NOW)).toBe('closed');
   });
 });
 
@@ -270,7 +274,7 @@ describe('closed opportunities: honest label, own sitemap child', () => {
     expect(opportunityStatus({ notice_type: 'Solicitation', response_deadline: '2027-01-01T00:00:00Z', active: false }, NOW)).toBe('closed');
     expect(opportunityStatus({ notice_type: 'Solicitation', response_deadline: null, active: false }, NOW)).toBe('closed');
     expect(opportunityStatus({ notice_type: 'Award Notice', response_deadline: null, active: false }, NOW)).toBe('awarded');
-    // `active` omitted keeps the old behaviour (callers that never read the column).
+    // #1557: a solicitation with no deadline stays open. Non-respondable types do not.
     expect(opportunityStatus({ notice_type: 'Solicitation', response_deadline: null }, NOW)).toBe('open');
   });
 
@@ -288,6 +292,8 @@ describe('closed opportunities: honest label, own sitemap child', () => {
     expect(opportunityStatusLabel({ notice_type: 'Award Notice', awardee_name: '  ' }, NOW).label).toBe('Award notice');
     expect(opportunityStatusLabel({ notice_type: 'Solicitation', response_deadline: '2026-12-01T00:00:00Z', active: true }, NOW).label)
       .toBe('Open for responses');
+    expect(opportunityStatusLabel({ notice_type: 'Justification', response_deadline: null, active: true }, NOW).label)
+      .toBe('Not open for responses — no deadline is recorded on this notice type');
   });
 
   it('lists past-deadline, non-award notices (active or archived) within the window, newest first', async () => {

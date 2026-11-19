@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
-import { saveVaultUpload, VAULT_MAX_BYTES } from '@/lib/vault/upload';
+import { saveVaultUpload, VAULT_MAX_BYTES, VAULT_PANEL_EXTS } from '@/lib/vault/upload';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 export const dynamic = 'force-dynamic';
@@ -56,6 +56,8 @@ export async function POST(request: NextRequest) {
       docClass: 'company',
       source: 'vault',
       docType: doc_type,
+      // Spreadsheets stay behind Ask Mindy's flagged chat upload — not the Vault API.
+      allowedExts: VAULT_PANEL_EXTS,
     },
     { db: supabase, storage: supabase.storage },
   );

@@ -24,6 +24,7 @@ import {
   type IncumbentFinding,
   type SolicitationIncumbentResult,
 } from '@/lib/usaspending/solicitation-incumbent';
+import { askMindyNoticeStatusLines } from '@/lib/sam/ask-mindy-notice-status';
 import { OPPORTUNITY_COLUMNS, describeDeadline, type OpportunityRecord } from './card-chat';
 
 /** The card columns plus what the buyer/contact facts read. */
@@ -195,7 +196,7 @@ export function formatSelectedNoticeFacts(f: SelectedNoticeFacts): string[] {
 
 /** The record fields the facts block reads (no description/SOW). */
 export const SOLICITATION_FACT_COLUMNS =
-  'notice_id,title,solicitation_number,department,sub_tier,office,notice_type,set_aside_description,naics_code,psc_code,posted_date,response_deadline,pop_city,pop_state,ui_link,active,agency_hierarchy,office_address,points_of_contact';
+  'notice_id,title,solicitation_number,department,sub_tier,office,notice_type,set_aside_description,naics_code,psc_code,posted_date,response_deadline,archive_date,pop_city,pop_state,ui_link,active,agency_hierarchy,office_address,points_of_contact';
 
 /** The compact block Manual Drive puts beside the requirements. Absent fields are said to be absent. */
 export function formatSolicitationFactsBlock(rec: SelectedNoticeRecord, facts: SelectedNoticeFacts): string {
@@ -211,6 +212,7 @@ export function formatSolicitationFactsBlock(rec: SelectedNoticeRecord, facts: S
     `NAICS: ${v(rec.naics_code)} · PSC: ${v(rec.psc_code)}`,
     `Response deadline: ${v(describeDeadline(rec.response_deadline))}`,
     `Place of performance: ${v([rec.pop_city, rec.pop_state].filter(Boolean).join(', '))}`,
+    ...askMindyNoticeStatusLines(rec),
     ...formatSelectedNoticeFacts(facts),
   ].join('\n');
 }

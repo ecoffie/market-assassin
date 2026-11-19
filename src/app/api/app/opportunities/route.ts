@@ -561,7 +561,7 @@ export async function GET(request: NextRequest) {
         daysLeft,
         // Honest runway (shared model): badge text + tier for the panel, and a
         // rank so pursuable opps float above ones closing tomorrow.
-        runwayLabel: runwayLabel(opp.response_deadline),
+        runwayLabel: runwayLabel(opp.response_deadline, new Date(), opp.notice_type),
         runwayTier: runwayTier(opp.response_deadline),
         isUrgent: daysLeft !== null && daysLeft <= 7 && daysLeft >= 0,
         isClosingSoon: daysLeft !== null && daysLeft <= 14 && daysLeft > 7,

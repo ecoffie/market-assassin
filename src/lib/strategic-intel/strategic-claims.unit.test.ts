@@ -117,7 +117,11 @@ describe('the real corpus, through the boundary', () => {
       for (const c of [...priorities, ...painPoints]) {
         expect(c.claimType).toBe('LEGACY_MANUAL');
         expect(c.citable).toBe(false);
-        expect(c.temporalStatus).toBe('UNDATED');
+        // Bare (Source: GAO) rows now carry their 1993–2000 government date → HISTORICAL.
+        // Undated manual strings stay UNDATED. Neither may read as CURRENT.
+        expect(c.temporalStatus).not.toBe('CURRENT');
+        if (c.sourceDate) expect(c.temporalStatus).toBe('HISTORICAL');
+        else expect(c.temporalStatus).toBe('UNDATED');
       }
     }
   });

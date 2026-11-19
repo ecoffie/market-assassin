@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isDefensiblePainPoint, deriveFromInstituteSource } from './derive';
+import { isDefensiblePainPoint, deriveFromInstituteSource, deriveAcquiredPainPoint } from './derive';
 import { resolveAgency } from './agency-resolver';
 
 const resolved = resolveAgency({ agencyName: 'Department of Homeland Security' });
@@ -82,5 +82,58 @@ describe('derivation — history before state', () => {
     const { db } = stubDb();
     const r = await deriveFromInstituteSource(db, src);
     expect(r.entityKey).toContain('Department of Homeland Security');
+  });
+
+  it('refuses to write the bare (Source: GAO) tag', async () => {
+    const { ops, db } = stubDb();
+    const r = await deriveFromInstituteSource(db, { ...src, documentNumber: 'GAO' });
+    expect(r.outcome).toBe('blocked_legacy_gao_reinjection');
+    expect(ops).toHaveLength(0);
+  });
+});
+
+describe('acquired recommendations — additive, source-id keyed', () => {
+  it('writes an IG recommendation as ig_report and does not delete', async () => {
+    const inserts: Array<{ table: string; row: Record<string, unknown> }> = [];
+    const db = {
+      from: (table: string) => {
+        const chain: Record<string, unknown> = {};
+        chain.select = () => chain;
+        chain.eq = () => chain;
+        chain.maybeSingle = async () => ({ data: null, error: null });
+        chain.insert = async (row: Record<string, unknown>) => {
+          inserts.push({ table, row });
+          return { error: null };
+        };
+        return chain;
+      },
+    } as never;
+    const r = await deriveAcquiredPainPoint(db, {
+      instituteSourceId: 'src-ig',
+      documentNumber: 'OIG-REC:reports~audit~example:1',
+      problem: 'Strengthen monitoring controls over the grant ledger.',
+      url: 'https://www.oversight.gov/reports/audit/example',
+      resolution: resolved,
+      sourceKind: 'ig_report',
+    });
+    expect(r.outcome).toBe('pain_point_created');
+    expect(inserts.map((i) => i.table)).toEqual(['intelligence_changes', 'agency_pain_points_db']);
+    expect(inserts[1].row.source).toBe('ig_report');
+    expect(inserts[1].row.pain_point).toMatch(/\(Source: OIG-REC:reports~audit~example:1\)$/);
+    expect(inserts[1].row.pain_point).not.toMatch(/\(Source: GAO\)$/);
+  });
+
+  it('an already-held source id does not insert again', async () => {
+    const { ops, db } = stubDb({ priorClaim: true });
+    const r = await deriveAcquiredPainPoint(db, {
+      instituteSourceId: 'src-ig',
+      documentNumber: 'OIG-REC:reports~audit~example:1',
+      problem: 'Strengthen monitoring controls over the grant ledger.',
+      url: 'https://www.oversight.gov/reports/audit/example',
+      resolution: resolved,
+      sourceKind: 'ig_report',
+    });
+    expect(r.outcome).toBe('pain_point_unchanged');
+    expect(ops).toHaveLength(0);
   });
 });

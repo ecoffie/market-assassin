@@ -6398,7 +6398,7 @@ const DRAWER_JS = `<script>
   // 'open' | 'dla' | 'recompete' | 'forecast' | 'company' | 'buyer', or null when closed.
   // Read-only for other modules; set by each drawer opener below.
   window.__drawerKind=null;
-  function close(){ dr.classList.remove('show'); bd.classList.remove('show'); clearTaskOrderPins(); window.__drawerKind=null; window.__selectedOpp=null; }
+  function close(){ dr.classList.remove('show'); bd.classList.remove('show'); clearTaskOrderPins(); window.__drawerKind=null; window.__selectedOpp=null; try{ if(window.__onSelectedOpp) window.__onSelectedOpp(); }catch(e){} /* shell → Ask Mindy clears chip */ }
   // listing_open for drawers that can be reached WITHOUT openOppDrawer (typed ?recompete= /
   // ?forecast= deep links, similar-listing cards). openOppDrawer already emits it before routing
   // to these drawers and leaves a one-shot marker, so the same open is never counted twice.
@@ -7034,8 +7034,13 @@ const DRAWER_JS = `<script>
     // sends only its id; the server loads the record. Cleared when this drawer closes.
     window.__selectedOpp=/^[0-9a-f]{32}$/.test(String(o.id||'').toLowerCase())?{id:String(o.id).toLowerCase(),title:o.title||'',deadline:o.deadline||''}:null;
     try{ if(window.__onSelectedOpp) window.__onSelectedOpp(); }catch(e){}
+    // Ask doorway (no second chat): card-chat flag → dedicated card thread; otherwise main Map Ask
+    // drawer with the selected notice already attached via __selectedOpp / syncAttached.
+    var _askBtn=_cc
+      ?'<button class="b ask" type="button" onclick="window.__askAboutOpp&&window.__askAboutOpp(window.__cardChatOpp)">Ask Mindy about this opportunity</button>'
+      :(window.__selectedOpp?'<button class="b ask" type="button" onclick="window.openAskMindy&&window.openAskMindy()">Ask Mindy about this opportunity</button>':'');
     return '<div class="oact" id="osec-actions">'
-      + (_cc?'<button class="b ask" onclick="window.__askAboutOpp&&window.__askAboutOpp(window.__cardChatOpp)">Ask Mindy about this opportunity</button>':'')
+      + _askBtn
       + '<button class="b pri" onclick="saveCurrentOpp(this)">Start pursuit</button>'
       // Opens the MAP-NATIVE Proposal Workspace via openProposalWorkspace (tracks, then opens with
       // ?pursuit=<id>). No data-u: the destination is not a static URL any more, it depends on the
@@ -7121,11 +7126,17 @@ const DRAWER_JS = `<script>
       + (o.dibbsUrl?'<a class="b" href="'+esc(o.dibbsUrl)+'" target="_blank" rel="noopener">View RFQ spec \\u2197</a>':'')
       + '</div>';
     var upd=relTime(o.syncedAt);
+    // Same rule as reportedCollectionFreshness: a disabled collector is never "live".
+    // Missing freshness fails closed. CURRENT is the only case that may say Live.
+    var dibbsLive = o.freshness && o.freshness.state === 'CURRENT';
+    var dibbsFresh = dibbsLive
+      ? 'Live from DLA DIBBS'
+      : ((o.freshness && o.freshness.warning) || 'Collector is disabled. A past ingest does not make this feed current.');
     return '<section class="osec dla-drawer" id="osec-overview">'
       + hero
       + sec('Price to quote', quote, 'quote')
       + sec('Bid facts', facts, 'facts')
-      + '<div class="snapfresh"><span class="snapdot"></span>Live from DLA DIBBS'+(upd?' \\u00b7 updated '+upd:'')+' \\u00b7 Solicitation '+esc(o.solicitation||o.id)+'</div>'
+      + '<div class="snapfresh"><span class="snapdot"></span>'+dibbsFresh+(upd?' \\u00b7 synced '+upd:'')+' \\u00b7 Solicitation '+esc(o.solicitation||o.id)+'</div>'
       + '</section>'
       + cta;
   }
@@ -8551,6 +8562,11 @@ const DRAWER_JS = `<script>
       if(det.length)oppInner+='<div class="osec-sub" style="margin-top:14px">Published forecast detail</div>'
         + '<div class="bf-grid">'+det.map(function(x){return '<div class="bf-row"><div class="bf-k">'+esc(x.k)+'</div><div class="bf-v">'+esc(String(x.v))+'</div></div>';}).join('')+'</div>'
         + (function(){ var s=forecastSource(f.source_url); return s?('<div class="ai-note">Source: <a href="'+esc(s.href)+'" target="_blank" rel="noopener">'+esc(s.label)+'</a></div>'):''; })();
+      // last_synced_at is Mindy's sync clock, not an agency posting date — never label it "Posted".
+      if(f.last_synced_at){
+        var _syncRel=relTime(f.last_synced_at);
+        oppInner+='<div class="snapfresh" style="margin-top:12px">Last synced by Mindy'+(_syncRel?' \\u00b7 '+_syncRel:'')+'</div>';
+      }
       if(!oppInner)oppInner=empty('The agency listed this requirement without further detail. Track it \\u2014 the description usually fills in as the buy nears solicitation.');
       oppBox.innerHTML=sec('Opportunity intelligence',oppInner,'fcdesc');
 
@@ -10573,8 +10589,8 @@ const SEARCH_PANEL_JS = `<script>(function(){
   function renderDefault(){
     var q=(input.value||'').trim();
     var h='';
-    // Ask Mindy row REMOVED for now (Eric 2026-08-03: "remove ask Mindy for now"). The panel opens
-    // straight into Near-me / history / saved / the NL example hints — pure search, no chat doorway.
+    // Ask Mindy doorway restored (2026-11-19 polish): same drawer engine, not a second chat.
+    h+='<button class="zsp-row zsp-ask" data-act="ask">'+ICON.ask+'<span>Ask Mindy'+(q?(' about \\u201c'+esc(q)+'\\u201d'):'')+'</span></button>';
     var st=window.__homeState;
     h+='<button class="zsp-row" data-act="state" data-st="'+esc(st||'')+'">'+ICON.pin+'<span>'+(st?('Jump to '+esc(st)+' \\u2014 your state'):'Near me / my area')+'</span></button>';
     // Search history + saved searches are filled async (server-backed).
@@ -10637,9 +10653,8 @@ const SEARCH_PANEL_JS = `<script>(function(){
         var d=a[0]||{}, ad=a[1]||{};
         var res=(d&&d.results)?d.results:[];
         var ags=(ad&&ad.results)?ad.results:[];
-        // Ask Mindy row REMOVED for now (Eric 2026-08-03) — autocomplete opens straight into the
-        // matched Agencies / Codes; Enter still runs the literal keyword search (the empty branch below).
-        var h='';
+        // Ask Mindy row first (same drawer); Enter still runs keyword search.
+        var h='<button class="zsp-row zsp-ask" data-act="ask">'+ICON.ask+'<span>Ask Mindy about \\u201c'+esc(q)+'\\u201d</span></button>';
         // NOTE: market-report generation is NOT offered here (Eric 2026-08-01: most
         // users want saved-search alerts to bid, not reports — it's a rare feature).
         // "Run report" lives on each SAVED SEARCH card (/opportunity-map/saved),
@@ -11024,6 +11039,8 @@ const ASK_MINDY_JS = `<script>(function(){
   if(wsEl) wsEl.addEventListener('click',function(){
     try{ sessionStorage.setItem('mindy_chat_handoff',JSON.stringify({v:1,sessionId:oppCtx?'':(sessionId||''),
       context:(attached&&!oppCtx)?{kind:'opportunity',notice_id:attached.id,title:attached.title,deadline:attached.deadline}:(oppCtx?{kind:'opportunity',notice_id:oppCtx.id,title:oppCtx.title,deadline:oppCtx.deadline}:null)})); }catch(e){}
+    // So the App workspace can offer "Back to Map" without dropping this conversation.
+    try{ sessionStorage.setItem('mindy_chat_from_map','1'); }catch(e){}
     try{ if(window.__track) window.__track('tool_use','ask_mindy_open_workspace',{attached:!!(attached||oppCtx)}); }catch(e){}
   });
   // CHARGE ONCE PER QUESTION: every card question gets a stable turn id. It is saved here as "pending" BEFORE
@@ -11158,7 +11175,7 @@ const ASK_MINDY_JS = `<script>(function(){
   function buildAttach(){
     var foot=drawer.querySelector('.amk-foot'); if(!foot)return;
     var row=document.createElement('div'); row.className='amk-attach'; row.setAttribute('data-testid','amk-attach');
-    row.innerHTML='<div class="amk-docs"></div><div class="amk-attach-bar"><input type="file" accept=".pdf,.docx,.txt" hidden><button type="button" class="amk-clip">Attach</button><span class="amk-priv">Saved privately to your Vault</span></div><div class="amk-attach-err" role="alert"></div>';
+    row.innerHTML='<div class="amk-docs"></div><div class="amk-attach-bar"><input type="file" accept=".pdf,.docx,.txt,.xlsx,.xls,.csv" hidden><button type="button" class="amk-clip">Attach</button><span class="amk-priv">Saved privately to your Vault</span></div><div class="amk-attach-err" role="alert"></div>';
     foot.insertBefore(row, foot.firstChild);
     var fileIn=row.querySelector('input'), clip=row.querySelector('.amk-clip'), docsEl=row.querySelector('.amk-docs'), errEl=row.querySelector('.amk-attach-err');
     function uuid(){ try{ if(window.crypto&&crypto.randomUUID) return crypto.randomUUID(); }catch(e){} var h='0123456789abcdef',x=''; for(var i=0;i<32;i++){ x+=h.charAt(Math.floor(Math.random()*16)); } return x.slice(0,8)+'-'+x.slice(8,12)+'-4'+x.slice(13,16)+'-8'+x.slice(17,20)+'-'+x.slice(20,32); }

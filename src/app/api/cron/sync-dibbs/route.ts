@@ -26,6 +26,7 @@ import { createClient } from '@supabase/supabase-js';
 import { ingestDibbs } from '@/lib/dibbs/ingest';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { reportCronOutcome } from '@/lib/cron-self-report';
+import { freshnessBody, stampDibbsClocks } from '@/lib/dibbs/clock-stamp';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -240,8 +241,13 @@ export async function GET(request: NextRequest) {
         'error',
         `STARVED: fetched ${result.fetched} | path: ${provenance}${result.costGuard ? ` | guard: ${result.costGuard}` : ''}`,
       );
+      const freshness = freshnessBody(await stampDibbsClocks(supabase, {
+        upstreamReadable: false,
+        recordsReceived: result.fetched,
+        recordsLanded: 0,
+      }), result.fetched);
       return NextResponse.json({
-        success: false, ...result, truncated, starved,
+        success: false, ...result, truncated, starved, freshness,
         error: `STARVED: fetched ${result.fetched} via ${provenance}. `
           + (apifyWasReached
             ? 'Check Apify billing (spend cap) before assuming WAF. Do not retry.'
@@ -265,6 +271,14 @@ export async function GET(request: NextRequest) {
         ? `[sync-dibbs] NO-DATA WINDOW: every file in the window was CONFIRMED missing (DLA FileNotFound) — holiday or not yet posted, not a refusal.`
         : `[sync-dibbs] NO-DATA WINDOW: last ${daysBack} day(s) are all weekend — DLA publishes one index file per business day, so ${result.fetched} record(s) is expected.`);
       await reportCronOutcome('sync-dibbs', 'success');
+      // Confirmed empty (weekend or FileNotFound). Job success is allowed because
+      // the window is evidenced empty. It does not move the nonempty-ingest clock,
+      // including when a single stray row was touched.
+      const freshness = freshnessBody(await stampDibbsClocks(supabase, {
+        upstreamReadable: true,
+        recordsReceived: result.fetched,
+        recordsLanded: 0,
+      }), result.fetched);
       // How stale is the CORPUS, independent of whether today's run was expected to find
       // anything. A weekend pass with a 4-day-old corpus is not health.
       let lastSyncAgeHours: number | null = null;
@@ -280,7 +294,7 @@ export async function GET(request: NextRequest) {
       }
 
       return NextResponse.json({
-        success: true, ...result, truncated, starved: false, noDataWindow: true, lastSyncAgeHours,
+        success: true, ...result, truncated, starved: false, noDataWindow: true, lastSyncAgeHours, freshness,
         message: result.noDataConfirmed && !noBusinessDayInWindow
           ? `DIBBS: every file in the window was confirmed missing at DLA (FileNotFound) — no data published yet, not starved.`
           : `DIBBS: no business days in the last ${daysBack} day(s) — DLA publishes per business day, so ${result.fetched} record(s) is expected (not starved).`,
@@ -290,8 +304,13 @@ export async function GET(request: NextRequest) {
     // Healthy run — overwrite the dispatcher's 'dispatched' with the real
     // outcome so a genuine success is distinguishable from "we never found out".
     await reportCronOutcome('sync-dibbs', 'success');
+    const freshness = freshnessBody(await stampDibbsClocks(supabase, {
+      upstreamReadable: true,
+      recordsReceived: result.fetched,
+      recordsLanded: result.upserted,
+    }), result.fetched);
     return NextResponse.json({
-      success: true, ...result, truncated, starved,
+      success: true, ...result, truncated, starved, freshness,
       message: `DIBBS: fetched ${result.fetched}, upserted ${result.upserted}${truncated ? ' (TRUNCATED)' : ''}`,
     });
   } catch (err) {
@@ -300,6 +319,11 @@ export async function GET(request: NextRequest) {
     // Same reasoning as the starved path: past the 12s ack window the HTTP 500
     // reaches nobody, so record the failure where the watchdog will see it.
     await reportCronOutcome('sync-dibbs', 'error', message);
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    const freshness = freshnessBody(await stampDibbsClocks(supabase, {
+      upstreamReadable: false,
+      recordsReceived: 0,
+      recordsLanded: 0,
+    }), 0);
+    return NextResponse.json({ success: false, error: message, freshness }, { status: 500 });
   }
 }

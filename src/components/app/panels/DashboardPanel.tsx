@@ -19,6 +19,9 @@ import { CollabHotCard } from '../CollabHotCard';
 import TargetingCard from './TargetingCard';
 import StartHereCard from './StartHereCard';
 import HiddenWorkNudge from './HiddenWorkNudge';
+import TodaysThree, { type TodaysPick } from './TodaysThree';
+import YourRankingCard from './YourRankingCard';
+import { BOOK_CALL_URL, BOOK_CALL_LABEL } from '@/lib/mindy/book-call';
 import { getNaics } from '@/lib/codes/lookup';
 import ShareButton from '@/components/briefings/ShareButton';
 import SamAttachmentLinks from '@/components/app/SamAttachmentLinks';
@@ -973,6 +976,20 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
   const briefingItems = useMemo(() => getBriefingItems(selectedBriefing), [selectedBriefing]);
   const summary = useMemo(() => getBriefingSummary(selectedBriefing), [selectedBriefing]);
 
+  // Today's 3 (owner 2026-11-19): the first three items of the NEWEST briefing, whatever briefing
+  // is selected in the list below. Ids are the stable notice id, the same one the pipeline dedups on.
+  const latestItems = useMemo(() => getBriefingItems(briefings[0] || null), [briefings]);
+  const todaysPicks = useMemo<TodaysPick[]>(() => latestItems.slice(0, 3).map(item => ({
+    id: getStableNoticeId(item),
+    title: item.title,
+    buyer: getBriefingItemBuyer(item, liveBuyers).full || item.buyerName || '',
+    noticeType: getBriefingItemNoticeType(item, liveNoticeTypes) || undefined,
+    setAside: resolveFromLive(item, liveSetAside) || undefined,
+    naics: resolveFromLive(item, liveNaics) || undefined,
+    deadline: item.deadline,
+    amount: item.amount,
+  })), [latestItems, liveBuyers, liveNoticeTypes, liveSetAside, liveNaics]);
+
   const filteredItems = useMemo(() => {
     const query = searchTerm.toLowerCase().trim();
     return briefingItems.filter(item => {
@@ -1335,6 +1352,26 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
             the codes/keywords editor discoverable from the home surface (Eric QC:
             users couldn't find how to see/reset them). */}
         <TargetingCard email={email} variant="compact" surface="dashboard" onEdit={onPanelChange} />
+        {/* Today's 3 — a 30-second daily pick from the newest briefing (owner 2026-11-19). */}
+        {!isLoading && (
+          <TodaysThree
+            email={email}
+            picks={todaysPicks}
+            alreadyPursued={(id) => pipelineSaved.has(id)}
+            getAuthHeaders={getAuthHeaders}
+            onPursue={(id) => { const it = latestItems.find(i => getStableNoticeId(i) === id); if (it) void handleTrackInPipeline(it); }}
+            onPass={(id) => { const it = latestItems.find(i => getStableNoticeId(i) === id); if (it) dismissItem(it); }}
+          />
+        )}
+        {/* Your ranking — lifetime federal dollars to the Vault UEI, overall + in-state (owner 2026-11-19). */}
+        <YourRankingCard email={email} getAuthHeaders={getAuthHeaders} onAddUei={() => onPanelChange?.('vault')} />
+        {/* Paid members can book a call with the Mindy team (owner 2026-11-19). For you is Pro/Team/trial only. */}
+        <section aria-label="Talk to the team" data-testid="book-call-card" className="rounded-xl border border-surface bg-ground px-4 py-3 mb-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted">Get help with your market, a pursuit or a proposal. A 30-minute call, free with your plan.</p>
+          <a href={BOOK_CALL_URL} target="_blank" rel="noopener noreferrer" className="h-10 px-4 rounded-lg bg-[#006aff] hover:bg-[#0057d1] text-white text-sm font-semibold inline-flex items-center">
+            {BOOK_CALL_LABEL}
+          </a>
+        </section>
       </div>
 
       {isLoading ? (

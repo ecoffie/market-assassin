@@ -13,6 +13,7 @@
  *      incomplete turns cost nothing. Pro card turns are not charged (unchanged).
  */
 import { selectRelevantRfp } from '@/lib/text/select-relevant';
+import { askMindyNoticeStatusLines } from '@/lib/sam/ask-mindy-notice-status';
 
 /** Server flag. Off unless exactly "true" (case-insensitive). */
 export function isCardChatEnabled(env: Record<string, string | undefined> = process.env): boolean {
@@ -157,6 +158,7 @@ export type OpportunityRecord = {
   psc_code: string | null;
   posted_date: string | null;
   response_deadline: string | null;
+  archive_date?: string | null;
   pop_city: string | null;
   pop_state: string | null;
   description: string | null;
@@ -166,7 +168,7 @@ export type OpportunityRecord = {
 };
 
 export const OPPORTUNITY_COLUMNS =
-  'notice_id,title,solicitation_number,department,sub_tier,office,notice_type,set_aside_description,naics_code,psc_code,posted_date,response_deadline,pop_city,pop_state,description,sow_text,ui_link,active';
+  'notice_id,title,solicitation_number,department,sub_tier,office,notice_type,set_aside_description,naics_code,psc_code,posted_date,response_deadline,archive_date,pop_city,pop_state,description,sow_text,ui_link,active';
 
 const DESCRIPTION_BUDGET = 6000;
 const SOW_BUDGET = 12000;
@@ -238,7 +240,7 @@ export function buildOpportunityContextBlock(
     line('Posted', rec.posted_date),
     line('Response deadline', describeDeadline(rec.response_deadline)),
     line('Place of performance', place || null),
-    line('Status', rec.active === false ? 'inactive' : rec.active ? 'active' : null),
+    ...askMindyNoticeStatusLines(rec),
     ...factLines,
     'Notice text:',
     desc ? desc.slice(0, DESCRIPTION_BUDGET) : 'not available in Mindy\'s copy of this notice',

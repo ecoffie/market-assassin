@@ -12,6 +12,7 @@
 import budgetData from '@/data/agency-budget-data.json';
 import agencyAliases from '@/data/agency-aliases.json';
 import { mcpFlags } from '@/lib/mcp/flags';
+import { decideAuthorityDisplay, probeLiveAuthority, type FileAuthority } from '@/lib/budget-intel/read';
 
 export interface AgencyBudgetTrendsInput {
   /** Agency name or abbreviation, e.g. "VA", "Department of Defense", "NASA". */
@@ -37,6 +38,22 @@ export interface AgencyBudgetTrendsResult {
   trend: string | null;
   source: string;
   last_updated: string;
+  /** Which store the numbers came from. Mixed years are labeled on `years`. */
+  shown?: 'usaspending_live' | 'static_file';
+  shown_reason?: string;
+  /** Percent change. -18.3 means down 18.3%. change_percent stays a ratio. */
+  change_percent_points?: number | null;
+  source_url?: string | null;
+  fetched_at?: string | null;
+  /** Fixed-file date when a displayed year came from agency-budget-data.json. */
+  as_of?: string | null;
+  years?: Array<{
+    fiscal_year: number;
+    budget_authority: number | null;
+    label: 'usaspending_live' | 'static_file';
+    fetched_at: string | null;
+    as_of: string | null;
+  }>;
   /** Close name matches when no exact hit. */
   candidates: string[];
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
@@ -78,7 +95,7 @@ function usd(n: number): string {
   return b >= 1 ? `$${b.toFixed(1)}B` : `$${(n / 1e6).toFixed(0)}M`;
 }
 
-export function getAgencyBudgetTrends(input: AgencyBudgetTrendsInput): AgencyBudgetTrendsResult {
+export function getAgencyBudgetTrendsFromFile(input: AgencyBudgetTrendsInput): AgencyBudgetTrendsResult {
   const raw = (input.agency || '').trim();
   const base: Omit<AgencyBudgetTrendsResult, '_meta' | 'candidates'> = {
     agency: null,
@@ -131,7 +148,7 @@ export function getAgencyBudgetTrends(input: AgencyBudgetTrendsInput): AgencyBud
     key = names.find((n) => /department of defense/i.test(n));
     if (key) {
       matchType = 'alias';
-      dodWideNote = `Budget authority is reported DoD-wide by OMB, not per-service. Showing Department of Defense (the "${raw}" service isn't a separate OMB budget line). For per-service obligations use get_agency_spending_detail.`;
+      dodWideNote = `Budget authority is reported DoD-wide by OMB, not per-service. Showing Department of Defense (the "${raw}" service isn't a separate OMB budget line). For per-service contract dollars use get_agency_spending_detail.`;
     }
   }
 
@@ -175,12 +192,71 @@ export function getAgencyBudgetTrends(input: AgencyBudgetTrendsInput): AgencyBud
           ? `${key}: ${usd(e.fy2025.budgetAuthority)} (FY25 enacted) → ${usd(e.fy2026.budgetAuthority)} (FY26 request) — ${dir}${e.change?.amount != null ? ` ${usd(Math.abs(e.change.amount))}` : ''}. Discretionary budget authority.`
           : `${key} is in the budget set but a fiscal-year figure is missing.`,
       how_to_use:
-        'A growing agency budget is a leading demand signal (more to spend → more solicitations); a declining one warns of tighter recompetes. Pair with get_agency_intel (actual obligations) and get_regulatory_demand for the fullest read.',
+        'A growing or declining figure is a budget signal about budgetary resources. It does not say which awards will appear. Pair with get_agency_intel and get_regulatory_demand for other reads.',
       key_caveats: [
-        'DISCRETIONARY budget authority only — NOT total obligations or mandatory spending. Do not present it as "the agency\'s total budget."',
-        'FY2026 is the President\'s REQUEST, not enacted — appropriations can move it. Data snapshot is from the source date; verify against current OMB for anything time-sensitive.',
+        'DISCRETIONARY budget authority only. Do not present it as the agency\'s whole budget.',
+        'FY2026 on the fixed file is the President\'s REQUEST, not enacted. Appropriations can move it. The snapshot date is the file as-of.',
       ],
     };
   }
   return result;
+}
+
+export async function getAgencyBudgetTrends(input: AgencyBudgetTrendsInput): Promise<AgencyBudgetTrendsResult> {
+  const file = getAgencyBudgetTrendsFromFile(input);
+  const names = [file.agency, input.agency].filter((name): name is string => !!name && name.trim().length > 0);
+  const probe = await probeLiveAuthority(names);
+  const fileAuthority: FileAuthority | null = file._meta.grounded && file.agency ? {
+    agency: file.agency,
+    toptierCode: file.toptier_code,
+    fy2025: file.fy2025_budget_authority,
+    fy2026: file.fy2026_budget_authority,
+    changeAmount: file.change_amount,
+    changeRatio: file.change_percent,
+    trend: file.trend,
+  } : null;
+  const decided = decideAuthorityDisplay({
+    table: probe.table,
+    live: probe.live,
+    file: fileAuthority,
+    fileSource: file.source,
+  });
+  return {
+    ...file,
+    agency: decided.agency ?? file.agency,
+    toptier_code: decided.toptier_code ?? file.toptier_code,
+    fiscal_years: decided.fiscal_years.length ? decided.fiscal_years : file.fiscal_years,
+    fy2025_budget_authority: decided.grounded ? decided.fy2025_budget_authority : file.fy2025_budget_authority,
+    fy2026_budget_authority: decided.grounded ? decided.fy2026_budget_authority : file.fy2026_budget_authority,
+    change_amount: decided.grounded ? decided.change_amount : file.change_amount,
+    change_percent: decided.grounded ? decided.change_percent : file.change_percent,
+    change_percent_points: decided.change_percent_points,
+    trend: decided.grounded ? decided.trend : file.trend,
+    source: decided.grounded ? decided.source : file.source,
+    last_updated: decided.shown === 'usaspending_live' ? (decided.fetched_at ?? file.last_updated) : file.last_updated,
+    shown: decided.shown,
+    shown_reason: decided.shown_reason,
+    source_url: decided.source_url,
+    fetched_at: decided.fetched_at,
+    as_of: decided.as_of,
+    years: decided.years,
+    _meta: {
+      ...file._meta,
+      grounded: file._meta.grounded || decided.grounded,
+      degraded: probe.table === 'unmeasured',
+      trend: (decided.grounded ? decided.trend : file.trend) ?? file._meta.trend,
+    },
+    ...(file._ai_hint && decided.shown === 'usaspending_live' ? {
+      _ai_hint: {
+        ...file._ai_hint,
+        summary: `${decided.agency}: USASpending budgetary resources, fetched ${decided.fetched_at ?? 'unknown'}.`,
+        how_to_use:
+          'USASpending budgetary resources are a budget signal for years labeled usaspending_live. They are not awards. Pair with get_agency_intel and get_regulatory_demand for other reads.',
+        key_caveats: [
+          'Years labeled usaspending_live are USASpending federal account budgetary resources. Years labeled static_file are the fixed OMB file.',
+          'change_percent is a ratio (1.05 = +5%). change_percent_points is the percent change.',
+        ],
+      },
+    } : {}),
+  };
 }

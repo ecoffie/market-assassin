@@ -69,6 +69,12 @@ describe('shell=app wiring', () => {
     expect(APP_SHELL_JS).toContain('if(window.parent===window)return;');
   });
 
+  it('posts the open SAM listing to the parent for Ask Mindy (and clears on close)', () => {
+    expect(APP_SHELL_JS).toContain('mindy:map-shell-selected-opp');
+    expect(APP_SHELL_JS).toContain('window.__onSelectedOpp=function');
+    expect(APP_SHELL_JS).toContain('window.__selectedOpp');
+  });
+
   it('injects into head + the last </body> and leaves a page without shell untouched', () => {
     const page = '<html><head></head><body><script>"</body>"</script></body></html>';
     const out = applyAppShell(page, SUBPAGE_APP_SHELL_CSS);

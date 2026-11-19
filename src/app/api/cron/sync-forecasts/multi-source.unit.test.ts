@@ -59,17 +59,21 @@ describe('zero-record guard', () => {
 });
 
 describe('DOE source', () => {
-  it('fails loudly when the monthly file moves', () => {
-    // DOE republishes under a DATED directory, so a moved file 404s. That is
-    // the one predictable way this source breaks.
+  it('reads the dated file linked from the OSDBU page, not the July workbook', () => {
+    // The July XLSX still returns HTTP 200. Fetching only that URL never sees
+    // a newer edition (2026-11-16 CSV on the OSDBU page).
     const fn = SRC.slice(SRC.indexOf('async function fetchDOE'));
+    expect(fn).toContain('DOE_FORECAST_PAGE');
+    expect(fn).toContain('extractDoeForecastDocuments');
+    expect(fn).not.toContain('DOE_FORECAST_URL');
+    expect(fn).toContain('refusing the July XLSX fallback');
     expect(fn).toContain('if (!res.ok)');
-    expect(fn).toMatch(/likely moved/);
   });
 
   it('throws when the layout changes rather than importing nothing', () => {
     const fn = SRC.slice(SRC.indexOf('async function fetchDOE'));
-    expect(fn).toMatch(/no header row found/);
+    expect(fn).toMatch(/no header row/);
+    expect(fn).toMatch(/parsed to 0 rows/);
   });
 
   it('carries the incumbent fields that make a forecast actionable', () => {

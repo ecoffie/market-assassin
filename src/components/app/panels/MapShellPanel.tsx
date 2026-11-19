@@ -33,9 +33,11 @@ import {
   mapShellSrc,
   mapViewOf,
   parseMapShellMessage,
+  parseMapSelectedOppMessage,
 } from '@/lib/app/map-shell';
 import { parseAppDeepLink } from '@/lib/app/deep-link-params';
 import { isKnownPanel } from '@/lib/app/known-panels';
+import { MAP_SELECTED_OPP_KEY, serializeMapSelectedOpp } from '@/lib/chat/chat-handoff';
 
 const TITLES: Record<Panel, string> = {
   map: 'Opportunity Map',
@@ -104,6 +106,21 @@ export default function MapShellPanel({ panel, onPanelChange }: Props) {
     const onMessage = (e: MessageEvent) => {
       if (e.origin !== window.location.origin) return;
       if (!frameRef.current || e.source !== frameRef.current.contentWindow) return;
+      // Selected listing for Ask Mindy (separate shape from URL/nav messages).
+      const selected = parseMapSelectedOppMessage(e.data);
+      if (selected) {
+        try {
+          sessionStorage.setItem(
+            MAP_SELECTED_OPP_KEY,
+            serializeMapSelectedOpp(
+              selected.id
+                ? { notice_id: selected.id, title: selected.title, deadline: selected.deadline }
+                : null,
+            ),
+          );
+        } catch { /* sessionStorage unavailable */ }
+        return;
+      }
       const msg = parseMapShellMessage(e.data);
       if (!msg) return;
       if (msg.type === MAP_SHELL_URL_MESSAGE) {

@@ -28,6 +28,8 @@ const ROUTES: Array<[string, string]> = [
   ['src/app/api/cron/institute-legislation-sync/route.ts', 'institute-legislation-sync'],
   ['src/app/api/cron/precompute-opp-intel/route.ts', 'precompute-opp-intel'],
   ['src/app/api/cron/snapshot-multisite/route.ts', 'snapshot-multisite-nih'],
+  ['src/app/api/cron/sync-sam-opportunities/route.ts', 'sync-sam-opportunities-full'],
+  ['src/app/api/cron/sync-recompete-contracts/route.ts', 'sync-recompete-contracts'],
 ];
 
 describe('every newly wired long route reports its own outcome', () => {

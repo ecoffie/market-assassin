@@ -150,6 +150,44 @@ export async function docxHeaderFooterText(buffer: Buffer): Promise<string> {
   return out.join('\n');
 }
 
+/**
+ * Print header/footer text from an .xlsx package (sheet XML <oddHeader>/<oddFooter>/…).
+ * sheet_to_csv never sees these, and they are where CUI/classified banners usually sit.
+ * Legacy .xls has no zip package — callers get '' and must rely on cell text.
+ */
+export async function xlsxHeaderFooterText(buffer: Buffer): Promise<string> {
+  const { unzipSync, strFromU8 } = await import('fflate');
+  let files: Record<string, Uint8Array>;
+  try {
+    files = unzipSync(new Uint8Array(buffer), { filter: (f) => /^xl\/worksheets\/sheet\d+\.xml$/.test(f.name) });
+  } catch {
+    return '';
+  }
+  const out: string[] = [];
+  const tagRe = /<(oddHeader|evenHeader|firstHeader|oddFooter|evenFooter|firstFooter)>([^<]*)<\/\1>/gi;
+  for (const name of Object.keys(files).sort()) {
+    const xml = strFromU8(files[name]);
+    for (const m of xml.matchAll(tagRe)) {
+      // Excel header/footer codes: &L/&C/&R sections, &"font,style", &K color, &12 size,
+      // &P/&N page tokens. A bold/red/left banner must still leave the marking text alone.
+      const decoded = m[2]
+        .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')
+        .replace(/&&/g, '\u0000')
+        .replace(/&[LCR]/g, '\n')
+        .replace(/&"[^"]*"/g, ' ')
+        .replace(/&K(?:[0-9A-Fa-f]{6}|\d{2}[+-]\d{3})/g, ' ')
+        .replace(/&\d+/g, ' ')
+        .replace(/&[A-Za-z]/g, ' ')
+        .replace(/\u0000/g, '&');
+      for (const line of decoded.split('\n')) {
+        const t = line.replace(/\s+/g, ' ').trim();
+        if (t) out.push(t);
+      }
+    }
+  }
+  return out.join('\n');
+}
+
 /** User-facing copy. Says why, says nothing was kept. */
 export function markingRefusalMessage(kind: ProhibitedMarkingKind): string {
   return kind === 'classified'

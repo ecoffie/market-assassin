@@ -141,10 +141,32 @@ describe('saveGeneratedDocument', () => {
 
   it('validation: format, empty bytes, missing model', async () => {
     const w = world([]);
-    for (const bad of [input({ format: 'xlsx' as never }), input({ bytes: Buffer.alloc(0) }), input({ docModel: null })]) {
+    for (const bad of [input({ format: 'html' as never }), input({ bytes: Buffer.alloc(0) }), input({ docModel: null })]) {
       expect((await saveGeneratedDocument(bad, { db: w.db, storage: w.storage, resolveScope: own })).ok).toBe(false);
     }
     expect(w.blobs).toEqual([]);
+  });
+
+  it('W4: xlsx and csv save with the right MIME and filename', async () => {
+    const w = world([]);
+    const x = await saveGeneratedDocument(
+      input({ format: 'xlsx', filename: 'Brief.xlsx', bytes: Buffer.from('PK') }),
+      { db: w.db, storage: w.storage, resolveScope: own, now: () => 9 },
+    );
+    expect(x).toMatchObject({ ok: true });
+    expect(w.inserts[0]).toMatchObject({
+      original_filename: 'Brief.xlsx',
+      mime_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const c = await saveGeneratedDocument(
+      input({ format: 'csv', filename: 'Brief.csv', bytes: Buffer.from('a,b\n1,2') }),
+      { db: w.db, storage: w.storage, resolveScope: own, now: () => 10 },
+    );
+    expect(c).toMatchObject({ ok: true });
+    expect(w.inserts[1]).toMatchObject({
+      original_filename: 'Brief.csv',
+      mime_type: 'text/csv; charset=utf-8',
+    });
   });
 
   it('concurrent revision took the version (unique conflict) → re-reads the latest sibling and retries with the next number', async () => {

@@ -122,6 +122,12 @@ describe('NS-1 — identity contract parity (North Star fixture)', () => {
       expect(e.registrationStatus).toBe('Unknown');
     });
 
+    it('Active + past registration_expiry derives Expired', async () => {
+      stubRow({ ...NORTH_STAR_ROW, registration_status: 'Active', registration_expiry: '2020-01-01' });
+      const e = (await localEntityByUEI('X'))!.entity as never as Record<string, unknown>;
+      expect(e.registrationStatus).toBe('Expired');
+    });
+
     it('missing NAICS yields an empty list, not a fabricated one', async () => {
       stubRow({ ...NORTH_STAR_ROW, naics_codes: null, primary_naics: null });
       const e = (await localEntityByUEI('X'))!.entity as never as Record<string, unknown>;

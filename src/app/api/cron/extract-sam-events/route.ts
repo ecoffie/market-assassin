@@ -21,14 +21,24 @@ import { extractLocation } from '@/lib/events/location';
 import { readNoticeEvent } from '@/lib/events/event-currency';
 import { loadActiveCandidates, loadFamilyPool, loadListedRows, loadNoticesById, type ListedEventRow } from '@/lib/events/event-currency-live';
 import { buildCandidateSet, familiesToLoad, planEvents, planRetirements, pruneMode } from '@/lib/events/extract-run';
+import { reportCronOutcome } from '@/lib/cron-self-report';
 
 export const maxDuration = 300;
 
 /** Wall-clock budget for loading candidates (the listed rows are always read first). */
 const DEFAULT_BUDGET_MS = 200_000;
 const UPSERT_CHUNK = 500;
-/** cron_logs.job_name of the durable prune report (one row per non-dry run). */
+/**
+ * Durable prune report. Written to cron_job_runs, which is what
+ * /api/admin/cron-jobs and the dispatcher watchdog read.
+ *
+ * cron_logs is the wrong table: 20260403_cron_logs.sql was not applied when it
+ * was committed (scripts/migrate.ts), production has 0 rows, and inserts there
+ * are invisible to ops even when they succeed. SAM_EVENTS_PRUNE stays unset, so
+ * this row is a report, not a delete.
+ */
 const PRUNE_REPORT_JOB = 'extract-sam-events:prune-report';
+const EXTRACT_JOB = 'extract-sam-events';
 const CANDIDATE_TYPES = ['Special Notice', 'Presolicitation', 'Sources Sought'];
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
@@ -213,7 +223,7 @@ export async function GET(request: NextRequest) {
 
   // Listed rows whose notice no longer reads as an event. REPORT-ONLY by default: nothing is
   // deleted unless SAM_EVENTS_PRUNE=apply (not set anywhere; Eric's approval is separate). Every
-  // non-dry run records the proposal durably in cron_logs so it can be reviewed before approval.
+  // non-dry run records the proposal in cron_job_runs so it can be reviewed before approval.
   const mode = pruneMode();
   const retirement = planRetirements(listedRows, listedSources, new Set(planned.map((p) => p.notice.notice_id)));
   let retiredCount = 0;
@@ -231,15 +241,48 @@ export async function GET(request: NextRequest) {
   let pruneReportRecorded: boolean | null = null;
   let pruneReportError: string | null = null;
   if (!dryRun) {
-    const { error: logError } = await getSupabase().from('cron_logs').insert({
+    const deleted = mode === 'apply' ? retiredCount : 0;
+    const { error: logError } = await getSupabase().from('cron_job_runs').insert({
       job_name: PRUNE_REPORT_JOB,
-      run_date: runAt,
+      started_at: runAt,
+      finished_at: new Date().toISOString(),
       status: mode === 'apply' ? 'applied' : 'report',
-      result: { mode, proposed: retirement.proposals.length, deleted: mode === 'apply' ? retiredCount : 0, guardSkipped: retirement.skipped, wouldRetire: retirement.wouldRetire, proposals: retirement.proposals },
+      tick: 'route',
+      // cron_job_runs has no JSON result column. The proposal lives in `error`
+      // as text; status stays `report` (not `error`) so the watchdog does not
+      // treat a report-only proposal as a failure.
+      error: JSON.stringify({
+        mode,
+        proposed: retirement.proposals.length,
+        deleted,
+        guardSkipped: retirement.skipped,
+        wouldRetire: retirement.wouldRetire,
+        proposals: retirement.proposals,
+      }),
     });
     pruneReportRecorded = !logError;
     pruneReportError = logError?.message ?? null;
-    if (logError) console.error('[extract-sam-events] prune report not recorded:', logError.message);
+    // Fail loud: a successful extract with no durable prune report is how approval evidence
+    // disappeared (cron_logs stayed at 0 rows after #2147). Do not return 200 when recording fails.
+    if (logError) {
+      console.error('[extract-sam-events] prune report not recorded:', logError.message);
+      await reportCronOutcome(EXTRACT_JOB, 'error', `prune report not recorded: ${logError.message}`);
+      return NextResponse.json({
+        success: false,
+        status: 'ingest_broken',
+        error: `prune report not recorded: ${logError.message}`,
+        upsertedCount,
+        prune: {
+          mode,
+          proposed: retirement.proposals.length,
+          deleted: mode === 'apply' ? retiredCount : 0,
+          guardSkipped: retirement.skipped,
+          recorded: false,
+          recordError: logError.message,
+          proposals: retirement.proposals,
+        },
+      }, { status: 500 });
+    }
   }
   if (Date.now() > deadline) truncated = true;
 
@@ -270,6 +313,14 @@ export async function GET(request: NextRequest) {
   }, {} as Record<string, number>);
 
   console.log(`[extract-sam-events] Found ${events.length} events, upserted ${upsertedCount}`);
+
+  if (!dryRun) {
+    await reportCronOutcome(
+      EXTRACT_JOB,
+      truncated ? 'error' : 'success',
+      truncated ? 'time budget exhausted before every candidate was re-read' : undefined,
+    );
+  }
 
   // A run cut short by its time budget did not re-read every candidate: report it as a failed
   // job (non-2xx) instead of a success. The listed rows were read first, so they are never the

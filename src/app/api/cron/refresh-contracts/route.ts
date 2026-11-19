@@ -16,10 +16,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { INDUSTRY_PRESETS } from '@/lib/industry-presets';
 import { verifyAdminPassword } from '@/lib/admin-auth';
 import { checkAdminRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
+import { reportCronOutcome } from '@/lib/cron-self-report';
 
 export const maxDuration = 300; // 5 minutes
 
@@ -274,6 +274,10 @@ export async function GET(request: NextRequest) {
       const activeContracts = existingContracts.filter(c => !isExpired(c.Expiration));
       const wouldRemove = existingContracts.length - activeContracts.length;
 
+      // The scheduled route has no mode=execute, so this weekly run is a preview.
+      // Record that on cron_job_runs. cron_logs is not what ops reads, and this
+      // branch never reached the old insert anyway.
+      await reportCronOutcome('refresh-contracts', 'partial', 'mode=preview; contract file not written');
       return NextResponse.json({
         success: true,
         mode: 'preview',
@@ -351,34 +355,11 @@ export async function GET(request: NextRequest) {
     console.log(`[RefreshContracts] Results: ${newCount} new, ${updatedCount} updated, ${expiredRemoved} expired removed`);
     console.log(`[RefreshContracts] Final count: ${merged.length}`);
 
-    // Log refresh to database
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _supabase: any = null;
-function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    await reportCronOutcome(
+      'refresh-contracts',
+      errors.length ? 'partial' : 'success',
+      `new=${newCount} updated=${updatedCount} expiredRemoved=${expiredRemoved} final=${merged.length} naics=${naicsArray.length} errors=${errors.length}`,
     );
-  }
-  return _supabase;
-}
-
-    await getSupabase().from('cron_logs').insert({
-      job_name: 'refresh-contracts',
-      run_date: new Date().toISOString(),
-      status: 'success',
-      result: {
-        previousCount: existingContracts.length,
-        newCount,
-        updatedCount,
-        expiredRemoved,
-        finalCount: merged.length,
-        naicsQueried: naicsArray.length,
-        errors: errors.length,
-        processingTimeMs: Date.now() - startTime,
-      },
-    });
 
     // Note: In production, this would need to:
     // 1. Write to contracts-data.js in the repo
@@ -416,6 +397,7 @@ function getSupabase() {
 
   } catch (error) {
     console.error('[RefreshContracts] Fatal error:', error);
+    await reportCronOutcome('refresh-contracts', 'error', error instanceof Error ? error.message : String(error));
     return NextResponse.json({
       success: false,
       error: String(error),

@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og';
-import { getAgencyBySlug } from '@/data/agencies-seo';
+import { getPublicAgencyBySlug } from '@/lib/seo/public-agency-pages';
 
 export const runtime = 'nodejs';
 export const size = { width: 1200, height: 630 };
@@ -7,14 +7,14 @@ export const contentType = 'image/png';
 export const alt = 'Federal agency buying profile on Mindy';
 
 // Per-agency share/SEO card — a link to /agencies/<slug> previews the agency's
-// name + annual contract spend instead of the generic site card. getAgencyBySlug
-// is a fast in-memory lookup. Mirrors the shared/opp opengraph-image template.
+// name + annual contract spend instead of the generic site card. The public
+// directory lookup is in-memory. Mirrors the shared/opp opengraph-image template.
 export default async function Image({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   let name = 'Federal Agency';
   let spend = 'A federal buyer worth tracking';
   try {
-    const agency = getAgencyBySlug(slug);
+    const agency = getPublicAgencyBySlug(slug);
     if (agency) {
       name = String(agency.name).slice(0, 70);
       if (agency.fy26BudgetB) spend = `$${agency.fy26BudgetB.toLocaleString()}B/yr in federal contracts`;

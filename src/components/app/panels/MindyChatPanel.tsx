@@ -21,12 +21,23 @@ import { Menu, MessageCircle, BookOpen, Lock, FileText, X } from 'lucide-react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 import { ChatAttachments } from '../chat/ChatAttachments';
+import { GeneratedDownloadChips, type GeneratedDownloadFile } from '../chat/GeneratedDownloadChips';
 import { useVaultCapabilities } from '../chat/useVaultCapabilities';
 import { UpgradeModal } from '../UpgradeModal';
 import { DEFAULT_STARTER_PROMPTS } from '@/lib/chat/starter-prompts';
 import { renderSafeMarkdown } from '@/lib/chat/safe-markdown';
 import { startProposalFromNotice } from '@/lib/chat/start-proposal';
-import { CHAT_HANDOFF_KEY, parseChatHandoff, opportunityContextField, type AttachedOpportunity } from '@/lib/chat/chat-handoff';
+import {
+  CHAT_HANDOFF_KEY,
+  LAST_CHAT_SESSION_KEY,
+  MAP_SELECTED_OPP_KEY,
+  parseChatHandoff,
+  parseLastChatSessionId,
+  parseMapSelectedOpp,
+  serializeMapSelectedOpp,
+  opportunityContextField,
+  type AttachedOpportunity,
+} from '@/lib/chat/chat-handoff';
 import { customerText } from '@/lib/chat/view-preamble';
 
 interface MindyChatPanelProps {
@@ -67,6 +78,9 @@ interface ChatMessage {
   notices?: string[];   // server notices: data tools unavailable, a lookup failed, answer cut off
   /** P3: the compact source ledger returned with this answer; re-sent with history so "#12" resolves. */
   ledger?: unknown;
+  /** W2: create_document files saved this turn — in-chat download chips mint signed URLs on click. */
+  deliverables?: GeneratedDownloadFile[];
+  deliverablePdfNote?: string | null;
 }
 
 
@@ -136,6 +150,8 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
   // removable chip; only its id is sent.
   const [attachedOpp, setAttachedOpp] = useState<AttachedOpportunity | null>(null);
   const [proposalState, setProposalState] = useState<'idle' | 'working' | 'failed'>('idle');
+  // Set when the Map hands off into this workspace — shows "Back to Map" without dropping the session.
+  const [fromMap, setFromMap] = useState(false);
   // Conversation history sidebar.
   const [sessions, setSessions] = useState<Array<{ id: string; title: string | null; message_count: number; updated_at: string }>>([]);
   const [loadingSession, setLoadingSession] = useState(false);
@@ -281,6 +297,21 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id ? { ...m, content: m.content + evt.content } : m
               ));
+            } else if (evt.type === 'deliverables' && Array.isArray(evt.files)) {
+              const files = (evt.files as GeneratedDownloadFile[]).filter(
+                (f) => f && typeof f.document_id === 'string' && typeof f.format === 'string',
+              );
+              if (files.length) {
+                setMessages(prev => prev.map(m =>
+                  m.id === assistantMsg.id
+                    ? {
+                        ...m,
+                        deliverables: files,
+                        ...(typeof evt.pdf_note === 'string' ? { deliverablePdfNote: evt.pdf_note } : {}),
+                      }
+                    : m
+                ));
+              }
             } else if (evt.type === 'sources' && evt.ledger && typeof evt.ledger === 'object') {
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id ? { ...m, ledger: evt.ledger } : m
@@ -368,12 +399,25 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
       const res = await authedFetch(`/api/app/chat-sessions?email=${encodeURIComponent(email)}&sessionId=${encodeURIComponent(sid)}`, email);
       const data = await res.json().catch(() => null);
       if (data?.success) {
-        setMessages((data.messages || []).map((m: { id: string; role: 'user' | 'assistant'; content: string; cited_sources?: CitedSource[] }) => ({
-          id: m.id,
-          role: m.role,
-          content: m.content,
-          citations: Array.isArray(m.cited_sources) ? m.cited_sources : undefined,
-        })));
+        setMessages((data.messages || []).map((m: {
+          id: string;
+          role: 'user' | 'assistant';
+          content: string;
+          cited_sources?: CitedSource[];
+          deliverables?: { files?: GeneratedDownloadFile[]; pdf_note?: string };
+        }) => {
+          const files = Array.isArray(m.deliverables?.files)
+            ? m.deliverables!.files!.filter((f) => f && typeof f.document_id === 'string' && typeof f.format === 'string')
+            : undefined;
+          return {
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            citations: Array.isArray(m.cited_sources) ? m.cited_sources : undefined,
+            ...(files?.length ? { deliverables: files } : {}),
+            ...(typeof m.deliverables?.pdf_note === 'string' ? { deliverablePdfNote: m.deliverables.pdf_note } : {}),
+          };
+        }));
         setSessionId(sid);
       }
     } catch { /* non-fatal */ } finally {
@@ -381,13 +425,20 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
     }
   }, [email, loadingSession, sessionId]);
 
+  // Drop a Map selection the customer explicitly dismissed (chip X / New chat) so remount does not re-attach it.
+  const clearMapSelectedOpp = useCallback(() => {
+    try { sessionStorage.setItem(MAP_SELECTED_OPP_KEY, serializeMapSelectedOpp(null)); } catch { /* unavailable */ }
+  }, []);
+
   // Start a fresh conversation.
   const startNewChat = useCallback(() => {
     setMessages([]);
     setSessionId(null);
     setAttachedOpp(null);
+    try { sessionStorage.removeItem(LAST_CHAT_SESSION_KEY); } catch { /* unavailable */ }
+    clearMapSelectedOpp();
     inputRef.current?.focus();
-  }, []);
+  }, [clearMapSelectedOpp]);
 
   // Delete a conversation from history.
   const deleteSession = useCallback(async (sid: string) => {
@@ -427,22 +478,40 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
     }
   }, [email, sendMessage]);
 
-  // Map drawer handoff ("Open in full workspace"): continue that conversation and keep its attached notice.
-  // Read once, never auto-sends. The session is loaded through the owner-checked chat-sessions API.
+  // Persist the active session so Map ↔ Chat remounts do not wipe an in-progress conversation.
+  // Never clear on the initial null mount — that would erase the key before the boot restore runs.
+  useEffect(() => {
+    if (!sessionId) return;
+    try { sessionStorage.setItem(LAST_CHAT_SESSION_KEY, sessionId); } catch { /* unavailable */ }
+  }, [sessionId]);
+
+  // Boot once: drawer handoff (consume) → else last session + Map selection (peek). Never auto-sends.
+  // Map selection uses the same context.notice_id path the server already loads authoritatively.
   const handoffHandledRef = useRef(false);
   useEffect(() => {
     if (handoffHandledRef.current || !email) return;
     handoffHandledRef.current = true;
-    let raw: string | null = null;
+    let handoffRaw: string | null = null;
+    let mapRaw: string | null = null;
+    let lastRaw: string | null = null;
+    let fromMapFlag = false;
     try {
-      raw = sessionStorage.getItem(CHAT_HANDOFF_KEY);
-      if (raw) sessionStorage.removeItem(CHAT_HANDOFF_KEY);
+      handoffRaw = sessionStorage.getItem(CHAT_HANDOFF_KEY);
+      if (handoffRaw) sessionStorage.removeItem(CHAT_HANDOFF_KEY);
+      mapRaw = sessionStorage.getItem(MAP_SELECTED_OPP_KEY);
+      lastRaw = sessionStorage.getItem(LAST_CHAT_SESSION_KEY);
+      fromMapFlag = sessionStorage.getItem('mindy_chat_from_map') === '1';
+      if (fromMapFlag) sessionStorage.removeItem('mindy_chat_from_map');
     } catch { /* sessionStorage unavailable */ }
-    const h = parseChatHandoff(raw);
-    if (!h) return;
-    if (h.opportunity) setAttachedOpp(h.opportunity);
-    if (h.sessionId) openSession(h.sessionId);
-    inputRef.current?.focus();
+    const h = parseChatHandoff(handoffRaw);
+    const mapOpp = parseMapSelectedOpp(mapRaw);
+    const lastSid = parseLastChatSessionId(lastRaw);
+    if (fromMapFlag || h || mapOpp) setFromMap(true);
+    if (h?.opportunity) setAttachedOpp(h.opportunity);
+    else if (mapOpp) setAttachedOpp(mapOpp);
+    if (h?.sessionId) openSession(h.sessionId);
+    else if (lastSid) openSession(lastSid);
+    if (h || mapOpp || lastSid) inputRef.current?.focus();
   }, [email, openSession]);
 
   // "Start a proposal" (user click only): track the attached notice, make sure its documents are fetched,
@@ -552,6 +621,17 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {fromMap && onPanelChange && (
+              <button
+                type="button"
+                data-testid="back-to-map"
+                onClick={() => onPanelChange('map')}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-200 hover:text-white px-3 py-1.5 rounded border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/15 transition-colors"
+                title="Return to the Opportunity Map — this conversation stays in History"
+              >
+                ← Back to Map
+              </button>
+            )}
             {/* KB entry point (Eric: KB lives off the sidebar; reached from chat
                 where its citations come from). */}
             {onPanelChange && (
@@ -616,11 +696,25 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
           <div className="max-w-2xl mx-auto pt-12">
             <div className="text-center mb-8">
               <MessageCircle className="h-10 w-10 mx-auto mb-3 text-accent" strokeWidth={1.5} />
-              <h2 className="text-xl font-semibold text-white mb-1">What do you want to know?</h2>
-              <p className="text-sm text-muted">
-                Mindy draws on 743 podcast interviews, real proposal templates, and 8 years of federal contracting teaching.
+              <h2 className="text-xl font-semibold text-white mb-1">Ask in plain English</h2>
+              <p className="text-sm text-muted max-w-lg mx-auto">
+                Type a question the way you would ask a colleague. Mindy looks things up and can turn the answer into a downloadable Word, PDF, Excel, or CSV file.
               </p>
             </div>
+            <ol className="mb-8 space-y-3 rounded-xl border border-surface bg-ground/40 p-4 text-left" data-testid="ask-mindy-how-to">
+              <li className="flex gap-3 text-sm text-slate-200">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-xs font-semibold text-emerald-300">1</span>
+                <span><span className="font-medium text-white">Attach</span> a capability statement or RFP (optional) using the paperclip below.</span>
+              </li>
+              <li className="flex gap-3 text-sm text-slate-200">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-xs font-semibold text-emerald-300">2</span>
+                <span><span className="font-medium text-white">Ask</span> what you need — for example, “Who buys my kind of work?” or “Write a strategy brief I can download.”</span>
+              </li>
+              <li className="flex gap-3 text-sm text-slate-200">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-xs font-semibold text-emerald-300">3</span>
+                <span><span className="font-medium text-white">Download</span> the green buttons under Mindy’s answer, or find the files later in Documents.</span>
+              </li>
+            </ol>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {starterPrompts.map((prompt: string) => (
                 <button
@@ -659,6 +753,13 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                         ? <span className="text-faint italic">Thinking…</span>
                         : null}
                   </div>
+                  {msg.role === 'assistant' && !!msg.deliverables?.length && !msg.isStreaming && email && (
+                    <GeneratedDownloadChips
+                      email={email}
+                      files={msg.deliverables}
+                      pdfNote={msg.deliverablePdfNote}
+                    />
+                  )}
                   {msg.role === 'assistant' && !!msg.citations?.length && !msg.isStreaming && (
                     <div className="mt-3 pt-3 border-t border-surface/50">
                       <div className="text-[10px] font-semibold tracking-wider text-faint mb-1.5">SOURCES</div>
@@ -767,7 +868,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
               </button>
               <button
                 type="button"
-                onClick={() => { setAttachedOpp(null); setProposalState('idle'); }}
+                onClick={() => { setAttachedOpp(null); setProposalState('idle'); clearMapSelectedOpp(); }}
                 aria-label="Remove this opportunity from the question"
                 className="shrink-0 rounded p-0.5 text-faint hover:text-white"
               >
