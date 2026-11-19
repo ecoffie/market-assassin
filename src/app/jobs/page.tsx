@@ -62,9 +62,12 @@ export default async function JobsPage({ searchParams }: { searchParams: SP }) {
       : UNAVAILABLE;
   // Order: Mindy's stored postings (once the daily sync has rows) → USAJobs read directly
   // (federal contract-specialist jobs, cached 6h) → the govcongiants.com feed as a last resort.
-  const direct = stored.state === 'ok' && (stored.totals.active ?? 0) > 0 ? null : await readJobBoardFromUsaJobs(filters);
+  // A null active count is unmeasured, not zero. Either way the live USAJobs
+  // read is the customer path until the mirror has a positive count.
+  const mirrorServing = stored.state === 'ok' && stored.totals.active != null && stored.totals.active > 0;
+  const direct = mirrorServing ? null : await readJobBoardFromUsaJobs(filters);
   const data =
-    stored.state === 'ok' && (stored.totals.active ?? 0) > 0
+    mirrorServing
       ? stored
       : direct?.state === 'ok'
         ? direct
