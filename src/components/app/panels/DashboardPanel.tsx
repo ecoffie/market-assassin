@@ -20,6 +20,7 @@ import TargetingCard from './TargetingCard';
 import StartHereCard from './StartHereCard';
 import HiddenWorkNudge from './HiddenWorkNudge';
 import TodaysThree, { type TodaysPick } from './TodaysThree';
+import StreakCard from './StreakCard';
 import { getNaics } from '@/lib/codes/lookup';
 import ShareButton from '@/components/briefings/ShareButton';
 import SamAttachmentLinks from '@/components/app/SamAttachmentLinks';
@@ -1350,6 +1351,8 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
             the codes/keywords editor discoverable from the home surface (Eric QC:
             users couldn't find how to see/reset them). */}
         <TargetingCard email={email} variant="compact" surface="dashboard" onEdit={onPanelChange} />
+        {/* Login streak — opening For you records today's visit; rewards at 7 and 30 days (owner 2026-11-19). */}
+        <StreakCard getAuthHeaders={getAuthHeaders} />
         {/* Today's 3 — a 30-second daily pick from the newest briefing (owner 2026-11-19). */}
         {!isLoading && (
           <TodaysThree
