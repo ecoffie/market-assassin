@@ -63,6 +63,8 @@ export interface AgencyIntelligenceBundle {
     provenanceAvailable: boolean;
     /** Which store `priorities` came from. legacyPriorityCount stays the file count so sort inputs that use it do not move. */
     priorityBasis?: 'live_table' | 'static_file' | 'static_file_live_unmeasured';
+    /** True when the living-table read threw. Empty sourced is not the same thing. */
+    sourcedReadFailed: boolean;
   };
 }
 
@@ -400,6 +402,7 @@ export async function getAgencySourcedIntelligence(
 ): Promise<AgencyIntelligenceBundle> {
   const { canonical, searchKeys } = resolveAgencyQuery(agencyQuery);
   let sourced: SourcedPainPoint[] = [];
+  let sourcedReadFailed = false;
   try {
     sourced = await loadSourcedPainPointsForAgency(agencyQuery, {
       client: opts.client,
@@ -407,7 +410,9 @@ export async function getAgencySourcedIntelligence(
     });
   } catch (err) {
     // Fail open to legacy rather than blanking the customer surface — but never
-    // upgrade legacy to sourced.
+    // upgrade legacy to sourced. The flag keeps a failed read distinct from
+    // a completed read that found no rows.
+    sourcedReadFailed = true;
     console.error('[sourced-pain-points] living read failed:', err);
   }
 
@@ -439,6 +444,7 @@ export async function getAgencySourcedIntelligence(
       legacyPriorityCount: legacyBundle.priorities.length,
       provenanceAvailable: sourced.length > 0,
       priorityBasis,
+      sourcedReadFailed,
     },
   };
 }
