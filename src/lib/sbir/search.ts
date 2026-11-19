@@ -106,7 +106,8 @@ async function fetchMultisite(keyword: string, agency: string, limit: number): P
     let q = supabase
       .from('aggregated_opportunities')
       .select('id,title,agency,set_aside_type,estimated_value,posted_date,close_date,description,source,source_url')
-      .eq('opportunity_type', 'sbir_sttr')
+      // SBIR/STTR rows, plus DARPA research announcements the collector stores as darpa_baa.
+      .or('opportunity_type.eq.sbir_sttr,source.eq.darpa_baa')
       .order('posted_date', { ascending: false })
       .limit(Math.min(limit, 50));
     if (keyword) q = q.or(`title.ilike.%${keyword}%,description.ilike.%${keyword}%`);
