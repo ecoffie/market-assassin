@@ -21,6 +21,7 @@ import { MindyLogo } from '@/components/mindy/MindyLogo';
 import { ToastHost } from '@/components/app/Toast';
 import { getSupabase } from '@/lib/supabase/client';
 import { isGatedMindyApi, skipAuthRecovery } from '@/lib/app/auth-recovery';
+import { getMIApiHeaders } from '@/components/app/authHeaders';
 import { sendAppEngagement } from '@/components/app/track';
 import { getStoredPartnerRef } from '@/lib/mindy/partner-referral-client';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
@@ -314,6 +315,11 @@ function AppDashboard() {
       setEmail(userEmail);
       setTier(userTier);
       setTierResolved(true);
+      // Login streak (owner 2026-11-19): record today's visit for every signed-in member, whatever
+      // panel they land on. Fire-and-forget; the server decides the day and pays any reward once.
+      try {
+        void fetch('/api/app/streak', { method: 'POST', headers: getMIApiHeaders(userEmail) }).catch(() => {});
+      } catch { /* never blocks sign-in */ }
       setCoachModeAllowed(!!accessData?.coachMode?.allowed);
       setIsStaff(!!accessData?.isStaff);
       setCanSeePrototypes(!!accessData?.canSeePrototypes);
