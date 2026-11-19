@@ -30,6 +30,7 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
 |---|---|---|---|---|---|
+| 2026-11-19 | Data Core / buying offices | The directory clock is `MAX(dodaac_directory.updated_at)` on the monthly producer, unknown when that read fails. `get_buying_offices` labels a missing name `not_reported` or `code_only` and does not invent a name or a contact. | `name_provenance` → `src/mcp/tools/buying-offices.ts` | `buying-offices.unit.test.ts` | BUILT, NOT MERGED |
 | 2026-11-19 | Budget labeling | Agency-level live years are USASpending budgetary resources, a budget signal, not awards or spending. `budget_programs` rows stay federal-account obligations (`amount_basis: 'obligations'`), distinct from those agency figures, and the program copy does not say they predict solicitations or opportunities. `/api/budget-intel?mode=opportunities` is unchanged. | `USASpending budgetary resources are a budget signal` → `src/mcp/tools/agency-budget-trends.ts` | `budget-label.unit.test.ts` | BUILT, NOT MERGED |
 
 ## 2026-11-18 — Budget tables acquire from USASpending
