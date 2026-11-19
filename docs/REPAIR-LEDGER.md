@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-19 — Budget labels are budgetary resources, not awards
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-19 | Budget labeling | Live budget copy no longer calls budgetary resources awards, spending, or obligations. Catalog, how_to_use, and program notes say budgetary resources, a budget signal. `amount_basis` stays `obligations` only as the stored field. `/api/budget-intel?mode=opportunities` is unchanged. | `USASpending budgetary resources are a budget signal` → `src/mcp/tools/agency-budget-trends.ts` | `budget-label.unit.test.ts` | BUILT, NOT MERGED |
+
 ## 2026-11-18 — Budget tables acquire from USASpending
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

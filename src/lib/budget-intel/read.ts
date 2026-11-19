@@ -226,7 +226,7 @@ export function decideProgramAnswer(input: {
       shown_reason: 'live_table_empty',
       keyword: input.keyword,
       agencies: null,
-      note: 'budget_programs has no rows. The fixed budget file has no federal-account obligations, so it is not used as a zero.',
+      note: 'budget_programs has no rows. The fixed budget file does not hold federal-account budgetary resources, so it is not used as a zero.',
     };
   }
   if (input.table !== 'ready' || input.matches == null) {
@@ -235,7 +235,7 @@ export function decideProgramAnswer(input: {
       shown_reason: 'live_table_unmeasured',
       keyword: input.keyword,
       agencies: null,
-      note: 'budget_programs could not be read. This is not a finding that no agency is increasing spending.',
+      note: 'budget_programs could not be read. This is not a finding that no agency has growing budgetary resources.',
     };
   }
   if (input.matches.length === 0) {
@@ -252,7 +252,7 @@ export function decideProgramAnswer(input: {
     shown_reason: 'live_table',
     keyword: input.keyword,
     agencies: input.matches,
-    note: 'Obligations from USASpending federal accounts stored in budget_programs. amount_basis is obligations, not enacted budget authority.',
+    note: 'USASpending federal account budgetary resources stored in budget_programs. A budget signal, not enacted budget authority from the fixed file.',
   };
 }
 

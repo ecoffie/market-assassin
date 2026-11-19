@@ -464,7 +464,7 @@ server.registerTool(
       'Target-research read on a federal agency: resolves it by name / abbreviation / CGAC code, then returns ' +
       'identity + hierarchy, pain points, and priorities (live rows for an agency that has been acquired, ' +
       'otherwise the fixed file — priorityBasis says which). program_keyword lists growing federal-account ' +
-      'obligations for that word from budget_programs; an empty table is unavailable, not zero agencies. ' +
+      'budgetary resources for that word from budget_programs; an empty table is unavailable, not zero agencies. ' +
       'Also (when available) live USASpending ' +
       'obligations for the fiscal year with top NAICS. The "size up a buyer before I pursue them" lookup. Pain ' +
       'points are curated intel, not an official statement. Also returns `legislation`: the NDAA record Mindy ' +
@@ -1401,10 +1401,10 @@ server.registerTool(
     title: 'Get Agency Budget Trends (OMB/CBJ)',
     annotations: { readOnlyHint: true, openWorldHint: true },
     description:
-      "An agency's discretionary budget authority + the FY2025→FY2026 trend (growing / cut / stable) — where the money " +
-      'is moving BEFORE it becomes awards. Pass an agency name or abbreviation ("VA", "Department of Defense", "NASA", ' +
+      "An agency's discretionary budget authority + the FY2025→FY2026 trend (growing / cut / stable) — a budget signal " +
+      'from budgetary resources. Pass an agency name or abbreviation ("VA", "Department of Defense", "NASA", ' +
       '"EPA"). Returns FY25 (enacted) + FY26 (President\'s request) budget authority, $ + % change, and the trend. ' +
-      'DISCRETIONARY budget authority only (not total obligations); FY26 is a request, not enacted. grounded=false = ' +
+      'DISCRETIONARY budget authority, not the agency\'s whole budget. FY26 on the fixed file is a request, not enacted. Live years are USASpending budgetary resources. grounded=false = ' +
       'agency not in the 47-agency toptier set — do NOT invent a number.',
     inputSchema: {
       agency: z.string().describe('Agency name or abbreviation, e.g. "VA", "Department of Defense", "NASA".'),

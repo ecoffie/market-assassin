@@ -148,7 +148,7 @@ export function getAgencyBudgetTrendsFromFile(input: AgencyBudgetTrendsInput): A
     key = names.find((n) => /department of defense/i.test(n));
     if (key) {
       matchType = 'alias';
-      dodWideNote = `Budget authority is reported DoD-wide by OMB, not per-service. Showing Department of Defense (the "${raw}" service isn't a separate OMB budget line). For per-service obligations use get_agency_spending_detail.`;
+      dodWideNote = `Budget authority is reported DoD-wide by OMB, not per-service. Showing Department of Defense (the "${raw}" service isn't a separate OMB budget line). For per-service contract dollars use get_agency_spending_detail.`;
     }
   }
 
@@ -192,10 +192,10 @@ export function getAgencyBudgetTrendsFromFile(input: AgencyBudgetTrendsInput): A
           ? `${key}: ${usd(e.fy2025.budgetAuthority)} (FY25 enacted) → ${usd(e.fy2026.budgetAuthority)} (FY26 request) — ${dir}${e.change?.amount != null ? ` ${usd(Math.abs(e.change.amount))}` : ''}. Discretionary budget authority.`
           : `${key} is in the budget set but a fiscal-year figure is missing.`,
       how_to_use:
-        'A growing agency budget is a leading demand signal (more to spend → more solicitations); a declining one warns of tighter recompetes. Pair with get_agency_intel (actual obligations) and get_regulatory_demand for the fullest read.',
+        'A growing or declining figure is a budget signal about budgetary resources. It does not say which awards will appear. Pair with get_agency_intel and get_regulatory_demand for other reads.',
       key_caveats: [
-        'DISCRETIONARY budget authority only — NOT total obligations or mandatory spending. Do not present it as "the agency\'s total budget."',
-        'FY2026 is the President\'s REQUEST, not enacted — appropriations can move it. Data snapshot is from the source date; verify against current OMB for anything time-sensitive.',
+        'DISCRETIONARY budget authority only. Do not present it as the agency\'s whole budget.',
+        'FY2026 on the fixed file is the President\'s REQUEST, not enacted. Appropriations can move it. The snapshot date is the file as-of.',
       ],
     };
   }
@@ -250,8 +250,10 @@ export async function getAgencyBudgetTrends(input: AgencyBudgetTrendsInput): Pro
       _ai_hint: {
         ...file._ai_hint,
         summary: `${decided.agency}: USASpending budgetary resources, fetched ${decided.fetched_at ?? 'unknown'}.`,
+        how_to_use:
+          'USASpending budgetary resources are a budget signal for years labeled usaspending_live. They are not awards. Pair with get_agency_intel and get_regulatory_demand for other reads.',
         key_caveats: [
-          'Years labeled usaspending_live were acquired from USASpending. Years labeled static_file are the fixed OMB file.',
+          'Years labeled usaspending_live are USASpending federal account budgetary resources. Years labeled static_file are the fixed OMB file.',
           'change_percent is a ratio (1.05 = +5%). change_percent_points is the percent change.',
         ],
       },
