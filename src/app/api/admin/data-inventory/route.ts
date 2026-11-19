@@ -653,10 +653,16 @@ export async function GET(request: NextRequest) {
       ],
       headlineContribution: c.research,
       freshness: {
-        state: researchInstances.length ? worstState(researchInstances.map((i) => i.state)) : timestampState(e.resNih, 24, now),
+        state: researchInstances.length ? corpusFreshness(researchInstances.map((i) => i.state)) : timestampState(e.resNih, 24, now),
         asOf: e.resNih,
-        basis: `worst of ${researchInstances.length} registered feeds; asOf = newest NIH advance`,
-        detail: summarizeStates(researchInstances.map((i) => i.state)),
+        basis: `corpus of ${researchInstances.length} registered feeds; asOf = newest NIH advance`,
+        detail: [
+          summarizeStates(researchInstances.map((i) => i.state)),
+          researchInstances.some((i) => i.state === 'UNREACHABLE')
+            ? `Unreachable feeds (not zero rows): ${researchInstances.filter((i) => i.state === 'UNREACHABLE').map((i) => i.sourceKey).join(', ')}.`
+            : '',
+          'NSF SBIR stays uncollected while api.www.sbir.gov returns HTTP 403. That absence is not a count of zero.',
+        ].filter(Boolean).join(' '),
         instances: researchInstances,
         schedules: schedules(CRON_JOBS.research),
       },
