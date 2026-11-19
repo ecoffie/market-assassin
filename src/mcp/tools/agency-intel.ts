@@ -194,7 +194,7 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
       priorityCitations = bundle.priorities.map(toCitation).filter((c) => c.claim.length > 0);
       painPoints = (resolved.painPoints?.length
         ? resolved.painPoints
-        : bundle.painPoints.map((p) => p.pain_point)
+        : bundle.painPoints.map(formatPainPointForDisplay)
       ).filter((s) => s.trim().length > 0);
       priorities = (bundle.meta.priorityBasis === 'live_table'
         ? bundle.priorities.map((p) => p.pain_point)

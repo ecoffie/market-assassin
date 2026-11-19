@@ -265,16 +265,19 @@ export function parseOversightOpenRecommendations(html: string): AcquiredDocumen
       if (!number || !recommendation) continue;
       const id = `OIG-REC:${slug(href)}:${number}`;
       const derived = resolutionFromSourceStatus('open');
+      // The report title is the public finding. The recommendation body stays
+      // in `recommendation` (and institute raw) for signed-in readers only.
+      const finding = title || 'Inspector General report';
       out.push({
         sourceOrg: oig || 'OIG',
         sourceType: 'ig_report',
         documentNumber: id,
-        title: recommendation.slice(0, 500),
+        title: finding.slice(0, 500),
         url: absUrl(href),
         publicationDate: published,
         abstract: recommendation.slice(0, 4000),
         agencyAsStated: agency,
-        problem: recommendation,
+        problem: finding,
         recommendation,
         resolutionStatus: derived.resolution_status,
         // The page is Oversight.gov "Open Recommendations" and the control is

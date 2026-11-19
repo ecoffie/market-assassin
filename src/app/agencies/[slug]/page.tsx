@@ -529,6 +529,10 @@ function PainPoints({ agency, section }: { agency: AgencySeo; section: PublicPai
       {section.cited.length > 0 && (
         <div className="mb-8">
           <p className="text-sm text-(--mp-muted) mb-4">{section.freshnessLabel}</p>
+          <p className="text-(--mp-body) mb-4 leading-relaxed">
+            A cited line shows the finding, the report number, the date, and the official link.
+            Recommendations and resolution details stay in signed-in Ask Mindy.
+          </p>
           <PainList items={section.cited} />
         </div>
       )}
