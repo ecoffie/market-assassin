@@ -15,6 +15,7 @@ import {
   type SpendingScope,
 } from '@/lib/gov-contacts/agency-identity';
 import {
+  formatPainPointForDisplay,
   getAgencySourcedIntelligence,
   toCitation,
   type ClaimProvenance,
@@ -197,10 +198,10 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
         : bundle.painPoints.map(formatPainPointForDisplay)
       ).filter((s) => s.trim().length > 0);
       priorities = (bundle.meta.priorityBasis === 'live_table'
-        ? bundle.priorities.map((p) => p.pain_point)
+        ? bundle.priorities.map(formatPainPointForDisplay)
         : resolved.priorities?.length
           ? resolved.priorities
-          : bundle.priorities.map((p) => p.pain_point)
+          : bundle.priorities.map(formatPainPointForDisplay)
       ).filter((s) => s.trim().length > 0);
       priorityBasis = bundle.meta.priorityBasis;
       const priorityLabel = priorityBasis ? ` Priorities shown: ${priorityBasis}.` : '';

@@ -18,7 +18,6 @@ import { resolveAgency } from '@/lib/strategic-intel/agency-resolver';
 import { isUnsupportedBudgetClaim } from '@/lib/strategic-intel/unsupported-budget-claim';
 import { isCurrentLegacyGao, legacyGaoDateLabel } from './legacy-gao-currency';
 import { labelHistoricalGaoPainPoint } from '@/lib/strategic-intel/legacy-gao-painpoints';
-import { sanitizeLegacyClaimText } from '@/lib/strategic-intel/sourced-pain-points';
 
 // Type for static pain points JSON
 interface AgencyPainPointsData {
@@ -570,7 +569,7 @@ function labelStaticCorpus(items: string[] | undefined): string[] {
   return (items ?? [])
     .filter((p) => !isUnsupportedBudgetClaim(p))
     .map((p) => {
-      const claim = sanitizeLegacyClaimText(labelHistoricalGaoPainPoint(p));
+      const claim = labelHistoricalGaoPainPoint(p);
       if (!claim) return '';
       if (/historical GAO finding/i.test(claim) || /provenance unavailable/i.test(claim)) return claim;
       return `${claim} [LEGACY_MANUAL — provenance unavailable]`;
