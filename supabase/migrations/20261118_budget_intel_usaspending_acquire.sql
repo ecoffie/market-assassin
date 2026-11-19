@@ -1,8 +1,10 @@
 -- USASpending acquire for the existing budget tables.
 -- NOT APPLIED by the session that added this file.
--- Apply only after /api/cron/sync-budget-intel is deployed:
+-- Apply only after /api/cron/sync-budget-intel is deployed, and only by
+-- docs/runbooks/2188-budget-migration.md:
 --   npm run migrate -- --go --only 20261118_budget_intel_usaspending_acquire.sql
--- The cron row is enabled in this file, so applying it starts the 2-hour slice.
+-- The cron row is inserted disabled. ON CONFLICT does not change enabled.
+-- Enable sync-budget-intel only after that checklist's read-only checks pass.
 -- Upsert keys only. No deletes. No backfill.
 
 ALTER TABLE public.agency_budget_authority
@@ -75,11 +77,10 @@ REVOKE ALL ON TABLE public.budget_intel_links FROM PUBLIC, anon, authenticated;
 GRANT ALL ON TABLE public.budget_intel_links TO service_role;
 
 INSERT INTO public.cron_jobs (job_name, route, cron_expr, timeout_ms, enabled, notes) VALUES
-  ('sync-budget-intel', '/api/cron/sync-budget-intel', '17 */2 * * *', 55000, true,
-   'One agency and one federal-account page per run from USASpending into agency_budget_authority, budget_programs, and agency_priorities_db. Upsert only. Apply after the route is deployed.')
+  ('sync-budget-intel', '/api/cron/sync-budget-intel', '17 */2 * * *', 55000, false,
+   'One agency and one federal-account page per run from USASpending into agency_budget_authority, budget_programs, and agency_priorities_db. Upsert only. Inserted disabled. Enable only after docs/runbooks/2188-budget-migration.md.')
 ON CONFLICT (job_name) DO UPDATE SET
   route = EXCLUDED.route,
   cron_expr = EXCLUDED.cron_expr,
   timeout_ms = EXCLUDED.timeout_ms,
-  enabled = EXCLUDED.enabled,
   notes = EXCLUDED.notes;
