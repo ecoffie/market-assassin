@@ -7,12 +7,12 @@ describe('buildStarterPrompts — always 4, plain-English for non-AI users', () 
     expect(buildStarterPrompts({ naicsCodes: ['541512'], hasPipeline: true })).toHaveLength(4);
   });
 
-  it('generic set stays jargon-free and includes the downloadable-brief loop', () => {
+  it('generic set stays jargon-free and includes the downloadable-report loop', () => {
     const p = DEFAULT_STARTER_PROMPTS.join(' | ').toLowerCase();
     expect(p).toMatch(/open contracts|this week/);
     expect(p).toMatch(/who is buying/);
     expect(p).toMatch(/which companies win/);
-    expect(p).toMatch(/strategy brief.*download|download/);
+    expect(p).toMatch(/downloadable report|agencies that buy/);
     // Generic chips must not dump expert jargon at a first-time user.
     expect(p).not.toMatch(/\bnaics\b/);
     expect(p).not.toMatch(/\bvault\b/);
@@ -41,15 +41,15 @@ describe('personalization — grounded in the user\'s real data only', () => {
     expect(withoutP[0]).toMatch(/open contracts|this week/i);
   });
 
-  it('uses a real set-aside in the brief prompt when present', () => {
+  it('uses a real set-aside in the report prompt when present', () => {
     const p = buildStarterPrompts({ setAsides: ['HUBZone'] });
     expect(p.some((x) => /HUBZone/i.test(x))).toBe(true);
-    expect(p[3]).toMatch(/strategy brief.*download/i);
+    expect(p[3]).toMatch(/downloadable report/i);
   });
 
-  it('falls back to the generic downloadable-brief prompt when no set-aside', () => {
+  it('falls back to the generic downloadable-report prompt when no set-aside', () => {
     const p = buildStarterPrompts({ setAsides: [] });
-    expect(p[3]).toMatch(/strategy brief I can download/i);
+    expect(p[3]).toMatch(/agencies that buy.*downloadable report/i);
   });
 
   it('fully-personalized profile hits all four personalized slots', () => {

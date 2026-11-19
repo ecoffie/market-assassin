@@ -7034,8 +7034,13 @@ const DRAWER_JS = `<script>
     // sends only its id; the server loads the record. Cleared when this drawer closes.
     window.__selectedOpp=/^[0-9a-f]{32}$/.test(String(o.id||'').toLowerCase())?{id:String(o.id).toLowerCase(),title:o.title||'',deadline:o.deadline||''}:null;
     try{ if(window.__onSelectedOpp) window.__onSelectedOpp(); }catch(e){}
+    // Ask doorway (no second chat): card-chat flag → dedicated card thread; otherwise main Map Ask
+    // drawer with the selected notice already attached via __selectedOpp / syncAttached.
+    var _askBtn=_cc
+      ?'<button class="b ask" type="button" onclick="window.__askAboutOpp&&window.__askAboutOpp(window.__cardChatOpp)">Ask Mindy about this opportunity</button>'
+      :(window.__selectedOpp?'<button class="b ask" type="button" onclick="window.openAskMindy&&window.openAskMindy()">Ask Mindy about this opportunity</button>':'');
     return '<div class="oact" id="osec-actions">'
-      + (_cc?'<button class="b ask" onclick="window.__askAboutOpp&&window.__askAboutOpp(window.__cardChatOpp)">Ask Mindy about this opportunity</button>':'')
+      + _askBtn
       + '<button class="b pri" onclick="saveCurrentOpp(this)">Start pursuit</button>'
       // Opens the MAP-NATIVE Proposal Workspace via openProposalWorkspace (tracks, then opens with
       // ?pursuit=<id>). No data-u: the destination is not a static URL any more, it depends on the
@@ -10584,8 +10589,8 @@ const SEARCH_PANEL_JS = `<script>(function(){
   function renderDefault(){
     var q=(input.value||'').trim();
     var h='';
-    // Ask Mindy row REMOVED for now (Eric 2026-08-03: "remove ask Mindy for now"). The panel opens
-    // straight into Near-me / history / saved / the NL example hints — pure search, no chat doorway.
+    // Ask Mindy doorway restored (2026-11-19 polish): same drawer engine, not a second chat.
+    h+='<button class="zsp-row zsp-ask" data-act="ask">'+ICON.ask+'<span>Ask Mindy'+(q?(' about \\u201c'+esc(q)+'\\u201d'):'')+'</span></button>';
     var st=window.__homeState;
     h+='<button class="zsp-row" data-act="state" data-st="'+esc(st||'')+'">'+ICON.pin+'<span>'+(st?('Jump to '+esc(st)+' \\u2014 your state'):'Near me / my area')+'</span></button>';
     // Search history + saved searches are filled async (server-backed).
@@ -10648,9 +10653,8 @@ const SEARCH_PANEL_JS = `<script>(function(){
         var d=a[0]||{}, ad=a[1]||{};
         var res=(d&&d.results)?d.results:[];
         var ags=(ad&&ad.results)?ad.results:[];
-        // Ask Mindy row REMOVED for now (Eric 2026-08-03) — autocomplete opens straight into the
-        // matched Agencies / Codes; Enter still runs the literal keyword search (the empty branch below).
-        var h='';
+        // Ask Mindy row first (same drawer); Enter still runs keyword search.
+        var h='<button class="zsp-row zsp-ask" data-act="ask">'+ICON.ask+'<span>Ask Mindy about \\u201c'+esc(q)+'\\u201d</span></button>';
         // NOTE: market-report generation is NOT offered here (Eric 2026-08-01: most
         // users want saved-search alerts to bid, not reports — it's a rare feature).
         // "Run report" lives on each SAVED SEARCH card (/opportunity-map/saved),
@@ -11035,6 +11039,8 @@ const ASK_MINDY_JS = `<script>(function(){
   if(wsEl) wsEl.addEventListener('click',function(){
     try{ sessionStorage.setItem('mindy_chat_handoff',JSON.stringify({v:1,sessionId:oppCtx?'':(sessionId||''),
       context:(attached&&!oppCtx)?{kind:'opportunity',notice_id:attached.id,title:attached.title,deadline:attached.deadline}:(oppCtx?{kind:'opportunity',notice_id:oppCtx.id,title:oppCtx.title,deadline:oppCtx.deadline}:null)})); }catch(e){}
+    // So the App workspace can offer "Back to Map" without dropping this conversation.
+    try{ sessionStorage.setItem('mindy_chat_from_map','1'); }catch(e){}
     try{ if(window.__track) window.__track('tool_use','ask_mindy_open_workspace',{attached:!!(attached||oppCtx)}); }catch(e){}
   });
   // CHARGE ONCE PER QUESTION: every card question gets a stable turn id. It is saved here as "pending" BEFORE

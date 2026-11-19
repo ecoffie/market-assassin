@@ -150,6 +150,8 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
   // removable chip; only its id is sent.
   const [attachedOpp, setAttachedOpp] = useState<AttachedOpportunity | null>(null);
   const [proposalState, setProposalState] = useState<'idle' | 'working' | 'failed'>('idle');
+  // Set when the Map hands off into this workspace — shows "Back to Map" without dropping the session.
+  const [fromMap, setFromMap] = useState(false);
   // Conversation history sidebar.
   const [sessions, setSessions] = useState<Array<{ id: string; title: string | null; message_count: number; updated_at: string }>>([]);
   const [loadingSession, setLoadingSession] = useState(false);
@@ -492,15 +494,19 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
     let handoffRaw: string | null = null;
     let mapRaw: string | null = null;
     let lastRaw: string | null = null;
+    let fromMapFlag = false;
     try {
       handoffRaw = sessionStorage.getItem(CHAT_HANDOFF_KEY);
       if (handoffRaw) sessionStorage.removeItem(CHAT_HANDOFF_KEY);
       mapRaw = sessionStorage.getItem(MAP_SELECTED_OPP_KEY);
       lastRaw = sessionStorage.getItem(LAST_CHAT_SESSION_KEY);
+      fromMapFlag = sessionStorage.getItem('mindy_chat_from_map') === '1';
+      if (fromMapFlag) sessionStorage.removeItem('mindy_chat_from_map');
     } catch { /* sessionStorage unavailable */ }
     const h = parseChatHandoff(handoffRaw);
     const mapOpp = parseMapSelectedOpp(mapRaw);
     const lastSid = parseLastChatSessionId(lastRaw);
+    if (fromMapFlag || h || mapOpp) setFromMap(true);
     if (h?.opportunity) setAttachedOpp(h.opportunity);
     else if (mapOpp) setAttachedOpp(mapOpp);
     if (h?.sessionId) openSession(h.sessionId);
@@ -615,6 +621,17 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {fromMap && onPanelChange && (
+              <button
+                type="button"
+                data-testid="back-to-map"
+                onClick={() => onPanelChange('map')}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-200 hover:text-white px-3 py-1.5 rounded border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/15 transition-colors"
+                title="Return to the Opportunity Map — this conversation stays in History"
+              >
+                ← Back to Map
+              </button>
+            )}
             {/* KB entry point (Eric: KB lives off the sidebar; reached from chat
                 where its citations come from). */}
             {onPanelChange && (

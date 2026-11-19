@@ -10,7 +10,7 @@
  *   (0) what to work on next
  *   (1) who's buying now
  *   (2) who wins that work
- *   (3) research → downloadable brief  (the full product loop)
+ *   (3) research → downloadable report  (the full product loop)
  */
 
 export interface StarterContext {
@@ -41,11 +41,11 @@ export function buildStarterPrompts(ctx: StarterContext = {}): string[] {
     ? `Which companies win the most work in NAICS ${primaryNaics}?`
     : 'Which companies win the work I want?';
 
-  // Slot 3 — FULL LOOP: research → downloadable brief. This is the chip that
-  // teaches the product without a tutorial.
+  // Slot 3 — FULL LOOP: upload-style ask → research → downloadable report.
+  // Phrase it like a customer talking to a colleague (capability statement → agencies → report).
   const briefPrompt = setAside
-    ? `Research my market and make a strategy brief I can download — highlight my ${setAside} status`
-    : 'Research my market and make a strategy brief I can download';
+    ? `Here is what my company does — find agencies that buy it and make me a downloadable report (highlight my ${setAside} status)`
+    : 'Here is what my company does — find agencies that buy it and make me a downloadable report';
 
   return [nextUpPrompt, marketPrompt, intelPrompt, briefPrompt];
 }
