@@ -20,12 +20,9 @@ import TargetingCard from './TargetingCard';
 import StartHereCard from './StartHereCard';
 import HiddenWorkNudge from './HiddenWorkNudge';
 import TodaysThree, { type TodaysPick } from './TodaysThree';
-<<<<<<< HEAD
 import StreakCard from './StreakCard';
-=======
 import YourRankingCard from './YourRankingCard';
 import { BOOK_CALL_URL, BOOK_CALL_LABEL } from '@/lib/mindy/book-call';
->>>>>>> origin/main
 import { getNaics } from '@/lib/codes/lookup';
 import ShareButton from '@/components/briefings/ShareButton';
 import SamAttachmentLinks from '@/components/app/SamAttachmentLinks';
