@@ -805,8 +805,13 @@ export async function GET(request: NextRequest) {
         { label: 'change-log events (intelligence_changes)', count: c.intelChanges, note: 'history of these claims, not additional claims' },
       ],
       headlineContribution: 0,
-      freshness: { state: 'UNKNOWN', asOf: e.claimsEvidence, basis: 'MAX(agency_pain_points_db.last_evidence_at) — derived alongside the GAO collector; no independent clock' },
-      surface: { state: 'customer_readable', tools: ['get_agency_intel', 'understand_customer'], note: 'preferred over legacy claims; served with citations' },
+      freshness: {
+        state: timestampState(e.claimsEvidence, 24, now),
+        asOf: e.claimsEvidence,
+        basis: 'MAX(agency_pain_points_db.last_evidence_at). Same daily collector as institute-gao-sync. A missing clock is unknown, not stale and not zero.',
+        schedules: schedules(CRON_JOBS.gao),
+      },
+      surface: { state: 'customer_readable', tools: ['get_agency_intel', 'understand_customer'], note: 'preferred over legacy claims; public pages show finding, report number, date, and .gov/.mil link. Recommendations stay signed-in.' },
       upstreams: ['gao'], provenance: 'Claims derived from the living GAO corpus, each citing its institute_sources document.',
     },
     {

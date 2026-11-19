@@ -13,6 +13,7 @@ import {
   listPublicAgencies,
   PUBLIC_PRIORITY_DOLLAR_NOTE,
   publicCitationHref,
+  publicFindingClaim,
   selectPublicSourced,
   type PublicSourcedClaim,
 } from './public-agency-pages';
@@ -145,6 +146,32 @@ describe('public agency pain points', () => {
     expect(JSON.stringify(row)).not.toContain('c870f3c7');
     expect(JSON.stringify(row)).not.toContain('Do not publish');
     expect(JSON.stringify(row)).not.toContain('confirmed_unresolved');
+  });
+
+  it('does not print a recommendation that was stored as the finding', () => {
+    const recommendation = 'Strengthen key monitoring controls to ensure control effectiveness throughout the financial reporting process.';
+    const claim = `${recommendation} (Source: OIG-REC:reports~audit~cpsc:1)`;
+    expect(publicFindingClaim(claim, recommendation)).not.toContain('monitoring controls');
+    expect(publicFindingClaim(claim, recommendation)).toContain('OIG-REC:reports~audit~cpsc:1');
+    const [row] = selectPublicSourced([
+      {
+        ...sourced({
+          pain_point: claim,
+          source_type: 'ig_report',
+          document_number: 'OIG-REC:reports~audit~cpsc:1',
+          source_url: 'https://www.oversight.gov/reports/audit/example',
+        }),
+        recommendation,
+        resolution_status: 'open',
+        resolution_flag: 'confirmed_unresolved',
+      },
+    ]);
+    expect(row.pain_point).not.toContain('monitoring controls');
+    expect(JSON.stringify(row)).not.toContain('confirmed_unresolved');
+    expect(publicFindingClaim(
+      'Audit of the fiscal year financial statements (Source: OIG-REC:reports~audit~cpsc:1)',
+      recommendation,
+    )).toMatch(/financial statements/i);
   });
 });
 

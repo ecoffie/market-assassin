@@ -15,8 +15,10 @@ import { fetchAgencySpendingPatterns, fetchNAICSSpending, fetchSubtierAgencies }
 import { batchVerify, quickVerify } from './verifier';
 import agencyPainPointsJson from '@/data/agency-pain-points.json';
 import { resolveAgency } from '@/lib/strategic-intel/agency-resolver';
-import { isUnsupportedBudgetClaim, stripUnsupportedBudgetClaims } from '@/lib/strategic-intel/unsupported-budget-claim';
+import { isUnsupportedBudgetClaim } from '@/lib/strategic-intel/unsupported-budget-claim';
 import { isCurrentLegacyGao, legacyGaoDateLabel } from './legacy-gao-currency';
+import { labelHistoricalGaoPainPoint } from '@/lib/strategic-intel/legacy-gao-painpoints';
+import { sanitizeLegacyClaimText } from '@/lib/strategic-intel/sourced-pain-points';
 
 // Type for static pain points JSON
 interface AgencyPainPointsData {
@@ -393,14 +395,11 @@ export async function getUnifiedAgencyIntelligence(
   if (result.painPoints.length === 0) {
     const staticAgency = findStaticAgency(agencyName);
     if (staticAgency) {
-      result.painPoints.push(
-        ...staticAgency.painPoints.map((p) => `${p} [LEGACY_MANUAL — provenance unavailable]`),
-      );
-      result.priorities.push(
-        ...stripUnsupportedBudgetClaims(staticAgency.priorities).map(
-          (p) => `${p} [LEGACY_MANUAL — provenance unavailable]`,
-        ),
-      );
+      // Exact agency only. A bare "(Source: GAO)" string is labeled with its
+      // government date here so this fallback cannot present 1993–2000 testimony
+      // as a current finding. The served JSON is not edited.
+      result.painPoints.push(...labelStaticCorpus(staticAgency.painPoints));
+      result.priorities.push(...labelStaticCorpus(staticAgency.priorities));
       result.sources.push('static');
     }
   }
@@ -567,30 +566,48 @@ export function searchAgencies(query: string, limit: number = 20): string[] {
 /**
  * Helper: Find agency in static JSON (handles variations in naming)
  */
-function findStaticAgency(agencyName: string): { painPoints: string[]; priorities: string[] } | null {
-  // Exact match first
-  if (staticPainPoints.agencies[agencyName]) {
-    return staticPainPoints.agencies[agencyName];
+function labelStaticCorpus(items: string[] | undefined): string[] {
+  return (items ?? [])
+    .filter((p) => !isUnsupportedBudgetClaim(p))
+    .map((p) => {
+      const claim = sanitizeLegacyClaimText(labelHistoricalGaoPainPoint(p));
+      if (!claim) return '';
+      if (/historical GAO finding/i.test(claim) || /provenance unavailable/i.test(claim)) return claim;
+      return `${claim} [LEGACY_MANUAL — provenance unavailable]`;
+    })
+    .filter(Boolean);
+}
+
+/**
+ * Static JSON lookup for the reader-failure fallback.
+ * Exact key, case-insensitive key, or the resolver's canonical name.
+ * Substring match is refused: "EPA" is inside "Department", and that path
+ * attached another agency's historical GAO strings to the wrong buyer.
+ */
+/** Labeled static claims for one agency. Empty when the name does not resolve exactly. */
+export function staticFallbackClaims(agencyName: string): string[] {
+  const agency = findStaticAgency(agencyName);
+  return agency ? labelStaticCorpus(agency.painPoints) : [];
+}
+
+export function findStaticAgency(agencyName: string): { painPoints: string[]; priorities: string[] } | null {
+  const raw = agencyName.trim();
+  if (!raw) return null;
+  if (staticPainPoints.agencies[raw]) return staticPainPoints.agencies[raw];
+
+  const nameLower = raw.toLowerCase();
+  for (const [key, value] of Object.entries(staticPainPoints.agencies)) {
+    if (key.toLowerCase() === nameLower) return value;
   }
 
-  // Try lowercase comparison
-  const nameLower = agencyName.toLowerCase();
-  for (const [key, value] of Object.entries(staticPainPoints.agencies)) {
-    if (key.toLowerCase() === nameLower) {
-      return value;
+  const canonical = resolveAgency({ agencyName: raw }).canonicalAgency;
+  if (canonical && staticPainPoints.agencies[canonical]) return staticPainPoints.agencies[canonical];
+  if (canonical) {
+    const canonicalLower = canonical.toLowerCase();
+    for (const [key, value] of Object.entries(staticPainPoints.agencies)) {
+      if (key.toLowerCase() === canonicalLower) return value;
     }
   }
-
-  // Try partial match (e.g., "VA" matches "Department of Veterans Affairs")
-  for (const [key, value] of Object.entries(staticPainPoints.agencies)) {
-    if (
-      key.toLowerCase().includes(nameLower) ||
-      nameLower.includes(key.toLowerCase())
-    ) {
-      return value;
-    }
-  }
-
   return null;
 }
 

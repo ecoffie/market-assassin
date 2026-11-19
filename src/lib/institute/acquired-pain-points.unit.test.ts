@@ -76,8 +76,10 @@ describe('recorded oversight.gov open recommendations', () => {
     expect(first.publicationDate).toBe('2026-11-17');
     expect(first.url).toMatch(/^https:\/\/www\.oversight\.gov\/reports\//);
     expect(first.documentNumber).toMatch(/^OIG-REC:/);
-    expect(first.problem).toMatch(/monitoring controls/i);
-    expect(first.recommendation).toBe(first.problem);
+    expect(first.title).toMatch(/Financial Statements/i);
+    expect(first.problem).toBe(first.title);
+    expect(first.recommendation).toMatch(/monitoring controls/i);
+    expect(first.recommendation).not.toBe(first.problem);
     expect(first.resolutionStatus).toBe('open');
     expect(first.statesProblem).toBe(true);
     expect(first.documentNumber).not.toMatch(/\(Source: GAO\)$/);

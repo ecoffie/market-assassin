@@ -113,14 +113,37 @@ export interface PublicSourcedClaim {
 }
 
 /**
+ * Public finding text. Rows ingested before the report title was kept stored the
+ * recommendation as the pain point. That body stays off the public page.
+ * A report title that is not the recommendation passes through. Signed-in
+ * Ask Mindy still receives the recommendation field from the shared reader.
+ */
+export function publicFindingClaim(
+  painPoint: string,
+  recommendation: string | null | undefined,
+): string {
+  const rec = recommendation?.trim() ?? '';
+  if (!rec) return painPoint;
+  const bare = painPoint.replace(/\s*\(Source:\s*[^)]+\)\s*$/i, '').trim();
+  const same = bare === rec || (bare.length >= 40 && rec.startsWith(bare));
+  if (!same) return painPoint;
+  const doc = painPoint.match(/\(Source:\s*([^)]+)\)\s*$/i)?.[1]?.trim();
+  return doc
+    ? `An inspector general finding is on file for this agency (Source: ${doc})`
+    : 'An inspector general finding is on file for this agency';
+}
+
+/**
  * Copy only the public fields off a living row. Anything else on the reader
  * object — institute id, recommendation, resolution — is dropped.
  */
-export function selectPublicSourced<T extends PublicSourcedClaim>(
+export function selectPublicSourced<T extends PublicSourcedClaim & {
+  recommendation?: string | null;
+}>(
   rows: readonly T[],
 ): PublicSourcedClaim[] {
   return rows.map((row) => ({
-    pain_point: row.pain_point,
+    pain_point: publicFindingClaim(row.pain_point, row.recommendation),
     source_type: row.source_type,
     source_url: row.source_url,
     document_number: row.document_number,
