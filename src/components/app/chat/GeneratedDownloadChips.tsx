@@ -85,6 +85,7 @@ export function GeneratedDownloadChips({
           </button>
         ))}
       </div>
+      <p className="mt-2 text-[11px] text-faint">Also saved under Documents → Generated. Reopen this chat anytime — these buttons come back.</p>
       {pdfNote ? (
         <p className="mt-2 text-[12px] text-amber-300/90" role="status">{pdfNote}</p>
       ) : null}

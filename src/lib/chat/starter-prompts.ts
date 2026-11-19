@@ -1,18 +1,16 @@
 /**
- * Mindy Chat v2 — starter-prompt suggestions.
+ * Mindy Chat — starter-prompt suggestions for the empty state.
  *
- * The empty-state chips. In v1 these were 4 static teaching questions, which now
- * UNDERSELL the chat: v2 can reach the Data Core (pipeline, Vault, live SAM,
- * contractor intel), but a user who only sees "How do I respond to a Sources
- * Sought?" never discovers it. This builds a small, DIVERSE set that showcases
- * each capability — and personalizes to the user's real profile when we have it.
+ * Audience: someone uncomfortable with AI. Every chip must read like something
+ * you would ask a colleague out loud — no "NAICS", "Vault", "pipeline", or
+ * tool jargon in the generic set. Personalization may name the user's real
+ * NAICS or set-aside (facts they already configured), never invent them.
  *
- * Grounding rule (Rule #1): a personalized prompt only ever references data the
- * user actually has — their real NAICS, whether they have pursuits. We never
- * invent a NAICS or imply a pipeline they don't own. When context is thin, we
- * fall back to strong generic examples of the same capability.
- *
- * Pure function → unit-testable; the route just feeds it profile + pipeline count.
+ * Four slots, always:
+ *   (0) what to work on next
+ *   (1) who's buying now
+ *   (2) who wins that work
+ *   (3) research → downloadable brief  (the full product loop)
  */
 
 export interface StarterContext {
@@ -22,42 +20,34 @@ export interface StarterContext {
   setAsides?: string[];         // e.g. ['WOSB','HUBZone']
 }
 
-// One curated example per capability so the four chips always span the range:
-// (0) your pipeline · (1) live market · (2) contractor/competitive intel ·
-// (3) your Vault / a teaching anchor. Order = what to show; we fill each slot
-// with the most personalized phrasing the context supports, else the generic.
 export function buildStarterPrompts(ctx: StarterContext = {}): string[] {
   const naics = (ctx.naicsCodes || []).map((c) => String(c || '').trim()).filter(Boolean);
   const primaryNaics = naics[0];
   const setAside = (ctx.setAsides || []).map((s) => String(s || '').trim()).filter(Boolean)[0];
 
-  // Slot 0 — YOUR PIPELINE. Only offer the "my pursuits" prompt if they have
-  // some; otherwise steer them to fill the pipeline (honest — no fake pursuits).
-  const pipelinePrompt = ctx.hasPipeline
+  // Slot 0 — WHAT TO WORK ON. Only say "my pursuits" when they have some.
+  const nextUpPrompt = ctx.hasPipeline
     ? 'Which of my pursuits has the nearest deadline?'
-    : 'Find me open opportunities to add to my pipeline';
+    : 'Find open contracts I should look at this week';
 
-  // Slot 1 — LIVE MARKET (SAM). Personalize by the user's real NAICS if present.
+  // Slot 1 — WHO'S BUYING. Personalize with their real NAICS when present;
+  // generic copy stays jargon-free.
   const marketPrompt = primaryNaics
-    ? `What SAM opportunities are open right now in NAICS ${primaryNaics}?`
-    : 'What government contracts are open in my industry right now?';
+    ? `Who is buying work in NAICS ${primaryNaics} right now?`
+    : 'Who is buying what I sell right now?';
 
-  // Slot 2 — CONTRACTOR / COMPETITIVE INTEL. NAICS-personalized when we can;
-  // otherwise a concrete named-company example that teaches the capability.
+  // Slot 2 — WHO WINS.
   const intelPrompt = primaryNaics
-    ? `Who are the top contractors winning work in NAICS ${primaryNaics}?`
-    : 'Who are the biggest contractors in my space, and what have they won?';
+    ? `Which companies win the most work in NAICS ${primaryNaics}?`
+    : 'Which companies win the work I want?';
 
-  // Slot 3 — YOUR VAULT / capability. Personalize with the set-aside they hold
-  // (a real, grounded fact) or fall back to a Vault-drafting anchor.
-  const vaultPrompt = setAside
-    ? `Draft a capability statement intro highlighting my ${setAside} status`
-    : 'Draft a capability statement intro from my Vault';
+  // Slot 3 — FULL LOOP: research → downloadable brief. This is the chip that
+  // teaches the product without a tutorial.
+  const briefPrompt = setAside
+    ? `Research my market and make a strategy brief I can download — highlight my ${setAside} status`
+    : 'Research my market and make a strategy brief I can download';
 
-  return [pipelinePrompt, marketPrompt, intelPrompt, vaultPrompt];
+  return [nextUpPrompt, marketPrompt, intelPrompt, briefPrompt];
 }
 
-// The static fallback, exported so the client can render instantly before the
-// personalized set loads (and if the suggestions call fails). Mirrors the four
-// capability slots with fully generic phrasing.
 export const DEFAULT_STARTER_PROMPTS: string[] = buildStarterPrompts({});
