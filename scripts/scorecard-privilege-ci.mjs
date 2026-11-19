@@ -154,7 +154,7 @@ async function main() {
   }
   const seen = await reader.query('SELECT count(*)::int AS n FROM public.data_source_instances');
   const sources = await reader.query('SELECT count(*)::int AS n FROM public.institute_sources');
-  if (seen.rows[0].n !== 1 || sources.rows[0].n !== 1) {
+  if (seen.rows[0].n !== 1 || sources.rows[0].n !== 2) {
     console.error('scorecard privilege ci: RLS hid a row the reader must count');
     process.exit(1);
   }
