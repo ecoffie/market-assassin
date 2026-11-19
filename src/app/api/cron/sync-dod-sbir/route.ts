@@ -37,9 +37,9 @@ function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 }
 
-async function heldCount(client: ReturnType<typeof sb>): Promise<number> {
+async function heldCount(client: ReturnType<typeof sb>): Promise<number | null> {
   const { count, error } = await client.from('dod_sbir_topics').select('*', { count: 'exact', head: true });
-  if (error || count == null) return 0;
+  if (error || count == null) return null;
   return count;
 }
 

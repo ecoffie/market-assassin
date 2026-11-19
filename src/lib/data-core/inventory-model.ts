@@ -412,6 +412,44 @@ export function summarizeStates(states: FreshnessState[]): string {
  * Freshness from a data timestamp and the producer's cadence. With no known cadence
  * the age cannot be judged, so the state is UNKNOWN (the date is still shown).
  */
+/**
+ * DoD SBIR/STTR health. A down source is UNREACHABLE (degraded). A failed
+ * count is UNKNOWN, never a manufactured zero. The collector stays enabled.
+ */
+export function classifyDodSbirHealth(input: {
+  held: number | null;
+  httpStatus: number | null;
+  runStatus: string | null;
+}): { state: FreshnessState; detail: string } {
+  const down = input.httpStatus === 503
+    || input.httpStatus === 502
+    || input.runStatus === 'error';
+  if (down) {
+    const held = input.held == null
+      ? 'Held count unmeasured — not zero.'
+      : input.held === 0
+        ? 'dod_sbir_topics holds 0 rows.'
+        : `${input.held} held rows were not advanced.`;
+    return {
+      state: 'UNREACHABLE',
+      detail: `sbir.gov degraded. ${held} sync-dod-sbir stays enabled; do not park it.`,
+    };
+  }
+  if (input.held == null) {
+    return { state: 'UNKNOWN', detail: 'Held count unmeasured — not zero.' };
+  }
+  if (input.held === 0) {
+    return {
+      state: 'UNKNOWN',
+      detail: '0 rows measured and no degraded run is on record. An empty corpus is not a current feed.',
+    };
+  }
+  return {
+    state: 'UNKNOWN',
+    detail: 'Rows are held. A missing synced_at clock is not current.',
+  };
+}
+
 export function timestampState(
   asOf: string | null,
   cadenceHours: number | null,

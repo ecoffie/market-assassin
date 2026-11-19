@@ -42,6 +42,7 @@ import {
   STATIC_FILE_AS_OF,
   UPSTREAM_PUBLISHERS,
   summarizeStates,
+  classifyDodSbirHealth,
   timestampState,
   worstState,
   type Freshness,
@@ -627,22 +628,36 @@ export async function GET(request: NextRequest) {
       surface: { state: 'customer_readable', tools: ['search_sbir'], app: ['Market scan'] },
       upstreams: researchUpstreams, provenance: 'Research/lab funding that never posts to SAM.gov, mirrored into one store. Only sources with rows count as contributing.',
     },
-    {
-      key: 'dod_sbir_topics', label: 'DoD SBIR/STTR topics', kind: 'source_corpus',
+    (() => {
+      const dodRun = latestRun('sync-dod-sbir');
+      const dodHealth = classifyDodSbirHealth({
+        held: c.dodSbir,
+        httpStatus: dodRun?.httpStatus ?? null,
+        runStatus: dodRun?.status ?? null,
+      });
+      return {
+      key: 'dod_sbir_topics', label: 'DoD SBIR/STTR topics', kind: 'source_corpus' as const,
       stored: c.dodSbir, unit: 'topics',
       headlineContribution: c.dodSbir,
       freshness: {
-        state: 'UNKNOWN',
+        state: dodHealth.state,
         asOf: null,
-        basis: 'no data clock — the table holds no rows',
-        detail: (c.dodSbir ?? 0) === 0
-          ? 'EMPTY. The collector reports HTTP 200 while sbir.gov is unreachable (reachability gate, #604) — a green run here is NOT evidence of data.'
-          : undefined,
+        basis: 'dod_sbir_topics count plus the latest sync-dod-sbir run. A failed count is unknown, not zero. The job stays enabled when sbir.gov is down.',
+        detail: dodHealth.detail,
         schedules: schedules(CRON_JOBS.dodSbir),
       },
-      surface: { state: 'customer_readable', tools: ['search_sbir'], note: (c.dodSbir ?? 0) === 0 ? 'wired to search_sbir, currently contributes nothing' : undefined },
-      upstreams: ['sbir_gov'], provenance: 'SBIR.gov DoD topics API mirrored into dod_sbir_topics.',
-    },
+      surface: {
+        state: 'customer_readable' as const,
+        tools: ['search_sbir'],
+        note: c.dodSbir == null
+          ? 'held count unmeasured — search_sbir must not be told this corpus is empty'
+          : c.dodSbir === 0
+            ? 'wired to search_sbir; the corpus has 0 rows, which is not a successful sync'
+            : undefined,
+      },
+      upstreams: ['sbir_gov'], provenance: 'SBIR.gov DoD topics API mirrored into dod_sbir_topics. sync-dod-sbir returns 503 when the source is down.',
+      };
+    })(),
     {
       key: 'legislation', label: 'Legislation (NDAA / defense acquisition measures)', kind: 'source_corpus',
       stored: legislativeRows ? leg.length : null, unit: 'source records',
