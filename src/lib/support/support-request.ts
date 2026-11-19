@@ -87,7 +87,7 @@ export function supportBlocks(i: SupportRequestInput): { text: string; blocks: u
     { type: 'header', text: { type: 'plain_text', text: `🛟 ${text}`.slice(0, 150), emoji: true } },
     { type: 'section', fields: fields.map((t) => ({ type: 'mrkdwn', text: t })) },
     { type: 'section', text: { type: 'mrkdwn', text: `*Message*\n${e(i.message).slice(0, 2900)}` } },
-    { type: 'context', elements: [{ type: 'mrkdwn', text: `Get help · getmindy.ai${i.page ? ` · on ${e(i.page)}` : ''} · goal: first reply within 1 business hour` }] },
+    { type: 'context', elements: [{ type: 'mrkdwn', text: `Get help · getmindy.ai${i.page ? ` · on ${e(i.page)}` : ''} · goal: first reply within 1 business day` }] },
   ];
   return { text, blocks };
 }

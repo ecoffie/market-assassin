@@ -54,7 +54,7 @@ export default function SupportForm() {
         <div>
           <p className="text-[13px] font-bold uppercase tracking-[0.08em] text-(--mp-navy)">Get help</p>
           <h1 className="mt-4 text-balance text-[42px] font-bold leading-[1.05] tracking-[-0.03em] sm:text-[54px]">How can we help?</h1>
-          <p className="mt-5 max-w-lg text-[19px] leading-relaxed text-(--mp-body)">A real person on the Mindy team reads every message. We usually reply within one business hour.</p>
+          <p className="mt-5 max-w-lg text-[19px] leading-relaxed text-(--mp-body)">A real person on the Mindy team reads every message. We usually reply within one business day.</p>
           <ul className="mt-8 space-y-4 text-[17px] text-(--mp-body)">
             {['Something not working? Tell us what you clicked and what you saw.', 'Questions about billing, credits or your account', 'Ideas for what Mindy should do next'].map((t) => (
               <li key={t} className="flex items-start gap-3">

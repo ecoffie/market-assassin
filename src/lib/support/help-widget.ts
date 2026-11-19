@@ -65,7 +65,7 @@ export function helpWidgetScript(): string {
     + '<p class="mhw-note">A real person reads every message. Or email <a href="mailto:' + mail + '">' + mail + '</a></p>'
     + '</form>';
   const panel =
-    '<div class="mhw-h"><h2 id="mhwT">How can we help?</h2><p>We usually reply within one business hour.</p>'
+    '<div class="mhw-h"><h2 id="mhwT">How can we help?</h2><p>We usually reply within one business day.</p>'
     + '<button type="button" class="mhw-x" aria-label="Close help">&times;</button></div>'
     + '<div class="mhw-body">' + form + '</div>';
 
