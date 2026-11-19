@@ -42,6 +42,7 @@ import {
   STATIC_FILE_AS_OF,
   UPSTREAM_PUBLISHERS,
   summarizeStates,
+  classifyJobPostingHealth,
   timestampState,
   worstState,
   type Freshness,
@@ -594,15 +595,37 @@ export async function GET(request: NextRequest) {
       upstreams: ['grants_gov'], provenance: 'Grants.gov mirrored nightly into grants_cache.',
       note: 'The research corpus below also holds a small Grants.gov slice from a different producer. Not deduplicated.',
     },
-    {
-      key: 'contractor_job_postings', label: 'Contractor + federal job postings', kind: 'source_corpus',
-      stored: c.jobPostings, unit: 'postings',
-      breakdown: [{ label: 'contractor postings (JSearch)', count: c.jobPostingsJsearch }, { label: 'federal agency postings (USAJobs)', count: c.jobPostingsUsajobs }],
-      headlineContribution: c.jobPostings,
-      freshness: fresh({ asOf: e.jobPostings, cadenceHours: 24, basis: 'MAX(contractor_job_postings.last_seen_at)', jobs: CRON_JOBS.contractorJobs }),
-      surface: { state: 'internal_only', tools: [], app: [] },
-      upstreams: ['jsearch', 'usajobs'], provenance: 'Public job postings pulled daily: JSearch (LinkedIn/Indeed/Glassdoor/ZipRecruiter) and USAJobs. Raw material for hiring signals; not yet shown to customers.',
-    },
+    (() => {
+      const jobsHealth = classifyJobPostingHealth({
+        held: c.jobPostings,
+        asOf: e.jobPostings,
+        cadenceHours: 24,
+        now,
+      });
+      const live = jobsHealth.state === 'PASSTHROUGH';
+      return {
+      key: 'contractor_job_postings', label: 'Contractor + federal job postings', kind: 'source_corpus' as const,
+      stored: jobsHealth.stored, unit: 'postings',
+      breakdown: [
+        { label: 'persisted mirror rows — not the customer count while the live USAJobs read is serving', count: jobsHealth.mirrorRows },
+        { label: 'contractor postings (JSearch)', count: c.jobPostingsJsearch },
+        { label: 'federal agency postings (USAJobs)', count: c.jobPostingsUsajobs },
+      ],
+      headlineContribution: jobsHealth.headlineContribution,
+      freshness: {
+        state: jobsHealth.state,
+        asOf: live ? null : e.jobPostings,
+        basis: jobsHealth.basis,
+        detail: jobsHealth.detail,
+        schedules: schedules(CRON_JOBS.contractorJobs),
+      },
+      surface: live
+        ? { state: 'passthrough' as const, tools: ['search_govcon_jobs'], app: ['/jobs'], note: 'Federal openings are read live from USAJobs. Contractor (JSearch) counts stay unknown until the mirror is serving.' }
+        : { state: 'internal_only' as const, tools: [], app: [] as string[], note: 'Persisted mirror is the serving copy. The live USAJobs read is the fallback when it is empty.' },
+      upstreams: ['jsearch', 'usajobs'],
+      provenance: 'Federal customer jobs are a live USAJobs query when the mirror has no clock. JSearch contractor postings are persisted only when sync-contractor-jobs writes them.',
+      };
+    })(),
     {
       key: 'research_funding', label: 'Research & Lab Funding Opportunities', kind: 'source_corpus',
       stored: c.research, unit: 'opportunities',

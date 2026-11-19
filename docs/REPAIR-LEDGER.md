@@ -30,6 +30,7 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
 |---|---|---|---|---|---|
+| 2026-11-19 | Data Core / job postings | Federal jobs are a live USAJobs query when the persisted mirror is empty or has no last_seen_at. That state is PASSTHROUGH, and the mirror count is not the customer job count. A mirror with rows and a clock stays on that clock. | `classifyJobPostingHealth` → `src/lib/data-core/inventory-model.ts` | `inventory-model.unit.test.ts` | BUILT, NOT MERGED |
 | 2026-11-19 | Budget labeling | Agency-level live years are USASpending budgetary resources, a budget signal, not awards or spending. `budget_programs` rows stay federal-account obligations (`amount_basis: 'obligations'`), distinct from those agency figures, and the program copy does not say they predict solicitations or opportunities. `/api/budget-intel?mode=opportunities` is unchanged. | `USASpending budgetary resources are a budget signal` → `src/mcp/tools/agency-budget-trends.ts` | `budget-label.unit.test.ts` | BUILT, NOT MERGED |
 
 ## 2026-11-18 — Budget tables acquire from USASpending
