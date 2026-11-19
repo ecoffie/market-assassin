@@ -504,6 +504,28 @@ describe('validateDocModel', () => {
   });
 });
 
+describe('pct: fractions and percent points (Koamana Build: 40.93 rendered 4,093%)', () => {
+  it('formatCell: |v|<=1 is a fraction, |v|>1 is percent points', () => {
+    expect(formatCell(40.93, 'pct')).toBe('40.9%');
+    expect(formatCell(0.4093, 'pct')).toBe('40.9%');
+    expect(formatCell(0.214, 'pct')).toBe('21.4%');
+    expect(formatCell(1, 'pct')).toBe('100.0%');
+    expect(formatCell(100, 'pct')).toBe('100.0%');
+    expect(formatCell(0, 'pct')).toBe('0.0%');
+    expect(formatCell(-12.5, 'pct')).toBe('-12.5%');
+    expect(formatCell(null, 'pct')).toBe(NOT_AVAILABLE);
+  });
+  it('formatChartValue: same rule, trailing .0 trimmed', () => {
+    expect(formatChartValue(40.93, 'pct')).toBe('40.9%');
+    expect(formatChartValue(0.284, 'pct')).toBe('28.4%');
+    expect(formatChartValue(25, 'pct')).toBe('25%');
+    expect(formatChartValue(0.25, 'pct')).toBe('25%');
+  });
+  it('formatColumn (table + spreadsheet path) never shows thousands of percent', () => {
+    expect(formatColumn([40.93, 12.1, 0.05, null], 'pct')).toEqual(['40.9%', '12.1%', '5.0%', NOT_AVAILABLE]);
+  });
+});
+
 describe('client-ready numbers (Eric, 2026-11-17)', () => {
   it('dollars read $1.93B · $412.5M · $30M · $850K; never raw', () => {
     expect([1_930_000_000, 1_200_000_000, 412_500_000, 30_000_000, 5_250_000, 850_000, 12_500, 31.4].map((v) => formatCell(v, 'usd')))
@@ -869,6 +891,31 @@ describe('render-html', () => {
     expect(html).toMatch(/<h2>Sources<\/h2><ol><li>Example award data extract/);
     expect(html).toContain('<h2>Contents</h2>');
     expect((html.match(/<svg /g) || []).length).toBe(4);
+  });
+});
+
+describe('contents list matches the body numbering', () => {
+  it('numbered-rule: TOC numbers equal body numbers; Sources/Unverified unnumbered; model-supplied "1." prefix not doubled', () => {
+    const m = { ...SAMPLE_REPORT, theme: 'mindy' as const, sections: SAMPLE_REPORT.sections.map((s, i) => (i === 0 ? { ...s, heading: '1. Executive summary' } : s)) };
+    const html = renderHtml(m);
+    expect(html).toContain('<h2><span class="num">1.</span>Executive summary</h2>');
+    expect(html).not.toContain('1. 1.');
+    expect(html).toContain('<li><span class="n">1.</span>Executive summary</li>');
+    expect(html).toMatch(/<li><span class="n"><\/span>Sources<\/li>/);
+    const n = m.sections.filter((s) => (s.level ?? 1) === 1).length;
+    expect(html).toContain(`<span class="n">${n}.</span>`);
+    expect(html).not.toContain(`<span class="n">${n + 1}.</span>`);
+  });
+  it('briefing theme (unnumbered body): TOC carries no numbers', () => {
+    const html = renderHtml({ ...SAMPLE_REPORT, theme: 'briefing' });
+    expect(html).not.toContain('<span class="n">');
+  });
+  it('wide tables get the dense class and header cells may wrap', () => {
+    const cols = ['a', 'b', 'c', 'd', 'e', 'f'].map((k) => ({ key: k, label: `Column ${k}`, format: 'int' as const }));
+    const m: DocModel = { ...SAMPLE_REPORT, sections: [{ id: 'w', heading: 'Wide', blocks: [{ type: 'table', id: 'wt', claim: 'fact', cites: ['s1'], columns: cols, rows: [{ a: 1, b: 2, c: 3, d: 4, e: 5, f: 6 }] }] }] };
+    const html = renderHtml(m);
+    expect(html).toContain('<table class="wide">');
+    expect(html).not.toMatch(/th \{[^}]*white-space: nowrap/);
   });
 });
 

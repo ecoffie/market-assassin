@@ -9,7 +9,7 @@
 import type { Block, Claim, DocModel, TableBlock } from './model';
 import { chartToSvg } from './charts';
 import { hex, resolveTheme, type Theme } from './theme';
-import { assumptionOrigin, keepDash, citationIndex, citeMarker, claimClass, claimLabel, claimsPresent, formatColumn, formatDocDate, parseInline, unverifiedStatements } from './format';
+import { assumptionOrigin, keepDash, stripHeadingNumber, citationIndex, citeMarker, claimClass, claimLabel, claimsPresent, formatColumn, formatDocDate, parseInline, unverifiedStatements } from './format';
 
 /**
  * The document page may load nothing but itself: no scripts, no network, no frames; only its own
@@ -69,7 +69,8 @@ body { margin: 0; color: ${c('ink')}; background: ${c('pageBg')}; font-family: $
 .reading { margin-top: 0.5in; padding: 12px 14px; border: 1px solid ${c('rule')}; border-radius: 6px; font-size: 9pt; color: ${c('meta')}; background: ${c('panelBg')}; }
 .reading b { color: ${c('ink')}; }
 .toc { break-after: page; }
-.toc ol { padding-left: 18px; } .toc li { margin: 4px 0; }
+.toc ol { list-style: none; padding-left: 0; } .toc li { margin: 4px 0; }
+.toc li .n { display: inline-block; width: 2em; color: ${c('accent')}; font-weight: 600; }
 ${band
     ? `h2 { background: ${c('accent')}; color: ${c('white')}; text-transform: uppercase; letter-spacing: .06em; font-size: 12pt; padding: 7px 12px; margin: 26px 0 12px; break-after: avoid; }`
     : `h2 { font-size: 15pt; color: ${c('accent')}; margin: 26px 0 10px; padding-bottom: 5px; border-bottom: 1px solid ${c('rule')}; break-after: avoid; }
@@ -88,12 +89,14 @@ sup.cite { font-size: 7.5pt; color: ${c('accent')}; margin-left: 2px; }
 table { width: 100%; border-collapse: separate; border-spacing: 0; margin: 6px 0 4px; font-size: 9pt; break-inside: auto; }
 thead { display: table-header-group; }
 tr { break-inside: avoid; }
-th { text-align: left; background: ${c('tableHeaderBg')}; color: ${c('tableHeaderFg')}; font-weight: 700; padding: 6px 8px; white-space: nowrap;${t.table.uppercaseHeader ? ' text-transform: uppercase; letter-spacing: .04em; font-size: 7.8pt;' : ''} }
+th { text-align: left; background: ${c('tableHeaderBg')}; color: ${c('tableHeaderFg')}; font-weight: 700; padding: 6px 8px; vertical-align: bottom; overflow-wrap: break-word;${t.table.uppercaseHeader ? ' text-transform: uppercase; letter-spacing: .04em; font-size: 7.8pt;' : ''} }
 ${r ? `th:first-child { border-top-left-radius: ${r}px; } th:last-child { border-top-right-radius: ${r}px; }` : ''}
-td { padding: 5px 8px; border-bottom: 1px solid ${c('rule')}; vertical-align: top; background: ${c('panelBg')}; }
+td { overflow-wrap: anywhere; padding: 5px 8px; border-bottom: 1px solid ${c('rule')}; vertical-align: top; background: ${c('panelBg')}; }
 tbody tr:nth-child(even) td { background: ${c('rowFill')}; }
 ${t.table.boldFirstColumn ? `td:first-child { font-weight: 600; color: ${c('accent')}; }` : ''}
-td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.num { white-space: nowrap; overflow-wrap: normal; }
+table.wide { font-size: 8pt; } table.wide th, table.wide td { padding: 4px 5px; }
 td.na { color: ${c('na')}; font-style: italic; }
 .caption { font-size: 8.5pt; color: ${c('muted')}; margin: 12px 0 4px; break-after: avoid; }
 .tablewrap { margin: 0 0 14px; }
@@ -135,7 +138,7 @@ function tableHtml(b: TableBlock, marker: string): string {
       .join('')}</tr>`)
     .join('');
   const cap = [labelChip(b.claim), b.caption ? inline(b.caption) : '', marker ? `<sup class="cite">${marker}</sup>` : ''].filter(Boolean).join(' ') + originHtml(b);
-  return `<div class="tablewrap">${cap ? `<div class="caption">${cap}</div>` : ''}<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+  return `<div class="tablewrap">${cap ? `<div class="caption">${cap}</div>` : ''}<table${b.columns.length >= 6 ? ' class="wide"' : ''}><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
 }
 
 function blockHtml(b: Block, numberOf: (id: string) => number | null, theme: Theme): string {
@@ -204,8 +207,13 @@ export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): strin
     ? `<section class="cover brand"><div class="brandband"><div class="who"><span class="mark">${escapeHtml(brand.mark)}</span><div><div class="name">${escapeHtml(brand.name)}</div><div class="tag">${escapeHtml(brand.tagline)}</div></div></div><div class="contact">${brand.contactLines.map(escapeHtml).join('<br>')}</div></div><h1>${escapeHtml(keepDash(model.title))}</h1>${model.subtitle ? `<p class="subtitle">${escapeHtml(model.subtitle)}</p>` : ''}<dl class="card">${card.join('')}</dl><div class="reading">${reading}</div></section>`
     : `<section class="cover rule"><div class="titleblock"><div class="kicker">Report</div><h1>${escapeHtml(keepDash(model.title))}</h1>${model.subtitle ? `<p class="subtitle">${escapeHtml(model.subtitle)}</p>` : ''}<dl>${meta.join('')}</dl></div><div class="reading">${reading}</div></section>`;
 
+  // Contents numbers a section only when the body does (numbered-rule themes), with the SAME numbers
+  // and from the same heading text; Unverified statements and Sources are unnumbered in the body, so
+  // they are unnumbered here too (the old auto-numbered <ol> counted them and disagreed with the body).
+  const numbered = theme.headingStyle === 'numbered-rule';
+  let tocNo = 0;
   const toc = showToc
-    ? `<section class="toc"><h2>Contents</h2><ol>${model.sections.filter((s) => (s.level ?? 1) === 1).map((s) => `<li>${escapeHtml(keepDash(s.heading))}</li>`).join('')}${unverified.length ? '<li>Unverified statements</li>' : ''}${ordered.length ? '<li>Sources</li>' : ''}</ol></section>`
+    ? `<section class="toc"><h2>Contents</h2><ol>${model.sections.filter((s) => (s.level ?? 1) === 1).map((s) => `<li>${numbered ? `<span class="n">${++tocNo}.</span>` : ''}${escapeHtml(keepDash(numbered ? stripHeadingNumber(s.heading) : s.heading))}</li>`).join('')}${unverified.length ? `<li>${numbered ? '<span class="n"></span>' : ''}Unverified statements</li>` : ''}${ordered.length ? `<li>${numbered ? '<span class="n"></span>' : ''}Sources</li>` : ''}</ol></section>`
     : '';
 
   let topNo = 0;
@@ -214,7 +222,8 @@ export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): strin
       const tag = s.level === 3 ? 'h4' : s.level === 2 ? 'h3' : 'h2';
       // 'numbered-rule' numbers the top-level body sections ("1. Executive summary").
       const num = tag === 'h2' && theme.headingStyle === 'numbered-rule' ? `<span class="num">${++topNo}.</span>` : '';
-      return `<section id="${escapeHtml(s.id)}"><${tag}>${num}${escapeHtml(keepDash(s.heading))}</${tag}>${s.blocks.map((b) => blockHtml(b, numberOf, theme)).join('')}</section>`;
+      const headingText = num ? stripHeadingNumber(s.heading) : s.heading;
+      return `<section id="${escapeHtml(s.id)}"><${tag}>${num}${escapeHtml(keepDash(headingText))}</${tag}>${s.blocks.map((b) => blockHtml(b, numberOf, theme)).join('')}</section>`;
     })
     .join('');
 

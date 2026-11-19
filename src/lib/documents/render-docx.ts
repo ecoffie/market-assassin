@@ -33,7 +33,7 @@ import {
 } from 'docx';
 import type { Block, ChartBlock, DocModel, TableBlock, TableColumn } from './model';
 import { resolveTheme, type Theme } from './theme';
-import { assumptionOrigin, keepDash, chartShownByAdjacentTable, citationIndex, citeMarker, claimLabel, claimsPresent, formatColumn, formatChartValue, formatDocDate, usdColumnDecimals, parseInline, unverifiedStatements } from './format';
+import { assumptionOrigin, keepDash, stripHeadingNumber, chartShownByAdjacentTable, citationIndex, citeMarker, claimLabel, claimsPresent, formatColumn, formatChartValue, formatDocDate, usdColumnDecimals, parseInline, unverifiedStatements } from './format';
 
 // The document's theme (theme.ts), resolved once per buildDocx call (which is synchronous). Every
 // color and the font below come from it — nothing is hard-coded in this renderer.
@@ -293,10 +293,20 @@ export function buildDocx(model: DocModel): Document {
   // Contents
   if (showToc) {
     children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ font: FONT, text: 'Contents' })] }));
-    const tops = model.sections.filter((s) => (s.level ?? 1) === 1).map((s) => keepDash(s.heading));
-    if (unverified.length) tops.push('Unverified statements');
-    if (ordered.length) tops.push('Sources');
-    tops.forEach((h) => children.push(new Paragraph({ style: 'Body', numbering: { reference: 'mindy-numbers-toc', level: 0 }, children: [new TextRun({ font: FONT, size: 21, text: h })] })));
+    // Numbered only when the body numbers its sections (numbered-rule), with the same numbers; Unverified
+    // statements and Sources are unnumbered in the body, so they are unnumbered here too.
+    const numberedToc = T.headingStyle === 'numbered-rule';
+    let tocNo = 0;
+    const tops: Array<{ n: number | null; text: string }> = model.sections.filter((s) => (s.level ?? 1) === 1)
+      .map((s) => ({ n: numberedToc ? ++tocNo : null, text: keepDash(numberedToc ? stripHeadingNumber(s.heading) : s.heading) }));
+    if (unverified.length) tops.push({ n: null, text: 'Unverified statements' });
+    if (ordered.length) tops.push({ n: null, text: 'Sources' });
+    tops.forEach((h) => children.push(new Paragraph({
+      style: 'Body',
+      indent: numberedToc ? { left: 400, hanging: 400 } : undefined,
+      children: [new TextRun({ font: FONT, size: 21, text: h.n === null ? (numberedToc ? `\t${h.text}` : h.text) : `${h.n}.\t${h.text}` })],
+      tabStops: numberedToc ? [{ type: TabStopType.LEFT, position: 400 }] : undefined,
+    })));
     children.push(new Paragraph({ children: [new PageBreak()] }));
   }
 
@@ -305,7 +315,7 @@ export function buildDocx(model: DocModel): Document {
   for (const s of model.sections) {
     const heading = s.level === 3 ? HeadingLevel.HEADING_3 : s.level === 2 ? HeadingLevel.HEADING_2 : HeadingLevel.HEADING_1;
     // 'numbered-rule' numbers the top-level body sections ("1. Executive summary").
-    const label = heading === HeadingLevel.HEADING_1 && T.headingStyle === 'numbered-rule' ? `${++topNo}. ${s.heading}` : s.heading;
+    const label = heading === HeadingLevel.HEADING_1 && T.headingStyle === 'numbered-rule' ? `${++topNo}. ${stripHeadingNumber(s.heading)}` : s.heading;
     children.push(new Paragraph({ heading, children: [new TextRun({ font: FONT, text: keepDash(label) })] }));
     s.blocks.forEach((b, i) => children.push(...blockToDocx(b, numberOf, chartShownByAdjacentTable(s.blocks, i))));
   }
@@ -363,7 +373,6 @@ export function buildDocx(model: DocModel): Document {
         { reference: 'mindy-bullets', levels: [{ level: 0, format: LevelFormat.BULLET, text: '•', alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 360, hanging: 260 } } } }] },
         { reference: 'mindy-numbers', levels: [{ level: 0, format: LevelFormat.DECIMAL, text: '%1.', alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 360, hanging: 300 } } } }] },
         { reference: 'mindy-numbers-unverified', levels: [{ level: 0, format: LevelFormat.DECIMAL, text: '%1.', alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 360, hanging: 300 } } } }] },
-        { reference: 'mindy-numbers-toc', levels: [{ level: 0, format: LevelFormat.DECIMAL, text: '%1.', alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 360, hanging: 300 } } } }] },
       ],
     },
     sections: [{
