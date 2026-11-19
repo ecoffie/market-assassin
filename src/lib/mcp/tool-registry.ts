@@ -503,7 +503,7 @@ const AGENCY_INTEL_TOOL_DEF = {
       'Target-research read on a federal agency: resolves it by name / abbreviation / CGAC code, then returns ' +
       'identity + hierarchy, pain points, and priorities. An agency keeps its fixed-file budget and priorities ' +
       'until that agency has live rows (priorityBasis and budget year labels say which). Pass program_keyword to list agencies whose ' +
-      'live federal-account budgetary resources for that word are growing or surging; an empty budget_programs table is ' +
+      'live federal-account obligations for that word are growing or surging; an empty budget_programs table is ' +
       'unavailable, not zero. Also (when available) live USASpending ' +
       'obligations for the fiscal year with top NAICS. The "size up a buyer before I pursue them" lookup. Pain ' +
       'points are curated intel, not an official statement. Also returns `legislation`: the NDAA record Mindy ' +
@@ -515,9 +515,9 @@ const AGENCY_INTEL_TOOL_DEF = {
     parameters: {
       type: 'object',
       properties: {
-        agency: { type: 'string', description: 'Agency name, abbreviation, or CGAC code, e.g. "VA", "Department of Defense", or "069". Omit only when program_keyword asks which agencies are increasing that spending.' },
+        agency: { type: 'string', description: 'Agency name, abbreviation, or CGAC code, e.g. "VA", "Department of Defense", or "069". Omit only when program_keyword asks which agencies have growing federal-account obligations for that word.' },
         fiscal_year: { type: 'number', description: 'Optional fiscal year for spending (defaults to current federal FY).' },
-        program_keyword: { type: 'string', description: 'Optional. Live federal-account budgetary resources whose name matches and whose stored trend is growing or surging, e.g. "cybersecurity". A budget signal, not awards. Empty live table is unavailable, not zero agencies. The fixed file is not a program-activity source.' },
+        program_keyword: { type: 'string', description: 'Optional. USASpending federal-account obligations whose name matches and whose stored trend is growing or surging, e.g. "cybersecurity". These are obligations, not agency budgetary resources. Empty live table is unavailable, not zero agencies. The fixed file is not a program-activity source.' },
       },
       required: [],
     },

@@ -464,7 +464,7 @@ server.registerTool(
       'Target-research read on a federal agency: resolves it by name / abbreviation / CGAC code, then returns ' +
       'identity + hierarchy, pain points, and priorities (live rows for an agency that has been acquired, ' +
       'otherwise the fixed file — priorityBasis says which). program_keyword lists growing federal-account ' +
-      'budgetary resources for that word from budget_programs; an empty table is unavailable, not zero agencies. ' +
+      'obligations for that word from budget_programs; an empty table is unavailable, not zero agencies. ' +
       'Also (when available) live USASpending ' +
       'obligations for the fiscal year with top NAICS. The "size up a buyer before I pursue them" lookup. Pain ' +
       'points are curated intel, not an official statement. Also returns `legislation`: the NDAA record Mindy ' +
@@ -484,7 +484,7 @@ server.registerTool(
       program_keyword: z
         .string()
         .optional()
-        .describe('Optional. Live federal accounts whose name matches and whose trend is growing or surging.'),
+        .describe('Optional. USASpending federal-account obligations whose name matches and whose trend is growing or surging. These are obligations, not agency budgetary resources.'),
     },
   },
   async ({ agency, fiscal_year, program_keyword }) => {

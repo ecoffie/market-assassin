@@ -1,7 +1,7 @@
 /**
- * Budget figures are a budget signal. Live copy must not call them contract
- * obligations, spending, or opportunities. The stored amount_basis field may
- * still say "obligations" when that is the field's basis.
+ * Agency budgetary resources and federal-account obligations stay distinct.
+ * "obligations" is allowed only on an object whose amount_basis is obligations.
+ * "spending" and "opportunit" are banned in both.
  */
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,33 +15,32 @@ vi.mock('@/lib/budget-intel/read', async () => {
 
 const { getAgencyBudgetTrends } = await import('@/mcp/tools/agency-budget-trends');
 
-const BANNED = /obligations|spending|opportunit/i;
+const OBLIGATIONS_WORD = /obligations/i;
+const OTHER_BANNED = /spending|opportunit/i;
 
 /** The publisher name contains "spending" and is not a claim that the figure is spending. */
 function withoutPublisher(text: string): string {
   return text.replace(/usaspending/gi, '');
 }
 
-function wordingLeaks(value: unknown, allowObligationsField = false): string[] {
+function wordingLeaks(value: unknown): string[] {
   const hits: string[] = [];
-  const walk = (node: unknown, basis: boolean) => {
+  const walk = (node: unknown, obligationsAllowed: boolean) => {
     if (typeof node === 'string') {
-      if (BANNED.test(withoutPublisher(node))) hits.push(node);
+      const text = withoutPublisher(node);
+      if (OTHER_BANNED.test(text) || (!obligationsAllowed && OBLIGATIONS_WORD.test(text))) hits.push(node);
       return;
     }
     if (Array.isArray(node)) {
-      for (const item of node) walk(item, basis);
+      for (const item of node) walk(item, obligationsAllowed);
       return;
     }
     if (!node || typeof node !== 'object') return;
     const record = node as Record<string, unknown>;
-    const fieldBasis = record.amount_basis === 'obligations';
-    for (const [key, child] of Object.entries(record)) {
-      if (key === 'amount_basis' && child === 'obligations' && (basis || allowObligationsField || fieldBasis)) continue;
-      walk(child, basis || fieldBasis);
-    }
+    const allowed = obligationsAllowed || record.amount_basis === 'obligations';
+    for (const child of Object.values(record)) walk(child, allowed);
   };
-  walk(value, allowObligationsField);
+  walk(value, false);
   return hits;
 }
 
@@ -90,7 +89,7 @@ describe('live budget labels', () => {
     expect(wordingLeaks(result)).toEqual([]);
   });
 
-  it('program notes call the rows budgetary resources', () => {
+  it('program notes call the rows federal-account obligations', () => {
     const cases = [
       decideProgramAnswer({ table: 'empty', keyword: 'cybersecurity', matches: null }),
       decideProgramAnswer({ table: 'unmeasured', keyword: 'cybersecurity', matches: null }),
@@ -110,18 +109,24 @@ describe('live budget labels', () => {
         }],
       }),
     ];
-    for (const answer of cases) expect(wordingLeaks(answer)).toEqual([]);
-    expect(cases[2].note).toMatch(/budgetary resources/);
-    expect(cases[2].note).toMatch(/budget signal/);
+    for (const answer of cases) {
+      expect(answer.amount_basis).toBe('obligations');
+      expect(wordingLeaks(answer)).toEqual([]);
+    }
+    expect(cases[2].note).toMatch(/federal-account obligations/);
+    expect(cases[2].note).toMatch(/not agency budgetary resources/);
+    expect(cases[2].note).not.toMatch(/opportunit|solicitation/i);
   });
 
-  it('allows the word obligations only on an amount_basis field that is obligations', () => {
+  it('allows the word obligations only where amount_basis is obligations', () => {
     const row = {
-      note: 'USASpending federal account budgetary resources.',
-      amount_basis: 'obligations',
+      note: 'USASpending federal-account obligations.',
+      amount_basis: 'obligations' as const,
     };
     expect(wordingLeaks(row)).toEqual([]);
-    expect(wordingLeaks({ ...row, note: 'These are obligations.' })).toEqual(['These are obligations.']);
+    expect(wordingLeaks({ note: row.note })).toEqual([row.note]);
+    expect(wordingLeaks({ note: 'These are spending.', amount_basis: 'obligations' })).toEqual(['These are spending.']);
+    expect(wordingLeaks({ note: 'These are obligations.', amount_basis: 'budgetary_resources' })).toEqual(['These are obligations.']);
   });
 
   it('catalog lines for get_agency_budget_trends no longer promise awards or obligations', () => {
@@ -133,6 +138,12 @@ describe('live budget labels', () => {
       expect(block).not.toMatch(/BEFORE it becomes awards/);
       expect(block).not.toMatch(/not total obligations/);
       expect(block).toMatch(/budgetary resources/);
+      expect(block).not.toMatch(/federal-account obligations/);
+    }
+    for (const src of [registry, server]) {
+      expect(src).toContain('federal-account obligations');
+      expect(src).not.toContain('federal-account budgetary resources');
+      expect(src).not.toContain('increasing that spending');
     }
   });
 });

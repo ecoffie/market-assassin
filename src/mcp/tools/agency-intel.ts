@@ -278,7 +278,8 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
         shown_reason: 'live_table_unmeasured',
         keyword: programKeyword,
         agencies: null,
-        note: 'budget_programs could not be read. This is not a finding that no agency has growing budgetary resources.',
+        amount_basis: 'obligations',
+        note: 'budget_programs could not be read. This is not a finding that no agency has growing federal-account obligations.',
       };
     }
   }
