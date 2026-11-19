@@ -455,22 +455,20 @@ export async function GET(request: NextRequest) {
     // able to refresh rows it already holds even when the new-identity count trips the cap.
     // New identities over the cap are quarantined whole (no partial insert of that new set).
     const refused: string[] = [];
-    const heldBack = new Set<string>();
+    const refusedSources = new Set<string>();
     for (const src of [...new Set(deduped.map((r) => String(r.source_agency)))]) {
       const srcRows = deduped.filter((r) => String(r.source_agency) === src);
-      const nr = await countNewForecastRows(supabase, src, srcRows.map((r) => String(r.external_id)));
-      if ('error' in nr) {
-        for (const r of srcRows) heldBack.add(`${src}|${r.external_id}`);
-        const q = await quarantineRefusedLoad(supabase, src, nr.error, -1, srcRows);
-        refused.push(`${src}: new-row count failed: ${nr.error} — ${q.quarantined ? 'quarantined for replay' : `QUARANTINE FAILED (${q.quarantineError}); replay needs a re-fetch`}`);
-        continue;
-      }
-      const g = await guardForecastInserts(supabase, src, nr.newRows);
+      const ids = srcRows.map((r) => String(r.external_id));
+      const nr = await countNewForecastRows(supabase, src, ids);
+      const g = 'error' in nr
+        ? { allow: false as const, reason: `${src}: new-row count failed: ${nr.error}` }
+        : await guardForecastInserts(supabase, src, nr.newRows);
       if (g.allow) continue;
-      const heldIds = await existingForecastIds(supabase, src, srcRows.map((r) => String(r.external_id)));
+      const heldIds = 'error' in nr ? { error: nr.error } : await existingForecastIds(supabase, src, ids);
       if ('error' in heldIds) {
-        for (const r of srcRows) heldBack.add(`${src}|${r.external_id}`);
-        refused.push(`${src}: held-id read failed: ${heldIds.error}`);
+        for (const r of srcRows) refusedSources.add(`${src}|${r.external_id}`);
+        const q = await quarantineRefusedLoad(supabase, src, g.reason, 'error' in nr ? -1 : nr.newRows, srcRows);
+        refused.push(`${g.reason} — ${q.quarantined ? 'quarantined for replay' : `QUARANTINE FAILED (${q.quarantineError}); replay needs a re-fetch`}`);
         continue;
       }
       const split = forecastRowsForDailySync(
@@ -478,11 +476,11 @@ export async function GET(request: NextRequest) {
         heldIds.ids,
         false,
       );
-      for (const r of split.quarantinedNew) heldBack.add(`${src}|${r.external_id}`);
+      for (const r of split.quarantinedNew) refusedSources.add(`${src}|${r.external_id}`);
       const q = await quarantineRefusedLoad(supabase, src, g.reason, nr.newRows, split.quarantinedNew);
       refused.push(`${g.reason} — updates to existing keys still upsert (${split.write.length}); new rows ${q.quarantined ? 'quarantined' : `NOT quarantined (${q.quarantineError})`}`);
     }
-    const writable = deduped.filter((r) => !heldBack.has(`${r.source_agency}|${r.external_id}`));
+    const writable = deduped.filter((r) => !refusedSources.has(`${r.source_agency}|${r.external_id}`));
     if (refused.length) {
       failures.push(...refused.map((r) => `insert_refused: ${r}`));
       await sendOpsAlert({ subject: 'Forecast sync — bulk of NEW rows refused (publisher floor active)', html: `<p>${refused.map((r) => `<div>${r}</div>`).join('')}</p>` }).catch(() => {});
