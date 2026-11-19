@@ -48,7 +48,7 @@ export async function sbirSearch(input: SbirToolInput): Promise<SbirToolResult> 
       degraded: res.degraded,
       count: res.opportunities.length,
       coverage_note:
-        'NIH rows are awarded RePORTER projects. DARPA rows are included only after the Grants.gov collector has landed them (source darpa_baa). NSF SBIR is not in this answer: api.www.sbir.gov returned HTTP 403 and that collector stays parked. That is not zero NSF opportunities.',
+        'NIH rows are awarded RePORTER projects. DARPA rows are included only after the Grants.gov collector has landed them (source darpa_baa). Six stored ids from the 2026-04-05 hardcoded list are withheld while their NAICS is still the collector-written 541715; that is not zero DARPA opportunities. NSF SBIR is not in this answer: api.www.sbir.gov returned HTTP 403 and that collector stays parked. That is not zero NSF opportunities.',
     },
   };
   if (mcpFlags.aiHint) {

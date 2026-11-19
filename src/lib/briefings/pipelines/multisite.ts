@@ -12,6 +12,7 @@ import type {
   SetAsideType,
   OpportunityType,
 } from '@/lib/scrapers/types';
+import { isManufacturedDarpaRow } from '@/lib/scrapers/manufactured-darpa';
 
 // ============================================================================
 // TYPES
@@ -188,7 +189,7 @@ export async function fetchMultisiteOpportunities(
   }
 
   // Transform to MultisiteOpportunity format
-  const opportunities: MultisiteOpportunity[] = (data || []).map(row => ({
+  const opportunities: MultisiteOpportunity[] = (data || []).filter((row) => !isManufacturedDarpaRow(row)).map(row => ({
     id: row.id,
     source: row.source as SourceId,
     externalId: row.external_id,
