@@ -157,7 +157,11 @@ async function fetchDHS(): Promise<Record<string, unknown>[]> {
       return await fetchDhsAllrecordsFile(DHS_ALLRECORDS_CSV_URL);
     } catch (csvErr) {
       const csvMsg = csvErr instanceof Error ? csvErr.message : String(csvErr);
-      throw new Error(`DHS APFS unreachable (${classified.detail}). Public allRecords file: ${csvMsg}`);
+      // Keep the fail-loud phrase the repair ledger anchors on. HTML 200 and a
+      // denied public file are both unreachable — never an empty upsert.
+      throw new Error(
+        `DHS APFS returned HTML (not JSON) — ${classified.detail}. Public allRecords file: ${csvMsg}`,
+      );
     }
   }
   const data = classified.rows;
