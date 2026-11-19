@@ -28,7 +28,7 @@ async function signingKey(token: string) {
   const body = await res.json() as { keys?: Array<JsonWebKey & { kid?: string }> };
   const jwk = body.keys?.find((key) => key.kid === header.kid) ?? body.keys?.[0];
   if (!jwk) return null;
-  return publicKeyFromJwk(jwk);
+  return publicKeyFromJwk(jwk as Parameters<typeof publicKeyFromJwk>[0]);
 }
 
 function readerUrl(password: string): string | null {

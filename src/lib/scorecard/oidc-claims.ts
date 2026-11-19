@@ -2,7 +2,7 @@
  * GitHub Actions OIDC claims for one scorecard run.
  * Signature verification is separate. This function never sees a secret.
  */
-import { createPublicKey, createVerify, type KeyObject } from 'node:crypto';
+import { createPublicKey, createVerify, type JsonWebKeyInput, type KeyObject } from 'node:crypto';
 
 export const SCORECARD_OIDC_AUDIENCE = 'scorecard-reader';
 export const SCORECARD_OIDC_ISSUER = 'https://token.actions.githubusercontent.com';
@@ -94,6 +94,6 @@ export function verifyRs256(token: string, publicKey: KeyObject): { ok: true; pa
   }
 }
 
-export function publicKeyFromJwk(jwk: JsonWebKey): KeyObject {
+export function publicKeyFromJwk(jwk: JsonWebKeyInput['key']): KeyObject {
   return createPublicKey({ key: jwk, format: 'jwk' });
 }
