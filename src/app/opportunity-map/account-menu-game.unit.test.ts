@@ -36,14 +36,15 @@ const okStreak = { success: true, status: 'ok', streak: 6, longest: 9, countedTo
 const okRank = { success: true, status: 'ok', uei: 'ABC123DEF456', ranking: { uei: 'ABC123DEF456', rankAll: 4210, countAll: 317402, rankState: 38, countState: 9210, state: 'FL' } };
 
 describe('top bar streak + ranking chips', () => {
-  it('shows streak, then rank, then credits — streak POST records the visit', async () => {
+  it('shows streak, then rank, then the plan badge — and no credits pill in the top bar', async () => {
     const { d, calls, order } = await mount({ streak: okStreak, ranking: okRank });
     expect(d.getElementById('mindyStreak')?.textContent).toBe('6-day streak');
     expect(d.getElementById('mindyStreak')?.getAttribute('title')).toContain('Come back tomorrow for +25 credits');
     expect(d.getElementById('mindyRank')?.textContent).toBe('#4,210');
     expect(d.getElementById('mindyRank')?.getAttribute('title')).toContain('of 317,402 federal contractors (top 2%) · #38 in FL');
     expect(order.indexOf('mindyStreak')).toBeLessThan(order.indexOf('mindyRank'));
-    expect(order.indexOf('mindyRank')).toBeLessThan(order.indexOf('mindyCred'));
+    expect(order.indexOf('mindyRank')).toBeLessThan(order.indexOf('mindyPlan'));
+    expect(d.getElementById('mindyCred')).toBeNull();
     expect(calls.find((c) => c.url === '/api/app/streak')?.method).toBe('POST');
   });
 
@@ -51,6 +52,14 @@ describe('top bar streak + ranking chips', () => {
     const { d } = await mount({ streak: okStreak, ranking: { success: true, status: 'no_uei' } });
     const a = d.getElementById('mindyRank');
     expect(a?.textContent).toBe('Get ranked');
+    expect(a?.getAttribute('href')).toBe('/app?panel=vault');
+  });
+
+  it('a UEI with no federal dollars says "Not ranked yet" and why, linking to My Vault', async () => {
+    const { d } = await mount({ streak: okStreak, ranking: { success: true, status: 'not_found', uei: 'ABC123DEF456' } });
+    const a = d.getElementById('mindyRank');
+    expect(a?.textContent).toBe('Not ranked yet');
+    expect(a?.getAttribute('title')).toContain('UEI ABC123DEF456');
     expect(a?.getAttribute('href')).toBe('/app?panel=vault');
   });
 
