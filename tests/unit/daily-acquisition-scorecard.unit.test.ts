@@ -419,7 +419,7 @@ describe('buildDailyScorecard', () => {
     expect(forecasts.newUnique7d.value).toBe(0);
   });
 
-  it('never prints institute_sources.raw', () => {
+  it('never prints institute_sources.raw or recommendation text', () => {
     const sentinel = 'RAW_RECOMMENDATION_TEXT resolution_flag';
     const report = {
       measured: true,
@@ -427,15 +427,23 @@ describe('buildDailyScorecard', () => {
       windows: dailyWindows(NOW),
       sources: [],
       corpora: [],
-      examples: { pain_points: { status: 'measured', value: [{ title: 'Grid', raw: sentinel }], reason: null } },
+      examples: {
+        pain_points: {
+          status: 'measured',
+          value: [{ title: 'Grid', raw: sentinel, recommendation: sentinel }],
+          reason: null,
+        },
+      },
       findability: { h24: null, d7: null },
       runHistory: [],
     };
     expect(publicMarkdown(report)).not.toContain(sentinel);
     expect(publicJson(report)).not.toContain(sentinel);
     expect(publicJson(report)).not.toContain('"raw"');
+    expect(publicJson(report)).not.toContain('"recommendation"');
     const src = readFileSync(join(process.cwd(), 'scripts/daily-acquisition-scorecard.mjs'), 'utf8');
     expect(src).not.toMatch(/select:\s*'[^']*\braw\b/);
+    expect(src).toContain('includeAcquisitionRaw: false');
   });
 
   it('public output keeps a government link and drops secrets, emails, and internal hosts', async () => {
@@ -624,7 +632,7 @@ describe('the script and the workflow stay read-only', () => {
     expect(src).toContain("fact(null, 'unknown'");
   });
 
-  it('schedules weekdays, publishes the artifact and summary, and uses the existing Actions secrets', () => {
+  it('schedules weekdays, publishes the artifact and summary, and mints a short-lived JWT in Actions', () => {
     expect(workflow).toContain("cron: '45 12 * * 1-5'");
     expect(workflow).toContain('8:45 AM ET');
     expect(workflow).toContain('workflow_dispatch:');
@@ -641,11 +649,20 @@ describe('the script and the workflow stay read-only', () => {
     expect(workflow).not.toContain('SUPABASE_SERVICE_ROLE_KEY');
     expect(workflow).not.toMatch(/echo\s+.*secrets\./);
     expect(workflow).toContain('scorecard-readonly-check.mjs');
+    expect(workflow).toContain('scorecard-mint-jwt.mjs');
+    expect(workflow).toContain('::add-mask::');
+    expect(workflow).toContain('secrets.SCORECARD_JWT_SECRET');
+    const mint = workflow.split('- name: Mint short-lived scorecard JWT')[1].split('- name:')[0];
+    expect(mint).toContain('secrets.SCORECARD_JWT_SECRET');
+    expect(mint).toContain('SCORECARD_READONLY_JWT=$TOKEN');
+    expect(mint).not.toContain('NEXT_PUBLIC_SUPABASE_URL');
     const build = workflow.split('- name: Build scorecard')[1].split('- name:')[0];
     expect(build).toContain('secrets.NEXT_PUBLIC_SUPABASE_URL');
-    expect(build).toContain('secrets.SCORECARD_READONLY_JWT');
-    expect(workflow.replace(build, '')).not.toContain('SCORECARD_READONLY_JWT');
-    expect(workflow.replace(build, '')).not.toContain('NEXT_PUBLIC_SUPABASE_URL');
+    expect(build).not.toContain('secrets.SCORECARD_READONLY_JWT');
+    expect(build).not.toContain('SCORECARD_JWT_SECRET');
+    // Signing secret is only interpolated in the mint step env.
+    expect(workflow.split('secrets.SCORECARD_JWT_SECRET').length - 1).toBe(1);
+    expect(workflow.split('secrets.NEXT_PUBLIC_SUPABASE_URL').length - 1).toBe(1);
   });
 
   it('the daily command does not run the seven-day scorecard', () => {
@@ -691,7 +708,7 @@ describe('the script and the workflow stay read-only', () => {
 });
 
 describe('the read-only credential', () => {
-  it('the migration grants select only and keeps rollback out of the applied SQL', () => {
+  it('the migration grants select only, omits institute_sources.raw, and keeps rollback out of the applied SQL', () => {
     const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20261119_scorecard_reader.sql'), 'utf8');
     const applied = sql.split('-- ROLLBACK —')[0];
     expect(applied).toContain('CREATE ROLE scorecard_reader NOLOGIN NOINHERIT');
@@ -706,6 +723,12 @@ describe('the read-only credential', () => {
     expect(applied).toContain('GRANT SELECT (created_at, last_modified)');
     expect(applied).not.toMatch(/GRANT SELECT \([^)]*\bsynced_at\b/);
     expect(applied).not.toContain('GRANT SELECT (job_name, route');
+    const instituteGrant = applied.match(/GRANT SELECT \(([^)]+)\) ON TABLE public\.institute_sources/);
+    expect(instituteGrant).toBeTruthy();
+    expect(instituteGrant![1]).not.toMatch(/\braw\b/);
+    expect(applied).toContain('SCORECARD_JWT_SECRET');
+    expect(applied).toContain('scorecard-mint-jwt.mjs');
+    expect(applied).not.toMatch(/Mint the JWT with a 30-day expiry/);
   });
 
   it('a permission-denied write passes and any 2xx means the key can write', async () => {
@@ -728,5 +751,44 @@ describe('the read-only credential', () => {
     const src = readFileSync(join(process.cwd(), 'scripts/scorecard-readonly-check.mjs'), 'utf8');
     expect(src).not.toMatch(/method:\s*'POST'/);
     expect(src).not.toContain("body: '{}'");
+  });
+
+  it('fails closed on expired JWT, wrong role, and select denial', async () => {
+    const {
+      classifyJwtClaims,
+      classifySelectSmoke,
+      selectSmokeRequest,
+      EXPECTED_ROLE,
+    } = await import('../../scripts/scorecard-readonly-check.mjs');
+    const { mintScorecardJwt } = await import('../../scripts/scorecard-mint-jwt.mjs');
+
+    const secret = 'unit-test-scorecard-jwt-secret';
+    const nowSec = 1_700_000_000;
+    const fresh = mintScorecardJwt(secret, { nowSec, ttlSec: 120 });
+    const expired = mintScorecardJwt(secret, { nowSec: nowSec - 3600, ttlSec: 60 });
+    expect(classifyJwtClaims(fresh, { nowSec }).ok).toBe(true);
+    expect(classifyJwtClaims(fresh, { nowSec }).reason).toBe('role and exp ok');
+    expect(classifyJwtClaims(expired, { nowSec }).ok).toBe(false);
+    expect(classifyJwtClaims(expired, { nowSec }).reason).toBe('JWT expired');
+    expect(classifyJwtClaims('not-a-jwt', { nowSec }).ok).toBe(false);
+
+    const wrongRolePayload = Buffer.from(JSON.stringify({
+      role: 'service_role',
+      exp: nowSec + 120,
+    })).toString('base64url');
+    const wrongRole = `eyJhbGciOiJIUzI1NiJ9.${wrongRolePayload}.sig`;
+    expect(classifyJwtClaims(wrongRole, { nowSec }).ok).toBe(false);
+    expect(classifyJwtClaims(wrongRole, { nowSec }).reason).toBe('JWT role claim is not scorecard_reader');
+    expect(EXPECTED_ROLE).toBe('scorecard_reader');
+
+    expect(classifySelectSmoke(200).ok).toBe(true);
+    expect(classifySelectSmoke(401).ok).toBe(false);
+    expect(classifySelectSmoke(401).reason).toBe('select was denied');
+    expect(selectSmokeRequest('https://example.test').url).toContain('select=source_key');
+
+    const mintSrc = readFileSync(join(process.cwd(), 'scripts/scorecard-mint-jwt.mjs'), 'utf8');
+    expect(mintSrc).toContain("role: SCORECARD_ROLE");
+    expect(mintSrc).toContain('SCORECARD_JWT_SECRET');
+    expect(mintSrc).not.toContain('SUPABASE_SERVICE_ROLE_KEY');
   });
 });

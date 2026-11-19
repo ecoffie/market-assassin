@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * Ask Mindy attach UI: says "Saved privately to your Vault", uploads to the conversation (minting one
+ * Ask Mindy attach UI: says formats are saved privately, uploads to the conversation (minting one
  * when the chat is new), shows the server's refusal reason (CUI/classified/too large) and keeps nothing,
  * removes a file from the conversation, reloads per conversation. The panel shows it only behind the flag.
  */
@@ -49,9 +49,10 @@ beforeEach(() => { calls.length = 0; next.post = { status: 201, body: { success:
 afterEach(() => { document.body.innerHTML = ''; });
 
 describe('ChatAttachments', () => {
-  it('says the file is saved privately to the Vault', async () => {
+  it('names the allowed formats and that they are saved privately', async () => {
     const { el } = await mount({ sessionId: null });
-    expect(el.textContent).toContain('Saved privately to your Vault');
+    expect(el.textContent).toMatch(/PDF, Word, Excel, or CSV/i);
+    expect(el.textContent).toMatch(/saved privately/i);
   });
 
   it('accept list includes spreadsheet uploads (xlsx/xls/csv)', async () => {

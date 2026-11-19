@@ -656,6 +656,10 @@ function AppDashboard() {
       if (nextPanel === 'map') window.dispatchEvent(new Event(MAP_SHELL_HOME_EVENT));
       return;
     }
+    // Map → Ask Mindy: mark the chat so it can offer "Back to Map" without losing the session.
+    if (activePanelRef.current === 'map' && nextPanel === 'chat') {
+      try { sessionStorage.setItem('mindy_chat_from_map', '1'); } catch { /* unavailable */ }
+    }
     flushPanelTime(activePanelRef.current, 'panel_change');
     activePanelRef.current = nextPanel;
     panelStartedAtRef.current = Date.now();
