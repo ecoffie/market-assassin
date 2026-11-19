@@ -7,6 +7,7 @@
  * Lifted from the core of src/app/api/sbir/route.ts.
  */
 import { createClient } from '@supabase/supabase-js';
+import { isManufacturedDarpaRow } from '@/lib/scrapers/manufactured-darpa';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -105,7 +106,7 @@ async function fetchMultisite(keyword: string, agency: string, limit: number): P
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     let q = supabase
       .from('aggregated_opportunities')
-      .select('id,title,agency,set_aside_type,estimated_value,posted_date,close_date,description,source,source_url')
+      .select('id,external_id,title,agency,naics_code,set_aside_type,estimated_value,posted_date,close_date,description,source,source_url')
       // SBIR/STTR rows, plus DARPA research announcements the collector stores as darpa_baa.
       .or('opportunity_type.eq.sbir_sttr,source.eq.darpa_baa')
       .order('posted_date', { ascending: false })
@@ -118,18 +119,21 @@ async function fetchMultisite(keyword: string, agency: string, limit: number): P
       return { rows: [], degraded: true };
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rows: SbirOpportunity[] = (data || []).map((r: any) => ({
-      id: String(r.id ?? ''),
-      title: r.title ?? '',
-      agency: r.agency ?? 'Unknown',
-      phase: r.set_aside_type ?? undefined,
-      amount: typeof r.estimated_value === 'number' ? r.estimated_value : undefined,
-      startDate: r.posted_date ?? undefined,
-      endDate: r.close_date ?? undefined,
-      description: (r.description || '').slice(0, 500) || undefined,
-      source: r.source || 'Multisite',
-      url: r.source_url ?? undefined,
-    }));
+    const rows: SbirOpportunity[] = (data || []).flatMap((r: any) => {
+      if (isManufacturedDarpaRow(r)) return [];
+      return [{
+        id: String(r.id ?? ''),
+        title: r.title ?? '',
+        agency: r.agency ?? 'Unknown',
+        phase: r.set_aside_type ?? undefined,
+        amount: typeof r.estimated_value === 'number' ? r.estimated_value : undefined,
+        startDate: r.posted_date ?? undefined,
+        endDate: r.close_date ?? undefined,
+        description: (r.description || '').slice(0, 500) || undefined,
+        source: r.source || 'Multisite',
+        url: r.source_url ?? undefined,
+      }];
+    });
     return { rows, degraded: false };
   } catch (err) {
     console.error('[sbir:multisite] failed:', err);
