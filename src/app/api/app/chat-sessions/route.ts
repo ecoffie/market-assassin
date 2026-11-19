@@ -68,9 +68,9 @@ export async function GET(request: NextRequest) {
     if (!session || session.user_email?.toLowerCase() !== userEmail) {
       return NextResponse.json({ error: 'conversation not found' }, { status: 404 });
     }
-    // truncation-ok: scoped to ONE session_id — a single conversation's messages, not a fleet population.
     const { data: messages, error } = await supabase
       .from('mindy_chat_messages')
+      // truncation-ok: scoped to ONE session_id — a single conversation's messages, not a fleet population.
       .select('id, role, content, cited_sources, created_at, trace')
       .eq('session_id', sessionId)
       .order('created_at', { ascending: true });
