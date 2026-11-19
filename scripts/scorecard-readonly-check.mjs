@@ -1,14 +1,17 @@
 /**
- * Prove the scorecard JWT cannot write. Never prints the token or the body.
+ * Fail-closed guards for the scorecard JWT. Never prints the token or bodies
+ * that may carry credentials or recommendation text.
  *
- * PATCH one column on data_source_instances, filtered to a key that does not
- * exist, with Prefer: tx=rollback. Zero rows match, and the transaction is
- * rolled back even if the filter were wrong. A 2xx (including zero rows)
- * means UPDATE is granted, and this process exits 1. The only pass is
- * HTTP 401 or 403 with permission denied (42501).
+ * 1. JWT payload must decode, role must be scorecard_reader, exp must be in
+ *    the future (expired → exit 1).
+ * 2. PATCH one column on data_source_instances, filtered to a key that does
+ *    not exist, with Prefer: tx=rollback. A 2xx means UPDATE is granted →
+ *    exit 1. Pass only on HTTP 401/403 with permission denied (42501).
+ * 3. SELECT smoke on a granted column must return HTTP 2xx.
  */
 const TABLE = 'data_source_instances';
 export const PROBE_KEY = '__scorecard_probe_never_exists__';
+export const EXPECTED_ROLE = 'scorecard_reader';
 
 export function writeProbeRequest(baseUrl) {
   const root = String(baseUrl || '').replace(/\/$/, '');
@@ -21,6 +24,59 @@ export function writeProbeRequest(baseUrl) {
     },
     body: JSON.stringify({ name: PROBE_KEY }),
   };
+}
+
+export function selectSmokeRequest(baseUrl) {
+  const root = String(baseUrl || '').replace(/\/$/, '');
+  return {
+    method: 'GET',
+    url: `${root}/rest/v1/${TABLE}?select=source_key&limit=1`,
+    headers: {
+      Accept: 'application/json',
+    },
+  };
+}
+
+/** Decode JWT payload without verifying the signature. */
+export function decodeJwtPayload(token) {
+  const parts = String(token || '').split('.');
+  if (parts.length !== 3 || !parts[1]) {
+    return { ok: false, reason: 'JWT is malformed' };
+  }
+  try {
+    const json = Buffer.from(parts[1], 'base64url').toString('utf8');
+    const payload = JSON.parse(json);
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return { ok: false, reason: 'JWT payload is not an object' };
+    }
+    return { ok: true, payload };
+  } catch {
+    return { ok: false, reason: 'JWT payload could not be decoded' };
+  }
+}
+
+/**
+ * Fail closed on missing/expired exp and wrong role claim.
+ * @param {string} token
+ * @param {{ nowSec?: number }} [opts]
+ */
+export function classifyJwtClaims(token, opts = {}) {
+  const decoded = decodeJwtPayload(token);
+  if (!decoded.ok) return { ok: false, reason: decoded.reason };
+  const payload = decoded.payload;
+  const role = payload.role;
+  if (role !== EXPECTED_ROLE) {
+    return { ok: false, reason: 'JWT role claim is not scorecard_reader' };
+  }
+  const exp = payload.exp;
+  if (typeof exp !== 'number' || !Number.isFinite(exp)) {
+    return { ok: false, reason: 'JWT exp claim is missing' };
+  }
+  const nowSec = typeof opts.nowSec === 'number' ? opts.nowSec : Math.floor(Date.now() / 1000);
+  if (exp <= nowSec) {
+    return { ok: false, reason: 'JWT expired' };
+  }
+  return { ok: true, reason: 'role and exp ok' };
 }
 
 export function classifyWriteAttempt(status, body) {
@@ -37,6 +93,16 @@ export function classifyWriteAttempt(status, body) {
   return { ok: false, reason: 'write denial was not proven' };
 }
 
+export function classifySelectSmoke(status) {
+  if (typeof status === 'number' && status >= 200 && status < 300) {
+    return { ok: true, reason: 'select ok' };
+  }
+  if (status === 401 || status === 403) {
+    return { ok: false, reason: 'select was denied' };
+  }
+  return { ok: false, reason: 'select smoke failed' };
+}
+
 async function main() {
   const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(/\/$/, '');
   const key = process.env.SCORECARD_READONLY_JWT || '';
@@ -44,20 +110,43 @@ async function main() {
     console.error('scorecard read-only check: credential is not configured');
     process.exit(2);
   }
+
+  const claims = classifyJwtClaims(key);
+  console.log(`scorecard read-only check: jwt — ${claims.reason}`);
+  if (!claims.ok) process.exit(1);
+
+  const authHeaders = {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+  };
+
   const probe = writeProbeRequest(url);
-  const res = await fetch(probe.url, {
+  const writeRes = await fetch(probe.url, {
     method: probe.method,
     headers: {
       ...probe.headers,
-      apikey: key,
-      Authorization: `Bearer ${key}`,
+      ...authHeaders,
     },
     body: probe.body,
   });
-  const body = await res.text();
-  const verdict = classifyWriteAttempt(res.status, body);
-  console.log(`scorecard read-only check: http ${res.status} — ${verdict.reason}`);
-  if (!verdict.ok) process.exit(1);
+  const writeBody = await writeRes.text();
+  const writeVerdict = classifyWriteAttempt(writeRes.status, writeBody);
+  console.log(`scorecard read-only check: write probe http ${writeRes.status} — ${writeVerdict.reason}`);
+  if (!writeVerdict.ok) process.exit(1);
+
+  const smoke = selectSmokeRequest(url);
+  const selectRes = await fetch(smoke.url, {
+    method: smoke.method,
+    headers: {
+      ...smoke.headers,
+      ...authHeaders,
+    },
+  });
+  // Discard body — never print row content (could include non-public fields later).
+  await selectRes.text();
+  const selectVerdict = classifySelectSmoke(selectRes.status);
+  console.log(`scorecard read-only check: select smoke http ${selectRes.status} — ${selectVerdict.reason}`);
+  if (!selectVerdict.ok) process.exit(1);
 }
 
 if (process.argv[1] && process.argv[1].endsWith('scorecard-readonly-check.mjs')) main();
