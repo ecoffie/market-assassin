@@ -447,8 +447,12 @@ describe('buildDailyScorecard', () => {
     }
     const src = readFileSync(join(process.cwd(), 'scripts/daily-acquisition-scorecard.mjs'), 'utf8');
     expect(src).not.toMatch(/select:\s*'[^']*\braw\b/);
-    expect(src).toContain('includeAcquisitionRaw: false');
-    expect(src).toContain('getAgencySourcedIntelligence');
+    expect(src).not.toContain('getAgencySourcedIntelligence');
+    expect(src).toContain('scorecard_reader');
+    const plantedUrl = 'postgresql://scorecard_reader.abc:supersecretpass@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=verify-full';
+    expect(publicMarkdown({ ...report, note: plantedUrl })).not.toContain('supersecretpass');
+    expect(publicJson({ ...report, note: plantedUrl })).not.toContain('supersecretpass');
+    expect(publicMarkdown({ ...report, note: plantedUrl })).not.toContain('postgresql://');
   });
 
   it('public output keeps a government link and drops secrets, emails, and internal hosts', async () => {
@@ -631,11 +635,13 @@ describe('the script and the workflow stay read-only', () => {
     expect(src).not.toMatch(/method:\s*'DELETE'/);
     expect(src).not.toContain("select: '*'");
     expect(src).not.toContain('SUPABASE_SERVICE_ROLE_KEY');
-    expect(src).toContain('SCORECARD_READONLY_JWT');
-    expect(src).toContain('getAgencySourcedIntelligence');
-    expect(src).toContain('includeAcquisitionRaw: false');
+    expect(src).toContain('SCORECARD_DATABASE_URL');
+    expect(src).not.toContain('SCORECARD_READONLY_JWT');
+    expect(src).not.toContain('SCORECARD_JWT_SECRET');
+    expect(src).not.toContain('getAgencySourcedIntelligence');
     expect(src).toContain('scorecard_institute_resolution');
-    expect(src).toContain('restGet');
+    expect(src).toContain('createPgReader');
+    expect(src).not.toContain('restGet');
     expect(src).toContain("fact(null, 'unknown'");
   });
 
@@ -643,35 +649,31 @@ describe('the script and the workflow stay read-only', () => {
     expect(workflow).toContain("cron: '45 12 * * 1-5'");
     expect(workflow).toContain('8:45 AM ET');
     expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).toContain('./node_modules/.bin/tsx scripts/daily-acquisition-scorecard.mjs');
+    expect(workflow).toContain('scorecard-run.mjs');
+    expect(src).toContain(SCORECARD_BEGIN);
     expect(workflow).toContain('contents: read');
     expect(workflow).not.toMatch(/contents:\s*write/);
-    expect(workflow).not.toMatch(/pull_request:/);
+    expect(workflow).toContain('pull_request:');
     expect(workflow).not.toMatch(/pull_request_target:/);
+    expect(workflow).toContain("github.event_name != 'pull_request'");
     expect(workflow).toContain('daily-acquisition-scorecard');
     expect(workflow).toContain('GITHUB_STEP_SUMMARY');
     expect(workflow).toContain('actions/upload-artifact');
     expect(workflow).toContain('set +x');
-    expect(workflow).toContain(SCORECARD_BEGIN);
     expect(workflow).not.toContain('SUPABASE_SERVICE_ROLE_KEY');
     expect(workflow).not.toMatch(/echo\s+.*secrets\./);
-    expect(workflow).toContain('scorecard-readonly-check.mjs');
-    expect(workflow).toContain('scorecard-mint-jwt.mjs');
-    expect(workflow).toContain('::add-mask::');
-    expect(workflow).toContain('secrets.SCORECARD_JWT_SECRET');
+    expect(workflow).toContain('scorecard-run.mjs');
+    expect(workflow).not.toContain('scorecard-mint-jwt.mjs');
+    expect(workflow).toContain('id-token: write');
+    expect(workflow).toContain('actions: write');
     expect(workflow).toContain('Scorecard numbers are unknown. No report was published.');
     expect(workflow.split('- name: Upload scorecard')[1]).toContain('if: success()');
-    const mint = workflow.split('- name: Mint short-lived scorecard JWT')[1].split('- name:')[0];
-    expect(mint).toContain('secrets.SCORECARD_JWT_SECRET');
-    expect(mint).toContain('SCORECARD_READONLY_JWT=$TOKEN');
-    expect(mint).not.toContain('NEXT_PUBLIC_SUPABASE_URL');
+    expect(workflow).not.toContain('SCORECARD_JWT_SECRET');
+    expect(workflow).not.toContain('SCORECARD_READONLY_JWT');
+    expect(workflow).not.toContain('SCORECARD_DATABASE_URL:');
     const build = workflow.split('- name: Build scorecard')[1].split('- name:')[0];
-    expect(build).toContain('secrets.NEXT_PUBLIC_SUPABASE_URL');
-    expect(build).not.toContain('secrets.SCORECARD_READONLY_JWT');
-    expect(build).not.toContain('SCORECARD_JWT_SECRET');
-    // Signing secret is only interpolated in the mint step env.
-    expect(workflow.split('secrets.SCORECARD_JWT_SECRET').length - 1).toBe(1);
-    expect(workflow.split('secrets.NEXT_PUBLIC_SUPABASE_URL').length - 1).toBe(1);
+    expect(build).toContain('SCORECARD_CREDENTIAL_URL');
+    expect(build).not.toContain('secrets.');
   });
 
   it('the daily command does not run the seven-day scorecard', () => {
@@ -688,7 +690,7 @@ describe('the script and the workflow stay read-only', () => {
         env: {
           PATH: process.env.PATH,
           SUPABASE_SERVICE_ROLE_KEY: plantedService,
-          SCORECARD_READONLY_JWT: planted,
+          SCORECARD_DATABASE_URL: '',
         },
       });
     } catch (err) {
@@ -709,82 +711,108 @@ describe('the script and the workflow stay read-only', () => {
 });
 
 describe('the read-only credential', () => {
-  it('the migration grants select only, omits institute_sources.raw, and keeps rollback out of the applied SQL', () => {
+  it('the migration creates a login with no password and keeps rollback out of the applied SQL', () => {
     const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20261119_scorecard_reader.sql'), 'utf8');
     const applied = sql.split('-- ROLLBACK —')[0];
-    expect(applied).toContain('CREATE ROLE scorecard_reader NOLOGIN NOINHERIT');
-    expect(applied).toContain('GRANT scorecard_reader TO authenticator');
+    expect(applied).toContain('CREATE ROLE scorecard_reader LOGIN NOINHERIT');
+    expect(applied).not.toContain('GRANT scorecard_reader TO authenticator');
+    expect(applied).not.toMatch(/PASSWORD\s+'[^']+'/i);
+    expect(applied).toContain('PASSWORD %L');
     expect(applied).not.toMatch(/\bDROP\b/i);
     expect(applied).not.toMatch(/\bDELETE\b/i);
     expect(applied).not.toMatch(/\bTRUNCATE\b/i);
     expect(applied).not.toMatch(/\bUPDATE\b/i);
-    expect(applied).not.toMatch(/\bINSERT\b/i);
-    expect(applied).not.toMatch(/\bALTER\s+(ROLE|POLICY)\b/i);
+    expect(applied).toContain('INSERT INTO public.scorecard_credential_audit');
+    expect(applied).not.toMatch(/INSERT\s+INTO\s+(?!public\.scorecard_credential_audit)/i);
     expect(sql).toContain('DROP ROLE IF EXISTS scorecard_reader');
-    expect(applied).toContain('GRANT SELECT (created_at, last_modified)');
-    expect(applied).not.toMatch(/GRANT SELECT \([^)]*\bsynced_at\b/);
-    expect(applied).not.toContain('GRANT SELECT (job_name, route');
+    expect(applied).toContain('CONNECTION LIMIT 3');
+    expect(applied).toContain('default_transaction_read_only = on');
+    expect(applied).toContain("statement_timeout = '20s'");
+    expect(applied).toContain("idle_session_timeout = '60s'");
+    expect(applied).not.toContain('SCORECARD_JWT_SECRET');
     const flat = applied.replace(/\s+/g, ' ');
     const instituteGrant = flat.match(/GRANT SELECT \(([^)]+)\) ON TABLE public\.institute_sources/);
     expect(instituteGrant).toBeTruthy();
     expect(instituteGrant![1]).not.toMatch(/\braw\b/);
-    expect(flat).not.toMatch(/GRANT SELECT \([^)]*\braw\b/);
-    expect(applied).toContain('SCORECARD_JWT_SECRET');
-    expect(applied).toContain('scorecard-mint-jwt.mjs');
-    expect(applied).not.toMatch(/Mint the JWT with a 30-day expiry/);
-    expect(applied).toContain('scorecard_institute_resolution');
-    expect(applied).toContain('GRANT EXECUTE ON FUNCTION public.scorecard_institute_resolution');
+    expect(applied).toContain('scorecard_rotate_reader_password');
+    expect(applied).toContain('GRANT EXECUTE ON FUNCTION public.scorecard_rotate_reader_password');
     expect(applied).toContain('NOT APPLIED');
     const returns = applied.slice(applied.indexOf('RETURNS TABLE'), applied.indexOf('LANGUAGE sql'));
     expect(returns).toContain('resolution_flag');
     expect(returns).not.toContain('raw');
-    expect(returns).not.toMatch(/recommendation/);
   });
 
-  it('a permission-denied write passes and any 2xx means the key can write', async () => {
-    const { classifyWriteAttempt, writeProbeRequest, PROBE_KEY } = await import('../../scripts/scorecard-readonly-check.mjs');
-    const probe = writeProbeRequest('https://example.test');
-    expect(probe.method).toBe('PATCH');
-    expect(probe.url).toBe(`https://example.test/rest/v1/data_source_instances?source_key=eq.${PROBE_KEY}`);
-    expect(probe.headers.Prefer).toContain('tx=rollback');
-    expect(probe.body).not.toBe('{}');
-    expect(probe.body).toContain(PROBE_KEY);
-    expect(classifyWriteAttempt(401, '{"code":"42501","message":"permission denied for table data_source_instances"}').ok).toBe(true);
-    expect(classifyWriteAttempt(403, 'permission denied for table data_source_instances').ok).toBe(true);
-    expect(classifyWriteAttempt(400, '{"code":"23502","message":"null value in column \\"name\\""}').ok).toBe(false);
-    expect(classifyWriteAttempt(401, 'new row violates row-level security policy').ok).toBe(false);
-    expect(classifyWriteAttempt(200, '[]').ok).toBe(false);
-    expect(classifyWriteAttempt(201, '').ok).toBe(false);
-    expect(classifyWriteAttempt(204, '').ok).toBe(false);
-    expect(classifyWriteAttempt(204, '').reason).toBe('write privilege exists');
-    expect(classifyWriteAttempt(401, 'Invalid API key').ok).toBe(false);
-    const src = readFileSync(join(process.cwd(), 'scripts/scorecard-readonly-check.mjs'), 'utf8');
-    expect(src).not.toMatch(/method:\s*'POST'/);
-    expect(src).not.toContain("body: '{}'");
-    expect(src).not.toContain('console.log(body');
-    expect(src).not.toContain('console.error(body');
+  it('refuses a url that is not the pooler login with verify-full', async () => {
+    const { parseScorecardDatabaseUrl, classifySession } = await import('../../scripts/scorecard-db.mjs');
+    expect(parseScorecardDatabaseUrl('').reason).toBe('credential is missing');
+    const password = 'supersecretpass';
+    const good = `postgresql://scorecard_reader.abc:${password}@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=verify-full`;
+    expect(parseScorecardDatabaseUrl(good).ok).toBe(true);
+    expect(parseScorecardDatabaseUrl(good.replace('6543', '5432')).ok).toBe(false);
+    expect(parseScorecardDatabaseUrl(good.replace('sslmode=verify-full', 'sslmode=require')).ok).toBe(false);
+    expect(parseScorecardDatabaseUrl(good.replace('scorecard_reader.abc', 'postgres')).reason).toBe('role is not scorecard_reader');
+    expect(classifySession({
+      current_user: 'scorecard_reader',
+      rolsuper: false,
+      rolbypassrls: false,
+      rolcreaterole: false,
+      rolconnlimit: 3,
+      default_transaction_read_only: 'on',
+      transaction_read_only: 'on',
+      memberships: 0,
+      raw_select: false,
+      rotate_execute: false,
+      statement_timeout: '20s',
+      writes: [{ insert: false, update: false, delete: false, truncate: false }],
+    }).ok).toBe(true);
+    expect(classifySession({
+      current_user: 'scorecard_reader',
+      rolsuper: true,
+      rolbypassrls: false,
+      rolcreaterole: false,
+      rolconnlimit: 3,
+      default_transaction_read_only: 'on',
+      transaction_read_only: 'on',
+      memberships: 0,
+      raw_select: false,
+      rotate_execute: false,
+      statement_timeout: '20s',
+      writes: [],
+    }).reason).toBe('role is a superuser');
+    expect(classifySession({
+      current_user: 'scorecard_reader',
+      rolsuper: false,
+      rolbypassrls: false,
+      rolcreaterole: false,
+      rolconnlimit: 3,
+      default_transaction_read_only: 'off',
+      transaction_read_only: 'off',
+      memberships: 0,
+      raw_select: false,
+      rotate_execute: false,
+      statement_timeout: '20s',
+      writes: [],
+    }).reason).toBe('session is not read-only');
+    expect(classifySession({
+      current_user: 'scorecard_reader',
+      rolsuper: false,
+      rolbypassrls: false,
+      rolcreaterole: false,
+      rolconnlimit: 3,
+      default_transaction_read_only: 'on',
+      transaction_read_only: 'on',
+      memberships: 0,
+      raw_select: false,
+      rotate_execute: false,
+      statement_timeout: '20s',
+      writes: [{ insert: true, update: false, delete: false, truncate: false }],
+    }).reason).toBe('role has a write privilege');
   });
 
-  it('a missing, expired, or rejected credential is refused before a request', async () => {
-    const { assessCredential } = await import('../../scripts/scorecard-readonly-check.mjs');
-    const now = Date.parse('2026-11-19T00:00:00.000Z');
-    const token = (payload: Record<string, unknown>) => {
-      const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
-      return `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${body}.sig`;
-    };
-    expect(assessCredential('', now).reason).toBe('credential is missing');
-    expect(assessCredential('not-a-jwt', now).reason).toBe('credential is rejected');
-    expect(assessCredential(token({ role: 'service_role', exp: 2_000_000_000 }), now).reason).toBe('credential is rejected');
-    expect(assessCredential(token({ role: 'scorecard_reader', exp: 1_700_000_000 }), now).reason).toBe('credential is expired');
-    expect(assessCredential(token({ role: 'scorecard_reader' }), now).reason).toBe('credential is expired');
-    expect(assessCredential(token({ role: 'scorecard_reader', exp: 2_000_000_000 }), now).ok).toBe(true);
-  });
-
-  it('an expired scorecard token writes no report and does not print the token', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'scorecard-expired-'));
-    const exp = Math.floor(Date.now() / 1000) - 60;
-    const body = Buffer.from(JSON.stringify({ role: 'scorecard_reader', exp })).toString('base64url');
-    const token = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${body}.sig`;
+  it('a rejected connection string writes no report and does not print the password', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'scorecard-rejected-'));
+    const password = 'supersecretpass';
+    const databaseUrl = `postgresql://postgres:${password}@db.example.supabase.co:5432/postgres`;
     const script = join(process.cwd(), 'scripts/daily-acquisition-scorecard.mjs');
     let code = 0;
     let stdout = '';
@@ -792,11 +820,7 @@ describe('the read-only credential', () => {
       stdout = execFileSync(process.execPath, [script, '--out-dir', dir], {
         cwd: dir,
         encoding: 'utf8',
-        env: {
-          PATH: process.env.PATH,
-          NEXT_PUBLIC_SUPABASE_URL: 'https://example.test',
-          SCORECARD_READONLY_JWT: token,
-        },
+        env: { PATH: process.env.PATH, SCORECARD_DATABASE_URL: databaseUrl },
       });
     } catch (err) {
       const thrown = err as { status?: number; stdout?: string; stderr?: string };
@@ -804,49 +828,11 @@ describe('the read-only credential', () => {
       stdout = `${thrown.stdout ?? ''}\n${thrown.stderr ?? ''}`;
     }
     expect(code).toBe(1);
-    expect(stdout).toContain('scorecard numbers are unknown: credential is expired');
+    expect(stdout).toContain('scorecard numbers are unknown');
+    expect(stdout).not.toContain(password);
+    expect(stdout).not.toContain(databaseUrl);
     expect(stdout).not.toContain(SCORECARD_BEGIN);
-    expect(stdout).not.toContain(token);
     expect(existsSync(join(dir, 'acquisition-scorecard.json'))).toBe(false);
     expect(existsSync(join(dir, 'acquisition-scorecard.md'))).toBe(false);
-  });
-
-  it('fails closed on expired JWT, wrong role, and select denial', async () => {
-    const {
-      classifyJwtClaims,
-      classifySelectSmoke,
-      selectSmokeRequest,
-      EXPECTED_ROLE,
-    } = await import('../../scripts/scorecard-readonly-check.mjs');
-    const { mintScorecardJwt } = await import('../../scripts/scorecard-mint-jwt.mjs');
-
-    const secret = 'unit-test-scorecard-jwt-secret';
-    const nowSec = 1_700_000_000;
-    const fresh = mintScorecardJwt(secret, { nowSec, ttlSec: 120 });
-    const expired = mintScorecardJwt(secret, { nowSec: nowSec - 3600, ttlSec: 60 });
-    expect(classifyJwtClaims(fresh, { nowSec }).ok).toBe(true);
-    expect(classifyJwtClaims(fresh, { nowSec }).reason).toBe('role and exp ok');
-    expect(classifyJwtClaims(expired, { nowSec }).ok).toBe(false);
-    expect(classifyJwtClaims(expired, { nowSec }).reason).toBe('JWT expired');
-    expect(classifyJwtClaims('not-a-jwt', { nowSec }).ok).toBe(false);
-
-    const wrongRolePayload = Buffer.from(JSON.stringify({
-      role: 'service_role',
-      exp: nowSec + 120,
-    })).toString('base64url');
-    const wrongRole = `eyJhbGciOiJIUzI1NiJ9.${wrongRolePayload}.sig`;
-    expect(classifyJwtClaims(wrongRole, { nowSec }).ok).toBe(false);
-    expect(classifyJwtClaims(wrongRole, { nowSec }).reason).toBe('JWT role claim is not scorecard_reader');
-    expect(EXPECTED_ROLE).toBe('scorecard_reader');
-
-    expect(classifySelectSmoke(200).ok).toBe(true);
-    expect(classifySelectSmoke(401).ok).toBe(false);
-    expect(classifySelectSmoke(401).reason).toBe('select was denied');
-    expect(selectSmokeRequest('https://example.test').url).toContain('select=source_key');
-
-    const mintSrc = readFileSync(join(process.cwd(), 'scripts/scorecard-mint-jwt.mjs'), 'utf8');
-    expect(mintSrc).toContain("role: SCORECARD_ROLE");
-    expect(mintSrc).toContain('SCORECARD_JWT_SECRET');
-    expect(mintSrc).not.toContain('SUPABASE_SERVICE_ROLE_KEY');
   });
 });

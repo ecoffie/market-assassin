@@ -3,12 +3,10 @@
  *
  *   node scripts/daily-acquisition-scorecard.mjs --out-dir /tmp/scorecard
  *
- * Same credentials and the same GET-only PostgREST client as
- * scripts/acquisition-scorecard.mjs. No insert, update, delete, upsert, or RPC.
- * Findability calls getAgencySourcedIntelligence with includeAcquisitionRaw
- * false, so institute_sources.raw is not selected. The unapplied migration's
- * scorecard_institute_resolution returns only id, discovered_at, and the
- * resolution flag when a caller needs that flag without raw.
+ * Reads through the scorecard_reader SQL login. No PostgREST JWT, no insert,
+ * update, delete, upsert, or RPC. Findability uses the granted columns only.
+ * institute_sources.raw is not selected. scorecard_institute_resolution
+ * returns the resolution flag without that column.
  *
  * New records are rows whose created_at or first_seen (or, where that column
  * is the insert-only acquisition clock, discovered_at) falls in the window.
@@ -21,8 +19,8 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
-import { applyEnvFile, q, restGet } from './acquisition-scorecard.mjs';
-import { assessCredential } from './scorecard-readonly-check.mjs';
+import { applyEnvFile } from './acquisition-scorecard.mjs';
+import { connectScorecard, createPgReader, parseScorecardDatabaseUrl } from './scorecard-db.mjs';
 
 const HOUR = 60 * 60 * 1000;
 export const EXAMPLE_CAP = 5;
@@ -711,7 +709,7 @@ export async function measureCustomerFindability(io, window, readCustomer, probe
   const reason = failed
     ? READ_FAILED
     : (candidates.length
-      ? 'checked with getAgencySourcedIntelligence (includeAcquisitionRaw=false), the thinner findability path of the reader behind /api/pain-points, Ask Mindy, and get_agency_intel'
+      ? 'matched on institute id, document number, and claim text through the read-only login. institute_sources.raw was not read.'
       : 'no Institute GAO or Inspector General pain point was inserted in this window');
   return {
     status: failed ? 'unknown' : 'measured',
@@ -725,20 +723,42 @@ export async function measureCustomerFindability(io, window, readCustomer, probe
   };
 }
 
-export async function loadCustomerReader() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-  const key = process.env.SCORECARD_READONLY_JWT || '';
-  if (!url || !key) return null;
-  const mod = await import('../src/lib/strategic-intel/sourced-pain-points.ts');
-  const { createClient } = await import('@supabase/supabase-js');
-  const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-  // Thinner path: never select institute_sources.raw (not granted to scorecard_reader).
-  // Findability still matches on institute_source_id / document_number / claim text.
-  // Resolution flags, when needed without raw, come from scorecard_institute_resolution.
-  return (agency) => mod.getAgencySourcedIntelligence(agency, {
-    client,
-    includeAcquisitionRaw: false,
-  });
+export function scorecardClaimReader(io) {
+  return async (agency) => {
+    const listed = await io.rows('agency_pain_points_db', {
+      select: 'agency,pain_point,source,source_url,institute_source_ids',
+      agency: `eq.${agency}`,
+      source: 'in.(gao,ig_report)',
+      order: 'last_evidence_at.desc',
+      limit: '50',
+    });
+    if (!listed || listed.ok !== true || !Array.isArray(listed.rows)) throw new Error('read failed');
+    const ids = [...new Set(listed.rows.flatMap((row) => (
+      Array.isArray(row.institute_source_ids) ? row.institute_source_ids.filter(Boolean) : []
+    )))];
+    const byId = new Map();
+    if (ids.length) {
+      const sources = await io.rows('institute_sources', {
+        select: 'id,document_number,source_url,discovered_at',
+        id: `in.(${ids.join(',')})`,
+        limit: String(ids.length),
+      });
+      if (!sources || sources.ok !== true) throw new Error('read failed');
+      for (const row of sources.rows) if (row?.id) byId.set(row.id, row);
+    }
+    return {
+      sourced: listed.rows.map((row) => {
+        const sid = Array.isArray(row.institute_source_ids) ? row.institute_source_ids.find(Boolean) : null;
+        const inst = sid ? byId.get(sid) : null;
+        return {
+          institute_source_id: sid ?? null,
+          document_number: inst?.document_number ?? null,
+          pain_point: row.pain_point ?? null,
+          source_url: row.source_url || inst?.source_url || null,
+        };
+      }),
+    };
+  };
 }
 
 export async function buildDailyScorecard(io, opts = {}) {
@@ -834,7 +854,7 @@ export async function buildDailyScorecard(io, opts = {}) {
   return {
     label: 'Daily acquisition scorecard',
     measured: true,
-    queries: 'GET /rest/v1 for counts. Customer findability calls getAgencySourcedIntelligence with includeAcquisitionRaw=false (no institute_sources.raw) and may HEAD a public citation.',
+    queries: 'SQL reads as scorecard_reader. Findability uses granted columns and does not read institute_sources.raw. A public citation may be checked with HEAD.',
     generatedAt: now.toISOString(),
     windows,
     counting: 'New records are rows whose created_at, first_seen, or insert-only discovered_at falls in the window (newly collected). Customer findability is a separate metric (newly customer-accessible). A cron_job_runs success, a synced_at touch, and an unchanged upsert are not new.',
@@ -972,39 +992,9 @@ export function renderMarkdown(report) {
   return lines.join('\n');
 }
 
-const CREDENTIAL_REFUSAL = /jwt|jws|invalid api key|pgrst301|pgrst302|permission denied|42501/i;
-
-export function createPostgrestReader(base, key) {
-  const state = { refusal: null };
-  const note = (res) => {
-    if (res && res.ok === false && CREDENTIAL_REFUSAL.test(String(res.error ?? ''))) {
-      state.refusal = 'credential is rejected';
-    }
-    return res;
-  };
-  return {
-    get refusal() { return state.refusal; },
-    async count(table, filters) {
-      const path = `/rest/v1/${table}?${q(filters)}`;
-      const res = note(await restGet(base, key, path, { count: true }));
-      if (!res.ok) return { ok: false, error: res.error, rows: [], count: null };
-      if (typeof res.count !== 'number') return { ok: false, error: 'count header missing', rows: [], count: null };
-      return { ok: true, error: null, rows: [], count: res.count };
-    },
-    async rows(table, filters) {
-      const path = `/rest/v1/${table}?${q(filters)}`;
-      const res = note(await restGet(base, key, path));
-      if (!res.ok) return { ok: false, error: res.error, rows: [], count: null };
-      return { ok: true, error: null, rows: res.rows, count: null };
-    },
-  };
-}
-
-function loadCredentials() {
+function loadDatabaseUrl() {
   if (existsSync('.env.local')) applyEnvFile(readFileSync('.env.local', 'utf8'));
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-  const key = process.env.SCORECARD_READONLY_JWT || '';
-  return { url: url.replace(/\/$/, ''), key };
+  return process.env.SCORECARD_DATABASE_URL || '';
 }
 
 function unmeasured(now, reason) {
@@ -1013,7 +1003,7 @@ function unmeasured(now, reason) {
   return {
     label: 'Daily acquisition scorecard',
     measured: false,
-    queries: 'GET /rest/v1 for counts. Customer findability calls getAgencySourcedIntelligence with includeAcquisitionRaw=false (no institute_sources.raw) and may HEAD a public citation.',
+    queries: 'SQL reads as scorecard_reader. Findability uses granted columns and does not read institute_sources.raw. A public citation may be checked with HEAD.',
     generatedAt: now.toISOString(),
     windows,
     reason,
@@ -1058,24 +1048,23 @@ async function main() {
     console.error('--out-dir needs a directory');
     process.exit(2);
   }
-  const { url, key } = loadCredentials();
-  const gate = assessCredential(key);
-  if (!url || !gate.ok) {
-    const reason = !url || gate.reason === 'credential is missing' ? 'credential is missing' : gate.reason;
-    console.error(`scorecard numbers are unknown: ${reason}`);
-    process.exit(reason === 'credential is missing' ? 2 : 1);
+  const databaseUrl = loadDatabaseUrl();
+  const parsed = parseScorecardDatabaseUrl(databaseUrl);
+  if (!parsed.ok) {
+    console.error(`scorecard numbers are unknown: ${parsed.reason}`);
+    process.exit(parsed.reason === 'credential is missing' ? 2 : 1);
   }
-  const io = createPostgrestReader(url, key);
-  let readCustomer = null;
+  const connected = await connectScorecard(databaseUrl);
+  if (!connected.ok) {
+    console.error(`scorecard numbers are unknown: ${connected.reason}`);
+    process.exit(1);
+  }
+  const io = createPgReader(connected.client);
   let report;
   try {
-    try {
-      readCustomer = await loadCustomerReader();
-    } catch {
-      readCustomer = null;
-    }
-    report = await buildDailyScorecard(io, { now, readCustomer });
+    report = await buildDailyScorecard(io, { now, readCustomer: scorecardClaimReader(io) });
   } catch {
+    await connected.client.end().catch(() => {});
     if (io.refusal) {
       console.error(`scorecard numbers are unknown: ${io.refusal}`);
       process.exit(1);
@@ -1084,12 +1073,13 @@ async function main() {
     writeReport(report, outDir);
     process.exit(1);
   }
+  await connected.client.end().catch(() => {});
   if (io.refusal) {
     console.error(`scorecard numbers are unknown: ${io.refusal}`);
     process.exit(1);
   }
   writeReport(report, outDir);
-  if (report.instanceList.readOk === false || !readCustomer) process.exit(1);
+  if (report.instanceList.readOk === false) process.exit(1);
 }
 
 if (process.argv[1] && basename(process.argv[1]) === 'daily-acquisition-scorecard.mjs') main();

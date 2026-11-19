@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-19 — Scorecard login rotates per run
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-19 | Acquisition scorecard | The weekday job no longer mints a JWT. It exchanges a GitHub OIDC token for a 30-minute `scorecard_reader` password. The workflow holds no database password and no signing secret. `scorecard_rotate_reader_password` is the only `ALTER ROLE` for that login. Migration `20261119_scorecard_reader.sql` is not applied. | `scorecard_rotate_reader_password` → `supabase/migrations/20261119_scorecard_reader.sql` | `tests/unit/daily-acquisition-scorecard.unit.test.ts` | BUILT, NOT MERGED |
+
 ## 2026-11-19 — Scorecard reader does not get institute raw
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
