@@ -19,6 +19,28 @@ tool, federal market research.*
 
 ---
 
+## Ask Mindy packaged market research (Nov 2026)
+
+**What:** On the Opportunity Map, Ask Mindy builds a comprehensive federal market
+research report with the **same one-shot packaged research engine** MCP agents use
+(`generate_market_report`) — Mindy IP, not a Claude-style ad-hoc tool chain. The
+report opens in the in-chat reading pane; Map filters no longer scope the chat.
+
+**Why:** Same federal data under MCP and Map Ask used to produce different quality
+because Ask assembled scraps into a document. Closing the orchestration gap is how
+Ask stays at (or above) Claude+MCP quality for market research.
+
+**SEO / content hooks:** AI federal market research report · GovCon market research
+in chat · SAM + USASpending market report · client-ready federal market brief.
+
+**Proof:** live `https://getmindy.ai/opportunity-map` serves `placeholder="Ask Mindy…"`,
+empty `ctxPreamble`, `market_report` SSE handler, and "Packaged research" pane copy
+(verified 2026-11-19 after deploy `dpl_3QqhR41H4VUStynt69N9uA2F211Y`). Policy unlock +
+forced `generate_market_report` on market-research asks in
+`src/lib/chat/chat-tool-policy.ts` / `tool-selection.ts` / `src/app/api/app/chat/route.ts`.
+
+---
+
 ## Shared team credits for multi-seat subscriptions (Sep 2026) — (coming: built, not yet sold publicly)
 
 **What:** A company buys one subscription, names its users, and every member's Mindy usage
