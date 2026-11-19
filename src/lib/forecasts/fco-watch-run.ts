@@ -10,6 +10,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { runFcoCensus, type FcoCensus } from './fco-census';
+import { gatewayWatchState } from './gateway-watch-state';
 import { evaluateFcoWatch, type FcoEvent, type FcoWatchState } from './fco-roster-watch';
 
 export const FCO_SOURCE_KEY = 'forecast_gsa_gateway';
@@ -84,10 +85,20 @@ export async function runFcoWatch(
     if (result.clocks.lastSourceAdvance) clocks.last_source_advance = result.clocks.lastSourceAdvance;
     // held_population is the VERIFIED canonical count — never an aspirational future number.
     clocks.held_population = heldCanonical;
-    // Behind upstream is CONTENT_STALE, not "current". A successful watch never implies currency.
-    clocks.source_state = heldCanonical < census.uniqueListingIds ? 'content_stale' : 'current';
-  } else if (census.pagesFetched === 0) {
-    clocks.source_state = 'unreachable';
+  }
+  // A page we could read is not unreachable, even when the census is incomplete
+  // (the source throttles and page=1 can repeat page=2). Unreachable only when
+  // nothing was read. current only from gatewayWatchState on a complete census.
+  const watched = gatewayWatchState({
+    pagesFetched: census.pagesFetched,
+    reportedTotal: census.reportedTotal,
+    complete: census.complete,
+    heldCanonical,
+    uniqueListingIds: census.uniqueListingIds,
+  });
+  if (watched) clocks.source_state = watched;
+  if (watched === 'content_stale' && !result.clocks.lastSuccessfulCheck && census.reportedTotal > 0) {
+    clocks.upstream_population = census.reportedTotal;
   }
 
   if (!dry) {

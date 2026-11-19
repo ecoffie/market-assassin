@@ -4,10 +4,11 @@
  * WHY ONLY THESE TWO: a health sweep of all 9 registered scrapers on 2026-07-31
  * found 2 alive; a second sweep of all 13 stale sources on 2026-08-01 found
  * exactly one more that can be automated. DHS historically returned ~754 records
- * from apfs-cloud.dhs.gov JSON — that host now serves migration HTML, so the
- * default path FAIL-LOUDs (never upserts empty). Optional
- * `DHS_FORECAST_ALLRECORDS_URL` switches to the DHS.gov public allRecords file
- * (see src/lib/forecasts/dhs-allrecords.ts). DOE's current file is the dated
+ * from apfs-cloud.dhs.gov JSON — that host now serves a migration notice (HTML 200),
+ * and era-apfs.dhs.gov does not resolve. The default path classifies that body and
+ * then tries the public allRecords CSV. A 403, HTML notice, or empty file FAIL-LOUDs
+ * (never upserts empty). Optional `DHS_FORECAST_ALLRECORDS_URL` still overrides.
+ * DOE's current file is the dated
  * CSV linked from energy.gov/osbp/acquisition-forecast (not the July 2026 XLSX,
  * which still returns 200). Everything else is blocked, not merely broken:
  *
@@ -36,10 +37,12 @@
  */
 import { canonicalDhsExternalId } from '@/lib/forecasts/dhs-identity';
 import {
+  DHS_ALLRECORDS_CSV_URL,
   DHS_ALLRECORDS_SOURCE_TYPE,
   dhsAllrecordsToDbRow,
   parseDhsAllrecordsBuffer,
 } from '@/lib/forecasts/dhs-allrecords';
+import { classifyDhsBody } from '@/lib/forecasts/dhs-source';
 import { NextRequest, NextResponse } from 'next/server';
 import { forecastWriterClient, guardForecastInserts, countNewForecastRows, quarantineRefusedLoad } from '@/lib/forecasts/writer';
 import { sendOpsAlert } from '@/lib/ops-alert';
@@ -145,29 +148,19 @@ async function fetchDHS(): Promise<Record<string, unknown>[]> {
     headers: { Accept: 'application/json', 'User-Agent': 'GovConGiants-Mindy/1.0' },
     cache: 'no-store',
   });
-  if (!res.ok) throw new Error(`DHS APFS HTTP ${res.status}`);
-
   const text = await res.text();
-  const trimmed = text.trim();
-  // Migration / Login.gov pages return 200 with HTML. That is a hard failure —
-  // never JSON.parse into [] and never upsert empty.
-  if (/^<!DOCTYPE\s+html/i.test(trimmed) || /^<html[\s>]/i.test(trimmed)) {
-    throw new Error(
-      'DHS APFS returned HTML (not JSON) — apfs-cloud migrated; ' +
-        'use scripts/ingest-dhs-forecast-allrecords.ts dry-run, or set DHS_FORECAST_ALLRECORDS_URL after review',
-    );
+  const classified = classifyDhsBody(res.status, text);
+  if (classified.kind !== 'json_array') {
+    // The JSON host is a migration page. The public CSV is the replacement when
+    // DHS.gov actually serves it. A 403 here is still a failure — never [].
+    try {
+      return await fetchDhsAllrecordsFile(DHS_ALLRECORDS_CSV_URL);
+    } catch (csvErr) {
+      const csvMsg = csvErr instanceof Error ? csvErr.message : String(csvErr);
+      throw new Error(`DHS APFS unreachable (${classified.detail}). Public allRecords file: ${csvMsg}`);
+    }
   }
-  let data: unknown;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error(
-      'DHS APFS returned non-JSON body — refusing empty upsert. ' +
-        'Official public file: DHS.gov APFS_forecast_allRecords.csv',
-    );
-  }
-  if (!Array.isArray(data)) throw new Error('DHS APFS returned a non-array payload');
-  if (data.length === 0) throw new Error('DHS APFS returned 0 rows — refusing empty upsert');
+  const data = classified.rows;
 
   const now = new Date().toISOString();
   return (data as DhsForecast[]).map((r) => {

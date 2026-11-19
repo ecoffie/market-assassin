@@ -41,6 +41,7 @@ import {
   scheduleTruth,
   STATIC_FILE_AS_OF,
   UPSTREAM_PUBLISHERS,
+  corpusFreshness,
   summarizeStates,
   timestampState,
   worstState,
@@ -543,10 +544,15 @@ export async function GET(request: NextRequest) {
       ],
       headlineContribution: c.forecasts,
       freshness: {
-        state: forecastInstances.length ? worstState(forecastInstances.map((i) => i.state)) : timestampState(e.forecasts, 24, now),
+        state: forecastInstances.length ? corpusFreshness(forecastInstances.map((i) => i.state)) : timestampState(e.forecasts, 24, now),
         asOf: e.forecasts,
-        basis: `worst of ${forecastInstances.length} registered feeds (data_source_instances); aggregate clock MAX(agency_forecasts.updated_at)`,
-        detail: `${forecastIssuers.length} issuing agencies hold rows; ${forecastInstances.length} have a registered feed in the control plane (${summarizeStates(forecastInstances.map((i) => i.state))}). Agencies without a registered feed are not health-monitored.`,
+        basis: `corpus of ${forecastInstances.length} registered feeds (data_source_instances); aggregate clock MAX(agency_forecasts.updated_at)`,
+        detail: [
+          `${forecastIssuers.length} issuing agencies hold rows; ${forecastInstances.length} have a registered feed in the control plane (${summarizeStates(forecastInstances.map((i) => i.state))}). Agencies without a registered feed are not health-monitored.`,
+          forecastInstances.some((i) => i.state === 'UNREACHABLE')
+            ? `Unreachable feeds (not zero rows): ${forecastInstances.filter((i) => i.state === 'UNREACHABLE').map((i) => i.sourceKey).join(', ')}.`
+            : '',
+        ].filter(Boolean).join(' '),
         instances: forecastInstances,
         schedules: schedules(CRON_JOBS.forecasts),
       },
