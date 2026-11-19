@@ -326,7 +326,7 @@ const LIVE_SYNC_CHECKS: Array<{ key: string; name: string; table: string; column
     table: 'dod_sbir_topics',
     column: 'synced_at',
     staleDays: 2,
-    refreshWith: 'sync-dod-sbir — empty corpus or api-down must not report success; park until sbir.gov advances',
+    refreshWith: 'sync-dod-sbir stays ENABLED. HTTP 503 is degraded, not a reason to park. Do not apply 20261118_park_false_green_freshness.sql to disable this job.',
   },
 ];
 

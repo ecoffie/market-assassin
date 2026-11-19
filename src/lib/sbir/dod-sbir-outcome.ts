@@ -63,17 +63,20 @@ export async function probeDodSbirWithRetries<T extends DodSbirProbePage>(
 export function decideDodSbirExecuteOutcome(input: {
   stopped: DodSbirStop;
   upserted: number;
-  heldRows: number;
+  /** null when the held-count read failed. Unknown is not an empty corpus. */
+  heldRows: number | null;
 }): DodSbirOutcome {
   if (input.stopped === 'api-down') {
+    const disclosure = input.heldRows == null
+      ? 'sbir.gov unreachable; held population unmeasured — not a successful sync and not an empty corpus'
+      : input.heldRows === 0
+        ? 'sbir.gov unreachable; dod_sbir_topics empty — not a successful sync'
+        : 'sbir.gov unreachable; held rows unchanged — not a successful sync';
     return {
       success: false,
       httpStatus: 503,
       cronOutcome: 'error',
-      disclosure:
-        input.heldRows === 0
-          ? 'sbir.gov unreachable; dod_sbir_topics empty — not a successful sync'
-          : 'sbir.gov unreachable; held rows unchanged — not a successful sync',
+      disclosure,
     };
   }
   if (input.stopped === 'error') {
@@ -93,12 +96,15 @@ export function decideDodSbirExecuteOutcome(input: {
     };
   }
   // last-page / budget with nothing held: the drain "finished" into an empty table.
-  if (input.upserted === 0 && input.heldRows <= 0) {
+  // A failed count is not the same fact as zero rows.
+  if (input.upserted === 0 && (input.heldRows == null || input.heldRows <= 0)) {
     return {
       success: false,
       httpStatus: 503,
       cronOutcome: 'error',
-      disclosure: 'drain completed with 0 topics held — empty corpus is not success',
+      disclosure: input.heldRows == null
+        ? 'drain completed and the held count could not be read — not a successful sync'
+        : 'drain completed with 0 topics held — empty corpus is not success',
     };
   }
   return {

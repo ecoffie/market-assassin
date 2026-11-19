@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import {
+  classifyDodSbirHealth,
   classifyJobPostingHealth,
   computeTotals,
   countUpstreamPublishers,
@@ -267,6 +268,17 @@ describe('job postings are live when the mirror is not serving', () => {
     expect(h.state).toBe('CURRENT');
     expect(h.stored).toBe(40);
     expect(h.headlineContribution).toBe(40);
+  });
+});
+
+describe('DoD SBIR is degraded when the source is down', () => {
+  it('a 503 is unreachable, and an unmeasured count is not zero', () => {
+    const down = classifyDodSbirHealth({ held: 0, httpStatus: 503, runStatus: 'error' });
+    expect(down.state).toBe('UNREACHABLE');
+    expect(down.detail).toMatch(/stays enabled/);
+    const unknown = classifyDodSbirHealth({ held: null, httpStatus: null, runStatus: null });
+    expect(unknown.state).toBe('UNKNOWN');
+    expect(unknown.detail).toMatch(/not zero/);
   });
 });
 
