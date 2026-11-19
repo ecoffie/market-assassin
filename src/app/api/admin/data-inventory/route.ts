@@ -82,6 +82,7 @@ const CRON_JOBS = {
   budgetIntel: ['sync-budget-intel'],
   usaspendingAwards: ['sync-usaspending-awards'],
   samEntities: ['sync-sam-entities', 'sync-gov-buyer-data'],
+  dodaac: ['refresh-dodaac-directory'],
 } as const;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -742,8 +743,13 @@ export async function GET(request: NextRequest) {
       derivedFrom: ['bq_awards'],
       stored: c.dodaac, unit: 'offices',
       headlineContribution: 0,
-      freshness: { state: 'UNKNOWN', asOf: e.dodaac, basis: 'MAX(dodaac_directory.updated_at) — monthly producer refresh-dodaac-directory (0 9 6 * *); age + row coverage judged by check-data-freshness (table-measured), never by last_built' },
-      surface: { state: 'internal_only', tools: [], note: 'anchors office rosters, events and opportunity office names' },
+      freshness: {
+        state: timestampState(e.dodaac, 24 * 32, now),
+        asOf: e.dodaac,
+        basis: 'MAX(dodaac_directory.updated_at). Monthly producer refresh-dodaac-directory (0 9 6 * *). A missing clock is unknown. A code with no stored name stays unnamed.',
+        schedules: schedules(CRON_JOBS.dodaac),
+      },
+      surface: { state: 'customer_readable', tools: ['get_buying_offices'], note: 'Ask Mindy ranks offices from award transactions. Unresolved codes stay unnamed. This directory does not invent contacts.' },
       upstreams: ['usaspending'], provenance: 'Contracting offices decoded from award DoDAACs (USASpending/FPDS in BigQuery).',
     },
     {

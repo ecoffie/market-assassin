@@ -265,3 +265,22 @@ describe('acc7 R4: metro radius with one city in `cities`', () => {
     expect(JSON.stringify(r._meta.ignored_args)).toMatch(/metro_radius_miles/);
   });
 });
+
+describe('unresolved offices stay unnamed', () => {
+  it('does not invent a name or a contact for a missing code or a code with no name', async () => {
+    const { d } = deps({
+      rows: [
+        { ...OFFICE_ROWS[0], office_key: '(not reported)' },
+        { ...OFFICE_ROWS[0], office_key: 'ABC123' },
+      ],
+    });
+    const r = await getBuyingOffices({ state: 'TN', naics: '5613' }, d, NOW);
+    expect(r.offices.map((o) => o.name_provenance)).toEqual(['not_reported', 'code_only']);
+    expect(r.offices[0].office_name).toBeNull();
+    expect(r.offices[0].office_code).toBeNull();
+    expect(r.offices[1].office_name).toBeNull();
+    expect(r.offices[1].office_code).toBe('ABC123');
+    expect(r.offices.every((o) => !('email' in o) && !('phone' in o))).toBe(true);
+    expect(r.notes.join(' ')).toMatch(/not filled in/);
+  });
+});

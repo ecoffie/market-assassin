@@ -30,6 +30,7 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
 |---|---|---|---|---|---|
+| 2026-11-19 | Data Core / buying offices | The directory clock is `MAX(dodaac_directory.updated_at)` on the monthly producer, unknown when that read fails. `get_buying_offices` labels a missing name `not_reported` or `code_only` and does not invent a name or a contact. | `name_provenance` → `src/mcp/tools/buying-offices.ts` | `buying-offices.unit.test.ts` | BUILT, NOT MERGED |
 | 2026-11-19 | Data Core / SAM entities | Incremental entity slices report on `sync-sam-entities` and no longer stamp `sync-decision-makers`. A slice error with nothing written is a failure. The dashboard clock is `MAX(sam_entities.synced_at)` on a 7-day cadence. The schedule migration is disabled and not applied. | `SAM_ENTITY_JOB` → `src/lib/sam/entity-sync-outcome.ts` | `entity-sync-outcome.unit.test.ts` | BUILT, NOT MERGED |
 | 2026-11-19 | Budget labeling | Agency-level live years are USASpending budgetary resources, a budget signal, not awards or spending. `budget_programs` rows stay federal-account obligations (`amount_basis: 'obligations'`), distinct from those agency figures, and the program copy does not say they predict solicitations or opportunities. `/api/budget-intel?mode=opportunities` is unchanged. | `USASpending budgetary resources are a budget signal` → `src/mcp/tools/agency-budget-trends.ts` | `budget-label.unit.test.ts` | BUILT, NOT MERGED |
 
