@@ -51,6 +51,11 @@ import { reportCronOutcome } from '@/lib/cron-self-report';
 const CRON_JOB_NAME = 'sync-decision-makers';
 import { createClient } from '@supabase/supabase-js';
 import { searchEntities } from '@/lib/sam/entity-api';
+import {
+  SAM_ENTITY_JOB,
+  entityPullStampsDecisionMakers,
+  entitySyncOutcome,
+} from '@/lib/sam/entity-sync-outcome';
 import { runDecisionMakersSync } from '@/lib/gov-contacts/buyer-contact-run';
 
 // The contacts drain runs under a soft wall-clock budget (budgetMs, default 210s). Without an
@@ -168,15 +173,17 @@ async function syncEntities() {
   // (bug 2026-06-04: checkpoints never advanced, table stuck re-pulling
   // pages 1-5). A non-null sentinel makes the conflict target work.
   for (const naics of SEED_NAICS) {
-    await sb.from('sam_entities_sync_state')
+    const { error: seedErr } = await sb.from('sam_entities_sync_state')
       .upsert({ naics_code: naics, state_code: 'ALL' }, { onConflict: 'naics_code,state_code', ignoreDuplicates: true });
+    if (seedErr) errors.push(`seed ${naics}: ${seedErr.message}`);
   }
 
-  const { data: slices } = await sb
+  const { data: slices, error: sliceErr } = await sb
     .from('sam_entities_sync_state')
     .select('*')
     .order('last_synced_at', { ascending: true, nullsFirst: true })
     .limit(ENTITY_SLICES_PER_RUN);
+  if (sliceErr) errors.push(`checkpoint read: ${sliceErr.message}`);
 
   const debug: Array<Record<string, unknown>> = [];
   for (const slice of slices || []) {
@@ -289,20 +296,33 @@ export async function GET(request: NextRequest) {
         budgetMs: num('budgetMs', 210_000),
       });
     }
+    let entityResult: { slicesRun: number; upserted: number; errors: string[] } | null = null;
     if ((pull === 'both' || pull === 'entities') && !dry) {
-      out.entities = await syncEntities();
+      entityResult = await syncEntities();
+      out.entities = entityResult;
     }
     out.durationSeconds = Math.round((Date.now() - started) / 1000);
-    out.success = true;
-    // The dispatcher fire-and-forgets this route (timeout_ms 290s > its 55s await
-    // cap) and records `dispatched` at 12s, which the watchdog ignores. Without
-    // this the run's real outcome is invisible forever — 71 such runs in 30 days.
-    // A `dry` rehearsal must not overwrite the scheduled job's status.
-    if (!dry) await reportCronOutcome(CRON_JOB_NAME, 'success');
-    return NextResponse.json(out);
+    const entityOutcome = entityResult ? entitySyncOutcome(entityResult) : null;
+    // Contacts and entities are different jobs. An entities-only chain must not
+    // stamp sync-decision-makers success over a contacts run that did not happen.
+    const contactsRan = entityPullStampsDecisionMakers(pull);
+    const entityOnlyFailed = pull === 'entities' && entityOutcome != null && !entityOutcome.success;
+    out.success = !entityOnlyFailed;
+    if (entityOutcome && !entityOutcome.success && contactsRan) out.entitySyncDegraded = true;
+    if (!dry && contactsRan) await reportCronOutcome(CRON_JOB_NAME, 'success');
+    if (!dry && entityOutcome) {
+      out.entitySync = entityOutcome;
+      await reportCronOutcome(SAM_ENTITY_JOB, entityOutcome.cronOutcome, entityOutcome.disclosure || undefined);
+    }
+    return NextResponse.json(out, { status: entityOnlyFailed ? 500 : 200 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (!dry) await reportCronOutcome(CRON_JOB_NAME, 'error', msg).catch(() => {});
+    if (!dry && entityPullStampsDecisionMakers(pull)) {
+      await reportCronOutcome(CRON_JOB_NAME, 'error', msg).catch(() => {});
+    }
+    if (!dry && (pull === 'entities' || pull === 'both')) {
+      await reportCronOutcome(SAM_ENTITY_JOB, 'error', msg).catch(() => {});
+    }
     return NextResponse.json({ success: false, error: msg, ...out }, { status: 500 });
   }
 }
