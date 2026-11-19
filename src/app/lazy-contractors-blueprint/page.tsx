@@ -98,6 +98,7 @@ export default async function LazyContractorsBlueprintPage() {
             <p className="lcb-date">{EVENT.dateLabel}</p>
             <p className="lcb-tz">11:00 AM ET · 10:00 AM CT · 9:00 AM MT · 8:00 AM PT · Live online</p>
             <p className="lcb-bonus">Show up live and get <strong>{CREDITS} free Mindy credits</strong>.</p>
+            {registered && <p className="lcb-proof">Join <strong>{registered} contractors</strong> already registered.</p>}
             <div className="lcb-cd-wrap lcb-wide"><Countdown /></div>
           </div>
           <RegistrationForm />
@@ -211,7 +212,7 @@ const LCB_CSS = `
 .lcb-sub{margin:18px 0 0;font-size:clamp(17px,1.8vw,20px);line-height:1.5;color:var(--lcb-soft);max-width:600px}
 .lcb-date{margin:26px 0 0;font-size:15px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
 .lcb-tz{margin:6px 0 0;font-size:15px;color:var(--lcb-soft)}
-.lcb-bonus{margin:18px 0 0;font-size:17px;color:#fff}
+.lcb-bonus{margin:18px 0 0;font-size:17px;color:#fff}.lcb-proof{margin:8px 0 0;font-size:15px;color:rgba(255,255,255,.85)}.lcb-proof strong{color:#fff}
 .lcb-bonus strong{color:var(--lcb-gold)}
 .lcb-cd-wrap .lcb-cd>p.mp-meta{color:var(--lcb-soft)}
 .lcb-cd-wrap .lcb-cd b{color:var(--mp-ink)}

@@ -57,6 +57,9 @@ export const MP_AI_MENU: readonly MpAiMenuItem[] = [
 export const MP_HEADER_PRODUCT_LINKS: readonly MpChromeLink[] = [
   { href: '/mcp/gallery', label: 'Mindy in your AI', sub: MP_AI_MENU },
   { href: '/roadmap', label: '2027 Roadmap' },
+  // Back in the bar 2026-11-19 (owner decision): visitors looking for the price had to guess that
+  // the signup button leads there.
+  { href: '/pricing', label: 'Pricing' },
 ];
 
 export interface MpHowItWorksItem extends MpChromeLink {
@@ -88,7 +91,7 @@ export const MP_HEADER_ACCOUNT_LINKS: readonly MpChromeLink[] = [
 ];
 
 /** No free plan for new users (2026-11): the signup CTA is the 14-day trial, chosen on /pricing. */
-export const MP_HEADER_SIGNUP_LINK: MpChromeLink = { href: '/pricing', label: 'Start for free' };
+export const MP_HEADER_SIGNUP_LINK: MpChromeLink = { href: '/pricing', label: 'Start 14-day free trial' };
 
 export const MP_LOGO_SRC = '/brand/mindy-logo-icon.png';
 
