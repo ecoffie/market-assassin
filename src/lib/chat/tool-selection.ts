@@ -12,6 +12,8 @@
  * Anything that mentions expiring / recompete / incumbent keeps every tool, so a recompete
  * question is never starved. This does not change how any search tool retrieves results.
  */
+import { normalizeStateCode } from '@/lib/utils/us-states';
+
 export const EXPIRING_CONTRACTS_TOOL = 'get_expiring_contracts';
 
 export const EXPIRING_SIGNAL =
@@ -199,6 +201,108 @@ export function enforceFindArgs(
   const lim = Number(a.limit_per_horizon);
   if (!Number.isFinite(lim) || lim < FIND_ROWS_PER_HORIZON) { a.limit_per_horizon = FIND_ROWS_PER_HORIZON; changes.push('limit_per_horizon'); }
   return changes.length ? { args: JSON.stringify(a), changes } : { args: rawArgs, changes };
+}
+
+/**
+ * Packaged market-report args (Ask ↔ MCP parity). The planner was forced to call
+ * generate_market_report but often passed only client_name + "Hawaii" and no keyword —
+ * the required market-total measurement then failed, the deliverable was withheld, and
+ * Ask narrated thin leftovers. Normalize state codes and ensure a measurement axis.
+ */
+export function enforceMarketReportArgs(
+  toolName: string,
+  rawArgs: string,
+  customerText: string,
+): { args: string; changes: string[] } {
+  if (toolName !== MARKET_REPORT_TOOL) return { args: rawArgs, changes: [] };
+  let a: Record<string, unknown>;
+  try { a = JSON.parse(rawArgs || '{}'); } catch { return { args: rawArgs, changes: [] }; }
+  if (!a || typeof a !== 'object' || Array.isArray(a)) return { args: rawArgs, changes: [] };
+  const changes: string[] = [];
+
+  if (typeof a.state === 'string' && a.state.trim()) {
+    const code = normalizeStateCode(a.state);
+    if (code && code !== a.state) { a.state = code; changes.push('state_normalized'); }
+    else if (!code) {
+      // Try the customer's words (planner may have put a place name elsewhere).
+      const fromText = extractStateFromCustomerText(customerText);
+      if (fromText) { a.state = fromText; changes.push('state_from_customer'); }
+    }
+  } else {
+    const fromText = extractStateFromCustomerText(customerText);
+    if (fromText) { a.state = fromText; changes.push('state_from_customer'); }
+  }
+
+  const hasAxis = [a.keyword, a.naics, a.psc].some((v) => typeof v === 'string' && String(v).trim());
+  if (!hasAxis) {
+    const derived = deriveMarketReportKeyword(customerText);
+    if (derived) { a.keyword = derived; changes.push('keyword_from_customer'); }
+  }
+
+  if (typeof a.client_name !== 'string' || !String(a.client_name).trim()) {
+    const client = extractClientName(customerText);
+    if (client) { a.client_name = client; changes.push('client_name_from_customer'); }
+  }
+
+  return changes.length ? { args: JSON.stringify(a), changes } : { args: rawArgs, changes: [] };
+}
+
+function extractStateFromCustomerText(text: string): string | null {
+  const t = String(text || '');
+  // "in Hawaii" / "in HI" / trailing state name
+  const m = t.match(/\bin\s+([A-Za-z][A-Za-z.\s]{1,30}?)\s*[.?!]?\s*$/i)
+    || t.match(/\b(?:for|serving|based in)\s+[^.]+?\bin\s+([A-Za-z][A-Za-z.\s]{1,30}?)\s*[.?!]?\s*$/i);
+  if (m) {
+    const code = normalizeStateCode(m[1].trim());
+    if (code) return code;
+  }
+  // Bare 2-letter code as its own word
+  for (const tok of t.split(/[\s,;]+/)) {
+    if (/^[A-Za-z]{2}$/.test(tok)) {
+      const code = normalizeStateCode(tok);
+      if (code) return code;
+    }
+  }
+  // Full state name anywhere
+  for (const name of ['Hawaii', 'Florida', 'California', 'Texas', 'Alaska', 'Virginia', 'Maryland', 'Pennsylvania', 'New York', 'Washington']) {
+    if (new RegExp(`\\b${name}\\b`, 'i').test(t)) {
+      const code = normalizeStateCode(name);
+      if (code) return code;
+    }
+  }
+  return null;
+}
+
+/** Industry / activity keyword when the planner forgot the measurement axis. */
+function deriveMarketReportKeyword(text: string): string | null {
+  const t = String(text || '');
+  // "for RBA Construction in Hawaii" → company phrase before "in <state>"
+  const forMatch = t.match(/\bfor\s+(.+?)(?:\s+in\s+[A-Za-z][A-Za-z.\s]{1,30})?\s*[.?!]?\s*$/i);
+  const phrase = (forMatch?.[1] || t)
+    .replace(/\b(my|our|the|a|an)\s+(company|firm|business)\b/gi, ' ')
+    .replace(/\b(comprehensive|federal|market|research|report|build|generate|create|write|prepare|make)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!phrase) return null;
+  // Prefer a distinctive industry noun at the end of a company name ("RBA Construction" → construction)
+  const words = phrase.split(/\s+/).filter(Boolean);
+  const last = words[words.length - 1] || '';
+  if (/^(construction|janitorial|roofing|hvac|staffing|cybersecurity|cyber|guard|security|catering|plumbing|electrical|landscaping|demolition|facilities|logistics|trucking|cleaning)$/i.test(last)) {
+    return last.toLowerCase();
+  }
+  // Drop all-caps acronyms (RBA) and keep the rest as a keyword phrase
+  const meaningful = words.filter((w) => !/^[A-Z]{2,5}$/.test(w) && w.length > 2);
+  if (meaningful.length) return meaningful.join(' ').toLowerCase().slice(0, 80);
+  return phrase.toLowerCase().slice(0, 80);
+}
+
+function extractClientName(text: string): string | null {
+  const m = String(text || '').match(/\bfor\s+(.+?)(?:\s+in\s+[A-Za-z][A-Za-z.\s]{1,30})?\s*[.?!]?\s*$/i);
+  if (!m) return null;
+  const name = m[1].replace(/\b(my|our|the)\s+(company|firm|business)\b/gi, '').trim();
+  if (!name || name.length < 2 || name.length > 80) return null;
+  if (/^(a|an|the|comprehensive|federal|market)$/i.test(name)) return null;
+  return name;
 }
 
 /** The one write tool allowed while document text is in the planner context. */

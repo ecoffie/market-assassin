@@ -51,7 +51,7 @@ import { fitMessages, inputBudget, type MsgKind } from '@/lib/chat/token-budget'
 import { stagingModelConfig, STAGING_CONFIG_HEADER } from '@/lib/chat/staging-model-config';
 import { customerErrorMessage } from '@/lib/chat/customer-errors';
 import { boundToolResult, perResultBudget } from '@/lib/chat/bound-tool-result';
-import { filterToolsForTurn, enforceFindArgs, SAM_ONLY_TOOL, MARKET_REPORT_TOOL, restrictWritesWhenDocumentText } from '@/lib/chat/tool-selection';
+import { filterToolsForTurn, enforceFindArgs, enforceMarketReportArgs, SAM_ONLY_TOOL, MARKET_REPORT_TOOL, restrictWritesWhenDocumentText } from '@/lib/chat/tool-selection';
 import { CURRENT_FIND_CHAT_CONTRACT } from '@/lib/mcp/potato-journey';
 import { findCompletionFooter, comingBackListLeadsWithNotCompeted, type FindResultWithItems } from '@/lib/chat/find-completeness';
 import { inferredCodeDisclosure } from '@/lib/chat/code-disclosure';
@@ -1080,9 +1080,16 @@ export async function POST(request: NextRequest) {
                 // F1: a find_opportunities call on a CURRENT_FIND turn keeps all three horizons unless the customer limited it.
                 const findArgs = enforceFindArgs(String(tc.function?.name || ''), guardedCities.args, toolOffer.intent, toolOffer.openOnly, customerTypedCodes);
                 for (const c of findArgs.changes) turnTrace.notices.push(`find_args_enforced:${c}`);
+                // Packaged market report: require a measurement axis + normalize state (Ask↔MCP parity).
+                const reportArgs = enforceMarketReportArgs(
+                  String(tc.function?.name || ''),
+                  findArgs.args,
+                  splitViewPreamble(message).rest || message,
+                );
+                for (const c of reportArgs.changes) turnTrace.notices.push(`market_report_args_enforced:${c}`);
                 // A resolved revision decides revises_document_id, not the model: the generated document's real id,
                 // or none for the user's own file (create_document only versions documents Mindy generated).
-                let docArgs = findArgs.args;
+                let docArgs = reportArgs.args;
                 if (revision && String(tc.function?.name || '') === CREATE_DOCUMENT) {
                   try {
                     const a = JSON.parse(docArgs || '{}');

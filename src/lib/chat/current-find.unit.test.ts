@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifyFindIntent, isOpenOnlyRequest, isMarketResearchRequest, filterToolsForTurn, enforceFindArgs, inheritFindIntent } from './tool-selection';
+import { classifyFindIntent, isOpenOnlyRequest, isMarketResearchRequest, filterToolsForTurn, enforceFindArgs, enforceMarketReportArgs, inheritFindIntent } from './tool-selection';
 import { CURRENT_FIND_CHAT_CONTRACT, P2_FIRST_TURN_INSTRUCTIONS } from '@/lib/mcp/potato-journey';
 
 const def = (name: string) => ({ type: 'function', function: { name } });
@@ -68,6 +68,30 @@ describe('filterToolsForTurn', () => {
   it('card chat (allowlist without find_opportunities) is unaffected: search tools are never removed for lack of FIND', () => {
     const card = ['lookup_solicitation', 'get_solicitation_documents', 'search_sam_opportunities'].map(def);
     expect(names(filterToolsForTurn(card, 'What open opportunities are like this one?').defs)).toEqual(['lookup_solicitation', 'get_solicitation_documents', 'search_sam_opportunities']);
+  });
+});
+
+describe('enforceMarketReportArgs: packaged report needs a measurement axis', () => {
+  const Q = 'Build a comprehensive federal market research report for RBA Construction in Hawaii.';
+  it('fills keyword + normalizes Hawaii → HI when the planner omitted the axis', () => {
+    const r = enforceMarketReportArgs('generate_market_report', JSON.stringify({ client_name: 'RBA Construction', state: 'Hawaii' }), Q);
+    const a = JSON.parse(r.args);
+    expect(a.state).toBe('HI');
+    expect(a.keyword).toBe('construction');
+    expect(a.client_name).toBe('RBA Construction');
+    expect(r.changes.sort()).toEqual(['keyword_from_customer', 'state_normalized']);
+  });
+  it('does not overwrite an explicit keyword/naics', () => {
+    const r = enforceMarketReportArgs('generate_market_report', JSON.stringify({ keyword: 'janitorial', state: 'HI' }), Q);
+    const a = JSON.parse(r.args);
+    expect(a.keyword).toBe('janitorial');
+    expect(a.state).toBe('HI');
+    // May still fill a missing client_name from the ask — never the keyword.
+    expect(r.changes.includes('keyword_from_customer')).toBe(false);
+  });
+  it('ignores other tools', () => {
+    const r = enforceMarketReportArgs('find_opportunities', '{"query":"x"}', Q);
+    expect(r).toEqual({ args: '{"query":"x"}', changes: [] });
   });
 });
 
