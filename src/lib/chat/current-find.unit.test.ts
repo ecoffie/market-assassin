@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifyFindIntent, isOpenOnlyRequest, filterToolsForTurn, enforceFindArgs, inheritFindIntent } from './tool-selection';
+import { classifyFindIntent, isOpenOnlyRequest, isMarketResearchRequest, filterToolsForTurn, enforceFindArgs, inheritFindIntent } from './tool-selection';
 import { CURRENT_FIND_CHAT_CONTRACT, P2_FIRST_TURN_INSTRUCTIONS } from '@/lib/mcp/potato-journey';
 
 const def = (name: string) => ({ type: 'function', function: { name } });
@@ -32,12 +32,29 @@ describe('isOpenOnlyRequest: only an explicit restriction narrows to open solici
   ])('%s -> %s', (q, want) => expect(isOpenOnlyRequest(q as string)).toBe(want));
 });
 
+describe('isMarketResearchRequest (packaged generate_market_report orchestration)', () => {
+  it.each([
+    ['Build a comprehensive federal market research report for my company.', true],
+    ['Generate a market research report for RBA Construction in Hawaii', true],
+    ['Write a full market report on janitorial services', true],
+    ['Which agencies buy 541512?', false],
+    ['What open opportunities are there for janitorial in Florida?', false],
+  ])('%s -> %s', (q, want) => expect(isMarketResearchRequest(q as string)).toBe(want));
+});
+
 describe('filterToolsForTurn', () => {
   it('CURRENT_FIND: find_opportunities offered, the open-only search and expiring tool are not', () => {
     const r = filterToolsForTurn(CHAT_TOOLS, 'What open opportunities are there for janitorial services in Florida?');
     expect(names(r.defs)).toEqual(['find_opportunities', 'lookup_solicitation', 'get_buying_offices']);
     expect(r.removed.sort()).toEqual(['get_expiring_contracts', 'search_sam_opportunities']);
-    expect(r).toMatchObject({ intent: 'CURRENT_FIND', openOnly: false });
+    expect(r).toMatchObject({ intent: 'CURRENT_FIND', openOnly: false, marketResearch: false });
+  });
+  it('MARKET_RESEARCH: drops create_document and capability_market_match when generate_market_report is offered', () => {
+    const tools = ['generate_market_report', 'create_document', 'capability_market_match', 'get_pricing_intel', 'find_opportunities'].map(def);
+    const r = filterToolsForTurn(tools, 'Build a comprehensive federal market research report for my company.');
+    expect(r.marketResearch).toBe(true);
+    expect(names(r.defs)).toEqual(['generate_market_report', 'get_pricing_intel', 'find_opportunities']);
+    expect(r.removed.sort()).toEqual(['capability_market_match', 'create_document']);
   });
   it('an explicit open-only request keeps search_sam_opportunities', () => {
     const r = filterToolsForTurn(CHAT_TOOLS, 'Show me only open solicitations for janitorial in FL');

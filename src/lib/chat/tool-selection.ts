@@ -102,25 +102,56 @@ export function inheritFindIntent(customerText: string, priorCustomerText: strin
   return classifyFindIntent(priorCustomerText) === 'CURRENT_FIND' ? 'CURRENT_FIND' : own;
 }
 
+// ── MARKET_RESEARCH: packaged one-shot (Mindy IP), same engine as MCP generate_market_report ──
+// Ask used to answer "build a comprehensive market research report" by picking ad-hoc tools and
+// stuffing scraps into create_document. MCP called generate_market_report once. Same federal data;
+// different orchestration — that gap is why quality diverged. These helpers close it.
+export const MARKET_REPORT_TOOL = 'generate_market_report';
+
+/** Customer asked for a full / packaged market research report (not a one-line market fact). */
+export const MARKET_RESEARCH_SIGNAL =
+  /\b((?:comprehensive|full|complete|client[- ]ready|one[- ]shot)\s+(?:federal\s+)?(?:market\s+)?(?:research\s+)?report|(?:market\s+research|deep[- ]dive)\s+report|(?:generate|create|build|write|prepare|make)\s+(?:me\s+)?(?:a\s+)?(?:comprehensive\s+|full\s+|federal\s+)?(?:market\s+research\s+)?report|(?:market\s+research)\s+for\s+(?:my|our|the)\s+(?:company|firm|business))\b/i;
+
+export function isMarketResearchRequest(customerText: string): boolean {
+  return MARKET_RESEARCH_SIGNAL.test(String(customerText || ''));
+}
+
 export function filterToolsForTurn<T extends { function?: Record<string, unknown> }>(
   defs: T[],
   customerText: string,
   priorCustomerText?: string | null,
-): { defs: T[]; removed: string[]; intent: FindIntent; openOnly: boolean } {
+): { defs: T[]; removed: string[]; intent: FindIntent; openOnly: boolean; marketResearch: boolean } {
   const base = filterToolsForQuestion(defs, customerText);
   const intent = inheritFindIntent(customerText, priorCustomerText);
   const openOnly = isOpenOnlyRequest(customerText);
+  const marketResearch = isMarketResearchRequest(customerText);
   const findOffered = base.defs.some((d) => String(d.function?.name ?? '') === FIND_TOOL);
-  if (intent !== 'CURRENT_FIND' || openOnly || !findOffered) return { ...base, intent, openOnly };
-  const removed = [...base.removed];
-  const kept = base.defs.filter((d) => {
-    const name = String(d.function?.name ?? '');
-    // FIND covers recompetes (its Coming back horizon), so the expiring-contracts tool is also not offered on
-    // a CURRENT_FIND turn, including one inherited from the previous question.
-    if (name === SAM_ONLY_TOOL || name === EXPIRING_CONTRACTS_TOOL) { if (!removed.includes(name)) removed.push(name); return false; }
-    return true;
-  });
-  return { defs: kept, removed, intent, openOnly };
+  let removed = [...base.removed];
+  let kept = base.defs;
+  if (intent === 'CURRENT_FIND' && !openOnly && findOffered) {
+    kept = kept.filter((d) => {
+      const name = String(d.function?.name ?? '');
+      // FIND covers recompetes (its Coming back horizon), so the expiring-contracts tool is also not offered on
+      // a CURRENT_FIND turn, including one inherited from the previous question.
+      if (name === SAM_ONLY_TOOL || name === EXPIRING_CONTRACTS_TOOL) { if (!removed.includes(name)) removed.push(name); return false; }
+      return true;
+    });
+  }
+  // Packaged market research (Mindy IP): when the customer asked for a full market report AND
+  // generate_market_report is offered, do not also offer create_document or capability_market_match
+  // on that turn — those are the scrap-assembly paths that diverge from MCP quality.
+  const reportOffered = kept.some((d) => String(d.function?.name ?? '') === MARKET_REPORT_TOOL);
+  if (marketResearch && reportOffered) {
+    kept = kept.filter((d) => {
+      const name = String(d.function?.name ?? '');
+      if (name === 'create_document' || name === 'capability_market_match') {
+        if (!removed.includes(name)) removed.push(name);
+        return false;
+      }
+      return true;
+    });
+  }
+  return { defs: kept, removed, intent, openOnly, marketResearch };
 }
 
 /**

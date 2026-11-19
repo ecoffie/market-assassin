@@ -10949,7 +10949,7 @@ const ASK_MINDY_HTML =
   + '<aside class="amk" id="amk" aria-hidden="true">'
   +   '<div class="amk-hd"><span class="mk"></span><div class="tt"><h3>Ask Mindy</h3><div class="amk-ctx" id="amkCtx"></div></div><button class="amk-x" id="amkX" aria-label="Close"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>'
   +   '<div class="amk-body" id="amkBody"></div>'
-  +   '<div class="amk-foot"><div class="amk-in"><textarea id="amkIn" rows="1" placeholder="Ask about this view&hellip;"></textarea>'
+  +   '<div class="amk-foot"><div class="amk-in"><textarea id="amkIn" rows="1" placeholder="Ask Mindy&hellip;"></textarea>'
   +     '<button class="amk-send" id="amkSend" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button></div></div>'
   + '</aside>';
 
@@ -11100,11 +11100,12 @@ const ASK_MINDY_JS = `<script>(function(){
   function renderCtx(){ if(!ctxEl)return;
     var about=oppCtx||attached;
     if(about){ ctxEl.innerHTML='<span class="dim">About:</span> '+esc(about.title||'this opportunity')+(about.deadline?' <span class="dim">\\u00b7 due '+esc(String(about.deadline).slice(0,10))+'</span>':''); return; }
-    var c=viewCtx(); var parts=ctxParts(c);
-    ctxEl.innerHTML='<span class="dim">Context:</span> '+parts.map(esc).join(' \\u00b7 '); }
-  // Threaded to the chat so answers are about THIS view — a compact, factual preface (no invented numbers).
-  function ctxPreamble(){ var c=viewCtx(); var parts=ctxParts(c); if(!parts.length)return '';
-    return '[Current map view \\u2014 '+parts.join('; ')+'. '+ctxLocation(c)+' Answer for THIS view when the question is about "these"/"this"/"here": use this location, not the user\\'s saved profile locations, and do not choose a city the user did not name.]\\n\\n'; }
+    // Product decision 2026-11-19: Map and Ask Mindy are separate tools. Do not show map viewport
+    // geography as Ask "Context" — that made Mid-Atlantic pins bind company market research.
+    ctxEl.innerHTML=''; }
+  // Kept for tests / dead call sites that still name it. Always empty: Ask messages are the customer's
+  // words only (no map-view injection).
+  function ctxPreamble(){ return ''; }
   // NARROW-PANEL DISPLAY (2026-11-16 parity audit): the drawer is ~420px wide, so every request says so with
   // display:'narrow_panel'. The server adds the presentation rule (answer first, short sections) to the answer
   // prompt as a SYSTEM note (src/lib/chat/display-hint.ts). It is never part of the message, so it is never
@@ -11139,24 +11140,21 @@ const ASK_MINDY_JS = `<script>(function(){
     if(pendingTurn){ var pd=pendingTurn; ask(pd.q,{turnId:pd.turnId,replay:true}); }
   };
   function greet(){
-    var c=viewCtx();
-    // View-aware follow-up chips — data-core only, NO teaching. Adapt the wording to what\\u2019s in view.
-    var chips=[];
-    if(c.count>0){ chips.push(['Who buys the most here?','Which agencies buy the most in this view? Name them with their spend.']);
-      chips.push(['Who wins these?','Which firms win the most contracts in this view? List the top incumbents.']); }
-    else { chips.push(['Who buys 541512 work?','Which agencies buy the most NAICS 541512 (custom computer programming) work?']);
-      chips.push(['Find the incumbent','How do I find who currently holds a contract before it recompetes?']); }
-    chips.push(['Write a capability statement','What should my capability statement include for the agencies in this view?']);
-    var h='<div class="amk-empty"><b>Ask about what you\\u2019re looking at</b><div class="lead">Agencies, incumbents, set-asides, teaming \\u2014 answered from live federal data for this view.</div><div class="amk-chips">';
+    // Ask Mindy is independent of the map viewport (2026-11-19). Chips are general federal questions.
+    var chips=[
+      ['Who buys 541512 work?','Which agencies buy the most NAICS 541512 (custom computer programming) work?'],
+      ['Find the incumbent','How do I find who currently holds a contract before it recompetes?'],
+      ['Write a capability statement','What should my capability statement include for federal buyers?'],
+      ['Market research report','Build a comprehensive federal market research report for my company.']
+    ];
+    var h='<div class="amk-empty"><b>Ask Mindy</b><div class="lead">Agencies, incumbents, set-asides, teaming, and market research \\u2014 from live federal data. The map filters do not scope this chat.</div><div class="amk-chips">';
     chips.forEach(function(ch){ h+='<button data-q="'+esc(ch[1])+'">'+esc(ch[0])+'</button>'; });
     h+='</div></div>';
     body.innerHTML=h;
     Array.prototype.forEach.call(body.querySelectorAll('.amk-chips button'),function(b){ b.onclick=function(){ ask(b.getAttribute('data-q')); }; });
   }
   // Public opener (does NOT auto-send). An explicit question (typed in the search bar, then "Ask") goes into the
-  // box as the customer's own words. The map's search term only becomes the HINT: it already reaches the answer
-  // through the view preamble, and putting it in the box made "click in and type" send the two glued together
-  // ("hvac servicesFind HVAC\\u2026", D7, Agent 4 live scorecard 2026-11-16). What is sent = what is in the box.
+  // box as the customer's own words. What is sent = what is in the box (map filters are not injected).
   // A later open without a seed clears the box only if it still holds the text the opener itself put there
   // (openerSeed); a draft the customer typed is kept.
   var openerSeed='';
@@ -11322,6 +11320,30 @@ const ASK_MINDY_JS = `<script>(function(){
     aEl.appendChild(w); body.scrollTop=body.scrollHeight;
     repOpen(id);
   }
+  // Packaged generate_market_report deliverable (Mindy IP — same engine as MCP). Opens the Ask
+  // report pane from the inline HTML; optional hosted /reports/<id> link for sharing.
+  function repOnMarketReport(ev,aEl){
+    var html=typeof ev.html==='string'?ev.html:''; if(!html) return;
+    var title=String(ev.title||'Market report').slice(0,160);
+    var url=typeof ev.url==='string'?ev.url:'';
+    var E=ensurePane(), seq=++repSeq;
+    E.el.classList.add('show'); E.el.setAttribute('aria-hidden','false');
+    E.f.srcdoc=html; E.f.style.visibility='visible'; E.msg.style.display='none';
+    E.t.textContent=title; E.v.textContent=url?'Packaged market report \\u00b7 shareable':'Packaged market report';
+    E.exp.innerHTML='';
+    if(url){ var a=document.createElement('a'); a.href=url; a.target='_blank'; a.rel='noopener'; a.textContent='Open hosted link'; a.style.cssText='font-size:12px;color:#93c5fd;margin-right:8px'; E.exp.appendChild(a); }
+    syncRepBtn();
+    var w=document.createElement('div'); w.className='amk-repcard'; w.setAttribute('data-testid','amk-report-card');
+    w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open report</button>';
+    w.querySelector('b').textContent=title;
+    w.querySelector('span').textContent='Packaged research \\u00b7 same engine as MCP';
+    w.querySelector('.amk-repcard-open').onclick=function(){
+      var E2=ensurePane(); E2.el.classList.add('show'); E2.el.setAttribute('aria-hidden','false');
+      if(seq===repSeq||E2.f.srcdoc){ E2.f.srcdoc=html; E2.f.style.visibility='visible'; E2.msg.style.display='none'; E2.t.textContent=title; }
+    };
+    aEl.appendChild(w); body.scrollTop=body.scrollHeight;
+    try{ if(window.__track) window.__track('tool_use','map_market_report_open',{}); }catch(e){}
+  }
   function addMsg(role, text){ var d=document.createElement('div'); d.className='amk-msg '+(role==='user'?'u':'a'); d.innerHTML=(role==='user')?esc(text):('<div class="bub"></div>'); if(role!=='user'){ var bb=d.querySelector('.bub'); if(text) paint(bb,text); else bb.textContent=''; } body.appendChild(d); body.scrollTop=body.scrollHeight; return d; }
   function upsell(){ body.innerHTML='<div class="amk-up"><h4>\\ud83d\\udd12 Ask Mindy is a Pro feature</h4><p>Get grounded, real-data answers on set-asides, agencies, opportunities, teaming and proposals \\u2014 with sources.</p><a href="/market-intelligence">Upgrade to Pro</a></div>'; }
   // opts (card chat only): turnId = reuse this question's id (retry/reopen); replay = only fetch the saved answer.
@@ -11343,13 +11365,11 @@ const ASK_MINDY_JS = `<script>(function(){
     bub.innerHTML='<span class="amk-typing"><i></i><i></i><i></i></span>';
     busy=true; if(send)send.disabled=true; clearFollowups();
     var acc='', started=false, gotDone=false, gotError=false, ledger=null, turnDoc=false;
-    // Prepend the grounded view context to the MESSAGE (not shown to the user) so the answer
-    // is about "these"/"here" — the map\\u2019s real filters + count, never fabricated.
-    // Card chat sends NO view preamble: the server supplies the opportunity from its own record.
-    // An attached notice travels as context (below); the map-view preface stays in the message exactly as
-    // without one (server contract, Agent 1, 2026-11-16: the server reconciles the two).
+    // Product decision 2026-11-19: Map and Ask Mindy are separate tools. Send the customer's words
+    // only — never inject map viewport filters/geography into Ask. Card chat still sends notice
+    // context (below); that is an opportunity record, not the map view.
     var attAtSend=oppCtx?null:attached;
-    var sendMsg=oppCtx?q:(ctxPreamble()+q);
+    var sendMsg=q;
     // Back on the map after a reload with a report still open: the conversation memory is gone, but the signed
     // source ledger saved with the report is what lets "revise it" resolve to THAT document. It rides along as
     // the oldest assistant turn (the server verifies the signature and the owner; a forged one is ignored).
@@ -11395,6 +11415,7 @@ const ASK_MINDY_JS = `<script>(function(){
             else if(ev.type==='sources'){ ledger=(ev.ledger&&typeof ev.ledger==='object')?ev.ledger:null; if(turnDoc&&rep&&ledger){ rep.ledger=ledger; repWrite(); } }
             // create_document saved a document: a card under the answer and the report opens in the pane (view mode only).
             else if(ev.type==='deliverables'&&Array.isArray(ev.files)&&!oppCtx){ turnDoc=true; try{ repOnDeliverables(ev.files,aEl); }catch(e){} }
+            else if(ev.type==='market_report'&&ev.html&&!oppCtx){ turnDoc=true; try{ repOnMarketReport(ev,aEl); }catch(e){} }
             else if(ev.type==='token'){ if(!started){ bub.textContent=''; started=true; } acc+=(ev.content||''); paint(bub,acc); body.scrollTop=body.scrollHeight; }
             // citations event is now always empty (RAG corpus removed 2026-08-02) \\u2014 ignored.
             else if(ev.type==='error'){ gotError=true; if(!started)bub.textContent=(ev.message||'Something went wrong.'); }

@@ -11,8 +11,9 @@
  *     SERVER-ISSUED confirmation token. Those tokens do not exist yet (Phase 3), so these
  *     tools are blocked in chat until then. A model-supplied `confirm: true` is never a
  *     confirmation — the executor strips it.
- *   - D1: `generate_market_report` is blocked in chat until the confirmation controls ship.
- *     It stays available through its existing app route and MCP.
+ *   - `generate_market_report` is Ask's packaged market-research path (same engine as MCP —
+ *     Mindy IP, not a Claude host chain). Offered as an allowed write so Ask quality can match
+ *     MCP for comprehensive market reports. Still one write per round.
  *   - Low-risk, reversible, owner-scoped writes (create an alert, rename/pause it) run when
  *     clearly requested, capped at one write per tool round.
  *
@@ -69,10 +70,9 @@ const CHAT_OVERRIDES: Readonly<Record<string, ChatToolPolicy>> = {
     userMessage: 'Adding contacts to your CRM is not available from chat yet.',
   },
   generate_market_report: {
-    decision: 'requires_confirmation',
-    reason: 'D1 (2026-11-13): blocked in chat until confirmation controls ship. Creates a public share link; 100-credit operation on MCP.',
-    userMessage:
-      'Creating a saved market report is not available from chat yet. You can generate one from the Market Report page, and I can still research the market for you here.',
+    decision: 'allowed_write',
+    reason:
+      'Packaged market research (Mindy IP — same generateMarketReport engine as MCP). One-shot sections + hosted deliverable; owner from verified session email. Ask uses this instead of ad-hoc tool scraps → create_document.',
   },
 
   // ── Chat-specific exceptions ──

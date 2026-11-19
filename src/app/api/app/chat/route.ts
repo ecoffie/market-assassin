@@ -51,7 +51,7 @@ import { fitMessages, inputBudget, type MsgKind } from '@/lib/chat/token-budget'
 import { stagingModelConfig, STAGING_CONFIG_HEADER } from '@/lib/chat/staging-model-config';
 import { customerErrorMessage } from '@/lib/chat/customer-errors';
 import { boundToolResult, perResultBudget } from '@/lib/chat/bound-tool-result';
-import { filterToolsForTurn, enforceFindArgs, SAM_ONLY_TOOL, restrictWritesWhenDocumentText } from '@/lib/chat/tool-selection';
+import { filterToolsForTurn, enforceFindArgs, SAM_ONLY_TOOL, MARKET_REPORT_TOOL, restrictWritesWhenDocumentText } from '@/lib/chat/tool-selection';
 import { CURRENT_FIND_CHAT_CONTRACT } from '@/lib/mcp/potato-journey';
 import { findCompletionFooter, comingBackListLeadsWithNotCompeted, type FindResultWithItems } from '@/lib/chat/find-completeness';
 import { inferredCodeDisclosure } from '@/lib/chat/code-disclosure';
@@ -251,6 +251,7 @@ You have a LARGE toolset over the federal Data Core — each tool's own descript
   When you show a mixed set, group or tag each item by type so the user instantly sees which are bid-now vs early-signal.
 - COMPETITORS: a company's award history + profile, the firms that win a NAICS/PSC (teaming or competition), incumbent financials, the likely incumbent behind an opp, SAM entity/registration. When the user pastes a SAM solicitation/RFQ NUMBER (e.g. 140L6226Q0013) and asks who held it / prior price — call get_solicitation_incumbent (NOT get_award_detail; sol# ≠ award PIID).
 - MARKET & PRICING: price-to-win labor rates, small-business/Rule-of-Two depth, buyer keyword coverage, market vocabulary, regulatory demand signals, SBA goaling.
+- MARKET RESEARCH REPORT (packaged — Mindy IP, same engine as MCP): when the user asks for a comprehensive / full / client-ready market research report, call generate_market_report ONCE with a keyword (best) or NAICS, optional state/agency, and client_name when they named a company. Do NOT assemble that report from many separate tool calls and create_document — that path is thinner than the packaged research. After it returns, summarize the answer in plain English and point them at the hosted deliverable URL when present; the in-app report pane opens that deliverable. create_document is for other deliverables (capability statements, short briefs), or a later turn if they explicitly want a Vault Word/PDF copy.
 - AGENCIES: an agency's pain points & priorities, spending detail, single-award detail (get_award_detail only for true contract PIIDs).
 - PEOPLE & EVENTS: the named contacts/decision-makers at a buying office (search_federal_contacts — use it whenever they ask WHO to contact; do NOT punt to SAM), the SBLO at a prime, agency OSBP, and federal events/series.
 - PROPOSAL HELP: bid/no-bid evaluation, compliance-matrix extraction, proposal structure, DQ-risk scan, independent compliance referee, SOW extraction, solicitation documents.
@@ -834,6 +835,8 @@ export async function POST(request: NextRequest) {
             files: Array<{ format: string; document_id: string; file_name?: string; version?: number }>;
             pdf_note?: string;
           };
+          /** Packaged generate_market_report deliverable (hosted URL + inline HTML for the Ask pane). */
+          market_report?: { report_id: string | null; url: string | null; title: string; html: string };
         } = { planner: null, planner_attempts: [], tools_offered: 0, tool_executions: [], answer: null, answer_attempts: [], notices: [],
               ...(selectedCtx ? { context: { kind: 'opportunity' as const, notice_id: selectedCtx.noticeId } } : {}) };
         if (selectedNoticeMiss) turnTrace.notices.push(`selected_notice:${selectedNoticeMiss}`);
@@ -874,6 +877,8 @@ export async function POST(request: NextRequest) {
         // W2: in-chat download chips for create_document — ids only; client mints signed URLs.
         const turnDeliverables: CreateDocumentDeliverable[] = [];
         let turnDeliverablePdfNote: string | null = null;
+        // Packaged market report (generate_market_report) — html for the Ask pane; stripped from model context.
+        let turnMarketReport: { report_id: string | null; url: string | null; title: string; html: string } | null = null;
         try {
           if (actingScope.kind === 'client') turnTrace.notices.push('acting_scope:client_workspace');
           if (actingScope.kind === 'unavailable') turnTrace.notices.push('acting_scope:unavailable');
@@ -905,6 +910,7 @@ export async function POST(request: NextRequest) {
           // is not offered the open-only search_sam_opportunities when find_opportunities is offered.
           const priorCustomerText = [...history].reverse().find((h) => h.role === 'user')?.content;
           const toolOffer = filterToolsForTurn(executor.offeredToolDefs(), splitViewPreamble(message).rest, priorCustomerText ? splitViewPreamble(String(priorCustomerText)).rest : null);
+          if (toolOffer.marketResearch) turnTrace.notices.push('intent:market_research');
           // Industry codes the CUSTOMER typed (a planner-chosen code is not passed to find_opportunities).
           const customerTypedCodes = interpretCapabilityNaics(splitViewPreamble(message).rest).typedCodes;
           const notOfferedThisTurn = new Set(toolOffer.removed);
@@ -946,10 +952,15 @@ export async function POST(request: NextRequest) {
 
           // One planner attempt. Returns the OpenAI-shaped JSON, or the failure details.
           // create_document offered → room for a whole doc_model; a resolved revision → that call is forced.
+          // Market research → force generate_market_report (packaged Mindy IP; same engine as MCP).
           const createOffered = ALL_TOOL_DEFS.some((d) => (d.function as { name?: string })?.name === CREATE_DOCUMENT);
+          const marketReportOffered = ALL_TOOL_DEFS.some((d) => (d.function as { name?: string })?.name === MARKET_REPORT_TOOL);
           const plannerMaxTokens = createOffered ? DOC_TOOL_ROUND_MAX_TOKENS : TOOL_ROUND_MAX_TOKENS;
           const forceCreate = !!revision && createOffered;
+          const forceMarketReport = !forceCreate && !cardCtx && toolOffer.marketResearch && marketReportOffered;
           if (forceCreate) turnTrace.notices.push('revision:create_document_forced');
+          if (forceMarketReport) turnTrace.notices.push('market_research:generate_market_report_forced');
+          const forcedToolName = forceCreate ? CREATE_DOCUMENT : forceMarketReport ? MARKET_REPORT_TOOL : null;
           // Round 1 keeps OPP_INTENT → required (Andre fix). Round 2 always uses auto so the
           // planner can stop after a seed without re-calling the same tool (R2 hygiene).
           const callPlanner = async (
@@ -964,18 +975,18 @@ export async function POST(request: NextRequest) {
             if (plannerFit.droppedHistory) turnTrace.notices.push(`planner_history_dropped:${plannerFit.droppedHistory}`);
             if (!plannerFit.fits) return { ok: false, status: null, detail: `request_too_large: est ${plannerFit.estimate} > budget ${plannerFit.budget} tokens` };
             const plannerMessages = plannerFit.messages;
-            const requireTools = !plannerOpts.forceAutoToolChoice && !forceCreate && OPP_INTENT;
+            const requireTools = !plannerOpts.forceAutoToolChoice && !forcedToolName && OPP_INTENT;
             try {
               if (t.provider === 'anthropic') {
                 const sys = plannerMessages.find((m) => m.role === 'system')?.content || '';
                 const convo = plannerMessages
                   .filter((m) => m.role === 'user' || m.role === 'assistant')
                   .map((m) => ({ role: m.role, content: m.content }));
-                const forced = (requireTools || forceCreate) && anthropicSupportsForcedToolChoice(t.model);
+                const forced = (requireTools || !!forcedToolName) && anthropicSupportsForcedToolChoice(t.model);
                 const cbody: Record<string, unknown> = {
                   model: t.model, max_tokens: plannerMaxTokens, system: sys,
                   messages: convo, tools: anthropicTools,
-                  tool_choice: forced ? (forceCreate ? { type: 'tool', name: CREATE_DOCUMENT } : { type: 'any' }) : { type: 'auto' },
+                  tool_choice: forced ? (forcedToolName ? { type: 'tool', name: forcedToolName } : { type: 'any' }) : { type: 'auto' },
                 };
                 if (/haiku-4-5|sonnet-4-|opus-4-[0-5]|claude-3/i.test(t.model)) cbody.temperature = 0;
                 const cr = await fetch('https://api.anthropic.com/v1/messages', {
@@ -993,7 +1004,7 @@ export async function POST(request: NextRequest) {
                   // OPP_INTENT (Andre fix) → 'required' so an opportunity search can't decline the tool.
                   // Round 2 passes forceAutoToolChoice so OPP_INTENT cannot force a second call.
                   tools: ALL_TOOL_DEFS,
-                  tool_choice: forceCreate ? { type: 'function', function: { name: CREATE_DOCUMENT } } : requireTools ? 'required' : 'auto',
+                  tool_choice: forcedToolName ? { type: 'function', function: { name: forcedToolName } } : requireTools ? 'required' : 'auto',
                 }),
               });
               if (r.ok) return { ok: true, json: await r.json() };
@@ -1167,7 +1178,6 @@ export async function POST(request: NextRequest) {
               // model a second time (the VERIFIED RECORD LIST carries it); a short stub keeps the call/result pair.
               const retrievedAt = new Date().toISOString();
               for (const r of results) {
-                groundingTexts.push(r.content);
                 if (r.record.tool === CREATE_DOCUMENT && r.record.status === 'success') {
                   const d = parseCreateDocumentDeliverables(r.content);
                   if (d) {
@@ -1175,6 +1185,37 @@ export async function POST(request: NextRequest) {
                     if (d.pdf_note) turnDeliverablePdfNote = d.pdf_note;
                   }
                 }
+                // Packaged market report: keep html for the Ask pane SSE; strip it from the model
+                // transcript (self-contained HTML blows the answer context).
+                if (r.record.tool === MARKET_REPORT_TOOL && r.record.status === 'success') {
+                  try {
+                    const parsed = JSON.parse(r.content) as {
+                      grounded?: boolean;
+                      client_name?: string;
+                      market?: { keyword?: string; naics?: string };
+                      deliverable?: { html?: string; url?: string | null; report_id?: string | null };
+                    };
+                    const html = typeof parsed.deliverable?.html === 'string' ? parsed.deliverable.html : '';
+                    if (html) {
+                      const titleBits = [parsed.client_name, parsed.market?.keyword || parsed.market?.naics, 'Market report'].filter(Boolean);
+                      turnMarketReport = {
+                        report_id: parsed.deliverable?.report_id ?? null,
+                        url: parsed.deliverable?.url ?? null,
+                        title: String(titleBits[0] || 'Market report'),
+                        html,
+                      };
+                      const forModel = { ...parsed, deliverable: { url: parsed.deliverable?.url ?? null, report_id: parsed.deliverable?.report_id ?? null, html: '[delivered to report pane]' } };
+                      r.content = JSON.stringify(forModel);
+                      const idxMr = toolMessageIdx.get(r.tool_call_id);
+                      if (idxMr != null) {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        (messages as any[])[idxMr].content = r.content;
+                        toolOriginals.set(r.tool_call_id, r.content);
+                      }
+                    }
+                  } catch { /* leave raw content */ }
+                }
+                groundingTexts.push(r.content);
                 const src = sourceFromToolResult({
                   tool: r.record.tool, toolCallId: r.tool_call_id, status: r.record.status, content: r.content,
                   rendered: renderedByCall.get(r.tool_call_id) ?? null, argsRedacted: r.argsRedacted,
@@ -1749,6 +1790,22 @@ export async function POST(request: NextRequest) {
             type: 'deliverables',
             files: deliverableFiles,
             ...(turnDeliverablePdfNote ? { pdf_note: turnDeliverablePdfNote } : {}),
+          });
+        }
+        if (turnMarketReport) {
+          // Trace keeps ids/url only — full HTML rides the SSE event for the Ask pane.
+          turnTrace.market_report = {
+            report_id: turnMarketReport.report_id,
+            url: turnMarketReport.url,
+            title: turnMarketReport.title,
+            html: '',
+          };
+          send({
+            type: 'market_report',
+            report_id: turnMarketReport.report_id,
+            url: turnMarketReport.url,
+            title: turnMarketReport.title,
+            html: turnMarketReport.html,
           });
         }
         // P3 (A2): the compact source ledger, kept by the client and re-sent with history.

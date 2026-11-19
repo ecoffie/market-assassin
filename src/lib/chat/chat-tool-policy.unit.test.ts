@@ -23,16 +23,17 @@ describe('Ask Mindy chat tool policy', () => {
     }
   });
 
-  it('requires confirmation (blocked until Phase 3) for delete and report generation (D1)', () => {
+  it('requires confirmation (blocked until Phase 3) for delete', () => {
     expect(chatToolPolicy('delete_market_schedule', true).decision).toBe('requires_confirmation');
-    expect(chatToolPolicy('generate_market_report', true).decision).toBe('requires_confirmation');
     expect(isChatOfferable(chatToolPolicy('delete_market_schedule', true))).toBe(false);
-    expect(isChatOfferable(chatToolPolicy('generate_market_report', true))).toBe(false);
   });
 
-  it('allows the low-risk reversible writes', () => {
+  it('allows the low-risk reversible writes and packaged market research', () => {
     expect(chatToolPolicy('schedule_market_search', true).decision).toBe('allowed_write');
     expect(chatToolPolicy('update_market_schedule', true).decision).toBe('allowed_write');
+    // Same generateMarketReport engine as MCP (Mindy IP) — Ask orchestration, not Claude's.
+    expect(chatToolPolicy('generate_market_report', true).decision).toBe('allowed_write');
+    expect(isChatOfferable(chatToolPolicy('generate_market_report', true))).toBe(true);
   });
 
   it('every registered WRITE tool is either explicitly classified or fails closed', () => {

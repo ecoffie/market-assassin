@@ -21,7 +21,7 @@ function drawerScript(): string {
 function boot(view: Record<string, unknown>) {
   const dom = new JSDOM(
     '<!doctype html><html><body><div id="amkOv"></div><div id="amk" aria-hidden="true"><div id="amkCtx"></div><button id="amkX"></button>'
-    + '<div id="amkBody"></div><div class="amk-foot"><div class="amk-in"><textarea id="amkIn" placeholder="Ask about this view\u2026"></textarea><button id="amkSend"></button></div></div></div></body></html>',
+    + '<div id="amkBody"></div><div class="amk-foot"><div class="amk-in"><textarea id="amkIn" placeholder="Ask Mindy\u2026"></textarea><button id="amkSend"></button></div></div></div></body></html>',
     { url: 'https://getmindy.ai/opportunity-map', runScripts: 'outside-only' },
   );
   const w = dom.window as unknown as Record<string, unknown> & Window & { eval: (s: string) => unknown };
@@ -72,12 +72,13 @@ describe('Ask Mindy sends exactly what is in the box (D7)', () => {
     const t = boot(VIEW);
     (t.w.openAskMindy as (s?: string) => void)();
     expect(t.box().value).toBe('');
+    // Placeholder may hint the map search term; it is NOT injected into the message (2026-11-19).
     expect(t.box().placeholder).toBe('Ask about \u201chvac services\u201d\u2026');
     await t.typeAndSend(TYPED);
     expect(question(t.chat[0].message)).toBe(TYPED);
+    expect(String(t.chat[0].message)).toBe(TYPED);
     expect(String(t.chat[0].message)).not.toContain('hvac servicesFind');
-    // The view term still grounds the answer, through the preamble (not as the customer's words).
-    expect(String(t.chat[0].message)).toContain('\u201chvac services\u201d');
+    expect(String(t.chat[0].message)).not.toContain('[Current map view');
     // The bubble shows the same words that were sent.
     const bubbles = t.w.document.querySelectorAll('.amk-msg.u');
     expect(bubbles[bubbles.length - 1].textContent).toBe(TYPED);
@@ -118,7 +119,7 @@ describe('Ask Mindy sends exactly what is in the box (D7)', () => {
     const t = boot({ count: 42, scope: 'open', state: 'TX' });
     (t.w.openAskMindy as (s?: string) => void)();
     expect(t.box().value).toBe('');
-    expect(t.box().placeholder).toBe('Ask about this view\u2026');
+    expect(t.box().placeholder).toBe('Ask Mindy\u2026');
   });
   it('the greeting has no how-to chip dressed as an action', () => {
     const t = boot(VIEW);

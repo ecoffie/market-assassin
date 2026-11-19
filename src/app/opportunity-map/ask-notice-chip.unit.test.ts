@@ -73,10 +73,10 @@ describe('selected notice attaches to the main chat', () => {
     expect(t.chat[0].context).toEqual({ kind: 'opportunity', notice_id: NID });
     expect(t.chat[0].turn_id).toBeUndefined();
     const m = String(t.chat[0].message);
-    expect(m).toContain('[Current map view'); // kept exactly as without a notice (server contract)
+    expect(m).toBe('Who held this before?'); // Map viewport is not injected (2026-11-19)
+    expect(m).not.toContain('[Current map view');
     expect(m).not.toContain('Display:');
     expect(t.chat[0].display).toBe('narrow_panel');
-    expect(m.endsWith('Who held this before?')).toBe(true);
     expect(JSON.stringify(t.chat[0])).not.toContain('Key West'); // the title is never sent; the server loads the record
   });
   it('is the SAME conversation: session and history carry across attach and remove', async () => {
@@ -96,10 +96,10 @@ describe('selected notice attaches to the main chat', () => {
     t.open();
     (t.chip().querySelector('.rm') as HTMLButtonElement).click();
     expect(t.chip().textContent).toBe('');
-    expect(t.w.document.getElementById('amkCtx')!.textContent).toContain('in view');
+    expect(t.w.document.getElementById('amkCtx')!.textContent).toBe('');
     await t.ask('q');
     expect(t.chat[0].context).toBeUndefined();
-    expect(String(t.chat[0].message)).toContain('[Current map view');
+    expect(String(t.chat[0].message)).toBe('q');
     t.open(); // reopening with the same selection keeps it removed
     expect(t.chip().textContent).toBe('');
     t.select({ ...OPP, id: NID2, title: 'Other' }); // a different notice attaches
