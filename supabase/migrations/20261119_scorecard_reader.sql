@@ -15,6 +15,18 @@
 -- sam_opportunities, agency_forecasts, and agency_pain_points_db already have
 -- a SELECT/ALL policy USING (true) for every role, so no new policy is added.
 -- cron_jobs and cron_job_runs were created without RLS.
+--
+-- JWT setup (do this in the dashboard; do not paste a secret into this file):
+-- The token expires in 30 days. Rotate SCORECARD_READONLY_JWT before that
+-- date. Settings → API → JWT tells you which signer is active, without
+-- copying the secret out. If the legacy JWT secret is still enabled, mint
+-- HS256 with that secret and "role": "scorecard_reader". If the legacy
+-- secret is disabled and only asymmetric signing keys are listed, a
+-- hand-minted HS256 token is rejected; sign with the current key instead.
+-- Confirm the gateway accepts the token as apikey. If it accepts only the
+-- anon or service-role key there, send the anon key as apikey and this
+-- token as Authorization. The token can read institute_sources.raw
+-- (recommendation text and the resolution flag). Do not print raw.
 
 DO $$
 BEGIN

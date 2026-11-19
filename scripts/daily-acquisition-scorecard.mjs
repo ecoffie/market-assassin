@@ -95,7 +95,12 @@ export function toPublicReport(value) {
   if (Array.isArray(value)) return value.map((item) => toPublicReport(item));
   if (typeof value === 'object') {
     const out = {};
-    for (const [k, v] of Object.entries(value)) out[k] = toPublicReport(v);
+    for (const [k, v] of Object.entries(value)) {
+      // institute_sources.raw is recommendation text. It is readable by the
+      // scorecard role and must never be published.
+      if (k === 'raw') continue;
+      out[k] = toPublicReport(v);
+    }
     return out;
   }
   return null;
@@ -125,6 +130,51 @@ function fact(value, status, reason, column = null) {
 
 export function unknown(reason, column = null) {
   return fact(null, 'unknown', reason, column);
+}
+
+/** Exact reason when a known-nonempty table reads back as zero rows. */
+export const NOT_VISIBLE = 'not visible to scorecard_reader (policy or grant missing)';
+
+/**
+ * Tables the scorecard counts, each known to be nonempty in production.
+ * A total count of 0 is a missing policy or grant, not a quiet day.
+ */
+export const VISIBILITY_PROBES = {
+  data_source_instances: 'source_key',
+  institute_sources: 'id',
+  sam_opportunities: 'created_at',
+  agency_forecasts: 'created_at',
+  agency_pain_points_db: 'id',
+};
+
+/** Total-count read. A window of zero is a real zero only after this is > 0. */
+export async function proveTableVisible(io, table, column) {
+  let res;
+  try {
+    res = await io.count(table, { select: column });
+  } catch {
+    return { ok: false, reason: READ_FAILED };
+  }
+  if (!res || res.ok !== true || typeof res.count !== 'number' || !Number.isFinite(res.count)) {
+    return { ok: false, reason: READ_FAILED };
+  }
+  if (res.count < 1) return { ok: false, reason: NOT_VISIBLE };
+  return { ok: true, reason: null };
+}
+
+export async function loadVisibility(io, probes = VISIBILITY_PROBES) {
+  const map = new Map();
+  for (const [table, column] of Object.entries(probes)) {
+    map.set(table, await proveTableVisible(io, table, column));
+  }
+  return map;
+}
+
+function hiddenReason(visibility, table) {
+  if (!table || !visibility) return null;
+  const verdict = visibility.get(table);
+  if (!verdict || verdict.ok) return null;
+  return verdict.reason;
 }
 
 export function measured(value, reason = null, column = null) {
@@ -310,11 +360,15 @@ async function countWhere(io, spec, column, start, end, extra) {
   return measured(res.count, null, column);
 }
 
-async function measureCounts(io, spec, windows) {
+async function measureCounts(io, spec, windows, visibility) {
   const blank = (note) => ({
     newUnique24h: unknown(note),
     newUnique7d: unknown(note),
+    materiallyUpdated24h: unknown(note),
+    materiallyUpdated7d: unknown(note),
   });
+  const hidden = spec.table && spec.newColumn ? hiddenReason(visibility, spec.table) : null;
+  if (hidden) return blank(hidden);
   let fresh;
   if (!spec.table || !spec.newColumn) fresh = blank(spec.newNote || 'no created_at or first_seen');
   else {
@@ -410,7 +464,9 @@ function clocksForCorpus(corpus, instanceRead, now, producer) {
   };
 }
 
-async function measureExamples(io, corpus, window) {
+async function measureExamples(io, corpus, window, visibility) {
+  const hidden = corpus.table ? hiddenReason(visibility, corpus.table) : null;
+  if (hidden) return unknown(hidden);
   if (!corpus.example || !corpus.newColumn || !corpus.table) {
     return unknown(corpus.newNote || 'no created_at or first_seen, so an example list would be the latest re-read');
   }
@@ -573,6 +629,10 @@ export async function probeCitation(url) {
  * customer reader. A thrown or failed read is unknown, never a not-found.
  */
 export async function measureCustomerFindability(io, window, readCustomer, probe = probeCitation) {
+  const painVisible = await proveTableVisible(io, 'agency_pain_points_db', VISIBILITY_PROBES.agency_pain_points_db);
+  if (!painVisible.ok) return emptyFindability(painVisible.reason);
+  const instituteVisible = await proveTableVisible(io, 'institute_sources', VISIBILITY_PROBES.institute_sources);
+  if (!instituteVisible.ok) return emptyFindability(instituteVisible.reason);
   if (typeof readCustomer !== 'function') return emptyFindability('the customer reader was not attached');
   const listed = await io.rows('agency_pain_points_db', {
     select: 'id,agency,pain_point,source,source_url,institute_source_ids,created_at',
@@ -674,15 +734,23 @@ export async function buildDailyScorecard(io, opts = {}) {
   const bindings = opts.bindings ?? SOURCE_BINDINGS;
   const corpora = opts.corpora ?? CORPORA;
   const jobs = opts.jobs ?? RUN_JOBS;
+  const visibility = opts.visibility ?? await loadVisibility(io);
 
-  const instanceRead = await io.rows('data_source_instances', {
-    select: INSTANCE_COLUMNS,
-    order: 'source_key.asc',
-    limit: String(INSTANCE_CAP),
-  });
+  const instancesVisible = visibility.get('data_source_instances')
+    ?? await proveTableVisible(io, 'data_source_instances', VISIBILITY_PROBES.data_source_instances);
+  let instanceRead = null;
+  if (instancesVisible.ok) {
+    instanceRead = await io.rows('data_source_instances', {
+      select: INSTANCE_COLUMNS,
+      order: 'source_key.asc',
+      limit: String(INSTANCE_CAP),
+    });
+  }
   const rows = instanceRead && instanceRead.ok && Array.isArray(instanceRead.rows) ? instanceRead.rows : [];
   const capped = instanceRead && instanceRead.ok === true && rows.length >= INSTANCE_CAP;
-  const instanceList = !instanceRead || instanceRead.ok !== true
+  const instanceList = !instancesVisible.ok
+    ? { ...unknown(instancesVisible.reason), capped: false, readOk: false }
+    : !instanceRead || instanceRead.ok !== true || rows.length === 0
     ? { ...unknown(READ_FAILED), capped: false, readOk: false }
     : capped
       ? { ...unknown('read cap of 1000 data_source_instances rows hit; the source list is a slice, not the population'), capped: true, readOk: true }
@@ -710,7 +778,7 @@ export async function buildDailyScorecard(io, opts = {}) {
     for (const row of rows) {
       const spec = bindings[row.source_key] || unboundSpec(row);
       const producer = resolveProducer(spec.cronJob, enabledByJob);
-      const counts = await measureCounts(io, spec, windows);
+      const counts = await measureCounts(io, spec, windows, visibility);
       sources.push({
         sourceKey: row.source_key ?? null,
         name: row.name ?? null,
@@ -728,7 +796,7 @@ export async function buildDailyScorecard(io, opts = {}) {
   const examples = {};
   for (const corpus of corpora) {
     const producer = resolveProducer(corpus.cronJob, enabledByJob);
-    const counts = await measureCounts(io, corpus, windows);
+    const counts = await measureCounts(io, corpus, windows, visibility);
     const clocks = clocksForCorpus(corpus, { ok: instanceList.readOk, error: instanceList.reason, rows }, now, producer);
     corpusReports.push({
       key: corpus.key,
@@ -738,7 +806,7 @@ export async function buildDailyScorecard(io, opts = {}) {
       ...clocks,
       producerEnabled: producer.fact,
     });
-    examples[corpus.key] = await measureExamples(io, corpus, windows.d7);
+    examples[corpus.key] = await measureExamples(io, corpus, windows.d7, visibility);
   }
 
   const runHistory = [];

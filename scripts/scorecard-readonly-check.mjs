@@ -1,18 +1,32 @@
 /**
- * Prove the scorecard JWT cannot write. Never prints the token.
+ * Prove the scorecard JWT cannot write. Never prints the token or the body.
  *
- * POST {} to data_source_instances. That table's required columns have no
- * defaults, so {} cannot insert a row even if INSERT were granted. A
- * permission-denied response is the pass. A not-null error, an RLS insert
- * error, or any 2xx means the credential can write, and this process exits 1
- * before the scorecard runs.
+ * PATCH one column on data_source_instances, filtered to a key that does not
+ * exist, with Prefer: tx=rollback. Zero rows match, and the transaction is
+ * rolled back even if the filter were wrong. A 2xx (including zero rows)
+ * means UPDATE is granted, and this process exits 1. The only pass is
+ * HTTP 401 or 403 with permission denied (42501).
  */
 const TABLE = 'data_source_instances';
+export const PROBE_KEY = '__scorecard_probe_never_exists__';
+
+export function writeProbeRequest(baseUrl) {
+  const root = String(baseUrl || '').replace(/\/$/, '');
+  return {
+    method: 'PATCH',
+    url: `${root}/rest/v1/${TABLE}?source_key=eq.${PROBE_KEY}`,
+    headers: {
+      'Content-Type': 'application/json',
+      Prefer: 'tx=rollback,return=minimal',
+    },
+    body: JSON.stringify({ name: PROBE_KEY }),
+  };
+}
 
 export function classifyWriteAttempt(status, body) {
   const text = String(body ?? '');
-  if (status === 200 || status === 201 || status === 204) {
-    return { ok: false, reason: 'write was accepted' };
+  if (typeof status === 'number' && status >= 200 && status < 300) {
+    return { ok: false, reason: 'write privilege exists' };
   }
   if (/23502|23514|not-null|null value in column|row-level security/i.test(text)) {
     return { ok: false, reason: 'write privilege reached the table' };
@@ -30,15 +44,15 @@ async function main() {
     console.error('scorecard read-only check: credential is not configured');
     process.exit(2);
   }
-  const res = await fetch(`${url}/rest/v1/${TABLE}`, {
-    method: 'POST',
+  const probe = writeProbeRequest(url);
+  const res = await fetch(probe.url, {
+    method: probe.method,
     headers: {
+      ...probe.headers,
       apikey: key,
       Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-      Prefer: 'return=minimal',
     },
-    body: '{}',
+    body: probe.body,
   });
   const body = await res.text();
   const verdict = classifyWriteAttempt(res.status, body);

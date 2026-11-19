@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CORPORA,
   EXAMPLE_CAP,
+  NOT_VISIBLE,
   READ_FAILED,
   SCORECARD_BEGIN,
   SCORECARD_END,
@@ -57,7 +58,11 @@ function fakeIo(handlers: {
     calls,
     async count(table: string, filters: Record<string, string>) {
       calls.push({ op: 'count', table, filters });
-      return handlers.count?.(table, filters) ?? { ok: true, error: null, rows: [], count: 0 };
+      const handled = handlers.count?.(table, filters);
+      if (handled) return handled;
+      // A total-count probe (no window) must be > 0 or the table is invisible.
+      if (!filters?.and) return { ok: true, error: null, rows: [], count: 1 };
+      return { ok: true, error: null, rows: [], count: 0 };
     },
     async rows(table: string, filters: Record<string, string>) {
       calls.push({ op: 'rows', table, filters });
@@ -198,6 +203,7 @@ describe('buildDailyScorecard', () => {
       },
       count(table, filters) {
         const clause = String(filters.and ?? '');
+        if (!filters.and) return { ok: true, error: null, rows: [], count: 8 };
         if (table === 'sam_opportunities' && clause.includes('last_modified')) return { ok: true, error: null, rows: [], count: 2 };
         if (table === 'sam_opportunities' && clause.includes(windows.h24.start)) return { ok: true, error: null, rows: [], count: 4 };
         if (table === 'sam_opportunities') return { ok: true, error: null, rows: [], count: 11 };
@@ -252,7 +258,7 @@ describe('buildDailyScorecard', () => {
       const encoded = JSON.stringify(call.filters);
       expect(encoded).not.toMatch(/synced_at|extracted_at|last_poll/);
     }
-    const samNew = countCalls.find((c) => c.table === 'sam_opportunities' && !String(c.filters.and).includes('last_modified'));
+    const samNew = countCalls.find((c) => c.table === 'sam_opportunities' && c.filters.and && !String(c.filters.and).includes('last_modified'));
     expect(samNew?.filters.and).toMatch(/^\(created_at\.gte\./);
     const samMaterial = countCalls.find((c) => c.table === 'sam_opportunities' && String(c.filters.and).includes('last_modified'));
     expect(samMaterial?.filters.and).toMatch(/created_at\.lt\./);
@@ -285,7 +291,8 @@ describe('buildDailyScorecard', () => {
         }
         return okRows([]);
       },
-      count(table) {
+      count(table, filters) {
+        if (!filters.and) return { ok: true, error: null, rows: [], count: 3 };
         if (table === 'sam_opportunities') {
           return { ok: false, error: 'column created_at does not exist', rows: [], count: 0 };
         }
@@ -318,6 +325,117 @@ describe('buildDailyScorecard', () => {
     expect(report.instanceList.value).toBeNull();
     expect(report.sources).toEqual([]);
     expect(report.corpora[0].newUnique24h.status).toBe('measured');
+  });
+
+  it('a missing policy is unknown for every metric from that table, never a measured zero', async () => {
+    const io = fakeIo({
+      rows(table) {
+        if (table === 'data_source_instances') {
+          return okRows([{
+            source_key: 'institute_gao',
+            name: 'GAO',
+            dataset_key: 'institute_sources',
+            source_state: 'current',
+            watch_cadence_days: 1,
+            last_verified_ingest: '2026-11-18T00:00:00.000Z',
+          }, {
+            source_key: 'sam_opportunities_sam_gov',
+            name: 'SAM.gov',
+            dataset_key: 'sam_opportunities',
+            source_state: 'current',
+            watch_cadence_days: 1,
+            last_verified_ingest: '2026-11-18T00:00:00.000Z',
+          }]);
+        }
+        return okRows([]);
+      },
+      count(table, filters) {
+        if (!filters.and && (table === 'data_source_instances' || table === 'institute_sources')) {
+          return { ok: true, error: null, rows: [], count: 0 };
+        }
+        if (!filters.and) return { ok: true, error: null, rows: [], count: 6 };
+        return { ok: true, error: null, rows: [], count: 0 };
+      },
+    });
+    const report = await buildDailyScorecard(io, { now: NOW, jobs: [] });
+    expect(report.instanceList).toMatchObject({ status: 'unknown', value: null, reason: NOT_VISIBLE, readOk: false });
+    expect(report.sources).toEqual([]);
+    const pain = report.corpora.find((c) => c.table === 'agency_pain_points_db');
+    expect(pain.newUnique24h).toMatchObject({ status: 'measured', value: 0, column: 'created_at' });
+    const findability = await measureCustomerFindability(io, dailyWindows(NOW).h24, async () => ({ sourced: [] }));
+    expect(findability).toMatchObject({ status: 'unknown', reason: NOT_VISIBLE });
+    expect(findability.checked.value).toBeNull();
+    expect(findability.found.value).toBeNull();
+
+    const visibleInstances = new Map([
+      ['data_source_instances', { ok: true, reason: null }],
+      ['institute_sources', { ok: false, reason: NOT_VISIBLE }],
+      ['sam_opportunities', { ok: true, reason: null }],
+      ['agency_forecasts', { ok: true, reason: null }],
+      ['agency_pain_points_db', { ok: true, reason: null }],
+    ]);
+    const hidden = await buildDailyScorecard(io, { now: NOW, jobs: [], visibility: visibleInstances });
+    const gao = hidden.sources.find((s) => s.sourceKey === 'institute_gao');
+    expect(gao.newUnique24h).toMatchObject({ status: 'unknown', value: null, reason: NOT_VISIBLE });
+    expect(gao.newUnique7d.reason).toBe(NOT_VISIBLE);
+    expect(gao.materiallyUpdated24h.reason).toBe(NOT_VISIBLE);
+    expect(gao.materiallyUpdated7d.reason).toBe(NOT_VISIBLE);
+    const sam = hidden.sources.find((s) => s.sourceKey === 'sam_opportunities_sam_gov');
+    expect(sam.newUnique24h).toMatchObject({ status: 'measured', value: 0, column: 'created_at' });
+    expect(hidden.findability.h24.reason).toBe(NOT_VISIBLE);
+    expect(hidden.findability.d7.checked.value).toBeNull();
+    const published = publicMarkdown(hidden);
+    expect(published).toContain(NOT_VISIBLE);
+    expect(published).not.toMatch(/new unique 24h: 0 \(discovered_at\)/);
+  });
+
+  it('a visible table keeps a measured window count, including a real zero', async () => {
+    const io = fakeIo({
+      rows(table) {
+        if (table === 'data_source_instances') {
+          return okRows([{
+            source_key: 'institute_gao',
+            name: 'GAO',
+            dataset_key: 'institute_sources',
+            source_state: 'current',
+            watch_cadence_days: 1,
+            last_verified_ingest: '2026-11-18T00:00:00.000Z',
+          }]);
+        }
+        return okRows([]);
+      },
+      count(table, filters) {
+        if (!filters.and) return { ok: true, error: null, rows: [], count: 4 };
+        if (table === 'institute_sources') return { ok: true, error: null, rows: [], count: 3 };
+        return { ok: true, error: null, rows: [], count: 0 };
+      },
+    });
+    const report = await buildDailyScorecard(io, { now: NOW, jobs: [] });
+    expect(report.instanceList).toMatchObject({ status: 'measured', value: 1, readOk: true });
+    const gao = report.sources.find((s) => s.sourceKey === 'institute_gao');
+    expect(gao.newUnique24h).toMatchObject({ status: 'measured', value: 3, column: 'discovered_at' });
+    const forecasts = report.corpora.find((c) => c.table === 'agency_forecasts');
+    expect(forecasts.newUnique24h).toMatchObject({ status: 'measured', value: 0, column: 'created_at' });
+    expect(forecasts.newUnique7d.value).toBe(0);
+  });
+
+  it('never prints institute_sources.raw', () => {
+    const sentinel = 'RAW_RECOMMENDATION_TEXT resolution_flag';
+    const report = {
+      measured: true,
+      generatedAt: NOW.toISOString(),
+      windows: dailyWindows(NOW),
+      sources: [],
+      corpora: [],
+      examples: { pain_points: { status: 'measured', value: [{ title: 'Grid', raw: sentinel }], reason: null } },
+      findability: { h24: null, d7: null },
+      runHistory: [],
+    };
+    expect(publicMarkdown(report)).not.toContain(sentinel);
+    expect(publicJson(report)).not.toContain(sentinel);
+    expect(publicJson(report)).not.toContain('"raw"');
+    const src = readFileSync(join(process.cwd(), 'scripts/daily-acquisition-scorecard.mjs'), 'utf8');
+    expect(src).not.toMatch(/select:\s*'[^']*\braw\b/);
   });
 
   it('public output keeps a government link and drops secrets, emails, and internal hosts', async () => {
@@ -590,13 +708,25 @@ describe('the read-only credential', () => {
     expect(applied).not.toContain('GRANT SELECT (job_name, route');
   });
 
-  it('a permission-denied write passes and a constraint error means the key can write', async () => {
-    const { classifyWriteAttempt } = await import('../../scripts/scorecard-readonly-check.mjs');
+  it('a permission-denied write passes and any 2xx means the key can write', async () => {
+    const { classifyWriteAttempt, writeProbeRequest, PROBE_KEY } = await import('../../scripts/scorecard-readonly-check.mjs');
+    const probe = writeProbeRequest('https://example.test');
+    expect(probe.method).toBe('PATCH');
+    expect(probe.url).toBe(`https://example.test/rest/v1/data_source_instances?source_key=eq.${PROBE_KEY}`);
+    expect(probe.headers.Prefer).toContain('tx=rollback');
+    expect(probe.body).not.toBe('{}');
+    expect(probe.body).toContain(PROBE_KEY);
     expect(classifyWriteAttempt(401, '{"code":"42501","message":"permission denied for table data_source_instances"}').ok).toBe(true);
     expect(classifyWriteAttempt(403, 'permission denied for table data_source_instances').ok).toBe(true);
     expect(classifyWriteAttempt(400, '{"code":"23502","message":"null value in column \\"name\\""}').ok).toBe(false);
     expect(classifyWriteAttempt(401, 'new row violates row-level security policy').ok).toBe(false);
+    expect(classifyWriteAttempt(200, '[]').ok).toBe(false);
     expect(classifyWriteAttempt(201, '').ok).toBe(false);
+    expect(classifyWriteAttempt(204, '').ok).toBe(false);
+    expect(classifyWriteAttempt(204, '').reason).toBe('write privilege exists');
     expect(classifyWriteAttempt(401, 'Invalid API key').ok).toBe(false);
+    const src = readFileSync(join(process.cwd(), 'scripts/scorecard-readonly-check.mjs'), 'utf8');
+    expect(src).not.toMatch(/method:\s*'POST'/);
+    expect(src).not.toContain("body: '{}'");
   });
 });
