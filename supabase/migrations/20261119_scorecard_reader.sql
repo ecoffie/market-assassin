@@ -1,5 +1,7 @@
--- NOT APPLIED. Do not run this file until Eric approves it.
--- After that approval, and only then:
+-- NOT APPLIED.
+-- Do not apply this migration, create these roles, set the rotator credential,
+-- deploy the route, or set any secret until Eric's written authorization for
+-- this release package. After that authorization, and only then:
 --   npm run migrate -- --go --only 20261119_scorecard_reader.sql
 --
 -- scorecard_reader is a direct SQL login. No password is stored in this file.

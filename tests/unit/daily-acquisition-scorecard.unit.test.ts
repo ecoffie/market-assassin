@@ -668,6 +668,13 @@ describe('the script and the workflow stay read-only', () => {
     expect(workflow).toContain('actions: write');
     expect(workflow).toContain('Scorecard numbers are unknown. No report was published.');
     expect(workflow.split('- name: Upload scorecard')[1]).toContain('if: success()');
+    const privileges = readFileSync(join(process.cwd(), 'scripts/scorecard-privilege-ci.mjs'), 'utf8');
+    expect(privileges).toContain("code !== '42501'");
+    expect(privileges).not.toContain('25006');
+    expect(privileges).toContain('SET default_transaction_read_only = off');
+    expect(privileges).toContain('SELECT route FROM public.cron_jobs');
+    expect(privileges).toContain('SELECT error FROM public.cron_job_runs');
+    expect(privileges).toContain('scorecard_institute_resolution');
     expect(workflow).not.toContain('SCORECARD_JWT_SECRET');
     expect(workflow).not.toContain('SCORECARD_READONLY_JWT');
     expect(workflow).not.toContain('SCORECARD_DATABASE_URL:');

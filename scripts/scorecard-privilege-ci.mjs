@@ -82,9 +82,35 @@ async function canLogin(databaseUrl) {
   }
 }
 
+async function expect42501(client, sql) {
+  await client.query('BEGIN');
+  await client.query('SET TRANSACTION READ WRITE');
+  let code = 'ok';
+  try {
+    await client.query(sql);
+  } catch (err) {
+    code = err.code;
+  }
+  await client.query('ROLLBACK');
+  if (code !== '42501') {
+    console.error(`scorecard privilege ci: expected 42501 and got ${code}`);
+    process.exit(1);
+  }
+}
+
 async function main() {
   const admin = await connect(url);
   await admin.query(STUBS);
+  await admin.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+        CREATE ROLE anon NOLOGIN;
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+        CREATE ROLE authenticated NOLOGIN;
+      END IF;
+    END $$;
+  `);
   await admin.query(appliedSql());
   await admin.query(`
     INSERT INTO public.data_source_instances (source_key, name, dataset_key, source_state, watch_cadence_days)
@@ -93,7 +119,11 @@ async function main() {
   `);
   await admin.query(`
     INSERT INTO public.institute_sources (id, source_type, title, raw)
-    VALUES ('11111111-1111-4111-8111-111111111111', 'gao_report', 'public title', '{"acquisition":{"recommendation":"private recommendation text"}}'::jsonb)
+    VALUES
+      ('11111111-1111-4111-8111-111111111111', 'gao_report', 'public title',
+       '{"acquisition":{"resolution_status":"PRIVATE_RECOMMENDATION_SENTINEL","recommendation":"PRIVATE_RECOMMENDATION_SENTINEL"}}'::jsonb),
+      ('22222222-2222-4222-8222-222222222222', 'gao_report', 'open title',
+       '{"acquisition":{"resolution_status":"open","recommendation":"PRIVATE_RECOMMENDATION_SENTINEL"}}'::jsonb)
     ON CONFLICT (id) DO NOTHING
   `);
 
@@ -128,25 +158,67 @@ async function main() {
     console.error('scorecard privilege ci: RLS hid a row the reader must count');
     process.exit(1);
   }
-  let rawDenied = false;
-  try {
-    await reader.query('SELECT raw FROM public.institute_sources');
-  } catch (err) {
-    rawDenied = err.code === '42501';
+  for (const sql of [
+    'SELECT raw FROM public.institute_sources',
+    'SELECT route FROM public.cron_jobs',
+    'SELECT error FROM public.cron_job_runs',
+  ]) {
+    let code = 'ok';
+    try {
+      await reader.query(sql);
+    } catch (err) {
+      code = err.code;
+    }
+    if (code !== '42501') {
+      console.error(`scorecard privilege ci: denied column returned ${code}`);
+      process.exit(1);
+    }
   }
-  if (!rawDenied) {
-    console.error('scorecard privilege ci: raw select was allowed');
+  const flags = await reader.query(
+    `SELECT * FROM public.scorecard_institute_resolution($1::uuid[])`,
+    [['11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222']],
+  );
+  const dumped = JSON.stringify(flags.rows);
+  if (dumped.includes('PRIVATE_RECOMMENDATION_SENTINEL')) {
+    console.error('scorecard privilege ci: resolution output contained raw text');
     process.exit(1);
   }
-  let writeDenied = false;
-  try {
-    await reader.query(`INSERT INTO public.cron_jobs (job_name, enabled) VALUES ('x', true)`);
-  } catch (err) {
-    writeDenied = err.code === '42501' || err.code === '25006';
-  }
-  if (!writeDenied) {
-    console.error('scorecard privilege ci: a write was allowed');
+  const odd = flags.rows.find((row) => row.id === '11111111-1111-4111-8111-111111111111');
+  const open = flags.rows.find((row) => row.id === '22222222-2222-4222-8222-222222222222');
+  const columns = Object.keys(flags.rows[0] || {}).sort().join(',');
+  if (columns !== 'discovered_at,id,resolution_flag,resolution_status') {
+    console.error('scorecard privilege ci: resolution returned unexpected columns');
     process.exit(1);
+  }
+  if (odd?.resolution_status !== 'unknown' || odd?.resolution_flag !== 'unknown') {
+    console.error('scorecard privilege ci: a non-open status was not unknown');
+    process.exit(1);
+  }
+  if (open?.resolution_status !== 'open' || open?.resolution_flag !== 'confirmed_unresolved') {
+    console.error('scorecard privilege ci: an open status was not mapped');
+    process.exit(1);
+  }
+  const grants = await admin.query(`
+    SELECT r.rolname,
+           has_function_privilege(r.oid, p.oid, 'EXECUTE') AS can_execute
+    FROM pg_roles r
+    JOIN pg_proc p ON p.proname = 'scorecard_institute_resolution'
+    JOIN pg_namespace n ON n.oid = p.pronamespace AND n.nspname = 'public'
+    WHERE r.rolname IN ('scorecard_reader', 'anon', 'authenticated', 'scorecard_rotator')
+  `);
+  const byRole = Object.fromEntries(grants.rows.map((row) => [row.rolname, row.can_execute]));
+  if (byRole.scorecard_reader !== true || byRole.anon !== false || byRole.authenticated !== false || byRole.scorecard_rotator !== false) {
+    console.error('scorecard privilege ci: resolution execute grants were wrong');
+    process.exit(1);
+  }
+  await reader.query('SET default_transaction_read_only = off');
+  for (const sql of [
+    `INSERT INTO public.cron_jobs (job_name, enabled) VALUES ('x', true)`,
+    `UPDATE public.cron_jobs SET enabled = false WHERE job_name = 'x'`,
+    `DELETE FROM public.cron_jobs WHERE job_name = 'x'`,
+    `TRUNCATE public.cron_jobs`,
+  ]) {
+    await expect42501(reader, sql);
   }
   let setRoleDenied = false;
   try {
@@ -191,6 +263,15 @@ async function main() {
   rotatorUrl.username = 'scorecard_rotator';
   rotatorUrl.password = 'ci-rotator-not-production';
   const rotator = await connect(rotatorUrl.toString());
+  const rotatorRole = await admin.query(`
+    SELECT rolsuper, rolbypassrls, rolcreaterole
+    FROM pg_roles WHERE rolname = 'scorecard_rotator'
+  `);
+  const shape = rotatorRole.rows[0];
+  if (!shape || shape.rolsuper || shape.rolbypassrls || shape.rolcreaterole) {
+    console.error('scorecard privilege ci: rotator is not a narrow login');
+    process.exit(1);
+  }
   let rotatorReadDenied = false;
   try {
     await rotator.query('SELECT count(*) FROM public.institute_sources');
@@ -201,6 +282,8 @@ async function main() {
     console.error('scorecard privilege ci: rotator could read institute_sources');
     process.exit(1);
   }
+  await expect42501(rotator, `INSERT INTO public.cron_jobs (job_name, enabled) VALUES ('rotator', true)`);
+  await expect42501(rotator, `SELECT id FROM public.scorecard_institute_resolution(NULL::uuid[])`);
   const spun = await rotator.query(
     `SELECT password, expires_at FROM public.scorecard_rotate_reader_password($1,$2,$3,$4,$5,$6)`,
     ['ci-jti-3', 'ci-run-4', 'ci', 'schedule', 'ecoffie/market-assassin', 'ecoffie/market-assassin/.github/workflows/daily-acquisition-scorecard.yml@refs/heads/main'],

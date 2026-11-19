@@ -14,18 +14,22 @@ A JWT signing secret in GitHub can mint `service_role`. A GitHub token that can 
 
 The route's attack surface is one POST. A stolen OIDC token can be replayed until its `jti` is stored or it expires (GitHub tokens last a few minutes). A stolen rotator URL can ask for a 30-minute reader password, which can read the granted columns and cannot read `institute_sources.raw` or write. It cannot mint a service-role JWT and cannot change GitHub secrets.
 
+`scorecard_rotator` can do nothing except `EXECUTE scorecard_rotate_reader_password`. It is not a superuser, has no BYPASSRLS or CREATEROLE, has no table privileges, and cannot execute `scorecard_institute_resolution`. The privilege job checks that.
+
+A compromised Next.js process is wider than the rotator login. This route runs inside the production app, so that process can read the deployment's other environment variables. The route as written does not return them. The rotator login cannot.
+
 `scorecard_reader` is not granted to `authenticator`. The scorecard connects with `pg` through the Supabase transaction pooler, port 6543, `sslmode=verify-full`. PostgREST is not on this path.
 
 ## One-time setup
 
-Do these in order. After each step, do the check named there. Stop if the check fails.
+Do not apply this migration, create these roles, set the rotator credential, deploy the route, or set any secret until Eric's written authorization for this release package. No production step comes before that authorization. After it, do these in order. After each step, do the check named there. Stop if the check fails.
 
 1. **Confirm the target.** From the production checkout, confirm `npm run migrate` is aimed at the production database and that a backup exists. Check: the migrate dry run names this file and no other pending file you intend to apply.
 2. **Apply only this migration.** `npm run migrate -- --go --only 20261119_scorecard_reader.sql`. Check: `\du scorecard_reader` shows LOGIN, connection limit 3, and no superuser, CREATEROLE, or BYPASSRLS. `\du scorecard_rotator` shows LOGIN and connection limit 2. Neither role has a password yet, so a password login fails.
 3. **Set the rotator password once.** Generate it locally. Do not echo it. In a SQL session as the migration role: `ALTER ROLE scorecard_rotator PASSWORD '...'`. Do not set `VALID UNTIL`. Check: a connection as `scorecard_rotator` can `SELECT 1 FROM scorecard_rotate_reader_password(...)` only when you choose to test it, and `SELECT * FROM institute_sources` fails.
 4. **Store the rotator URL on the server only.** In the production host env, set `SCORECARD_ROTATOR_URL` to the pooler URL for `scorecard_rotator.<project-ref>` on port 6543 with `sslmode=verify-full`. Set `SCORECARD_READER_HOST` to that pooler host and `SCORECARD_READER_USER` to `scorecard_reader.<project-ref>`. Do not create a GitHub secret for either. Check: GitHub Actions secrets do not list `SCORECARD_ROTATOR_URL`, `SCORECARD_DATABASE_URL`, `SCORECARD_JWT_SECRET`, or `SCORECARD_READONLY_JWT`.
 5. **Remove the unused signing secret.** If `SCORECARD_JWT_SECRET` or `SCORECARD_READONLY_JWT` exists in GitHub or the server env, delete it. Check: both names are absent.
-6. **Deploy the route** only when Eric has approved this release. The route is `POST /api/scorecard/credential`. Check: a request with no token returns 401 and no password.
+6. **Deploy the route.** This is covered by the same written authorization above, not a second approval. The route is `POST /api/scorecard/credential`. Check: a request with no token returns 401 and no password.
 7. **One dispatch.** Agent 5 runs the workflow with `workflow_dispatch` on `main`. Check: the job is green, the summary has counts or an unknown that is not a zero, and `scorecard_credential_audit` has one new row with the run id and an expiry about 30 minutes out. The row has no password column.
 
 ## Break-glass
