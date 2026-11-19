@@ -30,7 +30,7 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
 |---|---|---|---|---|---|
-| 2026-11-19 | Acquisition scorecard | `scorecard_reader` is not granted `institute_sources.raw`. Resolution comes from `scorecard_institute_resolution`, which returns id, discovered_at, and the two flags. A missing, expired, rejected, or writable credential exits non-zero and publishes no report. Migration `20261119_scorecard_reader.sql` is not applied. | `Scorecard numbers are unknown. No report was published.` → `.github/workflows/daily-acquisition-scorecard.yml` | `daily-acquisition-scorecard.unit.test.ts` | BUILT, NOT MERGED |
+| 2026-11-19 | Acquisition scorecard | `scorecard_reader` is not granted `institute_sources.raw`. Resolution comes from `scorecard_institute_resolution`, which returns id, discovered_at, and the two flags. A missing, expired, rejected, or writable credential exits non-zero and publishes no report. Migration `20261119_scorecard_reader.sql` is not applied. | `Scorecard numbers are unknown. No report was published.` → `.github/workflows/daily-acquisition-scorecard.yml` | `tests/unit/daily-acquisition-scorecard.unit.test.ts` | BUILT, NOT MERGED |
 
 ## 2026-11-19 — Budget labels are budgetary resources, not awards
 
