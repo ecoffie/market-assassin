@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { LAZY_CONTRACTORS_BLUEPRINT as EVENT } from '@/lib/events/lazy-contractors-blueprint';
 import { countContactsByTag } from '@/lib/ghl/event-registration';
-import RegistrationForm from './RegistrationForm';
+import SeatDialog from './SeatDialog';
 import Countdown from './Countdown';
 
 const URL = `https://getmindy.ai${EVENT.path}`;
@@ -52,7 +52,7 @@ export default async function LazyContractorsBlueprintPage() {
     <main className="lcb">
       <style dangerouslySetInnerHTML={{ __html: LCB_CSS }} />
 
-      {/* Above the fold: headline, subheadline, proof, one reason, the form. */}
+      {/* Above the fold: headline, subheadline, proof and ONE button; the form opens in steps (SeatDialog). */}
       <section className="lcb-hero">
         <div className="lcb-wrap lcb-hero-grid">
           <div className="lcb-hero-copy">
@@ -61,22 +61,14 @@ export default async function LazyContractorsBlueprintPage() {
             <p className="lcb-sub">{SUBHEAD}</p>
             <p className="lcb-bonus">Join live and get <strong>{CREDITS} free Mindy credits</strong> to run it on your own business.</p>
             {registered && <p className="lcb-proof">{registered} contractors already registered.</p>}
-            <figure className="lcb-shot lcb-wide">
-              {/* eslint-disable-next-line @next/next/no-img-element -- static 37 KB WebP, no layout shift (fixed aspect) */}
-              <img src="/events/lcb-hero-map.webp" width={800} height={800} alt="Mindy's opportunity map: every open federal opportunity as a pin, filtered by industry" />
-              <figcaption>What you’ll use: every open federal opportunity on one map, filtered to what you sell.</figcaption>
-            </figure>
-          </div>
-          <div className="lcb-form-col">
-            <RegistrationForm />
-            <p className="lcb-why">Your join link comes by email right away.</p>
+            <SeatDialog />
+            <p className="lcb-why">Takes 30 seconds. Your join link comes by email right away.</p>
             <div className="lcb-cd-wrap"><Countdown /></div>
           </div>
-          {/* Phones: the proof image after the form, so the form stays near the top. */}
-          <figure className="lcb-shot lcb-narrow-only">
-            {/* eslint-disable-next-line @next/next/no-img-element -- same static image as above */}
-            <img src="/events/lcb-hero-map.webp" width={800} height={800} alt="Mindy's opportunity map: every open federal opportunity as a pin, filtered by industry" loading="lazy" />
-            <figcaption>What you’ll use: every open federal opportunity on one map.</figcaption>
+          <figure className="lcb-shot">
+            {/* eslint-disable-next-line @next/next/no-img-element -- static 37 KB WebP, no layout shift (fixed aspect) */}
+            <img src="/events/lcb-hero-map.webp" width={800} height={800} alt="Mindy's opportunity map: every open federal opportunity as a pin, filtered by industry" />
+            <figcaption>What you’ll use: every open federal opportunity on one map, filtered to what you sell.</figcaption>
           </figure>
         </div>
       </section>
@@ -111,8 +103,8 @@ const LCB_CSS = `
 .lcb-wrap{max-width:1160px;margin:0 auto;padding-left:max(24px, env(safe-area-inset-left, 0px));padding-right:max(24px, env(safe-area-inset-right, 0px))}
 .lcb-hero{background:var(--mp-navy);color:#fff;padding:56px 0 64px}
 .lcb-hero-grid{display:grid;gap:32px;align-items:start}
-@media (min-width:900px){.lcb-hero-grid{grid-template-columns:minmax(0,1fr) minmax(0,420px);gap:56px}}
-.lcb-hero-copy,.lcb-form-col{min-width:0}
+@media (min-width:900px){.lcb-hero-grid{grid-template-columns:minmax(0,1fr) minmax(0,460px);gap:56px;align-items:center}}
+.lcb-hero-copy{min-width:0}
 .lcb-kicker{margin:0 0 14px;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--lcb-gold)}
 .lcb-title{margin:0;font-family:var(--mp-font-serif);font-weight:700;font-size:clamp(34px,4.6vw,56px);line-height:1.06;letter-spacing:-.02em;text-wrap:balance;color:#fff}
 .lcb-sub{margin:18px 0 0;font-size:clamp(17px,1.7vw,19px);line-height:1.55;color:var(--lcb-soft);max-width:620px}
@@ -122,13 +114,21 @@ const LCB_CSS = `
 .lcb-shot{margin:28px 0 0}
 .lcb-shot img{display:block;width:100%;max-width:560px;height:auto;aspect-ratio:1/1;object-fit:cover;object-position:top;border-radius:14px;box-shadow:0 20px 50px rgba(5,15,40,.45)}
 .lcb-shot figcaption{margin:10px 0 0;font-size:14px;color:var(--lcb-soft)}
-.lcb-hero .mp-panel{background:#fff;color:var(--mp-ink);border-radius:18px;box-shadow:0 24px 60px rgba(5,15,40,.45);border:0;scroll-margin-top:24px}
-.lcb-why{margin:12px 0 0;font-size:14px;color:var(--lcb-soft);text-align:center}
+.lcb-dialog{position:fixed;inset:0;margin:auto;height:fit-content;width:min(480px,calc(100vw - 32px));max-height:calc(100dvh - 32px);padding:0;border:0;border-radius:18px;background:#fff;color:var(--mp-ink);box-shadow:0 24px 60px rgba(5,15,40,.45)}
+.lcb-dialog::backdrop{background:rgba(5,15,40,.7)}
+.lcb-dialog .mp-panel{border:0;box-shadow:none;padding:28px 24px 24px}
+.lcb-dialog-x{position:absolute;top:10px;right:10px;width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:10px;background:transparent;color:var(--mp-muted);cursor:pointer;z-index:1}
+.lcb-dialog-x:hover{background:var(--mp-hair)}
+.lcb-step-meta{display:grid;gap:6px;padding-right:40px}
+.lcb-steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.lcb-steps li{font-size:12px;font-weight:600;color:var(--mp-muted);padding-top:8px;border-top:4px solid var(--mp-hair)}
+.lcb-steps li.on{color:var(--mp-ink);border-top-color:var(--lcb-gold)}
+.lcb-step-q{margin:0;font-family:var(--mp-font-serif);font-weight:700;font-size:24px;line-height:1.2}
+.lcb-cta--hero{border:0;cursor:pointer;font-size:18px;padding:18px 34px;margin-top:28px}
+.lcb-why{margin:12px 0 0;font-size:14px;color:var(--lcb-soft)}
 .lcb-cd-wrap{margin-top:18px}
 .lcb-cd-wrap .lcb-cd>p.mp-meta{color:var(--lcb-soft)}
 .lcb-cd-wrap .lcb-cd b{color:var(--mp-ink)}
-@media (min-width:900px){.lcb-narrow-only{display:none}}
-@media (max-width:899px){.lcb-wide{display:none}}
 .lcb-sec{padding:64px 0}
 .lcb-narrow{max-width:720px}
 .lcb-h2{margin:0 0 20px;font-family:var(--mp-font-serif);font-weight:700;font-size:clamp(26px,3vw,34px);line-height:1.15;color:var(--mp-ink)}
