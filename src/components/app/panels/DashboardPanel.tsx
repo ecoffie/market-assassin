@@ -21,6 +21,7 @@ import StartHereCard from './StartHereCard';
 import HiddenWorkNudge from './HiddenWorkNudge';
 import TodaysThree, { type TodaysPick } from './TodaysThree';
 import YourRankingCard from './YourRankingCard';
+import { BOOK_CALL_URL, BOOK_CALL_LABEL } from '@/lib/mindy/book-call';
 import { getNaics } from '@/lib/codes/lookup';
 import ShareButton from '@/components/briefings/ShareButton';
 import SamAttachmentLinks from '@/components/app/SamAttachmentLinks';
@@ -1364,6 +1365,16 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
         )}
         {/* Your ranking — lifetime federal dollars to the Vault UEI, overall + in-state (owner 2026-11-19). */}
         <YourRankingCard email={email} getAuthHeaders={getAuthHeaders} onAddUei={() => onPanelChange?.('vault')} />
+        {/* Paid members can book a call with the Mindy team (owner 2026-11-19). For you is Pro/Team/trial only. */}
+        <section aria-label="Talk to the Mindy team" data-testid="book-call-card" className="rounded-xl border border-surface bg-ground px-4 py-3 mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-white">Talk to the Mindy team</p>
+            <p className="text-xs text-muted">Get help with your market, a pursuit or a proposal. 30 minutes, free with your plan.</p>
+          </div>
+          <a href={BOOK_CALL_URL} target="_blank" rel="noopener noreferrer" className="h-10 px-4 rounded-lg bg-[#006aff] hover:bg-[#0057d1] text-white text-sm font-semibold inline-flex items-center">
+            {BOOK_CALL_LABEL}
+          </a>
+        </section>
       </div>
 
       {isLoading ? (
