@@ -96,9 +96,10 @@ export function toPublicReport(value) {
   if (typeof value === 'object') {
     const out = {};
     for (const [k, v] of Object.entries(value)) {
-      // institute_sources.raw is recommendation text. It is readable by the
-      // scorecard role and must never be published.
-      if (k === 'raw') continue;
+      // institute_sources.raw is recommendation text. The scorecard role is not
+      // granted it and the findability path does not select it. Drop it anyway
+      // so a leaked field never reaches a public log or artifact.
+      if (k === 'raw' || k === 'recommendation') continue;
       out[k] = toPublicReport(v);
     }
     return out;
@@ -704,7 +705,7 @@ export async function measureCustomerFindability(io, window, readCustomer, probe
   const reason = failed
     ? READ_FAILED
     : (candidates.length
-      ? 'checked with getAgencySourcedIntelligence, the reader behind /api/pain-points, Ask Mindy, and get_agency_intel'
+      ? 'checked with getAgencySourcedIntelligence (includeAcquisitionRaw=false), the thinner findability path of the reader behind /api/pain-points, Ask Mindy, and get_agency_intel'
       : 'no Institute GAO or Inspector General pain point was inserted in this window');
   return {
     status: failed ? 'unknown' : 'measured',
@@ -725,7 +726,12 @@ export async function loadCustomerReader() {
   const mod = await import('../src/lib/strategic-intel/sourced-pain-points.ts');
   const { createClient } = await import('@supabase/supabase-js');
   const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-  return (agency) => mod.getAgencySourcedIntelligence(agency, { client });
+  // Thinner path: never select institute_sources.raw (not granted to scorecard_reader).
+  // Findability still matches on institute_source_id / document_number / claim text.
+  return (agency) => mod.getAgencySourcedIntelligence(agency, {
+    client,
+    includeAcquisitionRaw: false,
+  });
 }
 
 export async function buildDailyScorecard(io, opts = {}) {
@@ -821,10 +827,10 @@ export async function buildDailyScorecard(io, opts = {}) {
   return {
     label: 'Daily acquisition scorecard',
     measured: true,
-    queries: 'GET /rest/v1 for counts. Customer findability calls getAgencySourcedIntelligence (read) and may HEAD a public citation.',
+    queries: 'GET /rest/v1 for counts. Customer findability calls getAgencySourcedIntelligence with includeAcquisitionRaw=false (no institute_sources.raw) and may HEAD a public citation.',
     generatedAt: now.toISOString(),
     windows,
-    counting: 'New records are rows whose created_at, first_seen, or insert-only discovered_at falls in the window. A cron_job_runs success, a synced_at touch, and an unchanged upsert are not new.',
+    counting: 'New records are rows whose created_at, first_seen, or insert-only discovered_at falls in the window (newly collected). Customer findability is a separate metric (newly customer-accessible). A cron_job_runs success, a synced_at touch, and an unchanged upsert are not new.',
     instanceList,
     sources,
     corpora: corpusReports,
@@ -990,11 +996,11 @@ function unmeasured(now, reason) {
   return {
     label: 'Daily acquisition scorecard',
     measured: false,
-    queries: 'GET /rest/v1 for counts. Customer findability calls getAgencySourcedIntelligence (read) and may HEAD a public citation.',
+    queries: 'GET /rest/v1 for counts. Customer findability calls getAgencySourcedIntelligence with includeAcquisitionRaw=false (no institute_sources.raw) and may HEAD a public citation.',
     generatedAt: now.toISOString(),
     windows,
     reason,
-    counting: 'New records are rows whose created_at, first_seen, or insert-only discovered_at falls in the window. A cron_job_runs success, a synced_at touch, and an unchanged upsert are not new.',
+    counting: 'New records are rows whose created_at, first_seen, or insert-only discovered_at falls in the window (newly collected). Customer findability is a separate metric (newly customer-accessible). A cron_job_runs success, a synced_at touch, and an unchanged upsert are not new.',
     instanceList: { ...unknown(reason), capped: false, readOk: false },
     sources: [],
     corpora: CORPORA.map((c) => ({

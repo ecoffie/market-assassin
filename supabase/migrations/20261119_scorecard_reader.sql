@@ -16,17 +16,27 @@
 -- a SELECT/ALL policy USING (true) for every role, so no new policy is added.
 -- cron_jobs and cron_job_runs were created without RLS.
 --
--- JWT setup (do this in the dashboard; do not paste a secret into this file):
--- The token expires in 30 days. Rotate SCORECARD_READONLY_JWT before that
--- date. Settings → API → JWT tells you which signer is active, without
--- copying the secret out. If the legacy JWT secret is still enabled, mint
--- HS256 with that secret and "role": "scorecard_reader". If the legacy
--- secret is disabled and only asymmetric signing keys are listed, a
--- hand-minted HS256 token is rejected; sign with the current key instead.
--- Confirm the gateway accepts the token as apikey. If it accepts only the
--- anon or service-role key there, send the anon key as apikey and this
--- token as Authorization. The token can read institute_sources.raw
--- (recommendation text and the resolution flag). Do not print raw.
+-- institute_sources.raw is NOT granted. That column holds recommendation text
+-- and resolution flags. The scorecard findability path uses a thinner select
+-- that never asks for raw. New-row counts (discovered_at / created_at) stay
+-- separate from customer-findability metrics.
+--
+-- Credential (supported path — no Mac JWT minting):
+-- Store the project's legacy JWT HS256 secret once as the Actions secret
+-- SCORECARD_JWT_SECRET. The weekday workflow runs
+-- scripts/scorecard-mint-jwt.mjs at job start, which mints a short-lived
+-- (2h) HS256 token with "role": "scorecard_reader", masks it, and writes it
+-- to GITHUB_ENV as SCORECARD_READONLY_JWT. Rotate by rotating the Actions
+-- secret SCORECARD_JWT_SECRET when the project signing secret changes. Do
+-- not mint 30-day JWTs on a laptop. Do not put the signing secret or the
+-- token in a log, commit, or PR.
+--
+-- Settings → API → JWT tells you which signer is active. This path requires
+-- the legacy JWT secret still enabled (HS256). If only asymmetric signing
+-- keys are listed, stop and extend the mint script for that signer before
+-- apply — do not hand-mint. Confirm the gateway accepts the token as apikey.
+-- If it accepts only the anon or service-role key there, send the anon key
+-- as apikey and this token as Authorization.
 
 DO $$
 BEGIN
@@ -82,9 +92,8 @@ GRANT SELECT (
   created_at
 ) ON TABLE public.agency_pain_points_db TO scorecard_reader;
 
--- Institute identity for GAO/IG findability, the discovered_at new-row clock,
--- and raw because getAgencySourcedIntelligence selects it. The scorecard does
--- not print raw.
+-- Institute identity for GAO/IG findability and the discovered_at new-row clock.
+-- raw (recommendation / resolution) is deliberately omitted.
 GRANT SELECT (
   id,
   source_type,
@@ -93,8 +102,7 @@ GRANT SELECT (
   publication_date,
   title,
   canonical_agency,
-  discovered_at,
-  raw
+  discovered_at
 ) ON TABLE public.institute_sources TO scorecard_reader;
 
 DO $$
@@ -138,7 +146,7 @@ NOTIFY pgrst, 'reload schema';
 -- DROP POLICY IF EXISTS scorecard_reader_select ON public.data_source_instances;
 -- REVOKE SELECT (
 --   id, source_type, document_number, source_url, publication_date, title,
---   canonical_agency, discovered_at, raw
+--   canonical_agency, discovered_at
 -- ) ON TABLE public.institute_sources FROM scorecard_reader;
 -- REVOKE SELECT (
 --   id, agency, pain_point, source, source_url, institute_source_ids,

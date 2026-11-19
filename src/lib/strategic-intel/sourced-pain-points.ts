@@ -155,19 +155,32 @@ interface InstituteRow {
   publication_date: string | null;
   title: string;
   canonical_agency: string | null;
-  raw: unknown;
+  /** Present only when includeAcquisitionRaw is true. Holds recommendation text. */
+  raw?: unknown;
 }
+
+/** Public institute columns. Omits raw (recommendation / resolution). */
+export const INSTITUTE_SOURCE_PUBLIC_SELECT =
+  'id,document_number,source_url,publication_date,title,canonical_agency';
+
+/** Full institute select used by customer surfaces that show recommendations. */
+export const INSTITUTE_SOURCE_CUSTOMER_SELECT = `${INSTITUTE_SOURCE_PUBLIC_SELECT},raw`;
 
 /**
  * Load living sourced pain points for an agency from canonical tables.
  * Requires service-role (or RLS-open) access to institute_sources + agency_pain_points_db.
+ *
+ * Set includeAcquisitionRaw: false for the scorecard findability path. That
+ * path must not select institute_sources.raw (recommendation text); the
+ * scorecard_reader role is not granted that column.
  */
 export async function loadSourcedPainPointsForAgency(
   agencyQuery: string,
-  opts: { client?: SupabaseClient; limit?: number } = {},
+  opts: { client?: SupabaseClient; limit?: number; includeAcquisitionRaw?: boolean } = {},
 ): Promise<SourcedPainPoint[]> {
   const client = opts.client ?? sb();
   const limit = opts.limit ?? 50;
+  const includeAcquisitionRaw = opts.includeAcquisitionRaw !== false;
   const { canonical, searchKeys } = resolveAgencyQuery(agencyQuery);
   if (searchKeys.length === 0) return [];
 
@@ -190,10 +203,16 @@ export async function loadSourcedPainPointsForAgency(
 
   const byId = new Map<string, InstituteRow>();
   if (sourceIds.length > 0) {
-    const { data: sources, error: sErr } = await client
-      .from('institute_sources')
-      .select('id,document_number,source_url,publication_date,title,canonical_agency,raw')
-      .in('id', sourceIds);
+    // Two literal .select() calls keep the PostgREST client types happy and
+    // keep the scorecard path from asking for raw.
+    const instituteQuery = includeAcquisitionRaw
+      ? client
+        .from('institute_sources')
+        .select('id,document_number,source_url,publication_date,title,canonical_agency,raw')
+      : client
+        .from('institute_sources')
+        .select('id,document_number,source_url,publication_date,title,canonical_agency');
+    const { data: sources, error: sErr } = await instituteQuery.in('id', sourceIds);
     if (sErr) throw new Error(`loadSourcedPainPointsForAgency institute: ${sErr.message}`);
     for (const s of (sources ?? []) as InstituteRow[]) byId.set(s.id, s);
   }
@@ -204,7 +223,7 @@ export async function loadSourcedPainPointsForAgency(
     const inst = sid ? byId.get(sid) : undefined;
     const docNum = inst?.document_number ?? extractDocumentNumber(row.pain_point);
     const url = row.source_url || inst?.source_url || null;
-    const acquired = readAcquiredFields(inst?.raw);
+    const acquired = includeAcquisitionRaw ? readAcquiredFields(inst?.raw) : null;
 
     // Living pipeline cites the source's own wording → SOURCE_FACT.
     // Anything without an Institute id or URL is not promoted to SOURCE_FACT.
@@ -397,6 +416,8 @@ export async function getAgencySourcedIntelligence(
     client?: SupabaseClient;
     sourcedLimit?: number;
     legacyLimit?: number;
+    /** Default true. Scorecard findability must pass false (no institute_sources.raw). */
+    includeAcquisitionRaw?: boolean;
     priorityProbe?: () => Promise<{ table: 'empty' | 'unmeasured' | 'ready'; rows: SourcedPainPoint[] }>;
   } = {},
 ): Promise<AgencyIntelligenceBundle> {
@@ -407,6 +428,7 @@ export async function getAgencySourcedIntelligence(
     sourced = await loadSourcedPainPointsForAgency(agencyQuery, {
       client: opts.client,
       limit: opts.sourcedLimit ?? 50,
+      includeAcquisitionRaw: opts.includeAcquisitionRaw,
     });
   } catch (err) {
     // Fail open to legacy rather than blanking the customer surface — but never
