@@ -79,6 +79,7 @@ const CRON_JOBS = {
   gao: ['institute-gao-sync'],
   legislation: ['institute-legislation-sync'],
   dodSbir: ['sync-dod-sbir'],
+  budgetIntel: ['sync-budget-intel'],
   usaspendingAwards: ['sync-usaspending-awards'],
   samEntities: ['sync-gov-buyer-data'],
 } as const;
@@ -803,7 +804,7 @@ export async function GET(request: NextRequest) {
       headlineContribution: 0,
       freshness: { state: 'STATIC', asOf: budgetAsOf, basis: 'agency-budget-data.json lastUpdated', detail: `fiscal years ${budgetFys.join(', ') || '?'} — FY2025 enacted, FY2026 President's request` },
       surface: { state: 'customer_readable', tools: ['get_agency_budget_trends'] },
-      upstreams: ['omb'], provenance: 'Built once from the OMB FY2026 discretionary request + agency CBJs. Not a living budget feed.',
+      upstreams: ['omb'], provenance: `Fixed file (OMB FY2026 discretionary request + agency CBJs). Customer tools prefer live agency_budget_authority and budget_programs when those tables are non-empty and label which store is shown. Scheduled acquire job '${CRON_JOBS.budgetIntel[0]}' is one agency page per run. This card stays the fixed file's as-of.`,
     },
 
     // ─── DERIVED INDEX / REPRESENTATION ─────────────────────────────────────────

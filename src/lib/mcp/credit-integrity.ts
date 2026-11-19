@@ -136,6 +136,7 @@ export const REQUIRED_ONE_OF: Readonly<Record<string, readonly string[]>> = {
   lookup_sam_entity: ['uei', 'name'],
   match_company_to_pathways: ['uei', 'company_name', 'cage', 'cai'],
   understand_customer: ['notice_id', 'agency'],
+  get_agency_intel: ['agency', 'program_keyword'],
   derive_company_keywords: ['description', 'past_performance', 'capabilities', 'code_titles'],
   extract_compliance_matrix: ['notice_id', 'rfp_text'],
   extract_statement_of_work: ['notice_id', 'rfp_text'],

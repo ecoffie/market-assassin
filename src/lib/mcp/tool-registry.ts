@@ -501,7 +501,10 @@ const AGENCY_INTEL_TOOL_DEF = {
     name: 'get_agency_intel',
     description:
       'Target-research read on a federal agency: resolves it by name / abbreviation / CGAC code, then returns ' +
-      'identity + hierarchy, curated GovCon pain points & priorities, and (when available) live USASpending ' +
+      'identity + hierarchy, pain points, and priorities. An agency keeps its fixed-file budget and priorities ' +
+      'until that agency has live rows (priorityBasis and budget year labels say which). Pass program_keyword to list agencies whose ' +
+      'live federal-account obligations for that word are growing or surging; an empty budget_programs table is ' +
+      'unavailable, not zero. Also (when available) live USASpending ' +
       'obligations for the fiscal year with top NAICS. The "size up a buyer before I pursue them" lookup. Pain ' +
       'points are curated intel, not an official statement. Also returns `legislation`: the NDAA record Mindy ' +
       'holds for the department — each bill and version with its stage and law status (enacted law vs House/' +
@@ -512,10 +515,11 @@ const AGENCY_INTEL_TOOL_DEF = {
     parameters: {
       type: 'object',
       properties: {
-        agency: { type: 'string', description: 'Agency name, abbreviation, or CGAC code, e.g. "VA", "Department of Defense", or "069".' },
+        agency: { type: 'string', description: 'Agency name, abbreviation, or CGAC code, e.g. "VA", "Department of Defense", or "069". Omit only when program_keyword asks which agencies are increasing that spending.' },
         fiscal_year: { type: 'number', description: 'Optional fiscal year for spending (defaults to current federal FY).' },
+        program_keyword: { type: 'string', description: 'Optional. Live federal-account obligations whose name matches and whose stored trend is growing or surging, e.g. "cybersecurity". Empty live table is unavailable, not zero agencies. The fixed file is not a program-activity source.' },
       },
-      required: ['agency'],
+      required: [],
     },
   },
 };
@@ -2372,6 +2376,7 @@ async function dispatchMcpTool(
     const result = (await getAgencyIntel({
       agency: typeof args.agency === 'string' ? args.agency : '',
       fiscal_year: typeof args.fiscal_year === 'number' ? args.fiscal_year : undefined,
+      program_keyword: typeof args.program_keyword === 'string' ? args.program_keyword : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
@@ -2852,9 +2857,9 @@ async function dispatchMcpTool(
   }
 
   if (name === 'get_agency_budget_trends') {
-    const result = getAgencyBudgetTrends({
+    const result = (await getAgencyBudgetTrends({
       agency: typeof args.agency === 'string' ? args.agency : '',
-    }) as unknown as Record<string, unknown>;
+    })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
 

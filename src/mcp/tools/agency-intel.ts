@@ -24,12 +24,18 @@ import {
   getLegislativeEvidenceForAgency,
   type LegislativeEvidence,
 } from '@/lib/strategic-intel/legislative-evidence';
+import { readIncreasingPrograms, type ProgramAnswer } from '@/lib/budget-intel/read';
 
 export interface AgencyIntelInput {
   /** Agency name, abbreviation, or CGAC code, e.g. "VA", "Department of Defense", or "069". */
-  agency: string;
+  agency?: string;
   /** Optional fiscal year for spending (defaults to the current federal FY). */
   fiscal_year?: number;
+  /**
+   * When set, also list live federal-account obligations whose name matches
+   * and whose stored trend is growing or surging. Does not change search ranking.
+   */
+  program_keyword?: string;
 }
 
 export interface AgencyIntelCitation {
@@ -79,7 +85,11 @@ export interface AgencyIntelResult {
     matchType: UnifiedAgencyResult['matchType'];
     hasSourcedIntelligence: boolean;
     provenanceNote: string;
+    /** live_table, static_file, or static_file_live_unmeasured. */
+    priorityBasis?: string;
   } | null;
+  /** Federal-account obligations. Null when program_keyword was not asked. */
+  program_activity?: ProgramAnswer | null;
   /** Live USASpending obligations, labeled by spending.scope. */
   spending: AgencyIntelSpending | null;
   /**
@@ -110,7 +120,7 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
   let spending: AgencyIntelSpending | null = null;
   let degraded = false;
 
-  if (!agencyQuery) {
+  if (!agencyQuery && !String(input.program_keyword ?? '').trim()) {
     return {
       queried: { agency: agencyQuery },
       requested_identity: { command: null, service: null, parent: null },
@@ -118,6 +128,7 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
       agency: null,
       spending: null,
       legislation: null,
+      program_activity: null,
       _meta: {
         grounded: false, degraded: false, has_spending: false,
         spending_scope: 'NOT_ESTABLISHED',
@@ -163,6 +174,7 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
   let priorities: string[] = resolved?.priorities ?? [];
   let hasSourced = false;
   let provenanceNote = 'No agency intelligence found.';
+  let priorityBasis: string | undefined;
 
   if (resolved) {
     try {
@@ -184,15 +196,19 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
         ? resolved.painPoints
         : bundle.painPoints.map((p) => p.pain_point)
       ).filter((s) => s.trim().length > 0);
-      priorities = (resolved.priorities?.length
-        ? resolved.priorities
-        : bundle.priorities.map((p) => p.pain_point)
+      priorities = (bundle.meta.priorityBasis === 'live_table'
+        ? bundle.priorities.map((p) => p.pain_point)
+        : resolved.priorities?.length
+          ? resolved.priorities
+          : bundle.priorities.map((p) => p.pain_point)
       ).filter((s) => s.trim().length > 0);
+      priorityBasis = bundle.meta.priorityBasis;
+      const priorityLabel = priorityBasis ? ` Priorities shown: ${priorityBasis}.` : '';
       provenanceNote = hasSourced
-        ? `${sourcedCount} living sourced claim(s) from GAO reports or Inspector General recommendations, with citations; ${legacyCount} legacy-manual fallback claim(s).`
+        ? `${sourcedCount} living sourced claim(s) from GAO reports or Inspector General recommendations, with citations; ${legacyCount} legacy-manual fallback claim(s).${priorityLabel}`
         : legacyCount > 0
-          ? `Provenance unavailable — ${legacyCount} legacy-manual claim(s) only. Do not treat as GAO fact. Unsourced dollar amounts are omitted from default priority text until sourced.`
-          : 'No pain-point claims for this agency.';
+          ? `Provenance unavailable — ${legacyCount} legacy-manual claim(s) only. Do not treat as GAO fact. Unsourced dollar amounts are omitted from default priority text until sourced.${priorityLabel}`
+          : `No pain-point claims for this agency.${priorityLabel}`;
     } catch (err) {
       degraded = true;
       console.error('[mcp:get_agency_intel] sourced intel failed:', err);
@@ -243,7 +259,31 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
   const legislativeMeasures = legislation.vehicles.reduce((n, v) => n + v.measures.length, 0)
     + legislation.other_measures.length;
 
-  const grounded = !!resolved;
+  let programActivity: ProgramAnswer | null = null;
+  const programKeyword = String(input.program_keyword ?? '').trim();
+  if (programKeyword) {
+    try {
+      programActivity = await readIncreasingPrograms({
+        keyword: programKeyword,
+        agency: agencyQuery || null,
+      });
+      if (programActivity.shown === 'unavailable' && programActivity.shown_reason === 'live_table_unmeasured') {
+        degraded = true;
+      }
+    } catch (err) {
+      degraded = true;
+      console.error('[mcp:get_agency_intel] program activity read failed:', err);
+      programActivity = {
+        shown: 'unavailable',
+        shown_reason: 'live_table_unmeasured',
+        keyword: programKeyword,
+        agencies: null,
+        note: 'budget_programs could not be read. This is not a finding that no agency is increasing spending.',
+      };
+    }
+  }
+
+  const grounded = !!resolved || programActivity?.shown === 'live_table';
   const result: AgencyIntelResult = {
     queried: { agency: agencyQuery, ...(fiscalYear ? { fiscal_year: fiscalYear } : {}) },
     requested_identity: grain.established ? grain.identity : { command: null, service: null, parent: null },
@@ -262,10 +302,12 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
           matchType: resolved.matchType,
           hasSourcedIntelligence: hasSourced,
           provenanceNote,
+          priorityBasis,
         }
       : null,
     spending,
     legislation,
+    program_activity: programActivity,
     _meta: {
       grounded,
       degraded,
