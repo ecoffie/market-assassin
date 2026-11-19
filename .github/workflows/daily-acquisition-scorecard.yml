@@ -66,6 +66,9 @@ jobs:
           # secret is not in this step's env.
         run: |
           set +x
+          if [ -n "$SCORECARD_READONLY_JWT" ]; then
+            echo "::add-mask::$SCORECARD_READONLY_JWT"
+          fi
           node scripts/scorecard-readonly-check.mjs
           ./node_modules/.bin/tsx scripts/daily-acquisition-scorecard.mjs --out-dir "$RUNNER_TEMP/scorecard"
 
@@ -75,16 +78,16 @@ jobs:
           if [ -f "$RUNNER_TEMP/scorecard/acquisition-scorecard.md" ]; then
             cat "$RUNNER_TEMP/scorecard/acquisition-scorecard.md" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "Scorecard file was not written." >> "$GITHUB_STEP_SUMMARY"
+            echo "Scorecard numbers are unknown. No report was published." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload scorecard
-        if: always()
+        if: success()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: daily-acquisition-scorecard
           path: |
             ${{ runner.temp }}/scorecard/acquisition-scorecard.json
             ${{ runner.temp }}/scorecard/acquisition-scorecard.md
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30

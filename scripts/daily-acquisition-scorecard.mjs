@@ -5,6 +5,10 @@
  *
  * Same credentials and the same GET-only PostgREST client as
  * scripts/acquisition-scorecard.mjs. No insert, update, delete, upsert, or RPC.
+ * Findability calls getAgencySourcedIntelligence with includeAcquisitionRaw
+ * false, so institute_sources.raw is not selected. The unapplied migration's
+ * scorecard_institute_resolution returns only id, discovered_at, and the
+ * resolution flag when a caller needs that flag without raw.
  *
  * New records are rows whose created_at or first_seen (or, where that column
  * is the insert-only acquisition clock, discovered_at) falls in the window.
@@ -18,6 +22,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { applyEnvFile, q, restGet } from './acquisition-scorecard.mjs';
+import { assessCredential } from './scorecard-readonly-check.mjs';
 
 const HOUR = 60 * 60 * 1000;
 export const EXAMPLE_CAP = 5;
@@ -97,9 +102,10 @@ export function toPublicReport(value) {
     const out = {};
     for (const [k, v] of Object.entries(value)) {
       // institute_sources.raw is recommendation text. The scorecard role is not
-      // granted it and the findability path does not select it. Drop it anyway
-      // so a leaked field never reaches a public log or artifact.
-      if (k === 'raw' || k === 'recommendation') continue;
+      // granted it and the findability path does not select it. Drop it, and
+      // the text fields stored inside it, so a leaked field never reaches a
+      // public log or artifact.
+      if (k === 'raw' || k === 'recommendation' || k === 'problem' || k === 'agency_as_stated' || k === 'acquisition') continue;
       out[k] = toPublicReport(v);
     }
     return out;
@@ -728,6 +734,7 @@ export async function loadCustomerReader() {
   const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
   // Thinner path: never select institute_sources.raw (not granted to scorecard_reader).
   // Findability still matches on institute_source_id / document_number / claim text.
+  // Resolution flags, when needed without raw, come from scorecard_institute_resolution.
   return (agency) => mod.getAgencySourcedIntelligence(agency, {
     client,
     includeAcquisitionRaw: false,
@@ -965,18 +972,28 @@ export function renderMarkdown(report) {
   return lines.join('\n');
 }
 
+const CREDENTIAL_REFUSAL = /jwt|jws|invalid api key|pgrst301|pgrst302|permission denied|42501/i;
+
 export function createPostgrestReader(base, key) {
+  const state = { refusal: null };
+  const note = (res) => {
+    if (res && res.ok === false && CREDENTIAL_REFUSAL.test(String(res.error ?? ''))) {
+      state.refusal = 'credential is rejected';
+    }
+    return res;
+  };
   return {
+    get refusal() { return state.refusal; },
     async count(table, filters) {
       const path = `/rest/v1/${table}?${q(filters)}`;
-      const res = await restGet(base, key, path, { count: true });
+      const res = note(await restGet(base, key, path, { count: true }));
       if (!res.ok) return { ok: false, error: res.error, rows: [], count: null };
       if (typeof res.count !== 'number') return { ok: false, error: 'count header missing', rows: [], count: null };
       return { ok: true, error: null, rows: [], count: res.count };
     },
     async rows(table, filters) {
       const path = `/rest/v1/${table}?${q(filters)}`;
-      const res = await restGet(base, key, path);
+      const res = note(await restGet(base, key, path));
       if (!res.ok) return { ok: false, error: res.error, rows: [], count: null };
       return { ok: true, error: null, rows: res.rows, count: null };
     },
@@ -1042,23 +1059,33 @@ async function main() {
     process.exit(2);
   }
   const { url, key } = loadCredentials();
-  if (!url || !key) {
-    const report = unmeasured(now, 'credentials are not available in this environment');
-    writeReport(report, outDir);
-    process.exit(2);
+  const gate = assessCredential(key);
+  if (!url || !gate.ok) {
+    const reason = !url || gate.reason === 'credential is missing' ? 'credential is missing' : gate.reason;
+    console.error(`scorecard numbers are unknown: ${reason}`);
+    process.exit(reason === 'credential is missing' ? 2 : 1);
   }
+  const io = createPostgrestReader(url, key);
   let readCustomer = null;
-  try {
-    readCustomer = await loadCustomerReader();
-  } catch {
-    readCustomer = null;
-  }
   let report;
   try {
-    report = await buildDailyScorecard(createPostgrestReader(url, key), { now, readCustomer });
+    try {
+      readCustomer = await loadCustomerReader();
+    } catch {
+      readCustomer = null;
+    }
+    report = await buildDailyScorecard(io, { now, readCustomer });
   } catch {
+    if (io.refusal) {
+      console.error(`scorecard numbers are unknown: ${io.refusal}`);
+      process.exit(1);
+    }
     report = unmeasured(now, READ_FAILED);
     writeReport(report, outDir);
+    process.exit(1);
+  }
+  if (io.refusal) {
+    console.error(`scorecard numbers are unknown: ${io.refusal}`);
     process.exit(1);
   }
   writeReport(report, outDir);

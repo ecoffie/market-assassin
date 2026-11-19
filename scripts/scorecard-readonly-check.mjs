@@ -13,6 +13,32 @@ const TABLE = 'data_source_instances';
 export const PROBE_KEY = '__scorecard_probe_never_exists__';
 export const EXPECTED_ROLE = 'scorecard_reader';
 
+/**
+ * Local check before any request. Does not verify the signature.
+ * A missing token, a token that is not a scorecard_reader JWT, or a token
+ * whose exp is absent or in the past never reaches the database.
+ */
+export function assessCredential(key, now = Date.now()) {
+  if (!key || !String(key).trim()) return { ok: false, reason: 'credential is missing' };
+  const parts = String(key).split('.');
+  if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) {
+    return { ok: false, reason: 'credential is rejected' };
+  }
+  let payload;
+  try {
+    payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+  } catch {
+    return { ok: false, reason: 'credential is rejected' };
+  }
+  if (!payload || payload.role !== 'scorecard_reader') {
+    return { ok: false, reason: 'credential is rejected' };
+  }
+  if (typeof payload.exp !== 'number' || !Number.isFinite(payload.exp) || payload.exp * 1000 <= now) {
+    return { ok: false, reason: 'credential is expired' };
+  }
+  return { ok: true, reason: null };
+}
+
 export function writeProbeRequest(baseUrl) {
   const root = String(baseUrl || '').replace(/\/$/, '');
   return {
@@ -106,9 +132,11 @@ export function classifySelectSmoke(status) {
 async function main() {
   const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(/\/$/, '');
   const key = process.env.SCORECARD_READONLY_JWT || '';
-  if (!url || !key) {
-    console.error('scorecard read-only check: credential is not configured');
-    process.exit(2);
+  const gate = assessCredential(key);
+  if (!url || !gate.ok) {
+    const reason = !url || gate.reason === 'credential is missing' ? 'credential is missing' : gate.reason;
+    console.error(`scorecard numbers are unknown: ${reason}`);
+    process.exit(reason === 'credential is missing' ? 2 : 1);
   }
 
   const claims = classifyJwtClaims(key);
@@ -131,8 +159,11 @@ async function main() {
   });
   const writeBody = await writeRes.text();
   const writeVerdict = classifyWriteAttempt(writeRes.status, writeBody);
+  if (!writeVerdict.ok) {
+    console.error(`scorecard numbers are unknown: ${writeVerdict.reason}`);
+    process.exit(1);
+  }
   console.log(`scorecard read-only check: write probe http ${writeRes.status} — ${writeVerdict.reason}`);
-  if (!writeVerdict.ok) process.exit(1);
 
   const smoke = selectSmokeRequest(url);
   const selectRes = await fetch(smoke.url, {
@@ -145,8 +176,11 @@ async function main() {
   // Discard body — never print row content (could include non-public fields later).
   await selectRes.text();
   const selectVerdict = classifySelectSmoke(selectRes.status);
+  if (!selectVerdict.ok) {
+    console.error(`scorecard numbers are unknown: ${selectVerdict.reason}`);
+    process.exit(1);
+  }
   console.log(`scorecard read-only check: select smoke http ${selectRes.status} — ${selectVerdict.reason}`);
-  if (!selectVerdict.ok) process.exit(1);
 }
 
 if (process.argv[1] && process.argv[1].endsWith('scorecard-readonly-check.mjs')) main();

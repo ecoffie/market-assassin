@@ -3,7 +3,7 @@
  * or a row touch as new, and must stay on GET.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -420,7 +420,7 @@ describe('buildDailyScorecard', () => {
   });
 
   it('never prints institute_sources.raw or recommendation text', () => {
-    const sentinel = 'RAW_RECOMMENDATION_TEXT resolution_flag';
+    const sentinel = 'RAW_RECOMMENDATION_TEXT_do_not_publish';
     const report = {
       measured: true,
       generatedAt: NOW.toISOString(),
@@ -430,20 +430,25 @@ describe('buildDailyScorecard', () => {
       examples: {
         pain_points: {
           status: 'measured',
-          value: [{ title: 'Grid', raw: sentinel, recommendation: sentinel }],
+          value: [{ title: 'Grid', raw: { recommendation: sentinel }, recommendation: sentinel, problem: sentinel }],
           reason: null,
         },
       },
       findability: { h24: null, d7: null },
       runHistory: [],
     };
-    expect(publicMarkdown(report)).not.toContain(sentinel);
-    expect(publicJson(report)).not.toContain(sentinel);
-    expect(publicJson(report)).not.toContain('"raw"');
-    expect(publicJson(report)).not.toContain('"recommendation"');
+    const markdown = publicMarkdown(report);
+    const json = publicJson(report);
+    const summary = markdown;
+    for (const published of [markdown, json, summary]) {
+      expect(published).not.toContain(sentinel);
+      expect(published).not.toContain('"raw"');
+      expect(published).not.toContain('"recommendation"');
+    }
     const src = readFileSync(join(process.cwd(), 'scripts/daily-acquisition-scorecard.mjs'), 'utf8');
     expect(src).not.toMatch(/select:\s*'[^']*\braw\b/);
     expect(src).toContain('includeAcquisitionRaw: false');
+    expect(src).toContain('getAgencySourcedIntelligence');
   });
 
   it('public output keeps a government link and drops secrets, emails, and internal hosts', async () => {
@@ -628,6 +633,8 @@ describe('the script and the workflow stay read-only', () => {
     expect(src).not.toContain('SUPABASE_SERVICE_ROLE_KEY');
     expect(src).toContain('SCORECARD_READONLY_JWT');
     expect(src).toContain('getAgencySourcedIntelligence');
+    expect(src).toContain('includeAcquisitionRaw: false');
+    expect(src).toContain('scorecard_institute_resolution');
     expect(src).toContain('restGet');
     expect(src).toContain("fact(null, 'unknown'");
   });
@@ -652,6 +659,8 @@ describe('the script and the workflow stay read-only', () => {
     expect(workflow).toContain('scorecard-mint-jwt.mjs');
     expect(workflow).toContain('::add-mask::');
     expect(workflow).toContain('secrets.SCORECARD_JWT_SECRET');
+    expect(workflow).toContain('Scorecard numbers are unknown. No report was published.');
+    expect(workflow.split('- name: Upload scorecard')[1]).toContain('if: success()');
     const mint = workflow.split('- name: Mint short-lived scorecard JWT')[1].split('- name:')[0];
     expect(mint).toContain('secrets.SCORECARD_JWT_SECRET');
     expect(mint).toContain('SCORECARD_READONLY_JWT=$TOKEN');
@@ -685,25 +694,17 @@ describe('the script and the workflow stay read-only', () => {
     } catch (err) {
       const thrown = err as { status?: number; stdout?: string };
       code = thrown.status ?? 1;
-      stdout = thrown.stdout ?? '';
+      stdout = `${thrown.stdout ?? ''}\n${(thrown as { stderr?: string }).stderr ?? ''}`;
     }
     expect(code).toBe(2);
-    expect(stdout.indexOf(SCORECARD_BEGIN)).toBeGreaterThanOrEqual(0);
-    expect(stdout.indexOf(SCORECARD_END)).toBeGreaterThan(stdout.indexOf(SCORECARD_BEGIN));
-    const report = JSON.parse(readFileSync(join(dir, 'acquisition-scorecard.json'), 'utf8'));
-    expect(report.label).toBe('Daily acquisition scorecard');
-    expect(report.measured).toBe(false);
-    expect(report.corpora[0].newUnique24h.value).toBeNull();
-    const md = readFileSync(join(dir, 'acquisition-scorecard.md'), 'utf8');
-    expect(md).toContain('None of them are zero.');
-    expect(md).not.toMatch(/\b0\b/);
+    expect(stdout).toContain('scorecard numbers are unknown');
+    expect(stdout).not.toContain(SCORECARD_BEGIN);
+    expect(stdout).not.toContain(SCORECARD_END);
+    expect(existsSync(join(dir, 'acquisition-scorecard.json'))).toBe(false);
+    expect(existsSync(join(dir, 'acquisition-scorecard.md'))).toBe(false);
     expectNoSecrets(stdout);
-    expectNoSecrets(md);
-    expectNoSecrets(JSON.stringify(report));
     expect(stdout).not.toContain(planted);
     expect(stdout).not.toContain(plantedService);
-    expect(md).not.toContain(planted);
-    expect(md).not.toContain(plantedService);
   });
 });
 
@@ -723,12 +724,21 @@ describe('the read-only credential', () => {
     expect(applied).toContain('GRANT SELECT (created_at, last_modified)');
     expect(applied).not.toMatch(/GRANT SELECT \([^)]*\bsynced_at\b/);
     expect(applied).not.toContain('GRANT SELECT (job_name, route');
-    const instituteGrant = applied.match(/GRANT SELECT \(([^)]+)\) ON TABLE public\.institute_sources/);
+    const flat = applied.replace(/\s+/g, ' ');
+    const instituteGrant = flat.match(/GRANT SELECT \(([^)]+)\) ON TABLE public\.institute_sources/);
     expect(instituteGrant).toBeTruthy();
     expect(instituteGrant![1]).not.toMatch(/\braw\b/);
+    expect(flat).not.toMatch(/GRANT SELECT \([^)]*\braw\b/);
     expect(applied).toContain('SCORECARD_JWT_SECRET');
     expect(applied).toContain('scorecard-mint-jwt.mjs');
     expect(applied).not.toMatch(/Mint the JWT with a 30-day expiry/);
+    expect(applied).toContain('scorecard_institute_resolution');
+    expect(applied).toContain('GRANT EXECUTE ON FUNCTION public.scorecard_institute_resolution');
+    expect(applied).toContain('NOT APPLIED');
+    const returns = applied.slice(applied.indexOf('RETURNS TABLE'), applied.indexOf('LANGUAGE sql'));
+    expect(returns).toContain('resolution_flag');
+    expect(returns).not.toContain('raw');
+    expect(returns).not.toMatch(/recommendation/);
   });
 
   it('a permission-denied write passes and any 2xx means the key can write', async () => {
@@ -751,6 +761,54 @@ describe('the read-only credential', () => {
     const src = readFileSync(join(process.cwd(), 'scripts/scorecard-readonly-check.mjs'), 'utf8');
     expect(src).not.toMatch(/method:\s*'POST'/);
     expect(src).not.toContain("body: '{}'");
+    expect(src).not.toContain('console.log(body');
+    expect(src).not.toContain('console.error(body');
+  });
+
+  it('a missing, expired, or rejected credential is refused before a request', async () => {
+    const { assessCredential } = await import('../../scripts/scorecard-readonly-check.mjs');
+    const now = Date.parse('2026-11-19T00:00:00.000Z');
+    const token = (payload: Record<string, unknown>) => {
+      const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+      return `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${body}.sig`;
+    };
+    expect(assessCredential('', now).reason).toBe('credential is missing');
+    expect(assessCredential('not-a-jwt', now).reason).toBe('credential is rejected');
+    expect(assessCredential(token({ role: 'service_role', exp: 2_000_000_000 }), now).reason).toBe('credential is rejected');
+    expect(assessCredential(token({ role: 'scorecard_reader', exp: 1_700_000_000 }), now).reason).toBe('credential is expired');
+    expect(assessCredential(token({ role: 'scorecard_reader' }), now).reason).toBe('credential is expired');
+    expect(assessCredential(token({ role: 'scorecard_reader', exp: 2_000_000_000 }), now).ok).toBe(true);
+  });
+
+  it('an expired scorecard token writes no report and does not print the token', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'scorecard-expired-'));
+    const exp = Math.floor(Date.now() / 1000) - 60;
+    const body = Buffer.from(JSON.stringify({ role: 'scorecard_reader', exp })).toString('base64url');
+    const token = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${body}.sig`;
+    const script = join(process.cwd(), 'scripts/daily-acquisition-scorecard.mjs');
+    let code = 0;
+    let stdout = '';
+    try {
+      stdout = execFileSync(process.execPath, [script, '--out-dir', dir], {
+        cwd: dir,
+        encoding: 'utf8',
+        env: {
+          PATH: process.env.PATH,
+          NEXT_PUBLIC_SUPABASE_URL: 'https://example.test',
+          SCORECARD_READONLY_JWT: token,
+        },
+      });
+    } catch (err) {
+      const thrown = err as { status?: number; stdout?: string; stderr?: string };
+      code = thrown.status ?? 1;
+      stdout = `${thrown.stdout ?? ''}\n${thrown.stderr ?? ''}`;
+    }
+    expect(code).toBe(1);
+    expect(stdout).toContain('scorecard numbers are unknown: credential is expired');
+    expect(stdout).not.toContain(SCORECARD_BEGIN);
+    expect(stdout).not.toContain(token);
+    expect(existsSync(join(dir, 'acquisition-scorecard.json'))).toBe(false);
+    expect(existsSync(join(dir, 'acquisition-scorecard.md'))).toBe(false);
   });
 
   it('fails closed on expired JWT, wrong role, and select denial', async () => {

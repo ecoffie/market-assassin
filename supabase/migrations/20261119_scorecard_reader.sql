@@ -1,6 +1,7 @@
+-- NOT APPLIED. Do not run this file. Eric has not approved it.
 -- Read-only PostgREST role for the weekday acquisition scorecard.
 -- Additive. Does not alter existing roles or policies. Do not apply from an
--- agent session. Apply later with:
+-- agent session. After Eric approves, and only then:
 --   npm run migrate -- --go --only 20261119_scorecard_reader.sql
 --
 -- Why a role, not the service-role key: the service role bypasses RLS and can
@@ -18,8 +19,10 @@
 --
 -- institute_sources.raw is NOT granted. That column holds recommendation text
 -- and resolution flags. The scorecard findability path uses a thinner select
--- that never asks for raw. New-row counts (discovered_at / created_at) stay
--- separate from customer-findability metrics.
+-- that never asks for raw. scorecard_institute_resolution returns only the
+-- id, the clock, and the two flag columns when a caller needs the flag.
+-- New-row counts (discovered_at / created_at) stay separate from
+-- customer-findability metrics.
 --
 -- Credential (supported path — no Mac JWT minting):
 -- Store the project's legacy JWT HS256 secret once as the Actions secret
@@ -36,7 +39,7 @@
 -- keys are listed, stop and extend the mint script for that signer before
 -- apply — do not hand-mint. Confirm the gateway accepts the token as apikey.
 -- If it accepts only the anon or service-role key there, send the anon key
--- as apikey and this token as Authorization.
+-- as apikey and this token as Authorization. Do not print raw.
 
 DO $$
 BEGIN
@@ -93,7 +96,7 @@ GRANT SELECT (
 ) ON TABLE public.agency_pain_points_db TO scorecard_reader;
 
 -- Institute identity for GAO/IG findability and the discovered_at new-row clock.
--- raw (recommendation / resolution) is deliberately omitted.
+-- raw is not granted. Text inside raw stays on the table.
 GRANT SELECT (
   id,
   source_type,
@@ -104,6 +107,43 @@ GRANT SELECT (
   canonical_agency,
   discovered_at
 ) ON TABLE public.institute_sources TO scorecard_reader;
+
+-- The function owner reads raw and returns only the id, the clock, and the
+-- two flag columns. scorecard_reader cannot select raw through this grant.
+CREATE OR REPLACE FUNCTION public.scorecard_institute_resolution(source_ids uuid[])
+RETURNS TABLE (
+  id uuid,
+  discovered_at timestamptz,
+  resolution_status text,
+  resolution_flag text
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    s.id,
+    s.discovered_at,
+    CASE
+      WHEN s.raw #>> '{acquisition,resolution_status}' IN ('open', 'closed')
+        THEN s.raw #>> '{acquisition,resolution_status}'
+      ELSE 'unknown'
+    END,
+    CASE s.raw #>> '{acquisition,resolution_status}'
+      WHEN 'open' THEN 'confirmed_unresolved'
+      WHEN 'closed' THEN 'historical'
+      ELSE 'unknown'
+    END
+  FROM public.institute_sources s
+  WHERE source_ids IS NOT NULL
+    AND s.id = ANY(source_ids);
+$$;
+
+REVOKE ALL ON FUNCTION public.scorecard_institute_resolution(uuid[]) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.scorecard_institute_resolution(uuid[]) FROM anon;
+REVOKE ALL ON FUNCTION public.scorecard_institute_resolution(uuid[]) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.scorecard_institute_resolution(uuid[]) TO scorecard_reader;
 
 DO $$
 BEGIN
@@ -144,6 +184,8 @@ NOTIFY pgrst, 'reload schema';
 -- ============================================================================
 -- DROP POLICY IF EXISTS scorecard_reader_select ON public.institute_sources;
 -- DROP POLICY IF EXISTS scorecard_reader_select ON public.data_source_instances;
+-- REVOKE EXECUTE ON FUNCTION public.scorecard_institute_resolution(uuid[]) FROM scorecard_reader;
+-- DROP FUNCTION IF EXISTS public.scorecard_institute_resolution(uuid[]);
 -- REVOKE SELECT (
 --   id, source_type, document_number, source_url, publication_date, title,
 --   canonical_agency, discovered_at
