@@ -10,6 +10,7 @@ import { NaicsAutocompleteInput } from '@/components/codes/NaicsAutocompleteInpu
 import { NaicsBadgeList } from '@/components/codes/NaicsBadge';
 import LibraryPanel from './LibraryPanel';
 import CertificationPicker, { splitCertifications } from '@/components/app/CertificationPicker';
+import { fileMetaLine } from '@/lib/vault/file-display';
 
 interface Props {
   email: string | null;
@@ -99,6 +100,7 @@ interface BoilerplateDoc {
   doc_class?: 'company' | 'reference' | 'generated' | null;
   version?: number | null;
   original_filename: string;
+  mime_type?: string | null;
   size_bytes?: number | null;
   page_count?: number | null;
   parse_status: string;
@@ -1447,7 +1449,10 @@ function DocumentsSection({ email, items, onChanged }: { email: string; items: B
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm truncate">{d.original_filename}</p>
                 <p className="text-xs text-muted">
-                  {grouped && d.version && d.version > 1 ? `v${d.version} · ` : ''}{d.doc_type} · {d.page_count ? `${d.page_count} pages · ` : ''}{d.size_bytes ? `${Math.round(d.size_bytes / 1024)} KB · ` : ''}
+                  {(() => {
+                    const m = fileMetaLine(d, { showVersion: !!grouped });
+                    return [m.version, m.type, m.pages, m.size].filter(Boolean).join(' · ') + (m.parse ? ' · ' : '');
+                  })()}
                   <span className={d.parse_status === 'parsed' ? 'text-emerald-400' : d.parse_status === 'failed' ? 'text-rose-400' : 'text-amber-400'}>
                     {d.parse_status}
                   </span>
@@ -1503,7 +1508,10 @@ function DocumentsSection({ email, items, onChanged }: { email: string; items: B
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm truncate">{d.original_filename}</p>
                 <p className="text-xs text-muted">
-                  {grouped && d.version && d.version > 1 ? `v${d.version} · ` : ''}{d.doc_type} · {d.page_count ? `${d.page_count} pages · ` : ''}{d.size_bytes ? `${Math.round(d.size_bytes / 1024)} KB · ` : ''}
+                  {(() => {
+                    const m = fileMetaLine(d, { showVersion: !!grouped });
+                    return [m.version, m.type, m.pages, m.size].filter(Boolean).join(' · ') + (m.parse ? ' · ' : '');
+                  })()}
                   <span className={d.parse_status === 'parsed' ? 'text-emerald-400' : d.parse_status === 'failed' ? 'text-rose-400' : 'text-amber-400'}>
                     {d.parse_status}
                   </span>

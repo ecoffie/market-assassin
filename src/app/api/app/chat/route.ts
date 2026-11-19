@@ -829,6 +829,11 @@ export async function POST(request: NextRequest) {
           answer_attempts: Array<{ provider: string; model: string; status: number | null; code: string | null }>;
           notices: string[];
           context?: { kind: 'opportunity'; notice_id: string };
+          /** create_document download chips — document ids only (never signed URLs). Restored when History reopens. */
+          deliverables?: {
+            files: Array<{ format: string; document_id: string; file_name?: string; version?: number }>;
+            pdf_note?: string;
+          };
         } = { planner: null, planner_attempts: [], tools_offered: 0, tool_executions: [], answer: null, answer_attempts: [], notices: [],
               ...(selectedCtx ? { context: { kind: 'opportunity' as const, notice_id: selectedCtx.noticeId } } : {}) };
         if (selectedNoticeMiss) turnTrace.notices.push(`selected_notice:${selectedNoticeMiss}`);
@@ -1728,15 +1733,21 @@ export async function POST(request: NextRequest) {
           console.error('[chat] grounding check failed (non-fatal):', (gErr as Error)?.message);
         }
         // W2: deliverable download chips (document ids only — never signed URLs on the wire).
+        // Persist the same payload on turnTrace so History reopen can restore the chips.
         if (turnDeliverables.length) {
+          const deliverableFiles = turnDeliverables.map((f) => ({
+            format: f.format,
+            document_id: f.document_id,
+            ...(f.file_name ? { file_name: f.file_name } : {}),
+            ...(f.version != null ? { version: f.version } : {}),
+          }));
+          turnTrace.deliverables = {
+            files: deliverableFiles,
+            ...(turnDeliverablePdfNote ? { pdf_note: turnDeliverablePdfNote } : {}),
+          };
           send({
             type: 'deliverables',
-            files: turnDeliverables.map((f) => ({
-              format: f.format,
-              document_id: f.document_id,
-              ...(f.file_name ? { file_name: f.file_name } : {}),
-              ...(f.version != null ? { version: f.version } : {}),
-            })),
+            files: deliverableFiles,
             ...(turnDeliverablePdfNote ? { pdf_note: turnDeliverablePdfNote } : {}),
           });
         }

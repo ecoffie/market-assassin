@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     }
     const { data: messages, error } = await supabase
       .from('mindy_chat_messages')
-      .select('id, role, content, cited_sources, created_at')
+      .select('id, role, content, cited_sources, created_at, trace')
       .eq('session_id', sessionId)
       .order('created_at', { ascending: true });
     if (error) {
@@ -79,10 +79,29 @@ export async function GET(request: NextRequest) {
     // Older Map conversations were titled from the Map view preamble; show the customer's first question.
     const firstUser = (messages || []).find((m: { role: string }) => m.role === 'user') as { content?: string } | undefined;
     const title = isViewPreambleTitle(session.title) ? (sessionTitleFrom(firstUser?.content || '') || null) : session.title;
+    // Project only deliverable ids from trace — never return the rest of the planner/tool trace.
+    const projected = (messages || []).map((m: {
+      id: string; role: string; content: string; cited_sources?: unknown; created_at: string;
+      trace?: { deliverables?: { files?: unknown; pdf_note?: string } } | null;
+    }) => {
+      const raw = m.trace?.deliverables;
+      const files = Array.isArray(raw?.files)
+        ? raw!.files!.filter((f): f is { format: string; document_id: string; file_name?: string; version?: number } =>
+            !!f && typeof f === 'object' && typeof (f as { document_id?: unknown }).document_id === 'string'
+            && typeof (f as { format?: unknown }).format === 'string')
+        : null;
+      const { trace: _omit, ...rest } = m;
+      return {
+        ...rest,
+        ...(files && files.length
+          ? { deliverables: { files, ...(typeof raw?.pdf_note === 'string' ? { pdf_note: raw.pdf_note } : {}) } }
+          : {}),
+      };
+    });
     return NextResponse.json({
       success: true,
       session: { id: session.id, title },
-      messages: messages || [],
+      messages: projected,
     });
   }
 

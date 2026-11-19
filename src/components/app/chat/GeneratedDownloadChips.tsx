@@ -66,7 +66,7 @@ export function GeneratedDownloadChips({
 
   return (
     <div className="mt-3 pt-3 border-t border-surface/50" data-testid="generated-downloads">
-      <div className="text-[10px] font-semibold tracking-wider text-faint mb-1.5">DOWNLOAD</div>
+      <div className="text-[10px] font-semibold tracking-wider text-faint mb-1.5">YOUR FILES — click to download</div>
       <div className="flex flex-wrap gap-2">
         {usable.map((f) => (
           <button

@@ -397,12 +397,25 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
       const res = await authedFetch(`/api/app/chat-sessions?email=${encodeURIComponent(email)}&sessionId=${encodeURIComponent(sid)}`, email);
       const data = await res.json().catch(() => null);
       if (data?.success) {
-        setMessages((data.messages || []).map((m: { id: string; role: 'user' | 'assistant'; content: string; cited_sources?: CitedSource[] }) => ({
-          id: m.id,
-          role: m.role,
-          content: m.content,
-          citations: Array.isArray(m.cited_sources) ? m.cited_sources : undefined,
-        })));
+        setMessages((data.messages || []).map((m: {
+          id: string;
+          role: 'user' | 'assistant';
+          content: string;
+          cited_sources?: CitedSource[];
+          deliverables?: { files?: GeneratedDownloadFile[]; pdf_note?: string };
+        }) => {
+          const files = Array.isArray(m.deliverables?.files)
+            ? m.deliverables!.files!.filter((f) => f && typeof f.document_id === 'string' && typeof f.format === 'string')
+            : undefined;
+          return {
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            citations: Array.isArray(m.cited_sources) ? m.cited_sources : undefined,
+            ...(files?.length ? { deliverables: files } : {}),
+            ...(typeof m.deliverables?.pdf_note === 'string' ? { deliverablePdfNote: m.deliverables.pdf_note } : {}),
+          };
+        }));
         setSessionId(sid);
       }
     } catch { /* non-fatal */ } finally {
@@ -666,11 +679,25 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
           <div className="max-w-2xl mx-auto pt-12">
             <div className="text-center mb-8">
               <MessageCircle className="h-10 w-10 mx-auto mb-3 text-accent" strokeWidth={1.5} />
-              <h2 className="text-xl font-semibold text-white mb-1">What do you want to know?</h2>
-              <p className="text-sm text-muted">
-                Mindy draws on 743 podcast interviews, real proposal templates, and 8 years of federal contracting teaching.
+              <h2 className="text-xl font-semibold text-white mb-1">Ask in plain English</h2>
+              <p className="text-sm text-muted max-w-lg mx-auto">
+                Type a question the way you would ask a colleague. Mindy looks things up and can turn the answer into a downloadable Word, PDF, Excel, or CSV file.
               </p>
             </div>
+            <ol className="mb-8 space-y-3 rounded-xl border border-surface bg-ground/40 p-4 text-left" data-testid="ask-mindy-how-to">
+              <li className="flex gap-3 text-sm text-slate-200">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-xs font-semibold text-emerald-300">1</span>
+                <span><span className="font-medium text-white">Attach</span> a capability statement or RFP (optional) using the paperclip below.</span>
+              </li>
+              <li className="flex gap-3 text-sm text-slate-200">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-xs font-semibold text-emerald-300">2</span>
+                <span><span className="font-medium text-white">Ask</span> what you need — for example, “Who buys my kind of work?” or “Write a strategy brief I can download.”</span>
+              </li>
+              <li className="flex gap-3 text-sm text-slate-200">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-xs font-semibold text-emerald-300">3</span>
+                <span><span className="font-medium text-white">Download</span> the green buttons under Mindy’s answer, or find the files later in Documents.</span>
+              </li>
+            </ol>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {starterPrompts.map((prompt: string) => (
                 <button
