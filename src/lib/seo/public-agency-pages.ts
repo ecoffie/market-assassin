@@ -143,14 +143,37 @@ export interface PublicPainItem {
 }
 
 export interface PublicPainSection {
+  /** Cited rows first, then unsourced snapshot lines. The page must not render `unsourced` under `freshnessLabel`. */
   items: PublicPainItem[];
+  /** Rows with a report number or an official .gov/.mil link. Only these may use `freshnessLabel` and `asOf`. */
+  cited: PublicPainItem[];
+  /** Published snapshot lines with no citation. Never a current GAO or inspector general finding. */
+  unsourced: PublicPainItem[];
   /** True when the section is the snapshot alone because the live read failed or returned no cited rows. */
   snapshotFloor: boolean;
+  /** Describes `cited` only. Empty when there are no cited rows; the snapshot label is `unsourcedLabel`. */
   freshnessLabel: string;
-  /** Newest cited report publication day, when one is present. */
+  /** Describes `unsourced` only. Does not carry the sourced as-of date. */
+  unsourcedLabel: string;
+  /** Newest cited report publication day, when one is present. Does not apply to `unsourced`. */
   asOf: string | null;
   /** When this read ran. Null when the page could not record a check. */
   checkedAt: string | null;
+}
+
+const DOLLAR_AMOUNT = /\$[\d,]+(?:\.\d+)?\s*(?:[BbMmKk](?:illion)?)?\b/;
+
+/** A curated priority line. Dollar text stays; it is not relabeled as an obligation or as spending. */
+export interface PublicPriorityLine {
+  text: string;
+  unsourcedDollar: boolean;
+}
+
+export const PUBLIC_PRIORITY_DOLLAR_NOTE =
+  'Curated figure from the published snapshot. Not an obligation and not spending.';
+
+export function classifyPublicPriority(text: string): PublicPriorityLine {
+  return { text, unsourcedDollar: DOLLAR_AMOUNT.test(text) };
 }
 
 const DAILY = 'The intelligence refreshes daily.';
@@ -257,6 +280,10 @@ export function buildPublicPainSection(
     .at(-1) ?? null;
   const checkedAt = formatCheckedAt(live.checkedAt);
   const checkedClause = checkedAt ? ` Mindy last checked ${checkedAt}.` : '';
+  const unsourced = items.filter((item) => !(item.href || item.documentNumber));
+  const unsourcedLabel = unsourced.length === 0
+    ? ''
+    : 'Published snapshot. These lines have no GAO or inspector general citation. They are not covered by the sourced report date.';
 
   if (cited.length === 0) {
     const why = live.ok
@@ -264,19 +291,25 @@ export function buildPublicPainSection(
       : 'The live source could not be read, so this list is unchanged.';
     return {
       items,
+      cited,
+      unsourced,
       snapshotFloor: true,
       asOf: null,
       checkedAt,
-      freshnessLabel: `Published snapshot. ${why}${checkedClause} ${DAILY}`,
+      freshnessLabel: '',
+      unsourcedLabel: `Published snapshot. ${why}${checkedClause} ${DAILY}`,
     };
   }
 
   const asOfClause = asOf ? `, as of ${asOf}` : '';
   return {
     items,
+    cited,
+    unsourced,
     snapshotFloor: false,
     asOf,
     checkedAt,
     freshnessLabel: `Sourced from GAO and inspectors general${asOfClause}.${checkedClause} ${DAILY}`,
+    unsourcedLabel,
   };
 }
