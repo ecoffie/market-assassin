@@ -31,8 +31,15 @@ export const revalidate = 300;
  * Credits are stated as credits, never as dollars.
  */
 const HEADLINE = 'Find federal contracts you can win, in minutes instead of hours.';
+/** Problem first (Hormozi's page: "you think you have a hundred problems; you usually have one"). */
 const SUBHEAD =
-  `${EVENT.title}: a free live training where Eric Coffie shows you how to find contracts that fit your business, see who holds them now, and know who to call, with Mindy doing the heavy lifting.`;
+  'Most small businesses think government contracting has a hundred problems. It usually has one: finding the contracts that fit you. Eric Coffie shows you how, live and free, with Mindy doing the heavy lifting.';
+
+/**
+ * Vimeo id of the short hero video (plays muted; Vimeo shows its own unmute control). Until the
+ * owner sends one, the hero shows the map image instead.
+ */
+const HERO_VIMEO_ID: string | null = null;
 
 /** Biggest objections first. */
 const OBJECTIONS = [
@@ -52,24 +59,31 @@ export default async function LazyContractorsBlueprintPage() {
     <main className="lcb">
       <style dangerouslySetInnerHTML={{ __html: LCB_CSS }} />
 
-      {/* Above the fold: headline, subheadline, proof and ONE button; the form opens in steps (SeatDialog). */}
+      {/* Top bar: real facts only (date, live-only, the real count when ≥50). Never a made-up "sold out". */}
+      <div className="lcb-bar">
+        Free · Live only · {EVENT.shortDate} at 11:00 AM ET{registered ? ` · ${registered} already registered` : ''}
+      </div>
+
+      {/* Above the fold (Hormozi's page): kicker, big centered headline, problem-first line, video, ONE button. */}
       <section className="lcb-hero">
-        <div className="lcb-wrap lcb-hero-grid">
-          <div className="lcb-hero-copy">
-            <p className="lcb-kicker">Free live training · {EVENT.dateLabel} · 11:00 AM ET</p>
-            <h1 className="lcb-title">{HEADLINE}</h1>
-            <p className="lcb-sub">{SUBHEAD}</p>
-            <p className="lcb-bonus">Join live and get <strong>{CREDITS} free Mindy credits</strong> to run it on your own business.</p>
-            {registered && <p className="lcb-proof">{registered} contractors already registered.</p>}
-            <SeatDialog />
-            <p className="lcb-why">Takes 30 seconds. Your join link comes by email right away.</p>
-            <div className="lcb-cd-wrap"><Countdown /></div>
+        <div className="lcb-wrap lcb-hero-col">
+          <p className="lcb-kicker">{EVENT.title} · Free live training</p>
+          <h1 className="lcb-title">{HEADLINE}</h1>
+          <p className="lcb-sub">{SUBHEAD}</p>
+          <div className="lcb-media">
+            {HERO_VIMEO_ID ? (
+              <iframe
+                src={`https://player.vimeo.com/video/${HERO_VIMEO_ID}?autoplay=1&muted=1&loop=1&playsinline=1&title=0&byline=0&portrait=0`}
+                title={`${EVENT.title} preview`} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen
+              />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element -- static 37 KB WebP, fixed aspect
+              <img src="/events/lcb-hero-map.webp" width={800} height={800} alt="Mindy's opportunity map: every open federal opportunity as a pin, filtered by industry" />
+            )}
           </div>
-          <figure className="lcb-shot">
-            {/* eslint-disable-next-line @next/next/no-img-element -- static 37 KB WebP, no layout shift (fixed aspect) */}
-            <img src="/events/lcb-hero-map.webp" width={800} height={800} alt="Mindy's opportunity map: every open federal opportunity as a pin, filtered by industry" />
-            <figcaption>What you’ll use: every open federal opportunity on one map, filtered to what you sell.</figcaption>
-          </figure>
+          <SeatDialog label="Save My Free Seat →" />
+          <p className="lcb-why">Takes 30 seconds. Join live and get <strong>{CREDITS} free Mindy credits</strong>.</p>
+          <div className="lcb-cd-wrap"><Countdown /></div>
         </div>
       </section>
 
@@ -83,7 +97,7 @@ export default async function LazyContractorsBlueprintPage() {
             ))}
           </ul>
           <p className="lcb-host-line">Hosted by <strong>Eric Coffie</strong>, founder of GovCon Giants, who has spent 8 years teaching small businesses to win federal contracts.</p>
-          <div className="lcb-center"><a className="lcb-cta" href="#register">Save My Free Seat</a></div>
+          <div className="lcb-center"><a className="lcb-cta" href="#register">Save My Free Seat →</a></div>
         </div>
       </section>
 
@@ -101,19 +115,17 @@ const LCB_CSS = `
 .lcb{--lcb-gold:var(--mp-warn-line);--lcb-soft:rgba(255,255,255,.82);font-family:var(--mp-font-sans);color:var(--mp-ink);background:var(--mp-surface)}
 .lcb *{box-sizing:border-box}
 .lcb-wrap{max-width:1160px;margin:0 auto;padding-left:max(24px, env(safe-area-inset-left, 0px));padding-right:max(24px, env(safe-area-inset-right, 0px))}
-.lcb-hero{background:var(--mp-navy);color:#fff;padding:56px 0 64px}
-.lcb-hero-grid{display:grid;gap:32px;align-items:start}
-@media (min-width:900px){.lcb-hero-grid{grid-template-columns:minmax(0,1fr) minmax(0,460px);gap:56px;align-items:center}}
-.lcb-hero-copy{min-width:0}
-.lcb-kicker{margin:0 0 14px;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--lcb-gold)}
-.lcb-title{margin:0;font-family:var(--mp-font-serif);font-weight:700;font-size:clamp(34px,4.6vw,56px);line-height:1.06;letter-spacing:-.02em;text-wrap:balance;color:#fff}
-.lcb-sub{margin:18px 0 0;font-size:clamp(17px,1.7vw,19px);line-height:1.55;color:var(--lcb-soft);max-width:620px}
-.lcb-bonus{margin:18px 0 0;font-size:17px;color:#fff}
-.lcb-bonus strong{color:var(--lcb-gold)}
-.lcb-proof{margin:8px 0 0;font-size:15px;color:rgba(255,255,255,.85)}
-.lcb-shot{margin:28px 0 0}
-.lcb-shot img{display:block;width:100%;max-width:560px;height:auto;aspect-ratio:1/1;object-fit:cover;object-position:top;border-radius:14px;box-shadow:0 20px 50px rgba(5,15,40,.45)}
-.lcb-shot figcaption{margin:10px 0 0;font-size:14px;color:var(--lcb-soft)}
+.lcb-hero{background:var(--mp-navy);color:#fff;padding:36px 0 56px}
+.lcb-bar{background:#0b1530;color:#fff;text-align:center;padding:10px 16px;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.lcb-hero-col{max-width:880px;text-align:center}
+.lcb-kicker{margin:0 0 16px;font-size:13px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--lcb-gold)}
+.lcb-title{margin:0;font-family:var(--mp-font-sans);font-weight:900;font-size:clamp(30px,4.4vw,52px);line-height:1.06;letter-spacing:-.01em;text-transform:uppercase;text-wrap:balance;color:#fff}
+.lcb-sub{margin:18px auto 0;font-size:clamp(17px,1.8vw,20px);line-height:1.55;color:var(--lcb-soft);max-width:720px;text-wrap:pretty}
+.lcb-media{margin:24px auto 0;max-width:min(480px,100%);aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#0b1530;box-shadow:0 20px 50px rgba(5,15,40,.45)}
+.lcb-media img{display:block;width:100%;height:100%;object-fit:cover;object-position:top}
+.lcb-media iframe{display:block;width:100%;height:100%;border:0}
+.lcb-why strong{color:var(--lcb-gold)}
+.lcb-hero-col .lcb-cd>div{justify-content:center}
 .lcb-dialog{position:fixed;inset:0;margin:auto;height:fit-content;width:min(480px,calc(100vw - 32px));max-height:calc(100dvh - 32px);padding:0;border:0;border-radius:18px;background:#fff;color:var(--mp-ink);box-shadow:0 24px 60px rgba(5,15,40,.45)}
 .lcb-dialog::backdrop{background:rgba(5,15,40,.7)}
 .lcb-dialog .mp-panel{border:0;box-shadow:none;padding:28px 24px 24px}
@@ -124,7 +136,7 @@ const LCB_CSS = `
 .lcb-steps li{font-size:12px;font-weight:600;color:var(--mp-muted);padding-top:8px;border-top:4px solid var(--mp-hair)}
 .lcb-steps li.on{color:var(--mp-ink);border-top-color:var(--lcb-gold)}
 .lcb-step-q{margin:0;font-family:var(--mp-font-serif);font-weight:700;font-size:24px;line-height:1.2}
-.lcb-cta--hero{border:0;cursor:pointer;font-size:18px;padding:18px 34px;margin-top:28px}
+.lcb-cta--hero{display:flex;width:100%;max-width:560px;margin:20px auto 0;border:0;cursor:pointer;font-size:clamp(18px,2.4vw,24px);font-weight:900;letter-spacing:.02em;text-transform:uppercase;padding:20px 24px;border-radius:14px}
 .lcb-why{margin:12px 0 0;font-size:14px;color:var(--lcb-soft)}
 .lcb-cd-wrap{margin-top:18px}
 .lcb-cd-wrap .lcb-cd>p.mp-meta{color:var(--lcb-soft)}
