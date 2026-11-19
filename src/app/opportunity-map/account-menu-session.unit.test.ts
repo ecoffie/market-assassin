@@ -44,7 +44,7 @@ const DAY = 24 * 60 * 60 * 1000;
 describe('account chip reflects a LIVE session, not a present token', () => {
   it('no token → Start for free, no /me call', async () => {
     const { btn, fetchMock } = await mount({ token: null });
-    expect(btn.textContent).toBe('Start for free');
+    expect(btn.textContent).toBe('Start 14-day free trial');
     expect(fetchMock.mock.calls.some((c) => String(c[0]).startsWith('/api/app/me'))).toBe(false);
   });
 
@@ -56,14 +56,14 @@ describe('account chip reflects a LIVE session, not a present token', () => {
 
   it('expired token → Start for free (was: initials), and it never asks /me', async () => {
     const { btn, fetchMock } = await mount({ token: token({ email: 'jb@example.com', exp: Date.now() - 1000 }) });
-    expect(btn.textContent).toBe('Start for free');
+    expect(btn.textContent).toBe('Start 14-day free trial');
     expect(btn.classList.contains('mindy-acct-signin')).toBe(true);
     expect(fetchMock.mock.calls.some((c) => String(c[0]).startsWith('/api/app/me'))).toBe(false);
   });
 
   it('unexpired token the server rejects (/me 401) → Start for free', async () => {
     const { btn, w } = await mount({ token: token({ email: 'jb@example.com', exp: Date.now() + DAY }), meStatus: 401 });
-    expect(btn.textContent).toBe('Start for free');
+    expect(btn.textContent).toBe('Start 14-day free trial');
     expect(w.document.getElementById('mindyAcctHd')!.style.display).toBe('none');
   });
 
