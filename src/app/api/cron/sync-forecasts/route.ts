@@ -460,14 +460,21 @@ export async function GET(request: NextRequest) {
       const srcRows = deduped.filter((r) => String(r.source_agency) === src);
       const ids = srcRows.map((r) => String(r.external_id));
       const nr = await countNewForecastRows(supabase, src, ids);
-      const g = 'error' in nr
-        ? { allow: false as const, reason: `${src}: new-row count failed: ${nr.error}` }
-        : await guardForecastInserts(supabase, src, nr.newRows);
+      if ('error' in nr) {
+        const reason = `${src}: new-row count failed: ${nr.error}`;
+        // Unknown new-row count refuses the publisher. Do not guess a count of zero.
+        await guardForecastInserts(supabase, src, Number.NaN);
+        for (const r of srcRows) refusedSources.add(`${src}|${r.external_id}`);
+        const q = await quarantineRefusedLoad(supabase, src, reason, -1, srcRows);
+        refused.push(`${reason} — ${q.quarantined ? 'quarantined for replay' : `QUARANTINE FAILED (${q.quarantineError}); replay needs a re-fetch`}`);
+        continue;
+      }
+      const g = await guardForecastInserts(supabase, src, nr.newRows);
       if (g.allow) continue;
-      const heldIds = 'error' in nr ? { error: nr.error } : await existingForecastIds(supabase, src, ids);
+      const heldIds = await existingForecastIds(supabase, src, ids);
       if ('error' in heldIds) {
         for (const r of srcRows) refusedSources.add(`${src}|${r.external_id}`);
-        const q = await quarantineRefusedLoad(supabase, src, g.reason, 'error' in nr ? -1 : nr.newRows, srcRows);
+        const q = await quarantineRefusedLoad(supabase, src, g.reason, nr.newRows, srcRows);
         refused.push(`${g.reason} — ${q.quarantined ? 'quarantined for replay' : `QUARANTINE FAILED (${q.quarantineError}); replay needs a re-fetch`}`);
         continue;
       }
