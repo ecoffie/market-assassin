@@ -20,6 +20,7 @@ import TargetingCard from './TargetingCard';
 import StartHereCard from './StartHereCard';
 import HiddenWorkNudge from './HiddenWorkNudge';
 import TodaysThree, { type TodaysPick } from './TodaysThree';
+import YourRankingCard from './YourRankingCard';
 import { getNaics } from '@/lib/codes/lookup';
 import ShareButton from '@/components/briefings/ShareButton';
 import SamAttachmentLinks from '@/components/app/SamAttachmentLinks';
@@ -1361,6 +1362,8 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
             onPass={(id) => { const it = latestItems.find(i => getStableNoticeId(i) === id); if (it) dismissItem(it); }}
           />
         )}
+        {/* Your ranking — lifetime federal dollars to the Vault UEI, overall + in-state (owner 2026-11-19). */}
+        <YourRankingCard email={email} getAuthHeaders={getAuthHeaders} onAddUei={() => onPanelChange?.('vault')} />
       </div>
 
       {isLoading ? (
