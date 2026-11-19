@@ -97,6 +97,8 @@ export interface ProgramAnswer {
   shown_reason: 'live_table' | 'none_found' | 'live_table_empty' | 'live_table_unmeasured' | 'keyword_rejected';
   keyword: string | null;
   agencies: ProgramMatch[] | null;
+  /** budget_programs stores federal-account obligated_amount, not agency budgetary resources. */
+  amount_basis: 'obligations';
   note: string;
 }
 
@@ -217,6 +219,7 @@ export function decideProgramAnswer(input: {
       shown_reason: 'keyword_rejected',
       keyword: null,
       agencies: null,
+      amount_basis: 'obligations',
       note: 'Program keyword was empty or not a plain word. No agency list was queried.',
     };
   }
@@ -226,7 +229,8 @@ export function decideProgramAnswer(input: {
       shown_reason: 'live_table_empty',
       keyword: input.keyword,
       agencies: null,
-      note: 'budget_programs has no rows. The fixed budget file has no federal-account obligations, so it is not used as a zero.',
+      amount_basis: 'obligations',
+      note: 'budget_programs has no rows. The fixed budget file does not hold federal-account obligations, so it is not used as a zero.',
     };
   }
   if (input.table !== 'ready' || input.matches == null) {
@@ -235,7 +239,8 @@ export function decideProgramAnswer(input: {
       shown_reason: 'live_table_unmeasured',
       keyword: input.keyword,
       agencies: null,
-      note: 'budget_programs could not be read. This is not a finding that no agency is increasing spending.',
+      amount_basis: 'obligations',
+      note: 'budget_programs could not be read. This is not a finding that no agency has growing federal-account obligations.',
     };
   }
   if (input.matches.length === 0) {
@@ -244,7 +249,8 @@ export function decideProgramAnswer(input: {
       shown_reason: 'none_found',
       keyword: input.keyword,
       agencies: [],
-      note: 'Live federal-account rows were read. None with this keyword are marked growing or surging. Accounts without a prior-year comparison are not listed.',
+      amount_basis: 'obligations',
+      note: 'Live federal-account obligations were read. None with this keyword are marked growing or surging. Accounts without a prior-year comparison are not listed.',
     };
   }
   return {
@@ -252,7 +258,8 @@ export function decideProgramAnswer(input: {
     shown_reason: 'live_table',
     keyword: input.keyword,
     agencies: input.matches,
-    note: 'Obligations from USASpending federal accounts stored in budget_programs. amount_basis is obligations, not enacted budget authority.',
+    amount_basis: 'obligations',
+    note: 'USASpending federal-account obligations stored in budget_programs. These rows are obligations, not agency budgetary resources.',
   };
 }
 
